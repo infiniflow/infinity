@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担于 cast）；geo 用例的排除见 `TEST_AUDIT.md`，DiskANN 15 类在本表 `excluded`。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `exempt` 20, `gap` 23, `mapped` 1067, `partial` 4, `test` 7
+- 状态分布：`excluded` 15, `exempt` 20, `gap` 23, `mapped` 1060, `partial` 11, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -29,8 +29,8 @@
 | 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | mapped | infinity_executor::analyzer 
 | 21 | `QuickSortSet` | `src/common/analyzer/ik/quick_sort_set.cppm` | mapped | infinity_executor::analyzer 
 | 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | mapped | infinity_executor::analyzer 
-| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | partial | 需 MeCab ipadic（Japanese），Rust 未移植且 AnalyzerPool 明确拒绝，不得标 mapped 
-| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | partial | 需 MeCab ko-dic（Korean），Rust 未移植且 AnalyzerPool 明确拒绝，不得标 mapped 
+| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `infinity_executor::analyzer::JapaneseAnalyzer`（移植 ijma/libmecab：ipadic 二进制词典、未知词、Viterbi；AnalyzerPool 派发 `japanese`） 
+| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `infinity_executor::analyzer::KoreanAnalyzer`（ko-dic 词表 + MeCab lattice；AnalyzerPool 派发 `korean`） 
 | 25 | `NGramAnalyzer` | `src/common/analyzer/ngram_analyzer.cppm` | mapped | `analyzer::NGramAnalyzer`（n-gram 窗口按 UTF-8 code point 滑动） |
 | 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `infinity_executor::analyzer::RAGAnalyzer` 
 | 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | mapped | infinity_executor::analyzer 
@@ -42,7 +42,7 @@
 | 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | mapped | infinity_executor::analyzer 
 | 34 | `TokenizeConfig` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::TokenizeConfig`（AddAllows/AddDivides/AddUnites） |
 | 35 | `Tokenizer` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::tokenize` |
-| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | partial | 需 OpenCC 简繁转换（Traditional Chinese），Rust 未移植且 AnalyzerPool 明确拒绝，不得标 mapped 
+| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `infinity_executor::analyzer::TraditionalChineseAnalyzer`（`OpenCcConverter` 繁转简 + `ChineseAnalyzer`；派发 `traditional[-fine]`） 
 | 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | mapped | infinity_executor::analyzer 
 | 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | mapped | infinity_executor::analyzer 
 | 39 | `WhitespaceAnalyzer` | `src/common/analyzer/whitespace_analyzer.cppm` | mapped | infinity_executor::analyzer 
@@ -369,19 +369,19 @@
 | 360 | `HTTPServer` | `src/network/http_server.cppm` | mapped | infinity_server 
 | 361 | `InfinityThriftService` | `src/network/infinity_thrift_service.cppm` | mapped | infinity_server 
 | 362 | `NodeInfo` | `src/network/node_info.cppm` | mapped | infinity_server 
-| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
-| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
-| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
-| 366 | `PeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
-| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
-| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
-| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
-| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
-| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
-| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
-| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | mapped | `infinity_server::pg::PGProtocolHandler`（泛型读写流：启动握手/SSL 拒绝、前端命令解析、响应帧、命令循环），`PgServer` 每条连接都由它处理，有单测 |
-| 374 | `PGServer` | `src/network/pg_server.cppm` | mapped | `infinity_server::PgServer` 
-| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 366 | `PeerTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | mapped | `infinity_server::pg::PGProtocolHandler`（同名类型，入口 `PGProtocolHandler::handle_connection`：启动握手/SSL 拒绝、前端命令解析、响应帧、命令循环），`pg::PgServer::run` 每条连接新建一个实例；映射为 `pg::PGProtocolHandler` / `pg::PgServer`（无独立 `pg::handle` 自由函数），有单测 |
+| 374 | `PGServer` | `src/network/pg_server.cppm` | mapped | `infinity_server::pg::PgServer`（命名差异：`PGServer`→`PgServer`；`bind`/`run`/`local_addr`，每连接交给 `PGProtocolHandler`） 
+| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
 | 376 | `NonBlockPoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 377 | `PoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 378 | `ThreadedThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 

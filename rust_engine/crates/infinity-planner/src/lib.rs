@@ -980,6 +980,18 @@ pub fn plan_select(
             n,
         };
     }
+    // C++ runs `ColumnPruner` over the bound plan before execution: every
+    // operator keeps only the columns some expression above it reads, and the
+    // binding remap rewrites the surviving references. The root operator's
+    // output is fully referenced, so the result schema is unchanged.
+    let plan = column::ColumnPruner::prune(plan)?;
+    // The pruner's post-condition is that a second pass finds nothing to do:
+    // every remaining scan column is referenced.
+    debug_assert_eq!(
+        column::ColumnPruner::prune(plan.clone()).expect("pruning is total"),
+        plan,
+        "column pruning left unreferenced scan columns"
+    );
     Ok(plan)
 }
 
@@ -1083,6 +1095,89 @@ mod tests {
                 assert_eq!((left_key, right_key, left_width), (0, 0, 2));
             }
             other => panic!("expected join, got {other:?}"),
+        }
+    }
+
+    /// `plan_select` finishes with `ColumnPruner` + `ColumnRemapper`: the scan
+    /// keeps only the projected column, and the projection's binding is
+    /// rewritten onto the compacted position.
+    #[test]
+    fn plan_select_prunes_unreferenced_scan_columns() {
+        let tables = vec![(
+            "t".to_string(),
+            vec!["a".to_string(), "b".to_string(), "c".to_string()],
+        )];
+        let p = plan_select(
+            &[SelectItem::Column("b".into())],
+            &tables,
+            None,
+            None,
+            &[],
+            None,
+            &[],
+            None,
+            None,
+        )
+        .unwrap();
+        match p {
+            LogicalPlan::Projection {
+                input,
+                exprs,
+                names,
+            } => {
+                assert_eq!(exprs, vec![Expr::Column(0)]);
+                assert_eq!(names, vec!["b".to_string()]);
+                assert!(matches!(*input, LogicalPlan::Scan { columns, .. } if columns == ["b"]));
+            }
+            other => panic!("expected projection, got {other:?}"),
+        }
+    }
+
+    /// A column only the filter reads survives pruning, and its reference is
+    /// remapped together with the projected one.
+    #[test]
+    fn plan_select_keeps_filter_columns() {
+        let tables = vec![(
+            "t".to_string(),
+            vec!["a".to_string(), "b".to_string(), "c".to_string()],
+        )];
+        let p = plan_select(
+            &[SelectItem::Column("c".into())],
+            &tables,
+            None,
+            Some(&Predicate::simple(
+                "b",
+                infinity_parser::CmpOp::Gt,
+                Literal::Int(1),
+            )),
+            &[],
+            None,
+            &[],
+            None,
+            None,
+        )
+        .unwrap();
+        match p {
+            LogicalPlan::Projection { input, exprs, .. } => {
+                assert_eq!(exprs, vec![Expr::Column(1)]);
+                match *input {
+                    LogicalPlan::Filter { input, predicate } => {
+                        assert_eq!(
+                            predicate,
+                            Expr::Cmp(
+                                Box::new(Expr::Column(0)),
+                                infinity_parser::CmpOp::Gt,
+                                Box::new(Expr::Literal(Value::Int(1)))
+                            )
+                        );
+                        assert!(
+                            matches!(*input, LogicalPlan::Scan { columns, .. } if columns == ["b", "c"])
+                        );
+                    }
+                    other => panic!("expected filter, got {other:?}"),
+                }
+            }
+            other => panic!("expected projection, got {other:?}"),
         }
     }
 

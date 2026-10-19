@@ -7515,9 +7515,9 @@ mod tests {
         assert_eq!(dc.session_id, ok.session_id);
     }
 
-    /// The peer manager owns the node `SHOW CURRENT NODE` reports: a role
-    /// change made through the manager is visible on the wire, and the peer
-    /// registry records the registration that produced it.
+    /// The peer manager owns the node `SHOW CURRENT NODE` reports: register,
+    /// heartbeat and change-role all go through the manager `Server` holds, and
+    /// every mutation is visible either on the wire or in the registry.
     #[test]
     fn show_current_node_reflects_the_peer_manager() {
         use crate::peer::{NodeRole, NodeStatus};
@@ -7546,6 +7546,22 @@ mod tests {
         assert_eq!(nodes[1].node_name(), "follower0");
         assert_eq!(nodes[1].node_status(), NodeStatus::Alive);
 
+        // A heartbeat advances the follower's replicated timestamp while the
+        // leader keeps answering `SHOW CURRENT NODE` from its own `NodeInfo`.
+        peer.set_now_secs(101);
+        peer.heartbeat_peer("follower0", "127.0.0.2", 23818, 20)
+            .unwrap();
+        let follower = peer
+            .list_nodes()
+            .into_iter()
+            .find(|node| node.node_name() == "follower0")
+            .unwrap();
+        assert_eq!(follower.txn_ts(), 20);
+        assert_eq!(follower.heartbeat_count(), 1);
+        let node = show_current_node(&addr, 1).unwrap();
+        assert_eq!(node.node_role, "leader");
+        assert_eq!(node.server_status, "alive");
+
         // The role transition reaches the client through the same NodeInfo.
         peer.change_role(NodeRole::Admin).unwrap();
         let node = show_current_node(&addr, 1).unwrap();
@@ -7555,6 +7571,7 @@ mod tests {
             peer.events(),
             vec![
                 "register@follower0, 127.0.0.2:23818, follower".to_string(),
+                "heartbeat@follower0, 20".to_string(),
                 "change-role@admin".to_string(),
             ]
         );

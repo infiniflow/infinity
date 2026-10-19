@@ -126,6 +126,78 @@ fn indices(required: &BTreeSet<usize>) -> Vec<usize> {
     required.iter().copied().collect()
 }
 
+/// The highest column position any expression in `plan` reads.
+fn max_position(plan: &LogicalPlan) -> Option<usize> {
+    fn of_exprs(exprs: &[Expr], max: &mut Option<usize>) {
+        let mut cols = BTreeSet::new();
+        for expr in exprs {
+            collect_expr_columns(expr, &mut cols);
+        }
+        if let Some(last) = cols.last() {
+            *max = Some(max.map_or(*last, |m| m.max(*last)));
+        }
+    }
+    fn walk(plan: &LogicalPlan, max: &mut Option<usize>) {
+        match plan {
+            LogicalPlan::Values { columns, .. } => {
+                if !columns.is_empty() {
+                    *max = Some(max.map_or(columns.len() - 1, |m| m.max(columns.len() - 1)));
+                }
+            }
+            LogicalPlan::Scan { columns, .. } => {
+                if !columns.is_empty() {
+                    *max = Some(max.map_or(columns.len() - 1, |m| m.max(columns.len() - 1)));
+                }
+            }
+            LogicalPlan::Projection { input, exprs, .. } => {
+                of_exprs(exprs, max);
+                walk(input, max);
+            }
+            LogicalPlan::Filter { input, predicate } => {
+                of_exprs(std::slice::from_ref(predicate), max);
+                walk(input, max);
+            }
+            LogicalPlan::Sort { input, keys } => {
+                let exprs: Vec<Expr> = keys.iter().map(|(e, _)| e.clone()).collect();
+                of_exprs(&exprs, max);
+                walk(input, max);
+            }
+            LogicalPlan::Aggregate {
+                input,
+                group_keys,
+                aggs,
+                ..
+            } => {
+                of_exprs(group_keys, max);
+                for (_, args, _, _) in aggs {
+                    if let Some(last) = args.iter().max() {
+                        *max = Some(max.map_or(*last, |m| m.max(*last)));
+                    }
+                }
+                walk(input, max);
+            }
+            LogicalPlan::Limit { input, .. } | LogicalPlan::Offset { input, .. } => {
+                walk(input, max)
+            }
+            LogicalPlan::Join {
+                left,
+                right,
+                left_key,
+                right_key,
+                left_width,
+            } => {
+                let pos = left_width + right_key;
+                *max = Some(max.map_or(pos.max(*left_key), |m| m.max(pos).max(*left_key)));
+                walk(left, max);
+                walk(right, max);
+            }
+        }
+    }
+    let mut max = None;
+    walk(plan, &mut max);
+    max
+}
+
 /// Prunes the columns produced/consumed by `plan`.
 ///
 /// `prune_projections` is on for `ColumnPruner` and off for `LazyLoad`, whose
@@ -182,9 +254,10 @@ fn prune_node(
             let kept_names: Vec<String> = keep.iter().map(|i| names[*i].clone()).collect();
             let input_required = required_refs(kept_exprs.clone());
             let (new_input, input_map) = prune_node(*input, &input_required, prune_projections)?;
+            let remapper = ColumnRemapper::new(input_map.clone());
             let exprs = kept_exprs
                 .iter()
-                .map(|e| remap_expr(e, &input_map))
+                .map(|e| remapper.remap_expr(e))
                 .collect::<Result<Vec<_>>>()?;
             let map = map_for(&keep, names.len());
             Ok((
@@ -218,9 +291,10 @@ fn prune_node(
                 input_required.extend(args.iter().copied());
             }
             let (new_input, input_map) = prune_node(*input, &input_required, prune_projections)?;
+            let remapper = ColumnRemapper::new(input_map.clone());
             let group_keys = group_keys
                 .iter()
-                .map(|e| remap_expr(e, &input_map))
+                .map(|e| remapper.remap_expr(e))
                 .collect::<Result<Vec<_>>>()?;
             let aggs = kept_aggs
                 .into_iter()
@@ -262,10 +336,11 @@ fn prune_node(
             let mut input_required = required.clone();
             collect_expr_columns(&predicate, &mut input_required);
             let (new_input, input_map) = prune_node(*input, &input_required, prune_projections)?;
+            let remapper = ColumnRemapper::new(input_map.clone());
             Ok((
                 LogicalPlan::Filter {
                     input: Box::new(new_input),
-                    predicate: remap_expr(&predicate, &input_map)?,
+                    predicate: remapper.remap_expr(&predicate)?,
                 },
                 input_map,
             ))
@@ -276,9 +351,10 @@ fn prune_node(
                 collect_expr_columns(key, &mut input_required);
             }
             let (new_input, input_map) = prune_node(*input, &input_required, prune_projections)?;
+            let remapper = ColumnRemapper::new(input_map.clone());
             let keys = keys
                 .iter()
-                .map(|(key, asc)| Ok((remap_expr(key, &input_map)?, *asc)))
+                .map(|(key, asc)| Ok((remapper.remap_expr(key)?, *asc)))
                 .collect::<Result<Vec<_>>>()?;
             Ok((
                 LogicalPlan::Sort {
@@ -385,9 +461,16 @@ pub struct ColumnPruner;
 
 impl ColumnPruner {
     pub fn prune(plan: LogicalPlan) -> Result<LogicalPlan> {
+        Ok(Self::prune_with_map(plan)?.0)
+    }
+
+    /// Prunes and also reports the old-position → new-position map, which is
+    /// how a caller that materialised the unpruned row layout (the executor)
+    /// keeps its row columns aligned with the pruned scan.
+    pub fn prune_with_map(plan: LogicalPlan) -> Result<(LogicalPlan, ColumnMap)> {
         let width = output_width(&plan);
         let required: BTreeSet<usize> = (0..width).collect();
-        Ok(prune_node(plan, &required, true)?.0)
+        prune_node(plan, &required, true)
     }
 }
 
@@ -412,8 +495,35 @@ impl ColumnRemapper {
         Self { map }
     }
 
+    /// The identity map for `plan`: every referenced position keeps its
+    /// position. Used by the optimizer's `ColumnRemapper` pass, whose binding
+    /// work the pruner already performed.
+    ///
+    /// The map spans the widest position any expression reads, not the root's
+    /// output width: a `Projection` over a join reads positions past its own
+    /// output width (`SELECT a.x, b.y` reads position 2 but emits 2 columns).
+    pub fn identity_for(plan: &LogicalPlan) -> Self {
+        let width = max_position(plan).map_or(0, |i| i + 1);
+        Self {
+            map: (0..width).map(Some).collect(),
+        }
+    }
+
     pub fn remap(&self, plan: LogicalPlan) -> Result<LogicalPlan> {
         remap_plan(plan, &self.map)
+    }
+
+    /// Rewrites one expression through this remapper (C++
+    /// `BindingRemapper::BindExpression`). `prune_node` funnels every
+    /// expression it rewrites through here, so no pruning path can bypass the
+    /// binder remap.
+    pub fn remap_expr(&self, expr: &Expr) -> Result<Expr> {
+        remap_expr(expr, &self.map)
+    }
+
+    /// The position map this remapper applies.
+    pub fn map(&self) -> &ColumnMap {
+        &self.map
     }
 }
 

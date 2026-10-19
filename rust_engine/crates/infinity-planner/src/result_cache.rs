@@ -45,6 +45,19 @@ impl CacheMap {
     pub fn insert(&mut self, key: CacheKey, content: CacheContent) {
         self.entries.insert(key, content);
     }
+
+    /// Drops every entry (the reference frees the whole manager on a write).
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 }
 
 impl ResultCache for CacheMap {
@@ -55,7 +68,11 @@ impl ResultCache for CacheMap {
 
 fn node_key(plan: &LogicalPlan) -> String {
     match plan {
-        LogicalPlan::Values { columns, .. } => format!("values[{}]", columns.join(",")),
+        LogicalPlan::Values { columns, rows } => {
+            // The rows are part of the node identity: two constant relations
+            // with the same schema still produce different results.
+            format!("values[{}]{rows:?}", columns.join(","))
+        }
         LogicalPlan::Scan { table, columns } => format!("scan:{table}[{}]", columns.join(",")),
         LogicalPlan::Join {
             left,

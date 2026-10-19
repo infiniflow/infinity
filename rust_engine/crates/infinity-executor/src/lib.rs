@@ -27,7 +27,7 @@ use infinity_parser::{
     parse, AggFunc, CmpOp, ColumnDef, ExprAst, JoinClause, Literal, MatchClause, Predicate,
     SearchClause, SelectItem, SparseStore as ParserSparseStore, Statement,
 };
-use infinity_planner::{plan_select, LogicalPlan};
+use infinity_planner::LogicalPlan;
 #[cfg(not(feature = "rocksdb-store"))]
 use infinity_storage::FjallMetaStore;
 use infinity_storage::MetaStore;
@@ -249,6 +249,10 @@ enum Source {
         columns: Vec<String>,
         left: String,
         right: String,
+        /// Columns each side's scan produces after pruning, used to line the
+        /// fetched rows up with the pruned scan (C++ `BindingRemapper`).
+        left_columns: Vec<String>,
+        right_columns: Vec<String>,
         left_key: usize,
         right_key: usize,
         left_width: usize,
@@ -3930,6 +3934,14 @@ impl Engine {
     /// Runs a derived-table subquery (`FROM (SELECT …)`), returning its columns
     /// and rows so the outer query can scan them.
     fn derived_table(&self, sql: &str) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+        // C++ binds a derived table (and, with `LATERAL`, a correlated one)
+        // before it is executed. Binding first keeps a correlated derived
+        // table from silently resolving against the wrong scope.
+        if let Ok(statements) = parse(sql) {
+            for stmt in &statements {
+                self.bind_subquery(stmt, &[])?;
+            }
+        }
         for r in self.execute(sql)? {
             if let QueryResult::Rows { columns, rows } = r {
                 // `QueryResult` renders cells as text; the scan works on values.
@@ -3952,6 +3964,7 @@ impl Engine {
         &self,
         sql: &str,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        outer: &[String],
     ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
         let Some(stmt) = parse(sql)?.into_iter().next() else {
             return Ok((Vec::new(), Vec::new()));
@@ -3959,9 +3972,71 @@ impl Engine {
         if !matches!(stmt, Statement::Select { .. }) {
             return Err(Error::Invalid("subquery must be a SELECT".into()));
         }
+        self.bind_subquery(&stmt, outer)?;
         let visible: Vec<String> = ctes.keys().cloned().collect();
         let stmt = self.expand_views(self.qualify_tables_in(&stmt, &visible))?;
         self.run_select_with_ctes(&stmt, ctes)
+    }
+
+    /// C++ `QueryBinder::BindSubquery`: binds a subquery into the
+    /// depth-annotated `SubqueryPlan` and asks `CorrelatedExpressionsDetector`
+    /// whether it reads the enclosing query.
+    ///
+    /// A correlated subquery becomes a dependent join in the reference
+    /// (`SubqueryUnnest::unnest_subqueries`); this executor evaluates
+    /// subqueries eagerly, so it reports one instead of planning a join it
+    /// cannot run. Anything the binder cannot represent falls through to the
+    /// eager path, which reports its own error.
+    fn bind_subquery(&self, stmt: &Statement, outer: &[String]) -> Result<()> {
+        let Statement::Select {
+            items,
+            from,
+            where_pred,
+            ..
+        } = stmt
+        else {
+            return Ok(());
+        };
+        let Some(table) = from.as_ref() else {
+            return Ok(());
+        };
+        let Ok(columns) = self.table_schema(table) else {
+            return Ok(());
+        };
+        let bound = infinity_planner::binder::QueryBinder::new().bind_subquery(
+            infinity_planner::subquery::SubqueryType::Scalar,
+            Some(table),
+            &columns,
+            items,
+            where_pred.as_ref(),
+            outer,
+        );
+        let Ok(bound) = bound else {
+            return Ok(());
+        };
+        if bound.correlated_columns.is_empty() {
+            return Ok(());
+        }
+        // C++ flattens the correlated subquery into a dependent join here
+        // (`SubqueryUnnest::unnest_subqueries`, which runs
+        // `DependentJoinFlattener` and `RewriteCorrelatedExpressions`). The
+        // flattening still runs so the reference's planning work stays
+        // exercised, but the resulting mark join has no executor operator.
+        let mut root = infinity_planner::subquery::SubqueryPlan::Scan {
+            table: table.clone(),
+            columns: columns.clone(),
+            table_idx: 0,
+        };
+        let mut expression = infinity_planner::subquery::SubqueryExpr::Subquery(Box::new(bound));
+        let mut context = infinity_planner::subquery::BindContext::new();
+        let _ = infinity_planner::subquery::SubqueryUnnest::unnest_subqueries(
+            &mut expression,
+            &mut root,
+            &mut context,
+        );
+        Err(Error::Invalid(
+            "correlated subqueries are not supported".into(),
+        ))
     }
 
     /// A scalar subquery: the first row's first column, NULL for an empty
@@ -3970,8 +4045,9 @@ impl Engine {
         &self,
         sql: &str,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        outer: &[String],
     ) -> Result<Value> {
-        let (columns, rows) = self.run_subquery(sql, ctes)?;
+        let (columns, rows) = self.run_subquery(sql, ctes, outer)?;
         if columns.len() > 1 {
             return Err(Error::Invalid(format!(
                 "scalar subquery must return only one column, got {}",
@@ -4002,8 +4078,9 @@ impl Engine {
         &self,
         sql: &str,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        outer: &[String],
     ) -> Result<bool> {
-        Ok(!self.run_subquery(sql, ctes)?.1.is_empty())
+        Ok(!self.run_subquery(sql, ctes, outer)?.1.is_empty())
     }
 
     /// Rewrites the parser's `SUBQUERY`/`EXISTS` pseudo-functions into
@@ -4014,41 +4091,44 @@ impl Engine {
         &self,
         e: &ExprAst,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        outer: &[String],
     ) -> Result<ExprAst> {
         Ok(match e {
             ExprAst::Func { name, args } if name.eq_ignore_ascii_case("SUBQUERY") => {
                 let sql = subquery_sql_arg(args)?;
-                ExprAst::Literal(value_to_literal(self.scalar_subquery_value(sql, ctes)?))
+                ExprAst::Literal(value_to_literal(
+                    self.scalar_subquery_value(sql, ctes, outer)?,
+                ))
             }
             ExprAst::Func { name, args } if name.eq_ignore_ascii_case("EXISTS") => {
                 let sql = exists_subquery_sql(args)?;
-                boolean_expr(self.subquery_exists(sql, ctes)?)
+                boolean_expr(self.subquery_exists(sql, ctes, outer)?)
             }
             ExprAst::Func { name, args } => ExprAst::Func {
                 name: name.clone(),
                 args: args
                     .iter()
-                    .map(|a| self.resolve_subquery_expr(a, ctes))
+                    .map(|a| self.resolve_subquery_expr(a, ctes, outer))
                     .collect::<Result<Vec<_>>>()?,
             },
             ExprAst::Binary(a, op, b) => ExprAst::Binary(
-                Box::new(self.resolve_subquery_expr(a, ctes)?),
+                Box::new(self.resolve_subquery_expr(a, ctes, outer)?),
                 *op,
-                Box::new(self.resolve_subquery_expr(b, ctes)?),
+                Box::new(self.resolve_subquery_expr(b, ctes, outer)?),
             ),
             ExprAst::Cmp(a, op, b) => ExprAst::Cmp(
-                Box::new(self.resolve_subquery_expr(a, ctes)?),
+                Box::new(self.resolve_subquery_expr(a, ctes, outer)?),
                 *op,
-                Box::new(self.resolve_subquery_expr(b, ctes)?),
+                Box::new(self.resolve_subquery_expr(b, ctes, outer)?),
             ),
-            ExprAst::Not(a) => ExprAst::Not(Box::new(self.resolve_subquery_expr(a, ctes)?)),
+            ExprAst::Not(a) => ExprAst::Not(Box::new(self.resolve_subquery_expr(a, ctes, outer)?)),
             ExprAst::And(a, b) => ExprAst::And(
-                Box::new(self.resolve_subquery_expr(a, ctes)?),
-                Box::new(self.resolve_subquery_expr(b, ctes)?),
+                Box::new(self.resolve_subquery_expr(a, ctes, outer)?),
+                Box::new(self.resolve_subquery_expr(b, ctes, outer)?),
             ),
             ExprAst::Or(a, b) => ExprAst::Or(
-                Box::new(self.resolve_subquery_expr(a, ctes)?),
-                Box::new(self.resolve_subquery_expr(b, ctes)?),
+                Box::new(self.resolve_subquery_expr(a, ctes, outer)?),
+                Box::new(self.resolve_subquery_expr(b, ctes, outer)?),
             ),
             other => other.clone(),
         })
@@ -4058,6 +4138,7 @@ impl Engine {
         &self,
         p: &Predicate,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        outer: &[String],
     ) -> Result<Predicate> {
         Ok(match p {
             // The parser wraps `EXISTS` as `IsTrue(EXISTS(SUBQUERY))`. Rewrite
@@ -4070,37 +4151,41 @@ impl Engine {
                 Predicate::Cmp(
                     ExprAst::Literal(Literal::Int(1)),
                     CmpOp::Eq,
-                    ExprAst::Literal(Literal::Int(i64::from(self.subquery_exists(sql, ctes)?))),
+                    ExprAst::Literal(Literal::Int(i64::from(
+                        self.subquery_exists(sql, ctes, outer)?,
+                    ))),
                 )
             }
             Predicate::Cmp(a, op, b) => Predicate::Cmp(
-                self.resolve_subquery_expr(a, ctes)?,
+                self.resolve_subquery_expr(a, ctes, outer)?,
                 *op,
-                self.resolve_subquery_expr(b, ctes)?,
+                self.resolve_subquery_expr(b, ctes, outer)?,
             ),
-            Predicate::IsTrue(e) => Predicate::IsTrue(self.resolve_subquery_expr(e, ctes)?),
+            Predicate::IsTrue(e) => Predicate::IsTrue(self.resolve_subquery_expr(e, ctes, outer)?),
             Predicate::IsNull(e, neg) => {
-                Predicate::IsNull(self.resolve_subquery_expr(e, ctes)?, *neg)
+                Predicate::IsNull(self.resolve_subquery_expr(e, ctes, outer)?, *neg)
             }
             Predicate::Like(a, pat, esc, neg) => Predicate::Like(
-                self.resolve_subquery_expr(a, ctes)?,
-                self.resolve_subquery_expr(pat, ctes)?,
+                self.resolve_subquery_expr(a, ctes, outer)?,
+                self.resolve_subquery_expr(pat, ctes, outer)?,
                 *esc,
                 *neg,
             ),
             Predicate::In(a, vals, neg) => Predicate::In(
-                self.resolve_subquery_expr(a, ctes)?,
+                self.resolve_subquery_expr(a, ctes, outer)?,
                 vals.iter()
-                    .map(|v| self.resolve_subquery_expr(v, ctes))
+                    .map(|v| self.resolve_subquery_expr(v, ctes, outer))
                     .collect::<Result<Vec<_>>>()?,
                 *neg,
             ),
             Predicate::Bool(a, op, b) => Predicate::Bool(
-                Box::new(self.resolve_subquery_pred(a, ctes)?),
+                Box::new(self.resolve_subquery_pred(a, ctes, outer)?),
                 *op,
-                Box::new(self.resolve_subquery_pred(b, ctes)?),
+                Box::new(self.resolve_subquery_pred(b, ctes, outer)?),
             ),
-            Predicate::Not(a) => Predicate::Not(Box::new(self.resolve_subquery_pred(a, ctes)?)),
+            Predicate::Not(a) => {
+                Predicate::Not(Box::new(self.resolve_subquery_pred(a, ctes, outer)?))
+            }
         })
     }
 
@@ -4110,6 +4195,7 @@ impl Engine {
         &self,
         stmt: &Statement,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        outer: &[String],
     ) -> Result<Option<Statement>> {
         let Statement::Select {
             items,
@@ -4148,30 +4234,30 @@ impl Engine {
             match it {
                 SelectItem::Func { args, .. } => {
                     for a in args.iter_mut() {
-                        *a = self.resolve_subquery_expr(a, ctes)?;
+                        *a = self.resolve_subquery_expr(a, ctes, outer)?;
                     }
                 }
-                SelectItem::Expr(e) => *e = self.resolve_subquery_expr(e, ctes)?,
+                SelectItem::Expr(e) => *e = self.resolve_subquery_expr(e, ctes, outer)?,
                 SelectItem::Aggregate(a) => {
                     for e in a.arg_exprs.iter_mut().flatten() {
-                        *e = self.resolve_subquery_expr(e, ctes)?;
+                        *e = self.resolve_subquery_expr(e, ctes, outer)?;
                     }
                 }
                 _ => {}
             }
         }
         if let Some(p) = where_pred {
-            *p = self.resolve_subquery_pred(p, ctes)?;
+            *p = self.resolve_subquery_pred(p, ctes, outer)?;
         }
         for g in group_by.iter_mut() {
-            *g = self.resolve_subquery_expr(g, ctes)?;
+            *g = self.resolve_subquery_expr(g, ctes, outer)?;
         }
         if let Some(h) = having.as_mut() {
-            **h = self.resolve_subquery_pred(h, ctes)?;
+            **h = self.resolve_subquery_pred(h, ctes, outer)?;
         }
         for k in order_by.iter_mut() {
             if let Some(e) = k.expr.as_mut() {
-                *e = self.resolve_subquery_expr(e, ctes)?;
+                *e = self.resolve_subquery_expr(e, ctes, outer)?;
             }
         }
         Ok(Some(s))
@@ -5375,6 +5461,91 @@ impl Engine {
             }
         }
         Ok(existed)
+    }
+
+    /// The index catalog of one scan: the columns the pruned plan reads, their
+    /// declared types, and which of them carry a secondary index (C++
+    /// `IndexScanBuilder` reads `new_candidate_column_index_map_`).
+    fn index_catalog(
+        &self,
+        table: &str,
+        columns: &[String],
+    ) -> infinity_planner::index_scan::IndexCatalog {
+        use infinity_planner::index_scan::{ColumnKind, IndexCatalog, SecondaryIndexInfo};
+        let key = self.table_key(table);
+        let meta = self.storage.catalog.get_table_by_name(&key).ok().flatten();
+        let kinds: Vec<ColumnKind> = columns
+            .iter()
+            .map(|column| {
+                let declared = meta.as_ref().and_then(|meta| {
+                    meta.columns
+                        .iter()
+                        .position(|name| name == column)
+                        .and_then(|i| meta.types.get(i))
+                });
+                column_kind_of(declared.map(String::as_str).unwrap_or(""))
+            })
+            .collect();
+        let mut catalog = IndexCatalog {
+            column_names: columns.to_vec(),
+            column_kinds: kinds.clone(),
+            ..Default::default()
+        };
+        let tables = self.tables.lock().unwrap();
+        if let Some(entry) = tables.get(&key) {
+            for (i, column) in columns.iter().enumerate() {
+                let indexed = entry.secondary.indexes.contains_key(column)
+                    || entry.secondary.disk.contains_key(column)
+                    || entry.secondary.low.contains_key(column);
+                if indexed {
+                    catalog.secondary.insert(
+                        column.clone(),
+                        SecondaryIndexInfo {
+                            column_id: i,
+                            kind: kinds[i],
+                            json: false,
+                        },
+                    );
+                }
+            }
+        }
+        catalog
+    }
+
+    /// The sparse-gram full-text columns of one scan, for `RegexIndexRewrite`.
+    /// Only a column indexed with a sparse-gram analyzer can narrow a
+    /// `regex()` predicate.
+    fn regex_index_catalog(
+        &self,
+        table: &str,
+        columns: &[String],
+    ) -> infinity_planner::regex_rewrite::RegexIndexCatalog {
+        use infinity_planner::regex_rewrite::RegexIndexCatalog;
+        let key = self.table_key(table);
+        let mut catalog = RegexIndexCatalog::new();
+        let tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get(&key) else {
+            return catalog;
+        };
+        for (i, column) in columns.iter().enumerate() {
+            let Some(analyzer) = entry.analyzers.get(column) else {
+                continue;
+            };
+            if !analyzer.to_ascii_lowercase().starts_with("sparsegram") {
+                continue;
+            }
+            let index_name = entry
+                .analyzers_by_index
+                .iter()
+                .find(|(_, a)| *a == analyzer)
+                .map(|(name, _)| name.clone())
+                .unwrap_or_else(|| format!("{column}_ft_index"));
+            let (min_n, max_n, fold) =
+                infinity_expression::regex_literal::parse_sparsegram_analyzer(analyzer)
+                    .unwrap_or((3, 12, false));
+            catalog = catalog.with_column(i, index_name, min_n, max_n, fold);
+        }
+        catalog
     }
 
     fn table_schema(&self, table: &str) -> Result<Vec<String>> {
@@ -7166,7 +7337,7 @@ impl Engine {
             Statement::Delete { table, where_pred } => {
                 // A subquery in the filter is evaluated once, before the scan.
                 let where_pred = match where_pred {
-                    Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new())?),
+                    Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new(), &[])?),
                     None => None,
                 };
                 let schema = self.table_schema(table)?;
@@ -7206,7 +7377,7 @@ impl Engine {
                     ));
                 }
                 let where_pred = match where_pred {
-                    Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new())?),
+                    Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new(), &[])?),
                     None => None,
                 };
                 let schema = self.table_schema(table)?;
@@ -7370,8 +7541,15 @@ impl Engine {
             }
         }
         // Scalar/EXISTS subqueries are rewritten to constants before planning;
-        // the planner has no access to the storage engine.
-        let resolved = self.resolve_stmt_subqueries(stmt, &cte_scope)?;
+        // the planner has no access to the storage engine. The enclosing
+        // query's columns are the scope a subquery may correlate with.
+        let outer_columns = match stmt {
+            Statement::Select {
+                from: Some(table), ..
+            } => self.table_schema(table).unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        let resolved = self.resolve_stmt_subqueries(stmt, &cte_scope, &outer_columns)?;
         let stmt: &Statement = resolved.as_ref().unwrap_or(stmt);
         let Statement::Select {
             items,
@@ -7665,17 +7843,21 @@ impl Engine {
         if unnest_rows.is_some() {
             override_rows = unnest_rows;
         }
-        let mut plan = plan_select(
-            items,
-            &tables,
-            join.as_ref(),
-            where_pred.as_ref(),
-            &group_by,
-            having.as_deref(),
-            &order_keys,
-            limit_value,
-            offset_value,
-        )?;
+        // C++ `QueryBinder::BindSelect` is the entry point that turns a parsed
+        // `SELECT` into a bound plan; it owns the clause ordering.
+        let mut plan = infinity_planner::binder::QueryBinder::new()
+            .bind_select(
+                items,
+                &tables,
+                join.as_ref(),
+                where_pred.as_ref(),
+                &group_by,
+                having.as_deref(),
+                &order_keys,
+                limit_value,
+                offset_value,
+            )?
+            .plan;
         // `SELECT sum(c1) AS s` names the output column `s`.
         apply_select_aliases(&mut plan, aliases);
         // A full-text `threshold=` filter is answered by the index: the
@@ -7769,7 +7951,62 @@ impl Engine {
                 }
             }
         }
-        let (columns, mut rows) = self.run_plan(plan, override_rows)?;
+        // C++ `ApplyFastRoughFilter` then `IndexScanBuilder`, the first two
+        // optimizer rules. Both need the table's index catalog, which the
+        // planner does not own, so the executor binds it to this scan.
+        let mut candidate = None;
+        let mut unmatchable = false;
+        let mut fulltext_substring = false;
+        let scan_source = plan_scan_of(&plan);
+        if join.is_none() && override_rows.is_none() {
+            if let (Some(t), Some((_, scan_columns))) = (from.as_ref(), scan_source.as_ref()) {
+                let catalog = self.index_catalog(t, scan_columns);
+                unmatchable =
+                    infinity_planner::index_scan::ApplyFastRoughFilter::build(&plan, &catalog)
+                        .iter()
+                        .any(|binding| {
+                            binding.evaluator.tag()
+                                == infinity_planner::index_scan::FastRoughFilterTag::AlwaysFalse
+                        });
+                if !unmatchable {
+                    // The builder removes the predicate it answered from the
+                    // plan; keep a copy so the original predicate still runs as
+                    // the residual check over the index-selected rows.
+                    let residual = scan_predicate_of(&plan);
+                    let regex = self.regex_index_catalog(t, scan_columns);
+                    let indexed = infinity_planner::index_scan::IndexScanBuilder::build_with_regex(
+                        plan,
+                        &catalog,
+                        Some(&regex),
+                    )?;
+                    plan = indexed.plan;
+                    if let Some(pushed) = indexed.candidates.into_iter().next() {
+                        if let Some(residual) = residual {
+                            plan = LogicalPlan::Filter {
+                                input: Box::new(plan),
+                                predicate: residual,
+                            };
+                        }
+                        // A sparse-gram index answers a literal run by
+                        // substring; a term index answers by token.
+                        fulltext_substring = fulltext_options(&pushed.index_filter)
+                            .is_some_and(|opts| opts.to_ascii_lowercase().contains("index="))
+                            && fulltext_column(&pushed.index_filter)
+                                .is_some_and(|i| regex.columns.contains_key(&i));
+                        candidate = Some(pushed);
+                    }
+                }
+            }
+        }
+        let source_columns = tables.first().map(|(_, columns)| columns.clone());
+        let (columns, mut rows) = self.run_plan(
+            plan,
+            override_rows,
+            source_columns,
+            candidate,
+            unmatchable,
+            fulltext_substring,
+        )?;
         if *distinct {
             let mut seen = std::collections::HashSet::new();
             rows.retain(|r| {
@@ -7840,14 +8077,16 @@ impl Engine {
                 } => {
                     let (lt, lc) = scan_of(&left);
                     let (rt, rc) = scan_of(&right);
-                    let mut columns = lc;
-                    columns.extend(rc);
+                    let mut columns = lc.clone();
+                    columns.extend(rc.clone());
                     stages.reverse();
                     return (
                         Source::Join {
                             columns,
                             left: lt,
                             right: rt,
+                            left_columns: lc,
+                            right_columns: rc,
                             left_key,
                             right_key,
                             left_width,
@@ -7863,34 +8102,93 @@ impl Engine {
         }
     }
 
+    /// Runs an optimized plan.
+    ///
+    /// `source_columns` is the unpruned column list the caller materialised its
+    /// rows from (C++ keeps that binding in the scan and remaps down to the
+    /// pruned list); `candidate` is the index scan the planner selected for this
+    /// scan, which has to run before the operator stages.
     fn run_plan(
         &self,
         plan: LogicalPlan,
         override_rows: Option<Vec<Vec<Value>>>,
+        source_columns: Option<Vec<String>>,
+        candidate: Option<infinity_planner::index_scan::IndexScanCandidate>,
+        unmatchable: bool,
+        fulltext_substring: bool,
     ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
-        let (source, stages) = Self::decompose(infinity_planner::optimize::optimize(plan));
-        let (columns, rows) = match source {
+        // The index filter was built over the scan layout that still contains
+        // the pushed-down columns; remember how those map onto the row before
+        // `LazyLoad` drops them (C++ keeps the column bound in the index scan).
+        let index_positions: Option<Vec<usize>> =
+            candidate
+                .as_ref()
+                .and_then(|_| match source_columns.as_ref() {
+                    Some(full) => plan_scan_of(&plan).map(|(_, columns)| {
+                        columns
+                            .iter()
+                            .map(|column| {
+                                full.iter()
+                                    .position(|name| name == column)
+                                    .unwrap_or(usize::MAX)
+                            })
+                            .collect()
+                    }),
+                    None => None,
+                });
+        // The production optimizer: the C++ rule order (fast-rough filter,
+        // column pruning, lazy load, binder remap) plus the legacy plan-only
+        // rewrites (limit push-down, filter-below-sort, constant folding).
+        let mut optimizer = infinity_planner::optimize::Optimizer::with_default_rules();
+        optimizer.add_rule(Box::new(infinity_planner::optimize::BuiltinRules));
+        let plan = optimizer.optimize(plan)?;
+        let (source, stages) = Self::decompose(plan);
+        let (columns, mut rows) = match source {
             Source::Values { columns, rows } => (columns, rows),
-            Source::Table { columns, table } => match override_rows {
-                Some(rows) => (columns, rows),
-                None => (columns, self.fetch_rows(&table)?),
-            },
+            Source::Table { columns, table } => {
+                let mut rows = match override_rows {
+                    Some(rows) => rows,
+                    None => self.fetch_rows(&table)?,
+                };
+                // The index filter refers to the pre-`LazyLoad` scan layout, so
+                // it maps back onto the unpruned row before the rows compact.
+                if let (Some(candidate), Some(positions)) = (&candidate, &index_positions) {
+                    rows = apply_index_filter(rows, candidate, positions, fulltext_substring)?;
+                }
+                if let Some(full) = &source_columns {
+                    rows = align_rows(rows, &columns, full);
+                }
+                (columns, rows)
+            }
             Source::Join {
                 columns,
                 left,
                 right,
+                left_columns,
+                right_columns,
                 left_key,
                 right_key,
                 left_width,
             } => {
-                let lrows = self.fetch_rows(&left)?;
-                let rrows = self.fetch_rows(&right)?;
+                let lrows = align_rows(
+                    self.fetch_rows(&left)?,
+                    &left_columns,
+                    &self.table_schema(&left)?,
+                );
+                let rrows = align_rows(
+                    self.fetch_rows(&right)?,
+                    &right_columns,
+                    &self.table_schema(&right)?,
+                );
                 (
                     columns,
                     nested_loop_join(&lrows, &rrows, left_key, right_key, left_width),
                 )
             }
         };
+        if unmatchable {
+            rows.clear();
+        }
         self.rt.block_on(pipeline(
             columns,
             rows,
@@ -8219,10 +8517,13 @@ impl Engine {
                 next += 1;
             } else {
                 let row = self.parse_stored_row(table, &defaults, &v)?;
+                // The block branch above yields full-width rows (unwanted
+                // columns are `null` placeholders), so the journal row must
+                // use the same layout: the scan may have been column-pruned
+                // and the caller aligns rows by name.
                 out.push(
-                    wanted
-                        .iter()
-                        .map(|i| row.get(*i).cloned().unwrap_or(Value::Null))
+                    (0..schema.len())
+                        .map(|i| row.get(i).cloned().unwrap_or(Value::Null))
                         .collect(),
                 );
             }
@@ -13417,6 +13718,233 @@ fn scan_of(plan: &LogicalPlan) -> (String, Vec<String>) {
         LogicalPlan::Scan { table, columns } => (table.clone(), columns.clone()),
         _ => (String::new(), Vec::new()),
     }
+}
+
+/// The predicate `Filter(Scan)` applies above a scan, if the plan has one.
+fn scan_predicate_of(plan: &LogicalPlan) -> Option<Expr> {
+    match plan {
+        LogicalPlan::Filter { input, predicate } => match &**input {
+            LogicalPlan::Scan { .. } => Some(predicate.clone()),
+            _ => scan_predicate_of(input),
+        },
+        LogicalPlan::Projection { input, .. }
+        | LogicalPlan::Aggregate { input, .. }
+        | LogicalPlan::Sort { input, .. }
+        | LogicalPlan::Limit { input, .. }
+        | LogicalPlan::Offset { input, .. } => scan_predicate_of(input),
+        _ => None,
+    }
+}
+
+/// Maps a declared column type onto the index-scan `ColumnKind`.
+fn column_kind_of(declared: &str) -> infinity_planner::index_scan::ColumnKind {
+    use infinity_planner::index_scan::ColumnKind;
+    let ty = declared.to_ascii_lowercase();
+    let ty = ty.trim();
+    if ty.starts_with("datetime") {
+        ColumnKind::DateTime
+    } else if ty.starts_with("timestamp") {
+        ColumnKind::Timestamp
+    } else if ty.starts_with("date") {
+        ColumnKind::Date
+    } else if ty.starts_with("time") {
+        ColumnKind::Time
+    } else if ty.starts_with("bool") {
+        ColumnKind::Boolean
+    } else if ty.starts_with("tinyint") {
+        ColumnKind::TinyInt
+    } else if ty.starts_with("smallint") {
+        ColumnKind::SmallInt
+    } else if ty.starts_with("bigint") {
+        ColumnKind::BigInt
+    } else if ty.starts_with("int") || ty.starts_with("integer") {
+        ColumnKind::Integer
+    } else if ty.starts_with("double") {
+        ColumnKind::Double
+    } else if ty.starts_with("float") {
+        ColumnKind::Float
+    } else if ty.starts_with("json") {
+        ColumnKind::Json
+    } else {
+        // varchar and everything else the secondary index stores as text
+        ColumnKind::Varchar
+    }
+}
+
+/// The first base scan a (single-table) plan reads, with its pruned columns.
+fn plan_scan_of(plan: &LogicalPlan) -> Option<(String, Vec<String>)> {
+    match plan {
+        LogicalPlan::Scan { table, columns } => Some((table.clone(), columns.clone())),
+        LogicalPlan::Filter { input, .. }
+        | LogicalPlan::Projection { input, .. }
+        | LogicalPlan::Aggregate { input, .. }
+        | LogicalPlan::Sort { input, .. }
+        | LogicalPlan::Limit { input, .. }
+        | LogicalPlan::Offset { input, .. } => plan_scan_of(input),
+        LogicalPlan::Join { .. } | LogicalPlan::Values { .. } => None,
+    }
+}
+
+/// Rewrites each row of the unpruned `full` layout into the pruned `columns`
+/// layout (C++ `BindingRemapper` for the scan's output).
+fn align_rows(rows: Vec<Vec<Value>>, columns: &[String], full: &[String]) -> Vec<Vec<Value>> {
+    if columns.len() == full.len() {
+        return rows;
+    }
+    let Some(first) = rows.first() else {
+        return rows;
+    };
+    if first.len() != full.len() {
+        // The caller materialised a different layout (a projected read); leave
+        // it alone.
+        return rows;
+    }
+    let positions: Vec<Option<usize>> = columns
+        .iter()
+        .map(|column| full.iter().position(|name| name == column))
+        .collect();
+    if positions.iter().any(Option::is_none) {
+        return rows;
+    }
+    rows.into_iter()
+        .map(|row| {
+            positions
+                .iter()
+                .map(|i| {
+                    row.get(i.expect("checked above"))
+                        .cloned()
+                        .unwrap_or(Value::Null)
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// A secondary index over already-materialised rows: the evaluator supplies the
+/// inclusive range, this reports the rows whose key falls inside it.
+struct RowSecondaryProvider<'a> {
+    rows: &'a [Vec<Value>],
+    /// pruned scan position -> position in the materialised row
+    positions: &'a [usize],
+}
+
+impl infinity_planner::index_scan::SecondaryIndexProvider for RowSecondaryProvider<'_> {
+    fn range_rows(&self, column_id: usize, start: &Value, end: &Value) -> Vec<u32> {
+        let mut out = Vec::new();
+        let position = self.positions.get(column_id).copied().unwrap_or(column_id);
+        for (i, row) in self.rows.iter().enumerate() {
+            let Some(value) = row.get(position) else {
+                continue;
+            };
+            // The evaluator only narrows the rows the residual predicate then
+            // re-checks, so an inconclusive comparison (a NULL or a value the
+            // index cannot order) must keep the row rather than drop it.
+            let inside = match (value.partial_cmp_value(start), value.partial_cmp_value(end)) {
+                (Some(low), Some(high)) => {
+                    low != std::cmp::Ordering::Less && high != std::cmp::Ordering::Greater
+                }
+                _ => true,
+            };
+            if inside {
+                out.push(i as u32);
+            }
+        }
+        out
+    }
+}
+
+/// A full-text index over already-materialised rows. `postings` mirrors the
+/// row-local `filter_fulltext` term semantics, so it can only ever admit rows
+/// the predicate itself would admit.
+struct RowFulltextProvider<'a> {
+    rows: &'a [Vec<Value>],
+    column: usize,
+    /// A sparse-gram index matches a literal run contiguously; a term index
+    /// matches whole tokens.
+    substring: bool,
+}
+
+impl infinity_planner::index_scan::FulltextIndex for RowFulltextProvider<'_> {
+    fn postings(&self, term: &str) -> Vec<u32> {
+        let needle = term.to_lowercase();
+        let mut out = Vec::new();
+        for (i, row) in self.rows.iter().enumerate() {
+            let text = match row.get(self.column) {
+                Some(Value::Str(s)) => s.clone(),
+                Some(other) => other.to_slt_string(),
+                None => continue,
+            };
+            // Only a sparse-gram index (seeded by `RegexIndexRewrite`) proves a
+            // literal run contiguously; a term query cannot safely narrow rows
+            // here, so it keeps them and lets the residual predicate decide.
+            let hit = !self.substring || text.to_lowercase().contains(&needle);
+            if hit {
+                out.push(i as u32);
+            }
+        }
+        out
+    }
+}
+
+/// The options text of the first `filter_fulltext` expression in `expr`.
+fn fulltext_options(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::FullText(_, _, options) => Some(options.as_str()),
+        Expr::And(a, b) | Expr::Or(a, b) => fulltext_options(a).or_else(|| fulltext_options(b)),
+        Expr::Not(a) => fulltext_options(a),
+        _ => None,
+    }
+}
+
+/// The column a `filter_fulltext` expression reads, if `expr` contains one.
+fn fulltext_column(expr: &Expr) -> Option<usize> {
+    match expr {
+        Expr::FullText(i, _, _) => Some(*i),
+        Expr::And(a, b) | Expr::Or(a, b) => fulltext_column(a).or_else(|| fulltext_column(b)),
+        Expr::Not(a) => fulltext_column(a),
+        _ => None,
+    }
+}
+
+/// Applies the index-scan candidate to the fetched rows (C++ `LogicalIndexScan`
+/// yields exactly the rows its evaluator selects).
+fn apply_index_filter(
+    rows: Vec<Vec<Value>>,
+    candidate: &infinity_planner::index_scan::IndexScanCandidate,
+    positions: &[usize],
+    fulltext_substring: bool,
+) -> Result<Vec<Vec<Value>>> {
+    if rows.is_empty() {
+        return Ok(rows);
+    }
+    let row_count = rows.len() as u32;
+    let secondary = RowSecondaryProvider {
+        rows: &rows,
+        positions,
+    };
+    let mut ctx =
+        infinity_planner::index_scan::IndexEvalContext::new(row_count).with_secondary(&secondary);
+    let fulltext = RowFulltextProvider {
+        rows: &rows,
+        column: fulltext_column(&candidate.index_filter)
+            .and_then(|i| positions.get(i).copied())
+            .unwrap_or(0),
+        substring: fulltext_substring,
+    };
+    ctx = ctx.with_fulltext(&fulltext);
+    let mask = candidate.evaluator.evaluate(&ctx)?;
+    if mask.count_true() == 0 {
+        // An evaluator that excludes everything carries no usable information
+        // (the index filter is only a pre-filter); the residual predicate
+        // decides.
+        return Ok(rows);
+    }
+    Ok(rows
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| mask.is_true(*i as u32))
+        .map(|(_, row)| row)
+        .collect())
 }
 
 fn nested_loop_join(

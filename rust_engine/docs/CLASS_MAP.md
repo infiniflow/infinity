@@ -124,15 +124,15 @@
 
 | C++ | Rust | 说明 |
 |---|---|---|
-| `PeerServerThriftService` / `PeerClient` / `PoolPeerThriftServer` | `infinity_server::peer::{PeerServerThriftService, PeerClient, PoolPeerThriftServer}` | 注册/注销/心跳/同步日志/改角色的错误码与 leader-only 规则；Thrift 传输替换为 `PeerTransport`（已登记设计变更），状态机未简化 |
+| `PeerServerThriftService` / `PeerClient` / `PoolPeerThriftServer` | `infinity_server::peer::{PeerServerThriftService, PeerClient, PoolPeerThriftServer}`，由 `PeerManager` 挂到 `Server` | 注册/注销/心跳/同步日志/改角色的错误码与 leader-only 规则；状态机、任务队列、事件环未简化。**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**——`thrift/peer_server.thrift` 的 TBinaryProtocol 监听未实现（剩余缺口，见 `PeerManager::handle_peer_request` 分派边界） |
 | `PeerTask` / `RegisterPeerTask` / `UnregisterPeerTask` / `TerminatePeerTask` / `HeartBeatPeerTask` / `SyncLogTask` / `ChangeRoleTask` | `infinity_server::peer::{PeerTask, RegisterPeerTask, UnregisterPeerTask, TerminatePeerTask, HeartBeatPeerTask, SyncLogTask, ChangeRoleTask}` | `execute`/`wait`/`complete` 完成门、C++ 字段集合与 `ToString`、重试/重连策略（2 次/1000ms） |
 | `RingBufferIterator` | `infinity_server::ring_buffer::RingBufferIterator` | 4096 环形缓冲、模自增、带符号 `Distance`、`Find`/`CopyN`，共享缓冲用 `Arc<RwLock<Vec<u8>>>`（crate 禁用 unsafe 别名） |
 
-> **已知限制（2026-10-19）**：相关子查询（引用外层列）未实现——解析器丢弃表限定符，执行器按常量/本地列求值，`SubqueryUnnest` 因此保持 `partial`；peer 层为进程内实现（`InProcessPeerTransport`），没有 Thrift/TCP 线路，相关类保持 `partial` 直到接入真实传输。
+> **已知限制（2026-10-20）**：相关子查询（引用外层列）未实现——解析器丢弃表限定符，执行器按常量/本地列求值，`SubqueryUnnest` 因此保持 `partial`；peer 层为进程内实现（`InProcessPeerTransport`），没有 Thrift/TCP 线路，`thrift/peer_server.thrift` 的 PeerService 未在 Rust 侧监听，相关 11 个类在 `CLASS_AUDIT.md` 中保持 `partial` 直到接入真实传输。
 
 ## 类级覆盖审计（基线 `5d27942c0`）
 
-`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；**逐名清单（1136 行，mapped 1094 / exempt 20 / excluded 15 / test 7，gap 0）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**：每行都指向具体 Rust 模块或已登记的设计变更/排除；下表是按区域汇总的聚合说明：
+`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；**逐名清单（1136 行，mapped 1060 / partial 11 / exempt 20 / excluded 15 / gap 23 / test 7）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**：每行都指向具体 Rust 模块或已登记的设计变更/排除；下表是按区域汇总的聚合说明：
 
 | 区域 | 未逐类命名 | Rust 承担方式 |
 |---|---:|---|

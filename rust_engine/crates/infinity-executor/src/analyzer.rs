@@ -605,15 +605,16 @@ pub const DEFAULT_RESOURCE_PATH: &str = "/usr/share/infinity/resource";
 /// C++: `AnalyzerPool` (`analyzer_pool.cppm`) — parses an analyzer name and
 /// hands out a fresh analyzer.
 ///
-/// Every family named by `AnalyzerPool::GetAnalyzer` is dispatched here except
-/// the three that need third-party engines the Rust port does not vendor:
-/// `japanese`/`korean` (MeCab dictionaries via `ijma`/`mecab_wrapper`) and
-/// `traditional` (OpenCC). Those return [`UNSUPPORTED_ANALYZER_MESSAGE`] and
-/// are rejected at DDL validation; see [`is_constructible_analyzer_name`].
+/// Every family named by `AnalyzerPool::GetAnalyzer` is dispatched here,
+/// including the dictionary-driven CJK families: `japanese` and `korean`
+/// (MeCab over `ipadic`/`ko-dic`) and `traditional` (OpenCC + jieba).
 pub struct AnalyzerPool {
     rag_prototype: Mutex<Option<Arc<RAGAnalyzer>>>,
     chinese_prototype: Mutex<Option<Arc<ChineseAnalyzer>>>,
     ik_prototype: Mutex<Option<Arc<IKAnalyzer>>>,
+    japanese_prototype: Mutex<Option<Arc<JapaneseAnalyzer>>>,
+    korean_prototype: Mutex<Option<Arc<KoreanAnalyzer>>>,
+    opencc_prototype: Mutex<Option<Arc<OpenCcConverter>>>,
 }
 
 /// A concrete analyzer handed out by [`AnalyzerPool`].
@@ -626,14 +627,16 @@ pub enum Analyzer {
     Whitespace(WhitespaceAnalyzer),
     RankFeatures(RankFeaturesAnalyzer),
     SparseGram(SparseGramAnalyzer),
+    Japanese(JapaneseAnalyzer),
+    Korean(KoreanAnalyzer),
+    Traditional(TraditionalChineseAnalyzer),
 }
 
 /// The C++ families the Rust port intentionally does not implement, and why.
-pub const UNSUPPORTED_ANALYZERS: &[(&str, &str)] = &[
-    ("japanese", "requires the MeCab ipadic engine (ijma)"),
-    ("korean", "requires the MeCab ko-dic engine (mecab_wrapper)"),
-    ("traditional", "requires the OpenCC converter"),
-];
+///
+/// Every family the reference names is implemented now; the table is kept so
+/// that a name that is genuinely unknown still reports a reason.
+pub const UNSUPPORTED_ANALYZERS: &[(&str, &str)] = &[];
 
 /// The message returned for a family that C++ supports but the port does not.
 pub fn unsupported_analyzer_message(name: &str) -> String {
@@ -659,6 +662,9 @@ impl Analyzer {
             Analyzer::Whitespace(_) => "whitespace",
             Analyzer::RankFeatures(_) => "rankfeatures",
             Analyzer::SparseGram(_) => "sparsegram",
+            Analyzer::Japanese(_) => "japanese",
+            Analyzer::Korean(_) => "korean",
+            Analyzer::Traditional(_) => "traditional",
         }
     }
 
@@ -673,6 +679,9 @@ impl Analyzer {
             Analyzer::Whitespace(analyzer) => analyzer.analyze(text),
             Analyzer::RankFeatures(analyzer) => analyzer.analyze(text),
             Analyzer::SparseGram(analyzer) => analyzer.analyze(text),
+            Analyzer::Japanese(analyzer) => analyzer.analyze(text),
+            Analyzer::Korean(analyzer) => analyzer.analyze(text),
+            Analyzer::Traditional(analyzer) => analyzer.analyze(text),
         }
     }
 }
@@ -719,7 +728,8 @@ pub fn is_constructible_analyzer_name(name: &str) -> bool {
         .split_once('-')
         .map_or((lower.as_str(), ""), |(family, suffix)| (family, suffix));
     match family {
-        "rag" | "standard" | "chinese" | "ik" | "keyword" | "whitespace" | "rankfeatures" => true,
+        "rag" | "standard" | "chinese" | "ik" | "keyword" | "whitespace" | "rankfeatures"
+        | "japanese" | "korean" | "traditional" => true,
         "ngram" => suffix.parse::<usize>().is_ok_and(|n| n > 0),
         "sparsegram" => SparseGramAnalyzer::from_name(&lower).is_some(),
         _ => false,
@@ -734,6 +744,9 @@ impl AnalyzerPool {
             rag_prototype: Mutex::new(None),
             chinese_prototype: Mutex::new(None),
             ik_prototype: Mutex::new(None),
+            japanese_prototype: Mutex::new(None),
+            korean_prototype: Mutex::new(None),
+            opencc_prototype: Mutex::new(None),
         })
     }
 
@@ -782,11 +795,57 @@ impl AnalyzerPool {
                 Ok(Analyzer::Whitespace(WhitespaceAnalyzer::new(delimiters)))
             }
             "rankfeatures" => Ok(Analyzer::RankFeatures(RankFeaturesAnalyzer)),
+            "japanese" => Ok(Analyzer::Japanese((*self.japanese_prototype()?).clone())),
+            "korean" => Ok(Analyzer::Korean((*self.korean_prototype()?).clone())),
+            // C++: `traditional[-fine]` wires the suffix into `SetCutGrain`.
+            "traditional" => {
+                let mut analyzer = TraditionalChineseAnalyzer::new(
+                    self.opencc_prototype()?,
+                    (*self.chinese_prototype()?).clone(),
+                );
+                if suffix.eq_ignore_ascii_case("fine") {
+                    analyzer.set_cut_grain(CutGrain::Fine);
+                }
+                Ok(Analyzer::Traditional(analyzer))
+            }
             "sparsegram" => SparseGramAnalyzer::from_name(&lower)
                 .map(Analyzer::SparseGram)
                 .ok_or_else(|| format!("SPARSEGRAM[-min[-max]][-fold], but it is {name}.")),
             _ => Err(unsupported_analyzer_message(name)),
         }
+    }
+
+    fn japanese_prototype(&self) -> Result<Arc<JapaneseAnalyzer>, String> {
+        let mut prototype = self
+            .japanese_prototype
+            .lock()
+            .map_err(|_| "analyzer pool was poisoned".to_string())?;
+        if prototype.is_none() {
+            *prototype = Some(Arc::new(JapaneseAnalyzer::load(DEFAULT_RESOURCE_PATH)?));
+        }
+        Ok(Arc::clone(prototype.as_ref().expect("just initialized")))
+    }
+
+    fn korean_prototype(&self) -> Result<Arc<KoreanAnalyzer>, String> {
+        let mut prototype = self
+            .korean_prototype
+            .lock()
+            .map_err(|_| "analyzer pool was poisoned".to_string())?;
+        if prototype.is_none() {
+            *prototype = Some(Arc::new(KoreanAnalyzer::load(DEFAULT_RESOURCE_PATH)?));
+        }
+        Ok(Arc::clone(prototype.as_ref().expect("just initialized")))
+    }
+
+    fn opencc_prototype(&self) -> Result<Arc<OpenCcConverter>, String> {
+        let mut prototype = self
+            .opencc_prototype
+            .lock()
+            .map_err(|_| "analyzer pool was poisoned".to_string())?;
+        if prototype.is_none() {
+            *prototype = Some(Arc::new(OpenCcConverter::load(DEFAULT_RESOURCE_PATH)?));
+        }
+        Ok(Arc::clone(prototype.as_ref().expect("just initialized")))
     }
 
     fn chinese_prototype(&self) -> Result<Arc<ChineseAnalyzer>, String> {
@@ -3742,6 +3801,1411 @@ mod user_defined_reference_suite {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MeCab engine (`third_party/ijma`): Japanese ipadic / Korean ko-dic
+// ---------------------------------------------------------------------------
+//
+// C++ `JapaneseAnalyzer` and `KoreanAnalyzer` delegate segmentation to the
+// vendored `ijma` build of MeCab. The port covers the code paths those two
+// analyzers exercise: the binary dictionary readers (`Dictionary`,
+// `CharProperty`, `Connector`, and the `jma` `sys.bin` archive),
+// `TokenizerImpl::lookup` (known + unknown lattice nodes) and `Viterbi`
+// (cheapest path). The zlib stream inside `sys.bin` is decoded by the inflate
+// implementation below, so the crate needs no extra dependency.
+
+/// C++ `MeCab::Token` (`libmecab/mecab.h`) — 16 bytes in a binary dictionary.
+const MECAB_TOKEN_SIZE: usize = 16;
+/// C++ `DEFAULT_MAX_GROUPING_SIZE` (`libmecab/common.h`).
+const MECAB_MAX_GROUPING_SIZE: usize = 24;
+/// C++ `LIMIT_PARSE_LENGTH` (`jma_analyzer.cpp`): longer inputs are analysed in
+/// chunks.
+const MECAB_LIMIT_PARSE_LENGTH: usize = 8192;
+/// C++ `DictionaryMagicID` (`libmecab/dictionary.cpp`).
+const MECAB_DICT_MAGIC: u32 = 0xef71_8f77;
+/// C++ `JMA_DICT_VERSION` / `JMA_DICT_BLOCK_SIZE` (`jma_dictionary.cpp`).
+const JMA_DICT_VERSION: u32 = 100;
+const JMA_DICT_BLOCK_SIZE: usize = 512;
+/// C++ `DIC_VERSION` (`libmecab/config.h`, passed by the build).
+const MECAB_DIC_VERSION: u32 = 102;
+
+/// The length (in bytes) of the character starting at `at`, following
+/// `MeCab::utf8_to_ucs2`: sequences it cannot decode count as one byte.
+fn mecab_utf8_char(text: &[u8], at: usize) -> (u16, usize) {
+    let tail = &text[at..];
+    let first = tail[0];
+    if first < 0x80 {
+        (u16::from(first), 1)
+    } else if tail.len() >= 2 && first & 0xe0 == 0xc0 {
+        (
+            u16::from((first & 0x1f) << 6) | u16::from(tail[1] & 0x3f),
+            2,
+        )
+    } else if tail.len() >= 3 && first & 0xf0 == 0xe0 {
+        (
+            (u16::from(first & 0x0f) << 12)
+                | (u16::from(tail[1] & 0x3f) << 6)
+                | u16::from(tail[2] & 0x3f),
+            3,
+        )
+    } else if tail.len() >= 4 && first & 0xf8 == 0xf0 {
+        // "belows are out of UCS2": the reference maps 4..6-byte sequences to 0.
+        (0, 4)
+    } else if tail.len() >= 5 && first & 0xfc == 0xf8 {
+        (0, 5)
+    } else if tail.len() >= 6 && first & 0xfe == 0xfc {
+        (0, 6)
+    } else {
+        (0, 1)
+    }
+}
+
+fn mecab_u32(bytes: &[u8], at: usize) -> Result<u32, String> {
+    bytes
+        .get(at..at + 4)
+        .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        .ok_or_else(|| "truncated MeCab dictionary".to_string())
+}
+
+// --- inflate -------------------------------------------------------------
+
+/// Bit reader in the style of `puff.c`; bits are consumed least-significant
+/// first from a little-endian byte stream.
+struct InflateBits<'a> {
+    data: &'a [u8],
+    pos: usize,
+    bitbuf: u32,
+    bitcnt: u32,
+}
+
+impl<'a> InflateBits<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self {
+            data,
+            pos: 0,
+            bitbuf: 0,
+            bitcnt: 0,
+        }
+    }
+
+    fn bits(&mut self, need: u32) -> Option<u32> {
+        let mut value = self.bitbuf;
+        while self.bitcnt < need {
+            let byte = *self.data.get(self.pos)?;
+            self.pos += 1;
+            value |= u32::from(byte) << self.bitcnt;
+            self.bitcnt += 8;
+        }
+        self.bitbuf = value >> need;
+        self.bitcnt -= need;
+        Some(value & ((1u32 << need) - 1))
+    }
+
+    fn align(&mut self) {
+        self.bitbuf = 0;
+        self.bitcnt = 0;
+    }
+}
+
+/// Canonical Huffman decoder.
+struct InflateHuffman {
+    count: [u16; 16],
+    symbol: Vec<u16>,
+}
+
+impl InflateHuffman {
+    fn new(lengths: &[u8]) -> Option<Self> {
+        let mut count = [0u16; 16];
+        for &length in lengths {
+            count[length as usize] += 1;
+        }
+        if count[0] as usize == lengths.len() {
+            return Some(Self {
+                count,
+                symbol: Vec::new(),
+            });
+        }
+        let mut left: i32 = 1;
+        for &width in &count[1..] {
+            left <<= 1;
+            left -= i32::from(width);
+            if left < 0 {
+                return None;
+            }
+        }
+        let mut offsets = [0u16; 16];
+        for len in 1..15 {
+            offsets[len + 1] = offsets[len] + count[len];
+        }
+        let mut symbol = vec![0u16; lengths.len()];
+        for (index, &length) in lengths.iter().enumerate() {
+            if length != 0 {
+                symbol[offsets[length as usize] as usize] = index as u16;
+                offsets[length as usize] += 1;
+            }
+        }
+        Some(Self { count, symbol })
+    }
+
+    fn decode(&self, reader: &mut InflateBits<'_>) -> Option<u16> {
+        let mut code: i32 = 0;
+        let mut first: i32 = 0;
+        let mut index: i32 = 0;
+        for &width in &self.count[1..] {
+            code |= reader.bits(1)? as i32;
+            let count = i32::from(width);
+            if code - count < first {
+                return self.symbol.get((index + (code - first)) as usize).copied();
+            }
+            index += count;
+            first += count;
+            first <<= 1;
+            code <<= 1;
+        }
+        None
+    }
+}
+
+const INFLATE_LEN_BASE: [u16; 29] = [
+    3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131,
+    163, 195, 227, 258,
+];
+const INFLATE_LEN_EXTRA: [u8; 29] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0,
+];
+const INFLATE_DIST_BASE: [u16; 30] = [
+    1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537,
+    2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577,
+];
+const INFLATE_DIST_EXTRA: [u8; 30] = [
+    0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13,
+    13,
+];
+
+fn inflate_codes(
+    reader: &mut InflateBits<'_>,
+    out: &mut Vec<u8>,
+    lit: &InflateHuffman,
+    dist: &InflateHuffman,
+) -> Result<(), String> {
+    loop {
+        let symbol = lit
+            .decode(reader)
+            .ok_or_else(|| "invalid deflate literal code".to_string())?;
+        match symbol {
+            0..=255 => out.push(symbol as u8),
+            256 => return Ok(()),
+            257..=285 => {
+                let index = usize::from(symbol - 257);
+                let extra = u32::from(INFLATE_LEN_EXTRA[index]);
+                let length =
+                    usize::from(INFLATE_LEN_BASE[index]) + reader.bits(extra).unwrap_or(0) as usize;
+                let dsymbol = dist
+                    .decode(reader)
+                    .ok_or_else(|| "invalid deflate distance code".to_string())?;
+                let dindex = usize::from(dsymbol);
+                if dindex >= INFLATE_DIST_BASE.len() {
+                    return Err("invalid deflate distance".to_string());
+                }
+                let dextra = u32::from(INFLATE_DIST_EXTRA[dindex]);
+                let distance = usize::from(INFLATE_DIST_BASE[dindex])
+                    + reader.bits(dextra).unwrap_or(0) as usize;
+                if distance > out.len() {
+                    return Err("deflate distance beyond the output".to_string());
+                }
+                let start = out.len() - distance;
+                for offset in 0..length {
+                    let byte = out[start + offset];
+                    out.push(byte);
+                }
+            }
+            _ => return Err("invalid deflate length code".to_string()),
+        }
+    }
+}
+
+fn inflate(reader: &mut InflateBits<'_>) -> Result<Vec<u8>, String> {
+    let mut out = Vec::new();
+    loop {
+        let last = reader
+            .bits(1)
+            .ok_or_else(|| "truncated deflate stream".to_string())?;
+        let kind = reader
+            .bits(2)
+            .ok_or_else(|| "truncated deflate stream".to_string())?;
+        match kind {
+            0 => {
+                reader.align();
+                let header = reader
+                    .data
+                    .get(reader.pos..reader.pos + 4)
+                    .ok_or_else(|| "truncated stored block".to_string())?;
+                let len = u16::from_le_bytes([header[0], header[1]]);
+                let nlen = u16::from_le_bytes([header[2], header[3]]);
+                if len != !nlen {
+                    return Err("stored block length mismatch".to_string());
+                }
+                reader.pos += 4;
+                let body = reader
+                    .data
+                    .get(reader.pos..reader.pos + usize::from(len))
+                    .ok_or_else(|| "truncated stored block".to_string())?;
+                out.extend_from_slice(body);
+                reader.pos += usize::from(len);
+            }
+            1 => {
+                let mut lengths = [0u8; 288];
+                lengths[..144].fill(8);
+                lengths[144..256].fill(9);
+                lengths[256..280].fill(7);
+                lengths[280..].fill(8);
+                let lit = InflateHuffman::new(&lengths)
+                    .ok_or_else(|| "invalid fixed literal table".to_string())?;
+                let dist = InflateHuffman::new(&[5u8; 30])
+                    .ok_or_else(|| "invalid fixed distance table".to_string())?;
+                inflate_codes(reader, &mut out, &lit, &dist)?;
+            }
+            2 => {
+                let nlen = reader.bits(5).unwrap_or(0) as usize + 257;
+                let ndist = reader.bits(5).unwrap_or(0) as usize + 1;
+                let ncode = reader.bits(4).unwrap_or(0) as usize + 4;
+                const ORDER: [usize; 19] = [
+                    16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15,
+                ];
+                let mut code_lengths = [0u8; 19];
+                for &slot in ORDER.iter().take(ncode) {
+                    code_lengths[slot] = reader.bits(3).unwrap_or(0) as u8;
+                }
+                let code_table = InflateHuffman::new(&code_lengths)
+                    .ok_or_else(|| "invalid code-length table".to_string())?;
+                let mut lengths = vec![0u8; nlen + ndist];
+                let mut index = 0usize;
+                while index < lengths.len() {
+                    let symbol = code_table
+                        .decode(reader)
+                        .ok_or_else(|| "invalid code-length symbol".to_string())?;
+                    match symbol {
+                        0..=15 => {
+                            lengths[index] = symbol as u8;
+                            index += 1;
+                        }
+                        16 => {
+                            let previous = if index == 0 { 0 } else { lengths[index - 1] };
+                            let repeat = 3 + reader.bits(2).unwrap_or(0) as usize;
+                            for _ in 0..repeat {
+                                if index < lengths.len() {
+                                    lengths[index] = previous;
+                                    index += 1;
+                                }
+                            }
+                        }
+                        17 => {
+                            let repeat = 3 + reader.bits(3).unwrap_or(0) as usize;
+                            index = (index + repeat).min(lengths.len());
+                        }
+                        _ => {
+                            let repeat = 11 + reader.bits(7).unwrap_or(0) as usize;
+                            index = (index + repeat).min(lengths.len());
+                        }
+                    }
+                }
+                let lit = InflateHuffman::new(&lengths[..nlen])
+                    .ok_or_else(|| "invalid literal table".to_string())?;
+                let dist = InflateHuffman::new(&lengths[nlen..])
+                    .ok_or_else(|| "invalid distance table".to_string())?;
+                inflate_codes(reader, &mut out, &lit, &dist)?;
+            }
+            _ => return Err("invalid deflate block type".to_string()),
+        }
+        if last == 1 {
+            return Ok(out);
+        }
+    }
+}
+
+/// zlib (`RFC 1950`) decompression over the raw DEFLATE decoder above.
+fn zlib_decompress(input: &[u8]) -> Result<Vec<u8>, String> {
+    if input.len() < 2 {
+        return Err("zlib stream is truncated".to_string());
+    }
+    let (cmf, flg) = (input[0], input[1]);
+    if cmf & 0x0f != 8 {
+        return Err("unsupported zlib compression method".to_string());
+    }
+    if (u16::from(cmf) << 8 | u16::from(flg)) % 31 != 0 {
+        return Err("bad zlib header checksum".to_string());
+    }
+    if flg & 0x20 != 0 {
+        return Err("zlib preset dictionaries are not supported".to_string());
+    }
+    let mut reader = InflateBits::new(&input[2..]);
+    inflate(&mut reader)
+}
+
+// --- binary dictionary ---------------------------------------------------
+
+#[derive(Clone, Copy)]
+struct MecabToken {
+    lc: u16,
+    rc: u16,
+    posid: u16,
+    wcost: i16,
+    feature: u32,
+}
+
+/// C++ `MeCab::Dictionary` — a Darts double array plus the token and feature
+/// pools it indexes.
+struct MecabDict {
+    /// `unit_t { int base; unsigned check; }`, 8 bytes per unit.
+    base: Vec<i32>,
+    check: Vec<u32>,
+    tokens: Vec<u8>,
+    features: Vec<u8>,
+}
+
+impl MecabDict {
+    fn parse(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() < 72 {
+            return Err("MeCab dictionary is truncated".to_string());
+        }
+        let magic = mecab_u32(bytes, 0)?;
+        if magic ^ MECAB_DICT_MAGIC != bytes.len() as u32 {
+            return Err("broken MeCab dictionary magic".to_string());
+        }
+        let version = mecab_u32(bytes, 4)?;
+        if version != MECAB_DIC_VERSION {
+            return Err(format!("unsupported MeCab dictionary version {version}"));
+        }
+        let dsize = mecab_u32(bytes, 24)? as usize;
+        let tsize = mecab_u32(bytes, 28)? as usize;
+        let fsize = mecab_u32(bytes, 32)? as usize;
+        let da_start = 72;
+        let token_start = da_start + dsize;
+        let feature_start = token_start + tsize;
+        if feature_start + fsize != bytes.len()
+            || !dsize.is_multiple_of(8)
+            || !tsize.is_multiple_of(MECAB_TOKEN_SIZE)
+        {
+            return Err("broken MeCab dictionary layout".to_string());
+        }
+        let units = &bytes[da_start..token_start];
+        let mut base = Vec::with_capacity(units.len() / 8);
+        let mut check = Vec::with_capacity(units.len() / 8);
+        for unit in units.chunks_exact(8) {
+            base.push(i32::from_le_bytes([unit[0], unit[1], unit[2], unit[3]]));
+            check.push(u32::from_le_bytes([unit[4], unit[5], unit[6], unit[7]]));
+        }
+        Ok(Self {
+            base,
+            check,
+            tokens: bytes[token_start..feature_start].to_vec(),
+            features: bytes[feature_start..].to_vec(),
+        })
+    }
+
+    fn token(&self, index: usize) -> Option<MecabToken> {
+        let at = index.checked_mul(MECAB_TOKEN_SIZE)?;
+        let raw = self.tokens.get(at..at + MECAB_TOKEN_SIZE)?;
+        Some(MecabToken {
+            lc: u16::from_le_bytes([raw[0], raw[1]]),
+            rc: u16::from_le_bytes([raw[2], raw[3]]),
+            posid: u16::from_le_bytes([raw[4], raw[5]]),
+            wcost: i16::from_le_bytes([raw[6], raw[7]]),
+            feature: u32::from_le_bytes([raw[8], raw[9], raw[10], raw[11]]),
+        })
+    }
+
+    fn feature_raw(&self, feature: u32) -> &[u8] {
+        let start = feature as usize;
+        let rest = self.features.get(start..).unwrap_or(&[]);
+        let len = rest.iter().position(|&b| b == 0).unwrap_or(rest.len());
+        &rest[..len]
+    }
+
+    /// C++ `Darts::DoubleArrayImpl::commonPrefixSearch` — `(value, length)`
+    /// pairs ordered by increasing key length.
+    fn common_prefix_search(&self, key: &[u8]) -> Vec<(i32, usize)> {
+        let mut results = Vec::new();
+        let mut b = self.base[0];
+        for (index, &byte) in key.iter().enumerate() {
+            let p = b as usize;
+            let n = *self.base.get(p).unwrap_or(&0);
+            if b as u32 == *self.check.get(p).unwrap_or(&u32::MAX) && n < 0 {
+                results.push((-n - 1, index));
+            }
+            let p = b.wrapping_add(i32::from(byte)).wrapping_add(1) as usize;
+            if p >= self.check.len() || b as u32 != self.check[p] {
+                return results;
+            }
+            b = self.base[p];
+        }
+        let p = b as usize;
+        let n = *self.base.get(p).unwrap_or(&0);
+        if b as u32 == *self.check.get(p).unwrap_or(&u32::MAX) && n < 0 {
+            results.push((-n - 1, key.len()));
+        }
+        results
+    }
+
+    /// C++ `Darts::DoubleArrayImpl::exactMatchSearch`.
+    fn exact_match(&self, key: &[u8]) -> Option<i32> {
+        let mut b = self.base[0];
+        for &byte in key {
+            let p = b.wrapping_add(i32::from(byte)).wrapping_add(1) as usize;
+            if p >= self.check.len() || b as u32 != self.check[p] {
+                return None;
+            }
+            b = self.base[p];
+        }
+        let p = b as usize;
+        let n = *self.base.get(p)?;
+        if b as u32 == *self.check.get(p)? && n < 0 {
+            Some(-n - 1)
+        } else {
+            None
+        }
+    }
+}
+
+/// C++ `MeCab::CharInfo` — the bit-field record stored per code point.
+#[derive(Clone, Copy, Default)]
+struct MecabCharInfo {
+    mask: u32,
+    default_type: u8,
+    length: u8,
+    group: bool,
+    invoke: bool,
+}
+
+impl MecabCharInfo {
+    fn is_kind_of(&self, other: &MecabCharInfo) -> bool {
+        self.mask & other.mask != 0
+    }
+}
+
+/// C++ `MeCab::CharProperty` (`char.bin`).
+struct MecabCharProperty {
+    names: Vec<String>,
+    map: Vec<MecabCharInfo>,
+}
+
+impl MecabCharProperty {
+    fn parse(bytes: &[u8]) -> Result<Self, String> {
+        let size = mecab_u32(bytes, 0)? as usize;
+        let expected = 4 + 32 * size + 4 * 0xffff;
+        if bytes.len() != expected {
+            return Err("broken MeCab char.bin".to_string());
+        }
+        let mut names = Vec::with_capacity(size);
+        for index in 0..size {
+            let at = 4 + 32 * index;
+            let raw = &bytes[at..at + 32];
+            let len = raw.iter().position(|&b| b == 0).unwrap_or(raw.len());
+            names.push(String::from_utf8_lossy(&raw[..len]).into_owned());
+        }
+        let table = &bytes[4 + 32 * size..];
+        let mut map = Vec::with_capacity(0xffff);
+        for entry in table.chunks_exact(4) {
+            // `unsigned int type:18; default_type:8; length:4; group:1; invoke:1`
+            let word = u32::from_le_bytes([entry[0], entry[1], entry[2], entry[3]]);
+            map.push(MecabCharInfo {
+                mask: word & 0x3_ffff,
+                default_type: ((word >> 18) & 0xff) as u8,
+                length: ((word >> 26) & 0xf) as u8,
+                group: (word >> 30) & 1 == 1,
+                invoke: (word >> 31) & 1 == 1,
+            });
+        }
+        Ok(Self { names, map })
+    }
+
+    fn get(&self, code: u16) -> MecabCharInfo {
+        self.map[usize::from(code).min(self.map.len() - 1)]
+    }
+}
+
+/// One morpheme produced by the Viterbi pass.
+struct MecabMorpheme {
+    start: usize,
+    length: usize,
+    posid: u16,
+    feature_start: u32,
+    feature_len: usize,
+    /// Unknown-word nodes take their feature from `unk.dic`, not `sys.dic`.
+    unknown: bool,
+}
+
+/// C++ `TokenizerImpl` + `Viterbi` over one system dictionary.
+struct MecabEngine {
+    sys: MecabDict,
+    unk: MecabDict,
+    /// `short matrix[lsize * rsize]` without the two size words.
+    matrix: Vec<i16>,
+    lsize: usize,
+    property: MecabCharProperty,
+    /// `unk_tokens_`: for each character category, `(first token, count)`.
+    unk_tokens: Vec<(usize, usize)>,
+    space: MecabCharInfo,
+}
+
+impl MecabEngine {
+    fn from_files(sys: &[u8], unk: &[u8], chars: &[u8], matrix: &[u8]) -> Result<Self, String> {
+        let sys = MecabDict::parse(sys)?;
+        let unk = MecabDict::parse(unk)?;
+        let property = MecabCharProperty::parse(chars)?;
+        if matrix.len() < 4 {
+            return Err("broken MeCab matrix.bin".to_string());
+        }
+        let lsize = usize::from(u16::from_le_bytes([matrix[0], matrix[1]]));
+        let rsize = usize::from(u16::from_le_bytes([matrix[2], matrix[3]]));
+        if matrix.len() != 4 + lsize * rsize * 2 {
+            return Err("broken MeCab matrix.bin".to_string());
+        }
+        let matrix = matrix[4..]
+            .chunks_exact(2)
+            .map(|b| i16::from_le_bytes([b[0], b[1]]))
+            .collect();
+        let mut unk_tokens = Vec::with_capacity(property.names.len());
+        for name in &property.names {
+            let value = unk
+                .exact_match(name.as_bytes())
+                .ok_or_else(|| format!("cannot find UNK category: {name}"))?;
+            unk_tokens.push(((value >> 8) as usize, (value & 0xff) as usize));
+        }
+        let space = property.get(0x20);
+        Ok(Self {
+            sys,
+            unk,
+            matrix,
+            lsize,
+            property,
+            unk_tokens,
+            space,
+        })
+    }
+
+    /// C++ `JMA_Dictionary::open` for `mecab/ipadic/sys.bin`: a zlib stream of
+    /// 512-byte-headed file blocks holding `sys.dic`, `unk.dic`, `char.bin`
+    /// and `matrix.bin`.
+    fn from_jma_archive(path: &Path) -> Result<Self, String> {
+        let data = std::fs::read(path)
+            .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
+        if data.len() < JMA_DICT_BLOCK_SIZE {
+            return Err(format!("dictionary file {} is broken", path.display()));
+        }
+        let version = mecab_u32(&data, 0)?;
+        if version != JMA_DICT_VERSION {
+            return Err(format!(
+                "dictionary file {} has unsupported version {version}",
+                path.display()
+            ));
+        }
+        let file_count = mecab_u32(&data, 4)? as usize;
+        let total_size = mecab_u32(&data, 8)? as usize;
+        if file_count == 0 || data.len() < JMA_DICT_BLOCK_SIZE * 2 {
+            return Err(format!("dictionary file {} is broken", path.display()));
+        }
+        let raw = zlib_decompress(&data[JMA_DICT_BLOCK_SIZE..])?;
+        if raw.len() != total_size {
+            return Err(format!(
+                "uncompressed size {} does not match {total_size}",
+                raw.len()
+            ));
+        }
+        let mut content = JMA_DICT_BLOCK_SIZE * file_count;
+        let mut files: HashMap<String, &[u8]> = HashMap::new();
+        for index in 0..file_count {
+            let head = &raw[index * JMA_DICT_BLOCK_SIZE..(index + 1) * JMA_DICT_BLOCK_SIZE];
+            let name_len = head.iter().position(|&b| b == 0).unwrap_or(500);
+            let name = String::from_utf8_lossy(&head[..name_len]).into_owned();
+            let length = u32::from_le_bytes([head[500], head[501], head[502], head[503]]) as usize;
+            let body = raw
+                .get(content..content + length)
+                .ok_or_else(|| "broken dictionary archive".to_string())?;
+            files.insert(name, body);
+            content += length.div_ceil(JMA_DICT_BLOCK_SIZE) * JMA_DICT_BLOCK_SIZE;
+        }
+        let get = |name: &str| -> Result<&[u8], String> {
+            files
+                .get(name)
+                .copied()
+                .ok_or_else(|| format!("dictionary archive lacks {name}"))
+        };
+        Self::from_files(
+            get("sys.dic")?,
+            get("unk.dic")?,
+            get("char.bin")?,
+            get("matrix.bin")?,
+        )
+    }
+
+    /// C++ `MeCab::Tokenizer::open` over a plain dictionary directory.
+    fn from_dir(dir: &Path) -> Result<Self, String> {
+        let read = |name: &str| -> Result<Vec<u8>, String> {
+            let path = dir.join(name);
+            std::fs::read(&path).map_err(|err| format!("failed to read {}: {err}", path.display()))
+        };
+        Self::from_files(
+            &read("sys.dic")?,
+            &read("unk.dic")?,
+            &read("char.bin")?,
+            &read("matrix.bin")?,
+        )
+    }
+
+    fn char_info_at(&self, text: &[u8], at: usize) -> (MecabCharInfo, usize) {
+        // The reference reads the terminating NUL when the lattice reaches the
+        // end of the sentence; that decodes as code point 0 (`DEFAULT`).
+        if at >= text.len() {
+            return (self.property.get(0), 1);
+        }
+        let (code, len) = mecab_utf8_char(text, at);
+        (self.property.get(code), len)
+    }
+
+    /// C++ `CharProperty::seekToOtherType`: skip characters that share a type
+    /// bit with `current`.
+    fn seek_to_other_type(
+        &self,
+        text: &[u8],
+        begin: usize,
+        end: usize,
+        current: MecabCharInfo,
+    ) -> (usize, MecabCharInfo, usize, usize) {
+        let mut position = begin;
+        let mut count = 0usize;
+        let mut kind = current;
+        let mut mblen = 0usize;
+        let mut fail = current;
+        while position < end {
+            let (info, len) = self.char_info_at(text, position);
+            fail = info;
+            mblen = len;
+            if !kind.is_kind_of(&info) {
+                break;
+            }
+            position += len;
+            count += 1;
+            kind = info;
+        }
+        (position, fail, mblen, count)
+    }
+
+    fn unknown_node(
+        &self,
+        category: u8,
+        start: usize,
+        length: usize,
+        rlength: usize,
+    ) -> Vec<LatticeNode> {
+        let Some(&(first, count)) = self.unk_tokens.get(usize::from(category)) else {
+            return Vec::new();
+        };
+        (0..count)
+            .filter_map(|offset| self.unk.token(first + offset))
+            .map(|token| LatticeNode {
+                start,
+                length,
+                rlength,
+                lc: token.lc,
+                rc: token.rc,
+                posid: token.posid,
+                wcost: token.wcost,
+                feature: token.feature,
+                unknown: true,
+                cost: 0,
+                prev: None,
+            })
+            .collect()
+    }
+
+    /// C++ `TokenizerImpl::lookup` — dictionary entries plus the unknown-word
+    /// candidates for the character at `begin`. Nodes are returned in creation
+    /// order; the reference links them head-first, i.e. in reverse.
+    fn lookup(&self, text: &[u8], begin: usize) -> Vec<LatticeNode> {
+        let end = (begin + 65535).min(text.len());
+        let (begin2, cinfo, mblen, _clen) = self.seek_to_other_type(text, begin, end, self.space);
+        let mut nodes = Vec::new();
+        for (value, length) in self.sys.common_prefix_search(&text[begin2..end]) {
+            let first = (value >> 8) as usize;
+            let count = (value & 0xff) as usize;
+            for offset in 0..count {
+                let Some(token) = self.sys.token(first + offset) else {
+                    continue;
+                };
+                nodes.push(LatticeNode {
+                    start: begin2,
+                    length,
+                    rlength: begin2 - begin + length,
+                    lc: token.lc,
+                    rc: token.rc,
+                    posid: token.posid,
+                    wcost: token.wcost,
+                    feature: token.feature,
+                    unknown: false,
+                    cost: 0,
+                    prev: None,
+                });
+            }
+        }
+        if !nodes.is_empty() && !cinfo.invoke {
+            return nodes;
+        }
+
+        let mut begin3 = begin2 + mblen;
+        if begin3 > end {
+            // The reference hands a pointer past the buffer to the unknown-word
+            // branch; the surface it reads there is just the terminating NUL,
+            // so the token is empty and `AnalyzeImpl` drops it.
+            nodes.extend(self.unknown_node(cinfo.default_type, begin2, 0, end - begin));
+            return nodes;
+        }
+
+        let mut group_begin3 = None;
+        if cinfo.group {
+            let saved = begin3;
+            let (group_end, _fail, _len, clen) = self.seek_to_other_type(text, begin3, end, cinfo);
+            if clen <= MECAB_MAX_GROUPING_SIZE {
+                nodes.extend(self.unknown_node(
+                    cinfo.default_type,
+                    begin2,
+                    group_end - begin2,
+                    group_end - begin,
+                ));
+            }
+            group_begin3 = Some(group_end);
+            begin3 = saved;
+        }
+
+        for _ in 1..=usize::from(cinfo.length) {
+            if begin3 > end {
+                break;
+            }
+            if Some(begin3) == group_begin3 {
+                continue;
+            }
+            nodes.extend(self.unknown_node(
+                cinfo.default_type,
+                begin2,
+                begin3 - begin2,
+                begin3 - begin,
+            ));
+            let (next, len) = self.char_info_at(text, begin3);
+            if !cinfo.is_kind_of(&next) {
+                break;
+            }
+            begin3 += len;
+        }
+
+        if nodes.is_empty() {
+            nodes.extend(self.unknown_node(
+                cinfo.default_type,
+                begin2,
+                begin3 - begin2,
+                begin3 - begin,
+            ));
+        }
+        nodes
+    }
+
+    /// C++ `Connector::cost` (`matrix[left.rc + lsize * right.lc] + right.wcost`).
+    fn connection_cost(&self, left: &LatticeNode, right: &LatticeNode) -> i64 {
+        let index = usize::from(left.rc) + self.lsize * usize::from(right.lc);
+        let matrix = self.matrix.get(index).copied().unwrap_or(0);
+        i64::from(matrix) + i64::from(right.wcost)
+    }
+
+    fn connect(
+        &self,
+        position: usize,
+        incoming: &[usize],
+        nodes: &mut [LatticeNode],
+        end_at: &mut [Vec<usize>],
+    ) {
+        for &index in incoming.iter().rev() {
+            let mut best: Option<usize> = None;
+            let mut best_cost = i64::MAX;
+            for &left in end_at[position].iter().rev() {
+                let cost = nodes[left].cost + self.connection_cost(&nodes[left], &nodes[index]);
+                if cost < best_cost {
+                    best_cost = cost;
+                    best = Some(left);
+                }
+            }
+            nodes[index].prev = best;
+            nodes[index].cost = best_cost;
+            let target = position + nodes[index].rlength;
+            if let Some(slot) = end_at.get_mut(target) {
+                slot.push(index);
+            }
+        }
+    }
+
+    fn tokenize_one(&self, text: &[u8]) -> Vec<MecabMorpheme> {
+        let len = text.len();
+        let mut nodes: Vec<LatticeNode> = Vec::new();
+        let mut end_at: Vec<Vec<usize>> = vec![Vec::new(); len + 1];
+        nodes.push(LatticeNode {
+            start: 0,
+            length: 0,
+            rlength: 0,
+            lc: 0,
+            rc: 0,
+            posid: 0,
+            wcost: 0,
+            feature: 0,
+            unknown: false,
+            cost: 0,
+            prev: None,
+        });
+        end_at[0].push(0);
+
+        for position in 0..len {
+            if end_at[position].is_empty() {
+                continue;
+            }
+            let found = self.lookup(text, position);
+            let mut incoming = Vec::with_capacity(found.len());
+            for node in found {
+                incoming.push(nodes.len());
+                nodes.push(node);
+            }
+            self.connect(position, &incoming, &mut nodes, &mut end_at);
+        }
+
+        let eos = nodes.len();
+        nodes.push(LatticeNode {
+            start: len,
+            length: 0,
+            rlength: 0,
+            lc: 0,
+            rc: 0,
+            posid: 0,
+            wcost: 0,
+            feature: 0,
+            unknown: false,
+            cost: 0,
+            prev: None,
+        });
+        if let Some(position) = (0..=len).rev().find(|&p| !end_at[p].is_empty()) {
+            self.connect(position, &[eos], &mut nodes, &mut end_at);
+        }
+
+        let mut path = Vec::new();
+        let mut current = eos;
+        while let Some(previous) = nodes[current].prev {
+            path.push(current);
+            current = previous;
+        }
+        path.reverse();
+        path.into_iter()
+            .filter(|&index| nodes[index].length > 0)
+            .map(|index| {
+                let node = &nodes[index];
+                let feature = if node.unknown {
+                    self.unk.feature_raw(node.feature)
+                } else {
+                    self.sys.feature_raw(node.feature)
+                };
+                MecabMorpheme {
+                    start: node.start,
+                    length: node.length.min(len - node.start),
+                    posid: node.posid,
+                    feature_start: node.feature,
+                    feature_len: feature.len(),
+                    unknown: node.unknown,
+                }
+            })
+            .collect()
+    }
+
+    /// C++ `JMA_Analyzer::runOneBest` — `splitLimitSize` chunks the input at
+    /// `LIMIT_PARSE_LENGTH`; short inputs are analysed in one pass.
+    fn tokenize(&self, text: &str) -> Vec<MecabMorpheme> {
+        let bytes = text.as_bytes();
+        let mut morphemes = Vec::new();
+        let mut start = 0usize;
+        while start < bytes.len() {
+            let mut end = (start + MECAB_LIMIT_PARSE_LENGTH).min(bytes.len());
+            while end < bytes.len() && (bytes[end] & 0xc0) == 0x80 {
+                end -= 1;
+            }
+            morphemes.extend(self.tokenize_one(&bytes[start..end]));
+            start = end;
+        }
+        morphemes
+    }
+
+    fn feature(&self, morpheme: &MecabMorpheme) -> &str {
+        let start = morpheme.feature_start as usize;
+        let pool = if morpheme.unknown {
+            &self.unk.features
+        } else {
+            &self.sys.features
+        };
+        let rest = pool.get(start..).unwrap_or(&[]);
+        let len = morpheme.feature_len.min(rest.len());
+        std::str::from_utf8(&rest[..len]).unwrap_or("")
+    }
+}
+
+/// A lattice node during the Viterbi pass.
+struct LatticeNode {
+    start: usize,
+    length: usize,
+    rlength: usize,
+    lc: u16,
+    rc: u16,
+    posid: u16,
+    wcost: i16,
+    feature: u32,
+    /// Whether `feature` indexes `unk.dic`'s feature pool instead of `sys.dic`'s.
+    unknown: bool,
+    cost: i64,
+    prev: Option<usize>,
+}
+
+/// C++ `JMA_CType::isSpace` — the first character decides.
+fn is_mecab_space(token: &str) -> bool {
+    match token.chars().next() {
+        Some(c) => c.is_ascii_whitespace() || c == '\u{3000}' || c == '\u{feff}',
+        None => true,
+    }
+}
+
+/// C++: the POS code of `S-A` (`記号,アルファベット`) in ipadic's `pos-id.def`.
+const JAPANESE_ALPHA_POS: u16 = 3;
+
+/// C++ `JapaneseAnalyzer` (`japanese_analyzer.cppm`).
+///
+/// Loads `mecab/ipadic/sys.bin`; index mode (one-best, no compound morphology,
+/// no user-noun decomposition) is the default.
+#[derive(Clone)]
+pub struct JapaneseAnalyzer {
+    engine: Arc<MecabEngine>,
+}
+
+impl JapaneseAnalyzer {
+    pub fn load(resource_dir: impl AsRef<Path>) -> Result<Self, String> {
+        let archive = resource_dir.as_ref().join("mecab/ipadic/sys.bin");
+        if !archive.is_file() {
+            return Err(format!("missing analyzer file: {}", archive.display()));
+        }
+        Ok(Self {
+            engine: Arc::new(MecabEngine::from_jma_archive(&archive)?),
+        })
+    }
+
+    /// C++ `CommonLanguageAnalyzer::AnalyzeImpl` over `JapaneseAnalyzer`'s
+    /// token stream: spaces are filtered by `iterateNode`, alphabet runs are
+    /// lower-cased, and stemming is never initialised for this family.
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        let mut terms = Vec::new();
+        let mut offset = 0u32;
+        for morpheme in self.engine.tokenize(input) {
+            let token = &input[morpheme.start..morpheme.start + morpheme.length];
+            if token.is_empty() || token.len() >= MAX_TUPLE_LENGTH || is_mecab_space(token) {
+                continue;
+            }
+            let text = if morpheme.posid == JAPANESE_ALPHA_POS {
+                token.to_ascii_lowercase()
+            } else {
+                token.to_string()
+            };
+            terms.push(Term {
+                text,
+                word_offset: offset,
+                char_offset: 0,
+                end_offset: 0,
+                is_index: true,
+                payload: 0,
+            });
+            offset += 1;
+        }
+        terms
+    }
+}
+
+/// C++ `KoreanAnalyzer` (`korean_analyzer.cppm`) over `mecab/ko-dic`.
+#[derive(Clone)]
+pub struct KoreanAnalyzer {
+    engine: Arc<MecabEngine>,
+}
+
+impl KoreanAnalyzer {
+    pub fn load(resource_dir: impl AsRef<Path>) -> Result<Self, String> {
+        let dir = resource_dir.as_ref().join("mecab/ko-dic");
+        for name in ["sys.dic", "unk.dic", "char.bin", "matrix.bin"] {
+            let path = dir.join(name);
+            if !path.is_file() {
+                return Err(format!("missing analyzer file: {}", path.display()));
+            }
+        }
+        Ok(Self {
+            engine: Arc::new(MecabEngine::from_dir(&dir)?),
+        })
+    }
+
+    /// C++ `KoreanAnalyzer::IsAlpha` — `MeCab::IsAlpha`: a two-byte-or-longer
+    /// token whose feature starts with `SL`.
+    fn is_alpha(engine: &MecabEngine, morpheme: &MecabMorpheme) -> bool {
+        morpheme.length >= 2 && engine.feature(morpheme).starts_with("SL")
+    }
+
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        let mut terms = Vec::new();
+        let mut offset = 0u32;
+        for morpheme in self.engine.tokenize(input) {
+            let token = &input[morpheme.start..morpheme.start + morpheme.length];
+            if token.is_empty() || token.len() >= MAX_TUPLE_LENGTH {
+                continue;
+            }
+            let text = if Self::is_alpha(&self.engine, &morpheme) {
+                token.to_ascii_lowercase()
+            } else {
+                token.to_string()
+            };
+            terms.push(Term {
+                text,
+                word_offset: offset,
+                char_offset: 0,
+                end_offset: 0,
+                is_index: true,
+                payload: 0,
+            });
+            offset += 1;
+        }
+        terms
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OpenCC (`third_party/opencc`): traditional -> simplified conversion
+// ---------------------------------------------------------------------------
+
+/// C++ `INFINITY_INT` (`opencc/utils.h`).
+const OPENCC_INFINITY: u64 = 0x7fff_ffff;
+/// C++ `DATRIE_UNUSED` (`opencc/dictionary/datrie.h`).
+const OPENCC_DATRIE_UNUSED: i32 = -1;
+
+struct OpenCcItem {
+    base: i32,
+    parent: i32,
+    word: i32,
+}
+
+/// C++ `datrie_dictionary` — the `OPENCCDATRIE` binary dictionary format.
+struct OpenCcDict {
+    items: Vec<OpenCcItem>,
+    lexicon: Vec<u32>,
+    lexicon_index: Vec<u32>,
+    lexicon_count: usize,
+}
+
+impl OpenCcDict {
+    fn parse(bytes: &[u8]) -> Result<Self, String> {
+        const HEADER: &[u8] = b"OPENCCDATRIE";
+        if !bytes.starts_with(HEADER) {
+            return Err("not an OpenCC DATRIE dictionary".to_string());
+        }
+        let mut offset = HEADER.len();
+        let lexicon_length = mecab_u32(bytes, offset)? as usize;
+        offset += 4;
+        let lexicon = bytes
+            .get(offset..offset + lexicon_length * 4)
+            .ok_or_else(|| "truncated OpenCC lexicon".to_string())?
+            .chunks_exact(4)
+            .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .collect::<Vec<_>>();
+        offset += lexicon_length * 4;
+        let index_length = mecab_u32(bytes, offset)? as usize;
+        offset += 4;
+        let lexicon_index = bytes
+            .get(offset..offset + index_length * 4)
+            .ok_or_else(|| "truncated OpenCC lexicon index".to_string())?
+            .chunks_exact(4)
+            .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .collect::<Vec<_>>();
+        offset += index_length * 4;
+        let lexicon_count = mecab_u32(bytes, offset)? as usize;
+        offset += 4;
+        let item_count = mecab_u32(bytes, offset)? as usize;
+        offset += 4;
+        let items = bytes
+            .get(offset..offset + item_count * 12)
+            .ok_or_else(|| "truncated OpenCC DATRIE".to_string())?
+            .chunks_exact(12)
+            .map(|c| OpenCcItem {
+                base: i32::from_le_bytes([c[0], c[1], c[2], c[3]]),
+                parent: i32::from_le_bytes([c[4], c[5], c[6], c[7]]),
+                word: i32::from_le_bytes([c[8], c[9], c[10], c[11]]),
+            })
+            .collect();
+        Ok(Self {
+            items,
+            lexicon,
+            lexicon_index,
+            lexicon_count,
+        })
+    }
+
+    /// C++ `datrie_match` — returns the consumed prefix length and the trie
+    /// item it stopped on.
+    fn dat_match(&self, word: &[u32], limit: usize) -> (usize, usize) {
+        let mut i = 0usize;
+        let mut p = 0usize;
+        while p < word.len()
+            && (limit == 0 || p < limit)
+            && self.items[i].base != OPENCC_DATRIE_UNUSED
+        {
+            let j = self.items[i].base as i64 + i64::from(word[p]);
+            if j < 0 || j as usize >= self.items.len() {
+                break;
+            }
+            let j = j as usize;
+            if self.items[j].parent != i as i32 {
+                break;
+            }
+            i = j;
+            p += 1;
+        }
+        (p, i)
+    }
+
+    /// The conversion string of `word`-th entry, or `None`.
+    fn lexicon_entry(&self, word: i32) -> Option<&[u32]> {
+        if word < 0 || word as usize >= self.lexicon_count {
+            return None;
+        }
+        let mut first = 0usize;
+        for index in 0..=word as usize {
+            let mut end = first;
+            while end < self.lexicon_index.len() && self.lexicon_index[end] != u32::MAX {
+                end += 1;
+            }
+            if index == word as usize {
+                let start = *self.lexicon_index.get(first)? as usize;
+                let len = end - first;
+                return self.lexicon.get(start..start + len);
+            }
+            first = end + 1;
+        }
+        None
+    }
+
+    /// C++ `dictionary_datrie_match_longest`.
+    fn match_longest(&self, word: &[u32], maxlen: usize) -> Option<(usize, &[u32])> {
+        let (mut position, mut item) = self.dat_match(word, maxlen);
+        while self.items[item].word == -1 && position > 1 {
+            let (new_position, new_item) = self.dat_match(word, position - 1);
+            if new_position == position && new_item == item {
+                break;
+            }
+            position = new_position;
+            item = new_item;
+        }
+        if position == 0 || self.items[item].word == -1 {
+            return None;
+        }
+        let conversion = self.lexicon_entry(self.items[item].word)?;
+        Some((position, conversion))
+    }
+
+    /// C++ `dictionary_datrie_get_all_match_lengths`.
+    fn all_match_lengths(&self, word: &[u32], out: &mut Vec<usize>) {
+        let mut i = 0usize;
+        let mut p = 0usize;
+        while p < word.len() && self.items[i].base != OPENCC_DATRIE_UNUSED {
+            let j = self.items[i].base as i64 + i64::from(word[p]);
+            if j < 0 || j as usize >= self.items.len() {
+                break;
+            }
+            let j = j as usize;
+            if self.items[j].parent != i as i32 {
+                break;
+            }
+            i = j;
+            p += 1;
+            if self.items[i].word != -1 {
+                out.push(p);
+            }
+        }
+    }
+}
+
+/// C++ `OpenCC` (`openccxx.cpp`) with the `zht2zhs.ini` dictionary set: the
+/// phrase table first, then the character table, both in one dictionary group.
+pub struct OpenCcConverter {
+    phrases: OpenCcDict,
+    characters: OpenCcDict,
+}
+
+impl OpenCcConverter {
+    pub fn load(resource_dir: impl AsRef<Path>) -> Result<Self, String> {
+        let dir = resource_dir.as_ref().join("opencc");
+        for name in [
+            "zht2zhs.ini",
+            "trad_to_simp_phrases.ocd",
+            "trad_to_simp_characters.ocd",
+        ] {
+            let path = dir.join(name);
+            if !path.is_file() {
+                return Err(format!("missing analyzer file: {}", path.display()));
+            }
+        }
+        let read = |name: &str| -> Result<Vec<u8>, String> {
+            let path = dir.join(name);
+            std::fs::read(&path).map_err(|err| format!("failed to read {}: {err}", path.display()))
+        };
+        Ok(Self {
+            phrases: OpenCcDict::parse(&read("trad_to_simp_phrases.ocd")?)?,
+            characters: OpenCcDict::parse(&read("trad_to_simp_characters.ocd")?)?,
+        })
+    }
+
+    /// C++ `dictionary_group_match_longest`: the longest match across both
+    /// dictionaries wins, ties keep the first (the phrase table).
+    fn match_longest(&self, word: &[u32], maxlen: usize) -> Option<(usize, &[u32])> {
+        let mut best: Option<(usize, &[u32])> = None;
+        for dict in [&self.phrases, &self.characters] {
+            if let Some((length, conversion)) = dict.match_longest(word, maxlen) {
+                if best.is_none_or(|(best_len, _)| length > best_len) {
+                    best = Some((length, conversion));
+                }
+            }
+        }
+        best
+    }
+
+    /// C++ `dictionary_group_get_all_match_lengths`: merged, sorted, deduped.
+    fn all_match_lengths(&self, word: &[u32]) -> Vec<usize> {
+        let mut lengths = Vec::new();
+        self.phrases.all_match_lengths(word, &mut lengths);
+        self.characters.all_match_lengths(word, &mut lengths);
+        lengths.sort_unstable();
+        lengths.dedup();
+        lengths
+    }
+
+    /// C++ `sp_seg` — shortest-path segmentation of one ambiguous region, then
+    /// longest-match conversion of each segment.
+    fn sp_seg(&self, word: &[u32], out: &mut Vec<u32>) {
+        if word.len() == 1 {
+            match self.match_longest(word, 1) {
+                Some((_, conversion)) => out.extend_from_slice(conversion),
+                None => out.push(word[0]),
+            }
+            return;
+        }
+
+        let length = word.len();
+        let mut min_len = vec![OPENCC_INFINITY; length + 1];
+        let mut parent = vec![0usize; length + 1];
+        min_len[0] = 0;
+        for i in 0..length {
+            let mut matches = self.all_match_lengths(&word[i..]);
+            if matches.first() != Some(&1) {
+                matches.push(1);
+            }
+            for k in matches {
+                if k > 1 {
+                    if min_len[i] < min_len[i + k] {
+                        min_len[i + k] = min_len[i] + 1;
+                        parent[i + k] = i;
+                    }
+                } else if min_len[i] + 1 < min_len[i + k] {
+                    min_len[i + k] = min_len[i] + 1;
+                    parent[i + k] = i;
+                }
+            }
+        }
+
+        let segments = min_len[length] as usize;
+        let mut path = vec![0usize; segments];
+        let mut position = length;
+        let mut slot = segments;
+        while position != 0 {
+            slot -= 1;
+            path[slot] = position;
+            position = parent[position];
+        }
+
+        let mut begin = 0usize;
+        let mut consumed = 0usize;
+        for end in path {
+            match self.match_longest(&word[consumed..], end - begin) {
+                Some((length, conversion)) => {
+                    out.extend_from_slice(conversion);
+                    consumed += length;
+                }
+                None => {
+                    if let Some(&character) = word.get(consumed) {
+                        out.push(character);
+                    }
+                    consumed += 1;
+                }
+            }
+            begin = end;
+        }
+    }
+
+    /// C++ `converter_convert` -> `segment` with the default FAST mode.
+    pub fn convert(&self, input: &str) -> String {
+        let word: Vec<u32> = input.chars().map(u32::from).collect();
+        let mut out = Vec::with_capacity(word.len());
+        let mut bound = 0usize;
+        let mut start = 0usize;
+        for i in 0..word.len() {
+            if i != 0 && i == bound {
+                self.sp_seg(&word[start..bound], &mut out);
+                start = i;
+            }
+            let mut match_len = self
+                .match_longest(&word[i..], 0)
+                .map_or(0, |(length, _)| length);
+            if match_len == 0 {
+                match_len = 1;
+            }
+            if i + match_len > bound {
+                bound = i + match_len;
+            }
+        }
+        if word.len() > start {
+            self.sp_seg(&word[start..bound.min(word.len())], &mut out);
+        }
+        out.into_iter()
+            .filter_map(char::from_u32)
+            .collect::<String>()
+    }
+}
+
+/// C++ `TraditionalChineseAnalyzer` — OpenCC trad→simp, then `ChineseAnalyzer`.
+#[derive(Clone)]
+pub struct TraditionalChineseAnalyzer {
+    converter: Arc<OpenCcConverter>,
+    chinese: ChineseAnalyzer,
+}
+
+impl TraditionalChineseAnalyzer {
+    pub fn new(converter: Arc<OpenCcConverter>, chinese: ChineseAnalyzer) -> Self {
+        Self { converter, chinese }
+    }
+
+    /// C++ `OpenCC::convert`.
+    pub fn convert(&self, input: &str) -> String {
+        self.converter.convert(input)
+    }
+
+    /// C++ `TraditionalChineseAnalyzer::SetCutGrain`.
+    pub fn set_cut_grain(&mut self, cut_grain: CutGrain) {
+        self.chinese.set_cut_grain(cut_grain);
+    }
+
+    /// C++ `TraditionalChineseAnalyzer::Parse`.
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        self.chinese.analyze(&self.convert(input))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4094,9 +5558,8 @@ mod analyzer_pool_tests {
     }
 
     /// C++ `AnalyzerPool::GetAnalyzer`: every name family resolves to the
-    /// analyzer the reference constructs. `japanese`, `korean` and
-    /// `traditional` are C++ families whose engines (MeCab/OpenCC) are not
-    /// vendored, so the pool and DDL validation both reject them.
+    /// analyzer the reference constructs, including the MeCab- and OpenCC-backed
+    /// CJK families.
     #[test]
     fn test_analyzer_families_construct() {
         if !resource_available() {
@@ -4125,11 +5588,10 @@ mod analyzer_pool_tests {
             ("sparsegram", Some("sparsegram")),
             ("sparsegram-3-12", Some("sparsegram")),
             ("sparsegram-3-12-fold", Some("sparsegram")),
-            // C++ families the Rust engine does not vendor.
-            ("japanese", None),
-            ("korean", None),
-            ("traditional", None),
-            ("traditional-fine", None),
+            ("japanese", Some("japanese")),
+            ("korean", Some("korean")),
+            ("traditional", Some("traditional")),
+            ("traditional-fine", Some("traditional")),
             // Not a family on either side: C++ hashes only whole prefixes.
             ("traditionalchinese", None),
             ("english", None),
@@ -4252,6 +5714,150 @@ mod analyzer_pool_tests {
                 "missing folded copy of {gram}: {grams:?}"
             );
         }
+    }
+
+    fn analyze_text(analyzer: &Analyzer, text: &str) -> Vec<String> {
+        analyzer
+            .analyze(text)
+            .into_iter()
+            .map(|term| term.text)
+            .collect()
+    }
+
+    /// C++ `JapaneseAnalyzer` over `mecab/ipadic`: one-best MeCab segmentation
+    /// with the dictionary's own word boundaries. The expected tokens are the
+    /// reference engine's output for these sentences (ipadic + Viterbi).
+    #[test]
+    fn test_japanese_analyzer_segments_with_ipadic() {
+        if !resource_available() {
+            panic!("Resource directory {RESOURCE_DIR} not available; ipadic cannot be loaded");
+        }
+        let analyzer = AnalyzerPool::instance().get_analyzer("japanese").unwrap();
+
+        assert_eq!(
+            analyze_text(&analyzer, "日本語の文章を解析する"),
+            vec!["日本語", "の", "文章", "を", "解析", "する"]
+        );
+        assert_eq!(
+            analyze_text(&analyzer, "東京都渋谷区に住んでいます"),
+            vec!["東京", "都", "渋谷", "区", "に", "住ん", "で", "い", "ます"]
+        );
+        // The reference's classic longest/shortest-path discriminator.
+        assert_eq!(
+            analyze_text(&analyzer, "すもももももももものうち"),
+            vec!["すもも", "も", "もも", "も", "もも", "の", "うち"]
+        );
+    }
+
+    /// Alphabet runs are POS `S-A` (ipadic `記号,アルファベット`) and are
+    /// lower-cased by `CommonLanguageAnalyzer`; no stemmer is initialised for
+    /// this family, so "running" keeps its form.
+    #[test]
+    fn test_japanese_analyzer_lowercases_alphabet_runs() {
+        if !resource_available() {
+            panic!("Resource directory {RESOURCE_DIR} not available; ipadic cannot be loaded");
+        }
+        let analyzer = AnalyzerPool::instance().get_analyzer("japanese").unwrap();
+        assert_eq!(
+            analyze_text(&analyzer, "I love Rust 2024年"),
+            vec!["i", "love", "rust", "2024", "年"]
+        );
+        assert_eq!(
+            analyze_text(&analyzer, "price: 3.14"),
+            vec!["price", ":", "3.14"]
+        );
+    }
+
+    /// C++ `KoreanAnalyzer` over `mecab/ko-dic`: morphemes come straight from
+    /// the MeCab lattice, with `SL` foreign-script tokens lower-cased.
+    #[test]
+    fn test_korean_analyzer_segments_with_ko_dic() {
+        if !resource_available() {
+            panic!("Resource directory {RESOURCE_DIR} not available; ko-dic cannot be loaded");
+        }
+        let analyzer = AnalyzerPool::instance().get_analyzer("korean").unwrap();
+
+        assert_eq!(
+            analyze_text(&analyzer, "안녕하세요"),
+            vec!["안녕", "하", "세요"]
+        );
+        assert_eq!(
+            analyze_text(&analyzer, "한국어 형태소 분석"),
+            vec!["한국어", "형태소", "분석"]
+        );
+        assert_eq!(
+            analyze_text(&analyzer, "서울에 갑니다"),
+            vec!["서울", "에", "갑니다"]
+        );
+        // `Rust` is tagged `SL`, so it is lower-cased like the reference.
+        assert_eq!(
+            analyze_text(&analyzer, "Rust 언어를 배웁니다"),
+            vec!["rust", "언어", "를", "배웁니다"]
+        );
+    }
+
+    /// C++ `OpenCC` with `zht2zhs.ini`: phrase table first, character table
+    /// second, converted along OpenCC's shortest-path segmentation.
+    #[test]
+    fn test_opencc_converts_traditional_to_simplified() {
+        if !resource_available() {
+            panic!("Resource directory {RESOURCE_DIR} not available; opencc cannot be loaded");
+        }
+        let converter = OpenCcConverter::load(RESOURCE_DIR).unwrap();
+        assert_eq!(converter.convert("漢字測試"), "汉字测试");
+        assert_eq!(converter.convert("臺灣大學的學生"), "台湾大学的学生");
+        assert_eq!(converter.convert("這個問題很難解決"), "这个问题很难解决");
+        assert_eq!(converter.convert("軟體開發"), "软体开发");
+        assert_eq!(converter.convert("記憶體與網路"), "记忆体与网路");
+        // Simplified input is already in the target script.
+        assert_eq!(converter.convert("汉字测试"), "汉字测试");
+        assert_eq!(converter.convert(""), "");
+    }
+
+    /// C++ `TraditionalChineseAnalyzer::Parse`: convert, then run the jieba
+    /// analyzer over the simplified text. `traditional-fine` switches the
+    /// jieba cut grain.
+    #[test]
+    fn test_traditional_analyzer_converts_then_segments() {
+        if !resource_available() {
+            panic!("Resource directory {RESOURCE_DIR} not available; opencc cannot be loaded");
+        }
+        let chinese = AnalyzerPool::instance().get_analyzer("chinese").unwrap();
+        let traditional = AnalyzerPool::instance()
+            .get_analyzer("traditional")
+            .unwrap();
+        let Analyzer::Traditional(traditional_analyzer) = &traditional else {
+            panic!("GetAnalyzer(\"traditional\") did not return a TraditionalChineseAnalyzer");
+        };
+
+        for text in ["漢字測試", "臺灣大學的學生", "這個問題很難解決", "軟體開發"]
+        {
+            let converted = traditional_analyzer.convert(text);
+            assert_eq!(
+                analyze_text(&traditional, text),
+                analyze_text(&chinese, &converted),
+                "conversion of {text} produced {converted}"
+            );
+        }
+
+        assert_eq!(analyze_text(&traditional, "漢字測試"), vec!["汉字", "测试"]);
+
+        let fine = AnalyzerPool::instance()
+            .get_analyzer("traditional-fine")
+            .unwrap();
+        let Analyzer::Traditional(fine_analyzer) = &fine else {
+            panic!("GetAnalyzer(\"traditional-fine\") did not return a TraditionalChineseAnalyzer");
+        };
+        assert_eq!(fine_analyzer.convert("臺灣大學"), "台湾大学");
+        // Fine-grained jieba splits the converted text the same way
+        // `chinese-fine` does; only the script conversion is added.
+        let chinese_fine = AnalyzerPool::instance()
+            .get_analyzer("chinese-fine")
+            .unwrap();
+        assert_eq!(
+            analyze_text(&fine, "臺灣大學"),
+            analyze_text(&chinese_fine, "台湾大学")
+        );
     }
 }
 

@@ -9,9 +9,13 @@
 
 use infinity_common::{Error, Result};
 use infinity_expression::{Expr, Value};
-use infinity_parser::{ExprAst, JoinClause, Literal, OrderKey, Predicate, SelectItem};
+use infinity_parser::{BoolOp, ExprAst, JoinClause, Literal, OrderKey, Predicate, SelectItem};
 
-use crate::{output_schema, plan_select, resolve_column, LogicalPlan};
+use crate::subquery::{
+    BoundSubquery, CorrelatedExpressionsDetector, DepthColumn, SubqueryExpr, SubqueryPlan,
+    SubqueryType,
+};
+use crate::{output_schema, plan_select, resolve_column, ColumnBinding, LogicalPlan};
 
 /// C++ `BoundDeleteStatement`: the target table and the bound predicate.
 #[derive(Debug, Clone, PartialEq)]
@@ -180,6 +184,185 @@ impl QueryBinder {
     pub fn bind_predicate(&self, pred: &Predicate, schema: &[String]) -> Result<Expr> {
         crate::predicate_expr(pred, schema)
     }
+
+    /// C++ `QueryBinder::BindSubquery` + `SubqueryUnnest` pre-pass: binds a
+    /// subquery/derived-table `SELECT` into the depth-annotated
+    /// [`SubqueryPlan`], then asks [`CorrelatedExpressionsDetector`] whether it
+    /// reads the enclosing query.
+    ///
+    /// A name that resolves in the subquery's own schema binds at depth 0; one
+    /// that only the enclosing query knows binds at depth 1, which is exactly
+    /// how the reference marks a correlated column.
+    #[allow(clippy::too_many_arguments)]
+    pub fn bind_subquery(
+        &self,
+        kind: SubqueryType,
+        table: Option<&str>,
+        local_columns: &[String],
+        items: &[SelectItem],
+        where_pred: Option<&Predicate>,
+        outer_columns: &[String],
+    ) -> Result<BoundSubquery> {
+        let Some(table) = table else {
+            return Err(Error::Invalid(
+                "a subquery without FROM cannot be bound".into(),
+            ));
+        };
+        let local_refs: Vec<&str> = local_columns.iter().map(String::as_str).collect();
+        let mut plan = SubqueryPlan::scan(table, local_refs, 0);
+        let mut correlated = Vec::new();
+        if let Some(pred) = where_pred {
+            let predicate =
+                bind_subquery_predicate(pred, local_columns, outer_columns, &mut correlated)?;
+            plan = SubqueryPlan::filter(plan, predicate);
+        }
+        // Only plain column projections are represented; anything else keeps
+        // the scan's own columns.
+        let projected: Option<Vec<SubqueryExpr>> = items
+            .iter()
+            .map(|item| match item {
+                SelectItem::Column(name) => Ok(Some(bind_subquery_column(
+                    name,
+                    local_columns,
+                    outer_columns,
+                    &mut correlated,
+                )?)),
+                _ => Ok(None),
+            })
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .collect();
+        if let Some(exprs) = projected {
+            if !exprs.is_empty() {
+                let names: Vec<String> = items
+                    .iter()
+                    .map(|item| match item {
+                        SelectItem::Column(name) => name.clone(),
+                        _ => String::new(),
+                    })
+                    .collect();
+                let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
+                plan = SubqueryPlan::projection(plan, exprs, name_refs, 0);
+            }
+        }
+        let mut detector = CorrelatedExpressionsDetector::new(Vec::new());
+        detector.visit_plan(&plan)?;
+        let bound = BoundSubquery::new(kind, plan);
+        Ok(if detector.is_correlated() {
+            bound.with_correlated(correlated)
+        } else {
+            bound
+        })
+    }
+}
+
+/// Binds one column reference of a subquery, recording outer references.
+fn bind_subquery_column(
+    name: &str,
+    local: &[String],
+    outer: &[String],
+    correlated: &mut Vec<DepthColumn>,
+) -> Result<SubqueryExpr> {
+    let base = name.split('.').next_back().unwrap_or(name);
+    if let Some(i) = local.iter().position(|c| c == base) {
+        return Ok(SubqueryExpr::col(ColumnBinding::new(0, i), 0));
+    }
+    let column = match outer.iter().position(|c| c == base) {
+        Some(i) => DepthColumn::outer(ColumnBinding::new(0, i)),
+        None => {
+            return Err(Error::Invalid(format!("unknown column '{name}'")));
+        }
+    };
+    if !correlated.iter().any(|c| c.binding == column.binding) {
+        correlated.push(column.clone());
+    }
+    Ok(SubqueryExpr::Column(column))
+}
+
+fn bind_subquery_expr(
+    expr: &ExprAst,
+    local: &[String],
+    outer: &[String],
+    correlated: &mut Vec<DepthColumn>,
+) -> Result<SubqueryExpr> {
+    Ok(match expr {
+        ExprAst::Column(name) => bind_subquery_column(name, local, outer, correlated)?,
+        ExprAst::Literal(value) => SubqueryExpr::Literal(Value::from_literal(value)),
+        ExprAst::Binary(a, op, b) => SubqueryExpr::Binary(
+            Box::new(bind_subquery_expr(a, local, outer, correlated)?),
+            *op,
+            Box::new(bind_subquery_expr(b, local, outer, correlated)?),
+        ),
+        ExprAst::Cmp(a, op, b) => SubqueryExpr::Cmp(
+            Box::new(bind_subquery_expr(a, local, outer, correlated)?),
+            *op,
+            Box::new(bind_subquery_expr(b, local, outer, correlated)?),
+        ),
+        ExprAst::Not(a) => {
+            SubqueryExpr::Not(Box::new(bind_subquery_expr(a, local, outer, correlated)?))
+        }
+        ExprAst::And(a, b) => SubqueryExpr::And(
+            Box::new(bind_subquery_expr(a, local, outer, correlated)?),
+            Box::new(bind_subquery_expr(b, local, outer, correlated)?),
+        ),
+        ExprAst::Or(a, b) => SubqueryExpr::Or(
+            Box::new(bind_subquery_expr(a, local, outer, correlated)?),
+            Box::new(bind_subquery_expr(b, local, outer, correlated)?),
+        ),
+        ExprAst::Func { name, args } => SubqueryExpr::Func {
+            name: name.clone(),
+            args: args
+                .iter()
+                .map(|a| bind_subquery_expr(a, local, outer, correlated))
+                .collect::<Result<Vec<_>>>()?,
+        },
+    })
+}
+
+fn bind_subquery_predicate(
+    pred: &Predicate,
+    local: &[String],
+    outer: &[String],
+    correlated: &mut Vec<DepthColumn>,
+) -> Result<SubqueryExpr> {
+    Ok(match pred {
+        Predicate::Cmp(a, op, b) => SubqueryExpr::Cmp(
+            Box::new(bind_subquery_expr(a, local, outer, correlated)?),
+            *op,
+            Box::new(bind_subquery_expr(b, local, outer, correlated)?),
+        ),
+        Predicate::IsTrue(e) => bind_subquery_expr(e, local, outer, correlated)?,
+        Predicate::IsNull(e, neg) => SubqueryExpr::Func {
+            name: if *neg { "is_not_null" } else { "is_null" }.into(),
+            args: vec![bind_subquery_expr(e, local, outer, correlated)?],
+        },
+        Predicate::Like(a, pat, _esc, neg) => SubqueryExpr::Func {
+            name: if *neg { "not_like" } else { "like" }.into(),
+            args: vec![
+                bind_subquery_expr(a, local, outer, correlated)?,
+                bind_subquery_expr(pat, local, outer, correlated)?,
+            ],
+        },
+        Predicate::In(a, values, neg) => SubqueryExpr::In(
+            Box::new(bind_subquery_expr(a, local, outer, correlated)?),
+            values
+                .iter()
+                .map(|v| bind_subquery_expr(v, local, outer, correlated))
+                .collect::<Result<Vec<_>>>()?,
+            *neg,
+        ),
+        Predicate::Bool(a, BoolOp::And, b) => SubqueryExpr::And(
+            Box::new(bind_subquery_predicate(a, local, outer, correlated)?),
+            Box::new(bind_subquery_predicate(b, local, outer, correlated)?),
+        ),
+        Predicate::Bool(a, BoolOp::Or, b) => SubqueryExpr::Or(
+            Box::new(bind_subquery_predicate(a, local, outer, correlated)?),
+            Box::new(bind_subquery_predicate(b, local, outer, correlated)?),
+        ),
+        Predicate::Not(a) => SubqueryExpr::Not(Box::new(bind_subquery_predicate(
+            a, local, outer, correlated,
+        )?)),
+    })
 }
 
 #[cfg(test)]
@@ -297,6 +480,53 @@ mod tests {
                 &schema
             )
             .is_err());
+    }
+
+    /// `QueryBinder::bind_subquery` + `CorrelatedExpressionsDetector`: a
+    /// predicate that names an enclosing column binds at depth 1 and is
+    /// reported as correlated; one that only reads the subquery's own table is
+    /// not.
+    #[test]
+    fn binds_subqueries_and_detects_correlation() {
+        let binder = QueryBinder::new();
+        let local = vec!["u".to_string()];
+        let outer = vec!["t".to_string()];
+        let items = [SelectItem::Column("u".into())];
+
+        let uncorrelated = Predicate::Cmp(
+            ExprAst::Column("u".into()),
+            CmpOp::Eq,
+            ExprAst::Literal(Literal::Int(1)),
+        );
+        let bound = binder
+            .bind_subquery(
+                SubqueryType::Exists,
+                Some("s"),
+                &local,
+                &items,
+                Some(&uncorrelated),
+                &outer,
+            )
+            .unwrap();
+        assert!(bound.correlated_columns.is_empty());
+
+        let correlated = Predicate::Cmp(
+            ExprAst::Column("u".into()),
+            CmpOp::Eq,
+            ExprAst::Column("t".into()),
+        );
+        let bound = binder
+            .bind_subquery(
+                SubqueryType::Exists,
+                Some("s"),
+                &local,
+                &items,
+                Some(&correlated),
+                &outer,
+            )
+            .unwrap();
+        assert_eq!(bound.correlated_columns.len(), 1);
+        assert_eq!(bound.correlated_columns[0].depth, 1);
     }
 
     /// C++ `BindExpression`: a select expression is resolved against the bound

@@ -25,6 +25,7 @@ use infinity_common::{Error, Result};
 use infinity_expression::{Expr, Value};
 use infinity_parser::CmpOp;
 
+use crate::regex_rewrite::{RegexIndexCatalog, RegexIndexRewrite};
 use crate::LogicalPlan;
 
 // ---------------------------------------------------------------------------
@@ -2238,8 +2239,20 @@ pub struct IndexScanBuilder;
 
 impl IndexScanBuilder {
     pub fn build(plan: LogicalPlan, catalog: &IndexCatalog) -> Result<IndexScanPlan> {
+        Self::build_with_regex(plan, catalog, None)
+    }
+
+    /// C++ `IndexScanBuilder::ApplyToPlan`: `RegexIndexRewrite` first
+    /// (`index_scan_builder_impl.cpp:74`), then the filter push-down. The
+    /// rewrite only ever conjoins predicates that a matching row must satisfy,
+    /// and the original regex stays in the residual filter.
+    pub fn build_with_regex(
+        plan: LogicalPlan,
+        catalog: &IndexCatalog,
+        regex: Option<&RegexIndexCatalog>,
+    ) -> Result<IndexScanPlan> {
         let mut candidates = Vec::new();
-        let plan = rewrite(plan, catalog, &mut candidates)?;
+        let plan = rewrite(plan, catalog, regex, &mut candidates)?;
         Ok(IndexScanPlan { plan, candidates })
     }
 }
@@ -2247,15 +2260,28 @@ impl IndexScanBuilder {
 fn rewrite(
     plan: LogicalPlan,
     catalog: &IndexCatalog,
+    regex: Option<&RegexIndexCatalog>,
     candidates: &mut Vec<IndexScanCandidate>,
 ) -> Result<LogicalPlan> {
     match plan {
         LogicalPlan::Filter { input, predicate } => {
-            let input = rewrite(*input, catalog, candidates)?;
+            let input = rewrite(*input, catalog, regex, candidates)?;
+            // C++ rewrites `regex()` into full-text narrowing before the
+            // push-down (`index_scan_builder_impl.cpp:74`).
+            let predicate = match regex {
+                Some(regex) if !regex.columns.is_empty() => {
+                    RegexIndexRewrite::rewrite(&predicate, regex)
+                }
+                _ => predicate,
+            };
             if let LogicalPlan::Scan { table, columns } = &input {
                 let pushed =
                     FilterExpressionPushDown::push_down_to_index_scan(&predicate, catalog)?;
-                if let Some(index_filter) = &pushed.index_filter {
+                // An evaluator that admits every row cannot replace the
+                // predicate: the column has no index (C++ only visits tables
+                // that have candidate index columns).
+                let answered = pushed.index_filter_evaluator.kind() != EvaluatorType::AllTrue;
+                if let Some(index_filter) = pushed.index_filter.as_ref().filter(|_| answered) {
                     candidates.push(IndexScanCandidate {
                         table: table.clone(),
                         index_filter: index_filter.clone(),
@@ -2284,7 +2310,7 @@ fn rewrite(
             exprs,
             names,
         } => Ok(LogicalPlan::Projection {
-            input: Box::new(rewrite(*input, catalog, candidates)?),
+            input: Box::new(rewrite(*input, catalog, regex, candidates)?),
             exprs,
             names,
         }),
@@ -2294,21 +2320,21 @@ fn rewrite(
             group_names,
             aggs,
         } => Ok(LogicalPlan::Aggregate {
-            input: Box::new(rewrite(*input, catalog, candidates)?),
+            input: Box::new(rewrite(*input, catalog, regex, candidates)?),
             group_keys,
             group_names,
             aggs,
         }),
         LogicalPlan::Sort { input, keys } => Ok(LogicalPlan::Sort {
-            input: Box::new(rewrite(*input, catalog, candidates)?),
+            input: Box::new(rewrite(*input, catalog, regex, candidates)?),
             keys,
         }),
         LogicalPlan::Limit { input, n } => Ok(LogicalPlan::Limit {
-            input: Box::new(rewrite(*input, catalog, candidates)?),
+            input: Box::new(rewrite(*input, catalog, regex, candidates)?),
             n,
         }),
         LogicalPlan::Offset { input, n } => Ok(LogicalPlan::Offset {
-            input: Box::new(rewrite(*input, catalog, candidates)?),
+            input: Box::new(rewrite(*input, catalog, regex, candidates)?),
             n,
         }),
         LogicalPlan::Join {
@@ -2318,8 +2344,8 @@ fn rewrite(
             right_key,
             left_width,
         } => Ok(LogicalPlan::Join {
-            left: Box::new(rewrite(*left, catalog, candidates)?),
-            right: Box::new(rewrite(*right, catalog, candidates)?),
+            left: Box::new(rewrite(*left, catalog, regex, candidates)?),
+            right: Box::new(rewrite(*right, catalog, regex, candidates)?),
             left_key,
             right_key,
             left_width,
@@ -2901,6 +2927,43 @@ mod tests {
             .kind(),
             EvaluatorType::AllTrue
         );
+    }
+
+    /// `IndexScanBuilder::build_with_regex`: a `regex()` predicate on a
+    /// sparse-gram column is rewritten into full-text narrowing, and the regex
+    /// itself stays as the residual filter.
+    #[test]
+    fn builder_rewrites_regex_into_an_index_filter() {
+        use crate::regex_rewrite::RegexIndexCatalog;
+        let catalog = IndexCatalog::new(&[("doc", ColumnKind::Varchar)]);
+        let regex = RegexIndexCatalog::new().with_column(0, "idx_regex", 3, 12, false);
+        let plan = LogicalPlan::Filter {
+            input: Box::new(LogicalPlan::Scan {
+                table: "t".into(),
+                columns: vec!["doc".into()],
+            }),
+            predicate: Expr::Regex(
+                0,
+                Box::new(Expr::Literal(Value::Str(
+                    "error (reading|writing) file".into(),
+                ))),
+            ),
+        };
+        let indexed =
+            IndexScanBuilder::build_with_regex(plan.clone(), &catalog, Some(&regex)).unwrap();
+        // Without the regex catalog the predicate cannot be narrowed.
+        let plain = IndexScanBuilder::build(plan, &catalog).unwrap();
+        assert!(plain.candidates.is_empty());
+        assert_eq!(indexed.candidates.len(), 1);
+        assert!(matches!(indexed.candidates[0].index_filter, Expr::And(..)));
+        // The original regex survives as the residual filter.
+        assert!(matches!(
+            indexed.plan,
+            LogicalPlan::Filter {
+                predicate: Expr::Regex(..),
+                ..
+            }
+        ));
     }
 
     /// C++ `ApplyFastRoughFilter`: an equality becomes bloom + min/max, an
