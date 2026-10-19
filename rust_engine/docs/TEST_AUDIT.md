@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 102, `gap` 106, `gate-a` 136, `integration` 250, `partial` 41, `ported` 334.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 136, `integration` 250, `partial` 41, `ported` 335.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -564,10 +564,10 @@
 | 550 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Get` | ported | `infinity-storage` `fst_get_values` |
 | 551 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Iterate` | ported | `infinity-storage` `fst_iterate_with_bounds` |
 | 552 | `src/unit_test/storage/invertedindex/fst/registry_ut.cpp` | `RegistryTest` | `InsertAndFind` | ported | `infinity-storage` `insert_and_find` |
-| 553 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `Chunk` | gap |
-| 554 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_Memory` | gap |
+| 553 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `Chunk` | ported | `infinity-executor` `tests::memory_indexer_builds_the_reference_postings` |
+| 554 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_Memory` | exempt | C++ 侧 `DISABLED_` 用例（gtest 从不执行） |
 | 555 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `SpillLoadTest` | gap |
-| 556 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_SeekPosition` | gap |
+| 556 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_SeekPosition` | exempt | C++ 侧 `DISABLED_` 用例（gtest 从不执行） |
 | 557 | `src/unit_test/storage/invertedindex/posting_merger_ut.cpp` | `PostingMergerTest` | `Basic` | gap |
 | 558 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `test1` | gap |
 | 559 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `tf_after_skip_to_across_segments` | gap |
