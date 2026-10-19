@@ -591,6 +591,29 @@ mod tests {
 
     /// Ported from `test_bmp_ivt_ut.cpp`: per term the postings keep the block
     /// ids, the block maxima and the k-th score.
+    /// C++: `BMPIndexTest.test2` (`test_bmp_index_ut.cpp`): six documents in
+    /// blocks of two; the first document has the strongest match.
+    #[test]
+    fn bmp_index_ranks_documents_across_blocks() {
+        let options = BmpSearchOptions {
+            alpha: 1.0,
+            beta: 1.0,
+            use_tail: true,
+        };
+        let mut index = BmpAlg::new(2);
+        index.add_doc(&[(0, 3.0)]);
+        index.add_doc(&[(1, 1.0)]);
+        for _ in 0..4 {
+            index.add_doc(&[(0, 1.0), (1, 1.0)]);
+        }
+        index.build();
+        let hits = index.search_knn(&[(0, 1.0), (1, 1.0)], 5, options);
+        let ids: Vec<usize> = hits.iter().map(|(doc, _)| *doc).collect();
+        let scores: Vec<f32> = hits.iter().map(|(_, score)| *score).collect();
+        assert_eq!(ids, vec![0, 2, 3, 4, 5]);
+        assert_eq!(scores, vec![3.0, 2.0, 2.0, 2.0, 2.0]);
+    }
+
     #[test]
     fn bmp_ivt_keeps_block_maxima_and_kth() {
         let data = dataset(1000, 5, 5);
