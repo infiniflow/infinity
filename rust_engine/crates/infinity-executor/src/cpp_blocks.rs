@@ -46,6 +46,25 @@ pub struct LoadedVectorIndex {
 /// best-effort interop artifact, not the system of record.
 const MIRROR_BUDGET_BYTES: usize = 1024 * 1024 * 1024;
 
+/// The stored text form of a literal (arrays with braces, vectors with
+/// brackets), matching the row journal's representation.
+fn render_stored_cell(value: &infinity_parser::Literal, column_type: &str) -> String {
+    let is_array = column_type.trim().to_ascii_uppercase().starts_with("ARRAY");
+    match value {
+        infinity_parser::Literal::Array(items) if is_array => format!("{{{}}}", items.join(",")),
+        infinity_parser::Literal::Array(items) => format!("[{}]", items.join(",")),
+        infinity_parser::Literal::Vector(items) => format!(
+            "[{}]",
+            items
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        other => other.to_slt_string(),
+    }
+}
+
 /// Rough encoded bytes per row, from the declared column types.
 fn estimated_row_bytes(types: &[String]) -> usize {
     types
@@ -1007,60 +1026,12 @@ impl Engine {
 
         let mut written = 0usize;
         for (block_index, chunk) in rows.chunks(DEFAULT_BLOCK_CAPACITY).enumerate() {
-            let mut block_columns = Vec::with_capacity(types.len());
-            for (col, column_type) in types.iter().enumerate() {
-                let kind = outline_kind(&meta.types[col]);
-                let mut slots: Vec<Option<Vec<u8>>> = Vec::with_capacity(chunk.len());
-                // Self-outlining columns build their own outline; the generic
-                // packer produces one for varchar/json.
-                let mut self_outline = Vec::new();
-                for (_, row) in chunk {
-                    let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
-                    match kind {
-                        OutlineKind::Tensor => slots.push(encode_tensor_slot(
-                            &meta.types[col],
-                            &text,
-                            &mut self_outline,
-                        )?),
-                        OutlineKind::TensorArray => slots.push(encode_tensorarray_slot(
-                            &meta.types[col],
-                            &text,
-                            &mut self_outline,
-                        )?),
-                        OutlineKind::Sparse => slots.push(encode_sparse_slot(
-                            &meta.types[col],
-                            &text,
-                            &mut self_outline,
-                        )?),
-                        OutlineKind::Array => slots.push(encode_array_slot(
-                            &meta.types[col],
-                            &text,
-                            &mut self_outline,
-                        )?),
-                        OutlineKind::None => {
-                            slots.push(encode_value(&meta.types[col], *column_type, &text)?)
-                        }
-                    }
-                }
-                let bytes: Vec<Option<&[u8]>> = slots.iter().map(|s| s.as_deref()).collect();
-                let (body, packed_outline) = pack_column_with_layout(
-                    *column_type,
-                    layouts[col],
-                    &bytes,
-                    DEFAULT_BLOCK_CAPACITY,
-                )
-                .map_err(|e| Error::Storage(format!("pack column {col}: {e}")))?;
-                let outline = if kind == OutlineKind::None {
-                    packed_outline
-                } else {
-                    self_outline
-                };
-                block_columns.push(BlockColumn {
-                    column_id: meta.ids.get(col).copied().unwrap_or(col as u64),
-                    body,
-                    outline,
-                });
-            }
+            let texts: Vec<Vec<String>> = chunk
+                .iter()
+                .map(|(_, row)| row.iter().map(|v| v.to_slt_string()).collect())
+                .collect();
+            let block_columns =
+                self.encode_block_columns(&meta.types, &meta.ids, &types, &layouts, &texts)?;
             let version = BlockVersionFile::new(
                 &[(block_index as u64 + 1, chunk.len() as u32)],
                 DEFAULT_BLOCK_CAPACITY,
@@ -1088,6 +1059,166 @@ impl Engine {
         Ok(written)
     }
 
+    /// Appends a committed batch to the block mirror, split into
+    /// `DEFAULT_BLOCK_CAPACITY` blocks. This makes the mirror cover the new
+    /// rows before the next checkpoint, so reads can use the column blocks as
+    /// the authoritative values. Returns `false` when the table's columns are
+    /// not block-encodable (the mirror is then skipped, as at checkpoint).
+    pub fn append_block_mirror(
+        &self,
+        table: &str,
+        base: usize,
+        rows: &[Vec<infinity_parser::Literal>],
+    ) -> Result<bool> {
+        if rows.is_empty() {
+            return Ok(false);
+        }
+        // A checkpoint rewrites the whole segment; never interleave with it.
+        let Ok(_flush) = self.storage.flush_lock.try_lock() else {
+            return Ok(false);
+        };
+        let table = self.qualified_table(table);
+        let Some(meta) = self.storage.catalog.get_table_by_name(&table)? else {
+            return Ok(false);
+        };
+        let mut types = Vec::with_capacity(meta.types.len());
+        let mut layouts = Vec::with_capacity(meta.types.len());
+        for ty in &meta.types {
+            let Some(column_type) = column_type_of(ty) else {
+                return Ok(false);
+            };
+            let Some(layout) = layout_of(ty, column_type) else {
+                return Ok(false);
+            };
+            types.push(column_type);
+            layouts.push(layout);
+        }
+        let Some(index) = self.block_index_for(&table) else {
+            return Ok(false);
+        };
+        // Render the stored form, exactly like the checkpoint path: arrays use
+        // braces (`{a,b}`), vectors use brackets (`[a,b]`).
+        let texts: Vec<Vec<String>> = rows
+            .iter()
+            .map(|row| {
+                (0..meta.types.len())
+                    .map(|col| match row.get(col) {
+                        Some(value) => render_stored_cell(value, &meta.types[col]),
+                        // A short row (COPY of a narrow CSV) takes the column
+                        // default, exactly as the row journal's decoder does.
+                        None => meta
+                            .defaults
+                            .get(col)
+                            .and_then(|d| d.clone())
+                            .unwrap_or_else(|| "null".to_string()),
+                    })
+                    .collect()
+            })
+            .collect();
+        let db_id = self.database_id_of(&table);
+        for (n, chunk) in texts.chunks(DEFAULT_BLOCK_CAPACITY).enumerate() {
+            let columns =
+                self.encode_block_columns(&meta.types, &meta.ids, &types, &layouts, chunk)?;
+            let mut index = index.lock().unwrap();
+            let block_id = index.next_block_id();
+            let id = BlockId {
+                db_id,
+                table_id: meta.id,
+                segment_id: 0,
+                block_id,
+            };
+            index.create_block(
+                id,
+                base + n * DEFAULT_BLOCK_CAPACITY,
+                DEFAULT_BLOCK_CAPACITY,
+                &columns,
+                chunk.len(),
+                base as u64 + 1,
+            )?;
+        }
+        Ok(true)
+    }
+
+    /// Marks the block mirror current when it covers every live row. Called
+    /// after an append; a tombstone or a schema rewrite makes the counts
+    /// differ, so the next reads fall back to the row journal until the next
+    /// checkpoint rewrites the mirror.
+    pub fn mark_mirror_current_if_complete(&self, table: &str) {
+        let Ok(live) = self.row_count(table) else {
+            return;
+        };
+        let Some(index) = self.block_index_for(table) else {
+            return;
+        };
+        let covered = index.lock().unwrap().row_count();
+        if covered != live {
+            return;
+        }
+        let key = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        if let Some(entry) = tables.get_mut(&key) {
+            entry.cpp_block_generation = Some(entry.write_batches);
+        }
+    }
+
+    /// Encodes one block's rows (already rendered as text) into the column
+    /// files, in the C++ layout.
+    #[allow(clippy::too_many_arguments)]
+    fn encode_block_columns(
+        &self,
+        declared: &[String],
+        column_ids: &[u64],
+        types: &[i32],
+        layouts: &[ColumnLayout],
+        chunk: &[Vec<String>],
+    ) -> Result<Vec<BlockColumn>> {
+        let mut block_columns = Vec::with_capacity(types.len());
+        for (col, column_type) in types.iter().enumerate() {
+            let kind = outline_kind(&declared[col]);
+            let mut slots: Vec<Option<Vec<u8>>> = Vec::with_capacity(chunk.len());
+            // Self-outlining columns build their own outline; the generic
+            // packer produces one for varchar/json.
+            let mut self_outline = Vec::new();
+            for row in chunk {
+                let text = row.get(col).map(String::as_str).unwrap_or("");
+                match kind {
+                    OutlineKind::Tensor => {
+                        slots.push(encode_tensor_slot(&declared[col], text, &mut self_outline)?)
+                    }
+                    OutlineKind::TensorArray => slots.push(encode_tensorarray_slot(
+                        &declared[col],
+                        text,
+                        &mut self_outline,
+                    )?),
+                    OutlineKind::Sparse => {
+                        slots.push(encode_sparse_slot(&declared[col], text, &mut self_outline)?)
+                    }
+                    OutlineKind::Array => {
+                        slots.push(encode_array_slot(&declared[col], text, &mut self_outline)?)
+                    }
+                    OutlineKind::None => {
+                        slots.push(encode_value(&declared[col], *column_type, text)?)
+                    }
+                }
+            }
+            let bytes: Vec<Option<&[u8]>> = slots.iter().map(|s| s.as_deref()).collect();
+            let (body, packed_outline) =
+                pack_column_with_layout(*column_type, layouts[col], &bytes, DEFAULT_BLOCK_CAPACITY)
+                    .map_err(|e| Error::Storage(format!("pack column {col}: {e}")))?;
+            let outline = if kind == OutlineKind::None {
+                packed_outline
+            } else {
+                self_outline
+            };
+            block_columns.push(BlockColumn {
+                column_id: column_ids.get(col).copied().unwrap_or(col as u64),
+                body,
+                outline,
+            });
+        }
+        Ok(block_columns)
+    }
+
     /// Mirrors every table into the C++ block layout.
     ///
     /// Called from [`Engine::flush`], so a normal clean shutdown leaves the data
@@ -1101,17 +1232,25 @@ impl Engine {
             if meta.types.iter().all(|t| column_type_of(t).is_some())
                 && rows.saturating_mul(per_row) <= MIRROR_BUDGET_BYTES
             {
+                // Capture the write generation *before* the snapshot: a batch
+                // committed while the mirror is rewritten is not part of it.
+                let key = self.table_key(&meta.name);
+                let before = self
+                    .tables
+                    .lock()
+                    .unwrap()
+                    .get(&key)
+                    .map(|e| e.write_batches)
+                    .unwrap_or(0);
                 self.write_cpp_blocks(&meta.name)?;
                 // The mirror now covers every row; the IVF memory segment is
                 // redundant and would double-count candidates.
-                let key = self.table_key(&meta.name);
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(key).or_default();
                 for rows in entry.ivf_mem.values_mut() {
                     rows.clear();
                 }
-                let generation = entry.write_batches;
-                entry.cpp_block_generation = Some(generation);
+                entry.cpp_block_generation = (entry.write_batches == before).then_some(before);
             }
             // A dropped index must not leave its `idx_{id}` mirror behind.
             let db_id = self.database_id_of(&meta.name);

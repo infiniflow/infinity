@@ -2517,6 +2517,25 @@ struct RowCache {
 
 const ROW_CACHE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
 
+/// Whether a table's declared types round-trip through the block mirror with
+/// exactly the same text the row journal stores. Float/JSON/embedding/array
+/// columns render differently (f32 widening, JSON spacing, bracket forms), so
+/// full-row reads keep using the journal for those tables.
+fn block_rows_safe(types: &[String]) -> bool {
+    types.iter().all(|t| {
+        let u = t.trim().to_ascii_uppercase();
+        u.starts_with("INT")
+            || u.starts_with("TINYINT")
+            || u.starts_with("SMALLINT")
+            || u.starts_with("BIGINT")
+            || u.starts_with("UINT")
+            || u.starts_with("BOOL")
+            || u.starts_with("DOUBLE")
+            || u.starts_with("VARCHAR")
+            || u.starts_with("TEXT")
+    })
+}
+
 /// Decoded rows paired with their row ids (the executor's scan unit).
 type TableRows = Vec<(usize, Vec<Value>)>;
 
@@ -3994,6 +4013,15 @@ impl Engine {
             self.dump_hnsw_over_capacity(table);
         }
         self.bump_writes(table);
+        // Persist the batch as blocks so the mirror covers the new rows before
+        // the next checkpoint; reads then use the column blocks as the
+        // authoritative values.
+        if self
+            .append_block_mirror(table, base, &rows)
+            .unwrap_or(false)
+        {
+            self.mark_mirror_current_if_complete(table);
+        }
         self.append_row_cache(table, base, &encoded_rows);
         // Give the allocator's per-batch scratch back to the OS. Trimming on
         // every batch walks the whole heap; once every few batches is enough
@@ -4018,6 +4046,9 @@ impl Engine {
     /// concurrent deleters get `kTxnConflict`.
     fn commit_with_deletes(&self, table: &str, deletes: &[usize], mut txn: Txn) -> Result<u64> {
         self.invalidate_row_cache(table);
+        // Deletes leave the old rows in the block mirror; reads fall back to
+        // the row journal until the next checkpoint rewrites it.
+        self.invalidate_block_mirror(table);
         for seq in deletes {
             txn.delete(del_key(table, *seq));
         }
@@ -5769,6 +5800,13 @@ impl Engine {
         }
         let schema = self.table_schema(table)?;
         if schema.is_empty() {
+            return Ok(None);
+        }
+        // The block decoder renders typed values; float/JSON/embedding/array
+        // spellings differ from the row journal's text. Full-row reads use the
+        // blocks only for types whose rendering is identical.
+        let declared = self.column_types(table)?;
+        if !block_rows_safe(&declared) {
             return Ok(None);
         }
         let wanted: Vec<usize> = (0..schema.len()).collect();
@@ -8477,6 +8515,12 @@ impl Engine {
                     self.update_vector_caches(table, base + k, &texts);
                 }
                 self.dump_hnsw_over_capacity(table);
+                if self
+                    .append_block_mirror(table, base, &batch)
+                    .unwrap_or(false)
+                {
+                    self.mark_mirror_current_if_complete(table);
+                }
                 total += batch.len();
             }
             if eof {
@@ -8615,6 +8659,12 @@ impl Engine {
             self.update_vector_caches(table, base + k, &texts);
         }
         self.dump_hnsw_over_capacity(table);
+        if self
+            .append_block_mirror(table, base, &rows)
+            .unwrap_or(false)
+        {
+            self.mark_mirror_current_if_complete(table);
+        }
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
@@ -12376,11 +12426,14 @@ mod tests {
                 vec!["3".to_string(), "c".to_string()],
             ]
         );
-        // A write after the flush makes the mirror stale: the planner must fall
-        // back to the row store instead of missing the new row.
+        // A write after the flush is appended to the mirror (per-batch block
+        // persistence), so the projection stays on the column path and sees
+        // the new row.
         e.execute("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
             .unwrap();
-        assert!(e.try_cpp_projection("p", &items).unwrap().is_none());
+        let projected = e.try_cpp_projection("p", &items).unwrap();
+        assert!(projected.is_some());
+        assert_eq!(projected.unwrap().len(), 4);
         assert_eq!(rows(&e, "SELECT id, name FROM p;").len(), 4);
     }
 
@@ -12953,11 +13006,13 @@ mod tests {
     fn full_rows_come_from_the_block_mirror_when_current() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bm (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute("CREATE TABLE bm (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO bm VALUES (1,[1.0,0.0]),(2,[2.0,0.0]);")
-            .unwrap();
+        e.execute("INSERT INTO bm VALUES (1,'a'),(2,'b');").unwrap();
         e.flush().unwrap();
+        // The scalar row cache would answer first; drop it so the test proves
+        // the block path.
+        e.invalidate_row_cache("default_db.bm");
         for seq in 0..2 {
             e.store()
                 .put(&row_key("default_db.bm", seq), b"999\t[9.0,9.0]")

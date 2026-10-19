@@ -155,6 +155,15 @@ impl BlockIndex {
         self.blocks.is_empty()
     }
 
+    /// The next free block id of `seg_0`.
+    pub fn next_block_id(&self) -> u16 {
+        self.blocks
+            .keys()
+            .next_back()
+            .map(|(_, block)| block.saturating_add(1))
+            .unwrap_or(0)
+    }
+
     pub fn metas(&self) -> impl Iterator<Item = &BlockMeta> {
         self.blocks.values()
     }
