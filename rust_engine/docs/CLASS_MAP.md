@@ -128,6 +128,8 @@
 | `PeerTask` / `RegisterPeerTask` / `UnregisterPeerTask` / `TerminatePeerTask` / `HeartBeatPeerTask` / `SyncLogTask` / `ChangeRoleTask` | `infinity_server::peer::{PeerTask, RegisterPeerTask, UnregisterPeerTask, TerminatePeerTask, HeartBeatPeerTask, SyncLogTask, ChangeRoleTask}` | `execute`/`wait`/`complete` 完成门、C++ 字段集合与 `ToString`、重试/重连策略（2 次/1000ms） |
 | `RingBufferIterator` | `infinity_server::ring_buffer::RingBufferIterator` | 4096 环形缓冲、模自增、带符号 `Distance`、`Find`/`CopyN`，共享缓冲用 `Arc<RwLock<Vec<u8>>>`（crate 禁用 unsafe 别名） |
 
+> **已知限制（2026-10-19）**：相关子查询（引用外层列）未实现——解析器丢弃表限定符，执行器按常量/本地列求值，`SubqueryUnnest` 因此保持 `partial`；peer 层为进程内实现（`InProcessPeerTransport`），没有 Thrift/TCP 线路，相关类保持 `partial` 直到接入真实传输。
+
 ## 类级覆盖审计（基线 `5d27942c0`）
 
 `src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；**逐名清单（1136 行，mapped 1094 / exempt 20 / excluded 15 / test 7，gap 0）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**：每行都指向具体 Rust 模块或已登记的设计变更/排除；下表是按区域汇总的聚合说明：

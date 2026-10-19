@@ -379,8 +379,8 @@
 | 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
 | 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
 | 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 374 | `PGServer` | `src/network/pg_server.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | partial | Rust 无独立 `PGProtocolHandler` 类型；协议处理由 `infinity_server::pg::handle` + `PgServer` 承担（命名/拆分差异），mapped 需先拆类 
+| 374 | `PGServer` | `src/network/pg_server.cppm` | mapped | `infinity_server::PgServer` 
 | 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
 | 376 | `NonBlockPoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 377 | `PoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
@@ -501,7 +501,7 @@
 | 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
 | 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
 | 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | partial | 仅覆盖未关联子查询；相关子查询未实现（解析器丢弃表限定符，执行器按常量/本地列求值），不得据此声称 C++ 相关子查询已移植 
 | 496 | `FragmentContext` | `src/scheduler/fragment_context.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
 | 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
