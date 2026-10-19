@@ -13989,6 +13989,41 @@ mod tests {
         );
     }
 
+    /// C++: `planner/node/logical_{create_table,drop_table,create_index,drop_index,
+    /// insert,update,aggregate,project,limit,optimize,compact,flush,check,command,
+    /// show}_ut.cpp` — each statement builds a logical node and must execute;
+    /// the reference asserts only `HandleQueryResult(query_result)`.
+    #[test]
+    fn logical_planner_statements_succeed() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE tb (col1 INTEGER, col2 VARCHAR);")
+            .unwrap();
+        for i in 0..200 {
+            e.execute(&format!("INSERT INTO tb VALUES ({i}, 'abc');"))
+                .unwrap();
+        }
+        for sql in [
+            "select min(col1), max(col1), sum(col1), avg(col1) from tb;",
+            "select col1 from tb where col1 > 50 and col1 < 150 and col2 = 'abc';",
+            "select col1 from tb limit 100;",
+            "select col1 from tb order by col1;",
+            "update tb set col1 = 666 where col1 = 100;",
+            "create index idx on tb(col1) using secondary;",
+            "show databases;",
+            "optimize tb;",
+            "compact table tb;",
+            "flush data;",
+            "flush log;",
+            "check table tb;",
+            "create snapshot tb_snapshot on table tb;",
+            "drop index idx;",
+        ] {
+            e.execute(sql).unwrap_or_else(|err| panic!("{sql}: {err}"));
+        }
+        e.execute("drop table tb;").unwrap();
+    }
+
     /// C++: `function/scalar/abs_functions_ut.cpp::AbsFunctionsTest/abs_func`:
     /// `ABS` over TinyInt/SmallInt/Integer/BigInt/Float/Double, with NULL
     /// propagation.

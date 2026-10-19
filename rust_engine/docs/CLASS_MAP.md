@@ -234,6 +234,7 @@
 | `function/aggregate/{sum,avg,count,min,max,first}_functions_ut.cpp` | `AggFunc` 求值（`infinity-expression::aggregate`） | `aggregate_functions_match_the_reference`（六种聚合、NULL 忽略、布尔 min/max/first） |
 | `function/scalar/{abs,add,div,equals,inequals,greater,greater_equals,less,less_equals}_functions_ut.cpp` | `infinity-expression` 标量求值 | `abs_function_covers_every_numeric_type`、`arithmetic_and_equality_follow_the_reference`（含比较族与除零 NULL；溢出语义见设计变更） |
 | `storage/invertedindex/memory_indexer_ut.cpp::Chunk` | `MemoryIndexer` | `memory_indexer_builds_the_reference_postings`（5 段 FST 文本的 term→doc/tf 与参考一致） |
+| `planner/node/logical_{create_table,drop_table,create_index,drop_index,insert,update,aggregate,project,limit,optimize,compact,flush,check,command,show}_ut.cpp`（15 例） | `Engine::execute` 的语句执行 | `logical_planner_statements_succeed`（C++ 用例只断言语句执行成功并打印逻辑节点） |
 | `executor/expression/expression_executor_select_ut.cpp`（3 例） | `ColumnVector<bool>` | `expression_select_alternating_input`、`expression_select_all_true_input`、`expression_select_all_false_input`（C++ 的 selector 调用本身在 `#if 0` 内） |
 | `storage/column_vector/{selection,var_buffer}_ut.cpp`（2 例） | `selection::Selection` / `var_buffer::VarBuffer` | `selection_matches_the_reference`、`var_buffer_appends_and_roundtrips` |
 | `storage/meta/entry/block_version_ut.cpp`（5 例） | `mvcc::BlockVersion` | `save_and_load_roundtrip`、`reopen_preserves_the_slot_array`、`delete_twice_is_rejected`、`check_delete_compares_timestamps`、`get_delete_ts_returns_the_slot_range` |

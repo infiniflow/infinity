@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 104, `gap` 103, `gate-a` 61, `integration` 250, `partial` 44, `ported` 403.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 104, `gap` 103, `gate-a` 46, `integration` 250, `partial` 44, `ported` 418.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -275,24 +275,24 @@
 | 261 | `src/unit_test/planner/explain_basic_ut.cpp` | `ExplainBasicTest` | `test1` | gate-a |
 | 262 | `src/unit_test/planner/logical_plan_tpch_ut.cpp` | `LogicalPlannerTpchTest` | `test1` | gate-a |
 | 263 | `src/unit_test/planner/logical_planner_ut_nimpl.cpp` | `LogicalPlannerTest` | `test1` | gate-a |
-| 264 | `src/unit_test/planner/node/logical_aggregate_ut.cpp` | `LogicalAggregateTest` | `test1` | gate-a |
-| 265 | `src/unit_test/planner/node/logical_check_ut.cpp` | `LogicalCheckTest` | `test1` | gate-a |
-| 266 | `src/unit_test/planner/node/logical_command_ut.cpp` | `LogicalCommandTest` | `test1` | gate-a |
-| 267 | `src/unit_test/planner/node/logical_compact_ut.cpp` | `LogicalCompactTest` | `test1` | gate-a |
+| 264 | `src/unit_test/planner/node/logical_aggregate_ut.cpp` | `LogicalAggregateTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 265 | `src/unit_test/planner/node/logical_check_ut.cpp` | `LogicalCheckTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 266 | `src/unit_test/planner/node/logical_command_ut.cpp` | `LogicalCommandTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 267 | `src/unit_test/planner/node/logical_compact_ut.cpp` | `LogicalCompactTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 268 | `src/unit_test/planner/node/logical_create_collection_ut.cpp` | `LogicalCreateCollectionTest` | `test1` | gate-a |
-| 269 | `src/unit_test/planner/node/logical_create_index_ut.cpp` | `LogicalCreateIndexTest` | `test1` | gate-a |
-| 270 | `src/unit_test/planner/node/logical_create_table_ut.cpp` | `LogicalCreateTableTest` | `test1` | gate-a |
+| 269 | `src/unit_test/planner/node/logical_create_index_ut.cpp` | `LogicalCreateIndexTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 270 | `src/unit_test/planner/node/logical_create_table_ut.cpp` | `LogicalCreateTableTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 271 | `src/unit_test/planner/node/logical_drop_collection_ut.cpp` | `LogicalDropCollectionTest` | `test1` | gate-a |
-| 272 | `src/unit_test/planner/node/logical_drop_index_ut.cpp` | `LogicalDropIndexTest` | `test1` | gate-a |
-| 273 | `src/unit_test/planner/node/logical_drop_table_ut.cpp` | `LogicalDropTableTest` | `test1` | gate-a |
-| 274 | `src/unit_test/planner/node/logical_flush_ut.cpp` | `LogicalFlushTest` | `test1` | gate-a |
-| 275 | `src/unit_test/planner/node/logical_insert_ut.cpp` | `LogicalInsertTest` | `test1` | gate-a |
-| 276 | `src/unit_test/planner/node/logical_limit_ut.cpp` | `LogicalLimitTest` | `test1` | gate-a |
+| 272 | `src/unit_test/planner/node/logical_drop_index_ut.cpp` | `LogicalDropIndexTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 273 | `src/unit_test/planner/node/logical_drop_table_ut.cpp` | `LogicalDropTableTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 274 | `src/unit_test/planner/node/logical_flush_ut.cpp` | `LogicalFlushTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 275 | `src/unit_test/planner/node/logical_insert_ut.cpp` | `LogicalInsertTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 276 | `src/unit_test/planner/node/logical_limit_ut.cpp` | `LogicalLimitTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 277 | `src/unit_test/planner/node/logical_match_scan_base_ut.cpp` | `LogicalMatchScanTest` | `test1` | gate-a |
-| 278 | `src/unit_test/planner/node/logical_optimize_ut.cpp` | `LogicalOptimzieTest` | `test1` | gate-a |
-| 279 | `src/unit_test/planner/node/logical_project_ut.cpp` | `LogicalProjectTest` | `test1` | gate-a |
-| 280 | `src/unit_test/planner/node/logical_show_ut.cpp` | `LogicalShowTest` | `test1` | gate-a |
-| 281 | `src/unit_test/planner/node/logical_update_ut.cpp` | `LogicalUpdateTest` | `test1` | gate-a |
+| 278 | `src/unit_test/planner/node/logical_optimize_ut.cpp` | `LogicalOptimzieTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 279 | `src/unit_test/planner/node/logical_project_ut.cpp` | `LogicalProjectTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 280 | `src/unit_test/planner/node/logical_show_ut.cpp` | `LogicalShowTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
+| 281 | `src/unit_test/planner/node/logical_update_ut.cpp` | `LogicalUpdateTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 282 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `top_level_alternation_requires_nothing` | ported |
 | 283 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `scoped_case_insensitive_group_keeps_its_mode` | ported |
 | 284 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `re2_escapes` | ported |
