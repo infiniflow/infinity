@@ -64,6 +64,29 @@ pub enum ExprAst {
     Or(Box<ExprAst>, Box<ExprAst>),
 }
 
+impl ExprAst {
+    /// True when this expression still carries an unresolved nested query: the
+    /// parser represents `EXISTS (SELECT …)` and a scalar subquery as the
+    /// `EXISTS`/`SUBQUERY` pseudo-functions whose argument is the nested SQL
+    /// text. A planner must not treat those as ordinary functions, because an
+    /// unknown function evaluates to `NULL` (i.e. silently false).
+    pub fn contains_subquery(&self) -> bool {
+        match self {
+            ExprAst::Func { name, args } => {
+                name.eq_ignore_ascii_case("SUBQUERY")
+                    || name.eq_ignore_ascii_case("EXISTS")
+                    || args.iter().any(ExprAst::contains_subquery)
+            }
+            ExprAst::Binary(a, _, b)
+            | ExprAst::Cmp(a, _, b)
+            | ExprAst::And(a, b)
+            | ExprAst::Or(a, b) => a.contains_subquery() || b.contains_subquery(),
+            ExprAst::Not(a) => a.contains_subquery(),
+            ExprAst::Column(_) | ExprAst::Literal(_) => false,
+        }
+    }
+}
+
 /// A boolean connective.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoolOp {
@@ -91,6 +114,21 @@ pub enum Predicate {
 }
 
 impl Predicate {
+    /// True when any leaf expression still carries an unresolved nested query.
+    pub fn contains_subquery(&self) -> bool {
+        match self {
+            Predicate::Cmp(a, _, b) | Predicate::Like(a, b, _, _) => {
+                a.contains_subquery() || b.contains_subquery()
+            }
+            Predicate::IsTrue(e) | Predicate::IsNull(e, _) => e.contains_subquery(),
+            Predicate::In(a, values, _) => {
+                a.contains_subquery() || values.iter().any(ExprAst::contains_subquery)
+            }
+            Predicate::Bool(a, _, b) => a.contains_subquery() || b.contains_subquery(),
+            Predicate::Not(a) => a.contains_subquery(),
+        }
+    }
+
     /// Convenience constructor for the common `column <op> literal` shape.
     pub fn simple(column: impl Into<String>, op: CmpOp, value: Literal) -> Predicate {
         Predicate::Cmp(ExprAst::Column(column.into()), op, ExprAst::Literal(value))
@@ -278,6 +316,21 @@ pub enum SelectItem {
     },
     /// An arbitrary scalar expression (e.g. `MAX(c1)+SUM(c2)`).
     Expr(ExprAst),
+}
+
+impl SelectItem {
+    /// True when the projected expression still carries an unresolved nested
+    /// query (see [`ExprAst::contains_subquery`]).
+    pub fn contains_subquery(&self) -> bool {
+        match self {
+            SelectItem::Func { args, .. } => args.iter().any(ExprAst::contains_subquery),
+            SelectItem::Expr(e) => e.contains_subquery(),
+            SelectItem::Aggregate(a) => {
+                a.arg_exprs.iter().flatten().any(ExprAst::contains_subquery)
+            }
+            SelectItem::Star | SelectItem::Literal(_) | SelectItem::Column(_) => false,
+        }
+    }
 }
 
 /// One `MATCH <KIND> (<column>, <args...>)` term of a `SEARCH MATCH` clause.

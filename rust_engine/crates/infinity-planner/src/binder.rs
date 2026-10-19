@@ -653,6 +653,19 @@ mod tests {
         assert_eq!(bound.correlated_columns[0].depth, 1);
     }
 
+    /// The predicate of a subquery whose single projection is a plain column:
+    /// `Projection(Filter(Scan))`, so the `WHERE` predicate lives one level
+    /// below the projection.
+    fn subquery_predicate(plan: &SubqueryPlan) -> &SubqueryExpr {
+        let SubqueryPlan::Projection { input, .. } = plan else {
+            panic!("expected a projection, got {plan:?}");
+        };
+        let SubqueryPlan::Filter { predicate, .. } = input.as_ref() else {
+            panic!("expected a filter, got {input:?}");
+        };
+        predicate
+    }
+
     /// A qualifier naming another table is an outer reference even when the
     /// bare column also exists locally (round-4 review G2).
     #[test]
@@ -678,6 +691,58 @@ mod tests {
             .unwrap();
         assert_eq!(bound.correlated_columns.len(), 1, "{bound:?}");
         assert_eq!(bound.correlated_columns[0].depth, 1);
+        // Correlation alone cannot distinguish the two bindings: `s.a` bound
+        // as an outer reference would dedupe with `o.a` and still yield one
+        // correlated column. Assert the sides themselves.
+        let SubqueryExpr::Cmp(left, CmpOp::Eq, right) = subquery_predicate(&bound.plan) else {
+            panic!("expected an equality, got {:?}", bound.plan);
+        };
+        assert_eq!(
+            **left,
+            SubqueryExpr::col(ColumnBinding::new(0, 0), 0),
+            "`s.a` must read the subquery's own scan"
+        );
+        assert_eq!(
+            **right,
+            SubqueryExpr::col(ColumnBinding::new(0, 0), 1),
+            "`o.a` must read the enclosing query"
+        );
+    }
+
+    /// A qualifier that *is* the subquery's own table keeps the reference
+    /// local; a database-qualified `db.s.a` normalises to the same table.
+    #[test]
+    fn a_qualified_local_reference_binds_to_the_subquery_scan() {
+        let binder = QueryBinder::new();
+        let local = vec!["a".to_string()];
+        let outer = vec!["a".to_string()];
+        let items = [SelectItem::Column("a".into())];
+        for qualifier in ["s.a", "db.s.a"] {
+            let pred = Predicate::Cmp(
+                ExprAst::Column(qualifier.into()),
+                CmpOp::Eq,
+                ExprAst::Literal(Literal::Int(1)),
+            );
+            let bound = binder
+                .bind_subquery(
+                    SubqueryType::Exists,
+                    Some("s"),
+                    &local,
+                    &items,
+                    Some(&pred),
+                    &outer,
+                )
+                .unwrap();
+            assert!(bound.correlated_columns.is_empty(), "{bound:?}");
+            let SubqueryExpr::Cmp(left, CmpOp::Eq, _) = subquery_predicate(&bound.plan) else {
+                panic!("expected an equality, got {:?}", bound.plan);
+            };
+            assert_eq!(
+                **left,
+                SubqueryExpr::col(ColumnBinding::new(0, 0), 0),
+                "`{qualifier}` must read the subquery's own scan"
+            );
+        }
     }
 
     /// C++ `BindExpression`: a select expression is resolved against the bound

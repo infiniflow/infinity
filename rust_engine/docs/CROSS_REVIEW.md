@@ -80,3 +80,19 @@ H4/H5 待 planner 接线后复核。
 | G16/G17 | HNSW 生产 codec、top-ef | G16 由 `knn_format` + `cpp_blocks` 生产路径测试覆盖；G17 已加 `search_candidates` 保持 C++ 不截断语义 |
 
 **未接线但已登记**：`IndexScanBuilder` 作为 `OptimizerRule`（执行器直接调用，避免丢谓词）、`ResultCacheGetter` 默认管线（语句缓存已覆盖，plan-level 需写路径失效钩子）、块级 rough filter（无 block stats 层）、相关子查询执行（无 mark join 算子，显式拒绝）。
+
+## Round 5（HEAD 563e07e10 + 本轮修复，收敛检查）
+
+| # | 发现 | 级别 | 处置 |
+|---|---|---|---|
+| R5-1 | G2 新测试只断言去重后剩一个相关列，若 `s.a` 被误绑定为外层也只有一个（与 `o.a` 去重），无法区分 | medium | **已修**：`a_qualified_outer_reference_is_not_shadowed_by_a_local_column` 现在直接断言谓词两侧：`s.a` = `(@0, 0, depth 0)`、`o.a` = `(@0, 0, depth 1)` |
+| R5-2 | 限定名为子查询自身表（`s.a`）的本地绑定分支无测试 | medium | **已修**：新增 `a_qualified_local_reference_binds_to_the_subquery_scan`，同时覆盖 `db.s.a` 的三段限定符归一化 |
+| R5-3 | `plan_select` 可能产出带 `Expr::Subquery` 的不可执行计划 | medium | **部分不成立**：`infinity_expression::Expr` 没有 `Subquery` 变体。但确认了真实边界：未解析的 `EXISTS`/`SUBQUERY` 会编译成未知函数，而未知函数求值为 `NULL`（静默 false）。**已修**：`ExprAst/Predicate/SelectItem::contains_subquery`（parser）在 `plan_select` 入口拒绝，报 `subqueries must be resolved before planning`；执行器的三个同名 helper 改为复用这套方法 |
+| R5-4 | Gate A 缺少 `statement error` 行时 `frac` 退回 `(0,0)`，比较退化为恒真 | low | **已修**：三个计数器任一缺失直接失败，且要求三者总数 > 0 |
+| R5-5 | `CLASS_MAP` 仍把 subquery 类标 `✅`、把 peer 写成 `partial`，与 `CLASS_AUDIT` 不一致 | low | **已修**：subquery 行改 `⚠️ partial`，`ResultCacheGetter` 注明仅测试接入；「已知限制」重写为“解析器保留限定符 + binder 检出 + 执行器显式拒绝”，peer 说明与 `CLASS_AUDIT` 的 `mapped` 一致，且都不宣称线路兼容 |
+
+**本轮顺带修掉的真 bug（评审未报，由 R5-3 的边界排查暴露）**：执行器 `bind_subquery` 与 `outer_columns` 都用裸表名查 catalog，而 catalog 的键是 `db.table`，导致 `table_schema("cs2")` 恒失败、`bind_subquery` 恒走 `Ok(())` 提前返回——相关子查询检测在 SQL 路径上从未真正跑到过。改为 `table_key` 归一化后，`a_correlated_subquery_is_rejected_instead_of_evaluated_as_a_constant` 端到端证明：未相关 `EXISTS` 正常返回全部行，相关 `EXISTS` 报 `correlated subqueries are not supported`。
+
+验证：`cargo fmt --all -- --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace --lib`（全绿）、Gate A `statement ok 1752/1752, statement error 129/129, query 1546/1546`。
+
+结论：**converged**——无未处置的 critical/high。

@@ -712,6 +712,24 @@ pub fn plan_select(
     limit: Option<u64>,
     offset: Option<u64>,
 ) -> Result<LogicalPlan> {
+    // Nested queries reach the planner as `EXISTS`/`SUBQUERY` pseudo-functions
+    // carrying SQL text. The planner has no storage engine, so it cannot
+    // evaluate them; compiling one would turn it into an unknown function,
+    // which the expression layer evaluates as NULL (a silent false). Require
+    // the caller to resolve subqueries first.
+    if items.iter().any(SelectItem::contains_subquery)
+        || where_pred.is_some_and(Predicate::contains_subquery)
+        || having.is_some_and(Predicate::contains_subquery)
+        || group_by.iter().any(ExprAst::contains_subquery)
+        || order_by
+            .iter()
+            .filter_map(|k| k.expr.as_ref())
+            .any(ExprAst::contains_subquery)
+    {
+        return Err(Error::Invalid(
+            "subqueries must be resolved before planning".into(),
+        ));
+    }
     if tables.is_empty() {
         let mut row = Vec::new();
         for it in items {
@@ -1024,6 +1042,36 @@ mod tests {
                 table: "t".into(),
                 columns: vec!["id".into(), "name".into()]
             }
+        );
+    }
+
+    /// A nested query must be resolved by the caller: the planner cannot run a
+    /// `SELECT`, and an unresolved `EXISTS`/`SUBQUERY` would compile to an
+    /// unknown function, which evaluates to `NULL` (a silent false).
+    #[test]
+    fn plan_select_rejects_unresolved_subqueries() {
+        let exists = ExprAst::Func {
+            name: "EXISTS".into(),
+            args: vec![ExprAst::Func {
+                name: "SUBQUERY".into(),
+                args: vec![ExprAst::Literal(Literal::Str("SELECT id FROM t".into()))],
+            }],
+        };
+        let err = plan_select(
+            &[SelectItem::Star],
+            &tables(),
+            None,
+            Some(&Predicate::IsTrue(exists)),
+            &[],
+            None,
+            &[],
+            None,
+            None,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("subqueries must be resolved"),
+            "{err}"
         );
     }
 

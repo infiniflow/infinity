@@ -1971,42 +1971,6 @@ fn value_to_literal(value: Value) -> Literal {
     }
 }
 
-fn expr_has_subquery(e: &ExprAst) -> bool {
-    match e {
-        ExprAst::Func { name, args } => {
-            name.eq_ignore_ascii_case("SUBQUERY")
-                || name.eq_ignore_ascii_case("EXISTS")
-                || args.iter().any(expr_has_subquery)
-        }
-        ExprAst::Binary(a, _, b)
-        | ExprAst::Cmp(a, _, b)
-        | ExprAst::And(a, b)
-        | ExprAst::Or(a, b) => expr_has_subquery(a) || expr_has_subquery(b),
-        ExprAst::Not(a) => expr_has_subquery(a),
-        _ => false,
-    }
-}
-
-fn pred_has_subquery(p: &Predicate) -> bool {
-    match p {
-        Predicate::Cmp(a, _, b) => expr_has_subquery(a) || expr_has_subquery(b),
-        Predicate::IsTrue(e) | Predicate::IsNull(e, _) => expr_has_subquery(e),
-        Predicate::Like(a, b, _, _) => expr_has_subquery(a) || expr_has_subquery(b),
-        Predicate::In(a, vals, _) => expr_has_subquery(a) || vals.iter().any(expr_has_subquery),
-        Predicate::Bool(a, _, b) => pred_has_subquery(a) || pred_has_subquery(b),
-        Predicate::Not(a) => pred_has_subquery(a),
-    }
-}
-
-fn item_has_subquery(item: &SelectItem) -> bool {
-    match item {
-        SelectItem::Func { args, .. } => args.iter().any(expr_has_subquery),
-        SelectItem::Expr(e) => expr_has_subquery(e),
-        SelectItem::Aggregate(a) => a.arg_exprs.iter().flatten().any(expr_has_subquery),
-        _ => false,
-    }
-}
-
 fn parse_value(cell: &str) -> Value {
     if let Ok(i) = cell.parse::<i64>() {
         Value::Int(i)
@@ -4008,7 +3972,11 @@ impl Engine {
         let Some(table) = from.as_ref() else {
             return Ok(());
         };
-        let Ok(columns) = self.table_schema(table) else {
+        // The catalog keys tables by `db.table`; an unqualified name in the
+        // subquery's FROM has to be resolved the same way. A name that still
+        // does not resolve (a CTE, say) is not a base-table subquery, so the
+        // binder check is skipped rather than failed.
+        let Ok(columns) = self.table_schema(&self.table_key(table)) else {
             return Ok(());
         };
         let bound = infinity_planner::binder::QueryBinder::new().bind_subquery(
@@ -4214,13 +4182,15 @@ impl Engine {
         else {
             return Ok(None);
         };
-        let changed = items.iter().any(item_has_subquery)
-            || where_pred.as_ref().is_some_and(pred_has_subquery)
-            || group_by.iter().any(expr_has_subquery)
-            || having.as_ref().is_some_and(|h| pred_has_subquery(h))
+        let changed = items.iter().any(SelectItem::contains_subquery)
+            || where_pred
+                .as_ref()
+                .is_some_and(Predicate::contains_subquery)
+            || group_by.iter().any(ExprAst::contains_subquery)
+            || having.as_ref().is_some_and(|h| h.contains_subquery())
             || order_by
                 .iter()
-                .any(|k| k.expr.as_ref().is_some_and(expr_has_subquery));
+                .any(|k| k.expr.as_ref().is_some_and(ExprAst::contains_subquery));
         if !changed {
             return Ok(None);
         }
@@ -4272,7 +4242,7 @@ impl Engine {
     /// Evaluates a constant `LIMIT`/`OFFSET` expression. A subquery is not a
     /// constant here: it is rejected rather than silently ignored.
     fn eval_limit_expr(&self, expr: &ExprAst) -> Result<u64> {
-        if expr_has_subquery(expr) {
+        if expr.contains_subquery() {
             return Err(Error::Invalid(
                 "LIMIT/OFFSET must be a constant expression, not a subquery".into(),
             ));
@@ -7552,7 +7522,9 @@ impl Engine {
         let outer_columns = match stmt {
             Statement::Select {
                 from: Some(table), ..
-            } => self.table_schema(table).unwrap_or_default(),
+            } => self
+                .table_schema(&self.table_key(table))
+                .unwrap_or_default(),
             _ => Vec::new(),
         };
         let resolved = self.resolve_stmt_subqueries(stmt, &cte_scope, &outer_columns)?;
@@ -15451,6 +15423,38 @@ mod tests {
         assert_eq!(
             rows(&e, "SELECT c3, c2, c1 from select3;"),
             vec![vec!["3".to_string(), "2".to_string(), "1".to_string()]]
+        );
+    }
+
+    /// Round-5 review: a subquery that reads the enclosing query is rejected
+    /// explicitly. Folding it once as a constant would silently answer
+    /// `true`/`false` for every outer row, which is what the old path did.
+    #[test]
+    fn a_correlated_subquery_is_rejected_instead_of_evaluated_as_a_constant() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE cs (id INT, v INT);").unwrap();
+        e.execute("INSERT INTO cs VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute("CREATE TABLE cs2 (id INT);").unwrap();
+        e.execute("INSERT INTO cs2 VALUES (2);").unwrap();
+        // Uncorrelated: the subquery is evaluated on its own, so every outer
+        // row sees the same answer.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM cs WHERE EXISTS (SELECT id FROM cs2) ORDER BY id;"
+            ),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+        // Correlated on the outer `cs.id`: no eager constant can be correct.
+        let err = e
+            .execute("SELECT id FROM cs WHERE EXISTS (SELECT id FROM cs2 WHERE cs2.id = cs.id);")
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("correlated subqueries are not supported"),
+            "{err}"
         );
     }
 
