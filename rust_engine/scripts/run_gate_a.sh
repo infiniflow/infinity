@@ -22,7 +22,12 @@ def frac(label):
     m = re.search(rf"{label}\s*:\s*(\d+)/(\d+)", text)
     return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
 ok_p, ok_t = frac("statement ok")
+e_p, e_t = frac("statement error")
 q_p, q_t = frac("query")
-print(f"Gate A: statement ok {ok_p}/{ok_t}, query {q_p}/{q_t}")
-sys.exit(0 if ok_p == ok_t and q_t > 0 and q_p == q_t else 1)
+print(f"Gate A: statement ok {ok_p}/{ok_t}, statement error {e_p}/{e_t}, query {q_p}/{q_t}")
+sys.exit(
+    0
+    if ok_p == ok_t and e_p == e_t and q_t > 0 and q_p == q_t
+    else 1
+)
 PY
