@@ -2490,6 +2490,9 @@ struct TableEntry {
     /// IVF memory segment: rows written since the last mirror dump, merged
     /// with the sealed chunks at query time.
     ivf_mem: HashMap<String, Vec<(u64, Vec<f32>)>>,
+    /// Block map of the C++-format mirror (C++ `BlockIndex`): block ids, row
+    /// ranges and the decoded-block LRU shared with `Context::buffer`.
+    block_index: Option<Arc<Mutex<infinity_storage::block_index::BlockIndex>>>,
     /// Decoded rows of a **scalar-only** table (the reference's in-memory
     /// `DataBlock`s). Served by `fetch_rows_with_ids` while it covers every
     /// live row; any mutation that rewrites rows drops it.
@@ -3654,6 +3657,35 @@ impl Engine {
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
             .columns)
+    }
+
+    /// The table's block map (C++ `BlockIndex`), opened lazily from the
+    /// C++-format mirror's `version` files. The decoded blocks go through the
+    /// engine-wide `Context::buffer` LRU.
+    fn block_index_for(
+        &self,
+        table: &str,
+    ) -> Option<Arc<Mutex<infinity_storage::block_index::BlockIndex>>> {
+        let meta = self.storage.catalog.get_table_by_name(table).ok()??;
+        let key = self.table_key(table);
+        {
+            let tables = self.tables.lock().unwrap();
+            if let Some(index) = tables.get(&key).and_then(|e| e.block_index.clone()) {
+                return Some(index);
+            }
+        }
+        let db_id = self.database_id_of(table);
+        let index =
+            infinity_storage::block_index::BlockIndex::open(self.blocks_root(), db_id, meta.id)
+                .ok()?;
+        let shared = Arc::new(Mutex::new(index));
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(key)
+            .or_default()
+            .block_index = Some(shared.clone());
+        Some(shared)
     }
 
     /// Reserves a contiguous block of `n` row ids for `table`.
@@ -6995,6 +7027,7 @@ impl Engine {
             // Block-level indexes refer to the old row ids.
             entry.secondary.indexes.clear();
             entry.vector.clear();
+            entry.block_index = None;
         }
         self.result_cache.lock().unwrap().clear();
         Ok(())

@@ -67,13 +67,14 @@ pub fn drop_tree_cache(root: &std::path::Path) {
     }
 }
 
-pub mod block_manager;
+pub mod block_index;
 pub mod bmp_cpp;
 pub mod bmp_segment;
 pub mod buffer;
 pub mod catalog_format;
 pub mod cpp_format;
 pub mod crc;
+pub mod data_block;
 pub mod emvb_segment;
 pub mod fulltext_segment;
 pub mod inverted_format;

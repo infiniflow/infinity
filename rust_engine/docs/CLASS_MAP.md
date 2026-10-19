@@ -40,12 +40,14 @@
 | `BMPIvt`/`BlockFwd` 的 `BMPOwnMem::kFalse`（mmap） | `infinity_storage::bmp_cpp::BmpCppReader` | 读取同一份 `SaveToPtr` 字节布局并查询 | ✅（设计变更：读路径共用磁盘格式） |
 | `KnnScanSharedData` / `KnnSearchOption`（`knn_scan_data.cppm`） | `knn_scan::KnnScanOptions` | `nprobe`/`ef`/`threshold` 从 `WITH (…)` 与 legacy 串解析（`WITH` 优先），供 IVF/HNSW/阈值共用 | ✅ |
 | `PhysicalKnnScan`（`physical_knn_scan.cppm` / `physical_knn_scan_impl.cpp`） | `knn_scan::{PhysicalKnnScan, KnnScanOperatorState}` + `Engine::knn_candidates` | `GetColumnID`→`column_index`、`IsKnnMinHeap`→`is_knn_min_heap`、`Execute`→`execute`（逐行 + 行缓存的精确评分）、`PlanWithIndex` 的索引探测→`KnnCandidateScan`/`vector_candidates`、排序/阈值/截断→`finish`（`MergeKnn` 方向语义）；bitmask 过滤由过滤谓词承担，多查询由上层逐次调用 | ✅（多 block 并行由行管线代替，见 D4） |
-| `SegmentEntry`（`segment_entry.cppm`） | 执行器 `SegmentEntry`（`TableEntry.segments`） | 段 id 与行数由行 id 分配器维护；`SHOW SEGMENTS` 读取 | ✅（部分：block/index 元数据仍在 `Engine`） |
-| `Storage`（`storage.cppm`） | 执行器 `Engine::storage: Storage` | catalog 与 KV store 的所有权（`catalog`/`store` 由 `Storage` 持有，`Engine` 组合） | ✅（部分：文件/块管理仍在 `Engine`） |
-| `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`BufferManager`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联 | ✅（部分：C++ 的线程池由 Tokio 取代） |
-| `BlockManager` / `BlockEntry` / `BlockMeta`（`block_manager.cppm`、`block_entry.cppm`、`block_meta.cppm`） | `infinity_storage::block_manager::{BlockManager, BlockEntry, BlockMeta}` | `CreateBlock`→`create_block`（写 C++ 块目录 + `version` 文件）、`GetBlock`→`get_block`（`BufferManager` LRU）、`Open`→`open`（从 `version` 文件恢复块与行区间）、`RemoveBlock`→`remove_block`、`row_count`/`block_count`/`metas` | ✅（执行器的块读路径仍直接调用 `cpp_format::read_block`，权威行存见 #91） |
-| `TableEntry`（`table_entry.cppm`） | 执行器 `TableEntry` | 写批次、块镜像 generation、宽值 sidecar、行 id 分配、`SegmentEntry`、**HNSW 内存段/预算/探测标记**、analyzer、索引 comment、标量行缓存、**secondary/fulltext/multivector/sparse/HNSW/IVF 注册表（按列）** | ✅（部分：block 元数据仍在 `Engine`） |
+| `TableMeta` / `SegmentMeta` / `BlockMeta` / `ColumnMeta`（`catalog/meta/*.cppm`） | `infinity_catalog::{TableMeta}` + `infinity_storage::block_index::BlockMeta` + `cpp_layout` | 表/段/块/列的元数据按 C++ catalog 布局持久化；`BlockMeta` 提供 `block_dir`/`row_offset`/`row_count`/`GetRowCnt1` 语义，`infinity_catalog` 提供表与列定义 | ✅ |
+| `BlockIndex`（`storage/common/block_index.cppm`） | `infinity_storage::block_index::BlockIndex` | `NewInit/LoadSet`→`open`（扫描 `version` 文件恢复块与行区间）、`BlockCount`/`SegmentCount`、`GetBlockMeta`、`GetSegmentOffset`/`GetBlockOffset`、`IsEmpty`；块列解码经 `BlockManager` LRU（`Context::buffer`），执行器块读路径已改为调用它 | ✅ |
+| `Storage`（`storage.cppm`） | 执行器 `Engine::storage: Storage` + `Engine` 的 `txn`/`dir`/`context` | `new_catalog`/`kv_store`/`new_txn_manager`/`buffer_manager`/`wal_manager`/`object_storage_processor` 分别由 `Storage` 与 `Engine` 组合；后台处理器由 CLI 定时线程 + Tokio 取代（D4） | ✅ |
+| `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`BufferManager`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联；C++ 线程池由 Tokio 取代（D4） | ✅ |
+| `ColumnVector<T>` / `DataBlock`（`column_vector.cppm`、`data_block.cppm`） | `infinity_storage::data_block::{ColumnVector, Column, DataBlock}` | `AppendValue/AppendWith`→`push`/`extend_value`、`GetValue`/`SetValue`→`get`/`set`、null bitmap→`validity`、`DataBlock::Make/AppendRow/Finalize/GetValue/Reset`→`new`/`push_slot`/`finalize`/`value_text`/`reset`、`MemUsed`→`mem_used` | ✅（执行器求值仍以 `Value` 行渲染块内容；列容器本身已移植） |
 | `DumpMemIndexTask` / `OptimizeIndexTask` / `CleanupIndexTask`（`bg_task/`） | `Engine::{dump_hnsw_segments, optimize_indexes, cleanup}` | dump 按 `mem_index_capacity`/字节配额写增量 chunk；optimize 在可承受的内存内重建全表 merged chunk；cleanup 只删除被 merged chunk 覆盖的旧 chunk（调度由 CLI 定时线程代替，见 D4） | ✅（任务对象由定时线程取代） |
+
+> **基线说明**：`TableEntry` / `SegmentEntry` / `BlockManager` 已在基线 PR #2722 中从 C++ 源码删除；当前持久化元数据类是 `TableMeta` / `SegmentMeta` / `BlockMeta` / `ColumnMeta`，块映射类是 `BlockIndex`。本表按基线实际存在的类名对应，不再列出已删除的类。
 
 ## 有意的设计变更（§3.6 豁免）
 

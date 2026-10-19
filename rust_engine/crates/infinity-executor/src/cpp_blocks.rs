@@ -1080,6 +1080,11 @@ impl Engine {
             })?;
             written += chunk.len();
         }
+        // The mirror has new block files; the table's block map must rescan.
+        let tkey = self.table_key(&table);
+        if let Some(entry) = self.tables.lock().unwrap().get_mut(&tkey) {
+            entry.block_index = None;
+        }
         Ok(written)
     }
 
@@ -1208,30 +1213,33 @@ impl Engine {
     /// a miss (the reference's `BufferManager::Get`).
     fn read_block_cached(
         &self,
+        table: &str,
         root: &Path,
         id: BlockId,
     ) -> std::io::Result<(BlockVersionFile, Arc<Vec<RawBlockColumn>>)> {
-        if let Some(columns) = self.context.buffer.lock().unwrap().get(&id) {
-            let dir = root.join(cpp_format::block_dir(
-                id.db_id,
-                id.table_id,
-                id.segment_id,
-                id.block_id,
-            ));
-            let version =
-                BlockVersionFile::decode(&std::fs::read(dir.join(cpp_format::VERSION_FILE))?)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-            return Ok((version, columns));
+        // C++ `BlockIndex` + `BlockMeta::GetBlockColumnInfo`: the metadata
+        // lookup and the decoded payload both go through the table's block
+        // index and the engine-wide buffer manager.
+        if let Some(index) = self.block_index_for(table) {
+            let index = index.lock().unwrap();
+            let mut buffer = self.context.buffer.lock().unwrap();
+            if let Ok((_, columns)) = index.get_block(&mut buffer, &id) {
+                let dir = root.join(cpp_format::block_dir(
+                    id.db_id,
+                    id.table_id,
+                    id.segment_id,
+                    id.block_id,
+                ));
+                let version =
+                    BlockVersionFile::decode(&std::fs::read(dir.join(cpp_format::VERSION_FILE))?)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                return Ok((version, columns));
+            }
         }
+        // A block not registered in the index (e.g. written between the
+        // index's open and this read) is still readable from disk.
         let (version, columns) = cpp_format::read_block(root, id)?;
-        let bytes = infinity_storage::buffer::block_bytes(&columns);
-        let columns = Arc::new(columns);
-        self.context
-            .buffer
-            .lock()
-            .unwrap()
-            .put(id, columns.clone(), bytes);
-        Ok((version, columns))
+        Ok((version, Arc::new(columns)))
     }
 
     /// Reads the block mirror back, returning `(columns, rows)`.
@@ -1314,7 +1322,7 @@ impl Engine {
                 segment_id: 0,
                 block_id: block_index,
             };
-            let (version, columns) = match self.read_block_cached(&root, id) {
+            let (version, columns) = match self.read_block_cached(&table, &root, id) {
                 Ok(v) => v,
                 Err(_) if block_index == 0 => {
                     return Err(Error::NotFound(format!("no blocks for table '{table}'")))
