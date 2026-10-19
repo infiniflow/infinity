@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 134, `gate-a` 136, `integration` 264, `partial` 60, `ported` 276.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 132, `gate-a` 136, `integration` 264, `partial` 60, `ported` 278.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -508,8 +508,8 @@
 | 494 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `ivf_readwrite` | ported | `value_format::tests::ivf_index_base_roundtrips_through_its_bytes` |
 | 495 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `hnsw_readwrite` | ported | `value_format::tests::hnsw_index_base_roundtrips_through_its_bytes` |
 | 496 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `full_text_readwrite` | ported | `value_format::tests::full_text_index_base_roundtrips_through_its_bytes` |
-| 497 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `test1` | gap |
-| 498 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `ReadWrite` | gap |
+| 497 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `test1` | ported | `infinity-catalog` `value_format::tests::table_def_reports_schema_table_comment_and_columns` |
+| 498 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `ReadWrite` | ported | `value_format::tests::table_def_roundtrips_through_its_bytes` |
 | 499 | `src/unit_test/storage/definition/table_ut.cpp` | `TableTest` | `test1` | gap |
 | 500 | `src/unit_test/storage/invertedindex/column_inverter_ut.cpp` | `ColumnInverterTest` | `Invert` | ported |
 | 501 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test1` | gap |

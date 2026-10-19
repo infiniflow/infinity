@@ -150,6 +150,97 @@ impl ColumnDefValue {
     }
 }
 
+/// C++: `TableDef` (`src/storage/definition/table_def.cppm:24`).
+///
+/// The reference serializes it with a hand-rolled `WriteAdv` layout. The port
+/// stores the same fields through the catalog's JSON encoding (registered as a
+/// deliberate design change in `CLASS_MAP.md`).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TableDef {
+    pub schema_name: String,
+    pub table_name: String,
+    pub table_comment: String,
+    pub columns: Vec<ColumnDefValue>,
+}
+
+impl TableDef {
+    /// C++: `TableDef::Make`.
+    pub fn make(
+        schema_name: impl Into<String>,
+        table_name: impl Into<String>,
+        table_comment: impl Into<String>,
+        columns: Vec<ColumnDefValue>,
+    ) -> Self {
+        Self {
+            schema_name: schema_name.into(),
+            table_name: table_name.into(),
+            table_comment: table_comment.into(),
+            columns,
+        }
+    }
+
+    pub fn column_count(&self) -> usize {
+        self.columns.len()
+    }
+
+    /// C++: `TableDef::GetColIdByName` — `None` where the reference returns
+    /// `(size_t)-1`.
+    pub fn get_col_id_by_name(&self, name: &str) -> Option<usize> {
+        self.columns.iter().position(|c| c.column_name == name)
+    }
+
+    /// The JSON form (see the type comment).
+    pub fn to_json(&self) -> Json {
+        obj(vec![
+            (
+                "schema_name".to_string(),
+                Json::Str(self.schema_name.clone()),
+            ),
+            ("table_name".to_string(), Json::Str(self.table_name.clone())),
+            (
+                "table_comment".to_string(),
+                Json::Str(self.table_comment.clone()),
+            ),
+            (
+                "columns".to_string(),
+                Json::Arr(self.columns.iter().map(column_def_json).collect()),
+            ),
+        ])
+    }
+
+    pub fn from_json(j: &Json) -> Option<Self> {
+        let as_str = |name: &str| match field(j, name) {
+            Some(Json::Str(s)) => Some(s.clone()),
+            _ => None,
+        };
+        let columns = match field(j, "columns") {
+            Some(Json::Arr(items)) => items
+                .iter()
+                .map(column_def_from_json)
+                .collect::<Option<Vec<_>>>()?,
+            _ => return None,
+        };
+        Some(Self {
+            schema_name: as_str("schema_name")?,
+            table_name: as_str("table_name")?,
+            table_comment: as_str("table_comment").unwrap_or_default(),
+            columns,
+        })
+    }
+
+    /// C++: `TableDef::WriteAdv`.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.to_json().compact().into_bytes()
+    }
+
+    /// C++: `TableDef::ReadAdv`.
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        Self::from_json(&infinity_expression::json::parse(
+            std::str::from_utf8(bytes).ok()?,
+        )?)
+    }
+}
+
 /// C++: `LogicalType2Str` (`src/parser/type/logical_type.cpp:28`).
 fn cpp_logical_name(code: i64) -> Option<&'static str> {
     Some(match code {
@@ -1285,6 +1376,37 @@ mod tests {
         let mut c = ColumnDefValue::new(data_type_json(logical::VARCHAR, None), 3, "c2");
         c.constraints = vec![2];
         assert_eq!(c.to_string(), "c2 Varchar PrimaryKey default Null");
+    }
+
+    /// `src/unit_test/storage/definition/table_def_ut.cpp::TableDefTest/test1`.
+    #[test]
+    fn table_def_reports_schema_table_comment_and_columns() {
+        let mut c1 = ColumnDefValue::new(data_type_json(logical::TINYINT, None), 0, "c1");
+        c1.constraints = vec![3, 1];
+        let mut c2 = ColumnDefValue::new(data_type_json(logical::VARCHAR, None), 1, "c2");
+        c2.constraints = vec![2];
+        let table = TableDef::make("default_db", "t1", "t1_comment", vec![c1, c2]);
+        assert_eq!(table.table_name, "t1");
+        assert_eq!(table.schema_name, "default_db");
+        assert_eq!(table.table_comment, "t1_comment");
+        assert_eq!(table.column_count(), 2);
+        assert_eq!(table.get_col_id_by_name("c1"), Some(0));
+        assert_eq!(table.get_col_id_by_name("c2"), Some(1));
+    }
+
+    /// `TableDefTest/ReadWrite`: the definition survives a serialization round
+    /// trip with and without a comment.
+    #[test]
+    fn table_def_roundtrips_through_its_bytes() {
+        for comment in ["", "t1_comment"] {
+            let c1 = ColumnDefValue::new(data_type_json(logical::TINYINT, None), 0, "c1");
+            let c2 = ColumnDefValue::new(data_type_json(logical::VARCHAR, None), 1, "c2");
+            let table = TableDef::make("default_db", "t1", comment, vec![c1, c2]);
+            let bytes = table.to_bytes();
+            let back = TableDef::from_bytes(&bytes).expect("decode TableDef");
+            assert_eq!(back, table);
+            assert_eq!(back.to_bytes(), bytes);
+        }
     }
 
     /// `src/unit_test/storage/definition/index_base_ut.cpp::IndexBaseTest/ivf_readwrite`.
