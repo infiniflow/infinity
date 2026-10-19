@@ -28,6 +28,14 @@ use infinity_parser::{
     SearchClause, SelectItem, SparseStore as ParserSparseStore, Statement,
 };
 use infinity_planner::LogicalPlan;
+
+// The optimized plan captured by the last `run_plan` call, for tests that
+// must prove the production optimizer pipeline actually ran.
+#[cfg(test)]
+thread_local! {
+    static LAST_PLAN_DEBUG: std::cell::RefCell<Option<String>> =
+        const { std::cell::RefCell::new(None) };
+}
 #[cfg(not(feature = "rocksdb-store"))]
 use infinity_storage::FjallMetaStore;
 use infinity_storage::MetaStore;
@@ -8141,6 +8149,8 @@ impl Engine {
         let mut optimizer = infinity_planner::optimize::Optimizer::with_default_rules();
         optimizer.add_rule(Box::new(infinity_planner::optimize::BuiltinRules));
         let plan = optimizer.optimize(plan)?;
+        #[cfg(test)]
+        LAST_PLAN_DEBUG.with(|slot| *slot.borrow_mut() = Some(format!("{plan:?}")));
         let (source, stages) = Self::decompose(plan);
         let (columns, mut rows) = match source {
             Source::Values { columns, rows } => (columns, rows),
@@ -15367,6 +15377,39 @@ mod tests {
             }
         }
         Vec::new()
+    }
+
+    /// Round-4 review G1: prove that production `run_plan` (not `plan_select`)
+    /// applies the optimizer. A hand-built plan keeps the unused column in the
+    /// scan, so only the `ColumnPruner` inside `run_plan` can remove it.
+    #[test]
+    fn run_plan_runs_the_production_optimizer() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE rp (a INT, b INT);").unwrap();
+        e.execute("INSERT INTO rp VALUES (1, 2);").unwrap();
+        let plan = LogicalPlan::Projection {
+            input: Box::new(LogicalPlan::Scan {
+                table: "default_db.rp".to_string(),
+                columns: vec!["a".to_string(), "b".to_string()],
+            }),
+            exprs: vec![infinity_expression::Expr::Column(0)],
+            names: vec!["a".to_string()],
+        };
+        let (_columns, rows) = e
+            .run_plan(
+                plan,
+                None,
+                Some(vec!["a".to_string(), "b".to_string()]),
+                None,
+                false,
+                false,
+            )
+            .unwrap();
+        assert_eq!(rows, vec![vec![Value::Int(1)]]);
+        let debug = LAST_PLAN_DEBUG.with(|slot| slot.borrow().clone()).unwrap();
+        assert!(debug.contains("columns: [\"a\"]"), "{debug}");
+        assert!(!debug.contains("\"b\""), "{debug}");
     }
 
     fn seed(e: &Engine) {
