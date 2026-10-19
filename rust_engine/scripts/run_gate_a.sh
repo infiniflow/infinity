@@ -13,7 +13,14 @@ slt="${1:-$root/test/sql}"
 
 cd "$here/.."
 out="$(cargo run -q --release -p infinity-cli -- conformance "$slt" 2>&1)"
+run_status=$?
 echo "$out"
+if [ "$run_status" -ne 0 ]; then
+    # The counters can still look complete when the CLI dies after printing
+    # them (or before printing anything); the exit status is the tie-breaker.
+    echo "Gate A: conformance run failed (exit $run_status)"
+    exit 1
+fi
 
 python3 - "$out" <<'PY'
 import re, sys

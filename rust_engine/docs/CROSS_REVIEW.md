@@ -96,3 +96,19 @@ H4/H5 待 planner 接线后复核。
 验证：`cargo fmt --all -- --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace --lib`（全绿）、Gate A `statement ok 1752/1752, statement error 129/129, query 1546/1546`。
 
 结论：**converged**——无未处置的 critical/high。
+
+## Round 6（HEAD a215f17cf，收敛检查）
+
+评审在 `77a0bd0ee` 落盘前开始，因此结论钉在 `a215f17cf`；其中唯一 high 正是本轮已自查并修复的 CTE 遮蔽问题。
+
+| # | 发现 | 级别 | 处置 |
+|---|---|---|---|
+| R6-1 | `bind_subquery` 用 `table_key` 归一化裸表名后，遮蔽基表的 CTE 别名会被当作基表绑定（换掉静默空转，换来错误 schema） | high | **已修** `77a0bd0ee`：`run_subquery` 携带 CTE 作用域，FROM 是 CTE 别名时跳过绑定。回归测试 `a_cte_alias_shadowing_a_table_is_not_bound_as_that_table`；去掉跳过即报 `correlated subqueries are not supported`，已实测 |
+| R6-2 | 外层查询的 FROM 是 CTE 别名时 `outer_columns` 同样按基表查，相关列作用域为空/错误 | medium | **已修**：外层作用域优先取 `cte_scope` 的列。测试 `an_outer_cte_supplies_the_correlation_scope`（修复前报 `unknown column 'cs.id'`，修复后报 `correlated subqueries are not supported`） |
+| R6-3 | `SEARCH MATCH (…) WHERE …` 的过滤器由搜索路径直接编译，既不经过 subquery 解析器也不经过规划器守卫，`EXISTS` 会当未知函数求值成 NULL（静默空结果） | medium | **已修**：`resolve_stmt_subqueries` 现在同时重写每个 match 的 args 与 filter（`search_has_subquery` 判定是否需要克隆）。测试 `a_subquery_in_a_match_filter_is_not_folded_to_a_constant`（修复前 `unwrap_err()` 直接 panic，说明返回了 Ok——正是静默折叠） |
+| R6-4 | `SelectItem::Func` 只查参数、不查函数名 | low | **已修**：先判 `SUBQUERY`/`EXISTS` 名 |
+| R6-5 | `run_gate_a.sh` 用命令替换取输出，忽略 `cargo run` 退出码 | low | **已修**：记录 `$?`，非 0 直接失败 |
+
+验证：`cargo fmt --check`、`clippy -D warnings`、`cargo test --workspace --lib`（executor 508 tests）、Gate A `1752/1752 + 129/129 + 1546/1546`。
+
+**Round 6 结论：not converged（1 high）**，该 high 与 4 条 medium/low 已在本节全部处置；R7 复核确认。

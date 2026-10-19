@@ -1971,6 +1971,16 @@ fn value_to_literal(value: Value) -> Literal {
     }
 }
 
+/// True when a `SEARCH MATCH` clause still carries an unresolved subquery in
+/// one of its argument lists or its in-parenthesis filter. The search path
+/// compiles those directly, without going through the planner.
+fn search_has_subquery(search: &SearchClause) -> bool {
+    search.matches.iter().any(|m| {
+        m.args.iter().any(ExprAst::contains_subquery)
+            || m.filter.as_ref().is_some_and(Predicate::contains_subquery)
+    })
+}
+
 fn parse_value(cell: &str) -> Value {
     if let Ok(i) = cell.parse::<i64>() {
         Value::Int(i)
@@ -4188,6 +4198,7 @@ impl Engine {
             group_by,
             having,
             order_by,
+            search,
             ..
         } = stmt
         else {
@@ -4201,7 +4212,8 @@ impl Engine {
             || having.as_ref().is_some_and(|h| h.contains_subquery())
             || order_by
                 .iter()
-                .any(|k| k.expr.as_ref().is_some_and(ExprAst::contains_subquery));
+                .any(|k| k.expr.as_ref().is_some_and(ExprAst::contains_subquery))
+            || search.as_ref().is_some_and(|s| search_has_subquery(s));
         if !changed {
             return Ok(None);
         }
@@ -4212,6 +4224,7 @@ impl Engine {
             group_by,
             having,
             order_by,
+            search,
             ..
         } = &mut s
         else {
@@ -4247,6 +4260,22 @@ impl Engine {
                 *e = self.resolve_subquery_expr(e, ctes, outer)?;
             }
         }
+        // `SEARCH MATCH (…) WHERE <filter>` is compiled directly by the search
+        // path, so an unresolved subquery there would never reach the planner's
+        // guard and would evaluate as an unknown function (NULL).
+        if let Some(search) = search.as_mut() {
+            for m in search.matches.iter_mut() {
+                for a in m.args.iter_mut() {
+                    *a = self.resolve_subquery_expr(a, ctes, outer)?;
+                }
+                if let Some(f) = m.filter.as_mut() {
+                    *f = self.resolve_subquery_pred(f, ctes, outer)?;
+                }
+            }
+        }
+        // `SEARCH MATCH (…) WHERE <filter>` is compiled directly by the search
+        // path, so an unresolved subquery there would never reach the planner's
+        // guard and would evaluate as an unknown function (NULL).
         Ok(Some(s))
     }
 
@@ -7530,12 +7559,18 @@ impl Engine {
         // Scalar/EXISTS subqueries are rewritten to constants before planning;
         // the planner has no access to the storage engine. The enclosing
         // query's columns are the scope a subquery may correlate with.
+        // The enclosing query's columns are the scope a subquery may correlate
+        // with. A CTE alias in FROM shadows any base table of the same name, so
+        // take its columns from the CTE scope instead of the catalog.
         let outer_columns = match stmt {
             Statement::Select {
                 from: Some(table), ..
-            } => self
-                .table_schema(&self.table_key(table))
-                .unwrap_or_default(),
+            } => match cte_scope.get(&table.to_ascii_lowercase()) {
+                Some((columns, _)) => columns.clone(),
+                None => self
+                    .table_schema(&self.table_key(table))
+                    .unwrap_or_default(),
+            },
             _ => Vec::new(),
         };
         let resolved = self.resolve_stmt_subqueries(stmt, &cte_scope, &outer_columns)?;
@@ -15489,6 +15524,56 @@ mod tests {
                  SELECT id FROM src WHERE EXISTS (SELECT id FROM shadow) ORDER BY id;"
             ),
             vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+    }
+
+    /// The enclosing query's FROM may itself be a CTE alias; then the CTE, not
+    /// a same-named base table, supplies the correlation scope.
+    #[test]
+    fn an_outer_cte_supplies_the_correlation_scope() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE otc (id INT);").unwrap();
+        e.execute("INSERT INTO otc VALUES (1);").unwrap();
+        e.execute("CREATE TABLE otc2 (id INT);").unwrap();
+        let err = e
+            .execute(
+                "WITH cs AS (SELECT id FROM otc) \
+                 SELECT id FROM cs WHERE EXISTS (SELECT id FROM otc2 WHERE otc2.id = cs.id);",
+            )
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("correlated subqueries are not supported"),
+            "{err}"
+        );
+    }
+
+    /// A `SEARCH MATCH (…) WHERE …` filter is compiled by the search path, not
+    /// the planner, so a subquery there must be resolved (or rejected) before
+    /// it can be folded into a constant.
+    #[test]
+    fn a_subquery_in_a_match_filter_is_not_folded_to_a_constant() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE mf (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute("CREATE INDEX mf_ft ON mf (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute("INSERT INTO mf VALUES (1, 'x'), (2, 'x');")
+            .unwrap();
+        e.execute("CREATE TABLE mf2 (id INT);").unwrap();
+        e.execute("INSERT INTO mf2 VALUES (1);").unwrap();
+        let err = e
+            .execute(
+                "SELECT id FROM mf SEARCH MATCH TEXT ('body', 'x', 'topn=10', \
+                 WHERE EXISTS (SELECT id FROM mf2 WHERE mf2.id = mf.id));",
+            )
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("correlated subqueries are not supported"),
+            "{err}"
         );
     }
 

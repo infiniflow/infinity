@@ -323,7 +323,11 @@ impl SelectItem {
     /// query (see [`ExprAst::contains_subquery`]).
     pub fn contains_subquery(&self) -> bool {
         match self {
-            SelectItem::Func { args, .. } => args.iter().any(ExprAst::contains_subquery),
+            SelectItem::Func { name, args } => {
+                name.eq_ignore_ascii_case("SUBQUERY")
+                    || name.eq_ignore_ascii_case("EXISTS")
+                    || args.iter().any(ExprAst::contains_subquery)
+            }
             SelectItem::Expr(e) => e.contains_subquery(),
             SelectItem::Aggregate(a) => {
                 a.arg_exprs.iter().flatten().any(ExprAst::contains_subquery)
