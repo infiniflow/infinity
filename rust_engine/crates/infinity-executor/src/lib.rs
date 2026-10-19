@@ -2464,7 +2464,7 @@ struct TableEntry {
     /// from the row journal, and rows deleted since it was written are hidden
     /// by their tombstones (`TableEntry`'s block snapshot is the Rust stand-in
     /// for the reference's per-block row ranges + delete bitmap).
-    cpp_block_rows: Option<Vec<usize>>,
+    cpp_block_rows: Option<Arc<Vec<usize>>>,
     /// Append-only sidecar holding this table's wide cells.
     row_blob: Option<Arc<Mutex<std::fs::File>>>,
     /// `(segment, offset, sealed)` of the row-id allocator.
@@ -5829,7 +5829,10 @@ impl Engine {
             // The mirror was rewritten between the snapshot and the read.
             return Ok(None);
         }
-        let mut blocks: HashMap<usize, Vec<String>> = snapshot.into_iter().zip(rows).collect();
+        // Both the snapshot and the journal scan are in ascending row-id
+        // order, so a linear merge finds each row's block cells without a
+        // per-scan hash table.
+        let mut next = 0usize;
         let prefix = row_prefix(table);
         let deleted = self.tombstone_set(table)?;
         let defaults = self.table_defaults(table).unwrap_or_default();
@@ -5847,10 +5850,17 @@ impl Engine {
             if deleted.contains(&(seq as u64)) {
                 continue;
             }
-            match blocks.remove(&seq) {
-                Some(cells) => out.push((seq, cells.iter().map(|c| parse_value(c)).collect())),
+            // Rows deleted after the checkpoint leave holes in the snapshot.
+            while next < snapshot.len() && snapshot[next] < seq {
+                next += 1;
+            }
+            if next < snapshot.len() && snapshot[next] == seq {
+                let cells = &rows[next];
+                out.push((seq, cells.iter().map(|c| parse_value(c)).collect()));
+                next += 1;
+            } else {
                 // Written after the mirror snapshot: the journal holds it.
-                None => out.push((seq, self.parse_stored_row(table, &defaults, &v)?)),
+                out.push((seq, self.parse_stored_row(table, &defaults, &v)?));
             }
         }
         Ok(Some(out))
@@ -5916,7 +5926,7 @@ impl Engine {
         }
         // Same snapshot + journal overlay as `try_cpp_rows`, but only the
         // projected columns are decoded from the blocks.
-        let mut blocks: HashMap<usize, Vec<String>> = snapshot.into_iter().zip(rows).collect();
+        let mut next = 0usize;
         let prefix = row_prefix(table);
         let deleted = self.tombstone_set(table)?;
         let defaults = self.table_defaults(table).unwrap_or_default();
@@ -5934,17 +5944,20 @@ impl Engine {
             if deleted.contains(&(seq as u64)) {
                 continue;
             }
-            match blocks.remove(&seq) {
-                Some(cells) => out.push(cells.iter().map(|c| parse_value(c)).collect()),
-                None => {
-                    let row = self.parse_stored_row(table, &defaults, &v)?;
-                    out.push(
-                        wanted
-                            .iter()
-                            .map(|i| row.get(*i).cloned().unwrap_or(Value::Null))
-                            .collect(),
-                    );
-                }
+            while next < snapshot.len() && snapshot[next] < seq {
+                next += 1;
+            }
+            if next < snapshot.len() && snapshot[next] == seq {
+                out.push(rows[next].iter().map(|c| parse_value(c)).collect());
+                next += 1;
+            } else {
+                let row = self.parse_stored_row(table, &defaults, &v)?;
+                out.push(
+                    wanted
+                        .iter()
+                        .map(|i| row.get(*i).cloned().unwrap_or(Value::Null))
+                        .collect(),
+                );
             }
         }
         Ok(Some(out))

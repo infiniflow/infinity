@@ -1151,7 +1151,7 @@ impl Engine {
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey).or_default();
         entry.block_index = None;
-        entry.cpp_block_rows = Some(block_rows);
+        entry.cpp_block_rows = Some(std::sync::Arc::new(block_rows));
         Ok(written)
     }
 
