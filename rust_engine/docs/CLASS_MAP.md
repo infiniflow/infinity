@@ -79,7 +79,23 @@
 
 | C++ | 当前 Rust | 差距 |
 |---|---|---|
-| （无） | — | 当前基线中需要类级对应的 C++ 类均已映射；新增上游类须先登记再移植 |
+| （无行为类缺口） | — | 承载行为、被其他类调用的 C++ 类均已在「已对应」表逐类映射；纯数据载体/模板特化/迭代器/生成类型见下方「类级覆盖审计」。新增上游行为类须先登记再移植 |
+
+## 类级覆盖审计（基线 `5d27942c0`）
+
+`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；本表显式命名 **78** 个。其余 1058 个按 §3.6 允许的「结构合并」处理（模板特化 / POD 状态 / 迭代器机件 / 生成的 Thrift 类型），不是静默省略：
+
+| 区域 | 未逐类命名 | Rust 承担方式 |
+|---|---:|---|
+| `storage/*` | 553 | `invertedindex` 117：posting/position 解码与 `And/Or/Phrase` 迭代器 → `inverted_format`/`fulltext_segment`/扫描求值函数；`knn_index` 110：模板特化（`Plain*/LVQ*/Rabitq*Dist`、`*VecStoreType`、`*Cache`）→ `vector::Store` 枚举 + 距离函数，`SparseVec*` → `Vec<(u32,f32)>` 别名，`BMPHandler`/`BMPIndexInMem` → 执行器 `SparseIndex`，DiskANN 15 个按 §2.6/R14 排除，`knn_flat` 11 个为距离原语；`catalog` 76 + `new_txn` 46 + `wal` 40 → `infinity_catalog`/`value_format` + `Txn` 操作 + 字节级 `wal`；`common` 40/`buffer` 16/`io` 16/`column_vector` 15/`definition` 12 → `Vec<u8>`/`BufferObj`/`std::fs`/S3 等原语（`ColumnVector`/`DataBlock` 已单独命名）；`bg_task` 26 → 定时线程 + `Engine::{dump,optimize,cleanup}` |
+| `executor/*` | 173 | `operator` 78 + `operator_state.cppm` 74 → `PhysicalOperator` 变体与 `OperatorState`；`expression` 13 → `infinity-expression` 求值函数；其余为执行器内部管线结构 |
+| `planner/*` | 117 | `node` 52 → `Statement`/计划结构；`optimizer` 17 → 规则函数；其余为绑定/解析中间结构 |
+| `function/*` | 64 | `cast` 29 + `table` 17 + 其余 → Rust 的 cast/builtin 函数与 `AggFunc` 枚举 |
+| `common/*` | 58 | `analyzer` 39 → `tokenize_*` analyzer 函数；其余为工具结构 |
+| `main/*` + `network/*` + `scheduler/*` + `admin` + `metrics` + `unit_test` | 39 + 23 + 10 + 1 + 1 + 7 | 查询选项 → 解析结构；Thrift 类型 → 生成代码；调度器按 D4 由 Tokio 取代；admin → 语句分发；metrics → 服务端计数；`unit_test` 为 C++ 测试夹具 |
+| `expression/*` | 12 | 标量表达式求值函数（`infinity-expression`） |
+
+> 判定口径：C++ 中承载**行为**且被其他类调用的类（HNSW/IVF/EMVB/PLAID/SMVE、全文段、事务、Buffer、BlockIndex、PDataBlock 等）在本表中逐类对应；纯数据载体、模板特化、迭代器和生成类型按上表合并，理由与归属均已登记。新增 C++ 行为类时仍须先登记再移植。
 
 ## 维护规则
 
