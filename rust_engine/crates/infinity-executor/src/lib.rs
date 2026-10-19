@@ -31,6 +31,7 @@ use infinity_storage::FjallMetaStore;
 use infinity_storage::MetaStore;
 use infinity_txn::{Txn, TxnManager};
 
+mod deferred_catalog;
 mod explain;
 
 #[cfg(test)]
@@ -109,6 +110,10 @@ mod table_ut;
 mod upload_meta_to_s3_ut;
 
 pub mod data_table;
+
+/// Background task processing (`BGTaskProcessor`).
+pub mod bg_task;
+pub use bg_task::{BGTaskProcessor, BgTask};
 
 #[cfg(test)]
 mod txn_ut;
@@ -2923,6 +2928,9 @@ struct SecondaryIndexes {
     low: HashMap<String, SecondaryLowChunks>,
     /// High-cardinality (integer/varchar) PGM chunk readers.
     disk: HashMap<String, SecondaryDiskChunks>,
+    /// Dumped chunk metadata per column: `(base row id, row count)` — the
+    /// `ChunkIndexMetaInfo` the reference stores next to each chunk.
+    chunk_meta: HashMap<String, Vec<(u64, usize)>>,
     /// Columns whose memory map is a tail backed by on-disk chunks.
     disk_backed: std::collections::HashSet<String>,
 }
@@ -3068,6 +3076,10 @@ struct Context {
     /// it is dumped into a sealed segment (the reference's
     /// `Config::MemIndexCapacity()`). `0` disables the row trigger.
     memindex_capacity: std::sync::atomic::AtomicUsize,
+    /// Set while a background `DumpMemIndexTask` proposed by the quota is
+    /// queued or running (C++ `MemIndexTracer::proposed_dump_`). Prevents the
+    /// per-row quota check from queueing one task per row.
+    memindex_pending: Arc<std::sync::atomic::AtomicUsize>,
     /// Object store backing the C++-format data files (`storage_type =
     /// "minio"`). `None` keeps everything on the local disk.
     object_store: Mutex<Option<Arc<infinity_storage::s3::S3Client>>>,
@@ -3091,6 +3103,12 @@ pub struct Engine {
     rt: tokio::runtime::Runtime,
     /// the engine's data directory (root of the C++-format block mirror)
     dir: PathBuf,
+    /// `false` for the reference's `NEW_CONFIG_NOWAL_PATH`: catalog DDL is
+    /// durable only through a checkpoint (`flush`), not on commit.
+    wal_enabled: bool,
+    /// Bumped when `optimize_indexes` runs: a `DumpMemIndex` staged before the
+    /// optimize cannot commit after it (the reference's index meta version).
+    index_epoch: std::sync::atomic::AtomicU64,
     /// Engine-wide runtime state (the reference's `InfinityContext`).
     context: Context,
     /// cached `SELECT` results keyed by the statement text
@@ -3099,7 +3117,19 @@ pub struct Engine {
     current_db: Mutex<String>,
     /// Per-table write bookkeeping (C++ `TableEntry`), keyed by the
     /// fully-qualified lower-case table name.
-    tables: Mutex<HashMap<String, TableEntry>>,
+    tables: Arc<Mutex<HashMap<String, TableEntry>>>,
+    /// Optional background task processor (`BGTaskProcessor`). When attached,
+    /// the memindex quota queues a real `DumpMemIndexTask`; otherwise the
+    /// quota is enforced synchronously.
+    bg_processor: Mutex<Option<Arc<BGTaskProcessor>>>,
+    /// Weak self handle handed to background tasks (avoids a cycle through
+    /// `bg_processor`).
+    self_weak: Mutex<std::sync::Weak<Engine>>,
+    /// Serializes a write batch against a background index dump. The
+    /// reference's `DumpMemIndex` transaction retries while an append holds
+    /// the segment, so it always dumps whole batches; holding this lock for
+    /// the batch gives the same chunk boundaries deterministically.
+    batch_lock: Mutex<()>,
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
@@ -3146,6 +3176,23 @@ impl PendingRestore<'_> {
 /// literal rows)`.
 type StagedAppend = (String, usize, Vec<String>, Vec<Vec<Literal>>);
 
+/// The catalog state a staged `DumpMemIndex` transaction validated against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DumpVersion {
+    table: infinity_catalog::TableMeta,
+    index: infinity_catalog::IndexMeta,
+    /// `Engine::index_epoch` when the dump was staged.
+    optimize_epoch: u64,
+}
+
+/// A `DumpMemIndex` staged in an [`EngineTxn`] (C++ `NewTxn::DumpMemIndex`).
+#[derive(Debug, Clone)]
+struct StagedDump {
+    table: String,
+    index: String,
+    version: DumpVersion,
+}
+
 /// A multi-statement transaction (the reference's `NewTxn`).
 ///
 /// Rows and row-id deletes are staged in an [`infinity_txn::Txn`] and become
@@ -3165,6 +3212,9 @@ pub struct EngineTxn<'a> {
     appends: Vec<StagedAppend>,
     /// `(table, global row id)` per staged delete.
     deletes: Vec<(String, usize)>,
+    /// `DumpMemIndex` requests applied only if their catalog version is still
+    /// current at commit.
+    dumps: Vec<StagedDump>,
 }
 
 impl<'a> EngineTxn<'a> {
@@ -3269,12 +3319,49 @@ impl<'a> EngineTxn<'a> {
         self.engine.create_table_snapshot(db, table, name)
     }
 
+    /// C++ `NewTxn::DumpMemIndex`: stages the dump of `index` on `table`.
+    ///
+    /// The dump is applied at [`Self::commit`] only if the table and index
+    /// catalogs are unchanged; a `DROP`/`RENAME`/`ALTER` that commits in
+    /// between makes the commit fail with a transaction conflict, exactly as
+    /// the reference's `CommitTxn` rejects a dump whose meta version moved.
+    pub fn dump_index(&mut self, table: &str, index: &str) -> Result<()> {
+        let table = self.engine.table_key(table);
+        let version = self.engine.dump_version(&table, index)?;
+        self.dumps.push(StagedDump {
+            table,
+            index: index.to_string(),
+            version,
+        });
+        Ok(())
+    }
+
     /// `CommitTxn`: applies the staged batch, then updates the in-memory index
     /// registries and row bookkeeping.
     pub fn commit(mut self) -> Result<()> {
         let Some(txn) = self.txn.take() else {
             return Ok(());
         };
+        // Validate every staged dump before touching the engine: a DDL that
+        // committed after the dump began (drop db/table/index, rename, alter)
+        // bumps the table/index metadata and fails the whole transaction.
+        for dump in &self.dumps {
+            match self.engine.dump_version(&dump.table, &dump.index) {
+                Ok(current) if current == dump.version => {}
+                Ok(_) => {
+                    return Err(Error::TxnConflict(format!(
+                        "index '{}' on '{}' changed before the dump committed",
+                        dump.index, dump.table
+                    )))
+                }
+                Err(_) => {
+                    return Err(Error::TxnConflict(format!(
+                        "index '{}' on '{}' was dropped before the dump committed",
+                        dump.index, dump.table
+                    )))
+                }
+            }
+        }
         // A table (or its database) dropped after this transaction began makes
         // the staged writes uncommittable, as `CommitTxn` fails when the
         // catalog entry the request targeted is gone (the reference's
@@ -3314,6 +3401,7 @@ impl<'a> EngineTxn<'a> {
                     self.engine.update_vector_caches(table, base + k, &texts);
                 }
                 self.engine.dump_hnsw_over_capacity(table);
+                self.engine.dump_secondary_over_capacity(table);
             }
             self.engine.bump_writes(table);
             self.engine.note_live_rows(table, rows.len() as isize);
@@ -3322,6 +3410,10 @@ impl<'a> EngineTxn<'a> {
         for (table, seq) in &self.deletes {
             self.engine.drop_text_index_rows(table, &[*seq]);
             self.engine.drop_vector_cache_rows(table, &[*seq]);
+        }
+        // The catalog is still current: perform the sealed writes now.
+        for dump in &self.dumps {
+            self.engine.dump_index(&dump.table, &dump.index)?;
         }
         Ok(())
     }
@@ -3380,26 +3472,90 @@ fn is_blob_type(t: &str) -> bool {
     is_embedding_type(t) || is_tensor_type(t) || is_sparse_type(t)
 }
 
+/// Open options (the reference's `InfinityContext` configuration relevant to
+/// durability).
+#[derive(Debug, Clone)]
+pub struct EngineOptions {
+    /// When `false`, catalog DDL becomes durable only at a checkpoint
+    /// (`Engine::flush`), reproducing `NEW_CONFIG_NOWAL_PATH`.
+    pub wal_enabled: bool,
+    /// Tokio exchange capacity per pipeline edge.
+    pub exchange_capacity: usize,
+}
+
+impl Default for EngineOptions {
+    fn default() -> Self {
+        Self {
+            wal_enabled: true,
+            exchange_capacity: 4,
+        }
+    }
+}
+
 impl Engine {
     pub fn open(dir: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_capacity(dir, 4)
+        Self::open_with_options(dir, EngineOptions::default())
+    }
+
+    /// Opens without a WAL: catalog writes are buffered behind an undo journal
+    /// and survive a reopen only if a checkpoint ran after they committed.
+    pub fn open_without_wal(dir: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with_options(
+            dir,
+            EngineOptions {
+                wal_enabled: false,
+                ..EngineOptions::default()
+            },
+        )
     }
 
     pub fn open_with_capacity(dir: impl AsRef<Path>, exchange_capacity: usize) -> Result<Self> {
+        Self::open_with_options(
+            dir,
+            EngineOptions {
+                exchange_capacity,
+                ..EngineOptions::default()
+            },
+        )
+    }
+
+    pub fn open_with_options(dir: impl AsRef<Path>, options: EngineOptions) -> Result<Self> {
         let dir: PathBuf = dir.as_ref().to_path_buf();
         // The catalog lives at `<dir>/catalog`, the path the C++ engine uses for
         // its catalog RocksDB. Under `rocksdb-store` the C++ key space is the
         // **only** catalog (the native fjall key space is not written), so a
         // C++ engine can open this directory's catalog; otherwise the catalog
         // is a native fjall store.
+        let catalog_dir = dir.join("catalog");
         #[cfg(feature = "rocksdb-store")]
-        let catalog = {
-            let catalog_store: Arc<dyn MetaStore> =
-                Arc::new(infinity_storage::RocksMetaStore::open(dir.join("catalog"))?);
-            Catalog::with_store_cpp_only(catalog_store)
-        };
+        let catalog_store: Arc<dyn MetaStore> =
+            Arc::new(infinity_storage::RocksMetaStore::open(&catalog_dir)?);
         #[cfg(not(feature = "rocksdb-store"))]
-        let catalog = Catalog::open(dir.join("catalog"))?;
+        let catalog_store: Arc<dyn MetaStore> =
+            Arc::new(FjallMetaStore::open(&catalog_dir, "catalog")?);
+        // A no-WAL open first undoes whatever the previous process wrote after
+        // its last checkpoint, then wraps the store so this process's writes
+        // are journaled too. Doing the rollback in both modes is defensive: a
+        // journal can only be left behind by a no-WAL run.
+        deferred_catalog::rollback_pending(catalog_store.as_ref(), &catalog_dir)?;
+        let catalog_store: Arc<dyn MetaStore> = if options.wal_enabled {
+            catalog_store
+        } else {
+            Arc::new(deferred_catalog::DeferredCatalogStore::new(
+                catalog_store,
+                &catalog_dir,
+            ))
+        };
+        let catalog = {
+            #[cfg(feature = "rocksdb-store")]
+            {
+                Catalog::with_store_cpp_only(catalog_store)
+            }
+            #[cfg(not(feature = "rocksdb-store"))]
+            {
+                Catalog::with_store(catalog_store)
+            }
+        };
         // The row/meta store: RocksDB when the `rocksdb-store` feature is on
         // (the substrate the C++ engine's catalog uses), fjall otherwise.
         #[cfg(feature = "rocksdb-store")]
@@ -3433,13 +3589,14 @@ impl Engine {
             txn,
             rt,
             context: Context {
-                exchange_capacity: exchange_capacity.max(1),
+                exchange_capacity: options.exchange_capacity.max(1),
                 buffer: Mutex::new(infinity_storage::buffer::BufferManager::new(
                     8 * 1024 * 1024 * 1024,
                 )),
                 config: Mutex::new(HashMap::new()),
                 memindex_quota: std::sync::atomic::AtomicU64::new(0),
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
+                memindex_pending: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
                 object_store: Mutex::new(None),
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
                 scan_gate: ScanGate::new(
@@ -3455,9 +3612,14 @@ impl Engine {
                     .unwrap_or_default(),
             },
             dir,
+            wal_enabled: options.wal_enabled,
+            index_epoch: std::sync::atomic::AtomicU64::new(0),
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
-            tables: Mutex::new(HashMap::new()),
+            tables: Arc::new(Mutex::new(HashMap::new())),
+            bg_processor: Mutex::new(None),
+            self_weak: Mutex::new(std::sync::Weak::new()),
+            batch_lock: Mutex::new(()),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
             vector_cache: Mutex::new(HashMap::new()),
         };
@@ -3846,10 +4008,58 @@ impl Engine {
         }
     }
 
+    /// The catalog state a `DumpMemIndex` transaction must still see at commit
+    /// (C++ `TableMeta` / `TableIndexMeta` versions).
+    fn dump_version(&self, table: &str, index: &str) -> Result<DumpVersion> {
+        let table = self.table_key(table);
+        let table_meta = self
+            .storage
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let index_meta = self
+            .storage
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .find(|im| self.table_key(&im.table) == table && im.name == index)
+            .ok_or_else(|| Error::NotFound(format!("index '{index}' on '{table}'")))?;
+        Ok(DumpVersion {
+            table: table_meta,
+            index: index_meta,
+            optimize_epoch: self
+                .index_epoch
+                .load(std::sync::atomic::Ordering::SeqCst),
+        })
+    }
+
+    /// Applies one `DumpMemIndex`: seals the target index's memory tail.
+    fn dump_index(&self, table: &str, index: &str) -> Result<()> {
+        let version = self.dump_version(table, index)?;
+        if is_secondary_kind(&version.index.index_type) {
+            self.seal_secondary_index(table, &version.index.column);
+            return Ok(());
+        }
+        Err(Error::Invalid(format!(
+            "DumpMemIndex is not supported for index type '{}'",
+            version.index.index_type
+        )))
+    }
+
     /// Dumps the memory tail of every disk-backed secondary index into new
     /// chunks, so memory stays bounded by the rows written since the last dump.
     fn seal_secondary_indexes(&self) {
-        let backed: Vec<(String, String)> = {
+        self.seal_secondary_indexes_filtered(None);
+    }
+
+    /// Dumps one secondary index's memory tail (`DumpMemIndex` for `index`).
+    fn seal_secondary_index(&self, table: &str, column: &str) {
+        self.seal_secondary_indexes_filtered(Some((table, column)));
+    }
+
+    fn seal_secondary_indexes_filtered(&self, only: Option<(&str, &str)>) {
+        let wanted = only.map(|(t, c)| (self.table_key(t), c.to_string()));
+        let mut backed: Vec<(String, String)> = {
             let tables = self.tables.lock().unwrap();
             tables
                 .iter()
@@ -3861,6 +4071,9 @@ impl Engine {
                 })
                 .collect()
         };
+        if let Some((tkey, column)) = &wanted {
+            backed.retain(|(t, c)| t == tkey && c == column);
+        }
         if backed.is_empty() {
             return;
         }
@@ -3903,6 +4116,10 @@ impl Engine {
             if tail.is_empty() {
                 continue;
             }
+            // `ChunkIndexMetaInfo`: the first row id in the dump and its row
+            // count. Recorded per dump (one chunk per seal call).
+            let base = tail.values().flatten().min().copied().unwrap_or(0);
+            let row_count: usize = tail.values().map(Vec::len).sum();
             if !is_bool {
                 let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
                 for (raw_key, ids) in &tail {
@@ -3949,16 +4166,22 @@ impl Engine {
                         readers.push((segment << 32, Arc::new(reader)));
                     }
                 }
-                self.tables
-                    .lock()
-                    .unwrap()
-                    .entry(tkey.clone())
-                    .or_default()
-                    .secondary
-                    .disk
-                    .entry(column.clone())
-                    .or_default()
-                    .extend(readers);
+                {
+                    let mut tables = self.tables.lock().unwrap();
+                    let entry = tables.entry(tkey.clone()).or_default();
+                    entry
+                        .secondary
+                        .disk
+                        .entry(column.clone())
+                        .or_default()
+                        .extend(readers);
+                    entry
+                        .secondary
+                        .chunk_meta
+                        .entry(column.clone())
+                        .or_default()
+                        .push((base, row_count));
+                }
             } else {
                 let mut by_segment: HashMap<u64, [Vec<u32>; 2]> = HashMap::new();
                 for (raw_key, ids) in &tail {
@@ -3999,16 +4222,23 @@ impl Engine {
                         readers.push((segment << 32, Arc::new(reader)));
                     }
                 }
-                self.tables
-                    .lock()
-                    .unwrap()
-                    .entry(tkey)
-                    .or_default()
-                    .secondary
-                    .low
-                    .entry(column)
-                    .or_default()
-                    .extend(readers);
+                {
+                    let mut tables = self.tables.lock().unwrap();
+                    let entry = tables.entry(tkey).or_default();
+                    let meta_key = column.clone();
+                    entry
+                        .secondary
+                        .low
+                        .entry(column)
+                        .or_default()
+                        .extend(readers);
+                    entry
+                        .secondary
+                        .chunk_meta
+                        .entry(meta_key)
+                        .or_default()
+                        .push((base, row_count));
+                }
             }
         }
     }
@@ -4061,6 +4291,12 @@ impl Engine {
 
     /// Dumps every memory index when the unified budget is exceeded, mirroring
     /// the reference's memindex dump. `memindex_memory_quota = 0` disables it.
+    ///
+    /// With a `BGTaskProcessor` attached this proposes one background
+    /// `DumpMemIndexTask` (C++ `BGMemIndexTracer::IncreaseMemoryUsage`): the
+    /// pending flag coalesces the per-row checks, and the task dumps whatever
+    /// was buffered when the worker runs. Without a processor the dump stays
+    /// synchronous, which is the engine's historical in-process behaviour.
     fn enforce_memindex_quota(&self) {
         let quota = self
             .context
@@ -4069,11 +4305,29 @@ impl Engine {
         if quota == 0 || self.memindex_bytes() <= quota {
             return;
         }
-        self.seal_multivector_indexes();
-        self.seal_sparse_indexes();
-        self.seal_secondary_indexes();
-        // HNSW: dump each memory segment and release it.
-        self.dump_hnsw_segments();
+        if let Some(processor) = self.bg_processor.lock().unwrap().clone() {
+            // One proposed dump at a time, like `proposed_dump_`.
+            if self
+                .context
+                .memindex_pending
+                .compare_exchange(
+                    0,
+                    1,
+                    std::sync::atomic::Ordering::AcqRel,
+                    std::sync::atomic::Ordering::Relaxed,
+                )
+                .is_err()
+            {
+                return;
+            }
+            let engine = self.self_weak.lock().unwrap().clone();
+            processor.submit(Box::new(DumpMemIndexTask {
+                engine,
+                pending: Arc::clone(&self.context.memindex_pending),
+            }));
+            return;
+        }
+        self.dump_all_memory_indexes();
     }
 
     fn index_lookup(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
@@ -4273,7 +4527,11 @@ impl Engine {
             // Durability: a committed mutation must survive a crash, so both the
             // catalog and the row/meta KV are fsynced before acknowledging.
             if mutating {
-                self.storage.catalog.flush()?;
+                // Without a WAL the catalog is checkpoint-durable only: a
+                // commit must not fsync (and publish) the DDL.
+                if self.wal_enabled {
+                    self.storage.catalog.flush()?;
+                }
                 self.storage.store.flush()?;
             }
         }
@@ -4727,6 +4985,7 @@ impl Engine {
             txn: Some(self.txn.begin()),
             appends: Vec::new(),
             deletes: Vec::new(),
+            dumps: Vec::new(),
         }
     }
 
@@ -4738,6 +4997,27 @@ impl Engine {
         table: &str,
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
+    ) -> Result<QueryResult> {
+        self.insert_literals_inner(table, columns, rows, false)
+    }
+
+    /// `NewTxn::Import`: like [`Self::insert_literals`], but the batch always
+    /// opens a fresh segment (`TableMeta::GetSegmentIDs1` gains a new id).
+    pub fn import_literals(
+        &self,
+        table: &str,
+        columns: Option<&[String]>,
+        rows: Vec<Vec<Literal>>,
+    ) -> Result<QueryResult> {
+        self.insert_literals_inner(table, columns, rows, true)
+    }
+
+    fn insert_literals_inner(
+        &self,
+        table: &str,
+        columns: Option<&[String]>,
+        rows: Vec<Vec<Literal>>,
+        new_segment: bool,
     ) -> Result<QueryResult> {
         let meta = self
             .storage
@@ -4795,8 +5075,10 @@ impl Engine {
             return Ok(QueryResult::Inserted { count: 0 });
         }
         // Reserve a contiguous block of row ids: two sessions inserting
-        // concurrently must not pick the same base sequence.
-        let base = self.reserve_rows(table, rows.len(), false)?;
+        // concurrently must not pick the same base sequence. `Import` asks the
+        // allocator for a fresh segment, `INSERT`/`Append` appends to the
+        // current one.
+        let base = self.reserve_rows(table, rows.len(), new_segment)?;
         let types = self.column_types(table)?;
         // tensor-like values must match the declared dimension, and
         // sparse values must be in range
@@ -4809,6 +5091,7 @@ impl Engine {
         }
         // A memory index that already exceeds its quota is dumped
         // before these rows join it.
+        let _batch = self.batch_lock.lock().unwrap();
         self.note_index_insert(table, rows.len());
         // A scalar table's first batch in this process starts an empty decoded
         // row cache; the batch is appended after the commit.
@@ -4845,6 +5128,7 @@ impl Engine {
             // C++ `AppendMemIndex`: a segment that reached
             // `mem_index_capacity` rows is dumped right after the batch.
             self.dump_hnsw_over_capacity(table);
+            self.dump_secondary_over_capacity(table);
         }
         self.bump_writes(table);
         self.note_live_rows(table, rows.len() as isize);
@@ -9911,6 +10195,7 @@ impl Engine {
                     self.update_vector_caches(table, base + k, &texts);
                 }
                 self.dump_hnsw_over_capacity(table);
+                self.dump_secondary_over_capacity(table);
                 total += batch.len();
             }
             if eof {
@@ -10049,6 +10334,7 @@ impl Engine {
             self.update_vector_caches(table, base + k, &texts);
         }
         self.dump_hnsw_over_capacity(table);
+        self.dump_secondary_over_capacity(table);
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
@@ -11308,6 +11594,12 @@ impl Engine {
                 .rewrite_cpp_layout(self.storage.catalog.store().as_ref());
         }
         mirror?;
+        // The C++-layout mirror above went through the catalog store after its
+        // first flush; in checkpoint-only mode that is part of this checkpoint,
+        // so publish it now (no-op for a normal store).
+        if !self.wal_enabled {
+            self.storage.catalog.flush()?;
+        }
         Ok(())
     }
 
@@ -11353,6 +11645,44 @@ impl Engine {
         self.context
             .memindex_capacity
             .store(rows, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Attaches a `BGTaskProcessor` (`Storage::dump_index_processor`). While
+    /// attached, exceeding the memindex quota queues a real
+    /// [`DumpMemIndexTask`] instead of dumping synchronously.
+    pub fn attach_bg_task_processor(self: &Arc<Self>, processor: Arc<BGTaskProcessor>) {
+        *self.self_weak.lock().unwrap() = Arc::downgrade(self);
+        *self.bg_processor.lock().unwrap() = Some(processor);
+    }
+
+    /// Waits for every queued background dump to finish.
+    pub fn drain_background_tasks(&self) {
+        let processor = self.bg_processor.lock().unwrap().clone();
+        if let Some(processor) = processor {
+            processor.drain();
+        }
+    }
+
+    /// Dumps every in-memory index (the body of the reference's dump task).
+    fn dump_all_memory_indexes(&self) {
+        self.seal_multivector_indexes();
+        self.seal_sparse_indexes();
+        self.seal_secondary_indexes();
+        self.dump_hnsw_segments();
+    }
+
+    /// `ChunkIndexMetaInfo` of the sealed secondary chunks: `(base row id,
+    /// row count)` in dump order.
+    #[allow(dead_code)]
+    pub(crate) fn secondary_chunk_meta(&self, table: &str, column: &str) -> Vec<(u64, usize)> {
+        let key = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|entry| entry.secondary.chunk_meta.get(column))
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// `SHOW VARIABLE` at the given scope.
@@ -11685,6 +12015,34 @@ impl Engine {
         }
     }
 
+    /// C++ `AppendMemIndex`: after a write batch, dump every secondary memory
+    /// tail that reached `mem_index_capacity` rows. This is the row bound the
+    /// reference applies at the end of the batch (the sibling of
+    /// [`Self::dump_hnsw_over_capacity`]).
+    fn dump_secondary_over_capacity(&self, table: &str) {
+        let capacity = self.memindex_capacity();
+        if capacity == 0 {
+            return;
+        }
+        let tkey = self.table_key(table);
+        let full = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .map(|entry| {
+                    entry
+                        .secondary
+                        .indexes
+                        .values()
+                        .any(|index| index.row_count() >= capacity)
+                })
+                .unwrap_or(false)
+        };
+        if full {
+            self.seal_secondary_indexes();
+        }
+    }
+
     /// Rotates and prunes the WAL without touching the KV store. Called by the
     /// periodic checkpoint loop so a slow `flush` cannot let the log grow
     /// unbounded; only fsynced records are dropped.
@@ -11695,6 +12053,10 @@ impl Engine {
     /// Runs the reference's optimize pass over the index mirrors: a mirror
     /// whose newest chunk does not cover every live row gets a merged chunk.
     pub fn optimize_indexes(&self) -> Result<()> {
+        // An optimize rewrites the index chunks; a dump that was staged before
+        // it no longer matches the index state.
+        self.index_epoch
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.optimize_cpp_index_chunks()
     }
 
@@ -12885,6 +13247,35 @@ fn files_under(dir: &Path) -> Vec<PathBuf> {
     }
     out.sort();
     out
+}
+
+/// Background `DumpMemIndexTask` (`src/storage/bg_task/bg_task.cppm`).
+///
+/// Submitted by [`Engine`] when the in-memory quota is exceeded while a
+/// `BGTaskProcessor` is attached. It upgrades the weak engine handle when it
+/// runs, so the dump sees every row buffered by the time the worker starts —
+/// the reference's proposed-dump coalescing.
+pub struct DumpMemIndexTask {
+    engine: std::sync::Weak<Engine>,
+    pending: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl BgTask for DumpMemIndexTask {
+    fn name(&self) -> &str {
+        "DumpMemIndexTask"
+    }
+
+    fn run(self: Box<Self>) {
+        if let Some(engine) = self.engine.upgrade() {
+            // A dump sees a whole write batch, never the rows of a batch that
+            // is still being indexed (the reference's dump transaction
+            // conflicts with the append and retries).
+            let _batch = engine.batch_lock.lock().unwrap();
+            engine.dump_all_memory_indexes();
+        }
+        self.pending
+            .store(0, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 #[cfg(test)]
@@ -15738,3 +16129,4 @@ mod tests {
         }
     }
 }
+

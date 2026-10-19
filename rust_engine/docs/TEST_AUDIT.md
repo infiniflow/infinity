@@ -297,11 +297,11 @@
 | 282 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `top_level_alternation_requires_nothing` | ported |
 | 283 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `scoped_case_insensitive_group_keeps_its_mode` | ported |
 | 284 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `re2_escapes` | ported |
-| 285 | `src/unit_test/storage/bg_task/background_process_ut.cpp` | `BGProcessTest` | `test1` | exempt | design change: no BGTaskProcessor thread pool in the Rust engine |
+| 285 | `src/unit_test/storage/bg_task/background_process_ut.cpp` | `BGProcessTest` | `test1` | ported | `infinity-executor` `bg_task_ut::background_process_start_stop` |
 | 286 | `src/unit_test/storage/bg_task/cleanup_task_ut.cpp` | `CleanupTaskTest` | `test_delete_db_simple` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 287 | `src/unit_test/storage/bg_task/compact_segments_task_ut.cpp` | `CompactTaskTest` | `bg_compact` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 288 | `src/unit_test/storage/bg_task/dump_index_task_2_ut.cpp` | `DumpMemIndexTaskTest2` | `DISABLED_SLOW_row_cnt_exceed_memory_quota` | exempt | design change: background DumpMemIndexTask absent; quota is enforced inline (design change) |
-| 289 | `src/unit_test/storage/bg_task/dump_index_task_ut.cpp` | `DumpMemIndexTaskTest` | `DISABLED_SLOW_row_cnt_exceed_memindex_capacity` | exempt | design change: background DumpMemIndexTask absent; quota is enforced inline (design change) |
+| 288 | `src/unit_test/storage/bg_task/dump_index_task_2_ut.cpp` | `DumpMemIndexTaskTest2` | `DISABLED_SLOW_row_cnt_exceed_memory_quota` | ported | `infinity-executor` `bg_task_ut::dump_index_task_row_cnt_exceed_memory_quota` (`#[ignore]`: C++ DISABLED_SLOW_) |
+| 289 | `src/unit_test/storage/bg_task/dump_index_task_ut.cpp` | `DumpMemIndexTaskTest` | `DISABLED_SLOW_row_cnt_exceed_memindex_capacity` | ported | `infinity-executor` `bg_task_ut::dump_index_task_row_cnt_exceed_memindex_capacity` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 290 | `src/unit_test/storage/binary_fuse_filter/binary_fuse_filter_test_ut.cpp` | `BinaryFuseFilterTest` | `test_2000` | ported | `infinity-storage` `binary_fuse_filter::tests::test_2000` |
 | 291 | `src/unit_test/storage/buffer/buffer_handle_ut.cpp` | `BufferHandleTest` | `test1` | ported |
 | 292 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerTest` | `cleanup_test` | ported |
@@ -716,8 +716,8 @@
 | 701 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_drop_index` | ported | `infinity-executor` `append_delete_ut::*` |
 | 702 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_compact` | ported | `infinity-executor` `append_delete_ut::*` |
 | 703 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_optimize_index` | ported | `infinity-executor` `append_delete_ut::*` |
-| 704 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_db` | exempt | design change: checkpoint-only durability mode absent; WAL is always written |
-| 705 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_table` | exempt | design change: checkpoint-only durability mode absent; WAL is always written |
+| 704 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_db` | ported | `infinity-executor` `checkpoint_ut::checkpoint_and_create_db` |
+| 705 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_table` | ported | `infinity-executor` `checkpoint_ut::checkpoint_and_create_table` |
 | 706 | `src/unit_test/storage/new_catalog/checkpoint_add_column_ut.cpp` | `TestTxnCheckpointAddColumnTest` | `addcol_checkpoint_insert` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 707 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `test_checkpoint0` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 708 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint1` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
@@ -787,18 +787,18 @@
 | 772 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_delete` | ported | `infinity-executor` `append_delete_ut::*` |
 | 773 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_compact` | ported | `infinity-executor` `append_delete_ut::*` |
 | 774 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_optimize_index` | ported | `infinity-executor` `append_delete_ut::*` |
-| 775 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_db` | exempt | design change: deferred dump commit / concurrent-DDL failure semantics absent |
-| 776 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_table` | exempt | design change: deferred dump commit / concurrent-DDL failure semantics absent |
+| 775 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_db` | ported | `infinity-executor` `dump_mem_index_ut::dump_and_drop_db` |
+| 776 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_table` | ported | `infinity-executor` `dump_mem_index_ut::dump_and_drop_table` |
 | 777 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_add_column` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 778 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_column` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 779 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_rename_table` | exempt | design change: deferred dump commit / concurrent-DDL failure semantics absent |
+| 779 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_rename_table` | ported | `infinity-executor` `dump_mem_index_ut::dump_and_rename_table` |
 | 780 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_create_index` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 781 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_index` | exempt | design change: deferred dump commit / concurrent-DDL failure semantics absent |
-| 782 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_import` | exempt | design change: per-import segment id not modelled; writes stay in segment 0 |
+| 781 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_index` | ported | `infinity-executor` `dump_mem_index_ut::dump_and_drop_index` |
+| 782 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_import` | ported | `infinity-executor` `dump_mem_index_ut::dump_and_import` |
 | 783 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_append` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 784 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_delete` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 785 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_dump_and_dump` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 786 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_test_dump_index_and_optimize_index` | exempt | design change: deferred dump commit / optimize failure semantics absent |
+| 786 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_test_dump_index_and_optimize_index` | ported | `infinity-executor` `dump_mem_index_ut::test_dump_index_and_optimize_index` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 787 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `test_dump_index_and_compact` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 788 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import1` | ported | `infinity-executor` `update_import_ut::*` |
 | 789 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_with_index` | ported | `infinity-executor` `update_import_ut::*` |
@@ -838,15 +838,15 @@
 | 823 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_add_column` | ported | `infinity-executor` `new_catalog_index_ut::*` |
 | 824 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_drop_column` | ported | `infinity-executor` `new_catalog_index_ut::*` |
 | 825 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_and_rename_table` | ported | `infinity-executor` `new_catalog_index_ut::*` |
-| 826 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store0` | exempt | design change: RocksDB Merge/Destroy semantics |
-| 827 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `DISABLED_SLOW_kv_store1` | exempt | design change: RocksDB TransactionDB multi-version transactions |
-| 828 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store2` | exempt | design change: RocksDB disable-WAL mode |
-| 829 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store3` | exempt | design change: RocksDB snapshot-isolated iterators |
-| 830 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store4` | exempt | design change: RocksDB backup/restore |
-| 831 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store5` | exempt | design change: RocksDB TransactionDB snapshots |
+| 826 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store0` | ported | `infinity-storage` `txn_kv::tests::kv_store0` |
+| 827 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `DISABLED_SLOW_kv_store1` | ported | `infinity-storage` `txn_kv::tests::kv_store1_multi_version_transactions` (`#[ignore]`: C++ DISABLED_SLOW_) |
+| 828 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store2` | ported | `infinity-storage` `txn_kv::tests::kv_store2_disable_wal` |
+| 829 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store3` | ported | `infinity-storage` `txn_kv::tests::kv_store3_snapshot_isolated_iterator` |
+| 830 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store4` | ported | `infinity-storage` `txn_kv::tests::kv_store4_backup_restore` |
+| 831 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store5` | ported | `infinity-storage` `txn_kv::tests::kv_store5_transaction_snapshot_iterator_bounds` |
 | 832 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store6` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 833 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `wal` | exempt | design change: RocksDB per-put disable_wal flag |
-| 834 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `txn_conflict_same_key_snapshot_isolation` | exempt | design change: RocksDB snapshot isolation + write conflict |
+| 833 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `wal` | ported | `infinity-storage` `txn_kv::tests::wal_disabled_put_is_lost_without_flush` |
+| 834 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `txn_conflict_same_key_snapshot_isolation` | ported | `infinity-storage` `txn_kv::tests::txn_conflict_same_key_snapshot_isolation` |
 | 835 | `src/unit_test/storage/new_catalog/kv_utility_ut.cpp` | `KVUtilityTest` | `test1` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 836 | `src/unit_test/storage/new_catalog/meta_cache_ut.cpp` | `MetaCacheTest` | `test_db` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 837 | `src/unit_test/storage/new_catalog/meta_cache_ut.cpp` | `MetaCacheTest` | `test_table` | ported | `infinity-executor`/`infinity-storage` unit suite ported |

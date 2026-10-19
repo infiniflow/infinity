@@ -1,20 +1,23 @@
 //! Ports of `src/unit_test/storage/bg_task/*_ut.cpp`.
 //!
-//! The reference runs a `BGTaskProcessor` thread pool; the Rust engine has no
-//! background scheduler, so each case runs the task explicitly through its
-//! public entry point (`cleanup`, `compact_table`, `flush`).
+//! Rows ported here:
+//! - 285 `background_process_ut.cpp` `BGProcessTest.test1` — start/stop the
+//!   `BGTaskProcessor` (`crate::bg_task`).
+//! - 288 `dump_index_task_2_ut.cpp`
+//!   `DISABLED_SLOW_row_cnt_exceed_memory_quota` — the quota proposes a
+//!   background `DumpMemIndexTask`; two appends coalesce into one 16384-row
+//!   chunk, the next append produces a second 8192-row chunk.
+//! - 289 `dump_index_task_ut.cpp`
+//!   `DISABLED_SLOW_row_cnt_exceed_memindex_capacity` — the row-capacity
+//!   trigger dumps each 8192-row append into its own chunk.
 //!
-//! Blocked rows (reported, no test):
-//! - `background_process_ut.cpp` `BGProcessTest.test1`: there is no
-//!   `BGTaskProcessor` (no start/stop thread pool) in the Rust engine.
-//! - `dump_index_task_ut.cpp` / `dump_index_task_2_ut.cpp`: the reference's
-//!   `DumpMemIndexTask` polls the memory-index capacity/quota from the
-//!   background, so two appends accumulate into one chunk before it fires.
-//!   The Rust engine enforces the quota inside the insert loop and dumps a
-//!   secondary index only at a checkpoint, so the chunk boundaries the
-//!   reference asserts are not reproducible without adding a background
-//!   scheduler.
+//! The reference disables 288/289 (`DISABLED_SLOW_`), so their Rust ports keep
+//! `#[ignore]`; they still run under `--ignored`.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
+use crate::bg_task::{BGTaskProcessor, BgTask};
 use crate::{Engine, QueryResult};
 use infinity_parser::Literal;
 use tempfile::tempdir;
@@ -109,4 +112,116 @@ fn compact_reduces_the_segment_count() {
         .parse()
         .unwrap();
     assert_eq!(count, 11 * 8192);
+}
+
+/// `{col1 INT, col2 VARCHAR}` plus a secondary index on `col1`
+/// (`DumpMemIndexTaskTest` fixture).
+fn secondary_fixture(engine: &Engine) {
+    engine.execute("CREATE DATABASE db1;").unwrap();
+    engine
+        .execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .unwrap();
+    engine
+        .execute("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
+}
+
+struct CountTask(Arc<AtomicUsize>);
+
+impl BgTask for CountTask {
+    fn name(&self) -> &str {
+        "CountTask"
+    }
+
+    fn run(self: Box<Self>) {
+        self.0.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+/// C++: `background_process_ut.cpp:37` (`BGProcessTest.test1`).
+///
+/// Start the processor, run a submitted task to completion (the reference's
+/// stop task is queued behind it), and stop.
+#[test]
+fn background_process_start_stop() {
+    let processor = Arc::new(BGTaskProcessor::new(2));
+    processor.start();
+
+    let counter = Arc::new(AtomicUsize::new(0));
+    processor.submit(Box::new(CountTask(Arc::clone(&counter))));
+    processor.drain();
+    assert_eq!(counter.load(Ordering::SeqCst), 1);
+
+    processor.stop();
+    assert_eq!(processor.running_task_count(), 0);
+}
+
+/// C++: `dump_index_task_2_ut.cpp:63`
+/// (`DumpMemIndexTaskTest2.DISABLED_SLOW_row_cnt_exceed_memory_quota`).
+///
+/// The mem-index quota is 1K. The insert path proposes one background dump
+/// while two 8192-row appends are in flight; the task runs afterwards and
+/// dumps both blocks as a single 16384-row chunk. The next append proposes
+/// another dump, which starts at row 16384.
+#[test]
+#[ignore = "SLOW: the reference disables this test"]
+fn dump_index_task_row_cnt_exceed_memory_quota() {
+    let dir = tempdir().unwrap();
+    let engine = Arc::new(Engine::open(dir.path()).unwrap());
+    engine.set_memindex_quota(1024);
+    secondary_fixture(&engine);
+
+    // Attach before the writes so the quota proposes the real task. The
+    // processor is started after both appends, which is the reference's
+    // proposed-dump coalescing (`proposed_dump_size_`).
+    let processor = Arc::new(BGTaskProcessor::new(1));
+    engine.attach_bg_task_processor(Arc::clone(&processor));
+
+    append_block(&engine, "db1.tb1");
+    append_block(&engine, "db1.tb1");
+
+    processor.start();
+    engine.drain_background_tasks();
+    assert_eq!(
+        engine.secondary_chunk_meta("db1.tb1", "col1"),
+        vec![(0, 8192 * 2)]
+    );
+
+    append_block(&engine, "db1.tb1");
+    engine.drain_background_tasks();
+    assert_eq!(
+        engine.secondary_chunk_meta("db1.tb1", "col1"),
+        vec![(0, 8192 * 2), (8192 * 2, 8192)]
+    );
+
+    engine.execute("DROP DATABASE db1;").unwrap();
+    processor.stop();
+}
+
+/// C++: `dump_index_task_ut.cpp:63`
+/// (`DumpMemIndexTaskTest.DISABLED_SLOW_row_cnt_exceed_memindex_capacity`).
+///
+/// `mem_index_capacity = 8192`: each append reaches the row bound and is
+/// dumped at the end of its batch, so the second chunk starts at row 8192.
+#[test]
+#[ignore = "SLOW: the reference disables this test"]
+fn dump_index_task_row_cnt_exceed_memindex_capacity() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+    engine.set_memindex_capacity(8192);
+    secondary_fixture(&engine);
+
+    append_block(&engine, "db1.tb1");
+    assert_eq!(
+        engine.secondary_chunk_meta("db1.tb1", "col1"),
+        vec![(0, 8192)]
+    );
+
+    append_block(&engine, "db1.tb1");
+    assert_eq!(
+        engine.secondary_chunk_meta("db1.tb1", "col1"),
+        vec![(0, 8192), (8192, 8192)]
+    );
+
+    engine.execute("DROP DATABASE db1;").unwrap();
 }

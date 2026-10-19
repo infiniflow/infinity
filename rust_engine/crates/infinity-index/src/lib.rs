@@ -86,6 +86,21 @@ impl SecondaryIndex {
         self.map.values().flatten().min().copied()
     }
 
+    /// Lowest row id and row count of `segment` (C++ `SegmentIndexMeta::
+    /// GetMemIndex()` reads one segment's memory tail).
+    pub fn segment_begin_and_count(&self, segment: u32) -> Option<(RowID, usize)> {
+        let segment = segment as u64;
+        let mut begin: Option<RowID> = None;
+        let mut count = 0usize;
+        for id in self.map.values().flatten() {
+            if (id >> 32) == segment {
+                begin = Some(begin.map_or(*id, |b| b.min(*id)));
+                count += 1;
+            }
+        }
+        begin.map(|b| (b, count))
+    }
+
     /// Persists to `path` (length-prefixed entries). Durable via `sync_all`.
     pub fn flush_to(&self, path: impl AsRef<Path>) -> Result<()> {
         let path = path.as_ref();

@@ -48,6 +48,67 @@ fn restart(old: Engine, dir: &Path) -> Engine {
     Engine::open(dir).unwrap()
 }
 
+/// `RestartTxnMgr` in the `NEW_CONFIG_NOWAL_PATH` configuration.
+fn restart_without_wal(old: Engine, dir: &Path) -> Engine {
+    drop(old);
+    Engine::open_without_wal(dir).unwrap()
+}
+
+/// C++: `checkpoint1_ut.cpp:100` (`checkpoint_and_create_db`).
+///
+/// With the WAL disabled, a database created before a checkpoint survives the
+/// restart and one created after the checkpoint is gone.
+#[test]
+fn checkpoint_and_create_db() {
+    // Create db, then checkpoint: the catalog is flushed.
+    let dir = tempdir().unwrap();
+    let e = Engine::open_without_wal(dir.path()).unwrap();
+    e.execute("CREATE DATABASE db1;").unwrap();
+    e.flush().unwrap();
+    let e = restart_without_wal(e, dir.path());
+    assert_eq!(
+        db_names(&e),
+        vec!["db1".to_string(), "default_db".to_string()]
+    );
+    drop(e);
+
+    // Checkpoint first, then create db: the DDL is not durable without WAL.
+    let dir = tempdir().unwrap();
+    let e = Engine::open_without_wal(dir.path()).unwrap();
+    e.flush().unwrap();
+    e.execute("CREATE DATABASE db1;").unwrap();
+    let e = restart_without_wal(e, dir.path());
+    assert_eq!(db_names(&e), vec!["default_db".to_string()]);
+}
+
+/// C++: `checkpoint1_ut.cpp:233` (`checkpoint_and_create_table`).
+///
+/// Same rule for a table in `default_db`.
+#[test]
+fn checkpoint_and_create_table() {
+    // Create table, then checkpoint.
+    let dir = tempdir().unwrap();
+    let e = Engine::open_without_wal(dir.path()).unwrap();
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .unwrap();
+    e.flush().unwrap();
+    let e = restart_without_wal(e, dir.path());
+    assert!(e.table_exists("default_db.tb1"));
+    assert_eq!(e.row_count("default_db.tb1").unwrap(), 0);
+    drop(e);
+
+    // Checkpoint first, then create table.
+    let dir = tempdir().unwrap();
+    let e = Engine::open_without_wal(dir.path()).unwrap();
+    e.flush().unwrap();
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .unwrap();
+    assert!(e.table_exists("default_db.tb1"));
+    let e = restart_without_wal(e, dir.path());
+    assert!(!e.table_exists("default_db.tb1"));
+    assert!(rows(&e, "SHOW TABLES FROM default_db;").is_empty());
+}
+
 /// C++: `checkpoint_add_column_ut.cpp:82` (`addcol_checkpoint_insert`).
 ///
 /// A column added before a checkpoint must read back for rows appended after
