@@ -97,6 +97,42 @@
 
 > 判定口径：C++ 中承载**行为**且被其他类调用的类（HNSW/IVF/EMVB/PLAID/SMVE、全文段、事务、Buffer、BlockIndex、PDataBlock 等）在本表中逐类对应；纯数据载体、模板特化、迭代器和生成类型按上表合并，理由与归属均已登记。新增 C++ 行为类时仍须先登记再移植。
 
+**聚合对应（精确计数，覆盖其余 1031 个类；逐名见 `CLASS_AUDIT.md`）**
+
+| 聚合到（Rust） | 类数 |
+|---|---:|
+| `Statement`/计划结构 + 规则函数（planner） | 117 |
+| `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 | 117 |
+| `PhysicalOperator` 变体（执行器算子） | 78 |
+| `infinity_catalog` + `value_format` | 76 |
+| `PhysicalOperator` + `OperatorState`（状态结构） | 73 |
+| `infinity_storage`/执行器对应模块 | 50 |
+| `vector::{HnswIndex, Store}` + `hnsw_handler`/`lvq`/`rabitq`/`lsg` | 50 |
+| `infinity_txn::{Txn, TxnManager}` | 46 |
+| `Vec<u8>`/`BufferObj` 等存储原语 | 40 |
+| `infinity_storage::wal` | 40 |
+| `tokenize_*` analyzer 函数 | 39 |
+| parser/CLI 结构 | 39 |
+| `infinity-expression` cast 函数 | 29 |
+| 定时线程 + `Engine::{dump,optimize,cleanup}` | 26 |
+| 生成的 Thrift 类型 / `infinity-server` | 23 |
+| `infinity-common` 工具/类型 | 19 |
+| 标量/聚合函数 + `AggFunc` | 17 |
+| 表函数（执行器直接求值） | 17 |
+| `infinity_storage::buffer` | 16 |
+| `std::fs` + `infinity_storage::s3` | 16 |
+| `data_block::{ColumnVector, DataBlock}` | 15 |
+| `infinity-expression` 求值函数 | 13 |
+| `infinity_catalog::value_format` | 12 |
+| `sparse::{BmpAlg, BMPIvt, BlockFwd, TailFwd}` + `SparseIndex` | 12 |
+| `infinity-expression`（表达式结构） | 12 |
+| Tokio（D4） | 10 |
+| 执行器管线（`lib.rs`） | 7 |
+| `ivf::IvfIndex` + `ivf`/`ivf_mem` | 7 |
+| `merge_knn::MergeKnn` + 结果堆 | 3 |
+| 其余 8 个聚合组（每组 ≤2 个类） | 12 |
+| **合计** | **1031** |
+
 ## 维护规则
 
 - 新增一个 C++ 子系统的移植时，先在本文档登记类/方法映射，再写代码。
