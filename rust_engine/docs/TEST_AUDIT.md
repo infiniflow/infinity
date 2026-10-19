@@ -469,9 +469,9 @@
 | 455 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestDifferentValueTypes` | ported |
 | 456 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestConcurrentInsertAndRead` | ported |
 | 457 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestConcurrentInsertDeleteRead` | ported |
-| 458 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestHighVolumeMultiThreading` | partial |
-| 459 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestRcuSwapUnderLoad` | partial |
-| 460 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestRcuBehavior` | partial |
+| 458 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestHighVolumeMultiThreading` | ported |
+| 459 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestRcuSwapUnderLoad` | ported |
+| 460 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestRcuBehavior` | ported |
 | 461 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestBasicInsertAndGet` | ported |
 | 462 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestLowercaseAliases` | ported |
 | 463 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestDelete` | ported |
@@ -488,8 +488,8 @@
 | 474 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestStressInsertAndRetrieve` | ported |
 | 475 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestConcurrentInsertAndRead` | ported |
 | 476 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestConcurrentInsertDeleteRead` | ported |
-| 477 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRcuSwapUnderLoad` | partial |
-| 478 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRcuBehavior` | partial |
+| 477 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRcuSwapUnderLoad` | ported |
+| 478 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRcuBehavior` | ported |
 | 479 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestMapVsMultiMapBehavior` | ported |
 | 480 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `ReadHeavyWorkload` | exempt |
 | 481 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `WriteHeavyWorkload` | exempt |

@@ -964,6 +964,141 @@ mod concurrency_reference_suite {
         assert!(map.size() <= keys as usize);
     }
 
+    /// C++: `RcuMapTest.TestRcuSwapUnderLoad`.
+    #[test]
+    fn map_rcu_swap_under_load() {
+        let map: RcuMap<i32, i32> = RcuMap::new();
+        let gets = AtomicI32::new(0);
+        let (threads, ops, keys) = (4i32, 100i32, 8i32);
+        std::thread::scope(|scope| {
+            for t in 0..threads {
+                let map = &map;
+                let gets = &gets;
+                scope.spawn(move || {
+                    for i in 0..ops {
+                        let key = (t * 3 + i) % keys;
+                        map.insert(key, t * ops + i);
+                        if let Some(value) = map.get(&key, true) {
+                            assert!(value >= 0);
+                        }
+                        gets.fetch_add(1, Ordering::Relaxed);
+                        let _ = map.get(&((t * 7 + i) % keys), true);
+                    }
+                });
+            }
+        });
+        assert!(gets.load(Ordering::Relaxed) >= threads * ops);
+        let accessible = (0..keys).filter(|key| map.get(key, true).is_some()).count();
+        assert!(accessible <= keys as usize);
+    }
+
+    /// C++: `RcuMapTest.TestRcuBehavior`.
+    #[test]
+    fn map_rcu_behavior() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.insert("key1".into(), 100);
+        map.insert("key2".into(), 200);
+        assert_eq!(map.get(&"key1".into(), true), Some(100));
+        for _ in 0..100 {
+            let _ = map.get(&"key1".into(), true);
+        }
+        assert_eq!(map.get(&"key1".into(), true), Some(100));
+    }
+
+    /// C++: `RcuMultiMapTest.TestHighVolumeMultiThreading`.
+    #[test]
+    fn multimap_high_volume_multi_threading() {
+        let map: RcuMultiMap<i64, i64> = RcuMultiMap::new();
+        let total_operations = AtomicI32::new(0);
+        let successful_reads = AtomicI32::new(0);
+        let stop = std::sync::atomic::AtomicBool::new(false);
+        let (threads, ops, keys) = (6i64, 300i32, 50i64);
+        std::thread::scope(|scope| {
+            for t in 0..threads {
+                let map = &map;
+                let total_operations = &total_operations;
+                let successful_reads = &successful_reads;
+                let stop = &stop;
+                scope.spawn(move || {
+                    let mut state = 0x9E37_79B9u64 ^ t as u64;
+                    let mut next = || -> u64 {
+                        state ^= state << 13;
+                        state ^= state >> 7;
+                        state ^= state << 17;
+                        state
+                    };
+                    let mut local = 0;
+                    while !stop.load(Ordering::Relaxed) && local < ops {
+                        let key = (next() % keys as u64) as i64;
+                        if next() % 100 < 70 {
+                            let values = map.get(&key, true);
+                            if !values.is_empty() {
+                                successful_reads.fetch_add(1, Ordering::Relaxed);
+                                assert!(values.iter().all(|v| *v >= 0));
+                            }
+                        } else {
+                            map.insert(key, t * ops as i64 + local as i64);
+                        }
+                        local += 1;
+                        total_operations.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            stop.store(true, Ordering::Relaxed);
+        });
+        assert!(total_operations.load(Ordering::Relaxed) > (threads * 100) as i32);
+        assert!(successful_reads.load(Ordering::Relaxed) > 0);
+        for key in 0..keys.min(100) {
+            assert!(map.get(&key, true).iter().all(|v| *v >= 0));
+        }
+    }
+
+    /// C++: `RcuMultiMapTest.TestRcuSwapUnderLoad`.
+    #[test]
+    fn multimap_rcu_swap_under_load() {
+        let map: RcuMultiMap<i32, i32> = RcuMultiMap::new();
+        let gets = AtomicI32::new(0);
+        let (threads, ops, keys) = (4i32, 200i32, 10i32);
+        std::thread::scope(|scope| {
+            for t in 0..threads {
+                let map = &map;
+                let gets = &gets;
+                scope.spawn(move || {
+                    for i in 0..ops {
+                        let key = (t * 3 + i) % keys;
+                        map.insert(key, t * ops + i);
+                        let values = map.get(&key, true);
+                        assert!(values.iter().all(|v| *v >= 0));
+                        gets.fetch_add(1, Ordering::Relaxed);
+                        let rapid = (t * 7 + i) % keys;
+                        let _ = map.get(&rapid, true);
+                    }
+                });
+            }
+        });
+        assert!(gets.load(Ordering::Relaxed) >= threads * ops);
+        let mut final_total = 0;
+        for key in 0..keys {
+            final_total += map.get(&key, true).len();
+        }
+        assert!(final_total > 0);
+        assert!(final_total <= (threads * ops) as usize);
+    }
+
+    /// C++: `RcuMultiMapTest.TestRcuBehavior`.
+    #[test]
+    fn multimap_rcu_behavior() {
+        let map: RcuMultiMap<String, i32> = RcuMultiMap::new();
+        map.insert("key1".into(), 100);
+        map.insert("key2".into(), 200);
+        assert_eq!(map.get(&"key1".into(), true), vec![100]);
+        for _ in 0..100 {
+            let _ = map.get(&"key1".into(), true);
+        }
+        assert_eq!(map.get(&"key1".into(), true), vec![100]);
+    }
+
     #[test]
     fn map_concurrent_insert_and_read() {
         let map: RcuMap<i32, i32> = RcuMap::new();
