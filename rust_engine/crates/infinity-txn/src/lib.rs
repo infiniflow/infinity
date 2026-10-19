@@ -6,6 +6,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod state;
+
+pub use state::{transaction_type_to_str, txn_state_to_str, TransactionType, TxnState};
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
