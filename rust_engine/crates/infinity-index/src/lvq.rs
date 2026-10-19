@@ -603,7 +603,10 @@ mod tests {
             let qv2 = decode(&store.data[i], &store.mean);
             let dist2 = plain_l2(&qv1, &qv2);
             let err = ((dist1 - dist2) / dist1).abs();
-            assert!(err < 1e-5, "vector {i}: dist1 {dist1}, dist2 {dist2}, err {err}");
+            assert!(
+                err < 1e-5,
+                "vector {i}: dist1 {dist1}, dist2 {dist2}, err {err}"
+            );
         }
     }
 
@@ -627,7 +630,10 @@ mod tests {
             let qv2 = decode(&store.data[i], &store.mean);
             let dist2: f32 = -qv1.iter().zip(&qv2).map(|(a, b)| a * b).sum::<f32>();
             let err = ((dist1 - dist2) / dist1).abs();
-            assert!(err < 1e-5, "vector {i}: dist1 {dist1}, dist2 {dist2}, err {err}");
+            assert!(
+                err < 1e-5,
+                "vector {i}: dist1 {dist1}, dist2 {dist2}, err {err}"
+            );
         }
     }
 }

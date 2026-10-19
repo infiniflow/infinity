@@ -531,11 +531,8 @@ impl HnswIndex {
             Metric::Ip => crate::lvq::Metric::Ip,
             Metric::Cos => crate::lvq::Metric::Cos,
         };
-        let mut store = crate::lvq::LvqStore::new(
-            self.dims,
-            metric,
-            metric == crate::lvq::Metric::Cos,
-        );
+        let mut store =
+            crate::lvq::LvqStore::new(self.dims, metric, metric == crate::lvq::Metric::Cos);
         store.build(&vectors);
         self.store = Store::Lvq(store);
     }
@@ -805,7 +802,11 @@ impl HnswIndex {
         visited.insert(ep);
         let ep_d = self.distance_query(q, self_id, ep);
         let mut candidates: Vec<(f32, usize)> = vec![(ep_d, ep)];
-        let mut result: Vec<(f32, usize)> = if allowed(ep) { vec![(ep_d, ep)] } else { vec![] };
+        let mut result: Vec<(f32, usize)> = if allowed(ep) {
+            vec![(ep_d, ep)]
+        } else {
+            vec![]
+        };
 
         while !candidates.is_empty() {
             let (cd, c) = candidates.remove(0);
@@ -1125,7 +1126,8 @@ mod reference_suite {
         use std::sync::{Arc, RwLock};
         let data = data();
         let half = data.len() / 2;
-        let mut index = HnswIndex::with_encoding(DIM, M, EF_CONSTRUCTION, EF_SEARCH, metric, encoding);
+        let mut index =
+            HnswIndex::with_encoding(DIM, M, EF_CONSTRUCTION, EF_SEARCH, metric, encoding);
         index.train_store(&data, None);
         for v in &data[..half] {
             index.add(v);

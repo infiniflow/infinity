@@ -315,7 +315,9 @@ impl IndexIvf {
                         invalid("Missing parameter 'product_quantization_subspace_bits'.")
                     })?;
                 let bits: i64 = value.trim().parse().map_err(|_| {
-                    invalid(format!("invalid product_quantization_subspace_bits: {value}"))
+                    invalid(format!(
+                        "invalid product_quantization_subspace_bits: {value}"
+                    ))
                 })?;
                 if !(4..=16).contains(&bits) {
                     return Err(invalid(format!(
@@ -326,10 +328,7 @@ impl IndexIvf {
             }
         }
         if !map.is_empty() {
-            let rest: Vec<String> = map
-                .iter()
-                .map(|(k, v)| format!(" ({k}, {v})"))
-                .collect();
+            let rest: Vec<String> = map.iter().map(|(k, v)| format!(" ({k}, {v})")).collect();
             return Err(invalid(format!(
                 "Following parameters are left unused:{}.",
                 rest.join("")
@@ -418,7 +417,8 @@ fn check_centroid_option(option: &CentroidOption) -> Result<()> {
     Ok(())
 }
 
-fn check_storage_option(option: &StorageOption, column_type: ColumnType) -> Result<()> {    let ColumnType::Embedding(embedding_data_type, dimension) = column_type else {
+fn check_storage_option(option: &StorageOption, column_type: ColumnType) -> Result<()> {
+    let ColumnType::Embedding(embedding_data_type, dimension) = column_type else {
         // `kMultiVector` has no element-type check in the reference: the
         // storage option is only inspected for embedding columns.
         return Ok(());
@@ -434,18 +434,18 @@ fn check_storage_option(option: &StorageOption, column_type: ColumnType) -> Resu
                     )));
                 }
             }
-            EmbeddingDataType::Float
-            | EmbeddingDataType::Float16
-            | EmbeddingDataType::BFloat16 => match embedding_data_type {
-                dt if dt.is_floating() => {}
-                _ => {
-                    return Err(invalid(format!(
-                        "Attempt to use floating point plain storage on embedding column with \
+            EmbeddingDataType::Float | EmbeddingDataType::Float16 | EmbeddingDataType::BFloat16 => {
+                match embedding_data_type {
+                    dt if dt.is_floating() => {}
+                    _ => {
+                        return Err(invalid(format!(
+                            "Attempt to use floating point plain storage on embedding column with \
                          type: {}.",
-                        column_type.describe()
-                    )))
+                            column_type.describe()
+                        )))
+                    }
                 }
-            },
+            }
             EmbeddingDataType::Double
             | EmbeddingDataType::Bit
             | EmbeddingDataType::Int16
@@ -516,7 +516,11 @@ mod tests {
 
     /// The reference's `BaseTableRef`: one BF16 embedding column, dimension 128.
     fn table() -> Vec<Column> {
-        vec![Column::embedding("col_ivf", EmbeddingDataType::BFloat16, 128)]
+        vec![Column::embedding(
+            "col_ivf",
+            EmbeddingDataType::BFloat16,
+            128,
+        )]
     }
 
     fn make(params: &[(&str, &str)]) -> Result<IndexIvf> {
@@ -617,11 +621,17 @@ mod tests {
             StorageType::ProductQuantization
         );
         assert_eq!(
-            index.option.storage_option.product_quantization_subspace_num,
+            index
+                .option
+                .storage_option
+                .product_quantization_subspace_num,
             32
         );
         assert_eq!(
-            index.option.storage_option.product_quantization_subspace_bits,
+            index
+                .option
+                .storage_option
+                .product_quantization_subspace_bits,
             12
         );
 
@@ -632,6 +642,9 @@ mod tests {
             ("product_quanTization_subspace_bits", "12"),
         ])
         .unwrap_err();
-        assert!(err.to_string().contains("Missing parameter 'metric'"), "{err}");
+        assert!(
+            err.to_string().contains("Missing parameter 'metric'"),
+            "{err}"
+        );
     }
 }

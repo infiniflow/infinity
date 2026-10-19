@@ -495,8 +495,7 @@ mod tests {
         let mut assignments = vec![0u32; N_DOCS * EMBEDDING_IN_ONE_DOC];
         for doc in 0..N_DOCS {
             for emb in 0..EMBEDDING_IN_ONE_DOC {
-                assignments[doc * EMBEDDING_IN_ONE_DOC + emb] =
-                    (doc / DOCS_IN_ONE_CENTROID) as u32;
+                assignments[doc * EMBEDDING_IN_ONE_DOC + emb] = (doc / DOCS_IN_ONE_CENTROID) as u32;
             }
         }
         let mut centroids = vec![0.0f32; CENTROID_NUM * DIM];

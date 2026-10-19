@@ -245,7 +245,7 @@ mod tests {
     }
 
     impl MockNode {
-        fn new(key: &str, names: &[&str]) -> Box<dyn CachedNode> {
+        fn node(key: &str, names: &[&str]) -> Box<dyn CachedNode> {
             Box::new(Self {
                 key: key.to_string(),
                 names: names.iter().map(|n| n.to_string()).collect(),
@@ -295,29 +295,29 @@ mod tests {
         let mut cache = ResultCacheManager::new(100);
 
         assert!(cache
-            .get_cache(MockNode::new("key1", &["col1", "col2"]).as_ref())
+            .get_cache(MockNode::node("key1", &["col1", "col2"]).as_ref())
             .is_none());
 
-        assert!(cache.add_cache(MockNode::new("key1", &["col1", "col2"]), vec![block(2)]));
+        assert!(cache.add_cache(MockNode::node("key1", &["col1", "col2"]), vec![block(2)]));
         let hit = cache
-            .get_cache(MockNode::new("key1", &["col1", "col2"]).as_ref())
+            .get_cache(MockNode::node("key1", &["col1", "col2"]).as_ref())
             .expect("cached");
         assert_eq!(hit.column_map, vec![0, 1]);
 
         let hit = cache
-            .get_cache(MockNode::new("key1", &["col2"]).as_ref())
+            .get_cache(MockNode::node("key1", &["col2"]).as_ref())
             .expect("projection hit");
         assert_eq!(hit.column_map, vec![1]);
 
         assert!(cache
-            .get_cache(MockNode::new("key1", &["col1", "col2", "col3"]).as_ref())
+            .get_cache(MockNode::node("key1", &["col1", "col2", "col3"]).as_ref())
             .is_none());
         assert!(!cache.add_cache(
-            MockNode::new("key1", &["col1", "col2", "col3"]),
+            MockNode::node("key1", &["col1", "col2", "col3"]),
             vec![block(3)]
         ));
         let hit = cache
-            .get_cache(MockNode::new("key1", &["col3"]).as_ref())
+            .get_cache(MockNode::node("key1", &["col3"]).as_ref())
             .expect("merged column");
         assert_eq!(hit.column_map, vec![2]);
     }
@@ -326,14 +326,14 @@ mod tests {
     #[test]
     fn cache_evicts_the_least_recently_used_entry() {
         let mut cache = ResultCacheManager::new(2);
-        assert!(cache.add_cache(MockNode::new("key1", &["col1"]), vec![]));
-        assert!(cache.add_cache(MockNode::new("key2", &["col2"]), vec![]));
+        assert!(cache.add_cache(MockNode::node("key1", &["col1"]), vec![]));
+        assert!(cache.add_cache(MockNode::node("key2", &["col2"]), vec![]));
         assert!(cache
-            .get_cache(MockNode::new("key1", &["col1"]).as_ref())
+            .get_cache(MockNode::node("key1", &["col1"]).as_ref())
             .is_some());
-        assert!(cache.add_cache(MockNode::new("key3", &["col1", "col2", "col3"]), vec![]));
+        assert!(cache.add_cache(MockNode::node("key3", &["col1", "col2", "col3"]), vec![]));
         assert!(cache
-            .get_cache(MockNode::new("key2", &["col2"]).as_ref())
+            .get_cache(MockNode::node("key2", &["col2"]).as_ref())
             .is_none());
     }
 

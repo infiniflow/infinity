@@ -38,7 +38,7 @@ mod catalog_ut;
 
 mod explain_search;
 
-mod analyzer;
+pub mod analyzer;
 mod hnsw_mem;
 mod knn_scan;
 mod profiler;
@@ -11415,16 +11415,17 @@ fn standard_tokenize(s: &str) -> Vec<String> {
 
 /// Query-side tokens: the standard analyzer's stem replaces the word.
 fn tokenize_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
-    let words = split_words(s, delims);
     // The C++ default analyzer is `standard` (`index_full_text_impl.cpp:68`) — a
     // `StandardAnalyzer` with `STEM_LANG_ENGLISH` (`analyzer_pool_impl.cpp:266-289`)
-    // — so the `None` (standard) case stems English. `keyword`/`whitespace`(±chars)
-    // do not.
+    // — so the `None` (standard) case stems English and drops the word form.
+    // `keyword`/`whitespace`(±chars) do not.
     if delims.is_none() {
-        words.into_iter().map(|t| stem_english(&t)).collect()
-    } else {
-        words
+        let mut analyzer = analyzer::StandardAnalyzer::new();
+        analyzer.init_stemmer_english();
+        analyzer.set_stem_only(true);
+        return analyzer.analyze(s).into_iter().map(|t| t.text).collect();
     }
+    split_words(s, delims)
 }
 
 /// The **index-side** tokenizer. The C++ `standard` analyzer emits each token
@@ -11435,21 +11436,12 @@ fn tokenize_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
 /// `another`->`anoth`), and `doc_len_sum` is 21 rather than 15. Query terms stay
 /// stem-only (a boolean query for `second text multiple` scores 3, not 4).
 fn tokenize_index_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
-    let words = split_words(s, delims);
     if delims.is_some() {
-        return words;
+        return split_words(s, delims);
     }
-    let mut out = Vec::with_capacity(words.len());
-    for t in words {
-        let stem = stem_english(&t);
-        if stem != t {
-            out.push(t);
-            out.push(stem);
-        } else {
-            out.push(t);
-        }
-    }
-    out
+    let mut analyzer = analyzer::StandardAnalyzer::new();
+    analyzer.init_stemmer_english();
+    analyzer.analyze(s).into_iter().map(|t| t.text).collect()
 }
 
 /// Index-side tokens **with their position**. The C++ analyzer emits a token's
@@ -11457,22 +11449,20 @@ fn tokenize_index_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
 /// re-uses `offset_` for both), so both share a position; `offset_` itself
 /// advances once per raw token. Phrase queries need this.
 fn tokenize_index_positions(s: &str, delims: &Option<Vec<char>>) -> Vec<(String, u32)> {
-    let words = split_words(s, delims);
-    let mut out = Vec::with_capacity(words.len());
-    for (pos, word) in words.into_iter().enumerate() {
-        if delims.is_some() {
-            out.push((word, pos as u32));
-            continue;
-        }
-        let stem = stem_english(&word);
-        if stem != word {
-            out.push((word, pos as u32));
-            out.push((stem, pos as u32));
-        } else {
-            out.push((word, pos as u32));
-        }
+    if delims.is_some() {
+        return split_words(s, delims)
+            .into_iter()
+            .enumerate()
+            .map(|(pos, word)| (word, pos as u32))
+            .collect();
     }
-    out
+    let mut analyzer = analyzer::StandardAnalyzer::new();
+    analyzer.init_stemmer_english();
+    analyzer
+        .analyze(s)
+        .into_iter()
+        .map(|t| (t.text, t.word_offset))
+        .collect()
 }
 
 /// Byte spans of the standard tokenizer's tokens, with the forms the analyzer
