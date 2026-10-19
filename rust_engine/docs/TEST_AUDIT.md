@@ -13,13 +13,13 @@
 
 | # | 文件 | Fixture | 用例 | 状态 |
 |---:|---|---|---|---|
-| 1 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_default_is_english_and_coarse` | gap |
-| 2 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_fine_keeps_english_stemming` | gap |
-| 3 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_slovak_folds_and_disables_stemming` | gap |
-| 4 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_czech_folds_and_disables_stemming` | gap |
-| 5 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_language_and_fine_in_both_orders` | gap |
-| 6 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_unknown_segment_falls_back_to_legacy` | gap |
-| 7 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_analyzers_are_independent` | gap |
+| 1 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_default_is_english_and_coarse` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_default_is_english_and_coarse` |
+| 2 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_fine_keeps_english_stemming` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_fine_keeps_english_stemming` |
+| 3 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_slovak_folds_and_disables_stemming` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_slovak_folds_and_disables_stemming` |
+| 4 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_czech_folds_and_disables_stemming` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_czech_folds_and_disables_stemming` |
+| 5 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_language_and_fine_in_both_orders` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_language_and_fine_in_both_orders` |
+| 6 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_unknown_segment_falls_back_to_legacy` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_unknown_segment_falls_back_to_legacy` |
+| 7 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_analyzers_are_independent` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_analyzers_are_independent` |
 | 8 | `src/unit_test/common/analyzer/chinese_analyzer_ut.cpp` | `ChineseAnalyzerTest` | `test1` | gap |
 | 9 | `src/unit_test/common/analyzer/ik_analyzer_ut.cpp` | `IKAnalyzerTest` | `test1` | gap |
 | 10 | `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp` | `NGramAnalyzerTest` | `test1` | ported | `infinity-executor` `analyzer::tests::ngram_two_slides_over_words` |
@@ -615,7 +615,7 @@
 | 600 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `minio_download` | integration |
 | 601 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestStorageType` | ported | `infinity-storage` `storage_type_conversions` |
 | 602 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestFileCompress` | ported | `infinity-storage` `file_compress_writes_a_record` |
-| 603 | `src/unit_test/storage/knnindex/emvb_search/test_emvb_ut.cpp` | `EMVBTest` | `test_fakepq` | gap |
+| 603 | `src/unit_test/storage/knnindex/emvb_search/test_emvb_ut.cpp` | `EMVBTest` | `test_fakepq` | ported | `infinity-index` `emvb::tests::fake_pq_ranks_the_matching_centroids_documents` |
 | 604 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testsum256` | exempt |
 | 605 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testloadstore` | exempt |
 | 606 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testmask` | exempt |
@@ -947,15 +947,15 @@
 | 932 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_append` | gap |
 | 933 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_select` | gap |
 | 934 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_delete` | gap |
-| 935 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_create_db` | gap |
-| 936 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_drop_db` | gap |
-| 937 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_create_table` | gap |
-| 938 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_drop_table` | gap |
-| 939 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_create_index` | gap |
-| 940 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_drop_index` | gap |
-| 941 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_add_column` | gap |
-| 942 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_drop_column` | gap |
-| 943 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_use_schema` | gap |
+| 935 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_create_db` | ported | `infinity-executor` `request_ut::create_database_succeeds_once` |
+| 936 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_drop_db` | ported | `infinity-executor` `request_ut::drop_database_succeeds_once` |
+| 937 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_create_table` | ported | `infinity-executor` `request_ut::create_table_succeeds_once` |
+| 938 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_drop_table` | ported | `infinity-executor` `request_ut::drop_table_succeeds_once` |
+| 939 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_create_index` | ported | `infinity-executor` `request_ut::create_index_succeeds_once` |
+| 940 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_drop_index` | ported | `infinity-executor` `request_ut::drop_index_succeeds_once` |
+| 941 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_add_column` | ported | `infinity-executor` `request_ut::add_column_succeeds_once` |
+| 942 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_drop_column` | ported | `infinity-executor` `request_ut::drop_column_succeeds_once` |
+| 943 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_use_schema` | ported | `infinity-executor` `request_ut::use_requires_existing_database` |
 | 944 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `index_scan` | gap |
 | 945 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `fulltext_index_scan` | gap |
 | 946 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `vector_index_scan` | gap |
@@ -970,13 +970,13 @@
 | 955 | `src/unit_test/storage/result_cache_manager_ut.cpp` | `ResultCacheManagerTest` | `test2` | ported | `infinity-storage` `result_cache::tests::cache_evicts_the_least_recently_used_entry` |
 | 956 | `src/unit_test/storage/secondary_index/test_high_cardinality_ut.cpp` | `HighCardinalitySecondaryIndexTest` | `TestSaveLoadHighCardinality` | partial |
 | 957 | `src/unit_test/storage/secondary_index/test_high_cardinality_ut.cpp` | `HighCardinalitySecondaryIndexTest` | `TestTxn` | partial |
-| 958 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestIntegerLowCardinality` | partial |
-| 959 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestFloatLowCardinality` | partial |
-| 960 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestEmptyIndex` | partial |
-| 961 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestSingleValueCardinality` | partial |
-| 962 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestComparisonWithHighCardinality` | partial |
-| 963 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestSaveLoadLowCardinality` | partial |
-| 964 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestAllDataType` | partial |
+| 958 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestIntegerLowCardinality` | ported | `infinity-storage` `secondary_lowcard::tests::test_integer_low_cardinality` |
+| 959 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestFloatLowCardinality` | ported | `infinity-storage` `secondary_lowcard::tests::test_float_low_cardinality` |
+| 960 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestEmptyIndex` | ported | `infinity-storage` `secondary_lowcard::tests::test_empty_low_cardinality_index` |
+| 961 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestSingleValueCardinality` | ported | `infinity-storage` `secondary_lowcard::tests::test_single_value_low_cardinality` |
+| 962 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestComparisonWithHighCardinality` | ported | `infinity-storage` `secondary_lowcard::tests::test_low_cardinality_vs_high_cardinality` |
+| 963 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestSaveLoadLowCardinality` | ported | `infinity-storage` `secondary_lowcard::tests::test_save_load_low_cardinality` |
+| 964 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestAllDataType` | ported | `infinity-storage` `secondary_lowcard::tests::test_all_data_types_low_cardinality` |
 | 965 | `src/unit_test/storage/tracer/test_tracer_ut.cpp` | `MemIndexTracerTest` | `test1` | gap |
 | 966 | `src/unit_test/storage/tracer/test_tracer_ut.cpp` | `MemIndexTracerTest` | `test2` | gap |
 | 967 | `src/unit_test/storage/txn/conflict_check_ut.cpp` | `ConflictCheckTest` | `conflict_check_delete` | gap |

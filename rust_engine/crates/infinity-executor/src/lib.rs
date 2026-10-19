@@ -36,6 +36,9 @@ mod explain;
 #[cfg(test)]
 mod catalog_ut;
 
+#[cfg(test)]
+mod request_ut;
+
 mod explain_search;
 
 pub mod analyzer;
@@ -3784,6 +3787,17 @@ impl Engine {
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             // `USE <db>` switches the session database for later statements.
             if let Statement::Use { name } = &s {
+                // The reference rejects `USE` of an unregistered database
+                // instead of switching the session into it.
+                if !self
+                    .storage
+                    .catalog
+                    .list_databases()?
+                    .iter()
+                    .any(|db| db.eq_ignore_ascii_case(name))
+                {
+                    return Err(Error::NotFound(format!("database '{name}'")));
+                }
                 *self.current_db.lock().unwrap() = name.clone();
                 out.push(QueryResult::Rows {
                     columns: vec![],

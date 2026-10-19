@@ -193,6 +193,16 @@ impl LowCardReader {
         u64::from_le_bytes(self.map[at..at + 8].try_into().unwrap())
     }
 
+    /// The ascending unique keys (`GetUniqueKeysPtr`); `None` when empty, as
+    /// the reference's `key_ptr_` stays null for an empty index.
+    pub fn unique_keys(&self) -> Option<Vec<u64>> {
+        if self.count == 0 {
+            None
+        } else {
+            Some((0..self.count).map(|i| self.key(i)).collect())
+        }
+    }
+
     /// All offsets stored for `key`.
     pub fn lookup(&self, key: u64) -> Vec<u32> {
         let (mut lo, mut hi) = (0usize, self.count);
@@ -222,6 +232,36 @@ impl LowCardReader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::secondary_index_data::{
+        ordered_f64, ordered_i64, HighCardinalityIndex, LowCardinalityIndex,
+    };
+    use std::collections::BTreeSet;
+
+    /// `CreateLowCardinalityData<T>`: `row_count` rows whose key cycles over
+    /// `unique_values` distinct values; the segment offset is the row index.
+    /// The result is stable-sorted by key, matching `std::multimap` iteration.
+    fn create_low_cardinality_data(
+        row_count: u32,
+        unique_values: u32,
+        encode: impl Fn(u32) -> u64,
+    ) -> Vec<(u64, u32)> {
+        let mut data: Vec<(u64, u32)> = (0..row_count)
+            .map(|i| (encode(i % unique_values), i))
+            .collect();
+        data.sort_by_key(|(key, _)| *key);
+        data
+    }
+
+    fn bitmap_offsets(bitmap: &BTreeSet<u32>) -> Vec<u32> {
+        bitmap.iter().copied().collect()
+    }
+
+    fn expected_offsets(data: &[(u64, u32)], key: u64) -> Vec<u32> {
+        data.iter()
+            .filter(|(data_key, _)| *data_key == key)
+            .map(|(_, offset)| *offset)
+            .collect()
+    }
 
     #[test]
     fn roaring_roundtrip_small_and_dense() {
@@ -247,5 +287,227 @@ mod tests {
         assert_eq!(reader.lookup(5), vec![10, 11, 12]);
         assert_eq!(reader.lookup(9).len(), 5000);
         assert!(reader.lookup(2).is_empty());
+    }
+
+    /// C++: `LowCardinalitySecondaryIndexTest.TestIntegerLowCardinality`.
+    #[test]
+    fn test_integer_low_cardinality() {
+        const CHUNK_ROW_COUNT: u32 = 100;
+        const UNIQUE_VALUES: u32 = 5;
+        let test_data = create_low_cardinality_data(CHUNK_ROW_COUNT, UNIQUE_VALUES, |v| {
+            ordered_i64(i64::from(v as i32))
+        });
+
+        let mut index = LowCardinalityIndex::new();
+        index.insert_data(test_data.clone());
+        assert_eq!(index.unique_key_count(), UNIQUE_VALUES);
+
+        // `GetUniqueKeysPtr`: ascending unique keys.
+        let unique_keys = index.unique_keys().expect("unique keys");
+        assert_eq!(unique_keys.len(), UNIQUE_VALUES as usize);
+        for pair in unique_keys.windows(2) {
+            assert!(pair[0] < pair[1], "unique keys are not ascending");
+        }
+
+        // `GetOffsetsForKeyPtr`: one bitmap per key, and the saved chunk
+        // preserves both the key array and every bitmap.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("integer_low_cardinality.idx");
+        index.save(&path).unwrap();
+        let reader = LowCardReader::open(&path).unwrap();
+        assert_eq!(reader.unique_keys(), Some(unique_keys.clone()));
+        for i in 0..UNIQUE_VALUES {
+            let key = ordered_i64(i64::from(i as i32));
+            let bitmap = index.offsets_for_key(key).expect("bitmap");
+            let expected = expected_offsets(&test_data, key);
+            assert_eq!(bitmap.len(), expected.len());
+            assert_eq!(bitmap_offsets(bitmap), expected);
+            assert_eq!(reader.lookup(key), expected);
+        }
+    }
+
+    /// C++: `LowCardinalitySecondaryIndexTest.TestFloatLowCardinality`.
+    #[test]
+    fn test_float_low_cardinality() {
+        const CHUNK_ROW_COUNT: u32 = 80;
+        const UNIQUE_VALUES: u32 = 4;
+        let unique_float_keys = [1.5f32, 2.5, 3.5, 4.5];
+        let test_data = create_low_cardinality_data(CHUNK_ROW_COUNT, UNIQUE_VALUES, |v| {
+            ordered_f64(f64::from(unique_float_keys[v as usize]))
+        });
+
+        let mut index = LowCardinalityIndex::new();
+        index.insert_data(test_data.clone());
+        assert_eq!(index.unique_key_count(), UNIQUE_VALUES);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("float_low_cardinality.idx");
+        index.save(&path).unwrap();
+        let reader = LowCardReader::open(&path).unwrap();
+        for key in unique_float_keys {
+            let encoded = ordered_f64(f64::from(key));
+            let bitmap = index.offsets_for_key(encoded).expect("bitmap");
+            let mut actual = bitmap_offsets(bitmap);
+            let mut expected = expected_offsets(&test_data, encoded);
+            actual.sort_unstable();
+            expected.sort_unstable();
+            assert_eq!(actual, expected);
+            assert_eq!(reader.lookup(encoded), expected);
+        }
+    }
+
+    /// C++: `LowCardinalitySecondaryIndexTest.TestEmptyIndex`.
+    #[test]
+    fn test_empty_low_cardinality_index() {
+        // C++: `chunk_row_count = 0` with an empty multimap.
+        let mut index = LowCardinalityIndex::new();
+        index.insert_data(std::iter::empty());
+        assert_eq!(index.unique_key_count(), 0);
+        assert!(index.unique_keys().is_none());
+    }
+
+    /// C++: `LowCardinalitySecondaryIndexTest.TestSingleValueCardinality`.
+    #[test]
+    fn test_single_value_low_cardinality() {
+        const CHUNK_ROW_COUNT: u32 = 50;
+        let test_data =
+            create_low_cardinality_data(CHUNK_ROW_COUNT, 1, |v| ordered_i64(i64::from(v as i16)));
+
+        let mut index = LowCardinalityIndex::new();
+        index.insert_data(test_data);
+        assert_eq!(index.unique_key_count(), 1);
+
+        let key = ordered_i64(0);
+        let bitmap = index.offsets_for_key(key).expect("bitmap");
+        assert_eq!(bitmap.len(), CHUNK_ROW_COUNT as usize);
+        assert_eq!(
+            bitmap_offsets(bitmap),
+            (0..CHUNK_ROW_COUNT).collect::<Vec<_>>()
+        );
+    }
+
+    /// C++: `LowCardinalitySecondaryIndexTest.TestComparisonWithHighCardinality`.
+    #[test]
+    fn test_low_cardinality_vs_high_cardinality() {
+        const CHUNK_ROW_COUNT: u32 = 100;
+        const UNIQUE_VALUES: u32 = 5;
+        let test_data = create_low_cardinality_data(CHUNK_ROW_COUNT, UNIQUE_VALUES, |v| {
+            ordered_i64(i64::from(v as i32))
+        });
+
+        let mut high_card_index = HighCardinalityIndex::new();
+        let mut low_card_index = LowCardinalityIndex::new();
+        high_card_index.insert_data(test_data.clone());
+        low_card_index.insert_data(test_data.clone());
+
+        // High cardinality keeps no unique-key view (base-class defaults).
+        assert_eq!(high_card_index.unique_key_count(), 0);
+        assert!(high_card_index.unique_keys().is_none());
+
+        // Low cardinality exposes the expected unique keys.
+        assert_eq!(low_card_index.unique_key_count(), UNIQUE_VALUES);
+        assert!(low_card_index.unique_keys().is_some());
+
+        for i in 0..UNIQUE_VALUES {
+            let key = ordered_i64(i64::from(i as i32));
+            let bitmap = low_card_index.offsets_for_key(key).expect("bitmap");
+            let expected_count = (CHUNK_ROW_COUNT / UNIQUE_VALUES) as usize;
+            assert_eq!(bitmap.len(), expected_count);
+            assert_eq!(expected_offsets(&test_data, key).len(), expected_count);
+        }
+    }
+
+    /// C++: `LowCardinalitySecondaryIndexTest.TestSaveLoadLowCardinality`.
+    #[test]
+    fn test_save_load_low_cardinality() {
+        const CHUNK_ROW_COUNT: u32 = 1000;
+        const UNIQUE_VALUES: u32 = 5;
+        let test_data = create_low_cardinality_data(CHUNK_ROW_COUNT, UNIQUE_VALUES, |v| {
+            ordered_i64(i64::from(v as i32))
+        });
+
+        let mut index = LowCardinalityIndex::new();
+        index.insert_data(test_data.clone());
+        let key_count = index.unique_key_count();
+
+        // `SaveIndexInner` then `ReadIndexInner`.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test001.idx");
+        index.save(&path).unwrap();
+        let loaded = LowCardinalityIndex::load(&path).unwrap();
+        assert_eq!(key_count, loaded.unique_key_count());
+        assert_eq!(loaded.unique_key_count(), UNIQUE_VALUES);
+
+        // The reloaded per-key bitmaps still contain exactly the original
+        // segment offsets.
+        for i in 0..UNIQUE_VALUES {
+            let key = ordered_i64(i64::from(i as i32));
+            assert_eq!(
+                loaded.offsets_for_key(key),
+                expected_offsets(&test_data, key)
+            );
+        }
+    }
+
+    /// C++: `LowCardinalitySecondaryIndexTest.TestAllDataType`.
+    #[test]
+    fn test_all_data_types_low_cardinality() {
+        const CHUNK_ROW_COUNT: u32 = 500;
+        const UNIQUE_VALUES: u32 = 10;
+        // The reference maps BigIntT to i64, DoubleT to double, DateT/TimeT
+        // to i32 and DateTimeT/TimestampT to i64.
+        let cases: [(&str, Vec<(u64, u32)>); 6] = [
+            (
+                "kBigInt/BigIntT",
+                create_low_cardinality_data(CHUNK_ROW_COUNT, UNIQUE_VALUES, |v| {
+                    ordered_i64(i64::from(v))
+                }),
+            ),
+            (
+                "kDouble/DoubleT",
+                create_low_cardinality_data(CHUNK_ROW_COUNT, UNIQUE_VALUES, |v| {
+                    ordered_f64(f64::from(v))
+                }),
+            ),
+            (
+                "kDate/DateT",
+                create_low_cardinality_data(CHUNK_ROW_COUNT, UNIQUE_VALUES, |v| {
+                    ordered_i64(i64::from(v as i32))
+                }),
+            ),
+            (
+                "kTime/TimeT",
+                create_low_cardinality_data(CHUNK_ROW_COUNT, UNIQUE_VALUES, |v| {
+                    ordered_i64(i64::from(v as i32))
+                }),
+            ),
+            (
+                "kDateTime/DateTimeT",
+                create_low_cardinality_data(CHUNK_ROW_COUNT, UNIQUE_VALUES, |v| {
+                    ordered_i64(i64::from(v))
+                }),
+            ),
+            (
+                "kTimestamp/TimestampT",
+                create_low_cardinality_data(CHUNK_ROW_COUNT, UNIQUE_VALUES, |v| {
+                    ordered_i64(i64::from(v))
+                }),
+            ),
+        ];
+
+        for (data_type, test_data) in cases {
+            let mut index = LowCardinalityIndex::new();
+            index.insert_data(test_data);
+            assert_eq!(
+                index.unique_key_count(),
+                UNIQUE_VALUES,
+                "unexpected unique key count for {data_type}"
+            );
+            let keys = index.unique_keys().expect("unique keys");
+            assert_eq!(keys.len(), UNIQUE_VALUES as usize, "{data_type}");
+            for pair in keys.windows(2) {
+                assert!(pair[0] < pair[1], "keys are not ascending for {data_type}");
+            }
+        }
     }
 }
