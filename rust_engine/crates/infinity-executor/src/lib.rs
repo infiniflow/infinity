@@ -3959,15 +3959,22 @@ impl Engine {
         // would reject a legitimate query.
         let from_is_cte = match &stmt {
             Statement::Select {
-                from: Some(table), ..
-            } => ctes.contains_key(&table.to_ascii_lowercase()),
+                from: Some(table),
+                ctes: local_ctes,
+                ..
+            } => {
+                ctes.contains_key(&table.to_ascii_lowercase())
+                    || local_ctes
+                        .iter()
+                        .any(|c| c.alias.eq_ignore_ascii_case(table))
+            }
             _ => false,
         };
         if !from_is_cte {
             self.bind_subquery(&stmt, outer)?;
         }
         let visible: Vec<String> = ctes.keys().cloned().collect();
-        let stmt = self.expand_views(self.qualify_tables_in(&stmt, &visible))?;
+        let stmt = self.expand_views(self.qualify_tables_in(&stmt, &visible), &visible)?;
         self.run_select_with_ctes(&stmt, ctes)
     }
 
@@ -4273,9 +4280,6 @@ impl Engine {
                 }
             }
         }
-        // `SEARCH MATCH (…) WHERE <filter>` is compiled directly by the search
-        // path, so an unresolved subquery there would never reach the planner's
-        // guard and would evaluate as an unknown function (NULL).
         Ok(Some(s))
     }
 
@@ -5133,7 +5137,7 @@ impl Engine {
                 });
                 continue;
             }
-            let qualified = self.expand_views(self.qualify_tables(&s))?;
+            let qualified = self.expand_views(self.qualify_tables(&s), &[])?;
             // Result cache: `SELECT` results are reused verbatim when the cache
             // is active; any data-modifying statement invalidates it.
             if matches!(qualified, Statement::Select { .. }) && self.result_cache_active() {
@@ -5280,15 +5284,19 @@ impl Engine {
     /// Replaces `FROM <view>` with the view's stored query. The derived-table
     /// path then executes that query. Views are expanded once per statement;
     /// nested views are expanded when the derived query itself is executed.
-    /// A CTE alias shadows a view of the same name.
-    fn expand_views(&self, mut stmt: Statement) -> Result<Statement> {
+    /// A CTE alias shadows a view of the same name, whether it is declared by
+    /// this statement or bound by an enclosing `WITH` (`inherited`).
+    fn expand_views(&self, mut stmt: Statement, inherited: &[String]) -> Result<Statement> {
         if let Statement::Select {
             from, join, ctes, ..
         } = &mut stmt
         {
             let cte_names: Vec<String> =
                 ctes.iter().map(|c| c.alias.to_ascii_lowercase()).collect();
-            let is_cte = |name: &str| cte_names.contains(&name.to_ascii_lowercase());
+            let is_cte = |name: &str| {
+                let name = name.to_ascii_lowercase();
+                cte_names.contains(&name) || inherited.iter().any(|i| i.eq_ignore_ascii_case(&name))
+            };
             if let Some(t) = from.as_mut() {
                 if !t.trim_start().to_ascii_uppercase().starts_with("SELECT ") && !is_cte(t) {
                     if let Some(v) = self.storage.catalog.get_view_by_name(t)? {
@@ -5799,7 +5807,7 @@ impl Engine {
             .catalog
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        let query = self.expand_views(query.clone())?;
+        let query = self.expand_views(query.clone(), &[])?;
         let (source_columns, rows) = self.run_select(&query)?;
         let target_indices: Vec<usize> = match columns {
             Some(cols) => {
@@ -5925,7 +5933,7 @@ impl Engine {
         columns: &[infinity_parser::ColumnDef],
         query: &Statement,
     ) -> Result<QueryResult> {
-        let query = self.expand_views(query.clone())?;
+        let query = self.expand_views(query.clone(), &[])?;
         let (source_columns, rows) = self.run_select(&query)?;
         let (names, types, defaults, not_nulls, comments, sparse_stores) = if columns.is_empty() {
             let names: Vec<String> = source_columns
@@ -6093,7 +6101,7 @@ impl Engine {
             .into_iter()
             .next()
             .ok_or_else(|| Error::Invalid("empty view query".to_string()))?;
-        let qualified = self.expand_views(parsed)?;
+        let qualified = self.expand_views(parsed, &[])?;
         let (source_columns, _) = self.run_select(&qualified)?;
         let view_columns = if aliases.is_empty() {
             source_columns
@@ -7539,8 +7547,10 @@ impl Engine {
                 // Only the bindings that precede this CTE are visible inside
                 // it, plus anything inherited from an enclosing query.
                 let visible: Vec<String> = cte_scope.keys().cloned().collect();
-                let query =
-                    self.expand_views(self.qualify_tables_in(cte.query.as_ref(), &visible))?;
+                let query = self.expand_views(
+                    self.qualify_tables_in(cte.query.as_ref(), &visible),
+                    &visible,
+                )?;
                 let (mut columns, rows) = self.run_select_with_ctes(&query, &cte_scope)?;
                 if !cte.columns.is_empty() {
                     if cte.columns.len() != columns.len() {
@@ -13735,7 +13745,17 @@ fn parse_filter_predicate(text: &str) -> Result<infinity_parser::Predicate> {
         [infinity_parser::Statement::Select {
             where_pred: Some(p),
             ..
-        }] => Ok(p.clone()),
+        }] => {
+            // The option string is opaque text parsed here, not by the row
+            // resolver, so a subquery would compile to an unknown function and
+            // evaluate to NULL (silently dropping matches). Reject it.
+            if p.contains_subquery() {
+                return Err(Error::Invalid(
+                    "subqueries are not supported in a search filter".into(),
+                ));
+            }
+            Ok(p.clone())
+        }
         _ => Err(Error::Invalid(format!("invalid filter '{text}'"))),
     }
 }
@@ -15574,6 +15594,70 @@ mod tests {
             err.to_string()
                 .contains("correlated subqueries are not supported"),
             "{err}"
+        );
+    }
+
+    /// `filter=` is an opaque option string parsed after resolution, so a
+    /// subquery there must be rejected rather than folded to NULL.
+    #[test]
+    fn a_subquery_in_a_search_option_filter_is_rejected() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sf (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute("CREATE INDEX sf_ft ON sf (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute("INSERT INTO sf VALUES (1, 'x');").unwrap();
+        e.execute("CREATE TABLE sf2 (id INT);").unwrap();
+        let err = e
+            .execute(
+                "SELECT id FROM sf SEARCH MATCH TEXT ('body', 'x', \
+                 'topn=10;filter=EXISTS (SELECT id FROM sf2)');",
+            )
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("subqueries are not supported in a search filter"),
+            "{err}"
+        );
+    }
+
+    /// A CTE alias bound by an enclosing `WITH` shadows a view of the same
+    /// name inside a subquery, just as it does in the outer statement. The CTE
+    /// exposes `wid`; the view of the same name exposes `id`.
+    #[test]
+    fn an_inherited_cte_alias_is_not_expanded_as_a_view() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE iv (id INT);").unwrap();
+        e.execute("INSERT INTO iv VALUES (1);").unwrap();
+        e.execute("CREATE VIEW ivw AS SELECT id FROM iv;").unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "WITH ivw AS (SELECT id AS wid FROM iv) \
+                 SELECT id FROM iv WHERE EXISTS (SELECT wid FROM ivw);"
+            ),
+            vec![vec!["1".to_string()]]
+        );
+    }
+
+    /// A `WITH` declared inside the subquery itself also shadows a base table.
+    #[test]
+    fn a_subquery_local_cte_shadows_a_base_table() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE lcte (id INT);").unwrap();
+        e.execute("INSERT INTO lcte VALUES (1), (2);").unwrap();
+        e.execute("CREATE TABLE lshadow (other INT);").unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM lcte WHERE EXISTS \
+                 (WITH lshadow AS (SELECT id FROM lcte WHERE id = 1) \
+                 SELECT id FROM lshadow) ORDER BY id;"
+            ),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
     }
 

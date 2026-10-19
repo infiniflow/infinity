@@ -112,3 +112,16 @@ H4/H5 待 planner 接线后复核。
 验证：`cargo fmt --check`、`clippy -D warnings`、`cargo test --workspace --lib`（executor 508 tests）、Gate A `1752/1752 + 129/129 + 1546/1546`。
 
 **Round 6 结论：not converged（1 high）**，该 high 与 4 条 medium/low 已在本节全部处置；R7 复核确认。
+
+## Round 7（HEAD 0d9d07243，收敛检查）
+
+| # | 发现 | 级别 | 处置 |
+|---|---|---|---|
+| R7-1 | `SEARCH` 选项串里的 `filter=…` 是事后由 `parse_filter_predicate` 解析的不透明文本，新解析器覆盖不到；其中 `EXISTS` 会当未知函数求值成 NULL，静默丢弃所有匹配 | high | **已修**：`parse_filter_predicate` 对含子查询的过滤器显式报 `subqueries are not supported in a search filter`。测试 `a_subquery_in_a_search_option_filter_is_rejected`；去掉拒绝后实测返回 `Rows{rows: []}`（静默空结果），正是该 bug |
+| R7-2 | `expand_views` 只认本语句的 CTE 列表，外层 `WITH` 绑定的别名可能被当作同名视图展开 | high | **未复现**：视图存于独立的 `view:` 键空间且名字是 `db.view`，而 CTE 别名在 `run_select_with_ctes` 路径中保持未限定，`get_view_by_name("cte")` 恒查不到。仍把 `inherited` CTE 作用域传给 `expand_views`，与 `qualify_tables_in` 的口径对齐，不再依赖这个「名字没归一化」的巧合。测试 `an_inherited_cte_alias_is_not_expanded_as_a_view`（改前改后都通过，故不作为回归证据） |
+| R7-3 | 子查询自带 `WITH`（`EXISTS (WITH x AS … SELECT …)`）的别名不在 `from_is_cte` 检查范围，仍会按同名基表绑定 | medium | **已修**：`from_is_cte` 同时看子查询自身的 `ctes`。测试 `a_subquery_local_cte_shadows_a_base_table` |
+| R7-4 | 解析器里重复的注释块 | low | **已删除** |
+
+验证：`cargo fmt --check`、`clippy -D warnings`、`cargo test --workspace --lib`（executor 511 tests）、Gate A `1752/1752 + 129/129 + 1546/1546`。
+
+**Round 7 结论：not converged（2 high）**；其中 R7-1 为真实高危并已修复，R7-2 未能复现但仍做了口径对齐。
