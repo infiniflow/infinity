@@ -501,10 +501,10 @@
 | 487 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `QuickPerformanceVerification` | exempt |
 | 488 | `src/unit_test/storage/definition/column_def_ut.cpp` | `ColumnDefTest` | `test1` | gap |
 | 489 | `src/unit_test/storage/definition/column_def_ut.cpp` | `ColumnDefTest` | `test2` | gap |
-| 490 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test1` | partial |
-| 491 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test2` | partial |
-| 492 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test3` | partial |
-| 493 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `ReadWrite` | partial |
+| 490 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test1` | ported |
+| 491 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test2` | ported |
+| 492 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test3` | ported |
+| 493 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `ReadWrite` | ported |
 | 494 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `ivf_readwrite` | gap |
 | 495 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `hnsw_readwrite` | gap |
 | 496 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `full_text_readwrite` | gap |

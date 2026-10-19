@@ -337,7 +337,6 @@ impl<T: Clone + Default> ColumnVector<T> {
     }
 }
 
-/// One typed column of a [`DataBlock`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum Column {
     Int(ColumnVector<i64>),
@@ -345,11 +344,25 @@ pub enum Column {
     Bool(ColumnVector<bool>),
     Str(ColumnVector<String>),
     Bytes(ColumnVector<Vec<u8>>),
+    TinyInt(ColumnVector<i8>),
+    SmallInt(ColumnVector<i16>),
+    Int32(ColumnVector<i32>),
+    HugeInt(ColumnVector<i128>),
+    Float32(ColumnVector<f32>),
+    Decimal(ColumnVector<infinity_common::DecimalT>),
+    Date(ColumnVector<infinity_common::DateT>),
+    Time(ColumnVector<infinity_common::TimeT>),
+    DateTime(ColumnVector<infinity_common::DateTimeT>),
+    Timestamp(ColumnVector<infinity_common::TimestampT>),
+    Interval(ColumnVector<infinity_common::IntervalT>),
+    Uuid(ColumnVector<[u8; 16]>),
+    Embedding(ColumnVector<Vec<f32>>),
+    Array(ColumnVector<Vec<i64>>),
+    Mixed(ColumnVector<infinity_common::MixedT>),
 }
 
 impl Column {
-    /// The C++ logical type this column stores (unsigned widths are folded
-    /// into the signed vector; the declared type stays in the catalog).
+    /// The C++ logical type this column stores.
     pub fn logical_type(&self) -> LogicalType {
         match self {
             Column::Int(_) => LogicalType::BigInt,
@@ -357,6 +370,21 @@ impl Column {
             Column::Bool(_) => LogicalType::Boolean,
             Column::Str(_) => LogicalType::Varchar,
             Column::Bytes(_) => LogicalType::Varchar,
+            Column::TinyInt(_) => LogicalType::TinyInt,
+            Column::SmallInt(_) => LogicalType::SmallInt,
+            Column::Int32(_) => LogicalType::Integer,
+            Column::HugeInt(_) => LogicalType::HugeInt,
+            Column::Float32(_) => LogicalType::Float,
+            Column::Decimal(_) => LogicalType::Decimal,
+            Column::Date(_) => LogicalType::Date,
+            Column::Time(_) => LogicalType::Time,
+            Column::DateTime(_) => LogicalType::DateTime,
+            Column::Timestamp(_) => LogicalType::Timestamp,
+            Column::Interval(_) => LogicalType::Interval,
+            Column::Uuid(_) => LogicalType::Uuid,
+            Column::Embedding(_) => LogicalType::Embedding(0),
+            Column::Array(_) => LogicalType::Array,
+            Column::Mixed(_) => LogicalType::Mixed,
         }
     }
 
@@ -367,6 +395,21 @@ impl Column {
             Column::Bool(c) => c.len(),
             Column::Str(c) => c.len(),
             Column::Bytes(c) => c.len(),
+            Column::TinyInt(c) => c.len(),
+            Column::SmallInt(c) => c.len(),
+            Column::Int32(c) => c.len(),
+            Column::HugeInt(c) => c.len(),
+            Column::Float32(c) => c.len(),
+            Column::Decimal(c) => c.len(),
+            Column::Date(c) => c.len(),
+            Column::Time(c) => c.len(),
+            Column::DateTime(c) => c.len(),
+            Column::Timestamp(c) => c.len(),
+            Column::Interval(c) => c.len(),
+            Column::Uuid(c) => c.len(),
+            Column::Embedding(c) => c.len(),
+            Column::Array(c) => c.len(),
+            Column::Mixed(c) => c.len(),
         }
     }
 
@@ -381,6 +424,21 @@ impl Column {
             Column::Bool(c) => c.null_count(),
             Column::Str(c) => c.null_count(),
             Column::Bytes(c) => c.null_count(),
+            Column::TinyInt(c) => c.null_count(),
+            Column::SmallInt(c) => c.null_count(),
+            Column::Int32(c) => c.null_count(),
+            Column::HugeInt(c) => c.null_count(),
+            Column::Float32(c) => c.null_count(),
+            Column::Decimal(c) => c.null_count(),
+            Column::Date(c) => c.null_count(),
+            Column::Time(c) => c.null_count(),
+            Column::DateTime(c) => c.null_count(),
+            Column::Timestamp(c) => c.null_count(),
+            Column::Interval(c) => c.null_count(),
+            Column::Uuid(c) => c.null_count(),
+            Column::Embedding(c) => c.null_count(),
+            Column::Array(c) => c.null_count(),
+            Column::Mixed(c) => c.null_count(),
         }
     }
 
@@ -391,11 +449,25 @@ impl Column {
             Column::Bool(c) => c.clear(),
             Column::Str(c) => c.clear(),
             Column::Bytes(c) => c.clear(),
+            Column::TinyInt(c) => c.clear(),
+            Column::SmallInt(c) => c.clear(),
+            Column::Int32(c) => c.clear(),
+            Column::HugeInt(c) => c.clear(),
+            Column::Float32(c) => c.clear(),
+            Column::Decimal(c) => c.clear(),
+            Column::Date(c) => c.clear(),
+            Column::Time(c) => c.clear(),
+            Column::DateTime(c) => c.clear(),
+            Column::Timestamp(c) => c.clear(),
+            Column::Interval(c) => c.clear(),
+            Column::Uuid(c) => c.clear(),
+            Column::Embedding(c) => c.clear(),
+            Column::Array(c) => c.clear(),
+            Column::Mixed(c) => c.clear(),
         }
     }
 
-    /// The rendered text of a slot (`None` for NULL), the form the executor
-    /// uses when it converts a decoded block into `Value` rows.
+    /// The rendered text of a slot (`None` for NULL).
     pub fn value_text(&self, row: usize) -> Option<String> {
         match self {
             Column::Int(c) => c.get(row).map(|v| v.to_string()),
@@ -403,8 +475,133 @@ impl Column {
             Column::Bool(c) => c.get(row).map(|v| v.to_string()),
             Column::Str(c) => c.get(row).cloned(),
             Column::Bytes(c) => c.get(row).map(|v| String::from_utf8_lossy(v).into_owned()),
+            Column::TinyInt(c) => c.get(row).map(|v| v.to_string()),
+            Column::SmallInt(c) => c.get(row).map(|v| v.to_string()),
+            Column::Int32(c) => c.get(row).map(|v| v.to_string()),
+            Column::HugeInt(c) => c.get(row).map(|v| v.to_string()),
+            Column::Float32(c) => c.get(row).map(|v| v.to_string()),
+            Column::Decimal(c) => c.get(row).map(|v| format!("{}e-{}", v.value, v.scale)),
+            Column::Date(c) => c.get(row).map(|v| v.value.to_string()),
+            Column::Time(c) => c.get(row).map(|v| v.value.to_string()),
+            Column::DateTime(c) => c.get(row).map(|v| format!("{} {}", v.date, v.time)),
+            Column::Timestamp(c) => c.get(row).map(|v| format!("{} {}", v.date, v.time)),
+            Column::Interval(c) => c.get(row).map(|v| v.value.to_string()),
+            Column::Uuid(c) => c
+                .get(row)
+                .map(|v| v.iter().map(|b| format!("{b:02x}")).collect::<String>()),
+            Column::Embedding(c) => c.get(row).map(|v| {
+                format!(
+                    "[{}]",
+                    v.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }),
+            Column::Array(c) => c.get(row).map(|v| {
+                format!(
+                    "[{}]",
+                    v.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }),
+            Column::Mixed(c) => c.get(row).map(|v| v.0.clone()),
         }
     }
+
+    /// Approximate heap bytes held by this column.
+    pub fn mem_used(&self) -> usize {
+        match self {
+            Column::Int(v) => v.values().len() * 8 + v.validity().len(),
+            Column::Float(v) => v.values().len() * 8 + v.validity().len(),
+            Column::Bool(v) => v.values().len() + v.validity().len(),
+            Column::Str(v) => {
+                v.values().iter().map(|s| s.len() + 24).sum::<usize>() + v.validity().len()
+            }
+            Column::Bytes(v) => {
+                v.values().iter().map(|s| s.len() + 24).sum::<usize>() + v.validity().len()
+            }
+            Column::TinyInt(v) => v.values().len() + v.validity().len(),
+            Column::SmallInt(v) => v.values().len() * 2 + v.validity().len(),
+            Column::Int32(v) => v.values().len() * 4 + v.validity().len(),
+            Column::HugeInt(v) => v.values().len() * 16 + v.validity().len(),
+            Column::Float32(v) => v.values().len() * 4 + v.validity().len(),
+            Column::Decimal(v) => v.values().len() * 16 + v.validity().len(),
+            Column::Date(v) => v.values().len() * 4 + v.validity().len(),
+            Column::Time(v) => v.values().len() * 4 + v.validity().len(),
+            Column::DateTime(v) => v.values().len() * 8 + v.validity().len(),
+            Column::Timestamp(v) => v.values().len() * 8 + v.validity().len(),
+            Column::Interval(v) => v.values().len() * 4 + v.validity().len(),
+            Column::Uuid(v) => v.values().len() * 16 + v.validity().len(),
+            Column::Embedding(v) => {
+                v.values().iter().map(|x| x.len() * 4 + 24).sum::<usize>() + v.validity().len()
+            }
+            Column::Array(v) => {
+                v.values().iter().map(|x| x.len() * 8 + 24).sum::<usize>() + v.validity().len()
+            }
+            Column::Mixed(v) => {
+                v.values().iter().map(|x| x.0.len() + 24).sum::<usize>() + v.validity().len()
+            }
+        }
+    }
+
+    /// Parses one text slot (the block/decoder path).
+    pub fn push_text(&mut self, text: Option<&str>) {
+        match self {
+            Column::Int(c) => c.push(text.and_then(|t| t.trim().parse::<i64>().ok())),
+            Column::Float(c) => c.push(text.and_then(|t| t.trim().parse::<f64>().ok())),
+            Column::Bool(c) => c.push(text.and_then(|t| match t.trim() {
+                "true" | "1" => Some(true),
+                "false" | "0" => Some(false),
+                _ => None,
+            })),
+            Column::Str(c) => c.push(text.map(str::to_string)),
+            Column::Bytes(c) => c.push(text.map(|t| t.as_bytes().to_vec())),
+            Column::TinyInt(c) => c.push(text.and_then(|t| t.trim().parse::<i8>().ok())),
+            Column::SmallInt(c) => c.push(text.and_then(|t| t.trim().parse::<i16>().ok())),
+            Column::Int32(c) => c.push(text.and_then(|t| t.trim().parse::<i32>().ok())),
+            Column::HugeInt(c) => c.push(text.and_then(|t| t.trim().parse::<i128>().ok())),
+            Column::Float32(c) => c.push(text.and_then(|t| t.trim().parse::<f32>().ok())),
+            Column::Decimal(_) => {}
+            Column::Date(_) => {}
+            Column::Time(_) => {}
+            Column::DateTime(_) => {}
+            Column::Timestamp(_) => {}
+            Column::Interval(_) => {}
+            Column::Uuid(_) => {}
+            Column::Embedding(_) => {}
+            Column::Array(_) => {}
+            Column::Mixed(c) => c.push(text.map(infinity_common::MixedT::new)),
+        }
+    }
+}
+
+/// One typed slot value, the Rust counterpart of the reference's `Value` at
+/// the `DataBlock` boundary.
+#[derive(Clone, Debug, PartialEq)]
+pub enum BlockValue {
+    Bool(bool),
+    TinyInt(i8),
+    SmallInt(i16),
+    Int(i64),
+    Int32(i32),
+    HugeInt(i128),
+    Float(f32),
+    Double(f64),
+    Decimal(infinity_common::DecimalT),
+    Str(String),
+    Date(infinity_common::DateT),
+    Time(infinity_common::TimeT),
+    DateTime(infinity_common::DateTimeT),
+    Timestamp(infinity_common::TimestampT),
+    Interval(infinity_common::IntervalT),
+    Uuid([u8; 16]),
+    Embedding(Vec<f32>),
+    Array(Vec<i64>),
+    Mixed(infinity_common::MixedT),
+    Null,
 }
 
 /// C++ `DataBlock`: a row-aligned set of typed columns.
@@ -458,17 +655,7 @@ impl DataBlock {
         let Some(col) = self.columns.get_mut(column) else {
             return;
         };
-        match col {
-            Column::Int(c) => c.push(text.and_then(|t| t.trim().parse::<i64>().ok())),
-            Column::Float(c) => c.push(text.and_then(|t| t.trim().parse::<f64>().ok())),
-            Column::Bool(c) => c.push(text.and_then(|t| match t.trim() {
-                "true" | "1" => Some(true),
-                "false" | "0" => Some(false),
-                _ => None,
-            })),
-            Column::Str(c) => c.push(text.map(str::to_string)),
-            Column::Bytes(c) => c.push(text.map(|t| t.as_bytes().to_vec())),
-        }
+        col.push_text(text);
     }
 
     /// C++ `DataBlock::Finalize`: all columns have the same length.
@@ -489,22 +676,189 @@ impl DataBlock {
         self.row_count = 0;
     }
 
+    /// C++ `DataBlock::AppendValue(column, value)`.
+    pub fn append_value(&mut self, column: usize, value: BlockValue) -> Result<(), String> {
+        let col = self
+            .columns
+            .get_mut(column)
+            .ok_or_else(|| format!("column {column} out of range"))?;
+        if value == BlockValue::Null {
+            match col {
+                Column::Bool(c) => c.push(None),
+                Column::TinyInt(c) => c.push(None),
+                Column::SmallInt(c) => c.push(None),
+                Column::Int(c) => c.push(None),
+                Column::Int32(c) => c.push(None),
+                Column::HugeInt(c) => c.push(None),
+                Column::Float32(c) => c.push(None),
+                Column::Float(c) => c.push(None),
+                Column::Decimal(c) => c.push(None),
+                Column::Str(c) => c.push(None),
+                Column::Date(c) => c.push(None),
+                Column::Time(c) => c.push(None),
+                Column::DateTime(c) => c.push(None),
+                Column::Timestamp(c) => c.push(None),
+                Column::Interval(c) => c.push(None),
+                Column::Uuid(c) => c.push(None),
+                Column::Embedding(c) => c.push(None),
+                Column::Array(c) => c.push(None),
+                Column::Mixed(c) => c.push(None),
+                Column::Bytes(c) => c.push(None),
+            }
+            return Ok(());
+        }
+        match (col, value) {
+            (Column::Bool(c), BlockValue::Bool(v)) => c.push(Some(v)),
+            (Column::TinyInt(c), BlockValue::TinyInt(v)) => c.push(Some(v)),
+            (Column::SmallInt(c), BlockValue::SmallInt(v)) => c.push(Some(v)),
+            (Column::Int(c), BlockValue::Int(v)) => c.push(Some(v)),
+            (Column::Int32(c), BlockValue::Int32(v)) => c.push(Some(v)),
+            (Column::HugeInt(c), BlockValue::HugeInt(v)) => c.push(Some(v)),
+            (Column::Float32(c), BlockValue::Float(v)) => c.push(Some(v)),
+            (Column::Float(c), BlockValue::Double(v)) => c.push(Some(v)),
+            (Column::Decimal(c), BlockValue::Decimal(v)) => c.push(Some(v)),
+            (Column::Str(c), BlockValue::Str(v)) => c.push(Some(v)),
+            (Column::Date(c), BlockValue::Date(v)) => c.push(Some(v)),
+            (Column::Time(c), BlockValue::Time(v)) => c.push(Some(v)),
+            (Column::DateTime(c), BlockValue::DateTime(v)) => c.push(Some(v)),
+            (Column::Timestamp(c), BlockValue::Timestamp(v)) => c.push(Some(v)),
+            (Column::Interval(c), BlockValue::Interval(v)) => c.push(Some(v)),
+            (Column::Uuid(c), BlockValue::Uuid(v)) => c.push(Some(v)),
+            (Column::Embedding(c), BlockValue::Embedding(v)) => c.push(Some(v)),
+            (Column::Array(c), BlockValue::Array(v)) => c.push(Some(v)),
+            (Column::Mixed(c), BlockValue::Mixed(v)) => c.push(Some(v)),
+            _ => return Err(format!("value type does not match column {column}")),
+        }
+        Ok(())
+    }
+
+    /// C++ `DataBlock::GetValue(column, row)`.
+    pub fn get_value(&self, column: usize, row: usize) -> Option<BlockValue> {
+        let col = self.columns.get(column)?;
+        match col {
+            Column::Bool(c) => c.get(row).copied().map(BlockValue::Bool),
+            Column::TinyInt(c) => c.get(row).copied().map(BlockValue::TinyInt),
+            Column::SmallInt(c) => c.get(row).copied().map(BlockValue::SmallInt),
+            Column::Int(c) => c.get(row).copied().map(BlockValue::Int),
+            Column::Int32(c) => c.get(row).copied().map(BlockValue::Int32),
+            Column::HugeInt(c) => c.get(row).copied().map(BlockValue::HugeInt),
+            Column::Float32(c) => c.get(row).copied().map(BlockValue::Float),
+            Column::Float(c) => c.get(row).copied().map(BlockValue::Double),
+            Column::Decimal(c) => c.get(row).copied().map(BlockValue::Decimal),
+            Column::Str(c) => c.get(row).cloned().map(BlockValue::Str),
+            Column::Date(c) => c.get(row).copied().map(BlockValue::Date),
+            Column::Time(c) => c.get(row).copied().map(BlockValue::Time),
+            Column::DateTime(c) => c.get(row).copied().map(BlockValue::DateTime),
+            Column::Timestamp(c) => c.get(row).copied().map(BlockValue::Timestamp),
+            Column::Interval(c) => c.get(row).copied().map(BlockValue::Interval),
+            Column::Uuid(c) => c.get(row).copied().map(BlockValue::Uuid),
+            Column::Embedding(c) => c.get(row).cloned().map(BlockValue::Embedding),
+            Column::Array(c) => c.get(row).cloned().map(BlockValue::Array),
+            Column::Mixed(c) => c.get(row).cloned().map(BlockValue::Mixed),
+            Column::Bytes(c) => c
+                .get(row)
+                .cloned()
+                .map(|v| BlockValue::Str(String::from_utf8_lossy(&v).into_owned())),
+        }
+    }
+
     /// Approximate heap bytes, for the buffer-manager budget.
     pub fn mem_used(&self) -> usize {
-        self.columns
-            .iter()
-            .map(|c| match c {
-                Column::Int(v) => v.values().len() * 8 + v.validity().len(),
-                Column::Float(v) => v.values().len() * 8 + v.validity().len(),
-                Column::Bool(v) => v.values().len() + v.validity().len(),
-                Column::Str(v) => {
-                    v.values().iter().map(|s| s.len() + 24).sum::<usize>() + v.validity().len()
-                }
-                Column::Bytes(v) => {
-                    v.values().iter().map(|s| s.len() + 24).sum::<usize>() + v.validity().len()
-                }
-            })
-            .sum()
+        self.columns.iter().map(Column::mem_used).sum()
+    }
+}
+
+/// C++: `DataBlockTest.test1` (`storage/definition/data_block_ut.cpp`):
+/// every supported column type appends and reads back in one row block. The
+/// geo columns of the reference test are excluded by scope.
+#[cfg(test)]
+mod data_block_reference_suite {
+    use super::*;
+    use infinity_common::{DateT, DateTimeT, DecimalT, IntervalT, MixedT, TimeT, TimestampT};
+
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::Bool(ColumnVector::new()),
+            Column::TinyInt(ColumnVector::new()),
+            Column::SmallInt(ColumnVector::new()),
+            Column::Int32(ColumnVector::new()),
+            Column::Int(ColumnVector::new()),
+            Column::HugeInt(ColumnVector::new()),
+            Column::Float32(ColumnVector::new()),
+            Column::Float(ColumnVector::new()),
+            Column::Decimal(ColumnVector::new()),
+            Column::Str(ColumnVector::new()),
+            Column::Date(ColumnVector::new()),
+            Column::Time(ColumnVector::new()),
+            Column::DateTime(ColumnVector::new()),
+            Column::Timestamp(ColumnVector::new()),
+            Column::Interval(ColumnVector::new()),
+            Column::Array(ColumnVector::new()),
+            Column::Uuid(ColumnVector::new()),
+            Column::Embedding(ColumnVector::new()),
+            Column::Mixed(ColumnVector::new()),
+        ]
+    }
+
+    fn row(i: i64) -> Vec<BlockValue> {
+        vec![
+            BlockValue::Bool(i % 2 == 0),
+            BlockValue::TinyInt(i as i8),
+            BlockValue::SmallInt(i as i16),
+            BlockValue::Int32(i as i32),
+            BlockValue::Int(i),
+            BlockValue::HugeInt(i as i128),
+            BlockValue::Float(i as f32),
+            BlockValue::Double(i as f64),
+            BlockValue::Decimal(DecimalT::new(i as i128, 2)),
+            BlockValue::Str(format!("str_{i}")),
+            BlockValue::Date(DateT::new(i as i32)),
+            BlockValue::Time(TimeT::new(i as i32)),
+            BlockValue::DateTime(DateTimeT::new(i as i32, i as i32)),
+            BlockValue::Timestamp(TimestampT::new(i as i32, i as i32)),
+            BlockValue::Interval(IntervalT::new(i as i32)),
+            BlockValue::Array(vec![i, i + 1]),
+            BlockValue::Uuid([i as u8; 16]),
+            BlockValue::Embedding(vec![i as f32; 32]),
+            BlockValue::Mixed(MixedT::new(format!("mixed_{i}"))),
+        ]
+    }
+
+    #[test]
+    fn all_types_append_and_read_back() {
+        let mut block = DataBlock::new(columns(), DEFAULT_VECTOR_SIZE);
+        for i in 0..DEFAULT_VECTOR_SIZE as i64 {
+            for (column, value) in row(i).into_iter().enumerate() {
+                block.append_value(column, value).unwrap();
+            }
+            block.finalize();
+        }
+        assert_eq!(block.row_count(), DEFAULT_VECTOR_SIZE);
+        for i in 0..DEFAULT_VECTOR_SIZE as i64 {
+            for (column, value) in row(i).into_iter().enumerate() {
+                assert_eq!(
+                    block.get_value(column, i as usize),
+                    Some(value),
+                    "col {column}"
+                );
+            }
+        }
+        block.reset();
+        assert_eq!(block.row_count(), 0);
+        assert!(block.mem_used() == 0);
+    }
+
+    #[test]
+    fn nulls_and_type_mismatches() {
+        let mut block = DataBlock::new(columns(), 4);
+        block.append_value(0, BlockValue::Null).unwrap();
+        block.append_value(1, BlockValue::Null).unwrap();
+        block.finalize();
+        assert_eq!(block.get_value(0, 0), None);
+        assert_eq!(
+            block.append_value(2, BlockValue::Str("bad".into())),
+            Err("value type does not match column 2".to_string())
+        );
     }
 }
 
@@ -797,10 +1151,7 @@ mod reference_suite {
             c.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
             c.set_value(0, source.get(i as usize).cloned()).unwrap();
             c.finalize(1);
-            assert_eq!(
-                c.get(0),
-                Some(&infinity_common::IntervalT::new(i as i32))
-            );
+            assert_eq!(c.get(0), Some(&infinity_common::IntervalT::new(i as i32)));
             c.reset();
         }
     }

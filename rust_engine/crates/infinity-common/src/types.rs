@@ -78,6 +78,30 @@ impl IntervalT {
     }
 }
 
+/// C++: `DecimalT` (`src/parser/type/decimal_type.h`): a scaled integer.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DecimalT {
+    pub value: i128,
+    pub scale: u32,
+}
+
+impl DecimalT {
+    pub fn new(value: i128, scale: u32) -> Self {
+        Self { value, scale }
+    }
+}
+
+/// C++: `MixedT` (`src/parser/type/mixed_type.h`): the heterogeneous value's
+/// rendered form (the executor keeps typed values in `Value`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MixedT(pub String);
+
+impl MixedT {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+}
+
 /// Logical column type (subset).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LogicalType {
@@ -87,9 +111,19 @@ pub enum LogicalType {
     SmallInt,
     Integer,
     BigInt,
+    HugeInt,
     Float,
     Double,
+    Decimal,
     Varchar,
+    Date,
+    Time,
+    DateTime,
+    Timestamp,
+    Interval,
+    Uuid,
+    Array,
+    Mixed,
     /// Embedded vector of `dim` f32 elements.
     Embedding(u32),
     Null,
@@ -103,9 +137,18 @@ impl LogicalType {
             Boolean | TinyInt => 1,
             SmallInt => 2,
             Integer | Float => 4,
-            BigInt | Double => 8,
+            BigInt | Double | DateTime | Timestamp => 8,
+            HugeInt => 16,
+            Decimal => 16,
+            Uuid => 16,
             Embedding(dim) => (*dim as usize) * 4,
-            Varchar | Invalid | Null => return None,
+            Varchar | Array | Mixed | Date | Time | Interval | Invalid | Null => {
+                if matches!(self, Date | Time | Interval) {
+                    4
+                } else {
+                    return None;
+                }
+            }
         })
     }
 

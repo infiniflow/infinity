@@ -9,6 +9,9 @@ pub mod error;
 pub mod types;
 
 pub use error::{Error, Result};
-pub use types::{DateT, DateTimeT, IntervalT, LogicalType, RowID, TimeT, TimestampT, TxnTimeStamp};
+pub use types::{
+    DateT, DateTimeT, DecimalT, IntervalT, LogicalType, MixedT, RowID, TimeT, TimestampT,
+    TxnTimeStamp,
+};
 
 pub mod loser_tree;
