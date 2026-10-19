@@ -900,3 +900,119 @@ mod tests {
         assert!(recall >= 0.8, "recall too low: {recall}");
     }
 }
+
+#[cfg(test)]
+mod reference_suite {
+    //! Ports of `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp`
+    //! (`HnswAlgTest`): 1280 vectors of dim 16, M=8, ef_construction=200,
+    //! ef_search=10, and self-query recall@10 >= 0.95 over the whole set.
+
+    use super::*;
+
+    const DIM: usize = 16;
+    const M: usize = 8;
+    const EF_CONSTRUCTION: usize = 200;
+    const EF_SEARCH: usize = 10;
+    const N: usize = 1280;
+
+    fn data() -> Vec<Vec<f32>> {
+        let mut rng = Rng::new(42);
+        (0..N)
+            .map(|_| (0..DIM).map(|_| rng.unit() as f32).collect())
+            .collect()
+    }
+
+    fn build(metric: Metric, encoding: HnswEncoding, data: &[Vec<f32>]) -> HnswIndex {
+        let mut index =
+            HnswIndex::with_encoding(DIM, M, EF_CONSTRUCTION, EF_SEARCH, metric, encoding);
+        index.train_store(data, None);
+        for v in data {
+            index.add(v);
+        }
+        index
+    }
+
+    fn self_recall(index: &HnswIndex, data: &[Vec<f32>]) -> f32 {
+        let mut correct = 0usize;
+        for (i, q) in data.iter().enumerate() {
+            if index
+                .search_with_ef(q, EF_SEARCH, EF_SEARCH)
+                .iter()
+                .any(|(id, _)| *id == i)
+            {
+                correct += 1;
+            }
+        }
+        correct as f32 / data.len() as f32
+    }
+
+    /// C++: `HnswAlgTest.test_plain_1`.
+    #[test]
+    fn plain_l2_self_recall() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Plain, &data);
+        let recall = self_recall(&index, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// C++: `HnswAlgTest.test_plain_2`.
+    #[test]
+    fn plain_cos_self_recall() {
+        let data = data();
+        let index = build(Metric::Cos, HnswEncoding::Plain, &data);
+        let recall = self_recall(&index, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// C++: `HnswAlgTest.test_lvq_1`.
+    #[test]
+    fn lvq_l2_self_recall() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Lvq, &data);
+        let recall = self_recall(&index, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// C++: `HnswAlgTest.test_rabitq_1`.
+    #[test]
+    fn rabitq_l2_self_recall() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Rabitq, &data);
+        let recall = self_recall(&index, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// C++: `HnswAlgTest.test_plain_4` (save/load through the chunk layout).
+    #[test]
+    fn chunk_roundtrip_preserves_recall() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Plain, &data);
+        let meta = index.store_meta_bytes();
+        let records = index.store_records_bytes();
+        let levels: Vec<usize> = (0..index.len()).map(|i| index.level_of(i)).collect();
+        let max_level = index.max_level();
+        let mut links = vec![vec![Vec::new(); index.len()]; max_level + 1];
+        for node in 0..index.len() {
+            for (layer, at) in links.iter_mut().enumerate() {
+                at[node] = index.neighbors(layer, node).to_vec();
+            }
+        }
+        let restored = HnswIndex::from_chunk_parts(
+            DIM,
+            M,
+            EF_SEARCH,
+            Metric::L2,
+            HnswEncoding::Plain,
+            &meta,
+            &records,
+            index.len(),
+            levels,
+            links,
+            index.entry_point(),
+            max_level,
+        )
+        .expect("chunk parts");
+        let recall = self_recall(&restored, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+}
