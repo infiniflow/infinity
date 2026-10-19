@@ -2516,6 +2516,9 @@ struct RowCache {
 
 const ROW_CACHE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
 
+/// Decoded rows paired with their row ids (the executor's scan unit).
+type TableRows = Vec<(usize, Vec<Value>)>;
+
 fn value_bytes(v: &Value) -> usize {
     match v {
         Value::Str(s) => s.len() + 24,
@@ -3604,6 +3607,17 @@ impl Engine {
         }
     }
 
+    /// Marks the C++ block mirror stale after a schema or row-id rewrite.
+    /// Block reads fall back to the KV row store until the next checkpoint
+    /// rewrites the mirror.
+    fn invalidate_block_mirror(&self, table: &str) {
+        let key = self.table_key(table);
+        if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
+            entry.cpp_block_generation = None;
+            entry.block_index = None;
+        }
+    }
+
     /// The key of a table's [`TableEntry`]: the fully-qualified lower-case
     /// name (the C++ catalog's `db.table` key).
     fn table_key(&self, table: &str) -> String {
@@ -4255,6 +4269,7 @@ impl Engine {
                 self.reset_row_counter(table);
                 // The rewrite moved every row to a new sequence id.
                 self.invalidate_row_cache(table);
+                self.invalidate_block_mirror(table);
                 self.storage.catalog.drop_column(table, column)?;
                 if let Some(im) = self
                     .storage
@@ -4294,6 +4309,7 @@ impl Engine {
             Statement::AlterTableAdd { table, columns } => {
                 // Rows cached before the new columns lack their defaults.
                 self.invalidate_row_cache(table);
+                self.invalidate_block_mirror(table);
                 // A column may not be added twice (`DUPLICATE_COLUMN_NAME`).
                 let existing = self.table_schema(table)?;
                 let mut seen: Vec<String> = existing.clone();
@@ -5605,6 +5621,12 @@ impl Engine {
                 }
             }
         }
+        // The C++ block mirror is the authoritative value source once it covers
+        // every live row; the KV store then only supplies the row-id list (the
+        // write-ahead journal between checkpoints).
+        if let Some(rows) = self.try_cpp_rows(table)? {
+            return Ok(rows);
+        }
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
         // Collect tombstones with one prefix scan: a point lookup per row
@@ -5685,6 +5707,72 @@ impl Engine {
     /// Projection-only `SELECT`: read the requested columns from the C++ block
     /// mirror when it matches the current write generation. Returns `None` when
     /// the mirror is stale or the projection is not a plain column list.
+    /// Full rows from the C++ block mirror when it covers every live row.
+    ///
+    /// The mirror is the authoritative value source at that point; the KV
+    /// store supplies only the live row-id list (the write-ahead journal
+    /// between checkpoints). Returns `None` when the mirror is stale or a
+    /// column type is not block-encodable, so the caller falls back to the KV
+    /// row store.
+    fn try_cpp_rows(&self, table: &str) -> Result<Option<TableRows>> {
+        let table = if table.contains('.') {
+            table.to_string()
+        } else {
+            format!("{}.{}", self.db(), table.to_ascii_lowercase())
+        };
+        let table = table.as_str();
+        let key = self.table_key(table);
+        let (current, generation) = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| (e.write_batches, e.cpp_block_generation))
+            .unwrap_or((0, None));
+        if generation != Some(current) {
+            return Ok(None);
+        }
+        if self.cpp_block_row_count(table)? != self.row_count(table)? {
+            return Ok(None);
+        }
+        let schema = self.table_schema(table)?;
+        if schema.is_empty() {
+            return Ok(None);
+        }
+        let wanted: Vec<usize> = (0..schema.len()).collect();
+        // Row ids in key order; the values are decoded from the blocks.
+        let prefix = row_prefix(table);
+        let deleted = self.tombstone_set(table)?;
+        let mut ids = Vec::new();
+        for (k, _) in self.storage.store.scan_prefix(&prefix)? {
+            let Some(raw) = k.get(prefix.len()..) else {
+                continue;
+            };
+            let Ok(raw) = std::str::from_utf8(raw) else {
+                continue;
+            };
+            let Ok(seq) = raw.parse::<usize>() else {
+                continue;
+            };
+            if !deleted.contains(&(seq as u64)) {
+                ids.push(seq);
+            }
+        }
+        let rows = match self.read_cpp_blocks_selected(table, &wanted) {
+            Ok((_, rows)) => rows,
+            Err(_) => return Ok(None),
+        };
+        if ids.len() != rows.len() {
+            return Ok(None);
+        }
+        Ok(Some(
+            ids.into_iter()
+                .zip(rows)
+                .map(|(id, cells)| (id, cells.iter().map(|c| parse_value(c)).collect()))
+                .collect(),
+        ))
+    }
+
     fn try_cpp_projection(
         &self,
         table: &str,
@@ -7028,6 +7116,7 @@ impl Engine {
             entry.secondary.indexes.clear();
             entry.vector.clear();
             entry.block_index = None;
+            entry.cpp_block_generation = None;
         }
         self.result_cache.lock().unwrap().clear();
         Ok(())
