@@ -125,3 +125,18 @@ H4/H5 待 planner 接线后复核。
 验证：`cargo fmt --check`、`clippy -D warnings`、`cargo test --workspace --lib`（executor 511 tests）、Gate A `1752/1752 + 129/129 + 1546/1546`。
 
 **Round 7 结论：not converged（2 high）**；其中 R7-1 为真实高危并已修复，R7-2 未能复现但仍做了口径对齐。
+
+## Round 8（HEAD 75907c2d9，收敛确认）
+
+只审 `75907c2d9` 的 diff 及其触及的函数。
+
+| 项 | 结论 | 证据 |
+|---|---|---|
+| A：新拒绝是否误杀正常过滤器 | **无问题** | `parse_filter_predicate` 用 `Predicate::contains_subquery`，仅对名为 `EXISTS`/`SUBQUERY` 的 `Func` 为真；解析器只在这三处产出这些名字（`IN (SELECT …)` 等）。没有同名标量函数。向量/knn 的 `filter=` 走同一函数 |
+| B：子查询自带 `WITH` | **无问题** | `from_is_cte` 用大小写不敏感的别名匹配并入 `local_ctes`；真实基表仍走 `bind_subquery`。跳过绑定只丢掉相关列检查，未被识别的外层限定符会由 `resolve_output_column` 报错，不会静默成 NULL |
+| C：`expand_views` 新参数 | **行为中性** | `&[]` 时 inherited 分支为死分支，非 CTE 调用点不变；只有子查询与 CTE 查询传入非空作用域，与 `qualify_tables_in` 一致 |
+| D：新引入的 critical/high | **无** | 仅改三个函数、删一段注释、加测试 |
+
+遗留一条 low（不阻塞，未改）：`from_is_cte` 与 `run_select_with_ctes` 内的 `cte_scope` 判断有重复，无害。
+
+**Round 8 结论：converged——无未处置的 critical/high。循环收敛于 `75907c2d9`。**
