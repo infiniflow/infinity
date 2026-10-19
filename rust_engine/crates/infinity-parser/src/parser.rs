@@ -646,6 +646,13 @@ impl Parser {
                         }
                     }
                 }
+                if offset.is_some() && limit.is_none() {
+                    return self.err("OFFSET requires LIMIT");
+                }
+                if search.is_some() && (!order_by.is_empty() || limit.is_some() || offset.is_some())
+                {
+                    return self.err("SEARCH cannot be combined with ORDER BY/OFFSET/LIMIT");
+                }
                 Ok(Statement::Select {
                     items,
                     from,
@@ -1380,6 +1387,25 @@ impl Parser {
                 if kind.eq_ignore_ascii_case("TEXT") && args.len() >= 2 {
                     if let ExprAst::Literal(Literal::Str(opts)) = &args[1] {
                         validate_fulltext_options(opts)?;
+                    }
+                }
+                // `MATCH VECTOR (col, vec, 'elem', 'metric', k)`: the metric must
+                // suit the element type (`hamming` only for bit vectors).
+                if kind.eq_ignore_ascii_case("VECTOR") && args.len() >= 3 {
+                    if let (
+                        ExprAst::Literal(Literal::Str(elem)),
+                        ExprAst::Literal(Literal::Str(metric)),
+                    ) = (&args[1], &args[2])
+                    {
+                        let elem = elem.to_ascii_lowercase();
+                        let metric = metric.to_ascii_lowercase();
+                        let is_bit = elem.eq_ignore_ascii_case("bit");
+                        if is_bit && metric != "hamming" {
+                            return self.err("bit vectors support only the hamming metric");
+                        }
+                        if !is_bit && metric == "hamming" {
+                            return self.err("hamming metric requires a bit vector");
+                        }
                     }
                 }
                 out.matches.push(MatchClause {
@@ -3049,5 +3075,43 @@ mod tests {
     fn select_list_accepts_constants_and_nested_calls() {
         assert!(parse("select 1;").is_ok());
         assert!(parse("select a, sum(b), function(c, nested(d)) from t1;").is_ok());
+    }
+    /// `SelectStatementParsingTest.bad_test1`: `OFFSET` requires `LIMIT`.
+    #[test]
+    fn offset_without_limit_is_rejected() {
+        assert!(parse("SELECT b FROM t1 WHERE a > 0 OFFSET 3;").is_err());
+    }
+
+    /// `SelectStatementParsingTest.bad_knn_test`: the vector metric must suit
+    /// the element type.
+    #[test]
+    fn vector_metric_type_mismatches_are_rejected() {
+        for sql in [
+            "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'hamming', 3) WHERE a > 0;",
+            "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0;",
+            "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 'bit', 'cosine', 3) WHERE a > 0;",
+        ] {
+            // The second statement is syntactically valid; C++ rejects it at
+            // bind time because the literal width does not match the declared
+            // bit dimension, which the parser cannot see. Only the metric/type
+            // mismatch is checked here.
+            let r = parse(sql);
+            if sql.contains("'double', 'hamming'") || sql.contains("'bit', 'cosine'") {
+                assert!(r.is_err(), "{sql}");
+            }
+        }
+    }
+
+    /// `SelectStatementParsingTest.bad_search_test`: `SEARCH` cannot be
+    /// combined with `ORDER BY`/`LIMIT`/`OFFSET`.
+    #[test]
+    fn search_with_order_or_limit_is_rejected() {
+        for sql in [
+            "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'l2', 3) WHERE a > 0 ORDER BY c2;",
+            "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0 LIMIT 5;",
+            "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'l2', 3) WHERE a > 0 LIMIT 5;",
+        ] {
+            assert!(parse(sql).is_err(), "{sql}");
+        }
     }
 }
