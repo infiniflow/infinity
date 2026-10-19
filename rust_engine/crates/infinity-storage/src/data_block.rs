@@ -631,6 +631,23 @@ impl DataBlock {
         &self.columns
     }
 
+    /// C++: `DataBlock::AppendColumns` — appends the selected columns of
+    /// `other`. The two blocks must hold the same number of rows.
+    pub fn append_columns(&mut self, other: &DataBlock, indexes: &[usize]) -> bool {
+        if self.row_count != other.row_count {
+            return false;
+        }
+        let mut added = Vec::with_capacity(indexes.len());
+        for &idx in indexes {
+            match other.columns.get(idx) {
+                Some(column) => added.push(column.clone()),
+                None => return false,
+            }
+        }
+        self.columns.extend(added);
+        true
+    }
+
     pub fn column(&self, index: usize) -> Option<&Column> {
         self.columns.get(index)
     }

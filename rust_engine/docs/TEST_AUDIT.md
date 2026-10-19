@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 136, `gate-a` 136, `integration` 264, `partial` 60, `ported` 274.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 134, `gate-a` 136, `integration` 264, `partial` 60, `ported` 276.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -965,8 +965,8 @@
 | 951 | `src/unit_test/storage/persistence/persistence_manager_ut.cpp` | `PersistenceManagerTest` | `PersistMultiFile` | gap |
 | 952 | `src/unit_test/storage/persistence/persistence_manager_ut.cpp` | `PersistenceManagerTest` | `PersistFileMultiThread` | gap |
 | 953 | `src/unit_test/storage/persistence/persistence_manager_ut.cpp` | `PersistenceManagerTest` | `CleanupBasic` | gap |
-| 954 | `src/unit_test/storage/result_cache_manager_ut.cpp` | `ResultCacheManagerTest` | `test1` | gap |
-| 955 | `src/unit_test/storage/result_cache_manager_ut.cpp` | `ResultCacheManagerTest` | `test2` | gap |
+| 954 | `src/unit_test/storage/result_cache_manager_ut.cpp` | `ResultCacheManagerTest` | `test1` | ported | `infinity-storage` `result_cache::tests::cache_projects_columns_and_merges_new_ones` |
+| 955 | `src/unit_test/storage/result_cache_manager_ut.cpp` | `ResultCacheManagerTest` | `test2` | ported | `infinity-storage` `result_cache::tests::cache_evicts_the_least_recently_used_entry` |
 | 956 | `src/unit_test/storage/secondary_index/test_high_cardinality_ut.cpp` | `HighCardinalitySecondaryIndexTest` | `TestSaveLoadHighCardinality` | partial |
 | 957 | `src/unit_test/storage/secondary_index/test_high_cardinality_ut.cpp` | `HighCardinalitySecondaryIndexTest` | `TestTxn` | partial |
 | 958 | `src/unit_test/storage/secondary_index/test_low_cardinality_ut.cpp` | `LowCardinalitySecondaryIndexTest` | `TestIntegerLowCardinality` | partial |

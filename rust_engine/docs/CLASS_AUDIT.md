@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `grouped` 1017, `mapped` 97, `test` 7
+- 状态分布：`excluded` 15, `grouped` 1012, `mapped` 102, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -415,8 +415,8 @@
 | 406 | `CachedMatchScanBase` | `src/planner/cached_node/cached_match_scan.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
 | 407 | `CachedMatchSparseScan` | `src/planner/cached_node/cached_match_scan.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
 | 408 | `CachedMatchTensorScan` | `src/planner/cached_node/cached_match_scan.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
-| 409 | `CachedNodeBase` | `src/planner/cached_node/cached_node_base.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
-| 410 | `CachedScanBase` | `src/planner/cached_node/cached_scan_base.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
+| 409 | `CachedNodeBase` | `src/planner/cached_node/cached_node_base.cppm` | mapped | `infinity_storage::result_cache::CachedNode`（Hash/Eq/output_names/type） |
+| 410 | `CachedScanBase` | `src/planner/cached_node/cached_scan_base.cppm` | mapped | `result_cache::CachedNode` 的 `schema_name`/`table_name` |
 | 411 | `ColumnBinding` | `src/planner/column_binding.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
 | 412 | `ColumnIdentifier` | `src/planner/column_identifier.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
 | 413 | `ExplainAST` | `src/planner/explain_ast.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
@@ -468,7 +468,7 @@
 | 459 | `LogicalMergeHashAggregate` | `src/planner/node/logical_merge_hash_aggregate.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
 | 460 | `LogicalOptimize` | `src/planner/node/logical_optimize.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
 | 461 | `LogicalProject` | `src/planner/node/logical_project.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
-| 462 | `CacheContent` | `src/planner/node/logical_read_cache.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
+| 462 | `CacheContent` | `src/planner/node/logical_read_cache.cppm` | mapped | `result_cache::CacheContent`（AppendColumns/Clone） |
 | 463 | `LogicalReadCache` | `src/planner/node/logical_read_cache.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
 | 464 | `LogicalShow` | `src/planner/node/logical_show.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
 | 465 | `LogicalSort` | `src/planner/node/logical_sort.cppm` | grouped | `Statement`/计划结构 + 规则函数 |
@@ -1079,8 +1079,8 @@
 | 1070 | `PersistReadResult` | `src/storage/persistence/persistence_manager.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1071 | `PersistWriteResult` | `src/storage/persistence/persistence_manager.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1072 | `PersistenceManager` | `src/storage/persistence/persistence_manager.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 1073 | `CacheOutput` | `src/storage/result_cache_manager.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 1074 | `ResultCacheManager` | `src/storage/result_cache_manager.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
+| 1073 | `CacheOutput` | `src/storage/result_cache_manager.cppm` | mapped | `result_cache::CacheOutput` |
+| 1074 | `ResultCacheManager` | `src/storage/result_cache_manager.cppm` | mapped | `result_cache::ResultCacheManager`（AddCache/GetCache/DropTable/ResetCacheNumCapacity/ClearCache） |
 | 1075 | `CommonQueryFilter` | `src/storage/secondary_index/common_query_filter.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1076 | `HighCardinalityTag` | `src/storage/secondary_index/secondary_index_data.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1077 | `LowCardinalityTag` | `src/storage/secondary_index/secondary_index_data.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
