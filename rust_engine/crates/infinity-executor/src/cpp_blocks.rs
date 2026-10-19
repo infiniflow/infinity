@@ -109,6 +109,11 @@ pub struct LoadedVectorIndex {
     /// The `chunk_{id}.idx` this graph came from, so a later reload can load
     /// only the chunks written since the last one.
     pub chunk_id: u64,
+    /// Approximate heap bytes (vectors + graph + labels), for the buffer budget.
+    pub bytes: usize,
+    /// `(len, mtime_secs)` of the chunk file when it was decoded; a rewritten
+    /// chunk under the same id is detected by a stamp change.
+    pub stamp: (u64, u64),
 }
 
 /// A table whose estimated encoded size exceeds this keeps only the engine's
@@ -2083,7 +2088,11 @@ impl Engine {
         })
     }
 
-    fn assemble_loaded_index(parts: HnswChunkParts, chunk_id: u64) -> Option<LoadedVectorIndex> {
+    fn assemble_loaded_index(
+        parts: HnswChunkParts,
+        chunk_id: u64,
+        stamp: (u64, u64),
+    ) -> Option<LoadedVectorIndex> {
         if parts.n == 0 {
             return None;
         }
@@ -2110,6 +2119,12 @@ impl Engine {
             }
         }
         let entry = parts.enterpoint.map(|e| e.min(parts.n.saturating_sub(1)));
+        let graph_bytes: usize = links
+            .iter()
+            .flat_map(|layer| layer.iter())
+            .map(|neighbors| neighbors.len() * 4 + 24)
+            .sum();
+        let bytes = parts.records.len() + parts.labels.len() * 4 + levels.len() * 8 + graph_bytes;
         let index = HnswIndex::from_chunk_parts(
             parts.dims,
             parts.m.max(1) as usize,
@@ -2128,6 +2143,8 @@ impl Engine {
             index: HnswHandler::from_index(index),
             labels: parts.labels,
             chunk_id,
+            bytes,
+            stamp,
         })
     }
 
@@ -2141,7 +2158,7 @@ impl Engine {
         let parts = self
             .read_hnsw_chunk_parts(&table, index_name, &bytes)
             .ok_or_else(|| Error::Invalid("bad HNSW chunk".to_string()))?;
-        Self::assemble_loaded_index(parts, 0)
+        Self::assemble_loaded_index(parts, 0, file_stamp(&path))
             .ok_or_else(|| Error::Invalid("HNSW mirror has no vectors".to_string()))
     }
 
@@ -2176,7 +2193,7 @@ impl Engine {
             let Some(parts) = self.read_hnsw_chunk_parts(&table, index_name, &bytes) else {
                 continue;
             };
-            if let Some(loaded) = Self::assemble_loaded_index(parts, chunk_id) {
+            if let Some(loaded) = Self::assemble_loaded_index(parts, chunk_id, file_stamp(&path)) {
                 out.push(loaded);
             }
         }
@@ -2210,7 +2227,23 @@ impl Engine {
             .map(|(_, path)| path)?;
         let bytes = std::fs::read(&path).ok()?;
         let parts = self.read_hnsw_chunk_parts(&table, index_name, &bytes)?;
-        Self::assemble_loaded_index(parts, chunk_id)
+        Self::assemble_loaded_index(parts, chunk_id, file_stamp(&path))
+    }
+
+    /// `chunk_id -> (file size, mtime seconds)` for the live chunks.
+    pub fn hnsw_chunk_stamps(
+        &self,
+        table: &str,
+        index_name: &str,
+    ) -> std::collections::HashMap<u64, (u64, u64)> {
+        let table = self.qualified_table(table);
+        let Some(dir) = self.cpp_hnsw_dir(&table, index_name) else {
+            return Default::default();
+        };
+        hnsw_chunks(&dir)
+            .into_iter()
+            .map(|(id, path)| (id, file_stamp(&path)))
+            .collect()
     }
 
     /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for
@@ -2647,6 +2680,21 @@ impl Default for PlaidOptions {
             colbertsar: false,
         }
     }
+}
+
+fn file_stamp(path: &std::path::Path) -> (u64, u64) {
+    std::fs::metadata(path)
+        .ok()
+        .map(|m| {
+            let modified = m
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            (m.len(), modified)
+        })
+        .unwrap_or((0, 0))
 }
 
 /// Serializes an existing graph as a C++ HNSW chunk (vec-store meta, graph

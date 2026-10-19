@@ -2836,6 +2836,10 @@ struct Context {
     object_store: Mutex<Option<Arc<infinity_storage::s3::S3Client>>>,
     /// Concurrency limit for full-table text/vector scans.
     scan_gate: ScanGate,
+    /// `[buffer] buffer_manager_size`: the decoded HNSW chunk budget. Loaded
+    /// graphs beyond it are evicted, and a scan that no longer sees full label
+    /// coverage falls back to the exact scan (the reference's buffer manager).
+    hnsw_budget: std::sync::atomic::AtomicUsize,
 }
 
 /// The engine: catalog + transaction manager + KV store + a Tokio runtime.
@@ -2971,6 +2975,7 @@ impl Engine {
                 memindex_quota: std::sync::atomic::AtomicU64::new(0),
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
                 object_store: Mutex::new(None),
+                hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
                 scan_gate: ScanGate::new(
                     std::env::var("INFINITY_SCAN_CONCURRENCY")
                         .ok()
@@ -3261,39 +3266,80 @@ impl Engine {
         };
         for im in indexes {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
-                let tkey = self.table_key(&im.table);
-                // Reconcile with the live chunk set: cleanup deletes the chunks
-                // a merged graph replaced, and the buffer manager must not keep
-                // their decoded vectors alive (this is what made a long import
-                // grow without bound). A rewrite under the same chunk id is
-                // detected by the coverage check below.
-                let disk = self.hnsw_chunk_ids(&im.table, &im.name);
-                if disk.is_empty() {
+                // Reconcile with the live chunk set and the buffer budget:
+                // cleanup deletes the chunks a merged graph replaced, a rewrite
+                // under the same id changes the file stamp, and the decoded
+                // graphs must stay within `[buffer] buffer_manager_size` (the
+                // reference's buffer manager). Without this a long import grows
+                // without bound. Partial coverage is safe: `knn_candidates`
+                // falls back to the exact scan when labels do not cover a row.
+                let stamps = self.hnsw_chunk_stamps(&im.table, &im.name);
+                if stamps.is_empty() {
                     continue;
                 }
-                let rows = self.row_count(&im.table).unwrap_or(0);
-                let mut tables = self.tables.lock().unwrap();
-                let list = tables
-                    .entry(tkey)
-                    .or_default()
-                    .vector
-                    .entry(im.column.clone())
-                    .or_default();
-                list.retain(|s| disk.contains(&s.chunk_id));
-                let covered: usize = list.iter().map(|s| s.labels.len()).sum();
-                if covered < rows {
-                    list.clear();
-                    drop(tables);
-                    let all = self.load_vector_indexes(&im.table, &im.name);
-                    if !all.is_empty() {
-                        let mut tables = self.tables.lock().unwrap();
-                        let list = tables
-                            .entry(self.table_key(&im.table))
-                            .or_default()
-                            .vector
-                            .entry(im.column.clone())
-                            .or_default();
-                        list.extend(all.into_iter().map(Arc::new));
+                let budget = self
+                    .context
+                    .hnsw_budget
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                    .max(1);
+                let tkey = self.table_key(&im.table);
+                let (mut total, have, kept) = {
+                    let mut tables = self.tables.lock().unwrap();
+                    let list = tables
+                        .entry(tkey.clone())
+                        .or_default()
+                        .vector
+                        .entry(im.column.clone())
+                        .or_default();
+                    list.retain(|s| stamps.get(&s.chunk_id).is_some_and(|st| *st == s.stamp));
+                    let total: usize = list.iter().map(|s| s.bytes).sum();
+                    let have: std::collections::HashSet<u64> =
+                        list.iter().map(|s| s.chunk_id).collect();
+                    (total, have, list.len())
+                };
+                // Newest chunks first: they hold the rows written since the
+                // last merge, which are the ones a fresh scan needs most.
+                let mut missing: Vec<u64> = stamps
+                    .keys()
+                    .copied()
+                    .filter(|id| !have.contains(id))
+                    .collect();
+                missing.sort_unstable_by(|a, b| b.cmp(a));
+                let mut loaded = Vec::new();
+                for id in missing {
+                    if total >= budget && kept + loaded.len() > 0 {
+                        break;
+                    }
+                    if let Some(index) = self.load_vector_index_chunk(&im.table, &im.name, id) {
+                        total += index.bytes;
+                        loaded.push(Arc::new(index));
+                    }
+                }
+                if !loaded.is_empty() {
+                    self.tables
+                        .lock()
+                        .unwrap()
+                        .entry(tkey)
+                        .or_default()
+                        .vector
+                        .entry(im.column.clone())
+                        .or_default()
+                        .extend(loaded);
+                }
+                // Still over budget (or the budget shrank): evict the largest
+                // decoded graphs, which frees the most memory.
+                if total > budget {
+                    let mut tables = self.tables.lock().unwrap();
+                    let list = tables
+                        .entry(self.table_key(&im.table))
+                        .or_default()
+                        .vector
+                        .entry(im.column.clone())
+                        .or_default();
+                    list.sort_by_key(|s| std::cmp::Reverse(s.bytes));
+                    while total > budget && list.len() > 1 {
+                        let gone = list.pop().unwrap();
+                        total = total.saturating_sub(gone.bytes);
                     }
                 }
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
@@ -10393,6 +10439,9 @@ impl Engine {
     /// `[buffer] buffer_manager_size`).
     pub fn set_buffer_manager_size(&self, bytes: usize) {
         self.context.buffer.lock().unwrap().set_budget(bytes);
+        self.context
+            .hnsw_budget
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
