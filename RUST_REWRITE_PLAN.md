@@ -2,7 +2,7 @@
 
 > 版本：v1.1（2026-10-18 迁移策略修订：D1 由「洁净室重写」改为「结构对齐的类级移植」）  
 > 日期：2026-10-18  
-> 基准代码：infinity `main` @ `32a6afce8`（v0.7.4，nightly tag）  
+> 基准代码：infinity `main` @ `5d27942c0`（v0.7.4 线，2026-10-19 rebase；含 regex literal extractor 上游更新）  
 > 实现代码：`rust_engine/`（Cargo workspace），C++ 引擎作为参考实现（oracle）  
 > 评审：codex 三轮评审（round 3 `VERDICT: APPROVE`，见附录 C）  
 > 状态：**计划已定稿；实现进入收尾** —— Gate A/B/D/E/F/G 达标；Gate C 常规全绿，重档在无 `earlyoom` 的 CI 机复跑（见 §8）
@@ -27,7 +27,7 @@
 
 | 维度 | 状态 |
 |---|---|
-| SQL 功能（Gate A） | ✅ 1752 statement ok / 129 statement error / 1536 query 全部通过 |
+| SQL 功能（Gate A） | ✅ 1752 statement ok / 129 statement error / 1546 query 全部通过 |
 | SDK 协议（Gate B） | ✅ 未修改的 Python / Go SDK 与 HTTP 模式全绿 |
 | 持久化恢复（Gate C） | ⚠️ 常规用例全绿；对齐 `mem_index_capacity` 后 5.toml 重档导入 RSS 3.0 GB、整轮峰值 ~8.2 GB，但 30 GB 开发机仍被宿主 `earlyoom -M 2000000` 在约 17 分钟处以 SIGTERM 终止（日志无 panic）；需在无看门狗的 CI 机复跑 |
 | 并发稳定（Gate D） | ✅ loom + miri + ASan/TSAN + `parallel_test` |
@@ -495,7 +495,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 | 关卡 | 门槛 | 当前状态 |
 |---|---|---|
-| **A** | 全部 `test/sql/**/*.slt` 通过 | ✅ 1752 statement ok / 129 statement error / 1536 query（100%） |
+| **A** | 全部 `test/sql/**/*.slt` 通过 | ✅ 1752 statement ok / 129 statement error / 1546 query（100%） |
 | **B** | 未修改的 Python/Go SDK + HTTP 全绿 | ✅ PySDK 逐文件全绿；Go 375/375；HTTP 全绿 |
 | **C** | 重启 / 快照 / 索引 chunk 生命周期 / 对象存储 | ⚠️ 常规全绿；重档 3 档未过（§7.5-1） |
 | **D** | 并发：loom + miri + sanitizer + `parallel_test` | ✅ loom 1、miri 39、ASan/TSAN 各 39；`parallel_test` 全绿 |

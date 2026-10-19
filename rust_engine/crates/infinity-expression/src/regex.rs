@@ -2,14 +2,15 @@
 //!
 //! Supported: literals, `.`, `*`, `+`, `?`, `{n}`, `{n,}`, `{n,m}`, alternation
 //! `a|b`, groups `( … )` / `(?: … )`, character classes `[a-z]` / `[^…]`,
-//! escapes `\s \d \w \S \D \W` and escaped literals, anchors `^` / `$`, and a
-//! leading `(?i)` case-insensitive flag.
+//! escapes `\s \d \w \S \D \W`, `\C` (any character), `\Q…\E` quoted
+//! text and escaped literals, anchors `^` / `$`, and inline case flags
+//! (`(?i)`, `(?i: … )`, `(?-i: … )`).
 
 #[derive(Debug, Clone)]
 enum Node {
-    Char(char),
+    Char(char, bool),
     Any,
-    Class(Vec<(char, char)>, bool),
+    Class(Vec<(char, char)>, bool, bool),
     Group(Vec<Vec<Node>>),
     Repeat(Box<Node>, usize, Option<usize>),
     Start,
@@ -29,11 +30,6 @@ pub fn is_match(text: &str, pattern: &str) -> bool {
         pos: 0,
         ci: false,
     };
-    // Optional `(?i)` prefix.
-    if p.chars.starts_with(&['(', '?', 'i', ')']) {
-        p.ci = true;
-        p.pos = 4;
-    }
     let alts = p.parse_alts(None);
     let hay: Vec<char> = text.chars().collect();
     let anchored = alts
@@ -94,8 +90,65 @@ impl Parser {
             }
             '(' => {
                 self.pos += 1;
-                if self.chars.get(self.pos..self.pos + 2) == Some(&['?', ':']) {
-                    self.pos += 2;
+                if self.peek() == Some('?') {
+                    self.pos += 1;
+                    // Lookarounds are zero width in RE2; skip the group. This
+                    // port never used them, but skipping beats misparsing the
+                    // lookaround body as literal text.
+                    if matches!(self.peek(), Some('=') | Some('!')) {
+                        self.skip_group();
+                        return self.parse_node();
+                    }
+                    if self.peek() == Some('<')
+                        && matches!(self.chars.get(self.pos + 1), Some('=') | Some('!'))
+                    {
+                        self.skip_group();
+                        return self.parse_node();
+                    }
+                    // Inline flags: `(?i)`, `(?i:…)`, `(?-i:…)`.
+                    let mut enable = true;
+                    let mut set_ci: Option<bool> = None;
+                    while let Some(c) = self.peek() {
+                        match c {
+                            'i' => {
+                                set_ci = Some(enable);
+                                self.pos += 1;
+                            }
+                            'm' | 's' | 'U' | 'R' | 'u' => self.pos += 1,
+                            '-' => {
+                                enable = false;
+                                self.pos += 1;
+                            }
+                            ':' | ')' => break,
+                            _ => break,
+                        }
+                    }
+                    match self.peek() {
+                        Some(':') => {
+                            self.pos += 1;
+                            let outer = self.ci;
+                            if let Some(v) = set_ci {
+                                self.ci = v;
+                            }
+                            let inner = self.parse_alts(Some(')'));
+                            self.ci = outer;
+                            if self.peek() == Some(')') {
+                                self.pos += 1;
+                            }
+                            return Some(self.parse_quantifier(Node::Group(inner)));
+                        }
+                        Some(')') => {
+                            self.pos += 1;
+                            if let Some(v) = set_ci {
+                                self.ci = v;
+                            }
+                            return self.parse_node();
+                        }
+                        _ => {
+                            self.skip_group();
+                            return self.parse_node();
+                        }
+                    }
                 }
                 let inner = self.parse_alts(Some(')'));
                 if self.peek() == Some(')') {
@@ -133,7 +186,7 @@ impl Parser {
                 if self.peek() == Some(']') {
                     self.pos += 1;
                 }
-                Node::Class(ranges, neg)
+                Node::Class(ranges, neg, self.ci)
             }
             '\\' => {
                 self.pos += 1;
@@ -143,6 +196,7 @@ impl Parser {
                         Node::Class(
                             vec![(' ', ' '), ('\t', '\t'), ('\n', '\n'), ('\r', '\r')],
                             false,
+                            false,
                         )
                     }
                     Some('S') => {
@@ -150,37 +204,100 @@ impl Parser {
                         Node::Class(
                             vec![(' ', ' '), ('\t', '\t'), ('\n', '\n'), ('\r', '\r')],
                             true,
+                            false,
                         )
                     }
                     Some('d') => {
                         self.pos += 1;
-                        Node::Class(vec![('0', '9')], false)
+                        Node::Class(vec![('0', '9')], false, false)
                     }
                     Some('D') => {
                         self.pos += 1;
-                        Node::Class(vec![('0', '9')], true)
+                        Node::Class(vec![('0', '9')], true, false)
                     }
                     Some('w') => {
                         self.pos += 1;
-                        Node::Class(vec![('a', 'z'), ('A', 'Z'), ('0', '9'), ('_', '_')], false)
+                        Node::Class(
+                            vec![('a', 'z'), ('A', 'Z'), ('0', '9'), ('_', '_')],
+                            false,
+                            false,
+                        )
                     }
                     Some('W') => {
                         self.pos += 1;
-                        Node::Class(vec![('a', 'z'), ('A', 'Z'), ('0', '9'), ('_', '_')], true)
+                        Node::Class(
+                            vec![('a', 'z'), ('A', 'Z'), ('0', '9'), ('_', '_')],
+                            true,
+                            false,
+                        )
+                    }
+                    Some('C') => {
+                        // `\C` matches any single character (RE2: any byte).
+                        self.pos += 1;
+                        Node::Any
+                    }
+                    Some('Q') => {
+                        // `\Q…\E` is literal text.
+                        self.pos += 1;
+                        let mut quoted = Vec::new();
+                        while self.pos < self.chars.len() {
+                            if self.chars[self.pos] == '\\'
+                                && self.chars.get(self.pos + 1) == Some(&'E')
+                            {
+                                self.pos += 2;
+                                break;
+                            }
+                            quoted.push(Node::Char(self.chars[self.pos], self.ci));
+                            self.pos += 1;
+                        }
+                        Node::Group(vec![quoted])
                     }
                     Some(c) => {
                         self.pos += 1;
-                        Node::Char(c)
+                        Node::Char(c, self.ci)
                     }
                     None => return None,
                 }
             }
             c => {
                 self.pos += 1;
-                Node::Char(c)
+                Node::Char(c, self.ci)
             }
         };
         Some(self.parse_quantifier(atom))
+    }
+
+    /// Consumes the body of a lookaround group whose opener was consumed.
+    fn skip_group(&mut self) {
+        let mut depth = 1i32;
+        while let Some(c) = self.peek() {
+            match c {
+                '\\' => {
+                    self.pos += 2;
+                    continue;
+                }
+                '[' => {
+                    self.pos += 1;
+                    while let Some(c) = self.peek() {
+                        self.pos += 1;
+                        if c == ']' {
+                            break;
+                        }
+                    }
+                    continue;
+                }
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        self.pos += 1;
+                        return;
+                    }
+                }
+                _ => {}
+            }
+            self.pos += 1;
+        }
     }
 
     fn escape_class(&mut self) -> Option<char> {
@@ -281,9 +398,9 @@ fn apply(node: &Node, text: &[char], pos: usize, ci: bool) -> Vec<usize> {
                 Vec::new()
             }
         }
-        Node::Char(c) => {
+        Node::Char(c, ci) => {
             if let Some(t) = text.get(pos) {
-                if eq_char(*t, *c, ci) {
+                if eq_char(*t, *c, *ci) {
                     return vec![pos + 1];
                 }
             }
@@ -296,9 +413,9 @@ fn apply(node: &Node, text: &[char], pos: usize, ci: bool) -> Vec<usize> {
                 Vec::new()
             }
         }
-        Node::Class(ranges, neg) => {
+        Node::Class(ranges, neg, ci) => {
             if let Some(t) = text.get(pos) {
-                let mut hit = ranges.iter().any(|(lo, hi)| in_range(*t, *lo, *hi, ci));
+                let mut hit = ranges.iter().any(|(lo, hi)| in_range(*t, *lo, *hi, *ci));
                 if *neg {
                     hit = !hit;
                 }
@@ -398,5 +515,11 @@ mod tests {
         assert!(!is_match("zabc", "^a"));
         assert!(is_match("abc", "c$"));
         assert!(!is_match("abcz", "c$"));
+        // Scoped inline flags, quoted text and `\C`.
+        assert!(is_match("The Nobel Prize", "(?i:THE NOBEL) Prize"));
+        assert!(!is_match("the nobel prize", "(?-i:THE NOBEL) Prize"));
+        assert!(is_match("fn main() { return 0; }", r"\Qmain()\E"));
+        assert!(is_match("fn main() { return 0; }", r"ma\Cn"));
+        assert!(!is_match("maXXn", r"ma\Cn"));
     }
 }

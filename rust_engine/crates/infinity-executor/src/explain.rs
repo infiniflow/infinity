@@ -14,6 +14,8 @@ use infinity_parser::{
     AggFunc, BinOp, BoolOp, CmpOp, ExprAst, Literal, OrderKey, Predicate, SelectItem,
 };
 
+use crate::regex_literal::{extract_regex_literal_runs, has_any_sparse_gram};
+
 /// A single-table `SELECT` reduced to what the printer needs.
 pub struct SelectPlan<'a> {
     pub items: &'a [SelectItem],
@@ -873,118 +875,6 @@ fn project_exprs(
     out
 }
 
-/// The literal runs a `regex` pattern requires, in order of first appearance.
-///
-/// Mirrors the C++ `ExtractRegexLiteralRuns`: alternation branches are dropped
-/// (the whole group), a quantifier removes the character it applies to
-/// (`colou?r` → `colo`), and character classes / escapes are handled.
-pub fn regex_literal_runs(pattern: &str) -> Vec<String> {
-    fn push(run: &mut String, out: &mut Vec<String>) {
-        if !run.is_empty() {
-            out.push(std::mem::take(run));
-        }
-    }
-    /// True when `inner` has a top-level `|` (an alternation).
-    fn has_top_alt(inner: &[char]) -> bool {
-        let mut d = 0i32;
-        for &c in inner {
-            match c {
-                '(' => d += 1,
-                ')' => d -= 1,
-                '|' if d == 0 => return true,
-                _ => {}
-            }
-        }
-        false
-    }
-    /// Strips a leading `?:` / `?flags:` group prefix.
-    fn strip_prefix(inner: &[char]) -> &[char] {
-        if inner.first() == Some(&'?') {
-            let mut i = 1;
-            while i < inner.len() && inner[i] != ':' && inner[i].is_ascii_alphabetic() {
-                i += 1;
-            }
-            if i < inner.len() && inner[i] == ':' {
-                return &inner[i + 1..];
-            }
-        }
-        inner
-    }
-    fn walk(p: &[char], out: &mut Vec<String>) {
-        let mut run = String::new();
-        let mut i = 0;
-        while i < p.len() {
-            let c = p[i];
-            match c {
-                '(' => {
-                    push(&mut run, out);
-                    let mut depth = 1i32;
-                    let mut j = i + 1;
-                    while j < p.len() && depth > 0 {
-                        if p[j] == '(' {
-                            depth += 1;
-                        } else if p[j] == ')' {
-                            depth -= 1;
-                        }
-                        j += 1;
-                    }
-                    let end = j.saturating_sub(1);
-                    let inner = &p[i + 1..end];
-                    if !has_top_alt(inner) {
-                        walk(strip_prefix(inner), out);
-                    }
-                    i = j;
-                }
-                '|' | ')' => {
-                    push(&mut run, out);
-                    i += 1;
-                }
-                '?' | '*' | '+' => {
-                    run.pop();
-                    push(&mut run, out);
-                    i += 1;
-                }
-                '{' => {
-                    run.pop();
-                    push(&mut run, out);
-                    while i < p.len() && p[i] != '}' {
-                        i += 1;
-                    }
-                    i += 1;
-                }
-                '[' => {
-                    push(&mut run, out);
-                    while i < p.len() && p[i] != ']' {
-                        i += 1;
-                    }
-                    i += 1;
-                }
-                '\\' => {
-                    if i + 1 < p.len() {
-                        run.push(p[i + 1]);
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-                '.' | '^' | '$' => {
-                    push(&mut run, out);
-                    i += 1;
-                }
-                _ => {
-                    run.push(c);
-                    i += 1;
-                }
-            }
-        }
-        push(&mut run, out);
-    }
-    let chars: Vec<char> = pattern.chars().collect();
-    let mut out = Vec::new();
-    walk(&chars, &mut out);
-    out
-}
-
 /// The canonical text of a function-call operand (`sqrt(c1)`,
 /// `substring(c2,0,5)`), used to match a functional-index expression.
 fn func_expr_text(e: &ExprAst) -> Option<String> {
@@ -1042,6 +932,8 @@ pub struct IndexScanPlan<'a> {
     pub indexed: &'a [String],
     /// `(column, index name)` for every index, used by the regex rewrite.
     pub index_names: &'a [(String, String)],
+    /// `(column, min_n, max_n, fold)` for every sparse-gram full-text index.
+    pub sparsegram: &'a [(String, u32, u32, bool)],
 }
 
 /// True for the integer column types that a comparison implicitly widens to
@@ -1345,20 +1237,33 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
                 .find(|(cc, _)| cc == bare(&col))
                 .map(|(_, n)| n.clone());
             if let Some(iname) = iname {
-                let mut runs = regex_literal_runs(&pat);
-                runs.sort_by_key(|r| std::cmp::Reverse(r.len()));
-                runs.truncate(4);
-                if !runs.is_empty() {
-                    for r in runs {
-                        idx_parts.push((
-                            format!(
-                                "FILTER_FULLTEXT('{col}@{iname}', '{r}', 'operator=and;similarity=boolean')"
-                            ),
-                            true,
-                        ));
+                // C++ rewrites only when the column has sparse-gram parameters
+                // (an index built with a sparsegram analyzer).
+                let params = p
+                    .sparsegram
+                    .iter()
+                    .find(|(c, _, _, _)| c == bare(&col))
+                    .map(|(_, min_n, max_n, fold)| (*min_n, *max_n, *fold));
+                if let Some((min_n, max_n, fold)) = params {
+                    let mut runs = extract_regex_literal_runs(&pat, false, fold);
+                    // A run the analyzer turns into no gram cannot be pushed
+                    // down: an empty full-text query is an error, not an
+                    // empty result.
+                    runs.retain(|r| has_any_sparse_gram(r, min_n, max_n));
+                    runs.sort_by_key(|r| std::cmp::Reverse(r.chars().count()));
+                    runs.truncate(4);
+                    if !runs.is_empty() {
+                        for r in runs {
+                            idx_parts.push((
+                                format!(
+                                    "FILTER_FULLTEXT('{col}@{iname}', '{r}', 'operator=and;similarity=boolean')"
+                                ),
+                                true,
+                            ));
+                        }
+                        left.push(c);
+                        continue;
                     }
-                    left.push(c);
-                    continue;
                 }
             }
         }

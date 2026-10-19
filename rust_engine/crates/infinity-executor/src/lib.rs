@@ -37,6 +37,7 @@ mod explain_search;
 
 mod hnsw_mem;
 mod knn_scan;
+mod regex_literal;
 mod wand;
 
 mod cpp_blocks;
@@ -3833,6 +3834,35 @@ impl Engine {
             .collect())
     }
 
+    /// `(column, min_n, max_n, fold)` for every full-text index whose analyzer
+    /// is a sparse gram analyzer. Only these indexes can consume the literal
+    /// runs of a `regex()` predicate (C++ `SparseGramParams`).
+    fn sparsegram_index_params(&self, table: &str) -> Result<Vec<(String, u32, u32, bool)>> {
+        let short = table.split('.').next_back().unwrap_or(table);
+        let mut out = Vec::new();
+        for im in self.storage.catalog.list_indexes()? {
+            if !(im.table == short || im.table == table)
+                || !im.index_type.eq_ignore_ascii_case("FULLTEXT")
+            {
+                continue;
+            }
+            let Some(analyzer) = im
+                .options
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case("analyzer"))
+                .map(|(_, v)| v)
+            else {
+                continue;
+            };
+            if let Some((min_n, max_n, fold)) =
+                crate::regex_literal::parse_sparsegram_analyzer(analyzer)
+            {
+                out.push((im.column, min_n, max_n, fold));
+            }
+        }
+        Ok(out)
+    }
+
     /// Columns of `table` that carry any index, for the `EXPLAIN` index/leftover
     /// filter split.
     fn indexed_columns(&self, table: &str) -> Result<Vec<String>> {
@@ -4554,6 +4584,7 @@ impl Engine {
                             Some(w) if !logical && !*distinct => {
                                 let indexed = self.indexed_columns(t)?;
                                 let index_names = self.index_name_pairs(t)?;
+                                let sparsegram = self.sparsegram_index_params(t)?;
                                 crate::explain::explain_index_scan(&crate::explain::IndexScanPlan {
                                     items,
                                     table: t,
@@ -4564,6 +4595,7 @@ impl Engine {
                                     types: &meta.types,
                                     indexed: &indexed,
                                     index_names: &index_names,
+                                    sparsegram: &sparsegram,
                                 })
                             }
                             _ => None,
