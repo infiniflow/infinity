@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担于 cast）；geo 用例的排除见 `TEST_AUDIT.md`，DiskANN 15 类在本表 `excluded`。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1094, `test` 7
+- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1090, `partial` 4, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -495,13 +495,13 @@
 | 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
 | 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
 | 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | partial | `ResultCacheGetterRule` 仅在 `Optimizer::with_result_cache` 注册并有单测；默认管线未启用（执行器使用语句级缓存），不计入生产接线 
 | 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
 | 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
 | 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行，随后显式报 “correlated subqueries are not supported”）；正常查询不可达，属 error-path/test-only 
+| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行，随后显式报 “correlated subqueries are not supported”）；正常查询不可达，属 error-path/test-only 
+| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行，随后显式报 “correlated subqueries are not supported”）；正常查询不可达，属 error-path/test-only 
 | 496 | `FragmentContext` | `src/scheduler/fragment_context.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
 | 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 

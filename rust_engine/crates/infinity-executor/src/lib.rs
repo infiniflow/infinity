@@ -4011,9 +4011,7 @@ impl Engine {
             where_pred.as_ref(),
             outer,
         );
-        let Ok(bound) = bound else {
-            return Ok(());
-        };
+        let bound = bound.map_err(|e| Error::Invalid(format!("failed to bind subquery: {e}")))?;
         if bound.correlated_columns.is_empty() {
             return Ok(());
         }
