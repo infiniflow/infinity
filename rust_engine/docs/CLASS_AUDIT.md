@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `exempt` 20, `gap` 0, `mapped` 1094, `test` 7
+- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1058, `partial` 36, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -369,19 +369,19 @@
 | 360 | `HTTPServer` | `src/network/http_server.cppm` | mapped | infinity_server 
 | 361 | `InfinityThriftService` | `src/network/infinity_thrift_service.cppm` | mapped | infinity_server 
 | 362 | `NodeInfo` | `src/network/node_info.cppm` | mapped | infinity_server 
-| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | mapped | `infinity_server::peer::PeerServerThriftService` 
-| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer::ChangeRoleTask` 
-| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer::HeartBeatPeerTask` 
-| 366 | `PeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer::PeerTask` (trait) 
-| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer::RegisterPeerTask` 
-| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer::SyncLogTask` 
-| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer::TerminatePeerTask` 
-| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer::UnregisterPeerTask` 
-| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | mapped | `infinity_server::peer::PeerClient` (in-process `PeerTransport` design change) 
-| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | mapped | `infinity_server::peer::PoolPeerThriftServer` (in-process worker pool) 
-| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | mapped | infinity_server 
-| 374 | `PGServer` | `src/network/pg_server.cppm` | mapped | infinity_server 
-| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | mapped | `infinity_server::ring_buffer::RingBufferIterator` 
+| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 366 | `PeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 374 | `PGServer` | `src/network/pg_server.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
 | 376 | `NonBlockPoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 377 | `PoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 378 | `ThreadedThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
@@ -479,29 +479,29 @@
 | 470 | `LogicalUpdate` | `src/planner/node/logical_update.cppm` | mapped | infinity_planner 
 | 471 | `LogicalViewScan` | `src/planner/node/logical_view_scan.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 472 | `Optimizer` | `src/planner/optimizer.cppm` | mapped | infinity_planner 
-| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | mapped | `index_scan::ApplyFastRoughFilter::build` → `FastRoughFilterEvaluator`；测试 `apply_fast_rough_filter_builds_minmax_evaluators` |
-| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | mapped | `column::ColumnPruner::prune`（`OptimizerRule`）；`RemoveUnusedColumns` → 位置化裁剪+remap；默认管线不启用（search/unnest 隐藏列在规划后才追加）；测试 `column_pruner_keeps_only_referenced_columns` |
-| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | mapped | `column::ColumnRemapper::remap` / `column::remap_expr`（`BindingRemapper`）；测试 `column_remapper_rewrites_all_expressions` |
-| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | `index_scan::FilterExpressionPushDown::{push_down_to_index_scan, build_filter_fulltext_expression, push_down_to_fast_rough_filter}`；测试 `pushdown_splits_index_and_leftover_filters` |
-| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | `index_scan::IndexFilterEvaluator`（`kind`/`evaluate`）；测试 `logical_evaluator_builders_simplify_children` |
-| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | `index_scan::IndexScanFilterExpressionPushDownResult`；测试 `pushdown_splits_index_and_leftover_filters` |
-| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | mapped | `index_scan::FilterExpressionPushDownHelper`（`calc_value_result`/`unwind_cast`/`encode_json_*`/`build_json_term`）；测试 `helper_unwinds_a_cast_to_the_source_column`、`helper_encodes_json_terms_in_sortable_order` |
-| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | `index_scan::IndexFilterEvaluator::AllFalse`；测试 `logical_evaluator_builders_simplify_children` |
-| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | `index_scan::IndexFilterEvaluator::AllTrue`；测试 `logical_evaluator_builders_simplify_children` |
-| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | `index_scan::IndexFilterEvaluatorFulltext`（`optimize_query_tree`/`evaluate`）；测试 `fulltext_evaluator_combines_term_postings` |
-| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | `index_scan::IndexFilterEvaluatorLogicalChildren` + `index_filter_evaluator_build_from_and/or`；测试 `logical_evaluator_builders_simplify_children` |
-| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | `index_scan::IndexFilterEvaluatorSecondary`（`make`/`merge`/`add_range`/`evaluate`）；测试 `secondary_evaluator_merges_ranges_and_filters_rows` |
-| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | mapped | `index_scan::ExpressionInfoTree<T>` + `ExpressionInfoTree::<IndexScanInfo>::build`；测试 `expression_info_tree_classifies_secondary_comparisons` |
-| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | `index_scan::IndexScanBuilder::build` → `IndexScanPlan`/`IndexScanCandidate`（Rust 无 `LogicalIndexScan` 节点，候选与 leftover 一并返回）；测试 `index_scan_builder_reports_candidates_and_leftover` |
-| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | `column::LazyLoad::{collect, clean_scan}`（`RefencecColumnCollection`/`CleanScan`）；测试 `lazy_load_collects_and_cleans_scan_columns` |
-| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | `regex_rewrite::RegexIndexRewrite::rewrite` + `RegexIndexCatalog`；测试 `rewrites_a_mandatory_run_into_a_fulltext_filter` |
-| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | mapped | `result_cache::ResultCacheGetter::{get, rewrite}`（命中替换为 `Values`）；测试 `result_cache_getter_replaces_a_hit` |
-| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | `optimize::OptimizerRule` trait + `optimize::Optimizer`；测试 `optimizer_rule_trait_runs_in_order` |
-| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | `binder::QueryBinder::{bind_select, bind_insert, bind_delete, bind_update, bind_from, bind_table, bind_expression, bind_predicate}`；测试 `binds_a_select_with_where_and_limit`、`binds_insert_delete_and_update` |
-| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | `subquery::CorrelatedExpressionsDetector`；测试 `correlation_detector_reports_depth` |
-| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | mapped | `subquery::DependentJoinFlattener`；测试 `flattener_cross_products_an_uncorrelated_subplan`、`flattener_appends_correlated_columns_to_a_projection` |
-| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | mapped | `subquery::RewriteCorrelatedExpressions`；测试 `rewrite_maps_correlated_columns_to_the_base_binding` |
-| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | mapped | `subquery::SubqueryUnnest` + `BindContext`；测试 `unnest_uncorrelated_scalar_builds_limit_aggregate_cross`、`unnest_correlated_exists_builds_mark_join_conditions` |
+| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
 | 496 | `FragmentContext` | `src/scheduler/fragment_context.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
 | 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
