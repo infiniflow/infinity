@@ -46,25 +46,6 @@ pub struct LoadedVectorIndex {
 /// best-effort interop artifact, not the system of record.
 const MIRROR_BUDGET_BYTES: usize = 1024 * 1024 * 1024;
 
-/// The stored text form of a literal (arrays with braces, vectors with
-/// brackets), matching the row journal's representation.
-fn render_stored_cell(value: &infinity_parser::Literal, column_type: &str) -> String {
-    let is_array = column_type.trim().to_ascii_uppercase().starts_with("ARRAY");
-    match value {
-        infinity_parser::Literal::Array(items) if is_array => format!("{{{}}}", items.join(",")),
-        infinity_parser::Literal::Array(items) => format!("[{}]", items.join(",")),
-        infinity_parser::Literal::Vector(items) => format!(
-            "[{}]",
-            items
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<_>>()
-                .join(",")
-        ),
-        other => other.to_slt_string(),
-    }
-}
-
 /// Rough encoded bytes per row, from the declared column types.
 fn estimated_row_bytes(types: &[String]) -> usize {
     types
@@ -1057,108 +1038,6 @@ impl Engine {
             entry.block_index = None;
         }
         Ok(written)
-    }
-
-    /// Appends a committed batch to the block mirror, split into
-    /// `DEFAULT_BLOCK_CAPACITY` blocks. This makes the mirror cover the new
-    /// rows before the next checkpoint, so reads can use the column blocks as
-    /// the authoritative values. Returns `false` when the table's columns are
-    /// not block-encodable (the mirror is then skipped, as at checkpoint).
-    pub fn append_block_mirror(
-        &self,
-        table: &str,
-        base: usize,
-        rows: &[Vec<infinity_parser::Literal>],
-    ) -> Result<bool> {
-        if rows.is_empty() {
-            return Ok(false);
-        }
-        // A checkpoint rewrites the whole segment; never interleave with it.
-        let Ok(_flush) = self.storage.flush_lock.try_lock() else {
-            return Ok(false);
-        };
-        let table = self.qualified_table(table);
-        let Some(meta) = self.storage.catalog.get_table_by_name(&table)? else {
-            return Ok(false);
-        };
-        let mut types = Vec::with_capacity(meta.types.len());
-        let mut layouts = Vec::with_capacity(meta.types.len());
-        for ty in &meta.types {
-            let Some(column_type) = column_type_of(ty) else {
-                return Ok(false);
-            };
-            let Some(layout) = layout_of(ty, column_type) else {
-                return Ok(false);
-            };
-            types.push(column_type);
-            layouts.push(layout);
-        }
-        let Some(index) = self.block_index_for(&table) else {
-            return Ok(false);
-        };
-        // Render the stored form, exactly like the checkpoint path: arrays use
-        // braces (`{a,b}`), vectors use brackets (`[a,b]`).
-        let texts: Vec<Vec<String>> = rows
-            .iter()
-            .map(|row| {
-                (0..meta.types.len())
-                    .map(|col| match row.get(col) {
-                        Some(value) => render_stored_cell(value, &meta.types[col]),
-                        // A short row (COPY of a narrow CSV) takes the column
-                        // default, exactly as the row journal's decoder does.
-                        None => meta
-                            .defaults
-                            .get(col)
-                            .and_then(|d| d.clone())
-                            .unwrap_or_else(|| "null".to_string()),
-                    })
-                    .collect()
-            })
-            .collect();
-        let db_id = self.database_id_of(&table);
-        for (n, chunk) in texts.chunks(DEFAULT_BLOCK_CAPACITY).enumerate() {
-            let columns =
-                self.encode_block_columns(&meta.types, &meta.ids, &types, &layouts, chunk)?;
-            let mut index = index.lock().unwrap();
-            let block_id = index.next_block_id();
-            let id = BlockId {
-                db_id,
-                table_id: meta.id,
-                segment_id: 0,
-                block_id,
-            };
-            index.create_block(
-                id,
-                base + n * DEFAULT_BLOCK_CAPACITY,
-                DEFAULT_BLOCK_CAPACITY,
-                &columns,
-                chunk.len(),
-                base as u64 + 1,
-            )?;
-        }
-        Ok(true)
-    }
-
-    /// Marks the block mirror current when it covers every live row. Called
-    /// after an append; a tombstone or a schema rewrite makes the counts
-    /// differ, so the next reads fall back to the row journal until the next
-    /// checkpoint rewrites the mirror.
-    pub fn mark_mirror_current_if_complete(&self, table: &str) {
-        let Ok(live) = self.row_count(table) else {
-            return;
-        };
-        let Some(index) = self.block_index_for(table) else {
-            return;
-        };
-        let covered = index.lock().unwrap().row_count();
-        if covered != live {
-            return;
-        }
-        let key = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        if let Some(entry) = tables.get_mut(&key) {
-            entry.cpp_block_generation = Some(entry.write_batches);
-        }
     }
 
     /// Encodes one block's rows (already rendered as text) into the column

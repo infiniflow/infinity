@@ -2494,6 +2494,9 @@ struct TableEntry {
     /// Block map of the C++-format mirror (C++ `BlockIndex`): block ids, row
     /// ranges and the decoded-block LRU shared with `Context::buffer`.
     block_index: Option<Arc<Mutex<infinity_storage::block_index::BlockIndex>>>,
+    /// Live row count, maintained incrementally so the per-batch mirror check
+    /// does not rescan every key. `None` means "recompute on demand".
+    live_rows: Option<usize>,
     /// Decoded rows of a **scalar-only** table (the reference's in-memory
     /// `DataBlock`s). Served by `fetch_rows_with_ids` while it covers every
     /// live row; any mutation that rewrites rows drops it.
@@ -3627,6 +3630,42 @@ impl Engine {
         }
     }
 
+    /// Applies `delta` to the cached live-row count of `table`.
+    fn note_live_rows(&self, table: &str, delta: isize) {
+        let key = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(key).or_default();
+        if let Some(live) = entry.live_rows {
+            entry.live_rows = Some(if delta >= 0 {
+                live.saturating_add(delta as usize)
+            } else {
+                live.saturating_sub(delta.unsigned_abs())
+            });
+        }
+    }
+
+    /// The live-row count, using the incremental counter when available.
+    fn live_row_count(&self, table: &str) -> Result<usize> {
+        let key = self.table_key(table);
+        if let Some(live) = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.live_rows)
+        {
+            return Ok(live);
+        }
+        let live = self.row_count(table)?;
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(key)
+            .or_default()
+            .live_rows = Some(live);
+        Ok(live)
+    }
+
     /// Marks the C++ block mirror stale after a schema or row-id rewrite.
     /// Block reads fall back to the KV row store until the next checkpoint
     /// rewrites the mirror.
@@ -3635,6 +3674,7 @@ impl Engine {
         if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
             entry.cpp_block_generation = None;
             entry.block_index = None;
+            entry.live_rows = None;
         }
     }
 
@@ -4013,15 +4053,7 @@ impl Engine {
             self.dump_hnsw_over_capacity(table);
         }
         self.bump_writes(table);
-        // Persist the batch as blocks so the mirror covers the new rows before
-        // the next checkpoint; reads then use the column blocks as the
-        // authoritative values.
-        if self
-            .append_block_mirror(table, base, &rows)
-            .unwrap_or(false)
-        {
-            self.mark_mirror_current_if_complete(table);
-        }
+        self.note_live_rows(table, rows.len() as isize);
         self.append_row_cache(table, base, &encoded_rows);
         // Give the allocator's per-batch scratch back to the OS. Trimming on
         // every batch walks the whole heap; once every few batches is enough
@@ -4046,6 +4078,7 @@ impl Engine {
     /// concurrent deleters get `kTxnConflict`.
     fn commit_with_deletes(&self, table: &str, deletes: &[usize], mut txn: Txn) -> Result<u64> {
         self.invalidate_row_cache(table);
+        self.note_live_rows(table, -(deletes.len() as isize));
         // Deletes leave the old rows in the block mirror; reads fall back to
         // the row journal until the next checkpoint rewrites it.
         self.invalidate_block_mirror(table);
@@ -5855,6 +5888,20 @@ impl Engine {
         };
         let table = table.as_str();
         let schema = self.table_schema(table)?;
+        // A decoded row cache answers a projection faster than decoding the
+        // block mirror; leave the scan to it.
+        let key = self.table_key(table);
+        let cached = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.row_cache.as_ref().map(|c| c.rows.len()));
+        if let Some(len) = cached {
+            if len == self.live_row_count(table)? {
+                return Ok(None);
+            }
+        }
         let mut wanted: Vec<usize> = Vec::new();
         for item in items {
             match item {
@@ -7187,6 +7234,7 @@ impl Engine {
             entry.vector.clear();
             entry.block_index = None;
             entry.cpp_block_generation = None;
+            entry.live_rows = Some(rows.len());
         }
         self.result_cache.lock().unwrap().clear();
         Ok(())
@@ -8515,12 +8563,6 @@ impl Engine {
                     self.update_vector_caches(table, base + k, &texts);
                 }
                 self.dump_hnsw_over_capacity(table);
-                if self
-                    .append_block_mirror(table, base, &batch)
-                    .unwrap_or(false)
-                {
-                    self.mark_mirror_current_if_complete(table);
-                }
                 total += batch.len();
             }
             if eof {
@@ -8659,12 +8701,6 @@ impl Engine {
             self.update_vector_caches(table, base + k, &texts);
         }
         self.dump_hnsw_over_capacity(table);
-        if self
-            .append_block_mirror(table, base, &rows)
-            .unwrap_or(false)
-        {
-            self.mark_mirror_current_if_complete(table);
-        }
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
@@ -12426,14 +12462,11 @@ mod tests {
                 vec!["3".to_string(), "c".to_string()],
             ]
         );
-        // A write after the flush is appended to the mirror (per-batch block
-        // persistence), so the projection stays on the column path and sees
-        // the new row.
+        // A write after the flush makes the mirror stale: the planner must fall
+        // back to the row store instead of missing the new row.
         e.execute("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
             .unwrap();
-        let projected = e.try_cpp_projection("p", &items).unwrap();
-        assert!(projected.is_some());
-        assert_eq!(projected.unwrap().len(), 4);
+        assert!(e.try_cpp_projection("p", &items).unwrap().is_none());
         assert_eq!(rows(&e, "SELECT id, name FROM p;").len(), 4);
     }
 
