@@ -672,8 +672,8 @@
 | 658 | `src/unit_test/storage/knnindex/knn_sparse/test_bmp_index_ut.cpp` | `BMPIndexTest` | `test1` | partial |
 | 659 | `src/unit_test/storage/knnindex/knn_sparse/test_bmp_index_ut.cpp` | `BMPIndexTest` | `test2` | partial |
 | 660 | `src/unit_test/storage/knnindex/knn_sparse/test_bmp_ivt_ut.cpp` | `BMPIvtTest` | `test1` | ported |
-| 661 | `src/unit_test/storage/knnindex/knn_sparse/test_bp_reordering_ut.cpp` | `BPReorderingTest` | `test1` | partial |
-| 662 | `src/unit_test/storage/knnindex/knn_sparse/test_bp_reordering_ut.cpp` | `BPReorderingTest` | `test2` | partial |
+| 661 | `src/unit_test/storage/knnindex/knn_sparse/test_bp_reordering_ut.cpp` | `BPReorderingTest` | `test1` | ported |
+| 662 | `src/unit_test/storage/knnindex/knn_sparse/test_bp_reordering_ut.cpp` | `BPReorderingTest` | `test2` | ported |
 | 663 | `src/unit_test/storage/knnindex/knn_sparse/test_linscan_ut.cpp` | `LinScanAlgTest` | `accurate_scan` | ported |
 | 664 | `src/unit_test/storage/knnindex/knn_sparse/test_linscan_ut.cpp` | `LinScanAlgTest` | `approximate_scan` | ported |
 | 665 | `src/unit_test/storage/knnindex/merge_optimize/test_optimize_ut.cpp` | `OptimizeKnnTest` | `test_hnsw_optimize` | partial |
