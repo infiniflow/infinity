@@ -42,6 +42,7 @@
 | `Storage`（`storage.cppm`） | 执行器 `Engine::storage: Storage` | catalog 与 KV store 的所有权（`catalog`/`store` 由 `Storage` 持有，`Engine` 组合） | ✅（部分：文件/块管理仍在 `Engine`） |
 | `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`BufferManager`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联 | ✅（部分：C++ 的线程池由 Tokio 取代） |
 | `TableEntry`（`table_entry.cppm`） | 执行器 `TableEntry` | 写批次、块镜像 generation、宽值 sidecar、行 id 分配、`SegmentEntry`、**HNSW 内存段/预算/探测标记**、analyzer、索引 comment、标量行缓存、**secondary/fulltext/multivector/sparse/HNSW/IVF 注册表（按列）** | ✅（部分：block 元数据仍在 `Engine`） |
+| `DumpMemIndexTask` / `OptimizeIndexTask` / `CleanupIndexTask`（`bg_task/`） | `Engine::{dump_hnsw_segments, optimize_indexes, cleanup}` | dump 按 `mem_index_capacity`/字节配额写增量 chunk；optimize 在可承受的内存内重建全表 merged chunk；cleanup 只删除被 merged chunk 覆盖的旧 chunk（调度由 CLI 定时线程代替，见 D4） | ✅（任务对象由定时线程取代） |
 
 ## 有意的设计变更（§3.6 豁免）
 
@@ -87,6 +88,7 @@
 | `knn/hnsw` 的插入/检索入口 | `hnsw_handler::HnswHandler` | `insert_vecs_counts_only_matching_dimensions`、`search_index_honours_the_ef_option` |
 | `invertedindex/column_inverter_ut.cpp`（tf/positions/length） | `MemoryIndexer` | `memory_indexer_records_tf_positions_and_length`、`memory_indexer_delete_keeps_the_postings` |
 | `knn/emvb`（候选/精排） | `emvb::EmvbView` / `EmvbPqIndex::prefilter` | `ranks_the_document_whose_centroid_matches_the_query`、`threshold_first_falls_back_to_the_closest_centroid`、`prefilter_keeps_the_exact_maxsim_winner` |
+| `bg_task/*_ut.cpp` 的索引生命周期 | `dump_hnsw_segments` / `optimize_indexes` / `cleanup` | `hnsw_checkpoint_dumps_only_the_memory_segment`、`mem_index_capacity_dumps_the_hnsw_segment_after_the_batch`、`cleanup_keeps_incremental_hnsw_chunks_until_a_merge_covers_the_table` |
 
 ### 未移植单测（Rust 类已存在）
 
@@ -100,7 +102,7 @@
 | `knn/hnsw/*_ut.cpp` | `infinity_index::vector::HnswIndex` | 层级/启发式/召回用例未逐个移植 |
 | `knn/sparse/*_ut.cpp` | `infinity_index::sparse` / `bmp_cpp` | 块/ivt 不变量与序列化往返已覆盖；`alpha` 剪枝边界用例未逐个移植 |
 | `knn/emvb/*_ut.cpp` | `emvb::EmvbView` / `MultiVectorIndex` | 候选/精排主路径已覆盖；OPQ 训练与 bitmask 过滤用例未移植 |
-| `bg_task/*_ut.cpp` | 执行器/CLI 的 dump/optimize/cleanup | 任务级场景未移植 |
+| `bg_task/*_ut.cpp` | 执行器/CLI 的 dump/optimize/cleanup | 索引生命周期已覆盖；任务调度/重试场景未移植（调度器为 D4 豁免） |
 
 ### 未移植单测（Rust 类也未移植）
 
