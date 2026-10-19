@@ -9,6 +9,8 @@
 //!   infinity recover <dir>
 //!   infinity smoke <dir>          # create table + commit kv + reopen + verify
 
+mod config;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;

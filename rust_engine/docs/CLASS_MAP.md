@@ -22,6 +22,7 @@
 | `IVF_Index_Storage::SearchIndex` | `infinity_index::ivf::IvfIndex::candidates` | 质心选择 + part 扫描 | ✅ |
 | `Fst` 尾块/校验和 | `inverted_format` 的 FST 写入/`fst_len_from_trailer` | 保存/校验 | ✅ |
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | MurmurHash64A | ✅（g++ 值已 pin） |
+| `Config` / `DefaultConfig`（`main/config.cppm`） | `infinity_cli::config::Config` | `Init`→`init`（默认值 + TOML 覆盖）、`Set`→`set`、`Validate`→`validate`（版本/时区/IP/字节大小/日志级别/时间信息错误分类）、全部访问器；错误码 `InvalidConfig`/`MismatchVersion`/`InvalidTimezone`/`InvalidIpAddr`/`InvalidByteSize`/`InvalidLogLevel`/`InvalidTimeInfo` | ✅ |
 | `TxnManager`（`new_txn_manager`） | `infinity_txn::TxnManager` | `BeginTxn`→`begin`、`CommitTxn`→`commit`（含删除冲突校验） | ✅ |
 | `NewTxn::Delete/Commit` 冲突检查 | `Txn::delete` + `TxnManager::commit` | 删除键在提交时按 `begin_ts` 校验 | ✅ |
 | `BM25Ranker`（`bm25_ranker_impl.cpp`） | `wand::Bm25Ranker` | `idf`/`score`/`upper_bound` | ✅ |
@@ -91,7 +92,7 @@
 
 ## 类级覆盖审计（基线 `5d27942c0`）
 
-`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；本表显式命名 **83** 个。其余 1053 个按 §3.6 允许的「结构合并」处理（模板特化 / POD 状态 / 迭代器机件 / 生成的 Thrift 类型），不是静默省略。**逐名清单（1136 行，mapped 83 / grouped 1031 / excluded 15 / test 7）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**；下表是按区域汇总（计数以加入 PLAID/SMVE 映射前的快照统计）：
+`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；本表显式命名 **85** 个。其余 1051 个按 §3.6 允许的「结构合并」处理（模板特化 / POD 状态 / 迭代器机件 / 生成的 Thrift 类型），不是静默省略。**逐名清单（1136 行，mapped 85 / grouped 1029 / excluded 15 / test 7）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**；下表是按区域汇总（计数以加入 PLAID/SMVE 映射前的快照统计）：
 
 | 区域 | 未逐类命名 | Rust 承担方式 |
 |---|---:|---|
@@ -105,7 +106,7 @@
 
 > 判定口径：C++ 中承载**行为**且被其他类调用的类（HNSW/IVF/EMVB/PLAID/SMVE、全文段、事务、Buffer、BlockIndex、PDataBlock 等）在本表中逐类对应；纯数据载体、模板特化、迭代器和生成类型按上表合并，理由与归属均已登记。新增 C++ 行为类时仍须先登记再移植。
 
-**聚合对应（精确计数，覆盖其余 1031 个类；逐名见 `CLASS_AUDIT.md`）**
+**聚合对应（精确计数，覆盖其余 1029 个类；逐名见 `CLASS_AUDIT.md`）**
 
 | 聚合到（Rust） | 类数 |
 |---|---:|
@@ -120,7 +121,7 @@
 | `Vec<u8>`/`BufferObj` 等存储原语 | 40 |
 | `infinity_storage::wal` | 40 |
 | `tokenize_*` analyzer 函数 | 39 |
-| parser/CLI 结构 | 39 |
+| parser/CLI 结构 | 37 |
 | `infinity-expression` cast 函数 | 29 |
 | 定时线程 + `Engine::{dump,optimize,cleanup}` | 26 |
 | 生成的 Thrift 类型 / `infinity-server` | 23 |
@@ -139,7 +140,7 @@
 | `ivf::IvfIndex` + `ivf`/`ivf_mem` | 7 |
 | `merge_knn::MergeKnn` + 结果堆 | 3 |
 | 其余 8 个聚合组（每组 ≤2 个类） | 12 |
-| **合计** | **1031** |
+| **合计** | **1029** |
 
 ## 维护规则
 
@@ -196,6 +197,7 @@
 | （执行器集成，无独立 C++ 单测） | `MultiVectorIndex::build_plaid` / `write_cpp_plaid_index` | `plaid_index_answers_tensor_search_and_mirrors_a_chunk`（PLAID 建索引、扫描仍与穷举 top-1 一致、flush 产出可解码的 C++ PLAID chunk） |
 | `SMVEIndexInMem` / `SMVETransform`（无独立 C++ 单测） | `smve::{SmveIndex, smve_transform}` | `projection_columns_are_unit_vectors`、`query_codes_are_sum_pooled_and_docs_averaged`、`search_returns_the_closest_document_and_honours_the_filter` |
 | （执行器集成，无独立 C++ 单测） | `MultiVectorIndex::build_smve` + `exact_tensor_score` | `smve_index_answers_tensor_search`（SMVE 建索引、候选按列值精确重排、top-1 与穷举一致） |
+| `main/config_ut.cpp`（6 例） | `infinity_cli::config::Config` | `defaults`（默认值逐项断言）、`full_config_file`（`infinity_conf.toml`）、`wrong_parameter_names`、`invalid_values`（版本/时区/IP/字节大小/日志级别/时间信息错误码）、`out_of_range_values`（5 个越界 fixture）、`valid_values` |
 
 ### 未移植单测（Rust 类已存在）
 

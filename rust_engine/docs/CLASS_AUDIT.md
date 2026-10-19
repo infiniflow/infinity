@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `grouped` 1031, `mapped` 83, `test` 7
+- 状态分布：`excluded` 15, `grouped` 1029, `mapped` 85, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -322,8 +322,8 @@
 | 313 | `TableScanFunctionData` | `src/function/table/table_scan_data.cppm` | grouped | 表函数由执行器直接求值 |
 | 314 | `TableFunctionData` | `src/function/table_function.cppm` | grouped | 表函数由执行器直接求值 |
 | 315 | `ClusterManager` | `src/main/cluster_manager.cppm` | grouped | parser/CLI 结构 |
-| 316 | `Config` | `src/main/config.cppm` | grouped | parser/CLI 结构 |
-| 317 | `DefaultConfig` | `src/main/config.cppm` | grouped | parser/CLI 结构 |
+| 316 | `Config` | `src/main/config.cppm` | mapped | `infinity_cli::config::Config`（`Init`/`Set`/访问器/校验） |
+| 317 | `DefaultConfig` | `src/main/config.cppm` | mapped | `infinity_cli::config::Config::default` + `init(None)` |
 | 318 | `Infinity` | `src/main/infinity.cppm` | grouped | parser/CLI 结构 |
 | 319 | `InfinityContext` | `src/main/infinity_context.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 320 | `Logger` | `src/main/logger.cppm` | grouped | parser/CLI 结构 |

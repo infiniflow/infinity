@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 12, `gap` 225, `gate-a` 216, `integration` 294, `partial` 231, `ported` 33.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 12, `gap` 219, `gate-a` 216, `integration` 294, `partial` 231, `ported` 39.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -194,12 +194,12 @@
 | 180 | `src/unit_test/function/scalar/weekday_functions_ut.cpp` | `WeekdayFunctionsTest` | `weekday_func` | gate-a |
 | 181 | `src/unit_test/function/scalar/year_functions_ut.cpp` | `YearFunctionsTest` | `year_func` | gate-a |
 | 182 | `src/unit_test/infinity_cloud/upload_meta_to_s3_ut.cpp` | `UploadMetaToS3` | `DISABLED_MINIO_test1` | gap |
-| 183 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `test1` | gap |
-| 184 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `test2` | gap |
-| 185 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestWrongParamNames` | gap |
-| 186 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestConfInvalidValues` | gap |
-| 187 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestOutofRangeValues` | gap |
-| 188 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestValidValues` | gap |
+| 183 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `test1` | ported | `infinity-cli` `config::tests::defaults` |
+| 184 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `test2` | ported | `infinity-cli` `config::tests::full_config_file` |
+| 185 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestWrongParamNames` | ported | `infinity-cli` `config::tests::wrong_parameter_names` |
+| 186 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestConfInvalidValues` | ported | `infinity-cli` `config::tests::invalid_values` |
+| 187 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestOutofRangeValues` | ported | `infinity-cli` `config::tests::out_of_range_values` |
+| 188 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestValidValues` | ported | `infinity-cli` `config::tests::valid_values` |
 | 189 | `src/unit_test/main/infinity_ut.cpp` | `InfinityTest` | `test1` | gap |
 | 190 | `src/unit_test/main/infinity_ut.cpp` | `InfinityTest` | `test2` | gap |
 | 191 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test1` | gap |
