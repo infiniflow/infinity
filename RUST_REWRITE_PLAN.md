@@ -5,7 +5,7 @@
 > 基准代码：infinity `main` @ `32a6afce8`（v0.7.4，nightly tag）  
 > 实现代码：`rust_engine/`（Cargo workspace），C++ 引擎作为参考实现（oracle）  
 > 评审：codex 三轮评审（round 3 `VERDICT: APPROVE`，见附录 C）  
-> 状态：**计划已定稿；实现进入收尾** —— Gate A/B/D/E/F/G 达标，仅 Gate C 重档未达标（见 §8）
+> 状态：**计划已定稿；实现进入收尾** —— Gate A/B/D/E/F/G 达标；Gate C 常规全绿，重档在无 `earlyoom` 的 CI 机复跑（见 §8）
 
 本文件是**唯一**的计划与状态来源。历史进展叙述已合并进 §7/§8；已实现项不再保留「待做」表述。
 
@@ -29,9 +29,9 @@
 |---|---|
 | SQL 功能（Gate A） | ✅ 1752 statement ok / 129 statement error / 1536 query 全部通过 |
 | SDK 协议（Gate B） | ✅ 未修改的 Python / Go SDK 与 HTTP 模式全绿 |
-| 持久化恢复（Gate C） | ⚠️ 常规用例全绿；重档引擎峰值 **1.5–2.1 GB**（原 19.4 GB）。本机 5.toml 档在 batch 31 被宿主 `earlyoom` 以 SIGTERM 终止（可用内存瞬时 1.96 GB < 其 2 GB 阈值），非引擎增长；CI 无该看门狗 |
-| 并发稳定（Gate D） | ✅ loom + miri + ASan + TSAN + `parallel_test` |
-| 性能（Gate E） | ✅ 对 C++ golden **+2.93%～+4.75%**（门限 `<7%`）：insert 持平、全量 select +81%、点查 +394% |
+| 持久化恢复（Gate C） | ⚠️ 常规用例全绿；对齐 `mem_index_capacity` 后 5.toml 重档导入 RSS 3.0 GB、整轮峰值 ~8.2 GB，但 30 GB 开发机仍被宿主 `earlyoom -M 2000000` 在约 17 分钟处以 SIGTERM 终止（日志无 panic）；需在无看门狗的 CI 机复跑 |
+| 并发稳定（Gate D） | ✅ loom + miri + ASan/TSAN + `parallel_test` |
+| 性能（Gate E） | ✅ 对 C++ golden **+4.59%**（最新；+2.93% / +4.75% 亦通过，门限 `<7%`）：insert 持平、全量 select +81%、点查 +394% |
 | 工程质量（Gate F） | ✅ fmt / clippy / deny |
 | 不变量（Gate G） | ✅ G1–G5 全部闭合 |
 | 磁盘格式（§3.1） | ✅ 全文 / 向量索引 / 稀疏 / 多向量 / 次级 / 数据块 / Catalog 均按 C++ 字节布局读写 |
