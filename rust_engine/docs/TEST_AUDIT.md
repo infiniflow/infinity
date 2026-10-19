@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 113, `gate-a` 136, `integration` 264, `partial` 60, `ported` 297.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 106, `gate-a` 136, `integration` 250, `partial` 60, `ported` 318.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -557,13 +557,13 @@
 | 543 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test2` | exempt |
 | 544 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test3` | exempt |
 | 545 | `src/unit_test/storage/invertedindex/format/term_meta_ut.cpp` | `TermMetaTest` | `test1` | ported |
-| 546 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMemEmpty` | gap |
-| 547 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildFileEmpty` | gap |
-| 548 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMem` | gap |
-| 549 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildFile` | gap |
-| 550 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Get` | gap |
-| 551 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Iterate` | gap |
-| 552 | `src/unit_test/storage/invertedindex/fst/registry_ut.cpp` | `RegistryTest` | `InsertAndFind` | gap |
+| 546 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMemEmpty` | ported | `infinity-storage` `fst_build_mem_empty` |
+| 547 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildFileEmpty` | ported | `infinity-storage` `fst_build_file_empty` |
+| 548 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMem` | ported | `infinity-storage` `fst_build_mem` |
+| 549 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildFile` | ported | `infinity-storage` `fst_build_file` |
+| 550 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Get` | ported | `infinity-storage` `fst_get_values` |
+| 551 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Iterate` | ported | `infinity-storage` `fst_iterate_with_bounds` |
+| 552 | `src/unit_test/storage/invertedindex/fst/registry_ut.cpp` | `RegistryTest` | `InsertAndFind` | ported | `infinity-storage` `insert_and_find` |
 | 553 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `Chunk` | gap |
 | 554 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_Memory` | gap |
 | 555 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `SpillLoadTest` | gap |
@@ -998,20 +998,20 @@
 | 984 | `src/unit_test/storage/wal/repeat_replay_ut.cpp` | `RepeatReplayTest` | `append` | integration |
 | 985 | `src/unit_test/storage/wal/repeat_replay_ut.cpp` | `RepeatReplayTest` | `import` | integration |
 | 986 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `ReadWriteV2` | ported | `infinity-storage` `read_write_v2_roundtrips_every_command` |
-| 987 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `WalEntryIterator` | integration |
-| 988 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `WalListIterator` | integration |
-| 989 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedEntryBeforeCheckpointIsIgnored` | integration |
-| 990 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedEntryTruncatesWalFile` | integration |
-| 991 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedFirstEntryDropsWalFile` | integration |
-| 992 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedTailAfterCheckpointIsTruncated` | integration |
-| 993 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedOlderFileDropsNewerOnes` | integration |
-| 994 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `NoCheckpointStillPurgesDamage` | integration |
-| 995 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `TornTailStopsIteration` | integration |
-| 996 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `CorruptedTrailingSizeIsRecoveredByForwardScan` | integration |
-| 997 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `EmptyWalFileIsNotAnError` | integration |
-| 998 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `FileShorterThanEntrySize` | integration |
-| 999 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `AllFilesPurgedLeavesEmptyList` | integration |
-| 1000 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamageAccumulatesToCheckpointFile` | integration |
+| 987 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `WalEntryIterator` | ported | `infinity-storage` `wal_entry_iterator_replay_stops_at_checkpoint` |
+| 988 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `WalListIterator` | ported | `infinity-storage` `wal_list_iterator_replay_stops_at_checkpoint` |
+| 989 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedEntryBeforeCheckpointIsIgnored` | ported | `infinity-storage` `damaged_entry_before_checkpoint_is_ignored` |
+| 990 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedEntryTruncatesWalFile` | ported | `infinity-storage` `damaged_entry_truncates_wal_file` |
+| 991 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedFirstEntryDropsWalFile` | ported | `infinity-storage` `damaged_first_entry_drops_wal_file` |
+| 992 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedTailAfterCheckpointIsTruncated` | ported | `infinity-storage` `damaged_tail_after_checkpoint_is_truncated` |
+| 993 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedOlderFileDropsNewerOnes` | ported | `infinity-storage` `damaged_older_file_drops_newer_ones` |
+| 994 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `NoCheckpointStillPurgesDamage` | ported | `infinity-storage` `no_checkpoint_still_purges_damage` |
+| 995 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `TornTailStopsIteration` | ported | `infinity-storage` `torn_tail_stops_iteration` |
+| 996 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `CorruptedTrailingSizeIsRecoveredByForwardScan` | ported | `infinity-storage` `corrupted_trailing_size_is_recovered_by_forward_scan` |
+| 997 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `EmptyWalFileIsNotAnError` | ported | `infinity-storage` `empty_wal_file_is_not_an_error` |
+| 998 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `FileShorterThanEntrySize` | ported | `infinity-storage` `file_shorter_than_entry_size_is_empty` |
+| 999 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `AllFilesPurgedLeavesEmptyList` | ported | `infinity-storage` `all_files_purged_leaves_empty_list` |
+| 1000 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamageAccumulatesToCheckpointFile` | ported | `infinity-storage` `damage_accumulates_to_checkpoint_file` |
 | 1001 | `src/unit_test/storage/wal/wal_replay_ut.cpp` | `WalReplayTest` | `wal_replay_database` | integration |
 | 1002 | `src/unit_test/storage/wal/wal_replay_ut.cpp` | `WalReplayTest` | `wal_replay_tables` | integration |
 | 1003 | `src/unit_test/storage/wal/wal_replay_ut.cpp` | `WalReplayTest` | `wal_replay_append` | integration |
