@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 192, `gate-a` 216, `integration` 294, `partial` 207, `ported` 89.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 136, `gate-a` 188, `integration` 294, `partial` 60, `ported` 192.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
