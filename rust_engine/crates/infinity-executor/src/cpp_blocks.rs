@@ -1519,9 +1519,16 @@ impl Engine {
         // memory and time on every checkpoint and was the Gate C OOM driver.
         // The full rebuild remains the fallback when no memory segment is
         // loaded (e.g. materialising the mirror after a restart).
-        let key = crate::index_key(&table, &column);
+        let tkey = self.table_key(&table);
         let from_memory = if new_chunk {
-            self.hnsw_mem.lock().unwrap().get(&key).and_then(|mem| {
+            let mem = self
+                .tables
+                .lock()
+                .unwrap()
+                .get(&tkey)
+                .and_then(|e| e.hnsw_mem.get(&column).cloned());
+            mem.and_then(|mem| {
+                let mem = mem.lock().ok()?;
                 if mem.is_empty() {
                     return None;
                 }

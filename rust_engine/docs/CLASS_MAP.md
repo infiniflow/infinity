@@ -41,7 +41,7 @@
 | `SegmentEntry`（`segment_entry.cppm`） | 执行器 `SegmentEntry`（`TableEntry.segments`） | 段 id 与行数由行 id 分配器维护；`SHOW SEGMENTS` 读取 | ✅（部分：block/index 元数据仍在 `Engine`） |
 | `Storage`（`storage.cppm`） | 执行器 `Engine::storage: Storage` | catalog 与 KV store 的所有权（`catalog`/`store` 由 `Storage` 持有，`Engine` 组合） | ✅（部分：文件/块管理仍在 `Engine`） |
 | `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`BufferManager`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联 | ✅（部分：C++ 的线程池由 Tokio 取代） |
-| `TableEntry`（`table_entry.cppm`）的写入簿记 | 执行器 `TableEntry` | 写批次数、块镜像 generation、宽值 sidecar、行 id 分配器；以全限定小写表名为键 | ✅（部分：索引/段元数据仍在 `Engine`） |
+| `TableEntry`（`table_entry.cppm`） | 执行器 `TableEntry` | 写批次、块镜像 generation、宽值 sidecar、行 id 分配、`SegmentEntry`、**HNSW 内存段/预算/探测标记**、analyzer、索引 comment、标量行缓存 | ✅（部分：其余索引注册表仍在 `Engine`） |
 
 ## 有意的设计变更（§3.6 豁免）
 
@@ -59,7 +59,7 @@
 | `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并走 `merge_knn::MergeKnn`、单段检索走 `HnswHandler`（`ef` 已透传）；仍缺算子对象（scan 状态/bitmask/多查询槽） |
 | `PLAID`（`IndexType::kPLAID`） | 无 | 实现不在本仓库（第三方库 + `plaid_index_file_worker`），不属于类级移植范围 |
 | `PhysicalKnnScan` 的评分/输出阶段 | `Engine` 的 KNN 分支 | 候选阶段已拆为 `KnnCandidateScan`；精确评分、bitmask 过滤、多查询槽与结果物化仍内联 |
-| `TableEntry` 的按列索引注册表 | `Engine` 的全局索引映射 | 索引映射仍按 `"table.column"` 键全局存放，未收进 `TableEntry` |
+| `TableEntry` 的其余索引注册表 | `Engine` 的全局索引映射 | secondary / fulltext / multivector / sparse / vector / IVF 的注册表仍按 `"table.column"` 全局存放；HNSW 内存段与相关状态已收进 `TableEntry` |
 
 ## 维护规则
 

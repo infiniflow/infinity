@@ -2416,6 +2416,9 @@ impl SparseIndex {
 pub struct Storage {
     catalog: Catalog,
     store: Arc<dyn MetaStore>,
+    /// Serializes checkpoints: the block mirror rewrites `seg_0`, so two
+    /// concurrent flushes would race on its files.
+    flush_lock: Mutex<()>,
 }
 
 /// Per-table write bookkeeping and row-id allocation.
@@ -2434,6 +2437,18 @@ struct TableEntry {
     row_counter: Option<(u32, u32, bool)>,
     /// Segments allocated by the row-id allocator, by id.
     segments: std::collections::BTreeMap<u32, SegmentEntry>,
+    /// Full-text analyzer per column (`CREATE INDEX … WITH (analyzer=…)`).
+    analyzers: HashMap<String, String>,
+    /// Analyzer per index name: two indexes on one column may differ.
+    analyzers_by_index: HashMap<String, String>,
+    /// `CREATE INDEX … COMMENT '…'` per index name.
+    comments: HashMap<String, String>,
+    /// HNSW memory segment per vector column (`MemIndex::hnsw_index_`).
+    hnsw_mem: HashMap<String, Arc<Mutex<hnsw_mem::HnswIndexInMem>>>,
+    /// HNSW bytes buffered per column since its last dump (memindex quota).
+    index_pending_bytes: HashMap<String, usize>,
+    /// Whether this table's HNSW indexes were probed since the last dump.
+    hnsw_probed: bool,
     /// Decoded rows of a **scalar-only** table (the reference's in-memory
     /// `DataBlock`s). Served by `fetch_rows_with_ids` while it covers every
     /// live row; any mutation that rewrites rows drops it.
@@ -2556,10 +2571,6 @@ pub struct Engine {
     ivf_mem: Mutex<HashMap<String, Vec<(u64, Vec<f32>)>>>,
     /// Engine-wide runtime state (the reference's `InfinityContext`).
     context: Context,
-    /// fulltext analyzer per `"<table>.<column>"`, from `CREATE INDEX … WITH (analyzer=…)`
-    index_analyzers: Mutex<HashMap<String, String>>,
-    /// `CREATE INDEX … COMMENT '…'`, keyed by `"<table>#<index>"`.
-    index_comments: Mutex<HashMap<String, String>>,
     /// cached `SELECT` results keyed by the statement text
     result_cache: Mutex<HashMap<String, Vec<QueryResult>>>,
     /// the database new unqualified table names are resolved against
@@ -2567,17 +2578,8 @@ pub struct Engine {
     /// Per-table write bookkeeping (C++ `TableEntry`), keyed by the
     /// fully-qualified lower-case table name.
     tables: Mutex<HashMap<String, TableEntry>>,
-    /// Estimated bytes buffered in each HNSW memory index since its last dump,
-    /// keyed by `"<table>.<column>"`.
-    index_pending_bytes: Mutex<HashMap<String, usize>>,
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
-    /// In-memory HNSW segment per vector column, keyed by
-    /// `"<table>.<column>"`; the on-disk graph lives in `vector_indexes`.
-    hnsw_mem: Mutex<HashMap<String, hnsw_mem::HnswIndexInMem>>,
-    /// Tables already checked for an HNSW index (avoids a catalog lookup per
-    /// inserted row).
-    hnsw_probed: Mutex<std::collections::HashSet<String>>,
     /// Inverted indexes, keyed by `"<table>.<column>"`.
     text_index: Mutex<HashMap<String, SharedTextIndex>>,
     /// Multi-vector indexes, keyed by `"<table>.<column>"`.
@@ -2682,7 +2684,11 @@ impl Engine {
             .build()
             .map_err(|e| Error::Invalid(format!("tokio runtime: {e}")))?;
         let engine = Self {
-            storage: Storage { catalog, store },
+            storage: Storage {
+                catalog,
+                store,
+                flush_lock: Mutex::new(()),
+            },
             txn,
             rt,
             context: Context {
@@ -2708,15 +2714,10 @@ impl Engine {
             vector_indexes: Mutex::new(HashMap::new()),
             ivf_indexes: Mutex::new(HashMap::new()),
             ivf_mem: Mutex::new(HashMap::new()),
-            index_analyzers: Mutex::new(HashMap::new()),
-            index_comments: Mutex::new(HashMap::new()),
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
             tables: Mutex::new(HashMap::new()),
-            index_pending_bytes: Mutex::new(HashMap::new()),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
-            hnsw_mem: Mutex::new(HashMap::new()),
-            hnsw_probed: Mutex::new(Default::default()),
             text_index: Mutex::new(HashMap::new()),
             mv_index: Mutex::new(HashMap::new()),
             sparse_index: Mutex::new(HashMap::new()),
@@ -2779,7 +2780,9 @@ impl Engine {
     /// Rebuilds all declared indexes from stored rows (called on open).
     fn rebuild_indexes(&self) -> Result<()> {
         // A new index may have appeared since the last write.
-        self.hnsw_probed.lock().unwrap().clear();
+        for e in self.tables.lock().unwrap().values_mut() {
+            e.hnsw_probed = false;
+        }
         self.vector_indexes.lock().unwrap().clear();
         for im in self.storage.catalog.list_indexes()? {
             // skip functional-index targets (not plain columns)
@@ -3128,12 +3131,6 @@ impl Engine {
                 total += g.mem.mem_used();
             }
         }
-        total += self
-            .index_pending_bytes
-            .lock()
-            .unwrap()
-            .values()
-            .sum::<usize>();
         for idx in self.sparse_index.lock().unwrap().values() {
             if let Ok(g) = idx.read() {
                 total += g.tail_bytes;
@@ -3146,8 +3143,13 @@ impl Engine {
         }
         // The HNSW memory segment (`HnswIndexInMem`) owns a graph per column;
         // the reference charges it against the same memindex budget.
-        for idx in self.hnsw_mem.lock().unwrap().values() {
-            total += idx.mem_usage();
+        for e in self.tables.lock().unwrap().values() {
+            for idx in e.hnsw_mem.values() {
+                if let Ok(idx) = idx.lock() {
+                    total += idx.mem_usage();
+                }
+            }
+            total += e.index_pending_bytes.values().sum::<usize>();
         }
         total
             + self
@@ -3172,33 +3174,8 @@ impl Engine {
         self.seal_multivector_indexes();
         self.seal_sparse_indexes();
         self.seal_secondary_indexes();
-        // HNSW: dump each memory segment, then release it. The dump rebuilds
-        // the graph from the live rows, so the memory form is no longer needed.
-        let keys: Vec<String> = self
-            .index_pending_bytes
-            .lock()
-            .unwrap()
-            .keys()
-            .cloned()
-            .collect();
-        let Ok(indexes) = self.storage.catalog.list_indexes() else {
-            return;
-        };
-        for key in keys {
-            let Some(im) = indexes
-                .iter()
-                .find(|im| index_key(&im.table, &im.column) == key)
-            else {
-                continue;
-            };
-            if self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
-                self.hnsw_mem.lock().unwrap().remove(&key);
-                self.index_pending_bytes.lock().unwrap().insert(key, 0);
-                // Re-probe HNSW indexes on the next insert so a fresh memory
-                // segment is created after this dump.
-                self.hnsw_probed.lock().unwrap().clear();
-            }
-        }
+        // HNSW: dump each memory segment and release it.
+        self.dump_hnsw_segments();
     }
 
     fn index_lookup(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
@@ -3443,7 +3420,12 @@ impl Engine {
         !self.indexes.lock().unwrap().is_empty()
             || !self.text_index.lock().unwrap().is_empty()
             || !self.vector_cache.lock().unwrap().is_empty()
-            || !self.hnsw_mem.lock().unwrap().is_empty()
+            || self
+                .tables
+                .lock()
+                .unwrap()
+                .values()
+                .any(|e| !e.hnsw_mem.is_empty())
             || !self.ivf_mem.lock().unwrap().is_empty()
             || !self.mv_index.lock().unwrap().is_empty()
             || !self.sparse_index.lock().unwrap().is_empty()
@@ -3672,15 +3654,17 @@ impl Engine {
     /// The analyzer recorded for the index named `index_name` on `table`, i.e.
     /// the analyzer of the column that index covers.
     fn analyzer_of_index(&self, table: &str, index_name: &str) -> Option<String> {
-        let short = table.split('.').next_back().unwrap_or(table);
+        let key = self.table_key(table);
         if let Some(a) = self
-            .index_analyzers
+            .tables
             .lock()
             .unwrap()
-            .get(&format!("{table}#{index_name}"))
+            .get(&key)
+            .and_then(|e| e.analyzers_by_index.get(index_name).cloned())
         {
-            return Some(a.clone());
+            return Some(a);
         }
+        let short = table.split('.').next_back().unwrap_or(table);
         let column = self
             .storage
             .catalog
@@ -3689,11 +3673,12 @@ impl Engine {
             .into_iter()
             .find(|im| im.name == index_name && (im.table == short || im.table == table))?
             .column;
-        self.index_analyzers
+        let key = self.table_key(table);
+        self.tables
             .lock()
             .unwrap()
-            .get(&index_key(table, &column))
-            .cloned()
+            .get(&key)
+            .and_then(|e| e.analyzers.get(&column).cloned())
     }
 
     fn index_name_pairs(&self, table: &str) -> Result<Vec<(String, String)>> {
@@ -4546,11 +4531,11 @@ impl Engine {
                         .trim()
                         .trim_matches(|c| c == '\'' || c == '"')
                         .to_ascii_lowercase();
-                    let mut analyzers = self.index_analyzers.lock().unwrap();
-                    // By column, for the match path; and by index name, because two
-                    // indexes on one column can have different analyzers.
-                    analyzers.insert(index_key(table, column), a.clone());
-                    analyzers.insert(format!("{table}#{name}"), a);
+                    let key = self.table_key(table);
+                    let mut tables = self.tables.lock().unwrap();
+                    let entry = tables.entry(key).or_default();
+                    entry.analyzers.insert(column.clone(), a.clone());
+                    entry.analyzers_by_index.insert(name.clone(), a);
                 }
                 // a functional-index target is not a plain column, so there is
                 // no materialised index to build
@@ -5851,67 +5836,63 @@ impl Engine {
         let Ok(schema) = self.table_schema(table) else {
             return;
         };
-        let prefix = format!("{table}.");
-        let mut map = self.hnsw_mem.lock().unwrap();
-        let mut live_segment = false;
-        for (key, mem) in map.iter_mut() {
-            if !key.starts_with(&prefix) {
-                continue;
+        let key = self.table_key(table);
+        // The table lock is only held to reach the per-segment mutexes; the
+        // graph updates run under each segment's own lock.
+        let segments: Vec<(String, Arc<Mutex<hnsw_mem::HnswIndexInMem>>)> = {
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(key).or_default();
+            if entry.hnsw_mem.is_empty() && !entry.hnsw_probed {
+                entry.hnsw_probed = true;
+                let Ok(indexes) = self.storage.catalog.list_indexes() else {
+                    return;
+                };
+                let Ok(types) = self.column_types(table) else {
+                    return;
+                };
+                let short = table.split('.').next_back().unwrap_or(table);
+                for im in indexes {
+                    if !(im.table == table || im.table == short)
+                        || !im.index_type.eq_ignore_ascii_case("HNSW")
+                    {
+                        continue;
+                    }
+                    let Some(ci) = schema.iter().position(|c| c == &im.column) else {
+                        continue;
+                    };
+                    let Some(dims) = types.get(ci).and_then(|t| type_dim(t)) else {
+                        continue;
+                    };
+                    let opt = |name: &str| -> Option<usize> {
+                        im.options
+                            .iter()
+                            .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                            .and_then(|(_, v)| v.parse().ok())
+                    };
+                    let m = opt("M").unwrap_or(16);
+                    let efc = opt("EF_CONSTRUCTION").unwrap_or(200);
+                    entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
+                        Arc::new(Mutex::new(hnsw_mem::HnswIndexInMem::new(dims, m, efc)))
+                    });
+                }
             }
-            live_segment = true;
-            let column = &key[prefix.len()..];
-            let Some(ci) = schema.iter().position(|c| c == column) else {
+            entry
+                .hnsw_mem
+                .iter()
+                .map(|(c, m)| (c.clone(), m.clone()))
+                .collect()
+        };
+        for (column, mem) in segments {
+            let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;
             };
             let Some(text) = cells.get(ci) else { continue };
             let v: Vec<f32> = parse_vec_str(text).iter().map(|x| *x as f32).collect();
-            if v.len() != mem.dims {
-                continue;
+            if let Ok(mut mem) = mem.lock() {
+                if v.len() == mem.dims {
+                    mem.insert(seq, &v);
+                }
             }
-            mem.insert(seq, &v);
-        }
-        if live_segment {
-            return;
-        }
-        drop(map);
-        // First write after `CREATE INDEX`: build the segment from the metadata.
-        {
-            let mut probed = self.hnsw_probed.lock().unwrap();
-            if !probed.insert(table.to_string()) {
-                return;
-            }
-        }
-        let Ok(indexes) = self.storage.catalog.list_indexes() else {
-            return;
-        };
-        let Ok(types) = self.column_types(table) else {
-            return;
-        };
-        let mut map = self.hnsw_mem.lock().unwrap();
-        for im in indexes {
-            if im.table != table || !im.index_type.eq_ignore_ascii_case("HNSW") {
-                continue;
-            }
-            let Some(ci) = schema.iter().position(|c| c == &im.column) else {
-                continue;
-            };
-            let Some(dims) = types.get(ci).and_then(|t| type_dim(t)) else {
-                continue;
-            };
-            let opt = |name: &str| -> Option<usize> {
-                im.options
-                    .iter()
-                    .find(|(k, _)| k.eq_ignore_ascii_case(name))
-                    .and_then(|(_, v)| v.parse().ok())
-            };
-            let m = opt("M").unwrap_or(16);
-            let efc = opt("EF_CONSTRUCTION").unwrap_or(200);
-            let mem = map
-                .entry(index_key(table, &im.column))
-                .or_insert_with(|| hnsw_mem::HnswIndexInMem::new(dims, m, efc));
-            let Some(text) = cells.get(ci) else { continue };
-            let v: Vec<f32> = parse_vec_str(text).iter().map(|x| *x as f32).collect();
-            mem.insert(seq, &v);
         }
     }
 
@@ -6562,19 +6543,24 @@ impl Engine {
     /// Records the comment given to `CREATE INDEX` (the SDK reads it back from
     /// `SHOW INDEX`).
     pub fn set_index_comment(&self, table: &str, index: &str, comment: &str) {
-        self.index_comments
+        let key = self.table_key(table);
+        self.tables
             .lock()
             .unwrap()
-            .insert(format!("{table}#{index}"), comment.to_string());
+            .entry(key)
+            .or_default()
+            .comments
+            .insert(index.to_string(), comment.to_string());
     }
 
     /// The comment recorded for `index` on `table`, if any.
     pub fn index_comment(&self, table: &str, index: &str) -> Option<String> {
-        self.index_comments
+        let key = self.table_key(table);
+        self.tables
             .lock()
             .unwrap()
-            .get(&format!("{table}#{index}"))
-            .cloned()
+            .get(&key)
+            .and_then(|e| e.comments.get(index).cloned())
     }
 
     /// True unless `result_cache` is explicitly `off`.
@@ -7194,12 +7180,9 @@ impl Engine {
     /// splits on the listed characters, and any other analyzer uses the standard
     /// tokeniser (`None`).
     fn index_delims(&self, table: &str, column: &str) -> Option<Vec<char>> {
-        let a = self
-            .index_analyzers
-            .lock()
-            .unwrap()
-            .get(&index_key(table, column))?
-            .to_ascii_lowercase();
+        let key = self.table_key(table);
+        let guard = self.tables.lock().unwrap();
+        let a = guard.get(&key)?.analyzers.get(column)?.to_ascii_lowercase();
         if a == "keyword" || a == "whitespace" {
             Some(Vec::new())
         } else {
@@ -7418,12 +7401,13 @@ impl Engine {
                         continue;
                     };
                     // The scoring column needs a `rankfeatures` full-text index.
+                    let tkey = self.table_key(table);
                     let analyzer = self
-                        .index_analyzers
+                        .tables
                         .lock()
                         .unwrap()
-                        .get(&index_key(table, col))
-                        .cloned()
+                        .get(&tkey)
+                        .and_then(|e| e.analyzers.get(*col).cloned())
                         .unwrap_or_default();
                     if !analyzer.eq_ignore_ascii_case("rankfeatures") {
                         if std::env::var_os("INF_DEBUG_SQL").is_some() {
@@ -9763,6 +9747,8 @@ impl Engine {
     }
 
     pub fn flush(&self) -> Result<()> {
+        // One checkpoint at a time: the block mirror is rewritten in place.
+        let _serial = self.storage.flush_lock.lock().unwrap();
         // Snapshot the applied timestamp *before* the fsync: everything up to
         // it is then durable, so the log prefix can be dropped afterwards.
         let applied = self.txn.applied_ts()?;
@@ -9844,27 +9830,34 @@ impl Engine {
     /// memindex dump). Each dump writes only the rows buffered since the last
     /// one; the segment is then emptied and the next insert starts a new one.
     fn dump_hnsw_segments(&self) {
-        let keys: Vec<String> = self.hnsw_mem.lock().unwrap().keys().cloned().collect();
-        if keys.is_empty() {
-            return;
-        }
         let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
-        for key in keys {
-            let Some((table, column)) = key.rsplit_once('.') else {
+        for im in indexes {
+            if !im.index_type.eq_ignore_ascii_case("HNSW") {
                 continue;
-            };
-            let found = indexes.iter().find(|im| {
-                im.column == column
-                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
-            });
-            let Some(im) = found else { continue };
+            }
+            let key = self.table_key(&im.table);
+            let has = self
+                .tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|e| e.hnsw_mem.contains_key(&im.column))
+                .unwrap_or(false);
+            if !has {
+                continue;
+            }
             if self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
-                self.hnsw_mem.lock().unwrap().remove(&key);
-                self.index_pending_bytes.lock().unwrap().insert(key, 0);
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(e) = tables.get_mut(&key) {
+                    e.hnsw_mem.remove(&im.column);
+                    e.index_pending_bytes.insert(im.column.clone(), 0);
+                }
             }
         }
         // New rows after this checkpoint must form fresh memory segments.
-        self.hnsw_probed.lock().unwrap().clear();
+        for e in self.tables.lock().unwrap().values_mut() {
+            e.hnsw_probed = false;
+        }
     }
 
     /// Accounts `count` rows about to be inserted into `table` against each
@@ -9909,10 +9902,14 @@ impl Engine {
             // constant term keeps small dimensions over the quota in the same
             // number of rows as the reference.
             let bytes = (dim * 4 + 256) * count;
-            let key = index_key(&im.table, &im.column);
+            let tkey = self.table_key(&im.table);
             let dump = {
-                let mut pending = self.index_pending_bytes.lock().unwrap();
-                let cur = pending.entry(key.clone()).or_insert(0);
+                let mut tables = self.tables.lock().unwrap();
+                let entry = tables.entry(tkey.clone()).or_default();
+                let cur = entry
+                    .index_pending_bytes
+                    .entry(im.column.clone())
+                    .or_insert(0);
                 if *cur >= quota {
                     // The dump empties the memory index; this batch is the
                     // first thing in the next one.
@@ -9926,9 +9923,12 @@ impl Engine {
             if dump && self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
                 // The dumped segment leaves memory; rows written after this
                 // checkpoint form the next one.
-                self.hnsw_mem.lock().unwrap().remove(&key);
-                self.index_pending_bytes.lock().unwrap().insert(key, 0);
-                self.hnsw_probed.lock().unwrap().clear();
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(e) = tables.get_mut(&tkey) {
+                    e.hnsw_mem.remove(&im.column);
+                    e.index_pending_bytes.insert(im.column.clone(), 0);
+                    e.hnsw_probed = false;
+                }
             }
         }
     }
@@ -12670,33 +12670,29 @@ mod tests {
         }
         sql.push(';');
         e.execute(&sql).unwrap();
-        assert_eq!(
-            e.hnsw_mem
+        let indexed = |e: &Engine| {
+            e.tables
                 .lock()
                 .unwrap()
                 .values()
-                .map(|m| m.len())
-                .sum::<usize>(),
-            10
-        );
+                .flat_map(|t| t.hnsw_mem.values())
+                .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
+                .sum::<usize>()
+        };
+        assert_eq!(indexed(&e), 10);
 
         e.flush().unwrap();
         assert!(
-            e.hnsw_mem.lock().unwrap().values().all(|m| m.is_empty()),
+            e.tables.lock().unwrap().values().all(|t| t
+                .hnsw_mem
+                .values()
+                .all(|m| m.lock().map(|m| m.is_empty()).unwrap_or(true))),
             "the checkpoint empties the HNSW memory segment"
         );
 
         e.execute("INSERT INTO hv VALUES (10, [10.0,0.0,0.0,0.0]), (11, [11.0,0.0,0.0,0.0]);")
             .unwrap();
-        assert_eq!(
-            e.hnsw_mem
-                .lock()
-                .unwrap()
-                .values()
-                .map(|m| m.len())
-                .sum::<usize>(),
-            2
-        );
+        assert_eq!(indexed(&e), 2);
 
         e.flush().unwrap();
         let indexed: usize = e
@@ -12766,5 +12762,50 @@ mod tests {
         e.reserve_rows("sg", 4, false).unwrap();
         e.reserve_rows("sg", 4, false).unwrap();
         assert_eq!(e.segments("sg"), vec![(0, 2), (1, 3), (2, 8)]);
+    }
+
+    /// Writers and readers share the table/index state; this exercises the
+    /// table-lock boundaries introduced for `TableEntry` (a deadlock hangs the
+    /// test binary, which the harness timeout catches).
+    #[test]
+    fn concurrent_inserts_and_vector_searches_do_not_deadlock() {
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute("CREATE TABLE cc (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute("CREATE INDEX cc_i ON cc (v) USING HNSW WITH (metric = l2);")
+            .unwrap();
+        let mut handles = Vec::new();
+        for t in 0..4 {
+            let e = e.clone();
+            handles.push(std::thread::spawn(move || {
+                for b in 0..25 {
+                    e.execute(&format!(
+                        "INSERT INTO cc VALUES ({}, [1.0,0.0,0.0,0.0]), ({}, [0.0,1.0,0.0,0.0]);",
+                        t * 1000 + b * 2,
+                        t * 1000 + b * 2 + 1
+                    ))
+                    .unwrap();
+                    if b % 5 == 0 {
+                        e.flush().unwrap();
+                    }
+                }
+            }));
+        }
+        for _ in 0..2 {
+            let e = e.clone();
+            handles.push(std::thread::spawn(move || {
+                for _ in 0..40 {
+                    let _ = e.execute(
+                        "SELECT id FROM cc SEARCH MATCH VECTOR (v, [1.0,0.0,0.0,0.0], 'float', 'l2', 3);",
+                    );
+                    let _ = e.execute("SELECT count(*) FROM cc;");
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        assert_eq!(e.row_count("default_db.cc").unwrap(), 200);
     }
 }

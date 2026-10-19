@@ -159,17 +159,21 @@ impl Engine {
                 .collect();
             merge.search(0, &hits);
         }
-        // The in-memory segment: q.rows written after the last dump. The
+        // The in-memory segment: rows written after the last dump. The
         // reference searches every segment and merges the results.
-        if let Some(mem) = self
-            .hnsw_mem
+        let tkey = self.table_key(q.table);
+        let mem = self
+            .tables
             .lock()
             .unwrap()
-            .get(&super::index_key(q.table, q.column))
-        {
-            for (row, dist) in mem.search(q.query, k) {
-                merge.add_result(0, dist, row);
-                covered.insert(row as usize);
+            .get(&tkey)
+            .and_then(|e| e.hnsw_mem.get(q.column).cloned());
+        if let Some(mem) = mem {
+            if let Ok(mem) = mem.lock() {
+                for (row, dist) in mem.search(q.query, k) {
+                    merge.add_result(0, dist, row);
+                    covered.insert(row as usize);
+                }
             }
         }
         merge.end();
