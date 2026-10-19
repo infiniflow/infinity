@@ -13792,6 +13792,41 @@ mod tests {
         assert_eq!(mem.mem_used(), before);
     }
 
+    /// C++: `function/aggregate/{sum,avg,count,min,max,first}_functions_ut.cpp`:
+    /// the six aggregates over one column, including NULL handling.
+    #[test]
+    fn aggregate_functions_match_the_reference() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ag (b BOOLEAN, t TINYINT);")
+            .unwrap();
+        e.execute("INSERT INTO ag VALUES (true, 10), (false, -5), (true, 127), (NULL, NULL);")
+            .unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT sum(t), avg(t), count(t), min(t), max(t), first(t) FROM ag;"
+            ),
+            vec![vec![
+                "132".to_string(),
+                "44.000000".to_string(),
+                "3".to_string(),
+                "-5".to_string(),
+                "127".to_string(),
+                "10".to_string(),
+            ]]
+        );
+        // Booleans: min=false, max=true, first=true.
+        assert_eq!(
+            rows(&e, "SELECT min(b), max(b), first(b) FROM ag;"),
+            vec![vec![
+                "false".to_string(),
+                "true".to_string(),
+                "true".to_string()
+            ]]
+        );
+    }
+
     /// C++: `function/scalar/{add,div,equals}_functions_ut.cpp`: checked
     /// arithmetic (overflow -> NULL), division by zero -> NULL, and equality.
     #[test]

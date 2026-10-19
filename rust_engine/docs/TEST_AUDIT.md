@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 127, `integration` 250, `partial` 42, `ported` 343.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 121, `integration` 250, `partial` 42, `ported` 349.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -71,12 +71,12 @@
 | 57 | `src/unit_test/executor/operator/physical_sort_ut_nimpl.cpp` | `PhysicalSortTest` | `test1` | gate-a |
 | 58 | `src/unit_test/executor/pipeline/explain_ut.cpp` | `ExplainTest` | `test1` | gate-a |
 | 59 | `src/unit_test/executor/pipeline/fragment_ut.cpp` | `FragmentTest` | `test_build_fragment` | gate-a |
-| 60 | `src/unit_test/function/aggregate/avg_functions_ut.cpp` | `AvgFunctionTest` | `avg_func` | gate-a |
-| 61 | `src/unit_test/function/aggregate/count_functions_ut.cpp` | `CountFunctionTest` | `quarter_func` | gate-a |
-| 62 | `src/unit_test/function/aggregate/first_functions_ut.cpp` | `FirstFunctionTest` | `first_func` | gate-a |
-| 63 | `src/unit_test/function/aggregate/max_functions_ut.cpp` | `MaxFunctionTest` | `max_func` | gate-a |
-| 64 | `src/unit_test/function/aggregate/min_functions_ut.cpp` | `MinFunctionTest` | `min_func` | gate-a |
-| 65 | `src/unit_test/function/aggregate/sum_functions_ut.cpp` | `SumFunctionTest` | `sum_func` | gate-a |
+| 60 | `src/unit_test/function/aggregate/avg_functions_ut.cpp` | `AvgFunctionTest` | `avg_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
+| 61 | `src/unit_test/function/aggregate/count_functions_ut.cpp` | `CountFunctionTest` | `quarter_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
+| 62 | `src/unit_test/function/aggregate/first_functions_ut.cpp` | `FirstFunctionTest` | `first_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
+| 63 | `src/unit_test/function/aggregate/max_functions_ut.cpp` | `MaxFunctionTest` | `max_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
+| 64 | `src/unit_test/function/aggregate/min_functions_ut.cpp` | `MinFunctionTest` | `min_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
+| 65 | `src/unit_test/function/aggregate/sum_functions_ut.cpp` | `SumFunctionTest` | `sum_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
 | 66 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast0` | gate-a |
 | 67 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast1` | gate-a |
 | 68 | `src/unit_test/function/cast/bool_cast_ut.cpp` | `BoolCastTest` | `bool_cast0` | ported | `infinity-common` `bool_cast0` |

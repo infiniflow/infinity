@@ -226,6 +226,7 @@
 | `storage/common/kv_code_ut.cpp`（2 例） | `catalog_format` | `catalog_keys_match_the_reference`、`name_keyed_catalog_keys_match_the_reference` |
 | `common/utility/{trim,utility,exception}_ut.cpp`（3 例） | `infinity_common::{utility, Error}` | `trim_path_keeps_the_repository_relative_part`、`extract_u64_reads_the_key_suffix`、`non_alphanumeric_suffix_reports_failure`、`exception_messages_match_the_reference` |
 | `storage/result_cache_manager_ut.cpp`（2 例） | `result_cache::ResultCacheManager` | `cache_projects_columns_and_merges_new_ones`、`cache_evicts_the_least_recently_used_entry` |
+| `function/aggregate/{sum,avg,count,min,max,first}_functions_ut.cpp` | `AggFunc` 求值（`infinity-expression::aggregate`） | `aggregate_functions_match_the_reference`（六种聚合、NULL 忽略、布尔 min/max/first） |
 | `function/scalar/{abs,add,div,equals,inequals,greater,greater_equals,less,less_equals}_functions_ut.cpp` | `infinity-expression` 标量求值 | `abs_function_covers_every_numeric_type`、`arithmetic_and_equality_follow_the_reference`（含比较族与除零 NULL；溢出语义见设计变更） |
 | `storage/invertedindex/memory_indexer_ut.cpp::Chunk` | `MemoryIndexer` | `memory_indexer_builds_the_reference_postings`（5 段 FST 文本的 term→doc/tf 与参考一致） |
 | `storage/column_vector/{selection,var_buffer}_ut.cpp`（2 例） | `selection::Selection` / `var_buffer::VarBuffer` | `selection_matches_the_reference`、`var_buffer_appends_and_roundtrips` |
