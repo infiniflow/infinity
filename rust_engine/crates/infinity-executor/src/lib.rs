@@ -8320,7 +8320,9 @@ impl Engine {
                     self.update_indexes_on_insert(table, base + k, row)?;
                     let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
                     self.update_text_indexes(table, base + k, &texts);
+                    self.update_vector_caches(table, base + k, &texts);
                 }
+                self.dump_hnsw_over_capacity(table);
                 total += batch.len();
             }
             if eof {
@@ -8456,7 +8458,9 @@ impl Engine {
             self.update_indexes_on_insert(table, base + k, row)?;
             let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
             self.update_text_indexes(table, base + k, &texts);
+            self.update_vector_caches(table, base + k, &texts);
         }
+        self.dump_hnsw_over_capacity(table);
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
@@ -11595,6 +11599,50 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    /// C++ `Import` populates the memory indexes: a `COPY` into a table with an
+    /// HNSW index feeds the memory segment and honours `mem_index_capacity`,
+    /// so the graph covers the imported rows without waiting for an INSERT.
+    #[test]
+    fn copy_populates_the_hnsw_memory_segment() {
+        let dir = tempdir().unwrap();
+        let csv = dir.path().join("hnsw.csv");
+        std::fs::write(
+            &csv,
+            "1,\"[0.0, 0.0, 0.0, 0.0]\"\n2,\"[1.0, 0.0, 0.0, 0.0]\"\n\
+             3,\"[0.0, 1.0, 0.0, 0.0]\"\n4,\"[0.0, 0.0, 1.0, 0.0]\"\n",
+        )
+        .unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_capacity(3);
+        e.execute("CREATE TABLE cvi (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute("CREATE INDEX cvi_i ON cvi (c2) USING HNSW WITH (metric = l2);")
+            .unwrap();
+        e.execute(&format!(
+            "COPY cvi FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            csv.display()
+        ))
+        .unwrap();
+        let indexed: usize = e
+            .tables
+            .lock()
+            .unwrap()
+            .values()
+            .flat_map(|t| t.hnsw_mem.values())
+            .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
+            .sum();
+        assert_eq!(
+            indexed, 0,
+            "the 4-row batch reached the capacity and dumped"
+        );
+        let dumped: usize = e
+            .load_vector_indexes("default_db.cvi", "cvi_i")
+            .iter()
+            .map(|seg| seg.labels.len())
+            .sum();
+        assert_eq!(dumped, 4);
     }
 
     #[test]
