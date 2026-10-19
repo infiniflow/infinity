@@ -827,7 +827,7 @@ mod data_block_reference_suite {
             BlockValue::HugeInt(i as i128),
             BlockValue::Float(i as f32),
             BlockValue::Double(i as f64),
-            BlockValue::Decimal(DecimalT::new(i as i128, 2)),
+            BlockValue::Decimal(DecimalT::new(i as i128, 0)),
             BlockValue::Str(format!("str_{i}")),
             BlockValue::Date(DateT::new(i as i32)),
             BlockValue::Time(TimeT::new(i as i32)),
@@ -1223,6 +1223,15 @@ mod reference_suite {
         constant_suite(conv);
         select_suite(conv);
         slice_suite(conv);
+    }
+
+    // C++: `column_vector_decimal_ut_nimpl.cpp` (flat/constant/select/slice).
+    #[test]
+    fn decimal_flat_constant_select_slice() {
+        flat_suite(|i| infinity_common::DecimalT::new(i as i128, 0));
+        constant_suite(|i| infinity_common::DecimalT::new(i as i128, 0));
+        select_suite(|i| infinity_common::DecimalT::new(i as i128, 0));
+        slice_suite(|i| infinity_common::DecimalT::new(i as i128, 0));
     }
 
     /// C++: `column_vector_varchar_ut.cpp` — the inline/out-of-line buffer

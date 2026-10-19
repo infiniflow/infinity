@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 106, `gate-a` 136, `integration` 250, `partial` 60, `ported` 318.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 106, `gate-a` 136, `integration` 250, `partial` 56, `ported` 322.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -335,10 +335,10 @@
 | 321 | `src/unit_test/storage/column_vector/column_vector_date_time_ut.cpp` | `ColumnVectorDateTimeTest` | `contant_flat` | ported |
 | 322 | `src/unit_test/storage/column_vector/column_vector_date_time_ut.cpp` | `ColumnVectorDateTimeTest` | `interval_column_vector_select` | ported |
 | 323 | `src/unit_test/storage/column_vector/column_vector_date_time_ut.cpp` | `ColumnVectorDateTimeTest` | `interval_column_slice_init` | ported |
-| 324 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `flat_decimal` | partial |
-| 325 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `contant_decimal` | partial |
-| 326 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `decimal_column_vector_select` | partial |
-| 327 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `decimal_column_slice_init` | partial |
+| 324 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `flat_decimal` | ported | `infinity-storage` `data_block::reference_suite::decimal_flat_constant_select_slice` |
+| 325 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `contant_decimal` | ported | `infinity-storage` `data_block::reference_suite::decimal_flat_constant_select_slice` |
+| 326 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `decimal_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::decimal_flat_constant_select_slice` |
+| 327 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `decimal_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::decimal_flat_constant_select_slice` |
 | 328 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `flat_embedding` | ported | `infinity-storage` `data_block::reference_suite::embedding_flat_constant_select_slice` |
 | 329 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `contant_embedding` | ported | `infinity-storage` `data_block::reference_suite::embedding_flat_constant_select_slice` |
 | 330 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `embedding_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::embedding_flat_constant_select_slice` |
