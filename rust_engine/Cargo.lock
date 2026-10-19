@@ -426,6 +426,7 @@ name = "infinity-index"
 version = "0.1.0"
 dependencies = [
  "infinity-common",
+ "infinity-storage",
  "tempfile",
 ]
 

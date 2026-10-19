@@ -535,7 +535,7 @@ mod tests {
 
     fn dataset(n: usize, nnz: usize, seed: u64) -> Vec<SparseVec> {
         let mut state = seed | 1;
-        let mut next = || {
+        let mut next = || -> u64 {
             state ^= state << 13;
             state ^= state >> 7;
             state ^= state << 17;
@@ -763,6 +763,143 @@ mod tests {
         for (g, e) in got.iter().zip(exact.iter()) {
             assert_eq!(g.0, e.0);
             assert!((g.1 - e.1).abs() < 1e-6);
+        }
+    }
+}
+
+#[cfg(test)]
+mod bmp_reference_suite {
+    //! Ports of `BMPIndexTest.test1` (`test_bmp_index_ut.cpp`): search
+    //! accuracy against the exact ground truth, before and after a disk
+    //! round trip. The C++ test instantiates four type/compression
+    //! combinations; the Rust implementation is type-erased, so the two block
+    //! layouts are exercised instead.
+
+    use super::*;
+    use infinity_storage::bmp_cpp::{write_bmp_file, BmpCppReader, IdxWidth};
+
+    fn dataset(rows: usize, cols: usize, sparsity: f32) -> Vec<Vec<(u32, f32)>> {
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+        let mut next = || -> u64 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        (0..rows)
+            .map(|_| {
+                let count = (cols as f32 * sparsity) as usize;
+                let mut seen = std::collections::HashSet::new();
+                let mut row = Vec::with_capacity(count);
+                while row.len() < count {
+                    let term = (next() % cols as u64) as u32;
+                    if seen.insert(term) {
+                        let value = (next() % 10_000) as f32 / 1000.0;
+                        row.push((term, value));
+                    }
+                }
+                row.sort_by_key(|(term, _)| *term);
+                row
+            })
+            .collect()
+    }
+
+    fn groundtruth(
+        dataset: &[Vec<(u32, f32)>],
+        query: &[(u32, f32)],
+        topk: usize,
+        cols: usize,
+    ) -> Vec<u32> {
+        let mut scores = vec![0.0f32; dataset.len()];
+        for &(term, value) in query {
+            let _ = cols;
+            for (row, doc) in dataset.iter().enumerate() {
+                if let Some((_, doc_value)) = doc.iter().find(|(t, _)| *t == term) {
+                    scores[row] += value * doc_value;
+                }
+            }
+        }
+        let mut hits: Vec<(u32, f32)> = scores
+            .into_iter()
+            .enumerate()
+            .map(|(row, score)| (row as u32, score))
+            .collect();
+        hits.sort_by(|a, b| b.1.total_cmp(&a.1));
+        hits.truncate(topk);
+        hits.into_iter().map(|(row, _)| row).collect()
+    }
+
+    fn assert_accuracy(hits: &[(usize, f32)], gt: &[u32]) -> (usize, usize) {
+        let got: std::collections::HashSet<u32> = hits.iter().map(|(doc, _)| *doc as u32).collect();
+        (gt.iter().filter(|row| got.contains(row)).count(), gt.len())
+    }
+
+    /// C++: `BMPIndexTest.test1`.
+    #[test]
+    fn bmp_index_accuracy_and_disk_roundtrip() {
+        let rows = 1000;
+        let cols = 1000;
+        let corpus = dataset(rows, cols, 0.05);
+        let queries = dataset(100, cols, 0.05);
+        let gt: Vec<Vec<u32>> = queries
+            .iter()
+            .map(|q| groundtruth(&corpus, q, 10, cols))
+            .collect();
+
+        for block_size in [8usize, 64] {
+            let options = BmpSearchOptions {
+                alpha: 1.0,
+                beta: 1.0,
+                use_tail: true,
+            };
+            let mut index = BmpAlg::new(block_size);
+            for doc in &corpus {
+                index.add_doc(doc);
+            }
+            index.build();
+            let mut hit = 0;
+            let mut total = 0;
+            for (q, gt) in queries.iter().zip(&gt) {
+                let query: Vec<(u32, f32)> = q.clone();
+                let hits = index.search_knn(&query, 10, options);
+                let (h, t) = assert_accuracy(&hits, gt);
+                hit += h;
+                total += t;
+            }
+            assert!(
+                hit as f32 >= total as f32 * 0.9,
+                "block {block_size}: {hit}/{total}"
+            );
+
+            // Disk round trip: the same corpus through the C++ BMP layout.
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("bmp.idx");
+            let docs: Vec<infinity_storage::bmp_cpp::SparseDoc> = corpus
+                .iter()
+                .enumerate()
+                .map(|(row, doc)| {
+                    (
+                        row as u64,
+                        doc.iter().map(|(t, v)| (*t as i32, *v)).collect(),
+                    )
+                })
+                .collect();
+            write_bmp_file(&path, block_size, IdxWidth::I32, &docs, cols).unwrap();
+            let reader = BmpCppReader::open(&path, IdxWidth::I32).unwrap();
+            assert_eq!(reader.doc_count(), rows);
+            let mut hit = 0;
+            let mut total = 0;
+            for (q, gt) in queries.iter().zip(&gt) {
+                let query: Vec<(i32, f32)> = q.iter().map(|(t, v)| (*t as i32, *v)).collect();
+                let hits = reader.search(&query, 10, 1.0);
+                let (h, t) = assert_accuracy(&hits, gt);
+                hit += h;
+                total += t;
+            }
+            assert!(
+                hit as f32 >= total as f32 * 0.9,
+                "disk block {block_size}: {hit}/{total}"
+            );
         }
     }
 }

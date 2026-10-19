@@ -184,6 +184,7 @@
 | `storage/common/test_rcu_multimap_ut.cpp`（RcuMap 功能 15 例） | `infinity_storage::rcu_map::RcuMap` | `basic_insert_and_get`…`map_vs_multimap_behavior` |
 | `storage/common/test_rcu_multimap_ut.cpp`（RcuMultiMap 功能 13 例） | `infinity_storage::rcu_map::RcuMultiMap` | `basic_insert_and_get`…`different_value_types`（插入/删除/GC/过期/多值/整数键/空表/压力） |
 | `knn/sparse/test_bp_reordering_ut.cpp`（2 例） | `infinity_index::bp::BpReordering` | `reordering_does_not_increase_cost`（1000×1000、10% 边，cost 不增）、`reordering_on_the_small_csr_when_present`（有 `base_small.csr` 时按 `SparseMatrix::Load` 布局读取并验证 cost） |
+| `knn/sparse/test_bmp_index_ut.cpp::test1` | `sparse::BmpAlg` + `bmp_cpp` | `bmp_index_accuracy_and_disk_roundtrip`（1000×1000、5% 稀疏、100 查询，block=8/64 的 top-10 hit ≥90%，以及 C++ BMP 磁盘布局写入/读回） |
 | `knn/sparse/test_bmp_index_ut.cpp::test2` | `sparse::BmpAlg` | `bmp_index_ranks_documents_across_blocks`（6 文档/block=2/topk=5 的跨块排名与分数） |
 | `knn/sparse/test_linscan_ut.cpp`（2 例） | `infinity_index::linscan::LinScan` | `accurate_scan`（1000×10000、1% 稀疏、50 查询，与暴力 top-10 逐位/1e-6 一致）、`approximate_scan`（budget = 1000，候选精确重排后 hit ≥ 90%）、`save_and_load_roundtrip` |
 | `storage/common/loser_tree_ut.cpp::LoserTreeTest` | `infinity_common::loser_tree::LoserTree` | `basic_merge_1`…`basic_merge_4`（10/3、10/12、1000/200、1000/2000 路归并）、`round_up_matches_the_reference` |

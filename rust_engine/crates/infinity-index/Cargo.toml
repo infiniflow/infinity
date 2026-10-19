@@ -9,3 +9,4 @@ infinity-common.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+infinity-storage.workspace = true
