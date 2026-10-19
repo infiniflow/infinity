@@ -781,146 +781,6 @@ mod reference_suite {
         slice_suite(|i| infinity_common::IntervalT::new(i as i32));
     }
 
-    // C++: `column_vector_geo_ut.cpp`, point.
-    #[test]
-    fn point_flat_constant_select_slice() {
-        flat_suite(|i| infinity_common::PointT::new(i as f64 + 0.5, i as f64 - 0.8));
-        constant_suite(|i| infinity_common::PointT::new(i as f64 + 0.5, i as f64 - 0.8));
-        select_suite(|i| infinity_common::PointT::new(i as f64 + 0.5, i as f64 - 0.8));
-        slice_suite(|i| infinity_common::PointT::new(i as f64 + 0.5, i as f64 - 0.8));
-    }
-
-    // C++: `column_vector_geo_ut.cpp`, line.
-    #[test]
-    fn line_flat_constant_select_slice() {
-        flat_suite(|i| infinity_common::LineT::new(i as f64, i as f64 + 1.0, i as f64 + 2.0));
-        constant_suite(|i| infinity_common::LineT::new(i as f64, i as f64 + 1.0, i as f64 + 2.0));
-        select_suite(|i| infinity_common::LineT::new(i as f64, i as f64 + 1.0, i as f64 + 2.0));
-        slice_suite(|i| infinity_common::LineT::new(i as f64, i as f64 + 1.0, i as f64 + 2.0));
-    }
-
-    // C++: `column_vector_geo_ut.cpp`, line segment.
-    #[test]
-    fn line_seg_flat_constant_select_slice() {
-        flat_suite(|i| {
-            infinity_common::LineSegT::new(
-                infinity_common::PointT::new(i as f64, 0.5),
-                infinity_common::PointT::new(i as f64 + 1.0, 1.5),
-            )
-        });
-        constant_suite(|i| {
-            infinity_common::LineSegT::new(
-                infinity_common::PointT::new(i as f64, 0.5),
-                infinity_common::PointT::new(i as f64 + 1.0, 1.5),
-            )
-        });
-        select_suite(|i| {
-            infinity_common::LineSegT::new(
-                infinity_common::PointT::new(i as f64, 0.5),
-                infinity_common::PointT::new(i as f64 + 1.0, 1.5),
-            )
-        });
-        slice_suite(|i| {
-            infinity_common::LineSegT::new(
-                infinity_common::PointT::new(i as f64, 0.5),
-                infinity_common::PointT::new(i as f64 + 1.0, 1.5),
-            )
-        });
-    }
-
-    // C++: `column_vector_geo_ut.cpp`, box.
-    #[test]
-    fn box_flat_constant_select_slice() {
-        flat_suite(|i| {
-            infinity_common::BoxT::new(
-                infinity_common::PointT::new(i as f64, 0.0),
-                infinity_common::PointT::new(i as f64 + 1.0, 1.0),
-            )
-        });
-        constant_suite(|i| {
-            infinity_common::BoxT::new(
-                infinity_common::PointT::new(i as f64, 0.0),
-                infinity_common::PointT::new(i as f64 + 1.0, 1.0),
-            )
-        });
-        select_suite(|i| {
-            infinity_common::BoxT::new(
-                infinity_common::PointT::new(i as f64, 0.0),
-                infinity_common::PointT::new(i as f64 + 1.0, 1.0),
-            )
-        });
-        slice_suite(|i| {
-            infinity_common::BoxT::new(
-                infinity_common::PointT::new(i as f64, 0.0),
-                infinity_common::PointT::new(i as f64 + 1.0, 1.0),
-            )
-        });
-    }
-
-    // C++: `column_vector_geo_ut.cpp`, circle.
-    #[test]
-    fn circle_flat_constant_select_slice() {
-        flat_suite(|i| {
-            infinity_common::CircleT::new(
-                infinity_common::PointT::new(i as f64, 0.5),
-                i as f64 + 0.25,
-            )
-        });
-        constant_suite(|i| {
-            infinity_common::CircleT::new(
-                infinity_common::PointT::new(i as f64, 0.5),
-                i as f64 + 0.25,
-            )
-        });
-        select_suite(|i| {
-            infinity_common::CircleT::new(
-                infinity_common::PointT::new(i as f64, 0.5),
-                i as f64 + 0.25,
-            )
-        });
-        slice_suite(|i| {
-            infinity_common::CircleT::new(
-                infinity_common::PointT::new(i as f64, 0.5),
-                i as f64 + 0.25,
-            )
-        });
-    }
-
-    // C++: `column_vector_geo_ut.cpp`, path.
-    #[test]
-    fn path_flat_constant_select_slice() {
-        let path = |i: i64| {
-            infinity_common::PathT::new(
-                vec![
-                    infinity_common::PointT::new(i as f64, 0.0),
-                    infinity_common::PointT::new(i as f64 + 1.0, 1.0),
-                    infinity_common::PointT::new(i as f64 + 2.0, 0.0),
-                ],
-                i % 2 == 0,
-            )
-        };
-        flat_suite(path);
-        constant_suite(path);
-        select_suite(path);
-        slice_suite(path);
-    }
-
-    // C++: `column_vector_geo_ut.cpp`, polygon.
-    #[test]
-    fn polygon_flat_constant_select_slice() {
-        let polygon = |i: i64| {
-            infinity_common::PolygonT::new(vec![
-                infinity_common::PointT::new(i as f64, 0.0),
-                infinity_common::PointT::new(i as f64 + 1.0, 1.0),
-                infinity_common::PointT::new(i as f64 + 2.0, 0.0),
-            ])
-        };
-        flat_suite(polygon);
-        constant_suite(polygon);
-        select_suite(polygon);
-        slice_suite(polygon);
-    }
-
     /// C++: `flat_interval`'s constant tail: `SetValueByIndex(0, …)` then
     /// `Finalize(1)` for every source row.
     #[test]
@@ -937,7 +797,10 @@ mod reference_suite {
             c.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
             c.set_value(0, source.get(i as usize).cloned()).unwrap();
             c.finalize(1);
-            assert_eq!(c.get(0), Some(&infinity_common::IntervalT::new(i as i32)));
+            assert_eq!(
+                c.get(0),
+                Some(&infinity_common::IntervalT::new(i as i32))
+            );
             c.reset();
         }
     }

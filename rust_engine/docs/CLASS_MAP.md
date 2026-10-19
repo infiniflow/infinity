@@ -175,7 +175,6 @@
 | `knn/hnsw/test_rabitq_ut.cpp` | `rabitq::RabitqStore` | `orthogonal_matrix_is_orthonormal`、`centroid_is_the_rotated_mean`、`save_and_load_roundtrip`、`l2_estimator_keeps_the_true_neighbour` |
 | `knn/hnsw/test_lsg_build_ut.cpp` | `lsg::LsgIndex` + `HnswIndex` | `avg_is_at_least_the_exhaustive_topk_mean`、`lsg_hnsw_keeps_self_query_recall`（recall@1 ≥ 0.95） |
 | `column_vector/column_vector_integer_ut.cpp`（20 例） | `data_block::ColumnVector<T>` | `tinyint/smallint/int/bigint/hugeint_flat_constant_select_slice`（flat/constant/selection/slice 四类场景） |
-| `column_vector/column_vector_geo_ut.cpp`（28 例） | `data_block::ColumnVector<T>` + `PointT`/`LineT`/`LineSegT`/`BoxT`/`CircleT`/`PathT`/`PolygonT` | `point/line/line_seg/box/circle/path/polygon_flat_constant_select_slice` |
 | `column_vector/column_vector_date_time_ut.cpp`（20 例） | `data_block::ColumnVector<T>` + `DateT`/`TimeT`/`DateTimeT`/`TimestampT`/`IntervalT` | `date/time/datetime/timestamp/interval_flat_constant_select_slice`、`interval_constant_set_value_before_finalize` |
 | `function/scalar/fixed_dimensional_encoding_ut.cpp`（14 例） | `infinity_expression::fde` | `config/tensor/random_generator/hash_partitioner/sparse_projector/internal_functions/simple_encoding/invalid_input/document_encoding/simhash_partitioning/ams_projection/final_projection/multiple_repetitions/fill_empty_partitions` |
 | `knn/sparse/test_bp_reordering_ut.cpp`（2 例） | `infinity_index::bp::BpReordering` | `reordering_does_not_increase_cost`（1000×1000、10% 边，cost 不增）、`reordering_on_the_small_csr_when_present`（有 `base_small.csr` 时按 `SparseMatrix::Load` 布局读取并验证 cost） |
@@ -209,6 +208,6 @@
 
 `src/unit_test` 共 **1012** 个 `TEST/TEST_F/TEST_P`，逐条状态见 [`TEST_AUDIT.md`](TEST_AUDIT.md)：`ported` 33、`partial` 231、`integration` 294、`gate-a` 216、`gap` 225、`exempt` 12、`excluded` 1。
 
-- `column_vector/*` 的 `ColumnVector`/`DataBlock` 类已移植；integer 套件（flat/constant/select/slice × tinyint/smallint/int/bigint/hugeint，20 例）已逐条移植。`VectorBuffer`/`Bitmask` 为设计变更（Rust `Vec` + `validity`）；integer/date-time/geo 套件（68 例）已移植。
+- `column_vector/*` 的 `ColumnVector`/`DataBlock` 类已移植；integer 套件（flat/constant/select/slice × tinyint/smallint/int/bigint/hugeint，20 例）已逐条移植。`VectorBuffer`/`Bitmask` 为设计变更（Rust `Vec` + `validity`）；integer 与 date/time 套件（40 例）已移植，geo 套件待补。
 - `LoserTree` 已移植（`infinity_common::loser_tree`，4 例通过）；`common/test_rcu_multimap_ut.cpp` 的 RCU 容器尚未移植，列为 `gap`。
 - `gap`/`partial` 的 456 个用例是下一阶段的移植队列，按 `TEST_AUDIT.md` 的文件分组推进。
