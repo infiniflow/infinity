@@ -349,7 +349,9 @@ impl PhysicalKnnScan<'_> {
                     let multi = self.column_type.starts_with("MULTIVECTOR");
                     // Un-packed bits already line up on `dim` boundaries;
                     // only a byte-packed query needs expanding.
-                    if dim > 0 && !qv.len().is_multiple_of(dim) && (qv.len() * 8).is_multiple_of(dim)
+                    if dim > 0
+                        && !qv.len().is_multiple_of(dim)
+                        && (qv.len() * 8).is_multiple_of(dim)
                     {
                         let mut bits = Vec::with_capacity(qv.len() * 8);
                         for b in &qv {
@@ -379,17 +381,14 @@ impl PhysicalKnnScan<'_> {
                 if multivector {
                     // MAXSIM: split both sides into `dim`-sized rows and sum,
                     // over the query rows, the best similarity to a stored row.
-                    let dim = crate::type_dim(self.column_type)
-                        .unwrap_or(qv.len())
-                        .max(1);
+                    let dim = crate::type_dim(self.column_type).unwrap_or(qv.len()).max(1);
                     // A bit multivector stores one bit string per row.
-                    let doc_rows = if crate::tensor_elem_type(self.column_type)
-                        == crate::ElemType::Bit
-                    {
-                        crate::parse_bit_leaves(v)
-                    } else {
-                        crate::parse_tensor_leaves(v)
-                    };
+                    let doc_rows =
+                        if crate::tensor_elem_type(self.column_type) == crate::ElemType::Bit {
+                            crate::parse_bit_leaves(v)
+                        } else {
+                            crate::parse_tensor_leaves(v)
+                        };
                     if doc_rows.is_empty() || doc_rows.iter().all(|r| r.is_empty()) {
                         continue;
                     }
@@ -466,10 +465,7 @@ impl PhysicalKnnScan<'_> {
 
     /// C++ `MergeKnn`/result-handler finish: sort in the scan's direction,
     /// apply `threshold`, keep `topn`.
-    pub(crate) fn finish(
-        &self,
-        mut state: KnnScanOperatorState,
-    ) -> KnnScanOperatorState {
+    pub(crate) fn finish(&self, mut state: KnnScanOperatorState) -> KnnScanOperatorState {
         let use_sim = state.use_sim;
         state.scored.sort_by(|a, b| {
             let (x, y) = if use_sim { (b.1, a.1) } else { (a.2, b.2) };

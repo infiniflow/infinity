@@ -2425,11 +2425,12 @@ pub struct Storage {
 }
 
 /// Sealed high-cardinality chunk readers with their base row id.
-type SecondaryDiskChunks =
-    Vec<(u64, Arc<infinity_storage::secondary_segment::SecondarySegmentReader>)>;
+type SecondaryDiskChunks = Vec<(
+    u64,
+    Arc<infinity_storage::secondary_segment::SecondarySegmentReader>,
+)>;
 /// Sealed low-cardinality (boolean) chunk readers with their base row id.
-type SecondaryLowChunks =
-    Vec<(u64, Arc<infinity_storage::secondary_lowcard::LowCardReader>)>;
+type SecondaryLowChunks = Vec<(u64, Arc<infinity_storage::secondary_lowcard::LowCardReader>)>;
 
 /// Secondary-index registry of one table (C++ `TableEntry::indexes_` plus the
 /// sealed chunk readers), keyed by column.
@@ -2809,7 +2810,10 @@ impl Engine {
                         .entry(tkey)
                         .or_default()
                         .vector
-                        .insert(im.column.clone(), segments.into_iter().map(Arc::new).collect());
+                        .insert(
+                            im.column.clone(),
+                            segments.into_iter().map(Arc::new).collect(),
+                        );
                 }
             }
             if im.index_type.eq_ignore_ascii_case("IVF") {
@@ -2819,9 +2823,10 @@ impl Engine {
                 let entry = tables.entry(tkey).or_default();
                 entry.ivf_mem.entry(im.column.clone()).or_default();
                 if !segments.is_empty() {
-                    entry
-                        .ivf
-                        .insert(im.column.clone(), segments.into_iter().map(Arc::new).collect());
+                    entry.ivf.insert(
+                        im.column.clone(),
+                        segments.into_iter().map(Arc::new).collect(),
+                    );
                 }
             }
         }
@@ -3030,7 +3035,10 @@ impl Engine {
                         .entry(tkey)
                         .or_default()
                         .ivf
-                        .insert(im.column.clone(), segments.into_iter().map(Arc::new).collect());
+                        .insert(
+                            im.column.clone(),
+                            segments.into_iter().map(Arc::new).collect(),
+                        );
                 }
             }
         }
@@ -6326,7 +6334,12 @@ impl Engine {
             .lock()
             .unwrap()
             .get(&tkey)
-            .map(|e| e.sparse.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .map(|e| {
+                e.sparse
+                    .iter()
+                    .map(|(c, v)| (c.clone(), v.clone()))
+                    .collect()
+            })
             .unwrap_or_default();
         if indexes.is_empty() {
             return;
@@ -11875,8 +11888,7 @@ mod tests {
             .values()
             .find_map(|t| t.sparse.values().next().cloned())
             .unwrap();
-        let sp_tail = sp.read().unwrap()
-            .tail_bytes;
+        let sp_tail = sp.read().unwrap().tail_bytes;
         assert_eq!(sp_tail, 0);
         let tables = e.tables.lock().unwrap();
         let sec = tables
