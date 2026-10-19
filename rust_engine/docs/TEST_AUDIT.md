@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 106, `gate-a` 136, `integration` 250, `partial` 56, `ported` 322.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 102, `gap` 106, `gate-a` 136, `integration` 250, `partial` 41, `ported` 334.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -632,26 +632,26 @@
 | 618 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_top1_blas_ut.cpp` | `KnnFlatL2Top1BlasTest` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_1_matches_the_reference` |
 | 619 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_top1_ut.cpp` | `KnnFlatL2Top1Test` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_1_matches_the_reference` |
 | 620 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_ut.cpp` | `KnnFlatL2Test` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_k_matches_the_reference` |
-| 621 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func2_ut.cpp` | `DistFuncTest2` | `test2` | partial |
-| 622 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func_ut.cpp` | `DistFuncTest` | `test1` | partial |
-| 623 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func_ut.cpp` | `DistFuncTest` | `test2` | partial |
-| 624 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_bitmask_ut.cpp` | `HnswAlgBitmaskTest` | `test1` | partial |
+| 621 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func2_ut.cpp` | `DistFuncTest2` | `test2` | ported | `infinity-index` `lvq::tests::lvq_ip_distance_matches_decompressed_vectors` |
+| 622 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func_ut.cpp` | `DistFuncTest` | `test1` | exempt | int8 IP 的 SSE 核与标量核对照；属已登记的 SIMD 原语设计变更 |
+| 623 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func_ut.cpp` | `DistFuncTest` | `test2` | ported | `infinity-index` `lvq::tests::lvq_l2_distance_matches_decompressed_vectors` |
+| 624 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_bitmask_ut.cpp` | `HnswAlgBitmaskTest` | `test1` | ported | `infinity-index` `vector::reference_suite::filtered_search_honours_the_bitmask` |
 | 625 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `test_memory` | partial |
 | 626 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `test_compress` | partial |
-| 627 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `DISABLED_SLOW_test_load` | partial |
-| 628 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `DISABLED_RANDOME_test_parallel` | partial |
+| 627 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `DISABLED_SLOW_test_load` | exempt | C++ 侧 `DISABLED_` 用例（gtest 从不执行）；场景已由 TestLoad/TestParallel 覆盖 |
+| 628 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `DISABLED_RANDOME_test_parallel` | exempt | C++ 侧 `DISABLED_` 用例（gtest 从不执行）；场景已由 TestLoad/TestParallel 覆盖 |
 | 629 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_sparse_ut.cpp` | `HnswSparseTest` | `test1` | partial |
 | 630 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_plain_1` | ported |
 | 631 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_plain_2` | ported |
-| 632 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_plain_3` | partial |
+| 632 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_plain_3` | ported | `infinity-index` `vector::reference_suite::plain_parallel_insert_and_search` |
 | 633 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_plain_4` | ported |
 | 634 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_lvq_1` | ported |
-| 635 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_lvq_2` | partial |
-| 636 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_lvq_3` | partial |
-| 637 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_lvq_4` | partial |
+| 635 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_lvq_2` | ported | `infinity-index` `vector::reference_suite::lvq_parallel_insert_and_search` |
+| 636 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_lvq_3` | ported | `infinity-index` `vector::reference_suite::lvq_chunk_roundtrip_preserves_recall` |
+| 637 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_lvq_4` | ported | `infinity-index` `vector::reference_suite::plain_index_compresses_to_lvq` |
 | 638 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_rabitq_1` | ported |
-| 639 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_rabitq_2` | partial |
-| 640 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_rabitq_3` | partial |
+| 639 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_rabitq_2` | ported | `infinity-index` `vector::reference_suite::rabitq_chunk_roundtrip_preserves_recall` |
+| 640 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_rabitq_3` | ported | `infinity-index` `vector::reference_suite::rabitq_parallel_insert_and_search` |
 | 641 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test_avg` | ported |
 | 642 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test1` | ported |
 | 643 | `src/unit_test/storage/knnindex/knn_hnsw/test_lvq_ut.cpp` | `HnswLVQTest` | `test1` | ported |
@@ -665,9 +665,9 @@
 | 651 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_simple` | ported |
 | 652 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_compress` | ported |
 | 653 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_distance` | ported |
-| 654 | `src/unit_test/storage/knnindex/knn_ivf/index_ivf_def_ut.cpp` | `IndexIVFTest` | `testplain` | partial |
-| 655 | `src/unit_test/storage/knnindex/knn_ivf/index_ivf_def_ut.cpp` | `IndexIVFTest` | `testsq` | partial |
-| 656 | `src/unit_test/storage/knnindex/knn_ivf/index_ivf_def_ut.cpp` | `IndexIVFTest` | `testpq` | partial |
+| 654 | `src/unit_test/storage/knnindex/knn_ivf/index_ivf_def_ut.cpp` | `IndexIVFTest` | `testplain` | ported | `infinity-index` `ivf_def::tests::testplain` |
+| 655 | `src/unit_test/storage/knnindex/knn_ivf/index_ivf_def_ut.cpp` | `IndexIVFTest` | `testsq` | ported | `infinity-index` `ivf_def::tests::testsq` |
+| 656 | `src/unit_test/storage/knnindex/knn_ivf/index_ivf_def_ut.cpp` | `IndexIVFTest` | `testpq` | ported | `infinity-index` `ivf_def::tests::testpq` |
 | 657 | `src/unit_test/storage/knnindex/knn_sparse/test_bmp_fwd_ut.cpp` | `BMPFwdTest` | `test1` | ported |
 | 658 | `src/unit_test/storage/knnindex/knn_sparse/test_bmp_index_ut.cpp` | `BMPIndexTest` | `test1` | partial |
 | 659 | `src/unit_test/storage/knnindex/knn_sparse/test_bmp_index_ut.cpp` | `BMPIndexTest` | `test2` | partial |
