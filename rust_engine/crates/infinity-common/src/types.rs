@@ -218,8 +218,16 @@ pub enum MixedValue {
     Float(f64),
     ShortStr(String),
     LongStr(String),
-    Tuple(Vec<MixedT>),
-    Array(Vec<MixedT>),
+    /// C++ `TupleMixedType`: a fixed number of named slots.
+    Tuple {
+        count: usize,
+        entries: Vec<(String, MixedT)>,
+    },
+    /// C++ `ArrayMixedType`: a fixed number of positional slots.
+    Array {
+        count: usize,
+        entries: Vec<Option<MixedT>>,
+    },
     Null,
     Missing,
     Dummy,
@@ -265,14 +273,116 @@ impl MixedT {
     }
 
     pub fn make_tuple(values: Vec<MixedT>) -> Self {
+        let count = values.len();
+        let entries = values
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| (format!("key{i}"), v))
+            .collect();
         Self {
-            value: MixedValue::Tuple(values),
+            value: MixedValue::Tuple { count, entries },
         }
     }
 
+    /// C++ `MixedType::MakeTuple(count)`: a tuple with `count` empty slots. A
+    /// zero count is a parser error in the reference.
+    pub fn make_tuple_with_count(count: usize) -> crate::Result<Self> {
+        if count == 0 {
+            return Err(crate::Error::Invalid(
+                "mixed tuple capacity must be positive".to_string(),
+            ));
+        }
+        Ok(Self {
+            value: MixedValue::Tuple {
+                count,
+                entries: Vec::new(),
+            },
+        })
+    }
+
     pub fn make_array(values: Vec<MixedT>) -> Self {
+        let count = values.len();
         Self {
-            value: MixedValue::Array(values),
+            value: MixedValue::Array {
+                count,
+                entries: values.into_iter().map(Some).collect(),
+            },
+        }
+    }
+
+    /// C++ `MixedType::MakeArray(count)`.
+    pub fn make_array_with_count(count: usize) -> crate::Result<Self> {
+        if count == 0 {
+            return Err(crate::Error::Invalid(
+                "mixed array capacity must be positive".to_string(),
+            ));
+        }
+        Ok(Self {
+            value: MixedValue::Array {
+                count,
+                entries: (0..count).map(|_| None).collect(),
+            },
+        })
+    }
+
+    /// C++ `Insert<Type>IntoTuple`: the key must be new and a slot must remain.
+    pub fn insert_into_tuple(&mut self, key: &str, value: MixedT) -> crate::Result<()> {
+        let MixedValue::Tuple { count, entries } = &mut self.value else {
+            return Err(crate::Error::Invalid(
+                "value is not a mixed tuple".to_string(),
+            ));
+        };
+        if entries.iter().any(|(k, _)| k == key) {
+            return Err(crate::Error::Invalid(format!(
+                "mixed tuple key '{key}' already exists"
+            )));
+        }
+        if entries.len() >= *count {
+            return Err(crate::Error::Invalid("mixed tuple is full".to_string()));
+        }
+        entries.push((key.to_string(), value));
+        Ok(())
+    }
+
+    /// C++ `GetFromTuple`.
+    pub fn get_from_tuple(&self, key: &str) -> Option<&MixedT> {
+        match &self.value {
+            MixedValue::Tuple { entries, .. } => {
+                entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+            }
+            _ => None,
+        }
+    }
+
+    /// C++ `Insert<Type>IntoArray`.
+    pub fn insert_into_array(&mut self, index: usize, value: MixedT) -> crate::Result<()> {
+        let MixedValue::Array { count, entries } = &mut self.value else {
+            return Err(crate::Error::Invalid(
+                "value is not a mixed array".to_string(),
+            ));
+        };
+        if index >= *count {
+            return Err(crate::Error::Invalid(format!(
+                "mixed array index {index} out of range {count}"
+            )));
+        }
+        entries[index] = Some(value);
+        Ok(())
+    }
+
+    /// C++ `GetByIndex`.
+    pub fn get_by_index(&self, index: usize) -> Option<&MixedT> {
+        match &self.value {
+            MixedValue::Array { entries, .. } => entries.get(index)?.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// The declared slot count of a tuple/array.
+    pub fn slot_count(&self) -> Option<usize> {
+        match &self.value {
+            MixedValue::Tuple { count, .. } | MixedValue::Array { count, .. } => Some(*count),
+            _ => None,
         }
     }
 
@@ -308,8 +418,8 @@ impl MixedT {
             MixedValue::Float(_) => MixedValueType::Float,
             MixedValue::ShortStr(_) => MixedValueType::ShortStr,
             MixedValue::LongStr(_) => MixedValueType::LongStr,
-            MixedValue::Tuple(_) => MixedValueType::Tuple,
-            MixedValue::Array(_) => MixedValueType::Array,
+            MixedValue::Tuple { .. } => MixedValueType::Tuple,
+            MixedValue::Array { .. } => MixedValueType::Array,
             MixedValue::Null => MixedValueType::Null,
             MixedValue::Missing => MixedValueType::Missing,
             MixedValue::Dummy => MixedValueType::Dummy,
@@ -347,8 +457,15 @@ impl MixedT {
             MixedValue::Null => "null".to_string(),
             MixedValue::Missing => "missing".to_string(),
             MixedValue::Dummy => "dummy".to_string(),
-            MixedValue::Tuple(items) | MixedValue::Array(items) => {
-                let inner: Vec<String> = items.iter().map(MixedT::text).collect();
+            MixedValue::Tuple { entries, .. } => {
+                let inner: Vec<String> = entries.iter().map(|(_, v)| v.text()).collect();
+                format!("[{}]", inner.join(","))
+            }
+            MixedValue::Array { entries, .. } => {
+                let inner: Vec<String> = entries
+                    .iter()
+                    .map(|v| v.as_ref().map(MixedT::text).unwrap_or_default())
+                    .collect();
                 format!("[{}]", inner.join(","))
             }
         }
@@ -358,8 +475,17 @@ impl MixedT {
     pub fn heap_len(&self) -> usize {
         match &self.value {
             MixedValue::ShortStr(s) | MixedValue::LongStr(s) => s.len(),
-            MixedValue::Tuple(items) | MixedValue::Array(items) => {
-                items.iter().map(MixedT::heap_len).sum::<usize>() + items.len() * 24
+            MixedValue::Tuple { entries, .. } => entries
+                .iter()
+                .map(|(k, v)| k.len() + v.heap_len() + 24)
+                .sum::<usize>(),
+            MixedValue::Array { entries, .. } => {
+                entries
+                    .iter()
+                    .flatten()
+                    .map(MixedT::heap_len)
+                    .sum::<usize>()
+                    + entries.len() * 24
             }
             _ => 0,
         }
@@ -1028,5 +1154,244 @@ mod tests {
         let array = MixedT::make_array(vec![tuple.clone(), MixedT::make_float(0.5)]);
         assert_eq!(array.value_type(), MixedValueType::Array);
         assert_eq!(array.text(), "[[1,abc],0.5]");
+    }
+    /// `mixed_type_ut.cpp::mixed_tuple2`: a 7-slot named tuple with a nested
+    /// tuple under key6.
+    #[test]
+    fn mixed_named_tuple_matches_the_reference() {
+        let mut tuple = MixedT::make_tuple_with_count(7).unwrap();
+        assert_eq!(tuple.value_type(), MixedValueType::Tuple);
+        assert_eq!(tuple.slot_count(), Some(7));
+        // Inserting into a tuple through the array API is an error.
+        assert!(tuple.insert_into_array(0, MixedT::make_integer(1)).is_err());
+
+        tuple
+            .insert_into_tuple("key1", MixedT::make_integer(100))
+            .unwrap();
+        tuple
+            .insert_into_tuple("key2", MixedT::make_float(1.1))
+            .unwrap();
+        tuple
+            .insert_into_tuple("key3", MixedT::make_string("Hello World !!"))
+            .unwrap();
+        tuple
+            .insert_into_tuple("key4", MixedT::make_string("Hello World Hello World"))
+            .unwrap();
+        tuple
+            .insert_into_tuple("key5", MixedT::make_null())
+            .unwrap();
+
+        assert_eq!(
+            tuple.get_from_tuple("key1").unwrap().as_integer(),
+            Some(100)
+        );
+        assert_eq!(tuple.get_from_tuple("key2").unwrap().as_float(), Some(1.1));
+        assert_eq!(
+            tuple.get_from_tuple("key3").unwrap().value_type(),
+            MixedValueType::ShortStr
+        );
+        assert_eq!(
+            tuple.get_from_tuple("key4").unwrap().value_type(),
+            MixedValueType::LongStr
+        );
+        assert_eq!(
+            tuple.get_from_tuple("key5").unwrap().value_type(),
+            MixedValueType::Null
+        );
+
+        let mut key6 = MixedT::make_tuple_with_count(5).unwrap();
+        key6.insert_into_tuple("key61", MixedT::make_integer(200))
+            .unwrap();
+        key6.insert_into_tuple("key62", MixedT::make_float(2.2))
+            .unwrap();
+        key6.insert_into_tuple("key63", MixedT::make_string("Hello"))
+            .unwrap();
+        key6.insert_into_tuple("key64", MixedT::make_missing())
+            .unwrap();
+        key6.insert_into_tuple("key65", MixedT::make_null())
+            .unwrap();
+        tuple.insert_into_tuple("key6", key6).unwrap();
+        let nested = tuple.get_from_tuple("key6").unwrap();
+        assert_eq!(nested.value_type(), MixedValueType::Tuple);
+        assert_eq!(
+            nested.get_from_tuple("key61").unwrap().as_integer(),
+            Some(200)
+        );
+        // A full tuple rejects further inserts.
+        tuple
+            .insert_into_tuple("key7", MixedT::make_integer(1))
+            .unwrap();
+        assert!(tuple
+            .insert_into_tuple("key8", MixedT::make_integer(1))
+            .is_err());
+    }
+
+    /// `mixed_type_ut.cpp::mixed_tuple3`: duplicate keys, overflow and a
+    /// zero-capacity tuple are errors.
+    #[test]
+    fn mixed_tuple_errors_match_the_reference() {
+        assert!(MixedT::make_tuple_with_count(0).is_err());
+        let mut tuple = MixedT::make_tuple_with_count(3).unwrap();
+        tuple
+            .insert_into_tuple("key1key1", MixedT::make_integer(300))
+            .unwrap();
+        assert!(tuple
+            .insert_into_tuple("key1key1", MixedT::make_integer(400))
+            .is_err());
+        tuple
+            .insert_into_tuple("key1key1key1key1key1key2", MixedT::make_string("ABC"))
+            .unwrap();
+        assert_eq!(
+            tuple
+                .get_from_tuple("key1key1key1key1key1key2")
+                .unwrap()
+                .as_text(),
+            Some("ABC")
+        );
+        assert!(tuple
+            .insert_into_tuple("key1key1key1key1key1key2", MixedT::make_integer(900))
+            .is_err());
+        tuple
+            .insert_into_tuple(
+                "key1key1key1key1key1key3",
+                MixedT::make_string("ABCABCABCABCABCABCABCABCABC"),
+            )
+            .unwrap();
+        assert_eq!(
+            tuple
+                .get_from_tuple("key1key1key1key1key1key3")
+                .unwrap()
+                .value_type(),
+            MixedValueType::LongStr
+        );
+        assert!(tuple
+            .insert_into_tuple("keyX", MixedT::make_string("ABC"))
+            .is_err());
+    }
+
+    /// `mixed_type_ut.cpp::mixed_array1`: positional slots and bounds checks.
+    #[test]
+    fn mixed_array_matches_the_reference() {
+        let mut array = MixedT::make_array_with_count(7).unwrap();
+        assert_eq!(array.value_type(), MixedValueType::Array);
+        assert_eq!(array.slot_count(), Some(7));
+        // Inserting into an array through the tuple API is an error.
+        assert!(array
+            .insert_into_tuple("key1", MixedT::make_integer(10))
+            .is_err());
+
+        array
+            .insert_into_array(0, MixedT::make_integer(300))
+            .unwrap();
+        array.insert_into_array(1, MixedT::make_float(1.5)).unwrap();
+        array
+            .insert_into_array(2, MixedT::make_string("HappyHalloween"))
+            .unwrap();
+        array
+            .insert_into_array(3, MixedT::make_string("HappyHalloween OK"))
+            .unwrap();
+        array.insert_into_array(4, MixedT::make_null()).unwrap();
+
+        assert_eq!(array.get_by_index(0).unwrap().as_integer(), Some(300));
+        assert_eq!(array.get_by_index(1).unwrap().as_float(), Some(1.5));
+        assert_eq!(
+            array.get_by_index(2).unwrap().as_text(),
+            Some("HappyHalloween")
+        );
+        assert_eq!(
+            array.get_by_index(3).unwrap().value_type(),
+            MixedValueType::LongStr
+        );
+        assert_eq!(
+            array.get_by_index(4).unwrap().value_type(),
+            MixedValueType::Null
+        );
+        assert!(array.get_by_index(5).is_none());
+        assert!(array.insert_into_array(7, MixedT::make_integer(1)).is_err());
+    }
+
+    /// `mixed_type_ut.cpp::mixed_array2`: slots 5 and 6 hold a nested tuple and
+    /// a nested array.
+    #[test]
+    fn mixed_array_nests_tuple_and_array() {
+        let mut array = MixedT::make_array_with_count(7).unwrap();
+        array
+            .insert_into_array(0, MixedT::make_integer(300))
+            .unwrap();
+
+        let mut tuple5 = MixedT::make_tuple_with_count(5).unwrap();
+        tuple5
+            .insert_into_tuple("key51", MixedT::make_integer(250))
+            .unwrap();
+        tuple5
+            .insert_into_tuple("key52", MixedT::make_float(2.5))
+            .unwrap();
+        tuple5
+            .insert_into_tuple("key53", MixedT::make_string("ABCDEFGHIJ"))
+            .unwrap();
+        tuple5
+            .insert_into_tuple("key54", MixedT::make_string("ABCDEFGHIJKLMNOPQRST"))
+            .unwrap();
+        tuple5
+            .insert_into_tuple("key55", MixedT::make_null())
+            .unwrap();
+        array.insert_into_array(5, tuple5).unwrap();
+
+        let mut nested = MixedT::make_array_with_count(5).unwrap();
+        nested
+            .insert_into_array(0, MixedT::make_integer(3000))
+            .unwrap();
+        nested
+            .insert_into_array(1, MixedT::make_float(1.5))
+            .unwrap();
+        nested
+            .insert_into_array(2, MixedT::make_string("MNOPQRSTUVWXYZ"))
+            .unwrap();
+        nested
+            .insert_into_array(3, MixedT::make_string("LMNOPQRSTUVWXYZ"))
+            .unwrap();
+        nested.insert_into_array(4, MixedT::make_null()).unwrap();
+        array.insert_into_array(6, nested).unwrap();
+
+        let t = array.get_by_index(5).unwrap();
+        assert_eq!(t.value_type(), MixedValueType::Tuple);
+        assert_eq!(t.slot_count(), Some(5));
+        assert_eq!(t.get_from_tuple("key51").unwrap().as_integer(), Some(250));
+        assert_eq!(
+            t.get_from_tuple("key54").unwrap().value_type(),
+            MixedValueType::LongStr
+        );
+
+        let a = array.get_by_index(6).unwrap();
+        assert_eq!(a.value_type(), MixedValueType::Array);
+        assert_eq!(a.slot_count(), Some(5));
+        assert_eq!(a.get_by_index(0).unwrap().as_integer(), Some(3000));
+        assert_eq!(
+            a.get_by_index(3).unwrap().value_type(),
+            MixedValueType::LongStr
+        );
+    }
+
+    /// `mixed_type_ut.cpp::mixed_array3`: inserts overwrite the slot; bad
+    /// indices and a zero capacity are errors.
+    #[test]
+    fn mixed_array_overwrites_and_bounds() {
+        let mut array = MixedT::make_array_with_count(2).unwrap();
+        array
+            .insert_into_array(0, MixedT::make_integer(300))
+            .unwrap();
+        array
+            .insert_into_array(0, MixedT::make_string("XXXXXXXXXXXXXXXXXXXXXXXX"))
+            .unwrap();
+        assert_eq!(
+            array.get_by_index(0).unwrap().value_type(),
+            MixedValueType::LongStr
+        );
+        array.insert_into_array(0, MixedT::make_float(4.3)).unwrap();
+        assert_eq!(array.get_by_index(0).unwrap().as_float(), Some(4.3));
+        array.insert_into_array(1, MixedT::make_float(1.5)).unwrap();
+        assert_eq!(array.get_by_index(1).unwrap().as_float(), Some(1.5));
+        assert!(array.insert_into_array(2, MixedT::make_float(1.5)).is_err());
+        assert!(MixedT::make_array_with_count(0).is_err());
     }
 }
