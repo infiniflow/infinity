@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 136, `gate-a` 188, `integration` 294, `partial` 60, `ported` 192.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 136, `gate-a` 136, `integration` 264, `partial` 60, `ported` 274.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -65,8 +65,8 @@
 | 51 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test1` | gate-a |
 | 52 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test2` | gate-a |
 | 53 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test3` | gate-a |
-| 54 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `add_bigint_constant_1` | gate-a |
-| 55 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `subtract_constant_8192_bigint` | gate-a |
+| 54 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `add_bigint_constant_1` | ported | `infinity-expression` `expression_evaluator_add_bigint_constant_1` |
+| 55 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `subtract_constant_8192_bigint` | ported | `infinity-expression` `expression_evaluator_subtract_constant_8192_bigint` |
 | 56 | `src/unit_test/executor/fragment/plan_fragment_ut.cpp` | `PlanFragmentTest` | `test1` | gate-a |
 | 57 | `src/unit_test/executor/operator/physical_sort_ut_nimpl.cpp` | `PhysicalSortTest` | `test1` | gate-a |
 | 58 | `src/unit_test/executor/pipeline/explain_ut.cpp` | `ExplainTest` | `test1` | gate-a |
@@ -79,26 +79,26 @@
 | 65 | `src/unit_test/function/aggregate/sum_functions_ut.cpp` | `SumFunctionTest` | `sum_func` | gate-a |
 | 66 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast0` | gate-a |
 | 67 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast1` | gate-a |
-| 68 | `src/unit_test/function/cast/bool_cast_ut.cpp` | `BoolCastTest` | `bool_cast0` | gate-a |
-| 69 | `src/unit_test/function/cast/bool_cast_ut.cpp` | `BoolCastTest` | `bool_cast1` | gate-a |
-| 70 | `src/unit_test/function/cast/cast_table_ut.cpp` | `CastTableTest` | `casttable_boolean` | gate-a |
-| 71 | `src/unit_test/function/cast/datetime/date_cast_ut.cpp` | `DateCastTest` | `date_cast0` | gate-a |
-| 72 | `src/unit_test/function/cast/datetime/date_cast_ut.cpp` | `DateCastTest` | `date_cast1` | gate-a |
-| 73 | `src/unit_test/function/cast/datetime/datetime_cast_ut.cpp` | `DateTimeCastTest` | `datetime_cast0` | gate-a |
-| 74 | `src/unit_test/function/cast/datetime/datetime_cast_ut.cpp` | `DateTimeCastTest` | `datetime_cast1` | gate-a |
-| 75 | `src/unit_test/function/cast/datetime/interval_cast_ut.cpp` | `IntervalCastTest` | `date_cast0` | gate-a |
-| 76 | `src/unit_test/function/cast/datetime/interval_cast_ut.cpp` | `IntervalCastTest` | `date_cast1` | gate-a |
-| 77 | `src/unit_test/function/cast/datetime/time_cast_ut.cpp` | `TimeCastTest` | `date_cast0` | gate-a |
-| 78 | `src/unit_test/function/cast/datetime/time_cast_ut.cpp` | `TimeCastTest` | `date_cast1` | gate-a |
-| 79 | `src/unit_test/function/cast/datetime/timestamp_cast_ut.cpp` | `TimestampCastTest` | `datetime_cast0` | gate-a |
-| 80 | `src/unit_test/function/cast/datetime/timestamp_cast_ut.cpp` | `TimestampCastTest` | `datetime_cast1` | gate-a |
-| 81 | `src/unit_test/function/cast/decimal/decimal_cast_ut.cpp` | `DecimalCastTest` | `decimal_cast0` | gate-a |
-| 82 | `src/unit_test/function/cast/decimal/decimal_cast_ut.cpp` | `DecimalCastTest` | `decimal_cast1` | gate-a |
-| 83 | `src/unit_test/function/cast/embedding_cast_ut.cpp` | `EmbeddingCastTest` | `embedding_cast1` | gate-a |
-| 84 | `src/unit_test/function/cast/float/double_cast_ut.cpp` | `DoubleCastTest` | `double_cast0` | gate-a |
-| 85 | `src/unit_test/function/cast/float/double_cast_ut.cpp` | `DoubleCastTest` | `double_cast1` | gate-a |
-| 86 | `src/unit_test/function/cast/float/float_cast_ut.cpp` | `FloatCastTest` | `float_cast0` | gate-a |
-| 87 | `src/unit_test/function/cast/float/float_cast_ut.cpp` | `FloatCastTest` | `float_cast1` | gate-a |
+| 68 | `src/unit_test/function/cast/bool_cast_ut.cpp` | `BoolCastTest` | `bool_cast0` | ported | `infinity-common` `bool_cast0` |
+| 69 | `src/unit_test/function/cast/bool_cast_ut.cpp` | `BoolCastTest` | `bool_cast1` | ported | `infinity-common` `bool_cast1` |
+| 70 | `src/unit_test/function/cast/cast_table_ut.cpp` | `CastTableTest` | `casttable_boolean` | ported | `infinity-common` `casttable_boolean` |
+| 71 | `src/unit_test/function/cast/datetime/date_cast_ut.cpp` | `DateCastTest` | `date_cast0` | ported | `infinity-common` `date_cast0` |
+| 72 | `src/unit_test/function/cast/datetime/date_cast_ut.cpp` | `DateCastTest` | `date_cast1` | ported | `infinity-common` `date_cast1` |
+| 73 | `src/unit_test/function/cast/datetime/datetime_cast_ut.cpp` | `DateTimeCastTest` | `datetime_cast0` | ported | `infinity-common` `datetime_cast0` |
+| 74 | `src/unit_test/function/cast/datetime/datetime_cast_ut.cpp` | `DateTimeCastTest` | `datetime_cast1` | ported | `infinity-common` `datetime_cast1` |
+| 75 | `src/unit_test/function/cast/datetime/interval_cast_ut.cpp` | `IntervalCastTest` | `date_cast0` | ported | `infinity-common` `interval_cast0` |
+| 76 | `src/unit_test/function/cast/datetime/interval_cast_ut.cpp` | `IntervalCastTest` | `date_cast1` | ported | `infinity-common` `interval_cast1` |
+| 77 | `src/unit_test/function/cast/datetime/time_cast_ut.cpp` | `TimeCastTest` | `date_cast0` | ported | `infinity-common` `time_cast0` |
+| 78 | `src/unit_test/function/cast/datetime/time_cast_ut.cpp` | `TimeCastTest` | `date_cast1` | ported | `infinity-common` `time_cast1` |
+| 79 | `src/unit_test/function/cast/datetime/timestamp_cast_ut.cpp` | `TimestampCastTest` | `datetime_cast0` | ported | `infinity-common` `timestamp_cast0` |
+| 80 | `src/unit_test/function/cast/datetime/timestamp_cast_ut.cpp` | `TimestampCastTest` | `datetime_cast1` | ported | `infinity-common` `timestamp_cast1` |
+| 81 | `src/unit_test/function/cast/decimal/decimal_cast_ut.cpp` | `DecimalCastTest` | `decimal_cast0` | ported | `infinity-common` `decimal_cast0` |
+| 82 | `src/unit_test/function/cast/decimal/decimal_cast_ut.cpp` | `DecimalCastTest` | `decimal_cast1` | ported | `infinity-common` `decimal_cast1` |
+| 83 | `src/unit_test/function/cast/embedding_cast_ut.cpp` | `EmbeddingCastTest` | `embedding_cast1` | ported | `infinity-common` `embedding_cast1` |
+| 84 | `src/unit_test/function/cast/float/double_cast_ut.cpp` | `DoubleCastTest` | `double_cast0` | ported | `infinity-common` `double_cast0` |
+| 85 | `src/unit_test/function/cast/float/double_cast_ut.cpp` | `DoubleCastTest` | `double_cast1` | ported | `infinity-common` `double_cast1` |
+| 86 | `src/unit_test/function/cast/float/float_cast_ut.cpp` | `FloatCastTest` | `float_cast0` | ported | `infinity-common` `float_cast0` |
+| 87 | `src/unit_test/function/cast/float/float_cast_ut.cpp` | `FloatCastTest` | `float_cast1` | ported | `infinity-common` `float_cast1` |
 | 88 | `src/unit_test/function/cast/geography/box_cast_ut.cpp` | `BoxCastTest` | `line_seg_cast0` | excluded |
 | 89 | `src/unit_test/function/cast/geography/box_cast_ut.cpp` | `BoxCastTest` | `line_seg_cast1` | excluded |
 | 90 | `src/unit_test/function/cast/geography/circle_cast_ut.cpp` | `CircleCastTest` | `circle_cast0` | excluded |
@@ -113,20 +113,20 @@
 | 99 | `src/unit_test/function/cast/geography/point_cast_ut.cpp` | `PointCastTest` | `point_cast1` | excluded |
 | 100 | `src/unit_test/function/cast/geography/polygon_cast_ut_nimpl.cpp` | `PolygonCastTest` | `polygon_cast0` | excluded |
 | 101 | `src/unit_test/function/cast/geography/polygon_cast_ut_nimpl.cpp` | `PolygonCastTest` | `polygon_cast1` | excluded |
-| 102 | `src/unit_test/function/cast/integer_cast/bigint_cast_ut.cpp` | `BigIntCastTest` | `bigint_cast0` | gate-a |
-| 103 | `src/unit_test/function/cast/integer_cast/bigint_cast_ut.cpp` | `BigIntCastTest` | `bigint_cast1` | gate-a |
-| 104 | `src/unit_test/function/cast/integer_cast/hugeint_cast_ut.cpp` | `HugeIntCastTest` | `hugeint_cast0` | gate-a |
-| 105 | `src/unit_test/function/cast/integer_cast/hugeint_cast_ut.cpp` | `HugeIntCastTest` | `hugeint_cast1` | gate-a |
-| 106 | `src/unit_test/function/cast/integer_cast/integer_cast_ut.cpp` | `IntegerCastTest` | `integer_cast0` | gate-a |
-| 107 | `src/unit_test/function/cast/integer_cast/integer_cast_ut.cpp` | `IntegerCastTest` | `integer_cast1` | gate-a |
-| 108 | `src/unit_test/function/cast/integer_cast/small_integer_cast_ut.cpp` | `SmallIntegerCastTest` | `small_integer_cast0` | gate-a |
-| 109 | `src/unit_test/function/cast/integer_cast/small_integer_cast_ut.cpp` | `SmallIntegerCastTest` | `small_integer_cast1` | gate-a |
-| 110 | `src/unit_test/function/cast/integer_cast/tiny_integer_cast_ut.cpp` | `TinyIntegerCastTest` | `tiny_integer_cast0` | gate-a |
-| 111 | `src/unit_test/function/cast/integer_cast/tiny_integer_cast_ut.cpp` | `TinyIntegerCastTest` | `tiny_integer_cast1` | gate-a |
+| 102 | `src/unit_test/function/cast/integer_cast/bigint_cast_ut.cpp` | `BigIntCastTest` | `bigint_cast0` | ported | `infinity-common` `bigint_cast0` |
+| 103 | `src/unit_test/function/cast/integer_cast/bigint_cast_ut.cpp` | `BigIntCastTest` | `bigint_cast1` | ported | `infinity-common` `bigint_cast1` |
+| 104 | `src/unit_test/function/cast/integer_cast/hugeint_cast_ut.cpp` | `HugeIntCastTest` | `hugeint_cast0` | ported | `infinity-common` `hugeint_cast0` |
+| 105 | `src/unit_test/function/cast/integer_cast/hugeint_cast_ut.cpp` | `HugeIntCastTest` | `hugeint_cast1` | ported | `infinity-common` `hugeint_cast1` |
+| 106 | `src/unit_test/function/cast/integer_cast/integer_cast_ut.cpp` | `IntegerCastTest` | `integer_cast0` | ported | `infinity-common` `integer_cast0` |
+| 107 | `src/unit_test/function/cast/integer_cast/integer_cast_ut.cpp` | `IntegerCastTest` | `integer_cast1` | ported | `infinity-common` `integer_cast1` |
+| 108 | `src/unit_test/function/cast/integer_cast/small_integer_cast_ut.cpp` | `SmallIntegerCastTest` | `small_integer_cast0` | ported | `infinity-common` `small_integer_cast0` |
+| 109 | `src/unit_test/function/cast/integer_cast/small_integer_cast_ut.cpp` | `SmallIntegerCastTest` | `small_integer_cast1` | ported | `infinity-common` `small_integer_cast1` |
+| 110 | `src/unit_test/function/cast/integer_cast/tiny_integer_cast_ut.cpp` | `TinyIntegerCastTest` | `tiny_integer_cast0` | ported | `infinity-common` `tiny_integer_cast0` |
+| 111 | `src/unit_test/function/cast/integer_cast/tiny_integer_cast_ut.cpp` | `TinyIntegerCastTest` | `tiny_integer_cast1` | ported | `infinity-common` `tiny_integer_cast1` |
 | 112 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast0` | gate-a |
 | 113 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast1` | gate-a |
-| 114 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast0` | gate-a |
-| 115 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast1` | gate-a |
+| 114 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast0` | ported | `infinity-common` `varchar_cast0` |
+| 115 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast1` | ported | `infinity-common` `varchar_cast1` |
 | 116 | `src/unit_test/function/scalar/abs_functions_ut.cpp` | `AbsFunctionsTest` | `abs_func` | gate-a |
 | 117 | `src/unit_test/function/scalar/add_functions_ut.cpp` | `AddFunctionsTest` | `add_func` | gate-a |
 | 118 | `src/unit_test/function/scalar/and_functions_ut.cpp` | `AndFunctionsTest` | `and_func` | gate-a |
@@ -208,9 +208,9 @@
 | 194 | `src/unit_test/main/stats/global_resource_usage_ut.cpp` | `GlobalResourceUsageTest` | `usage_test` | exempt | 用例主体在 `#ifdef INFINITY_STATS` 内，构建系统从未定义该宏 → C++ 侧编译为空 |
 | 195 | `src/unit_test/main/table_ut.cpp` | `InfinityTableTest` | `test1` | ported | `infinity-executor` `tests::explain_covers_every_plan_kind`（6 种 EXPLAIN） |
 | 196 | `src/unit_test/parallel/chaos_ut.cpp` | `ParallelTest` | `DISABLED_SLOW_ChaosTest` | gap |
-| 197 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_precision` | gate-a |
-| 198 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json` | gate-a |
-| 199 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json_hex_float` | gate-a |
+| 197 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_precision` | ported | `infinity-parser` `float_serialize_test_precision` |
+| 198 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json` | ported | `infinity-expression` `float_serialize_test_json` |
+| 199 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json_hex_float` | ported | `infinity-expression` `float_serialize_test_json_hex_float` |
 | 200 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `good_test1` | gate-a |
 | 201 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `good_test2` | gate-a |
 | 202 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `operator_option_test` | gate-a |
@@ -221,35 +221,35 @@
 | 207 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test1` | gate-a |
 | 208 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test2` | gate-a |
 | 209 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_test1` | gate-a |
-| 210 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_create_index_1` | gate-a |
-| 211 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_create_index_1` | gate-a |
-| 212 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test1` | gate-a |
-| 213 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test2` | gate-a |
+| 210 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_create_index_1` | ported | `infinity-parser` `sql_parser_good_create_index_1` |
+| 211 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_create_index_1` | ported | `infinity-parser` `sql_parser_bad_create_index_1` |
+| 212 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test1` | ported | `infinity-parser` `select_statement_parsing_good_test1` |
+| 213 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test2` | ported | `infinity-parser` `select_statement_parsing_good_test2` |
 | 214 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test3` | gate-a |
 | 215 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test4` | gate-a |
 | 216 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_test1` | gate-a |
 | 217 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_knn_test` | gate-a |
 | 218 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_search_test` | gate-a |
-| 219 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_search_test` | gate-a |
-| 220 | `src/unit_test/parser/sql_statement_ut.cpp` | `StatementParsingTest` | `good_test1` | gate-a |
+| 219 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_search_test` | ported | `infinity-parser` `select_statement_parsing_good_search_test` |
+| 220 | `src/unit_test/parser/sql_statement_ut.cpp` | `StatementParsingTest` | `good_test1` | ported | `infinity-parser` `statement_parsing_good_test1` |
 | 221 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap1` | gate-a |
 | 222 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap2` | gate-a |
 | 223 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap33` | gate-a |
 | 224 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap34` | gate-a |
 | 225 | `src/unit_test/parser/type/complex/blob_type_ut_nimpl.cpp` | `BlobTypeTest` | `blob1` | gate-a |
-| 226 | `src/unit_test/parser/type/complex/uuid_type_ut.cpp` | `UuidTypeTest` | `Uuid` | gate-a |
+| 226 | `src/unit_test/parser/type/complex/uuid_type_ut.cpp` | `UuidTypeTest` | `Uuid` | ported | `infinity-common` `uuid` |
 | 227 | `src/unit_test/parser/type/complex/varchar_ut.cpp` | `VarcharTest` | `structure_check` | gate-a |
-| 228 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `GetTypeName` | gate-a |
-| 229 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `TypeToString` | gate-a |
+| 228 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `GetTypeName` | ported | `infinity-common` `data_type_get_type_name` |
+| 229 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `TypeToString` | ported | `infinity-common` `data_type_type_to_string` |
 | 230 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `Serialize` | gate-a |
 | 231 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `ReadWrite` | gate-a |
 | 232 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `test1` | gate-a |
 | 233 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `TestEqStdChronoForward` | gate-a |
 | 234 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `TestEqStdChronoBackward` | gate-a |
 | 235 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestSameSize` | gate-a |
-| 236 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestFromString` | gate-a |
-| 237 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestAddSubstract` | gate-a |
-| 238 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestNegativeYears` | gate-a |
+| 236 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestFromString` | ported | `infinity-common` `test_from_string` |
+| 237 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestAddSubstract` | ported | `infinity-common` `test_add_subtract` |
+| 238 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestNegativeYears` | ported | `infinity-common` `test_negative_years` |
 | 239 | `src/unit_test/parser/type/fp16_ut.cpp` | `FP16TypeTest` | `test1` | gate-a |
 | 240 | `src/unit_test/parser/type/geo/box_type_ut.cpp` | `BoxTypeTest` | `point1` | gate-a |
 | 241 | `src/unit_test/parser/type/geo/path_type_ut_nimpl.cpp` | `PathTypeTest` | `path1` | gate-a |
@@ -268,9 +268,9 @@
 | 254 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_array1` | gate-a |
 | 255 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_array2` | gate-a |
 | 256 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_array3` | gate-a |
-| 257 | `src/unit_test/parser/type/info/decimal_info_ut.cpp` | `DecimalInfoTest` | `decimal_info_A` | gate-a |
-| 258 | `src/unit_test/parser/type/info/embedding_info_ut.cpp` | `EmbeddingInfoTest` | `embedding_info_A` | gate-a |
-| 259 | `src/unit_test/parser/type/null_value_ut.cpp` | `NullValueTest` | `null_value_test1` | gate-a |
+| 257 | `src/unit_test/parser/type/info/decimal_info_ut.cpp` | `DecimalInfoTest` | `decimal_info_A` | ported | `infinity-common` `decimal_info_a` |
+| 258 | `src/unit_test/parser/type/info/embedding_info_ut.cpp` | `EmbeddingInfoTest` | `embedding_info_A` | ported | `infinity-common` `embedding_info_a` |
+| 259 | `src/unit_test/parser/type/null_value_ut.cpp` | `NullValueTest` | `null_value_test1` | ported | `infinity-common` `null_value_test1` |
 | 260 | `src/unit_test/planner/column_binding_ut.cpp` | `ColumnBindingTest` | `test1` | gate-a |
 | 261 | `src/unit_test/planner/explain_basic_ut.cpp` | `ExplainBasicTest` | `test1` | gate-a |
 | 262 | `src/unit_test/planner/logical_plan_tpch_ut.cpp` | `LogicalPlannerTpchTest` | `test1` | gate-a |
@@ -603,17 +603,17 @@
 | 589 | `src/unit_test/storage/io/local_file_ut.cpp` | `LocalFileTest` | `test1` | integration |
 | 590 | `src/unit_test/storage/io/s3_client_minio_ut.cpp` | `S3ClientMinioTest` | `test1` | integration |
 | 591 | `src/unit_test/storage/io/stream_reader_ut.cpp` | `StreamReaderTest` | `TestBasicStreamIO` | integration |
-| 592 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestAppend` | integration |
-| 593 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestDir` | integration |
-| 594 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestRead` | integration |
-| 595 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestRename` | integration |
-| 596 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestTruncate` | integration |
-| 597 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestMerge` | integration |
-| 598 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestCleanDir` | integration |
+| 592 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestAppend` | ported | `infinity-storage` `append_then_delete` |
+| 593 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestDir` | ported | `infinity-storage` `dir_create_and_remove` |
+| 594 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestRead` | ported | `infinity-storage` `write_then_read` |
+| 595 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestRename` | ported | `infinity-storage` `rename_moves_the_file` |
+| 596 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestTruncate` | ported | `infinity-storage` `truncate_cuts_the_tail` |
+| 597 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestMerge` | ported | `infinity-storage` `merge_appends_src_to_dst` |
+| 598 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestCleanDir` | ported | `infinity-storage` `cleanup_directory_keeps_the_directory` |
 | 599 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `minio_upload` | integration |
 | 600 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `minio_download` | integration |
-| 601 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestStorageType` | integration |
-| 602 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestFileCompress` | integration |
+| 601 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestStorageType` | ported | `infinity-storage` `storage_type_conversions` |
+| 602 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestFileCompress` | ported | `infinity-storage` `file_compress_writes_a_record` |
 | 603 | `src/unit_test/storage/knnindex/emvb_search/test_emvb_ut.cpp` | `EMVBTest` | `test_fakepq` | gap |
 | 604 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testsum256` | exempt |
 | 605 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testloadstore` | exempt |
@@ -700,20 +700,20 @@
 | 686 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `get_delete_ts_test` | ported | `mvcc::tests::get_delete_ts_returns_the_slot_range` |
 | 687 | `src/unit_test/storage/new_catalog/alter_ut.cpp` | `TestTxnAlter` | `add_column0` | integration |
 | 688 | `src/unit_test/storage/new_catalog/alter_ut.cpp` | `TestTxnAlter` | `drop_column0` | integration |
-| 689 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append0` | integration |
+| 689 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append0` | ported | `infinity-executor` `appends_accumulate_across_commits` |
 | 690 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append1` | integration |
-| 691 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append2` | integration |
-| 692 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_mismatch` | integration |
-| 693 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_db` | integration |
-| 694 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_table` | integration |
-| 695 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_add_column` | integration |
-| 696 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_column` | integration |
-| 697 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_rename` | integration |
+| 691 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append2` | ported | `infinity-executor` `large_appends_span_blocks` |
+| 692 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_mismatch` | ported | `infinity-executor` `append_type_mismatch_is_rejected` |
+| 693 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_db` | ported | `infinity-executor` `append_after_drop_is_rejected` |
+| 694 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_table` | ported | `infinity-executor` `append_after_drop_is_rejected` |
+| 695 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_add_column` | ported | `infinity-executor` `append_add_column_fills_old_rows_with_null` |
+| 696 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_column` | ported | `infinity-executor` `append_add_column_fills_old_rows_with_null` |
+| 697 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_rename` | ported | `infinity-executor` `append_uses_the_renamed_table` |
 | 698 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_append` | integration |
 | 699 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `DISABLED_SLOW_test_append_append_concurrent` | integration |
-| 700 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_create_index` | integration |
-| 701 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_drop_index` | integration |
-| 702 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_compact` | integration |
+| 700 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_create_index` | ported | `infinity-executor` `append_around_secondary_index_lifecycle` |
+| 701 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_drop_index` | ported | `infinity-executor` `append_around_secondary_index_lifecycle` |
+| 702 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_compact` | ported | `infinity-executor` `append_then_compact_preserves_rows` |
 | 703 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_optimize_index` | integration |
 | 704 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_db` | integration |
 | 705 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_table` | integration |
@@ -759,10 +759,10 @@
 | 745 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_with_index_rollback` | integration |
 | 746 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_db` | integration |
 | 747 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_table` | integration |
-| 748 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_add_columns` | integration |
+| 748 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_add_columns` | ported | `infinity-executor` `compact_then_alter_and_drop_table` |
 | 749 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_columns` | integration |
 | 750 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_rename_table` | integration |
-| 751 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_compact` | integration |
+| 751 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_compact` | ported | `infinity-executor` `compaction_is_idempotent` |
 | 752 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_create_index` | integration |
 | 753 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_index` | integration |
 | 754 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `createdb_createdb_test` | integration |
@@ -772,8 +772,8 @@
 | 758 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `dropdb_wrong_conflicttype` | integration |
 | 759 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `dropdb_dropdb_test` | integration |
 | 760 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `createdb_dropdb_test` | integration |
-| 761 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete` | integration |
-| 762 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_multiple_blocks` | integration |
+| 761 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete` | ported | `infinity-executor` `delete_removes_rows_from_scans` |
+| 762 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_multiple_blocks` | ported | `infinity-executor` `delete_across_multiple_blocks` |
 | 763 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_db` | integration |
 | 764 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_table` | integration |
 | 765 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_add_column` | integration |
@@ -782,9 +782,9 @@
 | 768 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_create_index` | integration |
 | 769 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_index` | integration |
 | 770 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_import` | integration |
-| 771 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_append` | integration |
+| 771 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_append` | ported | `infinity-executor` `delete_then_append_and_compact` |
 | 772 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_delete` | integration |
-| 773 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_compact` | integration |
+| 773 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_compact` | ported | `infinity-executor` `delete_then_append_and_compact` |
 | 774 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_optimize_index` | integration |
 | 775 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_db` | integration |
 | 776 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_table` | integration |
@@ -911,7 +911,7 @@
 | 897 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_system_snapshot` | integration |
 | 898 | `src/unit_test/storage/new_catalog/table_cache_ut.cpp` | `TestTableCache` | `test_table_cache` | integration |
 | 899 | `src/unit_test/storage/new_catalog/table_meta_ut.cpp` | `TestTxnTableMeta` | `table_meta` | integration |
-| 900 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `table_test1` | integration |
+| 900 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `table_test1` | ported | `infinity-executor` `create_and_drop_table_conflicts` |
 | 901 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `table_test2` | integration |
 | 902 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createtable_wrong_conflicttype` | integration |
 | 903 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `droptable_wrong_conflicttype` | integration |
@@ -922,7 +922,7 @@
 | 908 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createtable_droptable_test` | integration |
 | 909 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `droptable_droptable_test` | integration |
 | 910 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `rename_table_test` | integration |
-| 911 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update` | integration |
+| 911 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update` | ported | `infinity-executor` `update_replaces_visible_values` |
 | 912 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_multiple_blocks` | integration |
 | 913 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_drop_db` | integration |
 | 914 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_drop_table` | integration |
@@ -931,7 +931,7 @@
 | 917 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_add_drop_column_conflicts` | integration |
 | 918 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_compact_conflicts` | integration |
 | 919 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_create_index_conflicts` | integration |
-| 920 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_delete_conflicts` | integration |
+| 920 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_delete_conflicts` | ported | `infinity-executor` `update_and_delete_compose` |
 | 921 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_delete_no_conflicts` | integration |
 | 922 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `create_index_append` | gap |
 | 923 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `add_column_append` | gap |
@@ -997,7 +997,7 @@
 | 983 | `src/unit_test/storage/wal/recycle_log_ut.cpp` | `RecycleLogTest` | `recycle_wal_after_delta_checkpoint` | integration |
 | 984 | `src/unit_test/storage/wal/repeat_replay_ut.cpp` | `RepeatReplayTest` | `append` | integration |
 | 985 | `src/unit_test/storage/wal/repeat_replay_ut.cpp` | `RepeatReplayTest` | `import` | integration |
-| 986 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `ReadWriteV2` | integration |
+| 986 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `ReadWriteV2` | ported | `infinity-storage` `read_write_v2_roundtrips_every_command` |
 | 987 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `WalEntryIterator` | integration |
 | 988 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `WalListIterator` | integration |
 | 989 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedEntryBeforeCheckpointIsIgnored` | integration |
