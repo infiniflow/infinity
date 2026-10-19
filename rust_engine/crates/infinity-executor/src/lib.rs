@@ -3264,6 +3264,13 @@ impl Engine {
         let Ok(indexes) = self.storage.catalog.list_indexes() else {
             return;
         };
+        // The reference has one buffer budget shared by every index; give each
+        // HNSW index an equal share so the total stays within it.
+        let hnsw_count = indexes
+            .iter()
+            .filter(|im| im.index_type.eq_ignore_ascii_case("HNSW"))
+            .count()
+            .max(1);
         for im in indexes {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
                 // Reconcile with the live chunk set and the buffer budget:
@@ -3281,7 +3288,8 @@ impl Engine {
                     .context
                     .hnsw_budget
                     .load(std::sync::atomic::Ordering::Relaxed)
-                    .max(1);
+                    .max(1)
+                    / hnsw_count;
                 let tkey = self.table_key(&im.table);
                 let (mut total, have, kept) = {
                     let mut tables = self.tables.lock().unwrap();
