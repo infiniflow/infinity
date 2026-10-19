@@ -12946,6 +12946,29 @@ mod tests {
     /// Scalar tables keep a decoded row cache (the reference's in-memory
     /// `DataBlock`s); array/vector tables do not, because their decoded form is
     /// not stable across the write and scan paths.
+    /// Once the mirror covers every live row, full scans read the values from
+    /// the column blocks: the row KV only supplies the row-id list. Poisoning
+    /// the KV values proves the read path no longer depends on them.
+    #[test]
+    fn full_rows_come_from_the_block_mirror_when_current() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE bm (id INT, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        e.execute("INSERT INTO bm VALUES (1,[1.0,0.0]),(2,[2.0,0.0]);")
+            .unwrap();
+        e.flush().unwrap();
+        for seq in 0..2 {
+            e.store()
+                .put(&row_key("default_db.bm", seq), b"999\t[9.0,9.0]")
+                .unwrap();
+        }
+        let rows = e.fetch_rows("default_db.bm").unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0][0], Value::Int(1));
+        assert_eq!(rows[1][0], Value::Int(2));
+    }
+
     #[test]
     fn scalar_tables_use_the_row_cache() {
         let dir = tempdir().unwrap();
