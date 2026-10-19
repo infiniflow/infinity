@@ -49,6 +49,7 @@
 | `Storage`（`storage.cppm`） | 执行器 `Engine::storage: Storage` + `Engine` 的 `txn`/`dir`/`context` | `new_catalog`/`kv_store`/`new_txn_manager`/`buffer_manager`/`wal_manager`/`object_storage_processor` 分别由 `Storage` 与 `Engine` 组合；后台处理器由 CLI 定时线程 + Tokio 取代（D4） | ✅ |
 | `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`BufferManager`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联；C++ 线程池由 Tokio 取代（D4） | ✅ |
 | `ColumnVector<T>` / `DataBlock`（`column_vector.cppm`、`data_block.cppm`） | `infinity_storage::data_block::{ColumnVector, Column, DataBlock}` | `AppendValue/AppendWith`→`push`/`extend_value`、`GetValue`/`SetValue`→`get`/`set`、null bitmap→`validity`、`DataBlock::Make/AppendRow/Finalize/GetValue/Reset`→`new`/`push_slot`/`finalize`/`value_text`/`reset`、`MemUsed`→`mem_used` | ✅（执行器求值仍以 `Value` 行渲染块内容；列容器本身已移植） |
+| `LoserTreeBase` / `LoserTree`（`invertedindex/common/loser_tree.cppm`） | `infinity_common::loser_tree::LoserTree` | `InsertStart`→`insert_start`、`InitWinner`/`Init`→`init_winner`/`init`、`TopSource`/`TopKey`、`DeleteTopInsert`→`delete_top_insert`、`round_up_to_power_of_two`；sentinel（`sup`/`invalid_`）语义一致 | ✅ |
 | `RegexLiteralRun` / `ExtractRegexLiteralRuns`（`planner/optimizer/regex_literal_extractor.h`） | `regex_literal::{extract_regex_literal_runs, has_any_sparse_gram, parse_sparsegram_analyzer}` | 只抽取每次匹配都必含的字面 run；`\Q…\E`/`\C`/内联 `(?i:)` 标志、量词回退、备选分支丢弃、ASCII fold 切分、`sparsegram-<min>-<max>[-fold]` 解析与 gram 下限 | ✅ |
 | `DumpMemIndexTask` / `OptimizeIndexTask` / `CleanupIndexTask`（`bg_task/`） | `Engine::{dump_hnsw_segments, optimize_indexes, cleanup}` | dump 按 `mem_index_capacity`/字节配额写增量 chunk；optimize 在可承受的内存内重建全表 merged chunk；cleanup 只删除被 merged chunk 覆盖的旧 chunk（调度由 CLI 定时线程代替，见 D4） | ✅（任务对象由定时线程取代） |
 | `PlaidQuantizer`（`plaid_quantizer.cppm`） | `infinity_index::plaid::PlaidQuantizer` | `Train`（全局均值 + 分位切断点/权重，超限按 `MAX_RESIDUAL_VALUES` 蓄水池采样）、`Quantize/Dequantize`（2/4-bit MSB-first 打包、反位映射、L2 归一）、`GetIPDistanceTable`/`BuildPositionLUT`/`GetSingleIPDistance*`、`Save/Load` 字节布局 | ✅ |
@@ -169,6 +170,7 @@
 | `knn/hnsw/test_lvq_ut.cpp` | `lvq::LvqStore` | `reconstruction_error_is_below_two_percent`（2% 重建误差）、`distances_track_the_plain_metric`、`save_and_load_roundtrip` |
 | `knn/hnsw/test_rabitq_ut.cpp` | `rabitq::RabitqStore` | `orthogonal_matrix_is_orthonormal`、`centroid_is_the_rotated_mean`、`save_and_load_roundtrip`、`l2_estimator_keeps_the_true_neighbour` |
 | `knn/hnsw/test_lsg_build_ut.cpp` | `lsg::LsgIndex` + `HnswIndex` | `avg_is_at_least_the_exhaustive_topk_mean`、`lsg_hnsw_keeps_self_query_recall`（recall@1 ≥ 0.95） |
+| `storage/common/loser_tree_ut.cpp::LoserTreeTest` | `infinity_common::loser_tree::LoserTree` | `basic_merge_1`…`basic_merge_4`（10/3、10/12、1000/200、1000/2000 路归并）、`round_up_matches_the_reference` |
 | `bg_task/*_ut.cpp` 的索引生命周期 | `dump_hnsw_segments` / `optimize_indexes` / `cleanup` | `hnsw_checkpoint_dumps_only_the_memory_segment`、`mem_index_capacity_dumps_the_hnsw_segment_after_the_batch`、`cleanup_keeps_incremental_hnsw_chunks_until_a_merge_covers_the_table` |
 | `knn/plaid/test_plaid_ut.cpp::PlaidQuantizerTest` | `plaid::PlaidQuantizer` | `train_quantize_dequantize`、`two_bit_quantization`、`ip_table_and_position_lut_agree`、`save_and_load_roundtrip` |
 | `PlaidGlobalCentroids`（由 `PlaidIndexTest` 覆盖） | `plaid::PlaidGlobalCentroids` | `trains_centroids_and_assigns_nearest`、`residuals_reconstruct_the_embedding`、`save_and_load_roundtrip`、`colbertsar_mode_has_no_quantizer` |
@@ -197,5 +199,5 @@
 `src/unit_test` 共 **1012** 个 `TEST/TEST_F/TEST_P`，逐条状态见 [`TEST_AUDIT.md`](TEST_AUDIT.md)：`ported` 33、`partial` 231、`integration` 294、`gate-a` 216、`gap` 225、`exempt` 12、`excluded` 1。
 
 - `column_vector/*` 的 `ColumnVector`/`DataBlock` **类已移植**（`infinity_storage::data_block`），但 C++ 用例覆盖完整 `ColumnVector` API（VectorBuffer/Initialize/Reset/ShallowCopy/typed Value 存取），Rust 容器只实现了求值所需子集，故列为 `partial`，剩余用例随 API 补齐逐条移植。
-- `common/loser_tree_ut.cpp` / `common/test_rcu_multimap_ut.cpp` 的 `LoserTree`/RCU 容器尚未移植，列为 `gap`。
+- `LoserTree` 已移植（`infinity_common::loser_tree`，4 例通过）；`common/test_rcu_multimap_ut.cpp` 的 RCU 容器尚未移植，列为 `gap`。
 - `gap`/`partial` 的 456 个用例是下一阶段的移植队列，按 `TEST_AUDIT.md` 的文件分组推进。

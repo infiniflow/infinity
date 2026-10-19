@@ -10,3 +10,5 @@ pub mod types;
 
 pub use error::{Error, Result};
 pub use types::{LogicalType, RowID, TxnTimeStamp};
+
+pub mod loser_tree;
