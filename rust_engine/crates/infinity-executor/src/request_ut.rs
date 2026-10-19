@@ -688,3 +688,30 @@ fn delete_removes_matching_row() {
         vec![vec!["2".to_string(), "def".to_string()]]
     );
 }
+
+/// C++: `main/table_ut.cpp` `InfinityTableTest.test1` — the `Infinity` facade
+/// path (create database → get database → create a table with an embedding
+/// column → insert → query).
+#[test]
+fn infinity_facade_create_database_table_insert_select() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    e.execute("CREATE DATABASE db1;").unwrap();
+    assert!(e.execute("CREATE DATABASE db1;").is_err());
+    e.execute("CREATE TABLE db1.tb1 (col1 EMBEDDING(FLOAT,128));")
+        .unwrap();
+    assert!(e.execute("CREATE TABLE db1.tb1 (col1 INT);").is_err());
+
+    let vector = format!("[{}]", vec!["0.5"; 128].join(","));
+    e.execute(&format!("INSERT INTO db1.tb1 VALUES ({vector});"))
+        .unwrap();
+    assert_eq!(count(&e, "db1.tb1"), 1);
+
+    let result = rows(&e, "SELECT col1 FROM db1.tb1;");
+    assert_eq!(result.len(), 1);
+    assert!(result[0][0].contains("0.5"), "{:?}", result[0]);
+
+    e.execute("DROP TABLE db1.tb1;").unwrap();
+    assert_eq!(count(&e, "db1.tb1"), 0);
+}

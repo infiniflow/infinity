@@ -1857,18 +1857,12 @@ fn is_plain_identifier(s: &str) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
-/// Qualifies the table references of a stored view query with `db`.
-///
-/// A view is stored as SQL text, but an unqualified `FROM t` must keep
-/// referring to the database in which the view was created even when a later
-/// session selects from the view under another `USE`. This walks the token
-/// stream and prefixes names in `FROM`/`JOIN` position (including
-/// comma-separated FROM lists); subqueries are handled by the same walk.
 /// Qualifies every unqualified table reference using `resolve(name)`, which
 /// returns the database the table actually lives in. Views created from a
 /// non-default database may reference tables in another database, so the
 /// caller resolves each name against the catalog instead of blindly using the
-/// current session database.
+/// current session database. The walk handles `FROM`/`JOIN` positions
+/// (including comma-separated FROM lists and subqueries).
 fn qualify_sql_tables_with(sql: &str, resolve: &dyn Fn(&str) -> String) -> Result<String> {
     let mut toks = tokenize(sql)?;
     let mut depth = 0i32;

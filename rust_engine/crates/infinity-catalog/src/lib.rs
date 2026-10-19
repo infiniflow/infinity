@@ -1273,6 +1273,31 @@ mod tests {
     }
 
     #[test]
+    fn cpp_only_catalog_keeps_the_sparse_hint() {
+        let dir = tempdir().unwrap();
+        let store: Arc<dyn MetaStore> =
+            Arc::new(FjallMetaStore::open(dir.path(), "catalog").unwrap());
+        {
+            let c = Catalog::with_store_cpp_only(store.clone());
+            c.create_table_typed_with_sparse_stores(
+                "default_db.sp",
+                &cols(&["id", "v"]),
+                &[None, None],
+                &[false, false],
+                &["INTEGER".to_string(), "SPARSE(FLOAT,30000)".to_string()],
+                &[None, None],
+                &[None, Some(SparseStore::Sorted)],
+            )
+            .unwrap();
+        }
+        // The hint is written to the C++ `sort` field and read back from it.
+        let c = Catalog::with_store_cpp_only(store);
+        let t = c.get_table_by_name("default_db.sp").unwrap().unwrap();
+        assert_eq!(t.types[1], "SPARSE(float,30000)");
+        assert_eq!(t.sparse_stores[1], Some(SparseStore::Sorted));
+    }
+
+    #[test]
     fn drop_table() {
         let dir = tempdir().unwrap();
         let c = Catalog::open(dir.path()).unwrap();
