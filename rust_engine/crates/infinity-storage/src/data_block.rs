@@ -1207,4 +1207,16 @@ mod reference_suite {
         select_suite(conv);
         slice_suite(conv);
     }
+
+    /// C++: `column_vector_varchar_ut.cpp` — the inline/out-of-line buffer
+    /// distinction does not exist here (a row owns its `String`), so the four
+    /// structural cases carry over directly.
+    #[test]
+    fn varchar_flat_constant_select_slice() {
+        let conv = |i: i64| format!("v{i}");
+        flat_suite(conv);
+        constant_suite(conv);
+        select_suite(conv);
+        slice_suite(conv);
+    }
 }

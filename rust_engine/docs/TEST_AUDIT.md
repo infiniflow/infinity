@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 193, `gate-a` 216, `integration` 294, `partial` 211, `ported` 84.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 193, `gate-a` 216, `integration` 294, `partial` 207, `ported` 88.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -432,10 +432,10 @@
 | 418 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `contant_uuid` | ported | `infinity-storage` `data_block::reference_suite::uuid_flat_constant_select_slice` |
 | 419 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `uuid_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::uuid_flat_constant_select_slice` |
 | 420 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `uuid_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::uuid_flat_constant_select_slice` |
-| 421 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_inline_varchar` | partial |
-| 422 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `constant_inline_varchar` | partial |
-| 423 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `varchar_column_vector_select` | partial |
-| 424 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `varchar_column_slice_init` | partial |
+| 421 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_inline_varchar` | ported | `infinity-storage` `data_block::reference_suite::varchar_flat_constant_select_slice` |
+| 422 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `constant_inline_varchar` | ported | `infinity-storage` `data_block::reference_suite::varchar_flat_constant_select_slice` |
+| 423 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `varchar_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::varchar_flat_constant_select_slice` |
+| 424 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `varchar_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::varchar_flat_constant_select_slice` |
 | 425 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_not_inline_varchar` | partial |
 | 426 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `constant_not_inline_varchar` | partial |
 | 427 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_mixed_inline_varchar` | partial |
