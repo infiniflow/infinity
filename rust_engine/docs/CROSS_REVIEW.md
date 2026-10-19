@@ -32,7 +32,7 @@
 | G7 | `DependentJoinFlattener` 缺逐节点相关表 | high | 属实；随相关子查询登记 |
 | G8 | `ColumnRemapper` 仅套用外部位置映射 | high | 属实；保持 `partial`，待接入真实重映射 |
 | G9 | `LazyLoad` 只收集元数据 | high | 属实；文档注明 analysis-only |
-| G10 | `PGProtocolHandler` 不存在 | high | 已修正映射（`pg::handle` + `PgServer`），该行 `partial` |
+| G10 | `PGProtocolHandler` 不存在 | high | **已解决**：新增 `pg::PGProtocolHandler`（启动握手/命令解析/响应帧/命令循环），`PgServer` 的每条连接都经由它；CLASS_AUDIT 373 已恢复 `mapped` |
 | G11 | `RegexIndexRewrite` 输出 `index=` 而非 `column@index` | medium | 要求 `planner-10` 修正 |
 | G12 | `ResultCacheGetter` 键/白名单不符 | medium | 要求 `planner-10` 修正 |
 | G13 | `IndexScanBuilder` 候选未被执行器消费 | medium | 随 G1 接线处理 |
@@ -59,3 +59,10 @@
 
 结论：稳定区无 critical/high；H2/H3/H6/H7 已修，H1 以现有生产层测试覆盖，
 H4/H5 待 planner 接线后复核。
+
+## 协作事故与恢复（2026-10-19 16:40）
+
+- `planner-10` 在 `infinity-executor/src/lib.rs` 完成了完整接线（行对齐、join 两侧对齐、索引候选、plan cache、QueryBinder），16:37 时 workspace 498 tests 通过。
+- 本 session 随后在同一文件上加了最小 `Optimizer::with_default_rules()` 调用并 revert，覆盖掉了该接线；同时 `planner/src/*` 的裁剪/重映射仍在，导致 Gate A 回落到 `query 1209/1546`（位置错位，如 `ROW_ID()/DISTANCE()` 取到错误列）。
+- 处理：`infinity-executor/src/lib.rs` 归还 `planner-10`，本 session 不再写入；由它重新接线并以 Gate A `1546/1546` 为验收。期间 peer 接线（server）不受影响。
+- 教训：同一文件不得并行写入；worker 未报告完成前，lead 只做只读复核。事故期间不以“部分接线”的状态作为收敛依据。

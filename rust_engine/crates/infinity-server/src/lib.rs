@@ -29,7 +29,7 @@ use std::sync::{Arc, Mutex};
 
 use infinity_common::{Error, Result};
 
-use crate::peer::{NodeInfo, NodeRole, NodeStatus};
+use crate::peer::PeerManager;
 use infinity_executor::{with_zero_dimension_sparse, Engine, QueryResult};
 
 use thrift::protocol::{
@@ -62,6 +62,15 @@ pub struct CommonResponse {
     pub error_code: i64,
     pub error_msg: String,
     pub session_id: i64,
+}
+
+/// `ShowCurrentNodeResponse` (the node role and status of this server).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ShowCurrentNodeResponse {
+    pub error_code: i64,
+    pub error_msg: String,
+    pub node_role: String,
+    pub server_status: String,
 }
 
 // -------- message writers (server + client) --------
@@ -250,27 +259,26 @@ pub struct Server {
     sessions: Arc<Mutex<HashMap<i64, i64>>>,
     next_session: Arc<AtomicI64>,
     engine: Option<Arc<Engine>>,
-    /// The node this process presents to `SHOW CURRENT NODE` and the peer
-    /// service. A standalone server is a leader with no peers.
-    node: Arc<NodeInfo>,
+    /// The cluster state: this node's `NodeInfo`, the peer registry, the peer
+    /// task queue and the event history ring. Shared with every connection.
+    peer: Arc<PeerManager>,
 }
 
 impl Server {
     pub fn bind(addr: &str) -> Result<Self> {
         let listener = TcpListener::bind(addr).map_err(|e| Error::io(addr, e))?;
+        let bound = listener.local_addr().map_err(|e| Error::io(addr, e))?;
         Ok(Self {
             listener,
             sessions: Arc::new(Mutex::new(HashMap::new())),
             next_session: Arc::new(AtomicI64::new(1)),
             engine: None,
-            node: Arc::new(NodeInfo::new(
-                NodeRole::Leader,
-                NodeStatus::Alive,
+            // A standalone server is a leader of an empty cluster; its peer
+            // endpoint is the address it listens on.
+            peer: Arc::new(PeerManager::new(
                 "leader",
-                "0.0.0.0",
-                0,
-                0,
-                0,
+                bound.ip().to_string(),
+                i64::from(bound.port()),
             )),
         })
     }
@@ -280,6 +288,13 @@ impl Server {
         let mut s = Self::bind(addr)?;
         s.engine = Some(engine);
         Ok(s)
+    }
+
+    /// The peer/cluster manager shared with every connection. Mutating node
+    /// state through it (`register_peer`, `heartbeat_peer`, `change_role`) is
+    /// reflected by `SHOW CURRENT NODE`.
+    pub fn peer(&self) -> Arc<PeerManager> {
+        Arc::clone(&self.peer)
     }
 
     pub fn local_addr(&self) -> Result<String> {
@@ -301,9 +316,9 @@ impl Server {
                     let sessions = self.sessions.clone();
                     let next = self.next_session.clone();
                     let engine = self.engine.clone();
-                    let node = self.node.clone();
+                    let peer = Arc::clone(&self.peer);
                     std::thread::spawn(move || {
-                        let _ = handle_connection(s, sessions, next, engine, node);
+                        let _ = handle_connection(s, sessions, next, engine, peer);
                     });
                 }
                 Err(_) => continue,
@@ -431,7 +446,7 @@ fn handle_connection(
     sessions: Arc<Mutex<HashMap<i64, i64>>>,
     next_session: Arc<AtomicI64>,
     engine: Option<Arc<Engine>>,
-    node: Arc<NodeInfo>,
+    peer: Arc<PeerManager>,
 ) -> Result<()> {
     // Thrift writes scalar fields one at a time (a `list<bool>` bitmask is one
     // `writeBool` per row); on a raw `TcpStream` that is one syscall per value.
@@ -1867,12 +1882,8 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         skip_struct(&mut ip)?;
                     }
-                    write_show_current_node_response(
-                        &mut writer,
-                        seq,
-                        &node.node_role().to_string(),
-                        &node.node_status().to_string(),
-                    )?;
+                    let (node_role, server_status) = peer.node_state();
+                    write_show_current_node_response(&mut writer, seq, &node_role, &server_status)?;
                 }
                 "ShowSnapshot" => {
                     let (sid, name) = {
@@ -2159,6 +2170,44 @@ pub fn disconnect(addr: &str, session_id: i64) -> Result<CommonResponse> {
     write_common_call(&mut stream, "Disconnect", 2, session_id)?;
     let mut reader = stream.try_clone().map_err(io)?;
     read_connect_reply(&mut reader)
+}
+
+/// A client-side `ShowCurrentNode`.
+pub fn show_current_node(addr: &str, session_id: i64) -> Result<ShowCurrentNodeResponse> {
+    let mut stream = TcpStream::connect(addr).map_err(|e| Error::io(addr, e))?;
+    // `ShowCurrentNodeRequest { 1: session_id }` has the `CommonRequest` shape.
+    write_common_call(&mut stream, "ShowCurrentNode", 3, session_id)?;
+    let mut reader = stream.try_clone().map_err(io)?;
+    read_show_current_node_reply(&mut reader)
+}
+
+/// Reads a `ShowCurrentNode` REPLY.
+pub fn read_show_current_node_reply(r: &mut impl Read) -> Result<ShowCurrentNodeResponse> {
+    let mut i = TBinaryInputProtocol::new(r, true);
+    let _msg = i.read_message_begin().map_err(tw)?;
+    i.read_struct_begin().map_err(tw)?; // ShowCurrentNode_result
+    let success = i.read_field_begin().map_err(tw)?;
+    if success.field_type != TType::Struct {
+        return Err(Error::Invalid("expected success struct".into()));
+    }
+    i.read_struct_begin().map_err(tw)?; // ShowCurrentNodeResponse
+    let mut response = ShowCurrentNodeResponse::default();
+    loop {
+        let f = i.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match (f.id, f.field_type) {
+            (Some(1), TType::I64) => response.error_code = i.read_i64().map_err(tw)?,
+            (Some(2), TType::String) => response.error_msg = i.read_string().map_err(tw)?,
+            (Some(3), TType::String) => response.node_role = i.read_string().map_err(tw)?,
+            (Some(4), TType::String) => response.server_status = i.read_string().map_err(tw)?,
+            _ => i.skip(f.field_type).map_err(tw)?,
+        }
+        i.read_field_end().map_err(tw)?;
+    }
+    i.read_struct_end().map_err(tw)?;
+    Ok(response)
 }
 
 /// A client-side `CreateTable`.
@@ -7464,6 +7513,125 @@ mod tests {
         let dc = disconnect(&addr, ok.session_id).unwrap();
         assert_eq!(dc.error_code, OK);
         assert_eq!(dc.session_id, ok.session_id);
+    }
+
+    /// The peer manager owns the node `SHOW CURRENT NODE` reports: a role
+    /// change made through the manager is visible on the wire, and the peer
+    /// registry records the registration that produced it.
+    #[test]
+    fn show_current_node_reflects_the_peer_manager() {
+        use crate::peer::{NodeRole, NodeStatus};
+
+        let server = Server::bind("127.0.0.1:0").unwrap();
+        let addr = server.local_addr().unwrap();
+        let peer = server.peer();
+        std::thread::spawn(move || server.run());
+
+        let node = show_current_node(&addr, 1).unwrap();
+        assert_eq!(node.error_code, OK);
+        assert_eq!(node.node_role, "leader");
+        assert_eq!(node.server_status, "alive");
+
+        // Register a follower; the local node stays the leader and the
+        // registry records the new peer.
+        peer.set_now_secs(100);
+        peer.register_peer("follower0", NodeRole::Follower, "127.0.0.2", 23818, 10)
+            .unwrap();
+        assert_eq!(
+            peer.node_state(),
+            ("leader".to_string(), "alive".to_string())
+        );
+        let nodes = peer.list_nodes();
+        assert_eq!(nodes.len(), 2);
+        assert_eq!(nodes[1].node_name(), "follower0");
+        assert_eq!(nodes[1].node_status(), NodeStatus::Alive);
+
+        // The role transition reaches the client through the same NodeInfo.
+        peer.change_role(NodeRole::Admin).unwrap();
+        let node = show_current_node(&addr, 1).unwrap();
+        assert_eq!(node.node_role, "admin");
+        assert_eq!(node.server_status, "alive");
+        assert_eq!(
+            peer.events(),
+            vec![
+                "register@follower0, 127.0.0.2:23818, follower".to_string(),
+                "change-role@admin".to_string(),
+            ]
+        );
+    }
+
+    /// The registry history is a real `RingBufferIterator`: it records the
+    /// register / heartbeat / terminate sequence, keeps only the newest 64
+    /// records and captures leader-side timeouts.
+    #[test]
+    fn peer_registry_records_register_heartbeat_and_terminate_events() {
+        use crate::peer::{NodeRole, PEER_EVENT_CAPACITY};
+
+        let server = Server::bind("127.0.0.1:0").unwrap();
+        let peer = server.peer();
+        peer.set_now_secs(100);
+
+        peer.register_peer("follower0", NodeRole::Follower, "127.0.0.2", 23818, 10)
+            .unwrap();
+        peer.register_peer("learner0", NodeRole::Learner, "127.0.0.3", 23819, 11)
+            .unwrap();
+        peer.heartbeat_peer("follower0", "127.0.0.2", 23818, 12)
+            .unwrap();
+        let follower = peer
+            .list_nodes()
+            .into_iter()
+            .find(|node| node.node_name() == "follower0")
+            .unwrap();
+        assert_eq!(follower.txn_ts(), 12);
+        assert_eq!(follower.heartbeat_count(), 1);
+
+        // A duplicate registration is rejected and leaves the log untouched.
+        assert!(peer
+            .register_peer("learner0", NodeRole::Learner, "127.0.0.9", 23820, 13)
+            .is_err());
+
+        peer.terminate_peer("follower0").unwrap();
+        assert!(peer
+            .list_nodes()
+            .iter()
+            .all(|node| node.node_name() != "follower0"));
+        assert_eq!(
+            peer.events(),
+            vec![
+                "register@follower0, 127.0.0.2:23818, follower".to_string(),
+                "register@learner0, 127.0.0.3:23819, learner".to_string(),
+                "heartbeat@follower0, 12".to_string(),
+                "terminate@follower0".to_string(),
+            ]
+        );
+
+        // The ring keeps the newest 64 events. Re-register the peer, then push
+        // enough heartbeats to wrap the buffer several times over.
+        peer.set_now_secs(100);
+        peer.register_peer("follower0", NodeRole::Follower, "127.0.0.2", 23818, 0)
+            .unwrap();
+        for txn in 0..80 {
+            peer.heartbeat_peer("follower0", "127.0.0.2", 23818, txn)
+                .unwrap();
+        }
+        let events = peer.events();
+        assert_eq!(events.len(), PEER_EVENT_CAPACITY);
+        // 4 earlier records + re-register + 80 heartbeats = 85; the oldest 21
+        // are overwritten, so the history starts at heartbeat #16.
+        assert_eq!(events.first().unwrap(), "heartbeat@follower0, 16");
+        assert_eq!(events.last().unwrap(), "heartbeat@follower0, 79");
+
+        // Four silent seconds mark both silent peers timed out and record it.
+        peer.set_now_secs(1000);
+        assert_eq!(
+            peer.check_heartbeat().unwrap(),
+            vec!["follower0".to_string(), "learner0".to_string()]
+        );
+        assert_eq!(peer.events().last().unwrap(), "timeout@learner0");
+
+        // The client terminates last: after this the task queue is closed.
+        peer.shutdown();
+        assert_eq!(peer.events().last().unwrap(), "terminate@leader");
     }
 
     #[test]

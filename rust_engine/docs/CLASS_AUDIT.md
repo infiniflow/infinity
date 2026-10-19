@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担于 cast）；geo 用例的排除见 `TEST_AUDIT.md`，DiskANN 15 类在本表 `excluded`。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1056, `partial` 38, `test` 7
+- 状态分布：`excluded` 15, `exempt` 20, `gap` 23, `mapped` 1067, `partial` 4, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -369,19 +369,19 @@
 | 360 | `HTTPServer` | `src/network/http_server.cppm` | mapped | infinity_server 
 | 361 | `InfinityThriftService` | `src/network/infinity_thrift_service.cppm` | mapped | infinity_server 
 | 362 | `NodeInfo` | `src/network/node_info.cppm` | mapped | infinity_server 
-| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 366 | `PeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | partial | Rust 无独立 `PGProtocolHandler` 类型；协议处理由 `infinity_server::pg::handle` + `PgServer` 承担（命名/拆分差异），mapped 需先拆类 
+| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 366 | `PeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
+| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | mapped | `infinity_server::pg::PGProtocolHandler`（泛型读写流：启动握手/SSL 拒绝、前端命令解析、响应帧、命令循环），`PgServer` 每条连接都由它处理，有单测 |
 | 374 | `PGServer` | `src/network/pg_server.cppm` | mapped | `infinity_server::PgServer` 
-| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
+| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | mapped | `infinity_server::peer` / `ring_buffer`，经 `PeerManager` 挂到 `Server`，有服务端行为测试（进程内传输，见 CLASS_MAP 限制说明） 
 | 376 | `NonBlockPoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 377 | `PoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 378 | `ThreadedThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
@@ -479,29 +479,29 @@
 | 470 | `LogicalUpdate` | `src/planner/node/logical_update.cppm` | mapped | infinity_planner 
 | 471 | `LogicalViewScan` | `src/planner/node/logical_view_scan.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 472 | `Optimizer` | `src/planner/optimizer.cppm` | mapped | infinity_planner 
-| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | partial | 实现已存在但尚未接入运行路径（`planner-10`/`peer-10` 正在接线）；接线并有行为测试后恢复 mapped 
-| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | partial | 仅覆盖未关联子查询；相关子查询未实现（解析器丢弃表限定符，执行器按常量/本地列求值），不得据此声称 C++ 相关子查询已移植 
+| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
 | 496 | `FragmentContext` | `src/scheduler/fragment_context.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
 | 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 

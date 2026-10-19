@@ -15,12 +15,27 @@
 //! The cluster manager itself is not part of the 11 audited classes; it is included
 //! here because the peer service and the heartbeat state machine are meaningless
 //! without it (the C++ service delegates every request to `ClusterManager`).
+//!
+//! [`PeerManager`] is what the running server owns: the local [`NodeInfo`], the
+//! peer registry, the [`PeerServerThriftService`] that answers peer RPCs, the
+//! [`PeerClient`] task queue that carries them and a [`RingBufferIterator`] ring
+//! of registry events. `SHOW CURRENT NODE` reads its `NodeInfo`, and the local
+//! `register` / `heartbeat` / `change_role` entry points mutate it.
+//!
+//! Follow-up: `thrift/peer_server.thrift` (the C++
+//! `src/network/peer_server_thrift_service.cppm` socket service, which listens on
+//! its own port rather than on `InfinityService`) is not served over the network
+//! yet. [`PeerManager::handle_peer_request`] is the dispatch boundary such a
+//! transport would call — the six request/response pairs are already typed, only
+//! the TBinaryProtocol listener is missing.
 
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use crate::ring_buffer::{RingBufferIterator, PG_MSG_BUFFER_SIZE};
 
 /// Error codes from `src/common/status.cppm` (`ErrorCode`).
 pub mod error_code {
@@ -2343,24 +2358,28 @@ impl PoolPeerThriftServer {
         }
         let _worker = self.take_worker();
         let now = self.now_secs.load(Ordering::SeqCst);
-        Ok(match request {
-            PeerRequest::Register(request) => {
-                PeerResponse::Register(self.service.register(&request, now))
-            }
-            PeerRequest::Unregister(request) => {
-                PeerResponse::Unregister(self.service.unregister(&request))
-            }
-            PeerRequest::HeartBeat(request) => {
-                PeerResponse::HeartBeat(self.service.heartbeat(&request, now))
-            }
-            PeerRequest::SyncLog(request) => PeerResponse::SyncLog(self.service.sync_log(&request)),
-            PeerRequest::ChangeRole(request) => {
-                PeerResponse::ChangeRole(self.service.change_role(&request))
-            }
-            PeerRequest::NewLeader(request) => {
-                PeerResponse::NewLeader(self.service.new_leader(&request))
-            }
-        })
+        Ok(dispatch_peer_request(&self.service, request, now))
+    }
+}
+
+/// Routes one peer request to the service. Shared by [`PoolPeerThriftServer`]
+/// (pooled dispatch) and [`PeerManager`] (local dispatch before the pool starts).
+fn dispatch_peer_request(
+    service: &PeerServerThriftService,
+    request: PeerRequest,
+    now_secs: u64,
+) -> PeerResponse {
+    match request {
+        PeerRequest::Register(request) => {
+            PeerResponse::Register(service.register(&request, now_secs))
+        }
+        PeerRequest::Unregister(request) => PeerResponse::Unregister(service.unregister(&request)),
+        PeerRequest::HeartBeat(request) => {
+            PeerResponse::HeartBeat(service.heartbeat(&request, now_secs))
+        }
+        PeerRequest::SyncLog(request) => PeerResponse::SyncLog(service.sync_log(&request)),
+        PeerRequest::ChangeRole(request) => PeerResponse::ChangeRole(service.change_role(&request)),
+        PeerRequest::NewLeader(request) => PeerResponse::NewLeader(service.new_leader(&request)),
     }
 }
 
@@ -2384,6 +2403,407 @@ pub enum PeerResponse {
     SyncLog(SyncLogResponse),
     ChangeRole(ChangeRoleResponse),
     NewLeader(NewLeaderResponse),
+}
+
+// ---------------------------------------------------------------------------
+// PeerManager: the server-side cluster state
+// ---------------------------------------------------------------------------
+
+/// Bytes reserved for one event record inside the peer event ring.
+pub const PEER_EVENT_SLOT: usize = 64;
+/// How many peer events the ring keeps before overwriting the oldest one.
+pub const PEER_EVENT_CAPACITY: usize = PG_MSG_BUFFER_SIZE / PEER_EVENT_SLOT;
+
+/// One entry of the peer event history. The rendering matches the peer task
+/// `to_string` forms so a log line can be traced back to the task that produced
+/// it (`RegisterPeerTask`, `HeartBeatPeerTask`, `UnregisterPeerTask`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PeerEvent(String);
+
+impl PeerEvent {
+    pub fn register(name: &str, ip: &str, port: i64, role: NodeRole) -> Self {
+        Self(format!("register@{name}, {ip}:{port}, {role}"))
+    }
+
+    pub fn heartbeat(name: &str, txn_ts: i64) -> Self {
+        Self(format!("heartbeat@{name}, {txn_ts}"))
+    }
+
+    pub fn terminate(name: &str) -> Self {
+        Self(format!("terminate@{name}"))
+    }
+
+    pub fn change_role(role: NodeRole) -> Self {
+        Self(format!("change-role@{role}"))
+    }
+
+    pub fn timeout(name: &str) -> Self {
+        Self(format!("timeout@{name}"))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for PeerEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// Fixed-size event history on top of [`RingBufferIterator`]. Every record is
+/// written into its own [`PEER_EVENT_SLOT`]-byte slot with
+/// `copy_n_from_slice` and read back with `copy_n_to_bytes`, so the cursor
+/// arithmetic (wrap included) is exercised by the running peer registry.
+#[derive(Debug)]
+pub struct PeerEventLog {
+    buffer: Arc<RwLock<Vec<u8>>>,
+    next_slot: Mutex<usize>,
+    written: AtomicUsize,
+}
+
+impl Default for PeerEventLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PeerEventLog {
+    pub fn new() -> Self {
+        Self {
+            buffer: RingBufferIterator::new_buffer(),
+            next_slot: Mutex::new(0),
+            written: AtomicUsize::new(0),
+        }
+    }
+
+    /// Appends one record, overwriting the oldest slot once the ring is full.
+    pub fn record(&self, event: &PeerEvent) {
+        let mut next_slot = lock(&self.next_slot);
+        let slot = *next_slot;
+        let mut cursor =
+            RingBufferIterator::new(Arc::clone(&self.buffer), (slot * PEER_EVENT_SLOT) as u32);
+        // One byte stays NUL so a reader can find the end of a short record.
+        let mut payload = event.as_str().as_bytes().to_vec();
+        payload.truncate(PEER_EVENT_SLOT - 1);
+        payload.resize(PEER_EVENT_SLOT, 0);
+        RingBufferIterator::copy_n_from_slice(&payload, &mut cursor);
+
+        *next_slot = (slot + 1) % PEER_EVENT_CAPACITY;
+        self.written.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// Oldest-to-newest history, capped at [`PEER_EVENT_CAPACITY`]. The write
+    /// cursor is held for the duration so a concurrent `record` cannot tear a
+    /// slot that is being read.
+    pub fn events(&self) -> Vec<String> {
+        let next_slot = lock(&self.next_slot);
+        let count = self.written.load(Ordering::SeqCst).min(PEER_EVENT_CAPACITY);
+        let start = (*next_slot + PEER_EVENT_CAPACITY - count) % PEER_EVENT_CAPACITY;
+        (0..count)
+            .map(|offset| {
+                let position = ((start + offset) % PEER_EVENT_CAPACITY * PEER_EVENT_SLOT) as u32;
+                let cursor = RingBufferIterator::new(Arc::clone(&self.buffer), position);
+                let bytes = RingBufferIterator::copy_n_to_bytes(&cursor, PEER_EVENT_SLOT);
+                let end = bytes
+                    .iter()
+                    .position(|byte| *byte == 0)
+                    .unwrap_or(bytes.len());
+                String::from_utf8_lossy(&bytes[..end]).into_owned()
+            })
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.written.load(Ordering::SeqCst).min(PEER_EVENT_CAPACITY)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+/// The cluster state a server process owns: the local [`NodeInfo`], the peer
+/// registry, the [`PeerServerThriftService`] that answers peer RPCs, the
+/// [`PoolPeerThriftServer`] that hosts it and the [`PeerClient`] task queue
+/// that carries outbound work.
+///
+/// The local `register` / `heartbeat` / `change_role` / `send_logs` methods
+/// queue the real peer tasks, so the server exercises the same request path
+/// (and the same state machine) a remote peer would. `handle_peer_request` is
+/// the inbound dispatch boundary, routed through the pooled peer server once it
+/// is started.
+pub struct PeerManager {
+    cluster: Arc<ClusterManager>,
+    service: Arc<PeerServerThriftService>,
+    peer_server: PoolPeerThriftServer,
+    transport: Arc<InProcessPeerTransport>,
+    client: PeerClient,
+    events: PeerEventLog,
+}
+
+impl PeerManager {
+    /// Builds the manager for `node_name` at `node_ip:node_port` and registers
+    /// it as the leader of an otherwise empty cluster.
+    pub fn new(node_name: impl Into<String>, node_ip: impl Into<String>, node_port: i64) -> Self {
+        let node_name = node_name.into();
+        let node_ip = node_ip.into();
+        let cluster = Arc::new(ClusterManager::new());
+        cluster
+            .init_as_leader(&node_name, &node_ip, node_port, system_now_secs())
+            .expect("a fresh cluster manager accepts its own leader node");
+        let sink: Arc<dyn LogSyncSink> = Arc::new(RecordingLogSink::default());
+        let service = Arc::new(PeerServerThriftService::new(cluster.clone(), sink));
+        let peer_server = PoolPeerThriftServer::new(service.clone());
+        let transport = Arc::new(
+            InProcessPeerTransport::new(service.clone()).with_from_node_name(node_name.clone()),
+        );
+        // Dispatch is in-process, so the retry loop needs no delay.
+        let client = PeerClient::new(node_name, node_ip, node_port, transport.clone())
+            .with_retry_policy(DEFAULT_PEER_RETRY_COUNT, Duration::ZERO);
+        let _ = client.init();
+        Self {
+            cluster,
+            service,
+            peer_server,
+            transport,
+            client,
+            events: PeerEventLog::new(),
+        }
+    }
+
+    pub fn cluster(&self) -> &Arc<ClusterManager> {
+        &self.cluster
+    }
+
+    pub fn service(&self) -> &Arc<PeerServerThriftService> {
+        &self.service
+    }
+
+    /// The pooled peer endpoint. Its lifecycle (`init` / `start` / `shutdown`)
+    /// is the server's; the socket transport on top of it is a follow-up.
+    pub fn peer_server(&self) -> &PoolPeerThriftServer {
+        &self.peer_server
+    }
+
+    /// Initialises and starts the pooled peer server on `address:port`.
+    pub fn start_peer_server(
+        &self,
+        address: &str,
+        port: i32,
+        pool_size: usize,
+    ) -> Result<(), PeerError> {
+        self.peer_server.init(address, port, pool_size)?;
+        self.peer_server.set_now_secs(self.now_secs());
+        self.peer_server.start()
+    }
+
+    pub fn stop_peer_server(&self) -> Result<(), PeerError> {
+        self.peer_server.shutdown()
+    }
+
+    pub fn local_node_name(&self) -> &str {
+        self.client.local_node_name()
+    }
+
+    pub fn this_node(&self) -> Option<NodeInfo> {
+        self.cluster.this_node()
+    }
+
+    /// `(node_role, server_status)` as `SHOW CURRENT NODE` renders them.
+    pub fn node_state(&self) -> (String, String) {
+        match self.this_node() {
+            Some(node) => (node.node_role().to_string(), node.node_status().to_string()),
+            None => (
+                NodeRole::UnInitialized.to_string(),
+                NodeStatus::Invalid.to_string(),
+            ),
+        }
+    }
+
+    pub fn list_nodes(&self) -> Vec<NodeInfo> {
+        self.cluster.list_nodes()
+    }
+
+    /// The injected clock every peer operation uses.
+    pub fn now_secs(&self) -> u64 {
+        self.transport.now_secs()
+    }
+
+    pub fn set_now_secs(&self, now_secs: u64) {
+        self.transport.set_now_secs(now_secs);
+    }
+
+    pub fn events(&self) -> Vec<String> {
+        self.events.events()
+    }
+
+    /// Registers a follower/learner with this node through `RegisterPeerTask`.
+    pub fn register_peer(
+        &self,
+        node_name: &str,
+        role: NodeRole,
+        node_ip: &str,
+        node_port: i64,
+        txn_ts: i64,
+    ) -> Result<(), PeerError> {
+        let task = Arc::new(RegisterPeerTask::new(
+            node_name, role, node_ip, node_port, txn_ts,
+        ));
+        self.client.send_sync(task.clone())?;
+        let response = task.response();
+        check_code(response.error_code, &response.error_msg)?;
+        self.record(PeerEvent::register(node_name, node_ip, node_port, role));
+        Ok(())
+    }
+
+    /// Sends one heartbeat through `HeartBeatPeerTask`; a registered peer's
+    /// `txn_ts`, `update_ts` and heartbeat counter move forward.
+    pub fn heartbeat_peer(
+        &self,
+        node_name: &str,
+        node_ip: &str,
+        node_port: i64,
+        txn_ts: i64,
+    ) -> Result<(), PeerError> {
+        let task = Arc::new(HeartBeatPeerTask::new(
+            node_name,
+            NodeRole::Follower,
+            node_ip,
+            node_port,
+            txn_ts,
+        ));
+        self.client.send_sync(task.clone())?;
+        let response = task.response();
+        check_code(response.error_code, &response.error_msg)?;
+        self.record(PeerEvent::heartbeat(node_name, txn_ts));
+        Ok(())
+    }
+
+    /// Removes a peer from the registry (`UnregisterPeerTask`).
+    pub fn terminate_peer(&self, node_name: &str) -> Result<(), PeerError> {
+        let task = Arc::new(UnregisterPeerTask::new(node_name));
+        self.client.send_sync(task.clone())?;
+        let response = task.response();
+        check_code(response.error_code, &response.error_msg)?;
+        self.record(PeerEvent::terminate(node_name));
+        Ok(())
+    }
+
+    /// Switches the local node role. Only `admin` is a legal target, matching
+    /// `ClusterManager::ChangeServerRole`.
+    pub fn change_role(&self, role: NodeRole) -> Result<(), PeerError> {
+        let task = Arc::new(ChangeRoleTask::new(
+            self.local_node_name().to_string(),
+            role.to_string(),
+        ));
+        self.client.send_sync(task.clone())?;
+        let response = task.response();
+        check_code(response.error_code, &response.error_msg)?;
+        self.record(PeerEvent::change_role(role));
+        Ok(())
+    }
+
+    /// Leader `SendLogs`: pushes a replicated log batch to `node_name` through
+    /// `SyncLogTask` and returns the applied-log count reported back.
+    pub fn send_logs(
+        &self,
+        node_name: &str,
+        entries: &[String],
+        on_startup: bool,
+    ) -> Result<i64, PeerError> {
+        let task = Arc::new(SyncLogTask::new(node_name, entries.to_vec(), on_startup));
+        self.client.send_sync(task.clone())?;
+        let response = task.response();
+        check_code(response.error_code, &response.error_msg)?;
+        Ok(response.txn_timestamp)
+    }
+
+    /// Leader-side heartbeat check: marks silent peers `timeout`.
+    pub fn check_heartbeat(&self) -> Result<Vec<String>, PeerError> {
+        let timed_out = self.cluster.check_heartbeat(self.now_secs())?;
+        for name in &timed_out {
+            self.record(PeerEvent::timeout(name));
+        }
+        Ok(timed_out)
+    }
+
+    /// Dispatches one inbound peer RPC and records the resulting registry
+    /// change. Requests go through the pooled peer server once it is running;
+    /// before that (or after shutdown) they go straight to the service. This is
+    /// the boundary a `peer_server.thrift` socket transport would call.
+    pub fn handle_peer_request(&self, request: PeerRequest) -> PeerResponse {
+        let now = self.now_secs();
+        self.peer_server.set_now_secs(now);
+        let response = match self.peer_server.handle(request.clone()) {
+            Ok(response) => response,
+            Err(_) => dispatch_peer_request(&self.service, request.clone(), now),
+        };
+        self.record_exchange(&request, &response);
+        response
+    }
+
+    /// Records the registry-visible outcome of one peer request.
+    fn record_exchange(&self, request: &PeerRequest, response: &PeerResponse) {
+        match (request, response) {
+            (PeerRequest::Register(request), PeerResponse::Register(response))
+                if response.error_code == 0 =>
+            {
+                let role = match request.node_type {
+                    NodeType::Follower => NodeRole::Follower,
+                    NodeType::Learner => NodeRole::Learner,
+                    _ => NodeRole::UnInitialized,
+                };
+                self.record(PeerEvent::register(
+                    &request.node_name,
+                    &request.node_ip,
+                    request.node_port,
+                    role,
+                ));
+            }
+            (PeerRequest::Unregister(request), PeerResponse::Unregister(response))
+                if response.error_code == 0 =>
+            {
+                self.record(PeerEvent::terminate(&request.node_name));
+            }
+            (PeerRequest::HeartBeat(request), PeerResponse::HeartBeat(response))
+                if response.error_code == 0 =>
+            {
+                self.record(PeerEvent::heartbeat(
+                    &request.node_name,
+                    request.txn_timestamp,
+                ));
+            }
+            (PeerRequest::ChangeRole(_), PeerResponse::ChangeRole(response))
+                if response.error_code == 0 =>
+            {
+                self.record(PeerEvent::change_role(self.cluster.role()));
+            }
+            _ => {}
+        }
+    }
+
+    /// Drains the task queue, stops the peer endpoint and disconnects, exactly
+    /// like `PeerClient::UnInit` plus `PeerThriftServer::Shutdown`.
+    pub fn shutdown(&self) {
+        let local = self.local_node_name().to_string();
+        let _ = self.peer_server.shutdown();
+        self.client.uninit(true);
+        self.record(PeerEvent::terminate(&local));
+    }
+
+    fn record(&self, event: PeerEvent) {
+        self.events.record(&event);
+    }
+}
+
+fn check_code(error_code: i64, error_msg: &str) -> Result<(), PeerError> {
+    if error_code == 0 {
+        Ok(())
+    } else {
+        Err(PeerError::rejected(error_code, error_msg))
+    }
 }
 
 #[cfg(test)]
@@ -2999,6 +3419,123 @@ mod tests {
             .is_err());
         assert!(server.shutdown().is_ok(), "already stopped is a no-op");
         server.start().unwrap();
+    }
+
+    #[test]
+    fn peer_manager_dispatches_inbound_rpcs_and_records_history() {
+        let manager = PeerManager::new("leader0", "127.0.0.1", 23817);
+        manager.set_now_secs(100);
+        assert_eq!(manager.local_node_name(), "leader0");
+        assert_eq!(manager.node_state(), ("leader".into(), "alive".into()));
+        assert!(manager.events().is_empty());
+
+        // Requests are answered directly until the peer endpoint is started.
+        assert_eq!(
+            manager.peer_server().status(),
+            PeerThriftServerStatus::Stopped
+        );
+
+        let registered = manager.handle_peer_request(PeerRequest::Register(RegisterRequest {
+            node_name: "follower0".to_string(),
+            node_type: NodeType::Follower,
+            node_ip: "127.0.0.2".to_string(),
+            node_port: 23818,
+            txn_timestamp: 100,
+        }));
+        match registered {
+            PeerResponse::Register(response) => assert_eq!(response.error_code, 0),
+            other => panic!("unexpected response: {other:?}"),
+        }
+        assert_eq!(manager.peer_server().worker_requests(), Vec::<u64>::new());
+
+        // Once started, the pooled endpoint round-robins the same requests.
+        manager.start_peer_server("127.0.0.1", 23817, 2).unwrap();
+        assert_eq!(
+            manager.peer_server().status(),
+            PeerThriftServerStatus::Running
+        );
+
+        manager.set_now_secs(101);
+        let heartbeat = manager.handle_peer_request(PeerRequest::HeartBeat(heartbeat_request(
+            "follower0",
+            23818,
+            120,
+        )));
+        match heartbeat {
+            PeerResponse::HeartBeat(response) => {
+                assert_eq!(response.error_code, 0);
+                assert_eq!(response.sender_status, NodeStatus::Alive);
+            }
+            other => panic!("unexpected response: {other:?}"),
+        }
+
+        // Replicated log batches go out through `SyncLogTask`.
+        let applied = manager
+            .send_logs(
+                "follower0",
+                &["log-a".to_string(), "log-b".to_string()],
+                true,
+            )
+            .unwrap();
+        assert_eq!(applied, 2);
+        assert_eq!(manager.cluster().applied_log_count(), 2);
+
+        // A rejected request leaves the history untouched.
+        let duplicate = manager.handle_peer_request(PeerRequest::Register(RegisterRequest {
+            node_name: "follower0".to_string(),
+            node_type: NodeType::Follower,
+            node_ip: "127.0.0.2".to_string(),
+            node_port: 23818,
+            txn_timestamp: 100,
+        }));
+        match duplicate {
+            PeerResponse::Register(response) => {
+                assert_eq!(response.error_code, error_code::DUPLICATE_NODE);
+            }
+            other => panic!("unexpected response: {other:?}"),
+        }
+        assert_eq!(manager.events().len(), 2);
+        assert_eq!(manager.peer_server().worker_requests(), vec![1, 1]);
+
+        let removed = manager.handle_peer_request(PeerRequest::Unregister(UnregisterRequest {
+            node_name: "follower0".to_string(),
+        }));
+        match removed {
+            PeerResponse::Unregister(response) => assert_eq!(response.error_code, 0),
+            other => panic!("unexpected response: {other:?}"),
+        }
+
+        let changed = manager.handle_peer_request(PeerRequest::ChangeRole(ChangeRoleRequest {
+            node_name: "leader0".to_string(),
+            node_type: NodeType::Admin,
+        }));
+        match changed {
+            PeerResponse::ChangeRole(response) => assert_eq!(response.error_code, 0),
+            other => panic!("unexpected response: {other:?}"),
+        }
+        assert_eq!(manager.node_state(), ("admin".into(), "alive".into()));
+        // register, duplicate, unregister, change_role = 4 pooled requests.
+        assert_eq!(manager.peer_server().worker_requests(), vec![2, 2]);
+
+        assert_eq!(
+            manager.events(),
+            vec![
+                "register@follower0, 127.0.0.2:23818, follower".to_string(),
+                "heartbeat@follower0, 120".to_string(),
+                "terminate@follower0".to_string(),
+                "change-role@admin".to_string(),
+            ]
+        );
+        assert_eq!(manager.list_nodes().len(), 1);
+
+        // `shutdown` stops the peer endpoint, drains the queue and records the
+        // local terminate.
+        manager.shutdown();
+        assert_eq!(
+            manager.peer_server().status(),
+            PeerThriftServerStatus::Stopped
+        );
+        assert_eq!(manager.events().last().unwrap(), "terminate@leader0");
     }
 
     #[test]
