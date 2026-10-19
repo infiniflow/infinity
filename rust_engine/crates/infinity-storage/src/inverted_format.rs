@@ -2167,6 +2167,30 @@ pub fn encode_u16_block(values: &[u16]) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    /// C++: `TermMetaTest.test1` (`term_meta_ut.cpp`): `TermMeta(1, 2, 3)`
+    /// dumped with `OPTION_FLAG_ALL` and read back.
+    #[test]
+    fn term_meta_all_options_roundtrip() {
+        let meta = TermMeta {
+            doc_freq: 1,
+            total_tf: 2,
+            payload: 3,
+            doc_start: 0,
+            pos_start: 0,
+            pos_end: 0,
+        };
+        let flags = TermMetaFlags {
+            has_term_frequency: true,
+            has_term_payload: true,
+        };
+        let bytes = encode_term_meta(&meta, flags);
+        let (decoded, used) = decode_term_meta(&bytes, flags).unwrap();
+        assert_eq!(used, bytes.len());
+        assert_eq!(decoded.doc_freq, meta.doc_freq);
+        assert_eq!(decoded.total_tf, meta.total_tf);
+        assert_eq!(decoded.payload, meta.payload);
+    }
+
     #[test]
     fn fst_trailer_roundtrip_and_verification() {
         // A toy FST body: the version, the FstType and some node bytes.

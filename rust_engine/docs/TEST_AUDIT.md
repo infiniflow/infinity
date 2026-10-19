@@ -7,7 +7,7 @@
 - `gate-a`：parser/planner/executor/function，当前由 Gate A 的 SQL 用例覆盖，单元断言待移植。
 - `integration`：catalog/txn/wal/io/bg_task，当前由 Gate C 的 restart/快照集成用例覆盖，单元断言待移植。
 - `excluded`：DiskANN（计划 §2.6/R14 排除）。
-- `exempt`：SIMD/第三方夹具。
+- `exempt`：SIMD/第三方夹具，以及 `PostingByteSlice`/`Skiplist`/PForDelta 等已登记为设计变更的压缩/字节切片原语。
 - `gap`：尚未移植。
 
 | # | 文件 | Fixture | 用例 | 状态 |
@@ -517,46 +517,46 @@
 | 503 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test1` | gap |
 | 504 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test2` | gap |
 | 505 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test3` | gap |
-| 506 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test1` | partial |
-| 507 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test2` | partial |
-| 508 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test3` | partial |
-| 509 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test4` | partial |
-| 510 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test5` | partial |
-| 511 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test6` | partial |
-| 512 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test7` | partial |
-| 513 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test8` | partial |
-| 514 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test9` | partial |
-| 515 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test10` | partial |
-| 516 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test11` | partial |
-| 517 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test12` | partial |
-| 518 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test1` | partial |
-| 519 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test2` | partial |
-| 520 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test3` | partial |
-| 521 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test4` | partial |
-| 522 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test5` | partial |
-| 523 | `src/unit_test/storage/invertedindex/format/position_list_decoder_ut.cpp` | `PositionListDecoderTest` | `test1` | partial |
-| 524 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test1` | partial |
-| 525 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test2` | partial |
-| 526 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test1` | partial |
-| 527 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test2` | partial |
-| 528 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test3` | partial |
-| 529 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test4` | partial |
-| 530 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test5` | partial |
-| 531 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test6` | partial |
-| 532 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test7` | partial |
-| 533 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test8` | partial |
-| 534 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test1` | partial |
-| 535 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test2` | partial |
-| 536 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test3` | partial |
-| 537 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test1` | partial |
-| 538 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test2` | partial |
-| 539 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test3` | partial |
-| 540 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderByteSliceTest` | partial |
-| 541 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderPostingByteSliceTest` | partial |
-| 542 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test1` | partial |
-| 543 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test2` | partial |
-| 544 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test3` | partial |
-| 545 | `src/unit_test/storage/invertedindex/format/term_meta_ut.cpp` | `TermMetaTest` | `test1` | partial |
+| 506 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test1` | exempt |
+| 507 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test2` | exempt |
+| 508 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test3` | exempt |
+| 509 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test4` | exempt |
+| 510 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test5` | exempt |
+| 511 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test6` | exempt |
+| 512 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test7` | exempt |
+| 513 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test8` | exempt |
+| 514 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test9` | exempt |
+| 515 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test10` | exempt |
+| 516 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test11` | exempt |
+| 517 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test12` | exempt |
+| 518 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test1` | exempt |
+| 519 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test2` | exempt |
+| 520 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test3` | exempt |
+| 521 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test4` | exempt |
+| 522 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test5` | exempt |
+| 523 | `src/unit_test/storage/invertedindex/format/position_list_decoder_ut.cpp` | `PositionListDecoderTest` | `test1` | exempt |
+| 524 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test1` | exempt |
+| 525 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test2` | exempt |
+| 526 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test1` | exempt |
+| 527 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test2` | exempt |
+| 528 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test3` | exempt |
+| 529 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test4` | exempt |
+| 530 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test5` | exempt |
+| 531 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test6` | exempt |
+| 532 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test7` | exempt |
+| 533 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test8` | exempt |
+| 534 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test1` | exempt |
+| 535 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test2` | exempt |
+| 536 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test3` | exempt |
+| 537 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test1` | exempt |
+| 538 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test2` | exempt |
+| 539 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test3` | exempt |
+| 540 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderByteSliceTest` | exempt |
+| 541 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderPostingByteSliceTest` | exempt |
+| 542 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test1` | exempt |
+| 543 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test2` | exempt |
+| 544 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test3` | exempt |
+| 545 | `src/unit_test/storage/invertedindex/format/term_meta_ut.cpp` | `TermMetaTest` | `test1` | ported |
 | 546 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMemEmpty` | gap |
 | 547 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildFileEmpty` | gap |
 | 548 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMem` | gap |
