@@ -468,3 +468,403 @@ mod reference_suite {
         assert_eq!(map.get(&"key2".into(), true), vec![84]);
     }
 }
+
+/// C++: `RcuMap::DeletedMap` (single-value snapshots).
+#[derive(Debug)]
+struct RcuMapDeleted<K, V> {
+    _map: Arc<BTreeMap<K, MapValue<V>>>,
+    delete_time: u64,
+}
+
+/// C++: `RcuMap` — the unique-key variant of [`RcuMultiMap`].
+#[derive(Debug)]
+pub struct RcuMap<K, V> {
+    read_map: RwLock<Arc<BTreeMap<K, MapValue<V>>>>,
+    dirty_map: Mutex<BTreeMap<K, MapValue<V>>>,
+    miss_time: Mutex<usize>,
+    deleted_values: Mutex<Vec<MapValue<V>>>,
+    deleted_maps: Mutex<Vec<RcuMapDeleted<K, V>>>,
+}
+
+impl<K: Ord + Clone, V: Clone + PartialEq> Default for RcuMap<K, V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<K: Ord + Clone, V: Clone + PartialEq> RcuMap<K, V> {
+    /// C++: `RcuMap()`.
+    pub fn new() -> Self {
+        Self {
+            read_map: RwLock::new(Arc::new(BTreeMap::new())),
+            dirty_map: Mutex::new(BTreeMap::new()),
+            miss_time: Mutex::new(0),
+            deleted_values: Mutex::new(Vec::new()),
+            deleted_maps: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// C++: `Get(key, update_access_time)` — a single value.
+    pub fn get(&self, key: &K, update_access_time: bool) -> Option<V> {
+        if let Some(map_value) = self.read_map.read().unwrap().get(key) {
+            return Some(map_value.value.clone());
+        }
+        let mut dirty = self.dirty_map.lock().unwrap();
+        let map_value = dirty.get_mut(key)?;
+        if update_access_time {
+            map_value.used_time = now_ms();
+        }
+        let out = map_value.value.clone();
+        let total = dirty.len();
+        let mut miss = self.miss_time.lock().unwrap();
+        *miss += 1;
+        // `RcuMap::CheckSwapInLock` is more conservative than the multimap's:
+        // it only publishes once the dirty map holds at least 100 entries and
+        // the misses reach three times its size.
+        if total < 100 || *miss < total * 3 {
+            return Some(out);
+        }
+        let published = dirty.clone();
+        drop(miss);
+        drop(dirty);
+        let old = {
+            let mut read = self.read_map.write().unwrap();
+            std::mem::replace(&mut *read, Arc::new(published))
+        };
+        self.deleted_maps.lock().unwrap().push(RcuMapDeleted {
+            _map: old,
+            delete_time: now_ms(),
+        });
+        *self.miss_time.lock().unwrap() = 0;
+        Some(out)
+    }
+
+    /// C++: `GetValue`.
+    pub fn get_value(&self, key: &K, update_access_time: bool) -> Option<V> {
+        self.get(key, update_access_time)
+    }
+
+    /// C++: `GetWithRcuTime`.
+    pub fn get_with_rcu_time(&self, key: &K) -> Option<V> {
+        self.get(key, false)
+    }
+
+    /// C++: `GetReadOnly` — bypasses the dirty-map lookup and the access-time
+    /// update (the reference's benchmark fast path).
+    pub fn get_read_only(&self, key: &K) -> Option<V> {
+        self.read_map
+            .read()
+            .unwrap()
+            .get(key)
+            .map(|v| v.value.clone())
+    }
+
+    /// C++: `Insert` — replaces the value for the key.
+    pub fn insert(&self, key: K, value: V) {
+        self.dirty_map.lock().unwrap().insert(
+            key,
+            MapValue {
+                value,
+                used_time: now_ms(),
+            },
+        );
+    }
+
+    /// C++: `Delete`.
+    pub fn delete(&self, key: &K) {
+        let mut dirty = self.dirty_map.lock().unwrap();
+        if let Some(mut map_value) = dirty.remove(key) {
+            map_value.used_time = now_ms();
+            self.deleted_values.lock().unwrap().push(map_value);
+        }
+    }
+
+    /// C++: `CheckGc`.
+    pub fn check_gc(&self, min_delete_time: u64) {
+        self.deleted_values
+            .lock()
+            .unwrap()
+            .retain(|v| v.used_time >= min_delete_time);
+        self.deleted_maps
+            .lock()
+            .unwrap()
+            .retain(|v| v.delete_time >= min_delete_time);
+    }
+
+    /// C++: `CheckExpired`.
+    pub fn check_expired(&self, min_access_time: u64) -> Vec<K> {
+        self.dirty_map
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, v)| v.used_time <= min_access_time)
+            .map(|(k, _)| k.clone())
+            .collect()
+    }
+
+    /// C++: `GetAllValuesWithRef`.
+    pub fn get_all_values_with_ref(&self, values: &mut Vec<V>) {
+        let dirty = self.dirty_map.lock().unwrap();
+        values.extend(dirty.values().map(|v| v.value.clone()));
+    }
+
+    /// C++: `GetAllKeyValuePairs`.
+    pub fn get_all_key_value_pairs(&self) -> Vec<(K, V)> {
+        let dirty = self.dirty_map.lock().unwrap();
+        let read = self.read_map.read().unwrap().clone();
+        let mut pairs = Vec::new();
+        for (key, value) in dirty.iter() {
+            pairs.push((key.clone(), value.value.clone()));
+        }
+        for (key, value) in read.iter() {
+            pairs.push((key.clone(), value.value.clone()));
+        }
+        pairs
+    }
+
+    /// C++: `size()`.
+    pub fn size(&self) -> usize {
+        self.dirty_map.lock().unwrap().len()
+    }
+
+    /// C++: `emplace`.
+    pub fn emplace(&self, key: K, value: V) {
+        self.insert(key, value);
+    }
+
+    /// C++: `range(key_min, key_max, result)`.
+    pub fn range(&self, key_min: &K, key_max: &K) -> Vec<(K, V)> {
+        let dirty = self.dirty_map.lock().unwrap();
+        let read = self.read_map.read().unwrap().clone();
+        let mut merged: BTreeMap<K, V> = BTreeMap::new();
+        for (key, value) in read.range(key_min.clone()..=key_max.clone()) {
+            merged.insert(key.clone(), value.value.clone());
+        }
+        for (key, value) in dirty.range(key_min.clone()..=key_max.clone()) {
+            merged.insert(key.clone(), value.value.clone());
+        }
+        merged.into_iter().collect()
+    }
+
+    /// C++: `GetOrAdd`.
+    pub fn get_or_add(&self, key: &K, value: &mut V, new_value: V) -> bool {
+        if let Some(existing) = self.get(key, true) {
+            *value = existing;
+            return true;
+        }
+        self.insert(key.clone(), new_value.clone());
+        *value = new_value;
+        false
+    }
+
+    /// C++: `Clear` — clears the dirty map and retires its values.
+    pub fn clear(&self) {
+        let mut dirty = self.dirty_map.lock().unwrap();
+        let mut deleted = self.deleted_values.lock().unwrap();
+        for (_, mut value) in std::mem::take(&mut *dirty) {
+            value.used_time = now_ms();
+            deleted.push(value);
+        }
+    }
+}
+
+#[cfg(test)]
+mod map_reference_suite {
+    //! Ports of the `RcuMapTest` functional cases in
+    //! `test_rcu_multimap_ut.cpp`.
+
+    use super::*;
+
+    /// C++: `RcuMapTest.TestBasicInsertAndGet`.
+    #[test]
+    fn basic_insert_and_get() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.insert("key1".into(), 10);
+        map.insert("key2".into(), 20);
+        map.insert("key1".into(), 30);
+        assert_eq!(map.get(&"key1".into(), true), Some(30));
+        assert_eq!(map.get(&"key2".into(), true), Some(20));
+        assert_eq!(map.get(&"key3".into(), true), None);
+        assert_eq!(map.size(), 2);
+    }
+
+    /// C++: `RcuMapTest.TestLowercaseAliases`.
+    #[test]
+    fn lowercase_aliases() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.insert("test_key".into(), 100);
+        map.insert("test_key".into(), 200);
+        assert_eq!(map.get(&"test_key".into(), true), Some(200));
+    }
+
+    /// C++: `RcuMapTest.TestDelete`.
+    #[test]
+    fn delete() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.insert("key1".into(), 10);
+        map.insert("key2".into(), 20);
+        map.delete(&"key1".into());
+        assert_eq!(map.get(&"key1".into(), true), None);
+        assert_eq!(map.get(&"key2".into(), true), Some(20));
+        map.delete(&"key2".into());
+        assert_eq!(map.size(), 0);
+    }
+
+    /// C++: `RcuMapTest.TestGetAllValuesWithRef`.
+    #[test]
+    fn get_all_values_with_ref() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.insert("key1".into(), 10);
+        map.insert("key2".into(), 20);
+        map.insert("key3".into(), 30);
+        let mut values = Vec::new();
+        map.get_all_values_with_ref(&mut values);
+        values.sort_unstable();
+        assert_eq!(values, vec![10, 20, 30]);
+    }
+
+    /// C++: `RcuMapTest.TestGetAllKeyValuePairs`.
+    #[test]
+    fn get_all_key_value_pairs() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.insert("key1".into(), 10);
+        map.insert("key2".into(), 20);
+        map.insert("key3".into(), 30);
+        let pairs = map.get_all_key_value_pairs();
+        assert_eq!(pairs.len(), 3);
+        assert_eq!(pairs[0], ("key1".to_string(), 10));
+        assert_eq!(pairs[1], ("key2".to_string(), 20));
+        assert_eq!(pairs[2], ("key3".to_string(), 30));
+    }
+
+    /// C++: `RcuMapTest.TestGarbageCollection`.
+    #[test]
+    fn garbage_collection() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.insert("key1".into(), 10);
+        map.insert("key2".into(), 20);
+        map.delete(&"key1".into());
+        map.check_gc(now_ms().saturating_sub(1000));
+        assert_eq!(map.get(&"key2".into(), true), Some(20));
+    }
+
+    /// C++: `RcuMapTest.TestExpiredEntries`.
+    #[test]
+    fn expired_entries() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.insert("key1".into(), 10);
+        map.insert("key2".into(), 20);
+        let _ = map.get(&"key1".into(), true);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let expired = map.check_expired(now_ms() + 1000);
+        assert!(expired.len() <= 2);
+    }
+
+    /// C++: `RcuMapTest.TestGetWithRcuTime`.
+    #[test]
+    fn get_with_rcu_time() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.insert("key1".into(), 10);
+        map.insert("key2".into(), 20);
+        assert_eq!(map.get_with_rcu_time(&"key1".into()), Some(10));
+        assert_eq!(map.get_with_rcu_time(&"key2".into()), Some(20));
+        assert_eq!(map.get_with_rcu_time(&"key3".into()), None);
+    }
+
+    /// C++: `RcuMapTest.TestUniqueKeys`.
+    #[test]
+    fn unique_keys() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.insert("key".into(), 100);
+        map.insert("key".into(), 200);
+        map.insert("key".into(), 300);
+        assert_eq!(map.get(&"key".into(), true), Some(300));
+        assert_eq!(map.size(), 1);
+    }
+
+    /// C++: `RcuMapTest.TestIntegerKeys`.
+    #[test]
+    fn integer_keys() {
+        let map: RcuMap<i32, i32> = RcuMap::new();
+        map.insert(1, 100);
+        map.insert(2, 200);
+        map.insert(3, 300);
+        assert_eq!(map.get(&1, true), Some(100));
+        assert_eq!(map.get(&2, true), Some(200));
+        assert_eq!(map.get(&3, true), Some(300));
+        assert_eq!(map.size(), 3);
+    }
+
+    /// C++: `RcuMapTest.TestEmptyMap`.
+    #[test]
+    fn empty_map() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        assert_eq!(map.get(&"nonexistent".into(), true), None);
+        assert_eq!(map.get_value(&"nonexistent".into(), true), None);
+        let mut values = Vec::new();
+        map.get_all_values_with_ref(&mut values);
+        assert!(values.is_empty());
+        assert_eq!(map.size(), 0);
+    }
+
+    /// C++: `RcuMapTest.TestEmplace`.
+    #[test]
+    fn emplace() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        map.emplace("key1".into(), 42);
+        map.emplace("key2".into(), 84);
+        assert_eq!(map.get(&"key1".into(), true), Some(42));
+        assert_eq!(map.get(&"key2".into(), true), Some(84));
+        map.emplace("key1".into(), 168);
+        assert_eq!(map.get(&"key1".into(), true), Some(168));
+        assert_eq!(map.size(), 2);
+    }
+
+    /// C++: `RcuMapTest.TestRange`.
+    #[test]
+    fn range() {
+        let map: RcuMap<i32, i32> = RcuMap::new();
+        for key in [1, 3, 5, 7, 9] {
+            map.insert(key, key * 100);
+        }
+        let result = map.range(&3, &7);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result, vec![(3, 300), (5, 500), (7, 700)]);
+    }
+
+    /// C++: `RcuMapTest.TestStressInsertAndRetrieve`.
+    #[test]
+    fn stress_insert_and_retrieve() {
+        let map: RcuMap<i32, i32> = RcuMap::new();
+        let num_operations = 20;
+        for i in 0..num_operations {
+            map.insert(i % 5, i);
+        }
+        for key in 0..5 {
+            assert!(map.get(&key, true).is_some());
+        }
+        assert!(map.size() > 0);
+    }
+
+    /// C++: `RcuMapTest.TestMapVsMultiMapBehavior`.
+    #[test]
+    fn map_vs_multimap_behavior() {
+        let map: RcuMap<String, i32> = RcuMap::new();
+        let multimap: RcuMultiMap<String, i32> = RcuMultiMap::new();
+        for value in [10, 20, 30] {
+            map.insert("test_key".into(), value);
+            multimap.insert("test_key".into(), value);
+        }
+        assert_eq!(map.get(&"test_key".into(), true), Some(30));
+        assert_eq!(map.size(), 1);
+        assert_eq!(multimap.get(&"test_key".into(), true).len(), 3);
+        for (key, value) in [("key1", 100), ("key2", 200), ("key3", 300)] {
+            map.insert(key.into(), value);
+            multimap.insert(key.into(), value);
+        }
+        let map_range = map.range(&"key1".into(), &"key3".into());
+        let multimap_range = multimap.range(&"key1".into(), &"key3".into());
+        assert!(map_range.len() >= 3);
+        assert_eq!(multimap_range.len(), map_range.len());
+    }
+}
