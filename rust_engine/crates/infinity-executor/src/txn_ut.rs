@@ -9,12 +9,10 @@
 //! back is staged with `begin_restore_*` and discarded through
 //! [`crate::PendingRestore::rollback`], mirroring `NewTxn::Rollback`.
 //!
-//! Two reference cases are not ported because they depend on an uncommitted
-//! append/delete being invisible to a snapshot created by another live
-//! transaction (`test_create_snapshot_insert_data`,
-//! `test_create_snapshot_delete_data`). The Rust engine has no multi-statement
-//! transactions: every statement commits before the next one starts, so that
-//! isolation cannot be constructed here.
+//! The two data-visibility cases (`test_create_snapshot_insert_data`,
+//! `test_create_snapshot_delete_data`) use [`crate::EngineTxn`]: an append or a
+//! row-id delete is staged in a live transaction, and a snapshot taken by
+//! another transaction must contain only committed state.
 
 use crate::{Engine, QueryResult};
 use infinity_parser::Literal;
@@ -553,4 +551,132 @@ fn table_snapshot_restore_same_snapshot_multithreaded() {
     assert!(succeeded.load(Ordering::SeqCst) >= 1);
     assert_eq!(count(&e, "default_db.tb1"), 100_000);
     assert_table_schema(&e, "default_db.tb1");
+}
+
+/// C++ `src/unit_test/storage/txn/table_snapshot_ut.cpp:480`
+/// (`test_create_snapshot_delete_data`).
+///
+/// Two row-id deletes are staged in live transactions; the snapshot created by
+/// `txn2` in between must contain the committed 100,000 rows, i.e. neither the
+/// earlier nor the later uncommitted delete may leak into it.
+#[test]
+fn table_snapshot_create_snapshot_delete_data() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    setup_table_snapshot(&e);
+
+    e.execute("RESTORE TABLE SNAPSHOT tb1_snapshot;").unwrap();
+    assert_eq!(count(&e, "default_db.tb1"), 100_000);
+
+    // `txn1->Delete(RowID(0, 1000..3000))`, not committed yet.
+    let first: Vec<(u32, u32)> = (1000..3000).map(|row| (0, row)).collect();
+    let mut txn1 = e.begin_txn();
+    assert_eq!(txn1.delete_row_ids("default_db.tb1", &first).unwrap(), 2000);
+
+    // The reference checkpoints the WAL between the two operations.
+    e.checkpoint_wal();
+
+    // `txn2->CreateTableSnapshot("default_db", "tb1", "test_delete")` while
+    // `txn1` is still uncommitted.
+    let txn2 = e.begin_txn();
+    txn2.create_table_snapshot("default_db", "tb1", "test_delete")
+        .unwrap();
+
+    // `txn3->Delete(RowID(0, 4000..5000))`, also uncommitted.
+    let second: Vec<(u32, u32)> = (4000..5000).map(|row| (0, row)).collect();
+    let mut txn3 = e.begin_txn();
+    assert_eq!(txn3.delete_row_ids("default_db.tb1", &second).unwrap(), 1000);
+
+    // Uncommitted deletes are invisible to a scan and to the snapshot.
+    assert_eq!(count(&e, "default_db.tb1"), 100_000);
+
+    txn1.commit().unwrap();
+    txn2.commit().unwrap();
+    txn3.commit().unwrap();
+
+    // Committed deletes are now visible.
+    assert_eq!(count(&e, "default_db.tb1"), 97_000);
+
+    e.execute("DROP TABLE tb1;").unwrap();
+    e.execute("RESTORE TABLE SNAPSHOT test_delete;").unwrap();
+
+    // The restored snapshot holds the state before the uncommitted deletes.
+    let restored = e.fetch_rows_with_ids("default_db.tb1").unwrap();
+    assert_eq!(restored.len(), 100_000);
+    let ids: std::collections::HashSet<usize> = restored.iter().map(|(id, _)| *id).collect();
+    assert!(ids.contains(&1000), "row 1000 was deleted only after the snapshot");
+    assert!(ids.contains(&4000), "row 4000 was deleted only after the snapshot");
+}
+
+/// C++ `src/unit_test/storage/txn/table_snapshot_ut.cpp:576`
+/// (`test_create_snapshot_insert_data`).
+///
+/// A 900-row append staged by `txn1` must not appear in the snapshot `txn2`
+/// creates before either commits.
+#[test]
+fn table_snapshot_create_snapshot_insert_data() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    setup_table_snapshot(&e);
+
+    e.execute("RESTORE TABLE SNAPSHOT tb1_snapshot;").unwrap();
+    assert_eq!(count(&e, "default_db.tb1"), 100_000);
+
+    // `MakeInputBlock(999, "abcdefghijklmnopqrstuvwxyz", 900)`.
+    let rows: Vec<Vec<Literal>> = (0..900)
+        .map(|_| {
+            vec![
+                Literal::Int(999),
+                Literal::Str("abcdefghijklmnopqrstuvwxyz".to_string()),
+            ]
+        })
+        .collect();
+    let mut txn1 = e.begin_txn();
+    assert_eq!(txn1.append("default_db.tb1", rows).unwrap(), 900);
+
+    let txn2 = e.begin_txn();
+    txn2.create_table_snapshot("default_db", "tb1", "test_insert")
+        .unwrap();
+
+    // The append is still staged: a scan and the snapshot see 100,000 rows.
+    assert_eq!(count(&e, "default_db.tb1"), 100_000);
+
+    // The reference commits the snapshot transaction before the append.
+    txn2.commit().unwrap();
+    txn1.commit().unwrap();
+    assert_eq!(count(&e, "default_db.tb1"), 100_900);
+
+    e.execute("DROP TABLE tb1;").unwrap();
+    e.execute("RESTORE TABLE SNAPSHOT test_insert;").unwrap();
+
+    // The uncommitted append was excluded from the snapshot.
+    assert_eq!(count(&e, "default_db.tb1"), 100_000);
+}
+
+/// C++ `src/unit_test/storage/secondary_index/test_high_cardinality_ut.cpp:112`
+/// (`HighCardinalitySecondaryIndexTest.TestTxn`): the reference creates the
+/// table and a secondary index through transactions, commits them, then builds
+/// a high-cardinality chunk "just for coverage".
+#[test]
+fn secondary_index_high_cardinality_txn() {
+    use infinity_storage::secondary_index_data::{ordered_i64, HighCardinalityIndex};
+
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    // BeginTxn(kCreateTable) -> CreateTable -> CommitTxn.
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .unwrap();
+    // BeginTxn(kCreateIndex) -> CreateIndex -> CommitTxn.
+    e.execute("CREATE INDEX second_idx ON tb1(col1);").unwrap();
+
+    // Committed DDL is visible.
+    assert!(e.table_exists("default_db.tb1"));
+    e.execute("SHOW TABLE tb1 INDEX second_idx;").unwrap();
+
+    // "Just for coverage": insert into a high-cardinality chunk.
+    let mut index = HighCardinalityIndex::new();
+    index.insert_data((0..10).map(|i| (ordered_i64(i % 5), i as u32)));
+    assert_eq!(index.row_count(), 10);
+    assert_eq!(index.unique_key_count(), 0);
 }

@@ -516,6 +516,8 @@ pub enum LogicalType {
     Double,
     Decimal,
     Varchar,
+    /// A parsed JSON document (`LogicalType::kJson`).
+    Json,
     Date,
     Time,
     DateTime,
@@ -551,6 +553,7 @@ impl LogicalType {
             Double => "Double",
             Decimal => "Decimal",
             Varchar => "Varchar",
+            Json => "Json",
             Date => "Date",
             Time => "Time",
             DateTime => "DateTime",
@@ -619,7 +622,7 @@ impl LogicalType {
             Decimal => 16,
             Uuid => 16,
             Embedding(dim) => (*dim as usize) * 4,
-            Varchar | Array | Mixed | Date | Time | Interval | Invalid | Null | Missing => {
+            Varchar | Json | Array | Mixed | Date | Time | Interval | Invalid | Null | Missing => {
                 if matches!(self, Date | Time | Interval) {
                     4
                 } else {

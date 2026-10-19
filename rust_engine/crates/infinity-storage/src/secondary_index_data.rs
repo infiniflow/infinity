@@ -339,7 +339,7 @@ mod tests {
         const UNIQUE: u32 = 5;
         let data = cyclic_i64(ROWS, UNIQUE);
         let mut index = HighCardinalityIndex::new();
-        index.insert_data(data);
+        index.insert_data(data.clone());
         let key_count = index.unique_key_count();
         assert_eq!(key_count, 0);
         assert_eq!(index.row_count(), ROWS as usize);
@@ -348,10 +348,25 @@ mod tests {
         let path = dir.path().join("test001.idx");
         index.save(&path).unwrap();
         let loaded = HighCardinalityIndex::load(&path).unwrap();
+        // `EXPECT_EQ(key_count, index2->GetUniqueKeyCount())`.
         assert_eq!(key_count, loaded.unique_key_count());
+        assert_eq!(loaded.unique_key_count(), 0);
         assert_eq!(loaded.row_count(), ROWS as usize);
-        let key = ordered_i64(1);
-        assert_eq!(loaded.lookup(key), vec![1, 6]);
+        // Every key/offset pair survives the save/load round trip in order.
+        let mut expected = data.clone();
+        expected.sort_unstable_by_key(|(key, _)| *key);
+        for i in 0..UNIQUE {
+            let key = ordered_i64(i64::from(i));
+            let want: Vec<u32> = expected
+                .iter()
+                .filter(|(k, _)| *k == key)
+                .map(|(_, off)| *off)
+                .collect();
+            let got = loaded.lookup(key);
+            assert_eq!(got, want, "key {i}");
+            assert!(got.windows(2).all(|w| w[0] < w[1]), "offsets ascend");
+        }
+        assert_eq!(loaded.lookup(ordered_i64(1)), vec![1, 6]);
     }
 
     /// C++: `HighCardinalitySecondaryIndexTest.TestTxn` — the index half: the

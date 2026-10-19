@@ -597,6 +597,30 @@ impl HnswIndex {
         }
     }
 
+    /// C++ `KnnHnsw::GetSizeInBytes` (`hnsw_alg.cppm:89`): the serialized size
+    /// of the graph — the vec-store meta, the vector records, the graph
+    /// records, the per-vertex levels and the labels, plus the header fields.
+    pub fn size_in_bytes(&self) -> usize {
+        let header = 2 * std::mem::size_of::<usize>();
+        let store_meta = self.store_meta_bytes().len();
+        let vectors = self.store_record_size() * self.len();
+        let labels = self.len() * std::mem::size_of::<u64>();
+        let levels = self.levels.len() * std::mem::size_of::<usize>();
+        let graph: usize = self
+            .links
+            .iter()
+            .map(|layer| {
+                layer
+                    .iter()
+                    .map(|neighbors| {
+                        std::mem::size_of::<u32>() + neighbors.len() * std::mem::size_of::<u32>()
+                    })
+                    .sum::<usize>()
+            })
+            .sum();
+        header + store_meta + vectors + labels + levels + graph
+    }
+
     /// Rebuilds an index from the chunk's meta/records and graph parts.
     #[allow(clippy::too_many_arguments)]
     pub fn from_chunk_parts(

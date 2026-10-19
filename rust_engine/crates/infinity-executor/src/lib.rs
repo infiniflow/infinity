@@ -37,7 +37,21 @@ mod explain;
 mod catalog_ut;
 
 #[cfg(test)]
+mod conflict_check_ut;
+
+#[cfg(test)]
+mod buffer_obj_ut;
+
+#[cfg(test)]
 mod request_ut;
+
+#[cfg(test)]
+mod table_ut;
+
+#[cfg(test)]
+mod upload_meta_to_s3_ut;
+
+pub mod data_table;
 
 #[cfg(test)]
 mod txn_ut;
@@ -3059,6 +3073,167 @@ impl PendingRestore<'_> {
     pub fn rollback(self) {}
 }
 
+/// One append staged by an [`EngineTxn`]: `(table, first row id, encoded rows,
+/// literal rows)`.
+type StagedAppend = (String, usize, Vec<String>, Vec<Vec<Literal>>);
+
+/// A multi-statement transaction (the reference's `NewTxn`).
+///
+/// Rows and row-id deletes are staged in an [`infinity_txn::Txn`] and become
+/// visible only at [`EngineTxn::commit`]. A snapshot created through
+/// [`EngineTxn::create_table_snapshot`] therefore observes committed state
+/// only — an uncommitted append or delete of another live transaction (or of
+/// this one) is absent, which is the isolation rule
+/// `TableSnapshotTest.test_create_snapshot_{insert,delete}_data` asserts.
+///
+/// `rollback` discards the staged writes. The row-id allocator is not rewound
+/// (the reference frees the append range on rollback; no test here reuses ids
+/// from a rolled-back append).
+pub struct EngineTxn<'a> {
+    engine: &'a Engine,
+    txn: Option<Txn>,
+    /// `(table, first row id, encoded rows, literal rows)` per append.
+    appends: Vec<StagedAppend>,
+    /// `(table, global row id)` per staged delete.
+    deletes: Vec<(String, usize)>,
+}
+
+impl<'a> EngineTxn<'a> {
+    /// C++ `NewTxn::Append`: normalize the block like `INSERT` does, reserve
+    /// row ids, and stage the encoded rows in the transaction.
+    pub fn append(&mut self, table: &str, rows: Vec<Vec<Literal>>) -> Result<usize> {
+        if rows.is_empty() {
+            return Ok(0);
+        }
+        let table = self.engine.table_key(table);
+        let meta = self
+            .engine
+            .storage
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let schema = meta.columns.clone();
+        let mut rows = align_insert_rows(&schema, &meta.defaults, None, &rows);
+        // Integer columns truncate a fractional literal, as the reference's
+        // implicit cast does (mirrors `Engine::insert_literals`).
+        for row in rows.iter_mut() {
+            for (i, cell) in row.iter_mut().enumerate() {
+                let int_col = meta
+                    .types
+                    .get(i)
+                    .map(|t| {
+                        let t = t.trim().to_ascii_uppercase();
+                        t.starts_with("INT")
+                            || t.starts_with("TINYINT")
+                            || t.starts_with("SMALLINT")
+                            || t.starts_with("BIGINT")
+                    })
+                    .unwrap_or(false);
+                if int_col {
+                    if let Literal::Float(f) = cell {
+                        *cell = Literal::Int(*f as i64);
+                    }
+                }
+            }
+        }
+        for row in &rows {
+            for (i, nn) in meta.not_nulls.iter().enumerate() {
+                if *nn && matches!(row.get(i), Some(Literal::Null) | None) {
+                    return Err(Error::Invalid(format!(
+                        "null value in NOT NULL column '{}'",
+                        schema.get(i).cloned().unwrap_or_default()
+                    )));
+                }
+            }
+        }
+        let base = self.engine.reserve_rows(&table, rows.len(), false)?;
+        let types = self.engine.column_types(&table)?;
+        let mut encoded = Vec::with_capacity(rows.len());
+        for (k, row) in rows.iter().enumerate() {
+            let text = self.engine.encode_row_stored(&table, row, &types)?;
+            self.txn
+                .as_mut()
+                .expect("transaction is open")
+                .put(row_key(&table, base + k), text.as_bytes().to_vec());
+            encoded.push(text);
+        }
+        let n = rows.len();
+        self.appends.push((table.to_string(), base, encoded, rows));
+        Ok(n)
+    }
+
+    /// C++ `NewTxn::Delete` over physical row ids: `(segment_id, offset)` maps
+    /// to the engine's global sequence id (`segment << 32 | offset`). Ids that
+    /// do not exist in committed state are skipped, as the reference's scan
+    /// does.
+    pub fn delete_row_ids(&mut self, table: &str, row_ids: &[(u32, u32)]) -> Result<usize> {
+        let table = self.engine.table_key(table);
+        let mut staged = 0;
+        for (segment_id, offset) in row_ids {
+            let seq = ((*segment_id as usize) << 32) | (*offset as usize);
+            if self.engine.storage.store.get(&row_key(&table, seq))?.is_some() {
+                self.txn
+                    .as_mut()
+                    .expect("transaction is open")
+                    .delete(del_key(&table, seq));
+                self.deletes.push((table.clone(), seq));
+                staged += 1;
+            }
+        }
+        Ok(staged)
+    }
+
+    /// `NewTxn::CreateTableSnapshot`: reads committed state only, so this
+    /// transaction's staged writes are invisible to the snapshot.
+    pub fn create_table_snapshot(&self, db: &str, table: &str, name: &str) -> Result<()> {
+        self.engine.create_table_snapshot(db, table, name)
+    }
+
+    /// `CommitTxn`: applies the staged batch, then updates the in-memory index
+    /// registries and row bookkeeping.
+    pub fn commit(mut self) -> Result<()> {
+        let Some(txn) = self.txn.take() else {
+            return Ok(());
+        };
+        // A commit changes visible rows; cached `SELECT` results must not
+        // survive it (the SQL path clears the cache for mutating statements).
+        self.engine.result_cache.lock().unwrap().clear();
+        let mut delete_counts: std::collections::BTreeMap<String, usize> = Default::default();
+        for (table, _) in &self.deletes {
+            *delete_counts.entry(table.clone()).or_default() += 1;
+        }
+        for (table, count) in &delete_counts {
+            self.engine.invalidate_row_cache(table);
+            self.engine.note_live_rows(table, -(*count as isize));
+        }
+        if !txn.is_empty() {
+            self.engine.txn.commit(txn)?;
+        }
+        for (table, base, encoded, rows) in &self.appends {
+            if self.engine.any_in_memory_index() || self.engine.has_index_declaration(table) {
+                for (k, row) in rows.iter().enumerate() {
+                    self.engine.update_indexes_on_insert(table, base + k, row)?;
+                    let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
+                    self.engine.update_text_indexes(table, base + k, &texts);
+                    self.engine.update_vector_caches(table, base + k, &texts);
+                }
+                self.engine.dump_hnsw_over_capacity(table);
+            }
+            self.engine.bump_writes(table);
+            self.engine.note_live_rows(table, rows.len() as isize);
+            self.engine.append_row_cache(table, *base, encoded);
+        }
+        for (table, seq) in &self.deletes {
+            self.engine.drop_text_index_rows(table, &[*seq]);
+            self.engine.drop_vector_cache_rows(table, &[*seq]);
+        }
+        Ok(())
+    }
+
+    /// `NewTxn::Rollback`: discards every staged write.
+    pub fn rollback(self) {}
+}
+
 fn index_key(table: &str, column: &str) -> String {
     format!("{table}.{column}")
 }
@@ -4250,15 +4425,16 @@ impl Engine {
         &self,
         table: &str,
     ) -> Option<Arc<Mutex<infinity_storage::block_index::BlockIndex>>> {
-        let meta = self.storage.catalog.get_table_by_name(table).ok()??;
-        let key = self.table_key(table);
+        let table = self.table_key(table);
+        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
+        let db_id = self.database_id_of(&table);
+        let key = table;
         {
             let tables = self.tables.lock().unwrap();
             if let Some(index) = tables.get(&key).and_then(|e| e.block_index.clone()) {
                 return Some(index);
             }
         }
-        let db_id = self.database_id_of(table);
         let index =
             infinity_storage::block_index::BlockIndex::open(self.blocks_root(), db_id, meta.id)
                 .ok()?;
@@ -4435,6 +4611,17 @@ impl Engine {
             .filter(|i| i.table == short || i.table == table)
             .map(|i| i.column)
             .collect())
+    }
+
+    /// Begins a multi-statement transaction (`NewTxn`). Its writes are staged
+    /// until [`EngineTxn::commit`].
+    pub fn begin_txn(&self) -> EngineTxn<'_> {
+        EngineTxn {
+            engine: self,
+            txn: Some(self.txn.begin()),
+            appends: Vec::new(),
+            deletes: Vec::new(),
+        }
     }
 
     /// Inserts literal rows into `table`. The Thrift `Insert` RPC calls this
@@ -5494,8 +5681,7 @@ impl Engine {
                 })
             }
             Statement::CreateSnapshot { name, table } => {
-                let blob = self.snapshot_table_blob(table)?;
-                self.storage.store.put(&snap_key(name), blob.as_bytes())?;
+                self.create_table_snapshot(&self.db(), table, name)?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -7700,6 +7886,97 @@ impl Engine {
         batches.max(rows.div_ceil(Self::SEGMENT_ROW_CAPACITY).max(1))
     }
 
+    /// C++ `TableMeta::GetSegmentIDs1`: the ids of the segments holding rows.
+    ///
+    /// The allocator's registry is authoritative after a write; a table that
+    /// was restored from a snapshot has no allocator history, so its segment
+    /// ids are derived from the stored row ids (`segment_id << 32 | offset`).
+    pub fn segment_ids(&self, table: &str) -> Vec<u32> {
+        let key = self.table_key(table);
+        let ids: Vec<u32> = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| e.segments.keys().copied().collect())
+            .unwrap_or_default();
+        if !ids.is_empty() {
+            return ids;
+        }
+        let mut ids: Vec<u32> = self
+            .fetch_rows_with_ids(&key)
+            .unwrap_or_default()
+            .iter()
+            .map(|(seq, _)| (seq >> 32) as u32)
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
+    }
+
+    /// C++ `SegmentMeta::GetBlockIDs1`: the block ids of `segment`, in order.
+    /// Blocks exist once the C++-format mirror has been written
+    /// ([`Self::write_cpp_blocks`] / [`Self::flush`]).
+    pub fn block_ids(&self, table: &str, segment: u32) -> Vec<u32> {
+        let Some(index) = self.block_index_for(table) else {
+            return Vec::new();
+        };
+        let index = index.lock().unwrap();
+        let mut ids: Vec<u32> = index
+            .metas()
+            .filter(|meta| meta.id.segment_id == segment)
+            .map(|meta| u32::from(meta.id.block_id))
+            .collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// C++ `BlockMeta::GetRowCnt1`.
+    pub fn block_row_count(&self, table: &str, segment: u32, block: u16) -> Option<usize> {
+        let index = self.block_index_for(table)?;
+        let index = index.lock().unwrap();
+        index
+            .get_block_meta(segment, block)
+            .map(|meta| meta.row_count)
+    }
+
+    /// C++ `NewCatalog::GetBlockVisibleRange` for a block without deletes: the
+    /// visible range is `[0, row_count)`.
+    pub fn block_visible_range(
+        &self,
+        table: &str,
+        segment: u32,
+        block: u16,
+    ) -> Option<(usize, usize)> {
+        self.block_row_count(table, segment, block)
+            .map(|rows| (0, rows))
+    }
+
+    /// Number of rows in the in-memory HNSW segment of `column`
+    /// (C++ `SegmentIndexMeta::GetMemIndex() != nullptr` plus its size).
+    pub fn mem_index_len(&self, table: &str, column: &str) -> Option<usize> {
+        let key = self.table_key(table);
+        let tables = self.tables.lock().unwrap();
+        let mem = tables.get(&key)?.hnsw_mem.get(column)?;
+        let len = mem.lock().unwrap().len();
+        Some(len)
+    }
+
+    /// Configured byte budget of the engine-wide block buffer manager.
+    pub fn buffer_memory_limit(&self) -> usize {
+        self.context.buffer.lock().unwrap().budget()
+    }
+
+    /// Resizes the block buffer manager (`BufferManager::set_budget`).
+    pub fn set_buffer_memory_limit(&self, bytes: usize) {
+        self.context.buffer.lock().unwrap().set_budget(bytes);
+    }
+
+    /// Bytes currently charged to the block buffer manager.
+    pub fn buffer_used_bytes(&self) -> usize {
+        self.context.buffer.lock().unwrap().used_bytes()
+    }
+
     /// Encodes one table (schema, indexes, rows) into the snapshot blob format
     /// written by `CREATE SNAPSHOT … ON TABLE` and by database snapshots.
     fn snapshot_table_blob(&self, table: &str) -> Result<String> {
@@ -7862,6 +8139,20 @@ impl Engine {
                 self.build_index(&table, &column)?;
             }
         }
+        Ok(())
+    }
+
+    /// `CREATE TABLE SNAPSHOT`: writes `table`'s committed schema, indexes and
+    /// rows under `name`. A caller inside an [`EngineTxn`] sees only committed
+    /// state, because staged rows/tombstones are not in the KV store yet.
+    pub fn create_table_snapshot(&self, db: &str, table: &str, name: &str) -> Result<()> {
+        let table = if table.contains('.') {
+            table.to_ascii_lowercase()
+        } else {
+            format!("{}.{}", db.to_ascii_lowercase(), table.to_ascii_lowercase())
+        };
+        let blob = self.snapshot_table_blob(&table)?;
+        self.storage.store.put(&snap_key(name), blob.as_bytes())?;
         Ok(())
     }
 
@@ -10790,6 +11081,22 @@ impl Engine {
     /// Binds an object store for the C++-format data files.
     pub fn set_object_store(&self, client: Arc<infinity_storage::s3::S3Client>) {
         *self.context.object_store.lock().unwrap() = Some(client);
+    }
+
+    /// C++: a checkpoint with object storage — persist locally, then mirror the
+    /// catalog and row store next to the C++-format `data` tree that
+    /// [`Self::flush`] already uploads. No-op upload when no store is bound.
+    pub fn checkpoint_to_object_store(&self) -> Result<()> {
+        self.flush()?;
+        if let Some(client) = self.context.object_store.lock().unwrap().clone() {
+            infinity_storage::s3::sync_tree(&client, &self.dir.join("catalog"), "catalog")?;
+            infinity_storage::s3::sync_tree(
+                &client,
+                &self.dir.join("persistence"),
+                "persistence",
+            )?;
+        }
+        Ok(())
     }
 
     /// Sets the column-block cache budget (the reference's
@@ -14778,6 +15085,63 @@ mod tests {
         let merged = chunks(&e);
         assert_eq!(merged.len(), 1, "the merged chunk supersedes the others");
         assert_eq!(merged[0].labels.len(), 4);
+    }
+
+    /// C++ `OptimizeKnnTest.test_hnsw_optimize` (`test_optimize_ut.cpp`):
+    /// three memory-index dumps (chunks 0..2) over 24 appended rows; optimize
+    /// appends one merged chunk (id 3) covering every live row, cleanup keeps
+    /// only it, and the merged graph still answers the top-1 query.
+    #[test]
+    fn test_hnsw_optimize() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE tb1 (col1 INT, col2 EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute("CREATE INDEX idx1 ON tb1 (col2) USING HNSW WITH (metric = l2, encode = plain);")
+            .unwrap();
+        for _ in 0..3 {
+            for _ in 0..2 {
+                e.execute(
+                    "INSERT INTO tb1 VALUES \
+                     (2,[0.1,0.2,0.3,-0.2]),(4,[0.2,0.1,0.3,0.4]),\
+                     (6,[0.3,0.2,0.1,0.4]),(8,[0.4,0.3,0.2,0.1]);",
+                )
+                .unwrap();
+            }
+            // DumpMemIndex: one chunk per iteration's memory segment.
+            e.flush().unwrap();
+        }
+        assert_eq!(
+            e.hnsw_chunk_ids("default_db.tb1", "idx1"),
+            vec![0, 1, 2],
+            "one chunk per memory-index dump"
+        );
+
+        e.optimize_indexes().unwrap();
+        e.cleanup().unwrap();
+
+        assert_eq!(
+            e.hnsw_chunk_ids("default_db.tb1", "idx1"),
+            vec![3],
+            "the merged chunk supersedes the incremental ones"
+        );
+        let chunks = e.load_vector_indexes("default_db.tb1", "idx1");
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].chunk_id, 3);
+        assert_eq!(chunks[0].index.len(), 24);
+        // `base_row_id == RowID(0,0)` and 24 rows: the mirror stores the
+        // segment offset of each row as its label.
+        assert_eq!(chunks[0].labels, (0..24).collect::<Vec<u32>>());
+        // The memory segment carries only the HNSW graph and row ids; there is
+        // no secondary index to merge (C++ `GetSecondaryIndex() == nullptr`).
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT col1 FROM tb1 SEARCH MATCH VECTOR \
+                 (col2, [0.1,0.2,0.3,-0.2], 'float', 'l2', 1);"
+            ),
+            vec![vec!["2".to_string()]]
+        );
     }
 
     /// Scalar tables keep a decoded row cache (the reference's in-memory

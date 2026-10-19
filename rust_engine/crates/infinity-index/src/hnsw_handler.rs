@@ -74,6 +74,22 @@ impl HnswHandler {
         self.index.mem_usage()
     }
 
+    /// C++: `HnswHandler::GetInfo` — `(mem_usage, row_count)`.
+    pub fn get_info(&self) -> (usize, usize) {
+        (self.mem_usage(), self.len())
+    }
+
+    /// C++: `HnswHandler::GetSizeInBytes` — the graph's serialized size.
+    pub fn size_in_bytes(&self) -> usize {
+        self.index.size_in_bytes()
+    }
+
+    /// C++: `HnswHandler::CompressToLVQ` — re-encode the stored vectors,
+    /// keeping the graph and labels.
+    pub fn compress_to_lvq(&mut self) {
+        self.index.compress_to_lvq();
+    }
+
     /// C++: `GetDocNum`.
     pub fn len(&self) -> usize {
         self.index.len()
@@ -132,5 +148,147 @@ mod tests {
         let ids: Vec<usize> = wide.iter().map(|(id, _)| *id).collect();
         assert_eq!(ids, vec![0, 1, 2]);
         assert!(handler.mem_usage() > 0);
+    }
+}
+
+#[cfg(test)]
+mod reference_suite {
+    //! Ports of `HnswHandlerTest.test_memory` / `test_compress`
+    //! (`src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp`):
+    //! 2048 vectors of dim 16, M=8, ef_construction=200, ef_search=10, L2.
+    //! The C++ fixture prints `GetInfo`/`GetSizeInBytes`; the port asserts
+    //! them, and checks top-1 self-recall after a chunk save/load round trip.
+
+    use super::*;
+    use crate::vector::{HnswEncoding, HnswIndex, Metric};
+
+    const DIM: usize = 16;
+    const M: usize = 8;
+    const EF_CONSTRUCTION: usize = 200;
+    const EF_SEARCH: usize = 10;
+    /// `max_chunk_n * chunk_size` from the fixture.
+    const N: usize = 16 * 128;
+
+    fn data() -> Vec<Vec<f32>> {
+        // Uniform [0, 1), like C++'s `uniform_real_distribution<float>`.
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        (0..N)
+            .map(|_| {
+                (0..DIM)
+                    .map(|_| ((next() >> 40) as f32) / ((1u64 << 24) as f32))
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn handler(data: &[Vec<f32>]) -> HnswHandler {
+        let mut handler = HnswHandler::new(DIM, M, EF_CONSTRUCTION, EF_SEARCH);
+        assert_eq!(handler.insert_vecs(data.iter().cloned()), data.len());
+        handler
+    }
+
+    /// C++ `SearchHnswHandler`: top-1 self-recall with `ef_ = 10`.
+    fn top1_self_recall(handler: &HnswHandler, data: &[Vec<f32>]) -> f32 {
+        let mut correct = 0usize;
+        for (i, query) in data.iter().enumerate() {
+            let hits = handler.search_index(
+                query,
+                1,
+                KnnSearchOption {
+                    ef: Some(EF_SEARCH),
+                },
+            );
+            if hits.first().is_some_and(|(id, _)| *id == i) {
+                correct += 1;
+            }
+        }
+        correct as f32 / data.len() as f32
+    }
+
+    /// The port's `SaveToPtr`/`LoadFromPtr`: rebuild from the chunk's
+    /// meta/records and graph parts (same layout as
+    /// `vector::reference_suite::chunk_roundtrip`).
+    fn roundtrip(handler: &HnswHandler, encoding: HnswEncoding) -> HnswHandler {
+        let index = handler.index();
+        let n = index.len();
+        let levels: Vec<usize> = (0..n).map(|i| index.level_of(i)).collect();
+        let max_level = index.max_level();
+        let mut links = vec![vec![Vec::new(); n]; max_level + 1];
+        for node in 0..n {
+            for (layer, nodes) in links.iter_mut().enumerate() {
+                nodes[node] = index.neighbors(layer, node).to_vec();
+            }
+        }
+        let rebuilt = HnswIndex::from_chunk_parts(
+            DIM,
+            M,
+            EF_SEARCH,
+            Metric::L2,
+            encoding,
+            &index.store_meta_bytes(),
+            &index.store_records_bytes(),
+            n,
+            levels,
+            links,
+            index.entry_point(),
+            max_level,
+        )
+        .expect("chunk parts");
+        HnswHandler::from_index(rebuilt)
+    }
+
+    /// C++: `HnswHandlerTest.test_memory`.
+    #[test]
+    fn test_memory() {
+        let data = data();
+        let handler = handler(&data);
+
+        let (mem_usage, vec_num) = handler.get_info();
+        assert_eq!(vec_num, N);
+        assert!(mem_usage > 0, "MemUsage must account the graph");
+        assert!(
+            handler.size_in_bytes() > 0,
+            "GetSizeInBytes must account the serialized graph"
+        );
+        let recall = top1_self_recall(&handler, &data);
+        assert!(recall >= 0.95, "plain top-1 recall {recall}");
+
+        let loaded = roundtrip(&handler, HnswEncoding::Plain);
+        assert_eq!(loaded.len(), N);
+        assert_eq!(loaded.get_info().1, N);
+        assert!(loaded.get_info().0 > 0);
+        let recall = top1_self_recall(&loaded, &data);
+        assert!(recall >= 0.95, "loaded plain top-1 recall {recall}");
+    }
+
+    /// C++: `HnswHandlerTest.test_compress`.
+    #[test]
+    fn test_compress() {
+        let data = data();
+        let mut handler = handler(&data);
+        let plain_size = handler.size_in_bytes();
+
+        handler.compress_to_lvq();
+        assert_eq!(handler.index().encoding(), HnswEncoding::Lvq);
+        // 64 bytes/vector plain -> 16 + dim = 32 bytes LVQ at dim 16.
+        assert!(
+            handler.size_in_bytes() < plain_size,
+            "LVQ must shrink the serialized vectors: {} !< {plain_size}",
+            handler.size_in_bytes()
+        );
+        let recall = top1_self_recall(&handler, &data);
+        assert!(recall >= 0.95, "compressed top-1 recall {recall}");
+
+        let loaded = roundtrip(&handler, HnswEncoding::Lvq);
+        assert_eq!(loaded.index().encoding(), HnswEncoding::Lvq);
+        assert!(loaded.size_in_bytes() < plain_size);
+        let recall = top1_self_recall(&loaded, &data);
+        assert!(recall >= 0.95, "loaded LVQ top-1 recall {recall}");
     }
 }

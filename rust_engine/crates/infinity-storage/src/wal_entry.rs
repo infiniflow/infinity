@@ -904,6 +904,7 @@ fn logical_type_code(t: LogicalType) -> (u8, u32) {
         LogicalType::Tuple => (21, 0),
         LogicalType::RowID => (22, 0),
         LogicalType::Missing => (23, 0),
+        LogicalType::Json => (24, 0),
     }
 }
 
@@ -933,6 +934,7 @@ fn logical_type_from(code: u8, dim: u32) -> Option<LogicalType> {
         21 => LogicalType::Tuple,
         22 => LogicalType::RowID,
         23 => LogicalType::Missing,
+        24 => LogicalType::Json,
         _ => return None,
     })
 }
@@ -1030,6 +1032,10 @@ fn put_block_value<S: Sink>(sink: &mut S, value: &BlockValue) {
             put_u32(sink, v.segment_id);
             put_u32(sink, v.segment_offset);
         }
+        BlockValue::Json(v) => {
+            put_u8(sink, 21);
+            put_str(sink, &v.compact());
+        }
     }
 }
 
@@ -1079,6 +1085,7 @@ fn read_block_value(cursor: &mut Cursor<'_>) -> Option<BlockValue> {
         }
         19 => BlockValue::Mixed(infinity_common::MixedT::new(cursor.string()?)),
         20 => BlockValue::RowId(crate::data_block::RowIdT::new(cursor.u32()?, cursor.u32()?)),
+        21 => BlockValue::Json(infinity_common::json::parse(&cursor.string()?)?),
         _ => return None,
     })
 }
@@ -1103,6 +1110,7 @@ fn empty_column(logical_type: LogicalType) -> Option<Column> {
         LogicalType::Uuid => Column::Uuid(ColumnVector::new()),
         LogicalType::Array => Column::Array(ColumnVector::new()),
         LogicalType::Mixed => Column::Mixed(ColumnVector::new()),
+        LogicalType::Json => Column::Json(ColumnVector::new()),
         LogicalType::Embedding(_) => Column::Embedding(ColumnVector::new()),
         LogicalType::RowID => Column::RowId(ColumnVector::new()),
         _ => return None,

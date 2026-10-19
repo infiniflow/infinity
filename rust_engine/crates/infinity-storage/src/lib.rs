@@ -67,6 +67,7 @@ pub fn drop_tree_cache(root: &std::path::Path) {
     }
 }
 
+pub mod binary_fuse_filter;
 pub mod block_index;
 pub mod bmp_cpp;
 pub mod bmp_segment;
@@ -81,6 +82,7 @@ pub mod fst_registry;
 pub mod fulltext_segment;
 pub mod inverted_format;
 pub mod knn_format;
+pub mod memindex_tracer;
 pub mod metastore;
 /// RocksDB substrate for a C++-compatible catalog (plan §2.6.1 item 4), behind
 /// the `rocksdb-store` feature.
@@ -88,6 +90,7 @@ pub mod metastore;
 pub mod metastore_rocks;
 pub mod multivector_segment;
 pub mod mvcc;
+pub mod persistence;
 pub mod rcu_map;
 pub mod result_cache;
 pub mod s3;

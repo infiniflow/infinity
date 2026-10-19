@@ -377,6 +377,7 @@ pub enum Column {
     Embedding(ColumnVector<Vec<f32>>),
     Array(ColumnVector<Vec<i64>>),
     Mixed(ColumnVector<infinity_common::MixedT>),
+    Json(ColumnVector<infinity_common::json::Json>),
     RowId(ColumnVector<RowIdT>),
 }
 
@@ -404,6 +405,7 @@ impl Column {
             Column::Embedding(_) => LogicalType::Embedding(0),
             Column::Array(_) => LogicalType::Array,
             Column::Mixed(_) => LogicalType::Mixed,
+            Column::Json(_) => LogicalType::Json,
             Column::RowId(_) => LogicalType::RowID,
         }
     }
@@ -430,6 +432,7 @@ impl Column {
             Column::Embedding(c) => c.len(),
             Column::Array(c) => c.len(),
             Column::Mixed(c) => c.len(),
+            Column::Json(c) => c.len(),
             Column::RowId(c) => c.len(),
         }
     }
@@ -460,6 +463,7 @@ impl Column {
             Column::Embedding(c) => c.null_count(),
             Column::Array(c) => c.null_count(),
             Column::Mixed(c) => c.null_count(),
+            Column::Json(c) => c.null_count(),
             Column::RowId(c) => c.null_count(),
         }
     }
@@ -486,6 +490,7 @@ impl Column {
             Column::Embedding(c) => c.clear(),
             Column::Array(c) => c.clear(),
             Column::Mixed(c) => c.clear(),
+            Column::Json(c) => c.clear(),
             Column::RowId(c) => c.clear(),
         }
     }
@@ -513,6 +518,7 @@ impl Column {
             Column::Embedding(c) => c.vector_type(),
             Column::Array(c) => c.vector_type(),
             Column::Mixed(c) => c.vector_type(),
+            Column::Json(c) => c.vector_type(),
             Column::RowId(c) => c.vector_type(),
         }
     }
@@ -540,6 +546,7 @@ impl Column {
             Column::Embedding(c) => c.size(),
             Column::Array(c) => c.size(),
             Column::Mixed(c) => c.size(),
+            Column::Json(c) => c.size(),
             Column::RowId(c) => c.size(),
         }
     }
@@ -567,6 +574,7 @@ impl Column {
             Column::Embedding(c) => c.capacity(),
             Column::Array(c) => c.capacity(),
             Column::Mixed(c) => c.capacity(),
+            Column::Json(c) => c.capacity(),
             Column::RowId(c) => c.capacity(),
         }
     }
@@ -594,6 +602,7 @@ impl Column {
             Column::Embedding(c) => c.initialize(vector_type, capacity),
             Column::Array(c) => c.initialize(vector_type, capacity),
             Column::Mixed(c) => c.initialize(vector_type, capacity),
+            Column::Json(c) => c.initialize(vector_type, capacity),
             Column::RowId(c) => c.initialize(vector_type, capacity),
         }
     }
@@ -621,6 +630,7 @@ impl Column {
             Column::Embedding(c) => c.reset(),
             Column::Array(c) => c.reset(),
             Column::Mixed(c) => c.reset(),
+            Column::Json(c) => c.reset(),
             Column::RowId(c) => c.reset(),
         }
     }
@@ -647,6 +657,7 @@ impl Column {
             LogicalType::Uuid => Column::Uuid(ColumnVector::new()),
             LogicalType::Array => Column::Array(ColumnVector::new()),
             LogicalType::Mixed => Column::Mixed(ColumnVector::new()),
+            LogicalType::Json => Column::Json(ColumnVector::new()),
             LogicalType::RowID => Column::RowId(ColumnVector::new()),
             _ => return None,
         })
@@ -693,6 +704,7 @@ impl Column {
                 )
             }),
             Column::Mixed(c) => c.get(row).map(|v| v.text()),
+            Column::Json(c) => c.get(row).map(|v| v.compact()),
             Column::RowId(c) => c
                 .get(row)
                 .map(|v| format!("{},{}", v.segment_id, v.segment_offset)),
@@ -731,6 +743,13 @@ impl Column {
             }
             Column::Mixed(v) => {
                 v.values().iter().map(|x| x.heap_len() + 24).sum::<usize>() + v.validity().len()
+            }
+            Column::Json(v) => {
+                v.values()
+                    .iter()
+                    .map(|x| x.compact().len() + 24)
+                    .sum::<usize>()
+                    + v.validity().len()
             }
             Column::RowId(v) => v.values().len() * 8 + v.validity().len(),
         }
@@ -781,6 +800,7 @@ impl Column {
                 Column::Embedding(c) => c.push(None),
                 Column::Array(c) => c.push(None),
                 Column::Mixed(c) => c.push(None),
+                Column::Json(c) => c.push(None),
                 Column::Bytes(c) => c.push(None),
                 Column::RowId(c) => c.push(None),
             }
@@ -806,6 +826,7 @@ impl Column {
             (Column::Embedding(c), BlockValue::Embedding(v)) => c.push(Some(v)),
             (Column::Array(c), BlockValue::Array(v)) => c.push(Some(v)),
             (Column::Mixed(c), BlockValue::Mixed(v)) => c.push(Some(v)),
+            (Column::Json(c), BlockValue::Json(v)) => c.push(Some(v)),
             (Column::RowId(c), BlockValue::RowId(v)) => c.push(Some(v)),
             _ => return Err("value type does not match column".to_string()),
         }
@@ -835,6 +856,7 @@ impl Column {
             Column::Embedding(c) => c.get(row).cloned().map(BlockValue::Embedding),
             Column::Array(c) => c.get(row).cloned().map(BlockValue::Array),
             Column::Mixed(c) => c.get(row).cloned().map(BlockValue::Mixed),
+            Column::Json(c) => c.get(row).cloned().map(BlockValue::Json),
             Column::Bytes(c) => c
                 .get(row)
                 .cloned()
@@ -866,6 +888,7 @@ impl Column {
             Column::Embedding(_) => 19,
             Column::Array(_) => 20,
             Column::Mixed(_) => 21,
+            Column::Json(_) => 22,
         }
     }
 
@@ -906,6 +929,13 @@ impl Column {
                     c.get(0).map_or(4, |v| v.len() + 4)
                 } else {
                     c.values().iter().map(|v| v.len() + 4).sum()
+                }
+            }
+            Column::Json(c) => {
+                if constant {
+                    c.get(0).map_or(4, |v| v.compact().len() + 4)
+                } else {
+                    c.values().iter().map(|v| v.compact().len() + 4).sum()
                 }
             }
             Column::HugeInt(_) | Column::Embedding(_) | Column::Array(_) | Column::Mixed(_) => {
@@ -961,6 +991,7 @@ impl Column {
             Column::Embedding(c) => c.get(row).is_some(),
             Column::Array(c) => c.get(row).is_some(),
             Column::Mixed(c) => c.get(row).is_some(),
+            Column::Json(c) => c.get(row).is_some(),
             Column::RowId(c) => c.get(row).is_some(),
         }
     }
@@ -1009,6 +1040,13 @@ impl Column {
                     let value = value_at(c, row);
                     out.extend_from_slice(&(value.len() as u32).to_le_bytes());
                     out.extend_from_slice(&value);
+                }
+            }
+            Column::Json(c) => {
+                for row in 0..value_rows {
+                    let value = value_at(c, row).compact();
+                    out.extend_from_slice(&(value.len() as u32).to_le_bytes());
+                    out.extend_from_slice(value.as_bytes());
                 }
             }
             Column::Decimal(c) => {
@@ -1096,6 +1134,7 @@ impl Column {
             15 => Column::Uuid(ColumnVector::new()),
             16 => Column::RowId(ColumnVector::new()),
             18 => Column::Bytes(ColumnVector::new()),
+            22 => Column::Json(ColumnVector::new()),
             _ => return None,
         };
         column.initialize(
@@ -1150,6 +1189,14 @@ impl Column {
                 for row in 0..value_rows {
                     let len = cursor.u32()? as usize;
                     c.push(valid(row).then_some(cursor.take(len)?.to_vec()));
+                }
+            }
+            Column::Json(c) => {
+                for row in 0..value_rows {
+                    let len = cursor.u32()? as usize;
+                    let text = std::str::from_utf8(cursor.take(len)?).ok()?;
+                    let value = infinity_common::json::parse(text)?;
+                    c.push(valid(row).then_some(value));
                 }
             }
             Column::Decimal(c) => {
@@ -1249,6 +1296,7 @@ impl Column {
                 Column::Timestamp(c) => to_constant!(c),
                 Column::Interval(c) => to_constant!(c),
                 Column::Uuid(c) => to_constant!(c),
+                Column::Json(c) => to_constant!(c),
                 Column::RowId(c) => to_constant!(c),
                 Column::HugeInt(_) | Column::Embedding(_) | Column::Array(_) | Column::Mixed(_) => {
                     return None
@@ -1311,6 +1359,8 @@ pub enum BlockValue {
     Embedding(Vec<f32>),
     Array(Vec<i64>),
     Mixed(infinity_common::MixedT),
+    /// A parsed JSON document (C++ `Value` of `LogicalType::kJson`).
+    Json(infinity_common::json::Json),
     RowId(RowIdT),
     Null,
 }
@@ -1334,6 +1384,7 @@ impl BlockValue {
             LogicalType::Float => BlockValue::Float(text.trim().parse().ok()?),
             LogicalType::Double => BlockValue::Double(text.trim().parse().ok()?),
             LogicalType::Varchar => BlockValue::Str(text.to_string()),
+            LogicalType::Json => BlockValue::Json(infinity_common::json::parse(text)?),
             LogicalType::Date => {
                 let mut date = infinity_common::DateT::default();
                 date.from_string(text).ok()?;
@@ -1507,6 +1558,16 @@ impl DataBlock {
     /// Approximate heap bytes, for the buffer-manager budget.
     pub fn mem_used(&self) -> usize {
         self.columns.iter().map(Column::mem_used).sum()
+    }
+
+    /// C++ `DataBlock::FillRowIDVector` (`data_block_impl.cpp:254`): appends one
+    /// `(INVALID_SEGMENT_ID, block_id * DEFAULT_BLOCK_CAPACITY + offset)` id per
+    /// row. The intermediate table uses these ids for its order-by result.
+    pub fn fill_row_id_vector(&self, row_ids: &mut Vec<RowIdT>, block_id: u32) {
+        let start = block_id * crate::cpp_format::DEFAULT_BLOCK_CAPACITY as u32;
+        for offset in 0..self.row_count as u32 {
+            row_ids.push(RowIdT::new(u32::MAX, start + offset));
+        }
     }
 }
 
@@ -2054,11 +2115,7 @@ mod reference_suite {
     }
 
     /// C++: `value_ut.cpp::ValueStringTest/test_stringtovalue` — text parses
-    /// into the declared scalar type.
-    ///
-    /// The JSON case has no counterpart: the Rust storage layer has no
-    /// JSON/BSON value type (JSON is carried as text), so the reference's
-    /// `MakeJson(...) == StringToValue(...)` comparison cannot be expressed.
+    /// into the declared scalar type, including a parsed JSON document.
     #[test]
     #[allow(clippy::approx_constant)]
     fn string_to_value_roundtrips_the_scalar_types() {
@@ -2128,6 +2185,30 @@ mod reference_suite {
             parse("", LogicalType::Varchar),
             BlockValue::Str(String::new())
         );
+
+        // JSON: the reference compares the parsed value with
+        // `Value::MakeJson(JsonManager::to_bson(nlohmann::json::parse(...)))`.
+        {
+            let text = "{\"key\": \"value\", \"number\": 42}";
+            let expected = infinity_common::json::parse(text).unwrap();
+            assert_eq!(
+                parse(text, LogicalType::Json),
+                BlockValue::Json(expected.clone())
+            );
+            let mut column = Column::new(LogicalType::Json).unwrap();
+            column.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+            column.push_block_value(BlockValue::Json(expected.clone())).unwrap();
+            assert_eq!(
+                column.get_value_by_index(0),
+                Some(BlockValue::Json(expected.clone()))
+            );
+            assert_eq!(column.value_text(0), Some(expected.compact()));
+            assert_eq!(
+                column.get_value_by_index(1),
+                None,
+                "unwritten JSON row stays NULL"
+            );
+        }
 
         let mut date = DateT::default();
         date.from_string("2023-12-25").unwrap();

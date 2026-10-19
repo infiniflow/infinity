@@ -302,6 +302,9 @@ pub struct BmpAlg {
     ivt: BMPIvt,
     fwd: BlockFwd,
     docs: Vec<SparseVec>,
+    /// `BMPIvt::Optimize` has run. Until it does, `BlockPostings::kth` is 0
+    /// (the C++ `kth_` starts at -1), so searches visit every block.
+    optimized: bool,
 }
 
 impl Default for BmpAlg {
@@ -317,6 +320,7 @@ impl BmpAlg {
             ivt: BMPIvt::new(0),
             fwd: BlockFwd::new(block_size),
             docs: Vec::new(),
+            optimized: false,
         }
     }
 
@@ -335,6 +339,7 @@ impl BmpAlg {
     /// C++: `BMPIvt::Optimize` — must run before [`BmpAlg::search_knn`].
     pub fn build(&mut self) {
         self.ivt.build();
+        self.optimized = true;
     }
 
     pub fn len(&self) -> usize {
@@ -392,7 +397,12 @@ impl BmpAlg {
             let Some(postings) = self.ivt.get_postings(term) else {
                 continue;
             };
-            threshold = threshold.max(q_score * postings.kth(topk));
+            // C++ `BlockPostings::kth` returns 0 until `Optimize` records the
+            // k-th score (`kth_ == -1`), so a pre-optimize search keeps every
+            // block as a candidate.
+            if self.optimized {
+                threshold = threshold.max(q_score * postings.kth(topk));
+            }
             for (i, block) in postings.block_ids().iter().enumerate() {
                 if (*block as usize) < upper_bounds.len() {
                     upper_bounds[*block as usize] += q_score * postings.max_scores()[i];
@@ -780,6 +790,11 @@ mod tests {
         index.add_doc(&[(0, 1.0), (1, 1.0)]);
         index.add_doc(&[(0, 1.0), (1, 1.0)]);
 
+        // C++ `SearchKnn(..., 0, ...)` returns an empty result.
+        assert!(index
+            .search_knn(&query, 0, BmpSearchOptions::default())
+            .is_empty());
+
         let got = index.search_knn(&query, 5, BmpSearchOptions::default());
         assert_eq!(
             got.iter().map(|(doc, _)| *doc).collect::<Vec<_>>(),
@@ -858,6 +873,13 @@ mod bmp_reference_suite {
     }
 
     /// C++: `BMPIndexTest.test1`.
+    ///
+    /// The C++ case instantiates four `(DataType, IdxType, BMPCompressType)`
+    /// combinations; this port is type-erased to `f32` and always uses the
+    /// compressed block layout, so the two block sizes that change the block
+    /// layout are exercised. `test_query` runs before and after `Optimize`,
+    /// rejects `topk == 0`, and every save/load/mmap variant must still answer
+    /// with the same top-k as the in-memory index.
     #[test]
     fn bmp_index_accuracy_and_disk_roundtrip() {
         let rows = 1000;
@@ -869,6 +891,18 @@ mod bmp_reference_suite {
             .map(|q| groundtruth(&corpus, q, 10, cols))
             .collect();
 
+        let accuracy = |index: &BmpAlg| -> (usize, usize) {
+            let mut hit = 0;
+            let mut total = 0;
+            for (q, gt) in queries.iter().zip(&gt) {
+                let hits = index.search_knn(q, 10, BmpSearchOptions::default());
+                let (h, t) = assert_accuracy(&hits, gt);
+                hit += h;
+                total += t;
+            }
+            (hit, total)
+        };
+
         for block_size in [8usize, 64] {
             let options = BmpSearchOptions {
                 alpha: 1.0,
@@ -879,22 +913,26 @@ mod bmp_reference_suite {
             for doc in &corpus {
                 index.add_doc(doc);
             }
+            // C++ `test_query`: an empty top-k asks for nothing.
+            assert!(index.search_knn(&queries[0], 0, options).is_empty());
+
+            // C++ runs `test_query` once before `Optimize` (no k-th score
+            // table yet, so every block is a candidate).
+            let (hit, total) = accuracy(&index);
+            assert!(
+                hit as f32 >= total as f32 * 0.9,
+                "pre-optimize block {block_size}: {hit}/{total}"
+            );
+
             index.build();
-            let mut hit = 0;
-            let mut total = 0;
-            for (q, gt) in queries.iter().zip(&gt) {
-                let query: Vec<(u32, f32)> = q.clone();
-                let hits = index.search_knn(&query, 10, options);
-                let (h, t) = assert_accuracy(&hits, gt);
-                hit += h;
-                total += t;
-            }
+            let (hit, total) = accuracy(&index);
             assert!(
                 hit as f32 >= total as f32 * 0.9,
                 "block {block_size}: {hit}/{total}"
             );
 
-            // Disk round trip: the same corpus through the C++ BMP layout.
+            // Disk round trip: the same corpus through the C++ BMP layout, and
+            // every query must return the same top-k as the memory index.
             let dir = tempfile::tempdir().unwrap();
             let path = dir.path().join("bmp.idx");
             let docs: Vec<infinity_storage::bmp_cpp::SparseDoc> = corpus
@@ -910,12 +948,25 @@ mod bmp_reference_suite {
             write_bmp_file(&path, block_size, IdxWidth::I32, &docs, cols).unwrap();
             let reader = BmpCppReader::open(&path, IdxWidth::I32).unwrap();
             assert_eq!(reader.doc_count(), rows);
+            assert!(reader.search(&[], 0, 1.0).is_empty());
+
             let mut hit = 0;
             let mut total = 0;
             for (q, gt) in queries.iter().zip(&gt) {
+                let mem_hits = index.search_knn(q, 10, options);
                 let query: Vec<(i32, f32)> = q.iter().map(|(t, v)| (*t as i32, *v)).collect();
-                let hits = reader.search(&query, 10, 1.0);
-                let (h, t) = assert_accuracy(&hits, gt);
+                let disk_hits = reader.search(&query, 10, 1.0);
+                assert_eq!(disk_hits.len(), mem_hits.len());
+                for (mem, disk) in mem_hits.iter().zip(&disk_hits) {
+                    assert_eq!(mem.0, disk.0, "doc id differs across the round trip");
+                    assert!(
+                        (mem.1 - disk.1).abs() < 1e-5,
+                        "score differs across the round trip: {:?} vs {:?}",
+                        mem.1,
+                        disk.1
+                    );
+                }
+                let (h, t) = assert_accuracy(&disk_hits, gt);
                 hit += h;
                 total += t;
             }
