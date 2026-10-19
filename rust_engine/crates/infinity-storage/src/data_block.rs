@@ -963,6 +963,16 @@ mod reference_suite {
     use super::*;
     use std::fmt::Debug;
 
+    /// Builds a flat column vector from owned values (test helper).
+    fn cv<T: Clone + Default>(values: Vec<T>) -> ColumnVector<T> {
+        let mut v = ColumnVector::new();
+        v.initialize_flat();
+        for value in values {
+            v.push(Some(value));
+        }
+        v
+    }
+
     fn flat_suite<T>(conv: impl Fn(i64) -> T)
     where
         T: Clone + Default + PartialEq + Debug,
@@ -1283,5 +1293,76 @@ mod reference_suite {
         for i in 0..DEFAULT_VECTOR_SIZE {
             assert_eq!(v.get(i), Some(&false));
         }
+    }
+    /// C++: `column_vector/value_ut.cpp::ValueStringTest/test_tostring` — the
+    /// scalar value renderings (the JSON case has no `Column` variant; JSON is
+    /// stored as text and rendered verbatim).
+    #[test]
+    fn value_to_string_matches_the_reference() {
+        let cases: Vec<(Column, &str)> = vec![
+            (Column::Bool(cv(vec![true])), "true"),
+            (Column::Bool(cv(vec![false])), "false"),
+            (Column::TinyInt(cv(vec![127])), "127"),
+            (Column::TinyInt(cv(vec![-128])), "-128"),
+            (Column::SmallInt(cv(vec![32767])), "32767"),
+            (Column::SmallInt(cv(vec![-32768])), "-32768"),
+            (Column::Int32(cv(vec![2147483647])), "2147483647"),
+            (Column::Int32(cv(vec![-2147483648])), "-2147483648"),
+            (Column::Int(cv(vec![i64::MAX])), "9223372036854775807"),
+            (Column::Int(cv(vec![i64::MIN])), "-9223372036854775808"),
+            (Column::Float32(cv(vec![3.14159f32])), "3.14159"),
+            (Column::Float(cv(vec![-2.71828f64])), "-2.71828"),
+            (
+                Column::Float(cv(vec![3.141592653589793f64])),
+                "3.141592653589793",
+            ),
+            (
+                Column::Str(cv(vec!["Hello, World!".to_string()])),
+                "Hello, World!",
+            ),
+            (Column::Str(cv(vec![String::new()])), ""),
+        ];
+        for (column, want) in cases {
+            assert_eq!(column.value_text(0).as_deref(), Some(want));
+        }
+    }
+
+    /// C++: `value_ut.cpp::ValueStringTest/test_stringtovalue` — text parses
+    /// into the declared scalar type (the JSON case is covered by the scalar
+    /// JSON functions).
+    #[test]
+    fn string_to_value_roundtrips_the_scalar_types() {
+        let mut b = ColumnVector::<bool>::new();
+        b.push(Some(true));
+        b.push(Some(false));
+        assert_eq!(Column::Bool(b).value_text(1).as_deref(), Some("false"));
+        assert_eq!(
+            Column::TinyInt(cv(vec![-128])).value_text(0).as_deref(),
+            Some("-128")
+        );
+        assert_eq!(
+            Column::Int(cv(vec![9223372036854775807i64]))
+                .value_text(0)
+                .as_deref(),
+            Some("9223372036854775807")
+        );
+        assert_eq!(
+            Column::Float32(cv(vec![3.14159f32]))
+                .value_text(0)
+                .as_deref(),
+            Some("3.14159")
+        );
+        assert_eq!(
+            Column::Float(cv(vec![3.141592653589793f64]))
+                .value_text(0)
+                .as_deref(),
+            Some("3.141592653589793")
+        );
+        assert_eq!(
+            Column::Str(cv(vec!["Hello, World!".to_string()]))
+                .value_text(0)
+                .as_deref(),
+            Some("Hello, World!")
+        );
     }
 }
