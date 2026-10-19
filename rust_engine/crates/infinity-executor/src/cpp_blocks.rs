@@ -2183,6 +2183,36 @@ impl Engine {
         out
     }
 
+    /// The `chunk_{id}.idx` ids currently on disk for `index_name`. A merged
+    /// chunk replaces the chunks cleanup deleted, so the in-memory set must be
+    /// reconciled with this list (the reference's buffer manager only holds
+    /// live index buffers).
+    pub fn hnsw_chunk_ids(&self, table: &str, index_name: &str) -> Vec<u64> {
+        let table = self.qualified_table(table);
+        let Some(dir) = self.cpp_hnsw_dir(&table, index_name) else {
+            return Vec::new();
+        };
+        hnsw_chunks(&dir).into_iter().map(|(id, _)| id).collect()
+    }
+
+    /// Decodes one on-disk chunk by id.
+    pub fn load_vector_index_chunk(
+        &self,
+        table: &str,
+        index_name: &str,
+        chunk_id: u64,
+    ) -> Option<LoadedVectorIndex> {
+        let table = self.qualified_table(table);
+        let dir = self.cpp_hnsw_dir(&table, index_name)?;
+        let path = hnsw_chunks(&dir)
+            .into_iter()
+            .find(|(id, _)| *id == chunk_id)
+            .map(|(_, path)| path)?;
+        let bytes = std::fs::read(&path).ok()?;
+        let parts = self.read_hnsw_chunk_parts(&table, index_name, &bytes)?;
+        Self::assemble_loaded_index(parts, chunk_id)
+    }
+
     /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for
     /// `column`'s vectors: a deterministic k-means partitions them into
     /// `centroid_count` parts (task #70).

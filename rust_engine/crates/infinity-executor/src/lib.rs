@@ -3262,30 +3262,39 @@ impl Engine {
         for im in indexes {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
                 let tkey = self.table_key(&im.table);
-                let loaded: Vec<Arc<crate::cpp_blocks::LoadedVectorIndex>> = self
-                    .tables
-                    .lock()
-                    .unwrap()
-                    .get(&tkey)
-                    .and_then(|e| e.vector.get(&im.column).cloned())
-                    .unwrap_or_default();
-                let newest = loaded.iter().map(|s| s.chunk_id).max();
-                // Checkpoints append chunks; only the new ones are decoded.
-                let fresh = self.load_vector_indexes_after(&im.table, &im.name, newest);
-                if !fresh.is_empty() {
-                    let rows = self.row_count(&im.table).unwrap_or(0);
-                    let supersedes = rows > 0 && fresh.iter().any(|s| s.labels.len() >= rows);
-                    let mut tables = self.tables.lock().unwrap();
-                    let list = tables
-                        .entry(tkey)
-                        .or_default()
-                        .vector
-                        .entry(im.column.clone())
-                        .or_default();
-                    if supersedes {
-                        list.clear();
+                // Reconcile with the live chunk set: cleanup deletes the chunks
+                // a merged graph replaced, and the buffer manager must not keep
+                // their decoded vectors alive (this is what made a long import
+                // grow without bound). A rewrite under the same chunk id is
+                // detected by the coverage check below.
+                let disk = self.hnsw_chunk_ids(&im.table, &im.name);
+                if disk.is_empty() {
+                    continue;
+                }
+                let rows = self.row_count(&im.table).unwrap_or(0);
+                let mut tables = self.tables.lock().unwrap();
+                let list = tables
+                    .entry(tkey)
+                    .or_default()
+                    .vector
+                    .entry(im.column.clone())
+                    .or_default();
+                list.retain(|s| disk.contains(&s.chunk_id));
+                let covered: usize = list.iter().map(|s| s.labels.len()).sum();
+                if covered < rows {
+                    list.clear();
+                    drop(tables);
+                    let all = self.load_vector_indexes(&im.table, &im.name);
+                    if !all.is_empty() {
+                        let mut tables = self.tables.lock().unwrap();
+                        let list = tables
+                            .entry(self.table_key(&im.table))
+                            .or_default()
+                            .vector
+                            .entry(im.column.clone())
+                            .or_default();
+                        list.extend(all.into_iter().map(Arc::new));
                     }
-                    list.extend(fresh.into_iter().map(Arc::new));
                 }
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
                 let segments = self.load_ivf_indexes(&im.table, &im.name);
