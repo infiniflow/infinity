@@ -308,7 +308,7 @@
 | 293 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerTest` | `varfile_test` | ported |
 | 294 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerParallelTest` | `parallel_test1` | ported |
 | 295 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerParallelTest` | `parallel_test2` | ported |
-| 296 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test1` | partial |
+| 296 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test1` | ported | `infinity-storage` `buffer::tests::buffer_obj_state_machine` |
 | 297 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test_hnsw_index_buffer_obj_shutdown` | partial |
 | 298 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test_big_with_gc_and_cleanup` | partial |
 | 299 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `DISABLED_SLOW_test_multiple_threads_read` | ported | `infinity-storage` `buffer::tests::disabled_slow_test_multiple_threads_read`（`#[ignore]`） |
@@ -424,11 +424,11 @@
 | 409 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_a` | exempt |
 | 410 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_column_vector_select` | exempt |
 | 411 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_column_slice_init` | exempt |
-| 412 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `flat_row` | partial |
-| 413 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `contant_row` | partial |
-| 414 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `row_column_vector_select` | partial |
-| 415 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `row_column_slice_init` | partial |
-| 416 | `src/unit_test/storage/column_vector/column_vector_ut.cpp` | `ColumnVectorTest` | `ReadWrite` | partial |
+| 412 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `flat_row` | ported | `infinity-storage` `data_block::reference_suite::row_flat` |
+| 413 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `contant_row` | ported | `infinity-storage` `data_block::reference_suite::row_constant` |
+| 414 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `row_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::row_column_vector_select` |
+| 415 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `row_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::row_column_slice_init` |
+| 416 | `src/unit_test/storage/column_vector/column_vector_ut.cpp` | `ColumnVectorTest` | `ReadWrite` | ported | `infinity-storage` `data_block::reference_suite::column_vector_read_write_roundtrips` |
 | 417 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `flat_uuid` | ported | `infinity-storage` `data_block::reference_suite::uuid_flat_constant_select_slice` |
 | 418 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `contant_uuid` | ported | `infinity-storage` `data_block::reference_suite::uuid_flat_constant_select_slice` |
 | 419 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `uuid_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::uuid_flat_constant_select_slice` |
@@ -437,9 +437,9 @@
 | 422 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `constant_inline_varchar` | ported | `infinity-storage` `data_block::reference_suite::varchar_flat_constant_select_slice` |
 | 423 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `varchar_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::varchar_flat_constant_select_slice` |
 | 424 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `varchar_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::varchar_flat_constant_select_slice` |
-| 425 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_not_inline_varchar` | partial |
-| 426 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `constant_not_inline_varchar` | partial |
-| 427 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_mixed_inline_varchar` | partial |
+| 425 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_not_inline_varchar` | ported | `infinity-storage` `data_block::reference_suite::varchar_flat_not_inline` |
+| 426 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `constant_not_inline_varchar` | ported | `infinity-storage` `data_block::reference_suite::varchar_constant_not_inline` |
+| 427 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_mixed_inline_varchar` | ported | `infinity-storage` `data_block::reference_suite::varchar_flat_mixed_inline` |
 | 428 | `src/unit_test/storage/column_vector/selection_ut.cpp` | `SelectionTest` | `test1` | ported | `infinity-storage` `selection::tests::selection_matches_the_reference` |
 | 429 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_embedding` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
 | 430 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_sparse` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
@@ -513,8 +513,8 @@
 | 498 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `ReadWrite` | ported | `value_format::tests::table_def_roundtrips_through_its_bytes` |
 | 499 | `src/unit_test/storage/definition/table_ut.cpp` | `TableTest` | `test1` | gap |
 | 500 | `src/unit_test/storage/invertedindex/column_inverter_ut.cpp` | `ColumnInverterTest` | `Invert` | ported |
-| 501 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test1` | gap |
-| 502 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test2` | gap |
+| 501 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test1` | ported | `infinity-storage` `external_sort::tests::test1` |
+| 502 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test2` | ported | `infinity-storage` `external_sort::tests::test2` |
 | 503 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test1` | exempt | Skiplist 容器已登记为设计变更（读路径按 postings 列表解码），不单独移植 |
 | 504 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test2` | exempt | Skiplist 容器已登记为设计变更（读路径按 postings 列表解码），不单独移植 |
 | 505 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test3` | exempt | Skiplist 容器已登记为设计变更（读路径按 postings 列表解码），不单独移植 |
@@ -567,15 +567,15 @@
 | 552 | `src/unit_test/storage/invertedindex/fst/registry_ut.cpp` | `RegistryTest` | `InsertAndFind` | ported | `infinity-storage` `insert_and_find` |
 | 553 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `Chunk` | ported | `infinity-executor` `tests::memory_indexer_builds_the_reference_postings` |
 | 554 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_Memory` | ported | `infinity-executor` `tests::disabled_slow_memory`（`#[ignore]`） |
-| 555 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `SpillLoadTest` | gap |
+| 555 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `SpillLoadTest` | ported | `infinity-executor` `memory_indexer_ut::spill_load_test` |
 | 556 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_SeekPosition` | ported | `infinity-executor` `tests::disabled_slow_seek_position`（`#[ignore]`） |
-| 557 | `src/unit_test/storage/invertedindex/posting_merger_ut.cpp` | `PostingMergerTest` | `Basic` | gap |
-| 558 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `test1` | gap |
-| 559 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `tf_after_skip_to_across_segments` | gap |
-| 560 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test1` | gap |
-| 561 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test2` | gap |
-| 562 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test3` | gap |
-| 563 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test4` | gap |
+| 557 | `src/unit_test/storage/invertedindex/posting_merger_ut.cpp` | `PostingMergerTest` | `Basic` | ported | `infinity-storage` `posting_merger_ut::basic` |
+| 558 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `test1` | ported | `infinity-storage` `posting_writer_ut::test1` |
+| 559 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `tf_after_skip_to_across_segments` | ported | `infinity-storage` `posting_writer_ut::tf_after_skip_to_across_segments` |
+| 560 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test1` | ported | `infinity-executor` `highlighter_ut::test1` |
+| 561 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test2` | ported | `infinity-executor` `highlighter_ut::test2` |
+| 562 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test3` | ported | `infinity-executor` `highlighter_ut::test3` |
+| 563 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test4` | ported | `infinity-executor` `highlighter_ut::test4` |
 | 564 | `src/unit_test/storage/invertedindex/search/query_builder_ut.cpp` | `QueryBuilderTest` | `test_and` | ported | `infinity-executor` `query_builder::tests::test_and` |
 | 565 | `src/unit_test/storage/invertedindex/search/query_builder_ut.cpp` | `QueryBuilderTest` | `test_or` | ported | `infinity-executor` `query_builder::tests::test_or` |
 | 566 | `src/unit_test/storage/invertedindex/search/query_builder_ut.cpp` | `QueryBuilderTest` | `test_and_not` | ported | `infinity-executor` `query_builder::tests::test_and_not` |
@@ -981,18 +981,18 @@
 | 966 | `src/unit_test/storage/tracer/test_tracer_ut.cpp` | `MemIndexTracerTest` | `test2` | gap |
 | 967 | `src/unit_test/storage/txn/conflict_check_ut.cpp` | `ConflictCheckTest` | `conflict_check_delete` | gap |
 | 968 | `src/unit_test/storage/txn/constants_ut.cpp` | `TxnContants` | `test1` | ported | `infinity-txn` `state::tests::started_state_renders_as_started` |
-| 969 | `src/unit_test/storage/txn/database_snapshot_ut.cpp` | `DatabaseSnapshotTest` | `test_restore_database_rollback_basic` | gap |
-| 970 | `src/unit_test/storage/txn/database_snapshot_ut.cpp` | `DatabaseSnapshotTest` | `test_restore_database_create_database_multithreaded` | gap |
-| 971 | `src/unit_test/storage/txn/database_snapshot_ut.cpp` | `DatabaseSnapshotTest` | `test_create_snapshot_same_name_multithreaded` | gap |
-| 972 | `src/unit_test/storage/txn/database_snapshot_ut.cpp` | `DatabaseSnapshotTest` | `test_sql_parser` | gap |
-| 973 | `src/unit_test/storage/txn/system_snapshot_ut.cpp` | `SystemSnapshotTest` | `test_restore_system_rollback_basic` | gap |
-| 974 | `src/unit_test/storage/txn/system_snapshot_ut.cpp` | `SystemSnapshotTest` | `test_restore_system_create_database_multithreaded` | gap |
-| 975 | `src/unit_test/storage/txn/system_snapshot_ut.cpp` | `SystemSnapshotTest` | `test_sql_parser` | gap |
-| 976 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_restore_table_rollback_basic` | gap |
-| 977 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_restore_table_create_table_multithreaded` | gap |
-| 978 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_create_snapshot_same_name_multithreaded` | gap |
-| 979 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_show_snapshot_multithreaded` | gap |
-| 980 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_restore_table_same_snapshot_multithreaded` | gap |
+| 969 | `src/unit_test/storage/txn/database_snapshot_ut.cpp` | `DatabaseSnapshotTest` | `test_restore_database_rollback_basic` | ported | `infinity-executor` `txn_ut::database_snapshot_restore_rollback_basic` |
+| 970 | `src/unit_test/storage/txn/database_snapshot_ut.cpp` | `DatabaseSnapshotTest` | `test_restore_database_create_database_multithreaded` | ported | `infinity-executor` `txn_ut::database_snapshot_restore_create_database_multithreaded` |
+| 971 | `src/unit_test/storage/txn/database_snapshot_ut.cpp` | `DatabaseSnapshotTest` | `test_create_snapshot_same_name_multithreaded` | ported | `infinity-executor` `txn_ut::database_snapshot_create_same_name_multithreaded` |
+| 972 | `src/unit_test/storage/txn/database_snapshot_ut.cpp` | `DatabaseSnapshotTest` | `test_sql_parser` | ported | `infinity-executor` `txn_ut::database_snapshot_sql_parser` |
+| 973 | `src/unit_test/storage/txn/system_snapshot_ut.cpp` | `SystemSnapshotTest` | `test_restore_system_rollback_basic` | ported | `infinity-executor` `txn_ut::system_snapshot_restore_rollback_basic` |
+| 974 | `src/unit_test/storage/txn/system_snapshot_ut.cpp` | `SystemSnapshotTest` | `test_restore_system_create_database_multithreaded` | ported | `infinity-executor` `txn_ut::system_snapshot_restore_create_database_multithreaded` |
+| 975 | `src/unit_test/storage/txn/system_snapshot_ut.cpp` | `SystemSnapshotTest` | `test_sql_parser` | ported | `infinity-executor` `txn_ut::system_snapshot_sql_parser` |
+| 976 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_restore_table_rollback_basic` | ported | `infinity-executor` `txn_ut::table_snapshot_restore_rollback_basic` |
+| 977 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_restore_table_create_table_multithreaded` | ported | `infinity-executor` `txn_ut::table_snapshot_restore_create_table_multithreaded` |
+| 978 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_create_snapshot_same_name_multithreaded` | ported | `infinity-executor` `txn_ut::table_snapshot_create_same_name_multithreaded` |
+| 979 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_show_snapshot_multithreaded` | ported | `infinity-executor` `txn_ut::table_snapshot_show_multithreaded` |
+| 980 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_restore_table_same_snapshot_multithreaded` | ported | `infinity-executor` `txn_ut::table_snapshot_restore_same_snapshot_multithreaded` |
 | 981 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_create_snapshot_delete_data` | gap |
 | 982 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_create_snapshot_insert_data` | gap |
 | 983 | `src/unit_test/storage/wal/recycle_log_ut.cpp` | `RecycleLogTest` | `recycle_wal_after_delta_checkpoint` | integration |

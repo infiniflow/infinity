@@ -76,6 +76,7 @@ pub mod cpp_format;
 pub mod crc;
 pub mod data_block;
 pub mod emvb_segment;
+pub mod external_sort;
 pub mod fst_registry;
 pub mod fulltext_segment;
 pub mod inverted_format;

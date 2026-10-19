@@ -345,10 +345,27 @@ pub enum Statement {
         name: String,
         table: String,
     },
+    /// `CREATE SNAPSHOT <name> ON DATABASE <db>`
+    CreateDatabaseSnapshot {
+        name: String,
+        database: String,
+    },
+    /// `CREATE SNAPSHOT <name> ON SYSTEM`
+    CreateSystemSnapshot {
+        name: String,
+    },
     DropSnapshot {
         name: String,
     },
     RestoreSnapshot {
+        name: String,
+    },
+    /// `RESTORE DATABASE SNAPSHOT <name>`
+    RestoreDatabaseSnapshot {
+        name: String,
+    },
+    /// `RESTORE SYSTEM SNAPSHOT <name>`
+    RestoreSystemSnapshot {
         name: String,
     },
     Delete {

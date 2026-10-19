@@ -39,8 +39,8 @@ use memmap2::Mmap;
 use crate::cpp_format::FormatError;
 use crate::inverted_format::{
     build_fst, decode_dic_meta_at, decode_u32_block, dic_fst, encode_column_lengths, encode_dic,
-    encode_term_meta_region_with_offsets, encode_u32_block, fst_get, fulltext_chunk_file, TermMeta,
-    TermMetaFlags, TermPostings, FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX,
+    encode_term_meta_region_with_offsets, encode_u32_block, fst_get, fulltext_chunk_file,
+    FstStream, TermMeta, TermMetaFlags, TermPostings, FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX,
     FULLTEXT_POSTING_SUFFIX, POSTING_MINI_BLOCK,
 };
 
@@ -225,6 +225,15 @@ impl SegmentIndexReader {
         decode_dic_meta_at(&self.dic, offset, self.flags).map(Some)
     }
 
+    /// Every term in the segment's dictionary, in lexicographic order
+    /// (`DictionaryReader::Next`).
+    pub fn terms(&self) -> Result<Vec<String>, FormatError> {
+        let fst = dic_fst(&self.dic)?;
+        Ok(FstStream::new(fst)?
+            .map(|(key, _)| String::from_utf8_lossy(&key).into_owned())
+            .collect())
+    }
+
     /// Decodes one term's posting list into `(row id, term frequency)` pairs,
     /// ascending by row id, with `base_row_id` added back.
     pub fn postings(&self, term: &str) -> Result<Vec<(u64, u32)>, FormatError> {
@@ -263,6 +272,176 @@ impl SegmentIndexReader {
             }
         }
         Ok(out)
+    }
+}
+
+/// The reference's `INVALID_ROWID`.
+pub const INVALID_ROW_ID: u64 = u64::MAX;
+
+/// One term's posting list under construction (`PostingWriter`,
+/// `posting_writer_impl.cpp`): each document's term frequency is the number of
+/// positions added before `end_document`.
+///
+/// The disk framing is the segment writer's ([`write_segment_index`]); the
+/// on-disk format does not persist position lists (see the module docs).
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct PostingWriter {
+    postings: Vec<(u64, u32)>,
+    current_tf: u32,
+}
+
+impl PostingWriter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// A writer preloaded with one decoded posting list
+    /// (`PostingWriter::Load`).
+    pub fn with_postings(postings: Vec<(u64, u32)>) -> Self {
+        Self {
+            postings,
+            current_tf: 0,
+        }
+    }
+
+    /// `PostingWriter::AddPosition`: count one occurrence in the current
+    /// document.
+    pub fn add_position(&mut self) {
+        self.current_tf += 1;
+    }
+
+    /// `PostingWriter::EndDocument`: append the current document's frequency.
+    pub fn end_document(&mut self, row: u64) {
+        self.postings.push((row, self.current_tf));
+        self.current_tf = 0;
+    }
+
+    /// `GetDF`.
+    pub fn doc_freq(&self) -> u32 {
+        self.postings.len() as u32
+    }
+
+    /// `GetTotalTF`.
+    pub fn total_tf(&self) -> u32 {
+        self.postings.iter().map(|(_, tf)| *tf).sum()
+    }
+
+    /// `GetCurrentTF`.
+    pub fn current_tf(&self) -> u32 {
+        self.current_tf
+    }
+
+    pub fn postings(&self) -> &[(u64, u32)] {
+        &self.postings
+    }
+}
+
+/// Merges segments' posting lists (`PostingMerger`,
+/// `posting_merger_impl.cpp`): the lists are appended in segment order and the
+/// row ids are already absolute ([`SegmentIndexReader::postings`] adds the
+/// segment base back).
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct PostingMerger {
+    postings: Vec<(u64, u32)>,
+}
+
+impl PostingMerger {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// `PostingMerger::Merge`.
+    pub fn merge(&mut self, segments: &[&[(u64, u32)]]) {
+        for list in segments {
+            self.postings.extend_from_slice(list);
+        }
+    }
+
+    /// `PostingMerger::GetDF`.
+    pub fn doc_freq(&self) -> u32 {
+        self.postings.len() as u32
+    }
+
+    /// `PostingMerger::GetTotalTF`.
+    pub fn total_tf(&self) -> u32 {
+        self.postings.iter().map(|(_, tf)| *tf).sum()
+    }
+
+    pub fn postings(&self) -> &[(u64, u32)] {
+        &self.postings
+    }
+}
+
+/// A posting iterator over one or more segments (`PostingIterator`,
+/// `posting_iterator_impl.cpp`).
+///
+/// `seek_doc` decodes the term frequency of the document it lands on, while
+/// `skip_to` only positions the cursor: `current_tf` is `0` until the next
+/// `seek_doc`, matching the reference (`SkipTo` resets `current_row_id_`).
+#[derive(Debug, Default, Clone)]
+pub struct PostingIterator {
+    /// Per segment: `(row id, term frequency)`, ascending.
+    segments: Vec<Vec<(u64, u32)>>,
+    segment: usize,
+    index: usize,
+    doc_id: u64,
+    tf: u32,
+}
+
+impl PostingIterator {
+    pub fn new(segments: Vec<Vec<(u64, u32)>>) -> Self {
+        Self {
+            segments,
+            segment: 0,
+            index: 0,
+            doc_id: INVALID_ROW_ID,
+            tf: 0,
+        }
+    }
+
+    /// `PostingIterator::DocID`.
+    pub fn doc_id(&self) -> u64 {
+        self.doc_id
+    }
+
+    /// `PostingIterator::GetCurrentTF`.
+    pub fn current_tf(&self) -> u32 {
+        self.tf
+    }
+
+    /// `PostingIterator::SkipTo`: positions at the first posting whose row id
+    /// is at least `row`, but leaves the term frequency undecoded.
+    pub fn skip_to(&mut self, row: u64) -> bool {
+        for (segment, list) in self.segments.iter().enumerate() {
+            let index = list.partition_point(|(doc, _)| *doc < row);
+            if index < list.len() {
+                self.segment = segment;
+                self.index = index;
+                self.doc_id = INVALID_ROW_ID;
+                self.tf = 0;
+                return true;
+            }
+        }
+        self.segment = self.segments.len();
+        self.index = 0;
+        self.doc_id = INVALID_ROW_ID;
+        self.tf = 0;
+        false
+    }
+
+    /// `PostingIterator::SeekDoc`: advances to the first posting at or after
+    /// `row` and returns its row id, or [`INVALID_ROW_ID`].
+    pub fn seek_doc(&mut self, row: u64) -> u64 {
+        if self.doc_id != INVALID_ROW_ID && row <= self.doc_id {
+            return self.doc_id;
+        }
+        if !self.skip_to(row) {
+            return INVALID_ROW_ID;
+        }
+        let (doc, tf) = self.segments[self.segment][self.index];
+        self.doc_id = doc;
+        self.tf = tf;
+        doc
     }
 }
 

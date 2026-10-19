@@ -15,6 +15,24 @@ use infinity_common::LogicalType;
 /// capacity of a freshly initialized flat vector.
 pub const DEFAULT_VECTOR_SIZE: usize = 8192;
 
+/// C++ `RowID` (`src/common/types/row_id.h`): the segment and the row offset
+/// inside it. The Rust engine mostly uses the packed `u64` alias from
+/// `infinity_common`; a column needs the two fields to stay addressable.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RowIdT {
+    pub segment_id: u32,
+    pub segment_offset: u32,
+}
+
+impl RowIdT {
+    pub fn new(segment_id: u32, segment_offset: u32) -> Self {
+        Self {
+            segment_id,
+            segment_offset,
+        }
+    }
+}
+
 /// C++: `ColumnVectorType` (`column_vector.cppm:49-62`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ColumnVectorType {
@@ -359,6 +377,7 @@ pub enum Column {
     Embedding(ColumnVector<Vec<f32>>),
     Array(ColumnVector<Vec<i64>>),
     Mixed(ColumnVector<infinity_common::MixedT>),
+    RowId(ColumnVector<RowIdT>),
 }
 
 impl Column {
@@ -385,6 +404,7 @@ impl Column {
             Column::Embedding(_) => LogicalType::Embedding(0),
             Column::Array(_) => LogicalType::Array,
             Column::Mixed(_) => LogicalType::Mixed,
+            Column::RowId(_) => LogicalType::RowID,
         }
     }
 
@@ -410,6 +430,7 @@ impl Column {
             Column::Embedding(c) => c.len(),
             Column::Array(c) => c.len(),
             Column::Mixed(c) => c.len(),
+            Column::RowId(c) => c.len(),
         }
     }
 
@@ -439,6 +460,7 @@ impl Column {
             Column::Embedding(c) => c.null_count(),
             Column::Array(c) => c.null_count(),
             Column::Mixed(c) => c.null_count(),
+            Column::RowId(c) => c.null_count(),
         }
     }
 
@@ -464,7 +486,170 @@ impl Column {
             Column::Embedding(c) => c.clear(),
             Column::Array(c) => c.clear(),
             Column::Mixed(c) => c.clear(),
+            Column::RowId(c) => c.clear(),
         }
+    }
+
+    /// C++ `ColumnVectorType` of the underlying vector.
+    pub fn vector_type(&self) -> ColumnVectorType {
+        match self {
+            Column::Int(c) => c.vector_type(),
+            Column::Float(c) => c.vector_type(),
+            Column::Bool(c) => c.vector_type(),
+            Column::Str(c) => c.vector_type(),
+            Column::Bytes(c) => c.vector_type(),
+            Column::TinyInt(c) => c.vector_type(),
+            Column::SmallInt(c) => c.vector_type(),
+            Column::Int32(c) => c.vector_type(),
+            Column::HugeInt(c) => c.vector_type(),
+            Column::Float32(c) => c.vector_type(),
+            Column::Decimal(c) => c.vector_type(),
+            Column::Date(c) => c.vector_type(),
+            Column::Time(c) => c.vector_type(),
+            Column::DateTime(c) => c.vector_type(),
+            Column::Timestamp(c) => c.vector_type(),
+            Column::Interval(c) => c.vector_type(),
+            Column::Uuid(c) => c.vector_type(),
+            Column::Embedding(c) => c.vector_type(),
+            Column::Array(c) => c.vector_type(),
+            Column::Mixed(c) => c.vector_type(),
+            Column::RowId(c) => c.vector_type(),
+        }
+    }
+
+    /// C++ `ColumnVector::Size()`: the number of rows.
+    pub fn size(&self) -> usize {
+        match self {
+            Column::Int(c) => c.size(),
+            Column::Float(c) => c.size(),
+            Column::Bool(c) => c.size(),
+            Column::Str(c) => c.size(),
+            Column::Bytes(c) => c.size(),
+            Column::TinyInt(c) => c.size(),
+            Column::SmallInt(c) => c.size(),
+            Column::Int32(c) => c.size(),
+            Column::HugeInt(c) => c.size(),
+            Column::Float32(c) => c.size(),
+            Column::Decimal(c) => c.size(),
+            Column::Date(c) => c.size(),
+            Column::Time(c) => c.size(),
+            Column::DateTime(c) => c.size(),
+            Column::Timestamp(c) => c.size(),
+            Column::Interval(c) => c.size(),
+            Column::Uuid(c) => c.size(),
+            Column::Embedding(c) => c.size(),
+            Column::Array(c) => c.size(),
+            Column::Mixed(c) => c.size(),
+            Column::RowId(c) => c.size(),
+        }
+    }
+
+    /// C++ `ColumnVector::capacity()`.
+    pub fn capacity(&self) -> usize {
+        match self {
+            Column::Int(c) => c.capacity(),
+            Column::Float(c) => c.capacity(),
+            Column::Bool(c) => c.capacity(),
+            Column::Str(c) => c.capacity(),
+            Column::Bytes(c) => c.capacity(),
+            Column::TinyInt(c) => c.capacity(),
+            Column::SmallInt(c) => c.capacity(),
+            Column::Int32(c) => c.capacity(),
+            Column::HugeInt(c) => c.capacity(),
+            Column::Float32(c) => c.capacity(),
+            Column::Decimal(c) => c.capacity(),
+            Column::Date(c) => c.capacity(),
+            Column::Time(c) => c.capacity(),
+            Column::DateTime(c) => c.capacity(),
+            Column::Timestamp(c) => c.capacity(),
+            Column::Interval(c) => c.capacity(),
+            Column::Uuid(c) => c.capacity(),
+            Column::Embedding(c) => c.capacity(),
+            Column::Array(c) => c.capacity(),
+            Column::Mixed(c) => c.capacity(),
+            Column::RowId(c) => c.capacity(),
+        }
+    }
+
+    /// C++ `ColumnVector::Initialize(vector_type, capacity)`.
+    pub fn initialize(&mut self, vector_type: ColumnVectorType, capacity: usize) {
+        match self {
+            Column::Int(c) => c.initialize(vector_type, capacity),
+            Column::Float(c) => c.initialize(vector_type, capacity),
+            Column::Bool(c) => c.initialize(vector_type, capacity),
+            Column::Str(c) => c.initialize(vector_type, capacity),
+            Column::Bytes(c) => c.initialize(vector_type, capacity),
+            Column::TinyInt(c) => c.initialize(vector_type, capacity),
+            Column::SmallInt(c) => c.initialize(vector_type, capacity),
+            Column::Int32(c) => c.initialize(vector_type, capacity),
+            Column::HugeInt(c) => c.initialize(vector_type, capacity),
+            Column::Float32(c) => c.initialize(vector_type, capacity),
+            Column::Decimal(c) => c.initialize(vector_type, capacity),
+            Column::Date(c) => c.initialize(vector_type, capacity),
+            Column::Time(c) => c.initialize(vector_type, capacity),
+            Column::DateTime(c) => c.initialize(vector_type, capacity),
+            Column::Timestamp(c) => c.initialize(vector_type, capacity),
+            Column::Interval(c) => c.initialize(vector_type, capacity),
+            Column::Uuid(c) => c.initialize(vector_type, capacity),
+            Column::Embedding(c) => c.initialize(vector_type, capacity),
+            Column::Array(c) => c.initialize(vector_type, capacity),
+            Column::Mixed(c) => c.initialize(vector_type, capacity),
+            Column::RowId(c) => c.initialize(vector_type, capacity),
+        }
+    }
+
+    /// C++ `ColumnVector::Reset`.
+    pub fn reset(&mut self) {
+        match self {
+            Column::Int(c) => c.reset(),
+            Column::Float(c) => c.reset(),
+            Column::Bool(c) => c.reset(),
+            Column::Str(c) => c.reset(),
+            Column::Bytes(c) => c.reset(),
+            Column::TinyInt(c) => c.reset(),
+            Column::SmallInt(c) => c.reset(),
+            Column::Int32(c) => c.reset(),
+            Column::HugeInt(c) => c.reset(),
+            Column::Float32(c) => c.reset(),
+            Column::Decimal(c) => c.reset(),
+            Column::Date(c) => c.reset(),
+            Column::Time(c) => c.reset(),
+            Column::DateTime(c) => c.reset(),
+            Column::Timestamp(c) => c.reset(),
+            Column::Interval(c) => c.reset(),
+            Column::Uuid(c) => c.reset(),
+            Column::Embedding(c) => c.reset(),
+            Column::Array(c) => c.reset(),
+            Column::Mixed(c) => c.reset(),
+            Column::RowId(c) => c.reset(),
+        }
+    }
+
+    /// C++ `ColumnVector::Make(DataType)`: an uninitialized column of the
+    /// given logical type (`None` for types without a typed column here).
+    pub fn new(logical_type: LogicalType) -> Option<Self> {
+        Some(match logical_type {
+            LogicalType::Boolean => Column::Bool(ColumnVector::new()),
+            LogicalType::TinyInt => Column::TinyInt(ColumnVector::new()),
+            LogicalType::SmallInt => Column::SmallInt(ColumnVector::new()),
+            LogicalType::Integer => Column::Int32(ColumnVector::new()),
+            LogicalType::BigInt => Column::Int(ColumnVector::new()),
+            LogicalType::HugeInt => Column::HugeInt(ColumnVector::new()),
+            LogicalType::Float => Column::Float32(ColumnVector::new()),
+            LogicalType::Double => Column::Float(ColumnVector::new()),
+            LogicalType::Decimal => Column::Decimal(ColumnVector::new()),
+            LogicalType::Varchar => Column::Str(ColumnVector::new()),
+            LogicalType::Date => Column::Date(ColumnVector::new()),
+            LogicalType::Time => Column::Time(ColumnVector::new()),
+            LogicalType::DateTime => Column::DateTime(ColumnVector::new()),
+            LogicalType::Timestamp => Column::Timestamp(ColumnVector::new()),
+            LogicalType::Interval => Column::Interval(ColumnVector::new()),
+            LogicalType::Uuid => Column::Uuid(ColumnVector::new()),
+            LogicalType::Array => Column::Array(ColumnVector::new()),
+            LogicalType::Mixed => Column::Mixed(ColumnVector::new()),
+            LogicalType::RowID => Column::RowId(ColumnVector::new()),
+            _ => return None,
+        })
     }
 
     /// The rendered text of a slot (`None` for NULL).
@@ -508,6 +693,9 @@ impl Column {
                 )
             }),
             Column::Mixed(c) => c.get(row).map(|v| v.text()),
+            Column::RowId(c) => c
+                .get(row)
+                .map(|v| format!("{},{}", v.segment_id, v.segment_offset)),
         }
     }
 
@@ -544,37 +732,559 @@ impl Column {
             Column::Mixed(v) => {
                 v.values().iter().map(|x| x.heap_len() + 24).sum::<usize>() + v.validity().len()
             }
+            Column::RowId(v) => v.values().len() * 8 + v.validity().len(),
         }
     }
 
-    /// Parses one text slot (the block/decoder path).
+    /// Parses one text slot (the block/decoder path). A slot whose text does
+    /// not parse becomes NULL, as in the reference decoder.
     pub fn push_text(&mut self, text: Option<&str>) {
+        // Bytes and Mixed keep their own text handling: `Bytes` is a byte
+        // string (not UTF-8 typed) and `Mixed` stores the text itself.
         match self {
-            Column::Int(c) => c.push(text.and_then(|t| t.trim().parse::<i64>().ok())),
-            Column::Float(c) => c.push(text.and_then(|t| t.trim().parse::<f64>().ok())),
-            Column::Bool(c) => c.push(text.and_then(|t| match t.trim() {
-                "true" | "1" => Some(true),
-                "false" | "0" => Some(false),
-                _ => None,
-            })),
-            Column::Str(c) => c.push(text.map(str::to_string)),
-            Column::Bytes(c) => c.push(text.map(|t| t.as_bytes().to_vec())),
-            Column::TinyInt(c) => c.push(text.and_then(|t| t.trim().parse::<i8>().ok())),
-            Column::SmallInt(c) => c.push(text.and_then(|t| t.trim().parse::<i16>().ok())),
-            Column::Int32(c) => c.push(text.and_then(|t| t.trim().parse::<i32>().ok())),
-            Column::HugeInt(c) => c.push(text.and_then(|t| t.trim().parse::<i128>().ok())),
-            Column::Float32(c) => c.push(text.and_then(|t| t.trim().parse::<f32>().ok())),
-            Column::Decimal(_) => {}
-            Column::Date(_) => {}
-            Column::Time(_) => {}
-            Column::DateTime(_) => {}
-            Column::Timestamp(_) => {}
-            Column::Interval(_) => {}
-            Column::Uuid(_) => {}
-            Column::Embedding(_) => {}
-            Column::Array(_) => {}
-            Column::Mixed(c) => c.push(text.map(infinity_common::MixedT::new)),
+            Column::Bytes(c) => {
+                c.push(text.map(|t| t.as_bytes().to_vec()));
+                return;
+            }
+            Column::Mixed(c) => {
+                c.push(text.map(infinity_common::MixedT::new));
+                return;
+            }
+            _ => {}
         }
+        let value = text
+            .and_then(|t| BlockValue::parse_text(t, self.logical_type()))
+            .unwrap_or(BlockValue::Null);
+        let _ = self.push_block_value(value);
+    }
+
+    /// Appends one typed slot (`BlockValue::Null` appends a NULL).
+    pub fn push_block_value(&mut self, value: BlockValue) -> Result<(), String> {
+        if value == BlockValue::Null {
+            match self {
+                Column::Bool(c) => c.push(None),
+                Column::TinyInt(c) => c.push(None),
+                Column::SmallInt(c) => c.push(None),
+                Column::Int(c) => c.push(None),
+                Column::Int32(c) => c.push(None),
+                Column::HugeInt(c) => c.push(None),
+                Column::Float32(c) => c.push(None),
+                Column::Float(c) => c.push(None),
+                Column::Decimal(c) => c.push(None),
+                Column::Str(c) => c.push(None),
+                Column::Date(c) => c.push(None),
+                Column::Time(c) => c.push(None),
+                Column::DateTime(c) => c.push(None),
+                Column::Timestamp(c) => c.push(None),
+                Column::Interval(c) => c.push(None),
+                Column::Uuid(c) => c.push(None),
+                Column::Embedding(c) => c.push(None),
+                Column::Array(c) => c.push(None),
+                Column::Mixed(c) => c.push(None),
+                Column::Bytes(c) => c.push(None),
+                Column::RowId(c) => c.push(None),
+            }
+            return Ok(());
+        }
+        match (self, value) {
+            (Column::Bool(c), BlockValue::Bool(v)) => c.push(Some(v)),
+            (Column::TinyInt(c), BlockValue::TinyInt(v)) => c.push(Some(v)),
+            (Column::SmallInt(c), BlockValue::SmallInt(v)) => c.push(Some(v)),
+            (Column::Int(c), BlockValue::Int(v)) => c.push(Some(v)),
+            (Column::Int32(c), BlockValue::Int32(v)) => c.push(Some(v)),
+            (Column::HugeInt(c), BlockValue::HugeInt(v)) => c.push(Some(v)),
+            (Column::Float32(c), BlockValue::Float(v)) => c.push(Some(v)),
+            (Column::Float(c), BlockValue::Double(v)) => c.push(Some(v)),
+            (Column::Decimal(c), BlockValue::Decimal(v)) => c.push(Some(v)),
+            (Column::Str(c), BlockValue::Str(v)) => c.push(Some(v)),
+            (Column::Date(c), BlockValue::Date(v)) => c.push(Some(v)),
+            (Column::Time(c), BlockValue::Time(v)) => c.push(Some(v)),
+            (Column::DateTime(c), BlockValue::DateTime(v)) => c.push(Some(v)),
+            (Column::Timestamp(c), BlockValue::Timestamp(v)) => c.push(Some(v)),
+            (Column::Interval(c), BlockValue::Interval(v)) => c.push(Some(v)),
+            (Column::Uuid(c), BlockValue::Uuid(v)) => c.push(Some(v)),
+            (Column::Embedding(c), BlockValue::Embedding(v)) => c.push(Some(v)),
+            (Column::Array(c), BlockValue::Array(v)) => c.push(Some(v)),
+            (Column::Mixed(c), BlockValue::Mixed(v)) => c.push(Some(v)),
+            (Column::RowId(c), BlockValue::RowId(v)) => c.push(Some(v)),
+            _ => return Err("value type does not match column".to_string()),
+        }
+        Ok(())
+    }
+
+    /// C++ `ColumnVector::GetValueByIndex`: the typed slot (`None` for NULL).
+    pub fn get_value_by_index(&self, row: usize) -> Option<BlockValue> {
+        match self {
+            Column::Bool(c) => c.get(row).copied().map(BlockValue::Bool),
+            Column::TinyInt(c) => c.get(row).copied().map(BlockValue::TinyInt),
+            Column::SmallInt(c) => c.get(row).copied().map(BlockValue::SmallInt),
+            Column::Int(c) => c.get(row).copied().map(BlockValue::Int),
+            Column::Int32(c) => c.get(row).copied().map(BlockValue::Int32),
+            Column::HugeInt(c) => c.get(row).copied().map(BlockValue::HugeInt),
+            Column::Float32(c) => c.get(row).copied().map(BlockValue::Float),
+            Column::Float(c) => c.get(row).copied().map(BlockValue::Double),
+            Column::Decimal(c) => c.get(row).copied().map(BlockValue::Decimal),
+            Column::Str(c) => c.get(row).cloned().map(BlockValue::Str),
+            Column::RowId(c) => c.get(row).copied().map(BlockValue::RowId),
+            Column::Date(c) => c.get(row).copied().map(BlockValue::Date),
+            Column::Time(c) => c.get(row).copied().map(BlockValue::Time),
+            Column::DateTime(c) => c.get(row).copied().map(BlockValue::DateTime),
+            Column::Timestamp(c) => c.get(row).copied().map(BlockValue::Timestamp),
+            Column::Interval(c) => c.get(row).copied().map(BlockValue::Interval),
+            Column::Uuid(c) => c.get(row).copied().map(BlockValue::Uuid),
+            Column::Embedding(c) => c.get(row).cloned().map(BlockValue::Embedding),
+            Column::Array(c) => c.get(row).cloned().map(BlockValue::Array),
+            Column::Mixed(c) => c.get(row).cloned().map(BlockValue::Mixed),
+            Column::Bytes(c) => c
+                .get(row)
+                .cloned()
+                .map(|v| BlockValue::Str(String::from_utf8_lossy(&v).into_owned())),
+        }
+    }
+
+    /// The `u8` discriminator used by [`Self::write_adv`].
+    fn tag(&self) -> u8 {
+        match self {
+            Column::Bool(_) => 1,
+            Column::TinyInt(_) => 2,
+            Column::SmallInt(_) => 3,
+            Column::Int32(_) => 4,
+            Column::Int(_) => 5,
+            Column::Float32(_) => 6,
+            Column::Float(_) => 7,
+            Column::Str(_) => 8,
+            Column::Decimal(_) => 9,
+            Column::Date(_) => 10,
+            Column::Time(_) => 11,
+            Column::DateTime(_) => 12,
+            Column::Timestamp(_) => 13,
+            Column::Interval(_) => 14,
+            Column::Uuid(_) => 15,
+            Column::RowId(_) => 16,
+            Column::HugeInt(_) => 17,
+            Column::Bytes(_) => 18,
+            Column::Embedding(_) => 19,
+            Column::Array(_) => 20,
+            Column::Mixed(_) => 21,
+        }
+    }
+
+    /// C++ `ColumnVector::GetSizeInBytes`: the exact byte count
+    /// [`Self::write_adv`] emits.
+    ///
+    /// The reference's byte layout (its `DataType`/`VectorBuffer`/`Bitmask`
+    /// encodings) is not reproduced; this is the storage layer's own
+    /// self-describing frame, registered as a design change.
+    pub fn get_size_in_bytes(&self) -> Result<usize, String> {
+        self.check_serializable()?;
+        let rows = self.size();
+        let constant = self.vector_type() == ColumnVectorType::Constant;
+        let value_rows = if constant { 1 } else { rows };
+        let payload = match self {
+            Column::Bool(_) | Column::TinyInt(_) => value_rows,
+            Column::SmallInt(_) => value_rows * 2,
+            Column::Int32(_) | Column::Float32(_) | Column::Date(_) | Column::Time(_) => {
+                value_rows * 4
+            }
+            Column::Int(_)
+            | Column::Float(_)
+            | Column::DateTime(_)
+            | Column::Timestamp(_)
+            | Column::RowId(_) => value_rows * 8,
+            Column::Interval(_) => value_rows * 5,
+            Column::Uuid(_) => value_rows * 16,
+            Column::Decimal(_) => value_rows * 20,
+            Column::Str(c) => {
+                if constant {
+                    c.get(0).map_or(4, |v| v.len() + 4)
+                } else {
+                    c.values().iter().map(|v| v.len() + 4).sum()
+                }
+            }
+            Column::Bytes(c) => {
+                if constant {
+                    c.get(0).map_or(4, |v| v.len() + 4)
+                } else {
+                    c.values().iter().map(|v| v.len() + 4).sum()
+                }
+            }
+            Column::HugeInt(_) | Column::Embedding(_) | Column::Array(_) | Column::Mixed(_) => {
+                unreachable!("rejected by check_serializable")
+            }
+        };
+        Ok(1 + 1 + 4 + rows.div_ceil(8) + payload)
+    }
+
+    fn check_serializable(&self) -> Result<(), String> {
+        if !matches!(
+            self.vector_type(),
+            ColumnVectorType::Flat | ColumnVectorType::Constant
+        ) {
+            return Err(format!(
+                "Not supported vector_type {:?}",
+                self.vector_type()
+            ));
+        }
+        if matches!(self, Column::HugeInt(_)) {
+            // Same restriction as the reference `WriteAdv`.
+            return Err("Attempt to serialize huge integer type".to_string());
+        }
+        if matches!(
+            self,
+            Column::Embedding(_) | Column::Array(_) | Column::Mixed(_)
+        ) {
+            return Err("Attempt to serialize a column with a variable-size payload".to_string());
+        }
+        Ok(())
+    }
+
+    /// Whether the row holds a value (the C++ null bitmap bit).
+    fn row_is_valid(&self, row: usize) -> bool {
+        match self {
+            Column::Bool(c) => c.get(row).is_some(),
+            Column::TinyInt(c) => c.get(row).is_some(),
+            Column::SmallInt(c) => c.get(row).is_some(),
+            Column::Int32(c) => c.get(row).is_some(),
+            Column::Int(c) => c.get(row).is_some(),
+            Column::HugeInt(c) => c.get(row).is_some(),
+            Column::Float32(c) => c.get(row).is_some(),
+            Column::Float(c) => c.get(row).is_some(),
+            Column::Decimal(c) => c.get(row).is_some(),
+            Column::Str(c) => c.get(row).is_some(),
+            Column::Bytes(c) => c.get(row).is_some(),
+            Column::Date(c) => c.get(row).is_some(),
+            Column::Time(c) => c.get(row).is_some(),
+            Column::DateTime(c) => c.get(row).is_some(),
+            Column::Timestamp(c) => c.get(row).is_some(),
+            Column::Interval(c) => c.get(row).is_some(),
+            Column::Uuid(c) => c.get(row).is_some(),
+            Column::Embedding(c) => c.get(row).is_some(),
+            Column::Array(c) => c.get(row).is_some(),
+            Column::Mixed(c) => c.get(row).is_some(),
+            Column::RowId(c) => c.get(row).is_some(),
+        }
+    }
+
+    /// C++ `ColumnVector::WriteAdv`: appends the frame to `out`.
+    pub fn write_adv(&self, out: &mut Vec<u8>) -> Result<(), String> {
+        self.check_serializable()?;
+        let rows = self.size();
+        let constant = self.vector_type() == ColumnVectorType::Constant;
+        let value_rows = if constant { 1 } else { rows };
+        out.push(self.tag());
+        out.push(u8::from(constant));
+        out.extend_from_slice(&(rows as u32).to_le_bytes());
+        let mut bitmap = vec![0u8; rows.div_ceil(8)];
+        for row in 0..rows {
+            if self.row_is_valid(row) {
+                bitmap[row / 8] |= 1 << (row % 8);
+            }
+        }
+        out.extend_from_slice(&bitmap);
+
+        macro_rules! write_pod {
+            ($c:expr, $conv:expr) => {
+                for row in 0..value_rows {
+                    out.extend_from_slice(&$conv(value_at($c, row)));
+                }
+            };
+        }
+        match self {
+            Column::Bool(c) => write_pod!(c, |v: bool| [u8::from(v)]),
+            Column::TinyInt(c) => write_pod!(c, |v: i8| v.to_le_bytes()),
+            Column::SmallInt(c) => write_pod!(c, |v: i16| v.to_le_bytes()),
+            Column::Int32(c) => write_pod!(c, |v: i32| v.to_le_bytes()),
+            Column::Int(c) => write_pod!(c, |v: i64| v.to_le_bytes()),
+            Column::Float32(c) => write_pod!(c, |v: f32| v.to_bits().to_le_bytes()),
+            Column::Float(c) => write_pod!(c, |v: f64| v.to_bits().to_le_bytes()),
+            Column::Str(c) => {
+                for row in 0..value_rows {
+                    let value = value_at(c, row);
+                    out.extend_from_slice(&(value.len() as u32).to_le_bytes());
+                    out.extend_from_slice(value.as_bytes());
+                }
+            }
+            Column::Bytes(c) => {
+                for row in 0..value_rows {
+                    let value = value_at(c, row);
+                    out.extend_from_slice(&(value.len() as u32).to_le_bytes());
+                    out.extend_from_slice(&value);
+                }
+            }
+            Column::Decimal(c) => {
+                for row in 0..value_rows {
+                    let value = value_at(c, row);
+                    out.extend_from_slice(&value.value.to_le_bytes());
+                    out.extend_from_slice(&value.scale.to_le_bytes());
+                }
+            }
+            Column::Date(c) => write_pod!(c, |v: infinity_common::DateT| v.value.to_le_bytes()),
+            Column::Time(c) => write_pod!(c, |v: infinity_common::TimeT| v.value.to_le_bytes()),
+            Column::DateTime(c) => {
+                for row in 0..value_rows {
+                    let value = value_at(c, row);
+                    out.extend_from_slice(&value.date.to_le_bytes());
+                    out.extend_from_slice(&value.time.to_le_bytes());
+                }
+            }
+            Column::Timestamp(c) => {
+                for row in 0..value_rows {
+                    let value = value_at(c, row);
+                    out.extend_from_slice(&value.date.to_le_bytes());
+                    out.extend_from_slice(&value.time.to_le_bytes());
+                }
+            }
+            Column::Interval(c) => {
+                for row in 0..value_rows {
+                    let value = value_at(c, row);
+                    out.extend_from_slice(&value.value.to_le_bytes());
+                    out.push(value.unit as u8);
+                }
+            }
+            Column::Uuid(c) => {
+                for row in 0..value_rows {
+                    out.extend_from_slice(&value_at(c, row));
+                }
+            }
+            Column::RowId(c) => {
+                for row in 0..value_rows {
+                    let value = value_at(c, row);
+                    out.extend_from_slice(&value.segment_id.to_le_bytes());
+                    out.extend_from_slice(&value.segment_offset.to_le_bytes());
+                }
+            }
+            Column::HugeInt(_) | Column::Embedding(_) | Column::Array(_) | Column::Mixed(_) => {
+                unreachable!("rejected by check_serializable")
+            }
+        }
+        debug_assert_eq!(out.len(), self.get_size_in_bytes()?);
+        Ok(())
+    }
+
+    /// C++ `ColumnVector::ReadAdv`: parses one frame written by
+    /// [`Self::write_adv`]; returns the column and the consumed byte count.
+    pub fn read_adv(input: &[u8]) -> Option<(Column, usize)> {
+        let mut cursor = Cursor { buf: input, pos: 0 };
+        let tag = cursor.u8()?;
+        let constant = match cursor.u8()? {
+            0 => false,
+            1 => true,
+            _ => return None,
+        };
+        let rows = cursor.u32()? as usize;
+        let bitmap = cursor.take(rows.div_ceil(8))?.to_vec();
+        let valid = |row: usize| {
+            bitmap
+                .get(row / 8)
+                .is_some_and(|byte| byte & (1 << (row % 8)) != 0)
+        };
+        let mut column = match tag {
+            1 => Column::Bool(ColumnVector::new()),
+            2 => Column::TinyInt(ColumnVector::new()),
+            3 => Column::SmallInt(ColumnVector::new()),
+            4 => Column::Int32(ColumnVector::new()),
+            5 => Column::Int(ColumnVector::new()),
+            6 => Column::Float32(ColumnVector::new()),
+            7 => Column::Float(ColumnVector::new()),
+            8 => Column::Str(ColumnVector::new()),
+            9 => Column::Decimal(ColumnVector::new()),
+            10 => Column::Date(ColumnVector::new()),
+            11 => Column::Time(ColumnVector::new()),
+            12 => Column::DateTime(ColumnVector::new()),
+            13 => Column::Timestamp(ColumnVector::new()),
+            14 => Column::Interval(ColumnVector::new()),
+            15 => Column::Uuid(ColumnVector::new()),
+            16 => Column::RowId(ColumnVector::new()),
+            18 => Column::Bytes(ColumnVector::new()),
+            _ => return None,
+        };
+        column.initialize(
+            if constant {
+                ColumnVectorType::Constant
+            } else {
+                ColumnVectorType::Flat
+            },
+            DEFAULT_VECTOR_SIZE,
+        );
+        let value_rows = if constant { 1 } else { rows };
+        macro_rules! read_pod {
+            ($c:expr, $t:ty) => {
+                for row in 0..value_rows {
+                    let bytes = cursor.take(std::mem::size_of::<$t>())?;
+                    let value = <$t>::from_le_bytes(bytes.try_into().ok()?);
+                    $c.push(valid(row).then_some(value));
+                }
+            };
+        }
+        match &mut column {
+            Column::Bool(c) => {
+                for row in 0..value_rows {
+                    let value = cursor.u8()? != 0;
+                    c.push(valid(row).then_some(value));
+                }
+            }
+            Column::TinyInt(c) => read_pod!(c, i8),
+            Column::SmallInt(c) => read_pod!(c, i16),
+            Column::Int32(c) => read_pod!(c, i32),
+            Column::Int(c) => read_pod!(c, i64),
+            Column::Float32(c) => {
+                for row in 0..value_rows {
+                    let bits = u32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    c.push(valid(row).then_some(f32::from_bits(bits)));
+                }
+            }
+            Column::Float(c) => {
+                for row in 0..value_rows {
+                    let bits = u64::from_le_bytes(cursor.take(8)?.try_into().ok()?);
+                    c.push(valid(row).then_some(f64::from_bits(bits)));
+                }
+            }
+            Column::Str(c) => {
+                for row in 0..value_rows {
+                    let len = cursor.u32()? as usize;
+                    let text = String::from_utf8(cursor.take(len)?.to_vec()).ok()?;
+                    c.push(valid(row).then_some(text));
+                }
+            }
+            Column::Bytes(c) => {
+                for row in 0..value_rows {
+                    let len = cursor.u32()? as usize;
+                    c.push(valid(row).then_some(cursor.take(len)?.to_vec()));
+                }
+            }
+            Column::Decimal(c) => {
+                for row in 0..value_rows {
+                    let value = i128::from_le_bytes(cursor.take(16)?.try_into().ok()?);
+                    let scale = u32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    c.push(valid(row).then_some(infinity_common::DecimalT::new(value, scale)));
+                }
+            }
+            Column::Date(c) => {
+                for row in 0..value_rows {
+                    let value = i32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    c.push(valid(row).then_some(infinity_common::DateT::new(value)));
+                }
+            }
+            Column::Time(c) => {
+                for row in 0..value_rows {
+                    let value = i32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    c.push(valid(row).then_some(infinity_common::TimeT::new(value)));
+                }
+            }
+            Column::DateTime(c) => {
+                for row in 0..value_rows {
+                    let date = i32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    let time = i32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    c.push(valid(row).then_some(infinity_common::DateTimeT::new(date, time)));
+                }
+            }
+            Column::Timestamp(c) => {
+                for row in 0..value_rows {
+                    let date = i32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    let time = i32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    c.push(valid(row).then_some(infinity_common::TimestampT::new(date, time)));
+                }
+            }
+            Column::Interval(c) => {
+                for row in 0..value_rows {
+                    let value = i32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    let unit = match cursor.u8()? {
+                        1 => infinity_common::TimeUnit::Year,
+                        2 => infinity_common::TimeUnit::Month,
+                        3 => infinity_common::TimeUnit::Day,
+                        4 => infinity_common::TimeUnit::Hour,
+                        5 => infinity_common::TimeUnit::Minute,
+                        6 => infinity_common::TimeUnit::Second,
+                        _ => infinity_common::TimeUnit::Invalid,
+                    };
+                    c.push(
+                        valid(row).then_some(infinity_common::IntervalT::with_unit(value, unit)),
+                    );
+                }
+            }
+            Column::Uuid(c) => {
+                for row in 0..value_rows {
+                    let mut value = [0u8; 16];
+                    value.copy_from_slice(cursor.take(16)?);
+                    c.push(valid(row).then_some(value));
+                }
+            }
+            Column::RowId(c) => {
+                for row in 0..value_rows {
+                    let segment_id = u32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    let segment_offset = u32::from_le_bytes(cursor.take(4)?.try_into().ok()?);
+                    c.push(valid(row).then_some(RowIdT::new(segment_id, segment_offset)));
+                }
+            }
+            Column::HugeInt(_) | Column::Embedding(_) | Column::Array(_) | Column::Mixed(_) => {
+                return None
+            }
+        }
+        if constant {
+            // `push` fills a flat tail; rebuild the constant vector from its
+            // single stored row.
+            macro_rules! to_constant {
+                ($c:expr) => {{
+                    let value = $c.values().first().cloned().filter(|_| valid(0));
+                    $c.clear();
+                    $c.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
+                    $c.set_value(0, value).ok()?;
+                    $c.finalize(rows);
+                }};
+            }
+            match &mut column {
+                Column::Bool(c) => to_constant!(c),
+                Column::TinyInt(c) => to_constant!(c),
+                Column::SmallInt(c) => to_constant!(c),
+                Column::Int32(c) => to_constant!(c),
+                Column::Int(c) => to_constant!(c),
+                Column::Float32(c) => to_constant!(c),
+                Column::Float(c) => to_constant!(c),
+                Column::Str(c) => to_constant!(c),
+                Column::Bytes(c) => to_constant!(c),
+                Column::Decimal(c) => to_constant!(c),
+                Column::Date(c) => to_constant!(c),
+                Column::Time(c) => to_constant!(c),
+                Column::DateTime(c) => to_constant!(c),
+                Column::Timestamp(c) => to_constant!(c),
+                Column::Interval(c) => to_constant!(c),
+                Column::Uuid(c) => to_constant!(c),
+                Column::RowId(c) => to_constant!(c),
+                Column::HugeInt(_) | Column::Embedding(_) | Column::Array(_) | Column::Mixed(_) => {
+                    return None
+                }
+            }
+        }
+        Some((column, cursor.pos))
+    }
+}
+
+/// The value at `row`, or the placeholder written for a NULL slot.
+fn value_at<T: Clone + Default>(c: &ColumnVector<T>, row: usize) -> T {
+    c.get(row).cloned().unwrap_or_default()
+}
+
+struct Cursor<'a> {
+    buf: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Cursor<'a> {
+    fn u8(&mut self) -> Option<u8> {
+        let value = *self.buf.get(self.pos)?;
+        self.pos += 1;
+        Some(value)
+    }
+
+    fn u32(&mut self) -> Option<u32> {
+        Some(u32::from_le_bytes(self.take(4)?.try_into().ok()?))
+    }
+
+    fn take(&mut self, len: usize) -> Option<&'a [u8]> {
+        let end = self.pos.checked_add(len)?;
+        let slice = self.buf.get(self.pos..end)?;
+        self.pos = end;
+        Some(slice)
     }
 }
 
@@ -601,7 +1311,93 @@ pub enum BlockValue {
     Embedding(Vec<f32>),
     Array(Vec<i64>),
     Mixed(infinity_common::MixedT),
+    RowId(RowIdT),
     Null,
+}
+
+impl BlockValue {
+    /// C++ `Value::StringToValue`: parses one text slot into the declared
+    /// logical type. `None` for text that does not parse or for types without
+    /// a text form here.
+    pub fn parse_text(text: &str, logical_type: LogicalType) -> Option<BlockValue> {
+        Some(match logical_type {
+            LogicalType::Boolean => BlockValue::Bool(match text.trim() {
+                "true" | "1" => true,
+                "false" | "0" => false,
+                _ => return None,
+            }),
+            LogicalType::TinyInt => BlockValue::TinyInt(text.trim().parse().ok()?),
+            LogicalType::SmallInt => BlockValue::SmallInt(text.trim().parse().ok()?),
+            LogicalType::Integer => BlockValue::Int32(text.trim().parse().ok()?),
+            LogicalType::BigInt => BlockValue::Int(text.trim().parse().ok()?),
+            LogicalType::HugeInt => BlockValue::HugeInt(text.trim().parse().ok()?),
+            LogicalType::Float => BlockValue::Float(text.trim().parse().ok()?),
+            LogicalType::Double => BlockValue::Double(text.trim().parse().ok()?),
+            LogicalType::Varchar => BlockValue::Str(text.to_string()),
+            LogicalType::Date => {
+                let mut date = infinity_common::DateT::default();
+                date.from_string(text).ok()?;
+                BlockValue::Date(date)
+            }
+            LogicalType::Time => BlockValue::Time(parse_time_text(text)?),
+            LogicalType::DateTime => BlockValue::DateTime(parse_datetime_text(text)?),
+            LogicalType::Timestamp => BlockValue::Timestamp(parse_timestamp_text(text)?),
+            _ => return None,
+        })
+    }
+}
+
+/// C++ `TimeType::ConvertFromString` (`HH:MM:SS`): seconds since midnight.
+fn parse_time_text(text: &str) -> Option<infinity_common::TimeT> {
+    let mut parts = text.trim().split(':');
+    let hour: i32 = parts.next()?.trim().parse().ok()?;
+    let minute: i32 = parts.next()?.trim().parse().ok()?;
+    let second: i32 = parts.next()?.trim().parse().ok()?;
+    if parts.next().is_some() || !(0..=23).contains(&hour) || !(0..=59).contains(&minute) {
+        return None;
+    }
+    if !(0..=59).contains(&second) {
+        return None;
+    }
+    Some(infinity_common::TimeT::new(
+        hour * 3600 + minute * 60 + second,
+    ))
+}
+
+/// C++ `DateTimeType::FromString`: `YYYY-MM-DD HH:MM:SS`, with the time part
+/// optional and defaulting to midnight.
+fn parse_datetime_text(text: &str) -> Option<infinity_common::DateTimeT> {
+    let (date_text, time_text) = split_datetime_text(text)?;
+    let mut date = infinity_common::DateT::default();
+    date.from_string(date_text).ok()?;
+    let time = match time_text {
+        Some(t) => parse_time_text(t)?,
+        None => infinity_common::TimeT::new(0),
+    };
+    Some(infinity_common::DateTimeT::new(date.value, time.value))
+}
+
+/// C++ `TimestampType::FromString`: the same `YYYY-MM-DD HH:MM:SS` layout.
+fn parse_timestamp_text(text: &str) -> Option<infinity_common::TimestampT> {
+    let (date_text, time_text) = split_datetime_text(text)?;
+    let mut date = infinity_common::DateT::default();
+    date.from_string(date_text).ok()?;
+    let time = match time_text {
+        Some(t) => parse_time_text(t)?,
+        None => infinity_common::TimeT::new(0),
+    };
+    Some(infinity_common::TimestampT::new(date.value, time.value))
+}
+
+fn split_datetime_text(text: &str) -> Option<(&str, Option<&str>)> {
+    let text = text.trim();
+    match text.find(' ') {
+        Some(idx) => {
+            let rest = text[idx + 1..].trim();
+            Some((text[..idx].trim(), (!rest.is_empty()).then_some(rest)))
+        }
+        None => Some((text, None)),
+    }
 }
 
 /// C++ `DataBlock`: a row-aligned set of typed columns.
@@ -699,84 +1495,13 @@ impl DataBlock {
             .columns
             .get_mut(column)
             .ok_or_else(|| format!("column {column} out of range"))?;
-        if value == BlockValue::Null {
-            match col {
-                Column::Bool(c) => c.push(None),
-                Column::TinyInt(c) => c.push(None),
-                Column::SmallInt(c) => c.push(None),
-                Column::Int(c) => c.push(None),
-                Column::Int32(c) => c.push(None),
-                Column::HugeInt(c) => c.push(None),
-                Column::Float32(c) => c.push(None),
-                Column::Float(c) => c.push(None),
-                Column::Decimal(c) => c.push(None),
-                Column::Str(c) => c.push(None),
-                Column::Date(c) => c.push(None),
-                Column::Time(c) => c.push(None),
-                Column::DateTime(c) => c.push(None),
-                Column::Timestamp(c) => c.push(None),
-                Column::Interval(c) => c.push(None),
-                Column::Uuid(c) => c.push(None),
-                Column::Embedding(c) => c.push(None),
-                Column::Array(c) => c.push(None),
-                Column::Mixed(c) => c.push(None),
-                Column::Bytes(c) => c.push(None),
-            }
-            return Ok(());
-        }
-        match (col, value) {
-            (Column::Bool(c), BlockValue::Bool(v)) => c.push(Some(v)),
-            (Column::TinyInt(c), BlockValue::TinyInt(v)) => c.push(Some(v)),
-            (Column::SmallInt(c), BlockValue::SmallInt(v)) => c.push(Some(v)),
-            (Column::Int(c), BlockValue::Int(v)) => c.push(Some(v)),
-            (Column::Int32(c), BlockValue::Int32(v)) => c.push(Some(v)),
-            (Column::HugeInt(c), BlockValue::HugeInt(v)) => c.push(Some(v)),
-            (Column::Float32(c), BlockValue::Float(v)) => c.push(Some(v)),
-            (Column::Float(c), BlockValue::Double(v)) => c.push(Some(v)),
-            (Column::Decimal(c), BlockValue::Decimal(v)) => c.push(Some(v)),
-            (Column::Str(c), BlockValue::Str(v)) => c.push(Some(v)),
-            (Column::Date(c), BlockValue::Date(v)) => c.push(Some(v)),
-            (Column::Time(c), BlockValue::Time(v)) => c.push(Some(v)),
-            (Column::DateTime(c), BlockValue::DateTime(v)) => c.push(Some(v)),
-            (Column::Timestamp(c), BlockValue::Timestamp(v)) => c.push(Some(v)),
-            (Column::Interval(c), BlockValue::Interval(v)) => c.push(Some(v)),
-            (Column::Uuid(c), BlockValue::Uuid(v)) => c.push(Some(v)),
-            (Column::Embedding(c), BlockValue::Embedding(v)) => c.push(Some(v)),
-            (Column::Array(c), BlockValue::Array(v)) => c.push(Some(v)),
-            (Column::Mixed(c), BlockValue::Mixed(v)) => c.push(Some(v)),
-            _ => return Err(format!("value type does not match column {column}")),
-        }
-        Ok(())
+        col.push_block_value(value)
+            .map_err(|_| format!("value type does not match column {column}"))
     }
 
     /// C++ `DataBlock::GetValue(column, row)`.
     pub fn get_value(&self, column: usize, row: usize) -> Option<BlockValue> {
-        let col = self.columns.get(column)?;
-        match col {
-            Column::Bool(c) => c.get(row).copied().map(BlockValue::Bool),
-            Column::TinyInt(c) => c.get(row).copied().map(BlockValue::TinyInt),
-            Column::SmallInt(c) => c.get(row).copied().map(BlockValue::SmallInt),
-            Column::Int(c) => c.get(row).copied().map(BlockValue::Int),
-            Column::Int32(c) => c.get(row).copied().map(BlockValue::Int32),
-            Column::HugeInt(c) => c.get(row).copied().map(BlockValue::HugeInt),
-            Column::Float32(c) => c.get(row).copied().map(BlockValue::Float),
-            Column::Float(c) => c.get(row).copied().map(BlockValue::Double),
-            Column::Decimal(c) => c.get(row).copied().map(BlockValue::Decimal),
-            Column::Str(c) => c.get(row).cloned().map(BlockValue::Str),
-            Column::Date(c) => c.get(row).copied().map(BlockValue::Date),
-            Column::Time(c) => c.get(row).copied().map(BlockValue::Time),
-            Column::DateTime(c) => c.get(row).copied().map(BlockValue::DateTime),
-            Column::Timestamp(c) => c.get(row).copied().map(BlockValue::Timestamp),
-            Column::Interval(c) => c.get(row).copied().map(BlockValue::Interval),
-            Column::Uuid(c) => c.get(row).copied().map(BlockValue::Uuid),
-            Column::Embedding(c) => c.get(row).cloned().map(BlockValue::Embedding),
-            Column::Array(c) => c.get(row).cloned().map(BlockValue::Array),
-            Column::Mixed(c) => c.get(row).cloned().map(BlockValue::Mixed),
-            Column::Bytes(c) => c
-                .get(row)
-                .cloned()
-                .map(|v| BlockValue::Str(String::from_utf8_lossy(&v).into_owned())),
-        }
+        self.columns.get(column)?.get_value_by_index(row)
     }
 
     /// Approximate heap bytes, for the buffer-manager budget.
@@ -1329,42 +2054,512 @@ mod reference_suite {
     }
 
     /// C++: `value_ut.cpp::ValueStringTest/test_stringtovalue` — text parses
-    /// into the declared scalar type (the JSON case is covered by the scalar
-    /// JSON functions).
+    /// into the declared scalar type.
+    ///
+    /// The JSON case has no counterpart: the Rust storage layer has no
+    /// JSON/BSON value type (JSON is carried as text), so the reference's
+    /// `MakeJson(...) == StringToValue(...)` comparison cannot be expressed.
     #[test]
     #[allow(clippy::approx_constant)]
     fn string_to_value_roundtrips_the_scalar_types() {
-        let mut b = ColumnVector::<bool>::new();
-        b.push(Some(true));
-        b.push(Some(false));
-        assert_eq!(Column::Bool(b).value_text(1).as_deref(), Some("false"));
+        use infinity_common::{DateT, DateTimeT, TimeT, TimestampT};
+
+        let parse = |text: &str, ty: LogicalType| {
+            BlockValue::parse_text(text, ty).unwrap_or_else(|| panic!("{text} does not parse"))
+        };
+        assert_eq!(parse("true", LogicalType::Boolean), BlockValue::Bool(true));
         assert_eq!(
-            Column::TinyInt(cv(vec![-128])).value_text(0).as_deref(),
-            Some("-128")
+            parse("false", LogicalType::Boolean),
+            BlockValue::Bool(false)
+        );
+
+        assert_eq!(parse("127", LogicalType::TinyInt), BlockValue::TinyInt(127));
+        assert_eq!(
+            parse("-128", LogicalType::TinyInt),
+            BlockValue::TinyInt(-128)
         );
         assert_eq!(
-            Column::Int(cv(vec![9223372036854775807i64]))
-                .value_text(0)
-                .as_deref(),
-            Some("9223372036854775807")
+            parse("32767", LogicalType::SmallInt),
+            BlockValue::SmallInt(32767)
         );
         assert_eq!(
-            Column::Float32(cv(vec![3.14159f32]))
-                .value_text(0)
-                .as_deref(),
-            Some("3.14159")
+            parse("-32768", LogicalType::SmallInt),
+            BlockValue::SmallInt(-32768)
         );
         assert_eq!(
-            Column::Float(cv(vec![3.141592653589793f64]))
-                .value_text(0)
-                .as_deref(),
-            Some("3.141592653589793")
+            parse("2147483647", LogicalType::Integer),
+            BlockValue::Int32(2147483647)
         );
         assert_eq!(
-            Column::Str(cv(vec!["Hello, World!".to_string()]))
-                .value_text(0)
-                .as_deref(),
-            Some("Hello, World!")
+            parse("-2147483648", LogicalType::Integer),
+            BlockValue::Int32(-2147483648)
         );
+        assert_eq!(
+            parse("9223372036854775807", LogicalType::BigInt),
+            BlockValue::Int(i64::MAX)
+        );
+        assert_eq!(
+            parse("-9223372036854775808", LogicalType::BigInt),
+            BlockValue::Int(i64::MIN)
+        );
+
+        assert_eq!(
+            parse("3.14159", LogicalType::Float),
+            BlockValue::Float(3.14159)
+        );
+        assert_eq!(
+            parse("-2.71828", LogicalType::Float),
+            BlockValue::Float(-2.71828)
+        );
+        assert_eq!(
+            parse("3.141592653589793", LogicalType::Double),
+            BlockValue::Double(3.141592653589793)
+        );
+        assert_eq!(
+            parse("-2.718281828459045", LogicalType::Double),
+            BlockValue::Double(-2.718281828459045)
+        );
+
+        assert_eq!(
+            parse("Hello, World!", LogicalType::Varchar),
+            BlockValue::Str("Hello, World!".to_string())
+        );
+        assert_eq!(
+            parse("", LogicalType::Varchar),
+            BlockValue::Str(String::new())
+        );
+
+        let mut date = DateT::default();
+        date.from_string("2023-12-25").unwrap();
+        assert_eq!(
+            parse("2023-12-25", LogicalType::Date),
+            BlockValue::Date(date)
+        );
+
+        // `TimeType` keeps seconds since midnight.
+        assert_eq!(
+            parse("14:30:45", LogicalType::Time),
+            BlockValue::Time(TimeT::new(14 * 3600 + 30 * 60 + 45))
+        );
+
+        let mut datetime = DateT::default();
+        datetime.from_string("2023-12-25").unwrap();
+        let time = TimeT::new(14 * 3600 + 30 * 60 + 45);
+        assert_eq!(
+            parse("2023-12-25 14:30:45", LogicalType::DateTime),
+            BlockValue::DateTime(DateTimeT::new(datetime.value, time.value))
+        );
+        assert_eq!(
+            parse("2023-12-25 14:30:45", LogicalType::Timestamp),
+            BlockValue::Timestamp(TimestampT::new(datetime.value, time.value))
+        );
+
+        // The column decoder path stores the same parsed values.
+        let mut column = Column::new(LogicalType::Time).unwrap();
+        column.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        column.push_text(Some("14:30:45"));
+        assert_eq!(
+            column.push_block_value(BlockValue::Null),
+            Ok(()),
+            "NULL stays appendable"
+        );
+        assert_eq!(column.value_text(0).as_deref(), Some("52245"));
+        assert_eq!(column.value_text(1), None);
+    }
+
+    // ---------------------------------------------------------------------
+    // `src/unit_test/storage/column_vector/column_vector_row_ut.cpp`
+    // ---------------------------------------------------------------------
+
+    /// C++: `ColumnVectorRowTest.flat_row`.
+    #[test]
+    fn row_flat() {
+        assert_eq!(std::mem::size_of::<RowIdT>(), 8);
+        let mut v = ColumnVector::<RowIdT>::new();
+        v.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        assert!(v.set_vector_type(ColumnVectorType::Flat).is_err());
+        assert_eq!(v.capacity(), DEFAULT_VECTOR_SIZE);
+        assert_eq!(v.size(), 0);
+        assert!(v.get_value_by_index(0).is_none());
+        assert_eq!(v.vector_type(), ColumnVectorType::Flat);
+        assert_eq!(
+            Column::RowId(ColumnVector::new()).logical_type(),
+            LogicalType::RowID
+        );
+        assert_eq!(v.null_count(), 0);
+
+        for i in 0..DEFAULT_VECTOR_SIZE as u32 {
+            v.append_value(Some(RowIdT::new(i, i))).unwrap();
+            let vx = v.get_value_by_index(i as usize).unwrap();
+            assert_eq!(vx.segment_id, i);
+            assert_eq!(vx.segment_offset, i);
+            assert!(v.get_value_by_index(i as usize + 1).is_none());
+        }
+
+        // C++ `ShallowCopy` shares the buffer; the Rust port copies it.
+        let mut clone = ColumnVector::<RowIdT>::new();
+        clone.shallow_copy(&v);
+        assert_eq!(clone.size(), v.size());
+        assert_eq!(clone.capacity(), v.capacity());
+        assert_eq!(clone.vector_type(), v.vector_type());
+        assert_eq!(clone.null_count(), v.null_count());
+        assert_eq!(clone.values(), v.values());
+        assert_eq!(clone.validity(), v.validity());
+        for i in 0..DEFAULT_VECTOR_SIZE as u32 {
+            let vx = v.get_value_by_index(i as usize).unwrap();
+            assert_eq!(vx.segment_id, i);
+            assert_eq!(vx.segment_offset, i);
+        }
+
+        v.reset();
+        assert_eq!(v.capacity(), 0);
+        assert_eq!(v.size(), 0);
+        assert_eq!(v.vector_type(), ColumnVectorType::Invalid);
+        assert!(v.values().is_empty());
+
+        // Second half: re-initialize and append through the pointer path
+        // (`AppendByPtr` == `push`/`append_value` for a flat vector).
+        v.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        assert!(v.set_vector_type(ColumnVectorType::Flat).is_err());
+        assert_eq!(v.capacity(), DEFAULT_VECTOR_SIZE);
+        assert_eq!(v.size(), 0);
+        assert!(v.get_value_by_index(0).is_none());
+        assert_eq!(v.vector_type(), ColumnVectorType::Flat);
+        for i in 0..DEFAULT_VECTOR_SIZE as u32 {
+            v.append_value(Some(RowIdT::new(i, i))).unwrap();
+            let vx = v.get_value_by_index(i as usize).unwrap();
+            assert_eq!(vx.segment_id, i);
+            assert_eq!(vx.segment_offset, i);
+            assert!(v.get_value_by_index(i as usize + 1).is_none());
+        }
+
+        // Constant tail: SetValueByIndex(0, ...) then Finalize(1) per row.
+        for i in 0..DEFAULT_VECTOR_SIZE as u32 {
+            let mut c = ColumnVector::<RowIdT>::new();
+            c.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
+            c.set_value(0, v.get_value_by_index(i as usize).cloned())
+                .unwrap();
+            c.finalize(1);
+            let vx = c.get_value_by_index(0).unwrap();
+            assert_eq!(vx.segment_id, i);
+            assert_eq!(vx.segment_offset, i);
+            c.reset();
+        }
+    }
+
+    /// C++: `ColumnVectorRowTest.contant_row`.
+    #[test]
+    fn row_constant() {
+        let mut v = ColumnVector::<RowIdT>::new();
+        v.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
+        assert!(v.set_vector_type(ColumnVectorType::Constant).is_err());
+        assert_eq!(v.capacity(), DEFAULT_VECTOR_SIZE);
+        assert_eq!(v.size(), 0);
+        assert!(v.get_value_by_index(0).is_none());
+        assert_eq!(v.size(), 0);
+        assert_eq!(v.vector_type(), ColumnVectorType::Constant);
+        assert_eq!(v.null_count(), 0);
+
+        v.append_value(Some(RowIdT::new(0, 0))).unwrap();
+        assert_eq!(v.get_value_by_index(0), Some(&RowIdT::new(0, 0)));
+        assert!(v.get_value_by_index(1).is_none());
+
+        v.reset();
+        assert_eq!(v.capacity(), 0);
+        assert_eq!(v.size(), 0);
+        assert_eq!(v.vector_type(), ColumnVectorType::Invalid);
+
+        v.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
+        assert!(v.set_vector_type(ColumnVectorType::Constant).is_err());
+        assert_eq!(v.capacity(), DEFAULT_VECTOR_SIZE);
+        assert_eq!(v.size(), 0);
+        assert!(v.get_value_by_index(0).is_none());
+        assert_eq!(v.vector_type(), ColumnVectorType::Constant);
+
+        v.append_value(Some(RowIdT::new(0, 0))).unwrap();
+        assert_eq!(v.get_value_by_index(0), Some(&RowIdT::new(0, 0)));
+        assert!(v.get_value_by_index(1).is_none());
+    }
+
+    /// C++: `ColumnVectorRowTest.row_column_vector_select`.
+    #[test]
+    fn row_column_vector_select() {
+        let mut v = ColumnVector::<RowIdT>::new();
+        v.initialize_flat();
+        for i in 0..DEFAULT_VECTOR_SIZE as u32 {
+            v.append_value(Some(RowIdT::new(i, i))).unwrap();
+        }
+        for i in 0..DEFAULT_VECTOR_SIZE as u32 {
+            let vx = v.get_value_by_index(i as usize).unwrap();
+            assert_eq!(vx.segment_id, i);
+            assert_eq!(vx.segment_offset, i);
+        }
+
+        let selection: Vec<usize> = (0..DEFAULT_VECTOR_SIZE / 2).map(|i| i * 2).collect();
+        let mut target = ColumnVector::<RowIdT>::new();
+        target.initialize_selection(&v, &selection);
+        assert_eq!(target.size(), DEFAULT_VECTOR_SIZE / 2);
+        for i in 0..DEFAULT_VECTOR_SIZE as u32 / 2 {
+            let vx = target.get_value_by_index(i as usize).unwrap();
+            assert_eq!(vx.segment_id, 2 * i);
+            assert_eq!(vx.segment_offset, 2 * i);
+        }
+    }
+
+    /// C++: `ColumnVectorRowTest.row_column_slice_init`.
+    #[test]
+    fn row_column_slice_init() {
+        let mut v = ColumnVector::<RowIdT>::new();
+        v.initialize_flat();
+        for i in 0..DEFAULT_VECTOR_SIZE as u32 {
+            v.append_value(Some(RowIdT::new(i, i))).unwrap();
+        }
+        for i in 0..DEFAULT_VECTOR_SIZE as u32 {
+            let vx = v.get_value_by_index(i as usize).unwrap();
+            assert_eq!(vx.segment_id, i);
+            assert_eq!(vx.segment_offset, i);
+        }
+
+        let start = DEFAULT_VECTOR_SIZE / 4;
+        let end = 3 * DEFAULT_VECTOR_SIZE / 4;
+        let count = end - start;
+        let mut target = ColumnVector::<RowIdT>::new();
+        target.initialize_slice(&v, start, end);
+        assert_eq!(target.size(), DEFAULT_VECTOR_SIZE / 2);
+        assert_eq!(count, DEFAULT_VECTOR_SIZE / 2);
+        // The reference test inspects the source vector here; the target is
+        // the vector under test, so assert both.
+        for i in 0..count as u32 {
+            let source = v.get_value_by_index(i as usize).unwrap();
+            assert_eq!(source.segment_id, i);
+            assert_eq!(source.segment_offset, i);
+            let vx = target.get_value_by_index(i as usize).unwrap();
+            assert_eq!(vx.segment_id, start as u32 + i);
+            assert_eq!(vx.segment_offset, start as u32 + i);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp`
+    //
+    // The reference distinguishes an inline (<= 16 byte) payload from an
+    // out-of-line one; a Rust `String` owns its bytes, so the four structural
+    // cases reduce to the same API assertions with the reference's payloads.
+    // ---------------------------------------------------------------------
+
+    /// The flat / select / slice / constant body shared by the three varchar
+    /// cases (`flat_inline_varchar` is covered by
+    /// `varchar_flat_constant_select_slice`; these use the longer payloads).
+    fn varchar_flat_suite(payload: impl Fn(i64) -> String) {
+        let mut v = ColumnVector::<String>::new();
+        v.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        assert!(v.set_vector_type(ColumnVectorType::Flat).is_err());
+        assert_eq!(v.capacity(), DEFAULT_VECTOR_SIZE);
+        assert_eq!(v.size(), 0);
+        assert!(v.get_value_by_index(0).is_none());
+        assert_eq!(v.vector_type(), ColumnVectorType::Flat);
+        assert_eq!(
+            Column::Str(ColumnVector::new()).logical_type(),
+            LogicalType::Varchar
+        );
+        assert_eq!(v.null_count(), 0);
+
+        for i in 0..DEFAULT_VECTOR_SIZE as i64 {
+            let s = payload(i);
+            v.append_value(Some(s.clone())).unwrap();
+            assert_eq!(v.get_value_by_index(i as usize), Some(&s));
+            assert!(v.get_value_by_index(i as usize + 1).is_none());
+        }
+
+        // C++ `ShallowCopy` shares the buffer; the Rust port copies it.
+        let mut clone = ColumnVector::<String>::new();
+        clone.shallow_copy(&v);
+        assert_eq!(clone.size(), v.size());
+        assert_eq!(clone.capacity(), v.capacity());
+        assert_eq!(clone.vector_type(), v.vector_type());
+        assert_eq!(clone.null_count(), v.null_count());
+        assert_eq!(clone.values(), v.values());
+        assert_eq!(clone.validity(), v.validity());
+        for i in 0..DEFAULT_VECTOR_SIZE as i64 {
+            assert_eq!(v.get(i as usize), Some(&payload(i)));
+        }
+
+        v.reset();
+        assert_eq!(v.capacity(), 0);
+        assert_eq!(v.size(), 0);
+        assert_eq!(v.vector_type(), ColumnVectorType::Invalid);
+        assert!(v.values().is_empty());
+
+        // Second half: re-initialize, then append through
+        // `AppendByStringView` (the same `push` path).
+        v.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        assert!(v.set_vector_type(ColumnVectorType::Flat).is_err());
+        assert_eq!(v.capacity(), DEFAULT_VECTOR_SIZE);
+        assert_eq!(v.size(), 0);
+        assert!(v.get_value_by_index(0).is_none());
+        assert_eq!(v.vector_type(), ColumnVectorType::Flat);
+        for i in 0..DEFAULT_VECTOR_SIZE as i64 {
+            let s = payload(i);
+            v.append_value(Some(s.clone())).unwrap();
+            assert_eq!(v.get_value_by_index(i as usize), Some(&s));
+            assert!(v.get_value_by_index(i as usize + 1).is_none());
+        }
+
+        // Constant tail: SetValueByIndex(0, ...) then Finalize(1) per row.
+        for i in 0..DEFAULT_VECTOR_SIZE as i64 {
+            let s = payload(i);
+            let mut c = ColumnVector::<String>::new();
+            c.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
+            c.set_value(0, v.get_value_by_index(i as usize).cloned())
+                .unwrap();
+            c.finalize(1);
+            assert_eq!(c.get_value_by_index(0), Some(&s));
+            c.reset();
+        }
+    }
+
+    /// C++: `ColumnVectorVarcharTest.flat_not_inline_varchar`.
+    #[test]
+    fn varchar_flat_not_inline() {
+        varchar_flat_suite(|i| format!("hellohellohello{i}"));
+    }
+
+    /// C++: `ColumnVectorVarcharTest.flat_mixed_inline_varchar`.
+    #[test]
+    fn varchar_flat_mixed_inline() {
+        varchar_flat_suite(|i| format!("Professional{i}"));
+    }
+
+    /// C++: `ColumnVectorVarcharTest.constant_not_inline_varchar`.
+    #[test]
+    fn varchar_constant_not_inline() {
+        let payload = |i: i64| format!("hellohellohello{i}");
+        let mut v = ColumnVector::<String>::new();
+        v.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
+        assert!(v.set_vector_type(ColumnVectorType::Constant).is_err());
+        assert_eq!(v.capacity(), DEFAULT_VECTOR_SIZE);
+        assert_eq!(v.size(), 0);
+        assert!(v.get_value_by_index(0).is_none());
+        assert_eq!(v.vector_type(), ColumnVectorType::Constant);
+        assert_eq!(v.null_count(), 0);
+
+        let s = payload(0);
+        v.append_value(Some(s.clone())).unwrap();
+        assert!(v.append_value(Some(s.clone())).is_err());
+        assert_eq!(v.get_value_by_index(0), Some(&s));
+        assert!(v.get_value_by_index(1).is_none());
+        assert_eq!(v.get_value_by_index(0), Some(&s));
+
+        v.reset();
+        assert_eq!(v.capacity(), 0);
+        assert_eq!(v.size(), 0);
+        assert_eq!(v.vector_type(), ColumnVectorType::Invalid);
+
+        v.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
+        assert!(v.set_vector_type(ColumnVectorType::Constant).is_err());
+        assert_eq!(v.capacity(), DEFAULT_VECTOR_SIZE);
+        assert_eq!(v.size(), 0);
+        assert!(v.get_value_by_index(0).is_none());
+        assert_eq!(v.vector_type(), ColumnVectorType::Constant);
+
+        let s = payload(0);
+        v.append_value(Some(s.clone())).unwrap();
+        assert!(v.append_value(Some(s.clone())).is_err());
+        assert_eq!(v.get_value_by_index(0), Some(&s));
+        assert!(v.get_value_by_index(1).is_none());
+    }
+
+    // ---------------------------------------------------------------------
+    // `src/unit_test/storage/column_vector/column_vector_ut.cpp`
+    // ---------------------------------------------------------------------
+
+    /// C++: `ColumnVectorTest.ReadWrite` — every supported flat column
+    /// serializes to exactly `GetSizeInBytes()` bytes and reads back equal.
+    #[test]
+    fn column_vector_read_write_roundtrips() {
+        let vector_size = DEFAULT_VECTOR_SIZE / 3;
+        let mut columns: Vec<Column> = Vec::new();
+
+        let mut boolean = Column::new(LogicalType::Boolean).unwrap();
+        boolean.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        for i in 0..vector_size {
+            boolean
+                .push_block_value(BlockValue::Bool(i % 2 == 0))
+                .unwrap();
+        }
+        columns.push(boolean);
+
+        let mut tinyint = Column::new(LogicalType::TinyInt).unwrap();
+        tinyint.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        for i in 0..vector_size {
+            tinyint
+                .push_block_value(BlockValue::TinyInt(i as i8))
+                .unwrap();
+        }
+        columns.push(tinyint);
+
+        let mut smallint = Column::new(LogicalType::SmallInt).unwrap();
+        smallint.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        for i in 0..vector_size {
+            smallint
+                .push_block_value(BlockValue::SmallInt(i as i16))
+                .unwrap();
+        }
+        columns.push(smallint);
+
+        let mut integer = Column::new(LogicalType::Integer).unwrap();
+        integer.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        for i in 0..vector_size {
+            integer
+                .push_block_value(BlockValue::Int32(i as i32))
+                .unwrap();
+        }
+        columns.push(integer);
+
+        let mut bigint = Column::new(LogicalType::BigInt).unwrap();
+        bigint.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        for i in 0..vector_size {
+            bigint.push_block_value(BlockValue::Int(i as i64)).unwrap();
+        }
+        columns.push(bigint);
+
+        let mut float = Column::new(LogicalType::Float).unwrap();
+        float.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        for i in 0..vector_size {
+            float
+                .push_block_value(BlockValue::Float(i as f32 + 0.5))
+                .unwrap();
+        }
+        columns.push(float);
+
+        let mut double = Column::new(LogicalType::Double).unwrap();
+        double.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        for i in 0..vector_size {
+            double
+                .push_block_value(BlockValue::Double(i as f64 + 0.5))
+                .unwrap();
+        }
+        columns.push(double);
+
+        let mut varchar = Column::new(LogicalType::Varchar).unwrap();
+        varchar.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
+        for i in 0..vector_size {
+            let ch = (b'a' + (i % 26) as u8) as char;
+            varchar
+                .push_block_value(BlockValue::Str(ch.to_string().repeat(i)))
+                .unwrap();
+        }
+        columns.push(varchar);
+
+        for column in &columns {
+            let expected = column.get_size_in_bytes().unwrap();
+            let mut buf = Vec::with_capacity(expected);
+            column.write_adv(&mut buf).unwrap();
+            assert_eq!(buf.len(), expected);
+
+            let (read, consumed) = Column::read_adv(&buf).unwrap();
+            assert_eq!(consumed, expected);
+            assert_eq!(&read, column);
+        }
     }
 }

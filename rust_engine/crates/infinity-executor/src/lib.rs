@@ -40,18 +40,33 @@ mod catalog_ut;
 mod request_ut;
 
 #[cfg(test)]
+mod txn_ut;
+
+#[cfg(test)]
 mod query_match_ut;
 
 #[cfg(test)]
 mod query_parser_and_optimizer_ut;
 
+#[cfg(test)]
+mod highlighter_ut;
+
+#[cfg(test)]
+mod posting_writer_ut;
+
+#[cfg(test)]
+mod posting_merger_ut;
+
+#[cfg(test)]
+mod memory_indexer_ut;
+
 mod explain_search;
 
 pub mod analyzer;
+pub mod fulltext_query;
 mod hnsw_mem;
 mod knn_scan;
 mod profiler;
-pub mod fulltext_query;
 pub mod query_builder;
 mod regex_literal;
 mod variables;
@@ -1153,8 +1168,12 @@ fn invalidates_result_cache(stmt: &Statement) -> bool {
             | Statement::CreateDatabase { .. }
             | Statement::DropDatabase { .. }
             | Statement::CreateSnapshot { .. }
+            | Statement::CreateDatabaseSnapshot { .. }
+            | Statement::CreateSystemSnapshot { .. }
             | Statement::DropSnapshot { .. }
             | Statement::RestoreSnapshot { .. }
+            | Statement::RestoreDatabaseSnapshot { .. }
+            | Statement::RestoreSystemSnapshot { .. }
             | Statement::Copy { from: true, .. }
     )
 }
@@ -1662,6 +1681,10 @@ struct MemoryIndexer {
     total_len: u64,
     /// Approximate bytes held by this segment, for the memindex budget.
     bytes: usize,
+    /// A spilled segment loaded back from disk (`MemoryIndexer::Load`). Its
+    /// postings are read on demand: the on-disk form stores frequencies but no
+    /// position lists (see `fulltext_segment`'s module docs).
+    spilled: Option<infinity_storage::fulltext_segment::SegmentIndexReader>,
 }
 
 impl MemoryIndexer {
@@ -1730,9 +1753,98 @@ impl MemoryIndexer {
         self.postings.shrink_to_fit();
         self.docs.clear();
         self.live.clear();
+        self.spilled = None;
         self.bytes = 0;
         self.n_docs = 0;
         self.total_len = 0;
+    }
+
+    /// C++: `MemoryIndexer::Dump(false, spill)` — writes the segment as the
+    /// C++ file family ([`infinity_storage::fulltext_segment::write_segment_index`]).
+    /// Position lists are not part of the on-disk format.
+    #[allow(dead_code)] // the product spill path; exercised by `memory_indexer_ut`.
+    fn dump(&self, dir: &str, base_name: &str) -> bool {
+        if self.docs.is_empty() {
+            return false;
+        }
+        let base_row_id = self.docs.keys().copied().min().unwrap_or(0);
+        let mut docs: Vec<(u64, u32)> = self.docs.iter().map(|(row, len)| (*row, *len)).collect();
+        docs.sort_unstable_by_key(|(row, _)| *row);
+        let mut postings: std::collections::BTreeMap<String, Vec<(u64, u32)>> =
+            std::collections::BTreeMap::new();
+        for (term, list) in &self.postings {
+            let mut hits: Vec<(u64, u32)> = list.iter().map(|(row, tf, _)| (*row, *tf)).collect();
+            dedupe_postings(&mut hits);
+            postings.insert(term.clone(), hits);
+        }
+        if let Some(reader) = &self.spilled {
+            if let Ok(terms) = reader.terms() {
+                for term in terms {
+                    if postings.contains_key(&term) {
+                        continue;
+                    }
+                    if let Ok(mut hits) = reader.postings(&term) {
+                        dedupe_postings(&mut hits);
+                        postings.insert(term, hits);
+                    }
+                }
+            }
+        }
+        infinity_storage::fulltext_segment::write_segment_index(
+            dir,
+            base_name,
+            base_row_id,
+            &docs,
+            &postings,
+            infinity_storage::inverted_format::TermMetaFlags::default(),
+        )
+        .is_ok()
+    }
+
+    /// C++: `MemoryIndexer::Load` — reads a spilled segment back. Document
+    /// lengths and live rows are restored eagerly; postings stay in the
+    /// reader and are served by [`Self::segment_posting`].
+    #[allow(dead_code)] // the product spill path; exercised by `memory_indexer_ut`.
+    fn load(&mut self, dir: &str, base_name: &str) -> bool {
+        let flags = infinity_storage::inverted_format::TermMetaFlags::default();
+        let Ok(reader) =
+            infinity_storage::fulltext_segment::SegmentIndexReader::open(dir, base_name, 0, flags)
+        else {
+            return false;
+        };
+        self.reset();
+        let rows = reader.rows().to_vec();
+        for row in &rows {
+            let len = reader.doc_len_of_row(*row).unwrap_or(0);
+            self.docs.insert(*row, len);
+            self.total_len += u64::from(len);
+            self.live.insert(*row);
+        }
+        self.n_docs = rows.len();
+        self.bytes = rows.len() * std::mem::size_of::<(u64, u32, Vec<u32>)>();
+        self.spilled = Some(reader);
+        true
+    }
+
+    /// C++: `InMemIndexSegmentReader::GetSegmentPosting` — the term's
+    /// `(row id, term frequency)` list from the spilled reader and/or the
+    /// in-memory postings (a re-inserted row wins over its spilled copy).
+    #[allow(dead_code)] // `InMemIndexSegmentReader`; exercised by `memory_indexer_ut`.
+    fn segment_posting(&self, term: &str) -> Option<Vec<(u64, u32)>> {
+        let mut hits: Vec<(u64, u32)> = Vec::new();
+        if let Some(reader) = &self.spilled {
+            if let Ok(mut list) = reader.postings(term) {
+                hits.append(&mut list);
+            }
+        }
+        if let Some(list) = self.postings.get(term) {
+            hits.extend(list.iter().map(|(row, tf, _)| (*row, *tf)));
+        }
+        if hits.is_empty() {
+            return None;
+        }
+        dedupe_postings(&mut hits);
+        Some(hits)
     }
 }
 
@@ -2908,6 +3020,43 @@ pub struct Engine {
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
+}
+
+/// What a pending snapshot restore recreates (the reference's `kRestoreTable`,
+/// `kRestoreDatabase` and `kRestoreSystem` transaction types).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RestoreScope {
+    Table,
+    Database,
+    System,
+}
+
+/// A snapshot restore that has not been applied yet.
+///
+/// The reference runs a restore inside a `NewTxn`: nothing is visible until
+/// `CommitTxn`, and `Rollback` discards it. [`Engine`] exposes the same
+/// two-phase shape: the `begin_restore_*` methods validate that the snapshot
+/// exists, the engine is only modified when [`PendingRestore::commit`] runs,
+/// and dropping the handle (or calling [`PendingRestore::rollback`]) leaves it
+/// untouched.
+pub struct PendingRestore<'a> {
+    engine: &'a Engine,
+    scope: RestoreScope,
+    name: String,
+}
+
+impl PendingRestore<'_> {
+    /// Applies the restore, as `CommitTxn` does for a restore transaction.
+    pub fn commit(self) -> Result<()> {
+        match self.scope {
+            RestoreScope::Table => self.engine.restore_table_snapshot(&self.name),
+            RestoreScope::Database => self.engine.restore_database_snapshot(&self.name),
+            RestoreScope::System => self.engine.restore_system_snapshot(&self.name),
+        }
+    }
+
+    /// Discards the restore, as `NewTxn::Rollback` does.
+    pub fn rollback(self) {}
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -4842,6 +4991,27 @@ impl Engine {
                         };
                         self.show_tables(db)
                     }
+                    // `SHOW SNAPSHOTS` lists every snapshot; `SHOW SNAPSHOT
+                    // <name>` describes one (the reference's
+                    // `physical_show_snapshot_impl.cpp`).
+                    Some("snapshots") => Ok(QueryResult::Rows {
+                        columns: vec!["snapshot".to_string()],
+                        rows: self
+                            .snapshot_names()?
+                            .into_iter()
+                            .map(|n| vec![n])
+                            .collect(),
+                    }),
+                    Some("snapshot") => {
+                        let name = words.next().unwrap_or_default();
+                        if !self.snapshot_names()?.iter().any(|n| n == name) {
+                            return Err(Error::NotFound(format!("snapshot '{name}'")));
+                        }
+                        Ok(QueryResult::Rows {
+                            columns: vec!["snapshot".to_string()],
+                            rows: vec![vec![name.to_string()]],
+                        })
+                    }
                     _ => Ok(QueryResult::Rows {
                         columns: vec![],
                         rows: vec![],
@@ -5331,6 +5501,20 @@ impl Engine {
                     rows: vec![],
                 })
             }
+            Statement::CreateDatabaseSnapshot { name, database } => {
+                self.create_database_snapshot(name, database)?;
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
+            Statement::CreateSystemSnapshot { name } => {
+                self.create_system_snapshot(name)?;
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
             Statement::DropSnapshot { name } => {
                 if self.storage.store.get(&snap_key(name))?.is_none() {
                     return Err(Error::NotFound(format!("snapshot '{name}'")));
@@ -5342,19 +5526,21 @@ impl Engine {
                 })
             }
             Statement::RestoreSnapshot { name } => {
-                let data = self
-                    .storage
-                    .store
-                    .get(&snap_key(name))?
-                    .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
-                let blob = String::from_utf8_lossy(&data).into_owned();
-                // Restoring into an existing table is refused, as in the
-                // reference (`DROP TABLE` first).
-                let table = blob.split(SNAP_REC).next().unwrap_or_default().to_string();
-                if !table.is_empty() && self.storage.catalog.get_table_by_name(&table)?.is_some() {
-                    return Err(Error::Invalid(format!("table '{table}' already exists")));
-                }
-                self.restore_table_blob(&blob)?;
+                self.restore_table_snapshot(name)?;
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
+            Statement::RestoreDatabaseSnapshot { name } => {
+                self.restore_database_snapshot(name)?;
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
+            Statement::RestoreSystemSnapshot { name } => {
+                self.restore_system_snapshot(name)?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -7713,18 +7899,38 @@ impl Engine {
         Ok(())
     }
 
-    /// Restores every table of a database snapshot.
-    pub fn restore_database_snapshot(&self, name: &str) -> Result<()> {
+    /// Restores one table from a `CREATE SNAPSHOT … ON TABLE` snapshot.
+    ///
+    /// Restoring into an existing table is refused, as in
+    /// `NewTxn::RestoreTableSnapshot` (`DROP TABLE` first).
+    pub fn restore_table_snapshot(&self, name: &str) -> Result<()> {
+        let data = self
+            .storage
+            .store
+            .get(&snap_key(name))?
+            .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
+        let blob = String::from_utf8_lossy(&data).into_owned();
+        let table = blob.split(SNAP_REC).next().unwrap_or_default().to_string();
+        if !table.is_empty() && self.storage.catalog.get_table_by_name(&table)?.is_some() {
+            return Err(Error::Invalid(format!("table '{table}' already exists")));
+        }
+        self.restore_table_blob(&blob)
+    }
+
+    /// Restores every table of a database or system snapshot.
+    ///
+    /// The snapshot records its tables as `<db>.<table>`. Restoring into an
+    /// existing database is refused, as in `NewTxn::RestoreDatabaseSnapshot`.
+    fn restore_snapshot_tables(&self, name: &str) -> Result<()> {
         let data = self
             .storage
             .store
             .get(&snap_key(name))?
             .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
         let text = String::from_utf8_lossy(&data).to_string();
-        // The snapshot's tables are named `<db>.<table>`; recreate the
-        // databases first (they may have been dropped since the snapshot).
+        let blobs: Vec<&str> = text.split(DB_SNAP_SEP).filter(|s| !s.is_empty()).collect();
         let mut databases: Vec<String> = Vec::new();
-        for blob in text.split(DB_SNAP_SEP).filter(|s| !s.is_empty()) {
+        for blob in &blobs {
             let table = blob.split(SNAP_REC).next().unwrap_or_default();
             if let Some((db, _)) = table.split_once('.') {
                 if !databases.iter().any(|d| d == db) {
@@ -7732,13 +7938,59 @@ impl Engine {
                 }
             }
         }
+        let existing = self.storage.catalog.list_databases()?;
         for db in &databases {
-            self.storage.catalog.create_database(db, true)?;
+            if existing.iter().any(|d| d == db) {
+                return Err(Error::Invalid(format!("database '{db}' already exists")));
+            }
         }
-        for blob in text.split(DB_SNAP_SEP).filter(|s| !s.is_empty()) {
+        // The snapshot's databases may have been dropped since it was taken.
+        for db in &databases {
+            self.storage.catalog.create_database(db, false)?;
+        }
+        for blob in blobs {
             self.restore_table_blob(blob)?;
         }
         Ok(())
+    }
+
+    /// Restores every table of a database snapshot.
+    pub fn restore_database_snapshot(&self, name: &str) -> Result<()> {
+        self.restore_snapshot_tables(name)
+    }
+
+    /// Restores every table of a system snapshot.
+    pub fn restore_system_snapshot(&self, name: &str) -> Result<()> {
+        self.restore_snapshot_tables(name)
+    }
+
+    /// Begins a table restore that is only applied by
+    /// [`PendingRestore::commit`].
+    pub fn begin_restore_table_snapshot(&self, name: &str) -> Result<PendingRestore<'_>> {
+        self.begin_restore(RestoreScope::Table, name)
+    }
+
+    /// Begins a database restore that is only applied by
+    /// [`PendingRestore::commit`].
+    pub fn begin_restore_database_snapshot(&self, name: &str) -> Result<PendingRestore<'_>> {
+        self.begin_restore(RestoreScope::Database, name)
+    }
+
+    /// Begins a system restore that is only applied by
+    /// [`PendingRestore::commit`].
+    pub fn begin_restore_system_snapshot(&self, name: &str) -> Result<PendingRestore<'_>> {
+        self.begin_restore(RestoreScope::System, name)
+    }
+
+    fn begin_restore(&self, scope: RestoreScope, name: &str) -> Result<PendingRestore<'_>> {
+        if self.storage.store.get(&snap_key(name))?.is_none() {
+            return Err(Error::NotFound(format!("snapshot '{name}'")));
+        }
+        Ok(PendingRestore {
+            engine: self,
+            scope,
+            name: name.to_string(),
+        })
     }
 
     /// Merges every segment of `table` into one: the live rows are re-keyed
@@ -11567,10 +11819,70 @@ fn highlight_text(text: &str, qterms: &[String], delims: &Option<Vec<char>>) -> 
             while let Some(off) = text[from..].find(q.as_str()) {
                 let a = from + off;
                 matches.push((a, a + q.len()));
-                from = a + 1;
+                from = next_char_boundary(text, a);
             }
         }
     }
+    apply_highlight_matches(text, matches)
+}
+
+/// `Highlighter::GetHighlight`: analyses the query and the document with
+/// `analyzer`. ASCII query terms match the analyzer's own token stream
+/// (`GetASCIIWordHighlight`); non-ASCII terms match as substrings
+/// (`GetUnicodeWordHighlight`).
+pub fn highlight_with_analyzer(
+    query: &str,
+    raw_text: &str,
+    analyzer: &analyzer::Analyzer,
+) -> String {
+    if query.is_empty() || raw_text.is_empty() {
+        return raw_text.to_string();
+    }
+    let query_terms: Vec<String> = analyzer_terms(analyzer, query)
+        .into_iter()
+        .map(|term| term.text)
+        .collect();
+    let (ascii, unicode): (Vec<&String>, Vec<&String>) =
+        query_terms.iter().partition(|term| term.is_ascii());
+    let mut matches: Vec<(usize, usize)> = Vec::new();
+    if !ascii.is_empty() {
+        for term in analyzer_terms(analyzer, raw_text) {
+            if ascii.iter().any(|query| query.as_str() == term.text) {
+                matches.push((term.word_offset as usize, term.end_offset as usize));
+            }
+        }
+    }
+    for term in unicode {
+        let mut from = 0usize;
+        while let Some(offset) = raw_text[from..].find(term.as_str()) {
+            let start = from + offset;
+            matches.push((start, start + term.len()));
+            from = next_char_boundary(raw_text, start);
+        }
+    }
+    apply_highlight_matches(raw_text, matches)
+}
+
+fn analyzer_terms(analyzer: &analyzer::Analyzer, text: &str) -> Vec<analyzer::Term> {
+    match analyzer {
+        analyzer::Analyzer::Rag(rag) => rag.analyze(text),
+        analyzer::Analyzer::Standard(standard) => standard.analyze(text),
+        analyzer::Analyzer::NGram(ngram) => ngram.analyze(text),
+    }
+}
+
+/// The byte offset after the character starting at `at`; substring search
+/// advances by one character so a multi-byte UTF-8 sequence is never split.
+fn next_char_boundary(text: &str, at: usize) -> usize {
+    text[at..]
+        .chars()
+        .next()
+        .map_or(at + 1, |c| at + c.len_utf8())
+}
+
+/// `Highlighter::ApplyHighlights`: merges overlapping spans and keeps only the
+/// sentences containing a hit, joining the kept sentences with `" ... "`.
+fn apply_highlight_matches(text: &str, mut matches: Vec<(usize, usize)>) -> String {
     if matches.is_empty() {
         return text.to_string();
     }

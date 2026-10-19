@@ -1025,6 +1025,11 @@ fn put_block_value<S: Sink>(sink: &mut S, value: &BlockValue) {
             put_u8(sink, 19);
             put_str(sink, &v.text());
         }
+        BlockValue::RowId(v) => {
+            put_u8(sink, 20);
+            put_u32(sink, v.segment_id);
+            put_u32(sink, v.segment_offset);
+        }
     }
 }
 
@@ -1073,6 +1078,7 @@ fn read_block_value(cursor: &mut Cursor<'_>) -> Option<BlockValue> {
             BlockValue::Array(v)
         }
         19 => BlockValue::Mixed(infinity_common::MixedT::new(cursor.string()?)),
+        20 => BlockValue::RowId(crate::data_block::RowIdT::new(cursor.u32()?, cursor.u32()?)),
         _ => return None,
     })
 }
@@ -1098,6 +1104,7 @@ fn empty_column(logical_type: LogicalType) -> Option<Column> {
         LogicalType::Array => Column::Array(ColumnVector::new()),
         LogicalType::Mixed => Column::Mixed(ColumnVector::new()),
         LogicalType::Embedding(_) => Column::Embedding(ColumnVector::new()),
+        LogicalType::RowID => Column::RowId(ColumnVector::new()),
         _ => return None,
     })
 }

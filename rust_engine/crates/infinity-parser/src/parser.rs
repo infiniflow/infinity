@@ -174,9 +174,16 @@ impl Parser {
                 if self.eat_kw("SNAPSHOT") {
                     let name = self.expect_name()?;
                     self.expect_kw("ON")?;
-                    self.expect_kw("TABLE")?;
-                    let table = self.expect_table_name()?;
-                    return Ok(Statement::CreateSnapshot { name, table });
+                    if self.eat_kw("TABLE") {
+                        let table = self.expect_table_name()?;
+                        return Ok(Statement::CreateSnapshot { name, table });
+                    }
+                    if self.eat_kw("DATABASE") {
+                        let database = self.expect_ident()?;
+                        return Ok(Statement::CreateDatabaseSnapshot { name, database });
+                    }
+                    self.expect_kw("SYSTEM")?;
+                    return Ok(Statement::CreateSystemSnapshot { name });
                 }
                 if self.eat_kw("DATABASE") {
                     // CREATE DATABASE [IF NOT EXISTS] name
@@ -344,6 +351,16 @@ impl Parser {
             }
             "RESTORE" => {
                 self.advance();
+                if self.eat_kw("DATABASE") {
+                    self.expect_kw("SNAPSHOT")?;
+                    let name = self.expect_name()?;
+                    return Ok(Statement::RestoreDatabaseSnapshot { name });
+                }
+                if self.eat_kw("SYSTEM") {
+                    self.expect_kw("SNAPSHOT")?;
+                    let name = self.expect_name()?;
+                    return Ok(Statement::RestoreSystemSnapshot { name });
+                }
                 self.expect_kw("TABLE")?;
                 self.expect_kw("SNAPSHOT")?;
                 let name = self.expect_name()?;
