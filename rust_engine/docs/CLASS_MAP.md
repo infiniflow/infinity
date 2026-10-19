@@ -12,6 +12,7 @@
 | `BufferManager`（`storage/buffer/buffer_manager*.cppm`） | `infinity_storage::buffer::{BufferManager, BufferPool}` | `Get`→`get`、`Put`→`put`、LRU 淘汰→`evict`、`SetBufferSize`→`set_budget`；`AllocateBufferObject`→`BufferPool::allocate`/`allocate_persistent`、加载/保存/释放→`BufferObj::{load,save,free}` | ✅ |
 | `BufferObj` / `BufferHandle`（`storage/buffer/buffer_obj.cppm`、`buffer_handle.cppm`） | `infinity_storage::buffer::{BufferObj, BufferHandle}` | `Load`→`load`（按池预算计费，超限报错）、`GetData/GetDataMut`→`data`/`data_mut`、`Save`→`save`、`Free`→`free`、`rc`/`status`/`type`；句柄 Drop 递减 rc，ephemeral 溢出到临时文件、persistent 常驻、transient 随句柄释放 | ✅ |
 | `BlockVersionFile`（`storage/buffer/block_version.cppm`） | `cpp_format::BlockVersionFile` | `Decode/Encode` | ✅ |
+| `BlockVersion` / `CreateField`（`catalog/meta/block_version.cppm`） | `infinity_storage::mvcc::{BlockVersion, CreateField}` | `Append`→`append`（累计行数）、`CommitAppend`→`commit_append`、`Delete`→`delete`（重复删除报 `TxnWWConflict`）、`RollbackDelete`、`CheckDelete`、`GetCreateTS`/`GetDeleteTS`、`SpillToFile`/`LoadFromFile`（复用 `BlockVersionFile` 字节布局） | ✅ |
 | `TableDef` / `ColumnDef` / `IndexBase` 系列（`table_def.cppm`、`column_def.cppm`、`index_def*.cppm`） | `infinity_catalog::{TableMeta, IndexMeta, ColumnDefValue, IndexDefValue}` + `cpp_layout` | catalog 键空间按 C++ 布局编解码；`IndexFullText/Secondary/HNSW/IVF/BMP/EMVB` 的参数存于 `IndexMeta.options` | ✅ |
 | `SecondaryIndexDataBase::SaveIndexInner` | `secondary_segment::write_secondary_segment` / `SecondarySegmentReader` | 保存/查找 | ✅ |
 | `SecondaryIndexDataLowCardinality` | `secondary_lowcard::LowCardWriter/Reader` | `WriteAdv` 兼容的 Roaring | ✅ |
@@ -94,7 +95,7 @@
 
 ## 类级覆盖审计（基线 `5d27942c0`）
 
-`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；本表显式命名 **92** 个。其余 1044 个按 §3.6 允许的「结构合并」处理（模板特化 / POD 状态 / 迭代器机件 / 生成的 Thrift 类型），不是静默省略。**逐名清单（1136 行，mapped 92 / grouped 1022 / excluded 15 / test 7）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**；下表是按区域汇总（计数以加入 PLAID/SMVE 映射前的快照统计）：
+`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；本表显式命名 **93** 个。其余 1043 个按 §3.6 允许的「结构合并」处理（模板特化 / POD 状态 / 迭代器机件 / 生成的 Thrift 类型），不是静默省略。**逐名清单（1136 行，mapped 93 / grouped 1021 / excluded 15 / test 7）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**；下表是按区域汇总（计数以加入 PLAID/SMVE 映射前的快照统计）：
 
 | 区域 | 未逐类命名 | Rust 承担方式 |
 |---|---:|---|
@@ -108,7 +109,7 @@
 
 > 判定口径：C++ 中承载**行为**且被其他类调用的类（HNSW/IVF/EMVB/PLAID/SMVE、全文段、事务、Buffer、BlockIndex、PDataBlock 等）在本表中逐类对应；纯数据载体、模板特化、迭代器和生成类型按上表合并，理由与归属均已登记。新增 C++ 行为类时仍须先登记再移植。
 
-**聚合对应（精确计数，覆盖其余 1022 个类；逐名见 `CLASS_AUDIT.md`）**
+**聚合对应（精确计数，覆盖其余 1021 个类；逐名见 `CLASS_AUDIT.md`）**
 
 | 聚合到（Rust） | 类数 |
 |---|---:|
@@ -123,7 +124,7 @@
 | `Vec<u8>`/`BufferObj` 等存储原语 | 40 |
 | `infinity_storage::wal` | 40 |
 | `tokenize_*` analyzer 函数 | 39 |
-| parser/CLI 结构 | 30 |
+| parser/CLI 结构 | 29 |
 | `infinity-expression` cast 函数 | 29 |
 | 定时线程 + `Engine::{dump,optimize,cleanup}` | 26 |
 | 生成的 Thrift 类型 / `infinity-server` | 23 |
@@ -142,7 +143,7 @@
 | `ivf::IvfIndex` + `ivf`/`ivf_mem` | 7 |
 | `merge_knn::MergeKnn` + 结果堆 | 3 |
 | 其余 8 个聚合组（每组 ≤2 个类） | 12 |
-| **合计** | **1022** |
+| **合计** | **1021** |
 
 ## 维护规则
 
@@ -202,6 +203,7 @@
 | `main/config_ut.cpp`（6 例） | `infinity_cli::config::Config` | `defaults`（默认值逐项断言）、`full_config_file`（`infinity_conf.toml`）、`wrong_parameter_names`、`invalid_values`（版本/时区/IP/字节大小/日志级别/时间信息错误码）、`out_of_range_values`（5 个越界 fixture）、`valid_values` |
 | `main/infinity_ut.cpp::InfinityTest`（2 例） | `Engine` + `Variables` | `catalog_lifecycle_matches_the_reference_test`（库/表 CRUD、`SHOW DATABASES`/`SHOW TABLES`、插入与选择）、`show_variable_covers_the_reference_names`（全局/会话变量名与 `error` 拒绝） |
 | `main/query_profiler_ut.cpp::QueryProfilerTest`（3 例） | `profiler::{QueryProfiler, QueryPhase, OptimizerProfiler, ProfileHistory, TaskProfiler}` | `query_phase_names_match_the_reference`、`disabled_profiler_ignores_phase_transitions`、`enabled_profiler_enforces_phase_order`、`all_phases_and_optimizer_rules_record_time`、`history_keeps_the_newest_profiles`、`task_profiler_records_operator_timings` |
+| `storage/meta/entry/block_version_ut.cpp`（5 例） | `mvcc::BlockVersion` | `save_and_load_roundtrip`、`reopen_preserves_the_slot_array`、`delete_twice_is_rejected`、`check_delete_compares_timestamps`、`get_delete_ts_returns_the_slot_range` |
 | `main/table_ut.cpp::InfinityTableTest::test1` | `Engine` + `ExplainKind` | `explain_covers_every_plan_kind`（AST/LOGICAL/OPTIMIZED/PHYSICAL/FRAGMENT/PIPELINE） |
 
 ### 未移植单测（Rust 类已存在）

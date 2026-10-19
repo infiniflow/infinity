@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `grouped` 1022, `mapped` 92, `test` 7
+- 状态分布：`excluded` 15, `grouped` 1021, `mapped` 93, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -574,7 +574,7 @@
 | 565 | `KVStore` | `src/storage/catalog/kv_store.cppm` | grouped | `infinity_catalog` + `value_format` |
 | 566 | `MemIndex` | `src/storage/catalog/mem_index.cppm` | grouped | `infinity_catalog` + `value_format` |
 | 567 | `MemIndexID` | `src/storage/catalog/mem_index.cppm` | grouped | `infinity_catalog` + `value_format` |
-| 568 | `BlockVersion` | `src/storage/catalog/meta/block_version.cppm` | grouped | `infinity_catalog` + `value_format` |
+| 568 | `BlockVersion` | `src/storage/catalog/meta/block_version.cppm` | mapped | `infinity_storage::mvcc::{BlockVersion, CreateField}`（Append/CommitAppend/Delete/RollbackDelete/CheckDelete/GetCreateTS/GetDeleteTS/SpillToFile/LoadFromFile） |
 | 569 | `CatalogMeta` | `src/storage/catalog/meta/catalog_meta.cppm` | grouped | `infinity_catalog` + `value_format` |
 | 570 | `ChunkIndexMetaInfo` | `src/storage/catalog/meta/chunk_index_meta.cppm` | grouped | `infinity_catalog` + `value_format` |
 | 571 | `ChunkIndexSnapshotInfo` | `src/storage/catalog/meta/chunk_index_meta.cppm` | grouped | `infinity_catalog` + `value_format` |

@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 212, `gate-a` 216, `integration` 294, `partial` 231, `ported` 45.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 207, `gate-a` 216, `integration` 294, `partial` 231, `ported` 50.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -693,11 +693,11 @@
 | 679 | `src/unit_test/storage/knnindex/plaid_search/test_plaid_ut.cpp` | `PlaidIndexColBERTSaRTest` | `test_colbertsar_mem_usage` | ported |
 | 680 | `src/unit_test/storage/knnindex/plaid_search/test_plaid_ut.cpp` | `PlaidIndexColBERTSaRTest` | `test_colbertsar_merge` | ported |
 | 681 | `src/unit_test/storage/knnindex/plaid_search/test_plaid_ut.cpp` | `PlaidIndexColBERTSaRTest` | `test_colbertsar_size_smaller_than_plaid` | ported |
-| 682 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `SaveAndLoad` | gap |
-| 683 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `SaveAndLoad2` | gap |
-| 684 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `delete_test` | gap |
-| 685 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `check_delete_test` | gap |
-| 686 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `get_delete_ts_test` | gap |
+| 682 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `SaveAndLoad` | ported | `infinity-storage` `mvcc::tests::save_and_load_roundtrip` |
+| 683 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `SaveAndLoad2` | ported | `mvcc::tests::reopen_preserves_the_slot_array` |
+| 684 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `delete_test` | ported | `mvcc::tests::delete_twice_is_rejected` |
+| 685 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `check_delete_test` | ported | `mvcc::tests::check_delete_compares_timestamps` |
+| 686 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `get_delete_ts_test` | ported | `mvcc::tests::get_delete_ts_returns_the_slot_range` |
 | 687 | `src/unit_test/storage/new_catalog/alter_ut.cpp` | `TestTxnAlter` | `add_column0` | integration |
 | 688 | `src/unit_test/storage/new_catalog/alter_ut.cpp` | `TestTxnAlter` | `drop_column0` | integration |
 | 689 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append0` | integration |
