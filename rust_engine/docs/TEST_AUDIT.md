@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 123, `gate-a` 136, `integration` 264, `partial` 60, `ported` 287.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 113, `gate-a` 136, `integration` 264, `partial` 60, `ported` 297.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -622,16 +622,16 @@
 | 608 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testleftpack` | exempt |
 | 609 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testleftpackf` | exempt |
 | 610 | `src/unit_test/storage/knnindex/knn_diskann/test_build_diskann_ut_nimpl.cpp` | `DiskAnnTest` | `test1` | excluded |
-| 611 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_ip_blas_reservoir_ut.cpp` | `KnnFlatIpBlasReservoirTest` | `test1` | gap |
-| 612 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_ip_blas_ut.cpp` | `KnnFlatIpBlasTest` | `test1` | gap |
-| 613 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_ip_reservoir_ut.cpp` | `KnnFlatIpReservoirTest` | `test1` | gap |
-| 614 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_ip_ut.cpp` | `KnnFlatIpTest` | `test1` | gap |
-| 615 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_blas_reservoir_ut.cpp` | `KnnFlatL2BlasReservoirTest` | `test1` | gap |
-| 616 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_blas_ut.cpp` | `KnnFlatL2BlasTest` | `test1` | gap |
-| 617 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_reservoir_ut.cpp` | `KnnFlatL2ReservoirTest` | `test1` | gap |
-| 618 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_top1_blas_ut.cpp` | `KnnFlatL2Top1BlasTest` | `test1` | gap |
-| 619 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_top1_ut.cpp` | `KnnFlatL2Top1Test` | `test1` | gap |
-| 620 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_ut.cpp` | `KnnFlatL2Test` | `test1` | gap |
+| 611 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_ip_blas_reservoir_ut.cpp` | `KnnFlatIpBlasReservoirTest` | `test1` | ported | `infinity-index` `knn_flat::tests::ip_top_k_matches_the_reference` |
+| 612 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_ip_blas_ut.cpp` | `KnnFlatIpBlasTest` | `test1` | ported | `infinity-index` `knn_flat::tests::ip_top_k_matches_the_reference` |
+| 613 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_ip_reservoir_ut.cpp` | `KnnFlatIpReservoirTest` | `test1` | ported | `infinity-index` `knn_flat::tests::ip_top_k_matches_the_reference` |
+| 614 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_ip_ut.cpp` | `KnnFlatIpTest` | `test1` | ported | `infinity-index` `knn_flat::tests::ip_top_k_matches_the_reference` |
+| 615 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_blas_reservoir_ut.cpp` | `KnnFlatL2BlasReservoirTest` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_k_matches_the_reference` |
+| 616 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_blas_ut.cpp` | `KnnFlatL2BlasTest` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_k_matches_the_reference` |
+| 617 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_reservoir_ut.cpp` | `KnnFlatL2ReservoirTest` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_k_matches_the_reference` |
+| 618 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_top1_blas_ut.cpp` | `KnnFlatL2Top1BlasTest` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_1_matches_the_reference` |
+| 619 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_top1_ut.cpp` | `KnnFlatL2Top1Test` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_1_matches_the_reference` |
+| 620 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_ut.cpp` | `KnnFlatL2Test` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_k_matches_the_reference` |
 | 621 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func2_ut.cpp` | `DistFuncTest2` | `test2` | partial |
 | 622 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func_ut.cpp` | `DistFuncTest` | `test1` | partial |
 | 623 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func_ut.cpp` | `DistFuncTest` | `test2` | partial |

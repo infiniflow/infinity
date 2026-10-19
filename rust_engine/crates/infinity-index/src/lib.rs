@@ -13,6 +13,7 @@ pub mod fulltext;
 pub mod hnsw_handler;
 pub mod ivf;
 pub mod ivf_def;
+pub mod knn_flat;
 pub mod linscan;
 pub mod lsg;
 pub mod lvq;

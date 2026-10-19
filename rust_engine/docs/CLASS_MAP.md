@@ -15,6 +15,7 @@
 | `ColumnDef::ToString` / `ConstrainTypeToString` / `LogicalType2Str`（`parser/definition/column_def.cpp:213`、`parser/type/logical_type.cpp:28`） | `ColumnDefValue` 的 `Display` | 约束按 `std::set<ConstraintType>` 顺序、缺省默认打印 `Null`、`DataType` 的 C++ 拼写（`TinyInt`/`Varchar`/`Decimal(p,s)`…） | ✅ |
 | `KeyEncode`（`storage/common/kv_code.cppm`） | `infinity_storage::catalog_format` 的 `catalog|…` 与名称键两族函数 | `CatalogDbKey`/`CatalogDbPrefix`/`CatalogDbTagPrefix`/`CatalogTableKey`/`TableColumnKey`/`CatalogTableSegmentKey` 与 `DatabaseKey`/`TableKey`/`TableSegmentKey`/`TableSegmentBlockKey`/`TableSegmentBlockColumnKey`/`TableIndexKey`/`TableIndexSegmentKey`/`TableIndexChunkKey` 及各自 `*Prefix` | ✅ |
 | `CachedNodeBase` / `CachedScanBase` / `CacheContent` / `CacheOutput` / `ResultCacheManager`（`cached_node/*.cppm`、`logical_read_cache.cppm`、`result_cache_manager.cppm`） | `infinity_storage::result_cache::{CachedNode, CacheContent, CacheOutput, CacheResultMap, ResultCacheManager}` | `AddCache`→`add_cache`（已有条目合并新列）、`GetCache`→`get_cache`（按输出列投影，缺列即 miss）、`DropTable`→`drop_table`、`ResetCacheNumCapacity`/`ClearCache`、LRU 淘汰 | ✅ |
+| `KnnFlatL2` / `KnnFlatIP` / `*Blas` / `*Reservoir` / `*Top1`（`knn_flat/*.cppm`） | `infinity_index::knn_flat::{top_k, top_1}` | `Search`→`top_k`（L2 升序 / IP 相似度降序、bitmask 过滤、并列取小 id）、`*Top1`→`top_1`；BLAS/reservoir 变体合并为同一实现（结构合并，行为一致） | ✅ |
 | `NGramAnalyzer`（`common/analyzer/ngram_analyzer.cppm`） | `infinity_executor::analyzer::NGramAnalyzer` | `Analyze`→`analyze`（按 code point 滑动窗口，窗口内空格结束当前词，尾部不足 n 停止） | ✅ |
 | `StandardAnalyzer` / `CommonLanguageAnalyzer` / `Tokenizer` / `TokenizeConfig` / `Term` / `TermList`（`common/analyzer/*.cppm`） | `infinity_executor::analyzer::{StandardAnalyzer, TokenizeConfig, Term, tokenize}` | `InitStemmer(ENGLISH)`、`SetCaseSensitive`、`SetExtractEngStem`、`SetStemOnly`、`SetCharOffset`、`SetTokenizerConfig`、`Analyze`→`analyze`（word/stem/case 的三种输出组合、stem 与原词共享 position） | ✅ |
 | `TableDef`（`storage/definition/table_def.cppm`） | `infinity_catalog::value_format::TableDef` | `Make`→`make`、`column_count`、`GetColIdByName`→`get_col_id_by_name`；字段（schema/table/comment/columns）与 `ColumnDefValue` 一致 | ✅ |
@@ -105,7 +106,7 @@
 
 ## 类级覆盖审计（基线 `5d27942c0`）
 
-`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；本表显式命名 **109** 个。其余 1027 个按 §3.6 允许的「结构合并」处理（模板特化 / POD 状态 / 迭代器机件 / 生成的 Thrift 类型），不是静默省略。**逐名清单（1136 行，mapped 109 / grouped 1005 / excluded 15 / test 7）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**；下表是按区域汇总（计数以加入 PLAID/SMVE 映射前的快照统计）：
+`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；本表显式命名 **121** 个。其余 1015 个按 §3.6 允许的「结构合并」处理（模板特化 / POD 状态 / 迭代器机件 / 生成的 Thrift 类型），不是静默省略。**逐名清单（1136 行，mapped 121 / grouped 993 / excluded 15 / test 7）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**；下表是按区域汇总（计数以加入 PLAID/SMVE 映射前的快照统计）：
 
 | 区域 | 未逐类命名 | Rust 承担方式 |
 |---|---:|---|
@@ -119,7 +120,7 @@
 
 > 判定口径：C++ 中承载**行为**且被其他类调用的类（HNSW/IVF/EMVB/PLAID/SMVE、全文段、事务、Buffer、BlockIndex、PDataBlock 等）在本表中逐类对应；纯数据载体、模板特化、迭代器和生成类型按上表合并，理由与归属均已登记。新增 C++ 行为类时仍须先登记再移植。
 
-**聚合对应（精确计数，覆盖其余 1005 个类；逐名见 `CLASS_AUDIT.md`）**
+**聚合对应（精确计数，覆盖其余 993 个类；逐名见 `CLASS_AUDIT.md`）**
 
 | 聚合到（Rust） | 类数 |
 |---|---:|
@@ -128,7 +129,7 @@
 | `PhysicalOperator` 变体（执行器算子） | 78 |
 | `infinity_catalog` + `value_format` | 76 |
 | `PhysicalOperator` + `OperatorState`（状态结构） | 73 |
-| `infinity_storage`/执行器对应模块 | 47 |
+| `infinity_storage`/执行器对应模块 | 35 |
 | `vector::{HnswIndex, Store}` + `hnsw_handler`/`lvq`/`rabitq`/`lsg` | 50 |
 | `infinity_txn::{Txn, TxnManager}` | 46 |
 | `Vec<u8>`/`BufferObj` 等存储原语 | 40 |
@@ -153,7 +154,7 @@
 | `ivf::IvfIndex` + `ivf`/`ivf_mem` | 7 |
 | `merge_knn::MergeKnn` + 结果堆 | 3 |
 | 其余 8 个聚合组（每组 ≤2 个类） | 12 |
-| **合计** | **1005** |
+| **合计** | **993** |
 
 ## 维护规则
 
@@ -215,6 +216,7 @@
 | `main/config_ut.cpp`（6 例） | `infinity_cli::config::Config` | `defaults`（默认值逐项断言）、`full_config_file`（`infinity_conf.toml`）、`wrong_parameter_names`、`invalid_values`（版本/时区/IP/字节大小/日志级别/时间信息错误码）、`out_of_range_values`（5 个越界 fixture）、`valid_values` |
 | `main/infinity_ut.cpp::InfinityTest`（2 例） | `Engine` + `Variables` | `catalog_lifecycle_matches_the_reference_test`（库/表 CRUD、`SHOW DATABASES`/`SHOW TABLES`、插入与选择）、`show_variable_covers_the_reference_names`（全局/会话变量名与 `error` 拒绝） |
 | `main/query_profiler_ut.cpp::QueryProfilerTest`（3 例） | `profiler::{QueryProfiler, QueryPhase, OptimizerProfiler, ProfileHistory, TaskProfiler}` | `query_phase_names_match_the_reference`、`disabled_profiler_ignores_phase_transitions`、`enabled_profiler_enforces_phase_order`、`all_phases_and_optimizer_rules_record_time`、`history_keeps_the_newest_profiles`、`task_profiler_records_operator_timings` |
+| `storage/knnindex/knn_flat/*_ut.cpp`（12 例） | `knn_flat::{top_k, top_1}` | `l2_top_k_matches_the_reference`、`ip_top_k_matches_the_reference`、`l2_top_1_matches_the_reference`、`ip_top_1_matches_the_reference`（含 bitmask 场景） |
 | `common/analyzer/ngram_analyzer_ut.cpp`（2 例） | `analyzer::NGramAnalyzer` | `ngram_two_slides_over_words`、`ngram_one_emits_each_character` |
 | `common/analyzer/standard_analyzer_ut.cpp`（7 例） | `analyzer::StandardAnalyzer` | `standard_analyzer_lowercases_without_stemming`、`keeps_the_source_case`、`emits_word_and_stem`、`emits_case_and_lower_forms`、`deduplicates_the_stem`、`honours_the_tokenizer_config`、`handles_a_large_extract` |
 | `storage/definition/table_def_ut.cpp`（2 例） | `TableDef` | `table_def_reports_schema_table_comment_and_columns`、`table_def_roundtrips_through_its_bytes` |

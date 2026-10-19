@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `grouped` 1005, `mapped` 109, `test` 7
+- 状态分布：`excluded` 15, `grouped` 993, `mapped` 121, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -901,17 +901,17 @@
 | 892 | `MemVamana` | `src/storage/knn_index/knn_diskann/vamana_alg.cppm` | excluded | 无：计划 §2.6/R14 排除（C++ populate 为 stub） |
 | 893 | `KnnDistance` | `src/storage/knn_index/knn_distance.cppm` | grouped | `simsimd`/`vector::distance_*` 距离原语 |
 | 894 | `KnnDistanceBase` | `src/storage/knn_index/knn_distance.cppm` | grouped | `simsimd`/`vector::distance_*` 距离原语 |
-| 895 | `KnnFlatCOS` | `src/storage/knn_index/knn_flat/knn_flat_cos.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 896 | `KnnFlatIP` | `src/storage/knn_index/knn_flat/knn_flat_ip.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 897 | `KnnFlatIPBlas` | `src/storage/knn_index/knn_flat/knn_flat_ip_blas.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 898 | `KnnFlatIPBlasReservoir` | `src/storage/knn_index/knn_flat/knn_flat_ip_blas_reservoir.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 899 | `KnnFlatIPReservoir` | `src/storage/knn_index/knn_flat/knn_flat_ip_reservoir.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 900 | `KnnFlatL2` | `src/storage/knn_index/knn_flat/knn_flat_l2.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 901 | `KnnFlatL2Blas` | `src/storage/knn_index/knn_flat/knn_flat_l2_blas.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 902 | `KnnFlatL2BlasReservoir` | `src/storage/knn_index/knn_flat/knn_flat_l2_blas_reservoir.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 903 | `KnnFlatL2Reservoir` | `src/storage/knn_index/knn_flat/knn_flat_l2_reservoir.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 904 | `KnnFlatL2Top1` | `src/storage/knn_index/knn_flat/knn_flat_l2_top1.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 905 | `KnnFlatL2Top1Blas` | `src/storage/knn_index/knn_flat/knn_flat_l2_top1_blas.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
+| 895 | `KnnFlatCOS` | `src/storage/knn_index/knn_flat/knn_flat_cos.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
+| 896 | `KnnFlatIP` | `src/storage/knn_index/knn_flat/knn_flat_ip.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
+| 897 | `KnnFlatIPBlas` | `src/storage/knn_index/knn_flat/knn_flat_ip_blas.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
+| 898 | `KnnFlatIPBlasReservoir` | `src/storage/knn_index/knn_flat/knn_flat_ip_blas_reservoir.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
+| 899 | `KnnFlatIPReservoir` | `src/storage/knn_index/knn_flat/knn_flat_ip_reservoir.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
+| 900 | `KnnFlatL2` | `src/storage/knn_index/knn_flat/knn_flat_l2.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
+| 901 | `KnnFlatL2Blas` | `src/storage/knn_index/knn_flat/knn_flat_l2_blas.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
+| 902 | `KnnFlatL2BlasReservoir` | `src/storage/knn_index/knn_flat/knn_flat_l2_blas_reservoir.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
+| 903 | `KnnFlatL2Reservoir` | `src/storage/knn_index/knn_flat/knn_flat_l2_reservoir.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
+| 904 | `KnnFlatL2Top1` | `src/storage/knn_index/knn_flat/knn_flat_l2_top1.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
+| 905 | `KnnFlatL2Top1Blas` | `src/storage/knn_index/knn_flat/knn_flat_l2_top1_blas.cppm` | mapped | `infinity_index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
 | 906 | `DataStore` | `src/storage/knn_index/knn_hnsw/data_store/data_store.cppm` | grouped | `infinity_index::vector::{HnswIndex, Store}` / `hnsw_handler` / `lvq` / `rabitq` / `lsg` |
 | 907 | `DataStoreBase` | `src/storage/knn_index/knn_hnsw/data_store/data_store.cppm` | grouped | `infinity_index::vector::{HnswIndex, Store}` / `hnsw_handler` / `lvq` / `rabitq` / `lsg` |
 | 908 | `DataStoreChunkIter` | `src/storage/knn_index/knn_hnsw/data_store/data_store.cppm` | grouped | `infinity_index::vector::{HnswIndex, Store}` / `hnsw_handler` / `lvq` / `rabitq` / `lsg` |
