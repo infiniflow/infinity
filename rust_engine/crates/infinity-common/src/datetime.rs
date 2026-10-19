@@ -270,4 +270,72 @@ mod tests {
             "-001-05-04"
         );
     }
+
+    /// Howard Hinnant's `civil_from_days`: an implementation independent of
+    /// `DateT::to_string_value`, used as the std::chrono stand-in.
+    fn civil_from_days(z: i64) -> (i32, i32, i32) {
+        let z = z + 719_468;
+        let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+        let doe = z - era * 146_097;
+        let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+        let y = yoe + era * 400;
+        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        let mp = (5 * doy + 2) / 153;
+        let d = doy - (153 * mp + 2) / 5 + 1;
+        let m = if mp < 10 { mp + 3 } else { mp - 9 };
+        (if m <= 2 { y + 1 } else { y } as i32, m as i32, d as i32)
+    }
+
+    fn ymd_text((y, m, d): (i32, i32, i32)) -> String {
+        format!("{y:04}-{m:02}-{d:02}")
+    }
+
+    // C++: src/unit_test/parser/type/datetime/date_type_old_ut.cpp:test1
+    #[test]
+    fn date_type_old_test1() {
+        let mut date = DateT::default();
+        assert_eq!(date.to_string_value(), "1970-01-01");
+
+        date.from_string("2000-01-01").unwrap();
+        assert_eq!(date.to_string_value(), "2000-01-01");
+        date.from_string("2000/10/31").unwrap();
+        assert_eq!(date.to_string_value(), "2000-10-31");
+        date.from_string("1-1-1").unwrap();
+        assert_eq!(date.to_string_value(), "0001-01-01");
+        date.from_string("9999-12-31").unwrap();
+        assert_eq!(date.to_string_value(), "9999-12-31");
+
+        assert!(date.from_string("0-0-0").is_err());
+        assert!(date.from_string("0/0/0").is_err());
+    }
+
+    // C++: src/unit_test/parser/type/datetime/date_type_old_ut.cpp:TestEqStdChronoForward
+    #[test]
+    fn date_type_old_test_eq_std_chrono_forward() {
+        let day = IntervalT::with_unit(1, TimeUnit::Day);
+        let start = ymd_to_date(2020, 1, 31).unwrap();
+        let mut date = start;
+        for i in 0..30_000i64 {
+            assert_eq!(
+                date.to_string_value(),
+                ymd_text(civil_from_days(i64::from(start.value) + i))
+            );
+            date = date.add(day).unwrap();
+        }
+    }
+
+    // C++: src/unit_test/parser/type/datetime/date_type_old_ut.cpp:TestEqStdChronoBackward
+    #[test]
+    fn date_type_old_test_eq_std_chrono_backward() {
+        let day = IntervalT::with_unit(1, TimeUnit::Day);
+        let start = ymd_to_date(2020, 1, 31).unwrap();
+        let mut date = start;
+        for i in 0..30_000i64 {
+            assert_eq!(
+                date.to_string_value(),
+                ymd_text(civil_from_days(i64::from(start.value) - i))
+            );
+            date = date.subtract(day).unwrap();
+        }
+    }
 }

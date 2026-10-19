@@ -144,7 +144,10 @@ impl TxnManager {
 
     pub fn begin(&self) -> Txn {
         let id = self.next_txn_id.fetch_add(1, Ordering::SeqCst);
-        let begin_ts = self.next_ts.load(Ordering::SeqCst);
+        // `NewTxn::BeginTS`: the timestamp of the last commit. A commit
+        // allocates a strictly larger timestamp, so a write transaction's
+        // begin is below its commit.
+        let begin_ts = self.next_ts.load(Ordering::SeqCst).saturating_sub(1);
         Txn {
             id,
             begin_ts,
@@ -168,7 +171,7 @@ impl TxnManager {
             let seen = self.delete_ts.lock().unwrap();
             for key in &txn.deletes {
                 if let Some(&ts) = seen.get(key) {
-                    if ts >= txn.begin_ts {
+                    if ts > txn.begin_ts {
                         return Err(Error::TxnConflict(format!(
                             "row changed by a newer transaction (begin_ts={})",
                             txn.begin_ts

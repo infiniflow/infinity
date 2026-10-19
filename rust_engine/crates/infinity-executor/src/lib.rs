@@ -37,6 +37,45 @@ mod explain;
 mod catalog_ut;
 
 #[cfg(test)]
+mod new_catalog_ut;
+
+#[cfg(test)]
+mod append_delete_ut;
+
+#[cfg(test)]
+mod update_import_ut;
+
+#[cfg(test)]
+mod compact_replay_ut;
+
+#[cfg(test)]
+mod optimize_replay_ut;
+
+#[cfg(test)]
+mod replay_txn_ut;
+
+#[cfg(test)]
+mod replay_misc_ut;
+
+#[cfg(test)]
+mod new_catalog_table_ut;
+
+#[cfg(test)]
+mod new_catalog_database_ut;
+
+#[cfg(test)]
+mod new_catalog_column_ut;
+
+#[cfg(test)]
+mod new_catalog_index_ut;
+
+#[cfg(test)]
+mod new_catalog_index_internal_ut;
+
+#[cfg(test)]
+mod new_catalog_meta_ut;
+
+#[cfg(test)]
 mod conflict_check_ut;
 
 #[cfg(test)]
@@ -3099,6 +3138,11 @@ pub struct EngineTxn<'a> {
 }
 
 impl<'a> EngineTxn<'a> {
+    /// C++ `NewTxn::BeginTS`: the read timestamp this transaction sees.
+    pub fn begin_ts(&self) -> u64 {
+        self.txn.as_ref().map(|t| t.begin_ts).unwrap_or(0)
+    }
+
     /// C++ `NewTxn::Append`: normalize the block like `INSERT` does, reserve
     /// row ids, and stage the encoded rows in the transaction.
     pub fn append(&mut self, table: &str, rows: Vec<Vec<Literal>>) -> Result<usize> {
@@ -7806,6 +7850,11 @@ impl Engine {
     }
 
     /// The names of the stored snapshots (`CREATE SNAPSHOT`).
+    /// C++ `NewTxnManager::CurrentTS`: the timestamp of the last commit.
+    pub fn current_ts(&self) -> u64 {
+        self.txn.current_ts()
+    }
+
     pub fn snapshot_names(&self) -> Result<Vec<String>> {
         let mut out = Vec::new();
         for (k, _) in self.storage.store.scan_prefix(b"snap:")? {
@@ -8313,13 +8362,19 @@ impl Engine {
         }
         if moved {
             self.txn.commit(t)?;
-            // Drop the source positions that no compacted row reuses. Keys
+            // Drop every source position that no compacted row reuses. Keys
             // below `rows.len()` are destinations: another row may have moved
-            // onto them, so deleting them would lose that row. The tombstones
-            // written above keep every moved source hidden until this sweep.
-            for (old, _) in &rows {
-                if *old >= rows.len() {
-                    self.storage.store.delete(&row_key(table, *old))?;
+            // onto them, so deleting them would lose that row. The tombstone
+            // sweep below also covers rows that were deleted before the
+            // compaction and therefore never appear in `rows`; without that,
+            // clearing the tombstones would resurrect them.
+            for (k, _) in self.storage.store.scan_prefix(&row_prefix(table))? {
+                let seq = std::str::from_utf8(&k)
+                    .ok()
+                    .and_then(|s| s.rsplit(':').next())
+                    .and_then(|s| s.parse::<usize>().ok());
+                if seq.is_some_and(|seq| seq >= rows.len()) {
+                    self.storage.store.delete(&k)?;
                 }
             }
         }

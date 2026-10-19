@@ -173,6 +173,38 @@ impl BlockIndex {
         self.blocks.get(&(segment_id, block_id))
     }
 
+    /// Registers a block with no rows, like `SegmentMeta::AddBlockID1` followed
+    /// by `BlockMeta::InitSet` in the reference (used when the allocator opens a
+    /// block before its first row is written).
+    pub fn add_empty_block(
+        &mut self,
+        db_id: u64,
+        table_id: u64,
+        segment_id: u32,
+        block_id: u16,
+    ) {
+        let row_offset = self
+            .blocks
+            .iter()
+            .filter(|((segment, _), _)| *segment == segment_id)
+            .map(|(_, meta)| meta.row_offset + meta.row_count)
+            .max()
+            .unwrap_or(0);
+        self.blocks.insert(
+            (segment_id, block_id),
+            BlockMeta {
+                id: BlockId {
+                    db_id,
+                    table_id,
+                    segment_id,
+                    block_id,
+                },
+                row_offset,
+                row_count: 0,
+            },
+        );
+    }
+
     /// C++ `BlockIndex::GetSegmentOffset`: the segment's first row offset.
     pub fn segment_offset(&self, segment_id: u32) -> Option<usize> {
         self.blocks

@@ -1546,11 +1546,23 @@ impl Parser {
             let mut default = None;
             let mut not_null = false;
             let mut comment = None;
-            // Tolerate column constraints (NOT NULL, PRIMARY KEY, DEFAULT …, COMMENT …).
+            // Column constraints. The reference rejects a stray identifier
+            // between columns (e.g. a missing comma), so only known constraint
+            // forms are accepted here.
             loop {
                 if self.eat_kw("NOT") {
                     let _ = self.eat_kw("NULL");
                     not_null = true;
+                    continue;
+                }
+                if self.eat_kw("NULL") {
+                    continue;
+                }
+                if self.eat_kw("PRIMARY") {
+                    let _ = self.eat_kw("KEY");
+                    continue;
+                }
+                if self.eat_kw("UNIQUE") {
                     continue;
                 }
                 if self.eat_kw("DEFAULT") {
@@ -1566,7 +1578,7 @@ impl Parser {
                 }
                 match self.peek() {
                     Token::Comma | Token::RParen | Token::Eof => break,
-                    // consume a balanced group (e.g. `WITH (sort)`, `COMMENT '…'`)
+                    // consume a balanced group (e.g. `WITH (sort)`)
                     Token::LParen => {
                         let mut depth = 0i32;
                         loop {
@@ -1584,7 +1596,10 @@ impl Parser {
                         }
                     }
                     _ => {
-                        self.advance();
+                        return Err(Error::Invalid(format!(
+                            "parser: unexpected token after column '{}'",
+                            name
+                        )));
                     }
                 }
             }
@@ -3127,6 +3142,19 @@ mod tests {
             "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'l2', 3) WHERE a > 0 ORDER BY c2;",
             "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0 LIMIT 5;",
             "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'l2', 3) WHERE a > 0 LIMIT 5;",
+        ] {
+            assert!(parse(sql).is_err(), "{sql}");
+        }
+    }
+
+    /// `SQLParserTest.bad_test1` (`sql_parser_ut.cpp`): malformed `CREATE
+    /// TABLE` column lists must reject the whole statement.
+    #[test]
+    fn sql_parser_bad_test1() {
+        for sql in [
+            "create table t1 (a boolean primary key not null null unique, b tinyint not null null unique,",
+            "create table t1 (a boolean primary key not null null unique, b tinyint not null null unique c smallint unique);",
+            "create table t1 t2 (a boolean primary key not null null unique);",
         ] {
             assert!(parse(sql).is_err(), "{sql}");
         }

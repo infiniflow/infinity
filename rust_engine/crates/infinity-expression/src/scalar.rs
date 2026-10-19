@@ -69,8 +69,12 @@ pub struct ScalarFunction {
 }
 
 impl fmt::Display for ScalarFunction {
-    /// C++ `ScalarFunction::ToString`: `+(TinyInt, TinyInt)->TinyInt`.
+    /// C++ `ScalarFunction::ToString`: `+(TinyInt, TinyInt)->TinyInt`; a
+    /// zero-argument function prints as `name()` with no return type.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.arguments.is_empty() {
+            return write!(f, "{}()", self.name);
+        }
         let args: Vec<&str> = self.arguments.iter().map(|t| t.type_name()).collect();
         write!(
             f,
@@ -124,6 +128,59 @@ impl ScalarFunctionSet {
                 binary([Mixed, Double], Mixed),
                 binary([Double, Mixed], Mixed),
                 binary([Mixed, Mixed], Mixed),
+            ],
+        }
+    }
+
+    /// `RegisterCurrentDateFunction`: `current_date()`.
+    pub fn current_date_function_set() -> Self {
+        Self {
+            name: "current_date".to_string(),
+            functions: vec![ScalarFunction {
+                name: "current_date".to_string(),
+                arguments: Vec::new(),
+                return_type: ScalarType::Date,
+            }],
+        }
+    }
+
+    /// `RegisterCurrentTimeFunction`: `current_time()`.
+    pub fn current_time_function_set() -> Self {
+        Self {
+            name: "current_time".to_string(),
+            functions: vec![ScalarFunction {
+                name: "current_time".to_string(),
+                arguments: Vec::new(),
+                return_type: ScalarType::Time,
+            }],
+        }
+    }
+
+    /// `RegisterCurrentTimestampFunction`: `current_timestamp()`.
+    pub fn current_timestamp_function_set() -> Self {
+        Self {
+            name: "current_timestamp".to_string(),
+            functions: vec![ScalarFunction {
+                name: "current_timestamp".to_string(),
+                arguments: Vec::new(),
+                return_type: ScalarType::Timestamp,
+            }],
+        }
+    }
+
+    /// `RegisterEpochFunction`: `epoch(Date|DateTime|Timestamp)->BigInt`.
+    pub fn epoch_function_set() -> Self {
+        let overload = |argument: ScalarType| ScalarFunction {
+            name: "epoch".to_string(),
+            arguments: vec![argument],
+            return_type: ScalarType::BigInt,
+        };
+        Self {
+            name: "epoch".to_string(),
+            functions: vec![
+                overload(ScalarType::Date),
+                overload(ScalarType::DateTime),
+                overload(ScalarType::Timestamp),
             ],
         }
     }
@@ -207,21 +264,13 @@ pub fn add(left: &TypedColumn, right: &TypedColumn) -> Option<TypedColumn> {
         (TypedColumn::Float(a), TypedColumn::Float(b)) => TypedColumn::Float(
             a.iter()
                 .zip(b)
-                .map(|(x, y)| {
-                    x.zip(*y)
-                        .map(|(x, y)| x + y)
-                        .filter(|sum| sum.is_finite())
-                })
+                .map(|(x, y)| x.zip(*y).map(|(x, y)| x + y).filter(|sum| sum.is_finite()))
                 .collect(),
         ),
         (TypedColumn::Double(a), TypedColumn::Double(b)) => TypedColumn::Double(
             a.iter()
                 .zip(b)
-                .map(|(x, y)| {
-                    x.zip(*y)
-                        .map(|(x, y)| x + y)
-                        .filter(|sum| sum.is_finite())
-                })
+                .map(|(x, y)| x.zip(*y).map(|(x, y)| x + y).filter(|sum| sum.is_finite()))
                 .collect(),
         ),
         _ => return None,
@@ -429,14 +478,66 @@ mod tests {
 
         // The cast wraparound is explicit at the boundaries the reference
         // exercises: row 128 stores i8::MIN and row 255 stores -1.
-        let TypedColumn::TinyInt(tiny) = TypedColumn::TinyInt(
-            (0..ROW_COUNT).map(|i| Some(i as i8)).collect(),
-        ) else {
+        let TypedColumn::TinyInt(tiny) =
+            TypedColumn::TinyInt((0..ROW_COUNT).map(|i| Some(i as i8)).collect())
+        else {
             unreachable!()
         };
         assert_eq!(tiny[127], Some(127));
         assert_eq!(tiny[128], Some(-128));
         assert_eq!(tiny[255], Some(-1));
         assert_eq!(tiny.len(), ROW_COUNT);
+    }
+
+    // C++: src/unit_test/function/scalar/current_date_functions_ut.cpp
+    #[test]
+    fn current_date_func() {
+        let set = ScalarFunctionSet::current_date_function_set();
+        assert_eq!(set.name, "current_date");
+        let function = set
+            .most_match_function(&[])
+            .expect("current_date() has no arguments");
+        assert_eq!(function.to_string(), "current_date()");
+        assert_eq!(function.return_type, ScalarType::Date);
+    }
+
+    // C++: src/unit_test/function/scalar/current_time_functions_ut.cpp
+    #[test]
+    fn current_time_func() {
+        let set = ScalarFunctionSet::current_time_function_set();
+        let function = set
+            .most_match_function(&[])
+            .expect("current_time() has no arguments");
+        assert_eq!(function.to_string(), "current_time()");
+        assert_eq!(function.return_type, ScalarType::Time);
+    }
+
+    // C++: src/unit_test/function/scalar/current_timestamp_functions_ut.cpp
+    #[test]
+    fn current_timestamp_func() {
+        let set = ScalarFunctionSet::current_timestamp_function_set();
+        let function = set
+            .most_match_function(&[])
+            .expect("current_timestamp() has no arguments");
+        assert_eq!(function.to_string(), "current_timestamp()");
+        assert_eq!(function.return_type, ScalarType::Timestamp);
+    }
+
+    // C++: src/unit_test/function/scalar/epoch_functions_ut.cpp
+    #[test]
+    fn epoch_func() {
+        let set = ScalarFunctionSet::epoch_function_set();
+        assert_eq!(set.name, "epoch");
+        for (argument, signature) in [
+            (ScalarType::Date, "epoch(Date)->BigInt"),
+            (ScalarType::DateTime, "epoch(DateTime)->BigInt"),
+            (ScalarType::Timestamp, "epoch(Timestamp)->BigInt"),
+        ] {
+            let function = set
+                .most_match_function(&[argument])
+                .unwrap_or_else(|| panic!("no epoch overload for {argument:?}"));
+            assert_eq!(function.to_string(), signature);
+            assert_eq!(function.return_type, ScalarType::BigInt);
+        }
     }
 }

@@ -94,3 +94,22 @@ fn test1() {
         }
     }
 }
+
+/// C++ `LogicalMatchScanTest.test1`
+/// (`src/unit_test/planner/node/logical_match_scan_base_ut.cpp`). The reference
+/// only asserts the table creation and the two-row append; the `SEARCH MATCH`
+/// block is commented out there.
+#[test]
+fn logical_match_scan_base_test1() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = crate::Engine::open(dir.path()).unwrap();
+    engine
+        .execute("create table tb_embedding(col1 int, col2 embedding(float, 4))")
+        .expect("create table");
+    engine
+        .execute(
+            "insert into tb_embedding values(1, [0.1, 0.1, 0.1, 0.1]), \
+             (2, [0.2, 0.2, 0.2, 0.2])",
+        )
+        .expect("insert rows");
+}

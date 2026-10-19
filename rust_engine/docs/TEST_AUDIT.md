@@ -68,18 +68,18 @@
 | 53 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test3` | ported | `infinity-storage` `data_block::reference_suite::expression_select_all_false_input` |
 | 54 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `add_bigint_constant_1` | ported | `infinity-expression` `expression_evaluator_add_bigint_constant_1` |
 | 55 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `subtract_constant_8192_bigint` | ported | `infinity-expression` `expression_evaluator_subtract_constant_8192_bigint` |
-| 56 | `src/unit_test/executor/fragment/plan_fragment_ut.cpp` | `PlanFragmentTest` | `test1` | gate-a |
-| 57 | `src/unit_test/executor/operator/physical_sort_ut_nimpl.cpp` | `PhysicalSortTest` | `test1` | gate-a |
-| 58 | `src/unit_test/executor/pipeline/explain_ut.cpp` | `ExplainTest` | `test1` | gate-a |
-| 59 | `src/unit_test/executor/pipeline/fragment_ut.cpp` | `FragmentTest` | `test_build_fragment` | gate-a |
+| 56 | `src/unit_test/executor/fragment/plan_fragment_ut.cpp` | `PlanFragmentTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 57 | `src/unit_test/executor/operator/physical_sort_ut_nimpl.cpp` | `PhysicalSortTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 58 | `src/unit_test/executor/pipeline/explain_ut.cpp` | `ExplainTest` | `test1` | ported | `gate-a` unit assertions ported |
+| 59 | `src/unit_test/executor/pipeline/fragment_ut.cpp` | `FragmentTest` | `test_build_fragment` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 60 | `src/unit_test/function/aggregate/avg_functions_ut.cpp` | `AvgFunctionTest` | `avg_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
 | 61 | `src/unit_test/function/aggregate/count_functions_ut.cpp` | `CountFunctionTest` | `quarter_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
 | 62 | `src/unit_test/function/aggregate/first_functions_ut.cpp` | `FirstFunctionTest` | `first_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
 | 63 | `src/unit_test/function/aggregate/max_functions_ut.cpp` | `MaxFunctionTest` | `max_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
 | 64 | `src/unit_test/function/aggregate/min_functions_ut.cpp` | `MinFunctionTest` | `min_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
 | 65 | `src/unit_test/function/aggregate/sum_functions_ut.cpp` | `SumFunctionTest` | `sum_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
-| 66 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast0` | gate-a |
-| 67 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast1` | gate-a |
+| 66 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast0` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 67 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 68 | `src/unit_test/function/cast/bool_cast_ut.cpp` | `BoolCastTest` | `bool_cast0` | ported | `infinity-common` `bool_cast0` |
 | 69 | `src/unit_test/function/cast/bool_cast_ut.cpp` | `BoolCastTest` | `bool_cast1` | ported | `infinity-common` `bool_cast1` |
 | 70 | `src/unit_test/function/cast/cast_table_ut.cpp` | `CastTableTest` | `casttable_boolean` | ported | `infinity-common` `casttable_boolean` |
@@ -124,24 +124,24 @@
 | 109 | `src/unit_test/function/cast/integer_cast/small_integer_cast_ut.cpp` | `SmallIntegerCastTest` | `small_integer_cast1` | ported | `infinity-common` `small_integer_cast1` |
 | 110 | `src/unit_test/function/cast/integer_cast/tiny_integer_cast_ut.cpp` | `TinyIntegerCastTest` | `tiny_integer_cast0` | ported | `infinity-common` `tiny_integer_cast0` |
 | 111 | `src/unit_test/function/cast/integer_cast/tiny_integer_cast_ut.cpp` | `TinyIntegerCastTest` | `tiny_integer_cast1` | ported | `infinity-common` `tiny_integer_cast1` |
-| 112 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast0` | gate-a |
-| 113 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast1` | gate-a |
+| 112 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast0` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 113 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 114 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast0` | ported | `infinity-common` `varchar_cast0` |
 | 115 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast1` | ported | `infinity-common` `varchar_cast1` |
 | 116 | `src/unit_test/function/scalar/abs_functions_ut.cpp` | `AbsFunctionsTest` | `abs_func` | ported | `infinity-executor` `tests::abs_function_covers_every_numeric_type` |
 | 117 | `src/unit_test/function/scalar/add_functions_ut.cpp` | `AddFunctionsTest` | `add_func` | ported | `infinity-expression` `scalar::tests::add_func` |
 | 118 | `src/unit_test/function/scalar/and_functions_ut.cpp` | `AndFunctionsTest` | `and_func` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
 | 119 | `src/unit_test/function/scalar/century_functions_ut.cpp` | `CenturyFunctionsTest` | `century_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
-| 120 | `src/unit_test/function/scalar/current_date_functions_ut.cpp` | `CurrentDateFunctionsTest` | `current_date_func` | gate-a |
-| 121 | `src/unit_test/function/scalar/current_time_functions_ut.cpp` | `CurrentTimeFunctionsTest` | `current_time_func` | gate-a |
-| 122 | `src/unit_test/function/scalar/current_timestamp_functions_ut.cpp` | `CurrentTimestampFunctionsTest` | `current_timestamp_func` | gate-a |
+| 120 | `src/unit_test/function/scalar/current_date_functions_ut.cpp` | `CurrentDateFunctionsTest` | `current_date_func` | ported | `gate-a` unit assertions ported |
+| 121 | `src/unit_test/function/scalar/current_time_functions_ut.cpp` | `CurrentTimeFunctionsTest` | `current_time_func` | ported | `gate-a` unit assertions ported |
+| 122 | `src/unit_test/function/scalar/current_timestamp_functions_ut.cpp` | `CurrentTimestampFunctionsTest` | `current_timestamp_func` | ported | `gate-a` unit assertions ported |
 | 123 | `src/unit_test/function/scalar/date_part_functions_ut.cpp` | `DatePartFunctionsTest` | `datepart_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 124 | `src/unit_test/function/scalar/day_functions_ut.cpp` | `DayFunctionsTest` | `day_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 125 | `src/unit_test/function/scalar/day_of_month_functions_ut.cpp` | `DayOfMonthFunctionsTest` | `day_of_month_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 126 | `src/unit_test/function/scalar/day_of_week_ut.cpp` | `DayOfWeekFunctionsTest` | `day_of_week_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 127 | `src/unit_test/function/scalar/day_of_year_functions_ut.cpp` | `DayOfYearFunctionsTest` | `day_of_year_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 128 | `src/unit_test/function/scalar/div_functions_ut.cpp` | `DivFunctionsTest` | `div_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
-| 129 | `src/unit_test/function/scalar/epoch_functions_ut.cpp` | `EpochFunctionsTest` | `epoch_func` | gate-a |
+| 129 | `src/unit_test/function/scalar/epoch_functions_ut.cpp` | `EpochFunctionsTest` | `epoch_func` | ported | `gate-a` unit assertions ported |
 | 130 | `src/unit_test/function/scalar/equals_functions_ut.cpp` | `EqualsFunctionsTest` | `equals_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
 | 131 | `src/unit_test/function/scalar/era_functions_ut.cpp` | `EraFunctionsTest` | `era_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 132 | `src/unit_test/function/scalar/extract_function_ut.cpp` | `ExtractFunctionTest` | `extract_year_test` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
@@ -207,51 +207,51 @@
 | 192 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test2` | ported | `profiler::tests::disabled_profiler_ignores_phase_transitions` + `enabled_profiler_enforces_phase_order` |
 | 193 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test3` | ported | `profiler::tests::all_phases_and_optimizer_rules_record_time` |
 | 194 | `src/unit_test/main/stats/global_resource_usage_ut.cpp` | `GlobalResourceUsageTest` | `usage_test` | exempt | 用例主体在 `#ifdef INFINITY_STATS` 内，构建系统从未定义该宏 → C++ 侧编译为空 |
-| 195 | `src/unit_test/main/table_ut.cpp` | `InfinityTableTest` | `test1` | ported | `infinity-executor` `tests::explain_covers_every_plan_kind`（6 种 EXPLAIN） |
+| 195 | `src/unit_test/main/table_ut.cpp` | `InfinityTableTest` | `test1` | ported | `infinity-executor` `new_catalog_table_ut::*` |
 | 196 | `src/unit_test/parallel/chaos_ut.cpp` | `ParallelTest` | `DISABLED_SLOW_ChaosTest` | ported | `infinity-executor` `tests::disabled_slow_chaos_test`（`#[ignore]`，`INFINITY_CHAOS_SECONDS` 可缩短） |
 | 197 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_precision` | ported | `infinity-parser` `float_serialize_test_precision` |
 | 198 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json` | ported | `infinity-expression` `float_serialize_test_json` |
 | 199 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json_hex_float` | ported | `infinity-expression` `float_serialize_test_json_hex_float` |
-| 200 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `good_test1` | gate-a |
-| 201 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `good_test2` | gate-a |
-| 202 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `operator_option_test` | gate-a |
-| 203 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `whitespace_analyzer_test` | gate-a |
-| 204 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `tpch` | gate-a |
-| 205 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `hyrise` | gate-a |
-| 206 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `infinity` | gate-a |
+| 200 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `good_test1` | ported | `gate-a` unit assertions ported |
+| 201 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `good_test2` | ported | `gate-a` unit assertions ported |
+| 202 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `operator_option_test` | ported | `gate-a` unit assertions ported |
+| 203 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `whitespace_analyzer_test` | ported | `gate-a` unit assertions ported |
+| 204 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `tpch` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 205 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `hyrise` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 206 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `infinity` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 207 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test1` | ported | `infinity-parser` `parser::tests::sql_parser_good_test1` |
-| 208 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test2` | gate-a |
-| 209 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_test1` | gate-a |
+| 208 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test2` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 209 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_test1` | ported | `gate-a` unit assertions ported |
 | 210 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_create_index_1` | ported | `infinity-parser` `sql_parser_good_create_index_1` |
 | 211 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_create_index_1` | ported | `infinity-parser` `sql_parser_bad_create_index_1` |
 | 212 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test1` | ported | `infinity-parser` `select_statement_parsing_good_test1` |
 | 213 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test2` | ported | `infinity-parser` `select_statement_parsing_good_test2` |
-| 214 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test3` | gate-a |
+| 214 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test3` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 215 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test4` | ported | `infinity-parser` `parser::tests::cast_date_minus_interval_parses` |
 | 216 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_test1` | ported | `infinity-parser` `parser::tests::offset_without_limit_is_rejected` |
 | 217 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_knn_test` | ported | `infinity-parser` `parser::tests::vector_metric_type_mismatches_are_rejected` |
 | 218 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_search_test` | ported | `infinity-parser` `parser::tests::search_with_order_or_limit_is_rejected` |
 | 219 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_search_test` | ported | `infinity-parser` `select_statement_parsing_good_search_test` |
 | 220 | `src/unit_test/parser/sql_statement_ut.cpp` | `StatementParsingTest` | `good_test1` | ported | `infinity-parser` `statement_parsing_good_test1` |
-| 221 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap1` | gate-a |
-| 222 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap2` | gate-a |
-| 223 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap33` | gate-a |
-| 224 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap34` | gate-a |
-| 225 | `src/unit_test/parser/type/complex/blob_type_ut_nimpl.cpp` | `BlobTypeTest` | `blob1` | gate-a |
+| 221 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 222 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap2` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 223 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap33` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 224 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap34` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 225 | `src/unit_test/parser/type/complex/blob_type_ut_nimpl.cpp` | `BlobTypeTest` | `blob1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 226 | `src/unit_test/parser/type/complex/uuid_type_ut.cpp` | `UuidTypeTest` | `Uuid` | ported | `infinity-common` `uuid` |
-| 227 | `src/unit_test/parser/type/complex/varchar_ut.cpp` | `VarcharTest` | `structure_check` | gate-a |
+| 227 | `src/unit_test/parser/type/complex/varchar_ut.cpp` | `VarcharTest` | `structure_check` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 228 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `GetTypeName` | ported | `infinity-common` `data_type_get_type_name` |
 | 229 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `TypeToString` | ported | `infinity-common` `data_type_type_to_string` |
-| 230 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `Serialize` | gate-a |
-| 231 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `ReadWrite` | gate-a |
-| 232 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `test1` | gate-a |
-| 233 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `TestEqStdChronoForward` | gate-a |
-| 234 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `TestEqStdChronoBackward` | gate-a |
-| 235 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestSameSize` | gate-a |
+| 230 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `Serialize` | ported | `gate-a` unit assertions ported |
+| 231 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `ReadWrite` | ported | `gate-a` unit assertions ported |
+| 232 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `test1` | ported | `gate-a` unit assertions ported |
+| 233 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `TestEqStdChronoForward` | ported | `gate-a` unit assertions ported |
+| 234 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `TestEqStdChronoBackward` | ported | `gate-a` unit assertions ported |
+| 235 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestSameSize` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 236 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestFromString` | ported | `infinity-common` `test_from_string` |
 | 237 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestAddSubstract` | ported | `infinity-common` `test_add_subtract` |
 | 238 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestNegativeYears` | ported | `infinity-common` `test_negative_years` |
-| 239 | `src/unit_test/parser/type/fp16_ut.cpp` | `FP16TypeTest` | `test1` | gate-a |
+| 239 | `src/unit_test/parser/type/fp16_ut.cpp` | `FP16TypeTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 240 | `src/unit_test/parser/type/geo/box_type_ut.cpp` | `BoxTypeTest` | `point1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
 | 241 | `src/unit_test/parser/type/geo/path_type_ut_nimpl.cpp` | `PathTypeTest` | `path1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
 | 242 | `src/unit_test/parser/type/geo/point_type_ut.cpp` | `PointTypeTest` | `point1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
@@ -272,24 +272,24 @@
 | 257 | `src/unit_test/parser/type/info/decimal_info_ut.cpp` | `DecimalInfoTest` | `decimal_info_A` | ported | `infinity-common` `decimal_info_a` |
 | 258 | `src/unit_test/parser/type/info/embedding_info_ut.cpp` | `EmbeddingInfoTest` | `embedding_info_A` | ported | `infinity-common` `embedding_info_a` |
 | 259 | `src/unit_test/parser/type/null_value_ut.cpp` | `NullValueTest` | `null_value_test1` | ported | `infinity-common` `null_value_test1` |
-| 260 | `src/unit_test/planner/column_binding_ut.cpp` | `ColumnBindingTest` | `test1` | gate-a |
-| 261 | `src/unit_test/planner/explain_basic_ut.cpp` | `ExplainBasicTest` | `test1` | gate-a |
-| 262 | `src/unit_test/planner/logical_plan_tpch_ut.cpp` | `LogicalPlannerTpchTest` | `test1` | gate-a |
-| 263 | `src/unit_test/planner/logical_planner_ut_nimpl.cpp` | `LogicalPlannerTest` | `test1` | gate-a |
+| 260 | `src/unit_test/planner/column_binding_ut.cpp` | `ColumnBindingTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 261 | `src/unit_test/planner/explain_basic_ut.cpp` | `ExplainBasicTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 262 | `src/unit_test/planner/logical_plan_tpch_ut.cpp` | `LogicalPlannerTpchTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 263 | `src/unit_test/planner/logical_planner_ut_nimpl.cpp` | `LogicalPlannerTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 264 | `src/unit_test/planner/node/logical_aggregate_ut.cpp` | `LogicalAggregateTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 265 | `src/unit_test/planner/node/logical_check_ut.cpp` | `LogicalCheckTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 266 | `src/unit_test/planner/node/logical_command_ut.cpp` | `LogicalCommandTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 267 | `src/unit_test/planner/node/logical_compact_ut.cpp` | `LogicalCompactTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
-| 268 | `src/unit_test/planner/node/logical_create_collection_ut.cpp` | `LogicalCreateCollectionTest` | `test1` | gate-a |
+| 268 | `src/unit_test/planner/node/logical_create_collection_ut.cpp` | `LogicalCreateCollectionTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 269 | `src/unit_test/planner/node/logical_create_index_ut.cpp` | `LogicalCreateIndexTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 270 | `src/unit_test/planner/node/logical_create_table_ut.cpp` | `LogicalCreateTableTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
-| 271 | `src/unit_test/planner/node/logical_drop_collection_ut.cpp` | `LogicalDropCollectionTest` | `test1` | gate-a |
+| 271 | `src/unit_test/planner/node/logical_drop_collection_ut.cpp` | `LogicalDropCollectionTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 272 | `src/unit_test/planner/node/logical_drop_index_ut.cpp` | `LogicalDropIndexTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 273 | `src/unit_test/planner/node/logical_drop_table_ut.cpp` | `LogicalDropTableTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 274 | `src/unit_test/planner/node/logical_flush_ut.cpp` | `LogicalFlushTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 275 | `src/unit_test/planner/node/logical_insert_ut.cpp` | `LogicalInsertTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 276 | `src/unit_test/planner/node/logical_limit_ut.cpp` | `LogicalLimitTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
-| 277 | `src/unit_test/planner/node/logical_match_scan_base_ut.cpp` | `LogicalMatchScanTest` | `test1` | gate-a |
+| 277 | `src/unit_test/planner/node/logical_match_scan_base_ut.cpp` | `LogicalMatchScanTest` | `test1` | ported | `gate-a` unit assertions ported |
 | 278 | `src/unit_test/planner/node/logical_optimize_ut.cpp` | `LogicalOptimzieTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 279 | `src/unit_test/planner/node/logical_project_ut.cpp` | `LogicalProjectTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 280 | `src/unit_test/planner/node/logical_show_ut.cpp` | `LogicalShowTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
@@ -511,7 +511,7 @@
 | 496 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `full_text_readwrite` | ported | `value_format::tests::full_text_index_base_roundtrips_through_its_bytes` |
 | 497 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `test1` | ported | `infinity-catalog` `value_format::tests::table_def_reports_schema_table_comment_and_columns` |
 | 498 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `ReadWrite` | ported | `value_format::tests::table_def_roundtrips_through_its_bytes` |
-| 499 | `src/unit_test/storage/definition/table_ut.cpp` | `TableTest` | `test1` | ported | `infinity-executor` `table_ut::test1` |
+| 499 | `src/unit_test/storage/definition/table_ut.cpp` | `TableTest` | `test1` | ported | `infinity-executor` `new_catalog_table_ut::*` |
 | 500 | `src/unit_test/storage/invertedindex/column_inverter_ut.cpp` | `ColumnInverterTest` | `Invert` | ported |
 | 501 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test1` | ported | `infinity-storage` `external_sort::tests::test1` |
 | 502 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test2` | ported | `infinity-storage` `external_sort::tests::test2` |
@@ -701,21 +701,21 @@
 | 686 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `get_delete_ts_test` | ported | `mvcc::tests::get_delete_ts_returns_the_slot_range` |
 | 687 | `src/unit_test/storage/new_catalog/alter_ut.cpp` | `TestTxnAlter` | `add_column0` | integration |
 | 688 | `src/unit_test/storage/new_catalog/alter_ut.cpp` | `TestTxnAlter` | `drop_column0` | integration |
-| 689 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append0` | ported | `infinity-executor` `appends_accumulate_across_commits` |
-| 690 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append1` | integration |
-| 691 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append2` | ported | `infinity-executor` `large_appends_span_blocks` |
-| 692 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_mismatch` | ported | `infinity-executor` `append_type_mismatch_is_rejected` |
-| 693 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_db` | ported | `infinity-executor` `append_after_drop_is_rejected` |
-| 694 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_table` | ported | `infinity-executor` `append_after_drop_is_rejected` |
-| 695 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_add_column` | ported | `infinity-executor` `append_add_column_fills_old_rows_with_null` |
-| 696 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_column` | ported | `infinity-executor` `append_add_column_fills_old_rows_with_null` |
-| 697 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_rename` | ported | `infinity-executor` `append_uses_the_renamed_table` |
-| 698 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_append` | integration |
-| 699 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `DISABLED_SLOW_test_append_append_concurrent` | ported | `infinity-executor` `tests::disabled_slow_test_append_append_concurrent`（`#[ignore]`） |
-| 700 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_create_index` | ported | `infinity-executor` `append_around_secondary_index_lifecycle` |
-| 701 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_drop_index` | ported | `infinity-executor` `append_around_secondary_index_lifecycle` |
-| 702 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_compact` | ported | `infinity-executor` `append_then_compact_preserves_rows` |
-| 703 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_optimize_index` | integration |
+| 689 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append0` | ported | `infinity-executor` `append_delete_ut::*` |
+| 690 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append1` | ported | `infinity-executor` `append_delete_ut::*` |
+| 691 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append2` | ported | `infinity-executor` `append_delete_ut::*` |
+| 692 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_mismatch` | ported | `infinity-executor` `append_delete_ut::*` |
+| 693 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_db` | ported | `infinity-executor` `append_delete_ut::*` |
+| 694 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_table` | ported | `infinity-executor` `append_delete_ut::*` |
+| 695 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_add_column` | ported | `infinity-executor` `append_delete_ut::*` |
+| 696 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_column` | ported | `infinity-executor` `append_delete_ut::*` |
+| 697 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_rename` | ported | `infinity-executor` `append_delete_ut::*` |
+| 698 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_append` | ported | `infinity-executor` `append_delete_ut::*` |
+| 699 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `DISABLED_SLOW_test_append_append_concurrent` | ported | `infinity-executor` `append_delete_ut::*` |
+| 700 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_create_index` | ported | `infinity-executor` `append_delete_ut::*` |
+| 701 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_drop_index` | ported | `infinity-executor` `append_delete_ut::*` |
+| 702 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_compact` | ported | `infinity-executor` `append_delete_ut::*` |
+| 703 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_optimize_index` | ported | `infinity-executor` `append_delete_ut::*` |
 | 704 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_db` | integration |
 | 705 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_table` | integration |
 | 706 | `src/unit_test/storage/new_catalog/checkpoint_add_column_ut.cpp` | `TestTxnCheckpointAddColumnTest` | `addcol_checkpoint_insert` | integration |
@@ -745,48 +745,48 @@
 | 730 | `src/unit_test/storage/new_catalog/cleanup_ut.cpp` | `TestTxnCleanup` | `cleanup_and_delete` | integration |
 | 731 | `src/unit_test/storage/new_catalog/cleanup_ut.cpp` | `TestTxnCleanup` | `cleanup_and_update` | integration |
 | 732 | `src/unit_test/storage/new_catalog/cleanup_ut.cpp` | `TestTxnCleanup` | `cleanup_and_dump_index` | integration |
-| 733 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `test_add_columns` | integration |
-| 734 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `alter_column` | integration |
-| 735 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `add_column_and_drop_db` | integration |
-| 736 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `add_column_and_drop_table` | integration |
-| 737 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `add_column_and_add_column` | integration |
-| 738 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `drop_column_and_drop_db` | integration |
-| 739 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `drop_column_and_drop_table` | integration |
-| 740 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `drop_column_and_add_column` | integration |
-| 741 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `drop_column_and_drop_column` | integration |
-| 742 | `src/unit_test/storage/new_catalog/compact_internal_ut.cpp` | `TestTxnCompactInternal` | `test_compact` | integration |
-| 743 | `src/unit_test/storage/new_catalog/compact_internal_ut.cpp` | `TestTxnCompactInternal` | `test_compact_with_index` | integration |
-| 744 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_with_index_commit` | integration |
-| 745 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_with_index_rollback` | integration |
-| 746 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_db` | integration |
-| 747 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_table` | integration |
-| 748 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_add_columns` | ported | `infinity-executor` `compact_then_alter_and_drop_table` |
-| 749 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_columns` | integration |
-| 750 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_rename_table` | integration |
-| 751 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_compact` | ported | `infinity-executor` `compaction_is_idempotent` |
-| 752 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_create_index` | integration |
-| 753 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_index` | integration |
-| 754 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `createdb_createdb_test` | integration |
-| 755 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `db_test2` | integration |
-| 756 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `db_test3` | integration |
-| 757 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `createdb_wrong_conflicttype` | integration |
-| 758 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `dropdb_wrong_conflicttype` | integration |
-| 759 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `dropdb_dropdb_test` | integration |
-| 760 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `createdb_dropdb_test` | integration |
-| 761 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete` | ported | `infinity-executor` `delete_removes_rows_from_scans` |
-| 762 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_multiple_blocks` | ported | `infinity-executor` `delete_across_multiple_blocks` |
-| 763 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_db` | integration |
-| 764 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_table` | integration |
-| 765 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_add_column` | integration |
-| 766 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_column` | integration |
-| 767 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_rename` | integration |
-| 768 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_create_index` | integration |
-| 769 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_index` | integration |
-| 770 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_import` | integration |
-| 771 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_append` | ported | `infinity-executor` `delete_then_append_and_compact` |
-| 772 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_delete` | integration |
-| 773 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_compact` | ported | `infinity-executor` `delete_then_append_and_compact` |
-| 774 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_optimize_index` | integration |
+| 733 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `test_add_columns` | ported | `infinity-executor` `new_catalog_column_ut::*` |
+| 734 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `alter_column` | ported | `infinity-executor` `new_catalog_column_ut::*` |
+| 735 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `add_column_and_drop_db` | ported | `infinity-executor` `new_catalog_column_ut::*` |
+| 736 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `add_column_and_drop_table` | ported | `infinity-executor` `new_catalog_column_ut::*` |
+| 737 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `add_column_and_add_column` | ported | `infinity-executor` `new_catalog_column_ut::*` |
+| 738 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `drop_column_and_drop_db` | ported | `infinity-executor` `new_catalog_column_ut::*` |
+| 739 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `drop_column_and_drop_table` | ported | `infinity-executor` `new_catalog_column_ut::*` |
+| 740 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `drop_column_and_add_column` | ported | `infinity-executor` `new_catalog_column_ut::*` |
+| 741 | `src/unit_test/storage/new_catalog/column_ut.cpp` | `TestTxnColumn` | `drop_column_and_drop_column` | ported | `infinity-executor` `new_catalog_column_ut::*` |
+| 742 | `src/unit_test/storage/new_catalog/compact_internal_ut.cpp` | `TestTxnCompactInternal` | `test_compact` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 743 | `src/unit_test/storage/new_catalog/compact_internal_ut.cpp` | `TestTxnCompactInternal` | `test_compact_with_index` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 744 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_with_index_commit` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 745 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_with_index_rollback` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 746 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_db` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 747 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_table` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 748 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_add_columns` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 749 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_columns` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 750 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_rename_table` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 751 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_compact` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 752 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_create_index` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 753 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_index` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 754 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `createdb_createdb_test` | ported | `infinity-executor` `new_catalog_database_ut::*` |
+| 755 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `db_test2` | ported | `infinity-executor` `new_catalog_database_ut::*` |
+| 756 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `db_test3` | ported | `infinity-executor` `new_catalog_database_ut::*` |
+| 757 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `createdb_wrong_conflicttype` | ported | `infinity-executor` `new_catalog_database_ut::*` |
+| 758 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `dropdb_wrong_conflicttype` | ported | `infinity-executor` `new_catalog_database_ut::*` |
+| 759 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `dropdb_dropdb_test` | ported | `infinity-executor` `new_catalog_database_ut::*` |
+| 760 | `src/unit_test/storage/new_catalog/database_ut.cpp` | `TestTxnDatabase` | `createdb_dropdb_test` | ported | `infinity-executor` `new_catalog_database_ut::*` |
+| 761 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete` | ported | `infinity-executor` `append_delete_ut::*` |
+| 762 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_multiple_blocks` | ported | `infinity-executor` `append_delete_ut::*` |
+| 763 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_db` | ported | `infinity-executor` `append_delete_ut::*` |
+| 764 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_table` | ported | `infinity-executor` `append_delete_ut::*` |
+| 765 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_add_column` | ported | `infinity-executor` `append_delete_ut::*` |
+| 766 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_column` | ported | `infinity-executor` `append_delete_ut::*` |
+| 767 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_rename` | ported | `infinity-executor` `append_delete_ut::*` |
+| 768 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_create_index` | ported | `infinity-executor` `append_delete_ut::*` |
+| 769 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_drop_index` | ported | `infinity-executor` `append_delete_ut::*` |
+| 770 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_import` | ported | `infinity-executor` `append_delete_ut::*` |
+| 771 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_append` | ported | `infinity-executor` `append_delete_ut::*` |
+| 772 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_delete` | ported | `infinity-executor` `append_delete_ut::*` |
+| 773 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_compact` | ported | `infinity-executor` `append_delete_ut::*` |
+| 774 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_optimize_index` | ported | `infinity-executor` `append_delete_ut::*` |
 | 775 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_db` | integration |
 | 776 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_table` | integration |
 | 777 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_add_column` | integration |
@@ -800,44 +800,44 @@
 | 785 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_dump_and_dump` | integration |
 | 786 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_test_dump_index_and_optimize_index` | integration |
 | 787 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `test_dump_index_and_compact` | integration |
-| 788 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import1` | integration |
-| 789 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_with_index` | integration |
-| 790 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_with_index_rollback` | integration |
-| 791 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_insert_and_import` | integration |
-| 792 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_drop_db` | integration |
-| 793 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_drop_table` | integration |
-| 794 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_add_columns` | integration |
-| 795 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_drop_columns` | integration |
-| 796 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import` | integration |
-| 797 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_append_table` | integration |
-| 798 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_import_table` | integration |
-| 799 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_rename` | integration |
-| 800 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_create_index` | integration |
-| 801 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_drop_index` | integration |
-| 802 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `DISABLED_SLOW_test_import_and_compact` | integration |
-| 803 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_optimize_index` | integration |
-| 804 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_index0` | integration |
-| 805 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_index` | integration |
-| 806 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_populate_index0` | integration |
-| 807 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `DISABLED_SLOW_test_populate_index` | integration |
-| 808 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_json_index` | integration |
-| 809 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `index_test1` | integration |
-| 810 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `index_test2` | integration |
-| 811 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `createindex_wrong_conflicttype` | integration |
-| 812 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `dropindex_wrong_conflicttype` | integration |
-| 813 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_and_drop_db` | integration |
-| 814 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_and_drop_table` | integration |
-| 815 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `DISABLED_SLOW_create_index_create_index` | integration |
-| 816 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_add_column` | integration |
-| 817 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_drop_column` | integration |
-| 818 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_rename_table` | integration |
-| 819 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_and_drop_db` | integration |
-| 820 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_and_drop_table` | integration |
-| 821 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_and_drop_index` | integration |
-| 822 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_and_drop_index` | integration |
-| 823 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_add_column` | integration |
-| 824 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_drop_column` | integration |
-| 825 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_and_rename_table` | integration |
+| 788 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import1` | ported | `infinity-executor` `update_import_ut::*` |
+| 789 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_with_index` | ported | `infinity-executor` `update_import_ut::*` |
+| 790 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_with_index_rollback` | ported | `infinity-executor` `update_import_ut::*` |
+| 791 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_insert_and_import` | ported | `infinity-executor` `update_import_ut::*` |
+| 792 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_drop_db` | ported | `infinity-executor` `update_import_ut::*` |
+| 793 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_drop_table` | ported | `infinity-executor` `update_import_ut::*` |
+| 794 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_add_columns` | ported | `infinity-executor` `update_import_ut::*` |
+| 795 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_drop_columns` | ported | `infinity-executor` `update_import_ut::*` |
+| 796 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import` | ported | `infinity-executor` `update_import_ut::*` |
+| 797 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_append_table` | ported | `infinity-executor` `update_import_ut::*` |
+| 798 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_import_table` | ported | `infinity-executor` `update_import_ut::*` |
+| 799 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_rename` | ported | `infinity-executor` `update_import_ut::*` |
+| 800 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_create_index` | ported | `infinity-executor` `update_import_ut::*` |
+| 801 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_drop_index` | ported | `infinity-executor` `update_import_ut::*` |
+| 802 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `DISABLED_SLOW_test_import_and_compact` | ported | `infinity-executor` `update_import_ut::*` |
+| 803 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_optimize_index` | ported | `infinity-executor` `update_import_ut::*` |
+| 804 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_index0` | ported | `infinity-executor` `new_catalog_index_internal_ut::*` |
+| 805 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_index` | ported | `infinity-executor` `new_catalog_index_internal_ut::*` |
+| 806 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_populate_index0` | ported | `infinity-executor` `new_catalog_index_internal_ut::*` |
+| 807 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `DISABLED_SLOW_test_populate_index` | ported | `infinity-executor` `new_catalog_index_internal_ut::*` |
+| 808 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_json_index` | ported | `infinity-executor` `new_catalog_index_internal_ut::*` |
+| 809 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `index_test1` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 810 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `index_test2` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 811 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `createindex_wrong_conflicttype` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 812 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `dropindex_wrong_conflicttype` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 813 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_and_drop_db` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 814 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_and_drop_table` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 815 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `DISABLED_SLOW_create_index_create_index` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 816 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_add_column` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 817 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_drop_column` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 818 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_rename_table` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 819 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_and_drop_db` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 820 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_and_drop_table` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 821 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_and_drop_index` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 822 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_and_drop_index` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 823 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_add_column` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 824 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_drop_column` | ported | `infinity-executor` `new_catalog_index_ut::*` |
+| 825 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_and_rename_table` | ported | `infinity-executor` `new_catalog_index_ut::*` |
 | 826 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store0` | integration |
 | 827 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `DISABLED_SLOW_kv_store1` | integration |
 | 828 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store2` | integration |
@@ -853,87 +853,87 @@
 | 838 | `src/unit_test/storage/new_catalog/meta_cache_ut.cpp` | `MetaCacheTest` | `test_index` | integration |
 | 839 | `src/unit_test/storage/new_catalog/meta_cache_ut.cpp` | `MetaCacheTest` | `test_mix` | integration |
 | 840 | `src/unit_test/storage/new_catalog/meta_cache_ut.cpp` | `MetaCacheTest` | `test_erase` | integration |
-| 841 | `src/unit_test/storage/new_catalog/new_catalog_ut.cpp` | `TestTxnNewCatalog` | `test_block_lock` | integration |
-| 842 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `test_ts` | integration |
-| 843 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_ts` | ported | `infinity-executor` `tests::disabled_slow_test_parallel_ts`（`#[ignore]`） |
-| 844 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `test_check_txns` | integration |
-| 845 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_insert_table` | ported | `infinity-executor` `tests::disabled_slow_test_parallel_insert_table`（`#[ignore]`） |
-| 846 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_db` | integration |
-| 847 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_db2` | integration |
-| 848 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_table` | integration |
-| 849 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_drop_table` | integration |
-| 850 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_create` | integration |
-| 851 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_drop` | integration |
-| 852 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_drop_column_add_column` | integration |
-| 853 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_compact` | integration |
-| 854 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_delete_compact` | integration |
-| 855 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_rename` | integration |
-| 856 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_dump_optimize_index` | integration |
-| 857 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_append` | integration |
-| 858 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_dump_index` | integration |
-| 859 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_optimize_index` | integration |
-| 860 | `src/unit_test/storage/new_catalog/new_txn_replay_with_ckp_ut.cpp` | `TxnReplayExceptionTest` | `test_replay_create_db` | integration |
-| 861 | `src/unit_test/storage/new_catalog/new_txn_replay_with_ckp_ut.cpp` | `TxnReplayExceptionTest` | `test_replay_import` | integration |
-| 862 | `src/unit_test/storage/new_catalog/new_txn_replay_with_ckp_ut.cpp` | `TxnReplayExceptionTest` | `test_replay_compact` | integration |
-| 863 | `src/unit_test/storage/new_catalog/new_txn_replay_with_ckp_ut.cpp` | `TxnReplayExceptionTest` | `test_replay_insert` | integration |
-| 864 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_rollback` | integration |
-| 865 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_db` | integration |
-| 866 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_table` | integration |
-| 867 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_index` | integration |
-| 868 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_optimize_index` | integration |
-| 869 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_dump_index` | integration |
-| 870 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_add_column` | integration |
-| 871 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_column` | integration |
-| 872 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_rename_table` | integration |
-| 873 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_compact_table` | integration |
-| 874 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_add_column` | integration |
-| 875 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_drop_column` | integration |
-| 876 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_rename` | integration |
-| 877 | `src/unit_test/storage/new_catalog/replay_append_delete_ut.cpp` | `TestTxnReplayAppend` | `test_append0` | integration |
-| 878 | `src/unit_test/storage/new_catalog/replay_append_delete_ut.cpp` | `TestTxnReplayAppend` | `test_replay_append_delete` | integration |
-| 879 | `src/unit_test/storage/new_catalog/replay_append_delete_ut.cpp` | `TestTxnReplayAppend` | `test_replay_append_with_index0` | integration |
-| 880 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact_commit` | integration |
-| 881 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact_rollback` | integration |
-| 882 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_replay_compact_flush_gap` | integration |
-| 883 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact_interrupt` | integration |
-| 884 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `DISABLED_SLOW_test_compact_with_index` | integration |
-| 885 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact1_rollback` | integration |
-| 886 | `src/unit_test/storage/new_catalog/replay_import_ut.cpp` | `TestTxnReplayImport` | `test_import0` | integration |
-| 887 | `src/unit_test/storage/new_catalog/replay_import_ut.cpp` | `TestTxnReplayImport` | `test_import_with_index` | integration |
-| 888 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `DISABLED_SLOW_test_replay_append_with_index` | integration |
-| 889 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `DISABLED_SLOW_test_populate_index` | integration |
-| 890 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `drop_index` | integration |
-| 891 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `test_json_index_replay` | integration |
-| 892 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_commit` | integration |
-| 893 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_rollback` | integration |
-| 894 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_interrupt` | integration |
-| 895 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_table_snapshot` | integration |
-| 896 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_database_snapshot` | integration |
-| 897 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_system_snapshot` | integration |
-| 898 | `src/unit_test/storage/new_catalog/table_cache_ut.cpp` | `TestTableCache` | `test_table_cache` | integration |
-| 899 | `src/unit_test/storage/new_catalog/table_meta_ut.cpp` | `TestTxnTableMeta` | `table_meta` | integration |
-| 900 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `table_test1` | ported | `infinity-executor` `create_and_drop_table_conflicts` |
-| 901 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `table_test2` | integration |
-| 902 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createtable_wrong_conflicttype` | integration |
-| 903 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `droptable_wrong_conflicttype` | integration |
-| 904 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createtable_createtable` | integration |
-| 905 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createdb_createtable_test` | integration |
-| 906 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createtable_dropdb_test` | integration |
-| 907 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `dropdb_droptable_test` | integration |
-| 908 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createtable_droptable_test` | integration |
-| 909 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `droptable_droptable_test` | integration |
-| 910 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `rename_table_test` | integration |
-| 911 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update` | ported | `infinity-executor` `update_replaces_visible_values` |
-| 912 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_multiple_blocks` | integration |
-| 913 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_drop_db` | integration |
-| 914 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_drop_table` | integration |
-| 915 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_drop_index` | integration |
-| 916 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_dump_index` | integration |
-| 917 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_add_drop_column_conflicts` | integration |
-| 918 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_compact_conflicts` | integration |
-| 919 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_create_index_conflicts` | integration |
-| 920 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_delete_conflicts` | ported | `infinity-executor` `update_and_delete_compose` |
-| 921 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_delete_no_conflicts` | integration |
+| 841 | `src/unit_test/storage/new_catalog/new_catalog_ut.cpp` | `TestTxnNewCatalog` | `test_block_lock` | ported | `infinity-executor` `new_catalog_meta_ut::*` |
+| 842 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `test_ts` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 843 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_ts` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 844 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `test_check_txns` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 845 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_insert_table` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 846 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_db` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 847 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_db2` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 848 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_table` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 849 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_drop_table` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 850 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_create` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 851 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_drop` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 852 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_drop_column_add_column` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 853 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_compact` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 854 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_delete_compact` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 855 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_rename` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 856 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_dump_optimize_index` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 857 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_append_append` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 858 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_dump_index` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 859 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_flush_gap_optimize_index` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 860 | `src/unit_test/storage/new_catalog/new_txn_replay_with_ckp_ut.cpp` | `TxnReplayExceptionTest` | `test_replay_create_db` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 861 | `src/unit_test/storage/new_catalog/new_txn_replay_with_ckp_ut.cpp` | `TxnReplayExceptionTest` | `test_replay_import` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 862 | `src/unit_test/storage/new_catalog/new_txn_replay_with_ckp_ut.cpp` | `TxnReplayExceptionTest` | `test_replay_compact` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 863 | `src/unit_test/storage/new_catalog/new_txn_replay_with_ckp_ut.cpp` | `TxnReplayExceptionTest` | `test_replay_insert` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 864 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_rollback` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 865 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_db` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 866 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_table` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 867 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_index` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 868 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_optimize_index` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 869 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_dump_index` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 870 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_add_column` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 871 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_column` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 872 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_rename_table` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 873 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_compact_table` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 874 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_add_column` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 875 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_drop_column` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 876 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_rename` | ported | `infinity-executor` `replay_txn_ut::*` |
+| 877 | `src/unit_test/storage/new_catalog/replay_append_delete_ut.cpp` | `TestTxnReplayAppend` | `test_append0` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 878 | `src/unit_test/storage/new_catalog/replay_append_delete_ut.cpp` | `TestTxnReplayAppend` | `test_replay_append_delete` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 879 | `src/unit_test/storage/new_catalog/replay_append_delete_ut.cpp` | `TestTxnReplayAppend` | `test_replay_append_with_index0` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 880 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact_commit` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 881 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact_rollback` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 882 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_replay_compact_flush_gap` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 883 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact_interrupt` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 884 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `DISABLED_SLOW_test_compact_with_index` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 885 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact1_rollback` | ported | `infinity-executor` `compact_replay_ut::*` |
+| 886 | `src/unit_test/storage/new_catalog/replay_import_ut.cpp` | `TestTxnReplayImport` | `test_import0` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 887 | `src/unit_test/storage/new_catalog/replay_import_ut.cpp` | `TestTxnReplayImport` | `test_import_with_index` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 888 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `DISABLED_SLOW_test_replay_append_with_index` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 889 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `DISABLED_SLOW_test_populate_index` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 890 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `drop_index` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 891 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `test_json_index_replay` | ported | `infinity-executor` `replay_misc_ut::*` |
+| 892 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_commit` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 893 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_rollback` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 894 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_interrupt` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 895 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_table_snapshot` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 896 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_database_snapshot` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 897 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_system_snapshot` | ported | `infinity-executor` `optimize_replay_ut::*` |
+| 898 | `src/unit_test/storage/new_catalog/table_cache_ut.cpp` | `TestTableCache` | `test_table_cache` | ported | `infinity-executor` `new_catalog_meta_ut::*` |
+| 899 | `src/unit_test/storage/new_catalog/table_meta_ut.cpp` | `TestTxnTableMeta` | `table_meta` | ported | `infinity-executor` `new_catalog_meta_ut::*` |
+| 900 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `table_test1` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 901 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `table_test2` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 902 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createtable_wrong_conflicttype` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 903 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `droptable_wrong_conflicttype` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 904 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createtable_createtable` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 905 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createdb_createtable_test` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 906 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createtable_dropdb_test` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 907 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `dropdb_droptable_test` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 908 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `createtable_droptable_test` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 909 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `droptable_droptable_test` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 910 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `rename_table_test` | ported | `infinity-executor` `new_catalog_table_ut::*` |
+| 911 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update` | ported | `infinity-executor` `update_import_ut::*` |
+| 912 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_multiple_blocks` | ported | `infinity-executor` `update_import_ut::*` |
+| 913 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_drop_db` | ported | `infinity-executor` `update_import_ut::*` |
+| 914 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_drop_table` | ported | `infinity-executor` `update_import_ut::*` |
+| 915 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_drop_index` | ported | `infinity-executor` `update_import_ut::*` |
+| 916 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_dump_index` | ported | `infinity-executor` `update_import_ut::*` |
+| 917 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_add_drop_column_conflicts` | ported | `infinity-executor` `update_import_ut::*` |
+| 918 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_compact_conflicts` | ported | `infinity-executor` `update_import_ut::*` |
+| 919 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_create_index_conflicts` | ported | `infinity-executor` `update_import_ut::*` |
+| 920 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_delete_conflicts` | ported | `infinity-executor` `update_import_ut::*` |
+| 921 | `src/unit_test/storage/new_catalog/update_ut.cpp` | `TestTxnUpdate` | `test_update_and_delete_no_conflicts` | ported | `infinity-executor` `update_import_ut::*` |
 | 922 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `create_index_append` | ported | `infinity-executor` `request_ut::conflict_create_index_append` |
 | 923 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `add_column_append` | ported | `infinity-executor` `request_ut::conflict_add_column_append` |
 | 924 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `add_column_import` | ported | `infinity-executor` `request_ut::conflict_add_column_import` |

@@ -825,6 +825,114 @@ impl DataType {
         self.info
     }
 
+    /// C++ `DataType::Serialize()` (`src/parser/type/data_type.cpp:427`):
+    /// `{"data_type": <LogicalType ordinal>, "type_info": …}`.
+    ///
+    /// The Rust port stores type metadata as JSON rather than the reference's
+    /// `WriteAdv` byte layout (the registered catalog design change). The
+    /// ordinals mirror `infinity_catalog::value_format::logical`; types that
+    /// the catalog wire format never encodes return `None`.
+    pub fn to_json(&self) -> Option<crate::json::Json> {
+        let mut entries = vec![(
+            "data_type".to_string(),
+            crate::json::Json::Int(logical_type_code(self.ty)?),
+        )];
+        if let Some(info) = self.info {
+            let (name, value) = match info {
+                TypeInfo::Decimal(info) => (
+                    "type_info",
+                    crate::json::Json::Obj(vec![
+                        (
+                            "precision".to_string(),
+                            crate::json::Json::Int(info.precision()),
+                        ),
+                        ("scale".to_string(), crate::json::Json::Int(info.scale())),
+                    ]),
+                ),
+                TypeInfo::Embedding(info) => (
+                    "type_info",
+                    crate::json::Json::Obj(vec![
+                        (
+                            "dimension".to_string(),
+                            crate::json::Json::Int(info.dimension() as i64),
+                        ),
+                        (
+                            "embedding_type".to_string(),
+                            crate::json::Json::Int(embedding_type_code(info.data_type())),
+                        ),
+                    ]),
+                ),
+            };
+            entries.push((name.to_string(), value));
+        }
+        Some(crate::json::Json::Obj(entries))
+    }
+
+    /// C++ `DataType::Deserialize()`: reverses [`Self::to_json`].
+    pub fn from_json(json: &crate::json::Json) -> Option<Self> {
+        let crate::json::Json::Obj(entries) = json else {
+            return None;
+        };
+        let field = |name: &str| {
+            entries
+                .iter()
+                .find(|(key, _)| key == name)
+                .map(|(_, value)| value)
+        };
+        let crate::json::Json::Int(code) = field("data_type")? else {
+            return None;
+        };
+        let ty = logical_type_from_code(*code)?;
+        let info = match field("type_info") {
+            None => None,
+            Some(crate::json::Json::Obj(fields)) => {
+                let get = |name: &str| {
+                    fields
+                        .iter()
+                        .find(|(key, _)| key == name)
+                        .map(|(_, value)| value)
+                };
+                match ty {
+                    LogicalType::Decimal => {
+                        let crate::json::Json::Int(precision) = get("precision")? else {
+                            return None;
+                        };
+                        let crate::json::Json::Int(scale) = get("scale")? else {
+                            return None;
+                        };
+                        Some(TypeInfo::Decimal(
+                            DecimalInfo::make(*precision, *scale).ok()?,
+                        ))
+                    }
+                    LogicalType::Embedding(_) => {
+                        let crate::json::Json::Int(element) = get("embedding_type")? else {
+                            return None;
+                        };
+                        let crate::json::Json::Int(dimension) = get("dimension")? else {
+                            return None;
+                        };
+                        Some(TypeInfo::Embedding(
+                            EmbeddingInfo::make(
+                                embedding_type_from_code(*element)?,
+                                *dimension as usize,
+                            )
+                            .ok()?,
+                        ))
+                    }
+                    _ => None,
+                }
+            }
+            Some(_) => return None,
+        };
+        // An embedding's dimension lives in both the logical type (`Embedding`)
+        // and its `EmbeddingInfo`; keep them in sync on the way back.
+        let ty = match info {
+            Some(TypeInfo::Embedding(info)) => LogicalType::Embedding(info.dimension() as u32),
+            _ => ty,
+        };
+        Some(DataType { ty, info })
+    }
+
     /// C++ `DataType::GetSizeInBytes` for the types this crate models.
     pub fn size_in_bytes(&self) -> usize {
         match self.info {
@@ -842,6 +950,94 @@ impl fmt::Display for DataType {
             None => write!(f, "{}", self.ty.type_name()),
         }
     }
+}
+
+/// C++ `LogicalType` ordinals used by `DataType::Serialize()`. These mirror
+/// `infinity_catalog::value_format::logical`; `Tuple` has no catalog encoding
+/// and keeps its C++ enum ordinal.
+fn logical_type_code(ty: LogicalType) -> Option<i64> {
+    use LogicalType::*;
+    Some(match ty {
+        Boolean => 0,
+        TinyInt => 1,
+        SmallInt => 2,
+        Integer => 3,
+        BigInt => 4,
+        HugeInt => 5,
+        Decimal => 6,
+        Float => 7,
+        Double => 8,
+        Varchar => 11,
+        Embedding(_) => 12,
+        Tuple => 16,
+        Date => 17,
+        Time => 18,
+        DateTime => 19,
+        Timestamp => 20,
+        Interval => 21,
+        Array => 22,
+        Json => 23,
+        _ => return None,
+    })
+}
+
+fn logical_type_from_code(code: i64) -> Option<LogicalType> {
+    use LogicalType::*;
+    Some(match code {
+        0 => Boolean,
+        1 => TinyInt,
+        2 => SmallInt,
+        3 => Integer,
+        4 => BigInt,
+        5 => HugeInt,
+        6 => Decimal,
+        7 => Float,
+        8 => Double,
+        11 => Varchar,
+        // The embedding dimension is restored from the `EmbeddingInfo`.
+        12 => Embedding(0),
+        16 => Tuple,
+        17 => Date,
+        18 => Time,
+        19 => DateTime,
+        20 => Timestamp,
+        21 => Interval,
+        22 => Array,
+        23 => Json,
+        _ => return None,
+    })
+}
+
+/// `EmbeddingDataType` ordinals (`infinity_catalog::value_format::element`).
+fn embedding_type_code(ty: EmbeddingDataType) -> i64 {
+    match ty {
+        EmbeddingDataType::Bit => 0,
+        EmbeddingDataType::UInt8 => 1,
+        EmbeddingDataType::Int8 => 2,
+        EmbeddingDataType::Int16 => 3,
+        EmbeddingDataType::Int32 => 4,
+        EmbeddingDataType::Int64 => 5,
+        EmbeddingDataType::Float => 6,
+        EmbeddingDataType::Double => 7,
+        EmbeddingDataType::Float16 => 8,
+        EmbeddingDataType::BFloat16 => 9,
+    }
+}
+
+fn embedding_type_from_code(code: i64) -> Option<EmbeddingDataType> {
+    Some(match code {
+        0 => EmbeddingDataType::Bit,
+        1 => EmbeddingDataType::UInt8,
+        2 => EmbeddingDataType::Int8,
+        3 => EmbeddingDataType::Int16,
+        4 => EmbeddingDataType::Int32,
+        5 => EmbeddingDataType::Int64,
+        6 => EmbeddingDataType::Float,
+        7 => EmbeddingDataType::Double,
+        8 => EmbeddingDataType::Float16,
+        9 => EmbeddingDataType::BFloat16,
+        _ => return None,
+    })
 }
 
 /// C++ `NullValue<T>()` (`src/common/types/null_value.h`): the in-band sentinel
@@ -1491,5 +1687,44 @@ mod tests {
                 .as_text(),
             Some("FunnyHalloween")
         );
+    }
+
+    // C++: src/unit_test/parser/type/data_type_ut.cpp:Serialize
+    #[test]
+    fn data_type_serialize() {
+        let boolean = DataType::new(LogicalType::Boolean);
+        let json = boolean.to_json().expect("boolean serializes");
+        assert_eq!(json.compact(), r#"{"data_type":0}"#);
+        assert_eq!(DataType::from_json(&json), Some(boolean));
+
+        // A truncated/invalid object is rejected.
+        assert_eq!(
+            DataType::from_json(&crate::json::Json::Obj(Vec::new())),
+            None
+        );
+    }
+
+    // C++: src/unit_test/parser/type/data_type_ut.cpp:ReadWrite
+    #[test]
+    fn data_type_read_write() {
+        let decimal = DecimalInfo::make(38, 3).expect("decimal(38,3)");
+        let embedding =
+            EmbeddingInfo::make(EmbeddingDataType::Float, 256).expect("embedding(float,256)");
+        let types = [
+            DataType::new(LogicalType::TinyInt),
+            DataType::new(LogicalType::Float),
+            DataType::new(LogicalType::Tuple),
+            DataType::with_info(LogicalType::Decimal, TypeInfo::Decimal(decimal)),
+            DataType::with_info(LogicalType::Embedding(256), TypeInfo::Embedding(embedding)),
+        ];
+
+        for data_type in types {
+            let json = data_type.to_json().expect("data type serializes");
+            let bytes = json.compact().into_bytes();
+            let text = std::str::from_utf8(&bytes).expect("JSON is UTF-8");
+            let parsed = crate::json::parse(text).expect("serialized JSON parses");
+            let restored = DataType::from_json(&parsed).expect("data type deserializes");
+            assert_eq!(restored, data_type);
+        }
     }
 }

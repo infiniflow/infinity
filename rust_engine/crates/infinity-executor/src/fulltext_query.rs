@@ -452,6 +452,12 @@ fn lex(query: &str) -> Result<Vec<Token>, QueryParseError> {
                             text,
                             quoted: false,
                         });
+                    } else {
+                        // A backslash before a non-escapable character: flex's
+                        // default action echoes (drops) it, then scanning
+                        // resumes with the next character. Advance so the
+                        // scanner always makes progress.
+                        i += 1;
                     }
                 } else {
                     // Default scanner action: the character is echoed and
@@ -981,5 +987,221 @@ mod tests {
         assert!(driver.parse_single("NOT a").is_ok());
         assert!(driver.parse_single("\"unterminated").is_err());
         assert!(lex("\"unterminated").is_err());
+    }
+
+    /// C++ `ParseStream` (`search_driver_ut.cpp`): skip blank lines and
+    /// comments, parse every remaining line, fail on the first bad one.
+    fn parse_stream(driver: &SearchDriver, text: &str) -> Result<usize, QueryParseError> {
+        let mut parsed = 0;
+        for raw in text.lines() {
+            let line = raw.trim_start_matches([' ', '\t']);
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            driver.parse_single(line)?;
+            parsed += 1;
+        }
+        Ok(parsed)
+    }
+
+    // C++: src/unit_test/parser/search_driver_ut.cpp:good_test1
+    #[test]
+    fn search_driver_good_test1() {
+        let queries = r##"
+#basic_filter with implicit field
+dune
+123.456
+
+#basic_filter with explicit field
+name:dune
+num:123.456
+
+#basic_filter_boost with implicit field
+dune^1.2
+123.456^7.8
+
+#basic_filter_boost with explicit field
+name:dune^1.2
+num:123.456^7.8
+
+#term
+NOT name:microsoft^1.2
+-name:google^1.2
+!name:microsoft^1.2
+(name:star OR name:duna)
+(dune god)
+(dune god)^1.3
+!(dune god)^1.3
+
+#clause
+foo AND name:duna^1.2
+foo +bar
+duna^2 AND foo
+duna AND foo
+(dune god) AND (foo bar)
+_exists_:"author" AND page_count:xxx AND name:star^1.3
+
+#query
+dune god
+dune OR god
+name:star OR name:duna
+_exists_:"author" AND page_count:yyy AND (name:star OR name:duna)
+_exists_:"author" AND page_count:zzz^1.3 AND (name:star^0.1 OR name:duna^1.2)^1.2
+
+#query
+(dune^1.2 AND NOT name:god^2 AND NOT kddd:ss^4 OR ee:ff^1.2)^1.3
+(dune^1.2 AND NOT (name:god^2 || kddd:ss^4) OR ee:ff^1.2)^1.3
+(dune^1.2 AND (NOT name:god^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
+
+#escape reserved characters per https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
+first\ name:Alice
+book\*:quick
+DS\-K3AJ303/Dm140
+DS\-K3AJ303\/Dm140
+\(DS\-K3AJ303\/Dm140\)
+
+#quote
+"first name":Alice
+"book*":quick
+"DS-K3AJ303/Dm140"
+
+#sloppy phrase
+"a b"
+"a b"~0
+"a b"~1
+"a b"~2
+"a b c"~4
+    "##;
+
+        let driver = SearchDriver::new(HashMap::new(), "body");
+        assert_eq!(parse_stream(&driver, queries), Ok(42));
+    }
+
+    // C++: src/unit_test/parser/search_driver_ut.cpp:good_test2
+    #[test]
+    fn search_driver_good_test2() {
+        let queries = r##"
+#basic_filter with implicit field
+芯片
+
+#basic_filter with explicit field
+name:芯片
+
+#basic_filter_boost with implicit field
+芯片^1.2
+
+#basic_filter_boost with explicit field
+name:芯片^1.2
+
+#term
+NOT name:microsoft^1.2
+-name:芯片^1.2
+!name:微软^1.2
+(name:星空 OR name:邓肯)
+(邓肯 上帝)
+(邓肯 上帝)^1.3
+!(邓肯 上帝)^1.3
+
+#clause
+foo AND name:邓肯^1.2
+foo +bar
+邓肯^2 AND foo
+邓肯 AND foo
+(邓肯 上帝) AND (foo bar)
+_exists_:"author" AND page_count:xxx AND name:star^1.3
+
+#query
+邓肯 上帝
+邓肯 OR 上帝
+name:星空 OR name:邓肯
+_exists_:"author" AND page_count:yyy AND (name:星空 OR name:邓肯)
+_exists_:"author" AND page_count:zzz^1.3 AND (name:星空^0.1 OR name:邓肯^1.2)^1.2
+
+#query
+(邓肯^1.2 AND NOT name:上帝^2 AND NOT kddd:ss^4 OR ee:ff^1.2)^1.3
+(邓肯^1.2 AND NOT (name:上帝^2 || kddd:ss^4) OR ee:ff^1.2)^1.3
+(邓肯^1.2 AND (NOT name:上帝^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
+
+#quote
+吉祥物“羽宝”头部
+nanjing吉祥物"羽宝"头部head "DS-K3AJ303/Dm140"
+吉祥物nanjing"DS-K3AJ303/Dm140"头部
+graphic cards
+
+#complex query
+((互联网 OR "联网" OR ("联网"~2)^0.5)^0.37996928602305424 (服务)^0.37996928602305424 (文章)^0.13455624904801738 (系统)^0.10443628332697895 (\+)^0.0004189177488833171 (监管)^0.00020561620385239324 (提到)^0.0001805935548173221 (提供)^0.00013985485008990281 (主要)^0.00012391322125226468 ("文章 提到 互联网 \+ 监管 系统 主要 提供 服务"~4)^1.5)
+    "##;
+
+        let mut body = HashMap::new();
+        body.insert("ft_index".to_string(), "chinese".to_string());
+        let driver = SearchDriver::new(HashMap::from([("body".to_string(), body)]), "body");
+        assert_eq!(parse_stream(&driver, queries), Ok(30));
+    }
+
+    // C++: src/unit_test/parser/search_driver_ut.cpp:operator_option_test
+    #[test]
+    fn search_driver_operator_option_test() {
+        let queries = r##"
+#basic_filter_boost with explicit field
+name:芯片^1.2
+name:dune^1.2
+num:123.456^7.8
+
+#clause
+(邓肯 上帝) AND (foo bar)
+_exists_:"author" AND page_count:xxx AND name:star^1.3
+
+#query
+(邓肯^1.2 AND (NOT name:上帝^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
+
+#quote
+TO BE OR NOT TO BE
+吉祥物“羽宝”头部
+nanjing吉祥物"羽宝"头部head "DS-K3AJ303/Dm140"
+吉祥物nanjing"DS-K3AJ303/Dm140"头部
+graphic cards
+    "##;
+
+        let mut body = HashMap::new();
+        body.insert("ft_index".to_string(), "chinese".to_string());
+        for operator in [OperatorOption::Or, OperatorOption::And] {
+            let driver =
+                SearchDriver::new(HashMap::from([("body".to_string(), body.clone())]), "body")
+                    .with_operator(operator);
+            assert_eq!(parse_stream(&driver, queries), Ok(11), "{operator:?}");
+        }
+    }
+
+    // C++: src/unit_test/parser/search_driver_ut.cpp:whitespace_analyzer_test
+    #[test]
+    fn search_driver_whitespace_analyzer_test() {
+        let queries = r##"
+#basic_filter_boost with explicit field
+name:芯片^1.2
+name:dune^1.2
+num:123.456^7.8
+label:DS-K3AJ303/Dm140^1.2
+date:2025-01-01^1.2
+
+#clause
+DS-K3AJ303/Dm140^1.2 OR 2025-01-01^1.2
+(邓肯 上帝) AND (foo bar)
+_exists_:"author" AND page_count:xxx AND name:star^1.3
+
+#quote
+"TO BE OR NOT TO BE"
+"nanjing吉祥物\"羽宝\"头部head" "DS-K3AJ303/Dm140"
+"吉祥物nanjing\"DS-K3AJ303/Dm140\"头部"
+    "##;
+
+        let mut column2analyzer = HashMap::new();
+        for column in ["name", "num", "label", "date", "_exists_", "body"] {
+            column2analyzer.insert(
+                column.to_string(),
+                HashMap::from([("ft_index".to_string(), "whitespace".to_string())]),
+            );
+        }
+        let driver = SearchDriver::new(column2analyzer, "body");
+        assert_eq!(parse_stream(&driver, queries), Ok(11));
     }
 }

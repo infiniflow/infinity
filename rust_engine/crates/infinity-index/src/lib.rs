@@ -75,6 +75,17 @@ impl SecondaryIndex {
         std::mem::take(&mut self.map)
     }
 
+    /// Number of row entries across all keys (C++ `GetRowCount`).
+    pub fn row_count(&self) -> usize {
+        self.map.values().map(Vec::len).sum()
+    }
+
+    /// Lowest row id recorded, in `segment << 32 | offset` form (C++
+    /// `GetBeginRowID`).
+    pub fn begin_row_id(&self) -> Option<RowID> {
+        self.map.values().flatten().min().copied()
+    }
+
     /// Persists to `path` (length-prefixed entries). Durable via `sync_all`.
     pub fn flush_to(&self, path: impl AsRef<Path>) -> Result<()> {
         let path = path.as_ref();

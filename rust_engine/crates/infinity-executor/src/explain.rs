@@ -16,6 +16,18 @@ use infinity_parser::{
 
 use crate::regex_literal::{extract_regex_literal_runs, has_any_sparse_gram};
 
+/// C++ `PhysicalExplain::AlignParagraphs`
+/// (`src/executor/operator/physical_explain_impl.cpp:42`): pad the shorter
+/// paragraph list with empty lines so both sides line up.
+#[cfg(test)]
+pub(crate) fn align_paragraphs(left: &mut Vec<String>, right: &mut Vec<String>) {
+    if left.len() < right.len() {
+        left.resize(right.len(), String::new());
+    } else if right.len() < left.len() {
+        right.resize(left.len(), String::new());
+    }
+}
+
 /// A single-table `SELECT` reduced to what the printer needs.
 pub struct SelectPlan<'a> {
     pub items: &'a [SelectItem],
@@ -1763,4 +1775,58 @@ pub fn explain_create_table(
         attr(0, "conflict type: Issue error"),
         attr(0, "output columns: [OK]"),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::align_paragraphs;
+
+    // C++: src/unit_test/executor/pipeline/explain_ut.cpp:ExplainTest.test1
+    #[test]
+    fn explain_align_paragraphs() {
+        let mut fragment_text: Vec<String> = vec![
+            "FRAGMENT (1)",
+            "-> SINK (7)",
+            "-> PROJECT (4)",
+            "   - table index: #4",
+            "   - expressions: [c1 (#0)]",
+            "-> AGGREGATE (3)",
+            "   - aggregate table index: #3",
+            "   - aggregate: []",
+            "   - group by table index: #2",
+            "   - group by: [c1 (#0)]",
+            "-> SOURCE (11): FRAGMENT #2",
+            "",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+        let mut task_text: Vec<String> = vec![
+            "Fragment #1 * 4 Task",
+            "-> Task #0",
+            "-> Task #1",
+            "-> Task #2",
+            "-> Task #3",
+            "",
+            "Fragment #2 * 2 Task",
+            "-> Task #0",
+            "-> Task #1",
+            "",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+
+        let fragments = fragment_text.clone();
+        let tasks = task_text.clone();
+        align_paragraphs(&mut fragment_text, &mut task_text);
+
+        assert_eq!(fragment_text.len(), task_text.len());
+        assert_eq!(fragment_text.len(), 12);
+        // The original lines are untouched and the shorter side is padded with
+        // empty paragraphs.
+        assert_eq!(fragment_text, fragments);
+        assert_eq!(&task_text[..tasks.len()], tasks.as_slice());
+        assert!(task_text[tasks.len()..].iter().all(String::is_empty));
+    }
 }
