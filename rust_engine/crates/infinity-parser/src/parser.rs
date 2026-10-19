@@ -1697,6 +1697,8 @@ impl Parser {
                 Token::Int(_) | Token::Float(_) | Token::Str(_) => {
                     SelectItem::Literal(self.literal()?)
                 }
+                // A leading unary sign (`SELECT -a`, `SELECT -1`).
+                Token::Op(op) if op == "-" || op == "+" => SelectItem::Expr(self.expr()?),
                 Token::Ident(s) if s.eq_ignore_ascii_case("NULL") => {
                     SelectItem::Literal(self.literal()?)
                 }

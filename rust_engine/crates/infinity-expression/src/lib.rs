@@ -877,6 +877,10 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             };
             dt_component(&src, &field)
         }
+        "POW" | "POWER" => match (a0().as_f64(), a1().as_f64()) {
+            (Some(x), Some(y)) => Value::Float(x.powf(y)),
+            _ => Value::Null,
+        },
         "SQRT" => a0()
             .as_f64()
             .map(|v| Value::Float(v.sqrt()))
@@ -1492,9 +1496,7 @@ mod tests {
         let out: Vec<Value> = empty.iter().map(|row| expr.eval(row)).collect();
         assert!(out.is_empty());
 
-        let column: Vec<Vec<Value>> = (0..EXPR_VECTOR_SIZE)
-            .map(|i| vec![Value::Int(i)])
-            .collect();
+        let column: Vec<Vec<Value>> = (0..EXPR_VECTOR_SIZE).map(|i| vec![Value::Int(i)]).collect();
         let out: Vec<i64> = column
             .iter()
             .map(|row| match expr.eval(row) {
@@ -1520,9 +1522,7 @@ mod tests {
         let out: Vec<Value> = empty.iter().map(|row| expr.eval(row)).collect();
         assert!(out.is_empty());
 
-        let column: Vec<Vec<Value>> = (0..EXPR_VECTOR_SIZE)
-            .map(|i| vec![Value::Int(i)])
-            .collect();
+        let column: Vec<Vec<Value>> = (0..EXPR_VECTOR_SIZE).map(|i| vec![Value::Int(i)]).collect();
         let out: Vec<i64> = column
             .iter()
             .map(|row| match expr.eval(row) {

@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 113, `integration` 250, `partial` 42, `ported` 357.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 82, `integration` 250, `partial` 42, `ported` 388.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -129,7 +129,7 @@
 | 115 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast1` | ported | `infinity-common` `varchar_cast1` |
 | 116 | `src/unit_test/function/scalar/abs_functions_ut.cpp` | `AbsFunctionsTest` | `abs_func` | ported | `infinity-executor` `tests::abs_function_covers_every_numeric_type` |
 | 117 | `src/unit_test/function/scalar/add_functions_ut.cpp` | `AddFunctionsTest` | `add_func` | partial | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` 覆盖常规值；C++ 的按列宽 checked 溢出→NULL 未建模（i64 求值） |
-| 118 | `src/unit_test/function/scalar/and_functions_ut.cpp` | `AndFunctionsTest` | `and_func` | gate-a |
+| 118 | `src/unit_test/function/scalar/and_functions_ut.cpp` | `AndFunctionsTest` | `and_func` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
 | 119 | `src/unit_test/function/scalar/century_functions_ut.cpp` | `CenturyFunctionsTest` | `century_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 120 | `src/unit_test/function/scalar/current_date_functions_ut.cpp` | `CurrentDateFunctionsTest` | `current_date_func` | gate-a |
 | 121 | `src/unit_test/function/scalar/current_time_functions_ut.cpp` | `CurrentTimeFunctionsTest` | `current_time_func` | gate-a |
@@ -160,39 +160,39 @@
 | 146 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `fill_empty_partitions_test` | ported |
 | 147 | `src/unit_test/function/scalar/greater_equals_functions_ut.cpp` | `GreaterEqualsFunctionsTest` | `greater_equals_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
 | 148 | `src/unit_test/function/scalar/greater_functions_ut.cpp` | `GreaterFunctionsTest` | `greater_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
-| 149 | `src/unit_test/function/scalar/hour_functions_ut.cpp` | `HourFunctionsTest` | `hour_func` | gate-a |
+| 149 | `src/unit_test/function/scalar/hour_functions_ut.cpp` | `HourFunctionsTest` | `hour_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 150 | `src/unit_test/function/scalar/inequals_functions_ut.cpp` | `InEqualsFunctionsTest` | `inequals_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
 | 151 | `src/unit_test/function/scalar/less_equals_functions_ut.cpp` | `LessEqualsFunctionsTest` | `less_equals_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
 | 152 | `src/unit_test/function/scalar/less_functions_ut.cpp` | `LessFunctionsTest` | `less_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
-| 153 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `re2_quote_meta_test` | gate-a |
-| 154 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_special_regex_chars_escape` | gate-a |
-| 155 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_basic_sanity` | gate-a |
-| 156 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_percent_wildcard` | gate-a |
-| 157 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_underscore_wildcard` | gate-a |
-| 158 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_escape_character` | gate-a |
-| 159 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_custom_escape_char` | gate-a |
-| 160 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_empty_pattern` | gate-a |
-| 161 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_complex_real_world_patterns` | gate-a |
-| 162 | `src/unit_test/function/scalar/minus_functions_ut.cpp` | `MinusFunctionsTest` | `plus_func` | gate-a |
-| 163 | `src/unit_test/function/scalar/minute_function_ut.cpp` | `MinuteFunctionsTest` | `minute_func` | gate-a |
-| 164 | `src/unit_test/function/scalar/modulo_functions_ut.cpp` | `ModuloFunctionsTest` | `mod_func` | gate-a |
-| 165 | `src/unit_test/function/scalar/month_functions_ut.cpp` | `MonthFunctionsTest` | `month_func` | gate-a |
-| 166 | `src/unit_test/function/scalar/mul_functions_ut.cpp` | `MulFunctionsTest` | `mul_func` | gate-a |
-| 167 | `src/unit_test/function/scalar/not_functions_ut.cpp` | `NotFunctionsTest` | `not_func` | gate-a |
-| 168 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func` | gate-a |
-| 169 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func_nullable_flat` | gate-a |
-| 170 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func_nullable_constant` | gate-a |
-| 171 | `src/unit_test/function/scalar/plus_functions_ut.cpp` | `PlusFunctionsTest` | `plus_func` | gate-a |
-| 172 | `src/unit_test/function/scalar/pow_functions_ut.cpp` | `PowFunctionsTest` | `mul_func` | gate-a |
-| 173 | `src/unit_test/function/scalar/quarter_functions_ut.cpp` | `QuarterFunctionsTest` | `quarter_func` | gate-a |
-| 174 | `src/unit_test/function/scalar/reverse_functions_ut.cpp` | `ReverseFunctionsTest` | `reverse_func` | gate-a |
-| 175 | `src/unit_test/function/scalar/second_function_ut.cpp` | `SecondFunctionsTest` | `second_func` | gate-a |
-| 176 | `src/unit_test/function/scalar/substr_function_ut_nimpl.cpp` | `SubstrFunctionTest` | `varchar_substr` | gate-a |
-| 177 | `src/unit_test/function/scalar/subtract_functions_ut.cpp` | `SubtractFunctionsTest` | `sub_func` | gate-a |
-| 178 | `src/unit_test/function/scalar/truncate_functions_ut.cpp` | `TruncateFunctionsTest` | `truncate_func` | gate-a |
-| 179 | `src/unit_test/function/scalar/week_of_year_functions_ut.cpp` | `WeekOfYearFunctionsTest` | `week_of_year_func` | gate-a |
-| 180 | `src/unit_test/function/scalar/weekday_functions_ut.cpp` | `WeekdayFunctionsTest` | `weekday_func` | gate-a |
-| 181 | `src/unit_test/function/scalar/year_functions_ut.cpp` | `YearFunctionsTest` | `year_func` | gate-a |
+| 153 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `re2_quote_meta_test` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 154 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_special_regex_chars_escape` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 155 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_basic_sanity` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 156 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_percent_wildcard` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 157 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_underscore_wildcard` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 158 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_escape_character` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 159 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_custom_escape_char` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 160 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_empty_pattern` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 161 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_complex_real_world_patterns` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 162 | `src/unit_test/function/scalar/minus_functions_ut.cpp` | `MinusFunctionsTest` | `plus_func` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 163 | `src/unit_test/function/scalar/minute_function_ut.cpp` | `MinuteFunctionsTest` | `minute_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 164 | `src/unit_test/function/scalar/modulo_functions_ut.cpp` | `ModuloFunctionsTest` | `mod_func` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 165 | `src/unit_test/function/scalar/month_functions_ut.cpp` | `MonthFunctionsTest` | `month_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 166 | `src/unit_test/function/scalar/mul_functions_ut.cpp` | `MulFunctionsTest` | `mul_func` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 167 | `src/unit_test/function/scalar/not_functions_ut.cpp` | `NotFunctionsTest` | `not_func` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 168 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 169 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func_nullable_flat` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 170 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func_nullable_constant` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 171 | `src/unit_test/function/scalar/plus_functions_ut.cpp` | `PlusFunctionsTest` | `plus_func` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 172 | `src/unit_test/function/scalar/pow_functions_ut.cpp` | `PowFunctionsTest` | `mul_func` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 173 | `src/unit_test/function/scalar/quarter_functions_ut.cpp` | `QuarterFunctionsTest` | `quarter_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 174 | `src/unit_test/function/scalar/reverse_functions_ut.cpp` | `ReverseFunctionsTest` | `reverse_func` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 175 | `src/unit_test/function/scalar/second_function_ut.cpp` | `SecondFunctionsTest` | `second_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 176 | `src/unit_test/function/scalar/substr_function_ut_nimpl.cpp` | `SubstrFunctionTest` | `varchar_substr` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 177 | `src/unit_test/function/scalar/subtract_functions_ut.cpp` | `SubtractFunctionsTest` | `sub_func` | ported | `infinity-executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 178 | `src/unit_test/function/scalar/truncate_functions_ut.cpp` | `TruncateFunctionsTest` | `truncate_func` | ported | `infinity-executor` `tests::string_and_power_functions_match_the_reference` |
+| 179 | `src/unit_test/function/scalar/week_of_year_functions_ut.cpp` | `WeekOfYearFunctionsTest` | `week_of_year_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 180 | `src/unit_test/function/scalar/weekday_functions_ut.cpp` | `WeekdayFunctionsTest` | `weekday_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 181 | `src/unit_test/function/scalar/year_functions_ut.cpp` | `YearFunctionsTest` | `year_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 182 | `src/unit_test/infinity_cloud/upload_meta_to_s3_ut.cpp` | `UploadMetaToS3` | `DISABLED_MINIO_test1` | gap |
 | 183 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `test1` | ported | `infinity-cli` `config::tests::defaults` |
 | 184 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `test2` | ported | `infinity-cli` `config::tests::full_config_file` |

@@ -13792,14 +13792,76 @@ mod tests {
         assert_eq!(mem.mem_used(), before);
     }
 
+    /// C++: `function/scalar/{plus,minus,subtract,mul,modulo,and,or,not}_functions_ut.cpp`.
+    #[test]
+    fn arithmetic_and_boolean_operators_match_the_reference() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE lg (a INTEGER, b INTEGER, x BOOLEAN, y BOOLEAN);")
+            .unwrap();
+        e.execute("INSERT INTO lg VALUES (7, 3, true, false);")
+            .unwrap();
+        assert_eq!(
+            rows(&e, "SELECT -a, a + b, a - b, a * b, a % b FROM lg;"),
+            vec![vec![
+                "-7".to_string(),
+                "10".to_string(),
+                "4".to_string(),
+                "21".to_string(),
+                "1".to_string(),
+            ]]
+        );
+        // Unary `+` in a predicate.
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM lg WHERE +a = 7;"),
+            vec![vec!["1".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT x AND y, x OR y, NOT x FROM lg;"),
+            vec![vec![
+                "false".to_string(),
+                "true".to_string(),
+                "false".to_string(),
+            ]]
+        );
+    }
+
+    /// C++: `function/scalar/{reverse,substr,like,pow,truncate}_*_ut.cpp`.
+    #[test]
+    fn string_and_power_functions_match_the_reference() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sf (s VARCHAR);").unwrap();
+        e.execute("INSERT INTO sf VALUES ('Hello');").unwrap();
+        assert_eq!(
+            rows(&e, "SELECT reverse(s), substr(s, 1, 3) FROM sf;"),
+            vec![vec!["olleH".to_string(), "ell".to_string()]]
+        );
+        // `LIKE` in a predicate: one match and one non-match.
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM sf WHERE s LIKE 'He%';"),
+            vec![vec!["1".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM sf WHERE s LIKE 'xx%';"),
+            vec![vec!["0".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT power(2, 10), trunc(3.14159, 2) FROM sf;"),
+            vec![vec!["1024.000000".to_string(), "3.14".to_string()]]
+        );
+    }
+
     /// C++: `function/scalar/{century,day,day_of_month,day_of_week,day_of_year,era,extract}_*_ut.cpp`:
     /// the date-component family over a DATE column.
     #[test]
     fn date_component_functions_match_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE dtf (d DATE);").unwrap();
-        e.execute("INSERT INTO dtf VALUES ('2023-12-25');").unwrap();
+        e.execute("CREATE TABLE dtf (d DATE, ts DATETIME);")
+            .unwrap();
+        e.execute("INSERT INTO dtf VALUES ('2023-12-25', '2023-12-25 14:30:45');")
+            .unwrap();
         assert_eq!(
             rows(
                 &e,
@@ -13813,6 +13875,22 @@ mod tests {
                 "359".to_string(),
                 "1".to_string(),
                 "4".to_string(),
+            ]]
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT year(ts), month(ts), quarter(ts), hour(ts), minute(ts), second(ts), weekday(ts), weekofyear(ts) FROM dtf;"
+            ),
+            vec![vec![
+                "2023".to_string(),
+                "12".to_string(),
+                "4".to_string(),
+                "14".to_string(),
+                "30".to_string(),
+                "45".to_string(),
+                "1".to_string(),
+                "52".to_string(),
             ]]
         );
         // `EXTRACT(field FROM source)` and `DATE_PART(field, source)`.
