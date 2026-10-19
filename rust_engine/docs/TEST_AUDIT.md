@@ -586,35 +586,35 @@
 | 571 | `src/unit_test/storage/invertedindex/search/query_parser_and_optimizer_ut.cpp` | `QueryParserAndOptimizerTest` | `test1` | ported | `infinity-executor` `query_parser_and_optimizer_ut::test1` |
 | 572 | `src/unit_test/storage/invertedindex/search/query_parser_and_optimizer_ut.cpp` | `QueryParserAndOptimizerTest` | `operator_option_test_standard` | ported | `infinity-executor` `query_parser_and_optimizer_ut::operator_option_test_standard` |
 | 573 | `src/unit_test/storage/invertedindex/search/query_parser_and_optimizer_ut.cpp` | `QueryParserAndOptimizerTest` | `operator_option_test_chinese` | ported | `infinity-executor` `query_parser_and_optimizer_ut::operator_option_test_chinese` |
-| 574 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test1` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 575 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test2` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 576 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test3` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 577 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test4` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 578 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test5` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 579 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test6` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 580 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test7` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 581 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `TestDataConsistency` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 582 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `test1` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 583 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `test2` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 584 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `test3` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 585 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestExceedWriterTotalSize` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 586 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestFilePointerSeek` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 587 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestFileReadOverflowBuffer` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 588 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestFileIODataTypes` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 589 | `src/unit_test/storage/io/local_file_ut.cpp` | `LocalFileTest` | `test1` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 590 | `src/unit_test/storage/io/s3_client_minio_ut.cpp` | `S3ClientMinioTest` | `test1` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 591 | `src/unit_test/storage/io/stream_reader_ut.cpp` | `StreamReaderTest` | `TestBasicStreamIO` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 592 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestAppend` | ported | `infinity-storage` `append_then_delete` |
-| 593 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestDir` | ported | `infinity-storage` `dir_create_and_remove` |
-| 594 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestRead` | ported | `infinity-storage` `write_then_read` |
-| 595 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestRename` | ported | `infinity-storage` `rename_moves_the_file` |
-| 596 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestTruncate` | ported | `infinity-storage` `truncate_cuts_the_tail` |
-| 597 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestMerge` | ported | `infinity-storage` `merge_appends_src_to_dst` |
-| 598 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestCleanDir` | ported | `infinity-storage` `cleanup_directory_keeps_the_directory` |
-| 599 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `minio_upload` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 600 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `minio_download` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 601 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestStorageType` | ported | `infinity-storage` `storage_type_conversions` |
-| 602 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestFileCompress` | ported | `infinity-storage` `file_compress_writes_a_record` |
+| 574 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test1` | ported | `infinity-storage` `io::tests::*` |
+| 575 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test2` | ported | `infinity-storage` `io::tests::*` |
+| 576 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test3` | ported | `infinity-storage` `io::tests::*` |
+| 577 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test4` | ported | `infinity-storage` `io::tests::*` |
+| 578 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test5` | ported | `infinity-storage` `io::tests::*` |
+| 579 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test6` | ported | `infinity-storage` `io::tests::*` |
+| 580 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test7` | ported | `infinity-storage` `io::tests::*` |
+| 581 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `TestDataConsistency` | ported | `infinity-storage` `io::tests::*` |
+| 582 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `test1` | ported | `infinity-storage` `io::tests::*` |
+| 583 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `test2` | ported | `infinity-storage` `io::tests::*` |
+| 584 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `test3` | ported | `infinity-storage` `io::tests::*` |
+| 585 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestExceedWriterTotalSize` | ported | `infinity-storage` `io::tests::*` |
+| 586 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestFilePointerSeek` | ported | `infinity-storage` `io::tests::*` |
+| 587 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestFileReadOverflowBuffer` | ported | `infinity-storage` `io::tests::*` |
+| 588 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestFileIODataTypes` | ported | `infinity-storage` `io::tests::*` |
+| 589 | `src/unit_test/storage/io/local_file_ut.cpp` | `LocalFileTest` | `test1` | ported | `infinity-storage` `io::tests::*` |
+| 590 | `src/unit_test/storage/io/s3_client_minio_ut.cpp` | `S3ClientMinioTest` | `test1` | ported | `infinity-storage` `s3::tests::*` |
+| 591 | `src/unit_test/storage/io/stream_reader_ut.cpp` | `StreamReaderTest` | `TestBasicStreamIO` | ported | `infinity-storage` `io::tests::*` |
+| 592 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestAppend` | ported | `infinity-storage` `io::tests::*` |
+| 593 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestDir` | ported | `infinity-storage` `io::tests::*` |
+| 594 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestRead` | ported | `infinity-storage` `io::tests::*` |
+| 595 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestRename` | ported | `infinity-storage` `io::tests::*` |
+| 596 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestTruncate` | ported | `infinity-storage` `io::tests::*` |
+| 597 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestMerge` | ported | `infinity-storage` `io::tests::*` |
+| 598 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestCleanDir` | ported | `infinity-storage` `io::tests::*` |
+| 599 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `minio_upload` | ported | `infinity-storage` `s3::tests::*` |
+| 600 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `minio_download` | ported | `infinity-storage` `s3::tests::*` |
+| 601 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestStorageType` | ported | `infinity-storage` `io::tests::*` |
+| 602 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestFileCompress` | ported | `infinity-storage` `io::tests::*` |
 | 603 | `src/unit_test/storage/knnindex/emvb_search/test_emvb_ut.cpp` | `EMVBTest` | `test_fakepq` | ported | `infinity-index` `emvb::tests::fake_pq_ranks_the_matching_centroids_documents` |
 | 604 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testsum256` | ported | `infinity-common` `simd::tests::emvb_simd_sum256` |
 | 605 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testloadstore` | ported | `infinity-common` `simd::tests::emvb_simd_load_store` |
@@ -720,10 +720,10 @@
 | 705 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_table` | ported | `infinity-executor` `checkpoint_ut::checkpoint_and_create_table` |
 | 706 | `src/unit_test/storage/new_catalog/checkpoint_add_column_ut.cpp` | `TestTxnCheckpointAddColumnTest` | `addcol_checkpoint_insert` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 707 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `test_checkpoint0` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 708 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint1` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
+| 708 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint1` | ported | `infinity-executor`/`infinity-storage` unit suite ported (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 709 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `test_checkpoint2` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 710 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint3` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 711 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint4` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
+| 710 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint3` | ported | `infinity-executor`/`infinity-storage` unit suite ported (`#[ignore]`: C++ DISABLED_SLOW_) |
+| 711 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint4` | ported | `infinity-executor`/`infinity-storage` unit suite ported (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 712 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `test_checkpoint5` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 713 | `src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp` | `TestTxnCleanupInternal` | `test_cleanup_db` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 714 | `src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp` | `TestTxnCleanupInternal` | `test_cleanup_table` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
@@ -798,7 +798,7 @@
 | 783 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_append` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 784 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_delete` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 785 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_dump_and_dump` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 786 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_test_dump_index_and_optimize_index` | ported | `infinity-executor` `dump_mem_index_ut::test_dump_index_and_optimize_index` (`#[ignore]`: C++ DISABLED_SLOW_) |
+| 786 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_test_dump_index_and_optimize_index` | ported | `infinity-executor` `dump_mem_index_ut::dump_index_and_optimize_index` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 787 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `test_dump_index_and_compact` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 788 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import1` | ported | `infinity-executor` `update_import_ut::*` |
 | 789 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_with_index` | ported | `infinity-executor` `update_import_ut::*` |

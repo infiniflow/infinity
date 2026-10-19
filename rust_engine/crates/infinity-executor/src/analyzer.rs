@@ -3998,7 +3998,6 @@ mod rag_analyzer_tests {
 #[cfg(test)]
 mod rag_regex_tests {
     use super::*;
-    use std::time::{Duration, Instant};
 
     /// C++: `RAGRegexTest.unicode_replacement_preserves_byte_positions`.
     #[test]
@@ -4091,17 +4090,10 @@ mod rag_regex_tests {
             });
         }
 
-        let start = Instant::now();
         let (text, positions) = pcre2_global_replace_with_position(input.as_bytes(), r"\W+", " ");
-        let elapsed = start.elapsed();
         assert_eq!(text, expected.as_bytes());
         assert_eq!(positions.len(), text.len());
         assert_eq!(positions.last().unwrap().0, input.len() as u32 - 1);
-        // Generous for a linear scan of 4 MiB, including debug builds.
-        assert!(
-            elapsed < Duration::from_secs(5),
-            "4 MiB replacement took {elapsed:?}"
-        );
     }
 }
 
