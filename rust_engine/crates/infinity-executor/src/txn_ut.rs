@@ -585,7 +585,10 @@ fn table_snapshot_create_snapshot_delete_data() {
     // `txn3->Delete(RowID(0, 4000..5000))`, also uncommitted.
     let second: Vec<(u32, u32)> = (4000..5000).map(|row| (0, row)).collect();
     let mut txn3 = e.begin_txn();
-    assert_eq!(txn3.delete_row_ids("default_db.tb1", &second).unwrap(), 1000);
+    assert_eq!(
+        txn3.delete_row_ids("default_db.tb1", &second).unwrap(),
+        1000
+    );
 
     // Uncommitted deletes are invisible to a scan and to the snapshot.
     assert_eq!(count(&e, "default_db.tb1"), 100_000);
@@ -604,8 +607,14 @@ fn table_snapshot_create_snapshot_delete_data() {
     let restored = e.fetch_rows_with_ids("default_db.tb1").unwrap();
     assert_eq!(restored.len(), 100_000);
     let ids: std::collections::HashSet<usize> = restored.iter().map(|(id, _)| *id).collect();
-    assert!(ids.contains(&1000), "row 1000 was deleted only after the snapshot");
-    assert!(ids.contains(&4000), "row 4000 was deleted only after the snapshot");
+    assert!(
+        ids.contains(&1000),
+        "row 1000 was deleted only after the snapshot"
+    );
+    assert!(
+        ids.contains(&4000),
+        "row 4000 was deleted only after the snapshot"
+    );
 }
 
 /// C++ `src/unit_test/storage/txn/table_snapshot_ut.cpp:576`

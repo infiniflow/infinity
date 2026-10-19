@@ -81,6 +81,7 @@ pub mod external_sort;
 pub mod fst_registry;
 pub mod fulltext_segment;
 pub mod inverted_format;
+pub mod io;
 pub mod knn_format;
 pub mod memindex_tracer;
 pub mod metastore;
@@ -118,6 +119,10 @@ pub use inverted_format::{
     append_fst_trailer, decode_column_lengths, decode_term_meta, encode_column_lengths,
     encode_term_meta, encode_term_meta_region, fst_checksum, read_vint, verify_fst, write_vint,
     TermMeta, TermMetaFlags, TermPostings, FST_TRAILER_LEN, FST_VERSION,
+};
+pub use io::{
+    ByteSlice, ByteSliceList, ByteSliceListIterator, ByteSliceReader, ByteSliceWriter, FileReader,
+    FileWriter, StreamReader,
 };
 pub use knn_format::{
     decode_graph_region, decode_ivf_plain_chunk, decode_ivf_pq_chunk, decode_ivf_sq_chunk,

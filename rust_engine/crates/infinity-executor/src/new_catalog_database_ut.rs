@@ -99,7 +99,10 @@ fn db_test3() {
     e.execute("CREATE DATABASE db1;").unwrap();
     assert!(e.execute("CREATE DATABASE db1;").is_err());
     e.execute("CREATE DATABASE IF NOT EXISTS db1;").unwrap();
-    assert_eq!(databases(&e), vec!["db1".to_string(), "default_db".to_string()]);
+    assert_eq!(
+        databases(&e),
+        vec!["db1".to_string(), "default_db".to_string()]
+    );
 
     e.execute("DROP DATABASE db1;").unwrap();
     assert!(!db_exists(&e, "db1"));

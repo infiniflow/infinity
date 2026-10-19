@@ -176,13 +176,7 @@ impl BlockIndex {
     /// Registers a block with no rows, like `SegmentMeta::AddBlockID1` followed
     /// by `BlockMeta::InitSet` in the reference (used when the allocator opens a
     /// block before its first row is written).
-    pub fn add_empty_block(
-        &mut self,
-        db_id: u64,
-        table_id: u64,
-        segment_id: u32,
-        block_id: u16,
-    ) {
+    pub fn add_empty_block(&mut self, db_id: u64, table_id: u64, segment_id: u32, block_id: u16) {
         let row_offset = self
             .blocks
             .iter()

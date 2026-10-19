@@ -132,9 +132,7 @@ impl Fuse8 {
         };
         // The reference relies on unsigned wrap-around for `size <= 1`; the
         // same intermediate values end at a 12-slot array.
-        let init_segment_count = capacity
-            .div_ceil(segment_length)
-            .wrapping_sub(ARITY - 1);
+        let init_segment_count = capacity.div_ceil(segment_length).wrapping_sub(ARITY - 1);
         let array_length = init_segment_count
             .wrapping_add(ARITY - 1)
             .wrapping_mul(segment_length);

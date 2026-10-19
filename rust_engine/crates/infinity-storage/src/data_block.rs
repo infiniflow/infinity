@@ -2197,7 +2197,9 @@ mod reference_suite {
             );
             let mut column = Column::new(LogicalType::Json).unwrap();
             column.initialize(ColumnVectorType::Flat, DEFAULT_VECTOR_SIZE);
-            column.push_block_value(BlockValue::Json(expected.clone())).unwrap();
+            column
+                .push_block_value(BlockValue::Json(expected.clone()))
+                .unwrap();
             assert_eq!(
                 column.get_value_by_index(0),
                 Some(BlockValue::Json(expected.clone()))

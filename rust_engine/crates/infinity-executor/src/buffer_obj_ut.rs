@@ -55,7 +55,10 @@ fn test_hnsw_index_buffer_obj_shutdown() {
     assert_eq!(e.segment_ids("test_hnsw"), vec![0]);
     // `SegmentIndexMeta(0).GetMemIndex() != nullptr`: both appended blocks are
     // in the memory segment (dumps happen only at `memindex_capacity`).
-    assert_eq!(e.mem_index_len("test_hnsw", "col1"), Some(INSERT_N * IMPORT_SIZE));
+    assert_eq!(
+        e.mem_index_len("test_hnsw", "col1"),
+        Some(INSERT_N * IMPORT_SIZE)
+    );
 
     // Drop table + cleanup (`CleanupTask`): the table entry, memory index and
     // block metadata are released.
@@ -85,8 +88,7 @@ fn test_big_with_gc_and_cleanup() {
         let rows: Vec<Vec<Literal>> = (0..IMPORT_SIZE)
             .map(|j| vec![Literal::Int((i * 1000 + j) as i64)])
             .collect();
-        e.insert_literals("default_db.table1", None, rows)
-            .unwrap();
+        e.insert_literals("default_db.table1", None, rows).unwrap();
     }
 
     // `GetTableMeta`: one segment; its block list has `kInsertN` entries.

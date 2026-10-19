@@ -10,6 +10,10 @@
 //! above. Queries use the same greedy descent + layer-0 beam search (`ef`).
 
 use std::collections::HashSet;
+use std::io::Write;
+use std::path::Path;
+
+use infinity_common::{Error, Result};
 
 /// Squared L2 distance.
 pub fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
@@ -133,13 +137,44 @@ enum HnswQuery {
     Plain(Vec<f32>),
     Lvq(crate::lvq::LvqQuery),
     Rabitq(crate::rabitq::RabitqQuery),
+    /// A sparse `(dimension, weight)` list, sorted by dimension (the
+    /// reference's `SparseVecRef`).
+    Sparse(Vec<(u32, f32)>),
+}
+
+/// Inner product of two sparse vectors.
+///
+/// C++: `SparseVecUtil::DistanceIP` (`sparse_util.cppm:162`). Both inputs are
+/// sorted by dimension; higher is closer, so the index stores `-IP`.
+fn sparse_ip(a: &[(u32, f32)], b: &[(u32, f32)]) -> f32 {
+    let (mut i, mut j, mut dot) = (0usize, 0usize, 0.0f32);
+    while i < a.len() && j < b.len() {
+        match a[i].0.cmp(&b[j].0) {
+            std::cmp::Ordering::Less => i += 1,
+            std::cmp::Ordering::Greater => j += 1,
+            std::cmp::Ordering::Equal => {
+                dot += a[i].1 * b[j].1;
+                i += 1;
+                j += 1;
+            }
+        }
+    }
+    dot
 }
 
 /// The vector payload of an HNSW graph.
 pub enum Store {
-    Plain { metric: Metric, data: Vec<Vec<f32>> },
+    Plain {
+        metric: Metric,
+        data: Vec<Vec<f32>>,
+    },
     Lvq(crate::lvq::LvqStore),
     Rabitq(crate::rabitq::RabitqStore),
+    /// The reference's `SparseIPVecStoreType`: sparse vectors scored by inner
+    /// product. It has no dense form, so `decompress` returns an empty vector.
+    SparseIp {
+        data: Vec<Vec<(u32, f32)>>,
+    },
 }
 
 fn plain_distance(a: &[f32], b: &[f32], metric: Metric) -> f32 {
@@ -162,6 +197,10 @@ fn plain_distance(a: &[f32], b: &[f32], metric: Metric) -> f32 {
 }
 
 impl Store {
+    fn sparse_ip() -> Self {
+        Store::SparseIp { data: Vec::new() }
+    }
+
     fn new(dims: usize, metric: Metric, encoding: HnswEncoding) -> Self {
         match encoding {
             HnswEncoding::Plain => Store::Plain {
@@ -196,6 +235,7 @@ impl Store {
             Store::Plain { data, .. } => data.len(),
             Store::Lvq(store) => store.len(),
             Store::Rabitq(store) => store.len(),
+            Store::SparseIp { data } => data.len(),
         }
     }
 
@@ -208,6 +248,15 @@ impl Store {
             Store::Rabitq(store) => {
                 store.compress(v);
             }
+            Store::SparseIp { .. } => panic!("dense insert into a sparse store"),
+        }
+    }
+
+    /// Appends one sparse document. `C++: SparseVecStoreInner::AddVector`.
+    fn push_sparse(&mut self, v: &[(u32, f32)]) {
+        match self {
+            Store::SparseIp { data } => data.push(v.to_vec()),
+            _ => panic!("sparse insert into a dense store"),
         }
     }
 
@@ -216,6 +265,14 @@ impl Store {
             Store::Plain { .. } => HnswQuery::Plain(v.to_vec()),
             Store::Lvq(store) => HnswQuery::Lvq(store.make_query(v)),
             Store::Rabitq(store) => HnswQuery::Rabitq(store.make_query(v)),
+            Store::SparseIp { .. } => panic!("dense query into a sparse store"),
+        }
+    }
+
+    fn make_query_sparse(&self, v: &[(u32, f32)]) -> HnswQuery {
+        match self {
+            Store::SparseIp { .. } => HnswQuery::Sparse(v.to_vec()),
+            _ => panic!("sparse query into a dense store"),
         }
     }
 
@@ -229,6 +286,10 @@ impl Store {
             (Store::Rabitq(store), HnswQuery::Rabitq(q)) => {
                 store.distance(q, index).unwrap_or(f32::MAX)
             }
+            (Store::SparseIp { data }, HnswQuery::Sparse(q)) => data
+                .get(index)
+                .map(|v| -sparse_ip(q, v))
+                .unwrap_or(f32::MAX),
             _ => f32::MAX,
         }
     }
@@ -253,10 +314,16 @@ impl Store {
                     store.distance(&q, b).unwrap_or(f32::MAX)
                 })
                 .unwrap_or(f32::MAX),
+            Store::SparseIp { data } => data
+                .get(a)
+                .zip(data.get(b))
+                .map(|(x, y)| -sparse_ip(x, y))
+                .unwrap_or(f32::MAX),
         }
     }
 
     /// The decompressed vector of `node` (allocates for quantized stores).
+    /// Sparse vectors have no dense form, so this returns an empty vector.
     fn decompress(&self, node: usize) -> Vec<f32> {
         match self {
             Store::Plain { data, .. } => data.get(node).cloned().unwrap_or_default(),
@@ -265,6 +332,7 @@ impl Store {
                 .map(|v| v.into_iter().map(|x| x as f32).collect())
                 .unwrap_or_default(),
             Store::Rabitq(store) => store.decompress(node).unwrap_or_default(),
+            Store::SparseIp { .. } => Vec::new(),
         }
     }
 
@@ -275,12 +343,16 @@ impl Store {
             Store::Rabitq(store) => {
                 store.len() * store.record_size() + store.dim() * store.dim() * 4 + 4 * store.dim()
             }
+            Store::SparseIp { data } => data
+                .iter()
+                .map(|v| v.capacity() * std::mem::size_of::<(u32, f32)>())
+                .sum(),
         }
     }
 
     fn encoding(&self) -> HnswEncoding {
         match self {
-            Store::Plain { .. } => HnswEncoding::Plain,
+            Store::Plain { .. } | Store::SparseIp { .. } => HnswEncoding::Plain,
             Store::Lvq(_) => HnswEncoding::Lvq,
             Store::Rabitq(_) => HnswEncoding::Rabitq,
         }
@@ -299,13 +371,14 @@ impl Store {
                 crate::rabitq::Metric::Ip => Metric::Ip,
                 crate::rabitq::Metric::Cos => Metric::Cos,
             },
+            Store::SparseIp { .. } => Metric::Ip,
         }
     }
 
     /// Trains the store's mean/centroid without storing any vector.
     fn train(&mut self, vectors: &[Vec<f32>]) {
         match self {
-            Store::Plain { .. } => {}
+            Store::Plain { .. } | Store::SparseIp { .. } => {}
             Store::Lvq(store) => store.train(vectors),
             Store::Rabitq(store) => store.train(vectors),
         }
@@ -351,13 +424,36 @@ impl HnswIndex {
         metric: Metric,
         encoding: HnswEncoding,
     ) -> Self {
+        Self::with_store(
+            dims,
+            m,
+            ef_construction,
+            ef_search,
+            Store::new(dims, metric, encoding),
+        )
+    }
+
+    /// C++: `KnnHnsw<SparseIPVecStoreType<float, i32>, u64>` — the last
+    /// `test_hnsw_sparse_ut.cpp` store. The graph and query path are shared
+    /// with the dense indexes; only the payload and distance differ.
+    pub fn sparse_ip(dims: usize, m: usize, ef_construction: usize, ef_search: usize) -> Self {
+        Self::with_store(dims, m, ef_construction, ef_search, Store::sparse_ip())
+    }
+
+    fn with_store(
+        dims: usize,
+        m: usize,
+        ef_construction: usize,
+        ef_search: usize,
+        store: Store,
+    ) -> Self {
         Self {
             dims,
             m,
             ef_construction: ef_construction.max(m),
             ef_search,
             ml: 1.0 / (m as f64).ln(),
-            store: Store::new(dims, metric, encoding),
+            store,
             lsg: None,
             levels: Vec::new(),
             links: Vec::new(),
@@ -425,6 +521,168 @@ impl HnswIndex {
     /// The stored (decompressed) vector of `node`.
     pub fn vector(&self, node: usize) -> Vec<f32> {
         self.store.decompress(node)
+    }
+
+    /// The stored sparse document of `node`, when this is a sparse index.
+    pub fn sparse_vector(&self, node: usize) -> Option<&[(u32, f32)]> {
+        match &self.store {
+            Store::SparseIp { data } => data.get(node).map(Vec::as_slice),
+            _ => None,
+        }
+    }
+
+    /// C++ `KnnHnsw::Check`: every link points at an existing node, never at
+    /// itself, and appears once per neighbour list.
+    pub fn check(&self) -> Result<()> {
+        let n = self.store.len();
+        if let Some(entry) = self.entry {
+            if entry >= n {
+                return Err(Error::Invalid(format!("entry {entry} outside 0..{n}")));
+            }
+        }
+        for (layer, nodes) in self.links.iter().enumerate() {
+            for (node, neighbors) in nodes.iter().enumerate() {
+                let mut seen = HashSet::with_capacity(neighbors.len());
+                for &neighbor in neighbors {
+                    if neighbor >= n {
+                        return Err(Error::Invalid(format!(
+                            "layer {layer} node {node} links to {neighbor} outside 0..{n}"
+                        )));
+                    }
+                    if neighbor == node {
+                        return Err(Error::Invalid(format!(
+                            "layer {layer} node {node} links to itself"
+                        )));
+                    }
+                    if !seen.insert(neighbor) {
+                        return Err(Error::Invalid(format!(
+                            "layer {layer} node {node} links to {neighbor} twice"
+                        )));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// C++ `KnnHnsw::Dump`: one line per node (`node level neighbours...`).
+    pub fn dump(&self, out: &mut impl Write) -> std::io::Result<()> {
+        for node in 0..self.store.len() {
+            write!(out, "{node} {}", self.level_of(node))?;
+            for &neighbor in self.neighbors(0, node) {
+                write!(out, " {neighbor}")?;
+            }
+            writeln!(out)?;
+        }
+        Ok(())
+    }
+
+    /// Serializes a sparse index (store + graph) to `path`.
+    ///
+    /// C++: `KnnHnsw::Save(FileHandle)`. The reference's writer is generic
+    /// over the store; this port implements the sparse store because that is
+    /// the only caller in the ported suite.
+    pub fn save_sparse(&self, path: impl AsRef<Path>) -> Result<()> {
+        let path = path.as_ref();
+        let Store::SparseIp { data } = &self.store else {
+            return Err(Error::Invalid(
+                "save_sparse requires a sparse index".to_string(),
+            ));
+        };
+        let mut out = Vec::new();
+        out.extend_from_slice(b"SPHNSW1\0");
+        put_u64(&mut out, self.dims as u64);
+        put_u64(&mut out, self.m as u64);
+        put_u64(&mut out, self.ef_search as u64);
+        put_u64(&mut out, self.max_level as u64);
+        put_u64(&mut out, data.len() as u64);
+        for doc in data {
+            put_u64(&mut out, doc.len() as u64);
+            for &(idx, weight) in doc {
+                out.extend_from_slice(&idx.to_le_bytes());
+                out.extend_from_slice(&weight.to_le_bytes());
+            }
+        }
+        for node in 0..data.len() {
+            put_u64(&mut out, self.level_of(node) as u64);
+        }
+        put_u64(&mut out, self.entry.map_or(u64::MAX, |entry| entry as u64));
+        put_u64(&mut out, self.links.len() as u64);
+        for layer in &self.links {
+            put_u64(&mut out, layer.len() as u64);
+            for neighbors in layer {
+                put_u64(&mut out, neighbors.len() as u64);
+                for &neighbor in neighbors {
+                    out.extend_from_slice(&(neighbor as u32).to_le_bytes());
+                }
+            }
+        }
+        std::fs::write(path, out).map_err(|e| Error::io(path, e))
+    }
+
+    /// Loads an index written by [`HnswIndex::save_sparse`].
+    pub fn load_sparse(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let buf = std::fs::read(path).map_err(|e| Error::io(path, e))?;
+        let mut reader = SparseReader { buf: &buf, pos: 0 };
+        if reader.take(8)? != b"SPHNSW1\0" {
+            return Err(Error::Invalid("bad sparse HNSW magic".to_string()));
+        }
+        let dims = reader.u64()? as usize;
+        let m = reader.u64()? as usize;
+        let ef_search = reader.u64()? as usize;
+        let max_level = reader.u64()? as usize;
+        let n = reader.u64()? as usize;
+        let mut data = Vec::with_capacity(n);
+        for _ in 0..n {
+            let nnz = reader.u64()? as usize;
+            let mut doc = Vec::with_capacity(nnz);
+            for _ in 0..nnz {
+                let idx = u32::from_le_bytes(reader.take(4)?.try_into().unwrap());
+                let weight = f32::from_le_bytes(reader.take(4)?.try_into().unwrap());
+                doc.push((idx, weight));
+            }
+            data.push(doc);
+        }
+        let mut levels = Vec::with_capacity(n);
+        for _ in 0..n {
+            levels.push(reader.u64()? as usize);
+        }
+        let entry_raw = reader.u64()?;
+        let entry = if entry_raw == u64::MAX {
+            None
+        } else {
+            Some(entry_raw as usize)
+        };
+        let layer_count = reader.u64()? as usize;
+        let mut links = Vec::with_capacity(layer_count);
+        for _ in 0..layer_count {
+            let rows = reader.u64()? as usize;
+            let mut layer = Vec::with_capacity(rows);
+            for _ in 0..rows {
+                let len = reader.u64()? as usize;
+                let mut neighbors = Vec::with_capacity(len);
+                for _ in 0..len {
+                    neighbors
+                        .push(u32::from_le_bytes(reader.take(4)?.try_into().unwrap()) as usize);
+                }
+                layer.push(neighbors);
+            }
+            links.push(layer);
+        }
+        let index = Self::from_store_parts(
+            dims,
+            m,
+            ef_search,
+            Store::SparseIp { data },
+            None,
+            levels,
+            links,
+            entry,
+            max_level,
+        );
+        index.check()?;
+        Ok(index)
     }
 
     /// The entry point, if any vectors were added.
@@ -529,6 +787,9 @@ impl HnswIndex {
     /// wrapper ("Discard LSG Wrapper after compression"), so the scaling is
     /// dropped here as well.
     pub fn compress_to_lvq(&mut self) {
+        if matches!(self.store, Store::SparseIp { .. }) {
+            return;
+        }
         let vectors: Vec<Vec<f32>> = (0..self.len()).map(|i| self.store.decompress(i)).collect();
         let metric = match self.store.metric() {
             Metric::L2 => crate::lvq::Metric::L2,
@@ -547,7 +808,7 @@ impl HnswIndex {
     /// labels stay untouched; like `compress_to_lvq`, the LSG wrapper is
     /// discarded by the reference conversion.
     pub fn compress_to_rabitq(&mut self) {
-        if matches!(self.store, Store::Rabitq(_)) {
+        if matches!(self.store, Store::Rabitq(_) | Store::SparseIp { .. }) {
             return;
         }
         let vectors: Vec<Vec<f32>> = (0..self.len()).map(|i| self.store.decompress(i)).collect();
@@ -565,7 +826,9 @@ impl HnswIndex {
     /// The vec-store meta blob written into the HNSW chunk header.
     pub fn store_meta_bytes(&self) -> Vec<u8> {
         match &self.store {
-            Store::Plain { .. } => (self.dims as u64).to_le_bytes().to_vec(),
+            Store::Plain { .. } | Store::SparseIp { .. } => {
+                (self.dims as u64).to_le_bytes().to_vec()
+            }
             Store::Lvq(store) => store.meta_bytes(),
             Store::Rabitq(store) => store.meta_bytes(),
         }
@@ -585,15 +848,29 @@ impl HnswIndex {
             }
             Store::Lvq(store) => store.records_bytes(),
             Store::Rabitq(store) => store.records_bytes(),
+            Store::SparseIp { data } => {
+                let mut out = Vec::new();
+                for doc in data {
+                    out.extend_from_slice(&(doc.len() as u32).to_le_bytes());
+                    for &(idx, weight) in doc {
+                        out.extend_from_slice(&idx.to_le_bytes());
+                        out.extend_from_slice(&weight.to_le_bytes());
+                    }
+                }
+                out
+            }
         }
     }
 
-    /// Bytes per vector in the chunk's vector region.
+    /// Bytes per vector in the chunk's vector region. Sparse records are
+    /// variable-length, so there is no fixed size (the sparse store is not
+    /// written through the HNSW chunk layout).
     pub fn store_record_size(&self) -> usize {
         match &self.store {
             Store::Plain { .. } => self.dims * 4,
             Store::Lvq(store) => store.record_size(),
             Store::Rabitq(store) => store.record_size(),
+            Store::SparseIp { .. } => 0,
         }
     }
 
@@ -742,9 +1019,27 @@ impl HnswIndex {
     /// `Build`: insert one vector into the graph.
     pub fn add(&mut self, v: &[f32]) -> usize {
         assert_eq!(v.len(), self.dims, "dimension mismatch");
-        let node = self.store.len();
-        self.store.push(v);
         let query = self.store.make_query(v);
+        self.insert_node(query, |store| store.push(v))
+    }
+
+    /// C++ `KnnHnsw<SparseIPVecStoreType>::InsertVecs` for one document.
+    pub fn add_sparse(&mut self, v: &[(u32, f32)]) -> usize {
+        assert!(
+            v.iter().all(|(idx, _)| (*idx as usize) < self.dims),
+            "sparse dimension out of range"
+        );
+        assert!(
+            v.windows(2).all(|pair| pair[0].0 < pair[1].0),
+            "sparse vector is not strictly sorted by dimension"
+        );
+        let query = self.store.make_query_sparse(v);
+        self.insert_node(query, |store| store.push_sparse(v))
+    }
+
+    fn insert_node(&mut self, query: HnswQuery, push: impl FnOnce(&mut Store)) -> usize {
+        let node = self.store.len();
+        push(&mut self.store);
         let q_layer = self.random_level();
 
         let (max_layer, mut ep) = match self.entry {
@@ -911,10 +1206,19 @@ impl HnswIndex {
 
     /// `KnnSearchOption.ef_`: the candidate list size for the bottom layer.
     pub fn search_with_ef(&self, q: &[f32], k: usize, ef: usize) -> Vec<(usize, f32)> {
+        self.search_query(self.store.make_query(q), k, ef)
+    }
+
+    /// The sparse counterpart of [`HnswIndex::search_with_ef`]
+    /// (C++ `KnnHnsw<SparseIPVecStoreType>::KnnSearchSorted`).
+    pub fn search_sparse(&self, q: &[(u32, f32)], k: usize, ef: usize) -> Vec<(usize, f32)> {
+        self.search_query(HnswQuery::Sparse(q.to_vec()), k, ef)
+    }
+
+    fn search_query(&self, query: HnswQuery, k: usize, ef: usize) -> Vec<(usize, f32)> {
         let Some(entry) = self.entry else {
             return vec![];
         };
-        let query = self.store.make_query(q);
         let mut cur = entry;
         let mut l = self.max_level as i64;
         while l > 0 {
@@ -952,6 +1256,32 @@ impl HnswIndex {
         res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         res.truncate(k);
         res.into_iter().map(|(d, i)| (i, d)).collect()
+    }
+}
+
+fn put_u64(out: &mut Vec<u8>, value: u64) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+/// Bounds-checked cursor for [`HnswIndex::load_sparse`].
+struct SparseReader<'a> {
+    buf: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> SparseReader<'a> {
+    fn take(&mut self, n: usize) -> Result<&'a [u8]> {
+        let end = self.pos + n;
+        let bytes = self
+            .buf
+            .get(self.pos..end)
+            .ok_or_else(|| Error::Invalid("truncated sparse HNSW file".to_string()))?;
+        self.pos = end;
+        Ok(bytes)
+    }
+
+    fn u64(&mut self) -> Result<u64> {
+        Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
     }
 }
 
@@ -1296,6 +1626,170 @@ mod reference_suite {
         assert_eq!(got[0].0, 3);
         assert!((got[0].1 - 0.2).abs() < 1e-4);
     }
+    /// C++: `HnswSparseTest.test1`
+    /// (`src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_sparse_ut.cpp:126`).
+    ///
+    /// `KnnHnsw<SparseIPVecStoreType<float, i32>, u64>` over the reference's
+    /// generated sparse matrix: 1280 documents, 1600 dimensions, 1% density,
+    /// M=16, ef_construction=200, ef=50. The reference's ground-truth checks
+    /// are commented out upstream; this port asserts the surface it does keep
+    /// (build, `Check`, `Dump`, `Save`/`Load`) plus the real contract of every
+    /// search result: a valid label whose returned distance is exactly
+    /// `-IP(query, stored_doc)`.
+    #[test]
+    fn sparse_ip_hnsw_roundtrip() {
+        use std::collections::HashSet;
+        use tempfile::tempdir;
+
+        const MAX_DIM: u32 = 1600;
+        const M: usize = 16;
+        const EF_CONSTRUCTION: usize = 200;
+        const EF_SEARCH: usize = 50;
+        const CHUNK_SIZE: usize = 128;
+        const MAX_CHUNK_N: usize = 10;
+
+        struct SparseRng(u64);
+        impl SparseRng {
+            fn new(seed: u64) -> Self {
+                Self(seed | 1)
+            }
+            fn next(&mut self) -> u64 {
+                let mut x = self.0;
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                self.0 = x;
+                x
+            }
+            fn below(&mut self, n: u32) -> u32 {
+                (self.next() % n as u64) as u32
+            }
+            fn unit(&mut self) -> f32 {
+                (self.next() >> 40) as f32 / (1u64 << 24) as f32
+            }
+        }
+
+        fn generate_dataset(nrow: u32, ncol: u32, sparsity: f32) -> Vec<Vec<(u32, f32)>> {
+            let mut rng = SparseRng::new(0x5EED_5EED);
+            let nnz = (nrow as usize * ncol as usize) as f32 * sparsity;
+            let nnz = nnz as usize;
+            let mut indptr = vec![0usize; nrow as usize + 1];
+            loop {
+                indptr[0] = 0;
+                indptr[nrow as usize] = nnz;
+                for slot in indptr.iter_mut().take(nrow as usize).skip(1) {
+                    *slot = rng.below(nnz as u32 + 1) as usize;
+                }
+                indptr[..nrow as usize].sort_unstable();
+                if indptr
+                    .windows(2)
+                    .all(|pair| pair[1] - pair[0] <= ncol as usize)
+                {
+                    break;
+                }
+            }
+            let mut docs = Vec::with_capacity(nrow as usize);
+            for row in 0..nrow as usize {
+                let count = indptr[row + 1] - indptr[row];
+                let mut indices = HashSet::with_capacity(count);
+                while indices.len() < count {
+                    indices.insert(rng.below(ncol));
+                }
+                let mut indices: Vec<u32> = indices.into_iter().collect();
+                indices.sort_unstable();
+                docs.push(
+                    indices
+                        .into_iter()
+                        .map(|idx| (idx, rng.unit()))
+                        .collect::<Vec<_>>(),
+                );
+            }
+            docs
+        }
+
+        fn exact_scores(query: &[(u32, f32)], docs: &[Vec<(u32, f32)>]) -> Vec<f32> {
+            docs.iter().map(|doc| sparse_ip(query, doc)).collect()
+        }
+
+        fn assert_results_are_exact(index: &HnswIndex, docs: &[Vec<(u32, f32)>]) -> f64 {
+            let mut queries = 0usize;
+            let mut top1 = 0usize;
+            for query in docs {
+                if query.is_empty() {
+                    continue;
+                }
+                let scores = exact_scores(query, docs);
+                let best = scores.iter().copied().fold(f32::MIN, f32::max);
+                if best == 0.0 {
+                    continue;
+                }
+                queries += 1;
+                let result = index.search_sparse(query, 1, EF_SEARCH);
+                assert_eq!(result.len(), 1, "one neighbour for a non-zero query");
+                let (label, distance) = result[0];
+                assert!(label < docs.len(), "label {label} outside the dataset");
+                let stored = index.sparse_vector(label).expect("sparse store");
+                assert_eq!(stored, docs[label].as_slice());
+                let ip = sparse_ip(query, stored);
+                assert!(
+                    (-distance - ip).abs() < 1e-4,
+                    "distance {distance} does not match -IP {ip}"
+                );
+                let exact_best = scores
+                    .iter()
+                    .enumerate()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                    .map(|(id, _)| id)
+                    .unwrap();
+                if label == exact_best {
+                    top1 += 1;
+                }
+            }
+            assert!(queries > 0, "no non-zero queries in the generated set");
+            top1 as f64 / queries as f64
+        }
+
+        assert_eq!(CHUNK_SIZE * MAX_CHUNK_N, 1280);
+        let docs = generate_dataset((CHUNK_SIZE * MAX_CHUNK_N) as u32, MAX_DIM, 0.01);
+        assert_eq!(docs.len(), 1280);
+
+        let mut index = HnswIndex::sparse_ip(MAX_DIM as usize, M, EF_CONSTRUCTION, EF_SEARCH);
+        for doc in &docs {
+            index.add_sparse(doc);
+        }
+        assert_eq!(index.len(), docs.len());
+        index.check().unwrap();
+
+        // `Dump`: one line per node.
+        let dir = tempdir().unwrap();
+        let dump_path = dir.path().join("dump.txt");
+        {
+            let mut file = std::fs::File::create(&dump_path).unwrap();
+            index.dump(&mut file).unwrap();
+        }
+        let dump = std::fs::read_to_string(&dump_path).unwrap();
+        assert_eq!(dump.lines().count(), docs.len());
+
+        let recall = assert_results_are_exact(&index, &docs);
+        assert!(
+            recall >= 0.9,
+            "top-1 recall against brute-force IP too low: {recall}"
+        );
+
+        let save_path = dir.path().join("test_hnsw_sparse.bin");
+        index.save_sparse(&save_path).unwrap();
+        let loaded = HnswIndex::load_sparse(&save_path).unwrap();
+        assert_eq!(loaded.len(), docs.len());
+        assert_eq!(loaded.dims(), MAX_DIM as usize);
+        assert_eq!(loaded.m(), M);
+        loaded.check().unwrap();
+        let restored_recall = assert_results_are_exact(&loaded, &docs);
+        assert!(
+            restored_recall >= 0.9,
+            "top-1 recall after load too low: {restored_recall}"
+        );
+    }
+
     /// C++: `HnswHandlerTest.DISABLED_SLOW_test_load` — build, save to the chunk
     /// layout, load and search. `#[ignore]` mirrors the C++ `DISABLED_` case.
     #[test]

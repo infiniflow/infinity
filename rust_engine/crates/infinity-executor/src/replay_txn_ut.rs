@@ -173,7 +173,7 @@ fn replay_flush_gap_append_compact() {
 
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
     e.cleanup().unwrap();
 }
 
@@ -345,7 +345,10 @@ fn ckp_replay_import() {
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["32768"]]
     );
     h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
@@ -368,9 +371,12 @@ fn ckp_replay_compact() {
 
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["32768"]]
     );
 }
@@ -409,7 +415,10 @@ fn replay_alter_add_column() {
         "default_db.tb1",
         (0..4).map(|_| vec![Literal::Int(1)]).collect(),
     );
-    h::ok(&e, "ALTER TABLE default_db.tb1 ADD COLUMN (col2 VARCHAR DEFAULT '');");
+    h::ok(
+        &e,
+        "ALTER TABLE default_db.tb1 ADD COLUMN (col2 VARCHAR DEFAULT '');",
+    );
 
     let e = h::reopen(e, dir.path());
     assert_eq!(e.segment_ids("default_db.tb1"), vec![0]);

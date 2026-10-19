@@ -78,7 +78,8 @@ fn test_add_columns() {
     );
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2"]);
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);").unwrap();
+    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+        .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1"]);
     e.cleanup().unwrap();
 }
@@ -95,10 +96,7 @@ fn alter_column() {
         .unwrap();
     e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
         .unwrap();
-    assert_eq!(
-        columns(&e, "db1.tb1"),
-        vec!["col1", "col2", "col3", "col4"]
-    );
+    assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2", "col3", "col4"]);
 
     e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col3);")
         .unwrap();
@@ -175,19 +173,13 @@ fn add_column_and_add_column() {
         .unwrap();
     e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
         .unwrap();
-    assert_eq!(
-        columns(&e, "db1.tb1"),
-        vec!["col1", "col2", "col3", "col4"]
-    );
+    assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2", "col3", "col4"]);
 
     // Duplicate column name (the reference's second add) is rejected.
     assert!(e
         .execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
         .is_err());
-    assert_eq!(
-        columns(&e, "db1.tb1"),
-        vec!["col1", "col2", "col3", "col4"]
-    );
+    assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2", "col3", "col4"]);
 
     e.execute("DROP DATABASE db1;").unwrap();
 }
@@ -277,8 +269,12 @@ fn drop_column_and_drop_column() {
     assert_eq!(columns(&e, "db1.tb1"), vec!["col2"]);
 
     // Dropping the same names again fails.
-    assert!(e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col1);").is_err());
-    assert!(e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col3);").is_err());
+    assert!(e
+        .execute("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
+        .is_err());
+    assert!(e
+        .execute("ALTER TABLE db1.tb1 DROP COLUMN (col3);")
+        .is_err());
     assert_eq!(columns(&e, "db1.tb1"), vec!["col2"]);
 
     e.execute("DROP DATABASE db1;").unwrap();

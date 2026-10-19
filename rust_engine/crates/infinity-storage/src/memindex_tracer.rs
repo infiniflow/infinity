@@ -385,7 +385,12 @@ mod tests {
                     let idx_i = (seed >> 33) % index_n;
                     let mem = (seed >> 20) % max_append_mem + 1;
                     let idx_name = format!("idx{idx_i}");
-                    catalog.append_mem_index(&idx_name, mem as usize, mem as usize, tracer.as_ref());
+                    catalog.append_mem_index(
+                        &idx_name,
+                        mem as usize,
+                        mem as usize,
+                        tracer.as_ref(),
+                    );
                 }
             }));
         }

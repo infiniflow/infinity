@@ -394,10 +394,7 @@ impl PersistenceManager {
             .append(true)
             .open(&dst_path)
             .map_err(|e| Error::io(&dst_path, e))?;
-        let current_size = dst
-            .metadata()
-            .map_err(|e| Error::io(&dst_path, e))?
-            .len() as usize;
+        let current_size = dst.metadata().map_err(|e| Error::io(&dst_path, e))?.len() as usize;
         if current_size < inner.current_object_size {
             dst.write_all(&vec![0u8; inner.current_object_size - current_size])
                 .map_err(|e| Error::io(&dst_path, e))?;
@@ -463,12 +460,16 @@ impl PersistenceManager {
                 }
                 if obj_addr.obj_key == inner.current_object_key {
                     self.finalize_locked(inner, persist_keys);
-                    inner.objects.get(&obj_addr.obj_key).cloned().ok_or_else(|| {
-                        Error::Unrecoverable(format!(
-                            "CleanupNoLock Failed to find object {}",
-                            obj_addr.obj_key
-                        ))
-                    })?
+                    inner
+                        .objects
+                        .get(&obj_addr.obj_key)
+                        .cloned()
+                        .ok_or_else(|| {
+                            Error::Unrecoverable(format!(
+                                "CleanupNoLock Failed to find object {}",
+                                obj_addr.obj_key
+                            ))
+                        })?
                 } else {
                     return Err(Error::Unrecoverable(format!(
                         "CleanupNoLock Failed to find object {}",
@@ -655,10 +656,7 @@ mod tests {
         let persist_str = "Persistence Manager Test";
         let file_path = fixture.write_file("persist_file", persist_str);
 
-        let result = fixture
-            .pm
-            .persist(&file_path, &file_path)
-            .expect("persist");
+        let result = fixture.pm.persist(&file_path, &file_path).expect("persist");
         PersistResultHandler::new(&fixture.pm)
             .handle_write_result(&result)
             .unwrap();
@@ -687,10 +685,7 @@ mod tests {
             file_paths.push(file_path.clone());
             persist_strs.push(persist_str);
 
-            let result = fixture
-                .pm
-                .persist(&file_path, &file_path)
-                .expect("persist");
+            let result = fixture.pm.persist(&file_path, &file_path).expect("persist");
             PersistResultHandler::new(&fixture.pm)
                 .handle_write_result(&result)
                 .unwrap();
@@ -768,10 +763,7 @@ mod tests {
         for i in 0..10 {
             let persist_str = format!("Persistence Manager Test {i}");
             let file_path = fixture.write_file(&format!("persist_file{i}"), &persist_str);
-            let result = fixture
-                .pm
-                .persist(&file_path, &file_path)
-                .expect("persist");
+            let result = fixture.pm.persist(&file_path, &file_path).expect("persist");
             PersistResultHandler::new(&fixture.pm)
                 .handle_write_result(&result)
                 .unwrap();

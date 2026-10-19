@@ -75,13 +75,7 @@ fn append_append_keeps_one_visible_block() {
 
     for _ in 0..2 {
         assert_eq!(
-            h::append_repeated(
-                &e,
-                "db1.tb1",
-                1,
-                "abcdefghijklmnopqrstuvwxyz",
-                4096
-            ),
+            h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 4096),
             4096
         );
     }
@@ -206,7 +200,15 @@ fn delete_then_add_column() {
     assert_eq!(e.row_count("db1.tb1").unwrap(), 0);
 
     h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col3 INT);");
-    h::append(&e, "db1.tb1", vec![vec![Literal::Int(2), Literal::Str("abc".into()), Literal::Int(9)]]);
+    h::append(
+        &e,
+        "db1.tb1",
+        vec![vec![
+            Literal::Int(2),
+            Literal::Str("abc".into()),
+            Literal::Int(9),
+        ]],
+    );
     let all = h::rows(&e, "SELECT col1, col2, col3 FROM db1.tb1;");
     assert_eq!(all, vec![vec!["2", "abc", "9"]]);
 }
@@ -242,14 +244,20 @@ fn delete_then_rename_table() {
         .collect();
     h::append(&e, "db1.tb1", rows);
     let mut t = e.begin_txn();
-    let ids: Vec<(u32, u32)> = (0..8192).filter(|i| i % 2 == 0).map(|i| (0, i as u32)).collect();
+    let ids: Vec<(u32, u32)> = (0..8192)
+        .filter(|i| i % 2 == 0)
+        .map(|i| (0, i as u32))
+        .collect();
     assert_eq!(t.delete_row_ids("db1.tb1", &ids).unwrap(), 4096);
     t.commit().unwrap();
 
     h::ok(&e, "ALTER TABLE db1.tb1 RENAME TO db1.tb2;");
     assert!(!e.table_exists("db1.tb1"));
     assert_eq!(e.row_count("db1.tb2").unwrap(), 4096);
-    assert_eq!(h::rows(&e, "SELECT col1 FROM db1.tb2 ORDER BY col1 LIMIT 1;"), vec![vec!["1"]]);
+    assert_eq!(
+        h::rows(&e, "SELECT col1 FROM db1.tb2 ORDER BY col1 LIMIT 1;"),
+        vec![vec!["1"]]
+    );
 }
 
 /// C++ `src/unit_test/storage/new_catalog/delete_ut.cpp:2839`
@@ -266,7 +274,10 @@ fn delete_then_create_index() {
     h::append(&e, "db1.tb1", rows);
     // `txn1->Delete(RowID(0, {0,2,4,…}))`: every even offset.
     let mut t = e.begin_txn();
-    let ids: Vec<(u32, u32)> = (0..8192).filter(|i| i % 2 == 0).map(|i| (0, i as u32)).collect();
+    let ids: Vec<(u32, u32)> = (0..8192)
+        .filter(|i| i % 2 == 0)
+        .map(|i| (0, i as u32))
+        .collect();
     assert_eq!(t.delete_row_ids("db1.tb1", &ids).unwrap(), 4096);
     t.commit().unwrap();
 
@@ -274,13 +285,20 @@ fn delete_then_create_index() {
     assert_eq!(h::count(&e, "db1.tb1"), 4096);
     for gone in [0, 2, 4] {
         assert!(
-            h::rows(&e, &format!("SELECT col1 FROM db1.tb1 WHERE col1 = {gone};")).is_empty(),
+            h::rows(
+                &e,
+                &format!("SELECT col1 FROM db1.tb1 WHERE col1 = {gone};")
+            )
+            .is_empty(),
             "even row {gone} is deleted"
         );
     }
     for live in [1, 3, 5] {
         assert_eq!(
-            h::rows(&e, &format!("SELECT col1 FROM db1.tb1 WHERE col1 = {live};")),
+            h::rows(
+                &e,
+                &format!("SELECT col1 FROM db1.tb1 WHERE col1 = {live};")
+            ),
             vec![vec![live.to_string()]]
         );
     }
@@ -325,11 +343,17 @@ fn delete_then_import() {
     std::fs::write(&csv, text).unwrap();
     h::ok(
         &e,
-        &format!("COPY db1.tb1 FROM '{}' WITH (DELIMITER ',', FORMAT CSV);", csv.display()),
+        &format!(
+            "COPY db1.tb1 FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            csv.display()
+        ),
     );
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     assert_eq!(h::count(&e, "db1.tb1"), 8192);
-    assert_eq!(h::rows(&e, "SELECT col1 FROM db1.tb1 LIMIT 1;"), vec![vec!["7"]]);
+    assert_eq!(
+        h::rows(&e, "SELECT col1 FROM db1.tb1 LIMIT 1;"),
+        vec![vec!["7"]]
+    );
 }
 
 /// C++ `src/unit_test/storage/new_catalog/delete_ut.cpp:5638`
@@ -364,7 +388,7 @@ fn delete_then_compact() {
 
     e.compact_table("db1.tb1").unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
     e.flush().unwrap();
     assert_eq!(e.block_ids("db1.tb1", 0).len(), 1);
     assert_eq!(e.block_row_count("db1.tb1", 0, 0), Some(8192));

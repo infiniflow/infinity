@@ -5,6 +5,8 @@
 #![forbid(unsafe_code)]
 
 pub mod cpp_layout;
+/// Versioned metadata cache (C++ `MetaCache`).
+pub mod meta_cache;
 /// C++-compatible value encoding for catalog records (spec §8.6).
 pub mod value_format;
 
@@ -349,6 +351,26 @@ impl Catalog {
         }
         self.write_cpp_layout_from(self.store.as_ref(), dbs, tables, indexes)?;
         Ok(())
+    }
+
+    /// Republishes the whole C++ layout from the **current** native catalog,
+    /// deleting every record the layout owns first. A checkpoint must call
+    /// this (not [`Self::write_cpp_layout`]) so a dropped database, table or
+    /// index cannot survive as a stale key that `import_cpp_layout` would
+    /// resurrect on the next open.
+    pub fn rewrite_cpp_layout(&self, store: &dyn MetaStore) -> Result<usize> {
+        let dbs = self.list_databases()?;
+        let tables = self.list_tables()?;
+        let indexes = self.list_indexes()?;
+        for prefix in CPP_KEY_PREFIXES {
+            for (k, _) in store.scan_prefix(prefix.as_bytes())? {
+                store.delete(&k)?;
+            }
+        }
+        for k in ["next_database_id", "next_table_id", "meta|version"] {
+            store.delete(k.as_bytes())?;
+        }
+        self.write_cpp_layout_from(store, &dbs, &tables, &indexes)
     }
 
     fn read_counter(&self) -> Result<u64> {

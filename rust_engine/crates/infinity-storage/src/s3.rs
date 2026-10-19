@@ -583,4 +583,92 @@ mod tests {
                 .1
         );
     }
+
+    /// MinIO endpoint/bucket from the environment; `None` skips the test
+    /// without touching the network, like `upload_meta_to_s3_ut`.
+    fn env_config() -> Option<S3Config> {
+        let endpoint = std::env::var("INFINITY_MINIO_ENDPOINT").unwrap_or_default();
+        let bucket = std::env::var("INFINITY_MINIO_BUCKET").unwrap_or_default();
+        if endpoint.is_empty() || bucket.is_empty() {
+            eprintln!(
+                "skipping minio test: set INFINITY_MINIO_ENDPOINT and \
+                 INFINITY_MINIO_BUCKET (optional: INFINITY_MINIO_ACCESS_KEY, \
+                 INFINITY_MINIO_SECRET_KEY, INFINITY_MINIO_HTTPS=1) and run with --ignored"
+            );
+            return None;
+        }
+        Some(S3Config {
+            endpoint,
+            bucket,
+            access_key: std::env::var("INFINITY_MINIO_ACCESS_KEY")
+                .unwrap_or_else(|_| "minioadmin".to_string()),
+            secret_key: std::env::var("INFINITY_MINIO_SECRET_KEY")
+                .unwrap_or_else(|_| "minioadmin".to_string()),
+            https: std::env::var("INFINITY_MINIO_HTTPS").ok().as_deref() == Some("1"),
+        })
+    }
+
+    fn object_key(name: &str) -> String {
+        format!("unit_test/{name}-{}", std::process::id())
+    }
+
+    /// C++: `s3_client_minio_ut.cpp:36` (`S3ClientMinioTest.test1`). The
+    /// reference body is commented out; this pins the same initialisation and
+    /// a real put/get/delete round trip when MinIO is configured.
+    #[test]
+    #[ignore = "C++ S3ClientMinioTest relies on MinIO; set INFINITY_MINIO_* and run with --ignored"]
+    fn minio_client_roundtrip() {
+        let Some(config) = env_config() else {
+            return;
+        };
+        let client = S3Client::new(config);
+        client.ensure_bucket().unwrap();
+        let key = object_key("client");
+        client.put_object(&key, b"minio-client").unwrap();
+        assert_eq!(
+            client.get_object(&key).unwrap().as_deref(),
+            Some(&b"minio-client"[..])
+        );
+        client.delete_object(&key).unwrap();
+        assert!(client.get_object(&key).unwrap().is_none());
+    }
+
+    /// C++: `virtual_store_ut.cpp:283` (`VirtualStoreTest.minio_upload`).
+    #[test]
+    #[ignore = "C++ VirtualStoreTest.minio_upload relies on MinIO; set INFINITY_MINIO_* and run with --ignored"]
+    fn minio_upload_object() {
+        let Some(config) = env_config() else {
+            return;
+        };
+        let client = S3Client::new(config);
+        client.ensure_bucket().unwrap();
+        let key = object_key("upload");
+        let payload: Vec<u8> = (1..=10u8).collect();
+        client.put_object(&key, &payload).unwrap();
+        assert_eq!(
+            client.get_object(&key).unwrap().as_deref(),
+            Some(payload.as_slice())
+        );
+        client.delete_object(&key).unwrap();
+        assert!(client.get_object(&key).unwrap().is_none());
+    }
+
+    /// C++: `virtual_store_ut.cpp:320` (`VirtualStoreTest.minio_download`).
+    #[test]
+    #[ignore = "C++ VirtualStoreTest.minio_download relies on MinIO; set INFINITY_MINIO_* and run with --ignored"]
+    fn minio_download_object() {
+        let Some(config) = env_config() else {
+            return;
+        };
+        let client = S3Client::new(config);
+        client.ensure_bucket().unwrap();
+        let key = object_key("download");
+        let payload: Vec<u8> = (1..=10u8).collect();
+        client.put_object(&key, &payload).unwrap();
+        // The reference deletes the local copy, then downloads it back.
+        let downloaded = client.get_object(&key).unwrap().expect("uploaded object");
+        assert_eq!(downloaded, payload);
+        client.delete_object(&key).unwrap();
+        assert!(client.get_object(&key).unwrap().is_none());
+    }
 }

@@ -39,9 +39,13 @@ impl Engine {
         let key = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(key).or_default();
-        entry
-            .segments
-            .insert(segment_id, crate::SegmentEntry { id: segment_id, rows: 0 });
+        entry.segments.insert(
+            segment_id,
+            crate::SegmentEntry {
+                id: segment_id,
+                rows: 0,
+            },
+        );
     }
 
     /// Registers a metadata-only block (C++ `SegmentMeta::AddBlockID1` +
@@ -116,18 +120,18 @@ fn table_meta() {
         .get_table_by_name("db1.tb1")
         .unwrap()
         .expect("tb1");
-    assert!(e
-        .dir
-        .join("catalog_format")
-        .join(format!("db_{}", e.database_id_of("db1.tb1")))
-        .join(format!("tbl_{}", meta.id))
-        .exists()
-        || e
-            .dir
-            .join("data")
+    assert!(
+        e.dir
+            .join("catalog_format")
             .join(format!("db_{}", e.database_id_of("db1.tb1")))
             .join(format!("tbl_{}", meta.id))
-            .exists());
+            .exists()
+            || e.dir
+                .join("data")
+                .join(format!("db_{}", e.database_id_of("db1.tb1")))
+                .join(format!("tbl_{}", meta.id))
+                .exists()
+    );
 
     // `GetColumnDefs` / `GetColumnIDByColumnName`: two columns, in order.
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2"]);
@@ -188,11 +192,7 @@ impl TableCache {
         self.next_segment_id
     }
 
-    fn prepare_append_nolock(
-        &mut self,
-        row_count: usize,
-        txn_id: u64,
-    ) -> AppendPrepareInfo {
+    fn prepare_append_nolock(&mut self, row_count: usize, txn_id: u64) -> AppendPrepareInfo {
         assert!(
             row_count <= MAX_BLOCK_CAPACITY && row_count != 0,
             "attempt to append row_count: {row_count}"
@@ -217,11 +217,13 @@ impl TableCache {
             Some(unsealed) => {
                 let used = unsealed.row_count;
                 if used + row_count < DEFAULT_SEGMENT_CAPACITY {
-                    info.ranges.push((RowId(unsealed.segment_id, used), row_count));
+                    info.ranges
+                        .push((RowId(unsealed.segment_id, used), row_count));
                     unsealed.row_count += row_count;
                     self.prepare_segment_offset += row_count;
                 } else if used + row_count == DEFAULT_SEGMENT_CAPACITY {
-                    info.ranges.push((RowId(unsealed.segment_id, used), row_count));
+                    info.ranges
+                        .push((RowId(unsealed.segment_id, used), row_count));
                     unsealed.row_count += row_count;
                     unsealed.sealed = true;
                     // `std::map::emplace`: keep an entry the commit path
@@ -248,10 +250,8 @@ impl TableCache {
                         row_count: second_row_count,
                         sealed: false,
                     });
-                    info.ranges.push((
-                        RowId(self.next_segment_id, 0),
-                        second_row_count,
-                    ));
+                    info.ranges
+                        .push((RowId(self.next_segment_id, 0), second_row_count));
                     self.next_segment_id += 1;
                 }
             }

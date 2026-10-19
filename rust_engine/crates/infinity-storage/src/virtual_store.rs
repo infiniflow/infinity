@@ -131,6 +131,16 @@ impl FileHandle {
     pub fn mode(&self) -> FileAccessMode {
         self.mode
     }
+
+    /// C++ `LocalFileHandle::MmapRead`: a no-op in the reference build.
+    pub fn mmap_read(&self, _name: impl AsRef<Path>) -> Result<()> {
+        Ok(())
+    }
+
+    /// C++ `LocalFileHandle::Unmmap`: a no-op in the reference build.
+    pub fn unmmap(&self, _name: impl AsRef<Path>) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// C++: `VirtualStore` (`src/storage/io/virtual_store.cppm`).
@@ -142,9 +152,13 @@ impl VirtualStore {
         let path = path.as_ref().to_path_buf();
         let file = match mode {
             FileAccessMode::Read => OpenOptions::new().read(true).open(&path),
+            // The reference opens `kWrite` as `O_RDWR | O_CREAT` with no
+            // `O_TRUNC`, so an existing file keeps its contents and the caller
+            // overwrites from offset 0.
             FileAccessMode::Write => OpenOptions::new()
                 .create(true)
-                .truncate(true)
+                .truncate(false)
+                .read(true)
                 .write(true)
                 .open(&path),
             FileAccessMode::Append => OpenOptions::new().append(true).open(&path),

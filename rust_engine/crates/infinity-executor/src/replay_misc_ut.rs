@@ -76,7 +76,11 @@ fn replay_append_delete() {
     let e = h::reopen(e, dir.path());
 
     let mut t = e.begin_txn();
-    assert_eq!(t.delete_row_ids("default_db.tb1", &[(0, 1), (0, 3)]).unwrap(), 2);
+    assert_eq!(
+        t.delete_row_ids("default_db.tb1", &[(0, 1), (0, 3)])
+            .unwrap(),
+        2
+    );
     t.commit().unwrap();
     let e = h::reopen(e, dir.path());
 
@@ -99,7 +103,10 @@ fn replay_append_with_index0() {
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
     h::ok(&e, "CREATE INDEX index1 ON default_db.tb1 (col1);");
-    h::ok(&e, "CREATE INDEX index2 ON default_db.tb1 (col2) USING fulltext;");
+    h::ok(
+        &e,
+        "CREATE INDEX index2 ON default_db.tb1 (col2) USING fulltext;",
+    );
     for _ in 0..2 {
         h::append(&e, "default_db.tb1", alternating_block());
     }
@@ -124,7 +131,10 @@ fn disabled_slow_test_replay_append_with_index() {
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
     h::ok(&e, "CREATE INDEX index1 ON default_db.tb1 (col1);");
-    h::ok(&e, "CREATE INDEX index2 ON default_db.tb1 (col2) USING fulltext;");
+    h::ok(
+        &e,
+        "CREATE INDEX index2 ON default_db.tb1 (col2) USING fulltext;",
+    );
     h::append(&e, "default_db.tb1", alternating_block());
     e.flush().unwrap();
     let e = h::reopen(e, dir.path());
@@ -167,7 +177,10 @@ fn replay_import0() {
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("default_db.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM default_db.tb1 WHERE col2 = 'abc';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM default_db.tb1 WHERE col2 = 'abc';"
+        ),
         vec![vec!["16384"]]
     );
     e.flush().unwrap();
@@ -188,7 +201,10 @@ fn replay_import_with_index() {
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
     h::ok(&e, "CREATE INDEX index1 ON default_db.tb1 (col1);");
-    h::ok(&e, "CREATE INDEX index2 ON default_db.tb1 (col2) USING fulltext;");
+    h::ok(
+        &e,
+        "CREATE INDEX index2 ON default_db.tb1 (col2) USING fulltext;",
+    );
     for _ in 0..2 {
         h::append(&e, "default_db.tb1", alternating_block());
         h::append(&e, "default_db.tb1", alternating_block());
@@ -199,7 +215,10 @@ fn replay_import_with_index() {
     h::ok(&e, "SHOW TABLE default_db.tb1 INDEX index1;");
     h::ok(&e, "SHOW TABLE default_db.tb1 INDEX index2;");
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM default_db.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM default_db.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["16384"]]
     );
 }
@@ -218,7 +237,9 @@ fn replay_index_drop_index() {
     h::ok(&e, "DROP INDEX index1 ON default_db.tb1;");
 
     let e = h::reopen(e, dir.path());
-    assert!(e.execute("SHOW TABLE default_db.tb1 INDEX index1;").is_err());
+    assert!(e
+        .execute("SHOW TABLE default_db.tb1 INDEX index1;")
+        .is_err());
     assert_eq!(e.row_count("default_db.tb1").unwrap(), 8192);
 }
 
@@ -252,7 +273,8 @@ fn txn_manager_timestamps() {
     // Write transaction: begin < commit.
     let mut t1 = e.begin_txn();
     let begin1 = t1.begin_ts();
-    t1.append("default_db.tb1", vec![vec![Literal::Int(1)]]).unwrap();
+    t1.append("default_db.tb1", vec![vec![Literal::Int(1)]])
+        .unwrap();
     t1.commit().unwrap();
     let commit1 = e.current_ts();
     assert!(begin1 < commit1, "begin {begin1} < commit {commit1}");
@@ -282,7 +304,8 @@ fn txn_manager_timestamps() {
     // A fresh create after the failure still advances the commit timestamp.
     let mut t5 = e.begin_txn();
     let begin5 = t5.begin_ts();
-    t5.append("default_db.tb1", vec![vec![Literal::Int(2)]]).unwrap();
+    t5.append("default_db.tb1", vec![vec![Literal::Int(2)]])
+        .unwrap();
     t5.commit().unwrap();
     assert!(begin5 < e.current_ts());
     // The reference finally asserts `CurrentTS() == PrepareCommitTS()`; the

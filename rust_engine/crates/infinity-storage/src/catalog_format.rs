@@ -365,6 +365,20 @@ pub fn table_index_chunk_key_prefix(db_name: &str, tbl_name: &str, index_name: &
     format!("idx_chunk|{db_name}|{tbl_name}|{index_name}|")
 }
 
+/// C++: `GetLastPartOfKey(key, '|')` (`kv_utility_impl.cpp:198`).
+pub fn get_last_part_of_key(key: &str, delimiter: char) -> String {
+    match key.rsplit_once(delimiter) {
+        Some((_, last)) => last.to_string(),
+        None => key.to_string(),
+    }
+}
+
+/// C++: `GetTimestampFromKey` (`kv_utility_impl.cpp:216`) — the commit
+/// timestamp is the last `|`-separated field of a catalog key.
+pub fn get_timestamp_from_key(key: &str) -> u64 {
+    get_last_part_of_key(key, '|').parse().unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

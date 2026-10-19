@@ -106,8 +106,12 @@ fn createtable_wrong_conflicttype() {
     // rejects a conflict keyword in the position where the reference's
     // ConflictType is passed (before the column list), which is the equivalent
     // of `kReplace`/`kInvalid` being refused.
-    assert!(e.execute("CREATE TABLE db1.tb1 REPLACE (col1 INT);").is_err());
-    assert!(e.execute("CREATE TABLE db1.tb1 INVALID (col1 INT);").is_err());
+    assert!(e
+        .execute("CREATE TABLE db1.tb1 REPLACE (col1 INT);")
+        .is_err());
+    assert!(e
+        .execute("CREATE TABLE db1.tb1 INVALID (col1 INT);")
+        .is_err());
     assert!(tables(&e, "db1").is_empty());
 
     // The default conflict type still works.
@@ -205,9 +209,7 @@ fn createtable_dropdb_test() {
         .unwrap();
     e.execute("DROP DATABASE db1;").unwrap();
     assert!(!db_exists(&e, "db1"));
-    assert!(e
-        .execute("INSERT INTO db1.tb1 VALUES (1, 'a');")
-        .is_err());
+    assert!(e.execute("INSERT INTO db1.tb1 VALUES (1, 'a');").is_err());
     // The database itself is gone: the session cannot enter it and the stored
     // table is not reachable through the dropped database.
     assert!(e.execute("USE db1;").is_err());
@@ -307,8 +309,7 @@ fn rename_table_test() {
     e.execute("INSERT INTO db1.tb1 VALUES (1, 'a'), (2, 'b');")
         .unwrap();
 
-    e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
-        .unwrap();
+    e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
     assert_eq!(tables(&e, "db1"), vec!["tb2".to_string()]);
     assert!(!e.table_exists("db1.tb1"));
     assert!(e.table_exists("db1.tb2"));

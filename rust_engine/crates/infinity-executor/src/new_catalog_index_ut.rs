@@ -98,10 +98,8 @@ fn index_test2() {
     e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
     e.execute("CREATE INDEX idx2 ON db1.tb1 (col2) USING FULLTEXT;")
         .unwrap();
-    e.execute(
-        "CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);",
-    )
-    .unwrap();
+    e.execute("CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+        .unwrap();
     for idx in ["idx1", "idx2", "idx3"] {
         assert!(index_exists(&e, "db1.tb1", idx), "{idx} exists");
     }
@@ -144,12 +142,8 @@ fn dropindex_wrong_conflicttype() {
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
 
     e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    assert!(e
-        .execute("DROP INDEX REPLACE idx1 ON db1.tb1;")
-        .is_err());
-    assert!(e
-        .execute("DROP INDEX INVALID idx1 ON db1.tb1;")
-        .is_err());
+    assert!(e.execute("DROP INDEX REPLACE idx1 ON db1.tb1;").is_err());
+    assert!(e.execute("DROP INDEX INVALID idx1 ON db1.tb1;").is_err());
     assert!(index_exists(&e, "db1.tb1", "idx1"));
 
     e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
@@ -171,19 +165,15 @@ fn create_index_and_drop_db() {
     e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
     e.execute("CREATE INDEX idx2 ON db1.tb1 (col2) USING FULLTEXT;")
         .unwrap();
-    e.execute(
-        "CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);",
-    )
-    .unwrap();
+    e.execute("CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+        .unwrap();
     assert_eq!(indexes_of_db(&e, "db1"), 3);
 
     e.execute("DROP DATABASE db1;").unwrap();
     assert_eq!(indexes_of_db(&e, "db1"), 0);
 
     // A create-index after the drop cannot commit.
-    assert!(e
-        .execute("CREATE INDEX idx4 ON db1.tb1 (col1);")
-        .is_err());
+    assert!(e.execute("CREATE INDEX idx4 ON db1.tb1 (col1);").is_err());
     assert!(!index_exists(&e, "db1.tb1", "idx4"));
 }
 
@@ -201,18 +191,14 @@ fn create_index_and_drop_table() {
     e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
     e.execute("CREATE INDEX idx2 ON db1.tb1 (col2) USING FULLTEXT;")
         .unwrap();
-    e.execute(
-        "CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);",
-    )
-    .unwrap();
+    e.execute("CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+        .unwrap();
     assert_eq!(indexes_of_db(&e, "db1"), 3);
 
     e.execute("DROP TABLE db1.tb1;").unwrap();
     assert!(!e.table_exists("db1.tb1"));
     assert_eq!(indexes_of_db(&e, "db1"), 0);
-    assert!(e
-        .execute("CREATE INDEX idx4 ON db1.tb1 (col1);")
-        .is_err());
+    assert!(e.execute("CREATE INDEX idx4 ON db1.tb1 (col1);").is_err());
 
     e.execute("DROP DATABASE db1;").unwrap();
 }
@@ -228,9 +214,7 @@ fn disabled_slow_create_index_create_index() {
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
 
     e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    assert!(e
-        .execute("CREATE INDEX idx1 ON db1.tb1 (col1);")
-        .is_err());
+    assert!(e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").is_err());
     assert!(index_exists(&e, "db1.tb1", "idx1"));
     assert_eq!(indexes_of_db(&e, "db1"), 1);
 
@@ -303,8 +287,7 @@ fn create_index_rename_table() {
     e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
     e.execute("INSERT INTO db1.tb1 VALUES (5, 'a');").unwrap();
 
-    e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
-        .unwrap();
+    e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
     assert!(!e.table_exists("db1.tb1"));
     assert!(e.table_exists("db1.tb2"));
     assert!(index_exists(&e, "db1.tb2", "idx1"));
@@ -330,9 +313,7 @@ fn drop_index_and_drop_db() {
     e.execute("DROP DATABASE db1;").unwrap();
     assert_eq!(indexes_of_db(&e, "db1"), 0);
     assert!(e.execute("DROP INDEX idx1 ON db1.tb1;").is_err());
-    assert!(e
-        .execute("CREATE INDEX idx2 ON db1.tb1 (col1);")
-        .is_err());
+    assert!(e.execute("CREATE INDEX idx2 ON db1.tb1 (col1);").is_err());
 }
 
 /// C++ `index_ut.cpp:2816` (`drop_index_and_drop_table`): dropping the index
@@ -448,8 +429,7 @@ fn drop_index_and_rename_table() {
     e.execute("INSERT INTO db1.tb1 VALUES (9, 'z');").unwrap();
 
     e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
-    e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
-        .unwrap();
+    e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
     assert!(e.table_exists("db1.tb2"));
     assert!(!index_exists(&e, "db1.tb2", "idx1"));
     assert_eq!(

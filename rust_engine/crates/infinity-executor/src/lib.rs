@@ -58,6 +58,9 @@ mod replay_txn_ut;
 mod replay_misc_ut;
 
 #[cfg(test)]
+mod wal_replay_ut;
+
+#[cfg(test)]
 mod new_catalog_table_ut;
 
 #[cfg(test)]
@@ -74,6 +77,21 @@ mod new_catalog_index_internal_ut;
 
 #[cfg(test)]
 mod new_catalog_meta_ut;
+
+#[cfg(test)]
+mod meta_cache_ut;
+
+#[cfg(test)]
+mod cleanup_ut;
+
+#[cfg(test)]
+mod cleanup_internal_ut;
+
+#[cfg(test)]
+mod cleanup_rollback_txn_ut;
+
+#[cfg(test)]
+mod alter_ut;
 
 #[cfg(test)]
 mod conflict_check_ut;
@@ -112,6 +130,18 @@ mod posting_merger_ut;
 
 #[cfg(test)]
 mod memory_indexer_ut;
+
+#[cfg(test)]
+mod checkpoint_ut;
+
+#[cfg(test)]
+mod dump_mem_index_ut;
+
+#[cfg(test)]
+mod kv_ut;
+
+#[cfg(test)]
+mod bg_task_ut;
 
 mod explain_search;
 
@@ -3215,7 +3245,13 @@ impl<'a> EngineTxn<'a> {
         let mut staged = 0;
         for (segment_id, offset) in row_ids {
             let seq = ((*segment_id as usize) << 32) | (*offset as usize);
-            if self.engine.storage.store.get(&row_key(&table, seq))?.is_some() {
+            if self
+                .engine
+                .storage
+                .store
+                .get(&row_key(&table, seq))?
+                .is_some()
+            {
                 self.txn
                     .as_mut()
                     .expect("transaction is open")
@@ -3239,6 +3275,22 @@ impl<'a> EngineTxn<'a> {
         let Some(txn) = self.txn.take() else {
             return Ok(());
         };
+        // A table (or its database) dropped after this transaction began makes
+        // the staged writes uncommittable, as `CommitTxn` fails when the
+        // catalog entry the request targeted is gone (the reference's
+        // `test_import_with_index_rollback_cleanup`).
+        for table in self
+            .appends
+            .iter()
+            .map(|(t, ..)| t)
+            .chain(self.deletes.iter().map(|(t, _)| t))
+        {
+            if !self.engine.table_exists(table) {
+                return Err(Error::NotFound(format!(
+                    "table '{table}' was dropped before commit"
+                )));
+            }
+        }
         // A commit changes visible rows; cached `SELECT` results must not
         // survive it (the SQL path clears the cache for mutating statements).
         self.engine.result_cache.lock().unwrap().clear();
@@ -3453,6 +3505,12 @@ impl Engine {
         } else {
             "default_db"
         };
+        self.database_id(db)
+    }
+
+    /// The C++ database id of `db`: its 1-based position in the catalog's
+    /// listing (`default_db` first).
+    pub fn database_id(&self, db: &str) -> u64 {
         self.storage
             .catalog
             .list_databases()
@@ -4525,17 +4583,21 @@ impl Engine {
     }
 
     /// Upper bound on the rows ever reserved for `table`, from the in-memory
-    /// counter (no scan). Used to decide whether the C++ block mirror is worth
+    /// allocator (no scan). Used to decide whether the C++ block mirror is worth
     /// its duplicate copy of a large table.
     fn approx_row_count(&self, table: &str) -> usize {
         let key = self.table_key(table);
-        match self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&key)
-            .and_then(|e| e.row_counter)
-        {
+        let tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get(&key) else {
+            return 0;
+        };
+        // Segment ids are monotonic and a compacted table lives in a high-id
+        // segment, so `segment_id << 32 | offset` is not the row count. Sum the
+        // per-segment counts instead.
+        if !entry.segments.is_empty() {
+            return entry.segments.values().map(|s| s.rows as usize).sum();
+        }
+        match entry.row_counter {
             Some((seg, off, _)) => ((seg as u64) << 32 | off as u64) as usize,
             None => 0,
         }
@@ -4984,21 +5046,22 @@ impl Engine {
                 }
                 let _ = meta;
                 let rows = self.fetch_rows_with_ids(table)?;
-                let mut next = self.next_row_seq(new_name)?;
-                // An empty table has nothing to move: committing an empty
-                // transaction is an error, so only open one when needed.
+                // `RenameTable` moves the catalog and row keys; the row ids
+                // themselves are unchanged, so the segment ids stay the same
+                // (the reference's `cleanup_and_rename_table` asserts the
+                // pre-rename segment id).
                 if !rows.is_empty() {
                     let mut t = self.txn.begin();
                     for (seq, row) in &rows {
                         // retire the old row, write it under the new table name
+                        // at the same sequence id
                         t.put(del_key(table, *seq), b"1".to_vec());
                         let encoded = row
                             .iter()
                             .map(|v| v.to_slt_string())
                             .collect::<Vec<_>>()
                             .join("\t");
-                        t.put(row_key(new_name, next), encoded.into_bytes());
-                        next += 1;
+                        t.put(row_key(new_name, *seq), encoded.into_bytes());
                     }
                     self.txn.commit(t)?;
                 }
@@ -5008,15 +5071,22 @@ impl Engine {
                 for (k, _) in self.storage.store.scan_prefix(&del_prefix(table))? {
                     self.storage.store.delete(&k)?;
                 }
+                // Move the per-table entry (allocator, registries) to the new
+                // name; the row ids it describes did not change.
+                let old_tkey = self.table_key(table);
+                let new_tkey = self.table_key(new_name);
+                let migrated = self.tables.lock().unwrap().remove(&old_tkey);
+                if let Some(entry) = migrated {
+                    self.tables.lock().unwrap().insert(new_tkey.clone(), entry);
+                }
                 // move the secondary-index declarations; the old table entry
                 // (whose registries refer to the old row ids) is dropped and
                 // rebuilt from the renamed rows below.
-                let old_tkey = self.table_key(table);
                 let pairs: Vec<String> = self
                     .tables
                     .lock()
                     .unwrap()
-                    .remove(&old_tkey)
+                    .get(&new_tkey)
                     .map(|e| e.secondary.indexes.keys().cloned().collect())
                     .unwrap_or_default();
                 for im in self.storage.catalog.list_indexes()? {
@@ -5070,17 +5140,13 @@ impl Engine {
                     None => return Err(Error::Invalid(format!("unknown column '{column}'"))),
                 };
                 // rewrite rows without the dropped column (an empty table has
-                // nothing to rewrite, and committing an empty txn is an error)
+                // nothing to rewrite, and committing an empty txn is an error).
+                // The row ids stay unchanged — dropping a column only removes
+                // its values, it does not move the rows to a new segment (the
+                // reference's `cleanup_and_drop_columns` keeps segment {2}).
                 if !rows.is_empty() {
-                    // Allocate the new ids through the row counter: a concurrent
-                    // append must not pick the same block, or one of the two
-                    // batches silently overwrites the other.
-                    let base = self.reserve_rows(table, rows.len(), false)?;
                     let mut t = self.txn.begin();
-                    for (seq, _) in &rows {
-                        t.put(del_key(table, *seq), b"1".to_vec());
-                    }
-                    for (i, (_, row)) in rows.iter().enumerate() {
+                    for (seq, row) in &rows {
                         let mut nr = row.clone();
                         if idx < nr.len() {
                             nr.remove(idx);
@@ -5090,11 +5156,11 @@ impl Engine {
                             .map(|v| v.to_slt_string())
                             .collect::<Vec<_>>()
                             .join("\t");
-                        t.put(row_key(table, base + i), encoded.into_bytes());
+                        t.put(row_key(table, *seq), encoded.into_bytes());
                     }
                     self.txn.commit(t)?;
                 }
-                // The rewrite moved every row to a new sequence id.
+                // The rewrite changed the stored layout but not the ids.
                 self.invalidate_row_cache(table);
                 self.invalidate_block_mirror(table);
                 self.storage.catalog.drop_column(table, column)?;
@@ -8001,6 +8067,88 @@ impl Engine {
             .map(|rows| (0, rows))
     }
 
+    /// Every file under the database's C++ data directory
+    /// (C++ `NewTxn::GetDBFilePaths`).
+    pub fn db_files(&self, db: &str) -> Vec<PathBuf> {
+        let dir = self
+            .dir
+            .join("data")
+            .join(format!("db_{}", self.database_id(db)));
+        files_under(&dir)
+    }
+
+    /// Every file under the table's C++ data directory
+    /// (C++ `NewTxn::GetTableFilePaths`).
+    pub fn table_files(&self, table: &str) -> Vec<PathBuf> {
+        let table = self.table_key(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return Vec::new();
+        };
+        let dir = self.blocks_root().join(format!(
+            "db_{}/tbl_{}",
+            self.database_id_of(&table),
+            meta.id
+        ));
+        files_under(&dir)
+    }
+
+    /// Every file under an index's C++ mirror directory
+    /// (C++ `NewTxn::GetTableIndexFilePaths`).
+    pub fn index_files(&self, table: &str, index: &str) -> Vec<PathBuf> {
+        let table = self.table_key(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return Vec::new();
+        };
+        let index_id = self
+            .storage
+            .catalog
+            .list_indexes()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|im| im.table == table && im.name == index)
+            .map(|im| im.id);
+        let Some(index_id) = index_id else {
+            return Vec::new();
+        };
+        let dir = self.blocks_root().join(format!(
+            "db_{}/tbl_{}/idx_{index_id}",
+            self.database_id_of(&table),
+            meta.id
+        ));
+        files_under(&dir)
+    }
+
+    /// C++ `NewTxn::GetColumnFilePaths`: the block-mirror files that belong to
+    /// one column (`<column_id>.col`, one per block). Columns are packed into
+    /// these per-column files inside the table's mirror directory; a column
+    /// dropped after a checkpoint leaves them behind for cleanup to reclaim.
+    pub fn column_files(&self, table: &str, column: &str) -> Vec<PathBuf> {
+        let table = self.table_key(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return Vec::new();
+        };
+        let Some(idx) = meta.columns.iter().position(|c| c == column) else {
+            return Vec::new();
+        };
+        let Some(column_id) = meta.ids.get(idx) else {
+            return Vec::new();
+        };
+        let file_name = format!("{column_id}.col");
+        let outline_name = format!("col_{column_id}_out");
+        let dir = self.blocks_root().join(format!(
+            "db_{}/tbl_{}",
+            self.database_id_of(&table),
+            meta.id
+        ));
+        files_under(&dir)
+            .into_iter()
+            .filter(|p| {
+                p.file_name()
+                    .is_some_and(|n| n == file_name.as_str() || n == outline_name.as_str())
+            })
+            .collect()
+    }
+
     /// Number of rows in the in-memory HNSW segment of `column`
     /// (C++ `SegmentIndexMeta::GetMemIndex() != nullptr` plus its size).
     pub fn mem_index_len(&self, table: &str, column: &str) -> Option<usize> {
@@ -8333,22 +8481,38 @@ impl Engine {
         })
     }
 
-    /// Merges every segment of `table` into one: the live rows are re-keyed
-    /// contiguously from row id 0, tombstones are dropped and the write-batch
-    /// counter is reset, so `SHOW SEGMENTS` reports a single segment.
+    /// Merges every segment of `table` into one new segment: the live rows are
+    /// re-keyed contiguously from the new segment's base row id, tombstones are
+    /// dropped and the write-batch counter is reset, so `SHOW SEGMENTS` reports
+    /// a single segment.
+    ///
+    /// The reference (`NewTxn::Compact`) writes the merged rows into a fresh
+    /// segment whose id is one past the highest existing segment id; the source
+    /// segments become garbage that `Cleanup` reclaims. Mirroring that here
+    /// keeps the segment ids the reference's fixtures assert (`{2}` after two
+    /// imports are compacted, `{3}` after compacting `{2}`, and so on).
     pub fn compact_table(&self, table: &str) -> Result<()> {
         self.invalidate_row_cache(table);
         // Rows are re-keyed below; the mirror's row-id snapshot stops matching
         // the moment the first row moves.
         self.invalidate_block_mirror(table);
         let rows = self.fetch_rows_with_ids(table)?;
+        // `SegmentMeta` ids are never reused: the merged segment takes the next
+        // id after every segment this table has ever used.
+        let next_seg = self
+            .segment_ids(table)
+            .into_iter()
+            .max()
+            .map_or(0, |id| id + 1);
+        // The new segment starts at its own row-id base (`segment_id << 32`).
+        let base = (next_seg as usize) << 32;
         // Renumber through the transaction so WAL replay reproduces the
-        // compacted state: a row moved from `old` to `i` also leaves a
-        // tombstone for `old`, otherwise replay would resurrect it.
+        // compacted state: a row moved from `old` to its destination also
+        // leaves a tombstone for `old`, otherwise replay would resurrect it.
         let mut t = self.txn.begin();
-        let mut moved = false;
         for (i, (old, _)) in rows.iter().enumerate() {
-            if *old == i {
+            let new = base + i;
+            if *old == new {
                 continue;
             }
             let v = self
@@ -8356,26 +8520,25 @@ impl Engine {
                 .store
                 .get(&row_key(table, *old))?
                 .ok_or_else(|| Error::Storage("row vanished during compaction".into()))?;
-            t.put(row_key(table, i), v);
+            t.put(row_key(table, new), v);
             t.put(del_key(table, *old), b"1".to_vec());
-            moved = true;
         }
-        if moved {
+        if !rows.is_empty() {
             self.txn.commit(t)?;
-            // Drop every source position that no compacted row reuses. Keys
-            // below `rows.len()` are destinations: another row may have moved
-            // onto them, so deleting them would lose that row. The tombstone
-            // sweep below also covers rows that were deleted before the
-            // compaction and therefore never appear in `rows`; without that,
-            // clearing the tombstones would resurrect them.
-            for (k, _) in self.storage.store.scan_prefix(&row_prefix(table))? {
-                let seq = std::str::from_utf8(&k)
-                    .ok()
-                    .and_then(|s| s.rsplit(':').next())
-                    .and_then(|s| s.parse::<usize>().ok());
-                if seq.is_some_and(|seq| seq >= rows.len()) {
-                    self.storage.store.delete(&k)?;
-                }
+        }
+        // Drop every source position that no compacted row reuses. The
+        // destination positions are exactly `[base, base + rows.len())`; every
+        // other key is an old copy (including rows deleted before the
+        // compaction that therefore never appear in `rows`) and must go, or a
+        // later scan would see it again.
+        let dests: std::collections::HashSet<usize> = (0..rows.len()).map(|i| base + i).collect();
+        for (k, _) in self.storage.store.scan_prefix(&row_prefix(table))? {
+            let seq = std::str::from_utf8(&k)
+                .ok()
+                .and_then(|s| s.rsplit(':').next())
+                .and_then(|s| s.parse::<usize>().ok());
+            if seq.is_none_or(|seq| !dests.contains(&seq)) {
+                self.storage.store.delete(&k)?;
             }
         }
         for (k, _) in self.storage.store.scan_prefix(&del_prefix(table))? {
@@ -8385,8 +8548,20 @@ impl Engine {
         {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(key).or_default();
-            entry.row_counter = Some((0, rows.len() as u32, true));
+            entry.row_counter = Some((next_seg, rows.len() as u32, true));
             entry.write_batches = 1;
+            // The merged rows all live in the new segment; the source segment
+            // metas are garbage collected with the old row keys.
+            entry.segments.clear();
+            if !rows.is_empty() {
+                entry.segments.insert(
+                    next_seg,
+                    SegmentEntry {
+                        id: next_seg,
+                        rows: rows.len() as u32,
+                    },
+                );
+            }
             // Compaction renumbered every row.
             entry.row_cache = None;
             // Block-level indexes refer to the old row ids.
@@ -8396,6 +8571,9 @@ impl Engine {
             entry.cpp_block_rows = None;
             entry.live_rows = Some(rows.len());
         }
+        // The merge renumbered every row, so every index posting now points at
+        // a dead row id. Rebuild the declared indexes from the merged rows.
+        self.rebuild_indexes()?;
         self.result_cache.lock().unwrap().clear();
         Ok(())
     }
@@ -11127,7 +11305,7 @@ impl Engine {
             let _ = self
                 .storage
                 .catalog
-                .write_cpp_layout(self.storage.catalog.store().as_ref());
+                .rewrite_cpp_layout(self.storage.catalog.store().as_ref());
         }
         mirror?;
         Ok(())
@@ -11145,11 +11323,7 @@ impl Engine {
         self.flush()?;
         if let Some(client) = self.context.object_store.lock().unwrap().clone() {
             infinity_storage::s3::sync_tree(&client, &self.dir.join("catalog"), "catalog")?;
-            infinity_storage::s3::sync_tree(
-                &client,
-                &self.dir.join("persistence"),
-                "persistence",
-            )?;
+            infinity_storage::s3::sync_tree(&client, &self.dir.join("persistence"), "persistence")?;
         }
         Ok(())
     }
@@ -12692,6 +12866,25 @@ fn sort_rows(rows: &mut [Vec<Value>], keys: &[(infinity_expression::Expr, bool)]
         }
         std::cmp::Ordering::Equal
     });
+}
+
+/// Recursively collects the files under `dir`, sorted. A missing directory has
+/// no files.
+fn files_under(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            out.extend(files_under(&path));
+        } else if path.is_file() {
+            out.push(path);
+        }
+    }
+    out.sort();
+    out
 }
 
 #[cfg(test)]

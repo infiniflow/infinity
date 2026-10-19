@@ -106,7 +106,10 @@ fn update_multiple_blocks() {
         vec![vec!["8192"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'updated_value';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'updated_value';"
+        ),
         vec![vec!["8192"]]
     );
     // The reference sees blocks 0 and 1 with every other row visible and a
@@ -181,7 +184,10 @@ fn update_then_drop_index() {
         })
         .collect();
     h::append(&e, "db1.tb1", rows);
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col2 = 'want_update';");
+    h::ok(
+        &e,
+        "UPDATE db1.tb1 SET col1 = 999 WHERE col2 = 'want_update';",
+    );
     h::ok(&e, "DROP INDEX index1 ON db1.tb1;");
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
@@ -215,14 +221,20 @@ fn update_then_dump_index() {
         })
         .collect();
     h::append(&e, "db1.tb1", rows);
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col2 = 'want_update';");
+    h::ok(
+        &e,
+        "UPDATE db1.tb1 SET col1 = 999 WHERE col2 = 'want_update';",
+    );
     e.flush().unwrap();
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     // The rewritten rows carry the marker in the unindexed column; counting
     // through `col2` avoids the duplicate-key index path.
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'want_update';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'want_update';"
+        ),
         vec![vec!["4096"]]
     );
     assert_eq!(
@@ -250,7 +262,10 @@ fn update_add_and_drop_column() {
     // Update then ADD COLUMN: the update is already committed, so the added
     // column applies to every row with its default (the reference's update
     // commit fails; the accepted request leaves the same visible schema).
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999, col2 = 'updated_abc' WHERE col1 = 2;");
+    h::ok(
+        &e,
+        "UPDATE db1.tb1 SET col1 = 999, col2 = 'updated_abc' WHERE col1 = 2;",
+    );
     h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col3 INT DEFAULT 1);");
     let cols = h::rows(&e, "SHOW TABLE db1.tb1 COLUMNS;");
     assert_eq!(cols.len(), 3);
@@ -265,7 +280,10 @@ fn update_add_and_drop_column() {
 
     // ADD COLUMN then UPDATE: the update still rewrites the rows and keeps the
     // new column's default.
-    h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR DEFAULT 'd');");
+    h::ok(
+        &e,
+        "ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR DEFAULT 'd');",
+    );
     h::ok(&e, "UPDATE db1.tb1 SET col1 = 777 WHERE col1 = 1;");
     assert_eq!(
         h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 777;"),
@@ -333,13 +351,19 @@ fn update_and_create_index_compose() {
         .collect();
     h::append(&e, "db1.tb1", rows);
 
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col2 = 'want_update';");
+    h::ok(
+        &e,
+        "UPDATE db1.tb1 SET col1 = 999 WHERE col2 = 'want_update';",
+    );
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     // Count through the unindexed marker column: `col1 = 999` is a
     // duplicate key, and the reference's chunk metadata (not a scan) is what
     // the C++ fixture checks here.
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'want_update';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'want_update';"
+        ),
         vec![vec!["4096"]]
     );
     assert_eq!(
@@ -464,7 +488,10 @@ fn import_with_index_rollback() {
     // `txn_add_column` commits while the second import is live; the import's
     // commit fails and leaves no rows. Model the failure with a CSV whose
     // first column is not an integer: the COPY is rejected before writing.
-    h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');");
+    h::ok(
+        &e,
+        "ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');",
+    );
     let mut bad = import.clone();
     for row in bad.iter_mut() {
         row[0] = Literal::Str("not_an_int".to_string());
@@ -760,7 +787,10 @@ fn import_then_optimize_index() {
         vec![vec!["16384"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["16384"]]
     );
     h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");

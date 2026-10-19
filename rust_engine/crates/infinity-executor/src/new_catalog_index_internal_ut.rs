@@ -138,14 +138,27 @@ fn test_index0() {
     let e = Engine::open(dir.path()).unwrap();
     e.execute("CREATE DATABASE db1;").unwrap();
     e.execute("CREATE TABLE db1.tb1 (col1 INT);").unwrap();
-    e.execute("CREATE INDEX index1 ON db1.tb1 (col1);")
-        .unwrap();
+    e.execute("CREATE INDEX index1 ON db1.tb1 (col1);").unwrap();
 
-    e.insert_literals("db1.tb1", None, two_block_rows(0, 8192).into_iter().map(|r| vec![r[0].clone()]).collect())
-        .unwrap();
+    e.insert_literals(
+        "db1.tb1",
+        None,
+        two_block_rows(0, 8192)
+            .into_iter()
+            .map(|r| vec![r[0].clone()])
+            .collect(),
+    )
+    .unwrap();
     e.flush().unwrap();
-    e.insert_literals("db1.tb1", None, two_block_rows(8192, 8192).into_iter().map(|r| vec![r[0].clone()]).collect())
-        .unwrap();
+    e.insert_literals(
+        "db1.tb1",
+        None,
+        two_block_rows(8192, 8192)
+            .into_iter()
+            .map(|r| vec![r[0].clone()])
+            .collect(),
+    )
+    .unwrap();
 
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
     assert_eq!(e.secondary_tail("db1.tb1", "col1"), Some((8192, 8192)));
@@ -156,8 +169,15 @@ fn test_index0() {
     // Second dump + third block, then OptimizeIndex (a no-op for secondary in
     // the Rust engine; the reference merges the chunks into chunk 2).
     e.flush().unwrap();
-    e.insert_literals("db1.tb1", None, two_block_rows(16384, 8192).into_iter().map(|r| vec![r[0].clone()]).collect())
-        .unwrap();
+    e.insert_literals(
+        "db1.tb1",
+        None,
+        two_block_rows(16384, 8192)
+            .into_iter()
+            .map(|r| vec![r[0].clone()])
+            .collect(),
+    )
+    .unwrap();
     e.optimize_indexes().unwrap();
     assert_eq!(e.secondary_tail("db1.tb1", "col1"), Some((16384, 8192)));
     // Each chunk records base row id 0 (the reference's
@@ -187,10 +207,8 @@ fn test_index() {
         .unwrap();
     e.execute("CREATE INDEX index3 ON db1.tb1 (col3) USING IVF WITH (metric = l2);")
         .unwrap();
-    e.execute(
-        "CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);",
-    )
-    .unwrap();
+    e.execute("CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+        .unwrap();
     e.execute("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
         .unwrap();
     e.execute("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB;")
@@ -263,10 +281,7 @@ fn test_populate_index0() {
     // The full-text index is built from every row on first use.
     assert_eq!(e.fulltext_tail("db1.tb1", "col2"), Some((0, 16384)));
     // One chunk covering all 16384 rows from base row id 0.
-    assert_eq!(
-        e.secondary_chunks("db1.tb1", "col1"),
-        vec![(0, 16384)]
-    );
+    assert_eq!(e.secondary_chunks("db1.tb1", "col1"), vec![(0, 16384)]);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
 }
 
@@ -293,10 +308,8 @@ fn disabled_slow_test_populate_index() {
         .unwrap();
     e.execute("CREATE INDEX index3 ON db1.tb1 (col3) USING IVF WITH (metric = l2);")
         .unwrap();
-    e.execute(
-        "CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);",
-    )
-    .unwrap();
+    e.execute("CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+        .unwrap();
     e.execute("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
         .unwrap();
     e.execute("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB;")
@@ -351,9 +364,7 @@ fn test_json_index() {
     // Without the hint the JSON secondary index is created.
     e.execute("CREATE INDEX idx_json ON db1.tb1 (meta) USING SECONDARY;")
         .unwrap();
-    assert!(e
-        .execute("SHOW TABLE db1.tb1 INDEX idx_json;")
-        .is_ok());
+    assert!(e.execute("SHOW TABLE db1.tb1 INDEX idx_json;").is_ok());
 
     e.execute("DROP INDEX idx_json ON db1.tb1;").unwrap();
     e.execute("DROP TABLE db1.tb1;").unwrap();

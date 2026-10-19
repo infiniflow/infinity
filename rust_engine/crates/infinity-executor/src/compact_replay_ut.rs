@@ -55,10 +55,10 @@ fn import_four_blocks(e: &Engine) {
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
 }
 
-fn assert_compacted(e: &Engine) {
+fn assert_compacted(e: &Engine, segment: u32) {
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(h::count(e, "db1.tb1"), 32768);
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1"), vec![segment]);
     e.flush().unwrap();
     assert_eq!(e.block_ids("db1.tb1", 0), vec![0, 1, 2, 3]);
     for block in 0..4u16 {
@@ -72,7 +72,10 @@ fn assert_compacted(e: &Engine) {
         vec![vec!["16384"]]
     );
     assert_eq!(
-        h::rows(e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["16384"]]
     );
 }
@@ -89,7 +92,7 @@ fn compact_with_index_commit() {
     import_four_blocks(&e);
 
     e.compact_table("db1.tb1").unwrap();
-    assert_compacted(&e);
+    assert_compacted(&e, 1);
     h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
 }
 
@@ -164,7 +167,10 @@ fn compact_then_add_columns() {
     // default is visible for every compacted block.
     for col1 in [1, 2] {
         assert_eq!(
-            h::rows(&e, &format!("SELECT count(*) FROM db1.tb1 WHERE col1 = {col1} AND col3 = 3;")),
+            h::rows(
+                &e,
+                &format!("SELECT count(*) FROM db1.tb1 WHERE col1 = {col1} AND col3 = 3;")
+            ),
             vec![vec!["16384"]]
         );
     }
@@ -217,9 +223,9 @@ fn compact_and_compact() {
     import_four_blocks(&e);
 
     e.compact_table("db1.tb1").unwrap();
-    assert_compacted(&e);
+    assert_compacted(&e, 1);
     e.compact_table("db1.tb1").unwrap();
-    assert_compacted(&e);
+    assert_compacted(&e, 2);
 }
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:1570`
@@ -234,7 +240,7 @@ fn compact_then_create_index() {
     e.compact_table("db1.tb1").unwrap();
 
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
     assert_eq!(
         h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
         vec![vec!["16384"]]
@@ -284,7 +290,7 @@ fn internal_compact_skips_deleted_offsets() {
 
     e.compact_table("db1.tb1").unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768 - 4096);
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
     e.flush().unwrap();
     assert_eq!(e.block_ids("db1.tb1", 0), vec![0, 1, 2, 3]);
     // The reference keeps the block's stored row count (8192) and hides the
@@ -301,7 +307,10 @@ fn internal_compact_skips_deleted_offsets() {
         vec![vec!["16384"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["12288"]]
     );
 }
@@ -331,7 +340,10 @@ fn internal_compact_with_index() {
         vec![vec!["16384"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["12288"]]
     );
     h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
@@ -348,7 +360,7 @@ fn replay_compact_commit() {
     import_four_blocks(&e);
     e.compact_table("db1.tb1").unwrap();
     let e = h::reopen(e, dir.path());
-    assert_compacted(&e);
+    assert_compacted(&e, 1);
 
     h::ok(&e, "DROP TABLE db1.tb1;");
     assert!(!e.table_exists("db1.tb1"));
@@ -398,7 +410,7 @@ fn replay_compact_flush_gap() {
     e.checkpoint_wal();
 
     let e = h::reopen(e, dir.path());
-    assert_compacted(&e);
+    assert_compacted(&e, 1);
 }
 
 /// C++ `src/unit_test/storage/new_catalog/replay_compact_ut.cpp:429`
@@ -434,7 +446,7 @@ fn disabled_slow_test_compact_with_index() {
     e.compact_table("db1.tb1").unwrap();
 
     let e = h::reopen(e, dir.path());
-    assert_compacted(&e);
+    assert_compacted(&e, 1);
     assert_eq!(h::count(&e, "db1.tb1"), 32768);
     assert_eq!(
         h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),

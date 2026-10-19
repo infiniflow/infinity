@@ -35,7 +35,10 @@ fn optimize_index_rollback() {
 
     // `RollBackTxn`: no optimize call.
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["16384"]]
     );
     h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
@@ -45,7 +48,10 @@ fn optimize_index_rollback() {
     e.cleanup().unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["16384"]]
     );
 
@@ -110,7 +116,10 @@ fn optimize_index_then_drop_index() {
     h::ok(&e, "DROP INDEX index1 ON db1.tb1;");
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["16384"]]
     );
 }
@@ -268,7 +277,10 @@ fn disabled_slow_test_optimize_commit() {
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"),
+        h::rows(
+            &e,
+            "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
+        ),
         vec![vec!["16384"]]
     );
     h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");

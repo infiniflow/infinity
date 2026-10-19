@@ -98,7 +98,8 @@ fn minio_upload_meta_to_s3() {
     // Download the remote metadata and data into a fresh engine directory.
     let dst = tempdir().unwrap();
     let restored_catalog = restore_tree(&client, &dst.path().join("catalog"), "catalog").unwrap();
-    let restored_rows = restore_tree(&client, &dst.path().join("persistence"), "persistence").unwrap();
+    let restored_rows =
+        restore_tree(&client, &dst.path().join("persistence"), "persistence").unwrap();
     let restored_data = restore_tree(&client, &dst.path().join("data"), "data").unwrap();
     assert!(restored_catalog > 0, "catalog restore was empty");
     assert!(restored_rows > 0, "row-store restore was empty");
@@ -116,16 +117,16 @@ fn minio_upload_meta_to_s3() {
     assert_eq!(restored.cpp_block_row_count("db1.tb1").unwrap(), 1);
 
     let mut rows = Vec::new();
-    for result in restored
-        .execute("SELECT col1, col2 FROM db1.tb1;")
-        .unwrap()
-    {
+    for result in restored.execute("SELECT col1, col2 FROM db1.tb1;").unwrap() {
         if let crate::QueryResult::Rows { rows: out, .. } = result {
             rows = out;
         }
     }
     assert_eq!(
         rows,
-        vec![vec!["1".to_string(), "abcdefghijklmnopqrstuvwxyz".to_string()]]
+        vec![vec![
+            "1".to_string(),
+            "abcdefghijklmnopqrstuvwxyz".to_string()
+        ]]
     );
 }
