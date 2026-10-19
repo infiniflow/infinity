@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 205, `gate-a` 216, `integration` 294, `partial` 231, `ported` 52.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 200, `gate-a` 216, `integration` 294, `partial` 231, `ported` 57.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -499,15 +499,15 @@
 | 485 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `MemoryAndGcPerformance` | exempt |
 | 486 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `ComprehensiveBenchmarkSummary` | exempt |
 | 487 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `QuickPerformanceVerification` | exempt |
-| 488 | `src/unit_test/storage/definition/column_def_ut.cpp` | `ColumnDefTest` | `test1` | gap |
-| 489 | `src/unit_test/storage/definition/column_def_ut.cpp` | `ColumnDefTest` | `test2` | gap |
+| 488 | `src/unit_test/storage/definition/column_def_ut.cpp` | `ColumnDefTest` | `test1` | ported | `infinity-catalog` `value_format::tests::column_def_to_string_renders_constraints_in_set_order` |
+| 489 | `src/unit_test/storage/definition/column_def_ut.cpp` | `ColumnDefTest` | `test2` | ported | `value_format::tests::column_def_to_string_renders_a_primary_key` |
 | 490 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test1` | ported |
 | 491 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test2` | ported |
 | 492 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test3` | ported |
 | 493 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `ReadWrite` | ported |
-| 494 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `ivf_readwrite` | gap |
-| 495 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `hnsw_readwrite` | gap |
-| 496 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `full_text_readwrite` | gap |
+| 494 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `ivf_readwrite` | ported | `value_format::tests::ivf_index_base_roundtrips_through_its_bytes` |
+| 495 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `hnsw_readwrite` | ported | `value_format::tests::hnsw_index_base_roundtrips_through_its_bytes` |
+| 496 | `src/unit_test/storage/definition/index_base_ut.cpp` | `IndexBaseTest` | `full_text_readwrite` | ported | `value_format::tests::full_text_index_base_roundtrips_through_its_bytes` |
 | 497 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `test1` | gap |
 | 498 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `ReadWrite` | gap |
 | 499 | `src/unit_test/storage/definition/table_ut.cpp` | `TableTest` | `test1` | gap |

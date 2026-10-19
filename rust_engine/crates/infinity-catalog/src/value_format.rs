@@ -150,6 +150,90 @@ impl ColumnDefValue {
     }
 }
 
+/// C++: `LogicalType2Str` (`src/parser/type/logical_type.cpp:28`).
+fn cpp_logical_name(code: i64) -> Option<&'static str> {
+    Some(match code {
+        logical::BOOLEAN => "Boolean",
+        logical::TINYINT => "TinyInt",
+        logical::SMALLINT => "SmallInt",
+        logical::INTEGER => "Integer",
+        logical::BIGINT => "BigInt",
+        logical::HUGEINT => "HugeInt",
+        logical::DECIMAL => "Decimal",
+        logical::FLOAT => "Float",
+        logical::DOUBLE => "Double",
+        logical::FLOAT16 => "Float16",
+        logical::BFLOAT16 => "BFloat16",
+        logical::VARCHAR => "Varchar",
+        logical::EMBEDDING => "Embedding",
+        logical::TENSOR => "Tensor",
+        logical::TENSORARRAY => "TensorArray",
+        logical::SPARSE => "Sparse",
+        logical::MULTIVECTOR => "MultiVector",
+        logical::DATE => "Date",
+        logical::TIME => "Time",
+        logical::DATETIME => "DateTime",
+        logical::TIMESTAMP => "Timestamp",
+        logical::INTERVAL => "Interval",
+        logical::ARRAY => "Array",
+        logical::JSON => "Json",
+        _ => return None,
+    })
+}
+
+/// `DataType::ToString()` (`src/parser/type/data_type.cpp:96`): the C++
+/// spellings, with the `type_info` text in parentheses when present.
+fn cpp_type_text(column_type: &Json) -> Option<String> {
+    let code = data_type_code(column_type)?;
+    let name = cpp_logical_name(code)?;
+    let text = crate::cpp_layout::type_text_of(column_type)?;
+    Some(match text.split_once('(') {
+        Some((_, rest)) => format!("{name}({rest}"),
+        None => name.to_string(),
+    })
+}
+
+/// C++: `ColumnDef::ToString` (`src/parser/definition/column_def.cpp:213`).
+///
+/// The constraints print in `std::set<ConstraintType>` order, and a column
+/// without an explicit default prints `Null` — the constructor replaces a
+/// missing default with a `kNull` constant.
+impl std::fmt::Display for ColumnDefValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {}",
+            self.column_name,
+            cpp_type_text(&self.column_type).unwrap_or_default()
+        )?;
+        let mut constraints = self.constraints.clone();
+        constraints.sort_unstable();
+        constraints.dedup();
+        for constraint in constraints {
+            // `ConstrainTypeToString` (`column_def.cpp:88`).
+            let name = match constraint {
+                0 => "Nullable",
+                1 => "Not nullable",
+                2 => "PrimaryKey",
+                3 => "Unique",
+                _ => "Invalid",
+            };
+            write!(f, " {name}")?;
+        }
+        if let Some(comment) = &self.column_comment {
+            if !comment.is_empty() {
+                write!(f, " comment {comment}")?;
+            }
+        }
+        let default = self
+            .default
+            .as_ref()
+            .and_then(crate::cpp_layout::default_text_of)
+            .unwrap_or_else(|| "Null".to_string());
+        write!(f, " default {default}")
+    }
+}
+
 /// Encodes `ColumnDef::ToJson()` (`column_def.cpp:228-248`).
 pub fn column_def_json(v: &ColumnDefValue) -> Json {
     let mut entries = vec![
@@ -1185,5 +1269,64 @@ mod tests {
         assert_eq!(sparse_index_type(32768), element::INT16);
         assert_eq!(sparse_index_type(32769), element::INT32);
         assert_eq!(sparse_index_type(2_147_483_649), element::INT64);
+    }
+
+    /// `src/unit_test/storage/definition/column_def_ut.cpp::ColumnDefTest/test1`.
+    #[test]
+    fn column_def_to_string_renders_constraints_in_set_order() {
+        let mut c = ColumnDefValue::new(data_type_json(logical::TINYINT, None), 0, "c1");
+        c.constraints = vec![3, 1]; // Unique + Not null
+        assert_eq!(c.to_string(), "c1 TinyInt Not nullable Unique default Null");
+    }
+
+    /// `ColumnDefTest/test2`.
+    #[test]
+    fn column_def_to_string_renders_a_primary_key() {
+        let mut c = ColumnDefValue::new(data_type_json(logical::VARCHAR, None), 3, "c2");
+        c.constraints = vec![2];
+        assert_eq!(c.to_string(), "c2 Varchar PrimaryKey default Null");
+    }
+
+    /// `src/unit_test/storage/definition/index_base_ut.cpp::IndexBaseTest/ivf_readwrite`.
+    #[test]
+    fn ivf_index_base_roundtrips_through_its_bytes() {
+        let v = IndexDefValue::ivf_plain("idx1", "tbl1_idx1", "col1", metric::L2, element::FLOAT32);
+        let bytes = index_def_bytes(&v);
+        let back = index_def_from_bytes(&bytes).expect("decode IVF index base");
+        assert_eq!(
+            index_def_json(&back).compact(),
+            index_def_json(&v).compact()
+        );
+        assert_eq!(index_def_bytes(&back), bytes);
+    }
+
+    /// `IndexBaseTest/hnsw_readwrite` (two columns, `m=16`,
+    /// `ef_construction=200`, plain encoding, L2).
+    #[test]
+    fn hnsw_index_base_roundtrips_through_its_bytes() {
+        let mut v = IndexDefValue::hnsw_default("idx1", "tbl1_idx1", "col1", "l2");
+        v.base.column_names = vec!["col1".to_string(), "col2".to_string()];
+        let bytes = index_def_bytes(&v);
+        let back = index_def_from_bytes(&bytes).expect("decode HNSW index base");
+        assert_eq!(
+            index_def_json(&back).compact(),
+            index_def_json(&v).compact()
+        );
+        assert_eq!(back.base.column_names, vec!["col1", "col2"]);
+        assert_eq!(index_def_bytes(&back), bytes);
+    }
+
+    /// `IndexBaseTest/full_text_readwrite` (two columns, default analyzer).
+    #[test]
+    fn full_text_index_base_roundtrips_through_its_bytes() {
+        let mut v = IndexDefValue::full_text("idx1", "tbl1_idx1", "col1", "standard");
+        v.base.column_names = vec!["col1".to_string(), "col2".to_string()];
+        let bytes = index_def_bytes(&v);
+        let back = index_def_from_bytes(&bytes).expect("decode full-text index base");
+        assert_eq!(
+            index_def_json(&back).compact(),
+            index_def_json(&v).compact()
+        );
+        assert_eq!(index_def_bytes(&back), bytes);
     }
 }
