@@ -499,7 +499,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 | **B** | 未修改的 Python/Go SDK + HTTP 全绿 | ✅ PySDK 逐文件全绿；Go 375/375；HTTP 全绿 |
 | **C** | 重启 / 快照 / 索引 chunk 生命周期 / 对象存储 | ⚠️ 常规全绿；重档 3 档未过（§7.5-1） |
 | **D** | 并发：loom + miri + sanitizer + `parallel_test` | ✅ loom 1、miri 39、ASan/TSAN 各 39；`parallel_test` 全绿 |
-| **E** | 对 C++ golden `<7%` | ✅ +2.93% / +4.75%（三次中的两次；一次 insert 抖动到 0.339 s 时为 +22.04%，见 §8.6） |
+| **E** | 对 C++ golden `<7%` | ✅ +4.59%（最新；此前 +2.93% / +4.75%，一次 insert 抖动时 +22.04%，见 §8.6） |
 | **F** | fmt / clippy `-D warnings` / `cargo deny` | ✅ 全绿（cargo-deny 0.20.2，schema v2） |
 | **G** | 内部不变量清单覆盖 | ✅ G1–G5 全部有回归测试 |
 
@@ -533,7 +533,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 - sift `knn_query_benchmark`（1/8 线程）与全文基准，对比 golden log；门限与 `tools/ci_tools/check_benchmark_result.py:44` 一致（**<7%** 均值回归）。
 - 测量控制（强制）：可比硬件、相同数据集/配置、等价驱动、重复次数、召回率指标；P99 / RSS 显式保留或移除。
 - golden：`rust_engine/golden/cpp_0.7.4_bench.txt`（由 `tools/bench_sdk_driver.py` 对 C++ 0.7.4 生成，三阶段：insert 20000 行 / 全量 select / 点查）。
-- 当前证据（2026-10-19，`./scripts/run_gate_e.sh golden/cpp_0.7.4_bench.txt`，同一驱动对 Rust 服务）：C++ 均值 0.1004 s，Rust 均值 0.1033–0.1052 s，**+2.93% / +4.75% → PASS**（三次中的两次；一次 insert 抖动到 0.339 s 时为 +22.04%）。分阶段：insert 0.288–0.293 s（与 C++ 0.291 s 持平）、全量 select **0.0165 s** vs 0.009105 s、点查 **0.0057–0.0060 s** vs 0.001152 s。
+- 当前证据（2026-10-19，`./scripts/run_gate_e.sh golden/cpp_0.7.4_bench.txt`，同一驱动对 Rust 服务）：最新一次 C++ 均值 0.1004 s，Rust 均值 0.1050 s，**+4.59% → PASS**；此前三次为 +2.93% / +4.75%（PASS）与 +22.04%（insert 抖动到 0.339 s）。分阶段：insert 0.292–0.293 s（与 C++ 0.291 s 持平）、全量 select **0.0165–0.0166 s** vs 0.009105 s、点查 **0.0057–0.0058 s** vs 0.001152 s。
 - 读路径修复：①标量表的已解码行缓存（内存 DataBlock 等价物，写入批后增量维护、按扫描路径解码、任何重写行的操作都失效）；②`SelectResponse` 仅在存在 NULL 时发送 `bitmasks`（与 C++ `ProcessColumnFieldType` 一致），消除 SDK 对 2 万行逐元素的有效性判断；③`malloc_trim` 改为每 8 个写入批一次；④`SELECT *` 的恒等投影不再复制一遍行。
 - 关键修复：①计划 pipeline 不再把已物化的行逐行走 `mpsc`（20k 行约省 20 ms）；②Thrift 传输改为 `BufReader`/`BufWriter`，消除 `list<bool>` 位图逐元素一次 `write` 系统调用（插入与 select 同时受益）。
 - 读路径分解（20k 行、release）：`fetch_rows` 6–7 ms，进程内 `SELECT *` **8.9 ms**（C++ 9.1 ms，已同级）；服务端 `exec` 12–18 ms + 列编码 0.3 ms；其余为客户端/传输。点查首次 7.7 ms（一次全表扫描），重复 18 µs（结果缓存）。
