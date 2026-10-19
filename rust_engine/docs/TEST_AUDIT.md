@@ -1,13 +1,13 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 108, `gap` 99, `gate-a` 42, `integration` 247, `partial` 35, `ported` 434.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 48, `exempt` 13, `ported` 951。
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
 - `gate-a`：parser/planner/executor/function，当前由 Gate A 的 SQL 用例覆盖，单元断言待移植。
 - `integration`：catalog/txn/wal/io/bg_task，当前由 Gate C 的 restart/快照集成用例覆盖，单元断言待移植。
 - `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point/Line/Box/Path/Polygon/Circle`）相关用例——用户确认不移植这些类型。
-- `exempt`：SIMD/第三方夹具、整段位于 `#if 0` 的用例（C++ 构建中不存在），以及已登记为设计变更的组件——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 事务型 KV、无 WAL 的 checkpoint 模式、后台任务线程池等（后三项已补齐实现，见 ported）。
+- `exempt`：SIMD/第三方夹具、整段或整块位于 `#if 0` 的用例（C++ 构建中不存在），以及已登记为设计变更的组件——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 事务型 KV、无 WAL 的 checkpoint 模式、后台任务线程池等（后三项已补齐实现，见 ported）。
 - `gap`：尚未移植。
 - 带 `#[ignore]` 的 `ported` 行：C++ 的 `DISABLED_*` 用例，Rust 用 `#[ignore]` 表达，需 `cargo test -- --ignored` 显式运行。
 
@@ -23,7 +23,7 @@
 | 8 | `src/unit_test/common/analyzer/chinese_analyzer_ut.cpp` | `ChineseAnalyzerTest` | `test1` | ported | `infinity-executor` `analyzer::chinese_analyzer_tests::test1` |
 | 9 | `src/unit_test/common/analyzer/ik_analyzer_ut.cpp` | `IKAnalyzerTest` | `test1` | ported | `infinity-executor` `analyzer::ik_analyzer_tests::test1` |
 | 10 | `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp` | `NGramAnalyzerTest` | `test1` | ported | `infinity-executor` `analyzer::tests::ngram_two_slides_over_words` |
-| 11 | `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp` | `NGramAnalyzerTest` | `test2` | ported | `analyzer::tests::ngram_one_emits_each_character` |
+| 11 | `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp` | `NGramAnalyzerTest` | `test2` | ported | `infinity-executor` `analyzer::tests::ngram_one_emits_each_character` |
 | 12 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_analyze_enable_position` | ported | `infinity-executor` `analyzer::rag_analyzer_tests::test_analyze_enable_position` |
 | 13 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_analyze_enable_position_fine_grained` | ported | `infinity-executor` `analyzer::rag_analyzer_tests::test_analyze_enable_position_fine_grained` |
 | 14 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_tokenize_consistency_with_posiiton` | ported | `infinity-executor` `analyzer::rag_analyzer_tests::test_tokenize_consistency_with_posiiton` |
@@ -218,9 +218,9 @@
 | 203 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `whitespace_analyzer_test` | ported | `gate-a` unit assertions ported |
 | 204 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `tpch` | ported | `infinity-parser` `corpora_ut::tests::sql_file_parsing_tpch` |
 | 205 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `hyrise` | ported | `infinity-parser` `corpora_ut::tests::sql_file_parsing_hyrise` |
-| 206 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `infinity` | ported | `infinity-executor` `corpora_ut::tests::sql_file_parsing_infinity` |
+| 206 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `infinity` | ported | `infinity-parser` `corpora_ut::tests::sql_file_parsing_infinity` |
 | 207 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test1` | ported | `infinity-parser` `parser::tests::sql_parser_good_test1` |
-| 208 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test2` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 208 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test2` | excluded | 含 geo 列（point/line/lseg/box/circle），用户确认不移植 geo |
 | 209 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_test1` | ported | `gate-a` unit assertions ported |
 | 210 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_create_index_1` | ported | `infinity-parser` `sql_parser_good_create_index_1` |
 | 211 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_create_index_1` | ported | `infinity-parser` `sql_parser_bad_create_index_1` |
@@ -942,7 +942,7 @@
 | 927 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_append` | ported | `infinity-executor` `request_ut::conflict_drop_column_append` |
 | 928 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_import` | ported | `infinity-executor` `request_ut::conflict_drop_column_import` |
 | 929 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_compact` | ported | `infinity-executor` `request_ut::conflict_drop_column_compact` |
-| 930 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_create_index` | exempt |
+| 930 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_create_index` | exempt | 该用例所在的 `#if 0` 块（691-767 行）被关闭，无编译后可执行行为 
 | 931 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `delete_append` | ported | `infinity-executor` `request_ut::conflict_delete_append` |
 | 932 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_append` | ported | `infinity-executor` `request_ut::append_into_missing_table_fails` |
 | 933 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_select` | ported | `infinity-executor` `request_ut::select_returns_inserted_row` |
@@ -1020,8 +1020,8 @@
 | 1005 | `src/unit_test/storage/wal/wal_replay_ut.cpp` | `WalReplayTest` | `wal_replay_compact` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 1006 | `src/unit_test/storage/wal/wal_replay_ut.cpp` | `WalReplayTest` | `wal_replay_create_index_IvfFlat` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 1007 | `src/unit_test/storage/wal/wal_replay_ut.cpp` | `WalReplayTest` | `wal_replay_create_index_hnsw` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 1008 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `nlohmann_test` | ported | `infinity-common` `json::third_party_json_suite::* / bitmap::third_party_reference_suite::*` |
-| 1009 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `simdjson_test` | ported | `infinity-common` `json::third_party_json_suite::* / bitmap::third_party_reference_suite::*` |
-| 1010 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test_size` | ported | `infinity-common` `json::third_party_json_suite::* / bitmap::third_party_reference_suite::*` |
-| 1011 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test1` | ported | `infinity-common` `json::third_party_json_suite::* / bitmap::third_party_reference_suite::*` |
-| 1012 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test2` | ported | `infinity-common` `json::third_party_json_suite::* / bitmap::third_party_reference_suite::*` |
+| 1008 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `nlohmann_test` | ported | `infinity-common` `json::tests::nlohmann_test_parses_twitter_metadata` |
+| 1009 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `simdjson_test` | ported | `infinity-common` `json::tests::simdjson_test_walks_documents_by_type` |
+| 1010 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test_size` | ported | `infinity-common` `bitmap::third_party_reference_suite::roaring_size_and_optimize` |
+| 1011 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test1` | ported | `infinity-common` `bitmap::third_party_reference_suite::roaring_cardinality_32_and_64` |
+| 1012 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test2` | ported | `infinity-common` `bitmap::third_party_reference_suite::roaring_bitmap_operations` |

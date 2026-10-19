@@ -748,4 +748,62 @@ mod tests {
         let json = Json::Str(text.clone());
         assert_eq!(parse(&json.compact()), Some(Json::Str(text)));
     }
+
+    fn get<'a>(value: &'a Json, key: &str) -> Option<&'a Json> {
+        match value {
+            Json::Obj(entries) => entries.iter().find(|(k, _)| k == key).map(|(_, v)| v),
+            _ => None,
+        }
+    }
+
+    fn twitter_document() -> Json {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../test/data/json/twitter.json"
+        );
+        let text = std::fs::read_to_string(path).expect("twitter.json fixture");
+        parse(&text).expect("twitter.json parses")
+    }
+
+    /// C++: `JsonTest.nlohmann_test` — parse the twitter fixture and read a
+    /// nested unsigned value.
+    #[test]
+    fn nlohmann_test_parses_twitter_metadata() {
+        let doc = twitter_document();
+        let metadata = get(&doc, "search_metadata").expect("search_metadata");
+        assert_eq!(get(metadata, "count"), Some(&Json::Int(100)));
+    }
+
+    /// C++: `JsonTest.simdjson_test` — the same value through a typed walk,
+    /// plus the literal document whose fields the reference prints by type.
+    #[test]
+    #[allow(clippy::approx_constant)]
+    fn simdjson_test_walks_documents_by_type() {
+        let doc = twitter_document();
+        let count = get(get(&doc, "search_metadata").expect("search_metadata"), "count")
+            .expect("count");
+        assert!(matches!(count, Json::Int(100)));
+
+        let text = "{\"hello\":\"world\",\"t\":true,\"f\":false,\"n\":null,\"i\":123,\"pi\":3.1416,"
+            .to_string()
+            + "\"a\":[0,1,2],\"o\":{\"v0\":\"v0\",\"v1\":\"v1\",\"v2\":\"v2\"}}";
+        let doc = parse(&text).expect("literal parses");
+        assert_eq!(get(&doc, "hello"), Some(&Json::Str("world".to_string())));
+        assert_eq!(get(&doc, "t"), Some(&Json::Bool(true)));
+        assert_eq!(get(&doc, "f"), Some(&Json::Bool(false)));
+        assert_eq!(get(&doc, "n"), Some(&Json::Null));
+        assert_eq!(get(&doc, "i"), Some(&Json::Int(123)));
+        match get(&doc, "pi") {
+            Some(Json::Float(v)) => assert!((v - 3.1416).abs() < 1e-9),
+            other => panic!("pi must be a float, got {other:?}"),
+        }
+        assert_eq!(
+            get(&doc, "a"),
+            Some(&Json::Arr(vec![Json::Int(0), Json::Int(1), Json::Int(2)]))
+        );
+        let object = get(&doc, "o").expect("o");
+        for key in ["v0", "v1", "v2"] {
+            assert_eq!(get(object, key), Some(&Json::Str(key.to_string())));
+        }
+    }
 }
