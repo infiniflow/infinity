@@ -170,6 +170,40 @@ impl UuidT {
     }
 }
 
+/// C++: `MixedValueType` (`src/parser/type/base_mixed_type.h`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MixedValueType {
+    #[default]
+    Invalid,
+    Integer,
+    Float,
+    ShortStr,
+    LongStr,
+    Tuple,
+    Array,
+    Null,
+    Missing,
+    Dummy,
+}
+
+impl MixedValueType {
+    /// C++: `BaseMixedType::GetTypeName`.
+    pub fn type_name(self) -> &'static str {
+        match self {
+            Self::Invalid => "Invalid",
+            Self::Integer => "Integer",
+            Self::Float => "Float",
+            Self::ShortStr => "Short String",
+            Self::LongStr => "Long String",
+            Self::Tuple => "Tuple",
+            Self::Array => "Array",
+            Self::Null => "Null",
+            Self::Missing => "Missing",
+            Self::Dummy => "Dummy",
+        }
+    }
+}
+
 /// C++: `MixedT` (`src/parser/type/mixed_type.h`): the heterogeneous value's
 /// rendered form (the executor keeps typed values in `Value`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -768,5 +802,22 @@ mod tests {
         assert_eq!(info.size(), PARSER_EMBEDDING_LIMIT * 8);
         assert_eq!(info.dimension(), PARSER_EMBEDDING_LIMIT);
         assert_eq!(info.data_type(), EmbeddingDataType::Int64);
+    }
+    /// `src/unit_test/parser/type/heterogeneous/base_mixed_type_ut.cpp::BaseMixedTypeTest/GetTypeName`.
+    #[test]
+    fn mixed_value_type_names_match_the_reference() {
+        for (ty, name) in [
+            (MixedValueType::Invalid, "Invalid"),
+            (MixedValueType::Integer, "Integer"),
+            (MixedValueType::LongStr, "Long String"),
+            (MixedValueType::ShortStr, "Short String"),
+            (MixedValueType::Tuple, "Tuple"),
+            (MixedValueType::Array, "Array"),
+            (MixedValueType::Null, "Null"),
+            (MixedValueType::Missing, "Missing"),
+            (MixedValueType::Dummy, "Dummy"),
+        ] {
+            assert_eq!(ty.type_name(), name);
+        }
     }
 }

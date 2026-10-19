@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 80, `integration` 250, `partial` 42, `ported` 390.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 79, `integration` 250, `partial` 42, `ported` 391.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -255,7 +255,7 @@
 | 241 | `src/unit_test/parser/type/geo/path_type_ut_nimpl.cpp` | `PathTypeTest` | `path1` | gate-a |
 | 242 | `src/unit_test/parser/type/geo/point_type_ut.cpp` | `PointTypeTest` | `point1` | gate-a |
 | 243 | `src/unit_test/parser/type/geo/polygon_type_ut_nimpl.cpp` | `PolygonTypeTest` | `polygon1` | gate-a |
-| 244 | `src/unit_test/parser/type/heterogeneous/base_mixed_type_ut.cpp` | `BaseMixedTypeTest` | `GetTypeName` | gate-a |
+| 244 | `src/unit_test/parser/type/heterogeneous/base_mixed_type_ut.cpp` | `BaseMixedTypeTest` | `GetTypeName` | ported | `infinity-common` `types::tests::mixed_value_type_names_match_the_reference` |
 | 245 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_integer` | gate-a |
 | 246 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_float` | gate-a |
 | 247 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_short_str` | gate-a |
