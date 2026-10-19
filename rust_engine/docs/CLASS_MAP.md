@@ -95,7 +95,7 @@
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | `varchar_hash_matches_libstdcxx` |
 | （无独立 C++ 单测） | `merge_knn::MergeKnn` | 6 例：多段合并/并列取小 RowID/阈值方向/多查询/EndWithoutSort/余弦排序 |
 | （无独立 C++ 单测） | `knn_scan::PhysicalKnnScan::finish` | `finish_ranks_by_metric_and_applies_threshold_and_topn`（相似度降序/距离升序/并列取小 RowID/阈值/topn） |
-| （无独立 C++ 单测） | `full_rows_come_from_the_block_mirror_when_current` | 毒化 KV 行值后全行扫描仍返回块中的值，证明块是权威值源 |
+| （无独立 C++ 单测） | `full_rows_come_from_the_block_mirror_when_current` / `block_mirror_covers_rows_after_deletes_and_updates` / `projection_reads_columns_from_the_block_mirror` | 毒化 KV 行值后全行/投影扫描仍返回块中的值；delete/update 后块快照 + tombstone + 行日志覆盖，不再等 checkpoint |
 | （无独立 C++ 单测） | `block_index::{create_block, get_block, open, remove_block}` | `creates_and_reads_blocks`、`reads_go_through_the_bounded_cache`、`open_recovers_block_ranges_from_version_files`、`removing_a_block_drops_it_from_the_manager` |
 | `knn/sparse/test_bmp_fwd_ut.cpp`（块分组/迭代不变量） | `sparse::BlockFwd`/`TailFwd` | `block_fwd_groups_docs_into_blocks` |
 | `knn/sparse/test_bmp_ivt_ut.cpp`（block max / kth 不变量） | `sparse::BMPIvt`/`Postings` | `bmp_ivt_keeps_block_maxima_and_kth` |

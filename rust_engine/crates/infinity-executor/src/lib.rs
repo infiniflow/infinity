@@ -2433,8 +2433,8 @@ type SecondaryDiskChunks = Vec<(
 /// Sealed low-cardinality (boolean) chunk readers with their base row id.
 type SecondaryLowChunks = Vec<(u64, Arc<infinity_storage::secondary_lowcard::LowCardReader>)>;
 
-/// Secondary-index registry of one table (C++ `TableEntry::indexes_` plus the
-/// sealed chunk readers), keyed by column.
+/// Secondary-index registry of one table (the reference's index metas under
+/// `src/storage/catalog/meta/` plus the sealed chunk readers), keyed by column.
 #[derive(Default)]
 struct SecondaryIndexes {
     /// Memory tails: rows written since the last chunk dump.
@@ -2449,14 +2449,22 @@ struct SecondaryIndexes {
 
 /// Per-table write bookkeeping and row-id allocation.
 ///
-/// C++: the mutable half of `TableEntry` (`src/storage/meta/entry/table_entry.cppm`):
-/// index registries, row-id allocator and the in-memory row blocks.
+/// C++ counterpart: the runtime state behind `TableMeta` / `SegmentMeta`
+/// (`src/storage/catalog/meta/`) plus the block map (`BlockIndex`,
+/// `src/storage/common/block_index.cppm`). Upstream removed the older
+/// `TableEntry` / `SegmentEntry` / `BlockManager` classes (PR #2722), so this
+/// type stands in for their catalog-level successors, not for a single class.
 #[derive(Default)]
 struct TableEntry {
     /// Number of write batches (`COPY`/`INSERT`) seen by this process.
     write_batches: usize,
-    /// Write generation at which the C++ block mirror was last flushed.
-    cpp_block_generation: Option<usize>,
+    /// Row ids the C++ block mirror was written from, in block order.
+    ///
+    /// The mirror is a snapshot: rows appended after it was written are read
+    /// from the row journal, and rows deleted since it was written are hidden
+    /// by their tombstones (`TableEntry`'s block snapshot is the Rust stand-in
+    /// for the reference's per-block row ranges + delete bitmap).
+    cpp_block_rows: Option<Vec<usize>>,
     /// Append-only sidecar holding this table's wide cells.
     row_blob: Option<Arc<Mutex<std::fs::File>>>,
     /// `(segment, offset, sealed)` of the row-id allocator.
@@ -2484,7 +2492,7 @@ struct TableEntry {
     /// Secondary indexes per column with their sealed chunk readers.
     secondary: SecondaryIndexes,
     /// HNSW chunks loaded from the C++ block mirror, per column (the
-    /// reference's `TableEntry::vector_indexes_`, on-disk form).
+    /// reference's `TableIndexMeta` chain for the index, on-disk form).
     vector: HashMap<String, Vec<Arc<crate::cpp_blocks::LoadedVectorIndex>>>,
     /// IVF chunks loaded from the C++ mirror, per column.
     ivf: HashMap<String, Vec<Arc<infinity_index::ivf::IvfIndex>>>,
@@ -2505,7 +2513,8 @@ struct TableEntry {
 
 /// One segment of a table: its id and the highest row offset ever allocated.
 ///
-/// C++: `SegmentEntry` (`src/storage/meta/entry/segment_entry.cppm`).
+/// C++: `SegmentMeta` (`src/storage/catalog/meta/segment_meta.cppm`); the
+/// removed `SegmentEntry` was its runtime counterpart.
 struct SegmentEntry {
     id: u32,
     /// Number of rows in the segment (`SegmentEntry::row_count`).
@@ -2519,25 +2528,6 @@ struct RowCache {
 }
 
 const ROW_CACHE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
-
-/// Whether a table's declared types round-trip through the block mirror with
-/// exactly the same text the row journal stores. Float/JSON/embedding/array
-/// columns render differently (f32 widening, JSON spacing, bracket forms), so
-/// full-row reads keep using the journal for those tables.
-fn block_rows_safe(types: &[String]) -> bool {
-    types.iter().all(|t| {
-        let u = t.trim().to_ascii_uppercase();
-        u.starts_with("INT")
-            || u.starts_with("TINYINT")
-            || u.starts_with("SMALLINT")
-            || u.starts_with("BIGINT")
-            || u.starts_with("UINT")
-            || u.starts_with("BOOL")
-            || u.starts_with("DOUBLE")
-            || u.starts_with("VARCHAR")
-            || u.starts_with("TEXT")
-    })
-}
 
 /// Decoded rows paired with their row ids (the executor's scan unit).
 type TableRows = Vec<(usize, Vec<Value>)>;
@@ -3672,7 +3662,7 @@ impl Engine {
     fn invalidate_block_mirror(&self, table: &str) {
         let key = self.table_key(table);
         if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
-            entry.cpp_block_generation = None;
+            entry.cpp_block_rows = None;
             entry.block_index = None;
             entry.live_rows = None;
         }
@@ -4079,9 +4069,9 @@ impl Engine {
     fn commit_with_deletes(&self, table: &str, deletes: &[usize], mut txn: Txn) -> Result<u64> {
         self.invalidate_row_cache(table);
         self.note_live_rows(table, -(deletes.len() as isize));
-        // Deletes leave the old rows in the block mirror; reads fall back to
-        // the row journal until the next checkpoint rewrites it.
-        self.invalidate_block_mirror(table);
+        // The block mirror keeps its snapshot: deleted row ids are hidden by
+        // the tombstones written here, and rows an UPDATE re-inserted arrive
+        // with fresh ids that the journal serves.
         for seq in deletes {
             txn.delete(del_key(table, *seq));
         }
@@ -5800,16 +5790,16 @@ impl Engine {
         Ok(rows)
     }
 
-    /// Projection-only `SELECT`: read the requested columns from the C++ block
-    /// mirror when it matches the current write generation. Returns `None` when
-    /// the mirror is stale or the projection is not a plain column list.
-    /// Full rows from the C++ block mirror when it covers every live row.
+    /// Full rows from the C++ block mirror.
     ///
-    /// The mirror is the authoritative value source at that point; the KV
-    /// store supplies only the live row-id list (the write-ahead journal
-    /// between checkpoints). Returns `None` when the mirror is stale or a
-    /// column type is not block-encodable, so the caller falls back to the KV
-    /// row store.
+    /// The mirror is a snapshot of the rows that existed when it was written,
+    /// so it serves every row whose id it recorded. Rows appended afterwards
+    /// (INSERT/COPY/UPDATE, or a column rewrite) are read from the row journal,
+    /// and rows deleted afterwards are hidden by their tombstones; no
+    /// checkpoint is needed for the mirror to stay authoritative.
+    ///
+    /// Returns `None` when the table has no block mirror or the mirror does not
+    /// match its recorded row ids, so the caller falls back to the KV row store.
     fn try_cpp_rows(&self, table: &str) -> Result<Option<TableRows>> {
         let table = if table.contains('.') {
             table.to_string()
@@ -5818,36 +5808,33 @@ impl Engine {
         };
         let table = table.as_str();
         let key = self.table_key(table);
-        let (current, generation) = self
+        let snapshot = self
             .tables
             .lock()
             .unwrap()
             .get(&key)
-            .map(|e| (e.write_batches, e.cpp_block_generation))
-            .unwrap_or((0, None));
-        if generation != Some(current) {
+            .and_then(|e| e.cpp_block_rows.clone());
+        let Some(snapshot) = snapshot else {
             return Ok(None);
-        }
-        if self.cpp_block_row_count(table)? != self.row_count(table)? {
-            return Ok(None);
-        }
+        };
         let schema = self.table_schema(table)?;
         if schema.is_empty() {
             return Ok(None);
         }
-        // The block decoder renders typed values; float/JSON/embedding/array
-        // spellings differ from the row journal's text. Full-row reads use the
-        // blocks only for types whose rendering is identical.
-        let declared = self.column_types(table)?;
-        if !block_rows_safe(&declared) {
+        let wanted: Vec<usize> = (0..schema.len()).collect();
+        let Ok((_, rows)) = self.read_cpp_blocks_selected(table, &wanted) else {
+            return Ok(None);
+        };
+        if rows.len() != snapshot.len() {
+            // The mirror was rewritten between the snapshot and the read.
             return Ok(None);
         }
-        let wanted: Vec<usize> = (0..schema.len()).collect();
-        // Row ids in key order; the values are decoded from the blocks.
+        let mut blocks: HashMap<usize, Vec<String>> = snapshot.into_iter().zip(rows).collect();
         let prefix = row_prefix(table);
         let deleted = self.tombstone_set(table)?;
-        let mut ids = Vec::new();
-        for (k, _) in self.storage.store.scan_prefix(&prefix)? {
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let mut out = Vec::new();
+        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
             let Some(raw) = k.get(prefix.len()..) else {
                 continue;
             };
@@ -5857,23 +5844,16 @@ impl Engine {
             let Ok(seq) = raw.parse::<usize>() else {
                 continue;
             };
-            if !deleted.contains(&(seq as u64)) {
-                ids.push(seq);
+            if deleted.contains(&(seq as u64)) {
+                continue;
+            }
+            match blocks.remove(&seq) {
+                Some(cells) => out.push((seq, cells.iter().map(|c| parse_value(c)).collect())),
+                // Written after the mirror snapshot: the journal holds it.
+                None => out.push((seq, self.parse_stored_row(table, &defaults, &v)?)),
             }
         }
-        let rows = match self.read_cpp_blocks_selected(table, &wanted) {
-            Ok((_, rows)) => rows,
-            Err(_) => return Ok(None),
-        };
-        if ids.len() != rows.len() {
-            return Ok(None);
-        }
-        Ok(Some(
-            ids.into_iter()
-                .zip(rows)
-                .map(|(id, cells)| (id, cells.iter().map(|c| parse_value(c)).collect()))
-                .collect(),
-        ))
+        Ok(Some(out))
     }
 
     fn try_cpp_projection(
@@ -5919,25 +5899,55 @@ impl Engine {
             return Ok(None);
         }
         let key = self.table_key(table);
-        let (current, generation) = self
+        let snapshot = self
             .tables
             .lock()
             .unwrap()
             .get(&key)
-            .map(|e| (e.write_batches, e.cpp_block_generation))
-            .unwrap_or((0, None));
-        if generation != Some(current) {
+            .and_then(|e| e.cpp_block_rows.clone());
+        let Some(snapshot) = snapshot else {
+            return Ok(None);
+        };
+        let Ok((_, rows)) = self.read_cpp_blocks_selected(table, &wanted) else {
+            return Ok(None);
+        };
+        if rows.len() != snapshot.len() {
             return Ok(None);
         }
-        if self.cpp_block_row_count(table)? != self.row_count(table)? {
-            return Ok(None);
+        // Same snapshot + journal overlay as `try_cpp_rows`, but only the
+        // projected columns are decoded from the blocks.
+        let mut blocks: HashMap<usize, Vec<String>> = snapshot.into_iter().zip(rows).collect();
+        let prefix = row_prefix(table);
+        let deleted = self.tombstone_set(table)?;
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let mut out = Vec::new();
+        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
+            let Some(raw) = k.get(prefix.len()..) else {
+                continue;
+            };
+            let Ok(raw) = std::str::from_utf8(raw) else {
+                continue;
+            };
+            let Ok(seq) = raw.parse::<usize>() else {
+                continue;
+            };
+            if deleted.contains(&(seq as u64)) {
+                continue;
+            }
+            match blocks.remove(&seq) {
+                Some(cells) => out.push(cells.iter().map(|c| parse_value(c)).collect()),
+                None => {
+                    let row = self.parse_stored_row(table, &defaults, &v)?;
+                    out.push(
+                        wanted
+                            .iter()
+                            .map(|i| row.get(*i).cloned().unwrap_or(Value::Null))
+                            .collect(),
+                    );
+                }
+            }
         }
-        let (_, rows) = self.read_cpp_blocks_selected(table, &wanted)?;
-        Ok(Some(
-            rows.into_iter()
-                .map(|r| r.iter().map(|c| parse_value(c)).collect())
-                .collect(),
-        ))
+        Ok(Some(out))
     }
 
     fn blob_file(&self, table: &str) -> Result<Arc<Mutex<std::fs::File>>> {
@@ -7203,6 +7213,9 @@ impl Engine {
     /// counter is reset, so `SHOW SEGMENTS` reports a single segment.
     pub fn compact_table(&self, table: &str) -> Result<()> {
         self.invalidate_row_cache(table);
+        // Rows are re-keyed below; the mirror's row-id snapshot stops matching
+        // the moment the first row moves.
+        self.invalidate_block_mirror(table);
         let rows = self.fetch_rows_with_ids(table)?;
         // Renumber through the transaction so WAL replay reproduces the
         // compacted state: a row moved from `old` to `i` also leaves a
@@ -7247,7 +7260,7 @@ impl Engine {
             entry.secondary.indexes.clear();
             entry.vector.clear();
             entry.block_index = None;
-            entry.cpp_block_generation = None;
+            entry.cpp_block_rows = None;
             entry.live_rows = Some(rows.len());
         }
         self.result_cache.lock().unwrap().clear();
@@ -12597,11 +12610,15 @@ mod tests {
                 vec!["3".to_string(), "c".to_string()],
             ]
         );
-        // A write after the flush makes the mirror stale: the planner must fall
-        // back to the row store instead of missing the new row.
+        // A row written after the flush is not in the block snapshot: the
+        // projection overlays it from the row journal, so the new row is
+        // visible without waiting for the next checkpoint.
         e.execute("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
             .unwrap();
-        assert!(e.try_cpp_projection("p", &items).unwrap().is_none());
+        let projected = e.try_cpp_projection("p", &items).unwrap().unwrap();
+        assert_eq!(projected.len(), 4);
+        assert_eq!(projected[3][0], Value::Int(4));
+        assert_eq!(projected[3][1], Value::Str("d".into()));
         assert_eq!(rows(&e, "SELECT id, name FROM p;").len(), 4);
     }
 
@@ -13190,6 +13207,41 @@ mod tests {
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0][0], Value::Int(1));
         assert_eq!(rows[1][0], Value::Int(2));
+    }
+
+    #[test]
+    fn block_mirror_covers_rows_after_deletes_and_updates() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE bmu (id INT, name VARCHAR);")
+            .unwrap();
+        e.execute("INSERT INTO bmu VALUES (1,'a'),(2,'b'),(3,'c');")
+            .unwrap();
+        e.flush().unwrap();
+        e.invalidate_row_cache("default_db.bmu");
+        // Poison the journal: the mirror must still supply every row it
+        // snapshotted, and only the rows written after the checkpoint may come
+        // from the journal.
+        for seq in 0..3 {
+            e.store()
+                .put(&row_key("default_db.bmu", seq), b"999\tzzz")
+                .unwrap();
+        }
+        e.execute("DELETE FROM bmu WHERE id = 2;").unwrap();
+        e.execute("UPDATE bmu SET name = 'u' WHERE id = 3;")
+            .unwrap();
+        let rows = e.try_cpp_rows("default_db.bmu").unwrap().unwrap();
+        let ids: Vec<&Value> = rows.iter().map(|(_, r)| &r[0]).collect();
+        let names: Vec<&Value> = rows.iter().map(|(_, r)| &r[1]).collect();
+        assert_eq!(ids, vec![&Value::Int(1), &Value::Int(3)]);
+        assert_eq!(
+            names,
+            vec![&Value::Str("a".into()), &Value::Str("u".into())]
+        );
+        assert_eq!(
+            rows.iter().map(|(seq, _)| *seq).collect::<Vec<_>>(),
+            vec![0, 3]
+        );
     }
 
     #[test]

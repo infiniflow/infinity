@@ -429,7 +429,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 ### 7.2 存储与格式模块
 
 - `cpp_format`：数据文件框架、块 `version`、列体 `[data_region][null_bitmap]`、`ColumnLayout`/`pack_column`、整块目录、日期时间与 f16/bf16。
-- **列式投影读路径（#87）**：仅含列清单的 `SELECT` 在「C++ 块镜像的写入代次 == 当前 write generation」时，只解码所需列（`read_cpp_blocks_selected`），不读行存、不解析宽列；镜像过期或存在过滤/排序时自动回退。
+- **列式投影读路径（#87）**：仅含列清单的 `SELECT` 只解码所需列（`read_cpp_blocks_selected`），不读行存、不解析宽列。块镜像记录写入时的行 ID 快照（`TableEntry::cpp_block_rows`）：快照内的行从列块读，快照之后写入的行（INSERT/COPY/UPDATE 新 ID）从行日志读，删除由 tombstone 过滤；因此 delete/update 之后无需等 checkpoint，镜像仍是权威值源。存在过滤/排序时仍走通用路径。
 - **行内宽值旁路（临时内存措施，待列存替换）**：向量/多向量/稀疏单元格以 LZ4 压缩后存入 `rowdata/<table>.bin`，KV 行只保留 `\x01B{offset}:{len}` 引用，读路径统一经 `decode_cell` 还原。C++ 的目标形态是**列存块文件作为权威数据**；这里的 sidecar 只是把不可回收的匿名内存换成可回收的文件页，属于过渡手段。
 - `cpp_blocks`（执行器）：把真实表镜像成 C++ 块文件（每 8192 行一块），`flush()` 自动镜像并可脱离 KV 读回。覆盖定宽标量、`VARCHAR`/`JSON`、`EMBEDDING`/`VECTOR`、`TENSOR`/`MULTIVECTOR`、`SPARSE`、嵌套 `ARRAY`、`TENSORARRAY`、`EMBEDDING(BIT)`、`SPARSE(BIT)`；`TENSOR(BIT)`/`TENSORARRAY(BIT)` 按设计返回错误。
 - `catalog_format` / `value_format` / `cpp_layout`：全部 catalog 键、`DataType`/`ColumnDef`/`IndexBase`（十种）逐字段复刻；`Engine::flush` 写入 C++ 键空间，`Engine::open` 可从 C++ 键空间导入 schema。
@@ -470,7 +470,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 **无。** 索引构建时机（#83/#84/#85）、统一 memindex 预算（#86）、唯一 C++ catalog（#69）均已落地；所有索引读路径均为「多封盘段 + 至多一个内存段」：全文、HNSW、稀疏、多向量、次级（含 VARCHAR/JSON 的 u64 哈希键 PGM chunk）、IVF（chunk + 内存段）。
 
-> **C++ 对齐的内存/性能路线（已落地类层与读路径）**：C++ 以**列存块文件为权威数据**（`BlockIndex`/`BlockMeta` + buffer manager 的 `buffer_manager_size` LRU），内存块由 checkpoint 落盘，memindex 另有 4 GiB 配额。Rust 侧现已：`BlockIndex::create_block` 按 `DEFAULT_BLOCK_CAPACITY` 写 `tbl_*/seg_0/blk_*`（checkpoint 全量重写），块读路径统一走 `BlockIndex` + 共享 `BufferManager`；镜像覆盖全表时**全行扫描直接读列块**（`try_cpp_rows`，用毒化 KV 的单测证明），行存退化为写前日志与回退。当前仍保留的回退：KV 文本与块类型渲染不完全一致的类型（FLOAT/JSON/embedding/array/bit）、删除/更新后的旧块（等下一次 checkpoint 重写）、以及超过镜像预算而跳过镜像的大表。逐批写块文件曾实现并跑过 Gate A，但把 insert 拖慢约 8%（Gate E 6.71%→12.45%），且 C++ 也只把内存块在 checkpoint 落盘，故保留为内存日志语义。
+> **C++ 对齐的内存/性能路线（已落地类层与读路径）**：C++ 以**列存块文件为权威数据**（`BlockIndex`/`BlockMeta` + buffer manager 的 `buffer_manager_size` LRU），内存块由 checkpoint 落盘，memindex 另有 4 GiB 配额。Rust 侧现已：`BlockIndex::create_block` 按 `DEFAULT_BLOCK_CAPACITY` 写 `tbl_*/seg_0/blk_*`（checkpoint 全量重写），块读路径统一走 `BlockIndex` + 共享 `BufferManager`；**全行扫描直接读列块**（`try_cpp_rows`，用毒化 KV 的单测证明），行存退化为写前日志。全部列类型（含 FLOAT/JSON/embedding/array/bit）都从块渲染且与 Gate A 逐字节一致；块镜像按写入时的行 ID 快照服务，delete/update 后由 tombstone + 行日志增量覆盖，不再等下一次 checkpoint。唯一剩余的 KV 读是超过镜像预算（`MIRROR_BUDGET_BYTES`）而未镜像的大表，以及镜像写失败时的保守回退。逐批写块文件曾实现并跑过 Gate A，但把 insert 拖慢约 8%（Gate E 6.71%→12.45%），且 C++ 也只把内存块在 checkpoint 落盘，故保留为内存日志语义。
 
 > 稀疏/多向量/次级的 filtered 查询仍走扫描路径（功能项，见 §7.5.2）。
 
@@ -482,7 +482,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 #### 7.5.3 验收缺口（P2）
 
-8. **Gate C 重档内存**（`test_multiple_index_types_import`）：统一 memindex 预算 + 行内宽值 sidecar（LZ4）+ 每批 `malloc_trim` + VARCHAR 次级 chunk + IVF 内存段后，5.toml 档在 **6:02 为 10.2 GB（峰值 12.7 GB）**，随后继续增长，**11:48 在 ~19.4 GB 峰值被杀**（30 GB 主机，其他会话常占 ~10 GB）。后续对齐 C++ 的 `[storage] mem_index_capacity`（每批写入后按**行数**把内存段落盘，5.toml=8192 行）、修正 optimize/cleanup（增量 chunk 不再被 cleanup 误删；内存段为空时 checkpoint 不做全表重建；大表跳过内存中的全表 merge），并让 checkpoint 只加载新增 HNSW chunk。复跑时导入阶段 RSS 由 5.9 GB 降到 3.0 GB、整轮峰值 ~8.2 GB；最新一轮跑到 23/50 个 insert 批（14:42，RSS 5–6 GB、批耗时从 36 s 增至 90 s）后被宿主以 SIGTERM 终止（`earlyoom -M 2000000`，日志无 panic；此前几轮分别在 13:13、17:09、18:38 终止），因此正式判定仍需 CI 机复跑。剩余常驻内存是已加载的 HNSW 向量（~4 GB，对应 C++ 的 `buffer_manager_size` 预算）；块文件 + buffer manager 的类层（`BlockIndex`/`BlockMeta`/`ColumnVector`/`DataBlock`）与块权威读路径已实现，剩余是让全部类型都从块渲染（当前 FLOAT/JSON/embedding/array 仍回退 KV 文本以保证输出逐字节一致）。
+8. **Gate C 重档内存**（`test_multiple_index_types_import`）：统一 memindex 预算 + 行内宽值 sidecar（LZ4）+ 每批 `malloc_trim` + VARCHAR 次级 chunk + IVF 内存段后，5.toml 档在 **6:02 为 10.2 GB（峰值 12.7 GB）**，随后继续增长，**11:48 在 ~19.4 GB 峰值被杀**（30 GB 主机，其他会话常占 ~10 GB）。后续对齐 C++ 的 `[storage] mem_index_capacity`（每批写入后按**行数**把内存段落盘，5.toml=8192 行）、修正 optimize/cleanup（增量 chunk 不再被 cleanup 误删；内存段为空时 checkpoint 不做全表重建；大表跳过内存中的全表 merge），并让 checkpoint 只加载新增 HNSW chunk。复跑时导入阶段 RSS 由 5.9 GB 降到 3.0 GB、整轮峰值 ~8.2 GB；最新一轮跑到 23/50 个 insert 批（14:42，RSS 5–6 GB、批耗时从 36 s 增至 90 s）后被宿主以 SIGTERM 终止（`earlyoom -M 2000000`，日志无 panic；此前几轮分别在 13:13、17:09、18:38 终止），因此正式判定仍需 CI 机复跑。剩余常驻内存是已加载的 HNSW 向量（~4 GB，对应 C++ 的 `buffer_manager_size` 预算）；块文件 + buffer manager 的类层（`BlockIndex`/`BlockMeta`/`ColumnVector`/`DataBlock`）与块权威读路径已实现，全部列类型（FLOAT/JSON/embedding/tensor/array/bit）都从块渲染并与 Gate A 逐字节一致，块镜像按写入时的行 ID 快照 + tombstone/行日志覆盖 delete/update，不再依赖下一次 checkpoint。
 9. **Gate E 读路径**：同机 A/B 对 C++ 0.7.4 `RelWithDebInfo`：写 68–73%（1.4×），读慢 7–20×（`count(*)` 2.0 ms vs 27.8 ms；`SELECT id,name` 7.7 ms vs 55.5 ms；点查 1.2 ms vs 27.3 ms）。根因是**行存 + 全表扫描**（无列存、无行数统计），与 7.5.3-8 同源。列式投影路径（#87）已落地，但只在镜像新鲜且纯列投影时生效；官方 golden 已由 SDK 驱动生成，Gate E 当前 +5.64%（PASS，§8.6）。
 
 ---

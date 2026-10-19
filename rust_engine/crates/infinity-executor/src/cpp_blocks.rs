@@ -20,8 +20,8 @@ use infinity_index::hnsw_handler::HnswHandler;
 use infinity_index::vector::HnswIndex;
 use infinity_storage::cpp_format::{
     self, date_to_days, datetime_to_pair, element_width, embedding_size, pack_column_with_layout,
-    push_embedding_element, read_embedding_element, time_to_secs, BlockColumn, BlockId,
-    BlockVersionFile, ColumnLayout, RawBlockColumn, DEFAULT_BLOCK_CAPACITY,
+    push_embedding_element, time_to_secs, BlockColumn, BlockId, BlockVersionFile, ColumnLayout,
+    RawBlockColumn, DEFAULT_BLOCK_CAPACITY,
 };
 use infinity_storage::knn_format;
 
@@ -616,6 +616,23 @@ fn sql_literal(type_text: &str, value: &str) -> String {
     }
     let up = type_text.to_ascii_uppercase();
     let base = up.split('(').next().unwrap_or("").trim();
+    // A BIT embedding's stored text is the display form (`[10110001]`); SQL
+    // input takes one number per element (`[1,0,1,1,0,0,0,1]`).
+    if let Some((dim, elem)) = embedding_shape(&up) {
+        let inner = value.trim().trim_start_matches('[').trim_end_matches(']');
+        if elem == 0
+            && dim > 0
+            && !inner.contains(',')
+            && inner.len() == dim
+            && inner.chars().all(|c| c == '0' || c == '1')
+        {
+            let cells: Vec<&str> = inner
+                .chars()
+                .map(|c| if c == '1' { "1" } else { "0" })
+                .collect();
+            return format!("[{}]", cells.join(","));
+        }
+    }
     let quoted = matches!(
         base,
         "VARCHAR" | "TEXT" | "STRING" | "JSON" | "DATE" | "TIME" | "DATETIME" | "TIMESTAMP"
@@ -762,7 +779,7 @@ fn decode_tensor_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<S
         let mut elems = Vec::with_capacity(dim);
         for k in 0..dim {
             let s = outline.get(at + k * width..at + (k + 1) * width)?;
-            elems.push(cpp_format::read_embedding_element(s, elem)?.to_string());
+            elems.push(embedding_element_text(s, elem)?);
         }
         parts.push(format!("[{}]", elems.join(",")));
     }
@@ -822,13 +839,29 @@ fn decode_tensorarray_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Opt
             let mut elems = Vec::with_capacity(dim);
             for k in 0..dim {
                 let s = outline.get(base + k * width..base + (k + 1) * width)?;
-                elems.push(cpp_format::read_embedding_element(s, elem)?.to_string());
+                elems.push(embedding_element_text(s, elem)?);
             }
             vecs.push(format!("[{}]", elems.join(",")));
         }
         tensors.push(format!("[{}]", vecs.join(",")));
     }
     Some(format!("[{}]", tensors.join(",")))
+}
+
+/// Renders one embedding element the way the reference's `ToString` does:
+/// integers exactly, floats with the shortest `f32`/`f64` spelling.
+fn embedding_element_text(bytes: &[u8], element_type: i32) -> Option<String> {
+    Some(match element_type {
+        1 => bytes.first().copied()?.to_string(),
+        2 => (bytes.first().copied()? as i8).to_string(),
+        3 => i16::from_le_bytes(bytes.try_into().ok()?).to_string(),
+        4 => i32::from_le_bytes(bytes.try_into().ok()?).to_string(),
+        5 => i64::from_le_bytes(bytes.try_into().ok()?).to_string(),
+        6 => f32::from_le_bytes(bytes.try_into().ok()?).to_string(),
+        7 => f64::from_le_bytes(bytes.try_into().ok()?).to_string(),
+        8 | 9 => cpp_format::read_embedding_element(bytes, element_type)?.to_string(),
+        _ => return None,
+    })
 }
 
 /// Encodes one text value into the bytes its `.col` slot holds.
@@ -947,12 +980,12 @@ fn decode_value(
             // (its *display* form is the bit string `[10110001]`, which
             // `encode_value` also accepts). Bit `j` at byte `j/8`, bit `j%8`.
             let at = row * embedding_size(elem, dim);
-            let mut parts = Vec::with_capacity(dim);
+            let mut parts = String::with_capacity(dim);
             for k in 0..dim {
                 let byte = body.get(at + k / 8)?;
-                parts.push(if byte & (1 << (k % 8)) != 0 { "1" } else { "0" });
+                parts.push(if byte & (1 << (k % 8)) != 0 { '1' } else { '0' });
             }
-            return Some(format!("[{}]", parts.join(",")));
+            return Some(format!("[{parts}]"));
         }
         // Inline `dim` elements per row.
         let width = element_width(elem);
@@ -960,7 +993,7 @@ fn decode_value(
         let mut parts = Vec::with_capacity(dim);
         for k in 0..dim {
             let s = body.get(at + k * width..at + (k + 1) * width)?;
-            parts.push(read_embedding_element(s, elem)?.to_string());
+            parts.push(embedding_element_text(s, elem)?);
         }
         return Some(format!("[{}]", parts.join(",")));
     }
@@ -978,8 +1011,9 @@ fn decode_value(
                 2 => i16::from_le_bytes(slot.try_into().unwrap()).to_string(),
                 3 => i32::from_le_bytes(slot.try_into().unwrap()).to_string(),
                 4 => i64::from_le_bytes(slot.try_into().unwrap()).to_string(),
-                5 => f32::from_le_bytes(slot.try_into().unwrap()).to_string(),
-                6 => f64::from_le_bytes(slot.try_into().unwrap()).to_string(),
+                // `Value::to_slt_string` renders floats with six decimals.
+                5 => format!("{:.6}", f32::from_le_bytes(slot.try_into().unwrap())),
+                6 => format!("{:.6}", f64::from_le_bytes(slot.try_into().unwrap())),
                 // Date/time values are stored as integers but must come back as
                 // text, matching how the engine renders them.
                 16 => cpp_format::days_to_date(i32::from_le_bytes(slot.try_into().unwrap())),
@@ -1068,11 +1102,22 @@ impl Engine {
             .collect::<Result<_>>()?;
 
         let rows = self.fetch_rows_with_ids(&table)?;
+        // The row ids this snapshot covers, in block order. Reads use them to
+        // tell block-resident rows from rows written after the checkpoint.
+        let block_rows: Vec<usize> = rows.iter().map(|(seq, _)| *seq).collect();
         let db_id = self.database_id_of(&table);
         let root = self.blocks_root();
         // Drop any previous mirror of this table's first segment so a rewrite
-        // cannot leave stale blocks behind.
+        // cannot leave stale blocks behind. The recorded row ids go with it:
+        // until every block is rewritten, the mirror matches no snapshot.
         let seg_dir = root.join(format!("db_{db_id}/tbl_{}/seg_0", meta.id));
+        let tkey = self.table_key(&table);
+        {
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(tkey.clone()).or_default();
+            entry.block_index = None;
+            entry.cpp_block_rows = None;
+        }
         let _ = std::fs::remove_dir_all(&seg_dir);
 
         let mut written = 0usize;
@@ -1103,10 +1148,10 @@ impl Engine {
             written += chunk.len();
         }
         // The mirror has new block files; the table's block map must rescan.
-        let tkey = self.table_key(&table);
-        if let Some(entry) = self.tables.lock().unwrap().get_mut(&tkey) {
-            entry.block_index = None;
-        }
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey).or_default();
+        entry.block_index = None;
+        entry.cpp_block_rows = Some(block_rows);
         Ok(written)
     }
 
@@ -1181,25 +1226,15 @@ impl Engine {
             if meta.types.iter().all(|t| column_type_of(t).is_some())
                 && rows.saturating_mul(per_row) <= MIRROR_BUDGET_BYTES
             {
-                // Capture the write generation *before* the snapshot: a batch
-                // committed while the mirror is rewritten is not part of it.
-                let key = self.table_key(&meta.name);
-                let before = self
-                    .tables
-                    .lock()
-                    .unwrap()
-                    .get(&key)
-                    .map(|e| e.write_batches)
-                    .unwrap_or(0);
                 self.write_cpp_blocks(&meta.name)?;
                 // The mirror now covers every row; the IVF memory segment is
                 // redundant and would double-count candidates.
+                let key = self.table_key(&meta.name);
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(key).or_default();
                 for rows in entry.ivf_mem.values_mut() {
                     rows.clear();
                 }
-                entry.cpp_block_generation = (entry.write_batches == before).then_some(before);
             }
             // A dropped index must not leave its `idx_{id}` mirror behind.
             let db_id = self.database_id_of(&meta.name);
@@ -2878,6 +2913,19 @@ mod tests {
     }
 
     #[test]
+    fn uint8_embedding_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE u8 (id INT, v EMBEDDING(UINT8,3));")
+            .unwrap();
+        e.execute("INSERT INTO u8 VALUES (1, [127,128,255]);")
+            .unwrap();
+        e.write_cpp_blocks("u8").unwrap();
+        let (_, rows) = e.read_cpp_blocks("u8").unwrap();
+        assert_eq!(rows[0][1], "[127,128,255]");
+    }
+
+    #[test]
     fn bit_embedding_packs_and_unpacks() {
         // `EMBEDDING(BIT,8)` is one byte per row, bit `j` at bit `j%8`
         // (`embedding_type.h:129-137,253-262`), not eight bytes.
@@ -2901,7 +2949,7 @@ mod tests {
         );
         assert_eq!(
             decode_value("EMBEDDING(BIT,8)", 10, &bytes, 0, &[]).unwrap(),
-            "[1,0,1,1,0,0,0,1]"
+            "[10110001]"
         );
     }
 
