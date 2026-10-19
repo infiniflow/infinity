@@ -12701,6 +12701,34 @@ mod tests {
         assert_eq!(dumped, 10);
     }
 
+    /// C++ optimize/cleanup: incremental chunks are all needed until a merged
+    /// chunk covers every live row; cleanup must not delete them early.
+    #[test]
+    fn cleanup_keeps_incremental_hnsw_chunks_until_a_merge_covers_the_table() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_capacity(2);
+        e.execute("CREATE TABLE hk (id INT, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        e.execute("CREATE INDEX hk_i ON hk (v) USING HNSW WITH (metric = l2);")
+            .unwrap();
+        e.execute("INSERT INTO hk VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
+            .unwrap();
+        e.execute("INSERT INTO hk VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
+            .unwrap();
+        let chunks = |e: &Engine| e.load_vector_indexes("default_db.hk", "hk_i");
+        assert_eq!(chunks(&e).len(), 2, "one chunk per memory-segment dump");
+
+        e.cleanup().unwrap();
+        assert_eq!(chunks(&e).len(), 2, "no chunk covers the whole table yet");
+
+        e.optimize_indexes().unwrap();
+        e.cleanup().unwrap();
+        let merged = chunks(&e);
+        assert_eq!(merged.len(), 1, "the merged chunk supersedes the others");
+        assert_eq!(merged[0].labels.len(), 4);
+    }
+
     /// Scalar tables keep a decoded row cache (the reference's in-memory
     /// `DataBlock`s); array/vector tables do not, because their decoded form is
     /// not stable across the write and scan paths.
