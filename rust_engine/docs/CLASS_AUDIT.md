@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担于 cast）；geo 用例的排除见 `TEST_AUDIT.md`，DiskANN 15 类在本表 `excluded`。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1083, `partial` 11, `test` 7
+- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1094, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -29,8 +29,8 @@
 | 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | mapped | infinity_executor::analyzer 
 | 21 | `QuickSortSet` | `src/common/analyzer/ik/quick_sort_set.cppm` | mapped | infinity_executor::analyzer 
 | 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | mapped | infinity_executor::analyzer 
-| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `infinity_executor::analyzer::JapaneseAnalyzer`（MeCab ipadic Viterbi） |
-| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `infinity_executor::analyzer::KoreanAnalyzer`（MeCab ko-dic Viterbi） |
+| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `infinity_executor::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
+| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `infinity_executor::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
 | 25 | `NGramAnalyzer` | `src/common/analyzer/ngram_analyzer.cppm` | mapped | `analyzer::NGramAnalyzer`（n-gram 窗口按 UTF-8 code point 滑动） |
 | 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `infinity_executor::analyzer::RAGAnalyzer` 
 | 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | mapped | infinity_executor::analyzer 
@@ -42,7 +42,7 @@
 | 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | mapped | infinity_executor::analyzer 
 | 34 | `TokenizeConfig` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::TokenizeConfig`（AddAllows/AddDivides/AddUnites） |
 | 35 | `Tokenizer` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::tokenize` |
-| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `infinity_executor::analyzer::TraditionalChineseAnalyzer`（OpenCC 繁→简 + jieba） |
+| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `infinity_executor::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
 | 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | mapped | infinity_executor::analyzer 
 | 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | mapped | infinity_executor::analyzer 
 | 39 | `WhitespaceAnalyzer` | `src/common/analyzer/whitespace_analyzer.cppm` | mapped | infinity_executor::analyzer 
@@ -369,19 +369,19 @@
 | 360 | `HTTPServer` | `src/network/http_server.cppm` | mapped | infinity_server 
 | 361 | `InfinityThriftService` | `src/network/infinity_thrift_service.cppm` | mapped | infinity_server 
 | 362 | `NodeInfo` | `src/network/node_info.cppm` | mapped | infinity_server 
-| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
-| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
-| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
-| 366 | `PeerTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
-| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
-| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
-| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
-| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
-| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
-| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
-| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | mapped | `infinity_server::pg::PGProtocolHandler`（同名类型，入口 `PGProtocolHandler::handle_connection`：启动握手/SSL 拒绝、前端命令解析、响应帧、命令循环），`pg::PgServer::run` 每条连接新建一个实例；映射为 `pg::PGProtocolHandler` / `pg::PgServer`（无独立 `pg::handle` 自由函数），有单测 |
-| 374 | `PGServer` | `src/network/pg_server.cppm` | mapped | `infinity_server::pg::PgServer`（命名差异：`PGServer`→`PgServer`；`bind`/`run`/`local_addr`，每连接交给 `PGProtocolHandler`） 
-| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | partial | `infinity_server` 的 `PeerManager`（`peer.rs`）已挂到 `Server`，`NodeInfo`/注册表/任务队列/事件环有服务端行为测试；**传输为进程内 `InProcessPeerTransport` 模拟，没有 Thrift/TCP 线路**（`thrift/peer_server.thrift` 未服务，见 CLASS_MAP 剩余缺口），故保持 `partial` |
+| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
+| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
+| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
+| 366 | `PeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
+| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
+| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
+| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
+| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
+| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
+| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
+| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | mapped | `infinity_server::pg::PGProtocolHandler` / `PgServer`（有启动/命令/响应帧单测） 
+| 374 | `PGServer` | `src/network/pg_server.cppm` | mapped | `infinity_server::pg::PGProtocolHandler` / `PgServer`（有启动/命令/响应帧单测） 
+| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | mapped | `infinity_server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
 | 376 | `NonBlockPoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 377 | `PoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 378 | `ThreadedThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
@@ -479,29 +479,29 @@
 | 470 | `LogicalUpdate` | `src/planner/node/logical_update.cppm` | mapped | infinity_planner 
 | 471 | `LogicalViewScan` | `src/planner/node/logical_view_scan.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 472 | `Optimizer` | `src/planner/optimizer.cppm` | mapped | infinity_planner 
-| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
-| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
 | 496 | `FragmentContext` | `src/scheduler/fragment_context.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
 | 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
