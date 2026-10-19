@@ -76,6 +76,7 @@ pub mod cpp_format;
 pub mod crc;
 pub mod data_block;
 pub mod emvb_segment;
+pub mod fst_registry;
 pub mod fulltext_segment;
 pub mod inverted_format;
 pub mod knn_format;
@@ -88,9 +89,14 @@ pub mod multivector_segment;
 pub mod mvcc;
 pub mod rcu_map;
 pub mod s3;
+pub mod secondary_index_data;
 pub mod secondary_lowcard;
 pub mod secondary_segment;
+pub mod selection;
+pub mod var_buffer;
+pub mod virtual_store;
 pub mod wal;
+pub mod wal_entry;
 
 pub use cpp_format::{
     block_dir, chunk_index_file, column_file, column_layout, column_outline_file, date_to_days,
@@ -119,4 +125,12 @@ pub use metastore::{FjallMetaStore, MetaStore};
 #[cfg(feature = "rocksdb-store")]
 pub use metastore_rocks::RocksMetaStore;
 pub use mvcc::{BlockVersion, CreateField};
+pub use virtual_store::{
+    string_to_storage_type, Compressor, FileAccessMode, FileHandle, StorageType, VirtualStore,
+};
 pub use wal::{WalManager, WalRecord, WAL_MAGIC};
+pub use wal_entry::{
+    append_entries, WalBlockInfo, WalChunkIndexInfo, WalCmd, WalColumnDef, WalCommandType,
+    WalEntry, WalEntryIterator, WalIndexBase, WalListIterator, WalRowId, WalSegmentIndexInfo,
+    WalSegmentInfo, WalTableDef, WAL_ENTRY_HEADER_LEN,
+};

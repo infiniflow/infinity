@@ -370,3 +370,57 @@ pub fn extract_typed(text: &str, path: &str, kind: &str) -> Value {
         _ => Value::Null,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn object_float(doc: &str, key: &str) -> f32 {
+        let Json::Obj(entries) = parse(doc).expect("valid JSON") else {
+            panic!("expected a JSON object");
+        };
+        let (_, value) = entries
+            .into_iter()
+            .find(|(k, _)| k == key)
+            .expect("key present");
+        let value = match value {
+            Json::Float(value) => value,
+            Json::Int(value) => value as f64,
+            other => panic!("expected a number, got {other:?}"),
+        };
+        value as f32
+    }
+
+    // C++: src/unit_test/parser/float_serialize_ut.cpp:test_json
+    #[test]
+    fn float_serialize_test_json() {
+        let f1 = f32::from_bits(0x447f_fffe);
+        let f2 = f32::from_bits(0x447f_ffff);
+        // Decimal renderings of the two hex floats.
+        let doc = r#"{ "f1": 1023.9999, "f2": 1023.99994 }"#;
+        assert_eq!(object_float(doc, "f1"), f1);
+        assert_eq!(object_float(doc, "f2"), f2);
+        assert_eq!(f64::from(f1), 1023.9998779296875);
+        assert_eq!(f64::from(f2), 1023.9999389648438);
+    }
+
+    // C++: src/unit_test/parser/float_serialize_ut.cpp:test_json_hex_float
+    #[test]
+    fn float_serialize_test_json_hex_float() {
+        // JSON has no hex-float literals; the reference rejects them.
+        assert!(parse(r#"{ "f1": 0x1.fffffcp+9, "f2": 0x1.fffffep+9 }"#).is_none());
+
+        let f1 = f32::from_bits(0x447f_fffe);
+        let f2 = f32::from_bits(0x447f_ffff);
+        for doc in [
+            r#"{ "f1": 1023.9999, "f2": 1023.99994 }"#,
+            r#"{ "f1": 1.0239999e+3, "f2": 1.02399994e+3 }"#,
+        ] {
+            assert_eq!(object_float(doc, "f1"), f1, "{doc}");
+            assert_eq!(object_float(doc, "f2"), f2, "{doc}");
+        }
+        let doc = r#"{ "f1": 1, "f2": 1.0 }"#;
+        assert_eq!(object_float(doc, "f1"), 1.0);
+        assert_eq!(object_float(doc, "f2"), 1.0);
+    }
+}

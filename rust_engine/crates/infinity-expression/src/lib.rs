@@ -1475,4 +1475,64 @@ mod tests {
             Value::Str("[\"x\",\"y\"]".into())
         );
     }
+
+    /// C++ `DEFAULT_VECTOR_SIZE`.
+    const EXPR_VECTOR_SIZE: i64 = 8192;
+
+    // C++: src/unit_test/executor/expression/new_expression_evaluator_ut.cpp:add_bigint_constant_1
+    #[test]
+    fn expression_evaluator_add_bigint_constant_1() {
+        let expr = Expr::Binary(
+            Box::new(Expr::Column(0)),
+            BinOp::Add,
+            Box::new(Expr::Literal(Value::Int(1))),
+        );
+        // An empty block produces no rows.
+        let empty: Vec<Vec<Value>> = Vec::new();
+        let out: Vec<Value> = empty.iter().map(|row| expr.eval(row)).collect();
+        assert!(out.is_empty());
+
+        let column: Vec<Vec<Value>> = (0..EXPR_VECTOR_SIZE)
+            .map(|i| vec![Value::Int(i)])
+            .collect();
+        let out: Vec<i64> = column
+            .iter()
+            .map(|row| match expr.eval(row) {
+                Value::Int(v) => v,
+                other => panic!("expected BigInt, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(out.len(), EXPR_VECTOR_SIZE as usize);
+        for (i, value) in out.iter().enumerate() {
+            assert_eq!(*value, i as i64 + 1);
+        }
+    }
+
+    // C++: src/unit_test/executor/expression/new_expression_evaluator_ut.cpp:subtract_constant_8192_bigint
+    #[test]
+    fn expression_evaluator_subtract_constant_8192_bigint() {
+        let expr = Expr::Binary(
+            Box::new(Expr::Literal(Value::Int(8192))),
+            BinOp::Sub,
+            Box::new(Expr::Column(0)),
+        );
+        let empty: Vec<Vec<Value>> = Vec::new();
+        let out: Vec<Value> = empty.iter().map(|row| expr.eval(row)).collect();
+        assert!(out.is_empty());
+
+        let column: Vec<Vec<Value>> = (0..EXPR_VECTOR_SIZE)
+            .map(|i| vec![Value::Int(i)])
+            .collect();
+        let out: Vec<i64> = column
+            .iter()
+            .map(|row| match expr.eval(row) {
+                Value::Int(v) => v,
+                other => panic!("expected BigInt, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(out.len(), EXPR_VECTOR_SIZE as usize);
+        for (i, value) in out.iter().enumerate() {
+            assert_eq!(*value, EXPR_VECTOR_SIZE - i as i64);
+        }
+    }
 }

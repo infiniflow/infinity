@@ -33,11 +33,16 @@ use infinity_txn::{Txn, TxnManager};
 
 mod explain;
 
+#[cfg(test)]
+mod catalog_ut;
+
 mod explain_search;
 
 mod hnsw_mem;
 mod knn_scan;
+mod profiler;
 mod regex_literal;
+mod variables;
 mod wand;
 
 mod cpp_blocks;
@@ -1429,6 +1434,31 @@ fn validate_insert_value(type_text: &str, lit: &str) -> Result<()> {
     }
     if is_sparse_type(type_text) {
         return validate_sparse_literal(type_text, lit);
+    }
+    // A scalar column rejects text that does not parse as its type: the
+    // reference's `StringToValue` fails, surfacing as a conversion error.
+    let upper = type_text.trim().to_ascii_uppercase();
+    let v = lit.trim();
+    if !v.is_empty() && !v.eq_ignore_ascii_case("null") {
+        let integer = upper == "INT"
+            || upper.starts_with("INTEGER")
+            || upper.starts_with("TINYINT")
+            || upper.starts_with("SMALLINT")
+            || upper.starts_with("BIGINT")
+            || upper.starts_with("HUGEINT");
+        if integer && v.parse::<i64>().is_err() && v.parse::<f64>().is_err() {
+            return Err(Error::Invalid(format!(
+                "not supported type conversion: '{v}' to {}",
+                upper
+            )));
+        }
+        let floating = upper.starts_with("DOUBLE") || upper.starts_with("FLOAT");
+        if floating && v.parse::<f64>().is_err() {
+            return Err(Error::Invalid(format!(
+                "not supported type conversion: '{v}' to {}",
+                upper
+            )));
+        }
     }
     // A column that stores a vector/tensor/array cannot take a bare scalar;
     // the C++ engine rejects this as NOT_SUPPORTED.
@@ -2840,6 +2870,10 @@ struct Context {
     /// graphs beyond it are evicted, and a scan that no longer sees full label
     /// coverage falls back to the exact scan (the reference's buffer manager).
     hnsw_budget: std::sync::atomic::AtomicUsize,
+    /// `query_count` global/session variable: statements executed so far.
+    query_count: std::sync::atomic::AtomicU64,
+    /// `connected_timestamp` session variable: when the engine was opened.
+    connected_at: String,
 }
 
 /// The engine: catalog + transaction manager + KV store + a Tokio runtime.
@@ -2982,6 +3016,11 @@ impl Engine {
                         .and_then(|v| v.parse().ok())
                         .unwrap_or(2),
                 ),
+                query_count: std::sync::atomic::AtomicU64::new(0),
+                connected_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs().to_string())
+                    .unwrap_or_default(),
             },
             dir,
             result_cache: Mutex::new(HashMap::new()),
@@ -3739,6 +3778,9 @@ impl Engine {
     pub fn execute(&self, sql: &str) -> Result<Vec<QueryResult>> {
         let mut out = Vec::new();
         for s in parse(sql)? {
+            self.context
+                .query_count
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             // `USE <db>` switches the session database for later statements.
             if let Statement::Use { name } = &s {
                 *self.current_db.lock().unwrap() = name.clone();
@@ -4774,10 +4816,23 @@ impl Engine {
                 }
                 Ok(QueryResult::DroppedDatabase { name: name.clone() })
             }
-            Statement::Show { .. } => Ok(QueryResult::Rows {
-                columns: vec![],
-                rows: vec![],
-            }),
+            Statement::Show { text } => {
+                let mut words = text.split_ascii_whitespace();
+                match words.next().map(str::to_ascii_lowercase).as_deref() {
+                    Some("databases") => self.show_databases(),
+                    Some("tables") => {
+                        let db = match (words.next(), words.next()) {
+                            (Some(kw), Some(db)) if kw.eq_ignore_ascii_case("from") => Some(db),
+                            _ => None,
+                        };
+                        self.show_tables(db)
+                    }
+                    _ => Ok(QueryResult::Rows {
+                        columns: vec![],
+                        rows: vec![],
+                    }),
+                }
+            }
             Statement::ShowTableIndex { table, index } => {
                 if !self
                     .storage
@@ -4798,201 +4853,216 @@ impl Engine {
             // EXPLAIN only describes a plan; it must not execute the statement,
             // but binding the plan surfaces a missing relation.
             Statement::Explain { kind, inner } => {
-                let logical = matches!(kind, infinity_parser::ExplainKind::Logical);
-                let text = match inner.as_ref() {
-                    Statement::Select {
-                        items,
-                        from: Some(t),
-                        join: Some(j),
-                        where_pred,
-                        search,
-                        ..
-                    } if logical && search.is_none() => Some(crate::explain::explain_logical_join(
-                        items,
-                        t,
-                        &j.table,
-                        j,
-                        where_pred.as_ref(),
-                    )),
-                    Statement::Select {
-                        items,
-                        from: Some(t),
-                        join,
-                        group_by,
-                        search,
-                        ..
-                    } if logical
-                        && join.is_none()
-                        && search.is_none()
-                        && crate::explain::has_aggregate(items) =>
-                    {
-                        crate::explain::explain_logical_agg(items, t, group_by)
-                    }
-                    Statement::Select {
-                        items,
-                        from: Some(t),
-                        join,
-                        group_by,
-                        where_pred,
-                        search,
-                        ..
-                    } if !logical
-                        && join.is_none()
-                        && search.is_none()
-                        && group_by.is_empty()
-                        && crate::explain::is_count_star_only(items) =>
-                    {
-                        Some(crate::explain::explain_count_star(
-                            t,
-                            where_pred.as_ref(),
-                            self.multi_segment(t),
-                        ))
-                    }
-                    Statement::Select {
-                        items,
-                        from: Some(t),
-                        join,
-                        group_by,
-                        order_by,
-                        search,
-                        ..
-                    } if join.is_none()
-                        && search.is_none()
-                        && crate::explain::is_distinct_agg_plan(items, group_by) =>
-                    {
-                        Some(crate::explain::explain_distinct_agg(
-                            &crate::explain::DistinctAggPlan {
-                                items,
-                                table: t,
-                                group_by,
-                                order_by,
-                            },
-                        ))
-                    }
-                    Statement::Select {
-                        items,
-                        from: Some(t),
-                        join,
-                        group_by,
-                        order_by,
-                        search,
-                        ..
-                    } if join.is_none()
-                        && search.is_none()
-                        && crate::explain::has_aggregate(items)
-                        && crate::explain::aggregates_renderable(items) =>
-                    {
-                        Some(crate::explain::explain_hash_agg(
-                            &crate::explain::HashAggPlan {
-                                items,
-                                table: t,
-                                group_by,
-                                order_by,
-                            },
-                        ))
-                    }
-                    Statement::Select {
-                        items,
-                        from: Some(t),
-                        join,
-                        search: Some(s),
-                        where_pred,
-                        limit,
-                        offset,
-                        ..
-                    } if join.is_none() => {
-                        let meta = self.table_meta(t)?;
-                        let indexed = self.indexed_columns(t)?;
-                        let plan = crate::explain_search::SearchPlan {
+                let logical = matches!(
+                    kind,
+                    infinity_parser::ExplainKind::Logical
+                        | infinity_parser::ExplainKind::UnOpt
+                        | infinity_parser::ExplainKind::Opt
+                );
+                // `EXPLAIN AST` prints the parsed statement, so it has no plan
+                // to build (and must not bind the relation).
+                let text = if matches!(kind, infinity_parser::ExplainKind::Ast) {
+                    Some(vec![format!("{inner:?}")])
+                } else {
+                    match inner.as_ref() {
+                        Statement::Select {
                             items,
-                            table: t,
-                            search: s,
-                            limit: *limit,
-                            offset: *offset,
-                            where_pred: where_pred.as_ref(),
-                            schema: &meta.columns,
-                            types: &meta.types,
-                            indexed: &indexed,
-                            multi: self.multi_segment(t),
-                        };
-                        if matches!(kind, infinity_parser::ExplainKind::Fragment) {
-                            crate::explain_search::fragment_lines(&plan)
-                        } else {
-                            crate::explain_search::explain_search(&plan)
+                            from: Some(t),
+                            join: Some(j),
+                            where_pred,
+                            search,
+                            ..
+                        } if logical && search.is_none() => {
+                            Some(crate::explain::explain_logical_join(
+                                items,
+                                t,
+                                &j.table,
+                                j,
+                                where_pred.as_ref(),
+                            ))
                         }
-                    }
-                    Statement::Select {
-                        items,
-                        from: Some(t),
-                        join,
-                        where_pred,
-                        group_by,
-                        order_by,
-                        distinct,
-                        search,
-                        limit,
-                        ..
-                    } if join.is_none()
-                        && group_by.is_empty()
-                        && !crate::explain::has_aggregate(items)
-                        && search.is_none() =>
-                    {
-                        let meta = self.table_meta(t)?;
-                        let schema = &meta.columns;
-                        // Try to push the filter into an index scan first.
-                        let index_plan = match where_pred.as_ref() {
-                            Some(w) if !logical && !*distinct => {
-                                let indexed = self.indexed_columns(t)?;
-                                let index_names = self.index_name_pairs(t)?;
-                                let sparsegram = self.sparsegram_index_params(t)?;
-                                crate::explain::explain_index_scan(&crate::explain::IndexScanPlan {
+                        Statement::Select {
+                            items,
+                            from: Some(t),
+                            join,
+                            group_by,
+                            search,
+                            ..
+                        } if logical
+                            && join.is_none()
+                            && search.is_none()
+                            && crate::explain::has_aggregate(items) =>
+                        {
+                            crate::explain::explain_logical_agg(items, t, group_by)
+                        }
+                        Statement::Select {
+                            items,
+                            from: Some(t),
+                            join,
+                            group_by,
+                            where_pred,
+                            search,
+                            ..
+                        } if !logical
+                            && join.is_none()
+                            && search.is_none()
+                            && group_by.is_empty()
+                            && crate::explain::is_count_star_only(items) =>
+                        {
+                            Some(crate::explain::explain_count_star(
+                                t,
+                                where_pred.as_ref(),
+                                self.multi_segment(t),
+                            ))
+                        }
+                        Statement::Select {
+                            items,
+                            from: Some(t),
+                            join,
+                            group_by,
+                            order_by,
+                            search,
+                            ..
+                        } if join.is_none()
+                            && search.is_none()
+                            && crate::explain::is_distinct_agg_plan(items, group_by) =>
+                        {
+                            Some(crate::explain::explain_distinct_agg(
+                                &crate::explain::DistinctAggPlan {
                                     items,
                                     table: t,
-                                    where_pred: w,
+                                    group_by,
                                     order_by,
-                                    limit: *limit,
-                                    schema,
-                                    types: &meta.types,
-                                    indexed: &indexed,
-                                    index_names: &index_names,
-                                    sparsegram: &sparsegram,
-                                })
-                            }
-                            _ => None,
-                        };
-                        Some(index_plan.unwrap_or_else(|| {
-                            crate::explain::explain_select(&crate::explain::SelectPlan {
+                                },
+                            ))
+                        }
+                        Statement::Select {
+                            items,
+                            from: Some(t),
+                            join,
+                            group_by,
+                            order_by,
+                            search,
+                            ..
+                        } if join.is_none()
+                            && search.is_none()
+                            && crate::explain::has_aggregate(items)
+                            && crate::explain::aggregates_renderable(items) =>
+                        {
+                            Some(crate::explain::explain_hash_agg(
+                                &crate::explain::HashAggPlan {
+                                    items,
+                                    table: t,
+                                    group_by,
+                                    order_by,
+                                },
+                            ))
+                        }
+                        Statement::Select {
+                            items,
+                            from: Some(t),
+                            join,
+                            search: Some(s),
+                            where_pred,
+                            limit,
+                            offset,
+                            ..
+                        } if join.is_none() => {
+                            let meta = self.table_meta(t)?;
+                            let indexed = self.indexed_columns(t)?;
+                            let plan = crate::explain_search::SearchPlan {
                                 items,
                                 table: t,
+                                search: s,
+                                limit: *limit,
+                                offset: *offset,
                                 where_pred: where_pred.as_ref(),
-                                order_by,
-                                distinct: *distinct,
-                                schema,
-                                logical,
-                            })
-                        }))
+                                schema: &meta.columns,
+                                types: &meta.types,
+                                indexed: &indexed,
+                                multi: self.multi_segment(t),
+                            };
+                            if matches!(kind, infinity_parser::ExplainKind::Fragment) {
+                                crate::explain_search::fragment_lines(&plan)
+                            } else {
+                                crate::explain_search::explain_search(&plan)
+                            }
+                        }
+                        Statement::Select {
+                            items,
+                            from: Some(t),
+                            join,
+                            where_pred,
+                            group_by,
+                            order_by,
+                            distinct,
+                            search,
+                            limit,
+                            ..
+                        } if join.is_none()
+                            && group_by.is_empty()
+                            && !crate::explain::has_aggregate(items)
+                            && search.is_none() =>
+                        {
+                            let meta = self.table_meta(t)?;
+                            let schema = &meta.columns;
+                            // Try to push the filter into an index scan first.
+                            let index_plan = match where_pred.as_ref() {
+                                Some(w) if !logical && !*distinct => {
+                                    let indexed = self.indexed_columns(t)?;
+                                    let index_names = self.index_name_pairs(t)?;
+                                    let sparsegram = self.sparsegram_index_params(t)?;
+                                    crate::explain::explain_index_scan(
+                                        &crate::explain::IndexScanPlan {
+                                            items,
+                                            table: t,
+                                            where_pred: w,
+                                            order_by,
+                                            limit: *limit,
+                                            schema,
+                                            types: &meta.types,
+                                            indexed: &indexed,
+                                            index_names: &index_names,
+                                            sparsegram: &sparsegram,
+                                        },
+                                    )
+                                }
+                                _ => None,
+                            };
+                            Some(index_plan.unwrap_or_else(|| {
+                                crate::explain::explain_select(&crate::explain::SelectPlan {
+                                    items,
+                                    table: t,
+                                    where_pred: where_pred.as_ref(),
+                                    order_by,
+                                    distinct: *distinct,
+                                    schema,
+                                    logical,
+                                })
+                            }))
+                        }
+                        Statement::Delete { table, where_pred } if logical => Some(
+                            crate::explain::explain_logical_delete(table, where_pred.as_ref()),
+                        ),
+                        Statement::CreateTable { name, columns } => {
+                            let (db, tbl) = match name.split_once('.') {
+                                Some((d, t)) => (d.to_string(), t.to_string()),
+                                None => ("default_db".to_string(), name.clone()),
+                            };
+                            let cols: Vec<(String, String, Option<String>)> = columns
+                                .iter()
+                                .map(|c| {
+                                    (
+                                        c.name.clone(),
+                                        describe_type(&c.type_text),
+                                        c.default.as_ref().map(|l| l.to_slt_string()),
+                                    )
+                                })
+                                .collect();
+                            Some(crate::explain::explain_create_table(&db, &tbl, &cols))
+                        }
+                        _ => None,
                     }
-                    Statement::Delete { table, where_pred } if logical => Some(
-                        crate::explain::explain_logical_delete(table, where_pred.as_ref()),
-                    ),
-                    Statement::CreateTable { name, columns } => {
-                        let (db, tbl) = match name.split_once('.') {
-                            Some((d, t)) => (d.to_string(), t.to_string()),
-                            None => ("default_db".to_string(), name.clone()),
-                        };
-                        let cols: Vec<(String, String, Option<String>)> = columns
-                            .iter()
-                            .map(|c| {
-                                (
-                                    c.name.clone(),
-                                    describe_type(&c.type_text),
-                                    c.default.as_ref().map(|l| l.to_slt_string()),
-                                )
-                            })
-                            .collect();
-                        Some(crate::explain::explain_create_table(&db, &tbl, &cols))
-                    }
-                    _ => None,
                 };
                 match text {
                     Some(lines) => Ok(QueryResult::Rows {
@@ -7685,10 +7755,12 @@ impl Engine {
         }
         if moved {
             self.txn.commit(t)?;
-            // Drop the old positions once the tombstones are durable; recovery
-            // re-creates both, and the tombstone keeps the old row hidden.
-            for (i, (old, _)) in rows.iter().enumerate() {
-                if *old != i {
+            // Drop the source positions that no compacted row reuses. Keys
+            // below `rows.len()` are destinations: another row may have moved
+            // onto them, so deleting them would lose that row. The tombstones
+            // written above keep every moved source hidden until this sweep.
+            for (old, _) in &rows {
+                if *old >= rows.len() {
                     self.storage.store.delete(&row_key(table, *old))?;
                 }
             }
@@ -10468,6 +10540,170 @@ impl Engine {
         self.context
             .memindex_capacity
             .store(rows, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// `SHOW VARIABLE` at the given scope.
+    ///
+    /// C++: `Infinity::ShowVariable` (`src/main/infinity_impl.cpp:311`). The
+    /// value set follows `PhysicalShow::ExecuteShowGlobalVariable` /
+    /// `ExecuteShowSessionVariable`; an unknown name is `NoSysVar`, as the
+    /// reference's `default:` arm reports.
+    pub fn show_variable(&self, name: &str, scope: variables::SetScope) -> Result<QueryResult> {
+        let key = name.to_ascii_lowercase();
+        let value = match scope {
+            variables::SetScope::Global => {
+                let var = variables::GlobalVariable::from_name(&key)
+                    .ok_or_else(|| Error::Invalid(format!("No system variable: {key}")))?;
+                self.global_variable_value(var)?
+            }
+            variables::SetScope::Session => {
+                let var = variables::SessionVariable::from_name(&key)
+                    .ok_or_else(|| Error::Invalid(format!("No system variable: {key}")))?;
+                match var {
+                    variables::SessionVariable::QueryCount => self.query_count().to_string(),
+                    variables::SessionVariable::TotalCommitCount => self.total_commit_count(),
+                    variables::SessionVariable::TotalRollbackCount => "0".to_string(),
+                    variables::SessionVariable::ConnectedTime => self.context.connected_at.clone(),
+                }
+            }
+        };
+        Ok(QueryResult::Rows {
+            columns: vec!["value".to_string()],
+            rows: vec![vec![value]],
+        })
+    }
+
+    fn query_count(&self) -> u64 {
+        self.context
+            .query_count
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn total_commit_count(&self) -> String {
+        self.txn.total_committed_txn_count().to_string()
+    }
+
+    /// One global variable's value; the names come from
+    /// `PhysicalShow::ExecuteShowGlobalVariable`.
+    fn global_variable_value(&self, var: variables::GlobalVariable) -> Result<String> {
+        use variables::GlobalVariable as G;
+        Ok(match var {
+            G::QueryCount => self.query_count().to_string(),
+            G::SessionCount => "1".to_string(),
+            G::BufferPoolUsage => {
+                let buffer = self.context.buffer.lock().unwrap();
+                format!("{}/{}", buffer.used_bytes(), buffer.budget())
+            }
+            G::SchedulePolicy => "round robin".to_string(),
+            G::NextTxnId => self.txn.current_transaction_id().to_string(),
+            G::BufferedObjectCount => "0".to_string(),
+            G::UnusedBufferObjectCount => "0".to_string(),
+            G::ActiveTxnCount => "0".to_string(),
+            G::CurrentTs => self.txn.current_ts().to_string(),
+            G::TotalCommitCount => self.total_commit_count(),
+            G::TotalRollbackCount => "0".to_string(),
+            G::ActiveWalFilename => self
+                .txn
+                .wal_path()
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            G::ProfileRecordCapacity => "0".to_string(),
+            G::BackgroundTaskCount
+            | G::RunningBgTask
+            | G::RunningCompactTask
+            | G::RunningOptimizeTask => "0".to_string(),
+            G::SystemMemoryUsage | G::OpenFileCount => "0".to_string(),
+            G::CpuUsage => "0".to_string(),
+            G::JeProf => "on".to_string(),
+            G::FollowerNum => "0".to_string(),
+            G::ResultCache => self
+                .context
+                .config
+                .lock()
+                .unwrap()
+                .get("result_cache")
+                .cloned()
+                .unwrap_or_else(|| "off".to_string()),
+            G::CacheResultCapacity => self.result_cache_capacity().to_string(),
+            G::CacheResultNum => self.result_cache.lock().unwrap().len().to_string(),
+            G::MemoryCacheMiss | G::DiskCacheMiss => "0/0".to_string(),
+            G::EnableProfile => "false".to_string(),
+        })
+    }
+
+    /// `SHOW DATABASES`: `<database, dir, comment>`, as
+    /// `PhysicalShow::ExecuteShowDatabases` (`physical_show_databases_impl.cpp`).
+    fn show_databases(&self) -> Result<QueryResult> {
+        let names = self.storage.catalog.list_databases()?;
+        let root = self.dir.join("data");
+        let rows = names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                vec![
+                    name.clone(),
+                    root.join(format!("db_{}", i + 1))
+                        .to_string_lossy()
+                        .into_owned(),
+                    String::new(),
+                ]
+            })
+            .collect();
+        Ok(QueryResult::Rows {
+            columns: vec![
+                "database".to_string(),
+                "dir".to_string(),
+                "comment".to_string(),
+            ],
+            rows,
+        })
+    }
+
+    /// `SHOW TABLES [FROM <db>]`: the reference's eight columns
+    /// (`physical_show_tables_impl.cpp`). The Rust catalog tracks neither a
+    /// create timestamp nor per-table block counts, so those report `0`.
+    fn show_tables(&self, db: Option<&str>) -> Result<QueryResult> {
+        let db = db
+            .map(str::to_string)
+            .unwrap_or_else(|| self.current_db.lock().unwrap().clone());
+        let mut rows: Vec<Vec<String>> = self
+            .storage
+            .catalog
+            .list_tables()?
+            .into_iter()
+            .filter(|t| t.name.starts_with(&format!("{db}.")))
+            .map(|t| {
+                vec![
+                    db.clone(),
+                    t.name
+                        .split_once('.')
+                        .map(|(_, n)| n)
+                        .unwrap_or(&t.name)
+                        .to_string(),
+                    t.id.to_string(),
+                    t.columns.len().to_string(),
+                    "0".to_string(),
+                    "0".to_string(),
+                    "0".to_string(),
+                    String::new(),
+                ]
+            })
+            .collect();
+        rows.sort_by(|a, b| a[1].cmp(&b[1]));
+        Ok(QueryResult::Rows {
+            columns: vec![
+                "database".to_string(),
+                "table".to_string(),
+                "id".to_string(),
+                "column_count".to_string(),
+                "segment_count".to_string(),
+                "block_count".to_string(),
+                "create_ts".to_string(),
+                "comment".to_string(),
+            ],
+            rows,
+        })
     }
 
     fn memindex_capacity(&self) -> usize {
@@ -13908,5 +14144,192 @@ mod tests {
             h.join().unwrap();
         }
         assert_eq!(e.row_count("default_db.cc").unwrap(), 200);
+    }
+
+    /// `src/unit_test/main/infinity_ut.cpp::InfinityTest/test1`: the catalog
+    /// lifecycle through the SQL path (`ListDatabases` / `CreateDatabase` /
+    /// `DropDatabase` / `ShowTables` / insert + select / `Query`).
+    #[test]
+    fn catalog_lifecycle_matches_the_reference_test() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+
+        // `ListDatabases` starts with `default_db` only.
+        assert_eq!(
+            rows(&e, "SHOW DATABASES;"),
+            vec![vec![
+                "default_db".to_string(),
+                dir.path()
+                    .join("data")
+                    .join("db_1")
+                    .to_string_lossy()
+                    .into_owned(),
+                String::new()
+            ]]
+        );
+
+        e.execute("CREATE DATABASE db1;").unwrap();
+        let dbs = rows(&e, "SHOW DATABASES;");
+        // The reference lists `db1` first (hash order); the Rust catalog is
+        // sorted, so compare the set.
+        let mut names: Vec<&str> = dbs.iter().map(|r| r[0].as_str()).collect();
+        names.sort_unstable();
+        assert_eq!(names, vec!["db1", "default_db"]);
+        assert!(e
+            .catalog()
+            .list_databases()
+            .unwrap()
+            .iter()
+            .any(|d| d == "db1"));
+        assert!(!e
+            .catalog()
+            .list_databases()
+            .unwrap()
+            .iter()
+            .any(|d| d == "db2"));
+        // Dropping a missing database with the default (`kError`) conflict type
+        // fails, while `default_db` stays.
+        assert!(e.catalog().drop_database("db2", false).is_err());
+        assert!(e
+            .catalog()
+            .list_databases()
+            .unwrap()
+            .iter()
+            .any(|d| d == "default_db"));
+        e.catalog().drop_database("db1", false).unwrap();
+        assert_eq!(rows(&e, "SHOW DATABASES;").len(), 1);
+        assert!(e
+            .catalog()
+            .list_databases()
+            .unwrap()
+            .iter()
+            .any(|d| d == "default_db"));
+
+        // Create/Show/Get/Drop a table in `default_db`.
+        e.execute("CREATE TABLE default_db.table1 (col1 BOOLEAN, col2 BIGINT);")
+            .unwrap();
+        let tables = rows(&e, "SHOW TABLES FROM default_db;");
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0][0], "default_db");
+        assert_eq!(tables[0][1], "table1");
+        assert_eq!(tables[0][3], "2");
+        assert!(e
+            .catalog()
+            .get_table_by_name("default_db.table1")
+            .unwrap()
+            .is_some());
+        e.execute("DROP TABLE default_db.table1;").unwrap();
+        assert!(rows(&e, "SHOW TABLES FROM default_db;").is_empty());
+        assert!(e
+            .catalog()
+            .get_table_by_name("default_db.table1")
+            .unwrap()
+            .is_none());
+
+        // Insert and select through two columns of different widths.
+        e.execute("CREATE TABLE default_db.table1 (col1 BIGINT, col2 SMALLINT);")
+            .unwrap();
+        e.execute("INSERT INTO default_db.table1 (col1, col2) VALUES (11, 22);")
+            .unwrap();
+        assert_eq!(
+            rows(&e, "SELECT col1, col2 FROM default_db.table1;"),
+            vec![vec!["11".to_string(), "22".to_string()]]
+        );
+        e.execute("DROP TABLE default_db.table1;").unwrap();
+
+        // `Query("create database db1;")` + `Query("show databases;")`.
+        e.execute("CREATE DATABASE db1;").unwrap();
+        let mut names: Vec<String> = rows(&e, "SHOW DATABASES;")
+            .into_iter()
+            .map(|r| r[0].clone())
+            .collect();
+        names.sort();
+        assert_eq!(names, vec!["db1", "default_db"]);
+        e.execute("DROP DATABASE db1;").unwrap();
+        assert_eq!(rows(&e, "SHOW DATABASES;").len(), 1);
+        assert!(e
+            .catalog()
+            .list_databases()
+            .unwrap()
+            .iter()
+            .any(|d| d == "default_db"));
+    }
+
+    /// `src/unit_test/main/infinity_ut.cpp::InfinityTest/test2`: every listed
+    /// global/session variable resolves, and `error` is rejected at both scopes
+    /// (`Status::NoSysVar`).
+    #[test]
+    fn show_variable_covers_the_reference_names() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        for name in [
+            "total_commit_count",
+            "active_txn_count",
+            "total_rollback_count",
+            "buffer_object_count",
+            "unused_buffer_object",
+            "next_transaction_id",
+            "schedule_policy",
+            "active_wal_filename",
+            "current_timestamp",
+            "session_count",
+            "query_count",
+            "buffer_usage",
+            "profile_record_capacity",
+            "profile",
+        ] {
+            let r = e.show_variable(name, variables::SetScope::Global).unwrap();
+            let QueryResult::Rows { columns, rows } = r else {
+                panic!("{name} must return a row")
+            };
+            assert_eq!(columns, vec!["value".to_string()]);
+            assert_eq!(rows.len(), 1);
+        }
+        for name in [
+            "connected_timestamp",
+            "total_rollback_count",
+            "total_commit_count",
+            "query_count",
+        ] {
+            e.show_variable(name, variables::SetScope::Session).unwrap();
+        }
+        assert!(e
+            .show_variable("error", variables::SetScope::Global)
+            .is_err());
+        assert!(e
+            .show_variable("error", variables::SetScope::Session)
+            .is_err());
+    }
+
+    /// `src/unit_test/main/table_ut.cpp::InfinityTableTest/test1`: a table with
+    /// an `EMBEDDING(FLOAT, 128)` and a `BIGINT` column explains in every plan
+    /// mode without executing the inner statement.
+    #[test]
+    fn explain_covers_every_plan_kind() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE DATABASE db1;").unwrap();
+        assert!(e
+            .catalog()
+            .list_databases()
+            .unwrap()
+            .iter()
+            .any(|d| d == "db1"));
+        e.execute("CREATE TABLE db1.knn_table (col1 EMBEDDING(FLOAT, 128), col2 BIGINT);")
+            .unwrap();
+        // The reference asks for AST, unoptimized/optimized logical, physical,
+        // fragment and pipeline plans; each must succeed.
+        for sql in [
+            "EXPLAIN AST SELECT col2 FROM db1.knn_table;",
+            "EXPLAIN LOGICAL SELECT col2 FROM db1.knn_table;",
+            "EXPLAIN OPTIMIZED SELECT col2 FROM db1.knn_table;",
+            "EXPLAIN PHYSICAL SELECT col2 FROM db1.knn_table;",
+            "EXPLAIN FRAGMENT SELECT col2 FROM db1.knn_table;",
+            "EXPLAIN PIPELINE SELECT col2 FROM db1.knn_table;",
+        ] {
+            let mut res = e.execute(sql).unwrap_or_else(|err| panic!("{sql}: {err}"));
+            assert_eq!(res.len(), 1, "{sql}");
+            assert!(matches!(res.remove(0), QueryResult::Rows { .. }), "{sql}");
+        }
     }
 }

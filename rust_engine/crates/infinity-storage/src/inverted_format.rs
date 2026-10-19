@@ -982,6 +982,117 @@ pub fn fst_get(fst: &[u8], key: &[u8]) -> Result<Option<u64>, FormatError> {
     Ok(Some(out.wrapping_add(node.final_output)))
 }
 
+/// All `(key, value)` pairs of an FST in lexicographic order (`FstStream`).
+///
+/// The reference walks the automaton lazily; this port materializes the same
+/// traversal once (the FST is already fully resident in these chunks).
+fn fst_entries(fst: &[u8]) -> Result<Vec<(Vec<u8>, u64)>, FormatError> {
+    struct Frame {
+        addr: u64,
+        prefix: Vec<u8>,
+        out: u64,
+        next: usize,
+    }
+    let mut entries = Vec::new();
+    let root = fst_root_addr(fst)?;
+    let mut stack = vec![Frame {
+        addr: root,
+        prefix: Vec::new(),
+        out: 0,
+        next: 0,
+    }];
+    while let Some(frame) = stack.last_mut() {
+        let i = frame.next;
+        let node = FstNode::new(fst, frame.addr)?;
+        if i >= node.ntrans {
+            stack.pop();
+            continue;
+        }
+        frame.next += 1;
+        let mut prefix = frame.prefix.clone();
+        prefix.push(node.input_at(i)?);
+        let out = frame.out.wrapping_add(node.output_at(i)?);
+        let addr = node.trans_addr(i)?;
+        let child = FstNode::new(fst, addr)?;
+        if child.is_final {
+            entries.push((prefix.clone(), out.wrapping_add(child.final_output)));
+        }
+        if child.ntrans > 0 {
+            stack.push(Frame {
+                addr,
+                prefix,
+                out,
+                next: 0,
+            });
+        }
+    }
+    Ok(entries)
+}
+
+/// Lexicographically ordered iteration over an FST with optional bounds
+/// (`FstStream`, `fst.cppm:231-330`).
+pub struct FstStream {
+    entries: Vec<(Vec<u8>, u64)>,
+    start: usize,
+    end: usize,
+}
+
+impl FstStream {
+    /// `FstStream(fst)` with unbounded ends.
+    pub fn new(fst: &[u8]) -> Result<Self, FormatError> {
+        let entries = fst_entries(fst)?;
+        let end = entries.len();
+        Ok(Self {
+            entries,
+            start: 0,
+            end,
+        })
+    }
+
+    /// `FstStream::Reset(min, max)`: `min` is inclusive/exclusive as given,
+    /// `max` is inclusive/exclusive as given; `None` is unbounded.
+    pub fn reset(&mut self, min: Option<(&[u8], bool)>, max: Option<(&[u8], bool)>) {
+        self.start = match min {
+            None => 0,
+            Some((key, inclusive)) => {
+                let idx = self.entries.partition_point(|(k, _)| {
+                    if inclusive {
+                        k.as_slice() < key
+                    } else {
+                        k.as_slice() <= key
+                    }
+                });
+                idx
+            }
+        };
+        self.end = match max {
+            None => self.entries.len(),
+            Some((key, inclusive)) => self.entries.partition_point(|(k, _)| {
+                if inclusive {
+                    k.as_slice() <= key
+                } else {
+                    k.as_slice() < key
+                }
+            }),
+        };
+    }
+
+    // `FstStream::Next` is the iterator's next item.
+}
+
+impl Iterator for FstStream {
+    type Item = (Vec<u8>, u64);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start >= self.end {
+            return None;
+        }
+        let entry = self.entries[self.start].clone();
+        self.start += 1;
+        Some(entry)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // FST building (`fst/build.cppm`, `fst/build_impl.cpp`, `fst/registry.cppm`)
 // ---------------------------------------------------------------------------
@@ -2976,5 +3087,126 @@ mod tests {
         };
         let bytes = p.encode();
         assert!(TermPostings::decode(&bytes[..bytes.len() - 1]).is_err());
+    }
+
+    /// The reference's `FstTest` months fixture, sorted lexicographically.
+    fn months() -> Vec<(Vec<u8>, u64)> {
+        let names = [
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+        ];
+        let mut entries: Vec<(Vec<u8>, u64)> = names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (name.as_bytes().to_vec(), i as u64 + 1))
+            .collect();
+        entries.sort();
+        entries
+    }
+
+    /// C++: `FstTest.BuildMemEmpty` (`fst_ut.cpp`).
+    #[test]
+    fn fst_build_mem_empty() {
+        let buffer = FstBuilder::new().finish();
+        // The 20-byte trailer (len, root, checksum) is included here whereas
+        // `BytesWritten()` excludes the checksum: 32 + 4 = 36.
+        assert_eq!(buffer.len(), 36);
+        let (len, root) = verify_fst(&buffer).unwrap();
+        assert_eq!(len, 0);
+        assert_eq!(root, 0);
+        assert!(len == 0, "IsEmpty");
+    }
+
+    /// C++: `FstTest.BuildFileEmpty` (`fst_ut.cpp`).
+    #[test]
+    fn fst_build_file_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty.fst");
+        let buffer = FstBuilder::new().finish();
+        std::fs::write(&path, &buffer).unwrap();
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), buffer.len() as u64);
+        assert_eq!(buffer.len(), 36);
+    }
+
+    /// C++: `FstTest.BuildMem` (`fst_ut.cpp`).
+    #[test]
+    fn fst_build_mem() {
+        let buffer = build_fst(&months());
+        // `buffer.size() == written + 4`: everything but the checksum is the
+        // writer's count.
+        let written = buffer.len() - 4;
+        assert_eq!(buffer.len(), written + 4);
+        verify_fst(&buffer).unwrap();
+    }
+
+    /// C++: `FstTest.BuildFile` (`fst_ut.cpp`).
+    #[test]
+    fn fst_build_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("months.fst");
+        let buffer = build_fst(&months());
+        std::fs::write(&path, &buffer).unwrap();
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().len() as usize,
+            buffer.len()
+        );
+    }
+
+    /// C++: `FstTest.Get` (`fst_ut.cpp`).
+    #[test]
+    fn fst_get_values() {
+        let entries = months();
+        let fst = build_fst(&entries);
+        let (len, _) = verify_fst(&fst).unwrap();
+        assert_eq!(len as usize, entries.len());
+        assert!(fst.len() > 36);
+        for (key, value) in &entries {
+            assert_eq!(fst_get(&fst, key).unwrap(), Some(*value));
+        }
+        assert_eq!(fst_get(&fst, b"NotAMonth").unwrap(), None);
+    }
+
+    /// C++: `FstTest.Iterate` (`fst_ut.cpp`): full-order iteration and the
+    /// `[included, excluded)` bounds.
+    #[test]
+    fn fst_iterate_with_bounds() {
+        let entries = months();
+        let fst = build_fst(&entries);
+        verify_fst(&fst).unwrap();
+        let mut stream = FstStream::new(&fst).unwrap();
+        let mut got = Vec::new();
+        for (key, value) in stream.by_ref() {
+            got.push((key, value));
+        }
+        assert_eq!(got, entries);
+
+        // [months[3], months[7])
+        let b1 = 3;
+        let b2 = 7;
+        stream.reset(Some((&entries[b1].0, true)), Some((&entries[b2].0, false)));
+        let mut i = b1;
+        for (key, value) in stream.by_ref() {
+            assert_eq!(key, entries[i].0);
+            assert_eq!(value, entries[i].1);
+            i += 1;
+        }
+        assert_eq!(i, b2);
+        // An excluded max also stops before that key.
+        stream.reset(Some((&entries[b1].0, true)), Some((&entries[b2].0, true)));
+        let mut seen = 0;
+        while stream.next().is_some() {
+            seen += 1;
+        }
+        assert_eq!(seen, b2 - b1 + 1);
     }
 }

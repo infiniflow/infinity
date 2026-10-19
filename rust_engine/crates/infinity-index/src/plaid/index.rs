@@ -42,6 +42,24 @@ impl Bitmask {
             .get(id / 64)
             .is_some_and(|w| w & (1 << (id % 64)) != 0)
     }
+    /// C++ `Bitmask::MakeSharedAllTrue(len)`: every id in `0..len` is set.
+    pub fn new_all_true(len: usize) -> Self {
+        let mut bits = vec![u64::MAX; len.div_ceil(64)];
+        if let Some(last) = bits.last_mut() {
+            let rem = len % 64;
+            if rem != 0 {
+                *last = (1u64 << rem) - 1;
+            }
+        }
+        Self { bits }
+    }
+    /// C++ `Bitmask::SetFalse(id)`.
+    pub fn set_false(&mut self, id: u32) {
+        let id = id as usize;
+        if let Some(word) = self.bits.get_mut(id / 64) {
+            *word &= !(1 << (id % 64));
+        }
+    }
     pub fn len(&self) -> usize {
         self.bits.len() * 64
     }

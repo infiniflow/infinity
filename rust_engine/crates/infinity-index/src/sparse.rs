@@ -765,6 +765,29 @@ mod tests {
             assert!((g.1 - e.1).abs() < 1e-6);
         }
     }
+
+    /// C++: `BMPIndexTest.test2` (`test_bmp_index_ut.cpp`): a hand-built index
+    /// over two columns, searched before `Optimize`, keeps the tie order by
+    /// row id and drops the lower-scoring document.
+    #[test]
+    fn bmp_index_two_columns_topk() {
+        let query = [(0u32, 1.0f32), (1, 1.0)];
+        let mut index = BmpAlg::new(2);
+        index.add_doc(&[(0, 3.0)]);
+        index.add_doc(&[(1, 1.0)]);
+        index.add_doc(&[(0, 1.0), (1, 1.0)]);
+        index.add_doc(&[(0, 1.0), (1, 1.0)]);
+        index.add_doc(&[(0, 1.0), (1, 1.0)]);
+        index.add_doc(&[(0, 1.0), (1, 1.0)]);
+
+        let got = index.search_knn(&query, 5, BmpSearchOptions::default());
+        assert_eq!(
+            got.iter().map(|(doc, _)| *doc).collect::<Vec<_>>(),
+            vec![0, 2, 3, 4, 5]
+        );
+        let scores: Vec<f32> = got.iter().map(|(_, score)| *score).collect();
+        assert_eq!(scores, vec![3.0, 2.0, 2.0, 2.0, 2.0]);
+    }
 }
 
 #[cfg(test)]

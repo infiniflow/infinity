@@ -476,4 +476,76 @@ mod tests {
         // Nothing passes the threshold, so the closest centroid is used.
         assert_eq!(got[0].0, 0);
     }
+
+    /// C++: `EMVBTest.test_fakepq` (`test_emvb_ut.cpp`). A zero PQ distance
+    /// table (`FakePQ`) reduces the final stage to the coarse-centroid MaxSim,
+    /// so the ten documents of centroid 3 tie at `32 * 1.0` and come back in
+    /// document order.
+    #[test]
+    fn fake_pq_ranks_the_matching_centroids_documents() {
+        const DIM: usize = 128;
+        const CENTROID_NUM: usize = 8;
+        const DOCS_IN_ONE_CENTROID: usize = 10;
+        const N_DOCS: usize = CENTROID_NUM * DOCS_IN_ONE_CENTROID;
+        const EMBEDDING_IN_ONE_DOC: usize = 10;
+        const QUERY_TOKEN_NUM: usize = 32;
+
+        let doc_lens = vec![EMBEDDING_IN_ONE_DOC as u32; N_DOCS];
+        // `doc_offsets` is implied by `doc_lens` in `EmvbView`.
+        let mut assignments = vec![0u32; N_DOCS * EMBEDDING_IN_ONE_DOC];
+        for doc in 0..N_DOCS {
+            for emb in 0..EMBEDDING_IN_ONE_DOC {
+                assignments[doc * EMBEDDING_IN_ONE_DOC + emb] =
+                    (doc / DOCS_IN_ONE_CENTROID) as u32;
+            }
+        }
+        let mut centroids = vec![0.0f32; CENTROID_NUM * DIM];
+        for c in 0..CENTROID_NUM {
+            centroids[c * DIM + c] = 1.0;
+        }
+        let centroids_to_docid: Vec<Vec<u32>> = (0..CENTROID_NUM)
+            .map(|c| {
+                (0..DOCS_IN_ONE_CENTROID)
+                    .map(|j| (c * DOCS_IN_ONE_CENTROID + j) as u32)
+                    .collect()
+            })
+            .collect();
+        let doc_segment_offsets: Vec<u32> = (0..N_DOCS as u32).collect();
+        // FakePQ: one subspace whose only codeword is the zero vector, so every
+        // residual inner product is zero.
+        let codebook = vec![0.0f32; DIM];
+        let codes = vec![0u8; N_DOCS * EMBEDDING_IN_ONE_DOC];
+        let view = EmvbView {
+            dims: DIM,
+            subspace_num: 1,
+            sub_dim: DIM,
+            k: 1,
+            centroids: &centroids,
+            codebook: &codebook,
+            codes: &codes,
+            assignments: &assignments,
+            doc_lens: &doc_lens,
+            doc_segment_offsets: &doc_segment_offsets,
+            centroids_to_docid: &centroids_to_docid,
+        };
+        let mut query = vec![vec![0.0f32; DIM]; QUERY_TOKEN_NUM];
+        for q in &mut query {
+            q[3] = 1.0;
+        }
+        let options = EmvbSearchOptions {
+            centroid_nprobe: 1,
+            threshold_first: 0.5,
+            n_doc_to_score: 100,
+            out_second_stage: 50,
+            threshold_final: 0.8,
+        };
+        let got = view.search(&query, 10, options);
+        assert_eq!(got.len(), 10);
+        let mut doc_ids: Vec<u32> = got.iter().map(|(doc, _)| *doc).collect();
+        doc_ids.sort_unstable();
+        for (i, (_, score)) in got.iter().enumerate() {
+            assert!((score - 32.0).abs() < 1e-5, "score {i} = {score}");
+        }
+        assert_eq!(doc_ids, (30..40).collect::<Vec<u32>>());
+    }
 }

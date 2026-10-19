@@ -758,8 +758,20 @@ impl Parser {
             }
             "EXPLAIN" => {
                 self.advance();
-                // `EXPLAIN [LOGICAL|PHYSICAL] <statement>` — the plan kind.
+                // `EXPLAIN [AST|UNOPTIMIZED|OPTIMIZED|LOGICAL|PHYSICAL|FRAGMENT|PIPELINE] <statement>`
                 let kind = match self.peek() {
+                    Token::Ident(s) if s.eq_ignore_ascii_case("ast") => {
+                        self.advance();
+                        ExplainKind::Ast
+                    }
+                    Token::Ident(s) if s.eq_ignore_ascii_case("unoptimized") => {
+                        self.advance();
+                        ExplainKind::UnOpt
+                    }
+                    Token::Ident(s) if s.eq_ignore_ascii_case("optimized") => {
+                        self.advance();
+                        ExplainKind::Opt
+                    }
                     Token::Ident(s) if s.eq_ignore_ascii_case("logical") => {
                         self.advance();
                         ExplainKind::Logical
@@ -771,6 +783,10 @@ impl Parser {
                     Token::Ident(s) if s.eq_ignore_ascii_case("fragment") => {
                         self.advance();
                         ExplainKind::Fragment
+                    }
+                    Token::Ident(s) if s.eq_ignore_ascii_case("pipeline") => {
+                        self.advance();
+                        ExplainKind::Pipeline
                     }
                     _ => ExplainKind::Physical,
                 };
@@ -802,7 +818,11 @@ impl Parser {
                             if self.peek() == &Token::Op("=".into()) {
                                 self.advance();
                             }
-                            let v = self.copy_option_value();
+                            // A bare flag (`HEADER`) has no value.
+                            let v = match self.peek() {
+                                Token::RParen | Token::Comma => String::new(),
+                                _ => self.copy_option_value(),
+                            };
                             opts.push((k.to_ascii_uppercase(), v));
                         } else {
                             self.advance();
@@ -1287,41 +1307,68 @@ impl Parser {
         Ok(Literal::Array(items))
     }
 
-    /// Parses `SEARCH MATCH <KIND> (col, args…) [, MATCH …, FUSION(…)] [WITH (…)…]`.
+    /// Parses
+    /// `SEARCH MATCH <KIND> (col, args…) [, MATCH …] [, QUERY(…)] [, FUSION(…)]`.
     fn search_clause(&mut self) -> Result<SearchClause> {
         let mut out = SearchClause::default();
         loop {
-            self.expect_kw("MATCH")?;
-            let kind = self.expect_ident()?.to_ascii_uppercase();
-            self.expect(Token::LParen)?;
-            let column = match self.expr()? {
-                ExprAst::Column(c) => c,
-                ExprAst::Literal(Literal::Str(s)) => s,
-                _ => return self.err("expected match column"),
-            };
-            let mut args = Vec::new();
-            let mut filter = None;
-            while self.peek() == &Token::Comma {
+            // `QUERY('…')` is a bare search term; `MATCH <KIND> (…)` is the
+            // keyword form (TEXT / VECTOR / …).
+            let is_query =
+                matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("QUERY"));
+            if is_query {
                 self.advance();
-                if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("WHERE")) {
+                self.expect(Token::LParen)?;
+                let column = match self.expr()? {
+                    ExprAst::Column(c) => c,
+                    ExprAst::Literal(Literal::Str(s)) => s,
+                    _ => return self.err("expected query text"),
+                };
+                let mut args = Vec::new();
+                while self.peek() == &Token::Comma {
                     self.advance();
-                    filter = Some(self.predicate()?);
-                    break;
+                    args.push(self.expr()?);
                 }
-                args.push(self.expr()?);
-            }
-            self.expect(Token::RParen)?;
-            if kind.eq_ignore_ascii_case("TEXT") && args.len() >= 2 {
-                if let ExprAst::Literal(Literal::Str(opts)) = &args[1] {
-                    validate_fulltext_options(opts)?;
+                self.expect(Token::RParen)?;
+                out.matches.push(MatchClause {
+                    kind: "QUERY".into(),
+                    column,
+                    args,
+                    filter: None,
+                });
+            } else {
+                self.expect_kw("MATCH")?;
+                let kind = self.expect_ident()?.to_ascii_uppercase();
+                self.expect(Token::LParen)?;
+                let column = match self.expr()? {
+                    ExprAst::Column(c) => c,
+                    ExprAst::Literal(Literal::Str(s)) => s,
+                    _ => return self.err("expected match column"),
+                };
+                let mut args = Vec::new();
+                let mut filter = None;
+                while self.peek() == &Token::Comma {
+                    self.advance();
+                    if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("WHERE")) {
+                        self.advance();
+                        filter = Some(self.predicate()?);
+                        break;
+                    }
+                    args.push(self.expr()?);
                 }
+                self.expect(Token::RParen)?;
+                if kind.eq_ignore_ascii_case("TEXT") && args.len() >= 2 {
+                    if let ExprAst::Literal(Literal::Str(opts)) = &args[1] {
+                        validate_fulltext_options(opts)?;
+                    }
+                }
+                out.matches.push(MatchClause {
+                    kind,
+                    column,
+                    args,
+                    filter,
+                });
             }
-            out.matches.push(MatchClause {
-                kind: kind.clone(),
-                column: column.clone(),
-                args,
-                filter,
-            });
             if self.eat_kw("WITH") {
                 out.with_opts = Some(self.paren_list_text()?);
             }
@@ -1333,9 +1380,10 @@ impl Parser {
             if self.eat_kw("IGNORE") {
                 self.expect_kw("INDEX")?;
             }
-            let next_is_match = self.peek() == &Token::Comma
-                && matches!(self.toks.get(self.pos + 1), Some(Token::Ident(s)) if s.eq_ignore_ascii_case("MATCH"));
-            if next_is_match {
+            let next_is_term = self.peek() == &Token::Comma
+                && matches!(self.toks.get(self.pos + 1), Some(Token::Ident(s))
+                    if s.eq_ignore_ascii_case("MATCH") || s.eq_ignore_ascii_case("QUERY"));
+            if next_is_term {
                 self.advance(); // comma
                 continue;
             }
@@ -2598,6 +2646,312 @@ mod tests {
             other => panic!("expected copy, got {other:?}"),
         }
         assert!(matches!(one("SET CONFIG a 1"), Statement::SetConfig { .. }));
+    }
+
+    // C++: src/unit_test/parser/sql_parser_ut.cpp:good_create_index_1
+    #[test]
+    fn sql_parser_good_create_index_1() {
+        let Statement::CreateIndex {
+            name,
+            table,
+            column,
+            index_type,
+            opts,
+            if_not_exists,
+        } = one("CREATE INDEX idx1 ON t1 (a) USING IVF;")
+        else {
+            panic!("expected CREATE INDEX");
+        };
+        assert_eq!(name, "idx1");
+        assert_eq!(table, "t1");
+        assert_eq!(column, "a");
+        assert_eq!(index_type, "IVF");
+        assert!(opts.is_empty());
+        assert!(!if_not_exists);
+
+        let Statement::CreateIndex {
+            name,
+            if_not_exists,
+            ..
+        } = one("CREATE INDEX IF NOT EXISTS idx1 ON t1 (a) USING IVF;")
+        else {
+            panic!("expected CREATE INDEX");
+        };
+        assert_eq!(name, "idx1");
+        assert!(if_not_exists);
+
+        // The Rust AST keeps the database qualifier on the table name.
+        let Statement::CreateIndex { table, .. } =
+            one("CREATE INDEX idx1 ON db1.t1 (a) USING IVF;")
+        else {
+            panic!("expected CREATE INDEX");
+        };
+        assert_eq!(table, "db1.t1");
+
+        let Statement::CreateIndex { opts, .. } =
+            one("CREATE INDEX idx3 ON t1 (a) USING IVF WITH (metric = l2);")
+        else {
+            panic!("expected CREATE INDEX");
+        };
+        assert_eq!(opts, vec![("METRIC".to_string(), "l2".to_string())]);
+    }
+
+    // C++: src/unit_test/parser/sql_parser_ut.cpp:bad_create_index_1
+    #[test]
+    fn sql_parser_bad_create_index_1() {
+        assert!(parse("CREATE INDEX IF NOT EXISTS ON t1 (a) USING IVF;").is_err());
+    }
+
+    // C++: src/unit_test/parser/sql_parser_ut.cpp:good_test1
+    //
+    // Ported for the statements this parser implements: COPY, SHOW, DELETE,
+    // UPDATE and KNN projections. CREATE/DROP COLLECTION/SCHEMA, DESCRIBE,
+    // FLUSH and OPTIMIZE use a different statement model and are covered by
+    // the executor-level tests instead.
+    #[test]
+    fn sql_parser_good_test1() {
+        let inputs = [
+            "copy t1 to '/usr/filename' with (format csv);",
+            "copy t1 to '/usr/filename' with (format csv, header);",
+            "copy t1 to '/usr/filename' with (format csv, header, delimiter '|');",
+            "copy t2 from '/usr/filename' with (format csv);",
+            "copy t2 from '/usr/filename' with (format csv, header);",
+            "copy t2 from '/usr/filename' with (format csv, header, delimiter '|');",
+            "show tables;",
+            "DELETE FROM products",
+            "DELETE FROM products WHERE price = 10",
+            "delete from s1.products where obsoletion_date = 'today'",
+            "UPDATE products SET price = price * 1.10 WHERE price <= 99.99;",
+            "SELECT KNN(c1, [1, 2], 2, 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;",
+            "SELECT KNN(c1, [1.0, 2.0], 2, 'float', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;",
+            "SELECT KNN(c1, [1,0,1,0,1,1,0,0], 8, 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;",
+        ];
+        for input in inputs {
+            assert!(parse(input).is_ok(), "{input}");
+        }
+
+        let Statement::Select { items, .. } =
+            one("SELECT KNN(c1, [1, 2], 2, 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;")
+        else {
+            panic!("expected SELECT");
+        };
+        match &items[0] {
+            SelectItem::Func { name, args } => {
+                assert_eq!(name, "KNN");
+                assert_eq!(args.len(), 5);
+            }
+            other => panic!("expected KNN function, got {other:?}"),
+        }
+    }
+
+    // C++: src/unit_test/parser/sql_statement_ut.cpp:good_test1
+    #[test]
+    fn statement_parsing_good_test1() {
+        let Statement::Show { text } = one("SHOW DATABASE default_db") else {
+            panic!("expected SHOW");
+        };
+        assert_eq!(text, "DATABASE default_db");
+
+        let Statement::Update {
+            table,
+            assignments,
+            where_pred,
+        } = one("UPDATE t1 SET a = 1, b = 2 WHERE c = 'O''K';")
+        else {
+            panic!("expected UPDATE");
+        };
+        assert_eq!(table, "t1");
+        assert_eq!(assignments[0].0, "a");
+        assert_eq!(assignments[0].1, ExprAst::Literal(Literal::Int(1)));
+        assert_eq!(assignments[1].0, "b");
+        let Some(Predicate::Cmp(ExprAst::Column(c), CmpOp::Eq, ExprAst::Literal(Literal::Str(s)))) =
+            where_pred
+        else {
+            panic!("expected c = 'O''K'");
+        };
+        assert_eq!(c, "c");
+        assert_eq!(s, "O'K");
+
+        let Statement::Insert { table, rows, .. } = one("INSERT INTO t1 VALUES ('abc', 333);")
+        else {
+            panic!("expected INSERT");
+        };
+        assert_eq!(table, "t1");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0], vec![Literal::Str("abc".into()), Literal::Int(333)]);
+
+        let Statement::Insert { rows, .. } =
+            one("INSERT INTO t1 VALUES ('abc', 333), ('def', 444);")
+        else {
+            panic!("expected INSERT");
+        };
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[1], vec![Literal::Str("def".into()), Literal::Int(444)]);
+    }
+
+    // C++: src/unit_test/parser/sql_select_statement_ut.cpp:good_test1
+    #[test]
+    fn select_statement_parsing_good_test1() {
+        let Statement::Select {
+            items,
+            from,
+            where_pred,
+            group_by,
+            having,
+            distinct,
+            aliases,
+            ..
+        } = one("select a from t1;")
+        else {
+            panic!("expected SELECT");
+        };
+        assert_eq!(from.as_deref(), Some("t1"));
+        assert!(where_pred.is_none());
+        assert!(group_by.is_empty());
+        assert!(having.is_none());
+        assert!(!distinct);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0], SelectItem::Column("a".into()));
+        assert_eq!(aliases, vec![None]);
+    }
+
+    // C++: src/unit_test/parser/sql_select_statement_ut.cpp:good_test2
+    #[test]
+    fn select_statement_parsing_good_test2() {
+        let Statement::Select {
+            items,
+            from,
+            where_pred,
+            group_by,
+            having,
+            distinct,
+            ..
+        } = one("select 1;")
+        else {
+            panic!("expected SELECT");
+        };
+        assert!(from.is_none());
+        assert!(where_pred.is_none());
+        assert!(group_by.is_empty());
+        assert!(having.is_none());
+        assert!(!distinct);
+        assert_eq!(items, vec![SelectItem::Literal(Literal::Int(1))]);
+
+        let Statement::Select { items, from, .. } =
+            one("select a, sum(b), function(c, nested(d)) from t1;")
+        else {
+            panic!("expected SELECT");
+        };
+        assert_eq!(from.as_deref(), Some("t1"));
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0], SelectItem::Column("a".into()));
+        match &items[1] {
+            SelectItem::Aggregate(agg) => {
+                assert_eq!(agg.func, AggFunc::Sum);
+                assert_eq!(agg.args, vec!["b".to_string()]);
+            }
+            other => panic!("expected SUM aggregate, got {other:?}"),
+        }
+        match &items[2] {
+            SelectItem::Func { name, args } => {
+                assert_eq!(name, "function");
+                assert_eq!(args.len(), 2);
+                assert_eq!(args[0], ExprAst::Column("c".into()));
+                match &args[1] {
+                    ExprAst::Func { name, args } => {
+                        assert_eq!(name, "nested");
+                        assert_eq!(args, &vec![ExprAst::Column("d".into())]);
+                    }
+                    other => panic!("expected nested function, got {other:?}"),
+                }
+            }
+            other => panic!("expected function call, got {other:?}"),
+        }
+    }
+
+    // C++: src/unit_test/parser/sql_select_statement_ut.cpp:good_search_test
+    #[test]
+    fn select_statement_parsing_good_search_test() {
+        let sql = r#"
+        SELECT *
+        FROM t1
+        SEARCH
+            MATCH TEXT ('author^2,name^5', 'frank dune'),
+            MATCH TEXT ('name', 'to the star', 'operator=OR;fuzziness=AUTO:1,5;minimum_should_match=1'),
+            QUERY('name:dune'),
+            QUERY('_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~)', 'default_operator=and;default_field=name'),
+            MATCH VECTOR (c1, [1, 2], 'integer', 'l2', 3),
+            MATCH VECTOR (c1, [3, 10, 1111], 'bigint', 'cosine', 3),
+            MATCH VECTOR (c1, [1.0, 2.0], 'double', 'cosine', 3),
+            MATCH VECTOR (c1, [1.00, 2.00], 'double', 'ip', 3),
+            MATCH VECTOR (c1, [1,0,1,0,1,1,0,0], 'bit', 'hamming', 3),
+            MATCH VECTOR (c1, [1.00, 2.00], 'float', 'ip', 3),
+            FUSION('rrf', 'rank_constant=60')
+        WHERE a > 0
+        "#;
+        let Statement::Select {
+            search, where_pred, ..
+        } = one(sql)
+        else {
+            panic!("expected SELECT");
+        };
+        assert!(where_pred.is_some());
+        let search = search.expect("SEARCH clause");
+        assert_eq!(search.matches.len(), 10);
+
+        assert_eq!(search.matches[0].kind, "TEXT");
+        assert_eq!(search.matches[0].column, "author^2,name^5");
+        assert_eq!(
+            search.matches[0].args,
+            vec![ExprAst::Literal(Literal::Str("frank dune".into()))]
+        );
+        assert_eq!(search.matches[1].column, "name");
+        assert_eq!(search.matches[1].args.len(), 2);
+
+        assert_eq!(search.matches[2].kind, "QUERY");
+        assert_eq!(search.matches[2].column, "name:dune");
+        assert!(search.matches[2].args.is_empty());
+        assert_eq!(search.matches[3].kind, "QUERY");
+        assert_eq!(search.matches[3].args.len(), 1);
+
+        let vector = &search.matches[4];
+        assert_eq!(vector.kind, "VECTOR");
+        assert_eq!(vector.column, "c1");
+        assert_eq!(
+            vector.args[0],
+            ExprAst::Literal(Literal::Array(vec!["1".into(), "2".into()]))
+        );
+        assert_eq!(
+            vector.args[1],
+            ExprAst::Literal(Literal::Str("integer".into()))
+        );
+        assert_eq!(vector.args[2], ExprAst::Literal(Literal::Str("l2".into())));
+        assert_eq!(vector.args[3], ExprAst::Literal(Literal::Int(3)));
+
+        assert_eq!(search.fusion.as_deref(), Some("rrf"));
+        assert_eq!(search.fusion_params.as_deref(), Some("rank_constant=60"));
+        assert_eq!(search.fusions.len(), 1);
+    }
+
+    // C++: src/unit_test/parser/float_serialize_ut.cpp:test_precision
+    #[test]
+    fn float_serialize_test_precision() {
+        // Keep this in sync with the C++ test's hex float literals
+        // (0x1.fffffcp+9 / 0x1.fffffep+9).
+        let f1 = f32::from_bits(0x447f_fffe);
+        let f2 = f32::from_bits(0x447f_ffff);
+        assert_eq!(format!("{f1}").parse::<f32>().unwrap(), f1);
+        assert_eq!(format!("{f2}").parse::<f32>().unwrap(), f2);
+        // `max_digits10` (9 and 17) worth of digits round-trip.
+        assert_eq!("1023.9999".parse::<f32>().unwrap(), f1);
+        assert_eq!("1023.99994".parse::<f32>().unwrap(), f2);
+        // 8 significant digits keep f1 but lose f2.
+        assert_eq!(format!("{f1:.4}").parse::<f32>().unwrap(), f1);
+        assert_ne!(format!("{f2:.4}").parse::<f32>().unwrap(), f2);
+        // Scientific notation round-trips.
+        assert_eq!(format!("{f1:e}").parse::<f32>().unwrap(), f1);
+        assert_eq!(format!("{f2:e}").parse::<f32>().unwrap(), f2);
+        // The hex-float branch has no Rust std counterpart.
     }
 
     #[test]

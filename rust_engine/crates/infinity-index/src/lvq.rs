@@ -455,6 +455,16 @@ fn global_cache(mean: &[f64]) -> (f64, f64) {
     (n1, n2)
 }
 
+/// C++ `I8IPSSEResidual`: the exact int32 dot product of two i8 vectors. The
+/// reference runs four SSE lanes; this scalar loop produces the same sum
+/// (each product is computed in `int16` and accumulated in `int32`).
+pub fn i8_ip_residual(a: &[i8], b: &[i8]) -> i32 {
+    a.iter()
+        .zip(b)
+        .map(|(x, y)| i32::from(*x) * i32::from(*y))
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -537,6 +547,87 @@ mod tests {
                 assert!((a.0 - b.0).abs() <= a.0.abs().max(1.0) * 1e-6);
                 assert!((a.1 - b.1).abs() <= a.1.abs().max(1.0) * 1e-6);
             }
+        }
+    }
+
+    /// C++: `DistFuncTest.test1` (`test_dist_func_ut.cpp`): the i8 residual
+    /// kernel equals the scalar int32 dot product over random vectors.
+    #[test]
+    fn i8_ip_residual_matches_the_scalar_dot_product() {
+        let dim = 200;
+        let vec_n = 10_000;
+        let mut rng = Rng(11);
+        for _ in 0..vec_n {
+            let mut a = vec![0i8; dim];
+            let mut b = vec![0i8; dim];
+            for j in 0..dim {
+                // `uniform_int_distribution<int8_t>(-128, 127)`.
+                a[j] = ((rng.next_f32() * 255.0).floor() as i32 - 128) as i8;
+                b[j] = ((rng.next_f32() * 255.0).floor() as i32 - 128) as i8;
+            }
+            let mut expected = 0i64;
+            for j in 0..dim {
+                expected += i64::from(a[j]) * i64::from(b[j]);
+            }
+            assert_eq!(i64::from(i8_ip_residual(&a, &b)), expected);
+        }
+    }
+
+    /// Reconstructs the LVQ vector a compressed record represents.
+    fn decode(data: &LvqData, mean: &[f64]) -> Vec<f32> {
+        data.code
+            .iter()
+            .enumerate()
+            .map(|(j, c)| data.scale * f32::from(*c) + data.bias + mean[j] as f32)
+            .collect()
+    }
+
+    /// C++: `DistFuncTest.test2` (`test_dist_func_ut.cpp`): the LVQ L2 distance
+    /// equals the plain L2 of the two decompressed vectors (relative error
+    /// below 1e-5).
+    #[test]
+    fn lvq_l2_distance_matches_decompressed_vectors() {
+        let dim = 200;
+        let vec_n = 8192;
+        let mut rng = Rng(5);
+        let stored: Vec<Vec<f32>> = (0..vec_n).map(|_| rng.vector(dim, 0.0, 1.0)).collect();
+        let queries: Vec<Vec<f32>> = (0..vec_n).map(|_| rng.vector(dim, 0.0, 1.0)).collect();
+        let mut store = LvqStore::new(dim, Metric::L2, false);
+        for v in &stored {
+            store.compress(v);
+        }
+        for (i, query) in queries.iter().enumerate() {
+            let q = store.make_query(query);
+            let dist1 = store.distance(&q, i).unwrap();
+            let qv1 = decode(q.data(), &store.mean);
+            let qv2 = decode(&store.data[i], &store.mean);
+            let dist2 = plain_l2(&qv1, &qv2);
+            let err = ((dist1 - dist2) / dist1).abs();
+            assert!(err < 1e-5, "vector {i}: dist1 {dist1}, dist2 {dist2}, err {err}");
+        }
+    }
+
+    /// C++: `DistFuncTest2.test2` (`test_dist_func2_ut.cpp`): the LVQ inner
+    /// product distance equals `-dot` of the decompressed vectors.
+    #[test]
+    fn lvq_ip_distance_matches_decompressed_vectors() {
+        let dim = 128;
+        let vec_n = 8192;
+        let mut rng = Rng(6);
+        let stored: Vec<Vec<f32>> = (0..vec_n).map(|_| rng.vector(dim, 0.0, 1.0)).collect();
+        let queries: Vec<Vec<f32>> = (0..vec_n).map(|_| rng.vector(dim, 0.0, 1.0)).collect();
+        let mut store = LvqStore::new(dim, Metric::Ip, false);
+        for v in &stored {
+            store.compress(v);
+        }
+        for (i, query) in queries.iter().enumerate() {
+            let q = store.make_query(query);
+            let dist1 = store.distance(&q, i).unwrap();
+            let qv1 = decode(q.data(), &store.mean);
+            let qv2 = decode(&store.data[i], &store.mean);
+            let dist2: f32 = -qv1.iter().zip(&qv2).map(|(a, b)| a * b).sum::<f32>();
+            let err = ((dist1 - dist2) / dist1).abs();
+            assert!(err < 1e-5, "vector {i}: dist1 {dist1}, dist2 {dist2}, err {err}");
         }
     }
 }

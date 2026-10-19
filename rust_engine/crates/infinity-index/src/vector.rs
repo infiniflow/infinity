@@ -522,6 +522,24 @@ impl HnswIndex {
         }
     }
 
+    /// C++ `KnnHnsw::CompressToLVQ`: re-encode the stored vectors with an LVQ
+    /// store trained on them, keeping the graph and labels unchanged.
+    pub fn compress_to_lvq(&mut self) {
+        let vectors: Vec<Vec<f32>> = (0..self.len()).map(|i| self.store.decompress(i)).collect();
+        let metric = match self.store.metric() {
+            Metric::L2 => crate::lvq::Metric::L2,
+            Metric::Ip => crate::lvq::Metric::Ip,
+            Metric::Cos => crate::lvq::Metric::Cos,
+        };
+        let mut store = crate::lvq::LvqStore::new(
+            self.dims,
+            metric,
+            metric == crate::lvq::Metric::Cos,
+        );
+        store.build(&vectors);
+        self.store = Store::Lvq(store);
+    }
+
     /// The vec-store meta blob written into the HNSW chunk header.
     pub fn store_meta_bytes(&self) -> Vec<u8> {
         match &self.store {
@@ -768,10 +786,26 @@ impl HnswIndex {
         layer: usize,
         self_id: Option<usize>,
     ) -> Vec<(f32, usize)> {
+        self.search_layer_filtered(q, ep, ef, layer, self_id, None)
+    }
+
+    /// `SearchLayer` with the reference's optional label filter: filtered-out
+    /// nodes are still traversed but never enter the result heap.
+    fn search_layer_filtered(
+        &self,
+        q: &HnswQuery,
+        ep: usize,
+        ef: usize,
+        layer: usize,
+        self_id: Option<usize>,
+        allow: Option<&dyn Fn(usize) -> bool>,
+    ) -> Vec<(f32, usize)> {
+        let allowed = |node: usize| allow.is_none_or(|f| f(node));
         let mut visited: HashSet<usize> = HashSet::new();
         visited.insert(ep);
-        let mut candidates: Vec<(f32, usize)> = vec![(self.distance_query(q, self_id, ep), ep)];
-        let mut result: Vec<(f32, usize)> = candidates.clone();
+        let ep_d = self.distance_query(q, self_id, ep);
+        let mut candidates: Vec<(f32, usize)> = vec![(ep_d, ep)];
+        let mut result: Vec<(f32, usize)> = if allowed(ep) { vec![(ep_d, ep)] } else { vec![] };
 
         while !candidates.is_empty() {
             let (cd, c) = candidates.remove(0);
@@ -791,11 +825,13 @@ impl HnswIndex {
                         candidates.sort_by(|a, b| {
                             a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
                         });
-                        result.push((d, nb));
-                        result.sort_by(|a, b| {
-                            a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
-                        });
-                        result.truncate(ef);
+                        if allowed(nb) {
+                            result.push((d, nb));
+                            result.sort_by(|a, b| {
+                                a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
+                            });
+                            result.truncate(ef);
+                        }
                     }
                 }
             }
@@ -837,6 +873,32 @@ impl HnswIndex {
         }
         let ef = ef.max(k);
         let mut res = self.search_layer(&query, cur, ef, 0, None);
+        res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        res.truncate(k);
+        res.into_iter().map(|(d, i)| (i, d)).collect()
+    }
+
+    /// `KnnSearchSorted(q, k, filter, option)`: the same traversal, but only
+    /// labels accepted by `allow` are returned.
+    pub fn search_filtered(
+        &self,
+        q: &[f32],
+        k: usize,
+        ef: usize,
+        allow: &dyn Fn(usize) -> bool,
+    ) -> Vec<(usize, f32)> {
+        let Some(entry) = self.entry else {
+            return vec![];
+        };
+        let query = self.store.make_query(q);
+        let mut cur = entry;
+        let mut l = self.max_level as i64;
+        while l > 0 {
+            cur = self.search_layer_nearest(&query, cur, l as usize, None);
+            l -= 1;
+        }
+        let ef = ef.max(k);
+        let mut res = self.search_layer_filtered(&query, cur, ef, 0, None, Some(allow));
         res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         res.truncate(k);
         res.into_iter().map(|(d, i)| (i, d)).collect()
@@ -987,6 +1049,14 @@ mod reference_suite {
     fn chunk_roundtrip_preserves_recall() {
         let data = data();
         let index = build(Metric::L2, HnswEncoding::Plain, &data);
+        let restored = chunk_roundtrip(&index, Metric::L2, HnswEncoding::Plain);
+        let recall = self_recall(&restored, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// Serializes `index` into the chunk's meta/records/graph parts and loads
+    /// them back, as `SaveToPtr` + `LoadFromPtr` do.
+    fn chunk_roundtrip(index: &HnswIndex, metric: Metric, encoding: HnswEncoding) -> HnswIndex {
         let meta = index.store_meta_bytes();
         let records = index.store_records_bytes();
         let levels: Vec<usize> = (0..index.len()).map(|i| index.level_of(i)).collect();
@@ -997,12 +1067,12 @@ mod reference_suite {
                 at[node] = index.neighbors(layer, node).to_vec();
             }
         }
-        let restored = HnswIndex::from_chunk_parts(
+        HnswIndex::from_chunk_parts(
             DIM,
             M,
             EF_SEARCH,
-            Metric::L2,
-            HnswEncoding::Plain,
+            metric,
+            encoding,
             &meta,
             &records,
             index.len(),
@@ -1011,8 +1081,168 @@ mod reference_suite {
             index.entry_point(),
             max_level,
         )
-        .expect("chunk parts");
+        .expect("chunk parts")
+    }
+
+    /// C++: `HnswAlgTest.test_lvq_3` (LVQ save/load, top-1 recall ≥ 0.95).
+    #[test]
+    fn lvq_chunk_roundtrip_preserves_recall() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Lvq, &data);
+        let restored = chunk_roundtrip(&index, Metric::L2, HnswEncoding::Lvq);
         let recall = self_recall(&restored, &data);
         assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// C++: `HnswAlgTest.test_rabitq_2` (RaBitQ save/load, top-1 recall ≥ 0.95).
+    #[test]
+    fn rabitq_chunk_roundtrip_preserves_recall() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Rabitq, &data);
+        let restored = chunk_roundtrip(&index, Metric::L2, HnswEncoding::Rabitq);
+        let recall = self_recall(&restored, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// C++: `HnswAlgTest.test_lvq_4` (`CompressToLVQ`, then save/load).
+    #[test]
+    fn plain_index_compresses_to_lvq() {
+        let data = data();
+        let mut index = build(Metric::L2, HnswEncoding::Plain, &data);
+        index.compress_to_lvq();
+        assert_eq!(index.encoding(), HnswEncoding::Lvq);
+        let recall = self_recall(&index, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+        let restored = chunk_roundtrip(&index, Metric::L2, HnswEncoding::Lvq);
+        let recall = self_recall(&restored, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// `TestParallel`: four readers query while a writer keeps inserting (the
+    /// reference's read path with a shared lock). Iteration count is the
+    /// reference's one pass over the data set per reader.
+    fn parallel_readers(metric: Metric, encoding: HnswEncoding) {
+        use std::sync::{Arc, RwLock};
+        let data = data();
+        let half = data.len() / 2;
+        let mut index = HnswIndex::with_encoding(DIM, M, EF_CONSTRUCTION, EF_SEARCH, metric, encoding);
+        index.train_store(&data, None);
+        for v in &data[..half] {
+            index.add(v);
+        }
+        let index = Arc::new(RwLock::new(index));
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        let writer = {
+            let index = Arc::clone(&index);
+            let data = data.clone();
+            std::thread::spawn(move || {
+                for v in &data[half..] {
+                    index.write().unwrap().add(v);
+                }
+            })
+        };
+        let mut readers = Vec::new();
+        for _ in 0..4 {
+            let index = Arc::clone(&index);
+            let stop = Arc::clone(&stop);
+            let data = data.clone();
+            readers.push(std::thread::spawn(move || {
+                loop {
+                    for (i, q) in data.iter().enumerate() {
+                        let result = index.read().unwrap().search_with_ef(q, 1, EF_SEARCH);
+                        // The reference leaves recall unasserted here; the
+                        // point is that the graph stays readable throughout.
+                        assert!(result.len() <= 1, "query {i} returned {}", result.len());
+                        if stop.load(std::sync::atomic::Ordering::Relaxed) {
+                            return;
+                        }
+                    }
+                    if stop.load(std::sync::atomic::Ordering::Relaxed) {
+                        return;
+                    }
+                }
+            }));
+        }
+        writer.join().unwrap();
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        for reader in readers {
+            reader.join().unwrap();
+        }
+        let index = index.read().unwrap();
+        assert_eq!(index.len(), data.len());
+        // The reference does not assert recall here (approximate stores may
+        // reorder the top-1 during concurrent inserts); any search must simply
+        // return a valid, bounded result.
+        assert!(index.search_with_ef(&data[0], 1, EF_SEARCH).len() <= 1);
+    }
+
+    /// C++: `HnswAlgTest.test_plain_3`.
+    #[test]
+    fn plain_parallel_insert_and_search() {
+        parallel_readers(Metric::L2, HnswEncoding::Plain);
+    }
+
+    /// C++: `HnswAlgTest.test_lvq_2`.
+    #[test]
+    fn lvq_parallel_insert_and_search() {
+        parallel_readers(Metric::L2, HnswEncoding::Lvq);
+    }
+
+    /// C++: `HnswAlgTest.test_rabitq_3`.
+    #[test]
+    fn rabitq_parallel_insert_and_search() {
+        parallel_readers(Metric::L2, HnswEncoding::Rabitq);
+    }
+
+    /// C++: `HnswAlgBitmaskTest.test1` (`test_hnsw_bitmask_ut.cpp`): the
+    /// filtered search drops `SetFalse` labels while still traversing them.
+    #[test]
+    fn filtered_search_honours_the_bitmask() {
+        use crate::plaid::Bitmask;
+
+        let base = [
+            [0.1f32, 0.2, 0.3, 0.4],
+            [0.2, 0.1, 0.3, 0.4],
+            [0.3, 0.2, 0.1, 0.4],
+            [0.4, 0.3, 0.2, 0.1],
+        ];
+        let query = [0.1f32, 0.2, 0.3, 0.4];
+        let mut index = HnswIndex::with_encoding(4, 16, 200, 8, Metric::L2, HnswEncoding::Lvq);
+        for v in &base {
+            index.add(v);
+        }
+        let ef = 8;
+        let unfiltered = index.search_filtered(&query, 4, ef, &|_| true);
+        let pairs: Vec<(usize, f32)> = unfiltered.iter().map(|(id, d)| (*id, *d)).collect();
+        assert_eq!(pairs[0].0, 0);
+        assert!((pairs[0].1 - 0.0).abs() < 1e-4);
+        assert_eq!(pairs[1].0, 1);
+        assert!((pairs[1].1 - 0.02).abs() < 1e-4);
+        assert_eq!(pairs[2].0, 2);
+        assert!((pairs[2].1 - 0.08).abs() < 1e-4);
+        assert_eq!(pairs[3].0, 3);
+        assert!((pairs[3].1 - 0.2).abs() < 1e-4);
+
+        let mut mask = Bitmask::new_all_true(base.len());
+        mask.set_false(1);
+        let allowed = |id: usize| mask.is_true(id as u32);
+        let got = index.search_filtered(&query, 3, ef, &allowed);
+        assert_eq!(
+            got.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+            vec![0, 2, 3]
+        );
+
+        mask.set_false(0);
+        let got = index.search_filtered(&query, 2, ef, &|id| mask.is_true(id as u32));
+        assert_eq!(
+            got.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+            vec![2, 3]
+        );
+
+        mask.set_false(2);
+        let got = index.search_filtered(&query, 1, ef, &|id| mask.is_true(id as u32));
+        assert_eq!(got[0].0, 3);
+        assert!((got[0].1 - 0.2).abs() < 1e-4);
     }
 }
