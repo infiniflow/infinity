@@ -380,6 +380,46 @@ impl MixedT {
         Ok(())
     }
 
+    /// C++ `InsertIntegerIntoTuple`.
+    pub fn insert_integer_into_tuple(&mut self, key: &str, value: i64) -> crate::Result<()> {
+        self.insert_into_tuple(key, Self::make_integer(value))
+    }
+
+    /// C++ `InsertFloatIntoTuple`.
+    pub fn insert_float_into_tuple(&mut self, key: &str, value: f64) -> crate::Result<()> {
+        self.insert_into_tuple(key, Self::make_float(value))
+    }
+
+    /// C++ `InsertStringIntoTuple`.
+    pub fn insert_string_into_tuple(&mut self, key: &str, value: &str) -> crate::Result<()> {
+        self.insert_into_tuple(key, Self::make_string(value))
+    }
+
+    /// C++ `InsertNullIntoTuple`.
+    pub fn insert_null_into_tuple(&mut self, key: &str) -> crate::Result<()> {
+        self.insert_into_tuple(key, Self::make_null())
+    }
+
+    /// C++ `InsertIntegerIntoArray`.
+    pub fn insert_integer_into_array(&mut self, value: i64, index: usize) -> crate::Result<()> {
+        self.insert_into_array(index, Self::make_integer(value))
+    }
+
+    /// C++ `InsertFloatIntoArray`.
+    pub fn insert_float_into_array(&mut self, value: f64, index: usize) -> crate::Result<()> {
+        self.insert_into_array(index, Self::make_float(value))
+    }
+
+    /// C++ `InsertStringIntoArray`.
+    pub fn insert_string_into_array(&mut self, value: &str, index: usize) -> crate::Result<()> {
+        self.insert_into_array(index, Self::make_string(value))
+    }
+
+    /// C++ `InsertNullIntoArray`.
+    pub fn insert_null_into_array(&mut self, index: usize) -> crate::Result<()> {
+        self.insert_into_array(index, Self::make_null())
+    }
+
     /// C++ `GetByIndex`.
     pub fn get_by_index(&self, index: usize) -> Option<&MixedT> {
         match &self.value {

@@ -152,6 +152,7 @@ mod explain_search;
 
 pub mod analyzer;
 pub mod fulltext_query;
+pub mod global_resource_usage;
 mod hnsw_mem;
 mod knn_scan;
 mod profiler;

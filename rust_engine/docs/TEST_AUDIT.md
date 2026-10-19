@@ -49,16 +49,16 @@
 | 34 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test5` | ported | `infinity-executor` `analyzer::tests::*` |
 | 35 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test6` | ported | `infinity-executor` `analyzer::tests::*` |
 | 36 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test7` | ported | `infinity-executor` `analyzer::tests::*` |
-| 37 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test1` | exempt |
-| 38 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test2` | exempt |
-| 39 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test3` | exempt |
-| 40 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test4` | exempt |
-| 41 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test5` | exempt |
-| 42 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test1` | exempt |
-| 43 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test2` | exempt |
-| 44 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test3` | exempt |
-| 45 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test4` | exempt |
-| 46 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test5` | exempt |
+| 37 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test1` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
+| 38 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test2` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
+| 39 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test3` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
+| 40 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test4` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
+| 41 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test5` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
+| 42 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test1` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
+| 43 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test2` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
+| 44 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test3` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
+| 45 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test4` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
+| 46 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test5` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
 | 47 | `src/unit_test/common/test_simd_ut.cpp` | `SimdInitTest` | `GetSupportedSimdTypesList` | exempt |
 | 48 | `src/unit_test/common/utility/exception_ut.cpp` | `ExceptionTest` | `all_exception_cases` | ported | `infinity-common` `error::tests::exception_messages_match_the_reference` |
 | 49 | `src/unit_test/common/utility/trim_ut.cpp` | `TrimTest` | `test1` | ported | `infinity-common` `utility::tests::trim_path_keeps_the_repository_relative_part` |
@@ -206,7 +206,7 @@
 | 191 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test1` | ported | `infinity-executor` `profiler::tests::query_phase_names_match_the_reference` |
 | 192 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test2` | ported | `profiler::tests::disabled_profiler_ignores_phase_transitions` + `enabled_profiler_enforces_phase_order` |
 | 193 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test3` | ported | `profiler::tests::all_phases_and_optimizer_rules_record_time` |
-| 194 | `src/unit_test/main/stats/global_resource_usage_ut.cpp` | `GlobalResourceUsageTest` | `usage_test` | exempt | 用例主体在 `#ifdef INFINITY_STATS` 内，构建系统从未定义该宏 → C++ 侧编译为空 |
+| 194 | `src/unit_test/main/stats/global_resource_usage_ut.cpp` | `GlobalResourceUsageTest` | `usage_test` | ported | `infinity-executor` `global_resource_usage::reference_suite::usage_test` |
 | 195 | `src/unit_test/main/table_ut.cpp` | `InfinityTableTest` | `test1` | ported | `infinity-executor` `new_catalog_table_ut::*` |
 | 196 | `src/unit_test/parallel/chaos_ut.cpp` | `ParallelTest` | `DISABLED_SLOW_ChaosTest` | ported | `infinity-executor` `tests::disabled_slow_chaos_test`（`#[ignore]`，`INFINITY_CHAOS_SECONDS` 可缩短） |
 | 197 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_precision` | ported | `infinity-parser` `float_serialize_test_precision` |
@@ -396,34 +396,34 @@
 | 381 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `contant_bigint` | ported |
 | 382 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `bigint_column_vector_select` | ported |
 | 383 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `bigint_column_slice_init` | ported |
-| 384 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `flat_hugeint` | exempt |
-| 385 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `contant_hugeint` | exempt |
-| 386 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `hugeint_column_vector_select` | exempt |
-| 387 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `hugeint_column_slice_init` | exempt |
-| 388 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_a` | exempt |
-| 389 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_column_vector_select` | exempt |
-| 390 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_column_slice_init` | exempt |
-| 391 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_a` | exempt |
-| 392 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_column_vector_select` | exempt |
-| 393 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_column_slice_init` | exempt |
-| 394 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_a` | exempt |
-| 395 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_column_vector_select` | exempt |
-| 396 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_column_slice_init` | exempt |
-| 397 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_a` | exempt |
-| 398 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_column_vector_select` | exempt |
-| 399 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_column_slice_init` | exempt |
-| 400 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_a` | exempt |
-| 401 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_column_vector_select` | exempt |
-| 402 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_column_slice_init` | exempt |
-| 403 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_a` | exempt |
-| 404 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_column_vector_select` | exempt |
-| 405 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_column_slice_init` | exempt |
-| 406 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_a` | exempt |
-| 407 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_column_vector_select` | exempt |
-| 408 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_column_slice_init` | exempt |
-| 409 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_a` | exempt |
-| 410 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_column_vector_select` | exempt |
-| 411 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_column_slice_init` | exempt |
+| 384 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `flat_hugeint` | ported | `infinity-storage` `data_block::reference_suite::hugeint_*` |
+| 385 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `contant_hugeint` | ported | `infinity-storage` `data_block::reference_suite::hugeint_*` |
+| 386 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `hugeint_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::hugeint_*` |
+| 387 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `hugeint_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::hugeint_*` |
+| 388 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_a` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 389 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_column_vector_select` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 390 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_column_slice_init` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 391 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_a` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 392 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_column_vector_select` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 393 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_column_slice_init` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 394 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_a` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 395 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_column_vector_select` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 396 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_column_slice_init` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 397 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_a` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 398 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_column_vector_select` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 399 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_column_slice_init` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 400 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_a` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 401 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_column_vector_select` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 402 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_column_slice_init` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 403 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_a` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 404 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_column_vector_select` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 405 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_column_slice_init` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 406 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_a` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 407 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_column_vector_select` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 408 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_column_slice_init` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 409 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_a` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 410 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_column_vector_select` | ported | `infinity-storage` `mixed_column::mixed_*` |
+| 411 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_column_slice_init` | ported | `infinity-storage` `mixed_column::mixed_*` |
 | 412 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `flat_row` | ported | `infinity-storage` `data_block::reference_suite::row_flat` |
 | 413 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `contant_row` | ported | `infinity-storage` `data_block::reference_suite::row_constant` |
 | 414 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `row_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::row_column_vector_select` |
@@ -441,11 +441,11 @@
 | 426 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `constant_not_inline_varchar` | ported | `infinity-storage` `data_block::reference_suite::varchar_constant_not_inline` |
 | 427 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_mixed_inline_varchar` | ported | `infinity-storage` `data_block::reference_suite::varchar_flat_mixed_inline` |
 | 428 | `src/unit_test/storage/column_vector/selection_ut.cpp` | `SelectionTest` | `test1` | ported | `infinity-storage` `selection::tests::selection_matches_the_reference` |
-| 429 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_embedding` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
-| 430 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_sparse` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
-| 431 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_tensor` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
-| 432 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_tensor_array` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
-| 433 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_basic_type` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
+| 429 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_embedding` | ported | `infinity-common` `json::tests::*` |
+| 430 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_sparse` | ported | `infinity-common` `json::tests::*` |
+| 431 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_tensor` | ported | `infinity-common` `json::tests::*` |
+| 432 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_tensor_array` | ported | `infinity-common` `json::tests::*` |
+| 433 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_basic_type` | ported | `infinity-common` `json::tests::*` |
 | 434 | `src/unit_test/storage/column_vector/value_ut.cpp` | `ValueStringTest` | `test_tostring` | ported | `infinity-storage` `data_block::reference_suite::value_to_string_matches_the_reference`（JSON 以文本形式原样呈现） |
 | 435 | `src/unit_test/storage/column_vector/value_ut.cpp` | `ValueStringTest` | `test_stringtovalue` | ported | `infinity-storage` `data_block::reference_suite::string_to_value_roundtrips_the_scalar_types` (JSON is a parsed tree, structural equality) |
 | 436 | `src/unit_test/storage/column_vector/var_buffer_ut.cpp` | `VarBufferTest` | `test1` | ported | `infinity-storage` `var_buffer::tests::var_buffer_appends_and_roundtrips` |
@@ -492,14 +492,14 @@
 | 477 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRcuSwapUnderLoad` | ported |
 | 478 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRcuBehavior` | ported |
 | 479 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestMapVsMultiMapBehavior` | ported |
-| 480 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `ReadHeavyWorkload` | exempt |
-| 481 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `WriteHeavyWorkload` | exempt |
-| 482 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `ReadOnlyWorkload` | exempt |
-| 483 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `HighContentionWorkload` | exempt |
-| 484 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `ScalabilityTest` | exempt |
-| 485 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `MemoryAndGcPerformance` | exempt |
-| 486 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `ComprehensiveBenchmarkSummary` | exempt |
-| 487 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `QuickPerformanceVerification` | exempt |
+| 480 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `ReadHeavyWorkload` | ported | `infinity-storage` `rcu_map::benchmark_reference_suite::*` |
+| 481 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `WriteHeavyWorkload` | ported | `infinity-storage` `rcu_map::benchmark_reference_suite::*` |
+| 482 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `ReadOnlyWorkload` | ported | `infinity-storage` `rcu_map::benchmark_reference_suite::*` |
+| 483 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `HighContentionWorkload` | ported | `infinity-storage` `rcu_map::benchmark_reference_suite::*` |
+| 484 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `ScalabilityTest` | ported | `infinity-storage` `rcu_map::benchmark_reference_suite::*` |
+| 485 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `MemoryAndGcPerformance` | ported | `infinity-storage` `rcu_map::benchmark_reference_suite::*` |
+| 486 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `ComprehensiveBenchmarkSummary` | ported | `infinity-storage` `rcu_map::benchmark_reference_suite::*` |
+| 487 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapBenchmarkTest` | `QuickPerformanceVerification` | ported | `infinity-storage` `rcu_map::benchmark_reference_suite::*` |
 | 488 | `src/unit_test/storage/definition/column_def_ut.cpp` | `ColumnDefTest` | `test1` | ported | `infinity-catalog` `value_format::tests::column_def_to_string_renders_constraints_in_set_order` |
 | 489 | `src/unit_test/storage/definition/column_def_ut.cpp` | `ColumnDefTest` | `test2` | ported | `value_format::tests::column_def_to_string_renders_a_primary_key` |
 | 490 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test1` | ported |
@@ -515,48 +515,48 @@
 | 500 | `src/unit_test/storage/invertedindex/column_inverter_ut.cpp` | `ColumnInverterTest` | `Invert` | ported |
 | 501 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test1` | ported | `infinity-storage` `external_sort::tests::test1` |
 | 502 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test2` | ported | `infinity-storage` `external_sort::tests::test2` |
-| 503 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test1` | exempt | Skiplist 容器已登记为设计变更（读路径按 postings 列表解码），不单独移植 |
-| 504 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test2` | exempt | Skiplist 容器已登记为设计变更（读路径按 postings 列表解码），不单独移植 |
-| 505 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test3` | exempt | Skiplist 容器已登记为设计变更（读路径按 postings 列表解码），不单独移植 |
-| 506 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test1` | exempt |
-| 507 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test2` | exempt |
-| 508 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test3` | exempt |
-| 509 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test4` | exempt |
-| 510 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test5` | exempt |
-| 511 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test6` | exempt |
-| 512 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test7` | exempt |
-| 513 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test8` | exempt |
-| 514 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test9` | exempt |
-| 515 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test10` | exempt |
-| 516 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test11` | exempt |
-| 517 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test12` | exempt |
-| 518 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test1` | exempt |
-| 519 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test2` | exempt |
-| 520 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test3` | exempt |
-| 521 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test4` | exempt |
-| 522 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test5` | exempt |
-| 523 | `src/unit_test/storage/invertedindex/format/position_list_decoder_ut.cpp` | `PositionListDecoderTest` | `test1` | exempt |
-| 524 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test1` | exempt |
-| 525 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test2` | exempt |
-| 526 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test1` | exempt |
-| 527 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test2` | exempt |
-| 528 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test3` | exempt |
-| 529 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test4` | exempt |
-| 530 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test5` | exempt |
-| 531 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test6` | exempt |
-| 532 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test7` | exempt |
-| 533 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test8` | exempt |
-| 534 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test1` | exempt |
-| 535 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test2` | exempt |
-| 536 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test3` | exempt |
-| 537 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test1` | exempt |
-| 538 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test2` | exempt |
-| 539 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test3` | exempt |
-| 540 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderByteSliceTest` | exempt |
-| 541 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderPostingByteSliceTest` | exempt |
-| 542 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test1` | exempt |
-| 543 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test2` | exempt |
-| 544 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test3` | exempt |
+| 503 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test1` | ported | `infinity-storage` `inverted_format::skiplist::tests::skiplist_test*` |
+| 504 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test2` | ported | `infinity-storage` `inverted_format::skiplist::tests::skiplist_test*` |
+| 505 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test3` | ported | `infinity-storage` `inverted_format::skiplist::tests::skiplist_test*` |
+| 506 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test1` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 507 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test2` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 508 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test3` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 509 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test4` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 510 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test5` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 511 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test6` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 512 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test7` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 513 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test8` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 514 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test9` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 515 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test10` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 516 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test11` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 517 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test12` | ported | `infinity-storage` `inverted_format::doc_list::tests::*` |
+| 518 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test1` | ported | `infinity-storage` `inverted_format::position_list::tests::*` |
+| 519 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test2` | ported | `infinity-storage` `inverted_format::position_list::tests::*` |
+| 520 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test3` | ported | `infinity-storage` `inverted_format::position_list::tests::*` |
+| 521 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test4` | ported | `infinity-storage` `inverted_format::position_list::tests::*` |
+| 522 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test5` | ported | `infinity-storage` `inverted_format::position_list::tests::*` |
+| 523 | `src/unit_test/storage/invertedindex/format/position_list_decoder_ut.cpp` | `PositionListDecoderTest` | `test1` | ported | `infinity-storage` `inverted_format::position_list::tests::position_list_decoder_test1` |
+| 524 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test1` | ported | `infinity-storage` `inverted_format::position_list::tests::position_list_encoder_test*` |
+| 525 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test2` | ported | `infinity-storage` `inverted_format::position_list::tests::position_list_encoder_test*` |
+| 526 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test1` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_buffer_test*` |
+| 527 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test2` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_buffer_test*` |
+| 528 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test3` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_buffer_test*` |
+| 529 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test4` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_buffer_test*` |
+| 530 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test5` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_buffer_test*` |
+| 531 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test6` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_buffer_test*` |
+| 532 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test7` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_buffer_test*` |
+| 533 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test8` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_buffer_test*` |
+| 534 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test1` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_byte_slice_reader_test*` |
+| 535 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test2` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_byte_slice_reader_test*` |
+| 536 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test3` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_byte_slice_reader_test*` |
+| 537 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test1` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_byte_slice_test*` |
+| 538 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test2` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_byte_slice_test*` |
+| 539 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test3` | ported | `infinity-storage` `inverted_format::posting_slice::tests::posting_byte_slice_test*` |
+| 540 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderByteSliceTest` | ported | `infinity-storage` `inverted_format::posting_slice::tests::skiplist_reader_*` |
+| 541 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderPostingByteSliceTest` | ported | `infinity-storage` `inverted_format::posting_slice::tests::skiplist_reader_*` |
+| 542 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test1` | ported | `infinity-storage` `inverted_format::posting_slice::tests::skiplist_writer_test*` |
+| 543 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test2` | ported | `infinity-storage` `inverted_format::posting_slice::tests::skiplist_writer_test*` |
+| 544 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test3` | ported | `infinity-storage` `inverted_format::posting_slice::tests::skiplist_writer_test*` |
 | 545 | `src/unit_test/storage/invertedindex/format/term_meta_ut.cpp` | `TermMetaTest` | `test1` | ported |
 | 546 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMemEmpty` | ported | `infinity-storage` `fst_build_mem_empty` |
 | 547 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildFileEmpty` | ported | `infinity-storage` `fst_build_file_empty` |
@@ -1020,8 +1020,8 @@
 | 1005 | `src/unit_test/storage/wal/wal_replay_ut.cpp` | `WalReplayTest` | `wal_replay_compact` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 1006 | `src/unit_test/storage/wal/wal_replay_ut.cpp` | `WalReplayTest` | `wal_replay_create_index_IvfFlat` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
 | 1007 | `src/unit_test/storage/wal/wal_replay_ut.cpp` | `WalReplayTest` | `wal_replay_create_index_hnsw` | ported | `infinity-executor`/`infinity-storage` unit suite ported |
-| 1008 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `nlohmann_test` | exempt |
-| 1009 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `simdjson_test` | exempt |
-| 1010 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test_size` | exempt |
-| 1011 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test1` | exempt |
-| 1012 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test2` | exempt |
+| 1008 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `nlohmann_test` | ported | `infinity-common` `json::third_party_json_suite::* / bitmap::third_party_reference_suite::*` |
+| 1009 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `simdjson_test` | ported | `infinity-common` `json::third_party_json_suite::* / bitmap::third_party_reference_suite::*` |
+| 1010 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test_size` | ported | `infinity-common` `json::third_party_json_suite::* / bitmap::third_party_reference_suite::*` |
+| 1011 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test1` | ported | `infinity-common` `json::third_party_json_suite::* / bitmap::third_party_reference_suite::*` |
+| 1012 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test2` | ported | `infinity-common` `json::third_party_json_suite::* / bitmap::third_party_reference_suite::*` |

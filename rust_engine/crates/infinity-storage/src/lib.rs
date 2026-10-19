@@ -146,3 +146,6 @@ pub use wal_entry::{
     WalEntry, WalEntryIterator, WalIndexBase, WalListIterator, WalRowId, WalSegmentIndexInfo,
     WalSegmentInfo, WalTableDef, WAL_ENTRY_HEADER_LEN,
 };
+
+#[cfg(test)]
+mod mixed_column;

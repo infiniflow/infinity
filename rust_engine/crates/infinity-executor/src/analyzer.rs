@@ -2933,6 +2933,374 @@ impl IKAnalyzer {
     }
 }
 
+// ---------------------------------------------------------------------------
+// User-defined analyzer and term weight
+// ---------------------------------------------------------------------------
+
+/// C++: `Status::FailToRunPython`. Every failure mode of the Python-backed
+/// `UserDefinedAnalyzer` / `UserDefinedTermWeight` loaders reports this code.
+pub const FAIL_TO_RUN_PYTHON: &str = "kFailToRunPython";
+
+/// The three failure modes the reference loaders distinguish:
+/// a missing script, a script without the requested callable, and a callable
+/// returning the wrong type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserDefinedError {
+    MissingModule,
+    MissingFunction,
+    InvalidReturn,
+}
+
+impl UserDefinedError {
+    /// C++: `Status::code()`.
+    pub fn code(self) -> &'static str {
+        FAIL_TO_RUN_PYTHON
+    }
+
+    fn message(self, path: &str, function: &str) -> String {
+        match self {
+            UserDefinedError::MissingModule => format!("{path} doesn't exist!"),
+            UserDefinedError::MissingFunction => format!("Can't to load function: {function}"),
+            UserDefinedError::InvalidReturn => format!("Failed to use {path} to parse"),
+        }
+    }
+}
+
+impl std::fmt::Display for UserDefinedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.code())
+    }
+}
+
+impl std::error::Error for UserDefinedError {}
+
+/// A registered `analyze(text)` implementation.
+pub type UserDefinedAnalyzeFn =
+    Arc<dyn Fn(&str) -> Result<Vec<String>, UserDefinedError> + Send + Sync>;
+
+/// A registered `term_weight(tokens)` implementation.
+pub type UserDefinedTermWeightFn =
+    Arc<dyn Fn(&[String]) -> Result<HashMap<String, f64>, UserDefinedError> + Send + Sync>;
+
+#[derive(Default)]
+struct UserDefinedScript {
+    analyze: Option<UserDefinedAnalyzeFn>,
+    term_weight: Option<UserDefinedTermWeightFn>,
+}
+
+/// Registration table for user-defined analyzers and term-weight functions.
+///
+/// C++: the reference imports a Python module from a `.py` path and calls its
+/// `analyze` / `term_weight` attribute. The Rust engine has no embedded Python
+/// interpreter, so the same contract is expressed by registering the module's
+/// callables under the module name (the file stem). A module that was never
+/// registered maps to the missing-file branch; a registered module without the
+/// requested callable maps to the missing-function branch.
+#[derive(Default)]
+pub struct UserDefinedScripts {
+    modules: Mutex<HashMap<String, UserDefinedScript>>,
+}
+
+impl UserDefinedScripts {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Declares a module without any callable (the reference's script that
+    /// defines, for example, `analyze1` instead of `analyze`).
+    pub fn register_module(&self, module: impl Into<String>) {
+        self.modules
+            .lock()
+            .unwrap()
+            .entry(module.into())
+            .or_default();
+    }
+
+    /// Registers the module's `analyze` callable.
+    pub fn register_analyzer(
+        &self,
+        module: impl Into<String>,
+        function: impl Fn(&str) -> Result<Vec<String>, UserDefinedError> + Send + Sync + 'static,
+    ) {
+        self.modules
+            .lock()
+            .unwrap()
+            .entry(module.into())
+            .or_default()
+            .analyze = Some(Arc::new(function));
+    }
+
+    /// Registers the module's `term_weight` callable.
+    pub fn register_term_weight(
+        &self,
+        module: impl Into<String>,
+        function: impl Fn(&[String]) -> Result<HashMap<String, f64>, UserDefinedError>
+            + Send
+            + Sync
+            + 'static,
+    ) {
+        self.modules
+            .lock()
+            .unwrap()
+            .entry(module.into())
+            .or_default()
+            .term_weight = Some(Arc::new(function));
+    }
+
+    /// C++: `std::filesystem::path::stem()`.
+    fn module_name(path: &str) -> String {
+        Path::new(path)
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string())
+    }
+
+    fn analyze_fn(&self, module: &str) -> Result<UserDefinedAnalyzeFn, UserDefinedError> {
+        let modules = self.modules.lock().unwrap();
+        let script = modules.get(module).ok_or(UserDefinedError::MissingModule)?;
+        script
+            .analyze
+            .clone()
+            .ok_or(UserDefinedError::MissingFunction)
+    }
+
+    fn term_weight_fn(&self, module: &str) -> Result<UserDefinedTermWeightFn, UserDefinedError> {
+        let modules = self.modules.lock().unwrap();
+        let script = modules.get(module).ok_or(UserDefinedError::MissingModule)?;
+        script
+            .term_weight
+            .clone()
+            .ok_or(UserDefinedError::MissingFunction)
+    }
+}
+
+/// C++: `UserDefinedAnalyzer` (`src/common/analyzer/user_defined_analyzer.cppm`).
+pub struct UserDefinedAnalyzer<'a> {
+    scripts: &'a UserDefinedScripts,
+    analyzer_path: String,
+}
+
+impl<'a> UserDefinedAnalyzer<'a> {
+    pub fn new(scripts: &'a UserDefinedScripts, analyzer_path: impl Into<String>) -> Self {
+        Self {
+            scripts,
+            analyzer_path: analyzer_path.into(),
+        }
+    }
+
+    /// C++: `UserDefinedAnalyzer::Analyze` — calls `analyze(text)` and
+    /// requires a list of strings as the result.
+    pub fn analyze(&self, text: &str) -> Result<Vec<String>, UserDefinedError> {
+        let module = UserDefinedScripts::module_name(&self.analyzer_path);
+        let function = self.scripts.analyze_fn(&module)?;
+        function(text)
+    }
+
+    /// The error message the reference would attach, for diagnostics.
+    pub fn error_message(&self, error: UserDefinedError) -> String {
+        error.message(&self.analyzer_path, "analyze")
+    }
+}
+
+/// C++: `UserDefinedTermWeight` (`src/common/analyzer/user_defined_term_weight.cppm`).
+pub struct UserDefinedTermWeight<'a> {
+    scripts: &'a UserDefinedScripts,
+    tw_path: String,
+}
+
+impl<'a> UserDefinedTermWeight<'a> {
+    pub fn new(scripts: &'a UserDefinedScripts, tw_path: impl Into<String>) -> Self {
+        Self {
+            scripts,
+            tw_path: tw_path.into(),
+        }
+    }
+
+    /// C++: `UserDefinedTermWeight::Run` — calls `term_weight(tokens)` and
+    /// requires a `{term: weight}` mapping as the result.
+    pub fn run(&self, tokens: &[String]) -> Result<HashMap<String, f64>, UserDefinedError> {
+        let module = UserDefinedScripts::module_name(&self.tw_path);
+        let function = self.scripts.term_weight_fn(&module)?;
+        function(tokens)
+    }
+
+    /// The error message the reference would attach, for diagnostics.
+    pub fn error_message(&self, error: UserDefinedError) -> String {
+        error.message(&self.tw_path, "term_weight")
+    }
+}
+
+#[cfg(test)]
+mod user_defined_reference_suite {
+    //! Ports of `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp`
+    //! (`UserDefinedAnalyzerTest`) and `user_defined_term_weight_nimpl.cpp`
+    //! (`UserDefinedTermWeightTest`).
+    //!
+    //! The C++ scripts map to registrations as follows:
+    //! * `uda1.py` — `analyze` returns `str.split()`;
+    //! * `uda2.py` — does not exist;
+    //! * `uda3.py` — defines `analyze1`, not `analyze`;
+    //! * `uda4.py` — `analyze` returns an integer;
+    //! * `uda5.py` — `term_weight` returns `{a:1, b:2, c:3}`;
+    //! * `uda6.py` — `term_weight` returns an integer.
+
+    use super::*;
+
+    const UDA1: &str = "test/data/scripts/uda1.py";
+    const UDA2: &str = "test/data/scripts/uda2.py";
+    const UDA3: &str = "test/data/scripts/uda3.py";
+    const UDA4: &str = "test/data/scripts/uda4.py";
+    const UDA5: &str = "test/data/scripts/uda5.py";
+    const UDA6: &str = "test/data/scripts/uda6.py";
+
+    fn scripts() -> UserDefinedScripts {
+        let scripts = UserDefinedScripts::new();
+        scripts.register_analyzer("uda1", |text| {
+            Ok(text.split_whitespace().map(str::to_string).collect())
+        });
+        // uda3 exports `analyze1` only, so it has no `analyze` callable.
+        scripts.register_module("uda3");
+        scripts.register_analyzer("uda4", |_| Err(UserDefinedError::InvalidReturn));
+        scripts.register_term_weight("uda5", |_| {
+            Ok(HashMap::from([
+                ("a".to_string(), 1.0),
+                ("b".to_string(), 2.0),
+                ("c".to_string(), 3.0),
+            ]))
+        });
+        scripts.register_term_weight("uda6", |_| Err(UserDefinedError::InvalidReturn));
+        scripts
+    }
+
+    fn assert_split_terms(analyzer: &UserDefinedAnalyzer<'_>) {
+        let term_vector = analyzer.analyze("text1 text2 text3").unwrap();
+        assert_eq!(term_vector.len(), 3);
+        assert_eq!(term_vector[0], "text1");
+        assert_eq!(term_vector[1], "text2");
+        assert_eq!(term_vector[2], "text3");
+    }
+
+    fn assert_term_weights(term_weight: &UserDefinedTermWeight<'_>) {
+        let tokens = vec![
+            "text1".to_string(),
+            "text2".to_string(),
+            "text3".to_string(),
+        ];
+        let term_map = term_weight.run(&tokens).unwrap();
+        assert_eq!(term_map.len(), 3);
+        assert_eq!(term_map["a"], 1.0);
+        assert_eq!(term_map["b"], 2.0);
+        assert_eq!(term_map["c"], 3.0);
+    }
+
+    /// C++: `UserDefinedAnalyzerTest.test1`.
+    #[test]
+    fn user_defined_analyzer_test1() {
+        let scripts = scripts();
+        let analyzer = UserDefinedAnalyzer::new(&scripts, UDA1);
+        assert_split_terms(&analyzer);
+    }
+
+    /// C++: `UserDefinedAnalyzerTest.test2` — one worker thread.
+    #[test]
+    fn user_defined_analyzer_test2() {
+        let scripts = scripts();
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let analyzer = UserDefinedAnalyzer::new(&scripts, UDA1);
+                assert_split_terms(&analyzer);
+            });
+        });
+    }
+
+    /// C++: `UserDefinedAnalyzerTest.test3` — `uda2.py` does not exist.
+    #[test]
+    fn user_defined_analyzer_test3() {
+        let scripts = scripts();
+        let analyzer = UserDefinedAnalyzer::new(&scripts, UDA2);
+        let error = analyzer.analyze("").unwrap_err();
+        assert_eq!(error.code(), FAIL_TO_RUN_PYTHON);
+        assert_eq!(error, UserDefinedError::MissingModule);
+    }
+
+    /// C++: `UserDefinedAnalyzerTest.test4` — `uda3.py` has no `analyze`.
+    #[test]
+    fn user_defined_analyzer_test4() {
+        let scripts = scripts();
+        let analyzer = UserDefinedAnalyzer::new(&scripts, UDA3);
+        let error = analyzer.analyze("").unwrap_err();
+        assert_eq!(error.code(), FAIL_TO_RUN_PYTHON);
+        assert_eq!(error, UserDefinedError::MissingFunction);
+    }
+
+    /// C++: `UserDefinedAnalyzerTest.test5` — `uda4.py` returns an integer.
+    #[test]
+    fn user_defined_analyzer_test5() {
+        let scripts = scripts();
+        let analyzer = UserDefinedAnalyzer::new(&scripts, UDA4);
+        let error = analyzer.analyze("text1 text2 text3").unwrap_err();
+        assert_eq!(error.code(), FAIL_TO_RUN_PYTHON);
+        assert_eq!(error, UserDefinedError::InvalidReturn);
+    }
+
+    /// C++: `UserDefinedTermWeightTest.test1`.
+    #[test]
+    fn user_defined_term_weight_test1() {
+        let scripts = scripts();
+        let term_weight = UserDefinedTermWeight::new(&scripts, UDA5);
+        assert_term_weights(&term_weight);
+    }
+
+    /// C++: `UserDefinedTermWeightTest.test2` — four worker threads.
+    #[test]
+    fn user_defined_term_weight_test2() {
+        let scripts = scripts();
+        std::thread::scope(|scope| {
+            for _ in 0..4 {
+                scope.spawn(|| {
+                    let term_weight = UserDefinedTermWeight::new(&scripts, UDA5);
+                    assert_term_weights(&term_weight);
+                });
+            }
+        });
+    }
+
+    /// C++: `UserDefinedTermWeightTest.test3` — `uda2.py` does not exist.
+    #[test]
+    fn user_defined_term_weight_test3() {
+        let scripts = scripts();
+        let term_weight = UserDefinedTermWeight::new(&scripts, UDA2);
+        let error = term_weight.run(&[]).unwrap_err();
+        assert_eq!(error.code(), FAIL_TO_RUN_PYTHON);
+        assert_eq!(error, UserDefinedError::MissingModule);
+    }
+
+    /// C++: `UserDefinedTermWeightTest.test4` — `uda3.py` has no `term_weight`.
+    #[test]
+    fn user_defined_term_weight_test4() {
+        let scripts = scripts();
+        let term_weight = UserDefinedTermWeight::new(&scripts, UDA3);
+        let error = term_weight.run(&[]).unwrap_err();
+        assert_eq!(error.code(), FAIL_TO_RUN_PYTHON);
+        assert_eq!(error, UserDefinedError::MissingFunction);
+    }
+
+    /// C++: `UserDefinedTermWeightTest.test5` — `uda6.py` returns an integer.
+    #[test]
+    fn user_defined_term_weight_test5() {
+        let scripts = scripts();
+        let term_weight = UserDefinedTermWeight::new(&scripts, UDA6);
+        let tokens = vec![
+            "text1".to_string(),
+            "text2".to_string(),
+            "text3".to_string(),
+        ];
+        let error = term_weight.run(&tokens).unwrap_err();
+        assert_eq!(error.code(), FAIL_TO_RUN_PYTHON);
+        assert_eq!(error, UserDefinedError::InvalidReturn);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

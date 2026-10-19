@@ -1894,12 +1894,48 @@ mod reference_suite {
         slice_suite(|i| i);
     }
 
-    // C++: ColumnVectorIntegerTest, hugeint.
+    // C++: `ColumnVectorIntegerTest.flat_hugeint`. The reference stores
+    // `HugeIntT(0, i)`; the Rust block model represents HugeInt as `i128`, so
+    // the numeric value is identical.
     #[test]
-    fn hugeint_flat_constant_select_slice() {
+    fn flat_hugeint() {
         flat_suite(|i| i as i128);
+
+        // Tail of the reference `flat_hugeint`: for every source row, write it
+        // into a constant vector via `SetValueByIndex(0)`, `Finalize(1)`, read
+        // it back, then `Reset`.
+        let mut source = ColumnVector::<i128>::new();
+        source.initialize_flat();
+        for i in 0..DEFAULT_VECTOR_SIZE as i64 {
+            source.append_value(Some(i as i128)).unwrap();
+        }
+        for i in 0..DEFAULT_VECTOR_SIZE as i64 {
+            let mut constant = ColumnVector::<i128>::new();
+            constant.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
+            constant
+                .set_value(0, source.get(i as usize).cloned())
+                .unwrap();
+            constant.finalize(1);
+            assert_eq!(constant.get(0), Some(&(i as i128)));
+            constant.reset();
+        }
+    }
+
+    // C++: `ColumnVectorIntegerTest.contant_hugeint` (reference spelling).
+    #[test]
+    fn contant_hugeint() {
         constant_suite(|i| i as i128);
+    }
+
+    // C++: `ColumnVectorIntegerTest.hugeint_column_vector_select`.
+    #[test]
+    fn hugeint_column_vector_select() {
         select_suite(|i| i as i128);
+    }
+
+    // C++: `ColumnVectorIntegerTest.hugeint_column_slice_init`.
+    #[test]
+    fn hugeint_column_slice_init() {
         slice_suite(|i| i as i128);
     }
 

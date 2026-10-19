@@ -549,11 +549,15 @@ impl<K: Ord + Clone, V: Clone + PartialEq> RcuMap<K, V> {
         self.get(key, false)
     }
 
-    /// C++: `GetReadOnly` — bypasses the dirty-map lookup and the access-time
-    /// update (the reference's benchmark fast path).
+    /// C++: `GetReadOnly` — the benchmark fast path: no access-time update.
+    /// The read snapshot is consulted first; a miss falls back to the dirty
+    /// map under its lock, exactly like the reference.
     pub fn get_read_only(&self, key: &K) -> Option<V> {
-        self.read_map
-            .read()
+        if let Some(map_value) = self.read_map.read().unwrap().get(key) {
+            return Some(map_value.value.clone());
+        }
+        self.dirty_map
+            .lock()
             .unwrap()
             .get(key)
             .map(|v| v.value.clone())
@@ -1184,4 +1188,471 @@ mod concurrency_reference_suite {
         assert_eq!(reads.load(Ordering::Relaxed), (threads / 3) * ops);
         assert!(map.size() <= keys as usize);
     }
+}
+
+#[cfg(test)]
+mod benchmark_reference_suite {
+    //! Ports of the eight `RcuMapBenchmarkTest` cases in
+    //! `src/unit_test/storage/common/test_rcu_multimap_ut.cpp`.
+    //!
+    //! The reference measures `RcuMap` against a mutex-guarded
+    //! `std::map` (`MapWithLock`). The workloads and assertions are unchanged;
+    //! the random sources are deterministic so the port is reproducible.
+
+    use super::*;
+    use std::collections::btree_map::Entry;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Instant;
+
+    const NS_PER_MS: f64 = 1_000_000.0;
+
+    /// C++: `RcuMapBenchmarkTest::MeasureTime` (milliseconds).
+    fn measure_ms(function: impl FnOnce()) -> f64 {
+        let start = Instant::now();
+        function();
+        start.elapsed().as_nanos() as f64 / NS_PER_MS
+    }
+
+    /// Deterministic xorshift generator; the reference seeds `mt19937` from
+    /// `random_device`, but only the value distribution matters here.
+    struct Rng(u64);
+
+    impl Rng {
+        fn new(seed: u64) -> Self {
+            Self(seed | 1)
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            let mut state = self.0;
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            self.0 = state;
+            state
+        }
+
+        fn below(&mut self, bound: u64) -> u64 {
+            self.next_u64() % bound
+        }
+
+        fn unit(&mut self) -> f64 {
+            ((self.next_u64() >> 11) as f64) / ((1u64 << 53) as f64)
+        }
+    }
+
+    /// C++: `MapWithLock` (`src/storage/common/map_with_lock.cppm`) — the
+    /// benchmark baseline.
+    struct MapWithLock<K, V> {
+        map: Mutex<BTreeMap<K, V>>,
+    }
+
+    impl<K: Ord + Clone, V> MapWithLock<K, V> {
+        fn new() -> Self {
+            Self {
+                map: Mutex::new(BTreeMap::new()),
+            }
+        }
+
+        fn get(&self, key: &K) -> Option<V>
+        where
+            V: Clone,
+        {
+            self.map.lock().unwrap().get(key).cloned()
+        }
+
+        /// C++: `MapWithLock::GetOrAdd` — returns whether the key existed.
+        fn get_or_add(&self, key: &K, new_value: V) -> bool {
+            match self.map.lock().unwrap().entry(key.clone()) {
+                Entry::Occupied(_) => true,
+                Entry::Vacant(slot) => {
+                    slot.insert(new_value);
+                    false
+                }
+            }
+        }
+    }
+
+    /// Runs `function(thread_index)` on `threads` threads released together,
+    /// mirroring the reference's start-flag barrier.
+    fn run_threads(threads: usize, function: impl Fn(usize) + Sync) {
+        let start = AtomicBool::new(false);
+        std::thread::scope(|scope| {
+            for thread_index in 0..threads {
+                let start = &start;
+                let function = &function;
+                scope.spawn(move || {
+                    while !start.load(Ordering::Relaxed) {
+                        std::thread::yield_now();
+                    }
+                    function(thread_index);
+                });
+            }
+            start.store(true, Ordering::Relaxed);
+        });
+    }
+
+    fn populate_pair(
+        rcu_map: &RcuMap<String, i32>,
+        lock_map: &MapWithLock<String, i32>,
+        count: i32,
+        value: impl Fn(i32) -> i32,
+    ) {
+        for i in 0..count {
+            let key = format!("key_{i}");
+            rcu_map.insert(key.clone(), value(i));
+            lock_map.get_or_add(&key, value(i));
+        }
+    }
+
+    /// C++: `RcuMapBenchmarkTest.ReadHeavyWorkload`.
+    #[test]
+    fn read_heavy_workload() {
+        const THREADS: usize = 8;
+        const OPS: i32 = 5000;
+        const KEY_RANGE: u64 = 100_000;
+        const READ_RATIO: f64 = 0.9;
+
+        let rcu_map: RcuMap<String, i32> = RcuMap::new();
+        let lock_map: MapWithLock<String, i32> = MapWithLock::new();
+        populate_pair(&rcu_map, &lock_map, (KEY_RANGE / 2) as i32, |i| i * 10);
+
+        let rcu_ms = measure_ms(|| {
+            run_threads(THREADS, |t| {
+                let mut rng = Rng::new(0x9E37_79B9_7F4A_7C15 ^ t as u64);
+                for i in 0..OPS {
+                    let key = format!("key_{}", rng.below(KEY_RANGE));
+                    if rng.unit() < READ_RATIO {
+                        let _ = rcu_map.get_read_only(&key);
+                    } else {
+                        rcu_map.insert(key, t as i32 * OPS + i);
+                    }
+                }
+            });
+        });
+
+        let lock_ms = measure_ms(|| {
+            run_threads(THREADS, |t| {
+                let mut rng = Rng::new(0xD1B5_4A32_D192_ED03 ^ t as u64);
+                for i in 0..OPS {
+                    let key = format!("key_{}", rng.below(KEY_RANGE));
+                    if rng.unit() < READ_RATIO {
+                        let _ = lock_map.get(&key);
+                    } else {
+                        lock_map.get_or_add(&key, t as i32 * OPS + i);
+                    }
+                }
+            });
+        });
+
+        assert!(
+            rcu_ms < lock_ms * 1.2,
+            "RcuMap ({rcu_ms:.3} ms) should be faster than MapWithLock ({lock_ms:.3} ms) within 20%"
+        );
+    }
+
+    /// C++: `RcuMapBenchmarkTest.WriteHeavyWorkload`.
+    #[test]
+    fn write_heavy_workload() {
+        const THREADS: usize = 8;
+        const OPS: i32 = 2000;
+        const KEY_RANGE: u64 = 100_000;
+        const READ_RATIO: f64 = 0.3;
+
+        let rcu_map: RcuMap<String, i32> = RcuMap::new();
+        let lock_map: MapWithLock<String, i32> = MapWithLock::new();
+        populate_pair(&rcu_map, &lock_map, (KEY_RANGE / 4) as i32, |i| i * 10);
+
+        let rcu_ms = measure_ms(|| {
+            run_threads(THREADS, |t| {
+                let mut rng = Rng::new(0x9E37_79B9_7F4A_7C15 ^ t as u64);
+                for i in 0..OPS {
+                    let key = format!("key_{}", rng.below(KEY_RANGE));
+                    if rng.unit() < READ_RATIO {
+                        let _ = rcu_map.get(&key, true);
+                    } else {
+                        rcu_map.insert(key, t as i32 * OPS + i);
+                    }
+                }
+            });
+        });
+
+        let lock_ms = measure_ms(|| {
+            run_threads(THREADS, |t| {
+                let mut rng = Rng::new(0xD1B5_4A32_D192_ED03 ^ t as u64);
+                for i in 0..OPS {
+                    let key = format!("key_{}", rng.below(KEY_RANGE));
+                    if rng.unit() < READ_RATIO {
+                        let _ = lock_map.get(&key);
+                    } else {
+                        lock_map.get_or_add(&key, t as i32 * OPS + i);
+                    }
+                }
+            });
+        });
+
+        assert!(rcu_ms > 0.0);
+        assert!(lock_ms > 0.0);
+    }
+
+    /// C++: `RcuMapBenchmarkTest.ReadOnlyWorkload`.
+    #[test]
+    fn read_only_workload() {
+        const THREADS: usize = 12;
+        const OPS: i32 = 10_000;
+        const KEY_RANGE: u64 = 100_000;
+
+        let rcu_map: RcuMap<String, i32> = RcuMap::new();
+        let lock_map: MapWithLock<String, i32> = MapWithLock::new();
+        populate_pair(&rcu_map, &lock_map, KEY_RANGE as i32, |i| i * 10);
+
+        let rcu_ms = measure_ms(|| {
+            run_threads(THREADS, |t| {
+                let mut rng = Rng::new(0x9E37_79B9_7F4A_7C15 ^ t as u64);
+                for _ in 0..OPS {
+                    let key = format!("key_{}", rng.below(KEY_RANGE));
+                    let _ = rcu_map.get(&key, true);
+                }
+            });
+        });
+
+        let lock_ms = measure_ms(|| {
+            run_threads(THREADS, |t| {
+                let mut rng = Rng::new(0xD1B5_4A32_D192_ED03 ^ t as u64);
+                for _ in 0..OPS {
+                    let key = format!("key_{}", rng.below(KEY_RANGE));
+                    let _ = lock_map.get(&key);
+                }
+            });
+        });
+
+        assert!(rcu_ms > 0.0);
+        assert!(lock_ms > 0.0);
+    }
+
+    /// C++: `RcuMapBenchmarkTest.HighContentionWorkload`.
+    #[test]
+    fn high_contention_workload() {
+        const THREADS: usize = 16;
+        const OPS: i32 = 2000;
+        const KEY_RANGE: u64 = 1000;
+        const READ_RATIO: f64 = 0.8;
+
+        let rcu_map: RcuMap<String, i32> = RcuMap::new();
+        let lock_map: MapWithLock<String, i32> = MapWithLock::new();
+        populate_pair(&rcu_map, &lock_map, KEY_RANGE as i32, |i| i * 10);
+
+        let rcu_ms = measure_ms(|| {
+            run_threads(THREADS, |t| {
+                let mut rng = Rng::new(0x9E37_79B9_7F4A_7C15 ^ t as u64);
+                for i in 0..OPS {
+                    let key = format!("key_{}", rng.below(KEY_RANGE));
+                    if rng.unit() < READ_RATIO {
+                        let _ = rcu_map.get(&key, true);
+                    } else {
+                        rcu_map.insert(key, t as i32 * OPS + i);
+                    }
+                }
+            });
+        });
+
+        let lock_ms = measure_ms(|| {
+            run_threads(THREADS, |t| {
+                let mut rng = Rng::new(0xD1B5_4A32_D192_ED03 ^ t as u64);
+                for i in 0..OPS {
+                    let key = format!("key_{}", rng.below(KEY_RANGE));
+                    if rng.unit() < READ_RATIO {
+                        let _ = lock_map.get(&key);
+                    } else {
+                        lock_map.get_or_add(&key, t as i32 * OPS + i);
+                    }
+                }
+            });
+        });
+
+        assert!(rcu_ms > 0.0);
+        assert!(lock_ms > 0.0);
+    }
+
+    /// C++: `RcuMapBenchmarkTest.ScalabilityTest`.
+    #[test]
+    fn scalability_test() {
+        const OPS: i32 = 5000;
+        const KEY_RANGE: u64 = 100_000;
+        const READ_RATIO: f64 = 0.85;
+
+        for threads in [1usize, 2, 4, 8, 16] {
+            let rcu_map: RcuMap<String, i32> = RcuMap::new();
+            let lock_map: MapWithLock<String, i32> = MapWithLock::new();
+            populate_pair(&rcu_map, &lock_map, (KEY_RANGE / 2) as i32, |i| i * 10);
+
+            let rcu_ms = measure_ms(|| {
+                run_threads(threads, |t| {
+                    let mut rng = Rng::new(0x9E37_79B9_7F4A_7C15 ^ t as u64);
+                    for i in 0..OPS {
+                        let key = format!("key_{}", rng.below(KEY_RANGE));
+                        if rng.unit() < READ_RATIO {
+                            let _ = rcu_map.get(&key, true);
+                        } else {
+                            rcu_map.insert(key, t as i32 * OPS + i);
+                        }
+                    }
+                });
+            });
+
+            let lock_ms = measure_ms(|| {
+                run_threads(threads, |t| {
+                    let mut rng = Rng::new(0xD1B5_4A32_D192_ED03 ^ t as u64);
+                    for i in 0..OPS {
+                        let key = format!("key_{}", rng.below(KEY_RANGE));
+                        if rng.unit() < READ_RATIO {
+                            let _ = lock_map.get(&key);
+                        } else {
+                            lock_map.get_or_add(&key, t as i32 * OPS + i);
+                        }
+                    }
+                });
+            });
+
+            assert!(rcu_ms > 0.0, "threads={threads}");
+            assert!(lock_ms > 0.0, "threads={threads}");
+        }
+    }
+
+    /// C++: `RcuMapBenchmarkTest.MemoryAndGcPerformance`.
+    #[test]
+    fn memory_and_gc_performance() {
+        const OPERATIONS: i32 = 100_000;
+        const KEY_RANGE: u64 = 100_000;
+
+        let rcu_map: RcuMap<String, i32> = RcuMap::new();
+        let lock_map: MapWithLock<String, i32> = MapWithLock::new();
+
+        let rcu_insert_ms = measure_ms(|| {
+            let mut rng = Rng::new(0x9E37_79B9_7F4A_7C15);
+            for i in 0..OPERATIONS {
+                let key = format!("key_{}", rng.below(KEY_RANGE));
+                rcu_map.insert(key, i);
+            }
+        });
+
+        let lock_insert_ms = measure_ms(|| {
+            let mut rng = Rng::new(0x9E37_79B9_7F4A_7C15);
+            for i in 0..OPERATIONS {
+                let key = format!("key_{}", rng.below(KEY_RANGE));
+                lock_map.get_or_add(&key, i);
+            }
+        });
+
+        let gc_ms = measure_ms(|| {
+            rcu_map.check_gc(now_ms().saturating_sub(1000));
+        });
+
+        assert!(rcu_insert_ms > 0.0);
+        assert!(lock_insert_ms > 0.0);
+        assert!(gc_ms >= 0.0);
+    }
+
+    /// C++: `RcuMapBenchmarkTest.ComprehensiveBenchmarkSummary`.
+    #[test]
+    fn comprehensive_benchmark_summary() {
+        const PREPOPULATE: i32 = 50_000;
+        let scenarios = [
+            ("Read-Heavy (95% reads)", 0.95, 8usize, 5000i32),
+            ("Balanced (70% reads)", 0.70, 8, 3000),
+            ("Write-Heavy (40% reads)", 0.40, 8, 2000),
+            ("High Contention", 0.80, 16, 2000),
+        ];
+
+        let mut results = Vec::new();
+        for (name, read_ratio, threads, ops) in scenarios {
+            let rcu_map: RcuMap<String, i32> = RcuMap::new();
+            let lock_map: MapWithLock<String, i32> = MapWithLock::new();
+            populate_pair(&rcu_map, &lock_map, PREPOPULATE, |i| i);
+
+            let rcu_ms = measure_ms(|| {
+                run_threads(threads, |t| {
+                    let mut rng = Rng::new(0x9E37_79B9_7F4A_7C15 ^ t as u64);
+                    for i in 0..ops {
+                        let key = format!("key_{}", rng.below(KEY_RANGE_FULL));
+                        if rng.unit() < read_ratio {
+                            let _ = rcu_map.get(&key, true);
+                        } else {
+                            rcu_map.insert(key, i);
+                        }
+                    }
+                });
+            });
+
+            let lock_ms = measure_ms(|| {
+                run_threads(threads, |t| {
+                    let mut rng = Rng::new(0xD1B5_4A32_D192_ED03 ^ t as u64);
+                    for i in 0..ops {
+                        let key = format!("key_{}", rng.below(KEY_RANGE_FULL));
+                        if rng.unit() < read_ratio {
+                            let _ = lock_map.get(&key);
+                        } else {
+                            lock_map.get_or_add(&key, i);
+                        }
+                    }
+                });
+            });
+
+            let speedup = lock_ms / rcu_ms;
+            results.push((name, rcu_ms, lock_ms, speedup));
+        }
+
+        for (name, rcu_ms, lock_ms, speedup) in results {
+            assert!(rcu_ms > 0.0, "{name}");
+            assert!(lock_ms > 0.0, "{name}");
+            assert!(speedup > 0.0, "{name}");
+        }
+    }
+
+    /// C++: `RcuMapBenchmarkTest.QuickPerformanceVerification`.
+    #[test]
+    fn quick_performance_verification() {
+        const THREADS: usize = 4;
+        const OPS: i32 = 1000;
+        const KEY_RANGE: u64 = 10_000;
+        const READ_RATIO: f64 = 0.9;
+
+        let rcu_map: RcuMap<String, i32> = RcuMap::new();
+        let lock_map: MapWithLock<String, i32> = MapWithLock::new();
+        populate_pair(&rcu_map, &lock_map, (KEY_RANGE / 2) as i32, |i| i * 10);
+
+        let rcu_ms = measure_ms(|| {
+            run_threads(THREADS, |t| {
+                let mut rng = Rng::new(0x9E37_79B9_7F4A_7C15 ^ t as u64);
+                for i in 0..OPS {
+                    let key = format!("key_{}", rng.below(KEY_RANGE));
+                    if rng.unit() < READ_RATIO {
+                        let _ = rcu_map.get(&key, true);
+                    } else {
+                        rcu_map.insert(key, t as i32 * OPS + i);
+                    }
+                }
+            });
+        });
+
+        let lock_ms = measure_ms(|| {
+            run_threads(THREADS, |t| {
+                let mut rng = Rng::new(0xD1B5_4A32_D192_ED03 ^ t as u64);
+                for i in 0..OPS {
+                    let key = format!("key_{}", rng.below(KEY_RANGE));
+                    if rng.unit() < READ_RATIO {
+                        let _ = lock_map.get(&key);
+                    } else {
+                        lock_map.get_or_add(&key, t as i32 * OPS + i);
+                    }
+                }
+            });
+        });
+
+        assert!(rcu_ms > 0.0);
+        assert!(lock_ms > 0.0);
+    }
+
+    /// The comprehensive suite samples the full 100K key space, like the
+    /// reference's `uniform_int_distribution(0, 99999)`.
+    const KEY_RANGE_FULL: u64 = 100_000;
 }

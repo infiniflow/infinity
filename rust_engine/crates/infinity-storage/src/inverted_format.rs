@@ -18,6 +18,11 @@
 
 use crate::cpp_format::FormatError;
 
+pub mod doc_list;
+pub mod position_list;
+pub mod posting_slice;
+pub mod skiplist;
+
 /// `optionflag_t` bits that change how a [`TermMeta`] is encoded. The flag word
 /// itself lives in the catalog's IndexBase JSON, **not** in the index files
 /// (`index_defines.cppm:13-38`; `index_full_text.cppm:42,73`).
@@ -1751,6 +1756,48 @@ pub fn decode_u32_block(buf: &[u8], expected: usize) -> Result<(Vec<u32>, usize)
     Ok((out, pos))
 }
 
+/// Decodes one `CompositeCodec<SIMDBinaryPacking, VariableByte>` payload whose
+/// length is already known (the `IntEncoder<u32, SIMDBitPacking>` u8 frame): the
+/// SIMD value count is the first word, and the variable-byte tail is
+/// self-delimiting. `VariableByte` zero-pads to a 32-bit boundary; padding bytes
+/// terminate no value, so decoding stops at the payload end without producing
+/// spurious zeros (`variablebyte.h:202-284`).
+pub(crate) fn decode_u32_block_all(payload: &[u8]) -> Result<Vec<u32>, FormatError> {
+    if payload.len() < 4 {
+        return Err(FormatError::Truncated {
+            need: 4,
+            got: payload.len(),
+        });
+    }
+    let simd_len = u32::from_le_bytes(payload[0..4].try_into().unwrap()) as usize;
+    let (mut out, used) = decode_u32_block(payload, simd_len)?;
+    let mut pos = used;
+    while pos < payload.len() {
+        let mut value = 0u64;
+        let mut shift = 0u32;
+        loop {
+            let Some(&byte) = payload.get(pos) else {
+                // Trailing `needPaddingTo32Bits` zero bytes: no value.
+                return Ok(out);
+            };
+            pos += 1;
+            value |= u64::from(byte & 0x7f) << shift;
+            if byte & 0x80 != 0 {
+                out.push(value as u32);
+                break;
+            }
+            shift += 7;
+            if shift >= 64 {
+                return Err(FormatError::Truncated {
+                    need: pos,
+                    got: payload.len(),
+                });
+            }
+        }
+    }
+    Ok(out)
+}
+
 // ---------------------------------------------------------------------------
 // u16 posting block codec: IndexLib `NewPForDeltaCompressor`
 // (`third_party/newpfor/`; layout verified against C++ output)
@@ -1840,7 +1887,9 @@ pub fn decode_u16_block(buf: &[u8], expected: usize) -> Result<(Vec<u16>, usize)
         let header = npf_header(u32::from_le_bytes(buf[pos..pos + 4].try_into().unwrap()));
         pos += 4;
         let word = |i: usize| -> Result<u32, FormatError> {
-            let at = pos - 4 + 4 * i;
+            // `TryDecompressSpecialBlock` reads the "alone" value at
+            // `src + HEADER_INT_SIZE`, i.e. the word *after* the header.
+            let at = pos + 4 * i;
             buf.get(at..at + 4)
                 .map(|s| u32::from_le_bytes(s.try_into().unwrap()))
                 .ok_or(FormatError::Truncated {
@@ -2783,6 +2832,26 @@ mod tests {
             assert_eq!(used, bytes.len(), "{label}: bytes consumed");
             // And the encoder must reproduce the C++ bytes.
             assert_eq!(encode_u16_block(&values), bytes, "{label}: encode");
+        }
+    }
+
+    #[test]
+    fn u16_block_roundtrips_the_alone_frames() {
+        // Values above `IsUniqValueStoreInline`'s 11-bit limit (2047) cannot live
+        // in the header, so the writer uses the "*_ALONE" frames, whose value is
+        // the word after the header (`new_pfordelta_compressor.h:488-540`).
+        let cases: &[(u32, Vec<u16>)] = &[
+            (254, vec![2560]),                              // same, alone
+            (252, vec![3000, 3001, 3002, 3003]),            // increase, alone
+            (250, vec![3003, 3002, 3001, 3000]),            // decrease, alone
+        ];
+        for (marker, values) in cases {
+            let bytes = encode_u16_block(values);
+            let header = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
+            assert_eq!(*marker, (header >> 17) & 0xff, "frame marker");
+            let (got, used) = decode_u16_block(&bytes, values.len()).unwrap();
+            assert_eq!(&got, values, "marker {marker}");
+            assert_eq!(used, bytes.len(), "marker {marker}");
         }
     }
 
