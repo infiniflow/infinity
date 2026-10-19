@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 112, `gap` 100, `gate-a` 42, `integration` 250, `partial` 37, `ported` 424.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 112, `gap` 100, `gate-a` 42, `integration` 250, `partial` 36, `ported` 425.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -262,7 +262,7 @@
 | 248 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_long_str` | ported | `infinity-common` `types::tests::mixed_long_string` |
 | 249 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_null` | ported | `infinity-common` `types::tests::mixed_null_and_missing_tags` |
 | 250 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_miss` | ported | `infinity-common` `types::tests::mixed_null_and_missing_tags` |
-| 251 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_tuple1` | partial | `infinity-common` `types::tests::mixed_tuple_and_array_nest` 覆盖基础嵌套；C++ 的多层访问器断言未移植 |
+| 251 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_tuple1` | ported | `infinity-common` `types::tests::mixed_tuple1_matches_the_reference` |
 | 252 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_tuple2` | ported | `infinity-common` `types::tests::mixed_named_tuple_matches_the_reference` |
 | 253 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_tuple3` | ported | `infinity-common` `types::tests::mixed_tuple_errors_match_the_reference` |
 | 254 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_array1` | ported | `infinity-common` `types::tests::mixed_array_matches_the_reference` |

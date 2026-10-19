@@ -344,6 +344,16 @@ impl MixedT {
         Ok(())
     }
 
+    /// C++ `CopyIntoTuple`: copies a value into a new slot.
+    pub fn copy_into_tuple(&mut self, key: &str, value: &MixedT) -> crate::Result<()> {
+        self.insert_into_tuple(key, value.clone())
+    }
+
+    /// C++ `CopyIntoArray`.
+    pub fn copy_into_array(&mut self, index: usize, value: &MixedT) -> crate::Result<()> {
+        self.insert_into_array(index, value.clone())
+    }
+
     /// C++ `GetFromTuple`.
     pub fn get_from_tuple(&self, key: &str) -> Option<&MixedT> {
         match &self.value {
@@ -1393,5 +1403,90 @@ mod tests {
         assert_eq!(array.get_by_index(1).unwrap().as_float(), Some(1.5));
         assert!(array.insert_into_array(2, MixedT::make_float(1.5)).is_err());
         assert!(MixedT::make_array_with_count(0).is_err());
+    }
+    /// `mixed_type_ut.cpp::mixed_tuple1`: the seven-slot tuple with nested
+    /// tuple and array values copied in.
+    #[test]
+    fn mixed_tuple1_matches_the_reference() {
+        let mut tuple = MixedT::make_tuple_with_count(7).unwrap();
+        tuple
+            .insert_into_tuple("key1", MixedT::make_integer(100))
+            .unwrap();
+        tuple
+            .insert_into_tuple("key2", MixedT::make_float(1.1))
+            .unwrap();
+        tuple
+            .insert_into_tuple("key3", MixedT::make_string("Hello World !!"))
+            .unwrap();
+        tuple
+            .insert_into_tuple("key4", MixedT::make_string("Hello World Hello World"))
+            .unwrap();
+        tuple
+            .insert_into_tuple("key5", MixedT::make_null())
+            .unwrap();
+
+        let mut key6 = MixedT::make_tuple_with_count(5).unwrap();
+        key6.insert_into_tuple("key61", MixedT::make_integer(200))
+            .unwrap();
+        key6.insert_into_tuple("key62", MixedT::make_float(2.2))
+            .unwrap();
+        key6.insert_into_tuple("key63", MixedT::make_string("Hello"))
+            .unwrap();
+        key6.insert_into_tuple("key64", MixedT::make_missing())
+            .unwrap();
+        key6.insert_into_tuple("key65", MixedT::make_null())
+            .unwrap();
+        tuple.copy_into_tuple("key6", &key6).unwrap();
+
+        let mut key7 = MixedT::make_array_with_count(5).unwrap();
+        key7.insert_into_array(0, MixedT::make_integer(4300))
+            .unwrap();
+        key7.insert_into_array(1, MixedT::make_float(5.5)).unwrap();
+        key7.insert_into_array(2, MixedT::make_string("FunnyHalloween"))
+            .unwrap();
+        key7.insert_into_array(3, MixedT::make_string("FunnyHalloween OK"))
+            .unwrap();
+        key7.insert_into_array(4, MixedT::make_null()).unwrap();
+        tuple.copy_into_tuple("key7", &key7).unwrap();
+
+        // The copied source is unchanged.
+        assert_eq!(key7.value_type(), MixedValueType::Array);
+        assert_eq!(key7.slot_count(), Some(5));
+
+        assert_eq!(tuple.slot_count(), Some(7));
+        assert_eq!(
+            tuple.get_from_tuple("key1").unwrap().as_integer(),
+            Some(100)
+        );
+        assert_eq!(tuple.get_from_tuple("key2").unwrap().as_float(), Some(1.1));
+        assert_eq!(
+            tuple.get_from_tuple("key3").unwrap().value_type(),
+            MixedValueType::ShortStr
+        );
+        assert_eq!(
+            tuple.get_from_tuple("key4").unwrap().value_type(),
+            MixedValueType::LongStr
+        );
+        assert_eq!(
+            tuple.get_from_tuple("key5").unwrap().value_type(),
+            MixedValueType::Null
+        );
+        assert_eq!(
+            tuple.get_from_tuple("key6").unwrap().value_type(),
+            MixedValueType::Tuple
+        );
+        assert_eq!(
+            tuple.get_from_tuple("key7").unwrap().value_type(),
+            MixedValueType::Array
+        );
+        assert_eq!(
+            tuple
+                .get_from_tuple("key7")
+                .unwrap()
+                .get_by_index(2)
+                .unwrap()
+                .as_text(),
+            Some("FunnyHalloween")
+        );
     }
 }
