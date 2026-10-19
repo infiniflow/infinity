@@ -39,12 +39,19 @@ mod catalog_ut;
 #[cfg(test)]
 mod request_ut;
 
+#[cfg(test)]
+mod query_match_ut;
+
+#[cfg(test)]
+mod query_parser_and_optimizer_ut;
+
 mod explain_search;
 
 pub mod analyzer;
 mod hnsw_mem;
 mod knn_scan;
 mod profiler;
+pub mod fulltext_query;
 pub mod query_builder;
 mod regex_literal;
 mod variables;

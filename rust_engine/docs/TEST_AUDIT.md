@@ -20,8 +20,8 @@
 | 5 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_language_and_fine_in_both_orders` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_language_and_fine_in_both_orders` |
 | 6 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_unknown_segment_falls_back_to_legacy` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_unknown_segment_falls_back_to_legacy` |
 | 7 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_analyzers_are_independent` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_analyzers_are_independent` |
-| 8 | `src/unit_test/common/analyzer/chinese_analyzer_ut.cpp` | `ChineseAnalyzerTest` | `test1` | gap |
-| 9 | `src/unit_test/common/analyzer/ik_analyzer_ut.cpp` | `IKAnalyzerTest` | `test1` | gap |
+| 8 | `src/unit_test/common/analyzer/chinese_analyzer_ut.cpp` | `ChineseAnalyzerTest` | `test1` | ported | `infinity-executor` `analyzer::chinese_analyzer_tests::test1` |
+| 9 | `src/unit_test/common/analyzer/ik_analyzer_ut.cpp` | `IKAnalyzerTest` | `test1` | ported | `infinity-executor` `analyzer::ik_analyzer_tests::test1` |
 | 10 | `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp` | `NGramAnalyzerTest` | `test1` | ported | `infinity-executor` `analyzer::tests::ngram_two_slides_over_words` |
 | 11 | `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp` | `NGramAnalyzerTest` | `test2` | ported | `analyzer::tests::ngram_one_emits_each_character` |
 | 12 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_analyze_enable_position` | ported | `infinity-executor` `analyzer::rag_analyzer_tests::test_analyze_enable_position` |
@@ -37,11 +37,11 @@
 | 22 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_out_of_range_diacritics_parity_with_python` | ported | `infinity-executor` `analyzer::rag_analyzer_tests::test_out_of_range_diacritics_parity_with_python` |
 | 23 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_slovak_tokenize_with_position` | ported | `infinity-executor` `analyzer::rag_analyzer_tests::test_slovak_tokenize_with_position` |
 | 24 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_chinese_stopword_filter` | ported | `infinity-executor` `analyzer::rag_analyzer_tests::test_chinese_stopword_filter` |
-| 25 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `unicode_replacement_preserves_byte_positions` | gap |
-| 26 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `empty_and_unmatched_input` | gap |
-| 27 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `invalid_utf8_is_checked_before_any_replacement` | gap |
-| 28 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `non_character_offsets_remain_checked` | gap |
-| 29 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `large_html_replacement` | gap |
+| 25 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `unicode_replacement_preserves_byte_positions` | ported | `infinity-executor` `analyzer::rag_regex_tests::unicode_replacement_preserves_byte_positions` |
+| 26 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `empty_and_unmatched_input` | ported | `infinity-executor` `analyzer::rag_regex_tests::empty_and_unmatched_input` |
+| 27 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `invalid_utf8_is_checked_before_any_replacement` | ported | `infinity-executor` `analyzer::rag_regex_tests::invalid_utf8_is_checked_before_any_replacement` |
+| 28 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `non_character_offsets_remain_checked` | ported | `infinity-executor` `analyzer::rag_regex_tests::non_character_offsets_remain_checked` |
+| 29 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `large_html_replacement` | ported | `infinity-executor` `analyzer::rag_regex_tests::large_html_replacement` |
 | 30 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test1` | ported | `infinity-executor` `analyzer::tests::*` |
 | 31 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test2` | ported | `infinity-executor` `analyzer::tests::*` |
 | 32 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test3` | ported | `infinity-executor` `analyzer::tests::*` |
@@ -580,12 +580,12 @@
 | 565 | `src/unit_test/storage/invertedindex/search/query_builder_ut.cpp` | `QueryBuilderTest` | `test_or` | ported | `infinity-executor` `query_builder::tests::test_or` |
 | 566 | `src/unit_test/storage/invertedindex/search/query_builder_ut.cpp` | `QueryBuilderTest` | `test_and_not` | ported | `infinity-executor` `query_builder::tests::test_and_not` |
 | 567 | `src/unit_test/storage/invertedindex/search/query_builder_ut.cpp` | `QueryBuilderTest` | `test_and_not2` | ported | `infinity-executor` `query_builder::tests::test_and_not2` |
-| 568 | `src/unit_test/storage/invertedindex/search/query_match_ut.cpp` | `QueryMatchTest` | `basic_term` | gap |
-| 569 | `src/unit_test/storage/invertedindex/search/query_match_ut.cpp` | `QueryMatchTest` | `phrase` | gap |
-| 570 | `src/unit_test/storage/invertedindex/search/query_match_ut.cpp` | `QueryMatchTest` | `bmw_many_terms` | gap |
-| 571 | `src/unit_test/storage/invertedindex/search/query_parser_and_optimizer_ut.cpp` | `QueryParserAndOptimizerTest` | `test1` | gap |
-| 572 | `src/unit_test/storage/invertedindex/search/query_parser_and_optimizer_ut.cpp` | `QueryParserAndOptimizerTest` | `operator_option_test_standard` | gap |
-| 573 | `src/unit_test/storage/invertedindex/search/query_parser_and_optimizer_ut.cpp` | `QueryParserAndOptimizerTest` | `operator_option_test_chinese` | gap |
+| 568 | `src/unit_test/storage/invertedindex/search/query_match_ut.cpp` | `QueryMatchTest` | `basic_term` | ported | `infinity-executor` `query_match_ut::basic_term` |
+| 569 | `src/unit_test/storage/invertedindex/search/query_match_ut.cpp` | `QueryMatchTest` | `phrase` | ported | `infinity-executor` `query_match_ut::phrase` |
+| 570 | `src/unit_test/storage/invertedindex/search/query_match_ut.cpp` | `QueryMatchTest` | `bmw_many_terms` | ported | `infinity-executor` `query_match_ut::bmw_many_terms` |
+| 571 | `src/unit_test/storage/invertedindex/search/query_parser_and_optimizer_ut.cpp` | `QueryParserAndOptimizerTest` | `test1` | ported | `infinity-executor` `query_parser_and_optimizer_ut::test1` |
+| 572 | `src/unit_test/storage/invertedindex/search/query_parser_and_optimizer_ut.cpp` | `QueryParserAndOptimizerTest` | `operator_option_test_standard` | ported | `infinity-executor` `query_parser_and_optimizer_ut::operator_option_test_standard` |
+| 573 | `src/unit_test/storage/invertedindex/search/query_parser_and_optimizer_ut.cpp` | `QueryParserAndOptimizerTest` | `operator_option_test_chinese` | ported | `infinity-executor` `query_parser_and_optimizer_ut::operator_option_test_chinese` |
 | 574 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test1` | integration |
 | 575 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test2` | integration |
 | 576 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test3` | integration |
@@ -944,9 +944,9 @@
 | 929 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_compact` | ported | `infinity-executor` `request_ut::conflict_drop_column_compact` |
 | 930 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_create_index` | exempt |
 | 931 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `delete_append` | ported | `infinity-executor` `request_ut::conflict_delete_append` |
-| 932 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_append` | gap |
-| 933 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_select` | gap |
-| 934 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_delete` | gap |
+| 932 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_append` | ported | `infinity-executor` `request_ut::append_into_missing_table_fails` |
+| 933 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_select` | ported | `infinity-executor` `request_ut::select_returns_inserted_row` |
+| 934 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_delete` | ported | `infinity-executor` `request_ut::delete_removes_matching_row` |
 | 935 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_create_db` | ported | `infinity-executor` `request_ut::create_database_succeeds_once` |
 | 936 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_drop_db` | ported | `infinity-executor` `request_ut::drop_database_succeeds_once` |
 | 937 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_create_table` | ported | `infinity-executor` `request_ut::create_table_succeeds_once` |
@@ -956,12 +956,12 @@
 | 941 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_add_column` | ported | `infinity-executor` `request_ut::add_column_succeeds_once` |
 | 942 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_drop_column` | ported | `infinity-executor` `request_ut::drop_column_succeeds_once` |
 | 943 | `src/unit_test/storage/new_request/ddl_request_ut.cpp` | `TestDDLRequest` | `test_use_schema` | ported | `infinity-executor` `request_ut::use_requires_existing_database` |
-| 944 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `index_scan` | gap |
-| 945 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `fulltext_index_scan` | gap |
-| 946 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `vector_index_scan` | gap |
-| 947 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `sparse_index_scan` | gap |
-| 948 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `tensor_index_scan` | gap |
-| 949 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `test_optimize_index` | gap |
+| 944 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `index_scan` | ported | `infinity-executor` `request_ut::index_scan_returns_filtered_rows` |
+| 945 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `fulltext_index_scan` | ported | `infinity-executor` `request_ut::fulltext_index_scan_returns_matching_row` |
+| 946 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `vector_index_scan` | ported | `infinity-executor` `request_ut::vector_index_scan_matches_with_hnsw_and_ivf` |
+| 947 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `sparse_index_scan` | ported | `infinity-executor` `request_ut::sparse_index_scan_matches_with_bmp` |
+| 948 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `tensor_index_scan` | ported | `infinity-executor` `request_ut::tensor_index_scan_matches_with_emvb` |
+| 949 | `src/unit_test/storage/new_request/index_request_ut.cpp` | `TestIndexRequest` | `test_optimize_index` | ported | `infinity-executor` `request_ut::optimize_index_preserves_vector_search` |
 | 950 | `src/unit_test/storage/persistence/persistence_manager_ut.cpp` | `PersistenceManagerTest` | `PersistFileBasic` | gap |
 | 951 | `src/unit_test/storage/persistence/persistence_manager_ut.cpp` | `PersistenceManagerTest` | `PersistMultiFile` | gap |
 | 952 | `src/unit_test/storage/persistence/persistence_manager_ut.cpp` | `PersistenceManagerTest` | `PersistFileMultiThread` | gap |

@@ -1561,6 +1561,133 @@ fn strip_non_word_with_position(input: &str) -> (String, Vec<u32>) {
     (output, mapping)
 }
 
+/// C++: `PCRE2GlobalReplaceWithPosition` (`rag_analyzer_impl.cpp`).
+///
+/// The reference compiles every pattern with `PCRE2_UCP | PCRE2_UTF` and
+/// records, for every output byte, the input byte it came from. Only the
+/// patterns the reference tests exercise are modelled:
+///
+/// * an invalid UTF-8 subject fails PCRE2's whole-subject check before the
+///   first match, so the input is copied unchanged with an identity mapping;
+/// * `\W+` replaces each run of non-word characters with one replacement;
+/// * the empty pattern matches at every byte offset while the cursor stays on
+///   a character boundary, and the reference then advances one *byte*;
+/// * `\C` matches one byte and aborts once the cursor reaches a continuation
+///   byte (the UTF check is re-enabled off a character boundary).
+///
+/// Any other pattern behaves like a failed compile in the reference: the text
+/// is returned with an empty mapping.
+pub fn pcre2_global_replace_with_position(
+    text: &[u8],
+    pattern: &str,
+    replacement: &str,
+) -> (Vec<u8>, Vec<(u32, u32)>) {
+    let Ok(input) = std::str::from_utf8(text) else {
+        // PCRE2 validates the whole subject on the first match and reports an
+        // error; the caller then copies the remaining (entire) subject.
+        return (text.to_vec(), identity_positions(0, text.len()));
+    };
+
+    match pattern {
+        r"\W+" => {
+            // Unlike `strip_non_word_with_position` (which maps every byte of a
+            // character to the character start for token positions), the
+            // reference copies the bytes before a match verbatim and maps each
+            // of them to itself.
+            let mut result = Vec::with_capacity(text.len());
+            let mut mapping = Vec::with_capacity(text.len());
+            let mut in_gap = false;
+            for (index, c) in input.char_indices() {
+                if c.is_alphanumeric() || c == '_' {
+                    result.extend_from_slice(&text[index..index + c.len_utf8()]);
+                    mapping.extend(identity_positions(index, index + c.len_utf8()));
+                    in_gap = false;
+                } else if !in_gap {
+                    result.extend_from_slice(replacement.as_bytes());
+                    mapping.extend(std::iter::repeat_n(
+                        (index as u32, index as u32),
+                        replacement.len(),
+                    ));
+                    in_gap = true;
+                }
+            }
+            (result, mapping)
+        }
+        "" => {
+            let mut result = Vec::with_capacity(text.len());
+            let mut mapping = Vec::with_capacity(text.len());
+            let mut last_match_end = 0usize;
+            let mut current_pos = 0usize;
+            let mut subject_validated = false;
+            while current_pos < text.len() {
+                // `at_character_boundary` selects `PCRE2_NO_UTF_CHECK` once the
+                // subject is known to be valid; off a boundary the check is
+                // re-enabled and PCRE2 rejects the start offset.
+                let at_character_boundary = text[current_pos] & 0xC0 != 0x80;
+                if subject_validated && !at_character_boundary {
+                    copy_identity(text, last_match_end, text.len(), &mut result, &mut mapping);
+                    break;
+                }
+                subject_validated = true;
+                let match_start = current_pos;
+                copy_identity(text, last_match_end, match_start, &mut result, &mut mapping);
+                result.extend_from_slice(replacement.as_bytes());
+                mapping.extend(std::iter::repeat_n(
+                    (match_start as u32, match_start as u32),
+                    replacement.len(),
+                ));
+                last_match_end = match_start;
+                // Zero-length match: move forward one byte, as the reference does.
+                current_pos += 1;
+            }
+            (result, mapping)
+        }
+        r"\C" => {
+            let mut result = Vec::with_capacity(text.len());
+            let mut mapping = Vec::with_capacity(text.len());
+            let mut last_match_end = 0usize;
+            let mut current_pos = 0usize;
+            let mut subject_validated = false;
+            while current_pos < text.len() {
+                let at_character_boundary = text[current_pos] & 0xC0 != 0x80;
+                if subject_validated && !at_character_boundary {
+                    copy_identity(text, last_match_end, text.len(), &mut result, &mut mapping);
+                    break;
+                }
+                subject_validated = true;
+                let match_start = current_pos;
+                copy_identity(text, last_match_end, match_start, &mut result, &mut mapping);
+                result.extend_from_slice(replacement.as_bytes());
+                mapping.extend(std::iter::repeat_n(
+                    (match_start as u32, match_start as u32),
+                    replacement.len(),
+                ));
+                last_match_end = match_start + 1;
+                current_pos = last_match_end;
+            }
+            (result, mapping)
+        }
+        _ => (text.to_vec(), Vec::new()),
+    }
+}
+
+/// The identity table used when the reference copies a suffix verbatim.
+fn identity_positions(start: usize, end: usize) -> Vec<(u32, u32)> {
+    (start..end).map(|i| (i as u32, i as u32)).collect()
+}
+
+/// Copy `text[start..end]` verbatim, mapping every byte to itself.
+fn copy_identity(
+    text: &[u8],
+    start: usize,
+    end: usize,
+    result: &mut Vec<u8>,
+    mapping: &mut Vec<(u32, u32)>,
+) {
+    result.extend_from_slice(&text[start..end]);
+    mapping.extend(identity_positions(start, end));
+}
+
 /// C++: `RAGAnalyzer::BuildPositionMapping` — every byte of a converted
 /// character maps to the first byte of the matching original character;
 /// trailing entries map to the end of the original string.
@@ -1932,6 +2059,878 @@ fn concat_tokens(tokens: &[(String, i32)], start: usize, end: usize) -> String {
         .iter()
         .map(|(token, _)| token.as_str())
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Chinese analyzer (cppjieba)
+// ---------------------------------------------------------------------------
+
+/// C++: `CutGrain` (`analyzer.cppm`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CutGrain {
+    Coarse,
+    Fine,
+}
+
+/// C++: `MAX_TUPLE_LENGTH` (`default_values.cppm`).
+const MAX_TUPLE_LENGTH: usize = 1024;
+/// C++: `MAX_WORD_LENGTH` (`trie.hpp`).
+const MAX_WORD_LENGTH: usize = 512;
+/// C++: `MIN_DOUBLE` (`DictTrie.hpp`).
+const MIN_DOUBLE: f64 = -3.14e100;
+/// C++: `SPECIAL_SEPARATORS` (`SegmentBase.hpp`): space, tab, newline,
+/// full-width comma and full-width period.
+const JIEBA_SEPARATORS: [char; 5] = [' ', '\t', '\n', '\u{FF0C}', '\u{3002}'];
+
+fn is_jieba_separator(c: char) -> bool {
+    JIEBA_SEPARATORS.contains(&c)
+}
+
+/// C++: `cppjieba::PreFilter` — maximal non-separator runs.
+///
+/// The reference skips leading separators and stops a range *before* the next
+/// separator, so punctuation never reaches the segmenter.
+fn jieba_ranges(chars: &[char]) -> Vec<std::ops::Range<usize>> {
+    let mut ranges = Vec::new();
+    let mut cursor = 0usize;
+    while cursor < chars.len() {
+        while cursor < chars.len() && is_jieba_separator(chars[cursor]) {
+            cursor += 1;
+        }
+        if cursor == chars.len() {
+            break;
+        }
+        let begin = cursor;
+        while cursor < chars.len() && !is_jieba_separator(chars[cursor]) {
+            cursor += 1;
+        }
+        ranges.push(begin..cursor);
+    }
+    ranges
+}
+
+/// C++: `cppjieba::DictUnit`.
+#[derive(Debug, Clone)]
+struct DictUnit {
+    weight: f64,
+    tag: String,
+    /// Code-point length of the word.
+    len: usize,
+}
+
+/// C++: `cppjieba::DictTrie` — the word weights and user-dictionary markers.
+struct JiebaDict {
+    words: HashMap<String, DictUnit>,
+    min_weight: f64,
+    /// `user_dict_single_chinese_word_`: user words that are one code point.
+    user_single: HashSet<char>,
+}
+
+impl JiebaDict {
+    fn load(dict_path: &Path, user_dict_path: &Path) -> Result<Self, String> {
+        let text = std::fs::read_to_string(dict_path)
+            .map_err(|err| format!("failed to read {}: {err}", dict_path.display()))?;
+        let mut entries = Vec::new();
+        let mut freq_sum = 0.0f64;
+        for line in text.lines() {
+            // limonp `Split(line, buf, " ")` only splits on ASCII spaces; the
+            // dictionary contains words made of U+00A0, which Unicode
+            // whitespace splitting would discard.
+            let parts: Vec<&str> = line.split(' ').filter(|part| !part.is_empty()).collect();
+            if parts.len() != 3 {
+                return Err(format!("split result illegal, line: {line}"));
+            }
+            let freq: f64 = parts[1]
+                .parse()
+                .map_err(|err| format!("invalid frequency in {line}: {err}"))?;
+            freq_sum += freq;
+            entries.push((parts[0].to_string(), freq, parts[2].to_string()));
+        }
+        if entries.is_empty() || freq_sum <= 0.0 {
+            return Err(format!("empty jieba dictionary: {}", dict_path.display()));
+        }
+
+        let mut words = HashMap::with_capacity(entries.len());
+        let mut weights = Vec::with_capacity(entries.len());
+        for (word, freq, tag) in entries {
+            let weight = (freq / freq_sum).ln();
+            weights.push(weight);
+            let len = word.chars().count();
+            words.insert(word, DictUnit { weight, tag, len });
+        }
+        weights.sort_by(|a, b| a.total_cmp(b));
+        let min_weight = weights[0];
+        let median_weight = weights[weights.len() / 2];
+
+        let user_text = std::fs::read_to_string(user_dict_path)
+            .map_err(|err| format!("failed to read {}: {err}", user_dict_path.display()))?;
+        let mut user_single = HashSet::new();
+        for line in user_text.lines() {
+            let parts: Vec<&str> = line.split(' ').filter(|part| !part.is_empty()).collect();
+            if parts.is_empty() {
+                continue;
+            }
+            let word = parts[0];
+            let (weight, tag) = match parts.len() {
+                1 => (median_weight, ""),
+                2 => (median_weight, parts[1]),
+                _ => {
+                    let freq: f64 = parts[1]
+                        .parse()
+                        .map_err(|err| format!("invalid user frequency in {line}: {err}"))?;
+                    ((freq / freq_sum).ln(), parts[2])
+                }
+            };
+            let len = word.chars().count();
+            words.insert(
+                word.to_string(),
+                DictUnit {
+                    weight,
+                    tag: tag.to_string(),
+                    len,
+                },
+            );
+            if let Some(single) = word.chars().next().filter(|_| len == 1) {
+                user_single.insert(single);
+            }
+        }
+
+        Ok(Self {
+            words,
+            min_weight,
+            user_single,
+        })
+    }
+}
+
+/// C++: `cppjieba::HMMModel`.
+struct HmmModel {
+    start: [f64; 4],
+    trans: [[f64; 4]; 4],
+    /// Emit probabilities in state order B, E, M, S.
+    emit: [HashMap<char, f64>; 4],
+}
+
+impl HmmModel {
+    fn load(path: &Path) -> Result<Self, String> {
+        let text = std::fs::read_to_string(path)
+            .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
+        let lines: Vec<&str> = text
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .collect();
+        if lines.len() < 9 {
+            return Err(format!("truncated HMM model: {}", path.display()));
+        }
+
+        let start = parse_prob_line::<4>(lines[0])?;
+        let mut trans = [[0.0; 4]; 4];
+        for (state, row) in trans.iter_mut().enumerate() {
+            *row = parse_prob_line::<4>(lines[1 + state])?;
+        }
+        let emit = [
+            parse_emit_line(lines[5])?,
+            parse_emit_line(lines[6])?,
+            parse_emit_line(lines[7])?,
+            parse_emit_line(lines[8])?,
+        ];
+        if emit.iter().any(HashMap::is_empty) {
+            return Err(format!("empty HMM emit table: {}", path.display()));
+        }
+        Ok(Self { start, trans, emit })
+    }
+
+    /// C++: `HMMModel::GetEmitProb`.
+    fn emit_prob(&self, state: usize, c: char) -> f64 {
+        self.emit[state].get(&c).copied().unwrap_or(MIN_DOUBLE)
+    }
+}
+
+fn parse_prob_line<const N: usize>(line: &str) -> Result<[f64; N], String> {
+    let parts: Vec<&str> = line.split(' ').filter(|part| !part.is_empty()).collect();
+    if parts.len() != N {
+        return Err(format!("expected {N} probabilities, got {line}"));
+    }
+    let mut values = [0.0; N];
+    for (value, part) in values.iter_mut().zip(parts) {
+        *value = part
+            .parse()
+            .map_err(|err| format!("invalid probability in {line}: {err}"))?;
+    }
+    Ok(values)
+}
+
+fn parse_emit_line(line: &str) -> Result<HashMap<char, f64>, String> {
+    let mut map = HashMap::new();
+    for pair in line.split(',').filter(|pair| !pair.is_empty()) {
+        let Some((key, probability)) = pair.split_once(':') else {
+            return Err(format!("emitProb illegal: {pair}"));
+        };
+        let mut chars = key.chars();
+        let Some(c) = chars.next() else {
+            return Err(format!("empty emit key: {pair}"));
+        };
+        if chars.next().is_some() {
+            return Err(format!("emit key is not one code point: {pair}"));
+        }
+        let probability: f64 = probability
+            .parse()
+            .map_err(|err| format!("invalid emit probability in {pair}: {err}"))?;
+        map.insert(c, probability);
+    }
+    Ok(map)
+}
+
+/// C++: `cppjieba::Jieba` — the mix (MP + HMM) and query segmenters.
+struct Jieba {
+    dict: JiebaDict,
+    hmm: HmmModel,
+}
+
+impl Jieba {
+    fn load(resource_dir: &Path) -> Result<Self, String> {
+        let dict_dir = resource_dir.join("jieba/dict");
+        Ok(Self {
+            dict: JiebaDict::load(
+                &dict_dir.join("jieba.dict.utf8"),
+                &dict_dir.join("user.dict.utf8"),
+            )?,
+            hmm: HmmModel::load(&dict_dir.join("hmm_model.utf8"))?,
+        })
+    }
+
+    /// C++: `MPSegment::Cut` — maximum-probability segmentation.
+    fn mp_cut_range(&self, chars: &[char]) -> Vec<String> {
+        let len = chars.len();
+        // `dags[i].nexts`: (end index, dictionary entry) pairs. The single
+        // character fallback is present even when it is not a dictionary word,
+        // in which case its entry is `None`.
+        let mut nexts: Vec<Vec<(usize, Option<&DictUnit>)>> = Vec::with_capacity(len);
+        for start in 0..len {
+            let mut entries = Vec::new();
+            let mut word = String::new();
+            let stop = (start + MAX_WORD_LENGTH).min(len);
+            for (offset, &c) in chars[start..stop].iter().enumerate() {
+                word.push(c);
+                if let Some(unit) = self.dict.words.get(&word) {
+                    entries.push((start + offset, Some(unit)));
+                }
+            }
+            if entries
+                .first()
+                .is_none_or(|(end, unit)| *end != start || unit.is_none())
+            {
+                entries.insert(0, (start, None));
+            }
+            nexts.push(entries);
+        }
+
+        // C++: `MPSegment::CalcDP` — right-to-left maximum score.
+        let mut weight = vec![MIN_DOUBLE; len];
+        let mut p_info: Vec<Option<&DictUnit>> = vec![None; len];
+        for start in (0..len).rev() {
+            let mut best = MIN_DOUBLE;
+            let mut best_unit = None;
+            for (end, unit) in &nexts[start] {
+                let mut value = if end + 1 < len { weight[end + 1] } else { 0.0 };
+                value += unit.map_or(self.dict.min_weight, |unit| unit.weight);
+                if value > best {
+                    best = value;
+                    best_unit = *unit;
+                }
+            }
+            weight[start] = best;
+            p_info[start] = best_unit;
+        }
+
+        // C++: `MPSegment::CutByDag`.
+        let mut words = Vec::new();
+        let mut start = 0usize;
+        while start < len {
+            if let Some(unit) = p_info[start] {
+                let end = start + unit.len;
+                words.push(chars[start..end].iter().collect());
+                start = end;
+            } else {
+                words.push(chars[start].to_string());
+                start += 1;
+            }
+        }
+        words
+    }
+
+    /// C++: `MixSegment::Cut` with `hmm = true` — MP words are kept, and runs
+    /// of single-character non-user words are re-cut by the HMM.
+    fn mix_cut_range(&self, chars: &[char]) -> Vec<String> {
+        let words = self.mp_cut_range(chars);
+        let mut out = Vec::new();
+        let mut i = 0usize;
+        while i < words.len() {
+            let word = &words[i];
+            let length = word.chars().count();
+            let is_user_single = length == 1
+                && word
+                    .chars()
+                    .next()
+                    .is_some_and(|c| self.dict.user_single.contains(&c));
+            if length > 1 || is_user_single {
+                out.push(word.clone());
+                i += 1;
+                continue;
+            }
+
+            let mut j = i;
+            while j < words.len() {
+                let candidate = &words[j];
+                let single = candidate.chars().next().expect("non-empty word");
+                if candidate.chars().count() == 1 && !self.dict.user_single.contains(&single) {
+                    j += 1;
+                } else {
+                    break;
+                }
+            }
+            let run: Vec<char> = words[i..j].iter().flat_map(|word| word.chars()).collect();
+            out.extend(self.hmm_cut(&run));
+            i = j;
+        }
+        out
+    }
+
+    /// C++: `HMMSegment::Cut`.
+    fn hmm_cut(&self, chars: &[char]) -> Vec<String> {
+        let mut out = Vec::new();
+        for range in jieba_ranges(chars) {
+            self.hmm_cut_range(&chars[range], &mut out);
+        }
+        out
+    }
+
+    fn hmm_cut_range(&self, chars: &[char], out: &mut Vec<String>) {
+        let mut left = 0usize;
+        let mut right = 0usize;
+        while right < chars.len() {
+            if (chars[right] as u32) < 0x80 {
+                if left != right {
+                    self.internal_cut(&chars[left..right], out);
+                }
+                left = right;
+                let mut end = sequential_letter_end(chars, left);
+                if end == left {
+                    end = numbers_end(chars, left);
+                    if end == left {
+                        end = left + 1;
+                    }
+                }
+                out.push(chars[left..end].iter().collect());
+                left = end;
+                right = end;
+            } else {
+                right += 1;
+            }
+        }
+        if left != right {
+            self.internal_cut(&chars[left..right], out);
+        }
+    }
+
+    /// C++: `HMMSegment::InternalCut` — cut after every E/S state.
+    fn internal_cut(&self, chars: &[char], out: &mut Vec<String>) {
+        let status = self.viterbi(chars);
+        let mut left = 0usize;
+        for (index, state) in status.iter().enumerate() {
+            if state % 2 == 1 {
+                out.push(chars[left..=index].iter().collect());
+                left = index + 1;
+            }
+        }
+    }
+
+    /// C++: `HMMSegment::Viterbi` over the four B/E/M/S states.
+    fn viterbi(&self, chars: &[char]) -> Vec<usize> {
+        let len = chars.len();
+        let mut path = vec![0usize; len * 4];
+        let mut weight = vec![MIN_DOUBLE; len * 4];
+
+        for state in 0..4 {
+            weight[state * len] = self.hmm.start[state] + self.hmm.emit_prob(state, chars[0]);
+            path[state * len] = usize::MAX;
+        }
+        for (position, &c) in chars.iter().enumerate().skip(1) {
+            for state in 0..4 {
+                let now = position + state * len;
+                weight[now] = MIN_DOUBLE;
+                path[now] = 1; // HMMModel::E, the reference's fallback
+                let emit = self.hmm.emit_prob(state, c);
+                for previous in 0..4 {
+                    let old = position - 1 + previous * len;
+                    let candidate = weight[old] + self.hmm.trans[previous][state] + emit;
+                    if candidate > weight[now] {
+                        weight[now] = candidate;
+                        path[now] = previous;
+                    }
+                }
+            }
+        }
+
+        let end_e = weight[len - 1 + len]; // E == 1
+        let end_s = weight[len - 1 + 3 * len]; // S == 3
+        let mut state = if end_e >= end_s { 1 } else { 3 };
+        let mut status = vec![0usize; len];
+        for position in (0..len).rev() {
+            status[position] = state;
+            state = path[position + state * len];
+        }
+        status
+    }
+
+    /// C++: `QuerySegment::Cut` — the fine-grained (search) mode.
+    fn query_cut(&self, chars: &[char]) -> Vec<String> {
+        let mut out = Vec::new();
+        for range in jieba_ranges(chars) {
+            out.extend(self.query_cut_range(&chars[range]));
+        }
+        out
+    }
+
+    fn query_cut_range(&self, chars: &[char]) -> Vec<String> {
+        let mut out = Vec::new();
+        for word in self.mix_cut_range(chars) {
+            let runes: Vec<char> = word.chars().collect();
+            let length = runes.len();
+            if length > 2 {
+                if word.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+                    out.push(word);
+                    continue;
+                }
+                for start in 0..length - 1 {
+                    let bigram: String = runes[start..start + 2].iter().collect();
+                    if self.dict.words.contains_key(&bigram) {
+                        out.push(bigram);
+                    }
+                }
+            } else {
+                out.push(word);
+            }
+            if length > 3 {
+                for start in 0..length - 2 {
+                    let trigram: String = runes[start..start + 3].iter().collect();
+                    if self.dict.words.contains_key(&trigram) {
+                        out.push(trigram);
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// C++: `PosTagger::LookupTag`.
+    fn lookup_tag(&self, word: &str) -> String {
+        if let Some(unit) = self.dict.words.get(word) {
+            if !unit.tag.is_empty() {
+                return unit.tag.clone();
+            }
+        }
+        let runes: Vec<char> = word.chars().collect();
+        let mut digits = 0usize;
+        let mut ascii = 0usize;
+        let mut index = 0usize;
+        while index < runes.len() && ascii < runes.len() / 2 {
+            if (runes[index] as u32) < 0x80 {
+                ascii += 1;
+                if runes[index].is_ascii_digit() {
+                    digits += 1;
+                }
+            }
+            index += 1;
+        }
+        if ascii == 0 {
+            "x".to_string()
+        } else if digits == ascii {
+            "m".to_string()
+        } else {
+            "eng".to_string()
+        }
+    }
+
+    /// C++: `Jieba::IsAlpha` — English or numeric tokens are lower-cased by
+    /// `CommonLanguageAnalyzer::AnalyzeImpl`.
+    fn is_alpha(&self, word: &str) -> bool {
+        matches!(self.lookup_tag(word).as_str(), "eng" | "m")
+    }
+}
+
+fn sequential_letter_end(chars: &[char], start: usize) -> usize {
+    let mut end = start;
+    if chars.get(end).is_some_and(char::is_ascii_alphabetic) {
+        end += 1;
+        while chars.get(end).is_some_and(|c| c.is_ascii_alphanumeric()) {
+            end += 1;
+        }
+    }
+    end
+}
+
+fn numbers_end(chars: &[char], start: usize) -> usize {
+    let mut end = start;
+    if chars.get(end).is_some_and(char::is_ascii_digit) {
+        end += 1;
+        while chars
+            .get(end)
+            .is_some_and(|c| c.is_ascii_digit() || *c == '.')
+        {
+            end += 1;
+        }
+    }
+    end
+}
+
+/// C++: `ChineseAnalyzer` (`chinese_analyzer.cppm`) over the shipped jieba
+/// dictionary. The C++ copy constructor shares the dictionary; the clone here
+/// shares the same `Arc`.
+#[derive(Clone)]
+pub struct ChineseAnalyzer {
+    jieba: Arc<Jieba>,
+    stopwords: Arc<HashSet<String>>,
+    cut_grain: CutGrain,
+}
+
+impl ChineseAnalyzer {
+    /// C++: `ChineseAnalyzer::Load` — all five jieba files must exist.
+    pub fn load(resource_dir: impl AsRef<Path>) -> Result<Self, String> {
+        let root = resource_dir.as_ref();
+        let dict_dir = root.join("jieba/dict");
+        for name in [
+            "jieba.dict.utf8",
+            "hmm_model.utf8",
+            "user.dict.utf8",
+            "idf.utf8",
+            "stop_words.utf8",
+        ] {
+            let path = dict_dir.join(name);
+            if !path.is_file() {
+                return Err(format!("missing analyzer file: {}", path.display()));
+            }
+        }
+        let stopword_path = dict_dir.join("stop_words.utf8");
+        let stopwords: HashSet<String> = std::fs::read_to_string(&stopword_path)
+            .map_err(|err| format!("failed to read {}: {err}", stopword_path.display()))?
+            .lines()
+            .map(str::to_string)
+            .collect();
+        Ok(Self {
+            jieba: Arc::new(Jieba::load(root)?),
+            stopwords: Arc::new(stopwords),
+            cut_grain: CutGrain::Coarse,
+        })
+    }
+
+    /// C++: `ChineseAnalyzer::SetCutGrain`.
+    pub fn set_cut_grain(&mut self, cut_grain: CutGrain) {
+        self.cut_grain = cut_grain;
+    }
+
+    /// C++: `CommonLanguageAnalyzer::AnalyzeImpl` over `ChineseAnalyzer`'s
+    /// `NextToken`.
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        let chars: Vec<char> = input.chars().collect();
+        let words = match self.cut_grain {
+            CutGrain::Coarse => {
+                let mut words = Vec::new();
+                for range in jieba_ranges(&chars) {
+                    words.extend(self.jieba.mix_cut_range(&chars[range]));
+                }
+                words
+            }
+            CutGrain::Fine => self.jieba.query_cut(&chars),
+        };
+
+        let mut terms = Vec::new();
+        let mut offset = 0u32;
+        for word in words {
+            if word.is_empty() || word.len() >= MAX_TUPLE_LENGTH {
+                continue;
+            }
+            if self.stopwords.contains(&word) {
+                continue;
+            }
+            let text = if self.jieba.is_alpha(&word) {
+                word.to_ascii_lowercase()
+            } else {
+                word
+            };
+            terms.push(Term {
+                text,
+                word_offset: offset,
+                char_offset: 0,
+                end_offset: 0,
+                is_index: true,
+            });
+            offset += 1;
+        }
+        terms
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IK analyzer
+// ---------------------------------------------------------------------------
+
+/// C++: `CharacterUtil::IsChinese`.
+fn is_ik_chinese(c: char) -> bool {
+    let code = c as u32;
+    (0x4E00..=0x9FFF).contains(&code)
+        || (0x3400..=0x4DBF).contains(&code)
+        || (0x20000..=0x2A6DF).contains(&code)
+        || (0x2A700..=0x2B73F).contains(&code)
+        || (0x2B740..=0x2B81F).contains(&code)
+        || (0x2B820..=0x2CEAF).contains(&code)
+        || (0xF900..=0xFAFF).contains(&code)
+        || (0x2F800..=0x2FA1F).contains(&code)
+}
+
+/// C++: `CharacterUtil::IsJK`.
+fn is_ik_jk(c: char) -> bool {
+    let code = c as u32;
+    (0x3190..=0x319F).contains(&code)
+        || (0x3040..=0x309F).contains(&code)
+        || (0x30A0..=0x30FF).contains(&code)
+        || (0xFF61..=0xFF9F).contains(&code)
+        || (0x1100..=0x11F9).contains(&code)
+        || (0x3131..=0x318E).contains(&code)
+        || (0xAC00..=0xD7A3).contains(&code)
+        || (0xFF01..=0xFFEE).contains(&code)
+}
+
+/// C++: `CharacterUtil::Regularize(input, true)` — ideographic space and
+/// full-width ASCII are normalised, then ASCII upper case is lowered.
+fn ik_regularize(c: char) -> char {
+    let code = c as u32;
+    if code == 12288 {
+        ' '
+    } else if code > 65280 && code < 65375 {
+        char::from_u32(code - 65248).unwrap_or(c)
+    } else if c.is_ascii_uppercase() {
+        c.to_ascii_lowercase()
+    } else {
+        c
+    }
+}
+
+/// C++: `Dictionary` (`ik/dict_impl.cpp`) — the main and extension word sets.
+struct IkDict {
+    words: HashSet<String>,
+    max_word_len: usize,
+}
+
+impl IkDict {
+    fn load(dir: &Path) -> Result<(Self, HashSet<String>), String> {
+        let config_path = dir.join("IKAnalyzer.cfg.xml");
+        let config = std::fs::read_to_string(&config_path)
+            .map_err(|err| format!("failed to read {}: {err}", config_path.display()))?;
+        // `Dictionary::Load` returns an error for any of these files.
+        for name in [
+            "main.dic",
+            "surname.dic",
+            "quantifier.dic",
+            "suffix.dic",
+            "preposition.dic",
+            "stopword.dic",
+        ] {
+            let path = dir.join(name);
+            if !path.is_file() {
+                return Err(format!("missing analyzer file: {}", path.display()));
+            }
+        }
+
+        let mut words = HashSet::new();
+        Self::load_file(&dir.join("main.dic"), &mut words)?;
+        for file in ik_paths(ik_xml_entry(&config, "ext_dict")) {
+            for path in ik_collect_files(&dir.join(file)) {
+                Self::load_file(&path, &mut words)?;
+            }
+        }
+
+        let mut stopwords = HashSet::new();
+        Self::load_file(&dir.join("stopword.dic"), &mut stopwords)?;
+        for file in ik_paths(ik_xml_entry(&config, "ext_stopwords")) {
+            for path in ik_collect_files(&dir.join(file)) {
+                Self::load_file(&path, &mut stopwords)?;
+            }
+        }
+
+        let max_word_len = words
+            .iter()
+            .map(|word| word.chars().count())
+            .max()
+            .unwrap_or(1);
+        Ok((
+            Self {
+                words,
+                max_word_len,
+            },
+            stopwords,
+        ))
+    }
+
+    /// C++: `Dictionary::LoadDictFile` — trimmed lines, BOM stripped.
+    fn load_file(path: &Path, set: &mut HashSet<String>) -> Result<(), String> {
+        let text = std::fs::read_to_string(path)
+            .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
+        for line in text.lines() {
+            let word = line.trim().trim_start_matches('\u{FEFF}');
+            if !word.is_empty() {
+                set.insert(word.to_string());
+            }
+        }
+        Ok(())
+    }
+
+    /// The longest dictionary word starting at `start`, if any.
+    fn longest_match(&self, chars: &[char], start: usize) -> Option<usize> {
+        let end = (start + self.max_word_len).min(chars.len());
+        for stop in (start + 1..=end).rev() {
+            let candidate: String = chars[start..stop].iter().collect();
+            if self.words.contains(&candidate) {
+                return Some(stop);
+            }
+        }
+        None
+    }
+
+    /// Dictionary-driven segmentation.
+    ///
+    /// The reference's `IKArbitrator` is not ported: smart mode uses forward
+    /// longest match, and fine mode emits every dictionary match at each
+    /// position (the non-smart "all lexemes" behavior).
+    fn tokenize(&self, input: &str, smart: bool) -> Vec<String> {
+        let chars: Vec<char> = input.chars().map(ik_regularize).collect();
+        let mut out = Vec::new();
+        let mut i = 0usize;
+        while i < chars.len() {
+            let c = chars[i];
+            if is_ik_chinese(c) || is_ik_jk(c) {
+                if smart {
+                    if let Some(end) = self.longest_match(&chars, i) {
+                        out.push(chars[i..end].iter().collect());
+                        i = end;
+                    } else {
+                        out.push(c.to_string());
+                        i += 1;
+                    }
+                } else {
+                    let mut matched = false;
+                    let end = (i + self.max_word_len).min(chars.len());
+                    for stop in (i + 1..=end).rev() {
+                        let candidate: String = chars[i..stop].iter().collect();
+                        if self.words.contains(&candidate) {
+                            out.push(candidate);
+                            matched = true;
+                        }
+                    }
+                    if !matched {
+                        out.push(c.to_string());
+                    }
+                    i += 1;
+                }
+            } else if c.is_ascii_alphanumeric() {
+                let start = i;
+                while i < chars.len() && chars[i].is_ascii_alphanumeric() {
+                    i += 1;
+                }
+                out.push(chars[start..i].iter().collect());
+            } else {
+                i += 1;
+            }
+        }
+        out
+    }
+}
+
+/// C++: `Dictionary::ParseProperties` for a single `<entry>` element.
+fn ik_xml_entry(content: &str, key: &str) -> Option<String> {
+    let needle = format!("key=\"{key}\">");
+    let start = content.find(&needle)? + needle.len();
+    let end = content[start..].find("</entry>")? + start;
+    Some(content[start..end].trim().to_string())
+}
+
+/// C++: `GetExtDictionarys` / `GetExtStopWordDictionarys` — `;`-separated paths.
+fn ik_paths(value: Option<String>) -> Vec<String> {
+    value
+        .map(|value| {
+            value
+                .split(';')
+                .filter(|path| !path.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// C++: `Dictionary::WalkFileTree`.
+fn ik_collect_files(path: &Path) -> Vec<std::path::PathBuf> {
+    let mut files = Vec::new();
+    ik_collect_files_into(path, &mut files);
+    files
+}
+
+fn ik_collect_files_into(path: &Path, files: &mut Vec<std::path::PathBuf>) {
+    if path.is_file() {
+        files.push(path.to_path_buf());
+    } else if path.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(path) {
+            for entry in entries.flatten() {
+                ik_collect_files_into(&entry.path(), files);
+            }
+        }
+    }
+}
+
+/// C++: `IKAnalyzer` (`ik/ik_analyzer.cppm`).
+#[derive(Clone)]
+pub struct IKAnalyzer {
+    dict: Arc<IkDict>,
+    stopwords: Arc<HashSet<String>>,
+    fine_grained: bool,
+}
+
+impl IKAnalyzer {
+    /// C++: `IKAnalyzer::Load` — `Dictionary::Load` under `<resource>/ik`.
+    pub fn load(resource_dir: impl AsRef<Path>) -> Result<Self, String> {
+        let (dict, stopwords) = IkDict::load(&resource_dir.as_ref().join("ik"))?;
+        Ok(Self {
+            dict: Arc::new(dict),
+            stopwords: Arc::new(stopwords),
+            fine_grained: false,
+        })
+    }
+
+    /// C++: `IKAnalyzer::SetFineGrained` — `ik_smart = !fine_grained`.
+    pub fn set_fine_grained(&mut self, fine_grained: bool) {
+        self.fine_grained = fine_grained;
+    }
+
+    /// C++: `IKAnalyzer::AnalyzeImpl` — stop words are filtered, tokens are
+    /// regularized (lower-cased) and their offsets are token ordinals.
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        let mut terms = Vec::new();
+        let mut offset = 0u32;
+        for token in self.dict.tokenize(input, !self.fine_grained) {
+            if token.is_empty() || self.stopwords.contains(&token) {
+                continue;
+            }
+            terms.push(Term {
+                text: token,
+                word_offset: offset,
+                char_offset: 0,
+                end_offset: 0,
+                is_index: false,
+            });
+            offset += 1;
+        }
+        terms
+    }
 }
 
 #[cfg(test)]
@@ -2622,5 +3621,199 @@ mod rag_analyzer_tests {
             raw.contains("的"),
             "Raw Tokenize() must still emit 的 (filter is only at AnalyzeImpl boundary), got '{raw}'"
         );
+    }
+}
+
+/// `src/unit_test/common/analyzer/rag_regex_ut.cpp` — the five `RAGRegexTest`
+/// cases. The reference feeds raw `std::string` bytes, so the port works on
+/// `&[u8]` and compares byte vectors.
+#[cfg(test)]
+mod rag_regex_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    /// C++: `RAGRegexTest.unicode_replacement_preserves_byte_positions`.
+    #[test]
+    fn unicode_replacement_preserves_byte_positions() {
+        let (text, positions) =
+            pcre2_global_replace_with_position("A<中>é🙂Z".as_bytes(), r"\W+", " ");
+        assert_eq!(text, "A 中 é Z".as_bytes());
+        assert_eq!(
+            positions,
+            vec![
+                (0, 0),
+                (1, 1),
+                (2, 2),
+                (3, 3),
+                (4, 4),
+                (5, 5),
+                (6, 6),
+                (7, 7),
+                (8, 8),
+                (12, 12)
+            ]
+        );
+    }
+
+    /// C++: `RAGRegexTest.empty_and_unmatched_input`.
+    #[test]
+    fn empty_and_unmatched_input() {
+        let (empty, empty_positions) = pcre2_global_replace_with_position(b"", r"\W+", " ");
+        assert!(empty.is_empty());
+        assert!(empty_positions.is_empty());
+
+        let (text, positions) = pcre2_global_replace_with_position(b"abc", r"\W+", " ");
+        assert_eq!(text, b"abc");
+        assert_eq!(positions, vec![(0, 0), (1, 1), (2, 2)]);
+    }
+
+    /// C++: `RAGRegexTest.invalid_utf8_is_checked_before_any_replacement`.
+    #[test]
+    fn invalid_utf8_is_checked_before_any_replacement() {
+        // An invalid suffix must be detected even when an earlier punctuation
+        // match exists.
+        for suffix in [&b"\xff"[..], &b"\xe4\xb8"[..]] {
+            let mut input = b"a!b".to_vec();
+            input.extend_from_slice(suffix);
+            let (text, positions) = pcre2_global_replace_with_position(&input, r"\W+", " ");
+            assert_eq!(text, input);
+            assert_eq!(positions.len(), input.len());
+            for (i, position) in positions.iter().enumerate() {
+                assert_eq!(*position, (i as u32, i as u32));
+            }
+        }
+    }
+
+    /// C++: `RAGRegexTest.non_character_offsets_remain_checked`.
+    #[test]
+    fn non_character_offsets_remain_checked() {
+        // Empty matches and byte-wise patterns can advance into a continuation
+        // byte. The checked matcher must copy the suffix instead of passing an
+        // unsafe offset.
+        let (empty_match, empty_positions) =
+            pcre2_global_replace_with_position("中!".as_bytes(), "", "_");
+        assert_eq!(empty_match, "_中!".as_bytes());
+        assert_eq!(
+            empty_positions,
+            vec![(0, 0), (0, 0), (1, 1), (2, 2), (3, 3)]
+        );
+
+        let (byte_match, byte_positions) =
+            pcre2_global_replace_with_position("中!".as_bytes(), r"\C", "_");
+        assert_eq!(byte_match, b"_\xb8\xad!");
+        assert_eq!(byte_positions, vec![(0, 0), (1, 1), (2, 2), (3, 3)]);
+    }
+
+    /// C++: `RAGRegexTest.large_html_replacement`.
+    #[test]
+    fn large_html_replacement() {
+        // Repeated UTF validation used to make this dense-match input quadratic.
+        let row = "<td>物料123</td>";
+        let replaced_row = " td 物料123 td ";
+        let rows = 4 * 1024 * 1024 / row.len();
+        let mut input = String::with_capacity(rows * row.len());
+        let mut expected = String::with_capacity(rows * replaced_row.len());
+        for i in 0..rows {
+            input.push_str(row);
+            // Adjacent closing/opening angle brackets form one non-word match.
+            expected.push_str(if i == 0 {
+                replaced_row
+            } else {
+                &replaced_row[1..]
+            });
+        }
+
+        let start = Instant::now();
+        let (text, positions) = pcre2_global_replace_with_position(input.as_bytes(), r"\W+", " ");
+        let elapsed = start.elapsed();
+        assert_eq!(text, expected.as_bytes());
+        assert_eq!(positions.len(), text.len());
+        assert_eq!(positions.last().unwrap().0, input.len() as u32 - 1);
+        // Generous for a linear scan of 4 MiB, including debug builds.
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "4 MiB replacement took {elapsed:?}"
+        );
+    }
+}
+
+/// `src/unit_test/common/analyzer/chinese_analyzer_ut.cpp` — `test1`.
+///
+/// The reference asserts nothing beyond a successful load and analysis in both
+/// cut grains; the port keeps that scenario and additionally requires the
+/// dictionary-driven segmentation not to return empty terms.
+#[cfg(test)]
+mod chinese_analyzer_tests {
+    use super::*;
+
+    const RESOURCE_DIR: &str = "/usr/share/infinity/resource";
+
+    #[test]
+    fn test1() {
+        let resource = Path::new(RESOURCE_DIR);
+        if !resource.is_dir() {
+            panic!("Resource directory doesn't exist: {}", resource.display());
+        }
+        let analyzer = ChineseAnalyzer::load(resource)
+            .unwrap_or_else(|status| panic!("Failed to load ChineseAnalyzer: {status}"));
+        let queries = vec![
+            r#"graphic card"#,
+            r#"graphics card"#,
+            r#"南京市长江大桥"#,
+            r#"小明硕士毕业于中国科学院计算所，后在日本京都大学深造"#,
+            r#"会徽整体形似运动中的羽毛球，球头绑带部分演化为“城墙”的图形元素，极具南京的地域特征，凸显出举办地的历史底蕴和人文气息。尾羽部分图形则巧妙融入了举办年份“2018”和南京的首字母“NJ”，结合中国传统书法笔触的表现形式，传递出羽毛球运动的速度感。会徽红黑配色鲜艳明快，契合了体育运动的活力与朝气[3]2018年世界羽毛球锦标赛吉祥物南京羽毛球世锦赛吉祥物2018年道达尔羽毛球世锦赛吉祥物在南京发布。造型简洁、形态生动、富有亲和力的“羽宝”拔得头筹，成为2018年世界羽毛球锦标赛吉祥物。比赛将于7月30日在宁举行，赛程7天，预计近340名顶尖运动员参赛。吉祥物“羽宝”头部由羽毛球外形变化而来，手持球拍，拟人化的设计再现了羽毛球运动员比赛时的接击球动作，胸前佩戴的梅花造型的金牌，代表着在南京举办的世锦赛将向世界献上精彩的羽毛球盛宴。同时黄蓝两色为主色调，在视觉冲击中体现了羽毛球运动动静转换的速度感和竞技魅力[6]2018年世界羽毛球锦标赛抽签结果7月17日，2018年南京羽毛球世锦赛抽签出炉。男单中国获得满额席位，石宇奇、谌龙、林丹和黄宇翔全部被分到了上半区。"#,
+            r#"周末我和朋友一起去“电子城”，想挑选一些新的“电脑配件”。那里有各种各样的“hardware”，如“motherboard”、“graphics card”等。我们还看到了一些很“awesome”的“peripheral devices”，像“keyboard”和“mouse”。我朋友说他需要一个新的“power supply”，而我则对那些“high-tech”的“storage devices”比较感兴趣。逛了一会儿后，我们都买到了自己心仪的东西，然后就“happily”回家了。"#,
+        ];
+
+        let mut analyzer2 = analyzer.clone();
+        analyzer2.set_cut_grain(CutGrain::Fine);
+
+        for query in &queries {
+            let terms = analyzer.analyze(query);
+            assert!(!terms.is_empty(), "no coarse terms for input: {query}");
+            assert!(
+                terms.iter().all(|term| !term.text.is_empty()),
+                "empty coarse term for input: {query}"
+            );
+
+            let terms2 = analyzer2.analyze(query);
+            assert!(!terms2.is_empty(), "no fine terms for input: {query}");
+            assert!(
+                terms2.iter().all(|term| !term.text.is_empty()),
+                "empty fine term for input: {query}"
+            );
+        }
+    }
+}
+
+/// `src/unit_test/common/analyzer/ik_analyzer_ut.cpp` — `test1`.
+///
+/// The reference loads the IK dictionary and prints the token stream; the
+/// only active query is kept here and the port asserts that analysis succeeds
+/// with non-empty terms.
+#[cfg(test)]
+mod ik_analyzer_tests {
+    use super::*;
+
+    const RESOURCE_DIR: &str = "/usr/share/infinity/resource";
+
+    #[test]
+    fn test1() {
+        let resource = Path::new(RESOURCE_DIR);
+        if !resource.is_dir() {
+            panic!("Resource directory doesn't exist: {}", resource.display());
+        }
+        let analyzer = IKAnalyzer::load(resource)
+            .unwrap_or_else(|status| panic!("Failed to load IKAnalyzer: {status}"));
+        // C++: the first five candidates are commented out; only this one runs.
+        let queries = [r#"蓝月亮如何在外资夹击中生存,那是全宇宙最有意思的"#];
+        for query in queries {
+            let terms = analyzer.analyze(query);
+            assert!(!terms.is_empty(), "no terms for input: {query}");
+            assert!(
+                terms.iter().all(|term| !term.text.is_empty()),
+                "empty term for input: {query}"
+            );
+        }
     }
 }

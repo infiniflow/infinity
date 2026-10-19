@@ -15,12 +15,43 @@ use std::any::Any;
 /// The reference's `INVALID_ROWID`.
 pub const INVALID_DOC_ID: u64 = u64::MAX;
 
+/// The reference's `DocIteratorType`, limited to the iterators this crate
+/// builds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocIteratorType {
+    TermDocIterator,
+    PhraseIterator,
+    AndIterator,
+    AndNotIterator,
+    OrIterator,
+    BmwIterator,
+}
+
 /// A posting iterator. `next(doc_id)` advances to the first document whose id
 /// is at least `doc_id` and reports whether such a document exists; `doc_id()`
 /// is [`INVALID_DOC_ID`] once exhausted.
 pub trait DocIterator {
     fn next(&mut self, doc_id: u64) -> bool;
     fn doc_id(&self) -> u64;
+    fn iterator_type(&self) -> DocIteratorType;
+    /// `DocIterator::Score`; only the leaf terms and the WAND iterator score.
+    fn score(&mut self) -> f64 {
+        0.0
+    }
+    /// `TermDocIterator::GetDocFreq` (posting-list length) or
+    /// `PhraseDocIterator::GetDocFreq` (documents matched so far).
+    fn doc_freq(&self) -> u32 {
+        0
+    }
+    /// `TermDocIterator::GetTermFreq`: frequency accumulated by `score`.
+    fn term_freq(&self) -> u64 {
+        0
+    }
+    /// `PhraseDocIterator::GetPhraseFreq`: phrase frequency accumulated by
+    /// successful matches.
+    fn phrase_freq(&self) -> f64 {
+        0.0
+    }
     /// `dynamic_cast` support for callers that inspect the iterator tree.
     fn as_any(&self) -> &dyn Any;
 }
@@ -29,6 +60,23 @@ pub trait DocIterator {
 /// `ColumnIndexReader::Lookup`).
 pub trait TermLookup {
     fn lookup(&self, column: &str, term: &str) -> Option<Box<dyn DocIterator>>;
+    /// Resolves a phrase leaf (the reference's `PhraseQueryNode::CreateSearch`).
+    fn lookup_phrase(
+        &self,
+        column: &str,
+        terms: &[String],
+        slop: u32,
+    ) -> Option<Box<dyn DocIterator>> {
+        let _ = (column, terms, slop);
+        None
+    }
+    /// Top-`topn` BM25 hits of a top-level OR over single terms, used for the
+    /// block-max WAND early-termination path. `None` when the lookup cannot
+    /// score.
+    fn bmw_search(&self, column: &str, terms: &[String], topn: usize) -> Option<Vec<(u64, f64)>> {
+        let _ = (column, terms, topn);
+        None
+    }
 }
 
 /// A term leaf.
@@ -38,11 +86,21 @@ pub struct TermQueryNode {
     pub term: String,
 }
 
+/// A phrase leaf: the analysed terms in order and the allowed slop
+/// (`"a b"~N`). A slop of zero requires consecutive positions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhraseQueryNode {
+    pub column: String,
+    pub terms: Vec<String>,
+    pub slop: u32,
+}
+
 /// The query tree. `Not` only appears in parser output and `AndNot` only in an
 /// optimized tree; `QueryNode::optimize` enforces that transition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QueryNode {
     Term(TermQueryNode),
+    Phrase(PhraseQueryNode),
     And(Vec<QueryNode>),
     Or(Vec<QueryNode>),
     Not(Vec<QueryNode>),
@@ -76,9 +134,9 @@ impl std::error::Error for QueryError {}
 impl QueryNode {
     /// Pushes the tree through `GetOptimizedQueryTree`: children first, then
     /// the node's own rewrite.
-    fn optimize(self) -> Result<QueryNode, QueryError> {
+    pub fn optimize(self) -> Result<QueryNode, QueryError> {
         match self {
-            QueryNode::Term(_) => Ok(self),
+            QueryNode::Term(_) | QueryNode::Phrase(_) => Ok(self),
             QueryNode::Not(_) => Err(QueryError::NotAtTopLevel),
             QueryNode::AndNot(_) => Err(QueryError::UnexpectedAndNot),
             QueryNode::And(_) | QueryNode::Or(_) => self.optimize_multi(),
@@ -87,7 +145,7 @@ impl QueryNode {
 
     fn optimize_child(child: QueryNode) -> Result<QueryNode, QueryError> {
         match child {
-            QueryNode::Term(_) => Ok(child),
+            QueryNode::Term(_) | QueryNode::Phrase(_) => Ok(child),
             QueryNode::Not(_) | QueryNode::And(_) | QueryNode::Or(_) => child.optimize_multi(),
             QueryNode::AndNot(_) => Err(QueryError::UnexpectedAndNot),
         }
@@ -118,7 +176,9 @@ impl QueryNode {
                     let child = QueryNode::optimize_child(child)?;
                     match child {
                         QueryNode::And(grandchildren) => and_list.extend(grandchildren),
-                        QueryNode::Term(_) | QueryNode::Or(_) => and_list.push(child),
+                        QueryNode::Term(_) | QueryNode::Phrase(_) | QueryNode::Or(_) => {
+                            and_list.push(child)
+                        }
                         QueryNode::Not(not_children) => not_list.extend(not_children),
                         QueryNode::AndNot(and_not_children) => {
                             let mut remaining = and_not_children.into_iter();
@@ -161,7 +221,10 @@ impl QueryNode {
                     let child = QueryNode::optimize_child(child)?;
                     match child {
                         QueryNode::Or(grandchildren) => or_list.extend(grandchildren),
-                        QueryNode::Term(_) | QueryNode::And(_) | QueryNode::AndNot(_) => {
+                        QueryNode::Term(_)
+                        | QueryNode::Phrase(_)
+                        | QueryNode::And(_)
+                        | QueryNode::AndNot(_) => {
                             or_list.push(child);
                         }
                         QueryNode::Not(_) => not_list.push(child),
@@ -192,7 +255,9 @@ impl QueryNode {
                     Err(QueryError::OrWithNotAndNonNot)
                 }
             }
-            QueryNode::Term(_) | QueryNode::AndNot(_) => Err(QueryError::UnexpectedAndNot),
+            QueryNode::Term(_) | QueryNode::Phrase(_) | QueryNode::AndNot(_) => {
+                Err(QueryError::UnexpectedAndNot)
+            }
         }
     }
 
@@ -201,6 +266,9 @@ impl QueryNode {
     fn create_search(&self, lookup: &dyn TermLookup) -> Option<Box<dyn DocIterator>> {
         match self {
             QueryNode::Term(term) => lookup.lookup(&term.column, &term.term),
+            QueryNode::Phrase(phrase) => {
+                lookup.lookup_phrase(&phrase.column, &phrase.terms, phrase.slop)
+            }
             QueryNode::And(children) => {
                 let mut iterators = Vec::with_capacity(children.len());
                 for child in children {
@@ -244,9 +312,44 @@ impl QueryNode {
     }
 }
 
+/// Early-termination strategy for a top-level OR of term leaves
+/// (the reference's `EarlyTermAlgo`; only the two used by the engine are
+/// modelled).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EarlyTermAlgo {
+    /// Plain `OrIterator`.
+    #[default]
+    Naive,
+    /// `BlockMaxWandIterator` over the term leaves.
+    Bmw,
+}
+
 /// Input of [`QueryBuilder::create_search`].
 pub struct FullTextQueryContext {
     pub query_tree: QueryNode,
+    /// Result size for early termination; `0` disables it.
+    pub topn: usize,
+    pub early_term_algo: EarlyTermAlgo,
+}
+
+impl FullTextQueryContext {
+    pub fn new(query_tree: QueryNode) -> Self {
+        Self {
+            query_tree,
+            topn: 0,
+            early_term_algo: EarlyTermAlgo::Naive,
+        }
+    }
+
+    pub fn with_topn(mut self, topn: usize) -> Self {
+        self.topn = topn;
+        self
+    }
+
+    pub fn with_early_term(mut self, early_term_algo: EarlyTermAlgo) -> Self {
+        self.early_term_algo = early_term_algo;
+        self
+    }
 }
 
 /// Optimizes a query tree and turns it into a document iterator.
@@ -264,7 +367,557 @@ impl<'a> QueryBuilder<'a> {
         context: FullTextQueryContext,
     ) -> Result<Option<Box<dyn DocIterator>>, QueryError> {
         let optimized = context.query_tree.optimize()?;
+        // `OrQueryNode::CreateSearch`: a top-level OR whose children are all
+        // term leaves may use block-max WAND when a result size is known.
+        if context.early_term_algo == EarlyTermAlgo::Bmw && context.topn > 0 {
+            if let QueryNode::Or(children) = &optimized {
+                if let Some(iter) = self.bmw_search(children, context.topn) {
+                    return Ok(Some(iter));
+                }
+            }
+        }
         Ok(optimized.create_search(self.lookup))
+    }
+
+    /// Builds the WAND iterator when every child is a term on one column and
+    /// the lookup can score.
+    fn bmw_search(&self, children: &[QueryNode], topn: usize) -> Option<Box<dyn DocIterator>> {
+        let mut column: Option<&str> = None;
+        let mut terms = Vec::with_capacity(children.len());
+        for child in children {
+            let QueryNode::Term(term) = child else {
+                return None;
+            };
+            match column {
+                None => column = Some(&term.column),
+                Some(existing) if existing == term.column => {}
+                Some(_) => return None,
+            }
+            terms.push(term.term.clone());
+        }
+        if terms.len() < 2 {
+            return None;
+        }
+        let hits = self.lookup.bmw_search(column?, &terms, topn)?;
+        Some(Box::new(BmwIterator::new(hits)))
+    }
+}
+
+/// The reference's `BlockMaxWandIterator` result stream: the lookup runs the
+/// scan up front, this adapter exposes the ranked hits as a document iterator.
+pub struct BmwIterator {
+    /// `(doc id, BM25 score)`, ascending by doc id.
+    hits: Vec<(u64, f64)>,
+    index: usize,
+    doc_id: u64,
+}
+
+impl BmwIterator {
+    pub fn new(mut hits: Vec<(u64, f64)>) -> Self {
+        hits.sort_unstable_by_key(|hit| hit.0);
+        Self {
+            hits,
+            index: 0,
+            doc_id: INVALID_DOC_ID,
+        }
+    }
+
+    pub fn hits(&self) -> &[(u64, f64)] {
+        &self.hits
+    }
+
+    /// The score of the current document (`BlockMaxWandIterator::Score`).
+    pub fn score(&self) -> f64 {
+        self.hits
+            .get(self.index)
+            .filter(|hit| hit.0 == self.doc_id)
+            .map(|hit| hit.1)
+            .unwrap_or(0.0)
+    }
+}
+
+impl DocIterator for BmwIterator {
+    fn next(&mut self, doc_id: u64) -> bool {
+        while self.index < self.hits.len() && self.hits[self.index].0 < doc_id {
+            self.index += 1;
+        }
+        match self.hits.get(self.index) {
+            Some(hit) => {
+                self.doc_id = hit.0;
+                true
+            }
+            None => {
+                self.doc_id = INVALID_DOC_ID;
+                false
+            }
+        }
+    }
+
+    fn doc_id(&self) -> u64 {
+        self.doc_id
+    }
+
+    fn iterator_type(&self) -> DocIteratorType {
+        DocIteratorType::BmwIterator
+    }
+
+    fn score(&mut self) -> f64 {
+        BmwIterator::score(self)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+/// The BM25 constants of `BM25Ranker`.
+const K1: f64 = 1.2;
+const B: f64 = 0.75;
+
+fn bm25_idf(n_docs: usize, doc_freq: usize) -> f64 {
+    let n = n_docs.max(1) as f64;
+    let df = doc_freq.max(1) as f64;
+    (1.0 + (n - df + 0.5) / (df + 0.5)).ln()
+}
+
+/// A term leaf's posting iterator (`TermDocIterator`): the documents of one
+/// term, their term frequencies and the corpus statistics BM25 needs.
+pub struct TermDocIterator {
+    term: String,
+    /// `(doc id, term frequency)`, ascending by doc id.
+    postings: Vec<(u64, u32)>,
+    /// Document length aligned with `postings`.
+    doc_lens: Vec<u32>,
+    index: usize,
+    doc_id: u64,
+    doc_freq: u32,
+    term_freq: u64,
+    n_docs: usize,
+    avg_len: f64,
+    weight: f64,
+    delta: f64,
+    scored_doc: u64,
+    score_cache: f64,
+}
+
+impl TermDocIterator {
+    /// `n_docs`/`total_len` are the column's corpus statistics (all documents
+    /// and their total token count), not just the matching ones.
+    pub fn new(
+        term: impl Into<String>,
+        postings: Vec<(u64, u32)>,
+        doc_lens: Vec<u32>,
+        n_docs: usize,
+        total_len: u64,
+        weight: f64,
+        delta: f64,
+    ) -> Self {
+        debug_assert_eq!(postings.len(), doc_lens.len());
+        let doc_freq = postings.len() as u32;
+        Self {
+            term: term.into(),
+            postings,
+            doc_lens,
+            index: 0,
+            doc_id: INVALID_DOC_ID,
+            doc_freq,
+            term_freq: 0,
+            n_docs,
+            avg_len: if n_docs == 0 {
+                1.0
+            } else {
+                (total_len as f64 / n_docs as f64).max(1e-9)
+            },
+            weight,
+            delta,
+            scored_doc: INVALID_DOC_ID,
+            score_cache: 0.0,
+        }
+    }
+
+    pub fn term(&self) -> &str {
+        &self.term
+    }
+
+    /// `GetDocFreq`: the term's document frequency.
+    pub fn doc_freq(&self) -> u32 {
+        self.doc_freq
+    }
+
+    /// `GetTermFreq`: the term frequency accumulated over the documents whose
+    /// `score` was taken (the reference adds `tf` inside `BM25Score`).
+    pub fn term_freq(&self) -> u64 {
+        self.term_freq
+    }
+
+    /// `BM25Score`. Cached per document, like the reference, and accumulates
+    /// `term_freq` exactly once per document.
+    pub fn score(&mut self) -> f64 {
+        if self.doc_id == INVALID_DOC_ID {
+            return 0.0;
+        }
+        if self.scored_doc == self.doc_id {
+            return self.score_cache;
+        }
+        let (tf, dl) = self
+            .postings
+            .get(self.index)
+            .map(|(_, tf)| {
+                (
+                    *tf as f64,
+                    self.doc_lens.get(self.index).copied().unwrap_or(1) as f64,
+                )
+            })
+            .unwrap_or((0.0, 1.0));
+        let idf = bm25_idf(self.n_docs, self.postings.len());
+        let norm = (K1 + 1.0) * tf / (tf + K1 * ((1.0 - B) + B * dl / self.avg_len));
+        self.score_cache = idf * (norm + self.delta) * self.weight;
+        self.term_freq += tf as u64;
+        self.scored_doc = self.doc_id;
+        self.score_cache
+    }
+
+    /// `BM25ScoreUpperBound`: `tf/(tf+p) <= 1`.
+    pub fn upper_bound(&self) -> f64 {
+        bm25_idf(self.n_docs, self.postings.len()) * (K1 + 1.0 + self.delta.max(0.0)) * self.weight
+    }
+}
+
+impl DocIterator for TermDocIterator {
+    fn next(&mut self, doc_id: u64) -> bool {
+        if self.doc_id != INVALID_DOC_ID && self.doc_id >= doc_id {
+            return true;
+        }
+        let rest = &self.postings[self.index..];
+        let offset = rest.partition_point(|(doc, _)| *doc < doc_id);
+        self.index += offset;
+        match self.postings.get(self.index) {
+            Some((doc, _)) => {
+                self.doc_id = *doc;
+                true
+            }
+            None => {
+                self.doc_id = INVALID_DOC_ID;
+                false
+            }
+        }
+    }
+
+    fn doc_id(&self) -> u64 {
+        self.doc_id
+    }
+
+    fn iterator_type(&self) -> DocIteratorType {
+        DocIteratorType::TermDocIterator
+    }
+
+    fn score(&mut self) -> f64 {
+        TermDocIterator::score(self)
+    }
+
+    fn doc_freq(&self) -> u32 {
+        self.doc_freq
+    }
+
+    fn term_freq(&self) -> u64 {
+        self.term_freq
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+/// A phrase leaf's iterator (`PhraseDocIterator`): only documents where the
+/// analysed terms occur in order within `slop` positions.
+pub struct PhraseDocIterator {
+    terms: Vec<String>,
+    /// Per query term: `(doc id, positions)`, ascending by doc id.
+    postings: Vec<Vec<(u64, Vec<u32>)>>,
+    cursors: Vec<usize>,
+    doc_id: u64,
+    doc_freq: u32,
+    term_freq: f64,
+    phrase_freq: f64,
+    slop: u32,
+    doc_lens: std::collections::HashMap<u64, u32>,
+    n_docs: usize,
+    avg_len: f64,
+    weight: f64,
+    delta: f64,
+    scored_doc: u64,
+    score_cache: f64,
+}
+
+impl PhraseDocIterator {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        terms: Vec<String>,
+        postings: Vec<Vec<(u64, Vec<u32>)>>,
+        slop: u32,
+        doc_lens: std::collections::HashMap<u64, u32>,
+        n_docs: usize,
+        total_len: u64,
+        weight: f64,
+        delta: f64,
+    ) -> Self {
+        let cursors = vec![0; postings.len()];
+        Self {
+            terms,
+            postings,
+            cursors,
+            doc_id: INVALID_DOC_ID,
+            doc_freq: 0,
+            term_freq: 0.0,
+            phrase_freq: 0.0,
+            slop,
+            doc_lens,
+            n_docs,
+            avg_len: if n_docs == 0 {
+                1.0
+            } else {
+                (total_len as f64 / n_docs as f64).max(1e-9)
+            },
+            weight,
+            delta,
+            scored_doc: INVALID_DOC_ID,
+            score_cache: 0.0,
+        }
+    }
+
+    pub fn terms(&self) -> &[String] {
+        &self.terms
+    }
+
+    /// `GetDocFreq`: documents matched so far.
+    pub fn doc_freq(&self) -> u32 {
+        self.doc_freq
+    }
+
+    /// `GetPhraseFreq`: sum of the per-document phrase frequencies matched so
+    /// far.
+    pub fn phrase_freq(&self) -> f64 {
+        self.phrase_freq
+    }
+
+    /// `BM25Score` of the current document.
+    pub fn score(&mut self) -> f64 {
+        if self.doc_id == INVALID_DOC_ID {
+            return 0.0;
+        }
+        if self.scored_doc == self.doc_id {
+            return self.score_cache;
+        }
+        let tf = self.term_freq;
+        let dl = self.doc_lens.get(&self.doc_id).copied().unwrap_or(1) as f64;
+        // `PhraseDocIterator::InitBM25Info` sums the terms' idf.
+        let idf_sum: f64 = self
+            .postings
+            .iter()
+            .map(|list| bm25_idf(self.n_docs, list.len()))
+            .sum();
+        let norm = (K1 + 1.0) * tf / (tf + K1 * ((1.0 - B) + B * dl / self.avg_len));
+        self.score_cache = idf_sum * (norm + self.delta) * self.weight;
+        self.scored_doc = self.doc_id;
+        self.score_cache
+    }
+
+    /// Moves `cursor` to the first posting whose doc id is at least `target`.
+    fn seek_term(&mut self, term: usize, target: u64) -> Option<u64> {
+        let list = &self.postings[term];
+        let mut cursor = self.cursors[term];
+        while cursor < list.len() && list[cursor].0 < target {
+            cursor += 1;
+        }
+        self.cursors[term] = cursor;
+        list.get(cursor).map(|(doc, _)| *doc)
+    }
+
+    /// `GetExactPhraseMatchData`.
+    fn exact_match(&mut self) -> bool {
+        let starts: Vec<u32> = self.postings[0][self.cursors[0]].1.clone();
+        let mut matched = 0u32;
+        for start in starts {
+            let mut found = true;
+            for i in 1..self.postings.len() {
+                let doc_positions = &self.postings[i][self.cursors[i]].1;
+                if doc_positions.binary_search(&(start + i as u32)).is_err() {
+                    found = false;
+                    break;
+                }
+            }
+            if found {
+                matched += 1;
+            }
+        }
+        if matched == 0 {
+            return false;
+        }
+        self.doc_freq += 1;
+        self.term_freq = f64::from(matched);
+        self.phrase_freq += f64::from(matched);
+        true
+    }
+
+    /// `GetSloppyPhraseMatchData`, including its `sloppyWeight`
+    /// `1 / (1 + matchLength)` per solution.
+    fn sloppy_match(&mut self) -> bool {
+        #[derive(Clone, Copy)]
+        struct Step {
+            pos_i: usize,
+            term_pos_idx: usize,
+            min_phrase_pos: i32,
+            max_phrase_pos: i32,
+        }
+        let positions: Vec<Vec<i32>> = self
+            .postings
+            .iter()
+            .enumerate()
+            .map(|(i, list)| {
+                list[self.cursors[i]]
+                    .1
+                    .iter()
+                    .map(|position| *position as i32)
+                    .collect()
+            })
+            .collect();
+        if positions.iter().any(Vec::is_empty) {
+            return false;
+        }
+        let slop = self.slop as i32;
+        let calibrate = |steps: &mut Vec<Step>, positions: &[Vec<i32>]| -> bool {
+            let last = steps.len() - 1;
+            if steps[last].term_pos_idx >= positions[steps[last].pos_i].len() {
+                return false;
+            }
+            let phrase_pos_i =
+                positions[steps[last].pos_i][steps[last].term_pos_idx] - steps[last].pos_i as i32;
+            if steps[last].pos_i == 0 {
+                steps[last].min_phrase_pos = phrase_pos_i;
+                steps[last].max_phrase_pos = phrase_pos_i;
+            } else {
+                let prev_min = steps[last - 1].min_phrase_pos;
+                let prev_max = steps[last - 1].max_phrase_pos;
+                let step = &mut steps[last];
+                step.min_phrase_pos = phrase_pos_i.min(prev_min);
+                step.max_phrase_pos = phrase_pos_i.max(prev_max);
+                if step.max_phrase_pos - step.min_phrase_pos > slop {
+                    return false;
+                }
+            }
+            true
+        };
+        let mut steps = vec![Step {
+            pos_i: 0,
+            term_pos_idx: 0,
+            min_phrase_pos: positions[0][0],
+            max_phrase_pos: positions[0][0],
+        }];
+        let mut solutions = 0usize;
+        let mut tf = 0.0f64;
+        while !steps.is_empty() {
+            if calibrate(&mut steps, &positions) {
+                if steps.len() == positions.len() {
+                    let step = steps.last().expect("non-empty");
+                    tf +=
+                        1.0 / (1.0 + f64::from((step.max_phrase_pos - step.min_phrase_pos) as u32));
+                    solutions += 1;
+                    steps.last_mut().expect("non-empty").term_pos_idx += 1;
+                } else {
+                    let prev_min = steps.last().expect("non-empty").min_phrase_pos;
+                    let pos_i = steps.len();
+                    let lower = prev_min - slop + pos_i as i32;
+                    let term_pos_idx =
+                        positions[pos_i].partition_point(|position| *position < lower);
+                    steps.push(Step {
+                        pos_i,
+                        term_pos_idx,
+                        min_phrase_pos: 0,
+                        max_phrase_pos: 0,
+                    });
+                }
+            } else {
+                steps.pop();
+                if steps.is_empty() {
+                    break;
+                }
+                if steps.len() != positions.len() {
+                    steps.last_mut().expect("non-empty").term_pos_idx += 1;
+                }
+            }
+        }
+        if solutions == 0 {
+            return false;
+        }
+        self.doc_freq += 1;
+        self.term_freq = tf;
+        self.phrase_freq += tf;
+        true
+    }
+}
+
+impl DocIterator for PhraseDocIterator {
+    fn next(&mut self, doc_id: u64) -> bool {
+        if self.doc_id != INVALID_DOC_ID && self.doc_id >= doc_id {
+            return true;
+        }
+        if self.postings.is_empty() {
+            self.doc_id = INVALID_DOC_ID;
+            return false;
+        }
+        let mut target = doc_id;
+        loop {
+            for term in 0..self.postings.len() {
+                match self.seek_term(term, target) {
+                    Some(doc) => target = doc,
+                    None => {
+                        self.doc_id = INVALID_DOC_ID;
+                        return false;
+                    }
+                }
+            }
+            if target == self.postings[0][self.cursors[0]].0 {
+                if self.exact_or_sloppy_match() {
+                    self.doc_id = target;
+                    return true;
+                }
+                target += 1;
+            }
+        }
+    }
+
+    fn doc_id(&self) -> u64 {
+        self.doc_id
+    }
+
+    fn iterator_type(&self) -> DocIteratorType {
+        DocIteratorType::PhraseIterator
+    }
+
+    fn score(&mut self) -> f64 {
+        PhraseDocIterator::score(self)
+    }
+
+    fn doc_freq(&self) -> u32 {
+        self.doc_freq
+    }
+
+    fn phrase_freq(&self) -> f64 {
+        self.phrase_freq
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl PhraseDocIterator {
+    fn exact_or_sloppy_match(&mut self) -> bool {
+        if self.slop == 0 {
+            self.exact_match()
+        } else {
+            self.sloppy_match()
+        }
     }
 }
 
@@ -318,6 +971,14 @@ impl DocIterator for AndIterator {
 
     fn doc_id(&self) -> u64 {
         self.doc_id
+    }
+
+    fn iterator_type(&self) -> DocIteratorType {
+        DocIteratorType::AndIterator
+    }
+
+    fn score(&mut self) -> f64 {
+        self.children.iter_mut().map(|child| child.score()).sum()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -389,6 +1050,14 @@ impl DocIterator for OrIterator {
         self.doc_id
     }
 
+    fn iterator_type(&self) -> DocIteratorType {
+        DocIteratorType::OrIterator
+    }
+
+    fn score(&mut self) -> f64 {
+        self.children.iter_mut().map(|child| child.score()).sum()
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -446,6 +1115,17 @@ impl DocIterator for AndNotIterator {
 
     fn doc_id(&self) -> u64 {
         self.doc_id
+    }
+
+    fn iterator_type(&self) -> DocIteratorType {
+        DocIteratorType::AndNotIterator
+    }
+
+    fn score(&mut self) -> f64 {
+        self.children
+            .first_mut()
+            .map(|child| child.score())
+            .unwrap_or(0.0)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -560,6 +1240,10 @@ mod tests {
             self.doc_id
         }
 
+        fn iterator_type(&self) -> DocIteratorType {
+            DocIteratorType::TermDocIterator
+        }
+
         fn as_any(&self) -> &dyn Any {
             self
         }
@@ -637,7 +1321,7 @@ mod tests {
         ]);
         let builder = QueryBuilder::new(&lookup);
         let mut result = builder
-            .create_search(FullTextQueryContext { query_tree: tree })
+            .create_search(FullTextQueryContext::new(tree))
             .unwrap()
             .unwrap();
 
@@ -681,7 +1365,7 @@ mod tests {
         ]);
         let builder = QueryBuilder::new(&lookup);
         let mut result = builder
-            .create_search(FullTextQueryContext { query_tree: tree })
+            .create_search(FullTextQueryContext::new(tree))
             .unwrap()
             .unwrap();
 
@@ -728,7 +1412,7 @@ mod tests {
         ]);
         let builder = QueryBuilder::new(&lookup);
         let mut result = builder
-            .create_search(FullTextQueryContext { query_tree: tree })
+            .create_search(FullTextQueryContext::new(tree))
             .unwrap()
             .unwrap();
 
@@ -781,7 +1465,7 @@ mod tests {
         ]);
         let builder = QueryBuilder::new(&lookup);
         let mut result = builder
-            .create_search(FullTextQueryContext { query_tree: tree })
+            .create_search(FullTextQueryContext::new(tree))
             .unwrap()
             .unwrap();
 

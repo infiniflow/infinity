@@ -1,5 +1,5 @@
 //! Engine-level ports of the reference's `new_request` tests
-//! (`src/unit_test/storage/new_request/{ddl,conflict}_request_ut.cpp`).
+//! (`src/unit_test/storage/new_request/{ddl,conflict,index,data}_request_ut.cpp`).
 //!
 //! Each DDL case issues a statement twice through a fresh `QueryContext` and
 //! asserts that the second attempt fails. The conflict cases run two
@@ -22,6 +22,16 @@ fn default_import_csv() -> String {
         .join("../../../test/data/csv/pysdk_test_import_default.csv")
         .to_string_lossy()
         .into_owned()
+}
+
+/// The rows of a query, as rendered strings.
+fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
+    for result in e.execute(sql).unwrap() {
+        if let QueryResult::Rows { rows, .. } = result {
+            return rows;
+        }
+    }
+    panic!("query returned no rows: {sql}");
 }
 
 /// `SELECT count(*)` — the visible row count the reference reads through
@@ -464,4 +474,217 @@ fn conflict_delete_append() {
     });
 
     e.execute("SELECT * FROM t1;").unwrap();
+}
+
+/// Asserts that `sql` returns a first row whose first column is `expected`
+/// (the reference reads `data_blocks_[0]->column_vectors_[0]->GetValueByIndex(0)`).
+fn assert_first(e: &Engine, sql: &str, expected: &str) {
+    let got = rows(e, sql);
+    assert_eq!(
+        got.first().map(|row| row[0].as_str()),
+        Some(expected),
+        "{sql}"
+    );
+}
+
+/// C++: `src/unit_test/storage/new_request/index_request_ut.cpp:43`
+/// (`index_scan`): a secondary index answers a range scan.
+#[test]
+fn index_scan_returns_filtered_rows() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    e.execute("CREATE TABLE t1(c1 INT, c2 VARCHAR);").unwrap();
+    e.execute("INSERT INTO t1 VALUES (1, 'abc'), (2, 'def');")
+        .unwrap();
+    e.execute("CREATE INDEX idx1 ON t1 (c1);").unwrap();
+
+    assert_eq!(
+        rows(&e, "SELECT * FROM t1 WHERE c1 > 1;"),
+        vec![vec!["2".to_string(), "def".to_string()]]
+    );
+}
+
+/// C++: `src/unit_test/storage/new_request/index_request_ut.cpp:88`
+/// (`fulltext_index_scan`): a full-text index answers `MATCH TEXT`.
+#[test]
+fn fulltext_index_scan_returns_matching_row() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    e.execute("CREATE TABLE t1(c1 INT, c2 VARCHAR);").unwrap();
+    e.execute("INSERT INTO t1 VALUES (1, 'abc'), (2, 'def');")
+        .unwrap();
+    e.execute("CREATE INDEX idx2 ON t1 (c2) USING FULLTEXT;")
+        .unwrap();
+
+    assert_eq!(
+        rows(
+            &e,
+            "SELECT * FROM t1 SEARCH MATCH TEXT ('c2', 'def', 'topn=1');"
+        ),
+        vec![vec!["2".to_string(), "def".to_string()]]
+    );
+}
+
+/// C++: `src/unit_test/storage/new_request/index_request_ut.cpp:132`
+/// (`vector_index_scan`): `MATCH VECTOR` ranks the same top-1 before any
+/// index, through the HNSW index (chosen implicitly and by `USING INDEX`), and
+/// through the IVF index.
+#[test]
+fn vector_index_scan_matches_with_hnsw_and_ivf() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    e.execute("CREATE TABLE t1(c1 INT, c2 EMBEDDING(FLOAT,4));")
+        .unwrap();
+    e.execute("INSERT INTO t1 VALUES (1, [0.1,0.1,0.1,0.1]), (2, [0.2,0.2,0.2,0.2]);")
+        .unwrap();
+
+    let search = "SELECT c1 FROM t1 SEARCH MATCH VECTOR \
+                  (c2, [0.3,0.3,0.2,0.2], 'float', 'l2', 1)";
+    assert_first(&e, &format!("{search};"), "2");
+
+    e.execute(
+        "CREATE INDEX idx1 ON t1 (c2) USING HNSW \
+         WITH (M=16, ef_construction=200, metric=l2);",
+    )
+    .unwrap();
+    assert_first(&e, &format!("{search};"), "2");
+    assert_first(&e, &format!("{search} USING INDEX (idx1);"), "2");
+
+    e.execute("CREATE INDEX idx2 ON t1 (c2) USING IVF WITH (metric=l2);")
+        .unwrap();
+    assert_first(&e, &format!("{search} USING INDEX (idx2);"), "2");
+}
+
+/// C++: `src/unit_test/storage/new_request/index_request_ut.cpp:186`
+/// (`sparse_index_scan`): `MATCH SPARSE` ranks the same top-1 before and after
+/// the BMP index is built.
+#[test]
+fn sparse_index_scan_matches_with_bmp() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    e.execute("CREATE TABLE t1(c1 INT, c2 SPARSE(FLOAT,100));")
+        .unwrap();
+    e.execute(
+        "INSERT INTO t1 VALUES (1, [10:1.0, 20:1.0, 30:1.0]), \
+         (2, [40:1.0, 50:1.0, 60:1.0]);",
+    )
+    .unwrap();
+
+    let search = "SELECT c1 FROM t1 SEARCH MATCH SPARSE \
+                  (c2, [20:1.0,30:1.0,40:1.0], 'ip', 1);";
+    assert_first(&e, search, "1");
+
+    e.execute(
+        "CREATE INDEX idx2 ON t1 (c2) USING BMP \
+         WITH (block_size=8, compress_type=compress);",
+    )
+    .unwrap();
+    assert_first(&e, search, "1");
+}
+
+/// C++: `src/unit_test/storage/new_request/index_request_ut.cpp:226`
+/// (`tensor_index_scan`): `MATCH TENSOR` applies MaxSim over the 4-wide leaves
+/// of each row, with and without the EMVB index.
+#[test]
+fn tensor_index_scan_matches_with_emvb() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    let search = "SELECT c1 FROM t1 SEARCH MATCH TENSOR \
+                  (c2, [0.4,0.5,0.6,0.7], 'float', 'maxsim', '');";
+    for use_index in [false, true] {
+        e.execute("CREATE TABLE t1(c1 INT, c2 TENSOR(FLOAT,4));")
+            .unwrap();
+        if use_index {
+            e.execute(
+                "CREATE INDEX idx1 ON t1 (c2) USING EMVB \
+                 WITH (pq_subspace_num=4, pq_subspace_bits=8);",
+            )
+            .unwrap();
+        }
+        // The second row concatenates two 4-wide vectors and wins on MaxSim.
+        e.execute(
+            "INSERT INTO t1 VALUES (1, [0.0,1.0,2.0,3.0]), \
+             (2, [0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0]);",
+        )
+        .unwrap();
+        assert_first(&e, search, "2");
+        e.execute("DROP TABLE t1;").unwrap();
+    }
+}
+
+/// C++: `src/unit_test/storage/new_request/index_request_ut.cpp:276`
+/// (`test_optimize_index`): an LVQ-encoded HNSW index survives
+/// `ALTER INDEX … WITH (lvq_avg)` and still answers the top-1 query.
+#[test]
+fn optimize_index_preserves_vector_search() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    e.execute("CREATE TABLE t1(c1 INT, c2 EMBEDDING(FLOAT,4));")
+        .unwrap();
+    e.execute(
+        "CREATE INDEX idx1 ON t1 (c2) USING HNSW \
+         WITH (M=16, ef_construction=200, metric=l2, encode=lvq);",
+    )
+    .unwrap();
+    e.execute("INSERT INTO t1 VALUES (1, [0.1,0.1,0.1,0.1]), (2, [0.2,0.2,0.2,0.2]);")
+        .unwrap();
+    e.execute("ALTER idx1 ON t1 WITH (lvq_avg);").unwrap();
+
+    assert_first(
+        &e,
+        "SELECT c1 FROM t1 SEARCH MATCH VECTOR \
+         (c2, [0.3,0.3,0.2,0.2], 'float', 'l2', 1);",
+        "2",
+    );
+}
+
+/// C++: `src/unit_test/storage/new_request/data_request_ut.cpp:52`
+/// (`test_append`): an append succeeds, while appending to a missing table is
+/// rejected.
+#[test]
+fn append_into_missing_table_fails() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    e.execute("CREATE TABLE t1(c1 INT, c2 VARCHAR);").unwrap();
+    e.execute("INSERT INTO t1 VALUES (1, 'abc');").unwrap();
+    assert!(e.execute("INSERT INTO t2 VALUES (1, 'abc');").is_err());
+}
+
+/// C++: `src/unit_test/storage/new_request/data_request_ut.cpp:72`
+/// (`test_select`): `SELECT *` returns the appended row verbatim.
+#[test]
+fn select_returns_inserted_row() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    e.execute("CREATE TABLE t1(c1 INT, c2 VARCHAR);").unwrap();
+    e.execute("INSERT INTO t1 VALUES (1, 'abc');").unwrap();
+    assert_eq!(
+        rows(&e, "SELECT * FROM t1;"),
+        vec![vec!["1".to_string(), "abc".to_string()]]
+    );
+}
+
+/// C++: `src/unit_test/storage/new_request/data_request_ut.cpp:104`
+/// (`test_delete`): `DELETE` removes the matching row and leaves the other.
+#[test]
+fn delete_removes_matching_row() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+
+    e.execute("CREATE TABLE t1(c1 INT, c2 VARCHAR);").unwrap();
+    e.execute("INSERT INTO t1 VALUES (1, 'abc'), (2, 'def');")
+        .unwrap();
+    e.execute("DELETE FROM t1 WHERE c1 = 1;").unwrap();
+    assert_eq!(
+        rows(&e, "SELECT * FROM t1;"),
+        vec![vec!["2".to_string(), "def".to_string()]]
+    );
 }
