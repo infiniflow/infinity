@@ -86,6 +86,7 @@ pub mod metastore;
 pub mod metastore_rocks;
 pub mod multivector_segment;
 pub mod mvcc;
+pub mod rcu_map;
 pub mod s3;
 pub mod secondary_lowcard;
 pub mod secondary_segment;
