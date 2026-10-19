@@ -145,7 +145,7 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 | HNSW / 稠密 KNN | `kHnsw` | 已实现 | 自研；plain/LVQ/Rabitq；MLAS GEMM |
 | IVF (flat/PQ/SQ) | `kIVF` | 已实现 | 自研；kmeans；MLAS |
 | DiskANN (Vamana) | `kDiskAnn` | **未实现** | 内存结构存在，populate 未接通 |
-| EMVB / PLAID / SMVE | 多向量 | 部分 | Eigen SVD + MLAS |
+| EMVB / PLAID / SMVE | 多向量 | 已实现 | 类级移植：EMVB（PQ/残差）、PLAID（2/4-bit 残差量化 + IVF + MaxSim）、SMVE（投影 + BMP）；SVD/GEMM 由自研循环与 `simsimd` 承担 |
 | 全文 / 倒排 | `kFullText` | 已实现 | 源自 iresearch：PForDelta、BM25/WAND、cppjieba/opencc、re2；FST 为 `BurntSushi/fst` 的 C++ 移植 |
 | 二级索引 | `kSecondary` | 已实现 | PGM-index + 低基数变体 + 函数索引 |
 | JSON | secondary 变体 | 已实现 | `JsonFlattener` + nlohmann |
@@ -476,7 +476,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 #### 7.5.2 功能对齐缺口（P1）
 
-5. **多向量查询侧**：持久化残差码字已接入（EMVB 第 2 步：粗质心 + 子空间码字打分，见 `EmvbPqIndex::prefilter`），最终候选仍按原始 token 精确重排；PLAID 的质心交互剪枝没有单独实现。
+5. **多向量查询侧**：持久化残差码字已接入（EMVB 第 2 步：粗质心 + 子空间码字打分，见 `EmvbPqIndex::prefilter`），最终候选仍按原始 token 精确重排；PLAID（IVF 探测 + 残差精排）与 SMVE（投影 + BMP，候选按列值精确重排）已按类移植并接入 `MATCH TENSOR`。
 6. **全文非 OR 路径**：WAND 已覆盖 filter、`similarity=boolean`、`minimum_should_match`、`delta_term` 与多字段加权（`lib.rs` 的 `WandMode` + per-field 统计）；短语与 `rank_features` 仍走扫描路径（该路径本身已按索引裁剪候选行）。
 7. ~~IVF 检索~~：plain 已接入（#89）；SQ/PQ 编码的检索在镜像写出这两种编码前不可达。
 

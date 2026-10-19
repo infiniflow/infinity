@@ -357,6 +357,19 @@ impl BmpAlg {
         topk: usize,
         options: BmpSearchOptions,
     ) -> Vec<(usize, f32)> {
+        self.search_knn_filtered(query, topk, options, None)
+    }
+
+    /// C++: `BMPAlgBase::SearchKnn` with the reference's per-document filter
+    /// (`KnnFilter`/`BitmaskFilter`): only ids where `allowed[id]` is true are
+    /// scored into the result heap.
+    pub fn search_knn_filtered(
+        &self,
+        query: &[(u32, f32)],
+        topk: usize,
+        options: BmpSearchOptions,
+        allowed: Option<&[bool]>,
+    ) -> Vec<(usize, f32)> {
         if topk == 0 || self.docs.is_empty() {
             return Vec::new();
         }
@@ -410,7 +423,9 @@ impl BmpAlg {
             let start = block_id as usize * block_size;
             for (offset, score) in scores.into_iter().enumerate() {
                 let doc = start + offset;
-                if doc < self.docs.len() {
+                if doc < self.docs.len()
+                    && allowed.is_none_or(|a| a.get(doc).copied().unwrap_or(false))
+                {
                     push_topk(&mut best, score, doc, topk);
                 }
             }
@@ -426,7 +441,10 @@ impl BmpAlg {
         }
         if options.use_tail && !stopped {
             for (i, score) in self.fwd.get_scores_tail(&q).into_iter().enumerate() {
-                push_topk(&mut best, score, block_num * block_size + i, topk);
+                let doc = block_num * block_size + i;
+                if allowed.is_none_or(|a| a.get(doc).copied().unwrap_or(false)) {
+                    push_topk(&mut best, score, doc, topk);
+                }
             }
         }
 

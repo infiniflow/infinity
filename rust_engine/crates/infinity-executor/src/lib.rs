@@ -1992,6 +1992,34 @@ struct MultiVectorIndex {
     /// it lags (the reference's `EMVBIndexInMem`).
     tail_generation: u64,
     tail_emvb: std::sync::Mutex<Option<MvTailEmvb>>,
+    /// PLAID options when the column carries a `USING PLAID` index.
+    plaid_config: Option<PlaidConfig>,
+    /// The reference's `PlaidIndex` over every document (`PlaidIndexInMem`
+    /// after its build, kept in step by incremental adds).
+    plaid: Option<infinity_index::plaid::PlaidIndex>,
+    /// Row id of each PLAID document id.
+    plaid_seqs: Vec<u64>,
+    /// SMVE options when the column carries a `USING SMVE` index.
+    smve_config: Option<SmveConfig>,
+    /// The reference's `SMVEIndexInMem` (a BMP over SMVE sparse codes).
+    smve: Option<infinity_index::smve::SmveIndex>,
+    /// Row id of each SMVE document id.
+    smve_seqs: Vec<u64>,
+}
+
+/// `CREATE INDEX … USING PLAID WITH (nbits=…, n_centroids=…)`.
+#[derive(Clone, Copy, Debug)]
+struct PlaidConfig {
+    nbits: u32,
+    n_centroids: u32,
+    colbertsar: bool,
+}
+
+/// `CREATE INDEX … USING SMVE WITH (width=…, topk=…)`.
+#[derive(Clone, Copy, Debug)]
+struct SmveConfig {
+    width: u32,
+    topk: u32,
 }
 
 /// The reference's `EMVBIndexInMem` over the multi-vector tail.
@@ -2043,7 +2071,12 @@ fn maxsim_tokens(query: &[Vec<f32>], doc: &[Vec<f32>]) -> f32 {
 }
 
 impl MultiVectorIndex {
-    fn new(dir: PathBuf, dims: usize) -> Self {
+    fn new(
+        dir: PathBuf,
+        dims: usize,
+        plaid_config: Option<PlaidConfig>,
+        smve_config: Option<SmveConfig>,
+    ) -> Self {
         let next_chunk = std::fs::read_dir(&dir)
             .map(|d| {
                 d.filter_map(|e| e.ok())
@@ -2060,6 +2093,12 @@ impl MultiVectorIndex {
             tail_bytes: 0,
             tail_generation: 0,
             tail_emvb: std::sync::Mutex::new(None),
+            plaid_config,
+            plaid: None,
+            plaid_seqs: Vec::new(),
+            smve_config,
+            smve: None,
+            smve_seqs: Vec::new(),
         }
     }
 
@@ -2073,18 +2112,145 @@ impl MultiVectorIndex {
     }
 
     fn insert(&mut self, seq: u64, doc: Vec<Vec<f32>>) {
+        let replacing = self.tail.contains_key(&seq);
+        let covered = self
+            .plaid
+            .as_ref()
+            .is_some_and(|p| p.doc_num() as usize == self.doc_count());
         if let Some(old) = self.tail.remove(&seq) {
             self.tail_bytes = self.tail_bytes.saturating_sub(multivector_doc_bytes(&old));
         }
         self.tail_bytes += multivector_doc_bytes(&doc);
-        self.tail.insert(seq, doc);
+        self.tail.insert(seq, doc.clone());
         self.tail_generation += 1;
+        // The reference's `PlaidIndexInMem::Insert`: once a trained index
+        // covers every document, new rows are added incrementally. A rewritten
+        // row cannot be removed from PLAID, so the index is dropped and the
+        // next rebuild recreates it.
+        if let Some(index) = self.plaid.as_mut() {
+            let flat: Vec<f32> = doc.iter().flatten().copied().collect();
+            let added = !replacing
+                && covered
+                && index
+                    .add_multiple_docs_embeddings(&flat, &[doc.len() as u32])
+                    .is_ok();
+            if added {
+                self.plaid_seqs.push(seq);
+            } else {
+                self.plaid = None;
+                self.plaid_seqs.clear();
+            }
+        }
+        // `SMVEIndexInMem::BuildFromColumn` runs per inserted block; the BMP
+        // accepts one document at a time.
+        if let Some(index) = self.smve.as_mut() {
+            let label = index.row_count() as u32;
+            if replacing || index.add_document(label, &doc).is_err() {
+                self.smve = None;
+                self.smve_seqs.clear();
+            } else {
+                self.smve_seqs.push(seq);
+            }
+        }
     }
 
     fn remove(&mut self, seq: u64) {
         if let Some(old) = self.tail.remove(&seq) {
             self.tail_bytes = self.tail_bytes.saturating_sub(multivector_doc_bytes(&old));
             self.tail_generation += 1;
+            // Neither index supports per-document deletes; the search bitmask
+            // hides dead rows, and a rewritten row needs a fresh build.
+            self.plaid = None;
+            self.plaid_seqs.clear();
+            self.smve = None;
+            self.smve_seqs.clear();
+        }
+    }
+
+    /// Builds the reference's `PlaidIndexInMem` over every buffered document.
+    ///
+    /// Called before the tail is sealed (the reference builds it while the
+    /// embeddings are still in `buffered_embeddings_`). Below
+    /// `max(256, n_centroids * 32)` embeddings the reference leaves the index
+    /// unbuilt and the caller falls back to an exhaustive scan of the range.
+    fn build_plaid(&mut self) {
+        eprintln!(
+            "DEBUG build_plaid cfg={:?} tail={}",
+            self.plaid_config,
+            self.tail.len()
+        );
+        let Some(cfg) = self.plaid_config else {
+            return;
+        };
+        let total: usize = self.tail.values().map(Vec::len).sum();
+        let threshold = 256usize.max(cfg.n_centroids as usize * 32);
+        if total < threshold {
+            return;
+        }
+        let mut k = if cfg.n_centroids == 0 {
+            infinity_index::plaid::PlaidIndex::compute_auto_n_centroids(total as u64)
+        } else {
+            cfg.n_centroids
+        };
+        while k > 8 && total < 32 * k as usize {
+            k >>= 1;
+        }
+        k = k.div_ceil(8) * 8;
+        if k as usize > total {
+            return;
+        }
+        let mut flat = Vec::with_capacity(total * self.dims);
+        let mut lens = Vec::with_capacity(self.tail.len());
+        let mut seqs = Vec::with_capacity(self.tail.len());
+        for (seq, doc) in &self.tail {
+            seqs.push(*seq);
+            lens.push(doc.len() as u32);
+            for token in doc {
+                flat.extend_from_slice(token);
+            }
+        }
+        let Ok(mut index) = infinity_index::plaid::PlaidIndex::new(
+            0,
+            self.dims as u32,
+            cfg.nbits,
+            k,
+            cfg.colbertsar,
+        ) else {
+            return;
+        };
+        if index.train(k, &flat, total, 4).is_err() {
+            return;
+        }
+        if index.add_multiple_docs_embeddings(&flat, &lens).is_err() {
+            return;
+        }
+        self.plaid = Some(index);
+        self.plaid_seqs = seqs;
+    }
+
+    /// C++: `SMVEIndexInMem::BuildFromColumn` over the buffered documents.
+    fn build_smve(&mut self) {
+        eprintln!(
+            "DEBUG build_smve cfg={:?} tail={}",
+            self.smve_config,
+            self.tail.len()
+        );
+        let Some(cfg) = self.smve_config else {
+            return;
+        };
+        let mut docs: Vec<(u32, Vec<Vec<f32>>)> = Vec::with_capacity(self.tail.len());
+        let mut seqs = Vec::with_capacity(self.tail.len());
+        for (i, (seq, doc)) in self.tail.iter().enumerate() {
+            seqs.push(*seq);
+            docs.push((i as u32, doc.clone()));
+        }
+        if docs.is_empty() {
+            return;
+        }
+        let mut index = infinity_index::smve::SmveIndex::new(cfg.width, cfg.topk, self.dims as u32);
+        if index.build_from_column(&docs).is_ok() {
+            self.smve = Some(index);
+            self.smve_seqs = seqs;
         }
     }
 
@@ -2149,7 +2315,84 @@ impl MultiVectorIndex {
         query: &[Vec<f32>],
         k: usize,
         dead: &std::collections::HashSet<u64>,
+        exact: Option<&dyn Fn(u64) -> Option<f32>>,
     ) -> Vec<(u64, f32)> {
+        // A built PLAID index answers the query directly: IVF probing, an
+        // approximate pass over the candidates and an exact residual rerank
+        // (the reference's `PlaidIndex::SearchWithBitmask`). Deleted rows are
+        // excluded by the bitmask.
+        if let Some(index) = &self.plaid {
+            if index.doc_num() as usize == self.plaid_seqs.len() {
+                let mut mask = infinity_index::plaid::Bitmask::new(index.doc_num() as usize);
+                for (doc, seq) in self.plaid_seqs.iter().enumerate() {
+                    if !dead.contains(seq) {
+                        mask.set(doc as u32);
+                    }
+                }
+                let flat: Vec<f32> = query.iter().flatten().copied().collect();
+                let topn = k.max(1);
+                let result = index.search_with_bitmask(
+                    &flat,
+                    query.len(),
+                    topn,
+                    &mask,
+                    8,
+                    -0.1,
+                    topn.saturating_mul(100),
+                    topn.saturating_mul(10),
+                );
+                let mut hits: Vec<(u64, f32)> = result
+                    .ids
+                    .iter()
+                    .zip(&result.scores)
+                    .filter_map(|(id, score)| {
+                        self.plaid_seqs.get(*id as usize).map(|seq| (*seq, *score))
+                    })
+                    .collect();
+                if !hits.is_empty() {
+                    hits.sort_by(|a, b| {
+                        b.1.partial_cmp(&a.1)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then(a.0.cmp(&b.0))
+                    });
+                    hits.truncate(k);
+                    return hits;
+                }
+            }
+        }
+        // `SMVEIndexInMem::Search`: BMP over the sparse codes yields candidates
+        // that the reference re-ranks with exact MaxSim from the column; the
+        // `exact` callback supplies that score here.
+        if let Some(index) = &self.smve {
+            if index.row_count() == self.smve_seqs.len() {
+                let allowed: Vec<bool> = self
+                    .smve_seqs
+                    .iter()
+                    .map(|seq| !dead.contains(seq))
+                    .collect();
+                let (scores, docs) = index.search(query, k.max(1), 5, Some(&allowed));
+                let mut hits: Vec<(u64, f32)> = docs
+                    .iter()
+                    .zip(&scores)
+                    .filter_map(|(doc, score)| {
+                        self.smve_seqs.get(*doc as usize).map(|seq| {
+                            let rank = exact.and_then(|f| f(*seq)).unwrap_or(*score);
+                            (*seq, rank)
+                        })
+                    })
+                    .filter(|(seq, _)| !dead.contains(seq))
+                    .collect();
+                if !hits.is_empty() {
+                    hits.sort_by(|a, b| {
+                        b.1.partial_cmp(&a.1)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then(a.0.cmp(&b.0))
+                    });
+                    hits.truncate(k);
+                    return hits;
+                }
+            }
+        }
         let mut hits: Vec<(u64, f32)> = Vec::new();
         for (reader, ids, pq) in &self.sealed {
             // The persisted residual codes rank the documents (EMVB stage 2);
@@ -4765,6 +5008,7 @@ impl Engine {
                 // memory tail and `flush()` dumps it.
                 if index_type.eq_ignore_ascii_case("EMVB")
                     || index_type.eq_ignore_ascii_case("PLAID")
+                    || index_type.eq_ignore_ascii_case("SMVE")
                 {
                     let dims = self
                         .table_schema(table)
@@ -6434,7 +6678,17 @@ impl Engine {
                 }
             }
         }
-        let mut index = MultiVectorIndex::new(dir, dims);
+        eprintln!(
+            "DEBUG mv_for build table={table} col={column} plaid={:?} smve={:?}",
+            self.mv_plaid_config(table, column),
+            self.mv_smve_config(table, column)
+        );
+        let mut index = MultiVectorIndex::new(
+            dir,
+            dims,
+            self.mv_plaid_config(table, column),
+            self.mv_smve_config(table, column),
+        );
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
             let text = match cells.get(ci) {
                 Some(Value::Str(s)) => s.clone(),
@@ -6445,6 +6699,10 @@ impl Engine {
                 index.insert(seq as u64, doc);
             }
         }
+        // The reference trains `PlaidGlobalCentroids` and builds
+        // `PlaidIndexInMem` while the embeddings are buffered, before the dump.
+        index.build_plaid();
+        index.build_smve();
         index.seal();
         let shared = Arc::new(std::sync::RwLock::new(index));
         self.tables
@@ -6455,6 +6713,120 @@ impl Engine {
             .mv
             .insert(column.to_string(), shared.clone());
         Ok(shared)
+    }
+
+    /// `CREATE INDEX … USING PLAID WITH (nbits=…, n_centroids=…)` on
+    /// `table.column`, if one exists.
+    fn mv_plaid_config(&self, table: &str, column: &str) -> Option<PlaidConfig> {
+        let short = table.rsplit('.').next().unwrap_or(table);
+        let im = self
+            .storage
+            .catalog
+            .list_indexes()
+            .ok()?
+            .into_iter()
+            .find(|im| {
+                im.index_type.eq_ignore_ascii_case("PLAID")
+                    && im.column == column
+                    && (im.table == table || im.table == short)
+            })?;
+        let mut cfg = PlaidConfig {
+            nbits: 4,
+            n_centroids: 0,
+            colbertsar: false,
+        };
+        for (key, value) in &im.options {
+            if key.eq_ignore_ascii_case("nbits") {
+                if let Ok(v) = value.trim().parse() {
+                    cfg.nbits = v;
+                }
+            } else if key.eq_ignore_ascii_case("n_centroids") {
+                if let Ok(v) = value.trim().parse() {
+                    cfg.n_centroids = v;
+                }
+            } else if key.eq_ignore_ascii_case("colbertsar_mode") {
+                let v = value.trim();
+                cfg.colbertsar = v.eq_ignore_ascii_case("true") || v == "1";
+            }
+        }
+        Some(cfg)
+    }
+
+    /// Whether `table.column` carries an ANN index that the tensor scan can
+    /// answer from (`PLAID`/`SMVE`; `EMVB` uses the same multi-vector path).
+    fn tensor_has_ann_index(&self, table: &str, column: &str) -> bool {
+        let short = table.rsplit('.').next().unwrap_or(table);
+        self.storage
+            .catalog
+            .list_indexes()
+            .unwrap_or_default()
+            .into_iter()
+            .any(|im| {
+                im.column == column
+                    && (im.table == table || im.table == short)
+                    && (im.index_type.eq_ignore_ascii_case("PLAID")
+                        || im.index_type.eq_ignore_ascii_case("SMVE")
+                        || im.index_type.eq_ignore_ascii_case("EMVB"))
+            })
+    }
+
+    /// `CREATE INDEX … USING SMVE WITH (width=…, topk=…)` on `table.column`.
+    fn mv_smve_config(&self, table: &str, column: &str) -> Option<SmveConfig> {
+        let short = table.rsplit('.').next().unwrap_or(table);
+        let im = self
+            .storage
+            .catalog
+            .list_indexes()
+            .ok()?
+            .into_iter()
+            .find(|im| {
+                im.index_type.eq_ignore_ascii_case("SMVE")
+                    && im.column == column
+                    && (im.table == table || im.table == short)
+            })?;
+        let mut cfg = SmveConfig {
+            width: 2048,
+            topk: 8,
+        };
+        for (key, value) in &im.options {
+            if key.eq_ignore_ascii_case("width") {
+                if let Ok(v) = value.trim().parse() {
+                    cfg.width = v;
+                }
+            } else if key.eq_ignore_ascii_case("topk") {
+                if let Ok(v) = value.trim().parse() {
+                    cfg.topk = v;
+                }
+            }
+        }
+        Some(cfg)
+    }
+
+    /// Exact MaxSim of one row against `query`, read from the row journal
+    /// (used to re-rank SMVE candidates the way the reference reads the column).
+    fn exact_tensor_score(
+        &self,
+        table: &str,
+        column: &str,
+        dims: usize,
+        query: &[Vec<f32>],
+        seq: u64,
+    ) -> Option<f32> {
+        let schema = self.table_schema(table).ok()?;
+        let ci = schema.iter().position(|c| c == column)?;
+        let raw = self
+            .storage
+            .store
+            .get(&row_key(table, seq as usize))
+            .ok()??;
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let cells = self.parse_stored_row(table, &defaults, &raw).ok()?;
+        let text = match cells.get(ci)? {
+            Value::Str(s) => s.clone(),
+            other => other.to_slt_string(),
+        };
+        let doc = parse_multivector_doc(&text, dims)?;
+        Some(maxsim_tokens(query, &doc))
     }
 
     /// Keeps existing multi-vector indexes in step with an inserted/rewritten
@@ -9488,7 +9860,14 @@ impl Engine {
                 .get(col_idx)
                 .map(|t| t.to_ascii_uppercase())
                 .unwrap_or_default();
-            if decl_up.starts_with("MULTIVECTOR") && tensor_elem_type(&decl_up) != ElemType::Bit {
+            let column = match_columns(&m.column)
+                .first()
+                .cloned()
+                .unwrap_or_default();
+            let ann_indexed = self.tensor_has_ann_index(table, &column);
+            if (decl_up.starts_with("MULTIVECTOR") || ann_indexed)
+                && tensor_elem_type(&decl_up) != ElemType::Bit
+            {
                 if let Some(dims) = type_dim(&decl_up) {
                     let q_flat: Vec<f32> = query_items
                         .iter()
@@ -9497,13 +9876,15 @@ impl Engine {
                     if dims > 0 && !q_flat.is_empty() && q_flat.len().is_multiple_of(dims) {
                         let query: Vec<Vec<f32>> =
                             q_flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
-                        let column = match_columns(&m.column)
-                            .first()
-                            .cloned()
-                            .unwrap_or_default();
                         let index = self.multivector_index_for(table, &column, dims)?;
                         let dead = self.tombstone_set(table)?;
-                        let hits = index.read().unwrap().search(&query, topn.max(1), &dead);
+                        let rank =
+                            |seq: u64| self.exact_tensor_score(table, &column, dims, &query, seq);
+                        let hits =
+                            index
+                                .read()
+                                .unwrap()
+                                .search(&query, topn.max(1), &dead, Some(&rank));
                         let scored: Vec<(u64, f64)> = hits
                             .into_iter()
                             .map(|(seq, score)| (seq, f64::from(score)))
@@ -9612,10 +9993,12 @@ impl Engine {
                         .cloned();
                     if let Some(index) = index {
                         let dead = self.tombstone_set(table)?;
+                        let rank =
+                            |seq: u64| self.exact_tensor_score(table, &column, dims, &query, seq);
                         let hits: Vec<(u64, f32)> = index
                             .read()
                             .unwrap()
-                            .search(&query, topn.max(1), &dead)
+                            .search(&query, topn.max(1), &dead, Some(&rank))
                             .into_iter()
                             .filter(|(_, score)| {
                                 threshold.map(|t| f64::from(*score) >= t).unwrap_or(true)
@@ -12095,6 +12478,114 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    /// `USING PLAID`: the tensor index builds the reference's `PlaidIndex`
+    /// once enough embeddings are buffered, answers `MATCH TENSOR` from it, and
+    /// `flush()` mirrors it as a C++ PLAID chunk (`PlaidIndex::SaveIndexInner`).
+    #[test]
+    fn plaid_index_answers_tensor_search_and_mirrors_a_chunk() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE pt (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..300 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                let y = ((i + j) % 5) as f32 - 1.0;
+                let z = ((i * j) % 11) as f32 * 0.25;
+                tokens.push(format!("[{x},{y},{z},{}]", (i % 3) as f32));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute(&format!("INSERT INTO pt VALUES {};", values.join(",")))
+            .unwrap();
+        let query = "SELECT id FROM pt SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
+        // Without an index the scan is exhaustive.
+        let baseline = rows(&e, query);
+        assert_eq!(baseline.len(), 3);
+
+        e.execute("CREATE INDEX pidx ON pt (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
+            .unwrap();
+        // The scan builds `PlaidIndexInMem` over the 1200 embeddings.
+        let indexed = rows(&e, query);
+        let tkey = e.table_key("default_db.pt");
+        let built = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .and_then(|t| t.mv.get("t"))
+            .map(|m| m.read().unwrap().plaid.is_some())
+            .unwrap_or(false);
+        assert!(built, "PLAID index was not built");
+        // The residual rerank keeps the brute-force ranking.
+        assert_eq!(indexed.len(), 3);
+        assert_eq!(indexed[0], baseline[0]);
+
+        e.flush().unwrap();
+        let loaded = e.read_cpp_plaid_index("default_db.pt", "pidx").unwrap();
+        assert_eq!(loaded.doc_num(), 300);
+        assert_eq!(loaded.total_embedding_num(), 1200);
+    }
+
+    /// `USING SMVE`: the tensor scan builds `SMVEIndexInMem` (projection +
+    /// BMP) and re-ranks its candidates with exact MaxSim.
+    #[test]
+    fn smve_index_answers_tensor_search() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE st (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..40 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 5) as f32 + j as f32 * 0.25;
+                let y = ((i + j) % 7) as f32 * 0.5 - 1.0;
+                tokens.push(format!("[{x},{y},0.5,{}]", (i % 3) as f32));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute(&format!("INSERT INTO st VALUES {};", values.join(",")))
+            .unwrap();
+        let query = "SELECT id FROM st SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.0,0.5,0.0]], 'float', 'maxsim', 'topn=3');";
+        let baseline = rows(&e, query);
+        assert_eq!(baseline.len(), 3);
+
+        e.execute("CREATE INDEX sidx ON st (t) USING SMVE WITH (width = 64, topk = 8);")
+            .unwrap();
+        let indexed = rows(&e, query);
+        eprintln!(
+            "DEBUG indexes: {:?}",
+            e.storage
+                .catalog
+                .list_indexes()
+                .unwrap()
+                .iter()
+                .map(|i| (
+                    i.name.clone(),
+                    i.index_type.clone(),
+                    i.column.clone(),
+                    i.options.clone()
+                ))
+                .collect::<Vec<_>>()
+        );
+        let tkey = e.table_key("default_db.st");
+        let built = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .and_then(|t| t.mv.get("t"))
+            .map(|m| m.read().unwrap().smve.is_some())
+            .unwrap_or(false);
+        assert!(built, "SMVE index was not built");
+        assert_eq!(indexed[0], baseline[0]);
     }
 
     /// The multi-vector index is built once (first use), appended at write time,

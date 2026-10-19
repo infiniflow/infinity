@@ -51,6 +51,13 @@
 | `ColumnVector<T>` / `DataBlock`（`column_vector.cppm`、`data_block.cppm`） | `infinity_storage::data_block::{ColumnVector, Column, DataBlock}` | `AppendValue/AppendWith`→`push`/`extend_value`、`GetValue`/`SetValue`→`get`/`set`、null bitmap→`validity`、`DataBlock::Make/AppendRow/Finalize/GetValue/Reset`→`new`/`push_slot`/`finalize`/`value_text`/`reset`、`MemUsed`→`mem_used` | ✅（执行器求值仍以 `Value` 行渲染块内容；列容器本身已移植） |
 | `RegexLiteralRun` / `ExtractRegexLiteralRuns`（`planner/optimizer/regex_literal_extractor.h`） | `regex_literal::{extract_regex_literal_runs, has_any_sparse_gram, parse_sparsegram_analyzer}` | 只抽取每次匹配都必含的字面 run；`\Q…\E`/`\C`/内联 `(?i:)` 标志、量词回退、备选分支丢弃、ASCII fold 切分、`sparsegram-<min>-<max>[-fold]` 解析与 gram 下限 | ✅ |
 | `DumpMemIndexTask` / `OptimizeIndexTask` / `CleanupIndexTask`（`bg_task/`） | `Engine::{dump_hnsw_segments, optimize_indexes, cleanup}` | dump 按 `mem_index_capacity`/字节配额写增量 chunk；optimize 在可承受的内存内重建全表 merged chunk；cleanup 只删除被 merged chunk 覆盖的旧 chunk（调度由 CLI 定时线程代替，见 D4） | ✅（任务对象由定时线程取代） |
+| `PlaidQuantizer`（`plaid_quantizer.cppm`） | `infinity_index::plaid::PlaidQuantizer` | `Train`（全局均值 + 分位切断点/权重，超限按 `MAX_RESIDUAL_VALUES` 蓄水池采样）、`Quantize/Dequantize`（2/4-bit MSB-first 打包、反位映射、L2 归一）、`GetIPDistanceTable`/`BuildPositionLUT`/`GetSingleIPDistance*`、`Save/Load` 字节布局 | ✅ |
+| `PlaidGlobalCentroids`（`plaid_global_centroids.cppm`） | `infinity_index::plaid::PlaidGlobalCentroids` + `kmeans_l2` | `Train`（k*256 采样 + `GetKMeansCentroids`：随机置换初始化、空簇分裂、L2 早停）、`FindNearestCentroid(s)`、`ComputeCentroidScores`/`ComputeResiduals`、ColBERTSaR 无量化器、`Save/Load` | ✅ |
+| `PlaidIndex`（`plaid_index.cppm`） | `infinity_index::plaid::PlaidIndex` | `Train`（含 ColBERTSaR query-aware SGD）、`AddMultipleDocsEmbeddings(WithCentroids)`、`SearchWithBitmask`（IVF 探测→近似分→`n_doc_to_score`→残差精排）、batched probe（`n_centroids > 4096`）、`ExactScore(Batch)`、`MergeChunks`/流式 merge/`ExpandCentroids`/`FindOutliers`、`Save/Load` 与 `CalcSize` | ✅（mmap 读取改为 owned，见设计变更） |
+| `PlaidIndexInMem`（`plaid_index_in_mem.cppm`） | 执行器 `MultiVectorIndex` 的 `plaid`/`plaid_seqs`/`PlaidConfig` | `NewPlaidIndexInMem`→按 `WITH` 选项构造；`Insert`→tail 插入时增量 `add_multiple_docs_embeddings`；`BuildIndex(FromScratch/WithGlobalCentroids)`→`build_plaid`（`max(256, k*32)` 阈值、auto-k 降级、8 的倍数）；`Dump`→`write_cpp_plaid_index` | ✅ |
+| `PlaidIndexDiskMerger` / `PlaidMergeManifest`（`plaid_index_disk_merger.cppm`） | `infinity_index::plaid::{PlaidIndexDiskMerger, PlaidMergeManifest}` | `MergeChunk(sParallel/Incremental)`、`Finalize`→`accept_merged_data`、`CalculateMergeSize`、manifest JSON（`NeedsMerge`/`UpdateChunk`/`Load/SaveManifest`） | ✅ |
+| `SMVETransform` / `GenerateProjectionMatrix`（`smve_transform.cppm`） | `infinity_index::smve::{smve_transform, generate_projection_matrix, SmveResult}` | 随机单位列投影（固定种子）、逐 token 取 top-k、query 求和池化 / doc 非零均值池化 | ✅ |
+| `SMVEIndexInMem` / `SMVESerializedData`（`smve_index.cppm`） | `infinity_index::smve::SmveIndex` + 执行器 `MultiVectorIndex` 的 `smve`/`smve_seqs`/`SmveConfig` | `BuildFromColumn`→`build_from_column`（内部 BMP 的 `AddDocs`）、`Search`→BMP `search_knn_filtered` + 执行器按列值精确 MaxSim 重排（与 C++ `PhysicalMatchTensorScan` 一致）、`GetSizeInBytes`/行数；`SMVEBMPCollector` 由 `search_knn` 的返回值承担 | ✅ |
 
 > **基线说明**：`TableEntry` / `SegmentEntry` / `BlockManager` 已在基线 PR #2722 中从 C++ 源码删除；当前持久化元数据类是 `TableMeta` / `SegmentMeta` / `BlockMeta` / `ColumnMeta`，块映射类是 `BlockIndex`。本表按基线实际存在的类名对应，不再列出已删除的类。
 
@@ -65,12 +72,13 @@
 | `DataFileWorker` / `VirtualStore` / `PersistenceManager`（`storage/io`、`storage/buffer`） | `std::fs` + `infinity_storage::s3::S3Client` + WAL | 本地/对象存储的选择在 CLI 启动时完成（`storage_type=minio` 时先 restore 再按 S3 同步）；C++ 的文件 worker/虚拟存储层合并为这两条路径 |
 | `TableIndexMeta` / `SegmentIndexMeta` / `ChunkIndexMeta`（`table_index_meta.cppm` 等） | `infinity_catalog` 的索引元数据 + `cpp_blocks` 的 `chunk_{n}.idx` 目录 | 持久化键空间与 chunk 目录布局已对齐；C++ 的模块类树未逐类拆分，索引生命周期由 `dump/optimize/cleanup` 方法承担 |
 | `TableMeta` / `SegmentMeta`（`catalog/meta/*.cppm`）+ `BlockIndex` | `infinity-executor` 的 `TableEntry`（运行时聚合） | 上游 PR #2722 删除了 `TableEntry` / `SegmentEntry` / `BlockManager`；Rust 把它们过去承担的运行时状态（写入代次、行 ID 分配、索引注册表、块快照）聚合为一个进程内结构，持久化元数据仍由 `infinity_catalog` + `BlockIndex` 按 C++ 布局承担 |
+| `PlaidIndex` 的 mmap 读取（`LoadFromPtr` / `centroid_ids` 指针模式） | `infinity_index::plaid::PlaidIndex` 的 owned `Vec<u32>` | mmap 属于已批准的原语豁免；执行器的 chunk 加载器总是解码为 owned 缓冲，语义（同一份 `SaveIndexInner` 字节布局）不变 |
 
 ## 尚未一一对应（待补，按优先级）
 
 | C++ | 当前 Rust | 差距 |
 |---|---|---|
-| `PlaidQuantizer` / `PlaidGlobalCentroids` / `PlaidIndex` / `PlaidIndexInMem` / `PlaidIndexDiskMerger`（`storage/knn_index/plaid/*`） | 无（`MATCH TENSOR` 走全量 MaxSim，SQL 结果相同但未使用索引） | **在仓库内**的 2/4-bit 残差量化 + IVF + MaxSim 索引（约 5.5k 行，含 `plaid_index_file_worker`）；需按类移植，`test_plaid_ut.cpp` 16 例随类移植 |
+| （无） | — | 当前基线中需要类级对应的 C++ 类均已映射；新增上游类须先登记再移植 |
 
 ## 维护规则
 
@@ -109,6 +117,13 @@
 | `knn/hnsw/test_rabitq_ut.cpp` | `rabitq::RabitqStore` | `orthogonal_matrix_is_orthonormal`、`centroid_is_the_rotated_mean`、`save_and_load_roundtrip`、`l2_estimator_keeps_the_true_neighbour` |
 | `knn/hnsw/test_lsg_build_ut.cpp` | `lsg::LsgIndex` + `HnswIndex` | `avg_is_at_least_the_exhaustive_topk_mean`、`lsg_hnsw_keeps_self_query_recall`（recall@1 ≥ 0.95） |
 | `bg_task/*_ut.cpp` 的索引生命周期 | `dump_hnsw_segments` / `optimize_indexes` / `cleanup` | `hnsw_checkpoint_dumps_only_the_memory_segment`、`mem_index_capacity_dumps_the_hnsw_segment_after_the_batch`、`cleanup_keeps_incremental_hnsw_chunks_until_a_merge_covers_the_table` |
+| `knn/plaid/test_plaid_ut.cpp::PlaidQuantizerTest` | `plaid::PlaidQuantizer` | `train_quantize_dequantize`、`two_bit_quantization`、`ip_table_and_position_lut_agree`、`save_and_load_roundtrip` |
+| `PlaidGlobalCentroids`（由 `PlaidIndexTest` 覆盖） | `plaid::PlaidGlobalCentroids` | `trains_centroids_and_assigns_nearest`、`residuals_reconstruct_the_embedding`、`save_and_load_roundtrip`、`colbertsar_mode_has_no_quantizer` |
+| `PlaidIndexTest` / `PlaidIndexColBERTSaRTest` | `plaid::PlaidIndex` | `basic_construction`、`train_and_add`、`search_ranks_the_queried_document_first`、`bitmask_filters_candidates`、`save_and_load_roundtrip`、`mem_usage_matches_calc_size`、`move_moves_the_index`、`colbertsar_mode_trains_and_searches_without_residuals`、`merge_keeps_documents_and_scores` |
+| `PlaidIndexDiskMerger` / manifest（无独立 C++ 单测） | `plaid::{PlaidIndexDiskMerger, PlaidMergeManifest}` | `streams_chunks_into_the_output_index`、`manifest_roundtrips_through_json`、`incremental_merge_skips_unchanged_chunks` |
+| （执行器集成，无独立 C++ 单测） | `MultiVectorIndex::build_plaid` / `write_cpp_plaid_index` | `plaid_index_answers_tensor_search_and_mirrors_a_chunk`（PLAID 建索引、扫描仍与穷举 top-1 一致、flush 产出可解码的 C++ PLAID chunk） |
+| `SMVEIndexInMem` / `SMVETransform`（无独立 C++ 单测） | `smve::{SmveIndex, smve_transform}` | `projection_columns_are_unit_vectors`、`query_codes_are_sum_pooled_and_docs_averaged`、`search_returns_the_closest_document_and_honours_the_filter` |
+| （执行器集成，无独立 C++ 单测） | `MultiVectorIndex::build_smve` + `exact_tensor_score` | `smve_index_answers_tensor_search`（SMVE 建索引、候选按列值精确重排、top-1 与穷举一致） |
 
 ### 未移植单测（Rust 类已存在）
 

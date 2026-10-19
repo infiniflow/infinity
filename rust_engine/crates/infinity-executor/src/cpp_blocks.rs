@@ -17,6 +17,7 @@ use std::sync::Arc;
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
 use infinity_index::hnsw_handler::HnswHandler;
+use infinity_index::plaid::PlaidIndex;
 use infinity_index::vector::HnswIndex;
 use infinity_storage::cpp_format::{
     self, date_to_days, datetime_to_pair, element_width, embedding_size, pack_column_with_layout,
@@ -1266,6 +1267,8 @@ impl Engine {
                 let _ = self.write_cpp_hnsw_index(&im.table, &im.name);
             } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                 let _ = self.write_cpp_fulltext_index(&im.table, &im.name);
+            } else if im.index_type.eq_ignore_ascii_case("PLAID") {
+                let _ = self.write_cpp_plaid_index(&im.table, &im.name);
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
                 let k = im
                     .options
@@ -2394,6 +2397,225 @@ impl Engine {
             }
         }
         Ok((centroids, out))
+    }
+
+    /// PLAID index options of `index_name` (`nbits`, `n_centroids`,
+    /// `colbertsar`), from `CREATE INDEX … USING PLAID WITH (…)`.
+    fn plaid_options(&self, table: &str, index_name: &str) -> PlaidOptions {
+        let short = table.rsplit('.').next().unwrap_or(table);
+        let Some(im) = self
+            .storage
+            .catalog
+            .list_indexes()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|im| im.name == index_name && (im.table == table || im.table == short))
+        else {
+            return PlaidOptions::default();
+        };
+        let mut options = PlaidOptions::default();
+        for (key, value) in &im.options {
+            let value = value.trim();
+            if key.eq_ignore_ascii_case("nbits") {
+                if let Ok(v) = value.parse() {
+                    options.nbits = v;
+                }
+            } else if key.eq_ignore_ascii_case("n_centroids") {
+                if let Ok(v) = value.parse() {
+                    options.n_centroids = v;
+                }
+            } else if key.eq_ignore_ascii_case("colbertsar_mode") {
+                options.colbertsar = value.eq_ignore_ascii_case("true") || value == "1";
+            }
+        }
+        options
+    }
+
+    /// The tensor documents of `table.column` as `(row id, tokens)`.
+    fn cpp_column_docs(
+        &self,
+        table: &str,
+        column: &str,
+        dims: usize,
+    ) -> Result<Vec<(u32, Vec<Vec<f32>>)>> {
+        let schema = self.table_schema(table)?;
+        let col_idx = schema
+            .iter()
+            .position(|c| c == column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}' on '{table}'")))?;
+        let mut out = Vec::new();
+        for (seq, row) in self.fetch_rows_with_ids(table)? {
+            let text = match row.get(col_idx) {
+                Some(Value::Str(s)) => s.clone(),
+                Some(other) => other.to_slt_string(),
+                None => continue,
+            };
+            if let Some(doc) = crate::parse_multivector_doc(&text, dims) {
+                out.push((seq as u32, doc));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Builds a PLAID index over `column` and serializes it in the reference's
+    /// `PlaidIndex::SaveIndexInner` layout (the `chunk_0.idx` the file worker
+    /// writes).
+    fn cpp_plaid_chunk(
+        &self,
+        table: &str,
+        column: &str,
+        dims: usize,
+        options: &PlaidOptions,
+    ) -> Result<(usize, Vec<u8>)> {
+        let docs = self.cpp_column_docs(table, column, dims)?;
+        let total: usize = docs.iter().map(|(_, d)| d.len()).sum();
+        if total == 0 {
+            return Err(Error::Invalid(format!(
+                "no tensors to index in '{table}.{column}'"
+            )));
+        }
+        let flat: Vec<f32> = docs
+            .iter()
+            .flat_map(|(_, d)| d.iter().flatten().copied())
+            .collect();
+        let lens: Vec<u32> = docs.iter().map(|(_, d)| d.len() as u32).collect();
+        let mut k = if options.n_centroids == 0 {
+            PlaidIndex::compute_auto_n_centroids(total as u64)
+        } else {
+            options.n_centroids
+        };
+        // Mirror `PlaidIndexInMem::BuildIndexFromScratch`: downgrade below the
+        // k-means data bound, keep the multiple-of-8 alignment.
+        while k > 8 && total < 32 * k as usize {
+            k >>= 1;
+        }
+        k = k.div_ceil(8) * 8;
+        if (k as usize) > total {
+            return Err(Error::Invalid(format!(
+                "not enough tensors for a PLAID index in '{table}.{column}': {total} < {k}"
+            )));
+        }
+        let mut index = PlaidIndex::new(0, dims as u32, options.nbits, k, options.colbertsar)?;
+        index.train(k, &flat, total, 4)?;
+        index.add_multiple_docs_embeddings(&flat, &lens)?;
+        Ok((total, index.to_bytes()))
+    }
+
+    /// Writes `table`'s PLAID index as `idx_{id}/seg_0/chunk_0.idx`.
+    pub fn write_cpp_plaid_index(&self, table: &str, index_name: &str) -> Result<usize> {
+        let table = self.qualified_table(table);
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let index_id = self.cpp_index_position(&table, index_name)?;
+        let column = self
+            .storage
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .find(|im| {
+                im.name == index_name
+                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
+            })
+            .map(|im| im.column)
+            .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
+        let ci = meta
+            .columns
+            .iter()
+            .position(|c| c == &column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let type_text = meta
+            .types
+            .get(ci)
+            .cloned()
+            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let (_, dims, elem) = tensor_shape(&type_text)
+            .ok_or_else(|| Error::Invalid(format!("not a tensor column: '{type_text}'")))?;
+        if elem != 6 {
+            return Err(Error::Invalid(
+                "PLAID only indexes TENSOR(FLOAT, dim) columns".into(),
+            ));
+        }
+        let options = self.plaid_options(&table, index_name);
+        let (count, bytes) = self.cpp_plaid_chunk(&table, &column, dims, &options)?;
+        let db_id = self.database_id_of(&table);
+        let dir = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id));
+        std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
+            path: dir.clone(),
+            source: e,
+        })?;
+        std::fs::write(dir.join("chunk_0.idx"), &bytes).map_err(|e| Error::Io {
+            path: dir.clone(),
+            source: e,
+        })?;
+        Ok(count)
+    }
+
+    /// Reads back a mirror written by [`Self::write_cpp_plaid_index`].
+    pub fn read_cpp_plaid_index(&self, table: &str, index_name: &str) -> Result<PlaidIndex> {
+        let table = self.qualified_table(table);
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let index_id = self.cpp_index_position(&table, index_name)?;
+        let column = self
+            .storage
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .find(|im| {
+                im.name == index_name
+                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
+            })
+            .map(|im| im.column)
+            .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
+        let ci = meta
+            .columns
+            .iter()
+            .position(|c| c == &column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let type_text = meta
+            .types
+            .get(ci)
+            .cloned()
+            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let (_, dims, _) = tensor_shape(&type_text)
+            .ok_or_else(|| Error::Invalid(format!("not a tensor column: '{type_text}'")))?;
+        let options = self.plaid_options(&table, index_name);
+        let db_id = self.database_id_of(&table);
+        let path = self.blocks_root().join(format!(
+            "db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx",
+            meta.id
+        ));
+        let bytes = std::fs::read(&path)
+            .map_err(|_| Error::NotFound(format!("no PLAID mirror at {}", path.display())))?;
+        let (index, _) = PlaidIndex::from_bytes(0, dims as u32, options.nbits, &bytes)
+            .map_err(|e| Error::Invalid(format!("bad PLAID chunk: {e}")))?;
+        Ok(index)
+    }
+}
+
+/// PLAID index parameters from `WITH (nbits=…, n_centroids=…)`.
+#[derive(Debug, Clone, Copy)]
+struct PlaidOptions {
+    nbits: u32,
+    n_centroids: u32,
+    colbertsar: bool,
+}
+
+impl Default for PlaidOptions {
+    fn default() -> Self {
+        Self {
+            nbits: 4,
+            n_centroids: 0,
+            colbertsar: false,
+        }
     }
 }
 
