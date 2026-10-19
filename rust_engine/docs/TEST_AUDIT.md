@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 76, `integration` 250, `partial` 42, `ported` 394.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 73, `integration` 250, `partial` 42, `ported` 397.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -62,9 +62,9 @@
 | 48 | `src/unit_test/common/utility/exception_ut.cpp` | `ExceptionTest` | `all_exception_cases` | ported | `infinity-common` `error::tests::exception_messages_match_the_reference` |
 | 49 | `src/unit_test/common/utility/trim_ut.cpp` | `TrimTest` | `test1` | ported | `infinity-common` `utility::tests::trim_path_keeps_the_repository_relative_part` |
 | 50 | `src/unit_test/common/utility/utility_ut.cpp` | `UtilityTest` | `test1` | ported | `utility::tests::extract_u64_reads_the_key_suffix` |
-| 51 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test1` | gate-a |
-| 52 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test2` | gate-a |
-| 53 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test3` | gate-a |
+| 51 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test1` | ported | `infinity-storage` `data_block::reference_suite::expression_select_alternating_input` |
+| 52 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test2` | ported | `infinity-storage` `data_block::reference_suite::expression_select_all_true_input` |
+| 53 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test3` | ported | `infinity-storage` `data_block::reference_suite::expression_select_all_false_input` |
 | 54 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `add_bigint_constant_1` | ported | `infinity-expression` `expression_evaluator_add_bigint_constant_1` |
 | 55 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `subtract_constant_8192_bigint` | ported | `infinity-expression` `expression_evaluator_subtract_constant_8192_bigint` |
 | 56 | `src/unit_test/executor/fragment/plan_fragment_ut.cpp` | `PlanFragmentTest` | `test1` | gate-a |

@@ -1245,4 +1245,43 @@ mod reference_suite {
         select_suite(conv);
         slice_suite(conv);
     }
+    // C++: `expression_executor_select_ut.cpp::test1` — the selector call is
+    // `#if 0` in the reference; only the boolean input vector is asserted.
+    #[test]
+    fn expression_select_alternating_input() {
+        let mut v = ColumnVector::<bool>::new();
+        v.initialize_flat();
+        for i in 0..DEFAULT_VECTOR_SIZE {
+            v.append_value(Some(i % 2 == 0)).unwrap();
+        }
+        for i in 0..DEFAULT_VECTOR_SIZE {
+            assert_eq!(v.get(i), Some(&(i % 2 == 0)));
+        }
+    }
+
+    // C++: `expression_executor_select_ut.cpp::test2` (all true).
+    #[test]
+    fn expression_select_all_true_input() {
+        let mut v = ColumnVector::<bool>::new();
+        v.initialize_flat();
+        for _ in 0..DEFAULT_VECTOR_SIZE {
+            v.append_value(Some(true)).unwrap();
+        }
+        for i in 0..DEFAULT_VECTOR_SIZE {
+            assert_eq!(v.get(i), Some(&true));
+        }
+    }
+
+    // C++: `expression_executor_select_ut.cpp::test3` (all false).
+    #[test]
+    fn expression_select_all_false_input() {
+        let mut v = ColumnVector::<bool>::new();
+        v.initialize_flat();
+        for _ in 0..DEFAULT_VECTOR_SIZE {
+            v.append_value(Some(false)).unwrap();
+        }
+        for i in 0..DEFAULT_VECTOR_SIZE {
+            assert_eq!(v.get(i), Some(&false));
+        }
+    }
 }
