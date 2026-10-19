@@ -1155,4 +1155,56 @@ mod reference_suite {
             c.reset();
         }
     }
+
+    // C++: `column_vector_bool_ut.cpp` (flat/constant/select/slice).
+    #[test]
+    fn bool_flat_constant_select_slice() {
+        let conv = |i: i64| i % 2 == 0;
+        flat_suite(conv);
+        constant_suite(conv);
+        select_suite(conv);
+        slice_suite(conv);
+    }
+
+    // C++: `column_vector_float_ut.cpp`, float.
+    #[test]
+    fn float_flat_constant_select_slice() {
+        flat_suite(|i| i as f32);
+        constant_suite(|i| i as f32);
+        select_suite(|i| i as f32);
+        slice_suite(|i| i as f32);
+    }
+
+    // C++: `column_vector_float_ut.cpp`, double.
+    #[test]
+    fn double_flat_constant_select_slice() {
+        flat_suite(|i| i as f64);
+        constant_suite(|i| i as f64);
+        select_suite(|i| i as f64);
+        slice_suite(|i| i as f64);
+    }
+
+    // C++: `column_vector_uuid_ut.cpp`.
+    #[test]
+    fn uuid_flat_constant_select_slice() {
+        let conv = |i: i64| {
+            let mut bytes = [0u8; 16];
+            bytes[..8].copy_from_slice(&(i as u64).to_le_bytes());
+            bytes
+        };
+        flat_suite(conv);
+        constant_suite(conv);
+        select_suite(conv);
+        slice_suite(conv);
+    }
+
+    // C++: `column_vector_embedding_ut.cpp`.
+    #[test]
+    fn embedding_flat_constant_select_slice() {
+        let conv = |i: i64| vec![i as f32, (i * 2) as f32, (i * 3) as f32];
+        flat_suite(conv);
+        constant_suite(conv);
+        select_suite(conv);
+        slice_suite(conv);
+    }
 }

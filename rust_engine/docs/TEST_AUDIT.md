@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 193, `gate-a` 216, `integration` 294, `partial` 231, `ported` 64.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 193, `gate-a` 216, `integration` 294, `partial` 211, `ported` 84.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -311,10 +311,10 @@
 | 297 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test_hnsw_index_buffer_obj_shutdown` | partial |
 | 298 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test_big_with_gc_and_cleanup` | partial |
 | 299 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `DISABLED_SLOW_test_multiple_threads_read` | partial |
-| 300 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `flat_boolean` | partial |
-| 301 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `contant_bool` | partial |
-| 302 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `bool_column_vector_select` | partial |
-| 303 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `bool_column_slice_init` | partial |
+| 300 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `flat_boolean` | ported | `infinity-storage` `data_block::reference_suite::bool_flat_constant_select_slice` |
+| 301 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `contant_bool` | ported | `infinity-storage` `data_block::reference_suite::bool_flat_constant_select_slice` |
+| 302 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `bool_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::bool_flat_constant_select_slice` |
+| 303 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `bool_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::bool_flat_constant_select_slice` |
 | 304 | `src/unit_test/storage/column_vector/column_vector_date_time_ut.cpp` | `ColumnVectorDateTimeTest` | `flat_date` | ported |
 | 305 | `src/unit_test/storage/column_vector/column_vector_date_time_ut.cpp` | `ColumnVectorDateTimeTest` | `contant_date` | ported |
 | 306 | `src/unit_test/storage/column_vector/column_vector_date_time_ut.cpp` | `ColumnVectorDateTimeTest` | `date_column_vector_select` | ported |
@@ -339,18 +339,18 @@
 | 325 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `contant_decimal` | partial |
 | 326 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `decimal_column_vector_select` | partial |
 | 327 | `src/unit_test/storage/column_vector/column_vector_decimal_ut_nimpl.cpp` | `ColumnVectorDecimalTest` | `decimal_column_slice_init` | partial |
-| 328 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `flat_embedding` | partial |
-| 329 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `contant_embedding` | partial |
-| 330 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `embedding_column_vector_select` | partial |
-| 331 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `embedding_column_slice_init` | partial |
-| 332 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `flat_float` | partial |
-| 333 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `contant_float` | partial |
-| 334 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `float_column_vector_select` | partial |
-| 335 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `float_column_slice_init` | partial |
-| 336 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `flat_double` | partial |
-| 337 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `contant_double` | partial |
-| 338 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `double_column_vector_select` | partial |
-| 339 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `double_column_slice_init` | partial |
+| 328 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `flat_embedding` | ported | `infinity-storage` `data_block::reference_suite::embedding_flat_constant_select_slice` |
+| 329 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `contant_embedding` | ported | `infinity-storage` `data_block::reference_suite::embedding_flat_constant_select_slice` |
+| 330 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `embedding_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::embedding_flat_constant_select_slice` |
+| 331 | `src/unit_test/storage/column_vector/column_vector_embedding_ut.cpp` | `ColumnVectorEmbeddingTest` | `embedding_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::embedding_flat_constant_select_slice` |
+| 332 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `flat_float` | ported | `infinity-storage` `data_block::reference_suite::float_flat_constant_select_slice` |
+| 333 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `contant_float` | ported | `infinity-storage` `data_block::reference_suite::float_flat_constant_select_slice` |
+| 334 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `float_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::float_flat_constant_select_slice` |
+| 335 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `float_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::float_flat_constant_select_slice` |
+| 336 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `flat_double` | ported | `infinity-storage` `data_block::reference_suite::double_flat_constant_select_slice` |
+| 337 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `contant_double` | ported | `infinity-storage` `data_block::reference_suite::double_flat_constant_select_slice` |
+| 338 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `double_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::double_flat_constant_select_slice` |
+| 339 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `double_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::double_flat_constant_select_slice` |
 | 340 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_point` | excluded |
 | 341 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_point` | excluded |
 | 342 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `point_column_vector_select` | excluded |
@@ -428,10 +428,10 @@
 | 414 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `row_column_vector_select` | partial |
 | 415 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `row_column_slice_init` | partial |
 | 416 | `src/unit_test/storage/column_vector/column_vector_ut.cpp` | `ColumnVectorTest` | `ReadWrite` | partial |
-| 417 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `flat_uuid` | partial |
-| 418 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `contant_uuid` | partial |
-| 419 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `uuid_column_vector_select` | partial |
-| 420 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `uuid_column_slice_init` | partial |
+| 417 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `flat_uuid` | ported | `infinity-storage` `data_block::reference_suite::uuid_flat_constant_select_slice` |
+| 418 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `contant_uuid` | ported | `infinity-storage` `data_block::reference_suite::uuid_flat_constant_select_slice` |
+| 419 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `uuid_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::uuid_flat_constant_select_slice` |
+| 420 | `src/unit_test/storage/column_vector/column_vector_uuid_ut.cpp` | `ColumnVectorUuidTest` | `uuid_column_slice_init` | ported | `infinity-storage` `data_block::reference_suite::uuid_flat_constant_select_slice` |
 | 421 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_inline_varchar` | partial |
 | 422 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `constant_inline_varchar` | partial |
 | 423 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `varchar_column_vector_select` | partial |
