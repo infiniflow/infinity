@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 200, `gate-a` 216, `integration` 294, `partial` 231, `ported` 57.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 197, `gate-a` 216, `integration` 294, `partial` 231, `ported` 60.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -59,9 +59,9 @@
 | 45 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test4` | exempt |
 | 46 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test5` | exempt |
 | 47 | `src/unit_test/common/test_simd_ut.cpp` | `SimdInitTest` | `GetSupportedSimdTypesList` | exempt |
-| 48 | `src/unit_test/common/utility/exception_ut.cpp` | `ExceptionTest` | `all_exception_cases` | gap |
-| 49 | `src/unit_test/common/utility/trim_ut.cpp` | `TrimTest` | `test1` | gap |
-| 50 | `src/unit_test/common/utility/utility_ut.cpp` | `UtilityTest` | `test1` | gap |
+| 48 | `src/unit_test/common/utility/exception_ut.cpp` | `ExceptionTest` | `all_exception_cases` | ported | `infinity-common` `error::tests::exception_messages_match_the_reference` |
+| 49 | `src/unit_test/common/utility/trim_ut.cpp` | `TrimTest` | `test1` | ported | `infinity-common` `utility::tests::trim_path_keeps_the_repository_relative_part` |
+| 50 | `src/unit_test/common/utility/utility_ut.cpp` | `UtilityTest` | `test1` | ported | `utility::tests::extract_u64_reads_the_key_suffix` |
 | 51 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test1` | gate-a |
 | 52 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test2` | gate-a |
 | 53 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test3` | gate-a |

@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `grouped` 1021, `mapped` 93, `test` 7
+- 状态分布：`excluded` 15, `grouped` 1019, `mapped` 95, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -59,8 +59,8 @@
 | 50 | `Singleton` | `src/common/singleton.cppm` | grouped | `infinity-common` 工具/类型 |
 | 51 | `Status` | `src/common/status.cppm` | grouped | `infinity-common` 工具/类型 |
 | 52 | `DeferFn` | `src/common/utility/defer_op.cppm` | grouped | `infinity-common` 工具/类型 |
-| 53 | `RecoverableException` | `src/common/utility/exception.cppm` | grouped | `infinity-common` 工具/类型 |
-| 54 | `UnrecoverableException` | `src/common/utility/exception.cppm` | grouped | `infinity-common` 工具/类型 |
+| 53 | `RecoverableException` | `src/common/utility/exception.cppm` | mapped | `infinity_common::Error::Unexpected`（`Unexpected error: {msg}`） |
+| 54 | `UnrecoverableException` | `src/common/utility/exception.cppm` | mapped | `infinity_common::Error::Unrecoverable`（裸消息） |
 | 55 | `SmallFloat` | `src/common/utility/smallfloat.cppm` | grouped | `infinity-common` 工具/类型 |
 | 56 | `ScopedSpinLock` | `src/common/utility/spinlock.cppm` | grouped | `infinity-common` 工具/类型 |
 | 57 | `ScopedTryLock` | `src/common/utility/spinlock.cppm` | grouped | `infinity-common` 工具/类型 |

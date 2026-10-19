@@ -38,6 +38,16 @@ pub enum Error {
 
     #[error("invalid argument: {0}")]
     Invalid(String),
+
+    /// C++: `UnrecoverableException` (`src/common/utility/exception.cppm`).
+    /// Its `what()` is the bare message.
+    #[error("{0}")]
+    Unrecoverable(String),
+
+    /// C++: `RecoverableException(Status::UnexpectedError(msg))` — the status
+    /// renders as `Unexpected error: {msg}`.
+    #[error("Unexpected error: {0}")]
+    Unexpected(String),
 }
 
 impl Error {
@@ -144,5 +154,23 @@ impl Error {
             // internal failures.
             _ => 1,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `src/unit_test/common/utility/exception_ut.cpp::ExceptionTest/all_exception_cases`.
+    #[test]
+    fn exception_messages_match_the_reference() {
+        assert_eq!(
+            Error::Unrecoverable("unrecoverable error".to_string()).to_string(),
+            "unrecoverable error"
+        );
+        assert_eq!(
+            Error::Unexpected("recoverable error".to_string()).to_string(),
+            "Unexpected error: recoverable error"
+        );
     }
 }
