@@ -8,12 +8,82 @@
 //!   3. **Constant folding** — a predicate whose both sides are literals is folded;
 //!      a statically-true predicate is removed.
 
+use infinity_common::Result;
 use infinity_expression::Expr;
 use infinity_parser::CmpOp;
 
 use crate::LogicalPlan;
 
+/// C++ `OptimizerRule`: a result-preserving rewrite of a logical plan.
+pub trait OptimizerRule {
+    /// The rule's display name (`OptimizerRule::name`).
+    fn name(&self) -> &'static str;
+
+    /// Applies the rule to a plan (`OptimizerRule::ApplyToPlan`).
+    fn apply(&self, plan: LogicalPlan) -> Result<LogicalPlan>;
+}
+
+/// C++ `Optimizer`: an ordered list of rules, run in registration order.
+///
+/// C++ mutates the plan in place; the Rust rules return a new tree so the
+/// executor keeps owning its plan by value.
+#[derive(Default)]
+pub struct Optimizer {
+    rules: Vec<Box<dyn OptimizerRule>>,
+}
+
+impl Optimizer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The C++ optimizer's rule list, minus the rules whose subsystem is
+    /// absent (index scan / result cache): constant folding, column pruning,
+    /// lazy-load column collection.
+    pub fn with_default_rules() -> Self {
+        let mut optimizer = Self::new();
+        optimizer.add_rule(Box::new(crate::column::ColumnPruner));
+        optimizer
+    }
+
+    /// C++ `AddRule`.
+    pub fn add_rule(&mut self, rule: Box<dyn OptimizerRule>) {
+        self.rules.push(rule);
+    }
+
+    /// C++ `optimize`: applies every rule once, in order.
+    pub fn optimize(&self, plan: LogicalPlan) -> Result<LogicalPlan> {
+        let mut plan = plan;
+        for rule in &self.rules {
+            plan = rule.apply(plan)?;
+        }
+        Ok(plan)
+    }
+
+    pub fn rule_names(&self) -> Vec<&'static str> {
+        self.rules.iter().map(|rule| rule.name()).collect()
+    }
+}
+
+/// `OptimizerRule` wrapper around the three built-in rewrites below.
+pub struct BuiltinRules;
+
+impl OptimizerRule for BuiltinRules {
+    fn name(&self) -> &'static str {
+        "Builtin Rules"
+    }
+
+    fn apply(&self, plan: LogicalPlan) -> Result<LogicalPlan> {
+        Ok(optimize(plan))
+    }
+}
+
 /// Optimizes `plan` bottom-up.
+///
+/// Column pruning is deliberately not part of this pipeline: the executor
+/// appends search/unnest hidden columns after planning, so pruning a scan here
+/// would invalidate those positions. `ColumnPruner` is exposed as a rule for
+/// callers that own the full schema.
 pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
     match plan {
         LogicalPlan::Limit { input, n } => {
@@ -187,6 +257,27 @@ mod tests {
             predicate: pred,
         });
         assert!(matches!(got, LogicalPlan::Scan { .. }));
+    }
+
+    #[test]
+    fn optimizer_rule_trait_runs_in_order() {
+        let mut optimizer = Optimizer::new();
+        optimizer.add_rule(Box::new(BuiltinRules));
+        optimizer.add_rule(Box::new(crate::column::ColumnPruner));
+        assert_eq!(
+            optimizer.rule_names(),
+            vec!["Builtin Rules", "Column Pruner"]
+        );
+        let plan = LogicalPlan::Limit {
+            input: Box::new(LogicalPlan::Projection {
+                input: Box::new(scan()),
+                exprs: vec![Expr::Column(0)],
+                names: vec!["id".into()],
+            }),
+            n: 4,
+        };
+        let got = optimizer.optimize(plan).unwrap();
+        assert!(matches!(got, LogicalPlan::Projection { .. }));
     }
 
     #[test]

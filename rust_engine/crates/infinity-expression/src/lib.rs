@@ -7,6 +7,7 @@ pub mod fde;
 pub mod json;
 pub mod md5;
 pub mod regex;
+pub mod regex_literal;
 pub mod scalar;
 
 use std::cmp::Ordering;

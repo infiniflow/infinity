@@ -95,6 +95,11 @@
 | JSON 值（`parser/type/*`、`storage/column_vector/json*`） | `infinity_common::json::Json` + `LogicalType::Json`/`BlockValue::Json` | 解析树、紧凑序列化、列/WAL 编解码 | ✅（以结构化 JSON 替代 BSON 字节） |
 | 多语句事务（`storage/txn/*`） | `infinity_executor::EngineTxn` + `infinity_txn::TxnManager` | `begin_txn`/`append`/`delete_row_ids`/`create_table_snapshot`/`commit`/`rollback`、begin/commit 时间戳 | ✅（rollback 不回退行号分配器） |
 | 稀疏 HNSW（`KnnHnsw<SparseIPVecStoreType>`，`knn_hnsw/*`） | `infinity_index::vector::{Store::SparseIp, HnswIndex::sparse_ip/add_sparse/search_sparse/save_sparse/load_sparse}` | 稀疏点积距离、图构建/检索/序列化 | ✅（不含 BMP 块压缩） |
+| `OptimizerRule` / `Optimizer` / `ColumnPruner` / `ColumnRemapper` / `LazyLoad` / `ApplyFastRoughFilter` / `ResultCacheGetter`（`planner/optimizer/*`、`optimizer_rule.cppm`） | `infinity_planner::{optimize, column, result_cache, index_scan}` | `OptimizerRule` trait + `Optimizer` 按序执行；`ColumnPruner::prune` / `ColumnRemapper::remap` / `LazyLoad::{collect,clean_scan}` 做位置化裁剪与重映射（默认管线不调用裁剪：search/unnest 隐藏列在规划后才追加）；`ApplyFastRoughFilter::build` 生成 min/max + bloom 跳过树；`ResultCacheGetter::{get,rewrite}` 命中替换为 `Values` | ✅ |
+| `FilterExpressionPushDown` / `IndexFilterEvaluator` 及其 AllTrue/AllFalse/Secondary/Fulltext/LogicalChildren / `FilterExpressionPushDownHelper` / `ExpressionInfoTree` / `IndexScanBuilder`（`planner/optimizer/index_scan/*`） | `infinity_planner::index_scan` | `push_down_to_index_scan` 拆分 index/leftover 并构建求值器；`unwind_cast`、JSON term 编码、区间 merge/AND-OR 组合；`IndexScanBuilder::build` 返回 `IndexScanCandidate`（Rust 无 `LogicalIndexScan` 节点，候选与 leftover 一并返回） | ✅ |
+| `RegexIndexRewrite`（`planner/optimizer/regex_index_rewrite.cppm`） | `infinity_planner::regex_rewrite::RegexIndexRewrite` | 对 sparsegram 全文索引列，把 `regex` 的必含字面 run 转成 `filter_fulltext` 合取并保留原正则作为残余过滤；run 抽取复用 `infinity_expression::regex_literal` | ✅ |
+| `QueryBinder`（`planner/query_binder.cppm`） | `infinity_planner::binder::QueryBinder` | `bind_select`/`bind_insert`/`bind_delete`/`bind_update`/`bind_from`/`bind_table`/`bind_expression`/`bind_predicate`；COMPACT 无 AST/绑定结构，由 `infinity-executor` 直接执行 | ✅ |
+| `CorrelatedExpressionsDetector` / `DependentJoinFlattener` / `RewriteCorrelatedExpressions` / `SubqueryUnnest`（`planner/subquery/*`） | `infinity_planner::subquery` | 深度化绑定子查询树 `SubqueryPlan`/`SubqueryExpr`；depth 检测、相关列重写、dependent join 下推、标量/IN/EXISTS unnest 与 mark join | ✅ |
 
 > **基线说明**：`TableEntry` / `SegmentEntry` / `BlockManager` 已在基线 PR #2722 中从 C++ 源码删除；当前持久化元数据类是 `TableMeta` / `SegmentMeta` / `BlockMeta` / `ColumnMeta`，块映射类是 `BlockIndex`。本表按基线实际存在的类名对应，不再列出已删除的类。
 
@@ -115,63 +120,17 @@
 | geo 类型（`PointType`/`LineType`/`LineSegmentType`/`BoxType`/`CircleType`/`PathType`/`PolygonType`）及其 `column_vector_geo_ut`、`function/cast/geography/*` 用例 | 无 | 用户明确决定不需要 Box/Point/Circle 等 geo 类型，测试与产品代码均不移植 | 
 | DiskANN / Vamana（`knn_diskann/*`：`VamanaAlg`、`PQFlashIndex`、`FixedChunkPQTable`、`DiskAnnMemGraphStore`、`NeighborPriorityQueue` 等） | 无 | 计划 §2.6/R14 明确不纳入：C++ 的 populate 分支只 `LOG_WARN("Not implemented yet")` 后返回成功，索引不可用；Rust 不移植不可达的骨架 |
 
-## 尚未一一对应（待补，按优先级）
+## peer / cluster（已一一对应）
 
-| C++ | 当前 Rust | 差距 |
+| C++ | Rust | 说明 |
 |---|---|---|
-| 优化器规则类（`ColumnPruner`/`ColumnRemapper`/`IndexScanBuilder`/`LazyLoad`/`RegexIndexRewrite`/`SubqueryUnnest` 等 23 个）、peer/network 类（`PeerTask`/`PeerClient`/`RingBufferIterator` 等 10 个） | `infinity_planner` 仅有 limit pushdown、filter-below-sort、constant-filter 三条规则；`infinity-server` 为单节点 | `CLASS_AUDIT` 中已标为 `gap`（34 行）；执行器按需处理部分语义，但无对应类。新增上游行为类须先登记再移植 |
-
-## 剩余缺口（34 个行为类）
-
-`CLASS_AUDIT` 中标记为 `gap` 的类如下；它们不是纯数据载体，而是 C++ 中承载行为的类，因此必须逐类补齐后才能声称“所有产品代码已移植”。
-
-### 优化器 / 子查询（23）
-
-| C++ 类 | 定义位置 | 状态 |
-|---|---|---|
-| `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | 进行中（planner-9） |
-| `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | 进行中（planner-9） |
-| `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | 进行中（planner-9） |
-| `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | 进行中（planner-9） |
-| `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | 进行中（planner-9） |
-| `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | 进行中（planner-9） |
-| `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | 进行中（planner-9） |
-| `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | 进行中（planner-9） |
-| `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | 进行中（planner-9） |
-| `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | 进行中（planner-9） |
-| `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | 进行中（planner-9） |
-| `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | 进行中（planner-9） |
-| `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | 进行中（planner-9） |
-| `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | 进行中（planner-9） |
-| `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | 进行中（planner-9） |
-| `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | 进行中（planner-9） |
-| `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | 进行中（planner-9） |
-| `OptimizerRule` | `src/planner/optimizer_rule.cppm` | 进行中（planner-9） |
-| `QueryBinder` | `src/planner/query_binder.cppm` | 进行中（planner-9） |
-| `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | 进行中（planner-9） |
-| `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | 进行中（planner-9） |
-| `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | 进行中（planner-9） |
-| `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | 进行中（planner-9） |
-
-### peer / cluster（11）
-
-| C++ 类 | 定义位置 | 状态 |
-|---|---|---|
-| `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | 进行中（peer-9） |
-| `ChangeRoleTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
-| `HeartBeatPeerTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
-| `PeerTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
-| `RegisterPeerTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
-| `SyncLogTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
-| `TerminatePeerTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
-| `UnregisterPeerTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
-| `PeerClient` | `src/network/peer_thrift_client.cppm` | 进行中（peer-9） |
-| `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | 进行中（peer-9） |
-| `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | 进行中（peer-9） |
+| `PeerServerThriftService` / `PeerClient` / `PoolPeerThriftServer` | `infinity_server::peer::{PeerServerThriftService, PeerClient, PoolPeerThriftServer}` | 注册/注销/心跳/同步日志/改角色的错误码与 leader-only 规则；Thrift 传输替换为 `PeerTransport`（已登记设计变更），状态机未简化 |
+| `PeerTask` / `RegisterPeerTask` / `UnregisterPeerTask` / `TerminatePeerTask` / `HeartBeatPeerTask` / `SyncLogTask` / `ChangeRoleTask` | `infinity_server::peer::{PeerTask, RegisterPeerTask, UnregisterPeerTask, TerminatePeerTask, HeartBeatPeerTask, SyncLogTask, ChangeRoleTask}` | `execute`/`wait`/`complete` 完成门、C++ 字段集合与 `ToString`、重试/重连策略（2 次/1000ms） |
+| `RingBufferIterator` | `infinity_server::ring_buffer::RingBufferIterator` | 4096 环形缓冲、模自增、带符号 `Distance`、`Find`/`CopyN`，共享缓冲用 `Arc<RwLock<Vec<u8>>>`（crate 禁用 unsafe 别名） |
 
 ## 类级覆盖审计（基线 `5d27942c0`）
 
-`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；**逐名清单（1136 行，mapped 1102 / exempt 12 / excluded 15 / test 7，grouped 0）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**：每行都指向具体 Rust 模块或已登记的设计变更/排除；下表是按区域汇总的聚合说明：
+`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；**逐名清单（1136 行，mapped 1094 / exempt 20 / excluded 15 / test 7，gap 0）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**：每行都指向具体 Rust 模块或已登记的设计变更/排除；下表是按区域汇总的聚合说明：
 
 | 区域 | 未逐类命名 | Rust 承担方式 |
 |---|---:|---|
@@ -180,7 +139,7 @@
 | `planner/*` | 117 | `node` 52 → `Statement`/计划结构；`optimizer` 17 → 规则函数；其余为绑定/解析中间结构 |
 | `function/*` | 64 | `cast` 29 + `table` 17 + 其余 → Rust 的 cast/builtin 函数与 `AggFunc` 枚举 |
 | `common/*` | 58 | `analyzer` 39 → `tokenize_*` analyzer 函数；其余为工具结构 |
-| `main/*` + `network/*` + `scheduler/*` + `admin` + `metrics` + `unit_test` | 39 + 23 + 10 + 1 + 1 + 7 | 查询选项 → 解析结构；Thrift 类型 → 生成代码；调度器按 D4 由 Tokio 取代；admin → 语句分发；metrics → 服务端计数；`unit_test` 为 C++ 测试夹具 |
+| `main/*` + `network/*` + `scheduler/*` + `admin` + `metrics` + `unit_test` | 39 + 23 + 10 + 1 + 1 + 7 | 查询选项 → 解析结构；peer/cluster → `infinity_server::peer` + `ring_buffer`；调度器按 D4 由 Tokio 取代；admin → 语句分发；metrics → 服务端计数；`unit_test` 为 C++ 测试夹具 |
 | `expression/*` | 12 | 标量表达式求值函数（`infinity-expression`） |
 
 > 判定口径：C++ 中承载**行为**且被其他类调用的类（HNSW/IVF/EMVB/PLAID/SMVE、全文段、事务、Buffer、BlockIndex、PDataBlock 等）在本表中逐类对应；纯数据载体、模板特化、迭代器和生成类型按上表合并，理由与归属均已登记。新增 C++ 行为类时仍须先登记再移植。

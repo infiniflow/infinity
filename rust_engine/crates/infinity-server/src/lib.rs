@@ -17,7 +17,9 @@
 #![forbid(unsafe_code)]
 
 pub mod http;
+pub mod peer;
 pub mod pg;
+pub mod ring_buffer;
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -26,6 +28,8 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use infinity_common::{Error, Result};
+
+use crate::peer::{NodeInfo, NodeRole, NodeStatus};
 use infinity_executor::{with_zero_dimension_sparse, Engine, QueryResult};
 
 use thrift::protocol::{
@@ -246,6 +250,9 @@ pub struct Server {
     sessions: Arc<Mutex<HashMap<i64, i64>>>,
     next_session: Arc<AtomicI64>,
     engine: Option<Arc<Engine>>,
+    /// The node this process presents to `SHOW CURRENT NODE` and the peer
+    /// service. A standalone server is a leader with no peers.
+    node: Arc<NodeInfo>,
 }
 
 impl Server {
@@ -256,6 +263,15 @@ impl Server {
             sessions: Arc::new(Mutex::new(HashMap::new())),
             next_session: Arc::new(AtomicI64::new(1)),
             engine: None,
+            node: Arc::new(NodeInfo::new(
+                NodeRole::Leader,
+                NodeStatus::Alive,
+                "leader",
+                "0.0.0.0",
+                0,
+                0,
+                0,
+            )),
         })
     }
 
@@ -285,8 +301,9 @@ impl Server {
                     let sessions = self.sessions.clone();
                     let next = self.next_session.clone();
                     let engine = self.engine.clone();
+                    let node = self.node.clone();
                     std::thread::spawn(move || {
-                        let _ = handle_connection(s, sessions, next, engine);
+                        let _ = handle_connection(s, sessions, next, engine, node);
                     });
                 }
                 Err(_) => continue,
@@ -414,6 +431,7 @@ fn handle_connection(
     sessions: Arc<Mutex<HashMap<i64, i64>>>,
     next_session: Arc<AtomicI64>,
     engine: Option<Arc<Engine>>,
+    node: Arc<NodeInfo>,
 ) -> Result<()> {
     // Thrift writes scalar fields one at a time (a `list<bool>` bitmask is one
     // `writeBool` per row); on a raw `TcpStream` that is one syscall per value.
@@ -1849,7 +1867,12 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         skip_struct(&mut ip)?;
                     }
-                    write_show_current_node_response(&mut writer, seq, "leader", "alive")?;
+                    write_show_current_node_response(
+                        &mut writer,
+                        seq,
+                        &node.node_role().to_string(),
+                        &node.node_status().to_string(),
+                    )?;
                 }
                 "ShowSnapshot" => {
                     let (sid, name) = {

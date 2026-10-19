@@ -3,8 +3,14 @@
 
 #![forbid(unsafe_code)]
 
+pub mod binder;
+pub mod column;
 pub mod column_binding;
+pub mod index_scan;
 pub mod optimize;
+pub mod regex_rewrite;
+pub mod result_cache;
+pub mod subquery;
 
 pub use column_binding::ColumnBinding;
 
@@ -13,6 +19,56 @@ use infinity_expression::{Expr, Value};
 use infinity_parser::{
     AggFunc, BoolOp, ExprAst, JoinClause, Literal, OrderKey, Predicate, SelectItem,
 };
+
+/// The column names produced by `plan`.
+pub fn output_schema(plan: &LogicalPlan) -> Vec<String> {
+    match plan {
+        LogicalPlan::Values { columns, .. } => columns.clone(),
+        LogicalPlan::Scan { columns, .. } => columns.clone(),
+        LogicalPlan::Join {
+            left,
+            right,
+            left_width,
+            ..
+        } => {
+            let mut names = output_schema(left);
+            names.truncate(*left_width);
+            names.extend(output_schema(right));
+            names
+        }
+        LogicalPlan::Filter { input, .. }
+        | LogicalPlan::Sort { input, .. }
+        | LogicalPlan::Limit { input, .. }
+        | LogicalPlan::Offset { input, .. } => output_schema(input),
+        LogicalPlan::Projection { names, .. } => names.clone(),
+        LogicalPlan::Aggregate {
+            group_names, aggs, ..
+        } => {
+            let mut names = group_names.clone();
+            names.extend(aggs.iter().map(|(_, _, _, label)| label.clone()));
+            names
+        }
+    }
+}
+
+/// The number of columns produced by `plan`.
+pub fn output_width(plan: &LogicalPlan) -> usize {
+    match plan {
+        LogicalPlan::Values { columns, .. } => columns.len(),
+        LogicalPlan::Scan { columns, .. } => columns.len(),
+        LogicalPlan::Join {
+            left_width, right, ..
+        } => left_width + output_width(right),
+        LogicalPlan::Filter { input, .. }
+        | LogicalPlan::Sort { input, .. }
+        | LogicalPlan::Limit { input, .. }
+        | LogicalPlan::Offset { input, .. } => output_width(input),
+        LogicalPlan::Projection { exprs, .. } => exprs.len(),
+        LogicalPlan::Aggregate {
+            group_keys, aggs, ..
+        } => group_keys.len() + aggs.len(),
+    }
+}
 
 /// A simple logical plan.
 #[derive(Debug, Clone, PartialEq)]
@@ -611,7 +667,7 @@ pub fn item_label(it: &SelectItem) -> String {
     }
 }
 
-fn build_source(
+pub(crate) fn build_source(
     tables: &[(String, Vec<String>)],
     join: Option<&JoinClause>,
 ) -> Result<LogicalPlan> {

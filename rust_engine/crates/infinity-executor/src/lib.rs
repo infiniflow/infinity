@@ -171,7 +171,7 @@ mod hnsw_mem;
 mod knn_scan;
 mod profiler;
 pub mod query_builder;
-mod regex_literal;
+pub use infinity_expression::regex_literal;
 mod variables;
 mod wand;
 
