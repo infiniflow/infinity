@@ -868,3 +868,185 @@ mod map_reference_suite {
         assert_eq!(multimap_range.len(), map_range.len());
     }
 }
+
+#[cfg(test)]
+mod concurrency_reference_suite {
+    //! C++: `RcuMultiMapTest.TestConcurrentInsertAndRead` and
+    //! `TestConcurrentInsertDeleteRead` (multi), plus the `RcuMapTest`
+    //! equivalents.
+
+    use super::*;
+    use std::sync::atomic::{AtomicI32, Ordering};
+
+    #[test]
+    fn multimap_concurrent_insert_and_read() {
+        let map: RcuMultiMap<i32, i32> = RcuMultiMap::new();
+        let insertions = AtomicI32::new(0);
+        let reads = AtomicI32::new(0);
+        let (threads, ops, keys) = (4i32, 200i32, 20i32);
+        std::thread::scope(|scope| {
+            for t in 0..threads / 2 {
+                let map = &map;
+                let insertions = &insertions;
+                scope.spawn(move || {
+                    for i in 0..ops {
+                        let key = (t * 7 + i) % keys;
+                        map.insert(key, t * ops + i);
+                        insertions.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+            for t in threads / 2..threads {
+                let map = &map;
+                let reads = &reads;
+                scope.spawn(move || {
+                    for i in 0..ops {
+                        let key = (t * 11 + i) % keys;
+                        let _ = map.get(&key, true);
+                        reads.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+        });
+        assert_eq!(insertions.load(Ordering::Relaxed), (threads / 2) * ops);
+        assert_eq!(reads.load(Ordering::Relaxed), (threads / 2) * ops);
+        let final_total: usize = (0..keys).map(|key| map.get(&key, true).len()).sum();
+        assert!(final_total > 0);
+        assert!(final_total <= (threads / 2 * ops) as usize);
+    }
+
+    #[test]
+    fn multimap_concurrent_insert_delete_read() {
+        let map: RcuMultiMap<i32, i32> = RcuMultiMap::new();
+        let insertions = AtomicI32::new(0);
+        let deletions = AtomicI32::new(0);
+        let reads = AtomicI32::new(0);
+        let (threads, ops, keys) = (6i32, 100i32, 15i32);
+        std::thread::scope(|scope| {
+            for t in 0..threads / 3 {
+                let map = &map;
+                let insertions = &insertions;
+                scope.spawn(move || {
+                    for i in 0..ops {
+                        let key = (t * 5 + i) % keys;
+                        map.insert(key, t * ops + i);
+                        insertions.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+            for t in threads / 3..2 * threads / 3 {
+                let map = &map;
+                let deletions = &deletions;
+                scope.spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                    for i in 0..ops / 2 {
+                        let key = (t * 3 + i) % keys;
+                        map.delete(&key);
+                        deletions.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+            for t in 2 * threads / 3..threads {
+                let map = &map;
+                let reads = &reads;
+                scope.spawn(move || {
+                    for i in 0..ops {
+                        let key = (t * 13 + i) % keys;
+                        let _ = map.get(&key, true);
+                        reads.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+        });
+        assert_eq!(insertions.load(Ordering::Relaxed), (threads / 3) * ops);
+        assert_eq!(deletions.load(Ordering::Relaxed), (threads / 3) * (ops / 2));
+        assert_eq!(reads.load(Ordering::Relaxed), (threads / 3) * ops);
+        assert!(map.size() <= keys as usize);
+    }
+
+    #[test]
+    fn map_concurrent_insert_and_read() {
+        let map: RcuMap<i32, i32> = RcuMap::new();
+        let insertions = AtomicI32::new(0);
+        let reads = AtomicI32::new(0);
+        let (threads, ops, keys) = (4i32, 100i32, 20i32);
+        std::thread::scope(|scope| {
+            for t in 0..threads / 2 {
+                let map = &map;
+                let insertions = &insertions;
+                scope.spawn(move || {
+                    for i in 0..ops {
+                        let key = (t * 7 + i) % keys;
+                        map.insert(key, t * ops + i);
+                        insertions.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+            for t in threads / 2..threads {
+                let map = &map;
+                let reads = &reads;
+                scope.spawn(move || {
+                    for i in 0..ops {
+                        let key = (t * 11 + i) % keys;
+                        let _ = map.get(&key, true);
+                        reads.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+        });
+        assert_eq!(insertions.load(Ordering::Relaxed), (threads / 2) * ops);
+        assert_eq!(reads.load(Ordering::Relaxed), (threads / 2) * ops);
+        let accessible = (0..keys).filter(|key| map.get(key, true).is_some()).count();
+        assert!(accessible > 0);
+        assert!(accessible <= keys as usize);
+    }
+
+    #[test]
+    fn map_concurrent_insert_delete_read() {
+        let map: RcuMap<i32, i32> = RcuMap::new();
+        let insertions = AtomicI32::new(0);
+        let deletions = AtomicI32::new(0);
+        let reads = AtomicI32::new(0);
+        let (threads, ops, keys) = (6i32, 50i32, 10i32);
+        std::thread::scope(|scope| {
+            for t in 0..threads / 3 {
+                let map = &map;
+                let insertions = &insertions;
+                scope.spawn(move || {
+                    for i in 0..ops {
+                        let key = (t * 5 + i) % keys;
+                        map.insert(key, t * ops + i);
+                        insertions.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+            for t in threads / 3..2 * threads / 3 {
+                let map = &map;
+                let deletions = &deletions;
+                scope.spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                    for i in 0..ops / 2 {
+                        let key = (t * 3 + i) % keys;
+                        map.delete(&key);
+                        deletions.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+            for t in 2 * threads / 3..threads {
+                let map = &map;
+                let reads = &reads;
+                scope.spawn(move || {
+                    for i in 0..ops {
+                        let key = (t * 13 + i) % keys;
+                        let _ = map.get(&key, true);
+                        reads.fetch_add(1, Ordering::Relaxed);
+                    }
+                });
+            }
+        });
+        assert_eq!(insertions.load(Ordering::Relaxed), (threads / 3) * ops);
+        assert_eq!(deletions.load(Ordering::Relaxed), (threads / 3) * (ops / 2));
+        assert_eq!(reads.load(Ordering::Relaxed), (threads / 3) * ops);
+        assert!(map.size() <= keys as usize);
+    }
+}
