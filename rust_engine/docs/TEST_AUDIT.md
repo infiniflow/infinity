@@ -2,7 +2,7 @@
 
 `src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 48, `exempt` 13, `ported` 951。
 
-- `ported`：Rust 已逐条移植同等场景。
+- `ported`：Rust 已逐条移植同等场景；少数以 native 组件等价替代 C++ 第三方（如 RocksDB 事务 KV → `txn_kv`、后台线程池 → `bg_task`），映射列直接指向替代实现，不声称字节级一致。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
 - `gate-a`：parser/planner/executor/function，当前由 Gate A 的 SQL 用例覆盖，单元断言待移植。
 - `integration`：catalog/txn/wal/io/bg_task，当前由 Gate C 的 restart/快照集成用例覆盖，单元断言待移植。

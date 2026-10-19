@@ -33,6 +33,9 @@ use infinity_storage::FjallMetaStore;
 use infinity_storage::MetaStore;
 use infinity_txn::{Txn, TxnManager};
 
+use crate::fulltext_query::SearchDriver;
+use crate::query_builder::QueryNode;
+
 mod deferred_catalog;
 mod explain;
 
@@ -128,6 +131,9 @@ mod query_match_ut;
 
 #[cfg(test)]
 mod select_ddl_ut;
+
+#[cfg(test)]
+mod subquery_cte_ut;
 
 #[cfg(test)]
 mod query_parser_and_optimizer_ut;
@@ -1912,6 +1918,81 @@ fn qualify_sql_tables_with(sql: &str, resolve: &dyn Fn(&str) -> String) -> Resul
         }
     }
     Ok(render_tokens_as_sql(&toks))
+}
+
+/// The SQL text carried by a parser-produced `SUBQUERY` pseudo-function.
+fn subquery_sql_arg(args: &[ExprAst]) -> Result<&str> {
+    match args.first() {
+        Some(ExprAst::Literal(Literal::Str(sql))) => Ok(sql.as_str()),
+        _ => Err(Error::Invalid("malformed subquery expression".into())),
+    }
+}
+
+/// The SQL text of the subquery nested in `EXISTS(SUBQUERY(sql))`.
+fn exists_subquery_sql(args: &[ExprAst]) -> Result<&str> {
+    match args.first() {
+        Some(ExprAst::Func { name, args }) if name.eq_ignore_ascii_case("SUBQUERY") => {
+            subquery_sql_arg(args)
+        }
+        _ => Err(Error::Invalid("malformed EXISTS subquery".into())),
+    }
+}
+
+/// A boolean-valued expression, used to splice `EXISTS` into an `ExprAst`
+/// (`Literal` has no boolean variant; the reference AST encodes booleans as
+/// `true`/`false` strings, which cannot feed `WHERE`).
+fn boolean_expr(value: bool) -> ExprAst {
+    ExprAst::Cmp(
+        Box::new(ExprAst::Literal(Literal::Int(1))),
+        CmpOp::Eq,
+        Box::new(ExprAst::Literal(Literal::Int(if value { 1 } else { 0 }))),
+    )
+}
+
+fn value_to_literal(value: Value) -> Literal {
+    match value {
+        Value::Int(i) => Literal::Int(i),
+        Value::Float(f) => Literal::Float(f),
+        Value::Str(s) => Literal::Str(s),
+        Value::Bool(b) => Literal::Str(if b { "true" } else { "false" }.into()),
+        Value::Null => Literal::Null,
+    }
+}
+
+fn expr_has_subquery(e: &ExprAst) -> bool {
+    match e {
+        ExprAst::Func { name, args } => {
+            name.eq_ignore_ascii_case("SUBQUERY")
+                || name.eq_ignore_ascii_case("EXISTS")
+                || args.iter().any(expr_has_subquery)
+        }
+        ExprAst::Binary(a, _, b)
+        | ExprAst::Cmp(a, _, b)
+        | ExprAst::And(a, b)
+        | ExprAst::Or(a, b) => expr_has_subquery(a) || expr_has_subquery(b),
+        ExprAst::Not(a) => expr_has_subquery(a),
+        _ => false,
+    }
+}
+
+fn pred_has_subquery(p: &Predicate) -> bool {
+    match p {
+        Predicate::Cmp(a, _, b) => expr_has_subquery(a) || expr_has_subquery(b),
+        Predicate::IsTrue(e) | Predicate::IsNull(e, _) => expr_has_subquery(e),
+        Predicate::Like(a, b, _, _) => expr_has_subquery(a) || expr_has_subquery(b),
+        Predicate::In(a, vals, _) => expr_has_subquery(a) || vals.iter().any(expr_has_subquery),
+        Predicate::Bool(a, _, b) => pred_has_subquery(a) || pred_has_subquery(b),
+        Predicate::Not(a) => pred_has_subquery(a),
+    }
+}
+
+fn item_has_subquery(item: &SelectItem) -> bool {
+    match item {
+        SelectItem::Func { args, .. } => args.iter().any(expr_has_subquery),
+        SelectItem::Expr(e) => expr_has_subquery(e),
+        SelectItem::Aggregate(a) => a.arg_exprs.iter().flatten().any(expr_has_subquery),
+        _ => false,
+    }
 }
 
 fn parse_value(cell: &str) -> Value {
@@ -3862,6 +3943,257 @@ impl Engine {
         Ok((Vec::new(), Vec::new()))
     }
 
+    /// Runs a scalar/`EXISTS` subquery, returning typed rows. The SQL text is
+    /// re-parsed here exactly like a derived table, but the typed
+    /// [`Self::run_select`] path is used so values are not round-tripped
+    /// through their `.slt` text. `ctes` are the bindings already visible in
+    /// the enclosing query.
+    fn run_subquery(
+        &self,
+        sql: &str,
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+    ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+        let Some(stmt) = parse(sql)?.into_iter().next() else {
+            return Ok((Vec::new(), Vec::new()));
+        };
+        if !matches!(stmt, Statement::Select { .. }) {
+            return Err(Error::Invalid("subquery must be a SELECT".into()));
+        }
+        let visible: Vec<String> = ctes.keys().cloned().collect();
+        let stmt = self.expand_views(self.qualify_tables_in(&stmt, &visible))?;
+        self.run_select_with_ctes(&stmt, ctes)
+    }
+
+    /// A scalar subquery: the first row's first column, NULL for an empty
+    /// result. More than one row or column is an error, as in the reference.
+    fn scalar_subquery_value(
+        &self,
+        sql: &str,
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+    ) -> Result<Value> {
+        let (columns, rows) = self.run_subquery(sql, ctes)?;
+        if columns.len() > 1 {
+            return Err(Error::Invalid(format!(
+                "scalar subquery must return only one column, got {}",
+                columns.len()
+            )));
+        }
+        if rows.len() > 1 {
+            return Err(Error::Invalid(format!(
+                "scalar subquery returned more than one row ({} rows)",
+                rows.len()
+            )));
+        }
+        Ok(rows
+            .into_iter()
+            .next()
+            .and_then(|mut r| {
+                if r.is_empty() {
+                    None
+                } else {
+                    Some(r.remove(0))
+                }
+            })
+            .unwrap_or(Value::Null))
+    }
+
+    /// `EXISTS (SELECT …)`: true when the subquery produces at least one row.
+    fn subquery_exists(
+        &self,
+        sql: &str,
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+    ) -> Result<bool> {
+        Ok(!self.run_subquery(sql, ctes)?.1.is_empty())
+    }
+
+    /// Rewrites the parser's `SUBQUERY`/`EXISTS` pseudo-functions into
+    /// constants that the planner can evaluate. A scalar subquery becomes a
+    /// literal (NULL when empty); `EXISTS` becomes a boolean comparison, which
+    /// keeps `NOT EXISTS` working through `Predicate::Not`.
+    fn resolve_subquery_expr(
+        &self,
+        e: &ExprAst,
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+    ) -> Result<ExprAst> {
+        Ok(match e {
+            ExprAst::Func { name, args } if name.eq_ignore_ascii_case("SUBQUERY") => {
+                let sql = subquery_sql_arg(args)?;
+                ExprAst::Literal(value_to_literal(self.scalar_subquery_value(sql, ctes)?))
+            }
+            ExprAst::Func { name, args } if name.eq_ignore_ascii_case("EXISTS") => {
+                let sql = exists_subquery_sql(args)?;
+                boolean_expr(self.subquery_exists(sql, ctes)?)
+            }
+            ExprAst::Func { name, args } => ExprAst::Func {
+                name: name.clone(),
+                args: args
+                    .iter()
+                    .map(|a| self.resolve_subquery_expr(a, ctes))
+                    .collect::<Result<Vec<_>>>()?,
+            },
+            ExprAst::Binary(a, op, b) => ExprAst::Binary(
+                Box::new(self.resolve_subquery_expr(a, ctes)?),
+                *op,
+                Box::new(self.resolve_subquery_expr(b, ctes)?),
+            ),
+            ExprAst::Cmp(a, op, b) => ExprAst::Cmp(
+                Box::new(self.resolve_subquery_expr(a, ctes)?),
+                *op,
+                Box::new(self.resolve_subquery_expr(b, ctes)?),
+            ),
+            ExprAst::Not(a) => ExprAst::Not(Box::new(self.resolve_subquery_expr(a, ctes)?)),
+            ExprAst::And(a, b) => ExprAst::And(
+                Box::new(self.resolve_subquery_expr(a, ctes)?),
+                Box::new(self.resolve_subquery_expr(b, ctes)?),
+            ),
+            ExprAst::Or(a, b) => ExprAst::Or(
+                Box::new(self.resolve_subquery_expr(a, ctes)?),
+                Box::new(self.resolve_subquery_expr(b, ctes)?),
+            ),
+            other => other.clone(),
+        })
+    }
+
+    fn resolve_subquery_pred(
+        &self,
+        p: &Predicate,
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+    ) -> Result<Predicate> {
+        Ok(match p {
+            // The parser wraps `EXISTS` as `IsTrue(EXISTS(SUBQUERY))`. Rewrite
+            // the whole predicate (not the inner expression) so the result is
+            // a comparison, which `validate_where_predicate` accepts.
+            Predicate::IsTrue(ExprAst::Func { name, args })
+                if name.eq_ignore_ascii_case("EXISTS") =>
+            {
+                let sql = exists_subquery_sql(args)?;
+                Predicate::Cmp(
+                    ExprAst::Literal(Literal::Int(1)),
+                    CmpOp::Eq,
+                    ExprAst::Literal(Literal::Int(i64::from(self.subquery_exists(sql, ctes)?))),
+                )
+            }
+            Predicate::Cmp(a, op, b) => Predicate::Cmp(
+                self.resolve_subquery_expr(a, ctes)?,
+                *op,
+                self.resolve_subquery_expr(b, ctes)?,
+            ),
+            Predicate::IsTrue(e) => Predicate::IsTrue(self.resolve_subquery_expr(e, ctes)?),
+            Predicate::IsNull(e, neg) => {
+                Predicate::IsNull(self.resolve_subquery_expr(e, ctes)?, *neg)
+            }
+            Predicate::Like(a, pat, esc, neg) => Predicate::Like(
+                self.resolve_subquery_expr(a, ctes)?,
+                self.resolve_subquery_expr(pat, ctes)?,
+                *esc,
+                *neg,
+            ),
+            Predicate::In(a, vals, neg) => Predicate::In(
+                self.resolve_subquery_expr(a, ctes)?,
+                vals.iter()
+                    .map(|v| self.resolve_subquery_expr(v, ctes))
+                    .collect::<Result<Vec<_>>>()?,
+                *neg,
+            ),
+            Predicate::Bool(a, op, b) => Predicate::Bool(
+                Box::new(self.resolve_subquery_pred(a, ctes)?),
+                *op,
+                Box::new(self.resolve_subquery_pred(b, ctes)?),
+            ),
+            Predicate::Not(a) => Predicate::Not(Box::new(self.resolve_subquery_pred(a, ctes)?)),
+        })
+    }
+
+    /// Resolves every subquery in a `SELECT`'s expressions. Returns `None`
+    /// (without cloning the statement) when there is nothing to do.
+    fn resolve_stmt_subqueries(
+        &self,
+        stmt: &Statement,
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+    ) -> Result<Option<Statement>> {
+        let Statement::Select {
+            items,
+            where_pred,
+            group_by,
+            having,
+            order_by,
+            ..
+        } = stmt
+        else {
+            return Ok(None);
+        };
+        let changed = items.iter().any(item_has_subquery)
+            || where_pred.as_ref().is_some_and(pred_has_subquery)
+            || group_by.iter().any(expr_has_subquery)
+            || having.as_ref().is_some_and(|h| pred_has_subquery(h))
+            || order_by
+                .iter()
+                .any(|k| k.expr.as_ref().is_some_and(expr_has_subquery));
+        if !changed {
+            return Ok(None);
+        }
+        let mut s = stmt.clone();
+        let Statement::Select {
+            items,
+            where_pred,
+            group_by,
+            having,
+            order_by,
+            ..
+        } = &mut s
+        else {
+            unreachable!()
+        };
+        for it in items.iter_mut() {
+            match it {
+                SelectItem::Func { args, .. } => {
+                    for a in args.iter_mut() {
+                        *a = self.resolve_subquery_expr(a, ctes)?;
+                    }
+                }
+                SelectItem::Expr(e) => *e = self.resolve_subquery_expr(e, ctes)?,
+                SelectItem::Aggregate(a) => {
+                    for e in a.arg_exprs.iter_mut().flatten() {
+                        *e = self.resolve_subquery_expr(e, ctes)?;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if let Some(p) = where_pred {
+            *p = self.resolve_subquery_pred(p, ctes)?;
+        }
+        for g in group_by.iter_mut() {
+            *g = self.resolve_subquery_expr(g, ctes)?;
+        }
+        if let Some(h) = having.as_mut() {
+            **h = self.resolve_subquery_pred(h, ctes)?;
+        }
+        for k in order_by.iter_mut() {
+            if let Some(e) = k.expr.as_mut() {
+                *e = self.resolve_subquery_expr(e, ctes)?;
+            }
+        }
+        Ok(Some(s))
+    }
+
+    /// Evaluates a constant `LIMIT`/`OFFSET` expression. A subquery is not a
+    /// constant here: it is rejected rather than silently ignored.
+    fn eval_limit_expr(&self, expr: &ExprAst) -> Result<u64> {
+        if expr_has_subquery(expr) {
+            return Err(Error::Invalid(
+                "LIMIT/OFFSET must be a constant expression, not a subquery".into(),
+            ));
+        }
+        let compiled = infinity_planner::compile_expr(expr, &[])?;
+        match compiled.eval(&[]) {
+            Value::Int(n) if n >= 0 => Ok(n as u64),
+            _ => Err(Error::Invalid(
+                "LIMIT/OFFSET must evaluate to a non-negative integer".into(),
+            )),
+        }
+    }
+
     /// Best-effort database id for a (possibly qualified) table name.
     ///
     /// The catalog tracks table ids but not database ids, so the id is the
@@ -4752,6 +5084,13 @@ impl Engine {
     /// Resolves unqualified table names to `<current_db>.<name>`; a name that
     /// already contains a `.` is taken as fully qualified.
     fn qualify_tables(&self, stmt: &Statement) -> Statement {
+        self.qualify_tables_in(stmt, &[])
+    }
+
+    /// [`Self::qualify_tables`] with the CTE aliases that are visible from an
+    /// enclosing `WITH` clause. A CTE reference is a query-local name, not a
+    /// catalog table, so it must never be qualified (or view-expanded).
+    fn qualify_tables_in(&self, stmt: &Statement, outer_ctes: &[String]) -> Statement {
         let db = self.db();
         // Identifiers are case-insensitive: the catalog keeps lower-case names,
         // so every table reference is normalised before it reaches it.
@@ -4772,11 +5111,11 @@ impl Engine {
             | Statement::DropCollection { name, .. } => *name = q(name),
             Statement::CreateTableAs { name, query, .. } => {
                 *name = q(name);
-                **query = self.qualify_tables(query);
+                **query = self.qualify_tables_in(query, outer_ctes);
             }
             Statement::CreateView { name, query, .. } => {
                 *name = q(name);
-                **query = self.qualify_tables(query);
+                **query = self.qualify_tables_in(query, outer_ctes);
             }
             Statement::Insert { table, .. }
             | Statement::Delete { table, .. }
@@ -4792,27 +5131,43 @@ impl Engine {
             | Statement::CreateSnapshot { table, .. } => *table = q(table),
             Statement::InsertSelect { table, query, .. } => {
                 *table = q(table);
-                **query = self.qualify_tables(query);
+                **query = self.qualify_tables_in(query, outer_ctes);
             }
             Statement::RenameTable { table, new_name } => {
                 *table = q(table);
                 *new_name = q(new_name);
             }
-            Statement::Select { from, join, .. } => {
+            Statement::Select {
+                from, join, ctes, ..
+            } => {
+                let cte_names: Vec<String> =
+                    ctes.iter().map(|c| c.alias.to_ascii_lowercase()).collect();
+                let is_cte = |name: &str| {
+                    let name = name.to_ascii_lowercase();
+                    outer_ctes.contains(&name) || cte_names.contains(&name)
+                };
+                // A CTE query sees only the bindings that precede it.
+                for i in 0..ctes.len() {
+                    let mut visible = outer_ctes.to_vec();
+                    visible.extend(cte_names[..i].iter().cloned());
+                    *ctes[i].query = self.qualify_tables_in(ctes[i].query.as_ref(), &visible);
+                }
                 if let Some(t) = from.as_mut() {
                     // A derived table holds the subquery's SQL, not a table name.
                     // (A table may legitimately be called `select3`, so require the
                     // keyword and its trailing space.)
-                    if !t.trim_start().to_ascii_uppercase().starts_with("SELECT ") {
+                    if !t.trim_start().to_ascii_uppercase().starts_with("SELECT ") && !is_cte(t) {
                         *t = q(t);
                     }
                 }
                 if let Some(j) = join.as_mut() {
-                    j.table = q(&j.table);
+                    if !is_cte(&j.table) {
+                        j.table = q(&j.table);
+                    }
                 }
             }
             Statement::Explain { inner, .. } => {
-                let inner_q = self.qualify_tables(inner.as_ref());
+                let inner_q = self.qualify_tables_in(inner.as_ref(), outer_ctes);
                 **inner = inner_q;
             }
             _ => {}
@@ -4823,17 +5178,24 @@ impl Engine {
     /// Replaces `FROM <view>` with the view's stored query. The derived-table
     /// path then executes that query. Views are expanded once per statement;
     /// nested views are expanded when the derived query itself is executed.
+    /// A CTE alias shadows a view of the same name.
     fn expand_views(&self, mut stmt: Statement) -> Result<Statement> {
-        if let Statement::Select { from, join, .. } = &mut stmt {
+        if let Statement::Select {
+            from, join, ctes, ..
+        } = &mut stmt
+        {
+            let cte_names: Vec<String> =
+                ctes.iter().map(|c| c.alias.to_ascii_lowercase()).collect();
+            let is_cte = |name: &str| cte_names.contains(&name.to_ascii_lowercase());
             if let Some(t) = from.as_mut() {
-                if !t.trim_start().to_ascii_uppercase().starts_with("SELECT ") {
+                if !t.trim_start().to_ascii_uppercase().starts_with("SELECT ") && !is_cte(t) {
                     if let Some(v) = self.storage.catalog.get_view_by_name(t)? {
                         *t = v.query;
                     }
                 }
             }
             if let Some(j) = join.as_mut() {
-                if self.storage.catalog.get_view_by_name(&j.table)?.is_some() {
+                if !is_cte(&j.table) && self.storage.catalog.get_view_by_name(&j.table)?.is_some() {
                     return Err(Error::Invalid(format!(
                         "view '{}' is not supported in a JOIN",
                         j.table
@@ -6802,8 +7164,13 @@ impl Engine {
                 rows,
             } => self.insert_literals(table, columns.as_deref(), rows.clone()),
             Statement::Delete { table, where_pred } => {
+                // A subquery in the filter is evaluated once, before the scan.
+                let where_pred = match where_pred {
+                    Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new())?),
+                    None => None,
+                };
                 let schema = self.table_schema(table)?;
-                let pred = match where_pred {
+                let pred = match &where_pred {
                     Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
                     None => None,
                 };
@@ -6838,6 +7205,10 @@ impl Engine {
                         "syntax: UPDATE requires a WHERE clause".into(),
                     ));
                 }
+                let where_pred = match where_pred {
+                    Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new())?),
+                    None => None,
+                };
                 let schema = self.table_schema(table)?;
                 let types = self.column_types(table)?;
                 let not_nulls = self
@@ -6896,7 +7267,7 @@ impl Engine {
                     }
                     asg.push((idx, infinity_planner::compile_expr(e, &schema)?));
                 }
-                let pred = match where_pred {
+                let pred = match &where_pred {
                     Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
                     None => None,
                 };
@@ -6964,6 +7335,44 @@ impl Engine {
     /// `CREATE TABLE … AS SELECT` must preserve values (and NULLs) before
     /// casting them to the target schema.
     fn run_select(&self, stmt: &Statement) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+        self.run_select_with_ctes(stmt, &HashMap::new())
+    }
+
+    /// [`Self::run_select`] with the CTEs bound by an enclosing `WITH` clause.
+    /// Each binding is materialised in order, so a later CTE (and the outer
+    /// query) can scan an earlier one.
+    fn run_select_with_ctes(
+        &self,
+        stmt: &Statement,
+        outer_ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+    ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+        let mut cte_scope = outer_ctes.clone();
+        if let Statement::Select { ctes, .. } = stmt {
+            for cte in ctes {
+                // Only the bindings that precede this CTE are visible inside
+                // it, plus anything inherited from an enclosing query.
+                let visible: Vec<String> = cte_scope.keys().cloned().collect();
+                let query =
+                    self.expand_views(self.qualify_tables_in(cte.query.as_ref(), &visible))?;
+                let (mut columns, rows) = self.run_select_with_ctes(&query, &cte_scope)?;
+                if !cte.columns.is_empty() {
+                    if cte.columns.len() != columns.len() {
+                        return Err(Error::Invalid(format!(
+                            "WITH query '{}' has {} column(s) available but {} specified",
+                            cte.alias,
+                            columns.len(),
+                            cte.columns.len()
+                        )));
+                    }
+                    columns = cte.columns.clone();
+                }
+                cte_scope.insert(cte.alias.to_ascii_lowercase(), (columns, rows));
+            }
+        }
+        // Scalar/EXISTS subqueries are rewritten to constants before planning;
+        // the planner has no access to the storage engine.
+        let resolved = self.resolve_stmt_subqueries(stmt, &cte_scope)?;
+        let stmt: &Statement = resolved.as_ref().unwrap_or(stmt);
         let Statement::Select {
             items,
             from,
@@ -6975,12 +7384,26 @@ impl Engine {
             order_by,
             limit,
             offset,
+            limit_expr,
+            offset_expr,
             search,
             distinct,
             ..
         } = stmt
         else {
             return Err(Error::Invalid("run_select requires a SELECT".into()));
+        };
+        // A non-literal LIMIT/OFFSET is evaluated here, before the fast paths
+        // below inspect the resolved values.
+        let limit_value: Option<u64> = match (limit, limit_expr) {
+            (Some(n), _) => Some(*n),
+            (None, Some(e)) => Some(self.eval_limit_expr(e)?),
+            _ => None,
+        };
+        let offset_value: Option<u64> = match (offset, offset_expr) {
+            (Some(n), _) => Some(*n),
+            (None, Some(e)) => Some(self.eval_limit_expr(e)?),
+            _ => None,
         };
         // `SELECT count(*)` with no other clause is answered from the key
         // counts alone; the generic path materialises every row.
@@ -6989,8 +7412,8 @@ impl Engine {
             && group_by.is_empty()
             && having.is_none()
             && order_by.is_empty()
-            && limit.is_none()
-            && offset.is_none()
+            && limit_value.is_none()
+            && offset_value.is_none()
             && search.is_none()
             && !*distinct
             && items.len() == 1
@@ -7098,12 +7521,14 @@ impl Engine {
         }
         let items: &[SelectItem] = &items_owned;
         // `FROM (SELECT …)`: run the subquery first and scan its result.
-        // Its columns become a synthetic table so names resolve.
+        // Its columns become a synthetic table so names resolve. A `FROM <cte>`
+        // uses the rows materialised above the same way.
         let derived: Option<(Vec<String>, Vec<Vec<Value>>)> = match from.as_ref() {
             Some(f) if f.trim_start().to_ascii_uppercase().starts_with("SELECT ") => {
                 Some(self.derived_table(f.trim())?)
             }
-            _ => None,
+            Some(f) => cte_scope.get(&f.to_ascii_lowercase()).cloned(),
+            None => None,
         };
         let from_derived: Option<String> = if derived.is_some() {
             Some("__derived".to_string())
@@ -7189,8 +7614,8 @@ impl Engine {
             && group_by.is_empty()
             && having.is_none()
             && order_by.is_empty()
-            && limit.is_none()
-            && offset.is_none()
+            && limit_value.is_none()
+            && offset_value.is_none()
             && !*distinct
         {
             if let Some(t) = from.as_ref() {
@@ -7248,8 +7673,8 @@ impl Engine {
             &group_by,
             having.as_deref(),
             &order_keys,
-            *limit,
-            *offset,
+            limit_value,
+            offset_value,
         )?;
         // `SELECT sum(c1) AS s` names the output column `s`.
         apply_select_aliases(&mut plan, aliases);
@@ -9839,17 +10264,12 @@ impl Engine {
                             .trim()
                             .trim_matches(|c| c == '\'' || c == '"')
                             .to_ascii_lowercase();
-                        // `standard`, `keyword`, `whitespace`/`whitespace-…` and the
-                        // CJK/English pipelines are the analyzers the engine has.
-                        let known = matches!(
-                            a.as_str(),
-                            "standard" | "english" | "chinese" | "keyword" | "whitespace"
-                        ) || a.starts_with("whitespace-")
-                            || a.starts_with("whitespace_")
-                            || a.starts_with("sparsegram")
-                            || a == "rankfeatures";
-                        if !known {
-                            return Err(Error::Invalid(format!("analyzer '{a}' not found")));
+                        // Accept exactly the families `AnalyzerPool::get_analyzer`
+                        // can construct; `japanese`, `korean` and `traditional`
+                        // are C++ families the port does not vendor (MeCab/OpenCC)
+                        // and are rejected here rather than at query time.
+                        if !analyzer::is_constructible_analyzer_name(&a) {
+                            return Err(Error::Invalid(analyzer::unsupported_analyzer_message(&a)));
                         }
                     }
                 }
@@ -9980,7 +10400,7 @@ impl Engine {
         if cols.is_empty() {
             // A column-less clause may still name fields inside the query.
             if let Some(groups) = parse_field_query(&query) {
-                return self.search_field_query(table, &groups, pred, &params, hidden);
+                return self.search_field_query(table, &groups, &query, pred, &params, hidden);
             }
             return Ok((Vec::new(), hidden.to_vec()));
         }
@@ -10513,20 +10933,32 @@ impl Engine {
         Ok((out, hidden.to_vec()))
     }
 
-    /// Scores a column-less `MATCH TEXT ('', '(doc:…)^w …')` clause: each group
-    /// multiplies its boost by the sum of its fields' boolean scores (a
-    /// `keyword`/`whitespace` field counts once, a standard field once per
-    /// matching term). A document qualifies when at least `minimum_should_match`
-    /// groups score.
+    /// Scores a column-less `MATCH TEXT ('', '(doc:…)^w …')` clause. With
+    /// `similarity=boolean` each group multiplies its boost by the sum of its
+    /// fields' boolean scores (a `keyword`/`whitespace` field counts once, a
+    /// standard field once per matching term); otherwise the query is parsed
+    /// into a normal query tree and scored with BM25, like a named column.
     #[allow(clippy::type_complexity)]
     fn search_field_query(
         &self,
         table: &str,
         groups: &[(f64, Vec<(String, String)>)],
+        query: &str,
         pred: Option<&Expr>,
         params: &str,
         hidden: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
+        let boolean = params.split(';').any(|p| {
+            p.split_once('=')
+                .map(|(k, v)| {
+                    k.trim().eq_ignore_ascii_case("similarity")
+                        && v.trim().eq_ignore_ascii_case("boolean")
+                })
+                .unwrap_or(false)
+        });
+        if !boolean {
+            return self.search_field_query_bm25(table, query, pred, params, hidden);
+        }
         let schema = self.table_schema(table)?;
         let mut fields: Vec<(String, usize, Option<Vec<char>>)> = Vec::new();
         for (_, terms) in groups {
@@ -10635,6 +11067,177 @@ impl Engine {
         scored.truncate(topn);
         let mut by_id: HashMap<usize, Vec<Value>> =
             self.fetch_rows_with_ids(table)?.into_iter().collect();
+        let mut out = Vec::new();
+        for (seq, score) in scored {
+            let mut row = by_id.remove(&seq).unwrap_or_default();
+            row.push(Value::Int(seq as i64));
+            row.push(Value::Float(score));
+            row.push(Value::Float(0.0));
+            row.push(Value::Float(score));
+            out.push(row);
+        }
+        Ok((out, hidden.to_vec()))
+    }
+
+    /// BM25 path for a column-less field-qualified query. The query string is
+    /// parsed by the shared [`SearchDriver`] into the same query tree the
+    /// reference builds, then every leaf is scored with the named-column
+    /// formula: per-field corpus statistics (document count, sum of token
+    /// counts, per-term document frequency) and per-document term frequency
+    /// and length, `k1 = 1.2`, `b = 0.75`, and the leaf's `^boost` weight.
+    #[allow(clippy::type_complexity)]
+    fn search_field_query_bm25(
+        &self,
+        table: &str,
+        query: &str,
+        pred: Option<&Expr>,
+        params: &str,
+        hidden: &[String],
+    ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
+        let schema = self.table_schema(table)?;
+        // `column2analyzer`: the driver only needs the column's analyzer name.
+        let field2analyzer: HashMap<String, HashMap<String, String>> = {
+            let key = self.table_key(table);
+            let guard = self.tables.lock().unwrap();
+            guard
+                .get(&key)
+                .map(|entry| {
+                    entry
+                        .analyzers
+                        .iter()
+                        .map(|(column, analyzer)| {
+                            (
+                                column.clone(),
+                                HashMap::from([(String::new(), analyzer.clone())]),
+                            )
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let default_field = params
+            .split(';')
+            .filter_map(|p| p.split_once('='))
+            .find(|(k, _)| k.trim().eq_ignore_ascii_case("default_field"))
+            .map(|(_, v)| v.trim().to_string())
+            .unwrap_or_default();
+        let tree = SearchDriver::new(field2analyzer, default_field)
+            .parse_single(query)
+            .map_err(|error| Error::Invalid(format!("{error}")))?;
+        let mut columns: Vec<String> = Vec::new();
+        collect_query_columns(&tree, &mut columns);
+        let mut fields: Vec<FieldGroupField> = columns
+            .iter()
+            .filter_map(|name| {
+                Some(FieldGroupField {
+                    ci: schema.iter().position(|s| s == name)?,
+                    name: name.clone(),
+                    delims: self.index_delims(table, name),
+                    df: HashMap::new(),
+                    avg_len: 1.0,
+                })
+            })
+            .collect();
+        let prefix = row_prefix(table);
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        // `(seq, live, passes the filter, per-field (term, position) pairs)`,
+        // over every stored row: deleted rows keep contributing to the corpus
+        // statistics, exactly as the index does until compaction.
+        #[allow(clippy::type_complexity)]
+        let mut docs: Vec<(usize, bool, bool, Vec<Vec<(String, u32)>>)> = Vec::new();
+        let mut len_sums = vec![0u64; fields.len()];
+        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
+            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
+                .parse()
+                .unwrap_or(0);
+            let mut row = self.parse_stored_row(table, &defaults, &v)?;
+            while row.len() < defaults.len() {
+                let i = row.len();
+                row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
+                    Some(d) => Value::from_literal(&default_literal(d)),
+                    None => Value::Null,
+                });
+            }
+            let live = self.storage.store.get(&del_key(table, seq))?.is_none();
+            let passes = pred.map(|p| p.eval_predicate(&row)).unwrap_or(true);
+            let tokens: Vec<Vec<(String, u32)>> = fields
+                .iter()
+                .map(|field| {
+                    let text = match row.get(field.ci) {
+                        Some(Value::Str(s)) => s.clone(),
+                        Some(other) => other.to_slt_string(),
+                        None => String::new(),
+                    };
+                    tokenize_index_positions(&text, &field.delims)
+                })
+                .collect();
+            for (fi, field_tokens) in tokens.iter().enumerate() {
+                len_sums[fi] += field_tokens.len() as u64;
+                let mut seen: std::collections::HashSet<&str> = Default::default();
+                for (term, _) in field_tokens {
+                    if seen.insert(term.as_str()) {
+                        *fields[fi].df.entry(term.clone()).or_insert(0) += 1;
+                    }
+                }
+            }
+            docs.push((seq, live, passes, tokens));
+        }
+        let n_docs = docs.len().max(1);
+        for (fi, field) in fields.iter_mut().enumerate() {
+            let avg = len_sums[fi] as f64 / docs.len().max(1) as f64;
+            field.avg_len = if avg <= 0.0 { 1.0 } else { avg };
+        }
+        let bm25_param = |name: &str| -> f64 {
+            params
+                .split(';')
+                .filter_map(|p| p.split_once('='))
+                .find(|(k, _)| k.trim().eq_ignore_ascii_case(name))
+                .and_then(|(_, v)| v.trim().parse().ok())
+                .unwrap_or(0.0)
+        };
+        // `bm25_param_delta` is shorthand for both, as in
+        // `bound_select_statement_impl.cpp:256-257`.
+        let delta_both = bm25_param("bm25_param_delta");
+        let delta_term = bm25_param("bm25_param_delta_term") + delta_both;
+        let delta_phrase = bm25_param("bm25_param_delta_phrase") + delta_both;
+        let threshold: Option<f64> = params
+            .split(';')
+            .filter_map(|p| p.split_once('='))
+            .find(|(k, _)| k.trim().eq_ignore_ascii_case("threshold"))
+            .and_then(|(_, v)| v.trim().parse().ok());
+        let total_terms = query_term_count(&tree);
+        let min_should = params
+            .split(';')
+            .filter_map(|p| p.split_once('='))
+            .find(|(k, _)| k.trim().eq_ignore_ascii_case("minimum_should_match"))
+            .map(|(_, v)| minimum_should_match(v.trim(), total_terms))
+            .unwrap_or(1);
+        let topn = parse_topn_param(params).unwrap_or(10);
+        let mut scored: Vec<(usize, f64)> = Vec::new();
+        for (seq, live, passes, tokens) in &docs {
+            if !live || !passes {
+                continue;
+            }
+            let Some((score, units)) =
+                eval_field_query_node(&tree, &fields, tokens, n_docs, delta_term, delta_phrase)
+            else {
+                continue;
+            };
+            if units >= min_should && units > 0 && threshold.map(|t| score >= t).unwrap_or(true) {
+                scored.push((*seq, score));
+            }
+        }
+        scored.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        scored.truncate(topn);
+        let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq as u64).collect();
+        let mut by_id: HashMap<usize, Vec<Value>> = self
+            .fetch_some_rows_with_ids(table, &wanted)?
+            .into_iter()
+            .collect();
         let mut out = Vec::new();
         for (seq, score) in scored {
             let mut row = by_id.remove(&seq).unwrap_or_default();
@@ -13472,11 +14075,7 @@ pub fn highlight_with_analyzer(
 }
 
 fn analyzer_terms(analyzer: &analyzer::Analyzer, text: &str) -> Vec<analyzer::Term> {
-    match analyzer {
-        analyzer::Analyzer::Rag(rag) => rag.analyze(text),
-        analyzer::Analyzer::Standard(standard) => standard.analyze(text),
-        analyzer::Analyzer::NGram(ngram) => ngram.analyze(text),
-    }
+    analyzer.analyze(text)
 }
 
 /// The byte offset after the character starting at `at`; substring search
@@ -13678,6 +14277,196 @@ fn query_units(query: &str) -> Vec<(bool, String, f64)> {
             (q, t, boost)
         })
         .collect()
+}
+
+/// One field named by a column-less query tree: its schema index, the
+/// tokeniser implied by its analyzer, its per-term document frequency and its
+/// average document length.
+struct FieldGroupField {
+    name: String,
+    ci: usize,
+    delims: Option<Vec<char>>,
+    df: HashMap<String, usize>,
+    avg_len: f64,
+}
+
+impl FieldGroupField {
+    /// `keyword` / `whitespace` fields split on whitespace and score a constant
+    /// boost per matching document (the named-column path's `keyword_field`).
+    fn keyword(&self) -> bool {
+        matches!(self.delims, Some(ref delims) if delims.is_empty())
+    }
+}
+
+/// Depth-first list of the columns a query tree names (`GetQueryColumnsTerms`).
+fn collect_query_columns(node: &QueryNode, out: &mut Vec<String>) {
+    match node {
+        QueryNode::Term(term) => {
+            if !out.contains(&term.column) {
+                out.push(term.column.clone());
+            }
+        }
+        QueryNode::Phrase(phrase) => {
+            if !out.contains(&phrase.column) {
+                out.push(phrase.column.clone());
+            }
+        }
+        QueryNode::And(children)
+        | QueryNode::Or(children)
+        | QueryNode::Not(children)
+        | QueryNode::AndNot(children) => {
+            for child in children {
+                collect_query_columns(child, out);
+            }
+        }
+    }
+}
+
+/// Number of leaf terms in the tree, the denominator of
+/// `minimum_should_match` when it is given as a percentage.
+fn query_term_count(node: &QueryNode) -> usize {
+    match node {
+        QueryNode::Term(_) => 1,
+        QueryNode::Phrase(phrase) => phrase.terms.len(),
+        QueryNode::And(children)
+        | QueryNode::Or(children)
+        | QueryNode::Not(children)
+        | QueryNode::AndNot(children) => children.iter().map(query_term_count).sum(),
+    }
+}
+
+/// Phrase occurrences at consecutive positions. Both a word and its stem share
+/// a position, so a position matches any of its forms.
+fn field_phrase_freq(tokens: &[(String, u32)], terms: &[String]) -> usize {
+    if terms.is_empty() {
+        return 0;
+    }
+    let mut at: HashMap<u32, Vec<&str>> = HashMap::new();
+    for (term, position) in tokens {
+        at.entry(*position).or_default().push(term.as_str());
+    }
+    let mut count = 0usize;
+    for (start, forms) in &at {
+        if !forms.iter().any(|form| *form == terms[0]) {
+            continue;
+        }
+        if terms.iter().enumerate().skip(1).all(|(k, term)| {
+            at.get(&(start + k as u32))
+                .map(|forms| forms.iter().any(|form| form == term))
+                .unwrap_or(false)
+        }) {
+            count += 1;
+        }
+    }
+    count
+}
+
+/// Scores one document against the parsed tree. Returns the score and the
+/// number of matched leaf terms (for `minimum_should_match`), or `None` when
+/// the document matches no branch.
+fn eval_field_query_node(
+    node: &QueryNode,
+    fields: &[FieldGroupField],
+    tokens: &[Vec<(String, u32)>],
+    n_docs: usize,
+    delta_term: f64,
+    delta_phrase: f64,
+) -> Option<(f64, usize)> {
+    match node {
+        QueryNode::Term(term) => {
+            let fi = fields.iter().position(|field| field.name == term.column)?;
+            let field = &fields[fi];
+            let tf = tokens[fi]
+                .iter()
+                .filter(|(token, _)| *token == term.term)
+                .count();
+            if tf == 0 {
+                return None;
+            }
+            let score = if field.keyword() {
+                f64::from(term.boost)
+            } else {
+                let df = field.df.get(&term.term).copied().unwrap_or(0).max(1) as f64;
+                let idf = (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln();
+                let len = tokens[fi].len() as f64;
+                let tf = tf as f64;
+                let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / field.avg_len));
+                idf * (norm + delta_term) * f64::from(term.boost)
+            };
+            Some((score, 1))
+        }
+        QueryNode::Phrase(phrase) => {
+            let fi = fields
+                .iter()
+                .position(|field| field.name == phrase.column)?;
+            let field = &fields[fi];
+            let freq = field_phrase_freq(&tokens[fi], &phrase.terms);
+            if freq == 0 {
+                return None;
+            }
+            let score = if field.keyword() {
+                f64::from(phrase.boost)
+            } else {
+                let idf_sum: f64 = phrase
+                    .terms
+                    .iter()
+                    .map(|term| {
+                        let df = field.df.get(term).copied().unwrap_or(0).max(1) as f64;
+                        (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln()
+                    })
+                    .sum();
+                let len = tokens[fi].len() as f64;
+                let tf = freq as f64;
+                let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / field.avg_len));
+                idf_sum * (norm + delta_phrase) * f64::from(phrase.boost)
+            };
+            Some((score, phrase.terms.len()))
+        }
+        QueryNode::And(children) => {
+            let (mut score, mut units) = (0.0, 0);
+            for child in children {
+                let (child_score, child_units) =
+                    eval_field_query_node(child, fields, tokens, n_docs, delta_term, delta_phrase)?;
+                score += child_score;
+                units += child_units;
+            }
+            Some((score, units))
+        }
+        QueryNode::Or(children) => {
+            let (mut score, mut units) = (0.0, 0);
+            let mut matched = false;
+            for child in children {
+                if let Some((child_score, child_units)) =
+                    eval_field_query_node(child, fields, tokens, n_docs, delta_term, delta_phrase)
+                {
+                    matched = true;
+                    score += child_score;
+                    units += child_units;
+                }
+            }
+            matched.then_some((score, units))
+        }
+        QueryNode::AndNot(children) => {
+            let mut iter = children.iter();
+            let (score, units) = eval_field_query_node(
+                iter.next()?,
+                fields,
+                tokens,
+                n_docs,
+                delta_term,
+                delta_phrase,
+            )?;
+            for child in iter {
+                if eval_field_query_node(child, fields, tokens, n_docs, delta_term, delta_phrase)
+                    .is_some()
+                {
+                    return None;
+                }
+            }
+            Some((score, units))
+        }
+        QueryNode::Not(_) => None,
+    }
 }
 
 /// A `MATCH TEXT ('', '(doc:"a b")^4.5 (doc2:c doc2:d)^3', …)` clause names its
@@ -15394,6 +16183,75 @@ mod tests {
                 vec!["2".to_string(), "2.000000".to_string()],
             ]
         );
+    }
+
+    /// A column-less field-qualified query must score exactly like the same
+    /// query written against a named column: `SearchDriver` builds the query
+    /// tree and the BM25/idf/tf/document-length formula is shared.
+    #[test]
+    fn field_group_match_scores_like_the_named_column() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE fg (id INT, title VARCHAR, body VARCHAR);")
+            .unwrap();
+        e.execute(
+            "INSERT INTO fg VALUES (1,'alpha beta','gamma'),(2,'alpha','beta gamma'),\
+             (3,'beta','alpha'),(4,'gamma','alpha beta');",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX fg_t ON fg(title) USING FULLTEXT;")
+            .unwrap();
+        e.execute("CREATE INDEX fg_b ON fg(body) USING FULLTEXT;")
+            .unwrap();
+
+        // OR of two terms.
+        let named = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
+             ('title','alpha beta','topn=10');",
+        );
+        let grouped = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
+             ('','(title:alpha title:beta)','topn=10');",
+        );
+        assert_eq!(grouped, named);
+        assert_eq!(named.len(), 3);
+
+        // Phrase.
+        let named = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
+             ('body','\"alpha beta\"','topn=10');",
+        );
+        let grouped = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
+             ('','(body:\"alpha beta\")','topn=10');",
+        );
+        assert_eq!(grouped, named);
+        assert_eq!(named.len(), 1);
+
+        // Term boost.
+        let named = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
+             ('title','alpha^3 beta','topn=10');",
+        );
+        let grouped = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
+             ('','(title:alpha)^3 title:beta','topn=10');",
+        );
+        assert_eq!(grouped, named);
+        assert!(!named.is_empty());
+        // The boost really changed the ranking/scores.
+        let plain = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
+             ('','(title:alpha title:beta)','topn=10');",
+        );
+        assert_ne!(named, plain);
     }
 
     /// `SELECT id, name` reads only those column files from the C++ block

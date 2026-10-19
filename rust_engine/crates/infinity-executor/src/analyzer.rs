@@ -126,6 +126,9 @@ pub struct Term {
     pub char_offset: u32,
     pub end_offset: u32,
     pub is_index: bool,
+    /// C++ `Term::payload_` — the rank-features weight encoded by
+    /// `SmallFloat::Float122ToUInt16`; zero for every other analyzer.
+    pub payload: u16,
 }
 
 /// C++: `StandardAnalyzer` + `CommonLanguageAnalyzer` options.
@@ -135,7 +138,9 @@ pub struct StandardAnalyzer {
     case_sensitive: bool,
     contain_lower: bool,
     extract_eng_stem: bool,
-    stemmer_initialized: bool,
+    /// C++: the `STEM_LANG_*` selected by `InitStemmer`. `None` until a
+    /// stemmer is initialized.
+    stemmer: Option<rust_stemmers::Algorithm>,
     stem_only: bool,
     char_offset: bool,
 }
@@ -153,16 +158,20 @@ impl StandardAnalyzer {
             case_sensitive: false,
             contain_lower: false,
             extract_eng_stem: true,
-            stemmer_initialized: false,
+            stemmer: None,
             stem_only: false,
             char_offset: false,
         }
     }
 
-    /// C++: `CommonLanguageAnalyzer::InitStemmer(STEM_LANG_ENGLISH)` — the port
-    /// ships the English stemmer only.
+    /// C++: `CommonLanguageAnalyzer::InitStemmer(STEM_LANG_ENGLISH)`.
     pub fn init_stemmer_english(&mut self) {
-        self.stemmer_initialized = true;
+        self.init_stemmer(rust_stemmers::Algorithm::English);
+    }
+
+    /// C++: `CommonLanguageAnalyzer::InitStemmer`.
+    pub fn init_stemmer(&mut self, algorithm: rust_stemmers::Algorithm) {
+        self.stemmer = Some(algorithm);
     }
 
     /// C++: `CommonLanguageAnalyzer::SetCaseSensitive`.
@@ -210,8 +219,13 @@ impl StandardAnalyzer {
                 word_offset
             };
             let lower = token.to_ascii_lowercase();
-            let stem = if self.extract_eng_stem && self.stemmer_initialized {
-                crate::stem_english(&lower)
+            let stem = if self.extract_eng_stem {
+                match self.stemmer {
+                    Some(algorithm) => rust_stemmers::Stemmer::create(algorithm)
+                        .stem(&lower)
+                        .to_string(),
+                    None => lower.clone(),
+                }
             } else {
                 lower.clone()
             };
@@ -225,6 +239,7 @@ impl StandardAnalyzer {
                     char_offset: offset,
                     end_offset,
                     is_index: true,
+                    payload: 0,
                 });
             };
 
@@ -308,11 +323,275 @@ impl NGramAnalyzer {
                 char_offset: start_byte as u32,
                 end_offset: end_byte as u32,
                 is_index: false,
+                payload: 0,
             });
             offset += 1;
             i += 1;
         }
         out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Whitespace / keyword analyzer
+// ---------------------------------------------------------------------------
+
+/// C++: `WhitespaceAnalyzer` (`whitespace_analyzer_impl.cpp`).
+///
+/// The `keyword` and `whitespace` families both construct this analyzer. With
+/// no delimiters it splits on `std::isspace()`; otherwise it splits **only** on
+/// the listed bytes (it does not additionally split on whitespace).
+#[derive(Debug, Clone)]
+pub struct WhitespaceAnalyzer {
+    delimiters: Vec<u8>,
+}
+
+impl WhitespaceAnalyzer {
+    /// C++: the constructor sorts and de-duplicates the delimiter bytes.
+    pub fn new(delimiters: &str) -> Self {
+        let mut delimiters = delimiters.as_bytes().to_vec();
+        delimiters.sort_unstable();
+        delimiters.dedup();
+        Self { delimiters }
+    }
+
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        let mut out = Vec::new();
+        let mut offset = 0u32;
+        // C++ emits raw byte ranges. A non-ASCII delimiter byte can split a
+        // UTF-8 sequence, which a Rust `str` cannot represent; lossily decode
+        // so the analyzer never panics on such a name.
+        let mut push = |text: &[u8]| {
+            out.push(Term {
+                text: String::from_utf8_lossy(text).into_owned(),
+                word_offset: offset,
+                char_offset: 0,
+                end_offset: 0,
+                is_index: false,
+                payload: 0,
+            });
+            offset += 1;
+        };
+        if self.delimiters.is_empty() {
+            for token in input.split_whitespace() {
+                push(token.as_bytes());
+            }
+            return out;
+        }
+        let bytes = input.as_bytes();
+        let mut start = 0usize;
+        while start < bytes.len() {
+            let found = bytes[start..]
+                .iter()
+                .position(|b| self.delimiters.binary_search(b).is_ok())
+                .map(|position| start + position);
+            match found {
+                None => {
+                    push(&bytes[start..]);
+                    break;
+                }
+                Some(found) => {
+                    if found > start {
+                        push(&bytes[start..found]);
+                    }
+                    start = found + 1;
+                }
+            }
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rank-features analyzer
+// ---------------------------------------------------------------------------
+
+/// C++: `SmallFloat::Float122ToUInt16` (`smallfloat.cppm`).
+fn float122_to_uint16(f: f32) -> u16 {
+    let bits = f.to_bits() as i32;
+    let smallfloat = bits >> (23 - 12);
+    let zero = (127 - 2) << 12;
+    if smallfloat < zero {
+        if bits <= 0 {
+            0
+        } else {
+            1
+        }
+    } else if smallfloat >= zero + 0x10000 {
+        0xFFFF
+    } else {
+        (smallfloat - zero) as u16
+    }
+}
+
+/// C++: `RankFeaturesAnalyzer` (`rank_features_analyzer_impl.cpp`).
+///
+/// Emits every field of every object in a JSON array. The numeric value is
+/// encoded into `Term::payload` exactly as the reference does.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RankFeaturesAnalyzer;
+
+impl RankFeaturesAnalyzer {
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        use infinity_expression::json::Json;
+
+        let Some(Json::Arr(items)) = infinity_expression::json::parse(input) else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        let mut offset = 0u32;
+        for item in items {
+            let Json::Obj(fields) = item else {
+                continue;
+            };
+            for (key, value) in fields {
+                let value = match value {
+                    Json::Int(value) => value as f32,
+                    Json::Float(value) => value as f32,
+                    _ => continue,
+                };
+                out.push(Term {
+                    text: key,
+                    word_offset: offset,
+                    char_offset: 0,
+                    end_offset: 0,
+                    is_index: false,
+                    payload: float122_to_uint16(value),
+                });
+                offset += 1;
+            }
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sparse-gram analyzer
+// ---------------------------------------------------------------------------
+
+/// C++: `SparsegramAnalyzer` (`sparsegram_analyzer_impl.cpp`) over
+/// `ForEachSparseGram` (`common/utility/sparse_gram.h`).
+#[derive(Debug, Clone, Copy)]
+pub struct SparseGramAnalyzer {
+    pub min_n: u32,
+    pub max_n: u32,
+    pub fold: bool,
+}
+
+impl SparseGramAnalyzer {
+    /// C++: `ParseSparseGramAnalyzerName`.
+    pub fn from_name(name: &str) -> Option<Self> {
+        crate::regex_literal::parse_sparsegram_analyzer(name).map(|(min_n, max_n, fold)| Self {
+            min_n,
+            max_n,
+            fold,
+        })
+    }
+
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        let mut out = Vec::new();
+        let mut offset = 0u32;
+        for_each_sparse_gram(input, self.min_n, self.max_n, self.fold, |gram| {
+            out.push(Term {
+                text: gram.to_string(),
+                word_offset: offset,
+                char_offset: 0,
+                end_offset: offset + 1,
+                is_index: false,
+                payload: 0,
+            });
+            offset += 1;
+        });
+        out
+    }
+}
+
+/// C++: `SparseGramBigramWeight` — splitmix64 over the two (ASCII-folded)
+/// code points.
+fn sparse_gram_bigram_weight(first: char, second: char) -> u64 {
+    fn fold(c: char) -> u32 {
+        if c.is_ascii_uppercase() {
+            (c as u32) - ('A' as u32) + ('a' as u32)
+        } else {
+            c as u32
+        }
+    }
+    let mut x = ((fold(first) as u64) << 32) | fold(second) as u64;
+    x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    x ^ (x >> 31)
+}
+
+/// C++: `ForEachSparseGram` — emits content-defined grams in
+/// `[min_n, max_n]` code points, plus the one/two character dense floors.
+fn for_each_sparse_gram(
+    text: &str,
+    min_n: u32,
+    max_n: u32,
+    fold: bool,
+    mut emit: impl FnMut(&str),
+) {
+    use crate::regex_literal::is_dense_code_point;
+
+    if min_n == 0 || max_n < min_n || text.is_empty() {
+        return;
+    }
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
+    let n = chars.len();
+    let offset = |index: usize| chars.get(index).map_or(text.len(), |(at, _)| *at);
+
+    let emit_window = |begin: usize, end: usize, fold: bool, emit: &mut dyn FnMut(&str)| {
+        let range = offset(begin)..offset(end);
+        let window = &text[range.clone()];
+        if window.as_bytes().contains(&0) {
+            return;
+        }
+        emit(window);
+        if !fold {
+            return;
+        }
+        if window.bytes().any(|b| b.is_ascii_uppercase()) {
+            emit(&window.to_ascii_lowercase());
+        }
+    };
+
+    let selected = |begin: usize, end: usize| -> bool {
+        let length = end - begin;
+        if length < 3 {
+            return false;
+        }
+        let all_dense = chars[begin..end]
+            .iter()
+            .all(|(_, c)| is_dense_code_point(*c as u32));
+        let effective_min = if all_dense { min_n.max(4) } else { min_n };
+        if (length as u32) < effective_min || (length as u32) > max_n {
+            return false;
+        }
+        let head = sparse_gram_bigram_weight(chars[begin].1, chars[begin + 1].1);
+        let tail = sparse_gram_bigram_weight(chars[end - 2].1, chars[end - 1].1);
+        let weaker = head.min(tail);
+        for index in begin + 1..end - 2 {
+            if sparse_gram_bigram_weight(chars[index].1, chars[index + 1].1) > weaker {
+                return false;
+            }
+        }
+        true
+    };
+
+    for begin in 0..n {
+        if is_dense_code_point(chars[begin].1 as u32) {
+            emit_window(begin, begin + 1, fold, &mut emit);
+            if begin + 1 < n && is_dense_code_point(chars[begin + 1].1 as u32) {
+                emit_window(begin, begin + 2, fold, &mut emit);
+            }
+        }
+        let limit = (begin + max_n as usize).min(n);
+        for end in begin + 3..=limit {
+            if selected(begin, end) {
+                emit_window(begin, end, fold, &mut emit);
+            }
+        }
     }
 }
 
@@ -326,10 +605,15 @@ pub const DEFAULT_RESOURCE_PATH: &str = "/usr/share/infinity/resource";
 /// C++: `AnalyzerPool` (`analyzer_pool.cppm`) — parses an analyzer name and
 /// hands out a fresh analyzer.
 ///
-/// Only the `rag[-<lang>][-fine]`, `standard` and `ngram-<n>` families are
-/// ported; the CJK/IK/whitespace families live in C++ only.
+/// Every family named by `AnalyzerPool::GetAnalyzer` is dispatched here except
+/// the three that need third-party engines the Rust port does not vendor:
+/// `japanese`/`korean` (MeCab dictionaries via `ijma`/`mecab_wrapper`) and
+/// `traditional` (OpenCC). Those return [`UNSUPPORTED_ANALYZER_MESSAGE`] and
+/// are rejected at DDL validation; see [`is_constructible_analyzer_name`].
 pub struct AnalyzerPool {
     rag_prototype: Mutex<Option<Arc<RAGAnalyzer>>>,
+    chinese_prototype: Mutex<Option<Arc<ChineseAnalyzer>>>,
+    ik_prototype: Mutex<Option<Arc<IKAnalyzer>>>,
 }
 
 /// A concrete analyzer handed out by [`AnalyzerPool`].
@@ -337,6 +621,109 @@ pub enum Analyzer {
     Rag(RAGAnalyzer),
     Standard(Box<StandardAnalyzer>),
     NGram(NGramAnalyzer),
+    Chinese(ChineseAnalyzer),
+    IK(IKAnalyzer),
+    Whitespace(WhitespaceAnalyzer),
+    RankFeatures(RankFeaturesAnalyzer),
+    SparseGram(SparseGramAnalyzer),
+}
+
+/// The C++ families the Rust port intentionally does not implement, and why.
+pub const UNSUPPORTED_ANALYZERS: &[(&str, &str)] = &[
+    ("japanese", "requires the MeCab ipadic engine (ijma)"),
+    ("korean", "requires the MeCab ko-dic engine (mecab_wrapper)"),
+    ("traditional", "requires the OpenCC converter"),
+];
+
+/// The message returned for a family that C++ supports but the port does not.
+pub fn unsupported_analyzer_message(name: &str) -> String {
+    let family = name.split('-').next().unwrap_or("");
+    match UNSUPPORTED_ANALYZERS
+        .iter()
+        .find(|(family_name, _)| *family_name == family)
+    {
+        Some((_, reason)) => format!("analyzer '{name}' not found: {reason}"),
+        None => format!("analyzer not found: {name}"),
+    }
+}
+
+impl Analyzer {
+    /// The name-level family, used by the DDL validation and the pool tests.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Analyzer::Rag(_) => "rag",
+            Analyzer::Standard(_) => "standard",
+            Analyzer::NGram(_) => "ngram",
+            Analyzer::Chinese(_) => "chinese",
+            Analyzer::IK(_) => "ik",
+            Analyzer::Whitespace(_) => "whitespace",
+            Analyzer::RankFeatures(_) => "rankfeatures",
+            Analyzer::SparseGram(_) => "sparsegram",
+        }
+    }
+
+    /// C++: `Analyzer::Analyze(Term, TermList)`.
+    pub fn analyze(&self, text: &str) -> Vec<Term> {
+        match self {
+            Analyzer::Rag(analyzer) => analyzer.analyze(text),
+            Analyzer::Standard(analyzer) => analyzer.analyze(text),
+            Analyzer::NGram(analyzer) => analyzer.analyze(text),
+            Analyzer::Chinese(analyzer) => analyzer.analyze(text),
+            Analyzer::IK(analyzer) => analyzer.analyze(text),
+            Analyzer::Whitespace(analyzer) => analyzer.analyze(text),
+            Analyzer::RankFeatures(analyzer) => analyzer.analyze(text),
+            Analyzer::SparseGram(analyzer) => analyzer.analyze(text),
+        }
+    }
+}
+
+/// C++ `STEM_LANG_*` names accepted by `standard-<language>`.
+const STANDARD_LANGUAGES: &[(&str, rust_stemmers::Algorithm)] = &[
+    ("danish", rust_stemmers::Algorithm::Danish),
+    ("dutch", rust_stemmers::Algorithm::Dutch),
+    ("english", rust_stemmers::Algorithm::English),
+    ("finnish", rust_stemmers::Algorithm::Finnish),
+    ("french", rust_stemmers::Algorithm::French),
+    ("german", rust_stemmers::Algorithm::German),
+    ("hungarian", rust_stemmers::Algorithm::Hungarian),
+    ("italian", rust_stemmers::Algorithm::Italian),
+    ("norwegian", rust_stemmers::Algorithm::Norwegian),
+    // C++ maps "-porter" to `STEM_LANG_PORT` (the original Porter stemmer);
+    // rust-stemmers ships Porter2 as `Algorithm::English`, its closest match.
+    ("porter", rust_stemmers::Algorithm::English),
+    ("portuguese", rust_stemmers::Algorithm::Portuguese),
+    ("romanian", rust_stemmers::Algorithm::Romanian),
+    ("russian", rust_stemmers::Algorithm::Russian),
+    ("spanish", rust_stemmers::Algorithm::Spanish),
+    ("swedish", rust_stemmers::Algorithm::Swedish),
+    ("turkish", rust_stemmers::Algorithm::Turkish),
+];
+
+/// The stemmer C++ selects for `standard-<suffix>`; unknown suffixes keep the
+/// English default, exactly like the reference's if-chain.
+fn standard_stemmer(name: &str) -> rust_stemmers::Algorithm {
+    let suffix = name.split_once('-').map(|(_, suffix)| suffix).unwrap_or("");
+    STANDARD_LANGUAGES
+        .iter()
+        .find(|(language, _)| language.eq_ignore_ascii_case(suffix))
+        .map(|(_, algorithm)| *algorithm)
+        .unwrap_or(rust_stemmers::Algorithm::English)
+}
+
+/// Whether [`AnalyzerPool::get_analyzer`] can construct `name` (ignoring
+/// resource availability). DDL validation uses this so it never accepts a name
+/// the pool will later reject.
+pub fn is_constructible_analyzer_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    let (family, suffix) = lower
+        .split_once('-')
+        .map_or((lower.as_str(), ""), |(family, suffix)| (family, suffix));
+    match family {
+        "rag" | "standard" | "chinese" | "ik" | "keyword" | "whitespace" | "rankfeatures" => true,
+        "ngram" => suffix.parse::<usize>().is_ok_and(|n| n > 0),
+        "sparsegram" => SparseGramAnalyzer::from_name(&lower).is_some(),
+        _ => false,
+    }
 }
 
 impl AnalyzerPool {
@@ -345,33 +732,83 @@ impl AnalyzerPool {
         static INSTANCE: OnceLock<AnalyzerPool> = OnceLock::new();
         INSTANCE.get_or_init(|| AnalyzerPool {
             rag_prototype: Mutex::new(None),
+            chinese_prototype: Mutex::new(None),
+            ik_prototype: Mutex::new(None),
         })
     }
 
     /// C++: `AnalyzerPool::GetAnalyzer`.
     pub fn get_analyzer(&self, name: &str) -> Result<Analyzer, String> {
-        match name.split('-').next().unwrap_or("") {
+        let lower = name.to_ascii_lowercase();
+        let (family, suffix) = lower
+            .split_once('-')
+            .map_or((lower.as_str(), ""), |(family, suffix)| (family, suffix));
+        match family {
             "rag" => self.get_rag(name),
             "standard" => {
-                // C++: divide `@#$`, unite `/`, then InitStemmer(English).
+                // C++: divide `@#$`, unite `/`, then InitStemmer(<language>).
                 let mut analyzer = StandardAnalyzer::new();
                 let mut config = TokenizeConfig::default();
                 config.add_divides("@#$");
                 config.add_unites("/");
                 analyzer.set_tokenizer_config(config);
-                analyzer.init_stemmer_english();
+                analyzer.init_stemmer(standard_stemmer(&lower));
                 Ok(Analyzer::Standard(Box::new(analyzer)))
             }
             "ngram" => {
-                let n = name
-                    .strip_prefix("ngram-")
-                    .and_then(|suffix| suffix.parse::<usize>().ok())
+                let n = suffix
+                    .parse::<usize>()
+                    .ok()
                     .filter(|n| *n > 0)
                     .ok_or_else(|| format!("NGRAM-number, number > 0, but it is {name}."))?;
                 Ok(Analyzer::NGram(NGramAnalyzer::new(n)))
             }
-            _ => Err(format!("analyzer not found: {name}")),
+            "chinese" => {
+                let mut analyzer = (*self.chinese_prototype()?).clone();
+                if suffix.eq_ignore_ascii_case("fine") {
+                    analyzer.set_cut_grain(CutGrain::Fine);
+                }
+                Ok(Analyzer::Chinese(analyzer))
+            }
+            "ik" => {
+                let mut analyzer = (*self.ik_prototype()?).clone();
+                analyzer.set_fine_grained(suffix.eq_ignore_ascii_case("fine"));
+                Ok(Analyzer::IK(analyzer))
+            }
+            // C++: `keyword` and `whitespace` both build a `WhitespaceAnalyzer`;
+            // the first '-' introduces the delimiter set.
+            "keyword" | "whitespace" => {
+                let delimiters = name.split_once('-').map_or("", |(_, rest)| rest);
+                Ok(Analyzer::Whitespace(WhitespaceAnalyzer::new(delimiters)))
+            }
+            "rankfeatures" => Ok(Analyzer::RankFeatures(RankFeaturesAnalyzer)),
+            "sparsegram" => SparseGramAnalyzer::from_name(&lower)
+                .map(Analyzer::SparseGram)
+                .ok_or_else(|| format!("SPARSEGRAM[-min[-max]][-fold], but it is {name}.")),
+            _ => Err(unsupported_analyzer_message(name)),
         }
+    }
+
+    fn chinese_prototype(&self) -> Result<Arc<ChineseAnalyzer>, String> {
+        let mut prototype = self
+            .chinese_prototype
+            .lock()
+            .map_err(|_| "analyzer pool was poisoned".to_string())?;
+        if prototype.is_none() {
+            *prototype = Some(Arc::new(ChineseAnalyzer::load(DEFAULT_RESOURCE_PATH)?));
+        }
+        Ok(Arc::clone(prototype.as_ref().expect("just initialized")))
+    }
+
+    fn ik_prototype(&self) -> Result<Arc<IKAnalyzer>, String> {
+        let mut prototype = self
+            .ik_prototype
+            .lock()
+            .map_err(|_| "analyzer pool was poisoned".to_string())?;
+        if prototype.is_none() {
+            *prototype = Some(Arc::new(IKAnalyzer::load(DEFAULT_RESOURCE_PATH)?));
+        }
+        Ok(Arc::clone(prototype.as_ref().expect("just initialized")))
     }
 
     /// C++: the `case Str2Int(RAG)` branch — `rag` optionally followed by
@@ -624,6 +1061,7 @@ impl RAGAnalyzer {
                     char_offset: 0,
                     end_offset: end,
                     is_index: false,
+                    payload: 0,
                 });
             }
             return terms;
@@ -650,6 +1088,7 @@ impl RAGAnalyzer {
                 char_offset: 0,
                 end_offset: 0,
                 is_index: false,
+                payload: 0,
             });
             offset += 1;
         }
@@ -2665,6 +3104,7 @@ impl ChineseAnalyzer {
                 char_offset: 0,
                 end_offset: 0,
                 is_index: true,
+                payload: 0,
             });
             offset += 1;
         }
@@ -2926,6 +3366,7 @@ impl IKAnalyzer {
                 char_offset: 0,
                 end_offset: 0,
                 is_index: false,
+                payload: 0,
             });
             offset += 1;
         }
@@ -3650,6 +4091,167 @@ mod analyzer_pool_tests {
 
         // The Slovak instance is unaffected by the later English one.
         assert_eq!(slovak.tokenize("daňové"), "danove");
+    }
+
+    /// C++ `AnalyzerPool::GetAnalyzer`: every name family resolves to the
+    /// analyzer the reference constructs. `japanese`, `korean` and
+    /// `traditional` are C++ families whose engines (MeCab/OpenCC) are not
+    /// vendored, so the pool and DDL validation both reject them.
+    #[test]
+    fn test_analyzer_families_construct() {
+        if !resource_available() {
+            panic!(
+                "Resource directory {RESOURCE_DIR} not available; the analyzers cannot be loaded"
+            );
+        }
+        let cases: &[(&str, Option<&str>)] = &[
+            ("rag", Some("rag")),
+            ("rag-fine", Some("rag")),
+            ("rag-czech-fine", Some("rag")),
+            ("rag-slovak", Some("rag")),
+            ("standard", Some("standard")),
+            ("standard-english", Some("standard")),
+            ("standard-french", Some("standard")),
+            ("standard-porter", Some("standard")),
+            ("ngram-3", Some("ngram")),
+            ("chinese", Some("chinese")),
+            ("chinese-fine", Some("chinese")),
+            ("ik", Some("ik")),
+            ("ik-fine", Some("ik")),
+            ("keyword", Some("whitespace")),
+            ("whitespace", Some("whitespace")),
+            ("whitespace-#@$", Some("whitespace")),
+            ("rankfeatures", Some("rankfeatures")),
+            ("sparsegram", Some("sparsegram")),
+            ("sparsegram-3-12", Some("sparsegram")),
+            ("sparsegram-3-12-fold", Some("sparsegram")),
+            // C++ families the Rust engine does not vendor.
+            ("japanese", None),
+            ("korean", None),
+            ("traditional", None),
+            ("traditional-fine", None),
+            // Not a family on either side: C++ hashes only whole prefixes.
+            ("traditionalchinese", None),
+            ("english", None),
+            ("userdefined", None),
+            ("ngram", None),
+            ("bogus", None),
+        ];
+        for (name, expected) in cases {
+            let constructible = is_constructible_analyzer_name(name);
+            match expected {
+                Some(kind) => {
+                    assert!(constructible, "{name} must be accepted by DDL validation");
+                    let analyzer = AnalyzerPool::instance()
+                        .get_analyzer(name)
+                        .unwrap_or_else(|error| panic!("GetAnalyzer({name}) failed: {error}"));
+                    assert_eq!(analyzer.kind(), *kind, "{name}");
+                }
+                None => {
+                    assert!(!constructible, "{name} must be rejected by DDL validation");
+                    let error = AnalyzerPool::instance()
+                        .get_analyzer(name)
+                        .err()
+                        .unwrap_or_else(|| panic!("GetAnalyzer({name}) must fail"));
+                    assert!(!error.is_empty(), "{name} must report a reason");
+                }
+            }
+        }
+    }
+
+    /// `keyword`/`whitespace` split only on the listed bytes; the standard
+    /// analyzer keeps `@#$` as delimiters and `/` as a uniter.
+    #[test]
+    fn test_whitespace_analyzer_matches_reference() {
+        let keyword = AnalyzerPool::instance().get_analyzer("keyword").unwrap();
+        assert_eq!(
+            keyword
+                .analyze("2023-01-01  hello\tworld")
+                .into_iter()
+                .map(|term| term.text)
+                .collect::<Vec<_>>(),
+            vec!["2023-01-01", "hello", "world"]
+        );
+
+        let sharp = AnalyzerPool::instance()
+            .get_analyzer("whitespace-#@$")
+            .unwrap();
+        // Only `#`, `@` and `$` split; the space does not.
+        assert_eq!(
+            sharp
+                .analyze("a#b@c$d e")
+                .into_iter()
+                .map(|term| term.text)
+                .collect::<Vec<_>>(),
+            vec!["a", "b", "c", "d e"]
+        );
+    }
+
+    /// C++ `RankFeaturesAnalyzer`: every object field becomes a weighted term.
+    #[test]
+    fn test_rankfeatures_analyzer_emits_weighted_terms() {
+        let analyzer = AnalyzerPool::instance()
+            .get_analyzer("rankfeatures")
+            .unwrap();
+        let terms = analyzer.analyze(r#"[{"Tag1":1},{"Tag2":2}]"#);
+        assert_eq!(
+            terms
+                .iter()
+                .map(|term| term.text.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Tag1", "Tag2"]
+        );
+        assert_eq!(terms[0].word_offset, 0);
+        assert_eq!(terms[1].word_offset, 1);
+        // 1.0 and 2.0 round-trip through the 12-bit mantissa encoding.
+        let smallfloat = (f32::to_bits(1.0f32) as i32) >> (23 - 12);
+        assert_eq!(
+            float122_to_uint16(1.0),
+            (smallfloat - ((127 - 2) << 12)) as u16
+        );
+        assert!(terms[1].payload > terms[0].payload);
+    }
+
+    /// C++ `SparsegramAnalyzer`: dense scripts get one- and two-character
+    /// floor grams, and `-fold` adds the ASCII-lowercased copy.
+    #[test]
+    fn test_sparsegram_analyzer_emits_dense_floors_and_folds() {
+        let analyzer = AnalyzerPool::instance()
+            .get_analyzer("sparsegram-3-12")
+            .unwrap();
+        let grams: Vec<String> = analyzer
+            .analyze("数据模型")
+            .into_iter()
+            .map(|term| term.text)
+            .collect();
+        assert!(grams.contains(&"数".to_string()), "{grams:?}");
+        assert!(grams.contains(&"数据".to_string()), "{grams:?}");
+
+        let folded = AnalyzerPool::instance()
+            .get_analyzer("sparsegram-3-12-fold")
+            .unwrap();
+        // Selection is case-invariant (boundary bigrams are ASCII-folded
+        // first), so every window selected for "ABCDEF" must also appear
+        // lower-cased when `-fold` is on.
+        let plain: Vec<String> = AnalyzerPool::instance()
+            .get_analyzer("sparsegram-3-12")
+            .unwrap()
+            .analyze("ABCDEF")
+            .into_iter()
+            .map(|term| term.text)
+            .collect();
+        assert!(!plain.is_empty(), "expected selected windows");
+        let grams: Vec<String> = folded
+            .analyze("ABCDEF")
+            .into_iter()
+            .map(|term| term.text)
+            .collect();
+        for gram in &plain {
+            assert!(
+                grams.contains(&gram.to_ascii_lowercase()),
+                "missing folded copy of {gram}: {grams:?}"
+            );
+        }
     }
 }
 

@@ -59,45 +59,57 @@ pub trait DocIterator {
 /// Resolves a term leaf into a posting iterator (the reference's
 /// `ColumnIndexReader::Lookup`).
 pub trait TermLookup {
-    fn lookup(&self, column: &str, term: &str) -> Option<Box<dyn DocIterator>>;
+    /// `boost` is the leaf's weight (`QueryNode::weight_`), already multiplied
+    /// by every enclosing `^boost`.
+    fn lookup(&self, column: &str, term: &str, boost: f64) -> Option<Box<dyn DocIterator>>;
     /// Resolves a phrase leaf (the reference's `PhraseQueryNode::CreateSearch`).
     fn lookup_phrase(
         &self,
         column: &str,
         terms: &[String],
         slop: u32,
+        boost: f64,
     ) -> Option<Box<dyn DocIterator>> {
-        let _ = (column, terms, slop);
+        let _ = (column, terms, slop, boost);
         None
     }
     /// Top-`topn` BM25 hits of a top-level OR over single terms, used for the
-    /// block-max WAND early-termination path. `None` when the lookup cannot
-    /// score.
-    fn bmw_search(&self, column: &str, terms: &[String], topn: usize) -> Option<Vec<(u64, f64)>> {
+    /// block-max WAND early-termination path. Each entry carries the term and
+    /// its boost. `None` when the lookup cannot score.
+    fn bmw_search(
+        &self,
+        column: &str,
+        terms: &[(String, f64)],
+        topn: usize,
+    ) -> Option<Vec<(u64, f64)>> {
         let _ = (column, terms, topn);
         None
     }
 }
 
-/// A term leaf.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A term leaf. `boost` is the reference's `QueryNode::weight_` after every
+/// `^boost` (on the leaf or an enclosing group) has been pushed down.
+#[derive(Debug, Clone, PartialEq)]
 pub struct TermQueryNode {
     pub column: String,
     pub term: String,
+    pub boost: f32,
 }
 
 /// A phrase leaf: the analysed terms in order and the allowed slop
-/// (`"a b"~N`). A slop of zero requires consecutive positions.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// (`"a b"~N`). A slop of zero requires consecutive positions. `boost` is the
+/// pushed-down weight.
+#[derive(Debug, Clone, PartialEq)]
 pub struct PhraseQueryNode {
     pub column: String,
     pub terms: Vec<String>,
     pub slop: u32,
+    pub boost: f32,
 }
 
 /// The query tree. `Not` only appears in parser output and `AndNot` only in an
 /// optimized tree; `QueryNode::optimize` enforces that transition.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum QueryNode {
     Term(TermQueryNode),
     Phrase(PhraseQueryNode),
@@ -265,10 +277,13 @@ impl QueryNode {
     /// `AND` / `AND_NOT` uninhabited, while an `OR` simply drops that branch.
     fn create_search(&self, lookup: &dyn TermLookup) -> Option<Box<dyn DocIterator>> {
         match self {
-            QueryNode::Term(term) => lookup.lookup(&term.column, &term.term),
-            QueryNode::Phrase(phrase) => {
-                lookup.lookup_phrase(&phrase.column, &phrase.terms, phrase.slop)
-            }
+            QueryNode::Term(term) => lookup.lookup(&term.column, &term.term, f64::from(term.boost)),
+            QueryNode::Phrase(phrase) => lookup.lookup_phrase(
+                &phrase.column,
+                &phrase.terms,
+                phrase.slop,
+                f64::from(phrase.boost),
+            ),
             QueryNode::And(children) => {
                 let mut iterators = Vec::with_capacity(children.len());
                 for child in children {
@@ -383,7 +398,7 @@ impl<'a> QueryBuilder<'a> {
     /// the lookup can score.
     fn bmw_search(&self, children: &[QueryNode], topn: usize) -> Option<Box<dyn DocIterator>> {
         let mut column: Option<&str> = None;
-        let mut terms = Vec::with_capacity(children.len());
+        let mut terms: Vec<(String, f64)> = Vec::with_capacity(children.len());
         for child in children {
             let QueryNode::Term(term) = child else {
                 return None;
@@ -393,7 +408,7 @@ impl<'a> QueryBuilder<'a> {
                 Some(existing) if existing == term.column => {}
                 Some(_) => return None,
             }
-            terms.push(term.term.clone());
+            terms.push((term.term.clone(), f64::from(term.boost)));
         }
         if terms.len() < 2 {
             return None;
@@ -1055,7 +1070,14 @@ impl DocIterator for OrIterator {
     }
 
     fn score(&mut self) -> f64 {
-        self.children.iter_mut().map(|child| child.score()).sum()
+        // `OrIterator::Score`: only children positioned at the current document
+        // contribute; the others sit on later postings.
+        let doc_id = self.doc_id;
+        self.children
+            .iter_mut()
+            .filter(|child| child.doc_id() == doc_id)
+            .map(|child| child.score())
+            .sum()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -1203,6 +1225,7 @@ mod tests {
         QueryNode::Term(TermQueryNode {
             column: "body".to_string(),
             term: term.to_string(),
+            boost: 1.0,
         })
     }
 
@@ -1262,7 +1285,7 @@ mod tests {
     }
 
     impl TermLookup for MockTermLookup {
-        fn lookup(&self, column: &str, term: &str) -> Option<Box<dyn DocIterator>> {
+        fn lookup(&self, column: &str, term: &str, _boost: f64) -> Option<Box<dyn DocIterator>> {
             let doc_ids = self
                 .docs
                 .get(&(column.to_string(), term.to_string()))?

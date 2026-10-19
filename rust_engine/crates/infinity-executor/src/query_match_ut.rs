@@ -246,3 +246,90 @@ fn bmw_many_terms() {
     }
     assert_eq!(result_size, 10);
 }
+
+/// Builds the iterator for `query` and reads `(doc id, BM25 score)` for every
+/// document it visits.
+fn scored_hits(index: &MemoryColumnIndex, query: &str) -> Vec<(u64, f64)> {
+    let tree = driver().parse_single_with_fields("text", query).unwrap();
+    let builder = QueryBuilder::new(index);
+    let mut iterator = builder
+        .create_search(FullTextQueryContext::new(tree).with_topn(10))
+        .unwrap()
+        .expect("query tree produced no iterator");
+    let mut hits = Vec::new();
+    let mut cursor = 0u64;
+    while iterator.next(cursor) {
+        let doc_id = iterator.doc_id();
+        hits.push((doc_id, iterator.score()));
+        cursor = doc_id + 1;
+    }
+    hits
+}
+
+/// Two documents `alpha` and two `beta`, each one token long: their BM25
+/// scores are identical (`df`, document length and average length are equal).
+fn ab_index() -> MemoryColumnIndex {
+    let mut index = MemoryColumnIndex::new();
+    let mut segment = MemorySegment::new("text");
+    segment.insert(0, "alpha");
+    segment.insert(1, "alpha");
+    segment.insert(2, "beta");
+    segment.insert(3, "beta");
+    index.push(segment);
+    index
+}
+
+#[test]
+fn term_boost_ranks_the_boosted_term_above_equal_bm25_terms() {
+    let index = ab_index();
+    let plain: HashMap<u64, f64> = scored_hits(&index, "alpha OR beta").into_iter().collect();
+    assert_eq!(plain.len(), 4);
+    // Equal statistics: every document scores the same without a boost.
+    let first = plain[&0];
+    assert!((first - plain[&2]).abs() < 1e-12, "{plain:?}");
+
+    let boosted: HashMap<u64, f64> = scored_hits(&index, "alpha^3 OR beta").into_iter().collect();
+    assert_eq!(boosted.len(), 4);
+    // `a^3` triples the alpha documents' score and leaves beta untouched.
+    assert!((boosted[&0] - 3.0 * first).abs() < 1e-12, "{boosted:?}");
+    assert!((boosted[&1] - 3.0 * first).abs() < 1e-12, "{boosted:?}");
+    assert!((boosted[&2] - plain[&2]).abs() < 1e-12, "{boosted:?}");
+    assert!(boosted[&0] > boosted[&2]);
+}
+
+#[test]
+fn boost_below_one_lowers_the_score() {
+    let index = ab_index();
+    let plain = scored_hits(&index, "alpha");
+    let lowered = scored_hits(&index, "alpha^0.5");
+    assert_eq!(plain.len(), lowered.len());
+    for (plain, lowered) in plain.iter().zip(&lowered) {
+        assert_eq!(plain.0, lowered.0);
+        assert!(
+            (lowered.1 - plain.1 * 0.5).abs() < 1e-12,
+            "{plain:?} {lowered:?}"
+        );
+    }
+}
+
+#[test]
+fn phrase_boost_scales_the_phrase_score() {
+    let mut index = MemoryColumnIndex::new();
+    let mut segment = MemorySegment::new("text");
+    segment.insert(0, "alpha beta");
+    segment.insert(1, "alpha beta");
+    segment.insert(2, "alpha gamma");
+    index.push(segment);
+
+    let plain = scored_hits(&index, "\"alpha beta\"");
+    let boosted = scored_hits(&index, "\"alpha beta\"^3");
+    assert_eq!(plain.len(), 2, "{plain:?}");
+    assert_eq!(boosted.len(), 2, "{boosted:?}");
+    for (plain, boosted) in plain.iter().zip(&boosted) {
+        assert_eq!(plain.0, boosted.0);
+        assert!(
+            (boosted.1 - plain.1 * 3.0).abs() < 1e-12,
+            "{plain:?} {boosted:?}"
+        );
+    }
+}

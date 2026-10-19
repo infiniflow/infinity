@@ -720,12 +720,19 @@ impl Parser {
                 let mut ctes = Vec::new();
                 loop {
                     let alias = self.expect_ident()?;
+                    // Optional column aliases: `WITH x (a, b) AS (…)`.
+                    let columns = if self.peek() == &Token::LParen {
+                        self.ident_list()?
+                    } else {
+                        Vec::new()
+                    };
                     self.expect_kw("AS")?;
                     self.expect(Token::LParen)?;
                     let query = self.statement()?;
                     self.expect(Token::RParen)?;
                     ctes.push(Cte {
                         alias,
+                        columns,
                         query: Box::new(query),
                     });
                     if self.peek() == &Token::Comma {
@@ -1856,6 +1863,23 @@ impl Parser {
             Token::Float(f) => fmt_float(f),
             _ => String::new(),
         }
+    }
+
+    /// Parses a parenthesised, comma-separated identifier list
+    /// (used by `WITH <name> (<col>, …) AS …`).
+    fn ident_list(&mut self) -> Result<Vec<String>> {
+        self.expect(Token::LParen)?;
+        let mut names = Vec::new();
+        loop {
+            names.push(self.expect_ident()?);
+            if self.peek() == &Token::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        self.expect(Token::RParen)?;
+        Ok(names)
     }
 
     /// Consumes a parenthesised token run and returns its text joined by spaces.
@@ -3919,6 +3943,14 @@ mod tests {
         assert_eq!(cte1_from.as_deref(), Some("y"));
         assert_eq!(outer_from.as_deref(), Some("t1"));
         assert_eq!(cross_tables, vec!["t2".to_string()]);
+
+        // `WITH x (a, b) AS (…)` carries its output column aliases.
+        let Statement::Select { ctes, .. } =
+            one("WITH x (p, q) AS (SELECT a, b FROM t) SELECT * FROM x;")
+        else {
+            panic!("expected SELECT");
+        };
+        assert_eq!(ctes[0].columns, vec!["p".to_string(), "q".to_string()]);
 
         // `a + 3 day`.
         let Statement::Select { items, .. } = one("select a + 3 day from t1;") else {

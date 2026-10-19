@@ -259,6 +259,8 @@ pub struct ColumnDef {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cte {
     pub alias: String,
+    /// Optional output column names: `WITH x (a, b) AS (…)`.
+    pub columns: Vec<String>,
     pub query: Box<Statement>,
 }
 

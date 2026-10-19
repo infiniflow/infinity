@@ -100,7 +100,9 @@ impl SearchDriver {
     }
 
     /// `SearchDriver::ParseSingleWithFields`: a comma-separated field list; a
-    /// query over several fields becomes an `OR` of one parse per field.
+    /// query over several fields becomes an `OR` of one parse per field. Each
+    /// field's own `^boost` multiplies its subtree (`MultiplyWeight`, pushed
+    /// down to the leaves like `PushDownWeight`).
     pub fn parse_single_with_fields(
         &self,
         fields: &str,
@@ -109,12 +111,16 @@ impl SearchDriver {
         let fields = parse_fields(fields);
         match fields.len() {
             0 => self.parse_single(query),
-            1 => self.parse_single_with_default(query, &fields[0]),
+            1 => {
+                let (field, boost) = &fields[0];
+                let node = self.parse_single_with_default(query, field)?;
+                Ok(apply_boost(node, *boost))
+            }
             _ => {
                 let mut children = Vec::with_capacity(fields.len());
-                for field in fields {
+                for (field, boost) in fields {
                     if let Ok(node) = self.parse_single_with_default(query, &field) {
-                        children.push(node);
+                        children.push(apply_boost(node, boost));
                     }
                 }
                 match children.len() {
@@ -149,6 +155,7 @@ impl SearchDriver {
                     QueryNode::Term(TermQueryNode {
                         column: field.clone(),
                         term,
+                        boost: 1.0,
                     })
                 })
                 .collect();
@@ -244,12 +251,14 @@ impl SearchDriver {
             return Ok(QueryNode::Term(TermQueryNode {
                 column: field,
                 term: text.to_string(),
+                boost: 1.0,
             }));
         }
         if terms.len() == 1 {
             return Ok(QueryNode::Term(TermQueryNode {
                 column: field,
                 term: terms.into_iter().next().expect("length checked").0,
+                boost: 1.0,
             }));
         }
         if from_quoted {
@@ -257,6 +266,7 @@ impl SearchDriver {
                 column: field,
                 terms: terms.into_iter().map(|(term, _)| term).collect(),
                 slop,
+                boost: 1.0,
             }));
         }
         Ok(QueryNode::Or(
@@ -266,6 +276,7 @@ impl SearchDriver {
                     QueryNode::Term(TermQueryNode {
                         column: field.clone(),
                         term,
+                        boost: 1.0,
                     })
                 })
                 .collect(),
@@ -273,17 +284,62 @@ impl SearchDriver {
     }
 }
 
-/// `ParseFields`: comma-separated `field^boost` entries; boosts are a scoring
-/// concern and are dropped by the structural builder.
-fn parse_fields(fields: &str) -> Vec<String> {
+/// `ParseFields`: comma-separated `field^boost` entries.
+fn parse_fields(fields: &str) -> Vec<(String, f32)> {
     if fields.is_empty() {
         return Vec::new();
     }
     fields
         .split(',')
         .filter(|field| !field.is_empty())
-        .map(|field| field.split('^').next().unwrap_or(field).to_string())
+        .map(|field| match field.split_once('^') {
+            Some((name, boost)) => (name.to_string(), boost.parse::<f32>().unwrap_or(1.0)),
+            None => (field.to_string(), 1.0),
+        })
         .collect()
+}
+
+/// `QueryNode::PushDownWeight`: multiplies a subtree by `factor`. Leaves keep
+/// the weight; a multi-node propagates it to every child, exactly like the
+/// reference's recursive push-down (its own weight is reset afterwards).
+fn apply_boost(node: QueryNode, factor: f32) -> QueryNode {
+    if factor == 1.0 {
+        return node;
+    }
+    match node {
+        QueryNode::Term(mut term) => {
+            term.boost *= factor;
+            QueryNode::Term(term)
+        }
+        QueryNode::Phrase(mut phrase) => {
+            phrase.boost *= factor;
+            QueryNode::Phrase(phrase)
+        }
+        QueryNode::And(children) => QueryNode::And(
+            children
+                .into_iter()
+                .map(|child| apply_boost(child, factor))
+                .collect(),
+        ),
+        QueryNode::Or(children) => QueryNode::Or(
+            children
+                .into_iter()
+                .map(|child| apply_boost(child, factor))
+                .collect(),
+        ),
+        QueryNode::Not(children) => QueryNode::Not(
+            children
+                .into_iter()
+                .map(|child| apply_boost(child, factor))
+                .collect(),
+        ),
+        QueryNode::AndNot(children) => QueryNode::AndNot(
+            children
+                .into_iter()
+                .map(|child| apply_boost(child, factor))
+                .collect(),
+        ),
+    }
 }
 
 /// `SplitFieldIndex`: `column@index` names one index of a column.
@@ -319,7 +375,7 @@ enum Token {
     LParen,
     RParen,
     Colon,
-    Caret,
+    Caret(f32),
     Tilde(u32),
     Text { text: String, quoted: bool },
 }
@@ -412,9 +468,8 @@ fn lex(query: &str) -> Result<Vec<Token>, QueryParseError> {
                 i += 1;
             }
             '^' => match caret_number(&chars, i + 1) {
-                Some((_, next)) => {
-                    // Boosts affect scoring only; the tree shape ignores them.
-                    tokens.push(Token::Caret);
+                Some((boost, next)) => {
+                    tokens.push(Token::Caret(boost));
                     i = next;
                 }
                 // An unmatched `^` is echoed and dropped by the scanner.
@@ -574,6 +629,17 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Consumes an optional `^boost` and returns its value.
+    fn eat_caret(&mut self) -> Option<f32> {
+        if let Some(Token::Caret(boost)) = self.peek() {
+            let boost = *boost;
+            self.position += 1;
+            Some(boost)
+        } else {
+            None
+        }
+    }
+
     fn parse_query(&mut self) -> Result<QueryNode, QueryParseError> {
         let mut node = self.parse_clause()?;
         loop {
@@ -616,14 +682,18 @@ impl<'a> Parser<'a> {
             if !self.eat(&Token::RParen) {
                 return Err(QueryParseError::Expected("')'"));
             }
-            // `(...)^boost`
-            self.eat(&Token::Caret);
-            return Ok(node);
+            // `(...)^boost` multiplies the whole subtree.
+            return Ok(match self.eat_caret() {
+                Some(boost) => apply_boost(node, boost),
+                None => node,
+            });
         }
         let node = self.parse_basic_filter()?;
         // `term^boost`
-        self.eat(&Token::Caret);
-        Ok(node)
+        Ok(match self.eat_caret() {
+            Some(boost) => apply_boost(node, boost),
+            None => node,
+        })
     }
 
     fn parse_basic_filter(&mut self) -> Result<QueryNode, QueryParseError> {
@@ -786,7 +856,7 @@ impl MemoryColumnIndex {
 }
 
 impl TermLookup for MemoryColumnIndex {
-    fn lookup(&self, column: &str, term: &str) -> Option<Box<dyn DocIterator>> {
+    fn lookup(&self, column: &str, term: &str, boost: f64) -> Option<Box<dyn DocIterator>> {
         let postings = self.postings(column, term);
         if postings.is_empty() {
             return None;
@@ -803,7 +873,7 @@ impl TermLookup for MemoryColumnIndex {
             doc_lens,
             self.doc_count(column),
             self.total_len(column),
-            1.0,
+            boost,
             0.0,
         )))
     }
@@ -813,6 +883,7 @@ impl TermLookup for MemoryColumnIndex {
         column: &str,
         terms: &[String],
         slop: u32,
+        boost: f64,
     ) -> Option<Box<dyn DocIterator>> {
         let mut per_term = Vec::with_capacity(terms.len());
         for term in terms {
@@ -835,15 +906,20 @@ impl TermLookup for MemoryColumnIndex {
             self.doc_lens(column),
             self.doc_count(column),
             self.total_len(column),
-            1.0,
+            boost,
             0.0,
         )))
     }
 
-    fn bmw_search(&self, column: &str, terms: &[String], topn: usize) -> Option<Vec<(u64, f64)>> {
+    fn bmw_search(
+        &self,
+        column: &str,
+        terms: &[(String, f64)],
+        topn: usize,
+    ) -> Option<Vec<(u64, f64)>> {
         let lens = self.doc_lens(column);
         let mut postings = HashMap::new();
-        for term in terms {
+        for (term, _) in terms {
             let hits: Vec<(u64, u32)> = self
                 .postings(column, term)
                 .into_iter()
@@ -864,12 +940,13 @@ impl TermLookup for MemoryColumnIndex {
             postings,
             doc_len: lens,
         };
-        let weights = vec![1.0; terms.len()];
+        let weights: Vec<f64> = terms.iter().map(|(_, boost)| *boost).collect();
+        let term_names: Vec<String> = terms.iter().map(|(term, _)| term.clone()).collect();
         let fields = vec![(index, weights)];
         let dead = std::collections::HashSet::new();
         let hits = crate::wand::BlockMaxWandIterator::new(
             &fields,
-            terms,
+            &term_names,
             topn,
             &dead,
             0.0,
@@ -900,7 +977,7 @@ mod tests {
                     text: "dune".into(),
                     quoted: false
                 },
-                Token::Caret,
+                Token::Caret(1.2),
                 Token::And,
                 Token::Not,
                 Token::LParen,
@@ -913,7 +990,7 @@ mod tests {
                     quoted: false
                 },
                 Token::RParen,
-                Token::Caret,
+                Token::Caret(1.3),
             ]
         );
         assert_eq!(
@@ -968,11 +1045,13 @@ mod tests {
             QueryNode::Or(vec![
                 QueryNode::Term(TermQueryNode {
                     column: "body".into(),
-                    term: "dune".into()
+                    term: "dune".into(),
+                    boost: 1.0,
                 }),
                 QueryNode::Term(TermQueryNode {
                     column: "body".into(),
-                    term: "god".into()
+                    term: "god".into(),
+                    boost: 1.0,
                 }),
             ])
         );
@@ -981,12 +1060,50 @@ mod tests {
             QueryNode::Phrase(PhraseQueryNode {
                 column: "body".into(),
                 terms: vec!["harm".into(), "chemic".into()],
-                slop: 2
+                slop: 2,
+                boost: 1.0,
             })
         );
         assert!(driver.parse_single("NOT a").is_ok());
         assert!(driver.parse_single("\"unterminated").is_err());
         assert!(lex("\"unterminated").is_err());
+    }
+
+    #[test]
+    fn parser_carries_and_pushes_down_boosts() {
+        let driver = SearchDriver::new(HashMap::new(), "body");
+        let term = |term: &str, boost: f32| {
+            QueryNode::Term(TermQueryNode {
+                column: "body".into(),
+                term: term.into(),
+                boost,
+            })
+        };
+        // `a^3 OR b`: the leaf keeps its own weight.
+        assert_eq!(
+            driver.parse_single("a^3 OR b").unwrap(),
+            QueryNode::Or(vec![term("a", 3.0), term("b", 1.0)])
+        );
+        // `(a OR b^2)^3`: the group weight multiplies the children's own.
+        assert_eq!(
+            driver.parse_single("(a OR b^2)^3").unwrap(),
+            QueryNode::Or(vec![term("a", 3.0), term("b", 6.0)])
+        );
+        // Phrase boost.
+        assert_eq!(
+            driver.parse_single("\"a b\"^2").unwrap(),
+            QueryNode::Phrase(PhraseQueryNode {
+                column: "body".into(),
+                terms: vec!["a".into(), "b".into()],
+                slop: 0,
+                boost: 2.0
+            })
+        );
+        // Field-list boost (`col^w`) scales the subtree too.
+        assert_eq!(
+            driver.parse_single_with_fields("body^2", "a").unwrap(),
+            term("a", 2.0)
+        );
     }
 
     /// C++ `ParseStream` (`search_driver_ut.cpp`): skip blank lines and

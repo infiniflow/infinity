@@ -160,7 +160,7 @@ mod reference_suite {
     //! them, and checks top-1 self-recall after a chunk save/load round trip.
 
     use super::*;
-    use crate::vector::{HnswEncoding, HnswIndex, Metric};
+    use crate::vector::{chunk_file, HnswEncoding, HnswIndex, Metric};
 
     const DIM: usize = 16;
     const M: usize = 8;
@@ -243,6 +243,17 @@ mod reference_suite {
         HnswHandler::from_index(rebuilt)
     }
 
+    /// The reference's `SaveToPtr`/`LoadFromPtr` over a real file:
+    /// [`chunk_file`] writes the same meta/records/graph parts into a buffer and
+    /// reopens it, so the test exercises disk I/O as the C++ fixture does.
+    fn file_roundtrip(handler: &HnswHandler) -> HnswHandler {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("test_hnsw.bin");
+        chunk_file::save(handler.index(), &path);
+        assert!(path.metadata().expect("saved file").len() > 0);
+        HnswHandler::from_index(chunk_file::load(&path, EF_SEARCH))
+    }
+
     /// C++: `HnswHandlerTest.test_memory`.
     #[test]
     fn test_memory() {
@@ -265,6 +276,14 @@ mod reference_suite {
         assert!(loaded.get_info().0 > 0);
         let recall = top1_self_recall(&loaded, &data);
         assert!(recall >= 0.95, "loaded plain top-1 recall {recall}");
+
+        // C++ writes `hnsw_handler->SaveToPtr(file_handle)` and reopens the
+        // file with `LoadFromPtr`: assert the disk round trip as well.
+        let loaded = file_roundtrip(&handler);
+        assert_eq!(loaded.len(), N);
+        assert_eq!(loaded.index().encoding(), HnswEncoding::Plain);
+        let recall = top1_self_recall(&loaded, &data);
+        assert!(recall >= 0.95, "file-loaded plain top-1 recall {recall}");
     }
 
     /// C++: `HnswHandlerTest.test_compress`.
@@ -290,5 +309,13 @@ mod reference_suite {
         assert!(loaded.size_in_bytes() < plain_size);
         let recall = top1_self_recall(&loaded, &data);
         assert!(recall >= 0.95, "loaded LVQ top-1 recall {recall}");
+
+        // `test_compress` saves the compressed handler and loads it through a
+        // freshly constructed `MakeIndexHnsw(true)`.
+        let loaded = file_roundtrip(&handler);
+        assert_eq!(loaded.index().encoding(), HnswEncoding::Lvq);
+        assert!(loaded.size_in_bytes() < plain_size);
+        let recall = top1_self_recall(&loaded, &data);
+        assert!(recall >= 0.95, "file-loaded LVQ top-1 recall {recall}");
     }
 }

@@ -86,8 +86,9 @@ impl Error {
             // 3009 INVALID_INDEX_DEFINITION (index kind vs column type).
             Error::Invalid(m) if m.starts_with("SECONDARY index requires") => 3009,
             Error::Invalid(m) if m.contains("index requires a") => 3009,
-            // 3077 ANALYZER_NOT_FOUND.
-            Error::Invalid(m) if m.starts_with("analyzer '") && m.ends_with("not found") => 3077,
+            // 3077 ANALYZER_NOT_FOUND (unknown name, or a C++ family the Rust
+            // port does not vendor; both carry an explanatory suffix).
+            Error::Invalid(m) if m.starts_with("analyzer ") && m.contains("not found") => 3077,
             // 3061 INVALID_INDEX_PARAM (BMP/PLAID option validation).
             Error::Invalid(m)
                 if m.starts_with("block_size ")

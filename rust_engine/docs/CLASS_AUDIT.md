@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1094, `test` 7
+- 状态分布：`excluded` 15, `exempt` 20, `gap` 34, `mapped` 1060, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -369,19 +369,19 @@
 | 360 | `HTTPServer` | `src/network/http_server.cppm` | mapped | infinity_server 
 | 361 | `InfinityThriftService` | `src/network/infinity_thrift_service.cppm` | mapped | infinity_server 
 | 362 | `NodeInfo` | `src/network/node_info.cppm` | mapped | infinity_server 
-| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | mapped | infinity_server 
-| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | mapped | infinity_server 
-| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | mapped | infinity_server 
-| 366 | `PeerTask` | `src/network/peer_task.cppm` | mapped | infinity_server 
-| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | mapped | infinity_server 
-| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | mapped | infinity_server 
-| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | mapped | infinity_server 
-| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | mapped | infinity_server 
-| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | mapped | infinity_server 
-| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | mapped | infinity_server 
+| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
+| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
+| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
+| 366 | `PeerTask` | `src/network/peer_task.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
+| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
+| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
+| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
+| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
+| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
+| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
 | 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | mapped | infinity_server 
 | 374 | `PGServer` | `src/network/pg_server.cppm` | mapped | infinity_server 
-| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | mapped | infinity_server 
+| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | gap | 未实现：Rust 为单节点服务，无 peer/heartbeat/ring-buffer 实现 
 | 376 | `NonBlockPoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 377 | `PoolThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
 | 378 | `ThreadedThriftServer` | `src/network/thrift_server.cppm` | mapped | infinity_server 
@@ -479,29 +479,29 @@
 | 470 | `LogicalUpdate` | `src/planner/node/logical_update.cppm` | mapped | infinity_planner 
 | 471 | `LogicalViewScan` | `src/planner/node/logical_view_scan.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 472 | `Optimizer` | `src/planner/optimizer.cppm` | mapped | infinity_planner 
-| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | mapped | infinity_planner 
-| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | mapped | infinity_planner 
-| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | mapped | infinity_planner 
-| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | infinity_planner 
-| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | infinity_planner 
-| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | infinity_planner 
-| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | mapped | infinity_planner 
-| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | infinity_planner 
-| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | infinity_planner 
-| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | infinity_planner 
-| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | infinity_planner 
-| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | infinity_planner 
-| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | mapped | infinity_planner 
-| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | infinity_planner 
-| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | infinity_planner 
-| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | infinity_planner 
-| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | mapped | infinity_planner 
-| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | infinity_planner 
-| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | infinity_planner 
-| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | infinity_planner 
-| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | mapped | infinity_planner 
-| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | mapped | infinity_planner 
-| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | mapped | infinity_planner 
+| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
+| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | gap | 未实现：Rust planner 仅有 limit pushdown / filter-below-sort / constant-filter 三条规则；执行器按需处理，但无对应类 
 | 496 | `FragmentContext` | `src/scheduler/fragment_context.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
 | 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 

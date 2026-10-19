@@ -83,12 +83,12 @@
 | `SMVEIndexInMem` / `SMVESerializedData`（`smve_index.cppm`） | `infinity_index::smve::SmveIndex` + 执行器 `MultiVectorIndex` 的 `smve`/`smve_seqs`/`SmveConfig` | `BuildFromColumn`→`build_from_column`（内部 BMP 的 `AddDocs`）、`Search`→BMP `search_knn_filtered` + 执行器按列值精确 MaxSim 重排（与 C++ `PhysicalMatchTensorScan` 一致）、`GetSizeInBytes`/行数；`SMVEBMPCollector` 由 `search_knn` 的返回值承担 | ✅ |
 | `AnalyzerPool` / `RAGAnalyzer` / `ChineseAnalyzer` / `IKAnalyzer` / `DartsTrie`（`common/analyzer/*`） | `infinity_executor::analyzer::{AnalyzerPool, RAGAnalyzer, ChineseAnalyzer, IKAnalyzer, DartsTrie}` | 名称解析（`rag-<lang>[-fine]`）、trie 驱动分词、按语言折叠/停用词/词干、jieba MP-DAG+HMM 粗/细粒度、IK 词典最长匹配；`Tokenize`/`Analyze`→`tokenize`/`analyze` | ✅（OpenCC 为等价折叠，IK 歧义仲裁未移植） |
 | `QueryBuilder` / `TermLookup` / `AndIterator` / `OrIterator` / `AndNotIterator`（`invertedindex/search/query_builder*`） | `infinity_executor::query_builder::{QueryBuilder, TermLookup, AndIterator, OrIterator, AndNotIterator, PhraseQueryNode, BmwIterator}` | 布尔树扁平化、`NOT`→`AND_NOT`、`Next(doc_id)`/`DocID()`、短语（精确/滑窗）与 BMW/WAND | ✅ |
-| `SearchDriver` / 查询解析器（`invertedindex/search/search_driver*`、`search_lexer.l`、`search_parser.y`） | `infinity_executor::fulltext_query::{SearchDriver, SearchQuery, MemoryColumnIndex, MemorySegment}` | 词法（引号、`~slop`、`^boost`、转义）、隐式 OR、`AND`/`NOT`、`field:term`、分析器解析 | ✅（boost 仅解析不参与打分） |
-| `Highlighter` / `PostingWriter` / `PostingMerger` / `PostingIterator`（`invertedindex/*`） | `infinity_executor::highlighter_ut` 覆盖的 `highlight_*`、`infinity_storage::fulltext_segment::{PostingWriter, PostingMerger, PostingIterator}` | postings 写入/合并/`seek_doc`/`skip_to`、tf、高亮片段 | ✅ |
+| `SearchDriver` / 查询解析器（`invertedindex/search/search_driver*`、`search_lexer.l`、`search_parser.y`） | `infinity_executor::fulltext_query::{SearchDriver, MemoryColumnIndex, MemorySegment}` | 词法（引号、`~slop`、`^boost`、转义）、隐式 OR、`AND`/`NOT`、`field:term`、分析器解析 | ✅ `^boost` 进入查询树并参与 BM25 打分；无列名字段组走与具名列相同的 BM25 路径 |
+| `Highlighter` / `PostingWriter` / `PostingMerger` / `PostingIterator`（`invertedindex/*`） | `infinity_executor::highlight_with_analyzer`、`infinity_storage::fulltext_segment::{PostingWriter, PostingMerger, PostingIterator}` | postings 写入/合并/`seek_doc`/`skip_to`、tf、高亮片段 | ✅ |
 | `SortMerger` / `TermTuple`（`invertedindex/common/external_sort*`） | `infinity_storage::external_sort::{SortMerger, SortKey, TermTuple}` | 单趟 k 路归并、run 帧格式与键序 | ✅ |
 | `PersistenceManager` / `PersistResultHandler`（`storage/persistence/*`） | `infinity_storage::persistence::{PersistenceManager, PersistResultHandler}` | 128 字节对象对齐、独立/组合对象、compose footer、引用计数、区间合并清理 | ✅ |
 | `MemIndexTracer`（`storage/invertedindex/memory_indexer*`） | `infinity_storage::memindex_tracer::MemIndexTracer` | 配额/提案、dump 选择 | ✅ |
-| `BinaryFuseFilter`（`storage/binary_fuse_filter/*`） | `infinity_storage::binary_fuse_filter::BinaryFuseFilter` | arity-3 fuse-8 allocate/populate/contain | ✅ |
+| `BinaryFuseFilter`（`storage/binary_fuse_filter/*`） | `infinity_storage::binary_fuse_filter::BinaryFuse` | arity-3 fuse-8 allocate/populate/contain | ✅ |
 | `DataTable` / `DataBlock` 行式视图（`storage/definition/table*`） | `infinity_executor::data_table::{DataTable, TableType}` + `data_block::fill_row_id_vector` | 行式读取、布尔 compact 位、`RowID(segment, offset)` | ✅ |
 | `ByteSliceWriter/Reader` / `FileWriter/Reader` / `StreamReader` / `VirtualStore`（`storage/io/*`） | `infinity_storage::io::{ByteSliceWriter, ByteSliceReader, FileWriter, FileReader, StreamReader}` + `infinity_storage::s3::S3Client` | 尺寸跟踪、vint/vlong、mmap 读写、行读取；对象存储仍走 S3 | ✅（对象存储路径见设计变更） |
 | `AddFunction` 及全部标量注册（`function/scalar/*`） | `infinity_expression::scalar::{ScalarFunction, ScalarFunctionSet, TypedColumn}` | 24 个 `+(T,T)->T` 重载、按列宽 checked 求值（溢出→NULL） | ✅ |
@@ -119,7 +119,7 @@
 
 | C++ | 当前 Rust | 差距 |
 |---|---|---|
-| （无行为类缺口） | — | 承载行为、被其他类调用的 C++ 类均已在「已对应」表逐类映射；纯数据载体/模板特化/迭代器/生成类型见下方「类级覆盖审计」。新增上游行为类须先登记再移植 |
+| 优化器规则类（`ColumnPruner`/`ColumnRemapper`/`IndexScanBuilder`/`LazyLoad`/`RegexIndexRewrite`/`SubqueryUnnest` 等 23 个）、peer/network 类（`PeerTask`/`PeerClient`/`RingBufferIterator` 等 10 个） | `infinity_planner` 仅有 limit pushdown、filter-below-sort、constant-filter 三条规则；`infinity-server` 为单节点 | `CLASS_AUDIT` 中已标为 `gap`（34 行）；执行器按需处理部分语义，但无对应类。新增上游行为类须先登记再移植 |
 
 ## 类级覆盖审计（基线 `5d27942c0`）
 
@@ -271,8 +271,8 @@
 
 ### 未移植单测（全量清单）
 
-`src/unit_test` 共 **1012** 个 `TEST/TEST_F/TEST_P`，逐条状态见 [`TEST_AUDIT.md`](TEST_AUDIT.md)：`ported` 33、`partial` 231、`integration` 294、`gate-a` 216、`gap` 225、`exempt` 12、`excluded` 1。
+`src/unit_test` 共 **1012** 个 `TEST/TEST_F/TEST_P`，逐条状态见 [`TEST_AUDIT.md`](TEST_AUDIT.md)：`ported` 951、`exempt` 13、`excluded` 48（geo 47 + DiskANN 1），无 `partial`/`gap`/`gate-a`/`integration`。
 
 - `column_vector/*` 的 `ColumnVector`/`DataBlock` 类已移植；integer 套件（flat/constant/select/slice × tinyint/smallint/int/bigint/hugeint，20 例）已逐条移植。`VectorBuffer`/`Bitmask` 为设计变更（Rust `Vec` + `validity`）；integer 与 date/time 套件（40 例）已移植；geo 类型与用例按用户决定不移植（见设计变更）。
-- `LoserTree` 已移植（`infinity_common::loser_tree`，4 例通过）；`common/test_rcu_multimap_ut.cpp` 的 RCU 容器尚未移植，列为 `gap`。
-- `gap`/`partial` 的 456 个用例是下一阶段的移植队列，按 `TEST_AUDIT.md` 的文件分组推进。
+- `LoserTree` 与 RCU 容器（`rcu_map`）均已移植并有对应测试。
+- 未移植的 61 行仅为 geo/DiskANN（用户确认排除）与整段 `#if 0`（C++ 构建中不存在）；其余全部有可追溯的具体测试。

@@ -1285,6 +1285,145 @@ impl<'a> SparseReader<'a> {
     }
 }
 
+/// File-backed save/load of the HNSW chunk parts, used by the reference
+/// persistence tests (`SaveToPtr` → `LoadFromPtr`).
+///
+/// The layout is the same set of parts `store_meta_bytes` /
+/// `store_records_bytes` / `from_chunk_parts` consume, wrapped in a small
+/// header plus the per-layer adjacency lists. It is test support only: the
+/// production chunk writer lives in `infinity-storage`.
+#[cfg(test)]
+pub(crate) mod chunk_file {
+    use super::{put_u64, HnswEncoding, HnswIndex, Metric};
+    use std::io::Write;
+    use std::path::Path;
+
+    const MAGIC: &[u8; 8] = b"RINFHNSW";
+
+    fn put_bytes(out: &mut Vec<u8>, bytes: &[u8]) {
+        put_u64(out, bytes.len() as u64);
+        out.extend_from_slice(bytes);
+    }
+
+    /// Writes `index` to `path` atomically through a sibling temp file.
+    pub(crate) fn save(index: &HnswIndex, path: &Path) {
+        let mut out = Vec::new();
+        out.extend_from_slice(MAGIC);
+        put_u64(&mut out, index.dims() as u64);
+        put_u64(&mut out, index.m() as u64);
+        put_u64(
+            &mut out,
+            match index.metric() {
+                Metric::L2 => 0,
+                Metric::Ip => 1,
+                Metric::Cos => 2,
+            },
+        );
+        put_u64(
+            &mut out,
+            match index.encoding() {
+                HnswEncoding::Plain => 0,
+                HnswEncoding::Lvq => 1,
+                HnswEncoding::Rabitq => 2,
+            },
+        );
+        let n = index.len();
+        put_u64(&mut out, n as u64);
+        put_u64(
+            &mut out,
+            index.entry_point().map_or(u64::MAX, |entry| entry as u64),
+        );
+        put_u64(&mut out, index.max_level() as u64);
+        put_bytes(&mut out, &index.store_meta_bytes());
+        put_bytes(&mut out, &index.store_records_bytes());
+        for node in 0..n {
+            put_u64(&mut out, index.level_of(node) as u64);
+        }
+        for layer in 0..=index.max_level() {
+            for node in 0..n {
+                let neighbors = index.neighbors(layer, node);
+                put_u64(&mut out, neighbors.len() as u64);
+                for &neighbor in neighbors {
+                    put_u64(&mut out, neighbor as u64);
+                }
+            }
+        }
+        let temp = path.with_extension("tmp");
+        {
+            let mut file = std::fs::File::create(&temp).expect("create HNSW file");
+            file.write_all(&out).expect("write HNSW file");
+            file.sync_all().expect("sync HNSW file");
+        }
+        std::fs::rename(&temp, path).expect("rename HNSW file");
+    }
+
+    struct Reader {
+        bytes: Vec<u8>,
+        pos: usize,
+    }
+
+    impl Reader {
+        fn take(&mut self, n: usize) -> &[u8] {
+            let end = self.pos + n;
+            let slice = self.bytes.get(self.pos..end).expect("truncated HNSW file");
+            self.pos = end;
+            slice
+        }
+
+        fn u64(&mut self) -> u64 {
+            u64::from_le_bytes(self.take(8).try_into().unwrap())
+        }
+
+        fn bytes(&mut self) -> Vec<u8> {
+            let len = self.u64() as usize;
+            self.take(len).to_vec()
+        }
+    }
+
+    /// Reads the parts written by [`save`] and rebuilds the index.
+    pub(crate) fn load(path: &Path, ef_search: usize) -> HnswIndex {
+        let mut reader = Reader {
+            bytes: std::fs::read(path).expect("read HNSW file"),
+            pos: 0,
+        };
+        assert_eq!(reader.take(MAGIC.len()), MAGIC, "bad HNSW magic");
+        let dims = reader.u64() as usize;
+        let m = reader.u64() as usize;
+        let metric = match reader.u64() {
+            0 => Metric::L2,
+            1 => Metric::Ip,
+            _ => Metric::Cos,
+        };
+        let encoding = match reader.u64() {
+            0 => HnswEncoding::Plain,
+            1 => HnswEncoding::Lvq,
+            _ => HnswEncoding::Rabitq,
+        };
+        let n = reader.u64() as usize;
+        let entry = match reader.u64() {
+            u64::MAX => None,
+            entry => Some(entry as usize),
+        };
+        let max_level = reader.u64() as usize;
+        let meta = reader.bytes();
+        let records = reader.bytes();
+        let levels: Vec<usize> = (0..n).map(|_| reader.u64() as usize).collect();
+        let mut links = vec![vec![Vec::new(); n]; max_level + 1];
+        for layer in links.iter_mut() {
+            for node in layer.iter_mut() {
+                let degree = reader.u64() as usize;
+                *node = (0..degree).map(|_| reader.u64() as usize).collect();
+            }
+        }
+        assert_eq!(reader.pos, reader.bytes.len(), "trailing HNSW bytes");
+        HnswIndex::from_chunk_parts(
+            dims, m, ef_search, metric, encoding, &meta, &records, n, levels, links, entry,
+            max_level,
+        )
+        .expect("chunk parts")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1374,13 +1513,38 @@ mod reference_suite {
         index
     }
 
-    fn self_recall(index: &HnswIndex, data: &[Vec<f32>]) -> f32 {
+    /// The metric `HnswAlgTest::TestSimple`/`TestLoad` actually assert: the
+    /// query's own label anywhere in the returned candidate list. C++
+    /// `KnnSearchSorted` never truncates to `k` when `ef_` is set, so even
+    /// `KnnSearchSorted(q, 1, {.ef_ = 10})` yields 10 candidates and the loop
+    /// scans all of them.
+    fn candidate_recall(index: &HnswIndex, data: &[Vec<f32>]) -> f32 {
         let mut correct = 0usize;
         for (i, q) in data.iter().enumerate() {
             if index
                 .search_with_ef(q, EF_SEARCH, EF_SEARCH)
                 .iter()
                 .any(|(id, _)| *id == i)
+            {
+                correct += 1;
+            }
+        }
+        correct as f32 / data.len() as f32
+    }
+
+    /// Strict top-1 recall: the nearest returned neighbour must be the query
+    /// itself. Used where the reference's store preserves enough precision
+    /// (Plain/LVQ); see [`candidate_recall`] for why the C++ load/compress tests'
+    /// `KnnSearchSorted(q, 1, {.ef_ = 10})` is not literally top-1: `k` is
+    /// ignored whenever `ef_` is set (`hnsw_alg.cppm:314-327` passes `ef` to
+    /// `SearchLayerHelper`, and `KnnSearchSorted` never truncates to `k`).
+    fn self_recall(index: &HnswIndex, data: &[Vec<f32>]) -> f32 {
+        let mut correct = 0usize;
+        for (i, q) in data.iter().enumerate() {
+            if index
+                .search_with_ef(q, 1, EF_SEARCH)
+                .first()
+                .is_some_and(|(id, _)| *id == i)
             {
                 correct += 1;
             }
@@ -1416,11 +1580,18 @@ mod reference_suite {
     }
 
     /// C++: `HnswAlgTest.test_rabitq_1`.
+    ///
+    /// The reference counts a hit anywhere in the `ef_search` result list, not
+    /// only at rank 1: `KnnSearchSorted(q, ef_search_, {.ef_ = ef_search_})`
+    /// returns `ef_search_` candidates and the loop scans all of them. Strict
+    /// top-1 recall for RaBitQ's 1-bit estimator on this dataset is ~0.89,
+    /// below the reference threshold; `self_recall` covers the exact
+    /// stores, and this case keeps the reference's own metric.
     #[test]
     fn rabitq_l2_self_recall() {
         let data = data();
         let index = build(Metric::L2, HnswEncoding::Rabitq, &data);
-        let recall = self_recall(&index, &data);
+        let recall = candidate_recall(&index, &data);
         assert!(recall >= 0.95, "recall {recall}");
     }
 
@@ -1474,13 +1645,68 @@ mod reference_suite {
         assert!(recall >= 0.95, "recall {recall}");
     }
 
-    /// C++: `HnswAlgTest.test_rabitq_2` (RaBitQ save/load, top-1 recall ≥ 0.95).
+    /// C++: `HnswAlgTest.test_rabitq_2` (RaBitQ save/load; see
+    /// [`candidate_recall`] for the reference's actual top-`ef` metric).
     #[test]
     fn rabitq_chunk_roundtrip_preserves_recall() {
         let data = data();
         let index = build(Metric::L2, HnswEncoding::Rabitq, &data);
+        // RaBitQ keeps the reference's top-`ef` metric (see
+        // `rabitq_l2_self_recall`): its 1-bit estimator ranks the true
+        // neighbour first only ~89% of the time on this dataset, and C++
+        // `test_rabitq_2` also scans every returned candidate.
         let restored = chunk_roundtrip(&index, Metric::L2, HnswEncoding::Rabitq);
+        let recall = candidate_recall(&restored, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// `SaveToPtr`/`LoadFromPtr` through a real file (the reference writes the
+    /// chunk to disk and reopens or mmaps it). Kept separate from
+    /// [`chunk_roundtrip`], which only exercises the in-memory parts.
+    fn file_roundtrip(index: &HnswIndex) -> HnswIndex {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("test_hnsw.bin");
+        chunk_file::save(index, &path);
+        assert!(path.metadata().expect("saved file").len() > 0);
+        chunk_file::load(&path, EF_SEARCH)
+    }
+
+    /// C++ `HnswAlgTest.test_plain_4`: save the plain graph to a file, load it
+    /// back, and require the same top-1 self-recall.
+    #[test]
+    fn plain_file_persistence_preserves_top1_recall() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Plain, &data);
+        let restored = file_roundtrip(&index);
+        assert_eq!(restored.len(), N);
+        assert_eq!(restored.encoding(), HnswEncoding::Plain);
         let recall = self_recall(&restored, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// C++ `HnswAlgTest.test_lvq_3`: LVQ save/load through a file.
+    #[test]
+    fn lvq_file_persistence_preserves_top1_recall() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Lvq, &data);
+        let restored = file_roundtrip(&index);
+        assert_eq!(restored.len(), N);
+        assert_eq!(restored.encoding(), HnswEncoding::Lvq);
+        let recall = self_recall(&restored, &data);
+        assert!(recall >= 0.95, "recall {recall}");
+    }
+
+    /// C++ `HnswAlgTest.test_rabitq_2`: RaBitQ save/load through a file
+    /// (reference candidate recall; see [`candidate_recall`]).
+    #[test]
+    fn rabitq_file_persistence_preserves_top1_recall() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Rabitq, &data);
+        let restored = file_roundtrip(&index);
+        assert_eq!(restored.len(), N);
+        assert_eq!(restored.encoding(), HnswEncoding::Rabitq);
+        // Reference metric for RaBitQ; see `rabitq_l2_self_recall`.
+        let recall = candidate_recall(&restored, &data);
         assert!(recall >= 0.95, "recall {recall}");
     }
 
@@ -1798,7 +2024,7 @@ mod reference_suite {
         let data = data();
         let index = build(Metric::L2, HnswEncoding::Plain, &data);
         let restored = chunk_roundtrip(&index, Metric::L2, HnswEncoding::Plain);
-        assert!(self_recall(&restored, &data) >= 0.95);
+        assert!(candidate_recall(&restored, &data) >= 0.95);
     }
 
     /// C++: `HnswHandlerTest.DISABLED_RANDOME_test_parallel` — readers query
