@@ -3,16 +3,16 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `grouped` 994, `mapped` 120, `test` 7
+- 状态分布：`excluded` 15, `grouped` 967, `mapped` 147, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
 | 1 | `AdminExecutor` | `src/admin/admin_executor.cppm` | grouped | `execute_stmt_inner` 的语句分发 |
-| 2 | `Analyzer` | `src/common/analyzer/analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
-| 3 | `AnalyzerPool` | `src/common/analyzer/analyzer_pool.cppm` | grouped | `tokenize_*` analyzer 函数 |
-| 4 | `ChineseAnalyzer` | `src/common/analyzer/chinese_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
+| 2 | `Analyzer` | `src/common/analyzer/analyzer.cppm` | mapped | `infinity_executor::analyzer::StandardAnalyzer` 
+| 3 | `AnalyzerPool` | `src/common/analyzer/analyzer_pool.cppm` | mapped | `infinity_executor::analyzer::AnalyzerPool` 
+| 4 | `ChineseAnalyzer` | `src/common/analyzer/chinese_analyzer.cppm` | mapped | `infinity_executor::analyzer::ChineseAnalyzer` 
 | 5 | `CommonLanguageAnalyzer` | `src/common/analyzer/common_analyzer.cppm` | mapped | `infinity_executor::analyzer::StandardAnalyzer` 的选项（case/stem/stem_only） |
-| 6 | `DartsTrie` | `src/common/analyzer/darts_trie.cppm` | grouped | `tokenize_*` analyzer 函数 |
+| 6 | `DartsTrie` | `src/common/analyzer/darts_trie.cppm` | mapped | `infinity_executor::analyzer::DartsTrie` 
 | 7 | `DartsTuple` | `src/common/analyzer/darts_trie.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 8 | `POSTable` | `src/common/analyzer/darts_trie.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 9 | `AnalyzeContext` | `src/common/analyzer/ik/analyze_context.cppm` | grouped | `tokenize_*` analyzer 函数 |
@@ -23,7 +23,7 @@
 | 14 | `Dictionary` | `src/common/analyzer/ik/dict.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 15 | `DictSegment` | `src/common/analyzer/ik/dict_segment.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 16 | `Hit` | `src/common/analyzer/ik/hit.cppm` | grouped | `tokenize_*` analyzer 函数 |
-| 17 | `IKAnalyzer` | `src/common/analyzer/ik/ik_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
+| 17 | `IKAnalyzer` | `src/common/analyzer/ik/ik_analyzer.cppm` | mapped | `infinity_executor::analyzer::IKAnalyzer` 
 | 18 | `LetterSegmenter` | `src/common/analyzer/ik/letter_segmenter.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 19 | `Lexeme` | `src/common/analyzer/ik/lexeme.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | grouped | `tokenize_*` analyzer 函数 |
@@ -32,7 +32,7 @@
 | 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 25 | `NGramAnalyzer` | `src/common/analyzer/ngram_analyzer.cppm` | mapped | `analyzer::NGramAnalyzer`（n-gram 窗口按 UTF-8 code point 滑动） |
-| 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
+| 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `infinity_executor::analyzer::RAGAnalyzer` 
 | 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 28 | `SparsegramAnalyzer` | `src/common/analyzer/sparsegram_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 29 | `StandardAnalyzer` | `src/common/analyzer/standard_analyzer.cppm` | mapped | `analyzer::StandardAnalyzer`（Analyze 的 word/stem/case 组合） |
@@ -299,8 +299,8 @@
 | 290 | `SparseProjector` | `src/function/scalar/fixed_dimensional_encoding.cppm` | grouped | 标量/聚合函数 + `AggFunc` 枚举 |
 | 291 | `Tensor` | `src/function/scalar/fixed_dimensional_encoding.cppm` | grouped | 标量/聚合函数 + `AggFunc` 枚举 |
 | 292 | `NewCatalog` | `src/function/scalar/modulo.cppm` | grouped | 标量/聚合函数 + `AggFunc` 枚举 |
-| 293 | `ScalarFunction` | `src/function/scalar_function.cppm` | grouped | 标量/聚合函数 + `AggFunc` 枚举 |
-| 294 | `ScalarFunctionSet` | `src/function/scalar_function_set.cppm` | grouped | 标量/聚合函数 + `AggFunc` 枚举 |
+| 293 | `ScalarFunction` | `src/function/scalar_function.cppm` | mapped | `infinity_expression::scalar::ScalarFunction` 
+| 294 | `ScalarFunctionSet` | `src/function/scalar_function_set.cppm` | mapped | `infinity_expression::scalar::ScalarFunctionSet` 
 | 295 | `SpecialFunction` | `src/function/special_function.cppm` | grouped | 标量/聚合函数 + `AggFunc` 枚举 |
 | 296 | `CompactSegmentData` | `src/function/table/compact_state_data.cppm` | grouped | 表函数由执行器直接求值 |
 | 297 | `CompactStateData` | `src/function/table/compact_state_data.cppm` | grouped | 表函数由执行器直接求值 |
@@ -543,7 +543,7 @@
 | 534 | `BuildFastRoughFilterTask` | `src/storage/bg_task/segment_sealing_tasks/build_fast_rough_filter_task.cppm` | grouped | 定时线程 + `Engine::{dump,optimize,cleanup}` |
 | 535 | `BuildingSegmentFastFilters` | `src/storage/bg_task/segment_sealing_tasks/build_fast_rough_filter_task.cppm` | grouped | 定时线程 + `Engine::{dump,optimize,cleanup}` |
 | 536 | `BufferHandle` | `src/storage/buffer/buffer_handle.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 537 | `BufferObj` | `src/storage/buffer/buffer_handle.cppm` | mapped | CLASS_MAP 已显式命名 |
+| 537 | `BufferObj` | `src/storage/buffer/buffer_handle.cppm` | mapped | `infinity_storage::buffer::BufferObj` 
 | 538 | `BufferManager` | `src/storage/buffer/buffer_manager.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 539 | `BufferObjectInfo` | `src/storage/buffer/buffer_obj.cppm` | grouped | `infinity_storage::buffer`（`BufferObj`/`BufferManager`） |
 | 540 | `VarBuffer` | `src/storage/buffer/buffer_obj.cppm` | mapped | `infinity_storage::var_buffer::VarBuffer`（Append/Get/Write/TotalSize/GetSize） |
@@ -704,7 +704,7 @@
 | 695 | `VByteCompressor` | `src/storage/common/vbyte_compressor.cppm` | grouped | `Vec<u8>`/`BufferObj` 等原语 |
 | 696 | `NewCompactionAlg` | `src/storage/compaction/new_compaction_alg.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 697 | `DataBlock` | `src/storage/data_block.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 698 | `DataTable` | `src/storage/data_table.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
+| 698 | `DataTable` | `src/storage/data_table.cppm` | mapped | `infinity_executor::data_table::DataTable` 
 | 699 | `IndexBase` | `src/storage/definition/index_base.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 700 | `IndexBMP` | `src/storage/definition/index_bmp.cppm` | grouped | `infinity_catalog::value_format` |
 | 701 | `IndexDiskAnn` | `src/storage/definition/index_diskann.cppm` | grouped | `infinity_catalog::value_format` |
@@ -741,7 +741,7 @@
 | 732 | `AhoCorasick` | `src/storage/invertedindex/common/aho_corasick.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 733 | `BufWriter` | `src/storage/invertedindex/common/buf_writer.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 734 | `DirectIO` | `src/storage/invertedindex/common/external_sort_merger.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 735 | `SortMerger` | `src/storage/invertedindex/common/external_sort_merger.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
+| 735 | `SortMerger` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | `infinity_storage::external_sort::SortMerger` 
 | 736 | `TermTuple` | `src/storage/invertedindex/common/external_sort_merger.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 737 | `TermTupleList` | `src/storage/invertedindex/common/external_sort_merger.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 738 | `MapWithLock` | `src/storage/invertedindex/common/map_with_lock.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
@@ -805,12 +805,12 @@
 | 796 | `BatchInvertTask` | `src/storage/invertedindex/invert_task.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 797 | `MemoryIndexer` | `src/storage/invertedindex/memory_indexer.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 798 | `MultiPostingDecoder` | `src/storage/invertedindex/multi_posting_decoder.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 799 | `PostingIterator` | `src/storage/invertedindex/posting_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 800 | `PostingMerger` | `src/storage/invertedindex/posting_merger.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 801 | `PostingWriter` | `src/storage/invertedindex/posting_writer.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
+| 799 | `PostingIterator` | `src/storage/invertedindex/posting_iterator.cppm` | mapped | `infinity_storage::fulltext_segment::PostingIterator` 
+| 800 | `PostingMerger` | `src/storage/invertedindex/posting_merger.cppm` | mapped | `infinity_storage::fulltext_segment::PostingMerger` 
+| 801 | `PostingWriter` | `src/storage/invertedindex/posting_writer.cppm` | mapped | `infinity_storage::fulltext_segment::PostingWriter` 
 | 802 | `Ring` | `src/storage/invertedindex/ring.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 803 | `AndIterator` | `src/storage/invertedindex/search/and_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 804 | `AndNotIterator` | `src/storage/invertedindex/search/and_not_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
+| 803 | `AndIterator` | `src/storage/invertedindex/search/and_iterator.cppm` | mapped | `infinity_executor::query_builder::AndIterator` 
+| 804 | `AndNotIterator` | `src/storage/invertedindex/search/and_not_iterator.cppm` | mapped | `infinity_executor::query_builder::AndNotIterator` 
 | 805 | `BatchOrIterator` | `src/storage/invertedindex/search/batch_or_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 806 | `BlockMaxLeafIterator` | `src/storage/invertedindex/search/blockmax_leaf_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 807 | `BlockMaxWandIterator` | `src/storage/invertedindex/search/blockmax_wand_iterator.cppm` | mapped | CLASS_MAP 已显式命名 |
@@ -828,12 +828,12 @@
 | 819 | `MustFirstIterator` | `src/storage/invertedindex/search/must_first_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 820 | `DocIteratorEntry` | `src/storage/invertedindex/search/or_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 821 | `DocIteratorHeap` | `src/storage/invertedindex/search/or_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 822 | `OrIterator` | `src/storage/invertedindex/search/or_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
+| 822 | `OrIterator` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | `infinity_executor::query_builder::OrIterator` 
 | 823 | `BM25Params` | `src/storage/invertedindex/search/parse_fulltext_options.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 824 | `RankFeatureOption` | `src/storage/invertedindex/search/parse_fulltext_options.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 825 | `PhraseDocIterator` | `src/storage/invertedindex/search/phrase_doc_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 826 | `FullTextQueryContext` | `src/storage/invertedindex/search/query_builder.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 827 | `QueryBuilder` | `src/storage/invertedindex/search/query_builder.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
+| 827 | `QueryBuilder` | `src/storage/invertedindex/search/query_builder.cppm` | mapped | `infinity_executor::query_builder::QueryBuilder` 
 | 828 | `AndNotQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 829 | `AndQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 830 | `CreateSearchParams` | `src/storage/invertedindex/search/query_node.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
@@ -841,7 +841,7 @@
 | 832 | `MultiQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 833 | `NotQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 834 | `OrQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 835 | `PhraseQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
+| 835 | `PhraseQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | `infinity_executor::query_builder::PhraseQueryNode` 
 | 836 | `QueryNode` | `src/storage/invertedindex/search/query_node.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 837 | `RankFeatureQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 838 | `RankFeaturesQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
@@ -850,14 +850,14 @@
 | 841 | `RankFeaturesDocIterator` | `src/storage/invertedindex/search/rank_features_doc_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 842 | `FullTextScoreResultHeap` | `src/storage/invertedindex/search/score_result_heap.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 843 | `ScoreThresholdIterator` | `src/storage/invertedindex/search/score_threshold_iterator.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 844 | `SearchDriver` | `src/storage/invertedindex/search/search_driver.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
+| 844 | `SearchDriver` | `src/storage/invertedindex/search/search_driver.cppm` | mapped | `infinity_executor::fulltext_query::SearchDriver` 
 | 845 | `SegmentPosting` | `src/storage/invertedindex/segment_posting.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 846 | `SegmentTermPosting` | `src/storage/invertedindex/segment_term_posting.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
 | 847 | `SegmentTermPostingQueue` | `src/storage/invertedindex/segment_term_posting.cppm` | grouped | `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 |
-| 848 | `ByteSliceReader` | `src/storage/io/byte_slice_reader.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
-| 849 | `ByteSliceWriter` | `src/storage/io/byte_slice_writer.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
-| 850 | `FileReader` | `src/storage/io/file_reader.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
-| 851 | `FileWriter` | `src/storage/io/file_writer.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
+| 848 | `ByteSliceReader` | `src/storage/io/byte_slice_reader.cppm` | mapped | `infinity_storage::io::ByteSliceReader` 
+| 849 | `ByteSliceWriter` | `src/storage/io/byte_slice_writer.cppm` | mapped | `infinity_storage::io::ByteSliceWriter` 
+| 850 | `FileReader` | `src/storage/io/file_reader.cppm` | mapped | `infinity_storage::io::FileReader` 
+| 851 | `FileWriter` | `src/storage/io/file_writer.cppm` | mapped | `infinity_storage::io::FileWriter` 
 | 852 | `LocalFileHandle` | `src/storage/io/local_file_handle.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
 | 853 | `ObjectStorageProcess` | `src/storage/io/object_storage_process.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
 | 854 | `BaseObjectStorageTask` | `src/storage/io/object_storage_task.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
@@ -869,7 +869,7 @@
 | 860 | `UploadTask` | `src/storage/io/object_storage_task.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
 | 861 | `S3Client` | `src/storage/io/s3_client.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 862 | `S3ClientMinio` | `src/storage/io/s3_client_minio.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
-| 863 | `StreamReader` | `src/storage/io/stream_reader.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
+| 863 | `StreamReader` | `src/storage/io/stream_reader.cppm` | mapped | `infinity_storage::io::StreamReader` 
 | 864 | `MmapInfo` | `src/storage/io/virtual_store.cppm` | grouped | `std::fs` + `infinity_storage::s3` |
 | 865 | `VirtualStore` | `src/storage/io/virtual_store.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 866 | `FlattenedTerm` | `src/storage/json_index/json_flattener.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
@@ -965,7 +965,7 @@
 | 956 | `HnswConfig` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | grouped | `infinity_index::vector::{HnswIndex, Store}` / `hnsw_handler` / `lvq` / `rabitq` / `lsg` |
 | 957 | `HnswInsertConfig` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | grouped | `infinity_index::vector::{HnswIndex, Store}` / `hnsw_handler` / `lvq` / `rabitq` / `lsg` |
 | 958 | `SparseVectorIter` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | grouped | `infinity_index::vector::{HnswIndex, Store}` / `hnsw_handler` / `lvq` / `rabitq` / `lsg` |
-| 959 | `HnswHandler` | `src/storage/knn_index/knn_hnsw/hnsw_handler.cppm` | mapped | CLASS_MAP 已显式命名 |
+| 959 | `HnswHandler` | `src/storage/knn_index/knn_hnsw/hnsw_handler.cppm` | mapped | `infinity_index::hnsw_handler::HnswHandler` 
 | 960 | `HnswIndexInMem` | `src/storage/knn_index/knn_hnsw/hnsw_handler.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 961 | `HnswLSGBuilder` | `src/storage/knn_index/knn_hnsw/hnsw_lsg_builder.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 962 | `HnswOptimizeOptions` | `src/storage/knn_index/knn_hnsw/hnsw_util.cppm` | grouped | `infinity_index::vector::{HnswIndex, Store}` / `hnsw_handler` / `lvq` / `rabitq` / `lsg` |
@@ -1074,11 +1074,11 @@
 | 1065 | `ObjectStats` | `src/storage/persistence/obj_stat_accessor.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1066 | `ObjStat` | `src/storage/persistence/obj_status.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1067 | `Range` | `src/storage/persistence/obj_status.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 1068 | `PersistResultHandler` | `src/storage/persistence/persist_result_handler.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
+| 1068 | `PersistResultHandler` | `src/storage/persistence/persist_result_handler.cppm` | mapped | `infinity_storage::persistence::PersistResultHandler` 
 | 1069 | `ObjAddr` | `src/storage/persistence/persistence_manager.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1070 | `PersistReadResult` | `src/storage/persistence/persistence_manager.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1071 | `PersistWriteResult` | `src/storage/persistence/persistence_manager.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 1072 | `PersistenceManager` | `src/storage/persistence/persistence_manager.cppm` | mapped | CLASS_MAP 已显式命名 |
+| 1072 | `PersistenceManager` | `src/storage/persistence/persistence_manager.cppm` | mapped | `infinity_storage::persistence::PersistenceManager` 
 | 1073 | `CacheOutput` | `src/storage/result_cache_manager.cppm` | mapped | `result_cache::CacheOutput` |
 | 1074 | `ResultCacheManager` | `src/storage/result_cache_manager.cppm` | mapped | `result_cache::ResultCacheManager`（AddCache/GetCache/DropTable/ResetCacheNumCapacity/ClearCache） |
 | 1075 | `CommonQueryFilter` | `src/storage/secondary_index/common_query_filter.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
@@ -1093,7 +1093,7 @@
 | 1084 | `MemUsageChange` | `src/storage/tracer/mem_usage_change.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1085 | `BGMemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1086 | `MemIndexDetail` | `src/storage/tracer/memindex_tracer.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
-| 1087 | `MemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
+| 1087 | `MemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | mapped | `infinity_storage::memindex_tracer::MemIndexTracer` 
 | 1088 | `MemIndexTracerInfo` | `src/storage/tracer/memindex_tracer.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1089 | `View` | `src/storage/view.cppm` | grouped | `infinity_storage`/执行器的对应模块 |
 | 1090 | `BottomExecutor` | `src/storage/wal/bottom_executor.cppm` | grouped | `infinity_storage::wal` 字节级日志 |
@@ -1126,7 +1126,7 @@
 | 1117 | `WalCmdRestoreDatabaseSnapshot` | `src/storage/wal/wal_entry.cppm` | grouped | `infinity_storage::wal` 字节级日志 |
 | 1118 | `WalCmdRestoreSystemSnapshot` | `src/storage/wal/wal_entry.cppm` | grouped | `infinity_storage::wal` 字节级日志 |
 | 1119 | `WalCmdRestoreTableSnapshot` | `src/storage/wal/wal_entry.cppm` | grouped | `infinity_storage::wal` 字节级日志 |
-| 1120 | `WalEntry` | `src/storage/wal/wal_entry.cppm` | grouped | `infinity_storage::wal` 字节级日志 |
+| 1120 | `WalEntry` | `src/storage/wal/wal_entry.cppm` | mapped | `infinity_storage::wal_entry::WalEntry` 
 | 1121 | `WalEntryHeader` | `src/storage/wal/wal_entry.cppm` | grouped | `infinity_storage::wal` 字节级日志 |
 | 1122 | `WalEntryIterator` | `src/storage/wal/wal_entry.cppm` | grouped | `infinity_storage::wal` 字节级日志 |
 | 1123 | `WalListIterator` | `src/storage/wal/wal_entry.cppm` | grouped | `infinity_storage::wal` 字节级日志 |

@@ -81,6 +81,20 @@
 | `PlaidIndexDiskMerger` / `PlaidMergeManifest`（`plaid_index_disk_merger.cppm`） | `infinity_index::plaid::{PlaidIndexDiskMerger, PlaidMergeManifest}` | `MergeChunk(sParallel/Incremental)`、`Finalize`→`accept_merged_data`、`CalculateMergeSize`、manifest JSON（`NeedsMerge`/`UpdateChunk`/`Load/SaveManifest`） | ✅ |
 | `SMVETransform` / `GenerateProjectionMatrix`（`smve_transform.cppm`） | `infinity_index::smve::{smve_transform, generate_projection_matrix, SmveResult}` | 随机单位列投影（固定种子）、逐 token 取 top-k、query 求和池化 / doc 非零均值池化 | ✅ |
 | `SMVEIndexInMem` / `SMVESerializedData`（`smve_index.cppm`） | `infinity_index::smve::SmveIndex` + 执行器 `MultiVectorIndex` 的 `smve`/`smve_seqs`/`SmveConfig` | `BuildFromColumn`→`build_from_column`（内部 BMP 的 `AddDocs`）、`Search`→BMP `search_knn_filtered` + 执行器按列值精确 MaxSim 重排（与 C++ `PhysicalMatchTensorScan` 一致）、`GetSizeInBytes`/行数；`SMVEBMPCollector` 由 `search_knn` 的返回值承担 | ✅ |
+| `AnalyzerPool` / `RAGAnalyzer` / `ChineseAnalyzer` / `IKAnalyzer` / `DartsTrie`（`common/analyzer/*`） | `infinity_executor::analyzer::{AnalyzerPool, RAGAnalyzer, ChineseAnalyzer, IKAnalyzer, DartsTrie}` | 名称解析（`rag-<lang>[-fine]`）、trie 驱动分词、按语言折叠/停用词/词干、jieba MP-DAG+HMM 粗/细粒度、IK 词典最长匹配；`Tokenize`/`Analyze`→`tokenize`/`analyze` | ✅（OpenCC 为等价折叠，IK 歧义仲裁未移植） |
+| `QueryBuilder` / `TermLookup` / `AndIterator` / `OrIterator` / `AndNotIterator`（`invertedindex/search/query_builder*`） | `infinity_executor::query_builder::{QueryBuilder, TermLookup, AndIterator, OrIterator, AndNotIterator, PhraseQueryNode, BmwIterator}` | 布尔树扁平化、`NOT`→`AND_NOT`、`Next(doc_id)`/`DocID()`、短语（精确/滑窗）与 BMW/WAND | ✅ |
+| `SearchDriver` / 查询解析器（`invertedindex/search/search_driver*`、`search_lexer.l`、`search_parser.y`） | `infinity_executor::fulltext_query::{SearchDriver, SearchQuery, MemoryColumnIndex, MemorySegment}` | 词法（引号、`~slop`、`^boost`、转义）、隐式 OR、`AND`/`NOT`、`field:term`、分析器解析 | ✅（boost 仅解析不参与打分） |
+| `Highlighter` / `PostingWriter` / `PostingMerger` / `PostingIterator`（`invertedindex/*`） | `infinity_executor::highlighter_ut` 覆盖的 `highlight_*`、`infinity_storage::fulltext_segment::{PostingWriter, PostingMerger, PostingIterator}` | postings 写入/合并/`seek_doc`/`skip_to`、tf、高亮片段 | ✅ |
+| `SortMerger` / `TermTuple`（`invertedindex/common/external_sort*`） | `infinity_storage::external_sort::{SortMerger, SortKey, TermTuple}` | 单趟 k 路归并、run 帧格式与键序 | ✅ |
+| `PersistenceManager` / `PersistResultHandler`（`storage/persistence/*`） | `infinity_storage::persistence::{PersistenceManager, PersistResultHandler}` | 128 字节对象对齐、独立/组合对象、compose footer、引用计数、区间合并清理 | ✅ |
+| `MemIndexTracer`（`storage/invertedindex/memory_indexer*`） | `infinity_storage::memindex_tracer::MemIndexTracer` | 配额/提案、dump 选择 | ✅ |
+| `BinaryFuseFilter`（`storage/binary_fuse_filter/*`） | `infinity_storage::binary_fuse_filter::BinaryFuseFilter` | arity-3 fuse-8 allocate/populate/contain | ✅ |
+| `DataTable` / `DataBlock` 行式视图（`storage/definition/table*`） | `infinity_executor::data_table::{DataTable, TableType}` + `data_block::fill_row_id_vector` | 行式读取、布尔 compact 位、`RowID(segment, offset)` | ✅ |
+| `ByteSliceWriter/Reader` / `FileWriter/Reader` / `StreamReader` / `VirtualStore`（`storage/io/*`） | `infinity_storage::io::{ByteSliceWriter, ByteSliceReader, FileWriter, FileReader, StreamReader}` + `infinity_storage::s3::S3Client` | 尺寸跟踪、vint/vlong、mmap 读写、行读取；对象存储仍走 S3 | ✅（对象存储路径见设计变更） |
+| `AddFunction` 及全部标量注册（`function/scalar/*`） | `infinity_expression::scalar::{ScalarFunction, ScalarFunctionSet, TypedColumn}` | 24 个 `+(T,T)->T` 重载、按列宽 checked 求值（溢出→NULL） | ✅ |
+| JSON 值（`parser/type/*`、`storage/column_vector/json*`） | `infinity_common::json::Json` + `LogicalType::Json`/`BlockValue::Json` | 解析树、紧凑序列化、列/WAL 编解码 | ✅（以结构化 JSON 替代 BSON 字节） |
+| 多语句事务（`storage/txn/*`） | `infinity_executor::EngineTxn` + `infinity_txn::TxnManager` | `begin_txn`/`append`/`delete_row_ids`/`create_table_snapshot`/`commit`/`rollback`、begin/commit 时间戳 | ✅（rollback 不回退行号分配器） |
+| 稀疏 HNSW（`KnnHnsw<SparseIPVecStoreType>`，`knn_hnsw/*`） | `infinity_index::vector::{Store::SparseIp, HnswIndex::sparse_ip/add_sparse/search_sparse/save_sparse/load_sparse}` | 稀疏点积距离、图构建/检索/序列化 | ✅（不含 BMP 块压缩） |
 
 > **基线说明**：`TableEntry` / `SegmentEntry` / `BlockManager` 已在基线 PR #2722 中从 C++ 源码删除；当前持久化元数据类是 `TableMeta` / `SegmentMeta` / `BlockMeta` / `ColumnMeta`，块映射类是 `BlockIndex`。本表按基线实际存在的类名对应，不再列出已删除的类。
 
@@ -92,10 +106,10 @@
 | 倒排 `fst` 打包/读取 | `fst` crate 数据路径 + 自实现 C++ 尾块 CRC-32/IEEE | §4.2（已批准；校验和不兼容，数据路径复用） |
 | SIMD 距离核 / 压缩 / mmap | `simsimd`/`faer`、`lz4_flex`、`memmap2` | §3.4（仅底层原语，控制流仍自研） |
 | 倒排 `PostingByteSlice` / `SkiplistReader` / `SkiplistWriter` | `inverted_format` 的 postings/positions 编解码；`fulltext_segment` 合并段 | 磁盘字节布局已对齐；skiplist 容器仅 C++ 构建期优化，读路径按同样的 postings 列表解码，类边界不单独移植 |
-| `DataFileWorker` / `VirtualStore` / `PersistenceManager`（`storage/io`、`storage/buffer`） | `std::fs` + `infinity_storage::s3::S3Client` + WAL | 本地/对象存储的选择在 CLI 启动时完成（`storage_type=minio` 时先 restore 再按 S3 同步）；C++ 的文件 worker/虚拟存储层合并为这两条路径 |
+| `DataFileWorker`（`storage/buffer/file_worker*`） | `std::fs` + `memmap2`（`infinity_storage::io`） | C++ 的 file worker 线程池合并为按需读写；`VirtualStore`/`PersistenceManager` 已按类移植（见上表），对象存储仍由 `storage_type=minio` 选择 `S3Client` |
 | `TableIndexMeta` / `SegmentIndexMeta` / `ChunkIndexMeta`（`table_index_meta.cppm` 等） | `infinity_catalog` 的索引元数据 + `cpp_blocks` 的 `chunk_{n}.idx` 目录 | 持久化键空间与 chunk 目录布局已对齐；C++ 的模块类树未逐类拆分，索引生命周期由 `dump/optimize/cleanup` 方法承担 |
 | `TableMeta` / `SegmentMeta`（`catalog/meta/*.cppm`）+ `BlockIndex` | `infinity-executor` 的 `TableEntry`（运行时聚合） | 上游 PR #2722 删除了 `TableEntry` / `SegmentEntry` / `BlockManager`；Rust 把它们过去承担的运行时状态（写入代次、行 ID 分配、索引注册表、块快照）聚合为一个进程内结构，持久化元数据仍由 `infinity_catalog` + `BlockIndex` 按 C++ 布局承担 |
-| 整数算术的宽度语义 | `infinity-expression` 的 `eval_binary`（i64/f64 域） | C++ 的 `AddFunction`/`SubFunction`/`MulFunction` 按列宽 checked 求值（溢出→NULL）；Rust 的值域统一为 i64，未按列宽检查溢出。普通值与除零/NULL 语义一致 |
+| 整数算术的宽度语义 | `infinity-expression` 的 `scalar::TypedColumn` 按列宽 checked；SQL `eval_binary` 仍为 i64/f64 域 | C++ 的 `AddFunction`/`SubFunction`/`MulFunction` 按列宽 checked 求值（溢出→NULL）。标量函数层已按列宽实现；SQL 表达式的值域统一为 i64，未按列宽检查溢出 |
 | `TableDef` / `ColumnDef` 的 `WriteAdv`/`ReadAdv` 二进制布局 | `TableDef::to_bytes`/`from_bytes`（JSON，复用 `ColumnDefValue` 编码） | Rust 侧不需要 C++ 的内存二进制布局；持久化仍走 `cpp_layout` 的键空间。字段集合与往返语义不变 |
 | `PlaidIndex` 的 mmap 读取（`LoadFromPtr` / `centroid_ids` 指针模式） | `infinity_index::plaid::PlaidIndex` 的 owned `Vec<u32>` | mmap 属于已批准的原语豁免；执行器的 chunk 加载器总是解码为 owned 缓冲，语义（同一份 `SaveIndexInner` 字节布局）不变 |
 | geo 类型（`PointType`/`LineType`/`LineSegmentType`/`BoxType`/`CircleType`/`PathType`/`PolygonType`）及其 `column_vector_geo_ut`、`function/cast/geography/*` 用例 | 无 | 用户明确决定不需要 Box/Point/Circle 等 geo 类型，测试与产品代码均不移植 | 
