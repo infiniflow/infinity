@@ -298,6 +298,8 @@ impl PlaidIndex {
     }
 
     /// `FindNearestCentroid` over the index's (possibly shared) centroids.
+    ///
+    /// ColBERTSaR assigns by pure dot product, PLAID by L2 (`dot - 0.5||c||²`).
     fn nearest_centroid(&self, embedding: &[f32]) -> u32 {
         let dim = self.embedding_dimension as usize;
         let centroids = self.centroids_data();
@@ -307,7 +309,11 @@ impl PlaidIndex {
         for k in 0..self.n_centroids as usize {
             let c = &centroids[k * dim..(k + 1) * dim];
             let dot: f32 = embedding.iter().zip(c).map(|(a, b)| a * b).sum();
-            let neg = dot + norms[k];
+            let neg = if self.colbertsar_mode {
+                dot
+            } else {
+                dot + norms[k]
+            };
             if neg > best_neg {
                 best_neg = neg;
                 best = k as u32;
