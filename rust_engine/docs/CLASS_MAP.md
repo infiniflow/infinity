@@ -192,6 +192,10 @@
 | `knn/emvb/*_ut.cpp` | `emvb::EmvbView` / `MultiVectorIndex` | 候选/精排、阈值回退、PQ 预过滤已覆盖；`test_fakepq` 的 OPQ 训练由写入路径测试覆盖 |
 | `bg_task/*_ut.cpp` | 执行器/CLI 的 dump/optimize/cleanup | 索引生命周期已覆盖；任务调度/重试场景未移植（调度器为 D4 豁免） |
 
-### 未移植单测（Rust 类也未移植）
+### 未移植单测（全量清单）
 
-`column_vector/*`、`definition/data_block_ut.cpp`、`common/loser_tree_ut.cpp`、`common/test_rcu_multimap_ut.cpp` 等属于尚未移植的 C++ 类（`ColumnVector`/`DataBlock`/`LoserTree`/RCU 容器），随对应类一起移植。
+`src/unit_test` 共 **1012** 个 `TEST/TEST_F/TEST_P`，逐条状态见 [`TEST_AUDIT.md`](TEST_AUDIT.md)：`ported` 33、`partial` 231、`integration` 294、`gate-a` 216、`gap` 225、`exempt` 12、`excluded` 1。
+
+- `column_vector/*` 的 `ColumnVector`/`DataBlock` **类已移植**（`infinity_storage::data_block`），但 C++ 用例覆盖完整 `ColumnVector` API（VectorBuffer/Initialize/Reset/ShallowCopy/typed Value 存取），Rust 容器只实现了求值所需子集，故列为 `partial`，剩余用例随 API 补齐逐条移植。
+- `common/loser_tree_ut.cpp` / `common/test_rcu_multimap_ut.cpp` 的 `LoserTree`/RCU 容器尚未移植，列为 `gap`。
+- `gap`/`partial` 的 456 个用例是下一阶段的移植队列，按 `TEST_AUDIT.md` 的文件分组推进。
