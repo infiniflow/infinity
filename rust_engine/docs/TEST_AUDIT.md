@@ -656,13 +656,13 @@
 | 641 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test_avg` | ported |
 | 642 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test1` | ported |
 | 643 | `src/unit_test/storage/knnindex/knn_hnsw/test_lvq_ut.cpp` | `HnswLVQTest` | `test1` | ported |
-| 644 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_lvq` | partial |
-| 645 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_rabitq` | partial |
-| 646 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lvq` | partial |
-| 647 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_rabitq` | partial |
-| 648 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lsg_rabitq` | partial |
-| 649 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_hnsw_to_rabitq` | partial |
-| 650 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_lsg_to_rabitq` | partial |
+| 644 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_lvq` | ported | `infinity-index` `quantizer_perf::disabled_slow_flat_lvq` (`#[ignore]`: C++ DISABLED_SLOW_flat_lvq) |
+| 645 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_rabitq` | ported | `infinity-index` `quantizer_perf::disabled_slow_flat_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_flat_rabitq) |
+| 646 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lvq` | ported | `infinity-index` `quantizer_perf::disabled_slow_hnsw_lvq` (`#[ignore]`: C++ DISABLED_SLOW_hnsw_lvq) |
+| 647 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_rabitq` | ported | `infinity-index` `quantizer_perf::disabled_slow_hnsw_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_hnsw_rabitq) |
+| 648 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lsg_rabitq` | ported | `infinity-index` `quantizer_perf::disabled_slow_hnsw_lsg_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_hnsw_lsg_rabitq) |
+| 649 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_hnsw_to_rabitq` | ported | `infinity-index` `quantizer_perf::disabled_slow_compress_hnsw_to_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_compress_hnsw_to_rabitq) |
+| 650 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_lsg_to_rabitq` | ported | `infinity-index` `quantizer_perf::disabled_slow_compress_lsg_to_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_compress_lsg_to_rabitq) |
 | 651 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_simple` | ported |
 | 652 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_compress` | ported |
 | 653 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_distance` | ported |

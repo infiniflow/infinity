@@ -25,6 +25,9 @@ pub mod smve;
 pub mod sparse;
 pub mod vector;
 
+#[cfg(test)]
+mod quantizer_perf;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;

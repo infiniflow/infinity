@@ -524,6 +524,10 @@ impl HnswIndex {
 
     /// C++ `KnnHnsw::CompressToLVQ`: re-encode the stored vectors with an LVQ
     /// store trained on them, keeping the graph and labels unchanged.
+    ///
+    /// The reference's `LSGDistWrapper::ToLVQDistance` discards the LSG
+    /// wrapper ("Discard LSG Wrapper after compression"), so the scaling is
+    /// dropped here as well.
     pub fn compress_to_lvq(&mut self) {
         let vectors: Vec<Vec<f32>> = (0..self.len()).map(|i| self.store.decompress(i)).collect();
         let metric = match self.store.metric() {
@@ -535,6 +539,27 @@ impl HnswIndex {
             crate::lvq::LvqStore::new(self.dims, metric, metric == crate::lvq::Metric::Cos);
         store.build(&vectors);
         self.store = Store::Lvq(store);
+        self.lsg = None;
+    }
+
+    /// C++ `KnnHnsw::CompressToRabitq`: rebuild the vector payload as RaBitQ
+    /// codes trained on the decompressed vectors. The graph, levels and
+    /// labels stay untouched; like `compress_to_lvq`, the LSG wrapper is
+    /// discarded by the reference conversion.
+    pub fn compress_to_rabitq(&mut self) {
+        if matches!(self.store, Store::Rabitq(_)) {
+            return;
+        }
+        let vectors: Vec<Vec<f32>> = (0..self.len()).map(|i| self.store.decompress(i)).collect();
+        let metric = match self.store.metric() {
+            Metric::L2 => crate::rabitq::Metric::L2,
+            Metric::Ip => crate::rabitq::Metric::Ip,
+            Metric::Cos => crate::rabitq::Metric::Cos,
+        };
+        let mut store = crate::rabitq::RabitqStore::new(self.dims, metric, 0x5EED);
+        store.build(&vectors);
+        self.store = Store::Rabitq(store);
+        self.lsg = None;
     }
 
     /// The vec-store meta blob written into the HNSW chunk header.
