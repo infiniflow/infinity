@@ -30,9 +30,9 @@ impl LsgConfig {
         let mut config = Self::default();
         for part in text.split(',') {
             let (key, value) = part.split_once('=')?;
-            let key = key.trim();
+            let key = key.trim().to_ascii_lowercase();
             let value = value.trim();
-            match key {
+            match key.as_str() {
                 "sample_ratio" => config.sample_ratio = value.parse().ok()?,
                 "ls_k" => config.ls_k = value.parse().ok()?,
                 "alpha" => config.alpha = value.parse().ok()?,
@@ -61,18 +61,20 @@ pub enum Metric {
     Cos,
 }
 
+/// The same values as C++ `KnnDistance1`: squared L2 (smaller is closer),
+/// inner product and cosine similarity (larger is closer).
 fn distance(a: &[f32], b: &[f32], metric: Metric) -> f32 {
     match metric {
         Metric::L2 => a.iter().zip(b).map(|(x, y)| (x - y) * (x - y)).sum(),
-        Metric::Ip => -a.iter().zip(b).map(|(x, y)| x * y).sum::<f32>(),
+        Metric::Ip => a.iter().zip(b).map(|(x, y)| x * y).sum::<f32>(),
         Metric::Cos => {
             let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
             let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
             let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
             if na == 0.0 || nb == 0.0 {
-                1.0
+                0.0
             } else {
-                1.0 - dot / (na * nb)
+                dot / (na * nb)
             }
         }
     }
@@ -118,7 +120,14 @@ impl LsgIndex {
                 .iter()
                 .map(|sample| distance(v, sample, metric))
                 .collect();
-            distances.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            match metric {
+                Metric::L2 => {
+                    distances.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                }
+                Metric::Ip | Metric::Cos => {
+                    distances.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal))
+                }
+            }
             let mean = distances.iter().take(ls_k).sum::<f32>() / ls_k as f32;
             avg.push(mean);
         }

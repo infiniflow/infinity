@@ -147,13 +147,15 @@ fn plain_distance(a: &[f32], b: &[f32], metric: Metric) -> f32 {
         Metric::L2 => l2_sq(a, b),
         Metric::Ip => -a.iter().zip(b).map(|(x, y)| x * y).sum::<f32>(),
         Metric::Cos => {
+            // C++ `PlainCosDist` returns `-cosine` (the SIMD kernel returns
+            // the similarity), so smaller is closer for every metric.
             let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
             let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
             let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
             if na == 0.0 || nb == 0.0 {
-                1.0
+                0.0
             } else {
-                1.0 - dot / (na * nb)
+                -dot / (na * nb)
             }
         }
     }
