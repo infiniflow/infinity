@@ -121,6 +121,54 @@
 |---|---|---|
 | 优化器规则类（`ColumnPruner`/`ColumnRemapper`/`IndexScanBuilder`/`LazyLoad`/`RegexIndexRewrite`/`SubqueryUnnest` 等 23 个）、peer/network 类（`PeerTask`/`PeerClient`/`RingBufferIterator` 等 10 个） | `infinity_planner` 仅有 limit pushdown、filter-below-sort、constant-filter 三条规则；`infinity-server` 为单节点 | `CLASS_AUDIT` 中已标为 `gap`（34 行）；执行器按需处理部分语义，但无对应类。新增上游行为类须先登记再移植 |
 
+## 剩余缺口（34 个行为类）
+
+`CLASS_AUDIT` 中标记为 `gap` 的类如下；它们不是纯数据载体，而是 C++ 中承载行为的类，因此必须逐类补齐后才能声称“所有产品代码已移植”。
+
+### 优化器 / 子查询（23）
+
+| C++ 类 | 定义位置 | 状态 |
+|---|---|---|
+| `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | 进行中（planner-9） |
+| `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | 进行中（planner-9） |
+| `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | 进行中（planner-9） |
+| `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | 进行中（planner-9） |
+| `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | 进行中（planner-9） |
+| `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | 进行中（planner-9） |
+| `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | 进行中（planner-9） |
+| `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | 进行中（planner-9） |
+| `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | 进行中（planner-9） |
+| `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | 进行中（planner-9） |
+| `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | 进行中（planner-9） |
+| `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | 进行中（planner-9） |
+| `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | 进行中（planner-9） |
+| `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | 进行中（planner-9） |
+| `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | 进行中（planner-9） |
+| `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | 进行中（planner-9） |
+| `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | 进行中（planner-9） |
+| `OptimizerRule` | `src/planner/optimizer_rule.cppm` | 进行中（planner-9） |
+| `QueryBinder` | `src/planner/query_binder.cppm` | 进行中（planner-9） |
+| `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | 进行中（planner-9） |
+| `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | 进行中（planner-9） |
+| `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | 进行中（planner-9） |
+| `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | 进行中（planner-9） |
+
+### peer / cluster（11）
+
+| C++ 类 | 定义位置 | 状态 |
+|---|---|---|
+| `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | 进行中（peer-9） |
+| `ChangeRoleTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
+| `HeartBeatPeerTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
+| `PeerTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
+| `RegisterPeerTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
+| `SyncLogTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
+| `TerminatePeerTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
+| `UnregisterPeerTask` | `src/network/peer_task.cppm` | 进行中（peer-9） |
+| `PeerClient` | `src/network/peer_thrift_client.cppm` | 进行中（peer-9） |
+| `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | 进行中（peer-9） |
+| `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | 进行中（peer-9） |
+
 ## 类级覆盖审计（基线 `5d27942c0`）
 
 `src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；**逐名清单（1136 行，mapped 1102 / exempt 12 / excluded 15 / test 7，grouped 0）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**：每行都指向具体 Rust 模块或已登记的设计变更/排除；下表是按区域汇总的聚合说明：
