@@ -171,6 +171,7 @@
 | `knn/hnsw/test_rabitq_ut.cpp` | `rabitq::RabitqStore` | `orthogonal_matrix_is_orthonormal`、`centroid_is_the_rotated_mean`、`save_and_load_roundtrip`、`l2_estimator_keeps_the_true_neighbour` |
 | `knn/hnsw/test_lsg_build_ut.cpp` | `lsg::LsgIndex` + `HnswIndex` | `avg_is_at_least_the_exhaustive_topk_mean`、`lsg_hnsw_keeps_self_query_recall`（recall@1 ≥ 0.95） |
 | `column_vector/column_vector_integer_ut.cpp`（20 例） | `data_block::ColumnVector<T>` | `tinyint/smallint/int/bigint/hugeint_flat_constant_select_slice`（flat/constant/selection/slice 四类场景） |
+| `column_vector/column_vector_date_time_ut.cpp`（20 例） | `data_block::ColumnVector<T>` + `DateT`/`TimeT`/`DateTimeT`/`TimestampT`/`IntervalT` | `date/time/datetime/timestamp/interval_flat_constant_select_slice`、`interval_constant_set_value_before_finalize` |
 | `storage/common/loser_tree_ut.cpp::LoserTreeTest` | `infinity_common::loser_tree::LoserTree` | `basic_merge_1`…`basic_merge_4`（10/3、10/12、1000/200、1000/2000 路归并）、`round_up_matches_the_reference` |
 | `bg_task/*_ut.cpp` 的索引生命周期 | `dump_hnsw_segments` / `optimize_indexes` / `cleanup` | `hnsw_checkpoint_dumps_only_the_memory_segment`、`mem_index_capacity_dumps_the_hnsw_segment_after_the_batch`、`cleanup_keeps_incremental_hnsw_chunks_until_a_merge_covers_the_table` |
 | `knn/plaid/test_plaid_ut.cpp::PlaidQuantizerTest` | `plaid::PlaidQuantizer` | `train_quantize_dequantize`、`two_bit_quantization`、`ip_table_and_position_lut_agree`、`save_and_load_roundtrip` |
@@ -199,6 +200,6 @@
 
 `src/unit_test` 共 **1012** 个 `TEST/TEST_F/TEST_P`，逐条状态见 [`TEST_AUDIT.md`](TEST_AUDIT.md)：`ported` 33、`partial` 231、`integration` 294、`gate-a` 216、`gap` 225、`exempt` 12、`excluded` 1。
 
-- `column_vector/*` 的 `ColumnVector`/`DataBlock` 类已移植；integer 套件（flat/constant/select/slice × tinyint/smallint/int/bigint/hugeint，20 例）已逐条移植。`VectorBuffer`/`Bitmask` 为设计变更（Rust `Vec` + `validity`），date/time/geo 套件待补。
+- `column_vector/*` 的 `ColumnVector`/`DataBlock` 类已移植；integer 套件（flat/constant/select/slice × tinyint/smallint/int/bigint/hugeint，20 例）已逐条移植。`VectorBuffer`/`Bitmask` 为设计变更（Rust `Vec` + `validity`）；integer 与 date/time 套件（40 例）已移植，geo 套件待补。
 - `LoserTree` 已移植（`infinity_common::loser_tree`，4 例通过）；`common/test_rcu_multimap_ut.cpp` 的 RCU 容器尚未移植，列为 `gap`。
 - `gap`/`partial` 的 456 个用例是下一阶段的移植队列，按 `TEST_AUDIT.md` 的文件分组推进。

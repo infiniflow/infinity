@@ -276,13 +276,23 @@ impl<T: Clone + Default> ColumnVector<T> {
     /// C++ `ColumnVector::SetValue(index, value)`: the index must be inside
     /// the written region.
     pub fn set_value(&mut self, row: usize, value: Option<T>) -> Result<(), String> {
+        if self.vector_type == ColumnVectorType::Constant {
+            // The reference writes the single constant value at index 0 even
+            // before `Finalize` fixes the row count.
+            if row != 0 {
+                return Err("index out of range".to_string());
+            }
+            let valid = value.is_some();
+            self.constant = value;
+            if self.validity.is_empty() {
+                self.validity.push(valid);
+            } else {
+                self.validity[0] = valid;
+            }
+            return Ok(());
+        }
         if row >= self.size() {
             return Err("index out of range".to_string());
-        }
-        if self.vector_type == ColumnVectorType::Constant {
-            self.constant = value;
-            self.validity[0] = self.constant.is_some();
-            return Ok(());
         }
         match value {
             Some(v) => {
@@ -724,5 +734,74 @@ mod reference_suite {
         constant_suite(|i| i as i128);
         select_suite(|i| i as i128);
         slice_suite(|i| i as i128);
+    }
+
+    // C++: `column_vector_date_time_ut.cpp`, date.
+    #[test]
+    fn date_flat_constant_select_slice() {
+        flat_suite(|i| infinity_common::DateT::new(i as i32));
+        constant_suite(|i| infinity_common::DateT::new(i as i32));
+        select_suite(|i| infinity_common::DateT::new(i as i32));
+        slice_suite(|i| infinity_common::DateT::new(i as i32));
+    }
+
+    // C++: `column_vector_date_time_ut.cpp`, time.
+    #[test]
+    fn time_flat_constant_select_slice() {
+        flat_suite(|i| infinity_common::TimeT::new(i as i32));
+        constant_suite(|i| infinity_common::TimeT::new(i as i32));
+        select_suite(|i| infinity_common::TimeT::new(i as i32));
+        slice_suite(|i| infinity_common::TimeT::new(i as i32));
+    }
+
+    // C++: `column_vector_date_time_ut.cpp`, datetime.
+    #[test]
+    fn datetime_flat_constant_select_slice() {
+        flat_suite(|i| infinity_common::DateTimeT::new(i as i32, i as i32));
+        constant_suite(|i| infinity_common::DateTimeT::new(i as i32, i as i32));
+        select_suite(|i| infinity_common::DateTimeT::new(i as i32, i as i32));
+        slice_suite(|i| infinity_common::DateTimeT::new(i as i32, i as i32));
+    }
+
+    // C++: `column_vector_date_time_ut.cpp`, timestamp.
+    #[test]
+    fn timestamp_flat_constant_select_slice() {
+        flat_suite(|i| infinity_common::TimestampT::new(i as i32, i as i32));
+        constant_suite(|i| infinity_common::TimestampT::new(i as i32, i as i32));
+        select_suite(|i| infinity_common::TimestampT::new(i as i32, i as i32));
+        slice_suite(|i| infinity_common::TimestampT::new(i as i32, i as i32));
+    }
+
+    // C++: `column_vector_date_time_ut.cpp`, interval.
+    #[test]
+    fn interval_flat_constant_select_slice() {
+        flat_suite(|i| infinity_common::IntervalT::new(i as i32));
+        constant_suite(|i| infinity_common::IntervalT::new(i as i32));
+        select_suite(|i| infinity_common::IntervalT::new(i as i32));
+        slice_suite(|i| infinity_common::IntervalT::new(i as i32));
+    }
+
+    /// C++: `flat_interval`'s constant tail: `SetValueByIndex(0, …)` then
+    /// `Finalize(1)` for every source row.
+    #[test]
+    fn interval_constant_set_value_before_finalize() {
+        let mut source = ColumnVector::<infinity_common::IntervalT>::new();
+        source.initialize_flat();
+        for i in 0..DEFAULT_VECTOR_SIZE as i64 {
+            source
+                .append_value(Some(infinity_common::IntervalT::new(i as i32)))
+                .unwrap();
+        }
+        for i in 0..DEFAULT_VECTOR_SIZE as i64 {
+            let mut c = ColumnVector::new();
+            c.initialize(ColumnVectorType::Constant, DEFAULT_VECTOR_SIZE);
+            c.set_value(0, source.get(i as usize).cloned()).unwrap();
+            c.finalize(1);
+            assert_eq!(
+                c.get(0),
+                Some(&infinity_common::IntervalT::new(i as i32))
+            );
+            c.reset();
+        }
     }
 }

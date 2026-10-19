@@ -14,6 +14,70 @@ pub type RowID = u64;
 /// Invalid row id sentinel.
 pub const INVALID_ROWID: RowID = u64::MAX;
 
+/// C++: `DateT` (`src/parser/type/datetime/date_type.h`): days since
+/// 1970-01-01.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DateT {
+    pub value: i32,
+}
+
+impl DateT {
+    pub fn new(value: i32) -> Self {
+        Self { value }
+    }
+}
+
+/// C++: `TimeT` (`src/parser/type/datetime/time_type.h`): microseconds since
+/// midnight.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TimeT {
+    pub value: i32,
+}
+
+impl TimeT {
+    pub fn new(value: i32) -> Self {
+        Self { value }
+    }
+}
+
+/// C++: `DateTimeT`: a date and a time of day.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DateTimeT {
+    pub date: i32,
+    pub time: i32,
+}
+
+impl DateTimeT {
+    pub fn new(date: i32, time: i32) -> Self {
+        Self { date, time }
+    }
+}
+
+/// C++: `TimestampT`: a date and a time of day.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TimestampT {
+    pub date: i32,
+    pub time: i32,
+}
+
+impl TimestampT {
+    pub fn new(date: i32, time: i32) -> Self {
+        Self { date, time }
+    }
+}
+
+/// C++: `IntervalT` (`src/parser/type/datetime/interval_type.h`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct IntervalT {
+    pub value: i32,
+}
+
+impl IntervalT {
+    pub fn new(value: i32) -> Self {
+        Self { value }
+    }
+}
+
 /// Logical column type (subset).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LogicalType {
