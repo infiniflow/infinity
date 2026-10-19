@@ -2451,6 +2451,10 @@ struct TableEntry {
     hnsw_probed: bool,
     /// Sparse (BMP) indexes per column.
     sparse: HashMap<String, Arc<std::sync::RwLock<SparseIndex>>>,
+    /// Multi-vector indexes per column.
+    mv: HashMap<String, Arc<std::sync::RwLock<MultiVectorIndex>>>,
+    /// Full-text inverted indexes per column.
+    text: HashMap<String, SharedTextIndex>,
     /// Decoded rows of a **scalar-only** table (the reference's in-memory
     /// `DataBlock`s). Served by `fetch_rows_with_ids` while it covers every
     /// live row; any mutation that rewrites rows drops it.
@@ -2582,10 +2586,6 @@ pub struct Engine {
     tables: Mutex<HashMap<String, TableEntry>>,
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
-    /// Inverted indexes, keyed by `"<table>.<column>"`.
-    text_index: Mutex<HashMap<String, SharedTextIndex>>,
-    /// Multi-vector indexes, keyed by `"<table>.<column>"`.
-    mv_index: Mutex<HashMap<String, Arc<std::sync::RwLock<MultiVectorIndex>>>>,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
 }
 
@@ -2718,8 +2718,6 @@ impl Engine {
             current_db: Mutex::new("default_db".to_string()),
             tables: Mutex::new(HashMap::new()),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
-            text_index: Mutex::new(HashMap::new()),
-            mv_index: Mutex::new(HashMap::new()),
             vector_cache: Mutex::new(HashMap::new()),
         };
         engine.recover_cpp_blocks()?;
@@ -3125,9 +3123,11 @@ impl Engine {
     /// covers full-text, HNSW, sparse, multi-vector and secondary tails.
     fn memindex_bytes(&self) -> usize {
         let mut total = 0usize;
-        for idx in self.text_index.lock().unwrap().values() {
-            if let Ok(g) = idx.read() {
-                total += g.mem.mem_used();
+        for e in self.tables.lock().unwrap().values() {
+            for idx in e.text.values() {
+                if let Ok(g) = idx.read() {
+                    total += g.mem.mem_used();
+                }
             }
         }
         for e in self.tables.lock().unwrap().values() {
@@ -3137,9 +3137,11 @@ impl Engine {
                 }
             }
         }
-        for idx in self.mv_index.lock().unwrap().values() {
-            if let Ok(g) = idx.read() {
-                total += g.tail_bytes;
+        for e in self.tables.lock().unwrap().values() {
+            for idx in e.mv.values() {
+                if let Ok(g) = idx.read() {
+                    total += g.tail_bytes;
+                }
             }
         }
         // The HNSW memory segment (`HnswIndexInMem`) owns a graph per column;
@@ -3419,7 +3421,12 @@ impl Engine {
     /// skips the per-row index hook entirely.
     fn any_in_memory_index(&self) -> bool {
         !self.indexes.lock().unwrap().is_empty()
-            || !self.text_index.lock().unwrap().is_empty()
+            || self
+                .tables
+                .lock()
+                .unwrap()
+                .values()
+                .any(|e| !e.text.is_empty())
             || !self.vector_cache.lock().unwrap().is_empty()
             || self
                 .tables
@@ -3428,7 +3435,12 @@ impl Engine {
                 .values()
                 .any(|e| !e.hnsw_mem.is_empty())
             || !self.ivf_mem.lock().unwrap().is_empty()
-            || !self.mv_index.lock().unwrap().is_empty()
+            || self
+                .tables
+                .lock()
+                .unwrap()
+                .values()
+                .any(|e| !e.mv.is_empty())
             || self
                 .tables
                 .lock()
@@ -5998,13 +6010,17 @@ impl Engine {
         delims: Option<Vec<char>>,
     ) -> Result<SharedTextIndex> {
         let key = index_key(table, column);
+        let tkey = self.table_key(table);
         // A bulk load that bypasses the DML hooks would leave the index short of
         // rows; compare against the cheap reservation counter and rebuild.
         let reserved = self.storage.store.scan_prefix(&row_prefix(table))?.len();
-        if let Some(idx) = self.text_index.lock().unwrap().get(&key) {
-            let complete = idx.read().map(|g| g.total_docs()).unwrap_or(0);
-            if complete >= reserved {
-                return Ok(idx.clone());
+        {
+            let tables = self.tables.lock().unwrap();
+            if let Some(idx) = tables.get(&tkey).and_then(|e| e.text.get(column)) {
+                let complete = idx.read().map(|g| g.total_docs()).unwrap_or(0);
+                if complete >= reserved {
+                    return Ok(idx.clone());
+                }
             }
         }
         let schema = self.table_schema(table)?;
@@ -6029,7 +6045,13 @@ impl Engine {
             index.maybe_seal();
         }
         let shared = Arc::new(std::sync::RwLock::new(index));
-        self.text_index.lock().unwrap().insert(key, shared.clone());
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(tkey)
+            .or_default()
+            .text
+            .insert(column.to_string(), shared.clone());
         Ok(shared)
     }
 
@@ -6044,11 +6066,15 @@ impl Engine {
         dims: usize,
     ) -> Result<Arc<std::sync::RwLock<MultiVectorIndex>>> {
         let key = index_key(table, column);
+        let tkey = self.table_key(table);
         let reserved = self.storage.store.scan_prefix(&row_prefix(table))?.len();
-        if let Some(idx) = self.mv_index.lock().unwrap().get(&key) {
-            let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
-            if complete >= reserved {
-                return Ok(idx.clone());
+        {
+            let tables = self.tables.lock().unwrap();
+            if let Some(idx) = tables.get(&tkey).and_then(|e| e.mv.get(column)) {
+                let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
+                if complete >= reserved {
+                    return Ok(idx.clone());
+                }
             }
         }
         let schema = self.table_schema(table)?;
@@ -6080,22 +6106,27 @@ impl Engine {
         }
         index.seal();
         let shared = Arc::new(std::sync::RwLock::new(index));
-        self.mv_index.lock().unwrap().insert(key, shared.clone());
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(tkey)
+            .or_default()
+            .mv
+            .insert(column.to_string(), shared.clone());
         Ok(shared)
     }
 
     /// Keeps existing multi-vector indexes in step with an inserted/rewritten
     /// row. Called from the shared DML hook so every write path is covered.
     fn update_multivector_indexes(&self, table: &str, seq: usize, cells: &[String]) {
-        let prefix = format!("{table}.");
+        let tkey = self.table_key(table);
         let indexes: Vec<(String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = self
-            .mv_index
+            .tables
             .lock()
             .unwrap()
-            .iter()
-            .filter(|(k, _)| k.starts_with(&prefix))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
+            .get(&tkey)
+            .map(|e| e.mv.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .unwrap_or_default();
         if indexes.is_empty() {
             return;
         }
@@ -6105,8 +6136,8 @@ impl Engine {
         let Ok(types) = self.column_types(table) else {
             return;
         };
-        for (key, shared) in indexes {
-            let column = &key[prefix.len()..];
+        for (column, shared) in indexes {
+            let column = &column;
             let Some(ci) = schema.iter().position(|c| c == column) else {
                 continue;
             };
@@ -6128,8 +6159,13 @@ impl Engine {
     /// Dumbs every multi-vector memory tail to its segment files. Called by
     /// `flush()` / checkpoint, mirroring the reference's memindex dump.
     fn seal_multivector_indexes(&self) {
-        let indexes: Vec<Arc<std::sync::RwLock<MultiVectorIndex>>> =
-            self.mv_index.lock().unwrap().values().cloned().collect();
+        let indexes: Vec<Arc<std::sync::RwLock<MultiVectorIndex>>> = self
+            .tables
+            .lock()
+            .unwrap()
+            .values()
+            .flat_map(|e| e.mv.values().cloned())
+            .collect();
         for shared in indexes {
             shared.write().unwrap().seal();
         }
@@ -6138,21 +6174,17 @@ impl Engine {
     /// Removes the multi-vector chunks of `table` (or one column) from disk and
     /// from the cache; called when the table or its index is dropped.
     fn drop_multivector_storage(&self, table: &str, column: Option<&str>) {
-        let prefix = match column {
-            Some(c) => index_key(table, c),
-            None => format!("{table}."),
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&tkey) else {
+            return;
         };
-        let mut map = self.mv_index.lock().unwrap();
-        let keys: Vec<String> = map
-            .keys()
-            .filter(|k| match column {
-                Some(_) => *k == &prefix,
-                None => k.starts_with(&prefix),
-            })
-            .cloned()
-            .collect();
-        for key in keys {
-            if let Some(idx) = map.remove(&key) {
+        let columns: Vec<String> = match column {
+            Some(c) => vec![c.to_string()],
+            None => entry.mv.keys().cloned().collect(),
+        };
+        for c in columns {
+            if let Some(idx) = entry.mv.remove(&c) {
                 let dir = idx.read().map(|g| g.dir.clone()).ok();
                 if let Some(dir) = dir {
                     if let Ok(entries) = std::fs::read_dir(&dir) {
@@ -6317,23 +6349,22 @@ impl Engine {
         self.update_multivector_indexes(table, seq, cells);
         self.update_sparse_indexes(table, seq, cells);
         self.enforce_memindex_quota();
-        let prefix = format!("{table}.");
+        let tkey = self.table_key(table);
         let indexes: Vec<(String, SharedTextIndex)> = self
-            .text_index
+            .tables
             .lock()
             .unwrap()
-            .iter()
-            .filter(|(k, _)| k.starts_with(&prefix))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
+            .get(&tkey)
+            .map(|e| e.text.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .unwrap_or_default();
         if indexes.is_empty() {
             return;
         }
         let Ok(schema) = self.table_schema(table) else {
             return;
         };
-        for (key, shared) in indexes {
-            let column = &key[prefix.len()..];
+        for (column, shared) in indexes {
+            let column = &column;
             let Some(ci) = schema.iter().position(|c| c == column) else {
                 continue;
             };
@@ -6349,32 +6380,25 @@ impl Engine {
     /// their sealed segment files. Called when the table or its full-text index
     /// is dropped, so segments never outlive the catalog entry.
     fn drop_text_index_storage(&self, table: &str, column: Option<&str>) {
-        let prefix = match column {
-            Some(c) => index_key(table, c),
-            None => format!("{table}."),
-        };
-        let exact = column.is_some();
+        let tkey = self.table_key(table);
         let mut removed: Vec<String> = Vec::new();
         {
-            let mut indexes = self.text_index.lock().unwrap();
-            let keys: Vec<String> = indexes
-                .keys()
-                .filter(|k| {
-                    if exact {
-                        k.as_str() == prefix
-                    } else {
-                        k.starts_with(&prefix)
+            let mut tables = self.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&tkey) {
+                let columns: Vec<String> = match column {
+                    Some(c) => vec![c.to_string()],
+                    None => entry.text.keys().cloned().collect(),
+                };
+                for c in columns {
+                    if let Some(idx) = entry.text.remove(&c) {
+                        if let Ok(g) = idx.read() {
+                            removed.push(g.dir.clone());
+                        }
                     }
-                })
-                .cloned()
-                .collect();
-            for key in keys {
-                indexes.remove(&key);
-                removed.push(key);
+                }
             }
         }
-        for key in removed {
-            let dir = self.dir.join("fulltext").join(key.replace('/', "_"));
+        for dir in removed {
             let _ = std::fs::remove_dir_all(dir);
         }
         self.drop_multivector_storage(table, column);
@@ -6383,13 +6407,18 @@ impl Engine {
 
     /// Drops deleted rows from every inverted index of `table`.
     fn drop_text_index_rows(&self, table: &str, seqs: &[usize]) {
-        let prefix = format!("{table}.");
-        for (key, shared) in self.text_index.lock().unwrap().iter() {
-            if key.starts_with(&prefix) {
-                let mut index = shared.write().unwrap();
-                for seq in seqs {
-                    index_delete_row(&mut index, *seq as u64);
-                }
+        let tkey = self.table_key(table);
+        let indexes: Vec<SharedTextIndex> = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .map(|e| e.text.values().cloned().collect())
+            .unwrap_or_default();
+        for shared in indexes {
+            let mut index = shared.write().unwrap();
+            for seq in seqs {
+                index_delete_row(&mut index, *seq as u64);
             }
         }
     }
@@ -9224,11 +9253,13 @@ impl Engine {
                         .first()
                         .cloned()
                         .unwrap_or_default();
+                    let tkey = self.table_key(table);
                     let index = self
-                        .mv_index
+                        .tables
                         .lock()
                         .unwrap()
-                        .get(&index_key(table, &column))
+                        .get(&tkey)
+                        .and_then(|e| e.mv.get(&column))
                         .cloned();
                     if let Some(index) = index {
                         let dead = self.tombstone_set(table)?;
@@ -11906,16 +11937,14 @@ mod tests {
         )
         .unwrap();
 
-        let mv_key = e.mv_index.lock().unwrap().keys().next().cloned().unwrap();
-        let mv_tail = e
-            .mv_index
+        let mv = e
+            .tables
             .lock()
             .unwrap()
-            .get(&mv_key)
-            .unwrap()
-            .read()
-            .unwrap()
-            .tail_bytes;
+            .values()
+            .find_map(|t| t.mv.values().next().cloned())
+            .unwrap();
+        let mv_tail = mv.read().unwrap().tail_bytes;
         assert_eq!(mv_tail, 0);
         let sp = e
             .tables
@@ -12125,10 +12154,15 @@ mod tests {
         sql.push(';');
         e.execute(&sql).unwrap();
         e.flush().unwrap();
-        let key = e.mv_index.lock().unwrap().keys().next().cloned().unwrap();
+        let mv = e
+            .tables
+            .lock()
+            .unwrap()
+            .values()
+            .find_map(|t| t.mv.values().next().cloned())
+            .unwrap();
         let has_codes = {
-            let guard = e.mv_index.lock().unwrap();
-            let idx = guard.get(&key).unwrap().read().unwrap();
+            let idx = mv.read().unwrap();
             idx.sealed
                 .first()
                 .map(|(_, _, pq)| pq.is_some())
