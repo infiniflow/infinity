@@ -878,6 +878,15 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             };
             dt_component(&src, &field)
         }
+        // The parser rewrites `EXTRACT(<field> FROM x)` to `extract_<field>(x)`.
+        n if n.starts_with("EXTRACT_") => {
+            let field = &n["EXTRACT_".len()..];
+            let src = match a0() {
+                Value::Str(s) => s,
+                other => other.to_slt_string(),
+            };
+            dt_component(&src, field)
+        }
         "POW" | "POWER" => match (a0().as_f64(), a1().as_f64()) {
             (Some(x), Some(y)) => Value::Float(x.powf(y)),
             _ => Value::Null,

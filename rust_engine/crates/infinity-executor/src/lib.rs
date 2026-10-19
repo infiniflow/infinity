@@ -107,6 +107,9 @@ mod request_ut;
 mod table_ut;
 
 #[cfg(test)]
+mod gate_b_executor_ut;
+
+#[cfg(test)]
 mod upload_meta_to_s3_ut;
 
 pub mod data_table;
@@ -1256,6 +1259,8 @@ fn invalidates_result_cache(stmt: &Statement) -> bool {
             | Statement::DropIndex { .. }
             | Statement::CreateDatabase { .. }
             | Statement::DropDatabase { .. }
+            | Statement::CreateCollection { .. }
+            | Statement::DropCollection { .. }
             | Statement::CreateSnapshot { .. }
             | Statement::CreateDatabaseSnapshot { .. }
             | Statement::CreateSystemSnapshot { .. }
@@ -4560,15 +4565,17 @@ impl Engine {
         };
         let mut s = stmt.clone();
         match &mut s {
-            Statement::CreateTable { name, .. } | Statement::DropTable { name, .. } => {
-                *name = q(name)
-            }
+            Statement::CreateTable { name, .. }
+            | Statement::DropTable { name, .. }
+            | Statement::CreateCollection { name, .. }
+            | Statement::DropCollection { name, .. } => *name = q(name),
             Statement::Insert { table, .. }
             | Statement::Delete { table, .. }
             | Statement::Update { table, .. }
             | Statement::AlterTableAdd { table, .. }
             | Statement::AlterTableDropColumn { table, .. }
             | Statement::ShowTableColumns { table }
+            | Statement::ShowTable { table }
             | Statement::ShowTableIndex { table, .. }
             | Statement::Copy { table, .. }
             | Statement::CreateIndex { table, .. }
@@ -5538,6 +5545,17 @@ impl Engine {
                 self.storage.catalog.create_database(name, *if_not_exists)?;
                 Ok(QueryResult::CreatedDatabase { name: name.clone() })
             }
+            // A collection is the legacy alias of a table: the reference's
+            // `PhysicalCreateCollection`/`PhysicalDropCollection` only check
+            // that the node is writable and acknowledge with `OK`.
+            Statement::CreateCollection { .. } => Ok(QueryResult::Rows {
+                columns: vec!["OK".to_string()],
+                rows: vec![],
+            }),
+            Statement::DropCollection { .. } => Ok(QueryResult::Rows {
+                columns: vec!["OK".to_string()],
+                rows: vec![],
+            }),
             Statement::DropDatabase { name, if_exists } => {
                 // The default database backs every session, so the C++ engine
                 // refuses to drop it (3033 DROPPING_USING_DB).
@@ -5991,6 +6009,15 @@ impl Engine {
                     existed,
                 })
             }
+            // Parse-only forms: the parser accepts them (so corpus files can be
+            // read) but the Rust executor has no implementation yet.
+            Statement::InsertSelect { .. }
+            | Statement::CreateTableAs { .. }
+            | Statement::CreateView { .. }
+            | Statement::DropView { .. }
+            | Statement::Describe { .. } => Err(Error::Invalid(
+                "statement is not supported by the Rust executor".to_string(),
+            )),
             Statement::Utility { .. } => Ok(QueryResult::Rows {
                 columns: vec![],
                 rows: vec![],
@@ -6073,6 +6100,32 @@ impl Engine {
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows,
+                })
+            }
+            // `SHOW TABLE <t>`: two columns (`name`, `value`) with the six
+            // label/value rows from `physical_show_table_impl.cpp`.
+            Statement::ShowTable { table } => {
+                let meta = self
+                    .storage
+                    .catalog
+                    .get_table_by_name(table)?
+                    .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+                let (db, name) = table
+                    .split_once('.')
+                    .unwrap_or(("default_db", table.as_str()));
+                Ok(QueryResult::Rows {
+                    columns: vec!["name".to_string(), "value".to_string()],
+                    rows: vec![
+                        vec!["database_name".to_string(), db.to_string()],
+                        vec!["table_name".to_string(), name.to_string()],
+                        vec!["table_comment".to_string(), String::new()],
+                        vec!["storage_directory".to_string(), String::new()],
+                        vec![
+                            "column_count".to_string(),
+                            meta.columns.len().to_string(),
+                        ],
+                        vec!["segment_count".to_string(), "0".to_string()],
+                    ],
                 })
             }
             Statement::CreateSnapshot { name, table } => {
@@ -6291,6 +6344,7 @@ impl Engine {
                 search,
                 distinct,
                 highlight: _,
+                ..
             } => {
                 // `SELECT count(*)` with no other clause is answered from the key
                 // counts alone; the generic path materialises every row.

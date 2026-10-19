@@ -9,18 +9,21 @@ pub mod bitmap;
 pub mod cast;
 pub mod datetime;
 pub mod error;
+pub mod fp16;
 pub mod json;
+pub mod simd;
 pub mod types;
 pub mod utility;
+pub mod varchar;
 
 pub use cast::{
     bind_integer_cast, integer_try_cast_to_fixlen, integer_try_cast_to_varlen, CastError,
 };
 pub use error::{Error, Result};
 pub use types::{
-    DataType, DateT, DateTimeT, DecimalInfo, DecimalT, EmbeddingDataType, EmbeddingInfo, HugeIntT,
-    IntervalT, LogicalType, MixedT, NullValue, RowID, TimeT, TimeUnit, TimestampT, TxnTimeStamp,
-    TypeInfo, UuidT, PARSER_EMBEDDING_LIMIT,
+    DataType, DateT, DateTOld, DateTimeT, DecimalInfo, DecimalT, EmbeddingDataType, EmbeddingInfo,
+    HugeIntT, IntervalT, LogicalType, MixedT, NullValue, RowID, TimeT, TimeUnit, TimestampT,
+    TxnTimeStamp, TypeInfo, UuidT, PARSER_EMBEDDING_LIMIT,
 };
 pub use utility::{extract_u64_from_string_suffix, trim_path};
 

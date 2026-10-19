@@ -59,7 +59,7 @@
 | 44 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test3` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
 | 45 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test4` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
 | 46 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test5` | ported | `infinity-executor` `analyzer::user_defined_reference_suite::*` |
-| 47 | `src/unit_test/common/test_simd_ut.cpp` | `SimdInitTest` | `GetSupportedSimdTypesList` | exempt |
+| 47 | `src/unit_test/common/test_simd_ut.cpp` | `SimdInitTest` | `GetSupportedSimdTypesList` | ported | `infinity-common` `simd::tests::simd_supported_types_list` |
 | 48 | `src/unit_test/common/utility/exception_ut.cpp` | `ExceptionTest` | `all_exception_cases` | ported | `infinity-common` `error::tests::exception_messages_match_the_reference` |
 | 49 | `src/unit_test/common/utility/trim_ut.cpp` | `TrimTest` | `test1` | ported | `infinity-common` `utility::tests::trim_path_keeps_the_repository_relative_part` |
 | 50 | `src/unit_test/common/utility/utility_ut.cpp` | `UtilityTest` | `test1` | ported | `utility::tests::extract_u64_reads_the_key_suffix` |
@@ -68,10 +68,10 @@
 | 53 | `src/unit_test/executor/expression/expression_executor_select_ut.cpp` | `ExpressionExecutorSelectTest` | `test3` | ported | `infinity-storage` `data_block::reference_suite::expression_select_all_false_input` |
 | 54 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `add_bigint_constant_1` | ported | `infinity-expression` `expression_evaluator_add_bigint_constant_1` |
 | 55 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `subtract_constant_8192_bigint` | ported | `infinity-expression` `expression_evaluator_subtract_constant_8192_bigint` |
-| 56 | `src/unit_test/executor/fragment/plan_fragment_ut.cpp` | `PlanFragmentTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 56 | `src/unit_test/executor/fragment/plan_fragment_ut.cpp` | `PlanFragmentTest` | `test1` | ported | `infinity-executor` `gate_b_executor_ut::plan_fragment_test1` |
 | 57 | `src/unit_test/executor/operator/physical_sort_ut_nimpl.cpp` | `PhysicalSortTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 58 | `src/unit_test/executor/pipeline/explain_ut.cpp` | `ExplainTest` | `test1` | ported | `gate-a` unit assertions ported |
-| 59 | `src/unit_test/executor/pipeline/fragment_ut.cpp` | `FragmentTest` | `test_build_fragment` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 59 | `src/unit_test/executor/pipeline/fragment_ut.cpp` | `FragmentTest` | `test_build_fragment` | ported | `infinity-executor` `gate_b_executor_ut::fragment_test_build_fragment` |
 | 60 | `src/unit_test/function/aggregate/avg_functions_ut.cpp` | `AvgFunctionTest` | `avg_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
 | 61 | `src/unit_test/function/aggregate/count_functions_ut.cpp` | `CountFunctionTest` | `quarter_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
 | 62 | `src/unit_test/function/aggregate/first_functions_ut.cpp` | `FirstFunctionTest` | `first_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
@@ -216,9 +216,9 @@
 | 201 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `good_test2` | ported | `gate-a` unit assertions ported |
 | 202 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `operator_option_test` | ported | `gate-a` unit assertions ported |
 | 203 | `src/unit_test/parser/search_driver_ut.cpp` | `SearchDriverTest` | `whitespace_analyzer_test` | ported | `gate-a` unit assertions ported |
-| 204 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `tpch` | excluded | component absent or file under `#if 0` (see gate-a report) |
-| 205 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `hyrise` | excluded | component absent or file under `#if 0` (see gate-a report) |
-| 206 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `infinity` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 204 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `tpch` | ported | `infinity-parser` `corpora_ut::tests::sql_file_parsing_tpch` |
+| 205 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `hyrise` | ported | `infinity-parser` `corpora_ut::tests::sql_file_parsing_hyrise` |
+| 206 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `infinity` | ported | `infinity-executor` `corpora_ut::tests::sql_file_parsing_infinity` |
 | 207 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test1` | ported | `infinity-parser` `parser::tests::sql_parser_good_test1` |
 | 208 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test2` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 209 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_test1` | ported | `gate-a` unit assertions ported |
@@ -226,7 +226,7 @@
 | 211 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_create_index_1` | ported | `infinity-parser` `sql_parser_bad_create_index_1` |
 | 212 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test1` | ported | `infinity-parser` `select_statement_parsing_good_test1` |
 | 213 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test2` | ported | `infinity-parser` `select_statement_parsing_good_test2` |
-| 214 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test3` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 214 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test3` | ported | `infinity-parser` `parser::tests::select_statement_parsing_good_test3` |
 | 215 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test4` | ported | `infinity-parser` `parser::tests::cast_date_minus_interval_parses` |
 | 216 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_test1` | ported | `infinity-parser` `parser::tests::offset_without_limit_is_rejected` |
 | 217 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_knn_test` | ported | `infinity-parser` `parser::tests::vector_metric_type_mismatches_are_rejected` |
@@ -239,7 +239,7 @@
 | 224 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap34` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 225 | `src/unit_test/parser/type/complex/blob_type_ut_nimpl.cpp` | `BlobTypeTest` | `blob1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 226 | `src/unit_test/parser/type/complex/uuid_type_ut.cpp` | `UuidTypeTest` | `Uuid` | ported | `infinity-common` `uuid` |
-| 227 | `src/unit_test/parser/type/complex/varchar_ut.cpp` | `VarcharTest` | `structure_check` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 227 | `src/unit_test/parser/type/complex/varchar_ut.cpp` | `VarcharTest` | `structure_check` | ported | `infinity-parser` `varchar::tests::varchar_structure_check` |
 | 228 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `GetTypeName` | ported | `infinity-common` `data_type_get_type_name` |
 | 229 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `TypeToString` | ported | `infinity-common` `data_type_type_to_string` |
 | 230 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `Serialize` | ported | `gate-a` unit assertions ported |
@@ -247,11 +247,11 @@
 | 232 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `test1` | ported | `gate-a` unit assertions ported |
 | 233 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `TestEqStdChronoForward` | ported | `gate-a` unit assertions ported |
 | 234 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `TestEqStdChronoBackward` | ported | `gate-a` unit assertions ported |
-| 235 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestSameSize` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 235 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestSameSize` | ported | `infinity-parser` `datetime::tests::date_type_same_size` |
 | 236 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestFromString` | ported | `infinity-common` `test_from_string` |
 | 237 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestAddSubstract` | ported | `infinity-common` `test_add_subtract` |
 | 238 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestNegativeYears` | ported | `infinity-common` `test_negative_years` |
-| 239 | `src/unit_test/parser/type/fp16_ut.cpp` | `FP16TypeTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 239 | `src/unit_test/parser/type/fp16_ut.cpp` | `FP16TypeTest` | `test1` | ported | `infinity-parser` `fp16::tests::fp16_test1` |
 | 240 | `src/unit_test/parser/type/geo/box_type_ut.cpp` | `BoxTypeTest` | `point1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
 | 241 | `src/unit_test/parser/type/geo/path_type_ut_nimpl.cpp` | `PathTypeTest` | `path1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
 | 242 | `src/unit_test/parser/type/geo/point_type_ut.cpp` | `PointTypeTest` | `point1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
@@ -272,18 +272,18 @@
 | 257 | `src/unit_test/parser/type/info/decimal_info_ut.cpp` | `DecimalInfoTest` | `decimal_info_A` | ported | `infinity-common` `decimal_info_a` |
 | 258 | `src/unit_test/parser/type/info/embedding_info_ut.cpp` | `EmbeddingInfoTest` | `embedding_info_A` | ported | `infinity-common` `embedding_info_a` |
 | 259 | `src/unit_test/parser/type/null_value_ut.cpp` | `NullValueTest` | `null_value_test1` | ported | `infinity-common` `null_value_test1` |
-| 260 | `src/unit_test/planner/column_binding_ut.cpp` | `ColumnBindingTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
-| 261 | `src/unit_test/planner/explain_basic_ut.cpp` | `ExplainBasicTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 260 | `src/unit_test/planner/column_binding_ut.cpp` | `ColumnBindingTest` | `test1` | ported | `infinity-planner` `column_binding::tests::column_binding_test1` |
+| 261 | `src/unit_test/planner/explain_basic_ut.cpp` | `ExplainBasicTest` | `test1` | ported | `infinity-executor` `gate_b_executor_ut::explain_basic_test1` |
 | 262 | `src/unit_test/planner/logical_plan_tpch_ut.cpp` | `LogicalPlannerTpchTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 263 | `src/unit_test/planner/logical_planner_ut_nimpl.cpp` | `LogicalPlannerTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
 | 264 | `src/unit_test/planner/node/logical_aggregate_ut.cpp` | `LogicalAggregateTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 265 | `src/unit_test/planner/node/logical_check_ut.cpp` | `LogicalCheckTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 266 | `src/unit_test/planner/node/logical_command_ut.cpp` | `LogicalCommandTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 267 | `src/unit_test/planner/node/logical_compact_ut.cpp` | `LogicalCompactTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
-| 268 | `src/unit_test/planner/node/logical_create_collection_ut.cpp` | `LogicalCreateCollectionTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 268 | `src/unit_test/planner/node/logical_create_collection_ut.cpp` | `LogicalCreateCollectionTest` | `test1` | ported | `infinity-executor` `gate_b_executor_ut::logical_create_collection_test1` |
 | 269 | `src/unit_test/planner/node/logical_create_index_ut.cpp` | `LogicalCreateIndexTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 270 | `src/unit_test/planner/node/logical_create_table_ut.cpp` | `LogicalCreateTableTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
-| 271 | `src/unit_test/planner/node/logical_drop_collection_ut.cpp` | `LogicalDropCollectionTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 271 | `src/unit_test/planner/node/logical_drop_collection_ut.cpp` | `LogicalDropCollectionTest` | `test1` | ported | `infinity-executor` `gate_b_executor_ut::logical_drop_collection_test1` |
 | 272 | `src/unit_test/planner/node/logical_drop_index_ut.cpp` | `LogicalDropIndexTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 273 | `src/unit_test/planner/node/logical_drop_table_ut.cpp` | `LogicalDropTableTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 274 | `src/unit_test/planner/node/logical_flush_ut.cpp` | `LogicalFlushTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
@@ -616,12 +616,12 @@
 | 601 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestStorageType` | ported | `infinity-storage` `storage_type_conversions` |
 | 602 | `src/unit_test/storage/io/virtual_store_ut.cpp` | `VirtualStoreTest` | `TestFileCompress` | ported | `infinity-storage` `file_compress_writes_a_record` |
 | 603 | `src/unit_test/storage/knnindex/emvb_search/test_emvb_ut.cpp` | `EMVBTest` | `test_fakepq` | ported | `infinity-index` `emvb::tests::fake_pq_ranks_the_matching_centroids_documents` |
-| 604 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testsum256` | exempt |
-| 605 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testloadstore` | exempt |
-| 606 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testmask` | exempt |
-| 607 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testmax` | exempt |
-| 608 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testleftpack` | exempt |
-| 609 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testleftpackf` | exempt |
+| 604 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testsum256` | ported | `infinity-common` `simd::tests::emvb_simd_sum256` |
+| 605 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testloadstore` | ported | `infinity-common` `simd::tests::emvb_simd_load_store` |
+| 606 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testmask` | ported | `infinity-common` `simd::tests::emvb_simd_mask` |
+| 607 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testmax` | ported | `infinity-common` `simd::tests::emvb_simd_max` |
+| 608 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testleftpack` | ported | `infinity-common` `simd::tests::emvb_simd_left_pack` |
+| 609 | `src/unit_test/storage/knnindex/emvb_search/test_simd_ut.cpp` | `SIMDTest` | `testleftpackf` | ported | `infinity-common` `simd::tests::emvb_simd_left_pack_filter` |
 | 610 | `src/unit_test/storage/knnindex/knn_diskann/test_build_diskann_ut_nimpl.cpp` | `DiskAnnTest` | `test1` | excluded |
 | 611 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_ip_blas_reservoir_ut.cpp` | `KnnFlatIpBlasReservoirTest` | `test1` | ported | `infinity-index` `knn_flat::tests::ip_top_k_matches_the_reference` |
 | 612 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_ip_blas_ut.cpp` | `KnnFlatIpBlasTest` | `test1` | ported | `infinity-index` `knn_flat::tests::ip_top_k_matches_the_reference` |
@@ -634,7 +634,7 @@
 | 619 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_top1_ut.cpp` | `KnnFlatL2Top1Test` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_1_matches_the_reference` |
 | 620 | `src/unit_test/storage/knnindex/knn_flat/knn_flat_l2_ut.cpp` | `KnnFlatL2Test` | `test1` | ported | `infinity-index` `knn_flat::tests::l2_top_k_matches_the_reference` |
 | 621 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func2_ut.cpp` | `DistFuncTest2` | `test2` | ported | `infinity-index` `lvq::tests::lvq_ip_distance_matches_decompressed_vectors` |
-| 622 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func_ut.cpp` | `DistFuncTest` | `test1` | exempt | int8 IP 的 SSE 核与标量核对照；属已登记的 SIMD 原语设计变更 |
+| 622 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func_ut.cpp` | `DistFuncTest` | `test1` | ported | `infinity-index` `lvq::tests::i8_ip_residual_matches_the_scalar_dot_product` |
 | 623 | `src/unit_test/storage/knnindex/knn_hnsw/test_dist_func_ut.cpp` | `DistFuncTest` | `test2` | ported | `infinity-index` `lvq::tests::lvq_l2_distance_matches_decompressed_vectors` |
 | 624 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_bitmask_ut.cpp` | `HnswAlgBitmaskTest` | `test1` | ported | `infinity-index` `vector::reference_suite::filtered_search_honours_the_bitmask` |
 | 625 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `test_memory` | ported | `infinity-index` `hnsw_handler::reference_suite::test_memory` |

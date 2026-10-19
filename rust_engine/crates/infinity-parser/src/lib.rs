@@ -8,8 +8,11 @@ pub mod ast;
 pub mod lexer;
 pub mod parser;
 
+#[cfg(test)]
+mod corpora_ut;
+
 pub use ast::{
-    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExplainKind, ExprAst, JoinClause, JoinKind, Literal,
-    MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, Statement,
+    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, Cte, ExplainKind, ExprAst, JoinClause, JoinKind,
+    Literal, MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, Statement,
 };
 pub use parser::{normalize_datetime, parse};

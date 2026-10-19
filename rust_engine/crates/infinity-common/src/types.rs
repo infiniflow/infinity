@@ -27,6 +27,20 @@ impl DateT {
     }
 }
 
+/// C++ `DateTOld` (`using DateTOld = DateType`): the legacy `DateType`, also a
+/// single `i32` day count. The reference asserts both representations have the
+/// same size.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DateTOld {
+    pub value: i32,
+}
+
+impl DateTOld {
+    pub fn new(value: i32) -> Self {
+        Self { value }
+    }
+}
+
 /// C++: `TimeT` (`src/parser/type/datetime/time_type.h`): microseconds since
 /// midnight.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]

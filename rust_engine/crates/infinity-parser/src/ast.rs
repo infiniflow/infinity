@@ -198,6 +198,8 @@ pub enum JoinKind {
     Inner,
     Left,
     Right,
+    Full,
+    Natural,
     Cross,
 }
 
@@ -208,6 +210,8 @@ impl JoinKind {
             JoinKind::Inner => "INNER JOIN",
             JoinKind::Left => "LEFT JOIN",
             JoinKind::Right => "RIGHT JOIN",
+            JoinKind::Full => "FULL JOIN",
+            JoinKind::Natural => "NATURAL JOIN",
             JoinKind::Cross => "CROSS JOIN",
         }
     }
@@ -234,6 +238,13 @@ pub struct ColumnDef {
     pub not_null: bool,
     /// `COMMENT '…'`
     pub comment: Option<String>,
+}
+
+/// One `WITH <alias> AS (<query>)` binding.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Cte {
+    pub alias: String,
+    pub query: Box<Statement>,
 }
 
 /// A `SELECT` list item.
@@ -297,6 +308,10 @@ pub enum ExplainKind {
     Fragment,
     /// `EXPLAIN PIPELINE`: the execution pipeline.
     Pipeline,
+    /// `EXPLAIN ANALYZE`: the physical plan annotated with run-time data.
+    Analyze,
+    /// `EXPLAIN RAW`: the raw (unresolved) plan.
+    Raw,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -311,6 +326,16 @@ pub enum Statement {
         if_not_exists: bool,
     },
     DropDatabase {
+        name: String,
+        if_exists: bool,
+    },
+    /// `CREATE COLLECTION [IF NOT EXISTS] <name>` (the legacy table alias).
+    CreateCollection {
+        name: String,
+        if_not_exists: bool,
+    },
+    /// `DROP COLLECTION [IF EXISTS] <name>`
+    DropCollection {
         name: String,
         if_exists: bool,
     },
@@ -384,6 +409,10 @@ pub enum Statement {
     ShowTableColumns {
         table: String,
     },
+    /// `SHOW TABLE <t>` (the table's six label/value rows).
+    ShowTable {
+        table: String,
+    },
     /// `SHOW TABLE <t> INDEX <name>`
     ShowTableIndex {
         table: String,
@@ -413,6 +442,32 @@ pub enum Statement {
         /// Optional explicit column list (`INSERT INTO t (a, b) VALUES …`).
         columns: Option<Vec<String>>,
         rows: Vec<Vec<Literal>>,
+    },
+    /// `INSERT INTO <table> [(…)] <SELECT …>`
+    InsertSelect {
+        table: String,
+        columns: Option<Vec<String>>,
+        query: Box<Statement>,
+    },
+    /// `CREATE TABLE <name> AS <SELECT …>`
+    CreateTableAs {
+        name: String,
+        query: Box<Statement>,
+    },
+    /// `CREATE VIEW <name> [(col, …)] AS <SELECT …>`
+    CreateView {
+        name: String,
+        columns: Vec<String>,
+        query: Box<Statement>,
+    },
+    /// `DROP VIEW [IF EXISTS] <name>`
+    DropView {
+        name: String,
+        if_exists: bool,
+    },
+    /// `DESCRIBE <table>` (the legacy `DESC` spelling is accepted too).
+    Describe {
+        table: String,
     },
     AlterTableAdd {
         table: String,
@@ -445,5 +500,13 @@ pub enum Statement {
         /// `HIGHLIGHT <col>, …` after the select list: those output columns are
         /// rendered with `<em>…</em>` around the query term occurrences.
         highlight: Vec<String>,
+        /// `WITH <alias> AS (<query>), …` bindings.
+        ctes: Vec<Cte>,
+        /// Extra `FROM t1, t2, …` tables (a cross product after `from`).
+        cross_tables: Vec<String>,
+        /// A non-literal `LIMIT` expression (e.g. `1 + 1` or a subquery).
+        limit_expr: Option<ExprAst>,
+        /// A non-literal `OFFSET` expression.
+        offset_expr: Option<ExprAst>,
     },
 }

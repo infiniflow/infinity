@@ -3,7 +3,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod column_binding;
 pub mod optimize;
+
+pub use column_binding::ColumnBinding;
 
 use infinity_common::{Error, Result};
 use infinity_expression::{Expr, Value};

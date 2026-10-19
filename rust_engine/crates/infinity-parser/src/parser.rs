@@ -3,8 +3,8 @@
 use infinity_common::{Error, LogicalType, Result};
 
 use crate::ast::{
-    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExplainKind, ExprAst, JoinClause, JoinKind, Literal,
-    MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, Statement,
+    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, Cte, ExplainKind, ExprAst, JoinClause, JoinKind,
+    Literal, MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, Statement,
 };
 use crate::lexer::{tokenize, Token};
 
@@ -119,11 +119,41 @@ impl Parser {
                         toks.push(Token::RParen);
                     }
                 }
-                Token::Eof => return self.err("unterminated subquery"),
+                Token::                Eof => return self.err("unterminated subquery"),
                 t => toks.push(t),
             }
         }
-        Ok(render_tokens_as_sql(&toks))
+        let sql = render_tokens_as_sql(&toks);
+        // Validate the nested statement now; the executor re-parses this text
+        // later, so a parse failure must surface here.
+        parse(&sql)?;
+        Ok(sql)
+    }
+
+    /// A `LIMIT`/`OFFSET` operand: a plain non-negative integer becomes the
+    /// numeric field, anything else (arithmetic or a parenthesised subquery)
+    /// is kept as an expression.
+    fn limit_value(&mut self) -> Result<(Option<u64>, Option<ExprAst>)> {
+        if self.peek() == &Token::LParen
+            && matches!(
+                self.toks.get(self.pos + 1),
+                Some(Token::Ident(s)) if s.eq_ignore_ascii_case("SELECT")
+            )
+        {
+            let sql = self.paren_subquery_sql()?;
+            return Ok((
+                None,
+                Some(ExprAst::Func {
+                    name: "SUBQUERY".to_string(),
+                    args: vec![ExprAst::Literal(Literal::Str(sql))],
+                }),
+            ));
+        }
+        let expr = self.expr()?;
+        match expr {
+            ExprAst::Literal(Literal::Int(n)) if n >= 0 => Ok((Some(n as u64), None)),
+            other => Ok((None, Some(other))),
+        }
     }
 
     fn expect_table_name(&mut self) -> Result<String> {
@@ -163,7 +193,122 @@ impl Parser {
         }
     }
 
+    /// True when the cursor is on `( SELECT … )`.
+    fn is_subquery_start(&self) -> bool {
+        self.peek() == &Token::LParen
+            && matches!(
+                self.toks.get(self.pos + 1),
+                Some(Token::Ident(s)) if s.eq_ignore_ascii_case("SELECT")
+            )
+    }
+
+    /// Parses `( <statement> )` as a scalar-expression subquery. The parsed
+    /// statement is rendered back to SQL text (the executor re-parses derived
+    /// tables from text), but the inner statement is validated by this parser.
+    fn subquery_expr(&mut self) -> Result<ExprAst> {
+        self.expect(Token::LParen)?;
+        let start = self.pos;
+        let _ = self.statement()?;
+        let end = self.pos;
+        self.expect(Token::RParen)?;
+        Ok(ExprAst::Func {
+            name: "SUBQUERY".to_string(),
+            args: vec![ExprAst::Literal(Literal::Str(render_tokens_as_sql(
+                &self.toks[start..end],
+            )))],
+        })
+    }
+
+    /// One `FROM` entry: a table or a derived table, with an optional alias
+    /// (`[AS] name [(col, …)]`). A derived table keeps the subquery's SQL text.
+    fn table_ref(&mut self) -> Result<String> {
+        let table = if self.peek() == &Token::LParen {
+            self.paren_subquery_sql()?
+        } else {
+            self.expect_table_name()?
+        };
+        self.eat_table_alias()?;
+        Ok(table)
+    }
+
+    /// Consumes `[AS] alias [(col, …)]` when one follows a table reference.
+    fn eat_table_alias(&mut self) -> Result<()> {
+        let aliased = if self.eat_kw("AS") {
+            let _ = self.expect_ident()?;
+            true
+        } else if matches!(self.peek(), Token::Ident(s) if !is_clause_keyword(s)) {
+            self.advance();
+            true
+        } else {
+            false
+        };
+        if aliased && self.peek() == &Token::LParen {
+            // Derived-table column aliases, e.g. `(…) AS c (a, b)`.
+            self.paren_list_text()?;
+        }
+        Ok(())
+    }
+
+    /// The right-hand side of `[NOT] IN`: either a parenthesised value list or
+    /// a parenthesised subquery.
+    fn in_rhs(&mut self) -> Result<Vec<ExprAst>> {
+        if self.is_subquery_start() {
+            return Ok(vec![self.subquery_expr()?]);
+        }
+        self.expect(Token::LParen)?;
+        let mut values = Vec::new();
+        while !matches!(self.peek(), Token::RParen | Token::Eof) {
+            values.push(self.expr()?);
+            if self.peek() == &Token::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        self.expect(Token::RParen)?;
+        Ok(values)
+    }
+
+    /// `CASE [operand] WHEN cond THEN value … [ELSE value] END`, encoded as
+    /// `Func("CASE", [operand?, cond, value, …, else?])`.
+    fn case_expr(&mut self) -> Result<ExprAst> {
+        let mut args = Vec::new();
+        if !matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("WHEN")) {
+            args.push(self.expr()?);
+        }
+        let mut saw_when = false;
+        while self.eat_kw("WHEN") {
+            saw_when = true;
+            let cond = self.predicate()?;
+            let cond = predicate_to_expr(&cond)
+                .ok_or_else(|| Error::Invalid("unsupported CASE condition".into()))?;
+            self.expect_kw("THEN")?;
+            let value = self.expr()?;
+            args.push(cond);
+            args.push(value);
+        }
+        if !saw_when {
+            return self.err("CASE requires at least one WHEN");
+        }
+        if self.eat_kw("ELSE") {
+            args.push(self.expr()?);
+        }
+        self.expect_kw("END")?;
+        Ok(ExprAst::Func {
+            name: "CASE".to_string(),
+            args,
+        })
+    }
+
     fn statement(&mut self) -> Result<Statement> {
+        // A parenthesised SELECT is a statement in its own right
+        // (`(SELECT a FROM t WHERE …);`).
+        if self.is_subquery_start() {
+            self.advance(); // (
+            let stmt = self.statement()?;
+            self.expect(Token::RParen)?;
+            return Ok(stmt);
+        }
         let kw = match self.peek() {
             Token::Ident(s) => s.to_ascii_uppercase(),
             _ => return self.err("expected statement"),
@@ -184,6 +329,40 @@ impl Parser {
                     }
                     self.expect_kw("SYSTEM")?;
                     return Ok(Statement::CreateSystemSnapshot { name });
+                }
+                if self.eat_kw("COLLECTION") {
+                    let ine = self.eat_kw("IF");
+                    let _ = self.eat_kw("NOT");
+                    let _ = self.eat_kw("EXISTS");
+                    let name = self.expect_table_name()?;
+                    return Ok(Statement::CreateCollection {
+                        name,
+                        if_not_exists: ine,
+                    });
+                }
+                if self.eat_kw("VIEW") {
+                    let name = self.expect_table_name()?;
+                    let mut columns = Vec::new();
+                    if self.peek() == &Token::LParen {
+                        self.advance();
+                        while !matches!(self.peek(), Token::RParen | Token::Eof) {
+                            if let Token::Ident(c) = self.peek().clone() {
+                                columns.push(c);
+                            }
+                            self.advance();
+                            if self.peek() == &Token::Comma {
+                                self.advance();
+                            }
+                        }
+                        self.expect(Token::RParen)?;
+                    }
+                    self.expect_kw("AS")?;
+                    let query = self.statement()?;
+                    return Ok(Statement::CreateView {
+                        name,
+                        columns,
+                        query: Box::new(query),
+                    });
                 }
                 if self.eat_kw("DATABASE") {
                     // CREATE DATABASE [IF NOT EXISTS] name
@@ -280,6 +459,13 @@ impl Parser {
                     let _ = self.eat_kw("EXISTS");
                     self.expect_kw("TABLE")?;
                     let name = self.expect_table_name()?;
+                    if self.eat_kw("AS") {
+                        let query = self.statement()?;
+                        return Ok(Statement::CreateTableAs {
+                            name,
+                            query: Box::new(query),
+                        });
+                    }
                     self.expect(Token::LParen)?;
                     let columns = self.column_defs()?;
                     self.expect(Token::RParen)?;
@@ -313,6 +499,10 @@ impl Parser {
                     let if_exists = self.eat_if_exists();
                     let name = self.expect_ident()?;
                     Ok(Statement::DropDatabase { name, if_exists })
+                } else if self.eat_kw("COLLECTION") {
+                    let if_exists = self.eat_if_exists();
+                    let name = self.expect_table_name()?;
+                    Ok(Statement::DropCollection { name, if_exists })
                 } else if self.eat_kw("SNAPSHOT") {
                     self.eat_if_exists();
                     let name = self.expect_name()?;
@@ -325,6 +515,10 @@ impl Parser {
                         let _ = self.expect_ident();
                     }
                     Ok(Statement::DropIndex { name, if_exists })
+                } else if self.eat_kw("VIEW") {
+                    let if_exists = self.eat_if_exists();
+                    let name = self.expect_table_name()?;
+                    Ok(Statement::DropView { name, if_exists })
                 } else {
                     self.expect_kw("TABLE")?;
                     let if_exists = self.eat_if_exists();
@@ -371,6 +565,11 @@ impl Parser {
                 let name = self.expect_ident()?;
                 Ok(Statement::Use { name })
             }
+            "DESCRIBE" | "DESC" => {
+                self.advance();
+                let table = self.expect_table_name()?;
+                Ok(Statement::Describe { table })
+            }
             "SET" | "SNAPSHOT" | "DUMP" | "PRAGMA" | "COMPACT" | "OPTIMIZE" | "FLUSH" | "CHECK" => {
                 self.advance();
                 let mut parts: Vec<String> = Vec::new();
@@ -414,6 +613,16 @@ impl Parser {
                 } else {
                     None
                 };
+                if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("SELECT"))
+                    || self.is_subquery_start()
+                {
+                    let query = self.statement()?;
+                    return Ok(Statement::InsertSelect {
+                        table,
+                        columns,
+                        query: Box::new(query),
+                    });
+                }
                 self.expect_kw("VALUES")?;
                 let mut rows = Vec::new();
                 loop {
@@ -490,6 +699,32 @@ impl Parser {
                     })
                 }
             }
+            "WITH" => {
+                self.advance();
+                let mut ctes = Vec::new();
+                loop {
+                    let alias = self.expect_ident()?;
+                    self.expect_kw("AS")?;
+                    self.expect(Token::LParen)?;
+                    let query = self.statement()?;
+                    self.expect(Token::RParen)?;
+                    ctes.push(Cte {
+                        alias,
+                        query: Box::new(query),
+                    });
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                let mut stmt = self.statement()?;
+                match &mut stmt {
+                    Statement::Select { ctes: slot, .. } => *slot = ctes,
+                    _ => return self.err("WITH must be followed by SELECT"),
+                }
+                Ok(stmt)
+            }
             "SELECT" => {
                 self.advance();
                 let distinct = self.eat_kw("DISTINCT");
@@ -511,47 +746,67 @@ impl Parser {
                     Vec::new()
                 };
                 let from = if self.eat_kw("FROM") {
-                    if self.peek() == &Token::LParen {
-                        // A derived table: `FROM (SELECT …)`. The subquery's SQL is
-                        // kept as the "table"; the executor runs it and scans the
-                        // result.
-                        Some(self.paren_subquery_sql()?)
+                    Some(self.table_ref()?)
+                } else {
+                    None
+                };
+                // Chained joins: `FROM a JOIN b ON … JOIN c ON …`. The AST keeps
+                // the first join; the rest are parsed so the statement is valid.
+                let mut join = None;
+                loop {
+                    let save = self.pos;
+                    let kind = if self.eat_kw("INNER") {
+                        JoinKind::Inner
+                    } else if self.eat_kw("LEFT") {
+                        let _ = self.eat_kw("OUTER");
+                        JoinKind::Left
+                    } else if self.eat_kw("RIGHT") {
+                        let _ = self.eat_kw("OUTER");
+                        JoinKind::Right
+                    } else if self.eat_kw("FULL") {
+                        let _ = self.eat_kw("OUTER");
+                        JoinKind::Full
+                    } else if self.eat_kw("OUTER") {
+                        JoinKind::Full
+                    } else if self.eat_kw("NATURAL") {
+                        JoinKind::Natural
+                    } else if self.eat_kw("CROSS") {
+                        JoinKind::Cross
                     } else {
-                        Some(self.expect_table_name()?)
+                        JoinKind::Inner
+                    };
+                    if !self.eat_kw("JOIN") {
+                        self.pos = save;
+                        break;
                     }
-                } else {
-                    None
-                };
-                let save = self.pos;
-                let kind = if self.eat_kw("INNER") {
-                    JoinKind::Inner
-                } else if self.eat_kw("LEFT") {
-                    let _ = self.eat_kw("OUTER");
-                    JoinKind::Left
-                } else if self.eat_kw("RIGHT") {
-                    let _ = self.eat_kw("OUTER");
-                    JoinKind::Right
-                } else if self.eat_kw("CROSS") {
-                    JoinKind::Cross
-                } else {
-                    JoinKind::Inner
-                };
-                let join = if self.eat_kw("JOIN") {
-                    let table = self.expect_table_name()?;
-                    self.expect_kw("ON")?;
-                    let left = self.expect_ident()?;
-                    self.expect(Token::Op("=".into()))?;
-                    let right = self.expect_ident()?;
-                    Some(JoinClause {
-                        table,
-                        left,
-                        right,
-                        kind,
-                    })
-                } else {
-                    self.pos = save;
-                    None
-                };
+                    let table = self.table_ref()?;
+                    let (left, right) = if kind == JoinKind::Natural {
+                        (String::new(), String::new())
+                    } else if self.eat_kw("ON") {
+                        join_keys(&self.predicate()?)
+                    } else if self.eat_kw("USING") {
+                        let cols = self.paren_list_text()?;
+                        let mut it = cols.split(',').map(|c| c.trim().to_string());
+                        (it.next().unwrap_or_default(), it.next().unwrap_or_default())
+                    } else {
+                        return self.err("expected ON or USING after JOIN");
+                    };
+                    if join.is_none() {
+                        join = Some(JoinClause {
+                            table,
+                            left,
+                            right,
+                            kind,
+                        });
+                    }
+                }
+                let join = join;
+                // `FROM t1, t2, …`: a cross product expressed with commas.
+                let mut cross_tables = Vec::new();
+                while self.peek() == &Token::Comma {
+                    self.advance();
+                    cross_tables.push(self.table_ref()?);
+                }
                 let search = if self.eat_kw("SEARCH") {
                     Some(Box::new(self.search_clause()?))
                 } else {
@@ -636,37 +891,41 @@ impl Parser {
                     Vec::new()
                 };
                 let mut limit = None;
+                let mut limit_expr = None;
                 let mut offset = None;
+                let mut offset_expr = None;
+                let ctes = Vec::new();
                 if self.eat_kw("LIMIT") {
-                    match self.advance() {
-                        Token::Int(n) if n >= 0 => limit = Some(n as u64),
-                        _ => return self.err("expected non-negative integer after LIMIT"),
-                    }
+                    let (n, e) = self.limit_value()?;
+                    limit = n;
+                    limit_expr = e;
                     if self.eat_kw("OFFSET") {
-                        if let Token::Int(n) = self.advance() {
-                            if n >= 0 {
-                                offset = Some(n as u64);
-                            }
-                        }
+                        let (n, e) = self.limit_value()?;
+                        offset = n;
+                        offset_expr = e;
                     }
                 } else if self.eat_kw("OFFSET") {
-                    if let Token::Int(n) = self.advance() {
-                        if n >= 0 {
-                            offset = Some(n as u64);
-                        }
-                    }
+                    let (n, e) = self.limit_value()?;
+                    offset = n;
+                    offset_expr = e;
                     if self.eat_kw("LIMIT") {
-                        if let Token::Int(n) = self.advance() {
-                            if n >= 0 {
-                                limit = Some(n as u64);
-                            }
-                        }
+                        let (n, e) = self.limit_value()?;
+                        limit = n;
+                        limit_expr = e;
                     }
                 }
-                if offset.is_some() && limit.is_none() {
+                if (offset.is_some() || offset_expr.is_some())
+                    && limit.is_none()
+                    && limit_expr.is_none()
+                {
                     return self.err("OFFSET requires LIMIT");
                 }
-                if search.is_some() && (!order_by.is_empty() || limit.is_some() || offset.is_some())
+                if search.is_some()
+                    && (!order_by.is_empty()
+                        || limit.is_some()
+                        || limit_expr.is_some()
+                        || offset.is_some()
+                        || offset_expr.is_some())
                 {
                     return self.err("SEARCH cannot be combined with ORDER BY/OFFSET/LIMIT");
                 }
@@ -684,6 +943,10 @@ impl Parser {
                     search,
                     distinct,
                     highlight,
+                    ctes,
+                    cross_tables,
+                    limit_expr,
+                    offset_expr,
                 })
             }
             "DELETE" => {
@@ -726,6 +989,11 @@ impl Parser {
             }
             "SHOW" => {
                 self.advance();
+                // A bare `SHOW COLUMNS` has no table to describe; the
+                // reference rejects it.
+                if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("COLUMNS")) {
+                    return self.err("SHOW COLUMNS requires a table");
+                }
                 // SHOW TABLE <t> COLUMNS
                 let is_table = self.eat_kw("TABLE");
                 if is_table && matches!(self.peek(), Token::Ident(_)) {
@@ -751,6 +1019,24 @@ impl Parser {
                                 self.pos = save;
                             }
                         }
+                        // A bare `SHOW TABLE <t>`. `SHOW TABLE <t> SEGMENTS …`
+                        // (and the other detail forms) keep their text so the
+                        // executor can ignore them, as the reference does.
+                        let mut suffix: Vec<String> = Vec::new();
+                        while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+                            suffix.push(match self.advance() {
+                                Token::Ident(s) => s,
+                                Token::Int(i) => i.to_string(),
+                                Token::Star => "*".to_string(),
+                                _ => String::new(),
+                            });
+                        }
+                        if suffix.is_empty() {
+                            return Ok(Statement::ShowTable { table: t });
+                        }
+                        return Ok(Statement::Show {
+                            text: format!("TABLE {t} {}", suffix.join(" ")),
+                        });
                     }
                 }
                 // SHOW GLOBAL VARIABLE <key>
@@ -811,6 +1097,14 @@ impl Parser {
                     Token::Ident(s) if s.eq_ignore_ascii_case("pipeline") => {
                         self.advance();
                         ExplainKind::Pipeline
+                    }
+                    Token::Ident(s) if s.eq_ignore_ascii_case("analyze") => {
+                        self.advance();
+                        ExplainKind::Analyze
+                    }
+                    Token::Ident(s) if s.eq_ignore_ascii_case("raw") => {
+                        self.advance();
+                        ExplainKind::Raw
                     }
                     _ => ExplainKind::Physical,
                 };
@@ -901,6 +1195,14 @@ impl Parser {
         if self.eat_kw("NOT") {
             return Ok(Predicate::Not(Box::new(self.not_predicate()?)));
         }
+        // `[NOT] EXISTS (SELECT …)`
+        if self.eat_kw("EXISTS") {
+            let sub = self.subquery_expr()?;
+            return Ok(Predicate::IsTrue(ExprAst::Func {
+                name: "EXISTS".to_string(),
+                args: vec![sub],
+            }));
+        }
         if self.peek() == &Token::LParen {
             let save = self.pos;
             // `(c2 + 1) IN (8, 9, 10)`: a parenthesised *expression* followed by
@@ -908,17 +1210,7 @@ impl Parser {
             if let Ok(left) = self.expr() {
                 if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("IN")) {
                     self.advance();
-                    self.expect(Token::LParen)?;
-                    let mut values = Vec::new();
-                    while !matches!(self.peek(), Token::RParen | Token::Eof) {
-                        values.push(self.expr()?);
-                        if self.peek() == &Token::Comma {
-                            self.advance();
-                        } else {
-                            break;
-                        }
-                    }
-                    self.expect(Token::RParen)?;
+                    let values = self.in_rhs()?;
                     return Ok(Predicate::In(left, values, false));
                 }
                 // `(c2) = 'x'`, `(f(x)) LIKE 'a%'`: a parenthesised *expression*
@@ -954,6 +1246,36 @@ impl Parser {
 
     /// The tail of a comparison, once its left operand has been parsed.
     fn comparison_from(&mut self, left: ExprAst) -> Result<Predicate> {
+        // `expr [NOT] BETWEEN low AND high` desugars to
+        // `expr >= low AND expr <= high` (the same rewrite the planner would
+        // apply; it keeps every existing `Predicate` consumer unchanged).
+        let between_neg = if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("NOT"))
+        {
+            let save = self.pos;
+            self.advance();
+            if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("BETWEEN")) {
+                true
+            } else {
+                self.pos = save;
+                false
+            }
+        } else {
+            false
+        };
+        if self.eat_kw("BETWEEN") {
+            let low = self.expr()?;
+            self.expect_kw("AND")?;
+            let high = self.expr()?;
+            let ge = Predicate::Cmp(left.clone(), CmpOp::Ge, low);
+            let le = Predicate::Cmp(left, CmpOp::Le, high);
+            let between =
+                Predicate::Bool(Box::new(ge), BoolOp::And, Box::new(le));
+            return Ok(if between_neg {
+                Predicate::Not(Box::new(between))
+            } else {
+                between
+            });
+        }
         if self.eat_kw("IS") {
             let neg = self.eat_kw("NOT");
             self.expect_kw("NULL")?;
@@ -1001,17 +1323,7 @@ impl Parser {
         };
         if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("IN")) {
             self.advance();
-            self.expect(Token::LParen)?;
-            let mut values = Vec::new();
-            while !matches!(self.peek(), Token::RParen | Token::Eof) {
-                values.push(self.expr()?);
-                if self.peek() == &Token::Comma {
-                    self.advance();
-                } else {
-                    break;
-                }
-            }
-            self.expect(Token::RParen)?;
+            let values = self.in_rhs()?;
             return Ok(Predicate::In(left, values, neg_in));
         }
         if let Token::Op(s) = self.peek().clone() {
@@ -1036,13 +1348,39 @@ impl Parser {
             match op {
                 Some(op) => {
                     self.advance();
-                    let right = self.term()?;
+                    let mut right = self.term()?;
+                    // `a + 3 day`: attach a trailing time unit to the integer
+                    // operand, mirroring the C++ `ConstantExpr` interval form.
+                    if let ExprAst::Literal(Literal::Int(n)) = right {
+                        if let Some(unit) = self.eat_time_unit() {
+                            right = ExprAst::Func {
+                                name: "INTERVAL".to_string(),
+                                args: vec![
+                                    ExprAst::Literal(Literal::Int(n)),
+                                    ExprAst::Literal(Literal::Str(unit)),
+                                ],
+                            };
+                        }
+                    }
                     left = ExprAst::Binary(Box::new(left), op, Box::new(right));
                 }
                 None => break,
             }
         }
         Ok(left)
+    }
+
+    /// Consumes `YEAR|MONTH|DAY|HOUR|MINUTE|SECOND` (singular or plural).
+    fn eat_time_unit(&mut self) -> Option<String> {
+        if let Token::Ident(s) = self.peek() {
+            let upper = s.to_ascii_uppercase();
+            let base = upper.strip_suffix('S').unwrap_or(&upper);
+            if matches!(base, "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND") {
+                self.advance();
+                return Some(base.to_string());
+            }
+        }
+        None
     }
 
     fn term(&mut self) -> Result<ExprAst> {
@@ -1091,6 +1429,7 @@ impl Parser {
             Token::Int(_) | Token::Float(_) | Token::Str(_) => {
                 Ok(ExprAst::Literal(self.literal()?))
             }
+            Token::LParen if self.is_subquery_start() => self.subquery_expr(),
             Token::LParen => {
                 self.advance();
                 // A parenthesised expression may be a *predicate*
@@ -1119,6 +1458,10 @@ impl Parser {
             Token::LBracket => Ok(ExprAst::Literal(self.array_literal()?)),
             Token::LBrace => Ok(ExprAst::Literal(self.brace_literal()?)),
             Token::Ident(s) => {
+                if s.eq_ignore_ascii_case("CASE") {
+                    self.advance();
+                    return self.case_expr();
+                }
                 if s.eq_ignore_ascii_case("NULL") {
                     self.advance();
                     return Ok(ExprAst::Literal(Literal::Null));
@@ -1173,12 +1516,11 @@ impl Parser {
                     self.expect_kw("FROM")?;
                     let src = self.expr()?;
                     self.expect(Token::RParen)?;
+                    // The reference rewrites `EXTRACT(<field> FROM …)` to a
+                    // function named `extract_<field>`.
                     return Ok(ExprAst::Func {
-                        name: "EXTRACT".to_string(),
-                        args: vec![
-                            ExprAst::Literal(Literal::Str(field.to_ascii_uppercase())),
-                            src,
-                        ],
+                        name: format!("extract_{}", field.to_ascii_lowercase()),
+                        args: vec![src],
                     });
                 }
                 // `INTERVAL <n> <UNIT>` (unquoted form), e.g. `INTERVAL -100 YEAR`.                // `INTERVAL <n> <UNIT>` (unquoted form), e.g. `INTERVAL -100 YEAR`.
@@ -1233,7 +1575,7 @@ impl Parser {
                     let kind = s.to_ascii_uppercase();
                     let inner = self.literal()?;
                     return Ok(ExprAst::Literal(match inner {
-                        Literal::Str(v) => Literal::Str(normalize_datetime(&kind, &v)),
+                        Literal::Str(v) => Literal::Str(typed_literal_value(&kind, &v)?),
                         other => other,
                     }));
                 }
@@ -1545,6 +1887,8 @@ impl Parser {
             let (ty, type_text) = self.parse_type()?;
             let mut default = None;
             let mut not_null = false;
+            let mut explicit_null = false;
+            let mut primary_key = false;
             let mut comment = None;
             // Column constraints. The reference rejects a stray identifier
             // between columns (e.g. a missing comma), so only known constraint
@@ -1556,10 +1900,12 @@ impl Parser {
                     continue;
                 }
                 if self.eat_kw("NULL") {
+                    explicit_null = true;
                     continue;
                 }
                 if self.eat_kw("PRIMARY") {
                     let _ = self.eat_kw("KEY");
+                    primary_key = true;
                     continue;
                 }
                 if self.eat_kw("UNIQUE") {
@@ -1602,6 +1948,14 @@ impl Parser {
                         )));
                     }
                 }
+            }
+            // A primary key is implicitly `NOT NULL`, so pairing it with an
+            // explicit `NULL` (either spelling) is contradictory, as is
+            // `NOT NULL NULL`.
+            if explicit_null && (primary_key || not_null) {
+                return Err(Error::Invalid(format!(
+                    "parser: conflicting NULL constraint on column '{name}'"
+                )));
             }
             cols.push(ColumnDef {
                 name,
@@ -1721,7 +2075,7 @@ impl Parser {
                 let kind = s.to_ascii_uppercase();
                 let inner = self.literal()?;
                 match inner {
-                    Literal::Str(v) => Ok(Literal::Str(normalize_datetime(&kind, &v))),
+                    Literal::Str(v) => Ok(Literal::Str(typed_literal_value(&kind, &v)?)),
                     other => Ok(other),
                 }
             }
@@ -2010,7 +2364,22 @@ fn predicate_to_expr(p: &Predicate) -> Option<ExprAst> {
         Predicate::Not(a) => ExprAst::Not(Box::new(predicate_to_expr(a)?)),
         // A bare value is a "truthy" predicate; its expression is the value.
         Predicate::IsTrue(e) => e.clone(),
-        _ => return None,
+        Predicate::Like(a, pat, _, neg) => ExprAst::Func {
+            name: if *neg { "NOT LIKE" } else { "LIKE" }.to_string(),
+            args: vec![a.clone(), pat.clone()],
+        },
+        Predicate::IsNull(a, neg) => ExprAst::Func {
+            name: if *neg { "IS_NOT_NULL" } else { "IS_NULL" }.to_string(),
+            args: vec![a.clone()],
+        },
+        Predicate::In(a, values, neg) => {
+            let mut args = vec![a.clone()];
+            args.extend(values.iter().cloned());
+            ExprAst::Func {
+                name: if *neg { "NOT IN" } else { "IN" }.to_string(),
+                args,
+            }
+        }
     })
 }
 
@@ -2215,6 +2584,87 @@ fn expr_text(e: &ExprAst) -> String {
     }
 }
 
+/// Validates and normalises a typed literal (`DATE '…'`, `INTERVAL '…'`, …).
+/// The reference rejects impossible dates and malformed interval payloads at
+/// parse time, so the parser does too.
+fn typed_literal_value(kind: &str, raw: &str) -> Result<String> {
+    match kind {
+        "DATE" => {
+            validate_date(raw)?;
+            Ok(normalize_datetime(kind, raw))
+        }
+        "TIME" => {
+            validate_time(raw)?;
+            Ok(normalize_datetime(kind, raw))
+        }
+        "TIMESTAMP" | "DATETIME" => {
+            if let Some((date, time)) = raw.trim().split_once(' ') {
+                validate_date(date)?;
+                validate_time(time)?;
+            } else {
+                validate_date(raw)?;
+            }
+            Ok(normalize_datetime(kind, raw))
+        }
+        "INTERVAL" => {
+            let mut parts = raw.split_whitespace();
+            let (Some(n), Some(unit), None) = (parts.next(), parts.next(), parts.next()) else {
+                return Err(Error::Invalid(format!("invalid interval literal '{raw}'")));
+            };
+            n.parse::<i64>()
+                .map_err(|_| Error::Invalid(format!("invalid interval amount '{n}'")))?;
+            let unit = unit.to_ascii_uppercase();
+            let base = unit.strip_suffix('S').unwrap_or(&unit);
+            if !matches!(base, "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND") {
+                return Err(Error::Invalid(format!("invalid interval unit '{unit}'")));
+            }
+            Ok(normalize_datetime(kind, raw))
+        }
+        _ => Ok(normalize_datetime(kind, raw)),
+    }
+}
+
+fn validate_date(raw: &str) -> Result<()> {
+    let s = raw.trim().replace('/', "-");
+    let parts: Vec<&str> = s.split('-').collect();
+    let [y, m, d] = parts.as_slice() else {
+        return Err(Error::Invalid(format!("invalid date literal '{raw}'")));
+    };
+    if y.len() > 4 || [y, m, d].iter().any(|p| p.is_empty() || !p.chars().all(|c| c.is_ascii_digit())) {
+        return Err(Error::Invalid(format!("invalid date literal '{raw}'")));
+    }
+    let (y, m, d): (i64, i64, i64) = (
+        y.parse().unwrap_or(0),
+        m.parse().unwrap_or(0),
+        d.parse().unwrap_or(0),
+    );
+    if !(1..=9999).contains(&y) || !(1..=12).contains(&m) || !(1..=31).contains(&d) {
+        return Err(Error::Invalid(format!("invalid date literal '{raw}'")));
+    }
+    Ok(())
+}
+
+fn validate_time(raw: &str) -> Result<()> {
+    let parts: Vec<&str> = raw.trim().split(':').collect();
+    if parts.len() < 2 || parts.len() > 3 {
+        return Err(Error::Invalid(format!("invalid time literal '{raw}'")));
+    }
+    let mut nums = Vec::new();
+    for p in &parts {
+        let n: u32 = p
+            .split('.')
+            .next()
+            .unwrap_or(p)
+            .parse()
+            .map_err(|_| Error::Invalid(format!("invalid time literal '{raw}'")))?;
+        nums.push(n);
+    }
+    if nums[0] > 23 || nums[1] > 59 || nums.get(2).copied().unwrap_or(0) > 59 {
+        return Err(Error::Invalid(format!("invalid time literal '{raw}'")));
+    }
+    Ok(())
+}
+
 pub fn normalize_datetime(kind: &str, raw: &str) -> String {
     // INTERVAL and JSON payloads are kept verbatim
     if kind == "INTERVAL" || kind == "JSON" {
@@ -2272,6 +2722,48 @@ fn cmp_op(s: &str) -> Option<CmpOp> {
         ">=" => CmpOp::Ge,
         _ => return None,
     })
+}
+
+/// Keywords that can follow a `FROM` entry and therefore cannot be a table
+/// alias.
+fn is_clause_keyword(s: &str) -> bool {
+    matches!(
+        s.to_ascii_uppercase().as_str(),
+        "WHERE"
+            | "GROUP"
+            | "HAVING"
+            | "ORDER"
+            | "LIMIT"
+            | "OFFSET"
+            | "JOIN"
+            | "INNER"
+            | "LEFT"
+            | "RIGHT"
+            | "FULL"
+            | "OUTER"
+            | "CROSS"
+            | "NATURAL"
+            | "ON"
+            | "USING"
+            | "SEARCH"
+            | "HIGHLIGHT"
+            | "UNION"
+            | "EXCEPT"
+            | "INTERSECT"
+    )
+}
+
+/// The unqualified `left`/`right` keys of a simple `ON a = b` join predicate.
+fn join_keys(p: &Predicate) -> (String, String) {
+    if let Predicate::Cmp(ExprAst::Column(a), CmpOp::Eq, ExprAst::Column(b)) = p {
+        (unqualified(a), unqualified(b))
+    } else {
+        (String::new(), String::new())
+    }
+}
+
+fn unqualified(name: &str) -> String {
+    name.rsplit('.').next().unwrap_or(name).to_string()
 }
 
 fn is_agg_name(name: &str) -> bool {
@@ -2399,6 +2891,10 @@ mod tests {
                 search: None,
                 distinct: false,
                 highlight: vec![],
+                ctes: vec![],
+                cross_tables: vec![],
+                limit_expr: None,
+                offset_expr: None,
             }
         );
         assert_eq!(
@@ -2420,6 +2916,10 @@ mod tests {
                 search: None,
                 distinct: false,
                 highlight: vec![],
+                ctes: vec![],
+                cross_tables: vec![],
+                limit_expr: None,
+                offset_expr: None,
             }
         );
     }
@@ -2478,6 +2978,10 @@ mod tests {
                 search: None,
                 distinct: false,
                 highlight: vec![],
+                ctes: vec![],
+                cross_tables: vec![],
+                limit_expr: None,
+                offset_expr: None,
             }
         );
     }
@@ -2513,6 +3017,10 @@ mod tests {
                 search: None,
                 distinct: false,
                 highlight: vec![],
+                ctes: vec![],
+                cross_tables: vec![],
+                limit_expr: None,
+                offset_expr: None,
             }
         );
         assert_eq!(
@@ -2543,6 +3051,10 @@ mod tests {
                 search: None,
                 distinct: false,
                 highlight: vec![],
+                ctes: vec![],
+                cross_tables: vec![],
+                limit_expr: None,
+                offset_expr: None,
             }
         );
     }
@@ -2570,6 +3082,10 @@ mod tests {
                 search: None,
                 distinct: false,
                 highlight: vec![],
+                ctes: vec![],
+                cross_tables: vec![],
+                limit_expr: None,
+                offset_expr: None,
             }
         );
     }
@@ -3108,6 +3624,242 @@ mod tests {
         assert!(parse("select 1;").is_ok());
         assert!(parse("select a, sum(b), function(c, nested(d)) from t1;").is_ok());
     }
+    /// C++ `src/unit_test/parser/sql_select_statement_ut.cpp:988-1213
+    /// SelectStatementParsingTest.good_test3`.
+    #[test]
+    fn select_statement_parsing_good_test3() {
+        // Two SELECT statements in one string.
+        let stmts = parse("SELECT * FROM t1; SELECt * FROM t2;").unwrap();
+        assert_eq!(stmts.len(), 2);
+        let Statement::Select { from, .. } = &stmts[0] else {
+            panic!("expected SELECT");
+        };
+        assert_eq!(from.as_deref(), Some("t1"));
+        let Statement::Select { from, .. } = &stmts[1] else {
+            panic!("expected SELECT");
+        };
+        assert_eq!(from.as_deref(), Some("t2"));
+
+        // JOIN spellings.
+        let stmts = parse(
+            "SELECT * FROM t1 join t2 on x = y; \
+             SELECT * FROM t1 inner join t2 on x = y; \
+             SELECT * FROM t1 left join t2 on x = y; \
+             SELECT * FROM t1 right join t2 on x = y; \
+             SELECT * FROM t1 full join t2 on x = y; \
+             SELECT * FROM t1 outer join t2 on x = y; \
+             SELECT * FROM t1 natural join t2; \
+             SELECT * FROM t1 cross join t2 on x = y; \
+             SELECT * FROM t1, t2 where x = y;",
+        )
+        .unwrap();
+        assert_eq!(stmts.len(), 9);
+        let kinds: Vec<JoinKind> = stmts[..8]
+            .iter()
+            .map(|s| match s {
+                Statement::Select {
+                    join: Some(join), ..
+                } => join.kind,
+                other => panic!("expected a join, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![
+                JoinKind::Inner,
+                JoinKind::Inner,
+                JoinKind::Left,
+                JoinKind::Right,
+                JoinKind::Full,
+                JoinKind::Full,
+                JoinKind::Natural,
+                JoinKind::Cross,
+            ]
+        );
+        // The comma form is a cross product of two tables.
+        let Statement::Select {
+            from, cross_tables, ..
+        } = &stmts[8]
+        else {
+            panic!("expected SELECT");
+        };
+        assert_eq!(from.as_deref(), Some("t1"));
+        assert_eq!(cross_tables, &vec!["t2".to_string()]);
+
+        // LIMIT/OFFSET expressions and subqueries.
+        let Statement::Select {
+            limit,
+            limit_expr,
+            offset,
+            offset_expr,
+            ..
+        } = one("SELECT * FROM t1 limit 1 + 1 offset 2 + 2;")
+        else {
+            panic!("expected SELECT");
+        };
+        assert!(limit.is_none());
+        assert!(offset.is_none());
+        assert_eq!(
+            limit_expr,
+            Some(ExprAst::Binary(
+                Box::new(ExprAst::Literal(Literal::Int(1))),
+                BinOp::Add,
+                Box::new(ExprAst::Literal(Literal::Int(1)))
+            ))
+        );
+        assert_eq!(
+            offset_expr,
+            Some(ExprAst::Binary(
+                Box::new(ExprAst::Literal(Literal::Int(2))),
+                BinOp::Add,
+                Box::new(ExprAst::Literal(Literal::Int(2)))
+            ))
+        );
+
+        let Statement::Select {
+            limit_expr,
+            offset_expr,
+            ..
+        } = one(
+            "SELECT * FROM t1 limit (SELECT MIN(x) FROM t2) offset (SELECT MAX(y) FROM t2);",
+        )
+        else {
+            panic!("expected SELECT");
+        };
+        let ExprAst::Func { name, args } = limit_expr.unwrap() else {
+            panic!("expected a subquery limit");
+        };
+        assert_eq!(name, "SUBQUERY");
+        let ExprAst::Literal(Literal::Str(sql)) = &args[0] else {
+            panic!("expected the subquery SQL");
+        };
+        assert!(sql.to_ascii_uppercase().contains("MIN"));
+        let ExprAst::Func { name, args } = offset_expr.unwrap() else {
+            panic!("expected a subquery offset");
+        };
+        assert_eq!(name, "SUBQUERY");
+        let ExprAst::Literal(Literal::Str(sql)) = &args[0] else {
+            panic!("expected the subquery SQL");
+        };
+        assert!(sql.to_ascii_uppercase().contains("MAX"));
+
+        // EXTRACT(field FROM ...) is named extract_<field>.
+        let Statement::Select { items, .. } =
+            one("SELECT extract('year' from date '2025-03-04');")
+        else {
+            panic!("expected SELECT");
+        };
+        let SelectItem::Func { name, args } = &items[0] else {
+            panic!("expected EXTRACT, got {:?}", items[0]);
+        };
+        assert_eq!(name, "extract_year");
+        assert_eq!(args[0], ExprAst::Literal(Literal::Str("2025-03-04".into())));
+
+        let Statement::Select { where_pred, .. } =
+            one("SELECT * FROM t1 WHERE extract('year' from a) < 2023")
+        else {
+            panic!("expected SELECT");
+        };
+        let Some(Predicate::Cmp(
+            ExprAst::Func { name, args },
+            CmpOp::Lt,
+            ExprAst::Literal(Literal::Int(2023)),
+        )) = where_pred
+        else {
+            panic!("expected extract_year(a) < 2023");
+        };
+        assert_eq!(name, "extract_year");
+        assert_eq!(args[0], ExprAst::Column("a".into()));
+
+        // CAST.
+        let Statement::Select { items, .. } = one("SELECT CAST(5.3 AS BIGINT);") else {
+            panic!("expected SELECT");
+        };
+        let SelectItem::Func { name, args } = &items[0] else {
+            panic!("expected CAST, got {:?}", items[0]);
+        };
+        assert_eq!(name, "CAST");
+        assert_eq!(args[0], ExprAst::Literal(Literal::Float(5.3)));
+        assert_eq!(args[1], ExprAst::Literal(Literal::Str("BIGINT".into())));
+
+        // WITH bindings and the outer cross product.
+        let Statement::Select {
+            ctes,
+            from: outer_from,
+            cross_tables,
+            ..
+        } = one("WITH t1 AS (SELECT a FROM x), t2 AS (SELECT b FROM y) SELECT * FROM t1, t2;")
+        else {
+            panic!("expected SELECT");
+        };
+        assert_eq!(ctes.len(), 2);
+        assert_eq!(ctes[0].alias, "t1");
+        let Statement::Select {
+            items,
+            from: cte0_from,
+            ..
+        } = ctes[0].query.as_ref()
+        else {
+            panic!("expected CTE SELECT");
+        };
+        assert_eq!(items, &vec![SelectItem::Column("a".into())]);
+        assert_eq!(cte0_from.as_deref(), Some("x"));
+        assert_eq!(ctes[1].alias, "t2");
+        let Statement::Select {
+            items,
+            from: cte1_from,
+            ..
+        } = ctes[1].query.as_ref()
+        else {
+            panic!("expected CTE SELECT");
+        };
+        assert_eq!(items, &vec![SelectItem::Column("b".into())]);
+        assert_eq!(cte1_from.as_deref(), Some("y"));
+        assert_eq!(outer_from.as_deref(), Some("t1"));
+        assert_eq!(cross_tables, vec!["t2".to_string()]);
+
+        // `a + 3 day`.
+        let Statement::Select { items, .. } = one("select a + 3 day from t1;") else {
+            panic!("expected SELECT");
+        };
+        let SelectItem::Expr(ExprAst::Binary(left, BinOp::Add, right)) = &items[0] else {
+            panic!("expected a + 3 day, got {:?}", items[0]);
+        };
+        assert_eq!(**left, ExprAst::Column("a".into()));
+        let ExprAst::Func { name, args } = right.as_ref() else {
+            panic!("expected an interval operand");
+        };
+        assert_eq!(name, "INTERVAL");
+        assert_eq!(args[0], ExprAst::Literal(Literal::Int(3)));
+        assert_eq!(args[1], ExprAst::Literal(Literal::Str("DAY".into())));
+
+        // CAST date minus INTERVAL.
+        let Statement::Select { where_pred, .. } = one(
+            "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 days;",
+        ) else {
+            panic!("expected SELECT");
+        };
+        let Some(Predicate::Cmp(
+            ExprAst::Column(column),
+            CmpOp::Eq,
+            ExprAst::Binary(left, BinOp::Sub, right),
+        )) = where_pred
+        else {
+            panic!("expected a = CAST(...) - INTERVAL");
+        };
+        assert_eq!(column, "a");
+        let ExprAst::Func { name, args } = left.as_ref() else {
+            panic!("expected CAST");
+        };
+        assert_eq!(name, "CAST");
+        assert_eq!(args[1], ExprAst::Literal(Literal::Str("DATE".into())));
+        let ExprAst::Func { name, args } = right.as_ref() else {
+            panic!("expected INTERVAL");
+        };
+        assert_eq!(name, "INTERVAL");
+        assert_eq!(args[0], ExprAst::Literal(Literal::Str("15 DAYS".into())));
+    }
+
     /// `SelectStatementParsingTest.bad_test1`: `OFFSET` requires `LIMIT`.
     #[test]
     fn offset_without_limit_is_rejected() {

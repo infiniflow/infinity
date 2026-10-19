@@ -203,6 +203,15 @@ const _: i32 = DAYS_PER_YEAR_LEAP + EPOCH_YEAR;
 mod tests {
     use super::*;
 
+    // C++: src/unit_test/parser/type/datetime/date_type_ut.cpp:TestSameSize
+    #[test]
+    fn date_type_same_size() {
+        assert_eq!(
+            std::mem::size_of::<crate::DateTOld>(),
+            std::mem::size_of::<DateT>()
+        );
+    }
+
     // C++: src/unit_test/parser/type/datetime/date_type_ut.cpp:TestFromString
     #[test]
     fn test_from_string() {
