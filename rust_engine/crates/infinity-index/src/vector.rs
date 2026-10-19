@@ -1247,4 +1247,22 @@ mod reference_suite {
         assert_eq!(got[0].0, 3);
         assert!((got[0].1 - 0.2).abs() < 1e-4);
     }
+    /// C++: `HnswHandlerTest.DISABLED_SLOW_test_load` — build, save to the chunk
+    /// layout, load and search. `#[ignore]` mirrors the C++ `DISABLED_` case.
+    #[test]
+    #[ignore = "C++ DISABLED_SLOW_test_load (run with --ignored)"]
+    fn disabled_slow_test_load() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Plain, &data);
+        let restored = chunk_roundtrip(&index, Metric::L2, HnswEncoding::Plain);
+        assert!(self_recall(&restored, &data) >= 0.95);
+    }
+
+    /// C++: `HnswHandlerTest.DISABLED_RANDOME_test_parallel` — readers query
+    /// while a writer inserts. `#[ignore]` mirrors the C++ `DISABLED_` case.
+    #[test]
+    #[ignore = "C++ DISABLED_RANDOME_test_parallel (run with --ignored)"]
+    fn disabled_random_test_parallel() {
+        parallel_readers(Metric::L2, HnswEncoding::Plain);
+    }
 }

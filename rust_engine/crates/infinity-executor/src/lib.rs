@@ -14063,6 +14063,215 @@ mod tests {
         );
     }
 
+    /// C++: `TestTxnManagerTest.DISABLED_SLOW_test_parallel_ts` — two threads
+    /// create and drop the same database; conflicting commits are tolerated.
+    #[test]
+    #[ignore = "C++ DISABLED_SLOW_test_parallel_ts (run with --ignored)"]
+    fn disabled_slow_test_parallel_ts() {
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        let mut handles = Vec::new();
+        for _ in 0..2 {
+            let e = e.clone();
+            handles.push(std::thread::spawn(move || {
+                for _ in 0..1280 {
+                    let _ = e.execute("CREATE DATABASE db1;");
+                    let _ = e.execute("DROP DATABASE db1;");
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        assert!(e
+            .catalog()
+            .list_databases()
+            .unwrap()
+            .iter()
+            .any(|d| d == "default_db"));
+    }
+
+    /// C++: `TestTxnManagerTest.DISABLED_SLOW_test_parallel_insert_table` —
+    /// concurrent inserts into one table.
+    #[test]
+    #[ignore = "C++ DISABLED_SLOW_test_parallel_insert_table (run with --ignored)"]
+    fn disabled_slow_test_parallel_insert_table() {
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute("CREATE TABLE pit (col1 INT, col2 VARCHAR);")
+            .unwrap();
+        let mut handles = Vec::new();
+        for t in 0..2 {
+            let e = e.clone();
+            handles.push(std::thread::spawn(move || {
+                for i in 0..600 {
+                    e.execute(&format!(
+                        "INSERT INTO pit VALUES ({}, 'abc');",
+                        t * 1000 + i
+                    ))
+                    .unwrap();
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        assert_eq!(e.row_count("pit").unwrap(), 1200);
+    }
+
+    /// C++: `TestTxnAppend.DISABLED_SLOW_test_append_append_concurrent` —
+    /// concurrent appends into one table. `#[ignore]` mirrors `DISABLED_`.
+    #[test]
+    #[ignore = "C++ DISABLED_SLOW_test_append_append_concurrent (run with --ignored)"]
+    fn disabled_slow_test_append_append_concurrent() {
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute("CREATE TABLE cac (id INT, name VARCHAR);")
+            .unwrap();
+        let mut handles = Vec::new();
+        for t in 0..4 {
+            let e = e.clone();
+            handles.push(std::thread::spawn(move || {
+                for i in 0..100 {
+                    e.execute(&format!(
+                        "INSERT INTO cac VALUES ({}, 'abc');",
+                        t * 1000 + i
+                    ))
+                    .unwrap();
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        assert_eq!(e.row_count("cac").unwrap(), 400);
+    }
+
+    /// C++: `ParallelTest.DISABLED_SLOW_ChaosTest` — four threads for
+    /// `kRunningTime` seconds mixing delete / vector search / update /
+    /// full-text search. `#[ignore]` mirrors `DISABLED_`; set
+    /// `INFINITY_CHAOS_SECONDS` to shorten the run.
+    #[test]
+    #[ignore = "C++ DISABLED_SLOW_ChaosTest (run with --ignored)"]
+    fn disabled_slow_chaos_test() {
+        let seconds: u64 = std::env::var("INFINITY_CHAOS_SECONDS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(30);
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute(
+            "CREATE TABLE chaos_test (id INT, body VARCHAR, other_vector EMBEDDING(FLOAT,4));",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX body_index ON chaos_test (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute(
+            "CREATE INDEX other_index ON chaos_test (other_vector) USING HNSW WITH (metric = l2);",
+        )
+        .unwrap();
+        for i in 0..100 {
+            e.execute(&format!(
+                "INSERT INTO chaos_test VALUES ({i}, 'the quick brown fox {i}', [{i}.0,1.0,2.0,3.0]);"
+            ))
+            .unwrap();
+        }
+        e.flush().unwrap();
+        let start = std::time::Instant::now();
+        let mut handles = Vec::new();
+        for t in 0..4 {
+            let e = e.clone();
+            handles.push(std::thread::spawn(move || {
+                let mut n = t * 1_000_000;
+                while start.elapsed() < std::time::Duration::from_secs(seconds) {
+                    n += 1;
+                    match n % 4 {
+                        0 => {
+                            let _ = e.execute(&format!("DELETE FROM chaos_test WHERE id = {};", n % 100));
+                        }
+                        1 => {
+                            let _ = e.execute(
+                                "SELECT id FROM chaos_test SEARCH MATCH VECTOR (other_vector, [0.0,1.0,2.0,3.0], 'float', 'l2', 3);",
+                            );
+                        }
+                        2 => {
+                            let _ = e.execute(&format!(
+                                "UPDATE chaos_test SET body = 'the quick brown fox {}' WHERE id = {};",
+                                n,
+                                n % 100
+                            ));
+                        }
+                        _ => {
+                            let _ = e.execute(
+                                "SELECT id FROM chaos_test SEARCH MATCH TEXT ('body', 'quick', 'topn=3');",
+                            );
+                        }
+                    }
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        e.execute("DROP TABLE chaos_test;").unwrap();
+        e.flush().unwrap();
+    }
+
+    /// C++: `MemoryIndexerTest.DISABLED_SLOW_Memory` — the reference appends
+    /// two blocks and checks the postings after the async dump; the port keeps
+    /// the same postings assertion and is `#[ignore]` exactly like the
+    /// `DISABLED_` case (run with `--ignored`).
+    #[test]
+    #[ignore = "C++ DISABLED_SLOW_Memory (run with --ignored)"]
+    fn disabled_slow_memory() {
+        let paragraphs = [
+            "A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.",
+            "An FST will read a set of strings on the input tape and generates a set of relations on the output tape. An FST can be thought of as a translator or relater between strings in a set.",
+            "In morphological parsing, an example would be inputting a string of letters into the FST, the FST would then output a string of morphemes.",
+            "An automaton can be said to recognize a string if we view the content of its tape as input. In other words, the automaton computes a function that maps strings into the set {0,1}. Alternatively, we can say that an automaton generates strings, which means viewing its tape as an output tape. On this view, the automaton generates a formal language, which is a set of strings. The two views of automata are equivalent: the function that the automaton computes is precisely the indicator function of the set of strings it generates. The class of languages generated by finite automata is known as the class of regular languages.",
+            "The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.",
+        ];
+        let mut mem = MemoryIndexer::new();
+        for (i, paragraph) in paragraphs.iter().enumerate() {
+            assert!(mem.insert(i as u64, paragraph, &None, usize::MAX));
+        }
+        let expected: [(&str, &[(u64, u32)]); 3] = [
+            ("fst", &[(0, 4), (1, 2), (2, 2)]),
+            ("automaton", &[(0, 2), (3, 5)]),
+            ("transducer", &[(0, 1), (4, 4)]),
+        ];
+        for (term, want) in expected {
+            let got: Vec<(u64, u32)> = mem.postings[term]
+                .iter()
+                .map(|(doc, tf, _)| (*doc, *tf))
+                .collect();
+            assert_eq!(got, want, "term {term}");
+        }
+    }
+
+    /// C++: `MemoryIndexerTest.DISABLED_SLOW_SeekPosition` — 8192 copies of
+    /// "A B C" repeated seven times; every document has tf 7 for `a`, `b`, `c`
+    /// at positions 0,3,6,…,18.
+    #[test]
+    #[ignore = "C++ DISABLED_SLOW_SeekPosition (run with --ignored)"]
+    fn disabled_slow_seek_position() {
+        let paragraph = "A B C A B C A B C A B C A B C A B C A B C";
+        let mut mem = MemoryIndexer::new();
+        for i in 0..8192u64 {
+            assert!(mem.insert(i, paragraph, &None, usize::MAX));
+        }
+        let a = &mem.postings["a"];
+        assert_eq!(a.len(), 8192);
+        for (doc, tf, positions) in a {
+            assert_eq!(*tf, 7, "doc {doc}");
+            assert_eq!(positions, &vec![0, 3, 6, 9, 12, 15, 18], "doc {doc}");
+        }
+        for doc in [0usize, 1, 2, 5, 127, 128, 512, 1024, 2048, 4096, 8191] {
+            assert_eq!(a[doc].0, doc as u64);
+            assert_eq!(a[doc].1, 7);
+        }
+    }
+
     /// C++: `MemoryIndexerTest.Chunk` (`memory_indexer_ut.cpp:191`): the
     /// five FST paragraphs produce the reference postings.
     #[test]

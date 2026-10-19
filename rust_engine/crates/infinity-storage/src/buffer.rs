@@ -487,4 +487,29 @@ mod tests {
         assert_eq!(b.status(), BufferStatus::Freed);
         assert_eq!(pool.used_bytes(), 0);
     }
+    /// C++: `BufferObjTest.DISABLED_SLOW_test_multiple_threads_read` — many
+    /// readers load the same persistent buffer concurrently.
+    #[test]
+    #[ignore = "C++ DISABLED_SLOW_test_multiple_threads_read (run with --ignored)"]
+    fn disabled_slow_test_multiple_threads_read() {
+        let pool = BufferPool::new(64 * 1024);
+        let b = pool.allocate(4096, BufferType::Persistent);
+        {
+            let mut h = b.load().unwrap();
+            h.data_mut().as_mut().unwrap()[0] = 9;
+        }
+        let mut handles = Vec::new();
+        for _ in 0..8 {
+            let b = b.clone();
+            handles.push(std::thread::spawn(move || {
+                for _ in 0..100 {
+                    let h = b.load().unwrap();
+                    assert_eq!(h.data().as_ref().unwrap()[0], 9);
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
 }
