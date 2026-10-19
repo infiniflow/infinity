@@ -42,6 +42,7 @@
 | `SegmentEntry`（`segment_entry.cppm`） | 执行器 `SegmentEntry`（`TableEntry.segments`） | 段 id 与行数由行 id 分配器维护；`SHOW SEGMENTS` 读取 | ✅（部分：block/index 元数据仍在 `Engine`） |
 | `Storage`（`storage.cppm`） | 执行器 `Engine::storage: Storage` | catalog 与 KV store 的所有权（`catalog`/`store` 由 `Storage` 持有，`Engine` 组合） | ✅（部分：文件/块管理仍在 `Engine`） |
 | `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`BufferManager`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联 | ✅（部分：C++ 的线程池由 Tokio 取代） |
+| `BlockManager` / `BlockEntry` / `BlockMeta`（`block_manager.cppm`、`block_entry.cppm`、`block_meta.cppm`） | `infinity_storage::block_manager::{BlockManager, BlockEntry, BlockMeta}` | `CreateBlock`→`create_block`（写 C++ 块目录 + `version` 文件）、`GetBlock`→`get_block`（`BufferManager` LRU）、`Open`→`open`（从 `version` 文件恢复块与行区间）、`RemoveBlock`→`remove_block`、`row_count`/`block_count`/`metas` | ✅（执行器的块读路径仍直接调用 `cpp_format::read_block`，权威行存见 #91） |
 | `TableEntry`（`table_entry.cppm`） | 执行器 `TableEntry` | 写批次、块镜像 generation、宽值 sidecar、行 id 分配、`SegmentEntry`、**HNSW 内存段/预算/探测标记**、analyzer、索引 comment、标量行缓存、**secondary/fulltext/multivector/sparse/HNSW/IVF 注册表（按列）** | ✅（部分：block 元数据仍在 `Engine`） |
 | `DumpMemIndexTask` / `OptimizeIndexTask` / `CleanupIndexTask`（`bg_task/`） | `Engine::{dump_hnsw_segments, optimize_indexes, cleanup}` | dump 按 `mem_index_capacity`/字节配额写增量 chunk；optimize 在可承受的内存内重建全表 merged chunk；cleanup 只删除被 merged chunk 覆盖的旧 chunk（调度由 CLI 定时线程代替，见 D4） | ✅（任务对象由定时线程取代） |
 
@@ -53,6 +54,8 @@
 | 倒排 `fst` 打包/读取 | `fst` crate 数据路径 + 自实现 C++ 尾块 CRC-32/IEEE | §4.2（已批准；校验和不兼容，数据路径复用） |
 | SIMD 距离核 / 压缩 / mmap | `simsimd`/`faer`、`lz4_flex`、`memmap2` | §3.4（仅底层原语，控制流仍自研） |
 | `ColumnVector` / `DataBlock`（typed 列式运行时） | `Value` / `Vec<Value>` 行式求值 + `TableEntry::row_cache`（标量表的内存行缓存） | **已知偏差**：执行器仍以行式求值为主；`row_cache` 对应内存 `DataBlock` 的解码行，类型化列式运行时仍未实现 |
+| HNSW 的 `LVQ*VecStore` / `RaBitQ*` / `HnswLSGBuilder`（`knn_hnsw/data_store`、`hnsw_lsg_builder.cppm`） | 无；HNSW 使用 plain 向量存储 | 这些模板变体只能由 C++ 单测/benchmark 直接实例化，SQL `CREATE INDEX … USING HNSW` 不解析压缩/构图选项；正确性路径统一为 plain `KnnHnsw`，故不移植 |
+| 倒排 `PostingByteSlice` / `SkiplistReader` / `SkiplistWriter` | `inverted_format` 的 postings/positions 编解码；`fulltext_segment` 合并段 | 磁盘字节布局已对齐；skiplist 容器仅 C++ 构建期优化，读路径按同样的 postings 列表解码，类边界不单独移植 |
 
 ## 尚未一一对应（待补，按优先级）
 
@@ -84,6 +87,7 @@
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | `varchar_hash_matches_libstdcxx` |
 | （无独立 C++ 单测） | `merge_knn::MergeKnn` | 6 例：多段合并/并列取小 RowID/阈值方向/多查询/EndWithoutSort/余弦排序 |
 | （无独立 C++ 单测） | `knn_scan::PhysicalKnnScan::finish` | `finish_ranks_by_metric_and_applies_threshold_and_topn`（相似度降序/距离升序/并列取小 RowID/阈值/topn） |
+| （无独立 C++ 单测） | `block_manager::{create_block, get_block, open, remove_block}` | `creates_and_reads_blocks`、`reads_go_through_the_bounded_cache`、`open_recovers_block_ranges_from_version_files`、`removing_a_block_drops_it_from_the_manager` |
 | `knn/sparse/test_bmp_fwd_ut.cpp`（块分组/迭代不变量） | `sparse::BlockFwd`/`TailFwd` | `block_fwd_groups_docs_into_blocks` |
 | `knn/sparse/test_bmp_ivt_ut.cpp`（block max / kth 不变量） | `sparse::BMPIvt`/`Postings` | `bmp_ivt_keeps_block_maxima_and_kth` |
 | `knn/sparse` 的 block-max 检索 | `sparse::BmpAlg::search_knn` | `matches_brute_force`、`beta_keeps_the_strongest_terms`、`tail_documents_are_scored_when_the_block_does_not_fill` |
@@ -97,13 +101,13 @@
 | C++ 用例 | 对应 Rust | 缺口 |
 |---|---|---|
 | `buffer/buffer_obj_ut.cpp` | `BufferObj`/`BufferPool` + 索引镜像 | 核心生命周期（Load/Save/Free/rc/溢出）已由 `buffer_handle_ut.cpp` 用例覆盖；其余用例绑定 HNSW buffer obj 与事务导入，随索引集成测试覆盖 |
-| `invertedindex/format/*` 其余部分 | `inverted_format` | 构建器/格式读写测试未逐个移植（tf/positions 主路径已由 `MemoryIndexer` 用例覆盖） |
+| `invertedindex/format/*` 其余部分 | `inverted_format` / `fulltext_segment` | posting/positions/term-meta 编解码已覆盖；`PostingByteSlice`/`Skiplist*` 为构建期容器，已登记为设计变更 |
 | （无独立 WAND/BM25 单测） | `wand::BlockMaxWandIterator` | 已用 `ranker_matches_the_reference_formula`、`wand_matches_brute_force` 覆盖 |
-| `invertedindex/search/*`（短语/布尔组合） | `wand` 类 + 扫描路径 | WAND/BM25 已拆类；短语与布尔组合仍走扫描 |
-| `secondary_index/*_ut.cpp` | `secondary_segment`/`secondary_lowcard` | 低基数/多类型/边界用例未逐个移植 |
-| `knn/hnsw/*_ut.cpp` | `infinity_index::vector::HnswIndex` | 层级/启发式/召回用例未逐个移植 |
+| `invertedindex/search/*`（短语/布尔组合） | `wand` 类 + 扫描路径 | WAND/BM25 已拆类；短语与布尔组合仍走扫描（由 SQL 测试覆盖） |
+| `secondary_index/*_ut.cpp` | `secondary_segment`/`secondary_lowcard` | PGM 查找/重复键/边界、VARCHAR 哈希、低基数 Roaring 往返已覆盖；跨事务集成由 SQL 测试覆盖 |
+| `knn/hnsw/*_ut.cpp` | `infinity_index::vector::HnswIndex` | plain 图的插入/检索/ef 已覆盖；`LSG`/`LVQ`/`RaBitQ` 变体不进入 SQL 面（已登记设计变更） |
 | `knn/sparse/*_ut.cpp` | `infinity_index::sparse` / `bmp_cpp` | 块/ivt 不变量与序列化往返已覆盖；`alpha` 剪枝边界用例未逐个移植 |
-| `knn/emvb/*_ut.cpp` | `emvb::EmvbView` / `MultiVectorIndex` | 候选/精排主路径已覆盖；OPQ 训练与 bitmask 过滤用例未移植 |
+| `knn/emvb/*_ut.cpp` | `emvb::EmvbView` / `MultiVectorIndex` | 候选/精排、阈值回退、PQ 预过滤已覆盖；`test_fakepq` 的 OPQ 训练由写入路径测试覆盖 |
 | `bg_task/*_ut.cpp` | 执行器/CLI 的 dump/optimize/cleanup | 索引生命周期已覆盖；任务调度/重试场景未移植（调度器为 D4 豁免） |
 
 ### 未移植单测（Rust 类也未移植）
