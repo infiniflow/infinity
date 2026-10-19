@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `grouped` 1006, `mapped` 108, `test` 7
+- 状态分布：`excluded` 15, `grouped` 1005, `mapped` 109, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -31,7 +31,7 @@
 | 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
-| 25 | `NGramAnalyzer` | `src/common/analyzer/ngram_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
+| 25 | `NGramAnalyzer` | `src/common/analyzer/ngram_analyzer.cppm` | mapped | `analyzer::NGramAnalyzer`（n-gram 窗口按 UTF-8 code point 滑动） |
 | 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 28 | `SparsegramAnalyzer` | `src/common/analyzer/sparsegram_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |

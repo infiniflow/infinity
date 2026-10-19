@@ -244,6 +244,70 @@ impl StandardAnalyzer {
     }
 }
 
+/// C++: `NGramAnalyzer` (`ngram_analyzer.cppm`, `ngram_analyzer_impl.cpp`).
+///
+/// Slides a window of `n` code points over each whitespace-delimited run; a run
+/// shorter than `n` at the end of the input produces nothing.
+#[derive(Debug, Clone)]
+pub struct NGramAnalyzer {
+    ngram: usize,
+}
+
+impl NGramAnalyzer {
+    pub fn new(ngram: usize) -> Self {
+        Self { ngram }
+    }
+
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        let chars: Vec<(usize, char)> = input.char_indices().collect();
+        let mut out = Vec::new();
+        let mut offset = 0u32;
+        let mut i = 0usize;
+        while i < chars.len() {
+            if chars[i].1.is_whitespace() {
+                i += 1;
+                continue;
+            }
+            let mut end = i;
+            let mut count = 0usize;
+            let mut hit_space = false;
+            while end < chars.len() && count < self.ngram {
+                if chars[end].1.is_whitespace() {
+                    hit_space = true;
+                    break;
+                }
+                end += 1;
+                count += 1;
+            }
+            if count < self.ngram {
+                if hit_space {
+                    // A space inside the window ends this run without emitting;
+                    // continue with the next word.
+                    i = end;
+                    while i < chars.len() && chars[i].1.is_whitespace() {
+                        i += 1;
+                    }
+                    continue;
+                }
+                // Fewer than `n` code points remain: the reference stops.
+                break;
+            }
+            let start_byte = chars[i].0;
+            let end_byte = chars.get(end).map(|(b, _)| *b).unwrap_or(input.len());
+            out.push(Term {
+                text: input[start_byte..end_byte].to_string(),
+                word_offset: offset,
+                char_offset: start_byte as u32,
+                end_offset: end_byte as u32,
+                is_index: false,
+            });
+            offset += 1;
+            i += 1;
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,5 +411,45 @@ mod tests {
              http://www.marxists.org/archive/malatesta/1930s/xx/toanarchy.htm \
              Anarchism as a Theory of Organization 2008-04-14";
         assert!(!analyzer.analyze(input).is_empty());
+    }
+    /// `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp::test1`.
+    #[test]
+    fn ngram_two_slides_over_words() {
+        let analyzer = NGramAnalyzer::new(2);
+        let terms = analyzer.analyze("hello world  123");
+        assert_eq!(
+            texts(&terms),
+            vec![
+                ("he", 0),
+                ("el", 1),
+                ("ll", 2),
+                ("lo", 3),
+                ("wo", 4),
+                ("or", 5),
+                ("rl", 6),
+                ("ld", 7),
+                ("12", 8),
+                ("23", 9)
+            ]
+        );
+    }
+
+    /// `ngram_analyzer_ut.cpp::test2` — single-character grams.
+    #[test]
+    fn ngram_one_emits_each_character() {
+        let analyzer = NGramAnalyzer::new(1);
+        let terms = analyzer.analyze("abc de  fg");
+        assert_eq!(
+            texts(&terms),
+            vec![
+                ("a", 0),
+                ("b", 1),
+                ("c", 2),
+                ("d", 3),
+                ("e", 4),
+                ("f", 5),
+                ("g", 6)
+            ]
+        );
     }
 }
