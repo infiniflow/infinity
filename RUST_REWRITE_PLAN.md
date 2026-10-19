@@ -452,7 +452,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 **全文的段生命周期**：内存段达预算（默认 64 MiB，`INFINITY_TEXT_SEGMENT_BYTES` 覆盖）即写出 `ft_{rowid:016x}.{dic,pos,len}`；查询合并「封盘段 + 内存尾段」，语料统计与 postings 均按段合并；UPDATE 重写的行用 `overridden` 屏蔽旧副本。强制 4 KiB 预算跑完整 Gate A 仍 1752/129/1536。
 
-**HNSW 的段生命周期**：`[buffer] memindex_memory_quota` 控制内存段落盘（插入前超限则先 dump），`[storage] optimize_interval` 驱动 optimize（新 chunk 覆盖全部存活行），`cleanup` 只保留最新 chunk。
+**HNSW 的段生命周期**：`[storage] mem_index_capacity`（C++ `Config::MemIndexCapacity()`，默认 65536 行）在每批写入后触发内存段落盘（`AppendMemIndex` 语义）；`[buffer] memindex_memory_quota` 另按字节数控制内存段落盘（插入前超限则先 dump）；`[storage] optimize_interval` 驱动 optimize（新 chunk 覆盖全部存活行），`cleanup` 只在最新 chunk 已覆盖全表时删除被合并的旧 chunk（增量 chunk 不会因 cleanup 丢失）。checkpoint/optimize 的内存段落盘在内存段为空时直接跳过，不再重建全表图。
 
 ### 7.4 协议、对象存储与恢复
 

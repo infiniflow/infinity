@@ -1849,9 +1849,12 @@ impl TextIndex {
         true
     }
 
-    /// Seals once the unsealed segment reaches its size budget.
-    fn maybe_seal(&mut self) {
-        if self.mem.mem_used() >= text_segment_bytes() {
+    /// Seals once the unsealed segment reaches its size budget or the
+    /// configured `mem_index_capacity` row count.
+    fn maybe_seal(&mut self, capacity: usize) {
+        if self.mem.mem_used() >= text_segment_bytes()
+            || (capacity > 0 && self.mem.doc_count() >= capacity)
+        {
             self.seal();
         }
     }
@@ -2561,6 +2564,10 @@ struct Context {
     /// `[buffer] memindex_memory_quota`, in bytes. `0` disables the dump
     /// trigger (the reference only dumps when a quota is configured).
     memindex_quota: std::sync::atomic::AtomicU64,
+    /// `[storage] mem_index_capacity`: rows an in-memory index may hold before
+    /// it is dumped into a sealed segment (the reference's
+    /// `Config::MemIndexCapacity()`). `0` disables the row trigger.
+    memindex_capacity: std::sync::atomic::AtomicUsize,
     /// Object store backing the C++-format data files (`storage_type =
     /// "minio"`). `None` keeps everything on the local disk.
     object_store: Mutex<Option<Arc<infinity_storage::s3::S3Client>>>,
@@ -2699,6 +2706,7 @@ impl Engine {
                 )),
                 config: Mutex::new(HashMap::new()),
                 memindex_quota: std::sync::atomic::AtomicU64::new(0),
+                memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
                 object_store: Mutex::new(None),
                 scan_gate: ScanGate::new(
                     std::env::var("INFINITY_SCAN_CONCURRENCY")
@@ -2986,16 +2994,31 @@ impl Engine {
         };
         for im in indexes {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
-                let segments = self.load_vector_indexes(&im.table, &im.name);
-                if !segments.is_empty() {
-                    let tkey = self.table_key(&im.table);
-                    self.tables
-                        .lock()
-                        .unwrap()
+                let tkey = self.table_key(&im.table);
+                let loaded: Vec<Arc<crate::cpp_blocks::LoadedVectorIndex>> = self
+                    .tables
+                    .lock()
+                    .unwrap()
+                    .get(&tkey)
+                    .and_then(|e| e.vector.get(&im.column).cloned())
+                    .unwrap_or_default();
+                let newest = loaded.iter().map(|s| s.chunk_id).max();
+                // Checkpoints append chunks; only the new ones are decoded.
+                let fresh = self.load_vector_indexes_after(&im.table, &im.name, newest);
+                if !fresh.is_empty() {
+                    let rows = self.row_count(&im.table).unwrap_or(0);
+                    let supersedes = rows > 0 && fresh.iter().any(|s| s.labels.len() >= rows);
+                    let mut tables = self.tables.lock().unwrap();
+                    let list = tables
                         .entry(tkey)
                         .or_default()
                         .vector
-                        .insert(im.column.clone(), segments.into_iter().map(Arc::new).collect());
+                        .entry(im.column.clone())
+                        .or_default();
+                    if supersedes {
+                        list.clear();
+                    }
+                    list.extend(fresh.into_iter().map(Arc::new));
                 }
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
                 let segments = self.load_ivf_indexes(&im.table, &im.name);
@@ -3882,6 +3905,9 @@ impl Engine {
                 self.update_text_indexes(table, base + k, &texts);
                 self.update_vector_caches(table, base + k, &texts);
             }
+            // C++ `AppendMemIndex`: a segment that reached
+            // `mem_index_capacity` rows is dumped right after the batch.
+            self.dump_hnsw_over_capacity(table);
         }
         self.bump_writes(table);
         self.append_row_cache(table, base, &encoded_rows);
@@ -6075,7 +6101,7 @@ impl Engine {
                 None => String::new(),
             };
             index_row(&mut index, seq as u64, &text);
-            index.maybe_seal();
+            index.maybe_seal(self.memindex_capacity());
         }
         let shared = Arc::new(std::sync::RwLock::new(index));
         self.tables
@@ -6405,7 +6431,7 @@ impl Engine {
             let mut index = shared.write().unwrap();
             index_delete_row(&mut index, seq as u64);
             index_row(&mut index, seq as u64, text);
-            index.maybe_seal();
+            index.maybe_seal(self.memindex_capacity());
         }
     }
 
@@ -9674,19 +9700,34 @@ impl Engine {
         *self.context.object_store.lock().unwrap() = Some(client);
     }
 
-    /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
-    /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
-    /// keeps every row in memory until a checkpoint.
     /// Sets the column-block cache budget (the reference's
     /// `[buffer] buffer_manager_size`).
     pub fn set_buffer_manager_size(&self, bytes: usize) {
         self.context.buffer.lock().unwrap().set_budget(bytes);
     }
 
+    /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
+    /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
+    /// keeps every row in memory until a checkpoint.
     pub fn set_memindex_quota(&self, bytes: u64) {
         self.context
             .memindex_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Sets `[storage] mem_index_capacity` (rows). The reference dumps an
+    /// in-memory index as soon as it holds this many rows; `0` disables the
+    /// row trigger.
+    pub fn set_memindex_capacity(&self, rows: usize) {
+        self.context
+            .memindex_capacity
+            .store(rows, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn memindex_capacity(&self) -> usize {
+        self.context
+            .memindex_capacity
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Dumps every HNSW memory segment at a checkpoint (the reference's
@@ -9724,9 +9765,10 @@ impl Engine {
     }
 
     /// Accounts `count` rows about to be inserted into `table` against each
-    /// HNSW memory index. When the buffer already exceeds the quota, the
-    /// reference dumps it **before** taking the new rows, which is what this
-    /// reproduces (one `chunk_{n}.idx` per dump).
+    /// HNSW memory index. The reference dumps an index when it reaches
+    /// `mem_index_capacity` rows (or, in this port, the buffered-size quota)
+    /// **before** taking the new rows, which is what this reproduces (one
+    /// `chunk_{n}.idx` per dump).
     fn note_index_insert(&self, table: &str, count: usize) {
         let quota = self
             .context
@@ -9773,19 +9815,71 @@ impl Engine {
                     .index_pending_bytes
                     .entry(im.column.clone())
                     .or_insert(0);
-                if *cur >= quota {
+                if quota > 0 && *cur >= quota {
                     // The dump empties the memory index; this batch is the
                     // first thing in the next one.
                     *cur = bytes;
                     true
                 } else {
-                    *cur += bytes;
+                    if quota > 0 {
+                        *cur += bytes;
+                    }
                     false
                 }
             };
             if dump && self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
                 // The dumped segment leaves memory; rows written after this
                 // checkpoint form the next one.
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(e) = tables.get_mut(&tkey) {
+                    e.hnsw_mem.remove(&im.column);
+                    e.index_pending_bytes.insert(im.column.clone(), 0);
+                    e.hnsw_probed = false;
+                }
+            }
+        }
+    }
+
+    /// C++ `AppendMemIndex`: after a write batch, dump every HNSW memory
+    /// segment that has reached `mem_index_capacity` rows. This is the row
+    /// bound the reference uses to keep an index's memory footprint constant
+    /// on a long import, independently of the byte quota.
+    fn dump_hnsw_over_capacity(&self, table: &str) {
+        let capacity = self.memindex_capacity();
+        if capacity == 0 {
+            return;
+        }
+        let tkey = self.table_key(table);
+        let full: Vec<String> = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .map(|e| {
+                    e.hnsw_mem
+                        .iter()
+                        .filter(|(_, m)| m.lock().map(|g| g.len() >= capacity).unwrap_or(false))
+                        .map(|(c, _)| c.clone())
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        if full.is_empty() {
+            return;
+        }
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+            return;
+        };
+        for im in indexes {
+            if !im.index_type.eq_ignore_ascii_case("HNSW") || !full.contains(&im.column) {
+                continue;
+            }
+            let same_table = im.table == table
+                || (im.table.rsplit('.').next() == table.rsplit('.').next()
+                    && (!im.table.contains('.') || !table.contains('.')));
+            if !same_table {
+                continue;
+            }
+            if self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.column);
@@ -12562,6 +12656,49 @@ mod tests {
             ),
             vec![vec!["11".to_string()]]
         );
+    }
+
+    /// C++ `AppendMemIndex`: after a write batch, an HNSW memory segment that
+    /// reached `mem_index_capacity` rows is dumped without waiting for a
+    /// checkpoint (the row bound that keeps a long import's memory flat).
+    #[test]
+    fn mem_index_capacity_dumps_the_hnsw_segment_after_the_batch() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_capacity(4);
+        e.execute("CREATE TABLE hc (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute("CREATE INDEX hc_i ON hc (v) USING HNSW WITH (metric = l2);")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO hc VALUES ");
+        for i in 0..10 {
+            sql.push_str(&format!("({i}, [{i}.0, 0.0, 0.0, 0.0])"));
+            if i < 9 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute(&sql).unwrap();
+        let indexed = |e: &Engine| {
+            e.tables
+                .lock()
+                .unwrap()
+                .values()
+                .flat_map(|t| t.hnsw_mem.values())
+                .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
+                .sum::<usize>()
+        };
+        assert_eq!(indexed(&e), 0, "the batch reached the capacity and dumped");
+
+        e.execute("INSERT INTO hc VALUES (10, [10.0,0.0,0.0,0.0]);")
+            .unwrap();
+        assert_eq!(indexed(&e), 1, "below the capacity the segment stays");
+        let dumped: usize = e
+            .load_vector_indexes("default_db.hc", "hc_i")
+            .iter()
+            .map(|seg| seg.labels.len())
+            .sum();
+        assert_eq!(dumped, 10);
     }
 
     /// Scalar tables keep a decoded row cache (the reference's in-memory

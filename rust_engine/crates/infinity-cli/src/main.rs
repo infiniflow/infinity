@@ -126,6 +126,12 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
         parse_size_bytes(&quota)
     };
     engine.set_memindex_quota(quota);
+    // `[storage] mem_index_capacity` — rows an in-memory index holds before it
+    // is dumped into a sealed chunk (the reference defaults to 65536 rows).
+    let capacity = toml_value(&text, "mem_index_capacity")
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .unwrap_or(64 * 1024);
+    engine.set_memindex_capacity(capacity);
     // `[buffer] buffer_manager_size` — the column-block cache budget (the
     // reference defaults to 8 GiB).
     let buffer = toml_value(&text, "buffer_manager_size").unwrap_or_default();

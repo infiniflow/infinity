@@ -35,6 +35,9 @@ type VectorRows = Vec<(u32, Vec<f32>)>;
 pub struct LoadedVectorIndex {
     pub index: HnswHandler,
     pub labels: Vec<u32>,
+    /// The `chunk_{id}.idx` this graph came from, so a later reload can load
+    /// only the chunks written since the last one.
+    pub chunk_id: u64,
 }
 
 /// A table whose estimated encoded size exceeds this keeps only the engine's
@@ -1464,13 +1467,19 @@ impl Engine {
     /// every checkpoint would not match the reference, which appends a chunk per
     /// memory-index dump.
     pub fn write_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<usize> {
-        self.write_cpp_hnsw_chunk(table, index_name, false)
+        self.write_cpp_hnsw_chunk(table, index_name, false, false)
     }
 
     /// Appends a fresh chunk, as the reference's memory-index dump does. Rows
     /// added since the previous dump end up in the new chunk.
     pub fn dump_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<usize> {
-        self.write_cpp_hnsw_chunk(table, index_name, true)
+        self.write_cpp_hnsw_chunk(table, index_name, true, false)
+    }
+
+    /// The optimize merge: rebuilds the graph over every live row and appends
+    /// it as the newest chunk, which then supersedes the incremental ones.
+    pub fn merge_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<usize> {
+        self.write_cpp_hnsw_chunk(table, index_name, false, true)
     }
 
     fn write_cpp_hnsw_chunk(
@@ -1478,6 +1487,7 @@ impl Engine {
         table: &str,
         index_name: &str,
         new_chunk: bool,
+        force_append: bool,
     ) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
@@ -1514,24 +1524,29 @@ impl Engine {
         // A checkpoint dumps the **memory segment** (rows since the previous
         // dump), not a graph rebuilt from every row: rebuilding cost O(table)
         // memory and time on every checkpoint and was the Gate C OOM driver.
-        // The full rebuild remains the fallback when no memory segment is
-        // loaded (e.g. materialising the mirror after a restart).
+        // The full rebuild remains the fallback when materialising the mirror
+        // explicitly (`new_chunk == false`), e.g. after a restart.
         let tkey = self.table_key(&table);
         let from_memory = if new_chunk {
-            let mem = self
+            let Some(mem) = self
                 .tables
                 .lock()
                 .unwrap()
                 .get(&tkey)
-                .and_then(|e| e.hnsw_mem.get(&column).cloned());
-            mem.and_then(|mem| {
-                let mem = mem.lock().ok()?;
-                if mem.is_empty() {
-                    return None;
-                }
-                let labels: Vec<u32> = mem.rows().iter().map(|s| *s as u32).collect();
-                Some(encode_hnsw_chunk_from(mem.index(), &labels))
-            })
+                .and_then(|e| e.hnsw_mem.get(&column).cloned())
+            else {
+                // Nothing buffered since the last dump: a checkpoint has
+                // nothing to write and must not rebuild the whole graph.
+                return Ok(0);
+            };
+            let Ok(mem) = mem.lock() else {
+                return Ok(0);
+            };
+            if mem.is_empty() {
+                return Ok(0);
+            }
+            let labels: Vec<u32> = mem.rows().iter().map(|s| *s as u32).collect();
+            Some(encode_hnsw_chunk_from(mem.index(), &labels))
         } else {
             None
         };
@@ -1548,7 +1563,7 @@ impl Engine {
             source: e,
         })?;
         let chunks = hnsw_chunks(&dir);
-        if !new_chunk && !chunks.is_empty() {
+        if !new_chunk && !force_append && !chunks.is_empty() {
             return Ok(count);
         }
         let name = format!(
@@ -1563,9 +1578,10 @@ impl Engine {
     }
 
     /// Optimizes every HNSW mirror: when the newest chunk does not cover all
-    /// live rows, writes a merged chunk with the whole table (the reference's
-    /// optimize step). A mirror whose newest chunk already covers the table is
-    /// left untouched, so repeated optimize ticks are no-ops.
+    /// live rows and the merge is affordable, writes a merged chunk with the
+    /// whole table (the reference's optimize step). A mirror whose newest
+    /// chunk already covers the table is left untouched, so repeated optimize
+    /// ticks are no-ops.
     pub fn optimize_cpp_index_chunks(&self) -> Result<()> {
         for im in self.storage.catalog.list_indexes()? {
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
@@ -1577,7 +1593,8 @@ impl Engine {
             let Some(dir) = self.cpp_hnsw_dir(&im.table, &im.name) else {
                 continue;
             };
-            if hnsw_chunks(&dir).is_empty() {
+            let chunks = hnsw_chunks(&dir);
+            if chunks.len() < 2 {
                 continue;
             }
             let covered = self
@@ -1595,24 +1612,70 @@ impl Engine {
                 })
                 .map(|c| c.header.cur_vec_num as usize)
                 .unwrap_or(0);
-            if covered != rows {
-                let _ = self.dump_cpp_hnsw_index(&im.table, &im.name);
+            if covered >= rows {
+                continue;
             }
+            // A merge holds the vectors, the rebuilt graph and the encoded
+            // chunk at the same time. On a multi-gigabyte table that transient
+            // is larger than the whole memory budget (C++ streams it through
+            // the buffer manager), so leave the incremental chunks alone
+            // rather than rebuilding the table every tick.
+            let dim = self
+                .table_schema(&im.table)
+                .ok()
+                .and_then(|s| s.iter().position(|c| c == &im.column))
+                .and_then(|ci| {
+                    self.column_types(&im.table)
+                        .ok()
+                        .and_then(|t| t.get(ci).cloned())
+                })
+                .and_then(|t| crate::type_dim(&t))
+                .unwrap_or(0);
+            let rebuild_bytes = rows.saturating_mul(dim).saturating_mul(4 * 3 + 64);
+            if rebuild_bytes > 1024 * 1024 * 1024 {
+                continue;
+            }
+            let _ = self.merge_cpp_hnsw_index(&im.table, &im.name);
         }
         Ok(())
     }
 
-    /// Removes every HNSW chunk except the newest one (the reference's cleanup
-    /// step marks the merged-away chunks deprecated and then deletes them).
+    /// Removes the HNSW chunks that a merged chunk supersedes. The reference
+    /// only cleans up chunks after `optimize` merged every live row into the
+    /// newest one; when the newest chunk does not cover the table, every
+    /// chunk is still needed and is kept.
     pub fn cleanup_cpp_index_chunks(&self) -> Result<()> {
         for im in self.storage.catalog.list_indexes()? {
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
                 continue;
             }
+            let Ok(rows) = self.row_count(&im.table) else {
+                continue;
+            };
             let Some(dir) = self.cpp_hnsw_dir(&im.table, &im.name) else {
                 continue;
             };
             let chunks = hnsw_chunks(&dir);
+            let covered = self
+                .cpp_hnsw_chunk_path(&im.table, &im.name)
+                .ok()
+                .and_then(|p| std::fs::read(p).ok())
+                .and_then(|b| {
+                    knn_format::decode_hnsw_chunk(
+                        &b,
+                        4,
+                        knn_format::VERTEX_L0_SIZE,
+                        knn_format::VERTEX_LX_SIZE,
+                    )
+                    .ok()
+                })
+                .map(|c| c.header.cur_vec_num as usize)
+                .unwrap_or(0);
+            // The newest chunk covers the table only when it is a merged
+            // chunk; incremental dumps cover just their own rows.
+            if covered < rows {
+                continue;
+            }
             if let Some((keep, _)) = chunks.last() {
                 for (id, path) in &chunks {
                     if id != keep {
@@ -1808,12 +1871,26 @@ impl Engine {
     /// merges. Missing/undecodable chunks are skipped so one bad segment cannot
     /// disable the index.
     pub fn load_vector_indexes(&self, table: &str, index_name: &str) -> Vec<LoadedVectorIndex> {
+        self.load_vector_indexes_after(table, index_name, None)
+    }
+
+    /// Loads only the chunks written after `after` (all when `None`), so a
+    /// checkpoint reload does not re-decode graphs it already holds in memory.
+    pub fn load_vector_indexes_after(
+        &self,
+        table: &str,
+        index_name: &str,
+        after: Option<u64>,
+    ) -> Vec<LoadedVectorIndex> {
         let table = self.qualified_table(table);
         let Some(dir) = self.cpp_hnsw_dir(&table, index_name) else {
             return Vec::new();
         };
         let mut out = Vec::new();
-        for (_, path) in hnsw_chunks(&dir) {
+        for (chunk_id, path) in hnsw_chunks(&dir) {
+            if after.is_some_and(|a| chunk_id <= a) {
+                continue;
+            }
             let Ok(bytes) = std::fs::read(&path) else {
                 continue;
             };
@@ -1847,9 +1924,10 @@ impl Engine {
             ) else {
                 continue;
             };
-            if let Ok(loaded) =
+            if let Ok(mut loaded) =
                 Self::assemble_loaded_index(chunk.header, chunk.labels.clone(), vectors, vertices)
             {
+                loaded.chunk_id = chunk_id;
                 out.push(loaded);
             }
         }
@@ -1900,6 +1978,7 @@ impl Engine {
         Ok(LoadedVectorIndex {
             index: HnswHandler::from_index(index),
             labels,
+            chunk_id: 0,
         })
     }
 
