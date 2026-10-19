@@ -2449,6 +2449,8 @@ struct TableEntry {
     index_pending_bytes: HashMap<String, usize>,
     /// Whether this table's HNSW indexes were probed since the last dump.
     hnsw_probed: bool,
+    /// Sparse (BMP) indexes per column.
+    sparse: HashMap<String, Arc<std::sync::RwLock<SparseIndex>>>,
     /// Decoded rows of a **scalar-only** table (the reference's in-memory
     /// `DataBlock`s). Served by `fetch_rows_with_ids` while it covers every
     /// live row; any mutation that rewrites rows drops it.
@@ -2584,8 +2586,6 @@ pub struct Engine {
     text_index: Mutex<HashMap<String, SharedTextIndex>>,
     /// Multi-vector indexes, keyed by `"<table>.<column>"`.
     mv_index: Mutex<HashMap<String, Arc<std::sync::RwLock<MultiVectorIndex>>>>,
-    /// Sparse (BMP) indexes, keyed by `"<table>.<column>"`.
-    sparse_index: Mutex<HashMap<String, Arc<std::sync::RwLock<SparseIndex>>>>,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
 }
 
@@ -2720,7 +2720,6 @@ impl Engine {
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
             text_index: Mutex::new(HashMap::new()),
             mv_index: Mutex::new(HashMap::new()),
-            sparse_index: Mutex::new(HashMap::new()),
             vector_cache: Mutex::new(HashMap::new()),
         };
         engine.recover_cpp_blocks()?;
@@ -3131,9 +3130,11 @@ impl Engine {
                 total += g.mem.mem_used();
             }
         }
-        for idx in self.sparse_index.lock().unwrap().values() {
-            if let Ok(g) = idx.read() {
-                total += g.tail_bytes;
+        for e in self.tables.lock().unwrap().values() {
+            for idx in e.sparse.values() {
+                if let Ok(g) = idx.read() {
+                    total += g.tail_bytes;
+                }
             }
         }
         for idx in self.mv_index.lock().unwrap().values() {
@@ -3428,7 +3429,12 @@ impl Engine {
                 .any(|e| !e.hnsw_mem.is_empty())
             || !self.ivf_mem.lock().unwrap().is_empty()
             || !self.mv_index.lock().unwrap().is_empty()
-            || !self.sparse_index.lock().unwrap().is_empty()
+            || self
+                .tables
+                .lock()
+                .unwrap()
+                .values()
+                .any(|e| !e.sparse.is_empty())
     }
 
     /// True when `table` has an index declaration. Consulted together with
@@ -6172,11 +6178,15 @@ impl Engine {
         width: infinity_storage::bmp_cpp::IdxWidth,
     ) -> Result<Arc<std::sync::RwLock<SparseIndex>>> {
         let key = index_key(table, column);
+        let tkey = self.table_key(table);
         let reserved = self.storage.store.scan_prefix(&row_prefix(table))?.len();
-        if let Some(idx) = self.sparse_index.lock().unwrap().get(&key) {
-            let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
-            if complete >= reserved {
-                return Ok(idx.clone());
+        {
+            let tables = self.tables.lock().unwrap();
+            if let Some(idx) = tables.get(&tkey).and_then(|e| e.sparse.get(column)) {
+                let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
+                if complete >= reserved {
+                    return Ok(idx.clone());
+                }
             }
         }
         let schema = self.table_schema(table)?;
@@ -6207,32 +6217,34 @@ impl Engine {
         }
         index.seal();
         let shared = Arc::new(std::sync::RwLock::new(index));
-        self.sparse_index
+        self.tables
             .lock()
             .unwrap()
-            .insert(key, shared.clone());
+            .entry(tkey)
+            .or_default()
+            .sparse
+            .insert(column.to_string(), shared.clone());
         Ok(shared)
     }
 
     /// Keeps existing sparse indexes in step with an inserted/rewritten row.
     fn update_sparse_indexes(&self, table: &str, seq: usize, cells: &[String]) {
-        let prefix = format!("{table}.");
+        let tkey = self.table_key(table);
         let indexes: Vec<(String, Arc<std::sync::RwLock<SparseIndex>>)> = self
-            .sparse_index
+            .tables
             .lock()
             .unwrap()
-            .iter()
-            .filter(|(k, _)| k.starts_with(&prefix))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
+            .get(&tkey)
+            .map(|e| e.sparse.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .unwrap_or_default();
         if indexes.is_empty() {
             return;
         }
         let Ok(schema) = self.table_schema(table) else {
             return;
         };
-        for (key, shared) in indexes {
-            let column = &key[prefix.len()..];
+        for (column, shared) in indexes {
+            let column = &column;
             let Some(ci) = schema.iter().position(|c| c == column) else {
                 continue;
             };
@@ -6254,11 +6266,11 @@ impl Engine {
     /// Dumps every sparse memory tail into its BMP chunks (called by `flush`).
     fn seal_sparse_indexes(&self) {
         let indexes: Vec<Arc<std::sync::RwLock<SparseIndex>>> = self
-            .sparse_index
+            .tables
             .lock()
             .unwrap()
             .values()
-            .cloned()
+            .flat_map(|e| e.sparse.values().cloned())
             .collect();
         for shared in indexes {
             shared.write().unwrap().seal();
@@ -6267,21 +6279,17 @@ impl Engine {
 
     /// Removes the sparse chunks of `table` (or one column) from disk and cache.
     fn drop_sparse_storage(&self, table: &str, column: Option<&str>) {
-        let prefix = match column {
-            Some(c) => index_key(table, c),
-            None => format!("{table}."),
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&tkey) else {
+            return;
         };
-        let mut map = self.sparse_index.lock().unwrap();
-        let keys: Vec<String> = map
-            .keys()
-            .filter(|k| match column {
-                Some(_) => *k == &prefix,
-                None => k.starts_with(&prefix),
-            })
-            .cloned()
-            .collect();
-        for key in keys {
-            if let Some(idx) = map.remove(&key) {
+        let columns: Vec<String> = match column {
+            Some(c) => vec![c.to_string()],
+            None => entry.sparse.keys().cloned().collect(),
+        };
+        for c in columns {
+            if let Some(idx) = entry.sparse.remove(&c) {
                 if let Ok(dir) = idx.read().map(|g| g.dir.clone()) {
                     let _ = std::fs::remove_dir_all(dir);
                 }
@@ -11909,22 +11917,14 @@ mod tests {
             .unwrap()
             .tail_bytes;
         assert_eq!(mv_tail, 0);
-        let sp_key = e
-            .sparse_index
+        let sp = e
+            .tables
             .lock()
             .unwrap()
-            .keys()
-            .next()
-            .cloned()
+            .values()
+            .find_map(|t| t.sparse.values().next().cloned())
             .unwrap();
-        let sp_tail = e
-            .sparse_index
-            .lock()
-            .unwrap()
-            .get(&sp_key)
-            .unwrap()
-            .read()
-            .unwrap()
+        let sp_tail = sp.read().unwrap()
             .tail_bytes;
         assert_eq!(sp_tail, 0);
         let sec_key = e
