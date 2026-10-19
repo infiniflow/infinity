@@ -1378,6 +1378,37 @@ mod tests {
         assert_eq!(c.to_string(), "c2 Varchar PrimaryKey default Null");
     }
 
+    /// `src/unit_test/parser/type/data_type_ut.cpp::DataTypeTest/GetTypeName`:
+    /// the C++ `DataType::ToString` spellings for the non-geo types (geo types
+    /// are excluded by the user's decision).
+    #[test]
+    fn cpp_type_names_match_the_reference() {
+        for (code, name) in [
+            (logical::BOOLEAN, "Boolean"),
+            (logical::TINYINT, "TinyInt"),
+            (logical::SMALLINT, "SmallInt"),
+            (logical::INTEGER, "Integer"),
+            (logical::BIGINT, "BigInt"),
+            (logical::HUGEINT, "HugeInt"),
+            (logical::FLOAT, "Float"),
+            (logical::DOUBLE, "Double"),
+            (logical::DECIMAL, "Decimal"),
+            (logical::VARCHAR, "Varchar"),
+            (logical::DATE, "Date"),
+            (logical::TIME, "Time"),
+            (logical::DATETIME, "DateTime"),
+            (logical::TIMESTAMP, "Timestamp"),
+            (logical::INTERVAL, "Interval"),
+            (logical::ARRAY, "Array"),
+            (logical::EMBEDDING, "Embedding"),
+            (logical::TENSOR, "Tensor"),
+            (logical::SPARSE, "Sparse"),
+            (logical::MULTIVECTOR, "MultiVector"),
+        ] {
+            assert_eq!(cpp_logical_name(code), Some(name), "code {code}");
+        }
+    }
+
     /// `src/unit_test/storage/definition/table_def_ut.cpp::TableDefTest/test1`.
     #[test]
     fn table_def_reports_schema_table_comment_and_columns() {
