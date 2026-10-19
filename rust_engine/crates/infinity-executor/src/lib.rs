@@ -3944,7 +3944,18 @@ impl Engine {
         if !matches!(stmt, Statement::Select { .. }) {
             return Err(Error::Invalid("subquery must be a SELECT".into()));
         }
-        self.bind_subquery(&stmt, outer)?;
+        // A CTE alias in FROM is resolved against `ctes`, not the catalog. A
+        // CTE may shadow a base table, and binding against that table's schema
+        // would reject a legitimate query.
+        let from_is_cte = match &stmt {
+            Statement::Select {
+                from: Some(table), ..
+            } => ctes.contains_key(&table.to_ascii_lowercase()),
+            _ => false,
+        };
+        if !from_is_cte {
+            self.bind_subquery(&stmt, outer)?;
+        }
         let visible: Vec<String> = ctes.keys().cloned().collect();
         let stmt = self.expand_views(self.qualify_tables_in(&stmt, &visible))?;
         self.run_select_with_ctes(&stmt, ctes)
@@ -15455,6 +15466,29 @@ mod tests {
             err.to_string()
                 .contains("correlated subqueries are not supported"),
             "{err}"
+        );
+    }
+
+    /// A CTE alias may shadow a base table. The correlated-subquery binder must
+    /// not resolve the alias against the catalog and reject the query with the
+    /// wrong schema.
+    #[test]
+    fn a_cte_alias_shadowing_a_table_is_not_bound_as_that_table() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE shadow (other INT);").unwrap();
+        e.execute("INSERT INTO shadow VALUES (99);").unwrap();
+        e.execute("CREATE TABLE src (id INT);").unwrap();
+        e.execute("INSERT INTO src VALUES (1), (2);").unwrap();
+        // `shadow` in the subquery's FROM is the CTE, which exposes `id`; the
+        // base table of the same name only has `other`.
+        assert_eq!(
+            rows(
+                &e,
+                "WITH shadow AS (SELECT id FROM src) \
+                 SELECT id FROM src WHERE EXISTS (SELECT id FROM shadow) ORDER BY id;"
+            ),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
     }
 
