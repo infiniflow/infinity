@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 136, `integration` 250, `partial` 41, `ported` 335.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 127, `integration` 250, `partial` 42, `ported` 343.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -127,8 +127,8 @@
 | 113 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast1` | gate-a |
 | 114 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast0` | ported | `infinity-common` `varchar_cast0` |
 | 115 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast1` | ported | `infinity-common` `varchar_cast1` |
-| 116 | `src/unit_test/function/scalar/abs_functions_ut.cpp` | `AbsFunctionsTest` | `abs_func` | gate-a |
-| 117 | `src/unit_test/function/scalar/add_functions_ut.cpp` | `AddFunctionsTest` | `add_func` | gate-a |
+| 116 | `src/unit_test/function/scalar/abs_functions_ut.cpp` | `AbsFunctionsTest` | `abs_func` | ported | `infinity-executor` `tests::abs_function_covers_every_numeric_type` |
+| 117 | `src/unit_test/function/scalar/add_functions_ut.cpp` | `AddFunctionsTest` | `add_func` | partial | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` 覆盖常规值；C++ 的按列宽 checked 溢出→NULL 未建模（i64 求值） |
 | 118 | `src/unit_test/function/scalar/and_functions_ut.cpp` | `AndFunctionsTest` | `and_func` | gate-a |
 | 119 | `src/unit_test/function/scalar/century_functions_ut.cpp` | `CenturyFunctionsTest` | `century_func` | gate-a |
 | 120 | `src/unit_test/function/scalar/current_date_functions_ut.cpp` | `CurrentDateFunctionsTest` | `current_date_func` | gate-a |
@@ -139,9 +139,9 @@
 | 125 | `src/unit_test/function/scalar/day_of_month_functions_ut.cpp` | `DayOfMonthFunctionsTest` | `day_of_month_func` | gate-a |
 | 126 | `src/unit_test/function/scalar/day_of_week_ut.cpp` | `DayOfWeekFunctionsTest` | `day_of_week_func` | gate-a |
 | 127 | `src/unit_test/function/scalar/day_of_year_functions_ut.cpp` | `DayOfYearFunctionsTest` | `day_of_year_func` | gate-a |
-| 128 | `src/unit_test/function/scalar/div_functions_ut.cpp` | `DivFunctionsTest` | `div_func` | gate-a |
+| 128 | `src/unit_test/function/scalar/div_functions_ut.cpp` | `DivFunctionsTest` | `div_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
 | 129 | `src/unit_test/function/scalar/epoch_functions_ut.cpp` | `EpochFunctionsTest` | `epoch_func` | gate-a |
-| 130 | `src/unit_test/function/scalar/equals_functions_ut.cpp` | `EqualsFunctionsTest` | `equals_func` | gate-a |
+| 130 | `src/unit_test/function/scalar/equals_functions_ut.cpp` | `EqualsFunctionsTest` | `equals_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
 | 131 | `src/unit_test/function/scalar/era_functions_ut.cpp` | `EraFunctionsTest` | `era_func` | gate-a |
 | 132 | `src/unit_test/function/scalar/extract_function_ut.cpp` | `ExtractFunctionTest` | `extract_year_test` | gate-a |
 | 133 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `config_test` | ported |
@@ -158,12 +158,12 @@
 | 144 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `final_projection_test` | ported |
 | 145 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `multiple_repetitions_test` | ported |
 | 146 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `fill_empty_partitions_test` | ported |
-| 147 | `src/unit_test/function/scalar/greater_equals_functions_ut.cpp` | `GreaterEqualsFunctionsTest` | `greater_equals_func` | gate-a |
-| 148 | `src/unit_test/function/scalar/greater_functions_ut.cpp` | `GreaterFunctionsTest` | `greater_func` | gate-a |
+| 147 | `src/unit_test/function/scalar/greater_equals_functions_ut.cpp` | `GreaterEqualsFunctionsTest` | `greater_equals_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
+| 148 | `src/unit_test/function/scalar/greater_functions_ut.cpp` | `GreaterFunctionsTest` | `greater_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
 | 149 | `src/unit_test/function/scalar/hour_functions_ut.cpp` | `HourFunctionsTest` | `hour_func` | gate-a |
-| 150 | `src/unit_test/function/scalar/inequals_functions_ut.cpp` | `InEqualsFunctionsTest` | `inequals_func` | gate-a |
-| 151 | `src/unit_test/function/scalar/less_equals_functions_ut.cpp` | `LessEqualsFunctionsTest` | `less_equals_func` | gate-a |
-| 152 | `src/unit_test/function/scalar/less_functions_ut.cpp` | `LessFunctionsTest` | `less_func` | gate-a |
+| 150 | `src/unit_test/function/scalar/inequals_functions_ut.cpp` | `InEqualsFunctionsTest` | `inequals_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
+| 151 | `src/unit_test/function/scalar/less_equals_functions_ut.cpp` | `LessEqualsFunctionsTest` | `less_equals_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
+| 152 | `src/unit_test/function/scalar/less_functions_ut.cpp` | `LessFunctionsTest` | `less_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
 | 153 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `re2_quote_meta_test` | gate-a |
 | 154 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_special_regex_chars_escape` | gate-a |
 | 155 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_basic_sanity` | gate-a |

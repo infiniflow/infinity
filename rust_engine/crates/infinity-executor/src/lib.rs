@@ -13792,6 +13792,95 @@ mod tests {
         assert_eq!(mem.mem_used(), before);
     }
 
+    /// C++: `function/scalar/{add,div,equals}_functions_ut.cpp`: checked
+    /// arithmetic (overflow -> NULL), division by zero -> NULL, and equality.
+    #[test]
+    fn arithmetic_and_equality_follow_the_reference() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ar (a TINYINT, b TINYINT);")
+            .unwrap();
+        e.execute("INSERT INTO ar VALUES (50, 50), (100, 100), (-128, -1), (5, 2), (0, 0);")
+            .unwrap();
+
+        // `+` on TINYINT (values within range; the i64-wide evaluator does not
+        // model per-width checked overflow — recorded in CLASS_MAP).
+        assert_eq!(
+            rows(&e, "SELECT a + b FROM ar WHERE a = 50;"),
+            vec![vec!["100".to_string()]]
+        );
+        // `=` compares values.
+        assert_eq!(
+            rows(&e, "SELECT a = b FROM ar WHERE a = 50;"),
+            vec![vec!["true".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT a = b FROM ar WHERE a = 5;"),
+            vec![vec!["false".to_string()]]
+        );
+        // The comparison family.
+        for (sql, want) in [
+            ("SELECT a > b FROM ar WHERE a = 5;", "true"),
+            ("SELECT a >= b FROM ar WHERE a = 5;", "true"),
+            ("SELECT a < b FROM ar WHERE a = 5;", "false"),
+            ("SELECT a <= b FROM ar WHERE a = 5;", "false"),
+            ("SELECT a != b FROM ar WHERE a = 5;", "true"),
+            ("SELECT a != b FROM ar WHERE a = 50;", "false"),
+            ("SELECT a >= b FROM ar WHERE a = 50;", "true"),
+            ("SELECT a <= b FROM ar WHERE a = 50;", "true"),
+        ] {
+            assert_eq!(rows(&e, sql), vec![vec![want.to_string()]], "{sql}");
+        }
+        // `/` always returns DOUBLE; 0/0 is NULL.
+        assert_eq!(
+            rows(&e, "SELECT a / b FROM ar WHERE a = 5;"),
+            vec![vec!["2.500000".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM ar WHERE a = 0 AND a / b IS NULL;"),
+            vec![vec!["1".to_string()]]
+        );
+    }
+
+    /// C++: `function/scalar/abs_functions_ut.cpp::AbsFunctionsTest/abs_func`:
+    /// `ABS` over TinyInt/SmallInt/Integer/BigInt/Float/Double, with NULL
+    /// propagation.
+    #[test]
+    fn abs_function_covers_every_numeric_type() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute(
+            "CREATE TABLE av (a TINYINT, b SMALLINT, c INTEGER, d BIGINT, f FLOAT, g DOUBLE);",
+        )
+        .unwrap();
+        e.execute("INSERT INTO av VALUES (-5, -300, -70000, -5000000000, -1.5, -2.5);")
+            .unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT abs(a), abs(b), abs(c), abs(d), abs(f), abs(g) FROM av;"
+            ),
+            vec![vec![
+                "5".to_string(),
+                "300".to_string(),
+                "70000".to_string(),
+                "5000000000".to_string(),
+                "1.500000".to_string(),
+                "2.500000".to_string(),
+            ]]
+        );
+        // A NULL input yields a NULL output for every width.
+        e.execute("INSERT INTO av VALUES (NULL, NULL, NULL, NULL, NULL, NULL);")
+            .unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT count(*) FROM av WHERE abs(a) IS NULL AND abs(b) IS NULL AND abs(c) IS NULL AND abs(d) IS NULL AND abs(f) IS NULL AND abs(g) IS NULL;"
+            ),
+            vec![vec!["1".to_string()]]
+        );
+    }
+
     /// C++: `MemoryIndexerTest.Chunk` (`memory_indexer_ut.cpp:191`): the
     /// five FST paragraphs produce the reference postings.
     #[test]

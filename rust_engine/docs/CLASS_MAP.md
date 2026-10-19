@@ -93,6 +93,7 @@
 | `DataFileWorker` / `VirtualStore` / `PersistenceManager`（`storage/io`、`storage/buffer`） | `std::fs` + `infinity_storage::s3::S3Client` + WAL | 本地/对象存储的选择在 CLI 启动时完成（`storage_type=minio` 时先 restore 再按 S3 同步）；C++ 的文件 worker/虚拟存储层合并为这两条路径 |
 | `TableIndexMeta` / `SegmentIndexMeta` / `ChunkIndexMeta`（`table_index_meta.cppm` 等） | `infinity_catalog` 的索引元数据 + `cpp_blocks` 的 `chunk_{n}.idx` 目录 | 持久化键空间与 chunk 目录布局已对齐；C++ 的模块类树未逐类拆分，索引生命周期由 `dump/optimize/cleanup` 方法承担 |
 | `TableMeta` / `SegmentMeta`（`catalog/meta/*.cppm`）+ `BlockIndex` | `infinity-executor` 的 `TableEntry`（运行时聚合） | 上游 PR #2722 删除了 `TableEntry` / `SegmentEntry` / `BlockManager`；Rust 把它们过去承担的运行时状态（写入代次、行 ID 分配、索引注册表、块快照）聚合为一个进程内结构，持久化元数据仍由 `infinity_catalog` + `BlockIndex` 按 C++ 布局承担 |
+| 整数算术的宽度语义 | `infinity-expression` 的 `eval_binary`（i64/f64 域） | C++ 的 `AddFunction`/`SubFunction`/`MulFunction` 按列宽 checked 求值（溢出→NULL）；Rust 的值域统一为 i64，未按列宽检查溢出。普通值与除零/NULL 语义一致 |
 | `TableDef` / `ColumnDef` 的 `WriteAdv`/`ReadAdv` 二进制布局 | `TableDef::to_bytes`/`from_bytes`（JSON，复用 `ColumnDefValue` 编码） | Rust 侧不需要 C++ 的内存二进制布局；持久化仍走 `cpp_layout` 的键空间。字段集合与往返语义不变 |
 | `PlaidIndex` 的 mmap 读取（`LoadFromPtr` / `centroid_ids` 指针模式） | `infinity_index::plaid::PlaidIndex` 的 owned `Vec<u32>` | mmap 属于已批准的原语豁免；执行器的 chunk 加载器总是解码为 owned 缓冲，语义（同一份 `SaveIndexInner` 字节布局）不变 |
 | geo 类型（`PointType`/`LineType`/`LineSegmentType`/`BoxType`/`CircleType`/`PathType`/`PolygonType`）及其 `column_vector_geo_ut`、`function/cast/geography/*` 用例 | 无 | 用户明确决定不需要 Box/Point/Circle 等 geo 类型，测试与产品代码均不移植 | 
@@ -225,6 +226,7 @@
 | `storage/common/kv_code_ut.cpp`（2 例） | `catalog_format` | `catalog_keys_match_the_reference`、`name_keyed_catalog_keys_match_the_reference` |
 | `common/utility/{trim,utility,exception}_ut.cpp`（3 例） | `infinity_common::{utility, Error}` | `trim_path_keeps_the_repository_relative_part`、`extract_u64_reads_the_key_suffix`、`non_alphanumeric_suffix_reports_failure`、`exception_messages_match_the_reference` |
 | `storage/result_cache_manager_ut.cpp`（2 例） | `result_cache::ResultCacheManager` | `cache_projects_columns_and_merges_new_ones`、`cache_evicts_the_least_recently_used_entry` |
+| `function/scalar/{abs,add,div,equals,inequals,greater,greater_equals,less,less_equals}_functions_ut.cpp` | `infinity-expression` 标量求值 | `abs_function_covers_every_numeric_type`、`arithmetic_and_equality_follow_the_reference`（含比较族与除零 NULL；溢出语义见设计变更） |
 | `storage/invertedindex/memory_indexer_ut.cpp::Chunk` | `MemoryIndexer` | `memory_indexer_builds_the_reference_postings`（5 段 FST 文本的 term→doc/tf 与参考一致） |
 | `storage/column_vector/{selection,var_buffer}_ut.cpp`（2 例） | `selection::Selection` / `var_buffer::VarBuffer` | `selection_matches_the_reference`、`var_buffer_appends_and_roundtrips` |
 | `storage/meta/entry/block_version_ut.cpp`（5 例） | `mvcc::BlockVersion` | `save_and_load_roundtrip`、`reopen_preserves_the_slot_array`、`delete_twice_is_rejected`、`check_delete_compares_timestamps`、`get_delete_ts_returns_the_slot_range` |
