@@ -66,3 +66,17 @@ H4/H5 待 planner 接线后复核。
 - 本 session 随后在同一文件上加了最小 `Optimizer::with_default_rules()` 调用并 revert，覆盖掉了该接线；同时 `planner/src/*` 的裁剪/重映射仍在，导致 Gate A 回落到 `query 1209/1546`（位置错位，如 `ROW_ID()/DISTANCE()` 取到错误列）。
 - 处理：`infinity-executor/src/lib.rs` 归还 `planner-10`，本 session 不再写入；由它重新接线并以 Gate A `1546/1546` 为验收。期间 peer 接线（server）不受影响。
 - 教训：同一文件不得并行写入；worker 未报告完成前，lead 只做只读复核。事故期间不以“部分接线”的状态作为收敛依据。
+
+## Round 4（HEAD bab0f5ef9，收敛检查）
+
+| # | 上轮遗留 | 结论 |
+|---|---|---|
+| G1 | 生产 planner 未接入优化器规则 | **已解决**：`cc1843436` 接入 `plan_select`/`run_select`（QueryBinder、ColumnPruner/Remapper、LazyLoad、FastRoughFilter、IndexScanBuilder + evaluators、RegexIndexRewrite、SubqueryUnnest），`530b11691` 修正 residual 谓词挂载到 base scan；有 plan-shape 测试。Gate A 1546/1546、executor 503 tests |
+| G2 | 相关子查询按常量求值 | **已解决（显式拒绝）**：`bind_subquery` 检测到 correlated_columns 后调用 `SubqueryUnnest`，随后返回 `correlated subqueries are not supported`，不再静默求值；`CLASS_MAP` 记录为限制 |
+| G3 | peer 仅进程内传输 | **已明确登记**：11 个类经 `PeerManager` 挂到 `Server` 并有服务端测试；`CLASS_AUDIT` 的备注写明“进程内 InProcessPeerTransport，无 Thrift/TCP 线路”，不声称 wire-compatible |
+| G4-G9 | SubqueryUnnest/IN/DependentJoinFlattener/ColumnRemapper/LazyLoad | 随 G1 接入执行路径；未被 C++ 覆盖的 correlated 执行路径以显式错误代替 |
+| G10 | PGProtocolHandler 不存在 | **已解决**：`pg::PGProtocolHandler` 实现并路由每条连接，行 373 mapped |
+| G11-G14 | Regex 输出、ResultCache 键、IndexScanBuilder 消费、全文 evaluator | Regex 已在 IndexScanBuilder 内接线；IndexScanBuilder 由执行器直接调用（规则无法携带 evaluator）；ResultCacheGetter 保留 API + 单测，执行器继续用语句级缓存；全文 MSM/语法差异保留为 `partial` 注记 |
+| G16/G17 | HNSW 生产 codec、top-ef | G16 由 `knn_format` + `cpp_blocks` 生产路径测试覆盖；G17 已加 `search_candidates` 保持 C++ 不截断语义 |
+
+**未接线但已登记**：`IndexScanBuilder` 作为 `OptimizerRule`（执行器直接调用，避免丢谓词）、`ResultCacheGetter` 默认管线（语句缓存已覆盖，plan-level 需写路径失效钩子）、块级 rough filter（无 block stats 层）、相关子查询执行（无 mark join 算子，显式拒绝）。
