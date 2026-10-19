@@ -3011,4 +3011,43 @@ mod tests {
             }
         );
     }
+    /// `src/unit_test/parser/sql_select_statement_ut.cpp::good_test3`: multiple
+    /// SELECTs and every JOIN spelling parse.
+    #[test]
+    fn select_statements_parse_like_the_reference() {
+        let stmts = parse("SELECT * FROM t1; SELECt * FROM t2;").unwrap();
+        assert_eq!(stmts.len(), 2);
+        for s in &stmts {
+            assert!(matches!(s, Statement::Select { .. }));
+        }
+        // The join spellings the Rust parser models (`FULL`/`OUTER`/`NATURAL`
+        // are not parsed yet, so `good_test3` stays unported beyond this).
+        let joins = [
+            "SELECT * FROM t1 join t2 on x = y;",
+            "SELECT * FROM t1 inner join t2 on x = y;",
+            "SELECT * FROM t1 left join t2 on x = y;",
+            "SELECT * FROM t1 right join t2 on x = y;",
+            "SELECT * FROM t1 cross join t2 on x = y;",
+        ];
+        for sql in joins {
+            assert!(parse(sql).is_ok(), "{sql}");
+        }
+    }
+
+    /// `SelectStatementParsingTest.good_test4`: a CAST date minus an INTERVAL.
+    #[test]
+    fn cast_date_minus_interval_parses() {
+        assert!(
+            parse("SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 DAYS;")
+                .is_ok()
+        );
+    }
+
+    /// `SelectStatementParsingTest.good_test2`: a bare constant and a nested
+    /// function call in the select list.
+    #[test]
+    fn select_list_accepts_constants_and_nested_calls() {
+        assert!(parse("select 1;").is_ok());
+        assert!(parse("select a, sum(b), function(c, nested(d)) from t1;").is_ok());
+    }
 }

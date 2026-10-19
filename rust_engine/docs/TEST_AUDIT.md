@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 82, `integration` 250, `partial` 42, `ported` 388.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 80, `integration` 250, `partial` 42, `ported` 390.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -218,7 +218,7 @@
 | 204 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `tpch` | gate-a |
 | 205 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `hyrise` | gate-a |
 | 206 | `src/unit_test/parser/sql_file_parsing_test_ut.cpp` | `SQLFileParsingTest` | `infinity` | gate-a |
-| 207 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test1` | gate-a |
+| 207 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test1` | ported | `infinity-parser` `parser::tests::sql_parser_good_test1` |
 | 208 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_test2` | gate-a |
 | 209 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `bad_test1` | gate-a |
 | 210 | `src/unit_test/parser/sql_parser_ut.cpp` | `SQLParserTest` | `good_create_index_1` | ported | `infinity-parser` `sql_parser_good_create_index_1` |
@@ -226,7 +226,7 @@
 | 212 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test1` | ported | `infinity-parser` `select_statement_parsing_good_test1` |
 | 213 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test2` | ported | `infinity-parser` `select_statement_parsing_good_test2` |
 | 214 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test3` | gate-a |
-| 215 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test4` | gate-a |
+| 215 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_test4` | ported | `infinity-parser` `parser::tests::cast_date_minus_interval_parses` |
 | 216 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_test1` | gate-a |
 | 217 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_knn_test` | gate-a |
 | 218 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_search_test` | gate-a |
