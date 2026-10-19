@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 65, `integration` 250, `partial` 44, `ported` 403.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 104, `gap` 103, `gate-a` 61, `integration` 250, `partial` 44, `ported` 403.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -251,10 +251,10 @@
 | 237 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestAddSubstract` | ported | `infinity-common` `test_add_subtract` |
 | 238 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestNegativeYears` | ported | `infinity-common` `test_negative_years` |
 | 239 | `src/unit_test/parser/type/fp16_ut.cpp` | `FP16TypeTest` | `test1` | gate-a |
-| 240 | `src/unit_test/parser/type/geo/box_type_ut.cpp` | `BoxTypeTest` | `point1` | gate-a |
-| 241 | `src/unit_test/parser/type/geo/path_type_ut_nimpl.cpp` | `PathTypeTest` | `path1` | gate-a |
-| 242 | `src/unit_test/parser/type/geo/point_type_ut.cpp` | `PointTypeTest` | `point1` | gate-a |
-| 243 | `src/unit_test/parser/type/geo/polygon_type_ut_nimpl.cpp` | `PolygonTypeTest` | `polygon1` | gate-a |
+| 240 | `src/unit_test/parser/type/geo/box_type_ut.cpp` | `BoxTypeTest` | `point1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
+| 241 | `src/unit_test/parser/type/geo/path_type_ut_nimpl.cpp` | `PathTypeTest` | `path1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
+| 242 | `src/unit_test/parser/type/geo/point_type_ut.cpp` | `PointTypeTest` | `point1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
+| 243 | `src/unit_test/parser/type/geo/polygon_type_ut_nimpl.cpp` | `PolygonTypeTest` | `polygon1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
 | 244 | `src/unit_test/parser/type/heterogeneous/base_mixed_type_ut.cpp` | `BaseMixedTypeTest` | `GetTypeName` | ported | `infinity-common` `types::tests::mixed_value_type_names_match_the_reference` |
 | 245 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_integer` | ported | `infinity-common` `types::tests::mixed_integer_value_and_clone` |
 | 246 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_float` | ported | `infinity-common` `types::tests::mixed_float_value` |
