@@ -234,6 +234,137 @@ pub fn drop_column_marker(
     format!("col|{db_name}|{table_name}|{segment_id}|{block_id}|{column_id}|{ts}")
 }
 
+/// Prefix of every database tag: `db|{db_id}|{tag}|`.
+///
+/// C++: `KeyEncode::CatalogDbTagPrefix` (`kv_code_impl.cpp`).
+pub fn catalog_db_tag_prefix(db_id: &str, tag_name: &str) -> String {
+    format!("db|{db_id}|{tag_name}|")
+}
+
+// ---------------------------------------------------------------------------
+// Name-keyed catalog keys — C++ `KeyEncode` (`src/storage/common/kv_code.cppm`).
+//
+// They mirror the `catalog|…` family but address entities by name instead of
+// id: the drop tombstones above are exactly their `*Key(…, ts)` forms.
+// ---------------------------------------------------------------------------
+
+/// C++: `KeyEncode::DatabaseKey` — `db|{db_name}|{ts}`.
+pub fn database_key(db_name: &str, ts: u64) -> String {
+    format!("db|{db_name}|{ts}")
+}
+
+/// C++: `KeyEncode::DatabasePrefix` — `db|{db_name}|`.
+pub fn database_prefix(db_name: &str) -> String {
+    format!("db|{db_name}|")
+}
+
+/// C++: `KeyEncode::TableKey` — `tbl|{db_name}|{tbl_name}|{ts}`.
+pub fn table_key(db_name: &str, tbl_name: &str, ts: u64) -> String {
+    format!("tbl|{db_name}|{tbl_name}|{ts}")
+}
+
+/// C++: `KeyEncode::TableKeyPrefix` — `tbl|{db_name}|{tbl_name}|`.
+pub fn table_key_prefix(db_name: &str, tbl_name: &str) -> String {
+    format!("tbl|{db_name}|{tbl_name}|")
+}
+
+/// C++: `KeyEncode::TableSegmentKey` — `seg|{db_name}|{tbl_name}|{segment_id}|{ts}`.
+pub fn table_segment_key(db_name: &str, tbl_name: &str, segment_id: u32, ts: u64) -> String {
+    format!("seg|{db_name}|{tbl_name}|{segment_id}|{ts}")
+}
+
+/// C++: `KeyEncode::TableSegmentKeyPrefix` — `seg|{db_name}|{tbl_name}|{segment_id}|`.
+pub fn table_segment_key_prefix(db_name: &str, tbl_name: &str, segment_id: u32) -> String {
+    format!("seg|{db_name}|{tbl_name}|{segment_id}|")
+}
+
+/// C++: `KeyEncode::TableSegmentBlockKey`.
+pub fn table_segment_block_key(
+    db_name: &str,
+    tbl_name: &str,
+    segment_id: u32,
+    block_id: u16,
+    ts: u64,
+) -> String {
+    format!("blk|{db_name}|{tbl_name}|{segment_id}|{block_id}|{ts}")
+}
+
+/// C++: `KeyEncode::TableSegmentBlockKeyPrefix`.
+pub fn table_segment_block_key_prefix(
+    db_name: &str,
+    tbl_name: &str,
+    segment_id: u32,
+    block_id: u16,
+) -> String {
+    format!("blk|{db_name}|{tbl_name}|{segment_id}|{block_id}|")
+}
+
+/// C++: `KeyEncode::TableSegmentBlockColumnKey`.
+pub fn table_segment_block_column_key(
+    db_name: &str,
+    tbl_name: &str,
+    segment_id: u32,
+    block_id: u16,
+    column_id: u32,
+    ts: u64,
+) -> String {
+    format!("col|{db_name}|{tbl_name}|{segment_id}|{block_id}|{column_id}|{ts}")
+}
+
+/// C++: `KeyEncode::TableSegmentBlockColumnKeyPrefix`.
+pub fn table_segment_block_column_key_prefix(
+    db_name: &str,
+    tbl_name: &str,
+    segment_id: u32,
+    block_id: u16,
+    column_id: u32,
+) -> String {
+    format!("col|{db_name}|{tbl_name}|{segment_id}|{block_id}|{column_id}|")
+}
+
+/// C++: `KeyEncode::TableIndexKey` — `idx|{db_name}|{tbl_name}|{index_name}|{ts}`.
+pub fn table_index_key(db_name: &str, tbl_name: &str, index_name: &str, ts: u64) -> String {
+    format!("idx|{db_name}|{tbl_name}|{index_name}|{ts}")
+}
+
+/// C++: `KeyEncode::TableIndexKeyPrefix` — `idx|{db_name}|{tbl_name}|{index_name}|`.
+pub fn table_index_key_prefix(db_name: &str, tbl_name: &str, index_name: &str) -> String {
+    format!("idx|{db_name}|{tbl_name}|{index_name}|")
+}
+
+/// C++: `KeyEncode::TableIndexSegmentKey`.
+pub fn table_index_segment_key(
+    db_name: &str,
+    tbl_name: &str,
+    index_name: &str,
+    segment_id: u32,
+    ts: u64,
+) -> String {
+    format!("idx_seg|{db_name}|{tbl_name}|{index_name}|{segment_id}|{ts}")
+}
+
+/// C++: `KeyEncode::TableIndexSegmentKeyPrefix`.
+pub fn table_index_segment_key_prefix(db_name: &str, tbl_name: &str, index_name: &str) -> String {
+    format!("idx_seg|{db_name}|{tbl_name}|{index_name}|")
+}
+
+/// C++: `KeyEncode::TableIndexChunkKey`.
+pub fn table_index_chunk_key(
+    db_name: &str,
+    tbl_name: &str,
+    index_name: &str,
+    segment_id: u32,
+    chunk_id: u32,
+    ts: u64,
+) -> String {
+    format!("idx_chunk|{db_name}|{tbl_name}|{index_name}|{segment_id}|{chunk_id}|{ts}")
+}
+
+/// C++: `KeyEncode::TableIndexChunkKeyPrefix`.
+pub fn table_index_chunk_key_prefix(db_name: &str, tbl_name: &str, index_name: &str) -> String {
+    format!("idx_chunk|{db_name}|{tbl_name}|{index_name}|")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -343,5 +474,85 @@ mod tests {
             .starts_with(&catalog_index_segment_prefix("1", "2", "3")));
         assert!(catalog_index_chunk_key("1", "2", "3", 4, 5)
             .starts_with(&catalog_index_chunk_prefix("1", "2", "3", 4)));
+    }
+
+    /// `src/unit_test/storage/common/kv_code_ut.cpp::KVCodeTest/kv_code1`.
+    #[test]
+    fn catalog_keys_match_the_reference() {
+        assert_eq!(catalog_db_key("db1", 123), "catalog|db|db1|123");
+        assert_eq!(catalog_db_prefix("db1"), "catalog|db|db1|");
+        assert_eq!(catalog_db_tag_prefix("3", "comment"), "db|3|comment|");
+        assert_eq!(
+            catalog_table_key("3", "tbl1", 123),
+            "catalog|tbl|3|tbl1|123"
+        );
+        assert_eq!(
+            table_column_key("3", "10", "col1", 123),
+            "tbl|col|3|10|col1|123"
+        );
+        assert_eq!(catalog_segment_key("3", "10", 2), "catalog|seg|3|10|2");
+    }
+
+    /// `src/unit_test/storage/common/kv_code_ut.cpp::KVCodeTest/kv_code2`.
+    #[test]
+    fn name_keyed_catalog_keys_match_the_reference() {
+        assert_eq!(database_key("db1", 123), "db|db1|123");
+        assert_eq!(database_prefix("db1"), "db|db1|");
+        assert_eq!(table_key("db1", "tbl1", 123), "tbl|db1|tbl1|123");
+        assert_eq!(table_key_prefix("db1", "tbl1"), "tbl|db1|tbl1|");
+        assert_eq!(
+            table_column_key("3", "10", "col1", 123),
+            "tbl|col|3|10|col1|123"
+        );
+        assert_eq!(table_column_prefix("3", "10"), "tbl|col|3|10|");
+        assert_eq!(column_tag_key("3", "10", "4", "tag1"), "col|3|10|4|tag1");
+        assert_eq!(
+            table_segment_key("db1", "tbl1", 2, 123),
+            "seg|db1|tbl1|2|123"
+        );
+        assert_eq!(
+            table_segment_key_prefix("db1", "tbl1", 2),
+            "seg|db1|tbl1|2|"
+        );
+        assert_eq!(
+            table_segment_block_key("db1", "tbl1", 2, 3, 123),
+            "blk|db1|tbl1|2|3|123"
+        );
+        assert_eq!(
+            table_segment_block_key_prefix("db1", "tbl1", 2, 3),
+            "blk|db1|tbl1|2|3|"
+        );
+        assert_eq!(
+            table_segment_block_column_key("db1", "tbl1", 2, 3, 4, 123),
+            "col|db1|tbl1|2|3|4|123"
+        );
+        assert_eq!(
+            table_segment_block_column_key_prefix("db1", "tbl1", 2, 3, 4),
+            "col|db1|tbl1|2|3|4|"
+        );
+        assert_eq!(
+            table_index_key("db1", "tbl1", "idx1", 123),
+            "idx|db1|tbl1|idx1|123"
+        );
+        assert_eq!(
+            table_index_key_prefix("db1", "tbl1", "idx1"),
+            "idx|db1|tbl1|idx1|"
+        );
+        assert_eq!(
+            table_index_segment_key("db1", "tbl1", "idx1", 2, 123),
+            "idx_seg|db1|tbl1|idx1|2|123"
+        );
+        assert_eq!(
+            table_index_segment_key_prefix("db1", "tbl1", "idx1"),
+            "idx_seg|db1|tbl1|idx1|"
+        );
+        assert_eq!(
+            table_index_chunk_key("db1", "tbl1", "idx1", 2, 5, 123),
+            "idx_chunk|db1|tbl1|idx1|2|5|123"
+        );
+        assert_eq!(
+            table_index_chunk_key_prefix("db1", "tbl1", "idx1"),
+            "idx_chunk|db1|tbl1|idx1|"
+        );
     }
 }

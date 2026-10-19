@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 207, `gate-a` 216, `integration` 294, `partial` 231, `ported` 50.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 205, `gate-a` 216, `integration` 294, `partial` 231, `ported` 52.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -448,8 +448,8 @@
 | 434 | `src/unit_test/storage/column_vector/value_ut.cpp` | `ValueStringTest` | `test_tostring` | partial |
 | 435 | `src/unit_test/storage/column_vector/value_ut.cpp` | `ValueStringTest` | `test_stringtovalue` | partial |
 | 436 | `src/unit_test/storage/column_vector/var_buffer_ut.cpp` | `VarBufferTest` | `test1` | partial |
-| 437 | `src/unit_test/storage/common/kv_code_ut.cpp` | `KVCodeTest` | `kv_code1` | gap |
-| 438 | `src/unit_test/storage/common/kv_code_ut.cpp` | `KVCodeTest` | `kv_code2` | gap |
+| 437 | `src/unit_test/storage/common/kv_code_ut.cpp` | `KVCodeTest` | `kv_code1` | ported | `infinity-storage` `catalog_format::tests::catalog_keys_match_the_reference` |
+| 438 | `src/unit_test/storage/common/kv_code_ut.cpp` | `KVCodeTest` | `kv_code2` | ported | `catalog_format::tests::name_keyed_catalog_keys_match_the_reference` |
 | 439 | `src/unit_test/storage/common/loser_tree_ut.cpp` | `LoserTreeTest` | `BasicMerge1` | gap |
 | 440 | `src/unit_test/storage/common/loser_tree_ut.cpp` | `LoserTreeTest` | `BasicMerge2` | gap |
 | 441 | `src/unit_test/storage/common/loser_tree_ut.cpp` | `LoserTreeTest` | `BasicMerge3` | gap |
