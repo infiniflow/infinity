@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担于 cast）；geo 用例的排除见 `TEST_AUDIT.md`，DiskANN 15 类在本表 `excluded`。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `exempt` 20, `gap` 23, `mapped` 1060, `partial` 11, `test` 7
+- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1083, `partial` 11, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -29,8 +29,8 @@
 | 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | mapped | infinity_executor::analyzer 
 | 21 | `QuickSortSet` | `src/common/analyzer/ik/quick_sort_set.cppm` | mapped | infinity_executor::analyzer 
 | 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | mapped | infinity_executor::analyzer 
-| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `infinity_executor::analyzer::JapaneseAnalyzer`（移植 ijma/libmecab：ipadic 二进制词典、未知词、Viterbi；AnalyzerPool 派发 `japanese`） 
-| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `infinity_executor::analyzer::KoreanAnalyzer`（ko-dic 词表 + MeCab lattice；AnalyzerPool 派发 `korean`） 
+| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `infinity_executor::analyzer::JapaneseAnalyzer`（MeCab ipadic Viterbi） |
+| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `infinity_executor::analyzer::KoreanAnalyzer`（MeCab ko-dic Viterbi） |
 | 25 | `NGramAnalyzer` | `src/common/analyzer/ngram_analyzer.cppm` | mapped | `analyzer::NGramAnalyzer`（n-gram 窗口按 UTF-8 code point 滑动） |
 | 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `infinity_executor::analyzer::RAGAnalyzer` 
 | 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | mapped | infinity_executor::analyzer 
@@ -42,7 +42,7 @@
 | 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | mapped | infinity_executor::analyzer 
 | 34 | `TokenizeConfig` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::TokenizeConfig`（AddAllows/AddDivides/AddUnites） |
 | 35 | `Tokenizer` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::tokenize` |
-| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `infinity_executor::analyzer::TraditionalChineseAnalyzer`（`OpenCcConverter` 繁转简 + `ChineseAnalyzer`；派发 `traditional[-fine]`） 
+| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `infinity_executor::analyzer::TraditionalChineseAnalyzer`（OpenCC 繁→简 + jieba） |
 | 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | mapped | infinity_executor::analyzer 
 | 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | mapped | infinity_executor::analyzer 
 | 39 | `WhitespaceAnalyzer` | `src/common/analyzer/whitespace_analyzer.cppm` | mapped | infinity_executor::analyzer 
@@ -479,29 +479,29 @@
 | 470 | `LogicalUpdate` | `src/planner/node/logical_update.cppm` | mapped | infinity_planner 
 | 471 | `LogicalViewScan` | `src/planner/node/logical_view_scan.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 472 | `Optimizer` | `src/planner/optimizer.cppm` | mapped | infinity_planner 
-| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
-| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | gap | 实现快照已回滚（接线导致 index-scan 候选过滤位置错误、Gate A 1209/1546）；快照在 /tmp/planner_wiring.patch，接线完成后恢复 mapped 
+| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
+| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | mapped | 已接入执行器（Optimizer/IndexScanBuilder/Binder/residual-above-scan）；Gate A 1546/1546 |
 | 496 | `FragmentContext` | `src/scheduler/fragment_context.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
 | 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 

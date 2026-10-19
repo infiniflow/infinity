@@ -7982,10 +7982,11 @@ impl Engine {
                     plan = indexed.plan;
                     if let Some(pushed) = indexed.candidates.into_iter().next() {
                         if let Some(residual) = residual {
-                            plan = LogicalPlan::Filter {
-                                input: Box::new(plan),
-                                predicate: residual,
-                            };
+                            // The residual predicate addresses the scan's
+                            // output, so it belongs directly above the scan:
+                            // wrapping the root would re-bind its columns to the
+                            // projection's narrower schema.
+                            plan = add_filter_above_scan(plan, residual);
                         }
                         // A sparse-gram index answers a literal run by
                         // substring; a term index answers by token.
@@ -13768,6 +13769,61 @@ fn column_kind_of(declared: &str) -> infinity_planner::index_scan::ColumnKind {
     } else {
         // varchar and everything else the secondary index stores as text
         ColumnKind::Varchar
+    }
+}
+
+/// Inserts `predicate` directly above the base scan of `plan`. The predicate
+/// is bound against the scan's output, so it cannot be wrapped around the root
+/// when the root re-projects.
+fn add_filter_above_scan(plan: LogicalPlan, predicate: Expr) -> LogicalPlan {
+    match plan {
+        LogicalPlan::Scan { .. } | LogicalPlan::Values { .. } => LogicalPlan::Filter {
+            input: Box::new(plan),
+            predicate,
+        },
+        LogicalPlan::Filter {
+            input,
+            predicate: existing,
+        } => LogicalPlan::Filter {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            predicate: existing,
+        },
+        LogicalPlan::Projection {
+            input,
+            exprs,
+            names,
+        } => LogicalPlan::Projection {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            exprs,
+            names,
+        },
+        LogicalPlan::Aggregate {
+            input,
+            group_keys,
+            group_names,
+            aggs,
+        } => LogicalPlan::Aggregate {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            group_keys,
+            group_names,
+            aggs,
+        },
+        LogicalPlan::Sort { input, keys } => LogicalPlan::Sort {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            keys,
+        },
+        LogicalPlan::Limit { input, n } => LogicalPlan::Limit {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            n,
+        },
+        LogicalPlan::Offset { input, n } => LogicalPlan::Offset {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            n,
+        },
+        other @ LogicalPlan::Join { .. } => LogicalPlan::Filter {
+            input: Box::new(other),
+            predicate,
+        },
     }
 }
 
