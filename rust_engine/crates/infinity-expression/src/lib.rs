@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod fde;
 pub mod json;
 pub mod md5;
 pub mod regex;
