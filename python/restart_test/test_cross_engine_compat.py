@@ -1,5 +1,6 @@
 import glob
 import os
+import socket
 import time
 
 import pytest
@@ -143,6 +144,17 @@ def _run(engine_path, body):
     runner = InfinityRunner(engine_path, CONFIG)
     runner.init(CONFIG)
     try:
+        # A process that died on startup (a bind failure, a rejected catalog)
+        # would otherwise surface as the harness's 30 retries and ~8 minutes of
+        # sleeping. Report the engine's own log instead.
+        for _ in range(50):
+            if runner.process.poll() is not None:
+                raise AssertionError(
+                    f"{engine_path} exited on startup:\n{_engine_log_tail()}"
+                )
+            if not _port_is_free():
+                break
+            time.sleep(0.1)
         # `init()` only spawns the process; `connect()` is the harness's retry
         # loop (the engine answers Thrift a moment later).
         conn = runner.connect(URI)
@@ -152,25 +164,59 @@ def _run(engine_path, body):
             conn.disconnect()
     finally:
         runner.uninit(kill=True)
+        # `uninit` kills the engine but the listening port is released
+        # asynchronously; the *next* engine in this test (and the reference in
+        # particular, which does not set SO_REUSEADDR) fails to bind if it
+        # starts first ("Could not bind to port 23817: Address already in use").
+        _wait_port_free()
+
+
+def _port_is_free():
+    """Whether a listener could bind 0.0.0.0:23817 without SO_REUSEADDR.
+
+    The reference binds the wildcard address and does not set `SO_REUSEADDR`
+    (`TServerSocket::listen`), so this is the exact condition it needs.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind(("0.0.0.0", URI.port))
+            return True
+        except OSError:
+            return False
+
+
+def _wait_port_free(timeout=60.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _port_is_free():
+            return
+        time.sleep(0.2)
+    raise AssertionError(f"port {URI.port} was still in use after {timeout:.0f}s")
+
+
+def _engine_log_tail(lines=20):
+    """The newest engine stdout/stderr the runner redirected to a file."""
+    paths = glob.glob("restart_test_infinity.log.*")
+    if not paths:
+        return "(no engine log)"
+    newest = max(paths, key=os.path.getmtime)
+    with open(newest, errors="replace") as handle:
+        return "".join(handle.readlines()[-lines:])
 
 
 def _drop_wal():
-    """Drop the redo log of the engine that just stopped.
+    """Unused: dropping the redo log breaks the *reference's* own recovery.
 
-    The handover point is a checkpoint (`flush_data()`), so the durable state is
-    the catalog (the C++ key space) plus the block/index mirror; the log holds
-    nothing that is not already there. Its *frame* is engine-private: this port
-    writes `[magic "WAL1"][size][crc][content]` while the reference writes
-    `[size][crc][txn_id][commit_ts]` followed by the commands. The reference
-    cannot step over a foreign frame -- it reports
-    `WAL error: ... entry size` and then aborts with
-    `WAL replay: No checkpoint found in wal` -- so a Rust-written directory is
-    unopenable by C++ for as long as `wal.log` exists. Dropping the fully
-    applied log keeps this test about what it is named for (catalog and
-    index-chunk compatibility) instead of dying in the redo log.
+    It was used here to step around the frame mismatch below, but the reference
+    reads `checkpoint_ts` from the log: with the log gone it opens at ts 0,
+    treats every block as uncommitted and aborts (`Can't get version from
+    .../blk_0/version`). The two frames differ — this port writes
+    `[magic "WAL1"][size][crc][content]`, the reference writes
+    `[size][crc][txn_id][commit_ts]` followed by the commands, and it cannot step
+    over a foreign frame (`WAL error: ... entry size` then
+    `WAL replay: No checkpoint found in wal`) — so the handover needs a
+    reference-readable checkpoint entry in the log, not a missing one.
     """
-    for path in glob.glob(os.path.join("/var/infinity", "wal", "wal.log*")):
-        os.remove(path)
 
 
 @pytest.mark.parametrize(
@@ -232,8 +278,11 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
     assert before["first_ids"] == [0, 1, 2], before["first_ids"]
     assert before["last_ids"] == [ROWS - 3, ROWS - 2, ROWS - 1], before["last_ids"]
 
-    _drop_wal()
-
+    # The handover is the directory as the first engine left it, redo log
+    # included: the reference derives `checkpoint_ts` from a checkpoint entry in
+    # the log (`GetReplayEntries`) and refuses to open a writable directory that
+    # has data but no checkpoint. Deleting the log is *not* an option - the
+    # reference then opens at ts 0 and aborts on its own blocks.
     def phase2(conn):
         after = _snapshot(conn)
         # Insert through the *second* engine and read it back through it.
