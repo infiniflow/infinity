@@ -89,7 +89,7 @@
 | 9 | 封盘段不存位置（`add_position` 无参数） | ✅ | `a16e1b361`（writer/reader 位置流）+ `ac909e68b`（executor 两条 seal 路径携带位置、spill 合并读 `positions()`）；一次性格式破坏已声明 |
 | 10 | `RowFulltextProvider::postings` 返回所有行 | ✅ | `80a2e24c0`：改走列倒排索引的 `merge`（C++ `ColumnIndexReader::Lookup`）并按扫描得到的 row id 求交——陈旧 posting 不会放行未物化的行；同列两个分词器不同的索引经 `guard.tokenizer != tokenizer` 判定为「不能回答」，回退为保留该行由残余谓词裁决。测试 `fulltext_index_filter_reads_postings_by_row_id` |
 | 11 | `index_delims` 抹平分析器 | ✅ | `d05c0f227`：`TextTokenizer` 增加 `analyzer: Option<String>`，`index_analyzer` 从表元数据取索引的 `ANALYZER` 选项（`standard`/`keyword`/`whitespace` 仍走分隔符路径），`tokenize_text`/`tokenize_index_text`/`tokenize_index_positions` 统一问 `AnalyzerPool::get_analyzer(name)`；写侧与查询侧同一 tokenizer，等值保护仍有效。测试 `an_ik_fulltext_index_is_tokenised_by_its_analyzer`（`热爱` 产生 posting、整段中文不被当作一个标准 token） |
-| 12 | `QueryBuilder`/短语/布尔迭代器不在产品路径 | ⏳ | MATCH 仍只走「单 term WAND，否则整行重分词」 |
+| 12 | `QueryBuilder`/短语/布尔迭代器不在产品路径 | 🔄 | `cf5bffed0`：`filter_fulltext` 的索引过滤现在真的构造 `Or`/`And` 查询树——裸 term 列表是 `OrQueryNode`，只有 `operator=and` 才是 `AndQueryNode`，布尔词是算子而不是 term（C++ `SearchDriver::AnalyzeAndBuildQueryNode`）。这条 bug 在索引过滤放行所有行时是隐形的，接上真实 postings 后立刻让 Gate A 掉到 1539/1546（`'second text'` 丢掉所有单 term 行）。**MATCH 的 WAND 路径仍只处理单 term，其余整行重分词扫**；短语/布尔迭代器的产品化仍未做 |
 | 13 | `MemoryIndexer` 无 spill-to-sorted-runs / `InsertGap` | ⏳ | `FULLTEXT_SPILL_SUFFIX` 声明未用，`SortMerger` 无调用方 |
 | 14 | BMW 无块级最大值、非增量 | 🔄 | `wand.rs` 移植中（per-block maxima + `Next/NextShallow`） |
 | 15 | `StandardAnalyzer` 用 Porter2 顶替 `STEM_LANG_PORT` | ⏳ | 只影响 `standard-porter`；rust-stemmers 无原版 Porter 算法 |
