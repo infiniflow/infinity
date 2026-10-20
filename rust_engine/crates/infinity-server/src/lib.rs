@@ -2008,8 +2008,12 @@ fn type_sql(logic_type: i32, physical: &PhysicalWire) -> String {
         PhysicalWire::Sparse {
             dimension,
             element_type,
-            ..
-        } => format!("SPARSE({}, {dimension})", element_type_name(*element_type)),
+            index_type,
+        } => format!(
+            "SPARSE({}, {}, {dimension})",
+            element_type_name(*element_type),
+            element_type_name(*index_type)
+        ),
         // A scalar array element's descriptor carries no shape.
         PhysicalWire::Scalar(_) | PhysicalWire::None => scalar_sql(logic_type),
     }
@@ -2499,9 +2503,9 @@ fn pack_tensor_body(vectors: &[Vec<f64>], dim: i32, elem: i32) -> Vec<u8> {
     body
 }
 
-/// Parses `SPARSE(<elem>,<bound>[,<index>])`. The index width is derived from
-/// the bound (matching the engine's `describe_type`), not the declared index
-/// name.
+/// Parses `SPARSE(<elem>,<bound>)` / `SPARSE(<elem>,<index>,<bound>)`. Without
+/// an explicit index the width is derived from the bound; with one the declared
+/// width wins (`sparse,8,float,int` stores 4-byte indices).
 fn sparse_info(type_text: &str) -> Option<(i64, i32, i32)> {
     let up = type_text.to_ascii_uppercase();
     if !up.starts_with("SPARSE(") {
@@ -2510,8 +2514,13 @@ fn sparse_info(type_text: &str) -> Option<(i64, i32, i32)> {
     let inner = up.split_once('(')?.1.trim_end_matches(')');
     let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
     let elem = (*parts.first()?).to_string();
-    let bound: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
-    let index_code = if bound <= 127 {
+    let (explicit_index, bound_text) = if parts.len() >= 3 {
+        (Some(parts[1]), parts[2])
+    } else {
+        (None, *parts.get(1)?)
+    };
+    let bound: u64 = bound_text.parse().unwrap_or(0);
+    let derived_index = if bound <= 127 {
         2 // ElementInt8
     } else if bound <= 32767 {
         3 // ElementInt16
@@ -2520,7 +2529,23 @@ fn sparse_info(type_text: &str) -> Option<(i64, i32, i32)> {
     } else {
         5 // ElementInt64
     };
+    let index_code = match explicit_index.and_then(sparse_index_code) {
+        Some(code) => code,
+        None => derived_index,
+    };
     Some((bound as i64, element_type_code(&elem), index_code))
+}
+
+/// `int8`/`tinyint`/… -> the `ColKind::Sparse` index-width selector
+/// (`src/parser/type/complex/embedding_type.h:33-45`).
+fn sparse_index_code(name: &str) -> Option<i32> {
+    Some(match name {
+        "INT8" | "TINYINT" | "UINT8" => 2,
+        "INT16" | "SMALLINT" => 3,
+        "INT" | "INTEGER" | "INT32" => 4,
+        "INT64" | "BIGINT" => 5,
+        _ => return None,
+    })
 }
 
 /// Classifies a column from its declared type text, falling back to value

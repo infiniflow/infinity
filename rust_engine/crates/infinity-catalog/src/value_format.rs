@@ -14,7 +14,15 @@
 
 use infinity_expression::json::Json;
 
-/// `LogicalType` ordinals (`src/parser/type/logical_type.h`).
+/// `LogicalType` ordinals (`src/parser/type/logical_type.h:43-128`).
+///
+/// These must be the reference's ordinals exactly: `DataType::Serialize()`
+/// stores `this->type_` as an integer, and the reference's enum has gaps (it
+/// declares `kPoint`…`kCircle`, `kUuid`, `kRowID`, `kMixed`, `kNull`,
+/// `kMissing`, `kEmptyArray`, `kFloat16`/`kBFloat16`, `kMultiVector`, `kJson`
+/// between the types this engine models). A compacted numbering shifted every
+/// type past `DOUBLE` — a C++-written `VARCHAR` (9) read back as `FLOAT16`,
+/// `EMBEDDING` (23) as `JSON`.
 pub mod logical {
     pub const BOOLEAN: i64 = 0;
     pub const TINYINT: i64 = 1;
@@ -25,35 +33,50 @@ pub mod logical {
     pub const DECIMAL: i64 = 6;
     pub const FLOAT: i64 = 7;
     pub const DOUBLE: i64 = 8;
-    pub const FLOAT16: i64 = 9;
-    pub const BFLOAT16: i64 = 10;
-    pub const VARCHAR: i64 = 11;
-    pub const EMBEDDING: i64 = 12;
-    pub const TENSOR: i64 = 13;
-    pub const TENSORARRAY: i64 = 14;
-    pub const SPARSE: i64 = 15;
-    pub const MULTIVECTOR: i64 = 16;
-    pub const DATE: i64 = 17;
-    pub const TIME: i64 = 18;
-    pub const DATETIME: i64 = 19;
-    pub const TIMESTAMP: i64 = 20;
-    pub const INTERVAL: i64 = 21;
-    pub const ARRAY: i64 = 22;
-    pub const JSON: i64 = 23;
+    pub const VARCHAR: i64 = 9;
+    pub const DATE: i64 = 10;
+    pub const TIME: i64 = 11;
+    pub const DATETIME: i64 = 12;
+    pub const TIMESTAMP: i64 = 13;
+    pub const INTERVAL: i64 = 14;
+    pub const ARRAY: i64 = 15;
+    pub const TUPLE: i64 = 16;
+    pub const POINT: i64 = 17;
+    pub const LINE: i64 = 18;
+    pub const LINESEG: i64 = 19;
+    pub const BOX: i64 = 20;
+    pub const CIRCLE: i64 = 21;
+    pub const UUID: i64 = 22;
+    pub const EMBEDDING: i64 = 23;
+    pub const ROWID: i64 = 24;
+    pub const MIXED: i64 = 25;
+    pub const NULL: i64 = 26;
+    pub const MISSING: i64 = 27;
+    pub const TENSOR: i64 = 28;
+    pub const TENSORARRAY: i64 = 29;
+    pub const SPARSE: i64 = 30;
+    pub const EMPTYARRAY: i64 = 31;
+    pub const FLOAT16: i64 = 32;
+    pub const BFLOAT16: i64 = 33;
+    pub const MULTIVECTOR: i64 = 34;
+    pub const JSON: i64 = 35;
+    pub const INVALID: i64 = 36;
 }
 
-/// `EmbeddingDataType` ordinals, shared by the embedding/tensor `type_info`.
+/// `EmbeddingDataType` ordinals (`src/parser/type/complex/embedding_type.h:33-45`),
+/// shared by the embedding/tensor `type_info` and the sparse element/index type.
 pub mod element {
     pub const BIT: i64 = 0;
-    pub const UINT8: i64 = 1;
-    pub const INT8: i64 = 2;
-    pub const INT16: i64 = 3;
-    pub const INT32: i64 = 4;
-    pub const INT64: i64 = 5;
-    pub const FLOAT32: i64 = 6;
-    pub const FLOAT64: i64 = 7;
+    pub const INT8: i64 = 1;
+    pub const INT16: i64 = 2;
+    pub const INT32: i64 = 3;
+    pub const INT64: i64 = 4;
+    pub const FLOAT32: i64 = 5;
+    pub const FLOAT64: i64 = 6;
+    pub const UINT8: i64 = 7;
     pub const FLOAT16: i64 = 8;
     pub const BFLOAT16: i64 = 9;
+    pub const INVALID: i64 = 10;
 }
 
 /// `LiteralType` ordinals (`src/parser/expr/constant_expr.h`).
@@ -1110,7 +1133,7 @@ mod tests {
         let v = ColumnDefValue::new(ty, 2, "vec");
         assert_eq!(
             column_def_json(&v).compact(),
-            r#"{"column_id":2,"column_name":"vec","column_type":{"data_type":12,"type_info":{"dimension":4,"embedding_type":6}}}"#
+            r#"{"column_id":2,"column_name":"vec","column_type":{"data_type":23,"type_info":{"dimension":4,"embedding_type":5}}}"#
         );
     }
 
@@ -1123,7 +1146,7 @@ mod tests {
         );
         assert_eq!(
             ty.compact(),
-            r#"{"data_type":22,"type_info":{"data_type":3}}"#
+            r#"{"data_type":15,"type_info":{"data_type":3}}"#
         );
     }
 
@@ -1136,7 +1159,7 @@ mod tests {
         let text = column_def_json(&v).compact();
         assert_eq!(
             text,
-            r#"{"column_comment":"note","column_id":1,"column_name":"s","column_type":{"data_type":11},"constraints":[1,2],"default":"x"}"#
+            r#"{"column_comment":"note","column_id":1,"column_name":"s","column_type":{"data_type":9},"constraints":[1,2],"default":"x"}"#
         );
         // An empty comment is omitted, like the C++ writer does.
         v.column_comment = Some(String::new());
@@ -1229,7 +1252,7 @@ mod tests {
         assert!(text.contains(r#""min_points_per_centroid_":32"#), "{text}");
         assert!(text.contains(r#""max_points_per_centroid_":256"#), "{text}");
         assert!(text.contains(r#""type_":0"#), "{text}");
-        assert!(text.contains(r#""plain_storage_data_type_":6"#), "{text}");
+        assert!(text.contains(r#""plain_storage_data_type_":5"#), "{text}");
         // `ivf_option` decodes back to the same bytes.
         assert_eq!(
             index_def_from_bytes(&index_def_bytes(&v)).unwrap().base,
@@ -1341,7 +1364,7 @@ mod tests {
 
     #[test]
     fn sparse_type_info_matches_the_cpp_json() {
-        // `{"data_type":6,"dimension":100,"index_type":2,"sort":0}` - the
+        // `{"data_type":5,"dimension":100,"index_type":1,"sort":0}` - the
         // index type is int8 for a bound of 100 (`GetIndexType`).
         assert_eq!(
             sparse_type_info(
@@ -1351,7 +1374,7 @@ mod tests {
                 sparse_store::SORT
             )
             .compact(),
-            r#"{"data_type":6,"dimension":100,"index_type":2,"sort":0}"#
+            r#"{"data_type":5,"dimension":100,"index_type":1,"sort":0}"#
         );
         // Bound thresholds: 128 -> int8, 129 -> int16, 32768 -> int16,
         // 32769 -> int32, 2^31+1 -> int64 (`sparse_info.cpp:44-58`).

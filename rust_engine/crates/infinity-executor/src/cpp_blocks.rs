@@ -268,19 +268,36 @@ pub fn tensorarray_shape(type_text: &str) -> Option<(i32, usize, i32)> {
     Some((12, dim, code))
 }
 
-/// `SPARSE(<elem>,<bound>)` → `(element_type, index_type, index_width)`.
+/// `SPARSE(<elem>,<bound>)` / `SPARSE(<elem>,<index>,<bound>)` →
+/// `(element_type, index_type, index_width)`.
 ///
-/// The index width is derived from the bound, exactly as the engine's
-/// `describe_type` does (spec §8.3): ≤127 int8, ≤32767 int16, ≤2^31-1 int32,
-/// otherwise int64.
+/// The two-component form derives the index width from the bound. The
+/// three-component form is what the C++ catalog and the REST physical type
+/// carry, and there the width is the *declared* one — a `sparse,8,float,int`
+/// column stores 4-byte indices even though a bound of 8 would imply int8.
 pub fn sparse_shape(type_text: &str) -> Option<(i32, i32, usize)> {
     let up = type_text.trim().to_ascii_uppercase();
     let rest = up.strip_prefix("SPARSE(")?;
     let inner = rest.trim_end_matches(')');
     let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
     let elem = element_code(parts.first()?)?;
-    let bound: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
-    let (index_type, width) = if bound <= 127 {
+    let (explicit_index, bound_text) = if parts.len() >= 3 {
+        (Some(parts[1]), parts[2])
+    } else {
+        (None, *parts.get(1)?)
+    };
+    let bound: u64 = bound_text.parse().unwrap_or(0);
+    let (index_type, width) = match explicit_index.and_then(sparse_index_kind) {
+        Some(kind) => kind,
+        None => derived_index_kind(bound),
+    };
+    Some((elem, index_type, width))
+}
+
+/// The index width implied by the bound (`SparseInfo::GetIndexType`,
+/// `src/parser/type/info/sparse_info.cpp:44-58`).
+fn derived_index_kind(bound: u64) -> (i32, usize) {
+    if bound <= 127 {
         (2, 1)
     } else if bound <= 32767 {
         (3, 2)
@@ -288,8 +305,18 @@ pub fn sparse_shape(type_text: &str) -> Option<(i32, i32, usize)> {
         (4, 4)
     } else {
         (5, 8)
-    };
-    Some((elem, index_type, width))
+    }
+}
+
+/// `int8`/`tinyint`/… → `(index_type, index_width)`.
+fn sparse_index_kind(name: &str) -> Option<(i32, usize)> {
+    Some(match name {
+        "INT8" | "TINYINT" | "UINT8" => (2, 1),
+        "INT16" | "SMALLINT" => (3, 2),
+        "INT" | "INTEGER" | "INT32" => (4, 4),
+        "INT64" | "BIGINT" => (5, 8),
+        _ => return None,
+    })
 }
 
 /// Parses the engine's sparse rendering `[i:val,…]` / `(empty)`.

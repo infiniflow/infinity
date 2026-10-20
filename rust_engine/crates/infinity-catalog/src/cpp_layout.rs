@@ -59,7 +59,9 @@ pub fn data_type_of_text_with_store(type_text: &str, store: Option<SparseStore>)
         "JSON" => plain(logical::JSON),
         "DATE" => plain(logical::DATE),
         "TIME" => plain(logical::TIME),
-        "DATETIME" | "TIMESTAMP" => plain(logical::DATETIME),
+        "DATETIME" => plain(logical::DATETIME),
+        "TIMESTAMP" => plain(logical::TIMESTAMP),
+        "UUID" => plain(logical::UUID),
         "DECIMAL" => {
             // `DECIMAL(p,s)`; the engine's type text carries the parameters.
             let inner = up.split_once('(')?.1.trim_end_matches(')');
@@ -101,17 +103,29 @@ pub fn data_type_of_text_with_store(type_text: &str, store: Option<SparseStore>)
             ))
         }
         "SPARSE" => {
-            // `SPARSE(<elem>,<bound>)` -> `SparseInfo::Serialize()`
-            // (`sparse_info.cpp:103-110`, `GetIndexType` `:44-58`).
+            // `SPARSE(<elem>,<bound>)` or `SPARSE(<elem>,<index>,<bound>)` ->
+            // `SparseInfo::Serialize()` (`sparse_info.cpp:103-110`,
+            // `GetIndexType` `:44-58`). The three-component form carries the
+            // index width the column was declared with; without it the width is
+            // derived from the bound.
             let inner = up.split_once('(')?.1.trim_end_matches(')');
-            let mut parts = inner.split(',');
-            let elem = parts.next()?.trim().to_string();
-            let dim: i64 = parts.next()?.trim().parse().ok()?;
+            let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+            let elem = (*parts.first()?).to_string();
+            let (explicit_index, bound) = if parts.len() >= 3 {
+                (Some(parts[1]), parts[2])
+            } else {
+                (None, *parts.get(1)?)
+            };
+            let dim: i64 = bound.parse().ok()?;
+            let index_type = match explicit_index.and_then(index_element_code) {
+                Some(code) => code,
+                None => value_format::sparse_index_type(dim),
+            };
             Some(data_type_json(
                 logical::SPARSE,
                 Some(value_format::sparse_type_info(
                     element_code(&elem)?,
-                    value_format::sparse_index_type(dim),
+                    index_type,
                     dim,
                     store.unwrap_or(SparseStore::Sort).as_i64(),
                 )),
@@ -119,6 +133,18 @@ pub fn data_type_of_text_with_store(type_text: &str, store: Option<SparseStore>)
         }
         _ => None,
     }
+}
+
+/// An `int8`/`int16`/`int32`/`int64` index name -> its `EmbeddingDataType`
+/// ordinal, for the three-component `SPARSE(elem, index, bound)` spelling.
+fn index_element_code(name: &str) -> Option<i64> {
+    Some(match name {
+        "INT8" | "TINYINT" => value_format::element::INT8,
+        "INT16" | "SMALLINT" => value_format::element::INT16,
+        "INT" | "INTEGER" | "INT32" => value_format::element::INT32,
+        "INT64" | "BIGINT" => value_format::element::INT64,
+        _ => return None,
+    })
 }
 
 /// Element type name -> `EmbeddingDataType` ordinal.
@@ -187,11 +213,15 @@ fn logical_name(code: i64) -> Option<&'static str> {
         value_format::logical::DOUBLE => "DOUBLE",
         value_format::logical::FLOAT16 => "FLOAT16",
         value_format::logical::BFLOAT16 => "BFLOAT16",
+        value_format::logical::TIMESTAMP => "TIMESTAMP",
+        value_format::logical::INTERVAL => "INTERVAL",
         value_format::logical::VARCHAR => "VARCHAR",
         value_format::logical::JSON => "JSON",
         value_format::logical::DATE => "DATE",
         value_format::logical::TIME => "TIME",
         value_format::logical::DATETIME => "DATETIME",
+        value_format::logical::UUID => "UUID",
+        value_format::logical::TUPLE => "TUPLE",
         _ => return None,
     })
 }
@@ -236,7 +266,20 @@ pub fn type_text_of(column_type: &infinity_expression::json::Json) -> Option<Str
             };
             let elem = value_format::type_info_int(column_type, elem_key)?;
             let dim = value_format::type_info_int(column_type, "dimension")?;
-            let text = format!("{base}({},{})", element_name(elem)?, dim);
+            // A SPARSE record also stores the index width, which is *not* a
+            // function of the bound (`sparse,8,float,int` is an int32 index
+            // over a bound of 8), so keep it in the text.
+            let text = if code == value_format::logical::SPARSE {
+                let index = value_format::type_info_int(column_type, "index_type")?;
+                format!(
+                    "{base}({},{},{})",
+                    element_name(elem)?,
+                    element_name(index)?,
+                    dim
+                )
+            } else {
+                format!("{base}({},{})", element_name(elem)?, dim)
+            };
             // Keep the sparse storage hint in the text: the C++ record carries
             // it as `"sort": 1`, and `create_table_typed_with_sparse_stores`
             // splits it back out.
@@ -1000,11 +1043,11 @@ mod tests {
         );
         assert_eq!(
             data_type_of_text("EMBEDDING(FLOAT,4)").unwrap().compact(),
-            r#"{"data_type":12,"type_info":{"dimension":4,"embedding_type":6}}"#
+            r#"{"data_type":23,"type_info":{"dimension":4,"embedding_type":5}}"#
         );
         assert_eq!(
             data_type_of_text("ARRAY(INTEGER)").unwrap().compact(),
-            r#"{"data_type":22,"type_info":{"data_type":3}}"#
+            r#"{"data_type":15,"type_info":{"data_type":3}}"#
         );
         assert_eq!(
             data_type_of_text("DECIMAL(18,2)").unwrap().compact(),
@@ -1016,7 +1059,7 @@ mod tests {
         // SPARSE carries the `SparseInfo` type_info (index type from the bound).
         assert_eq!(
             data_type_of_text("SPARSE(FLOAT,100)").unwrap().compact(),
-            r#"{"data_type":15,"type_info":{"data_type":6,"dimension":100,"index_type":2,"sort":0}}"#
+            r#"{"data_type":30,"type_info":{"data_type":5,"dimension":100,"index_type":1,"sort":0}}"#
         );
         // `WITH (SORTED)` selects the C++ `kSorted` flag; `WITH (sort)` keeps
         // the default.
@@ -1024,13 +1067,13 @@ mod tests {
             data_type_of_text("SPARSE(FLOAT,100) WITH (SORTED)")
                 .unwrap()
                 .compact(),
-            r#"{"data_type":15,"type_info":{"data_type":6,"dimension":100,"index_type":2,"sort":1}}"#
+            r#"{"data_type":30,"type_info":{"data_type":5,"dimension":100,"index_type":1,"sort":1}}"#
         );
         assert_eq!(
             data_type_of_text("SPARSE(FLOAT,100) WITH (sort)")
                 .unwrap()
                 .compact(),
-            r#"{"data_type":15,"type_info":{"data_type":6,"dimension":100,"index_type":2,"sort":0}}"#
+            r#"{"data_type":30,"type_info":{"data_type":5,"dimension":100,"index_type":1,"sort":0}}"#
         );
     }
 
@@ -1057,16 +1100,16 @@ mod tests {
         assert_eq!(tables.len(), 1);
         assert_eq!(
             tables[0].columns[1].column_type.compact(),
-            r#"{"data_type":15,"type_info":{"data_type":6,"dimension":30000,"index_type":3,"sort":1}}"#
+            r#"{"data_type":30,"type_info":{"data_type":5,"dimension":30000,"index_type":2,"sort":1}}"#
         );
         assert_eq!(
             type_text_of(&tables[0].columns[1].column_type).unwrap(),
-            "SPARSE(float,30000) WITH (SORTED)"
+            "SPARSE(float,int16,30000) WITH (SORTED)"
         );
 
         // The read direction restores the bare type text plus the hint field.
         let metas = read_cpp_tables_as_meta(store.as_ref()).unwrap();
-        assert_eq!(metas[0].types[1], "SPARSE(float,30000)");
+        assert_eq!(metas[0].types[1], "SPARSE(float,int16,30000)");
         assert_eq!(metas[0].sparse_stores[1], Some(crate::SparseStore::Sorted));
 
         // Importing the layout into a fresh native catalog keeps the hint.
@@ -1077,7 +1120,7 @@ mod tests {
             .get_table_by_name("default_db.sp")
             .unwrap()
             .unwrap();
-        assert_eq!(meta.types[1], "SPARSE(float,30000)");
+        assert_eq!(meta.types[1], "SPARSE(float,int16,30000)");
         assert_eq!(meta.sparse_stores[1], Some(crate::SparseStore::Sorted));
     }
 
@@ -1172,7 +1215,7 @@ mod tests {
         // The embedding column kept its type_info, byte for byte.
         assert_eq!(
             got.columns[2].column_type.compact(),
-            r#"{"data_type":12,"type_info":{"dimension":3,"embedding_type":6}}"#
+            r#"{"data_type":23,"type_info":{"dimension":3,"embedding_type":5}}"#
         );
         assert_eq!(got.next_column_id, 3);
     }
@@ -1188,8 +1231,8 @@ mod tests {
             ("TENSOR(FLOAT32,3)", "TENSOR(float,3)"),
             ("ARRAY(INTEGER)", "ARRAY(INTEGER)"),
             ("DECIMAL(18,2)", "DECIMAL(18,2)"),
-            ("SPARSE(FLOAT32,100)", "SPARSE(float,100)"),
-            ("SPARSE(DOUBLE,30000)", "SPARSE(double,30000)"),
+            ("SPARSE(FLOAT32,100)", "SPARSE(float,int8,100)"),
+            ("SPARSE(DOUBLE,30000)", "SPARSE(double,int16,30000)"),
         ] {
             let j = data_type_of_text(text).unwrap();
             assert_eq!(type_text_of(&j).unwrap(), canonical, "{text}");

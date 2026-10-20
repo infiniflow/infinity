@@ -1345,7 +1345,7 @@ mod tests {
         // The hint is written to the C++ `sort` field and read back from it.
         let c = Catalog::with_store_cpp_only(store);
         let t = c.get_table_by_name("default_db.sp").unwrap().unwrap();
-        assert_eq!(t.types[1], "SPARSE(float,30000)");
+        assert_eq!(t.types[1], "SPARSE(float,int16,30000)");
         assert_eq!(t.sparse_stores[1], Some(SparseStore::Sorted));
     }
 
