@@ -170,6 +170,35 @@ mod tests {
         }
     }
 
+    /// `AppendCodes`/`ExtractCodes` round-trip for every code width, including
+    /// the odd subspace counts where a vector starts mid-byte.
+    #[test]
+    fn product_quantization_codes_roundtrip_across_a_part() {
+        for bits in [4u8, 8, 12, 16] {
+            for subspace_num in [1usize, 2, 3] {
+                let max = (1u32 << bits) - 1;
+                let mut stream = Vec::new();
+                let mut stored: Vec<Vec<u32>> = Vec::new();
+                for v in 0..5u32 {
+                    let codes: Vec<u32> = (0..subspace_num as u32)
+                        .map(|j| (v * 7 + j * 13) % max.min(4000))
+                        .collect();
+                    pq_append_codes(&mut stream, stored.len() * subspace_num, &codes, bits);
+                    stored.push(codes);
+                }
+                for (v, codes) in stored.iter().enumerate() {
+                    for (j, want) in codes.iter().enumerate() {
+                        assert_eq!(
+                            pq_code(&stream, v, j, subspace_num, bits),
+                            *want,
+                            "bits {bits} subspace_num {subspace_num} vector {v} subspace {j}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     /// A scalar-quantized chunk ranks the vector its codes describe first, for
     /// both the inner-product and the L2 metric.
     #[test]
@@ -551,14 +580,19 @@ fn pq_code(codes: &[u8], idx: usize, subspace: usize, subspace_num: usize, bits:
     }
 }
 
-/// Writes one vector's codes (`PQ_Code_StorageT::AppendCodes`), returning the
-/// packed bytes for that vector.
-fn pq_pack(codes: &[u32], subspace_num: usize, bits: u8) -> Vec<u8> {
-    let mut out = vec![0u8; pq_bytes_per_vector(subspace_num, bits)];
+/// Appends one vector's codes to a part's packed stream
+/// (`PQ_Code_StorageT::AppendCodes`).
+///
+/// The codes are a continuous nibble/byte/word stream across the whole part,
+/// so `last_code_id` (the number of codes already stored) decides where this
+/// vector starts — a vector may begin mid-byte for 4- and 12-bit codes.
+pub fn pq_append_codes(out: &mut Vec<u8>, last_code_id: usize, codes: &[u32], bits: u8) {
+    let total = last_code_id + codes.len();
     match bits {
         0..=4 => {
+            out.resize(total.div_ceil(2), 0);
             for (i, code) in codes.iter().enumerate() {
-                let pos = i;
+                let pos = last_code_id + i;
                 if pos & 1 == 1 {
                     out[pos >> 1] |= (*code as u8) << 4;
                 } else {
@@ -566,29 +600,25 @@ fn pq_pack(codes: &[u32], subspace_num: usize, bits: u8) -> Vec<u8> {
                 }
             }
         }
-        5..=8 => {
-            for (i, code) in codes.iter().enumerate() {
-                out[i] = *code as u8;
-            }
-        }
+        5..=8 => out.extend(codes.iter().map(|c| *c as u8)),
         9..=12 => {
-            let mut byte_pos = 0usize;
-            let mut is_odd = false;
+            out.resize((total * 3).div_ceil(2), 0);
+            let mut half = last_code_id * 3;
             for code in codes {
+                let byte_pos = half >> 1;
+                let is_odd = half & 1 == 1;
                 let write_16 = if is_odd { code << 4 } else { *code };
                 out[byte_pos] |= (write_16 & 0xff) as u8;
                 out[byte_pos + 1] |= (write_16 >> 8) as u8;
-                byte_pos += if is_odd { 2 } else { 1 };
-                is_odd = !is_odd;
+                half += 3;
             }
         }
         _ => {
-            for (i, code) in codes.iter().enumerate() {
-                out[i * 2..i * 2 + 2].copy_from_slice(&(*code as u16).to_le_bytes());
+            for code in codes {
+                out.extend_from_slice(&(*code as u16).to_le_bytes());
             }
         }
     }
-    out
 }
 
 /// Trains the per-subspace codebooks on residuals
@@ -671,16 +701,15 @@ pub fn train_product_quantization(
     (real, codewords, norms)
 }
 
-/// The nearest codeword of each subspace for one residual, packed
-/// (`IVF_Part_Storage_PQ::AppendOneEmbedding`).
+/// The nearest codeword of each subspace for one residual
+/// (`IVF_Part_Storage_PQ::AppendOneEmbedding`, before packing).
 pub fn encode_product_quantized(
     residual: &[f32],
     dims: usize,
     subspace_num: usize,
     real: usize,
     codewords: &[f32],
-    bits: u8,
-) -> Vec<u8> {
+) -> Vec<u32> {
     let subspace_dim = dims / subspace_num.max(1);
     let mut codes = Vec::with_capacity(subspace_num);
     for j in 0..subspace_num {
@@ -698,7 +727,7 @@ pub fn encode_product_quantized(
         }
         codes.push(best as u32);
     }
-    pq_pack(&codes, subspace_num, bits)
+    codes
 }
 
 impl IvfPqIndex {

@@ -2440,11 +2440,15 @@ impl Engine {
                 options.pq_subspace_num,
                 real,
                 &codewords,
-                options.pq_bits,
             );
             let part = &mut parts[assign[i]];
             part.segment_offsets.push(*label);
-            part.codes.extend_from_slice(&codes);
+            infinity_index::ivf::pq_append_codes(
+                &mut part.codes,
+                part.last_code_id as usize,
+                &codes,
+                options.pq_bits,
+            );
             part.last_code_id += options.pq_subspace_num as u64;
         }
         let codebook = knn_format::IvfPqCodebook {
