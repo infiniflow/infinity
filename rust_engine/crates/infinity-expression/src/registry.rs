@@ -143,6 +143,10 @@ pub const SPECIAL_FUNCTIONS: &[&str] = &[
     "SIMILARITY",
     "SIMILARITY_FACTORS",
     "SUBQUERY",
+    // The executor expands `UNNEST(col)` itself: `rewrite_unnest_expr`
+    // (infinity-executor/src/lib.rs:1395) maps it to the synthetic column that
+    // the expansion appends before the expression is compiled.
+    "UNNEST",
 ];
 
 /// Prefix the reference parser gives the rewritten `EXTRACT` call.
@@ -277,6 +281,8 @@ mod tests {
         assert!(is_known_function("create_timestamp"));
         assert!(is_known_function("DELETE_TIMESTAMP"));
         assert!(is_known_function("similarity_factors"));
+        // `UNNEST` is expanded by the executor before the call is compiled
+        assert!(is_known_function("Unnest"));
     }
 
     /// The whitelist has no duplicates and every entry resolves case-insensitively.
