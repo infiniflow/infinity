@@ -60,6 +60,30 @@ pub struct CppSegmentSet {
     pub segments: Vec<CppSegment>,
 }
 
+/// One sealed index chunk, as `ChunkIndexMetaInfo` records it
+/// (`src/storage/catalog/meta/chunk_index_meta_impl.cpp:47`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CppIndexChunk {
+    pub chunk_id: u32,
+    /// Full-text chunks name their files after it; the other workers derive
+    /// `chunk_{id}.idx` from the chunk id itself.
+    pub base_name: String,
+    pub base_row_id: u64,
+    pub row_count: u64,
+    pub term_count: u64,
+    /// Bytes the index occupies on disk (the HNSW/BMP/IVF workers size their
+    /// buffer with it).
+    pub index_size: u64,
+}
+
+/// The sealed chunks of one index over one segment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CppIndexSegment {
+    pub index_id: u64,
+    pub segment_id: u32,
+    pub chunks: Vec<CppIndexChunk>,
+}
+
 /// The timestamp every record of a block mirror is published with.
 ///
 /// The mirror is a full rewrite of the table at a checkpoint, not an append, so
@@ -745,10 +769,7 @@ impl Catalog {
             // a mismatch here meant no set was ever found - the sweep below
             // deletes every `catalog|` key, so the segment records were dropped
             // on every checkpoint and the reference saw a segmentless table.
-            if let Some(set) = segments
-                .iter()
-                .find(|s| s.table_id == t.id.to_string())
-            {
+            if let Some(set) = segments.iter().find(|s| s.table_id == t.id.to_string()) {
                 let mut set = set.clone();
                 set.db_id = db_id.to_string();
                 written += write_cpp_segments(store, &set)?;
@@ -1141,6 +1162,99 @@ pub fn write_cpp_segments(store: &dyn MetaStore, set: &CppSegmentSet) -> Result<
     }
     written += 2;
     Ok(written)
+}
+
+/// Writes the sealed-chunk layer of one index: `idx_seg|…` (the segment index),
+/// its `next_chunk_id` tag, and one `idx_chunk|…|chunk_info` record per chunk.
+///
+/// The reference needs these to know that the segment's rows are already
+/// indexed: `NewTxn::RecoverMemIndex` walks the appended rows, and with no chunk
+/// records every row is a "gap" it tries to rebuild into the memory index
+/// (`CountMemIndexGapInSegment`, `new_txn_index_impl.cpp:2768`) — which dumps a
+/// fresh chunk and, on a Rust-written mirror, aborts the startup.
+pub fn write_cpp_index_segments(
+    store: &dyn MetaStore,
+    set: &CppSegmentSet,
+    indexes: &[CppIndexSegment],
+) -> Result<usize> {
+    let mut written = 0usize;
+    for index in indexes {
+        let idx_str = index.index_id.to_string();
+        let seg_prefix = format!(
+            "idx_chunk|{}|{}|{}|{}|",
+            set.db_id, set.table_id, idx_str, index.segment_id
+        );
+        for (k, _) in store.scan_prefix(seg_prefix.as_bytes())? {
+            store.delete(&k)?;
+        }
+        let seg_key =
+            key::catalog_index_segment_key(&set.db_id, &set.table_id, &idx_str, index.segment_id);
+        for (k, _) in store.scan_prefix(format!("{seg_key}|").as_bytes())? {
+            store.delete(&k)?;
+        }
+        if index.chunks.is_empty() {
+            store.delete(seg_key.as_bytes())?;
+            continue;
+        }
+        store.put(seg_key.as_bytes(), CPP_MIRROR_TS.to_string().as_bytes())?;
+        written += 1;
+        let next_chunk = index
+            .chunks
+            .iter()
+            .map(|c| c.chunk_id + 1)
+            .max()
+            .unwrap_or(0);
+        store.put(
+            key::catalog_index_segment_tag_key(
+                &set.db_id,
+                &set.table_id,
+                &idx_str,
+                index.segment_id,
+                "next_chunk_id",
+            )
+            .as_bytes(),
+            next_chunk.to_string().as_bytes(),
+        )?;
+        written += 1;
+        for chunk in &index.chunks {
+            let key = key::catalog_index_chunk_tag_key(
+                &set.db_id,
+                &set.table_id,
+                &idx_str,
+                index.segment_id,
+                chunk.chunk_id as u64,
+                "chunk_info",
+            );
+            let value = format!(
+                "{{\"base_name\":{},\"base_row_id\":{},\"row_count\":{},\"term_count\":{},\"index_size\":{}}}",
+                json_string(&chunk.base_name),
+                chunk.base_row_id,
+                chunk.row_count,
+                chunk.term_count,
+                chunk.index_size
+            );
+            store.put(key.as_bytes(), value.as_bytes())?;
+            written += 1;
+        }
+    }
+    Ok(written)
+}
+
+/// A JSON string literal (the chunk info is read with `simdjson`, so the base
+/// name has to be quoted and escaped).
+fn json_string(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 2);
+    out.push('"');
+    for c in text.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 /// Maps a C++ index record onto the engine's `IndexMeta`, resolving the owning
@@ -1599,12 +1713,7 @@ mod tests {
 
         // The `next_index_id` tag counts both indexes.
         let db = cat.list_databases().unwrap();
-        let db_id = (db
-            .iter()
-            .position(|d| d == "default_db")
-            .unwrap()
-            + 1)
-        .to_string();
+        let db_id = (db.iter().position(|d| d == "default_db").unwrap() + 1).to_string();
         let tables = cat.list_tables().unwrap();
         let tbl_id = tables[0].id.to_string();
         assert_eq!(

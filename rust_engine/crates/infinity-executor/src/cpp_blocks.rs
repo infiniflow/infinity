@@ -14,6 +14,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use infinity_catalog::cpp_layout::{CppBlock, CppSegment, CppSegmentSet, CPP_MIRROR_TS};
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
 use infinity_index::hnsw_handler::HnswHandler;
@@ -1171,6 +1172,7 @@ impl Engine {
         let _ = std::fs::remove_dir_all(&seg_dir);
 
         let mut written = 0usize;
+        let mut blocks: Vec<CppBlock> = Vec::new();
         // Drain the snapshot block by block so each block's values are freed
         // once it is encoded: holding the whole table's decoded rows while the
         // texts are rendered doubled the transient on a long import.
@@ -1184,8 +1186,13 @@ impl Engine {
                 .collect();
             let block_columns =
                 self.encode_block_columns(&meta.types, &meta.ids, &types, &layouts, &texts)?;
+            // The mirror is a full rewrite at one checkpoint, so its rows carry
+            // no per-append commit order: publishing them with ts 0 keeps them
+            // visible to a reader whose `begin_ts` is 1 (the C++
+            // `BlockVersion::GetRowCount` returns 0 when the first create entry
+            // is *newer* than `begin_ts`).
             let version = BlockVersionFile::new(
-                &[(block_index as u64 + 1, chunk.len() as u32)],
+                &[(CPP_MIRROR_TS, chunk.len() as u32)],
                 DEFAULT_BLOCK_CAPACITY,
             );
             let id = BlockId {
@@ -1201,9 +1208,26 @@ impl Engine {
                     source: e,
                 }
             })?;
+            blocks.push(CppBlock {
+                block_id: block_index as u16,
+                commit_ts: CPP_MIRROR_TS,
+            });
             written += chunk.len();
             block_index += 1;
         }
+        // Publish the segment layer the C++ reader enumerates
+        // (`catalog|seg|…` / `catalog|blk|…`, `GetTableSegments`): without it
+        // the table opens with no segments and every query returns nothing.
+        // One segment (`seg_0`), as the mirror writes all blocks into it.
+        self.storage.catalog.publish_cpp_segments(&CppSegmentSet {
+            db_id: db_id.to_string(),
+            table_id: meta.id.to_string(),
+            segments: vec![CppSegment {
+                segment_id: 0,
+                create_ts: CPP_MIRROR_TS,
+                blocks,
+            }],
+        })?;
         // The mirror has new block files; the table's block map must rescan.
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey).or_default();

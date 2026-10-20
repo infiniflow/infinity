@@ -500,8 +500,13 @@ impl Catalog {
         tables: &[TableMeta],
         indexes: &[IndexMeta],
     ) -> Result<()> {
+        // The sweep covers the `catalog|` prefix, which holds the segment and
+        // block records of the block mirror: read them first so a DDL republishes
+        // them unchanged instead of leaving the C++ reader with a segmentless
+        // table.
+        let segments = crate::cpp_layout::read_cpp_segments(self.store.as_ref())?;
         let mut batch = self.cpp_layout_sweep(self.store.as_ref())?;
-        batch.extend(self.write_cpp_layout_batch(dbs, tables, indexes)?);
+        batch.extend(self.write_cpp_layout_batch(dbs, tables, indexes, &segments)?);
         self.store.atomic_batch(&last_op_per_key(batch))
     }
 
@@ -515,12 +520,36 @@ impl Catalog {
         let dbs = self.list_databases()?;
         let tables = self.list_tables()?;
         let indexes = self.list_indexes()?;
-        let layout = self.write_cpp_layout_batch(&dbs, &tables, &indexes)?;
+        let segments = crate::cpp_layout::read_cpp_segments(store)?;
+        let layout = self.write_cpp_layout_batch(&dbs, &tables, &indexes, &segments)?;
         let written = layout.len();
         let mut batch = self.cpp_layout_sweep(store)?;
         batch.extend(layout);
         store.atomic_batch(&last_op_per_key(batch))?;
         Ok(written)
+    }
+
+    /// Publishes the segment layer of a block mirror the engine just wrote
+    /// (`catalog|seg|…`, `catalog|blk|…`, `first_delete_ts`, and the table's
+    /// `next_segment_id` / `unsealed_segment_id`).
+    ///
+    /// A targeted write: nothing is swept, so a checkpoint can publish blocks
+    /// after [`Self::rewrite_cpp_layout`] (or, in C++-only mode, after the DDL
+    /// that created the mirror).
+    pub fn publish_cpp_segments(&self, set: &crate::cpp_layout::CppSegmentSet) -> Result<usize> {
+        crate::cpp_layout::write_cpp_segments(self.store.as_ref(), set)
+    }
+
+    /// Publishes the sealed-chunk layer of the table's index mirrors
+    /// (`idx_seg|…`, `idx_seg|…|next_chunk_id`, `idx_chunk|…|chunk_info`), so the
+    /// reference knows the segment's rows are already indexed and does not try
+    /// to rebuild them into its memory index at startup.
+    pub fn publish_cpp_index_segments(
+        &self,
+        set: &crate::cpp_layout::CppSegmentSet,
+        indexes: &[crate::cpp_layout::CppIndexSegment],
+    ) -> Result<usize> {
+        crate::cpp_layout::write_cpp_index_segments(self.store.as_ref(), set, indexes)
     }
 
     /// The deletes a C++-layout rewrite performs before writing the layout.
@@ -1158,6 +1187,7 @@ impl Catalog {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cpp_layout::{CppBlock, CppSegment, CppSegmentSet, CPP_MIRROR_TS};
     use tempfile::tempdir;
 
     fn cols(names: &[&str]) -> Vec<String> {
@@ -1607,9 +1637,31 @@ mod tests {
         let dbs = c.list_databases().unwrap();
         let tables = c.list_tables().unwrap();
         let indexes = c.list_indexes().unwrap();
+        // A segment layer as a checkpoint publishes it: one segment, two blocks.
+        // `default_db` is the first database, so the reference id is 1.
+        let db_id = dbs.iter().position(|d| d == "db2").unwrap() as u64 + 1;
+        let table_id = tables.iter().find(|t| t.name == "db2.t").unwrap().id;
+        let segments = vec![CppSegmentSet {
+            db_id: db_id.to_string(),
+            table_id: table_id.to_string(),
+            segments: vec![CppSegment {
+                segment_id: 0,
+                create_ts: CPP_MIRROR_TS,
+                blocks: vec![
+                    CppBlock {
+                        block_id: 0,
+                        commit_ts: CPP_MIRROR_TS,
+                    },
+                    CppBlock {
+                        block_id: 1,
+                        commit_ts: CPP_MIRROR_TS,
+                    },
+                ],
+            }],
+        }];
 
         let batch: std::collections::BTreeMap<Vec<u8>, Vec<u8>> = c
-            .write_cpp_layout_batch(&dbs, &tables, &indexes)
+            .write_cpp_layout_batch(&dbs, &tables, &indexes, &segments)
             .unwrap()
             .into_iter()
             .map(|(k, v)| (k, v.expect("the layout writer only writes")))
@@ -1617,11 +1669,91 @@ mod tests {
 
         let direct: Arc<dyn MetaStore> =
             Arc::new(FjallMetaStore::open(dst.path(), "catalog").unwrap());
+        // The direct writer preserves the segment layer already in the store, so
+        // publish it first and the two paths see the same input.
+        for set in &segments {
+            crate::cpp_layout::write_cpp_segments(direct.as_ref(), set).unwrap();
+        }
         c.write_cpp_layout(direct.as_ref()).unwrap();
         let written: std::collections::BTreeMap<Vec<u8>, Vec<u8>> =
             direct.scan_prefix(b"").unwrap().into_iter().collect();
 
         assert!(!batch.is_empty());
         assert_eq!(batch, written);
+    }
+
+    /// The segment layer is what makes a written block mirror visible to the
+    /// reference: `GetTableSegments` / `GetTableSegmentBlocks` enumerate
+    /// `catalog|seg|…` and `catalog|blk|…` by prefix, so a table with no
+    /// records there opens with zero segments.
+    #[test]
+    fn segment_layer_round_trips_and_sets_the_table_tags() {
+        let src = tempdir().unwrap();
+        let c = Catalog::open(src.path()).unwrap();
+        c.create_table_typed(
+            "t",
+            &cols(&["id"]),
+            &[None],
+            &[false],
+            &["INTEGER".into()],
+            &[None],
+        )
+        .unwrap();
+        let t = c.list_tables().unwrap()[0].clone();
+        let db_id = "0".to_string();
+        let tbl_id = t.id.to_string();
+        let set = CppSegmentSet {
+            db_id: db_id.clone(),
+            table_id: tbl_id.clone(),
+            segments: vec![CppSegment {
+                segment_id: 0,
+                create_ts: CPP_MIRROR_TS,
+                blocks: vec![
+                    CppBlock {
+                        block_id: 0,
+                        commit_ts: CPP_MIRROR_TS,
+                    },
+                    CppBlock {
+                        block_id: 1,
+                        commit_ts: CPP_MIRROR_TS,
+                    },
+                ],
+            }],
+        };
+        let store = c.store();
+        c.publish_cpp_segments(&set).unwrap();
+
+        let back = crate::cpp_layout::read_cpp_segments(store.as_ref()).unwrap();
+        assert_eq!(back, vec![set]);
+        // `next_segment_id` is the next id to hand out, `unsealed_segment_id`
+        // the segment the engine would still append to.
+        let tag = |name: &str| {
+            store
+                .get(
+                    infinity_storage::catalog_format::catalog_table_tag_key(&db_id, &tbl_id, name)
+                        .as_bytes(),
+                )
+                .unwrap()
+                .map(|v| String::from_utf8_lossy(&v).to_string())
+        };
+        assert_eq!(tag("next_segment_id").as_deref(), Some("1"));
+        assert_eq!(tag("unsealed_segment_id").as_deref(), Some("0"));
+
+        // Publishing again with fewer blocks must not leave the stale record.
+        let shrunk = CppSegmentSet {
+            db_id,
+            table_id: tbl_id,
+            segments: vec![CppSegment {
+                segment_id: 0,
+                create_ts: CPP_MIRROR_TS,
+                blocks: vec![CppBlock {
+                    block_id: 0,
+                    commit_ts: CPP_MIRROR_TS,
+                }],
+            }],
+        };
+        c.publish_cpp_segments(&shrunk).unwrap();
+        let back = crate::cpp_layout::read_cpp_segments(store.as_ref()).unwrap();
+        assert_eq!(back, vec![shrunk]);
     }
 }
