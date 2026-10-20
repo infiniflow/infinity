@@ -36,6 +36,7 @@
 
 - 实现文件：`src/storage/catalog/kv_store.cppm`、`src/storage/catalog/kv_store_impl.cpp`；合并算子：`src/storage/common/rocksdb_merge_operator.cppm` / `_impl.cpp`。
 - 结论：Rust 侧**必须改用 `rust-rocksdb`**（计划 §4.2 已列为「保留磁盘兼容」的回退方案），当前 `fjall`（纯 Rust LSM）与 C++ 目录**互不可读**。
+- **现状更新**：`rust-rocksdb` 后端已落地，feature 为 `rocksdb-store`（`infinity-storage/src/metastore_rocks.rs`）；开了它，catalog 直接用 C++ 的键空间（`Catalog::with_store_cpp_only`），目录可被参考打开，由 `python/restart_test/test_cross_engine_compat.py` 双向验证。后端选择、磁盘兼容矩阵与 fsync 屏障见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md)——本文 §2/§7 的"尚未接入"描述已过时，以 FAQ 为准。
 - 迁移前需冻结（见 §6）：RocksDB `Options`/`ColumnFamily` 集合、比较器、`MergeOperator` 的 `Merge`/`FullMergeV2` 语义、以及键前缀命名空间。
 
 ## 3. 已验证：全文倒排索引的组成模块（待逐文件冻结细节）

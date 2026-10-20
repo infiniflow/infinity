@@ -497,8 +497,18 @@ impl TxnManager {
         if let Some(parent) = self.checkpoint_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
         }
-        std::fs::write(&self.checkpoint_path, &buf)
-            .map_err(|e| Error::io(&self.checkpoint_path, e))?;
+        // Written and fsynced: this file is the only thing that tells the
+        // reference which checkpoint the directory holds, and it refuses to
+        // open a directory whose checkpoint entry a power loss took away.
+        {
+            use std::io::Write;
+            let mut file = std::fs::File::create(&self.checkpoint_path)
+                .map_err(|e| Error::io(&self.checkpoint_path, e))?;
+            file.write_all(&buf)
+                .map_err(|e| Error::io(&self.checkpoint_path, e))?;
+            file.sync_all()
+                .map_err(|e| Error::io(&self.checkpoint_path, e))?;
+        }
         Ok(())
     }
 

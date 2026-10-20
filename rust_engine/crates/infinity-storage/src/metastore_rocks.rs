@@ -94,8 +94,14 @@ impl MetaStore for RocksMetaStore {
     }
 
     fn flush(&self) -> Result<()> {
-        // `flush` + WAL sync is the durability barrier the trait contract wants.
-        self.db.flush().map_err(re)
+        // `flush` + WAL sync is the durability barrier the trait contract wants:
+        // `flush` moves the memtable into an SST, and only `flush_wal(true)`
+        // makes the log that carried the writes durable. Without the sync the
+        // memtable is on disk but the log is not, and a crash right after a
+        // checkpoint would lose exactly the writes it claimed to have made
+        // durable.
+        self.db.flush().map_err(re)?;
+        self.db.flush_wal(true).map_err(re)
     }
 }
 
