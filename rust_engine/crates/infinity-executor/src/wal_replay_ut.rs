@@ -446,7 +446,9 @@ fn recycle_wal_after_delta_checkpoint() {
         e.insert_literals("db1.t1", None, rows).unwrap();
     }
 
-    let wal_path = dir.path().join("wal").join("wal.log");
+    // This engine's redo records live in `wal.rust`; `wal/wal.log` holds the
+    // reference-framed checkpoint entry the other engine reads.
+    let wal_path = dir.path().join("wal").join("wal.rust");
     assert!(
         std::fs::metadata(&wal_path).unwrap().len() > 0,
         "row appends must fill the WAL"
