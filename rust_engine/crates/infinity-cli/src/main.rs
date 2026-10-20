@@ -46,7 +46,8 @@ fn open_txn(dir: &Path) -> infinity_common::Result<(TxnManager, Arc<dyn MetaStor
 
 fn usage() -> ! {
     eprintln!(
-        "usage: infinity <create-table|list-tables|put|get|recover|query|bench|serve|import-csv|conformance|smoke> <dir> [args...]"
+        "usage: infinity <create-table|list-tables|put|get|recover|query|bench|serve|import-csv|conformance|smoke> <dir> [args...]
+       [--catalog-engine=fjall|rocksdb]  the substrate a fresh catalog is created on"
     );
     std::process::exit(2);
 }
@@ -62,6 +63,32 @@ fn toml_value(text: &str, key: &str) -> Option<String> {
 
 /// `infinity --config=<file>` — the C++ server's invocation, used by
 /// `python/restart_test`. The data root is the parent of `persistence_dir`.
+/// The catalog substrate named on the command line
+/// (`--catalog-engine=fjall|rocksdb`).
+///
+/// It decides what a *fresh* data directory is created on; an existing
+/// directory is always opened on the substrate it holds. Naming it makes it
+/// easy to produce a directory the reference can read (rocksdb) or one the
+/// port keeps to itself (fjall).
+fn catalog_backend_flag(
+    args: &[String],
+) -> infinity_common::Result<Option<infinity_storage::metastore::StoreBackend>> {
+    let mut backend = None;
+    for arg in args {
+        let Some(value) = arg.strip_prefix("--catalog-engine=") else {
+            continue;
+        };
+        backend = Some(
+            infinity_storage::metastore::StoreBackend::parse(value).ok_or_else(|| {
+                infinity_common::Error::Invalid(format!(
+                    "unknown catalog engine '{value}' (expected fjall or rocksdb)"
+                ))
+            })?,
+        );
+    }
+    Ok(backend)
+}
+
 fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     let text = std::fs::read_to_string(path).map_err(|e| infinity_common::Error::Io {
         path: PathBuf::from(path),
@@ -115,7 +142,18 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
             Err(e) => eprintln!("object store: restore failed: {e}"),
         }
     }
-    let engine = Arc::new(Engine::open(&root)?);
+    // `[storage] catalog_engine = "rocksdb" | "fjall"`: the substrate a fresh
+    // catalog is created on. The command line wins over the file.
+    let mut backend = toml_value(&text, "catalog_engine")
+        .and_then(|v| infinity_storage::metastore::StoreBackend::parse(&v));
+    if let Some(flag) = catalog_backend_flag(&std::env::args().collect::<Vec<_>>())? {
+        backend = Some(flag);
+    }
+    let options = infinity_executor::EngineOptions {
+        catalog_backend: backend,
+        ..Default::default()
+    };
+    let engine = Arc::new(Engine::open_with_options(&root, options)?);
     if let Some(client) = object_store {
         engine.set_object_store(client);
     }
@@ -337,7 +375,12 @@ fn run(args: &[String]) -> infinity_common::Result<()> {
                 .get(2)
                 .cloned()
                 .unwrap_or_else(|| "0.0.0.0:23817".into());
-            let engine = std::sync::Arc::new(infinity_executor::Engine::open(&dir)?);
+            let options = infinity_executor::EngineOptions {
+                catalog_backend: catalog_backend_flag(args)?,
+                ..Default::default()
+            };
+            let engine =
+                std::sync::Arc::new(infinity_executor::Engine::open_with_options(&dir, options)?);
             let server = infinity_server::Server::bind_with_engine(&addr, engine)?;
             println!("serving on {}", server.local_addr()?);
             server.run();
