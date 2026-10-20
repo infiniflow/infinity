@@ -163,7 +163,13 @@ def _run(engine_path, body):
         finally:
             conn.disconnect()
     finally:
-        runner.uninit(kill=True)
+        try:
+            runner.uninit(kill=True)
+        except Exception:
+            # An engine that already died (the startup liveness check above is
+            # what reports it) has no children left for `uninit` to walk; its
+            # pid is gone and psutil raises. Do not mask the real failure.
+            pass
         # `uninit` kills the engine but the listening port is released
         # asynchronously; the *next* engine in this test (and the reference in
         # particular, which does not set SO_REUSEADDR) fails to bind if it

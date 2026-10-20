@@ -418,12 +418,18 @@ impl TxnManager {
                         WalCmd::KvBatch { writes: batch, .. } => writes.extend(batch.clone()),
                         WalCmd::Checkpoint { .. } => {}
                         other => {
-                            // Not emitted by this engine; replaying it needs
-                            // catalog/index operations the executor owns.
-                            return Err(Error::Wal(format!(
-                                "cannot replay typed command {:?} without the executor",
-                                other.command_type()
-                            )));
+                            // The reference's log carries its catalog DDL
+                            // (`WalCmdCreateDatabaseV2`, `CreateTableV2`,
+                            // `CreateIndexV2`, …). Their effect is already in
+                            // the C++ key space this engine opens the catalog
+                            // from (`Engine::open` -> the C++ layout reader),
+                            // and replaying them needs catalog operations the
+                            // executor owns, so skip them: aborting here made a
+                            // directory the reference had just written
+                            // unopenable ("cannot replay typed command
+                            // CreateDatabaseV2 without the executor"). Only the
+                            // row commands above have to reach the KV store.
+                            let _ = other.command_type();
                         }
                     }
                 }
@@ -450,6 +456,28 @@ impl TxnManager {
                     .map(|b| TxnTimeStamp::from_le_bytes(b.try_into().unwrap()))
             })
             .unwrap_or(0))
+    }
+
+    /// C++ `NewCheckpoint`: append the checkpoint entry the reference keeps.
+    ///
+    /// `GetReplayEntries` derives `last_commit_ts`/`max_checkpoint_ts` from the
+    /// newest `kNewCheckpoint` command and refuses to open a writable directory
+    /// that has data but no checkpoint ("WAL replay: No checkpoint found in
+    /// wal", `wal_manager_impl.cpp:670`). The entry therefore has to survive the
+    /// truncation that follows it, and the log must never be left empty.
+    pub fn append_checkpoint(&self, max_commit_ts: TxnTimeStamp) -> Result<()> {
+        if max_commit_ts == 0 {
+            return Ok(());
+        }
+        let entry = WalEntry::new(
+            -1,
+            max_commit_ts,
+            vec![WalCmd::Checkpoint { max_commit_ts }],
+        );
+        let mut wal = self.wal.lock().unwrap();
+        wal.append(&entry)?;
+        self.last_appended.fetch_max(max_commit_ts, Ordering::SeqCst);
+        wal.flush()
     }
 
     /// Drops the WAL prefix that the KV store already holds. The caller must
