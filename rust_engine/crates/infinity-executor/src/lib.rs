@@ -170,6 +170,9 @@ mod kv_ut;
 #[cfg(test)]
 mod bg_task_ut;
 
+#[cfg(test)]
+mod storage_mode_ut;
+
 mod explain_search;
 
 pub mod analyzer;
@@ -3315,6 +3318,101 @@ pub struct Storage {
     /// Serializes checkpoints: the block mirror rewrites `seg_0`, so two
     /// concurrent flushes would race on its files.
     flush_lock: Mutex<()>,
+    /// The lifecycle mode (`Storage::current_storage_mode_`).
+    mode: Mutex<StorageMode>,
+}
+
+/// `Storage`'s lifecycle mode.
+///
+/// C++: `enum class StorageMode` (`src/storage/wal/wal_manager.cppm:33-38`),
+/// driven by `Storage::SetStorageMode` (`src/storage/storage_impl.cpp:805-877`).
+///
+/// In the reference every transition starts or stops subsystems: `InitToAdmin`
+/// builds the WAL manager and the persistence layer, `AdminToReaderBottom` /
+/// `AdminToWriter` build the buffer manager, the catalog, the transaction
+/// manager, the memory-index tracer and the four background processors,
+/// `AttachCatalog(ts)` opens a catalog snapshot bounded by a checkpoint
+/// timestamp, and `RecoverMemIndex` reloads the memory indexes. This port does
+/// all of that once, inside [`Engine::open_with_options`], and tears it down
+/// with the `Engine`; there is no checkpoint-timestamp catalog view because the
+/// catalog is read live from the `MetaStore`. Only the part a client can
+/// observe is modelled here: which mode the storage is in, which transitions
+/// are legal, and whether a statement may write. `storage_mode_ut.rs` records
+/// this as a deliberate deviation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageMode {
+    /// `kUnInitialized`: nothing is open. A mutating statement is fatal, as
+    /// the reference's `UnrecoverableError("Uninitialized storage mode")` is.
+    UnInitialized,
+    /// `kAdmin`: a cluster-management node. Reads work, user writes do not.
+    Admin,
+    /// `kReadable`: a follower/learner replica. Reads and cleanup run, user
+    /// writes do not.
+    Readable,
+    /// `kWritable`: a standalone or leader node.
+    Writable,
+}
+
+impl StorageMode {
+    /// Whether a user write (`INSERT`/`UPDATE`/`DELETE`/`IMPORT`/DDL/
+    /// `FLUSH`/`DUMP INDEX`) is allowed. The reference's operators and its
+    /// checkpoint task all require exactly `kWritable`
+    /// (`physical_insert_impl.cpp:117`, `background_process_impl.cpp:82`).
+    pub fn accepts_writes(self) -> bool {
+        matches!(self, StorageMode::Writable)
+    }
+
+    /// Whether `CLEANUP` is allowed. The reference's cleanup task runs in
+    /// `kWritable` or `kReadable` (`background_process_impl.cpp:109`).
+    pub fn accepts_cleanup(self) -> bool {
+        matches!(self, StorageMode::Writable | StorageMode::Readable)
+    }
+}
+
+impl Storage {
+    /// C++ `Storage::GetStorageMode` (`storage_impl.cpp:800-803`).
+    pub fn get_storage_mode(&self) -> StorageMode {
+        *self.mode.lock().unwrap()
+    }
+
+    /// C++ `Storage::SetStorageMode` (`storage_impl.cpp:805-877`).
+    ///
+    /// The transition table is the reference's: `kUnInitialized` only moves to
+    /// `kAdmin`; `kAdmin` reaches everything else; `kReadable`/`kWritable`
+    /// step back to `kAdmin`, drop to `kUnInitialized`, or swap with each
+    /// other. Setting the current mode again is a no-op (`Set unchanged
+    /// mode`). The reference calls `UnrecoverableError` on an illegal
+    /// transition; this port returns the same message as an error so an admin
+    /// RPC can report it instead of aborting the process.
+    pub fn set_storage_mode(&self, target: StorageMode) -> Result<()> {
+        let mut mode = self.mode.lock().unwrap();
+        if *mode == target {
+            return Ok(());
+        }
+        let legal = matches!(
+            (*mode, target),
+            (StorageMode::UnInitialized, StorageMode::Admin)
+                | (
+                    StorageMode::Admin,
+                    StorageMode::UnInitialized | StorageMode::Readable | StorageMode::Writable
+                )
+                | (
+                    StorageMode::Readable,
+                    StorageMode::UnInitialized | StorageMode::Admin | StorageMode::Writable
+                )
+                | (
+                    StorageMode::Writable,
+                    StorageMode::UnInitialized | StorageMode::Admin | StorageMode::Readable
+                )
+        );
+        if !legal {
+            return Err(Error::Unrecoverable(format!(
+                "Attempt to set storage mode from {mode:?} to {target:?}"
+            )));
+        }
+        *mode = target;
+        Ok(())
+    }
 }
 
 /// Sealed high-cardinality chunk readers with their base row id.
@@ -3746,6 +3844,11 @@ impl<'a> EngineTxn<'a> {
     /// `CommitTxn`: applies the staged batch, then updates the in-memory index
     /// registries and row bookkeeping.
     pub fn commit(mut self) -> Result<()> {
+        // A transaction is only a staged batch until here, so the mode is
+        // checked at commit: a node that turned read-only (or uninitialized)
+        // after the append must not publish it (`PhysicalInsert` checks the
+        // same condition while executing the request).
+        self.engine.ensure_writable()?;
         let Some(txn) = self.txn.take() else {
             return Ok(());
         };
@@ -3992,6 +4095,12 @@ impl Engine {
                 catalog,
                 store,
                 flush_lock: Mutex::new(()),
+                // The subsystems are built above, so the storage is writable
+                // the moment it exists: the reference's standalone/leader
+                // startup path reaches `kWritable` in `AdminToWriter` before
+                // it serves a request, and every caller of `open` expects to
+                // write. `set_storage_mode` moves it elsewhere.
+                mode: Mutex::new(StorageMode::Writable),
             },
             txn,
             rt,
@@ -5453,6 +5562,23 @@ impl Engine {
                 continue;
             }
             let qualified = self.expand_views(self.qualify_tables(&s), &[])?;
+            // Storage mode gate, before the statement can touch the engine.
+            // Every write operator checks the mode in the reference, and this
+            // covers INSERT/INSERT SELECT/DELETE/UPDATE, the DDL and snapshot
+            // statements, and COPY FROM.
+            //
+            // `FLUSH`/`OPTIMIZE`/`COMPACT`/`CLEANUP`/`DUMP` are not covered:
+            // they have no AST node, and the parser folds them into
+            // `Utility { text }` while dropping the keyword itself (`FLUSH
+            // DATA` parses to `text == "DATA"`, see
+            // `infinity-parser/src/corpora_ut.rs:50-57`), so the verb cannot be
+            // recovered here. Nothing is bypassed today because the executor
+            // answers every `Utility` with an empty result; they must be gated
+            // once they get real `Statement` variants. Their engine-method
+            // entry points (`flush`, `optimize_indexes`, `cleanup`) are gated.
+            if invalidates_result_cache(&qualified) {
+                self.ensure_writable()?;
+            }
             // Result cache: `SELECT` results are reused verbatim when the cache
             // is active; any data-modifying statement invalidates it.
             if matches!(qualified, Statement::Select { .. }) && self.result_cache_active() {
@@ -6480,6 +6606,9 @@ impl Engine {
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
+        // The Thrift `Insert` RPC reaches this directly, so the mode gate has
+        // to live here and not only in `execute` (`PhysicalInsert`).
+        self.ensure_writable()?;
         self.insert_literals_inner(table, columns, rows, false)
     }
 
@@ -6491,6 +6620,7 @@ impl Engine {
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
+        self.ensure_writable()?;
         self.insert_literals_inner(table, columns, rows, true)
     }
 
@@ -10653,6 +10783,9 @@ impl Engine {
     /// keeps the segment ids the reference's fixtures assert (`{2}` after two
     /// imports are compacted, `{3}` after compacting `{2}`, and so on).
     pub fn compact_table(&self, table: &str) -> Result<()> {
+        // Compaction rewrites segments, so both the manual and the periodic
+        // task require `kWritable` (`compaction_process_impl.cpp:270-295`).
+        self.ensure_writable()?;
         self.invalidate_row_cache(table);
         // Rows are re-keyed below; the mirror's row-id snapshot stops matching
         // the moment the first row moves.
@@ -13663,7 +13796,64 @@ impl Engine {
         Ok(total.saturating_sub(deleted))
     }
 
+    /// The storage's lifecycle mode (C++ `Storage::GetStorageMode`).
+    pub fn storage_mode(&self) -> StorageMode {
+        self.storage.get_storage_mode()
+    }
+
+    /// Moves the storage between modes (C++ `Storage::SetStorageMode`).
+    ///
+    /// Only the mode and its legality are modelled: the reference rebuilds the
+    /// WAL/catalog/processors on each transition, while this port built them
+    /// once in [`Self::open_with_options`] (see [`StorageMode`]).
+    pub fn set_storage_mode(&self, mode: StorageMode) -> Result<()> {
+        self.storage.set_storage_mode(mode)
+    }
+
+    /// Rejects a user write unless the storage is `kWritable`.
+    ///
+    /// The reference gates every write operator on the mode: an
+    /// `kUnInitialized` storage is `UnrecoverableError("Uninitialized storage
+    /// mode")`, anything but `kWritable` is
+    /// `Status::InvalidNodeRole("Attempt to write on non-writable node")`
+    /// (8007, e.g. `physical_insert_impl.cpp:117-128`).
+    fn ensure_writable(&self) -> Result<()> {
+        match self.storage_mode() {
+            StorageMode::Writable => Ok(()),
+            StorageMode::UnInitialized => {
+                Err(Error::Unrecoverable("Uninitialized storage mode".into()))
+            }
+            _ => Err(Error::InvalidNodeRole(
+                "Attempt to write on non-writable node".into(),
+            )),
+        }
+    }
+
+    /// Rejects a cleanup unless the storage is `kWritable` or `kReadable`
+    /// (`background_process_impl.cpp:109`).
+    fn ensure_cleanup_allowed(&self) -> Result<()> {
+        match self.storage_mode() {
+            StorageMode::UnInitialized => {
+                Err(Error::Unrecoverable("Uninitialized storage mode".into()))
+            }
+            mode if mode.accepts_cleanup() => Ok(()),
+            _ => Err(Error::InvalidNodeRole(
+                "Attempt to write on non-writable node".into(),
+            )),
+        }
+    }
+
+    /// A checkpoint (`PhysicalFlush`). The reference only serves it from a
+    /// writable node (`physical_flush_impl.cpp:42-52`).
     pub fn flush(&self) -> Result<()> {
+        self.ensure_writable()?;
+        self.flush_storage()
+    }
+
+    /// The checkpoint itself, without the mode gate: [`Self::cleanup`] runs it
+    /// on a read-only replica too, where the reference's cleanup task is
+    /// allowed (`background_process_impl.cpp:109`).
+    fn flush_storage(&self) -> Result<()> {
         // One checkpoint at a time: the block mirror is rewritten in place.
         let _serial = self.storage.flush_lock.lock().unwrap();
         // Snapshot the applied timestamp *before* the fsync: everything up to
@@ -14189,6 +14379,9 @@ impl Engine {
     /// Runs the reference's optimize pass over the index mirrors: a mirror
     /// whose newest chunk does not cover every live row gets a merged chunk.
     pub fn optimize_indexes(&self) -> Result<()> {
+        // The optimize task only runs on a writable node
+        // (`optimization_process_impl.cpp:174-185`).
+        self.ensure_writable()?;
         // An optimize rewrites the index chunks; a dump that was staged before
         // it no longer matches the index state.
         self.index_epoch
@@ -14199,7 +14392,10 @@ impl Engine {
     /// `Cleanup`: flush, then drop the chunks that a previous optimize merged
     /// away, matching what the reference's cleanup thread removes.
     pub fn cleanup(&self) -> Result<()> {
-        self.flush()?;
+        // The cleanup task runs in `kWritable` and `kReadable`
+        // (`background_process_impl.cpp:109`); only `kAdmin` is rejected.
+        self.ensure_cleanup_allowed()?;
+        self.flush_storage()?;
         self.cleanup_cpp_index_chunks()
     }
 }
