@@ -9,6 +9,7 @@
 use infinity_common::Result;
 use infinity_planner::LogicalPlan;
 
+use super::filter::Filter;
 use super::project::Projection;
 use super::PhysicalOperator;
 
@@ -39,6 +40,10 @@ pub fn lower(plan: &LogicalPlan) -> Result<Option<Lowered>> {
                     exprs.clone(),
                     projection_names.clone(),
                 )));
+                cursor = input;
+            }
+            LogicalPlan::Filter { input, predicate } => {
+                operators.push(Box::new(Filter::new(predicate.clone())));
                 cursor = input;
             }
             LogicalPlan::Scan { columns, .. } | LogicalPlan::Values { columns, .. } => {
@@ -131,6 +136,34 @@ mod tests {
             aggs: Vec::new(),
         };
         assert!(lower(&plan).unwrap().is_none());
+    }
+
+    #[test]
+    fn lowers_a_filter() {
+        let plan = LogicalPlan::Projection {
+            input: Box::new(LogicalPlan::Filter {
+                input: Box::new(scan()),
+                predicate: Expr::Cmp(
+                    Box::new(Expr::Column(0)),
+                    infinity_parser::CmpOp::Gt,
+                    Box::new(Expr::Literal(Value::Int(1))),
+                ),
+            }),
+            exprs: vec![Expr::Column(1)],
+            names: vec!["c2".into()],
+        };
+        let (operators, names) = lower(&plan).unwrap().unwrap();
+        assert_eq!(operators.len(), 2);
+        // Execution order: the filter sits nearest the scan.
+        assert_eq!(
+            operators[0].operator_type(),
+            super::super::PhysicalOperatorType::Filter
+        );
+        assert_eq!(
+            operators[1].operator_type(),
+            super::super::PhysicalOperatorType::Projection
+        );
+        assert_eq!(names, vec!["c2".to_string()]);
     }
 
     #[test]

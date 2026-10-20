@@ -17747,6 +17747,30 @@ mod tests {
         assert_eq!(crate::operators::operator_run_count(), before + 1);
     }
 
+    /// A `WHERE` runs through the filter operator, and a predicate that matches
+    /// nothing still reports the projected column names.
+    #[test]
+    fn run_plan_executes_a_filter_through_the_operator_model() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE of (a INT, b INT);").unwrap();
+        e.execute("INSERT INTO of VALUES (1, 10), (2, 20), (3, 30);")
+            .unwrap();
+        let before = crate::operators::operator_run_count();
+        assert_eq!(
+            rows(&e, "SELECT b FROM of WHERE a > 1;"),
+            vec![vec!["20".to_string()], vec!["30".to_string()]]
+        );
+        assert_eq!(crate::operators::operator_run_count(), before + 1);
+        // No match: the projection still defines the schema.
+        let mut result = e.execute("SELECT b FROM of WHERE a > 9;").unwrap();
+        let QueryResult::Rows { columns, rows } = result.remove(0) else {
+            panic!("expected rows");
+        };
+        assert_eq!(columns, vec!["b".to_string()]);
+        assert!(rows.is_empty());
+    }
+
     fn seed(e: &Engine) {
         e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
         for (i, n) in [(1, "c"), (2, "a"), (3, "b"), (4, "a")] {

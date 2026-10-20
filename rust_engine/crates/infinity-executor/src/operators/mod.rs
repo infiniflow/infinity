@@ -13,6 +13,7 @@
 //! stores it root-first and therefore walks `operator_count - 1 ..= 0`
 //! backwards. Walking `0..len` here is the same traversal.
 
+pub mod filter;
 pub mod lower;
 pub mod project;
 
