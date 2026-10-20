@@ -12,6 +12,7 @@ members = [
     "crates/infinity-executor",
     "crates/infinity-server",
     "crates/infinity-cli",
+    "crates/infinity-catalog-convert",
 ]
 
 [workspace.package]

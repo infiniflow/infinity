@@ -84,6 +84,57 @@ pub mod inverted_format;
 pub mod io;
 pub mod knn_format;
 pub mod memindex_tracer;
+/// A store opened on the substrate its directory actually holds.
+pub struct OpenedStore {
+    /// The store itself.
+    pub store: std::sync::Arc<dyn MetaStore>,
+    /// Which substrate it turned out to be.
+    pub backend: metastore::StoreBackend,
+}
+
+/// Opens the store at `path` on the substrate the directory holds.
+///
+/// The directory decides: a directory the reference wrote holds a RocksDB, a
+/// directory this port wrote holds a fjall store, and a fresh directory gets
+/// `default_backend`. That way one binary opens both, and the substrate is a
+/// property of the data rather than of the build.
+///
+/// A RocksDB directory needs the `rocksdb-store` feature; without it the
+/// error says so and names the conversion tool.
+pub fn open_store(
+    path: &std::path::Path,
+    keyspace: &str,
+    default_backend: metastore::StoreBackend,
+) -> infinity_common::Result<OpenedStore> {
+    let backend = metastore::StoreBackend::detect(path).unwrap_or(default_backend);
+    match backend {
+        metastore::StoreBackend::Fjall => Ok(OpenedStore {
+            store: std::sync::Arc::new(metastore::FjallMetaStore::open(path, keyspace)?),
+            backend,
+        }),
+        metastore::StoreBackend::RocksDb => {
+            #[cfg(feature = "rocksdb-store")]
+            {
+                Ok(OpenedStore {
+                    store: std::sync::Arc::new(metastore_rocks::RocksMetaStore::open(path)?),
+                    backend,
+                })
+            }
+            #[cfg(not(feature = "rocksdb-store"))]
+            {
+                Err(infinity_common::Error::Storage(format!(
+                    "{} holds a RocksDB store, which this build cannot open: rebuild with \
+                     `--features rocksdb-store`, or convert it with \
+                     `infinity-catalog-convert --dir {} --from rocksdb --to fjall`",
+                    path.display(),
+                    path.parent().unwrap_or(path).display()
+                )))
+            }
+        }
+    }
+}
+
+pub mod catalog_convert;
 pub mod metastore;
 /// RocksDB substrate for a C++-compatible catalog (plan §2.6.1 item 4), behind
 /// the `rocksdb-store` feature.

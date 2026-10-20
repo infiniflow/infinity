@@ -378,6 +378,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "infinity-catalog-convert"
+version = "0.1.0"
+dependencies = [
+ "infinity-common",
+ "infinity-storage",
+]
+
+[[package]]
 name = "infinity-cli"
 version = "0.1.0"
 dependencies = [

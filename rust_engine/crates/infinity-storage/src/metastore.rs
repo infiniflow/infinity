@@ -123,6 +123,62 @@ pub(crate) fn merge_delta(current: Option<&[u8]>, delta: u64) -> Result<u64> {
         .ok_or_else(|| Error::Storage("String2UInt64AddOperator overflow".into()))
 }
 
+/// The substrate a store directory holds.
+///
+/// The two substrates are told apart by what they leave on disk: fjall writes
+/// a `keyspaces/` directory and `<id>.jnl` journals, RocksDB writes `CURRENT`
+/// and a `MANIFEST-*`. The engine looks at the directory it was pointed at and
+/// picks the matching substrate, so one binary can open a directory either
+/// engine wrote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoreBackend {
+    Fjall,
+    RocksDb,
+}
+
+impl StoreBackend {
+    /// Detects the substrate of an existing store directory.
+    ///
+    /// `None` when the directory does not exist or carries no marker (an empty
+    /// directory, or one only holding leftovers).
+    ///
+    /// RocksDB is looked for first: it is the substrate the reference uses, so
+    /// a directory that holds one is opened as a RocksDB, and fjall is the
+    /// fallback for a directory that does not.
+    pub fn detect(path: &Path) -> Option<Self> {
+        if !path.is_dir() {
+            return None;
+        }
+        let has_manifest = std::fs::read_dir(path)
+            .ok()?
+            .flatten()
+            .any(|e| e.file_name().to_string_lossy().starts_with("MANIFEST-"));
+        if has_manifest || path.join("CURRENT").is_file() {
+            return Some(StoreBackend::RocksDb);
+        }
+        if path.join("keyspaces").is_dir() {
+            return Some(StoreBackend::Fjall);
+        }
+        None
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            StoreBackend::Fjall => "fjall",
+            StoreBackend::RocksDb => "rocksdb",
+        }
+    }
+
+    /// Parses the name of a substrate (`fjall`, `rocksdb`).
+    pub fn parse(text: &str) -> Option<Self> {
+        match text.trim().to_ascii_lowercase().as_str() {
+            "fjall" => Some(StoreBackend::Fjall),
+            "rocksdb" | "rocks" => Some(StoreBackend::RocksDb),
+            _ => None,
+        }
+    }
+}
+
 /// `fjall`-backed `MetaStore`.
 pub struct FjallMetaStore {
     db: Database,
