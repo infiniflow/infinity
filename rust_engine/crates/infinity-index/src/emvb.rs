@@ -47,6 +47,458 @@ impl Default for EmvbSearchOptions {
     }
 }
 
+/// Optimised-product-quantisation rotation of the residual codebook.
+///
+/// C++: `OPQ` (`src/storage/knn_index/emvb/product_quantizer.cppm`) and
+/// `OPQ::Train` (`product_quantizer_impl.cpp:150`). The reference multiplies
+/// row vectors on the right, so the encoder maps `x -> x·R`, and
+/// `GetIPDistanceTable` maps the query the same way (`R^T·q` in column form),
+/// which leaves every inner product unchanged. `EMVBIndex` always builds an
+/// OPQ (`emvb_index_impl.cpp:62`), never a plain PQ.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OpqRotation {
+    dims: usize,
+    /// `dims * dims`, row-major, applied as `x·R`.
+    matrix: Vec<f32>,
+}
+
+impl OpqRotation {
+    pub fn identity(dims: usize) -> Self {
+        let mut matrix = vec![0.0f32; dims * dims];
+        for i in 0..dims {
+            matrix[i * dims + i] = 1.0;
+        }
+        Self { dims, matrix }
+    }
+
+    pub fn dims(&self) -> usize {
+        self.dims
+    }
+
+    pub fn matrix(&self) -> &[f32] {
+        &self.matrix
+    }
+
+    pub fn is_identity(&self) -> bool {
+        let dims = self.dims;
+        self.matrix.len() == dims * dims
+            && self.matrix.iter().enumerate().all(|(i, v)| {
+                let diagonal = dims > 0 && i / dims == i % dims;
+                *v == if diagonal { 1.0 } else { 0.0 }
+            })
+    }
+
+    /// `OPQ::Train(embedding_data, embedding_num, iter_cnt)`.
+    ///
+    /// `residuals` are the `token - coarse centroid` vectors; `k` is the
+    /// residual codebook size per subspace (`1 << residual_pq_subspace_bits`)
+    /// and `iter_cnt` the k-means iteration budget the index trains with
+    /// (`EMVBIndex::Train(..., 20)`). Returns the rotation the reference would
+    /// store in `matrix_R_`.
+    pub fn train(
+        dims: usize,
+        subspace_num: usize,
+        k: usize,
+        residuals: &[&[f32]],
+        iter_cnt: usize,
+    ) -> Self {
+        if dims == 0
+            || subspace_num == 0
+            || k < 2
+            || !dims.is_multiple_of(subspace_num)
+            || residuals.is_empty()
+        {
+            return Self::identity(dims);
+        }
+        // The reference trains on a random sample (`GetKMeansCentroids` caps it
+        // at `256 * k` points); a fixed stride keeps the build deterministic.
+        // The codebook only has to expose the subspace variance while `R` is
+        // being learnt — the persistent codebook is retrained at full rate on
+        // the rotated residuals afterwards — so the sample and the k-means
+        // width are also capped to bound the build cost.
+        const MAX_TRAIN_SAMPLE: usize = 2048;
+        const MAX_KMEANS_WORK: usize = 3_000_000;
+        let stride = residuals.len().div_ceil(MAX_TRAIN_SAMPLE).max(1);
+        let sample: Vec<&[f32]> = residuals.iter().step_by(stride).copied().collect();
+        if sample.len() < 2 {
+            return Self::identity(dims);
+        }
+        let per_centroid = (sample.len() * dims).max(1);
+        let k = k
+            .min(sample.len())
+            .min((MAX_KMEANS_WORK / per_centroid).max(2))
+            .max(2);
+        let sample: Vec<Vec<f32>> = sample
+            .iter()
+            .map(|r| {
+                let mut v = r.to_vec();
+                v.resize(dims, 0.0);
+                v
+            })
+            .collect();
+
+        // step 1. R = I
+        let mut rotation = Self::identity(dims);
+        // `loop_short` / `loop_middle` / `loop_long` from `OPQ::Train`
+        // (`(iter_cnt + 1) / 2` there is `iter_cnt.div_ceil(2)`).
+        let loop_short = 3.min(iter_cnt.div_ceil(2));
+        let loop_middle = 3.max(iter_cnt.div_ceil(2));
+        let loop_long = iter_cnt;
+        let sub_dim = dims / subspace_num;
+        let mut pq = ResidualPqModel::new(subspace_num, sub_dim, k.min(sample.len()));
+        let mut transformed: Vec<Vec<f32>> = vec![Vec::with_capacity(dims); sample.len()];
+        let mut codes = vec![0u8; sample.len() * subspace_num];
+        let mut decoded = vec![0.0f32; sample.len() * dims];
+        for i in 0..6 {
+            let train_iter = if i < 3 {
+                loop_short
+            } else if i < 5 {
+                loop_middle
+            } else {
+                loop_long
+            };
+            // transformed = X·R
+            for (dst, src) in transformed.iter_mut().zip(&sample) {
+                dst.clear();
+                dst.extend_from_slice(&mul_row(&rotation.matrix, dims, src));
+            }
+            pq.train(&transformed, train_iter);
+            for (j, x) in transformed.iter().enumerate() {
+                pq.encode(x, &mut codes[j * subspace_num..(j + 1) * subspace_num]);
+                pq.decode(
+                    &codes[j * subspace_num..(j + 1) * subspace_num],
+                    &mut decoded[j * dims..(j + 1) * dims],
+                );
+            }
+            // A = X^T · decoded, then A = U·S·V^T and R = U·V^T.
+            let mut a = vec![0.0f32; dims * dims];
+            for (src, dec) in sample.iter().zip(decoded.chunks_exact(dims)) {
+                for row in 0..dims {
+                    let xi = src[row];
+                    if xi == 0.0 {
+                        continue;
+                    }
+                    for col in 0..dims {
+                        a[row * dims + col] += xi * dec[col];
+                    }
+                }
+            }
+            let mut u = vec![0.0f32; dims * dims];
+            let mut v = vec![0.0f32; dims * dims];
+            jacobi_svd(dims, &mut a, &mut u, &mut v);
+            // R = U·V^T (either factor's sign is free, and flipping a column of
+            // both leaves `U·S·V^T` invariant, hence `U·V^T` too).
+            let mut next = vec![0.0f32; dims * dims];
+            for row in 0..dims {
+                for col in 0..dims {
+                    let mut acc = 0.0f32;
+                    for j in 0..dims {
+                        acc += u[row * dims + j] * v[col * dims + j];
+                    }
+                    next[row * dims + col] = acc;
+                }
+            }
+            rotation.matrix = next;
+        }
+        rotation
+    }
+
+    /// `x·R`; a row vector times the rotation, as `matrixA_multiply_matrixB_output_to_C`
+    /// does for both `AddEmbeddings` and `GetIPDistanceTable`.
+    pub fn rotate(&self, v: &[f32]) -> Vec<f32> {
+        if self.matrix.len() != self.dims * self.dims {
+            return v.to_vec();
+        }
+        mul_row(&self.matrix, self.dims, v)
+    }
+
+    /// `OPQ::Save`'s trailing block: `dim * dim` raw `f32`s.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(self.matrix.len() * 4);
+        for v in &self.matrix {
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+        out
+    }
+
+    /// `OPQ::Load`'s trailing block.
+    pub fn from_bytes(dims: usize, bytes: &[u8]) -> Option<Self> {
+        let n = dims.checked_mul(dims)?;
+        if bytes.len() < n * 4 {
+            return None;
+        }
+        let matrix = (0..n)
+            .map(|i| f32::from_le_bytes(bytes[i * 4..i * 4 + 4].try_into().unwrap()))
+            .collect();
+        Some(Self { dims, matrix })
+    }
+}
+
+/// `out = x·R` for a row vector `x`. C++: `matrixA_multiply_matrixB_output_to_C`.
+fn mul_row(rotation: &[f32], dims: usize, x: &[f32]) -> Vec<f32> {
+    let n = dims.min(x.len());
+    let mut out = vec![0.0f32; dims];
+    for (col, slot) in out.iter_mut().enumerate() {
+        let mut acc = 0.0f32;
+        for row in 0..n {
+            acc += x[row] * rotation[row * dims + col];
+        }
+        *slot = acc;
+    }
+    out
+}
+
+/// Residual product quantizer used only while learning `R`.
+///
+/// C++: the `PQ` base of `OPQ` (`PQ::Train` / `PQ::EncodeEmbedding` /
+/// `PQ::DecodeEmbedding`); a nearest-code lookup by inner product, which is the
+/// same argmin the reference takes for L2.
+struct ResidualPqModel {
+    subspace_num: usize,
+    sub_dim: usize,
+    k: usize,
+    /// `subspace_num * k * sub_dim`.
+    centroids: Vec<f32>,
+}
+
+impl ResidualPqModel {
+    fn new(subspace_num: usize, sub_dim: usize, k: usize) -> Self {
+        Self {
+            subspace_num,
+            sub_dim,
+            k: k.max(1),
+            centroids: vec![0.0f32; subspace_num * k.max(1) * sub_dim],
+        }
+    }
+
+    fn train(&mut self, data: &[Vec<f32>], iters: usize) {
+        let (k, sub_dim) = (self.k, self.sub_dim);
+        for sub in 0..self.subspace_num {
+            let lo = sub * sub_dim;
+            let base = sub * k * sub_dim;
+            for c in 0..k {
+                let idx = (c * data.len()) / k;
+                let src = &data[idx.min(data.len() - 1)][lo..lo + sub_dim];
+                self.centroids[base + c * sub_dim..base + (c + 1) * sub_dim].copy_from_slice(src);
+            }
+            let mut sums = vec![0.0f32; k * sub_dim];
+            let mut counts = vec![0usize; k];
+            for _ in 0..iters.max(1) {
+                sums.fill(0.0);
+                counts.fill(0);
+                for x in data {
+                    let part = &x[lo..lo + sub_dim];
+                    let mut best = 0usize;
+                    let mut best_d = f32::INFINITY;
+                    for c in 0..k {
+                        let d: f32 = self.centroids[base + c * sub_dim..base + (c + 1) * sub_dim]
+                            .iter()
+                            .zip(part)
+                            .map(|(a, b)| (a - b) * (a - b))
+                            .sum();
+                        if d < best_d {
+                            best_d = d;
+                            best = c;
+                        }
+                    }
+                    counts[best] += 1;
+                    for (acc, v) in sums[best * sub_dim..(best + 1) * sub_dim]
+                        .iter_mut()
+                        .zip(part)
+                    {
+                        *acc += v;
+                    }
+                }
+                for c in 0..k {
+                    if counts[c] == 0 {
+                        continue;
+                    }
+                    let inv = 1.0 / counts[c] as f32;
+                    for i in 0..sub_dim {
+                        self.centroids[base + c * sub_dim + i] = sums[c * sub_dim + i] * inv;
+                    }
+                }
+            }
+        }
+    }
+
+    fn encode(&self, x: &[f32], out: &mut [u8]) {
+        for (sub, slot) in out.iter_mut().enumerate().take(self.subspace_num) {
+            let lo = sub * self.sub_dim;
+            let base = sub * self.k * self.sub_dim;
+            let mut best = 0usize;
+            let mut best_d = f32::INFINITY;
+            for c in 0..self.k {
+                let d: f32 = self.centroids[base + c * self.sub_dim..base + (c + 1) * self.sub_dim]
+                    .iter()
+                    .zip(&x[lo..lo + self.sub_dim])
+                    .map(|(a, b)| (a - b) * (a - b))
+                    .sum();
+                if d < best_d {
+                    best_d = d;
+                    best = c;
+                }
+            }
+            *slot = best as u8;
+        }
+    }
+
+    fn decode(&self, codes: &[u8], out: &mut [f32]) {
+        for (sub, &code) in codes.iter().enumerate().take(self.subspace_num) {
+            let lo = sub * self.sub_dim;
+            let base = (sub * self.k + code as usize) * self.sub_dim;
+            out[lo..lo + self.sub_dim]
+                .copy_from_slice(&self.centroids[base..base + self.sub_dim]);
+        }
+    }
+}
+
+/// C++: `Eigen::JacobiSVDSolve` (`third_party/eigen-3.4.0/JacobiSVD.h`), the
+/// variant `EMVBSVDSolve` (`eigen_svd_impl.cpp`) calls: a two-sided Jacobi SVD
+/// of a square matrix, `A = U·S·V^T`, without sorting the singular values.
+/// Negative diagonal entries are folded into the matching column of `U` so the
+/// singular values come out non-negative.
+fn jacobi_svd(dim: usize, a: &mut [f32], u: &mut [f32], v: &mut [f32]) {
+    let precision = 2.0 * f32::EPSILON;
+    let consider_as_zero = f32::MIN_POSITIVE;
+    let scale = a.iter().fold(0.0f32, |acc, x| acc.max(x.abs()));
+    let scale = if scale == 0.0 { 1.0 } else { scale };
+    if scale != 1.0 {
+        for x in a.iter_mut() {
+            *x /= scale;
+        }
+    }
+    u.fill(0.0);
+    v.fill(0.0);
+    for i in 0..dim {
+        u[i * dim + i] = 1.0;
+        v[i * dim + i] = 1.0;
+    }
+    let mut max_diag = (0..dim).fold(0.0f32, |acc, i| acc.max(a[i * dim + i].abs()));
+    let mut finished = false;
+    while !finished {
+        finished = true;
+        for p in 1..dim {
+            for q in 0..p {
+                let threshold = consider_as_zero.max(precision * max_diag);
+                if a[p * dim + q].abs() > threshold || a[q * dim + p].abs() > threshold {
+                    finished = false;
+                    let (j_left, j_right) = real_2x2_jacobi_svd(a, dim, p, q);
+                    apply_on_the_left(a, dim, p, q, j_left);
+                    apply_on_the_right(u, dim, p, q, j_left.transpose());
+                    apply_on_the_right(a, dim, p, q, j_right);
+                    apply_on_the_right(v, dim, p, q, j_right);
+                    max_diag = max_diag
+                        .max(a[p * dim + p].abs())
+                        .max(a[q * dim + q].abs());
+                }
+            }
+        }
+    }
+    // Make the diagonal (the singular values) non-negative by flipping `U`.
+    let negative: Vec<usize> = (0..dim).filter(|&i| a[i * dim + i] < 0.0).collect();
+    for col in negative {
+        for row in 0..dim {
+            u[row * dim + col] = -u[row * dim + col];
+        }
+    }
+}
+
+/// C++: `JacobiRotation`.
+#[derive(Clone, Copy)]
+struct JacobiRotation {
+    c: f32,
+    s: f32,
+}
+
+impl JacobiRotation {
+    fn mul(self, other: Self) -> Self {
+        Self {
+            c: self.c * other.c - self.s * other.s,
+            s: self.c * other.s + self.s * other.c,
+        }
+    }
+
+    fn transpose(self) -> Self {
+        Self {
+            c: self.c,
+            s: -self.s,
+        }
+    }
+}
+
+/// C++: `JacobiRotation::makeJacobi`.
+fn make_jacobi(x: f32, y: f32, z: f32) -> JacobiRotation {
+    let deno = 2.0 * y.abs();
+    if deno < f32::MIN_POSITIVE {
+        return JacobiRotation { c: 1.0, s: 0.0 };
+    }
+    let tau = (x - z) / deno;
+    let w = (1.0 + tau * tau).sqrt();
+    let t = 1.0 / if tau > 0.0 { tau + w } else { tau - w };
+    let n = 1.0 / (1.0 + t * t).sqrt();
+    let s = if y.is_sign_negative() { t * n } else { -t * n };
+    JacobiRotation { c: n, s }
+}
+
+/// C++: `Matrix::applyOnTheLeft` — rotates rows `p` and `q` in place.
+fn apply_on_the_left(a: &mut [f32], dim: usize, p: usize, q: usize, j: JacobiRotation) {
+    if j.c == 1.0 && j.s == 0.0 {
+        return;
+    }
+    for k in 0..dim {
+        let x = a[p * dim + k];
+        let y = a[q * dim + k];
+        a[p * dim + k] = j.c * x + j.s * y;
+        a[q * dim + k] = -j.s * x + j.c * y;
+    }
+}
+
+/// C++: `Matrix::applyOnTheRight` — rotates columns `p` and `q` in place.
+fn apply_on_the_right(a: &mut [f32], dim: usize, p: usize, q: usize, j: JacobiRotation) {
+    let jt = j.transpose();
+    if jt.c == 1.0 && jt.s == 0.0 {
+        return;
+    }
+    for k in 0..dim {
+        let x = a[k * dim + p];
+        let y = a[k * dim + q];
+        a[k * dim + p] = jt.c * x + jt.s * y;
+        a[k * dim + q] = -jt.s * x + jt.c * y;
+    }
+}
+
+/// C++: `internal::real_2x2_jacobi_svd` (`src/misc/RealSvd2x2.h`).
+fn real_2x2_jacobi_svd(
+    a: &[f32],
+    dim: usize,
+    p: usize,
+    q: usize,
+) -> (JacobiRotation, JacobiRotation) {
+    let mut m = [
+        a[p * dim + p],
+        a[p * dim + q],
+        a[q * dim + p],
+        a[q * dim + q],
+    ];
+    let t = m[0] + m[3];
+    let d = m[2] - m[1];
+    let rot1 = if d.abs() < f32::MIN_POSITIVE {
+        JacobiRotation { c: 1.0, s: 0.0 }
+    } else {
+        let u = t / d;
+        let tmp = (1.0 + u * u).sqrt();
+        JacobiRotation {
+            c: u / tmp,
+            s: 1.0 / tmp,
+        }
+    };
+    apply_on_the_left(&mut m, 2, 0, 1, rot1);
+    let j_right = make_jacobi(m[0], m[1], m[3]);
+    let j_left = rot1.mul(j_right.transpose());
+    (j_left, j_right)
+}
+
 /// A borrowed EMVB segment.
 pub struct EmvbView<'a> {
     pub dims: usize,
@@ -65,6 +517,11 @@ pub struct EmvbView<'a> {
     pub doc_segment_offsets: &'a [u32],
     /// Documents per coarse centroid (the reference's `centroids_to_docid_`).
     pub centroids_to_docid: &'a [Vec<u32>],
+    /// `OPQ`'s `matrix_R_` (`dims * dims`, row-major). The residual codebook
+    /// lives in the rotated space, so the query is rotated the same way before
+    /// the residual inner products; the coarse-centroid scores stay unrotated,
+    /// exactly as in `EMVBSearch`. An identity matrix is equivalent to `None`.
+    pub rotation: Option<&'a [f32]>,
 }
 
 impl EmvbView<'_> {
@@ -292,8 +749,23 @@ impl EmvbView<'_> {
     }
 
     /// `EMVBProductQuantizer::GetIPDistanceTable`: `table[qt][sub][code]`.
+    ///
+    /// `OPQ::GetIPDistanceTable` rotates the query first (`R^T·q` in column
+    /// form, i.e. `q·R` for the row vectors used throughout this module); the
+    /// codebook was trained on rotated residuals, so without the rotation the
+    /// residual scores are meaningless.
     fn ip_table(&self, query: &[Vec<f32>]) -> Vec<Vec<Vec<f32>>> {
         let sn = self.subspace_num;
+        let rotated: Option<Vec<Vec<f32>>> = self
+            .rotation
+            .filter(|r| r.len() == self.dims * self.dims)
+            .map(|r| {
+                query
+                    .iter()
+                    .map(|q| mul_row(r, self.dims, q))
+                    .collect()
+            });
+        let query = rotated.as_deref().unwrap_or(query);
         let mut table = Vec::with_capacity(query.len());
         for q in query {
             let mut per_sub = Vec::with_capacity(sn);
@@ -440,6 +912,7 @@ mod tests {
             doc_lens: &f.doc_lens,
             doc_segment_offsets: &f.doc_segment_offsets,
             centroids_to_docid: &f.centroids_to_docid,
+            rotation: None,
         }
     }
 
@@ -526,6 +999,7 @@ mod tests {
             doc_lens: &doc_lens,
             doc_segment_offsets: &doc_segment_offsets,
             centroids_to_docid: &centroids_to_docid,
+            rotation: None,
         };
         let mut query = vec![vec![0.0f32; DIM]; QUERY_TOKEN_NUM];
         for q in &mut query {
@@ -546,5 +1020,465 @@ mod tests {
             assert!((score - 32.0).abs() < 1e-5, "score {i} = {score}");
         }
         assert_eq!(doc_ids, (30..40).collect::<Vec<u32>>());
+    }
+
+    // ---- OPQ (`OPQ::Train` / `EMVBSVDSolve`) --------------------------------
+
+    const OPQ_DIMS: usize = 8;
+    const OPQ_SUBSPACE_NUM: usize = 2;
+    const OPQ_BITS: u32 = 4;
+
+    /// Deterministic pseudo-random in `[-0.5, 0.5)`.
+    fn rng(state: &mut u64) -> f32 {
+        *state ^= *state << 13;
+        *state ^= *state >> 7;
+        *state ^= *state << 17;
+        ((*state >> 40) as f32) / ((1u64 << 24) as f32) - 0.5
+    }
+
+    /// An orthonormal basis: the normalised 8x8 Hadamard matrix.
+    fn hadamard8() -> Vec<f32> {
+        let mut h = vec![1.0f32; 64];
+        let mut step = 1;
+        while step < 8 {
+            for i in 0..8 {
+                for j in 0..8 {
+                    if (i / step) % 2 == 1 && (j / step) % 2 == 1 {
+                        h[i * 8 + j] = -h[i * 8 + j];
+                    }
+                }
+            }
+            step *= 2;
+        }
+        let norm = (8.0f32).sqrt();
+        h.iter().map(|v| v / norm).collect()
+    }
+
+    /// Residuals whose covariance is anisotropic in a basis that is *not* the
+    /// coordinate axes: `x = H · diag(scale) · z` with decreasing `scale`.
+    /// The coordinate split into two 4-dim subspaces therefore cuts across the
+    /// principal directions, which is what OPQ is meant to fix.
+    fn anisotropic_residuals(n: usize) -> Vec<Vec<f32>> {
+        let h = hadamard8();
+        let scale = [4.0f32, 2.5, 1.5, 1.0, 0.7, 0.5, 0.35, 0.25];
+        let mut state = 0x2545_F491_4F6C_DD1Du64;
+        (0..n)
+            .map(|_| {
+                let z: Vec<f32> = (0..OPQ_DIMS).map(|_| rng(&mut state)).collect();
+                (0..OPQ_DIMS)
+                    .map(|k| {
+                        (0..OPQ_DIMS)
+                            .map(|j| h[k * OPQ_DIMS + j] * scale[j] * z[j])
+                            .sum()
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn residual_pq(rotation: &OpqRotation, data: &[&[f32]]) -> ResidualPqModel {
+        let k = 1usize << OPQ_BITS;
+        let mut pq = ResidualPqModel::new(OPQ_SUBSPACE_NUM, OPQ_DIMS / OPQ_SUBSPACE_NUM, k);
+        let rotated: Vec<Vec<f32>> = data.iter().map(|x| rotation.rotate(x)).collect();
+        pq.train(&rotated, 20);
+        pq
+    }
+
+    /// Mean squared reconstruction error of the rotated-then-quantised data.
+    fn reconstruction_error(rotation: &OpqRotation, data: &[Vec<f32>]) -> f32 {
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let pq = residual_pq(rotation, &refs);
+        let mut code = vec![0u8; OPQ_SUBSPACE_NUM];
+        let mut decoded = vec![0.0f32; OPQ_DIMS];
+        let mut total = 0.0f64;
+        for x in data {
+            let rotated = rotation.rotate(x);
+            pq.encode(&rotated, &mut code);
+            pq.decode(&code, &mut decoded);
+            total += rotated
+                .iter()
+                .zip(&decoded)
+                .map(|(a, b)| ((a - b) * (a - b)) as f64)
+                .sum::<f64>();
+        }
+        (total / (data.len() * OPQ_DIMS) as f64) as f32
+    }
+
+    #[test]
+    fn opq_trains_a_non_identity_rotation_and_beats_the_axis_aligned_baseline() {
+        let data = anisotropic_residuals(512);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let rotation = OpqRotation::train(
+            OPQ_DIMS,
+            OPQ_SUBSPACE_NUM,
+            1usize << OPQ_BITS,
+            &refs,
+            20,
+        );
+        assert!(!rotation.is_identity(), "OPQ left the rotation at identity");
+        // The rotation the reference stores is orthogonal.
+        for i in 0..OPQ_DIMS {
+            for j in 0..OPQ_DIMS {
+                let dot: f32 = (0..OPQ_DIMS)
+                    .map(|k| {
+                        rotation.matrix()[k * OPQ_DIMS + i] * rotation.matrix()[k * OPQ_DIMS + j]
+                    })
+                    .sum();
+                let expected = if i == j { 1.0 } else { 0.0 };
+                assert!(
+                    (dot - expected).abs() < 1e-3,
+                    "R^T R[{i}][{j}] = {dot}, expected {expected}"
+                );
+            }
+        }
+        let identity = OpqRotation::identity(OPQ_DIMS);
+        let err_identity = reconstruction_error(&identity, &data);
+        let err_rotated = reconstruction_error(&rotation, &data);
+        assert!(
+            err_rotated < 0.85 * err_identity,
+            "OPQ error {err_rotated} should be clearly below identity error {err_identity}"
+        );
+    }
+
+    /// The ported two-sided Jacobi SVD must satisfy `A = U·S·V^T` with
+    /// non-negative `S`, which is what `EMVBSVDSolve` is used for.
+    #[test]
+    fn jacobi_svd_reconstructs_the_matrix() {
+        let dim = 5;
+        let mut a: Vec<f32> = (0..dim * dim)
+            .map(|i| {
+                let (r, c) = (i / dim, i % dim);
+                // Non-symmetric, well conditioned.
+                (r as f32 + 1.0) * 0.3 + (c as f32 + 1.0).powi(2) * 0.7 - if r == c { 3.0 } else { 0.0 }
+            })
+            .collect();
+        let original = a.clone();
+        let mut u = vec![0.0f32; dim * dim];
+        let mut v = vec![0.0f32; dim * dim];
+        jacobi_svd(dim, &mut a, &mut u, &mut v);
+        // S = U^T A V must be diagonal and non-negative.
+        let mut s = vec![0.0f32; dim * dim];
+        for i in 0..dim {
+            for j in 0..dim {
+                let mut acc = 0.0f32;
+                for r in 0..dim {
+                    for c in 0..dim {
+                        acc += u[r * dim + i] * original[r * dim + c] * v[c * dim + j];
+                    }
+                }
+                s[i * dim + j] = acc;
+            }
+        }
+        for i in 0..dim {
+            assert!(s[i * dim + i] >= -1e-4, "sigma[{i}] = {}", s[i * dim + i]);
+            for j in 0..dim {
+                if i != j {
+                    assert!(s[i * dim + j].abs() < 1e-3, "S[{i}][{j}] = {}", s[i * dim + j]);
+                }
+            }
+        }
+        // A = U·S·V^T
+        for r in 0..dim {
+            for c in 0..dim {
+                let mut acc = 0.0f32;
+                for i in 0..dim {
+                    for j in 0..dim {
+                        acc += u[r * dim + i] * s[i * dim + j] * v[c * dim + j];
+                    }
+                }
+                assert!(
+                    (acc - original[r * dim + c]).abs() < 1e-3,
+                    "A[{r}][{c}] = {} vs reconstruction {acc}",
+                    original[r * dim + c]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn opq_rotation_survives_save_and_load() {
+        let data = anisotropic_residuals(256);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let rotation =
+            OpqRotation::train(OPQ_DIMS, OPQ_SUBSPACE_NUM, 1usize << OPQ_BITS, &refs, 20);
+        // `OPQ::Save` / `OPQ::Load`: dim*dim raw f32s.
+        let bytes = rotation.to_bytes();
+        assert_eq!(bytes.len(), OPQ_DIMS * OPQ_DIMS * 4);
+        let loaded = OpqRotation::from_bytes(OPQ_DIMS, &bytes).expect("rotation block");
+        assert_eq!(loaded, rotation);
+        for x in data.iter().take(8) {
+            assert_eq!(loaded.rotate(x), rotation.rotate(x));
+        }
+    }
+
+    /// The residual-PQ block of an EMVB chunk (`PQ::Save` / `OPQ::Save`):
+    /// per-subspace codebook, `-0.5*||c||` table, the codes, `next_embedding_id`
+    /// and the rotation. Only the parts OPQ touches are modelled here.
+    struct MiniChunk {
+        subspace_num: usize,
+        codebook: Vec<f32>,
+        norms: Vec<f32>,
+        codes: Vec<u8>,
+        rotations: Vec<u8>,
+    }
+
+    impl MiniChunk {
+        fn encode(dims: usize, subspace_num: usize, bits: u32, docs: &[Vec<Vec<f32>>], r: &OpqRotation) -> Self {
+            let k = 1usize << bits;
+            let sub_dim = dims / subspace_num;
+            let tokens: Vec<&[f32]> = docs.iter().flatten().map(|t| t.as_slice()).collect();
+            let pq = residual_pq(r, &tokens);
+            let rotated: Vec<Vec<f32>> = tokens.iter().map(|t| r.rotate(t)).collect();
+            let mut norms = Vec::with_capacity(subspace_num * k);
+            for sub in 0..subspace_num {
+                for c in 0..k {
+                    let base = (sub * k + c) * sub_dim;
+                    let norm: f32 = pq.centroids[base..base + sub_dim]
+                        .iter()
+                        .map(|x| x * x)
+                        .sum::<f32>()
+                        .sqrt();
+                    norms.push(-0.5 * norm);
+                }
+            }
+            let mut codes = vec![0u8; tokens.len() * subspace_num];
+            for (i, x) in rotated.iter().enumerate() {
+                pq.encode(x, &mut codes[i * subspace_num..(i + 1) * subspace_num]);
+            }
+            Self {
+                subspace_num,
+                codebook: pq.centroids,
+                norms,
+                codes,
+                rotations: r.to_bytes(),
+            }
+        }
+
+        fn to_bytes(&self) -> Vec<u8> {
+            let mut out = Vec::new();
+            for v in self.codebook.iter().chain(&self.norms) {
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+            let n = self.codes.len() / self.subspace_num;
+            out.extend_from_slice(&(n as u32).to_le_bytes());
+            out.extend_from_slice(&self.codes);
+            out.extend_from_slice(&(n as u32).to_le_bytes());
+            out.extend_from_slice(&self.rotations);
+            out
+        }
+
+        fn decode(
+            dims: usize,
+            subspace_num: usize,
+            bits: u32,
+            bytes: &[u8],
+        ) -> Option<(Vec<f32>, Vec<u8>, OpqRotation)> {
+            let k = 1usize << bits;
+            let sub_dim = dims / subspace_num;
+            let cb_len = subspace_num * k * sub_dim;
+            let mut at = 0usize;
+            let read = |at: &mut usize, n: usize| -> Option<Vec<f32>> {
+                if bytes.len() < *at + n * 4 {
+                    return None;
+                }
+                let v = (0..n)
+                    .map(|i| f32::from_le_bytes(bytes[*at + i * 4..*at + i * 4 + 4].try_into().unwrap()))
+                    .collect();
+                *at += n * 4;
+                Some(v)
+            };
+            let codebook = read(&mut at, cb_len)?;
+            let _norms = read(&mut at, subspace_num * k)?;
+            if bytes.len() < at + 4 {
+                return None;
+            }
+            let n = u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
+            at += 4;
+            if bytes.len() < at + n * subspace_num + 4 {
+                return None;
+            }
+            let codes = bytes[at..at + n * subspace_num].to_vec();
+            at += n * subspace_num + 4;
+            let rotation = OpqRotation::from_bytes(dims, &bytes[at..])?;
+            Some((codebook, codes, rotation))
+        }
+    }
+
+    /// Splits the documents of the mini chunk into the `EmvbView` arrays. One
+    /// coarse centroid at the origin keeps every stage below the residual
+    /// refinements (which is the only part OPQ changes).
+    struct MiniSegment {
+        dims: usize,
+        subspace_num: usize,
+        sub_dim: usize,
+        k: usize,
+        centroids: Vec<f32>,
+        codebook: Vec<f32>,
+        codes: Vec<u8>,
+        assignments: Vec<u32>,
+        doc_lens: Vec<u32>,
+        doc_segment_offsets: Vec<u32>,
+        centroids_to_docid: Vec<Vec<u32>>,
+        rotation: Vec<f32>,
+    }
+
+    impl MiniSegment {
+        fn new(docs: &[Vec<Vec<f32>>], r: &OpqRotation) -> Self {
+            let chunk = MiniChunk::encode(OPQ_DIMS, OPQ_SUBSPACE_NUM, OPQ_BITS, docs, r);
+            let bytes = chunk.to_bytes();
+            let (codebook, codes, rotation) =
+                MiniChunk::decode(OPQ_DIMS, OPQ_SUBSPACE_NUM, OPQ_BITS, &bytes)
+                    .expect("PQ block");
+            let n_embeddings = docs.iter().map(|d| d.len()).sum::<usize>();
+            Self {
+                dims: OPQ_DIMS,
+                subspace_num: OPQ_SUBSPACE_NUM,
+                sub_dim: OPQ_DIMS / OPQ_SUBSPACE_NUM,
+                k: 1usize << OPQ_BITS,
+                centroids: vec![0.0f32; OPQ_DIMS],
+                codebook,
+                codes,
+                assignments: vec![0u32; n_embeddings],
+                doc_lens: docs.iter().map(|d| d.len() as u32).collect(),
+                doc_segment_offsets: (0..docs.len() as u32).collect(),
+                centroids_to_docid: vec![(0..docs.len() as u32).collect()],
+                rotation: rotation.matrix().to_vec(),
+            }
+        }
+
+        fn view(&self) -> EmvbView<'_> {
+            EmvbView {
+                dims: self.dims,
+                subspace_num: self.subspace_num,
+                sub_dim: self.sub_dim,
+                k: self.k,
+                centroids: &self.centroids,
+                codebook: &self.codebook,
+                codes: &self.codes,
+                assignments: &self.assignments,
+                doc_lens: &self.doc_lens,
+                doc_segment_offsets: &self.doc_segment_offsets,
+                centroids_to_docid: &self.centroids_to_docid,
+                rotation: Some(&self.rotation),
+            }
+        }
+    }
+
+    /// Exact MaxSim over the raw tokens (`EMVBIndex`'s ground truth).
+    fn exact_maxsim(docs: &[Vec<Vec<f32>>], query: &[Vec<f32>]) -> usize {
+        let mut best = (f32::NEG_INFINITY, 0usize);
+        for (doc, tokens) in docs.iter().enumerate() {
+            let mut total = 0.0f32;
+            for q in query {
+                let best_token = tokens
+                    .iter()
+                    .map(|t| t.iter().zip(q).map(|(a, b)| a * b).sum::<f32>())
+                    .fold(f32::NEG_INFINITY, f32::max);
+                total += best_token;
+            }
+            if total > best.0 {
+                best = (total, doc);
+            }
+        }
+        best.1
+    }
+
+    #[test]
+    fn opq_chunk_reranks_the_same_document_as_exact_maxsim() {
+        let docs: Vec<Vec<Vec<f32>>> = anisotropic_residuals(12)
+            .chunks(4)
+            .map(|doc| doc.to_vec())
+            .collect();
+        let train: Vec<Vec<f32>> = docs.iter().flatten().cloned().collect();
+        let refs: Vec<&[f32]> = train.iter().map(|v| v.as_slice()).collect();
+        let rotation =
+            OpqRotation::train(OPQ_DIMS, OPQ_SUBSPACE_NUM, 1usize << OPQ_BITS, &refs, 20);
+        assert!(!rotation.is_identity());
+
+        let segment = MiniSegment::new(&docs, &rotation);
+        // A query token taken from document 2, so the exact path must pick it.
+        let query = vec![docs[2][1].clone()];
+        let expected = exact_maxsim(&docs, &query);
+        assert_eq!(expected, 2);
+
+        let got = segment
+            .view()
+            .search(&query, 3, EmvbSearchOptions::for_topk(3));
+        assert!(!got.is_empty());
+        assert_eq!(
+            got[0].0 as usize, expected,
+            "OPQ chunk ranked {:?}, exact MaxSim winner is {expected}",
+            got.iter().map(|(d, s)| (*d, *s)).collect::<Vec<_>>()
+        );
+        // The top score tracks the exact inner product (the query is not
+        // rotated with `R^-1`, so the comparison is only approximate).
+        assert!(got[0].1 > 0.0, "score {} not positive", got[0].1);
+    }
+
+    #[test]
+    fn opq_chunk_search_survives_a_save_load_round_trip() {
+        let docs: Vec<Vec<Vec<f32>>> = anisotropic_residuals(12)
+            .chunks(4)
+            .map(|doc| doc.to_vec())
+            .collect();
+        let train: Vec<Vec<f32>> = docs.iter().flatten().cloned().collect();
+        let refs: Vec<&[f32]> = train.iter().map(|v| v.as_slice()).collect();
+        let rotation =
+            OpqRotation::train(OPQ_DIMS, OPQ_SUBSPACE_NUM, 1usize << OPQ_BITS, &refs, 20);
+        let segment = MiniSegment::new(&docs, &rotation);
+        let query = vec![docs[1][0].clone()];
+        let before = segment.view().search(&query, 4, EmvbSearchOptions::for_topk(4));
+
+        // Re-read the PQ block including `matrix_R_` from its bytes.
+        let chunk = MiniChunk::encode(OPQ_DIMS, OPQ_SUBSPACE_NUM, OPQ_BITS, &docs, &rotation);
+        let bytes = chunk.to_bytes();
+        let (_, _, loaded) = MiniChunk::decode(OPQ_DIMS, OPQ_SUBSPACE_NUM, OPQ_BITS, &bytes)
+            .expect("PQ block");
+        assert_eq!(loaded, rotation);
+        let reloaded = MiniSegment {
+            rotation: loaded.matrix().to_vec(),
+            ..segment
+        };
+        let after = reloaded.view().search(&query, 4, EmvbSearchOptions::for_topk(4));
+        assert_eq!(
+            before.iter().map(|(d, _)| *d).collect::<Vec<u32>>(),
+            after.iter().map(|(d, _)| *d).collect::<Vec<u32>>()
+        );
+        for (a, b) in before.iter().zip(&after) {
+            assert!((a.1 - b.1).abs() < 1e-6, "score drift {} -> {}", a.1, b.1);
+        }
+    }
+
+    /// A chunk encoded in the rotated space must not be scoreable without the
+    /// rotation: this is the audit's "a C++-written chunk cannot be scored with
+    /// its rotation" failure mode.
+    #[test]
+    fn dropping_the_rotation_degrades_the_residual_scores() {
+        let docs: Vec<Vec<Vec<f32>>> = anisotropic_residuals(12)
+            .chunks(4)
+            .map(|doc| doc.to_vec())
+            .collect();
+        let train: Vec<Vec<f32>> = docs.iter().flatten().cloned().collect();
+        let refs: Vec<&[f32]> = train.iter().map(|v| v.as_slice()).collect();
+        let rotation =
+            OpqRotation::train(OPQ_DIMS, OPQ_SUBSPACE_NUM, 1usize << OPQ_BITS, &refs, 20);
+        let segment = MiniSegment::new(&docs, &rotation);
+        let query = vec![docs[2][1].clone()];
+        let rotated_scores = segment
+            .view()
+            .search(&query, 3, EmvbSearchOptions::for_topk(3));
+        let unrotated = MiniSegment {
+            rotation: OpqRotation::identity(OPQ_DIMS).matrix().to_vec(),
+            ..segment
+        };
+        let identity_scores = unrotated
+            .view()
+            .search(&query, 3, EmvbSearchOptions::for_topk(3));
+        assert!(
+            rotated_scores[0].1 > identity_scores[0].1,
+            "rotating the query should score the matching document higher: {} vs {}",
+            rotated_scores[0].1,
+            identity_scores[0].1
+        );
     }
 }

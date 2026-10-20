@@ -16,19 +16,25 @@
 //! u32 n + u32[] centroid_id_assignments
 //! per centroid: u32 count + u32[] doc ids
 //! PQ: (no subspaces) u32 0 encoded embeddings, u32 0 next id,
-//!     f32[dim * dim] rotation matrix R (identity)
+//!     f32[dim * dim] OPQ rotation matrix R
 //! ```
 //!
-//! The residual product quantizer is written with `subspace_num = 0`: the
-//! coarse centroids and the document tables are the ones the reference reads
-//! back, and the quantizer carries an identity rotation with no codes. Our
-//! query path scores from the companion `.mvec` segment, which keeps the raw
-//! tokens for exact `MaxSim`.
+//! The residual product quantizer is written the way `OPQ::Save` writes it:
+//! per-subspace centroids, the `-0.5*||c||` table, one code per embedding and
+//! the trailing `matrix_R_` block. `R` is trained exactly like
+//! `OPQ::Train` (`product_quantizer_impl.cpp:150`, six rounds of
+//! k-means + two-sided Jacobi SVD, see
+//! `infinity_index::emvb::OpqRotation`), the residuals are rotated before they
+//! are quantised, and the query is rotated the same way at search time.
+//! `EMVBIndex` always builds an OPQ (`emvb_index_impl.cpp:62`), never a plain
+//! PQ, so an identity rotation here would make the chunk unscorable.
 
 use std::fs::File;
 use std::path::Path;
 
 use memmap2::Mmap;
+
+use infinity_index::emvb::OpqRotation;
 
 use crate::cpp_format::FormatError;
 
@@ -116,8 +122,9 @@ fn push_f32s(out: &mut Vec<u8>, vs: &[f32]) {
 }
 
 /// Residual product quantizer (`PQ::Save` / `OPQ::Save`): per-subspace
-/// centroids over `token - coarse centroid`, their `-0.5 * norm` table and one
-/// code per embedding.
+/// centroids over `(token - coarse centroid)·R`, their `-0.5 * norm` table and
+/// one code per embedding. `R` is the trained `matrix_R_`; the encoded data
+/// only makes sense in the rotated space.
 struct ResidualPq {
     subspace_num: usize,
     bits: u32,
@@ -131,10 +138,13 @@ fn train_residual_pq(
     subspace_num: usize,
     bits: u32,
     residuals: &[Vec<f32>],
+    rotation: &OpqRotation,
 ) -> ResidualPq {
     let subspace_num = subspace_num.max(1);
     let width = dims.div_ceil(subspace_num);
     let k = 1usize << bits.min(8);
+    // `OPQ::AddEmbeddings` / `OPQ::Train`: quantize `x·R`, not `x`.
+    let residuals: Vec<Vec<f32>> = residuals.iter().map(|r| rotation.rotate(r)).collect();
     let mut centroids = Vec::with_capacity(subspace_num * k * width);
     let mut norms = Vec::with_capacity(subspace_num * k);
     // Sample so training stays bounded on large segments.
@@ -275,6 +285,8 @@ pub struct EmvbData {
     pub centroids_to_docid: Vec<Vec<u32>>,
     pub codebook: Vec<f32>,
     pub codes: Vec<u8>,
+    /// OPQ `matrix_R_`, `dims * dims` row-major (`OPQ::Save`'s last block).
+    pub rotation: Vec<f32>,
 }
 
 impl EmvbData {
@@ -292,6 +304,7 @@ impl EmvbData {
             doc_lens: &self.doc_lens,
             doc_segment_offsets: &self.doc_segment_offsets,
             centroids_to_docid: &self.centroids_to_docid,
+            rotation: Some(&self.rotation),
         }
     }
 
@@ -321,7 +334,7 @@ impl EmvbData {
             push_u32s(&mut out, list);
         }
         // Residual PQ (`PQ::Save` / `OPQ::Save`): per-subspace centroids, their
-        // -0.5*norm table, the codes, and the OPQ rotation (identity here).
+        // -0.5*norm table, the codes, `next_embedding_id` and the OPQ rotation.
         let sub_dim = self.dims.div_ceil(self.subspace_num.max(1));
         let k = 1usize << self.subspace_bits.min(8);
         for sub in 0..self.subspace_num {
@@ -337,11 +350,9 @@ impl EmvbData {
         push_u32(&mut out, n_embeddings as u32);
         out.extend_from_slice(&self.codes);
         push_u32(&mut out, n_embeddings as u32); // next_embedding_id
-        for i in 0..self.dims {
-            for j in 0..self.dims {
-                let v = if i == j { 1.0f32 } else { 0.0 };
-                out.extend_from_slice(&v.to_le_bytes());
-            }
+        // `OPQ::Save`: `matrix_R_`, `dim * dim` f32s.
+        for v in &self.rotation {
+            out.extend_from_slice(&v.to_le_bytes());
         }
         out
     }
@@ -399,7 +410,11 @@ pub fn build_emvb(dims: usize, start_segment_offset: u32, docs: &[(u32, &[Vec<f3
         );
     }
     let subspace_num = if dims.is_multiple_of(8) { 8 } else { 1 };
-    let pq = train_residual_pq(dims, subspace_num, 8, &residuals);
+    // `EMVBIndex::Train` ends with `product_quantizer_->Train(residuals, n, 20)`,
+    // i.e. `OPQ::Train` with 20 iterations.
+    let residual_refs: Vec<&[f32]> = residuals.iter().map(|v| v.as_slice()).collect();
+    let rotation = OpqRotation::train(dims, subspace_num, 1usize << 8, &residual_refs, 20);
+    let pq = train_residual_pq(dims, subspace_num, 8, &residuals, &rotation);
 
     // The codebook layout is `subspace_num * k * sub_dim`.
     let sub_dim = dims.div_ceil(pq.subspace_num);
@@ -426,6 +441,7 @@ pub fn build_emvb(dims: usize, start_segment_offset: u32, docs: &[(u32, &[Vec<f3
         centroids_to_docid,
         codebook,
         codes: pq.codes.into_iter().flatten().collect(),
+        rotation: rotation.matrix().to_vec(),
     }
 }
 
@@ -483,6 +499,10 @@ pub struct EmvbPqIndex {
     pub doc_segment_offsets: Vec<u32>,
     /// Documents per coarse centroid (the reference's `centroids_to_docid_`).
     pub centroids_to_docid: Vec<Vec<u32>>,
+    /// OPQ `matrix_R_` (`dims * dims`). Both a chunk written here and one
+    /// written by the reference carry it as `OPQ::Save`'s last block, so the
+    /// residual codes stay scorable across implementations.
+    pub rotation: Vec<f32>,
 }
 
 impl EmvbPqIndex {
@@ -509,6 +529,7 @@ impl EmvbPqIndex {
             doc_lens: &self.doc_lens,
             doc_segment_offsets: &self.doc_segment_offsets,
             centroids_to_docid: &self.centroids_to_docid,
+            rotation: Some(&self.rotation),
         };
         let mut hits = view.search(
             query,
@@ -675,6 +696,19 @@ impl EmvbReader {
             return None;
         }
         let codes = m[at..at + code_bytes].to_vec();
+        at += code_bytes;
+        // `next_embedding_id`, then `OPQ::Save`'s `matrix_R_` block.
+        if m.len() < at + 4 {
+            return None;
+        }
+        at += 4;
+        let rotation_len = dims * dims;
+        if m.len() < at + rotation_len * 4 {
+            return None;
+        }
+        let rotation: Vec<f32> = (0..rotation_len)
+            .map(|i| f32::from_le_bytes(m[at + i * 4..at + i * 4 + 4].try_into().unwrap()))
+            .collect();
         // `centroids_to_docid_`: one document list per coarse centroid.
         let n_centroids = self.header.n_centroids as usize;
         let mut centroids_to_docid: Vec<Vec<u32>> = vec![Vec::new(); n_centroids];
@@ -701,6 +735,7 @@ impl EmvbReader {
             doc_lens,
             doc_segment_offsets,
             centroids_to_docid,
+            rotation,
         })
     }
 
@@ -817,4 +852,126 @@ mod tests {
             &candidates[..candidates.len().min(8)]
         );
     }
+
+    /// Residuals with a decaying spectrum in the coordinate basis plus a strong
+    /// cross-dimension component, so the coordinate subspaces cut across the
+    /// principal directions and OPQ has something to rotate.
+    fn correlated_docs(n: u32, dims: usize) -> Vec<(u32, Vec<Vec<f32>>)> {
+        let mut state = 0x2545_F491_4F6C_DD1Du64;
+        let mut rng = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            ((state >> 40) as f32) / ((1u64 << 24) as f32) - 0.5
+        };
+        (0..n)
+            .map(|row| {
+                let toks = (0..3)
+                    .map(|_| {
+                        let z: Vec<f32> = (0..dims).map(|_| rng()).collect();
+                        (0..dims)
+                            .map(|k| {
+                                let scale = 4.0 / (1.0 + k as f32);
+                                scale * z[k] + 0.6 * z[(k + 1) % dims]
+                            })
+                            .collect()
+                    })
+                    .collect();
+                (row, toks)
+            })
+            .collect()
+    }
+
+    /// The chunk carries the trained `matrix_R_` (`OPQ::Save`) and reading it
+    /// back yields the same matrix, both from `EmvbPqIndex` and in the view the
+    /// search uses.
+    #[test]
+    fn chunk_persists_the_trained_opq_rotation() {
+        let dims = 32usize;
+        let docs = correlated_docs(120, dims);
+        let refs: Vec<(u32, &[Vec<f32>])> = docs
+            .iter()
+            .map(|(row, toks)| (*row, toks.as_slice()))
+            .collect();
+        let data = build_emvb(dims, 0, &refs);
+        assert_eq!(data.rotation.len(), dims * dims);
+        let identity = OpqRotation::identity(dims);
+        assert_ne!(
+            data.rotation, identity.matrix(),
+            "the encoder must train OPQ, not ship the identity rotation"
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("seg_0.emvb");
+        std::fs::write(&path, data.encode()).unwrap();
+        let reader = EmvbReader::open(&path).unwrap();
+        let pq = reader.pq_index().expect("residual PQ tables");
+        assert_eq!(pq.rotation.len(), dims * dims);
+        assert_eq!(pq.rotation, data.rotation, "matrix_R_ did not round-trip");
+
+        // The same rotation reaches the search view.
+        let query = vec![docs[5].1[1].clone()];
+        let in_memory = data
+            .view()
+            .search(&query, 3, infinity_index::emvb::EmvbSearchOptions::for_topk(3));
+        let reloaded = pq.prefilter(&query, 3);
+        assert_eq!(in_memory[0].0 as usize, reloaded[0]);
+    }
+
+    /// Encoding rotates the residual (and the query does too): dropping `R`
+    /// from the same chunk degrades the matching document's score, which is the
+    /// audit's failure mode for a chunk whose rotation is ignored.
+    #[test]
+    fn opq_rotation_is_applied_to_the_query() {
+        let dims = 32usize;
+        let docs = correlated_docs(120, dims);
+        let refs: Vec<(u32, &[Vec<f32>])> = docs
+            .iter()
+            .map(|(row, toks)| (*row, toks.as_slice()))
+            .collect();
+        let mut data = build_emvb(dims, 0, &refs);
+        let query = vec![docs[7].1[0].clone()];
+        // Widen the pre-filters so the residual stage sees every document; the
+        // rotation only affects that stage.
+        let options = infinity_index::emvb::EmvbSearchOptions {
+            centroid_nprobe: 8,
+            threshold_first: -0.1,
+            n_doc_to_score: 10_000,
+            out_second_stage: 10_000,
+            threshold_final: 0.0,
+        };
+        let n = docs.len();
+        let with_rotation = data.view().search(&query, n, options);
+        data.rotation = OpqRotation::identity(dims).matrix().to_vec();
+        let without_rotation = data.view().search(&query, n, options);
+        // The exact MaxSim winner over the raw tokens.
+        let exact = docs
+            .iter()
+            .map(|(_, toks)| {
+                toks.iter()
+                    .map(|t| t.iter().zip(&query[0]).map(|(a, b)| a * b).sum::<f32>())
+                    .fold(f32::NEG_INFINITY, f32::max)
+            })
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .unwrap()
+            .0;
+        assert_eq!(
+            with_rotation[0].0 as usize, exact,
+            "the rotated chunk should rank the exact MaxSim winner first"
+        );
+        let score_of = |hits: &[(u32, f32)], doc: usize| {
+            hits.iter()
+                .find(|(d, _)| *d as usize == doc)
+                .map(|(_, s)| *s)
+                .unwrap_or(f32::NEG_INFINITY)
+        };
+        assert!(
+            score_of(&with_rotation, exact) > score_of(&without_rotation, exact),
+            "rotating the query must score the residual codes properly: {} vs {}",
+            score_of(&with_rotation, exact),
+            score_of(&without_rotation, exact)
+        );
+    }
 }
+
