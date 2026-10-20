@@ -146,6 +146,8 @@
 
 并行 agent 在同一工作树里改同一个热点文件（`infinity-executor/src/lib.rs`）时，`git add <file>` 会把**别人尚未提交的 hunk 一起带走**：`948731581`（BMP 选项）实际包含了 bindctx-15 的整套整数范围索引扫描。两次复现（另一次是 `d05c0f227` 把已提交的 `memindex_pending` 修复回退，后由 `760e878b7` 恢复）。为此：本条目的功能归属以哈希链 `54454e892` → `948731581` → `a6f638ef7` 为准；后续热点文件同时只允许一个 agent 写，其余待命，且每个 agent 提交后要 `git show <hash>` 复核删除行是否属于别人。
 
+| P1 | `result_cache` 默认值与参考相反 | `Engine::result_cache_active()` 在配置缺失时返回 true；C++ `DEFAULT_RESULT_CACHE = "off"`（`src/common/default_values.cppm:211`） | 默认配置下 Rust 会缓存结果、C++ 不缓存；`SHOW VARIABLES` 在 C++ 里会整行跳过 `cache_result_capacity`（`physical_show_global_variables_impl.cpp:56-60`），Rust 仍列出。**影响**：缓存失效时机与变量行数的语义偏差，不影响查询结果。已修一半：`cache_result_capacity` 不再泄漏 `usize::MAX`（`80dddcc71`）。翻转默认值会改变所有测试的缓存行为，需单独决策 |
+
 ## 处置口径
 
 1. **P0 全部要改**（磁盘格式/结果正确性/互操作），改完补针对性回归（C++ 写、Rust 读；Rust 写、C++ 读）。
