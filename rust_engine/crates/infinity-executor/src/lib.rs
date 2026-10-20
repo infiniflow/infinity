@@ -6256,6 +6256,11 @@ impl Engine {
                 }
             }
         }
+        // A commit changes visible rows, so cached `SELECT` results must not
+        // survive it. The SQL path clears on the mutating statement; callers
+        // that reach this primitive directly (Thrift insert, import) would
+        // otherwise keep serving a stale `count(*)`.
+        self.result_cache.lock().unwrap().clear();
         // A memory index that already exceeds its quota is dumped
         // before these rows join it.
         let _batch = self.batch_lock.lock().unwrap();
@@ -6322,6 +6327,9 @@ impl Engine {
     /// `ConflictCheckTest.conflict_check_delete`: the first committer wins and
     /// concurrent deleters get `kTxnConflict`.
     fn commit_with_deletes(&self, table: &str, deletes: &[usize], mut txn: Txn) -> Result<u64> {
+        // See `insert_literals_inner`: a direct delete must invalidate the
+        // cached `SELECT` results too.
+        self.result_cache.lock().unwrap().clear();
         self.invalidate_row_cache(table);
         self.note_live_rows(table, -(deletes.len() as isize));
         // The block mirror keeps its snapshot: deleted row ids are hidden by
@@ -16946,6 +16954,34 @@ mod tests {
         assert_eq!(
             rows(&e, q),
             vec![vec!["5".to_string()], vec!["2".to_string()]]
+        );
+    }
+
+    /// A write that reaches the engine through the Thrift/import primitives
+    /// rather than SQL still has to invalidate cached `SELECT` results: the
+    /// memidx restart suite counts rows after an SDK insert and must see it.
+    #[test]
+    fn a_direct_insert_invalidates_cached_select_results() {
+        use infinity_parser::Literal;
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE dc (c1 INT);").unwrap();
+        e.insert_literals(
+            "default_db.dc",
+            None,
+            vec![vec![Literal::Int(1)], vec![Literal::Int(2)]],
+        )
+        .unwrap();
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM dc;"),
+            vec![vec!["2".to_string()]]
+        );
+        // The same primitive again: the cached `count(*)` above must not win.
+        e.insert_literals("default_db.dc", None, vec![vec![Literal::Int(3)]])
+            .unwrap();
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM dc;"),
+            vec![vec!["3".to_string()]]
         );
     }
 
