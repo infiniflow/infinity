@@ -3631,6 +3631,10 @@ pub struct Engine {
     /// Optional background task processor (`BGTaskProcessor`). When attached,
     /// the memindex quota queues a real `DumpMemIndexTask`; otherwise the
     /// quota is enforced synchronously.
+    /// Serializes table creation against the orphan sweep: the sweep deletes
+    /// `row:` keys of a name with no catalog entry, so a create that races a
+    /// snapshot restore of the same table must not run it concurrently.
+    ddl_lock: Mutex<()>,
     bg_processor: Mutex<Option<Arc<BGTaskProcessor>>>,
     /// Weak self handle handed to background tasks (avoids a cycle through
     /// `bg_processor`).
@@ -4139,6 +4143,7 @@ impl Engine {
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
             tables: Arc::new(Mutex::new(HashMap::new())),
+            ddl_lock: Mutex::new(()),
             bg_processor: Mutex::new(None),
             self_weak: Mutex::new(std::sync::Weak::new()),
             batch_lock: Mutex::new(()),
@@ -5898,6 +5903,65 @@ impl Engine {
         }
     }
 
+    /// Deletes every `row:`/`del:` key of `name` in one batch.
+    ///
+    /// Two callers need it. `drop_table_all` sweeps after the catalog delete,
+    /// so a crashed drop leaves keys no catalog entry refers to; and
+    /// [`Self::create_table_clearing_orphans`] repeats the sweep when a name is
+    /// created again, because `fetch_rows` walks `row:{table}:` and
+    /// `next_row_seq` starts past the highest orphan id — without this a new
+    /// table would read a dropped table's rows back. The reference cannot hit
+    /// either window: its drop and its segment removal share one transaction.
+    fn clear_orphan_rows(&self, name: &str) -> Result<()> {
+        // Both spellings: `DROP TABLE t` and a qualified `db.t` write the same
+        // rows under whichever name reached the executor, so a sweep keyed on
+        // only one of them can miss half the prefixes.
+        let qualified = self.table_key(name);
+        let mut keys: std::collections::BTreeSet<Vec<u8>> = std::collections::BTreeSet::new();
+        for table in [name, qualified.as_str()] {
+            for prefix in [row_prefix(table), del_prefix(table)] {
+                for (k, _) in self.storage.store.scan_prefix(&prefix)? {
+                    keys.insert(k);
+                }
+            }
+        }
+        if keys.is_empty() {
+            return Ok(());
+        }
+        let deletes: Vec<(Vec<u8>, Option<Vec<u8>>)> =
+            keys.into_iter().map(|k| (k, None)).collect();
+        self.storage.store.atomic_batch(&deletes)
+    }
+
+    /// `CREATE TABLE` deletes the row keys a crashed `DROP TABLE` of the same
+    /// name left behind, but only when no table by that name exists: a
+    /// duplicate name must fail in the catalog, never lose its rows here.
+    #[allow(clippy::too_many_arguments)]
+    fn create_table_clearing_orphans(
+        &self,
+        name: &str,
+        columns: &[String],
+        defaults: &[Option<String>],
+        not_nulls: &[bool],
+        types: &[String],
+        comments: &[Option<String>],
+        sparse_stores: &[Option<infinity_catalog::SparseStore>],
+    ) -> Result<infinity_catalog::TableMeta> {
+        let _ddl = self.ddl_lock.lock().unwrap();
+        if self.storage.catalog.get_table_by_name(name)?.is_none() {
+            self.clear_orphan_rows(name)?;
+        }
+        self.storage.catalog.create_table_typed_with_sparse_stores(
+            name,
+            columns,
+            defaults,
+            not_nulls,
+            types,
+            comments,
+            sparse_stores,
+        )
+    }
+
     /// Drops a table and purges its stored rows, tombstones, secondary-index
     /// entries and index declarations, so a later CREATE TABLE with the same
     /// name starts empty.
@@ -5919,12 +5983,12 @@ impl Engine {
                 }
             }
         }
-        for (k, _) in self.storage.store.scan_prefix(&row_prefix(name))? {
-            self.storage.store.delete(&k)?;
-        }
-        for (k, _) in self.storage.store.scan_prefix(&del_prefix(name))? {
-            self.storage.store.delete(&k)?;
-        }
+        // One batch: the rows and their tombstones go together, so the sweep
+        // cannot leave half a table behind. It still runs *after* the catalog
+        // delete, which is the visible commit point: a crash in between leaves
+        // orphan row keys that no catalog entry refers to, and
+        // `clear_orphan_rows` removes them when the name is created again.
+        self.clear_orphan_rows(name)?;
         // The table entry (index registries included) was removed above.
         for im in self.storage.catalog.list_indexes()? {
             if im.table == name {
@@ -6432,7 +6496,7 @@ impl Engine {
                 sparse_store_hints(columns),
             )
         };
-        let created = self.storage.catalog.create_table_typed_with_sparse_stores(
+        let created = self.create_table_clearing_orphans(
             name,
             &names,
             &defaults,
@@ -6937,7 +7001,7 @@ impl Engine {
                 let comments: Vec<Option<String>> =
                     columns.iter().map(|c| c.comment.clone()).collect();
                 let sparse_stores = sparse_store_hints(columns);
-                let t = self.storage.catalog.create_table_typed_with_sparse_stores(
+                let t = self.create_table_clearing_orphans(
                     name,
                     &names,
                     &defaults,
@@ -10689,6 +10753,7 @@ impl Engine {
     /// Restoring into an existing table is refused, as in
     /// `NewTxn::RestoreTableSnapshot` (`DROP TABLE` first).
     pub fn restore_table_snapshot(&self, name: &str) -> Result<()> {
+        let _ddl = self.ddl_lock.lock().unwrap();
         let data = self
             .storage
             .store
@@ -10707,6 +10772,7 @@ impl Engine {
     /// The snapshot records its tables as `<db>.<table>`. Restoring into an
     /// existing database is refused, as in `NewTxn::RestoreDatabaseSnapshot`.
     fn restore_snapshot_tables(&self, name: &str) -> Result<()> {
+        let _ddl = self.ddl_lock.lock().unwrap();
         let data = self
             .storage
             .store
@@ -14003,10 +14069,7 @@ impl Engine {
         self.submit_task(|engine| Box::new(OptimizeTask { engine }))
     }
 
-    fn submit_task(
-        &self,
-        make: impl FnOnce(std::sync::Weak<Engine>) -> Box<dyn BgTask>,
-    ) -> bool {
+    fn submit_task(&self, make: impl FnOnce(std::sync::Weak<Engine>) -> Box<dyn BgTask>) -> bool {
         let Some(processor) = self.bg_processor.lock().unwrap().clone() else {
             return false;
         };
@@ -14057,7 +14120,12 @@ impl Engine {
         let spawned = std::thread::Builder::new()
             .name("infinity-trigger".to_string())
             .spawn(move || {
-                trigger_loop(engine, cleanup_interval, compact_interval, optimize_interval)
+                trigger_loop(
+                    engine,
+                    cleanup_interval,
+                    compact_interval,
+                    optimize_interval,
+                )
             });
         if let Err(error) = spawned {
             eprintln!("background trigger thread not started: {error}");
@@ -20022,5 +20090,46 @@ mod tests {
             assert_eq!(res.len(), 1, "{sql}");
             assert!(matches!(res.remove(0), QueryResult::Rows { .. }), "{sql}");
         }
+    }
+    /// A `DROP TABLE` that commits the catalog delete and then dies before the
+    /// row sweep leaves `row:` keys no catalog entry refers to. A later
+    /// `CREATE TABLE` with the same name must clear them: `fetch_rows` walks
+    /// `row:{table}:` and `next_row_seq` starts past the highest orphan id, so
+    /// without the sweep the new table reads the dropped table's rows back.
+    #[test]
+    fn a_crashed_drop_does_not_resurrect_rows() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE crash_t (id INT);").unwrap();
+        e.execute("INSERT INTO crash_t VALUES (1), (2), (3);")
+            .unwrap();
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM crash_t;"),
+            vec![vec!["3".to_string()]]
+        );
+
+        // The crash window: catalog entry gone, row keys still present.
+        e.storage.catalog.drop_table("default_db.crash_t").unwrap();
+        e.tables.lock().unwrap().clear();
+
+        assert!(
+            e.storage
+                .catalog
+                .get_table_by_name("default_db.crash_t")
+                .unwrap()
+                .is_none(),
+            "the drop must be visible before the sweep runs"
+        );
+        e.execute("CREATE TABLE crash_t (id INT);").unwrap();
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM crash_t;"),
+            vec![vec!["0".to_string()]],
+            "the recreated table must not see the dropped table's rows"
+        );
+        e.execute("INSERT INTO crash_t VALUES (7);").unwrap();
+        assert_eq!(
+            rows(&e, "SELECT id FROM crash_t;"),
+            vec![vec!["7".to_string()]]
+        );
     }
 }
