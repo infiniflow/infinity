@@ -5,6 +5,7 @@
 //! alternative impl behind the same trait.
 
 use std::path::Path;
+use std::sync::Mutex;
 
 use fjall::{Database, Keyspace, KeyspaceCreateOptions, PersistMode};
 use infinity_common::{Error, Result};
@@ -45,12 +46,53 @@ fn decode_value(value: &[u8]) -> Vec<u8> {
 }
 
 /// A transactional key-value store for metadata.
+///
+/// The write surface mirrors the reference's `KVInstance`
+/// (`src/storage/catalog/kv_store.cppm:42-98`): a single commit may carry
+/// both puts and deletes ([`MetaStore::atomic_batch`]), and `Merge` runs the
+/// numeric `String2UInt64AddOperator` ([`MetaStore::merge`]).
 pub trait MetaStore: Send + Sync {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()>;
     fn delete(&self, key: &[u8]) -> Result<()>;
+    /// C++: `KVInstance::Put` / `KVInstance::Delete` + `Commit` — one
+    /// all-or-nothing commit of puts (`Some(value)`) and deletes (`None`).
+    ///
+    /// This is the single primitive a DDL uses: a catalog mutation that
+    /// removes N old entries and adds M new ones commits once, so a crash or
+    /// an error can never leave half a DDL behind.
+    ///
+    /// The default applies the operations one by one; an implementation that
+    /// can batch (the LSM and RocksDB backends) must override it.
+    fn atomic_batch(&self, items: &[(Vec<u8>, Option<Vec<u8>>)]) -> Result<()> {
+        for (key, value) in items {
+            match value {
+                Some(value) => self.put(key, value)?,
+                None => self.delete(key)?,
+            }
+        }
+        Ok(())
+    }
     /// Atomically apply all writes (single all-or-nothing batch).
-    fn atomic_write(&self, items: &[(Vec<u8>, Vec<u8>)]) -> Result<()>;
+    fn atomic_write(&self, items: &[(Vec<u8>, Vec<u8>)]) -> Result<()> {
+        let batch: Vec<(Vec<u8>, Option<Vec<u8>>)> = items
+            .iter()
+            .map(|(key, value)| (key.clone(), Some(value.clone())))
+            .collect();
+        self.atomic_batch(&batch)
+    }
+    /// C++: `KVStore::Merge` with `String2UInt64AddOperator` — the stored
+    /// value and `delta` are read as `u64` and the sum is stored in decimal
+    /// (`"1"` merged with `2` is `"3"`). A missing key merges against `0`.
+    ///
+    /// Returns the merged value. The read-modify-write is atomic within the
+    /// store; like the reference, it is not coordinated with another process
+    /// opening the same catalog directory.
+    fn merge(&self, key: &[u8], delta: u64) -> Result<u64> {
+        let merged = merge_delta(self.get(key)?.as_deref(), delta)?;
+        self.put(key, merged.to_string().as_bytes())?;
+        Ok(merged)
+    }
     /// All `(key, value)` pairs whose key starts with `prefix`, in key order.
     fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
     /// Number of keys with `prefix`. Counting (`SELECT count(*)`, `SHOW TABLE`)
@@ -62,10 +104,32 @@ pub trait MetaStore: Send + Sync {
     fn flush(&self) -> Result<()>;
 }
 
+/// C++: `String2UInt64AddOperator` (`catalog/kv_store.cpp:91`) — both merge
+/// operands are parsed as `u64`.
+fn parse_u64(value: &[u8]) -> Result<u64> {
+    std::str::from_utf8(value)
+        .ok()
+        .and_then(|text| text.trim().parse::<u64>().ok())
+        .ok_or_else(|| Error::Storage("merge operand is not a u64".into()))
+}
+
+/// The merge operator itself: `current` (or `0`) plus `delta`.
+pub(crate) fn merge_delta(current: Option<&[u8]>, delta: u64) -> Result<u64> {
+    let base = match current {
+        Some(value) => parse_u64(value)?,
+        None => 0,
+    };
+    base.checked_add(delta)
+        .ok_or_else(|| Error::Storage("String2UInt64AddOperator overflow".into()))
+}
+
 /// `fjall`-backed `MetaStore`.
 pub struct FjallMetaStore {
     db: Database,
     ks: Keyspace,
+    /// Serialises the read-modify-write of [`MetaStore::merge`], so two
+    /// concurrent merges of one counter cannot lose an increment.
+    merge_lock: Mutex<()>,
 }
 
 impl FjallMetaStore {
@@ -75,7 +139,11 @@ impl FjallMetaStore {
         let ks = db
             .keyspace(name, KeyspaceCreateOptions::default)
             .map_err(fe)?;
-        Ok(Self { db, ks })
+        Ok(Self {
+            db,
+            ks,
+            merge_lock: Mutex::new(()),
+        })
     }
 }
 
@@ -92,13 +160,28 @@ impl MetaStore for FjallMetaStore {
         self.ks.remove(key).map_err(fe)
     }
 
-    fn atomic_write(&self, items: &[(Vec<u8>, Vec<u8>)]) -> Result<()> {
+    fn atomic_batch(&self, items: &[(Vec<u8>, Option<Vec<u8>>)]) -> Result<()> {
+        if items.is_empty() {
+            return Ok(());
+        }
         let mut batch = self.db.batch();
-        for (k, v) in items {
-            let stored = encode_value(v);
-            batch.insert(&self.ks, k.as_slice(), stored.as_slice());
+        for (key, value) in items {
+            match value {
+                Some(value) => {
+                    let stored = encode_value(value);
+                    batch.insert(&self.ks, key.as_slice(), stored.as_slice());
+                }
+                None => batch.remove(&self.ks, key.as_slice()),
+            }
         }
         batch.commit().map_err(fe)
+    }
+
+    fn merge(&self, key: &[u8], delta: u64) -> Result<u64> {
+        let _guard = self.merge_lock.lock().unwrap();
+        let merged = merge_delta(self.get(key)?.as_deref(), delta)?;
+        self.put(key, merged.to_string().as_bytes())?;
+        Ok(merged)
     }
 
     fn count_prefix(&self, prefix: &[u8]) -> Result<usize> {
@@ -173,6 +256,64 @@ mod tests {
         .unwrap();
         assert_eq!(s.get(b"k1").unwrap(), Some(b"v1".to_vec()));
         assert_eq!(s.get(b"k2").unwrap(), Some(b"v2".to_vec()));
+    }
+
+    /// C++: `KVInstance::Put` + `KVInstance::Delete` + `Commit` — one DDL
+    /// commit carries the new entries *and* the removals.
+    #[test]
+    fn atomic_batch_carries_puts_and_deletes_in_one_commit() {
+        let (_d, s) = open();
+        s.put(b"tbl:1:old_a", b"x").unwrap();
+        s.put(b"tbl:1:old_b", b"y").unwrap();
+        s.put(b"tbl:1:keep", b"z").unwrap();
+
+        s.atomic_batch(&[
+            (b"tbl:1:old_a".to_vec(), None),
+            (b"tbl:1:old_b".to_vec(), None),
+            (b"tbl:1:new".to_vec(), Some(b"n".to_vec())),
+            (b"tbl:1:keep".to_vec(), Some(b"z2".to_vec())),
+        ])
+        .unwrap();
+
+        assert_eq!(s.get(b"tbl:1:old_a").unwrap(), None);
+        assert_eq!(s.get(b"tbl:1:old_b").unwrap(), None);
+        assert_eq!(s.get(b"tbl:1:new").unwrap(), Some(b"n".to_vec()));
+        assert_eq!(s.get(b"tbl:1:keep").unwrap(), Some(b"z2".to_vec()));
+        assert_eq!(s.count_prefix(b"tbl:1:").unwrap(), 2);
+    }
+
+    /// Deleting a key that does not exist is a no-op, not an error.
+    #[test]
+    fn atomic_batch_tolerates_missing_deletes() {
+        let (_d, s) = open();
+        s.atomic_batch(&[(b"absent".to_vec(), None), (b"k".to_vec(), Some(b"v".to_vec()))])
+            .unwrap();
+        assert_eq!(s.get(b"k").unwrap(), Some(b"v".to_vec()));
+    }
+
+    #[test]
+    fn atomic_batch_empty_is_a_noop() {
+        let (_d, s) = open();
+        s.atomic_batch(&[]).unwrap();
+        assert!(s.scan_prefix(b"").unwrap().is_empty());
+    }
+
+    /// C++ `kv_store_ut.cpp:29`: `Put("1")` then `Merge("2")` reads back `"3"`
+    /// (the numeric `String2UInt64AddOperator`).
+    #[test]
+    fn merge_accumulates_u64_values() {
+        let (_d, s) = open();
+        s.put(b"counter", b"1").unwrap();
+        assert_eq!(s.merge(b"counter", 2).unwrap(), 3);
+        assert_eq!(s.get(b"counter").unwrap(), Some(b"3".to_vec()));
+        assert_eq!(s.merge(b"counter", 7).unwrap(), 10);
+        assert_eq!(s.get(b"counter").unwrap(), Some(b"10".to_vec()));
+        // A missing key merges against zero.
+        assert_eq!(s.merge(b"fresh", 5).unwrap(), 5);
+        assert_eq!(s.get(b"fresh").unwrap(), Some(b"5".to_vec()));
+        // The operand must be numeric, exactly as the reference's operator.
+        s.put(b"text", b"abc").unwrap();
+        assert!(s.merge(b"text", 1).is_err());
     }
 
     #[test]

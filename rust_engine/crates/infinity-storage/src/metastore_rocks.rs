@@ -10,6 +10,7 @@
 //! `librocksdb`; the default build stays pure Rust.
 
 use std::path::Path;
+use std::sync::Mutex;
 
 use infinity_common::{Error, Result};
 use rocksdb::{Options, WriteBatch, DB};
@@ -24,6 +25,8 @@ fn re(e: rocksdb::Error) -> Error {
 /// the C++ engine's `catalog` directory).
 pub struct RocksMetaStore {
     db: DB,
+    /// Serialises the read-modify-write of [`MetaStore::merge`].
+    merge_lock: Mutex<()>,
 }
 
 impl RocksMetaStore {
@@ -35,7 +38,10 @@ impl RocksMetaStore {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         let db = DB::open(&opts, path.as_ref()).map_err(re)?;
-        Ok(Self { db })
+        Ok(Self {
+            db,
+            merge_lock: Mutex::new(()),
+        })
     }
 }
 
@@ -52,12 +58,22 @@ impl MetaStore for RocksMetaStore {
         self.db.delete(key).map_err(re)
     }
 
-    fn atomic_write(&self, items: &[(Vec<u8>, Vec<u8>)]) -> Result<()> {
+    fn atomic_batch(&self, items: &[(Vec<u8>, Option<Vec<u8>>)]) -> Result<()> {
         let mut batch = WriteBatch::default();
-        for (k, v) in items {
-            batch.put(k, v);
+        for (key, value) in items {
+            match value {
+                Some(value) => batch.put(key, value),
+                None => batch.delete(key),
+            }
         }
         self.db.write(batch).map_err(re)
+    }
+
+    fn merge(&self, key: &[u8], delta: u64) -> Result<u64> {
+        let _guard = self.merge_lock.lock().unwrap();
+        let merged = crate::metastore::merge_delta(self.get(key)?.as_deref(), delta)?;
+        self.put(key, merged.to_string().as_bytes())?;
+        Ok(merged)
     }
 
     fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
