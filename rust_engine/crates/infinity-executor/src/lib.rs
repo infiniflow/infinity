@@ -195,6 +195,9 @@ mod wand;
 
 mod cpp_blocks;
 
+/// The batch of rows the physical operators exchange (C++ `DataBlock`).
+pub mod chunk;
+
 /// Result of executing one statement.
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueryResult {
