@@ -1142,6 +1142,24 @@ struct IvfOptions {
     min_points: usize,
 }
 
+/// The types the reference stores in a variable-length buffer
+/// (`ColumnVector::GetVectorBufferType` -> `kVarBuffer`): the data of such a
+/// column is preceded by an outline file, `col_{id}_out`.
+fn is_var_buffer_type(type_code: i32) -> bool {
+    use infinity_catalog::value_format::logical;
+    matches!(
+        type_code as i64,
+        logical::VARCHAR
+            | logical::ARRAY
+            | logical::EMBEDDING
+            | logical::TENSOR
+            | logical::TENSORARRAY
+            | logical::SPARSE
+            | logical::MULTIVECTOR
+            | logical::JSON
+    )
+}
+
 impl Engine {
     /// Root of the C++-format block mirror. The C++ engine keeps the table
     /// data under `<data_dir>/data/db_{db}/…`, next to `<data_dir>/catalog`.
@@ -1241,12 +1259,27 @@ impl Engine {
                 block_id: block_index as u16,
             };
             self.context.buffer.lock().unwrap().invalidate(&id);
+            let block_dir = cpp_format::block_dir(db_id, meta.id, 0, id.block_id);
             cpp_format::write_block(&root, id, &block_columns, &version).map_err(|e| {
                 Error::Io {
-                    path: root.join(cpp_format::block_dir(db_id, meta.id, 0, id.block_id)),
+                    path: root.join(&block_dir),
                     source: e,
                 }
             })?;
+            // The reference opens an outline file for every variable-length
+            // column (`ColumnMeta::FilePaths` lists `col_{id}_out` for a
+            // kVarBuffer type) and aborts the whole read when it is missing,
+            // even though the file is empty for a column whose data is inline.
+            for (i, ty) in types.iter().enumerate() {
+                if is_var_buffer_type(*ty) {
+                    let path = root
+                        .join(&block_dir)
+                        .join(cpp_format::column_outline_file(meta.ids[i]));
+                    if !path.exists() {
+                        let _ = std::fs::write(&path, b"");
+                    }
+                }
+            }
             blocks.push(CppBlock {
                 block_id: block_index as u16,
                 commit_ts: CPP_MIRROR_TS,
@@ -1751,7 +1784,7 @@ impl Engine {
     /// (`next_index_id`, `cpp_layout.rs:545-550`).
     fn cpp_index_position(&self, table: &str, index_name: &str) -> Result<usize> {
         let short = table.split('.').next_back().unwrap_or(table);
-        let ids: Vec<(String, u64)> = self
+        let mut ids: Vec<(String, u64)> = self
             .storage
             .catalog
             .list_indexes()?
@@ -1759,6 +1792,13 @@ impl Engine {
             .filter(|im| im.table == short || im.table == table)
             .map(|im| (im.name, im.id))
             .collect();
+        // The id is the position in a stable order: `list_indexes` is a map, and
+        // two callers that number the same table's indexes in different
+        // iteration orders wrote one index's chunk into another's directory
+        // (the HNSW chunk landed under the sparse index). Sorting by name makes
+        // the numbering match the catalog layout, which emits indexes in name
+        // order.
+        ids.sort_by(|a, b| a.0.cmp(&b.0));
         ids.iter()
             .position(|(n, _)| n == index_name)
             .map(|p| match ids[p].1 {
