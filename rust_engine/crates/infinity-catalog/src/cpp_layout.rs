@@ -7,7 +7,7 @@
 //! round-trips on a real catalog. The C++ global counters
 //! (`next_database_id`/`next_table_id`) are written too.
 
-use infinity_common::{Error, Result};
+use infinity_common::{Error, Result, TxnTimeStamp};
 use infinity_expression::json::Json;
 use infinity_storage::{catalog_format as key, MetaStore};
 
@@ -28,6 +28,50 @@ pub struct CppTable {
     /// The `next_column_id` tag the C++ writer keeps per table.
     pub next_column_id: u64,
 }
+
+/// One block of a flushed segment, as the reference records it under
+/// `catalog|blk|{db_id}|{table_id}|{segment_id}|{block_id}`.
+///
+/// `commit_ts` is the value of that record; the reference keeps a block when it
+/// is `<= begin_ts` (`GetTableSegmentBlocks`,
+/// `src/storage/catalog/kv_utility_impl.cpp:100`). A block mirror is one
+/// checkpoint of the whole table, so every block is published with
+/// [`CPP_MIRROR_TS`] and is visible to any reader.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CppBlock {
+    pub block_id: u16,
+    pub commit_ts: u64,
+}
+
+/// One segment of a flushed mirror: `catalog|seg|…` plus its blocks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CppSegment {
+    pub segment_id: u32,
+    /// Value of the `catalog|seg|…` record (the reference's create timestamp).
+    pub create_ts: u64,
+    pub blocks: Vec<CppBlock>,
+}
+
+/// A table's segment layer, keyed by the **decimal** ids the C++ keys use.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CppSegmentSet {
+    pub db_id: String,
+    pub table_id: String,
+    pub segments: Vec<CppSegment>,
+}
+
+/// The timestamp every record of a block mirror is published with.
+///
+/// The mirror is a full rewrite of the table at a checkpoint, not an append, so
+/// it has no per-block commit order. The reference hides a segment or block
+/// whose timestamp is greater than the reader's `begin_ts`
+/// (`GetTableSegments` / `GetTableSegmentBlocks`); 0 is visible to every reader,
+/// including one that starts from an empty WAL and therefore begins at ts 1.
+pub const CPP_MIRROR_TS: TxnTimeStamp = 0;
+
+/// C++ `UNCOMMIT_TS` (`src/common/default_values.cppm:83`): the value a segment
+/// carries until something is deleted from it.
+pub const UNCOMMIT_TS: TxnTimeStamp = u64::MAX;
 
 /// Maps a declared type text to the C++ `DataType::Serialize()` object.
 ///
@@ -560,29 +604,42 @@ impl Catalog {
         let dbs = self.list_databases()?;
         let tables = self.list_tables()?;
         let indexes = self.list_indexes()?;
-        self.write_cpp_layout_from(store, &dbs, &tables, &indexes)
+        // The segment layer belongs to the block mirror, not to the native
+        // catalog: keep whatever is already published instead of dropping it.
+        let segments = read_cpp_segments(store)?;
+        self.write_cpp_layout_from(store, &dbs, &tables, &indexes, &segments)
     }
 
     /// Like [`Self::write_cpp_layout`] but from an explicit snapshot. The
     /// C++-only catalog mode needs this: it mutates the desired lists and then
     /// rewrites the whole layout, and the just-mutated state is not yet readable
     /// back from the store.
+    ///
+    /// `segments` carries the tables' segment/block records
+    /// ([`read_cpp_segments`] for a preserve-and-rewrite, or the mirror a
+    /// checkpoint just wrote): the layout writer owns the `catalog|` key space
+    /// and its sweep, so the segment layer has to be re-emitted here or a DDL
+    /// would leave the C++ reader with a table that has no segments.
     pub fn write_cpp_layout_from(
         &self,
         store: &dyn MetaStore,
         dbs: &[String],
         tables: &[TableMeta],
         indexes: &[IndexMeta],
+        segments: &[CppSegmentSet],
     ) -> Result<usize> {
         let mut written = 0usize;
 
         let next_table_id = tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+        // The reference hands out **1-based** database ids (`CreateDatabase`
+        // applies `next_database_id_ + 1`, and the block mirror names its
+        // directory `db_{db_id}`), so the first database is 1, not 0.
         let db_id_of =
-            |name: &str| -> u64 { dbs.iter().position(|d| d == name).unwrap_or(0) as u64 };
+            |name: &str| -> u64 { dbs.iter().position(|d| d == name).unwrap_or(0) as u64 + 1 };
 
         for (i, db) in dbs.iter().enumerate() {
             let ts = i as u64 + 1;
-            let db_str = i.to_string();
+            let db_str = (i as u64 + 1).to_string();
             store.put(key::catalog_db_key(db, ts).as_bytes(), db_str.as_bytes())?;
             store.put(
                 key::catalog_db_tag_key(&db_str, "next_table_id").as_bytes(),
@@ -678,6 +735,24 @@ impl Catalog {
                     next_column_id: t.ids.iter().copied().max().map_or(0, |v| v + 1),
                 },
             ));
+            // The segment/block records of this table's block mirror. Written
+            // after the table tags so the real `next_segment_id` /
+            // `unsealed_segment_id` replace the 0 defaults above.
+            //
+            // Match on the table id alone and re-key the set to this layout's
+            // database id: the publisher derives its db id from the engine's
+            // 1-based numbering while the layout numbers databases from 0, and
+            // a mismatch here meant no set was ever found - the sweep below
+            // deletes every `catalog|` key, so the segment records were dropped
+            // on every checkpoint and the reference saw a segmentless table.
+            if let Some(set) = segments
+                .iter()
+                .find(|s| s.table_id == t.id.to_string())
+            {
+                let mut set = set.clone();
+                set.db_id = db_id.to_string();
+                written += write_cpp_segments(store, &set)?;
+            }
         }
 
         // Index records: `idx|{db}|{tbl}|{name}|{ts}` -> index_id (a per-table
@@ -783,9 +858,10 @@ impl Catalog {
         dbs: &[String],
         tables: &[TableMeta],
         indexes: &[IndexMeta],
+        segments: &[CppSegmentSet],
     ) -> Result<Vec<crate::BatchItem>> {
         let recorder = LayoutBatch::new();
-        self.write_cpp_layout_from(&recorder, dbs, tables, indexes)?;
+        self.write_cpp_layout_from(&recorder, dbs, tables, indexes, segments)?;
         Ok(recorder.into_items())
     }
 
@@ -925,6 +1001,146 @@ pub fn read_cpp_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
     }
     out.sort_by(|a, b| a.base.index_name.cmp(&b.base.index_name));
     Ok(out)
+}
+
+/// Reads a table's segment layer back: every `catalog|seg|…` record plus the
+/// `catalog|blk|…` records beneath it.
+///
+/// The reference enumerates segments and blocks by prefix scan
+/// (`GetTableSegments` / `GetTableSegmentBlocks`,
+/// `src/storage/catalog/kv_utility_impl.cpp:37,100`), so these two families are
+/// exactly what makes a written mirror visible: without them a C++ engine opens
+/// the table but believes it has no data.
+pub fn read_cpp_segments(store: &dyn MetaStore) -> Result<Vec<CppSegmentSet>> {
+    let mut out: Vec<CppSegmentSet> = Vec::new();
+    for (k, v) in store.scan_prefix(b"catalog|seg|")? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        // `catalog|seg|{db_id}|{table_id}|{segment_id}`
+        let fields: Vec<&str> = key.split('|').collect();
+        if fields.len() != 5 {
+            continue;
+        }
+        let (db_id, table_id) = (fields[2].to_string(), fields[3].to_string());
+        let Ok(segment_id) = fields[4].parse::<u32>() else {
+            continue;
+        };
+        let create_ts = String::from_utf8_lossy(&v).parse().unwrap_or(0);
+        let mut blocks = Vec::new();
+        for (bk, _) in store
+            .scan_prefix(key::catalog_block_prefix(&db_id, &table_id, segment_id).as_bytes())?
+        {
+            let bkey = String::from_utf8_lossy(&bk).to_string();
+            // `catalog|blk|{db_id}|{table_id}|{segment_id}|{block_id}`
+            let bfields: Vec<&str> = bkey.split('|').collect();
+            let Some(block_id) = bfields.get(5).and_then(|f| f.parse::<u16>().ok()) else {
+                continue;
+            };
+            let commit_ts = store
+                .get(bk.as_slice())?
+                .and_then(|v| String::from_utf8_lossy(&v).parse().ok())
+                .unwrap_or(CPP_MIRROR_TS);
+            blocks.push(CppBlock {
+                block_id,
+                commit_ts,
+            });
+        }
+        blocks.sort_by_key(|b| b.block_id);
+        let set = match out
+            .iter_mut()
+            .find(|s| s.db_id == db_id && s.table_id == table_id)
+        {
+            Some(set) => set,
+            None => {
+                out.push(CppSegmentSet {
+                    db_id: db_id.clone(),
+                    table_id: table_id.clone(),
+                    segments: Vec::new(),
+                });
+                out.last_mut().unwrap()
+            }
+        };
+        set.segments.push(CppSegment {
+            segment_id,
+            create_ts,
+            blocks,
+        });
+    }
+    for set in out.iter_mut() {
+        set.segments.sort_by_key(|s| s.segment_id);
+    }
+    out.sort_by(|a, b| (&a.db_id, &a.table_id).cmp(&(&b.db_id, &b.table_id)));
+    Ok(out)
+}
+
+/// Writes a table's segment layer: `catalog|seg|…`, `catalog|blk|…`, the
+/// segment's `first_delete_ts` tag, and the table's `next_segment_id` /
+/// `unsealed_segment_id` tags.
+///
+/// Nothing else in the catalog is touched, so a checkpoint can publish the
+/// blocks it just wrote without rewriting (and re-sweeping) the whole layout.
+/// The C++ reader derives a block's column files from the column ids and its
+/// row count from the block's `version` file (`ColumnMeta::FilePaths`,
+/// `GetBlockRowCount`), so there are no per-block column records to write.
+pub fn write_cpp_segments(store: &dyn MetaStore, set: &CppSegmentSet) -> Result<usize> {
+    let mut written = 0usize;
+    // A mirror rewrite can leave fewer blocks (or segments) than the previous
+    // one, so start from an empty segment layer for the table.
+    for prefix in [
+        key::catalog_segment_prefix(&set.db_id, &set.table_id),
+        format!("catalog|blk|{}|{}|", set.db_id, set.table_id),
+    ] {
+        for (k, _) in store.scan_prefix(prefix.as_bytes())? {
+            store.delete(&k)?;
+        }
+    }
+    for seg in &set.segments {
+        store.put(
+            key::catalog_segment_key(&set.db_id, &set.table_id, seg.segment_id).as_bytes(),
+            seg.create_ts.to_string().as_bytes(),
+        )?;
+        store.put(
+            key::catalog_segment_tag_key(
+                &set.db_id,
+                &set.table_id,
+                seg.segment_id,
+                "first_delete_ts",
+            )
+            .as_bytes(),
+            UNCOMMIT_TS.to_string().as_bytes(),
+        )?;
+        written += 2;
+        for block in &seg.blocks {
+            store.put(
+                key::catalog_block_key(&set.db_id, &set.table_id, seg.segment_id, block.block_id)
+                    .as_bytes(),
+                block.commit_ts.to_string().as_bytes(),
+            )?;
+            written += 1;
+        }
+    }
+    // `next_segment_id` is the next id to hand out; `unsealed_segment_id` is the
+    // segment the engine would still append to (`TableMeta::InitSet`,
+    // `table_meta_impl.cpp:274`; `unsealed_segment_id` is read by
+    // `NewTxn::AddSegment`).
+    let next = set
+        .segments
+        .iter()
+        .map(|s| s.segment_id + 1)
+        .max()
+        .unwrap_or(0);
+    let unsealed = set.segments.iter().map(|s| s.segment_id).max();
+    store.put(
+        key::catalog_table_tag_key(&set.db_id, &set.table_id, "next_segment_id").as_bytes(),
+        next.to_string().as_bytes(),
+    )?;
+    if let Some(unsealed) = unsealed {
+        store.put(
+            key::catalog_table_tag_key(&set.db_id, &set.table_id, "unsealed_segment_id").as_bytes(),
+            unsealed.to_string().as_bytes(),
+        )?;
+    }
+    written += 2;
+    Ok(written)
 }
 
 /// Maps a C++ index record onto the engine's `IndexMeta`, resolving the owning
@@ -1194,8 +1410,9 @@ mod tests {
                 .map(|v| String::from_utf8_lossy(&v).to_string()),
             Some((t.id + 1).to_string())
         );
+        // `default_db` is the first database, so its reference id is 1.
         assert!(!store
-            .scan_prefix(key::catalog_db_table_prefix("0").as_bytes())
+            .scan_prefix(key::catalog_db_table_prefix("1").as_bytes())
             .unwrap()
             .is_empty());
 
@@ -1382,11 +1599,12 @@ mod tests {
 
         // The `next_index_id` tag counts both indexes.
         let db = cat.list_databases().unwrap();
-        let db_id = db
+        let db_id = (db
             .iter()
             .position(|d| d == "default_db")
             .unwrap()
-            .to_string();
+            + 1)
+        .to_string();
         let tables = cat.list_tables().unwrap();
         let tbl_id = tables[0].id.to_string();
         assert_eq!(
