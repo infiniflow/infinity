@@ -11510,7 +11510,7 @@ impl Engine {
         }
         let default = match key.as_str() {
             "log_level" => "info",
-            "result_cache" => "on",
+            "result_cache" => "off",
             "cache_result_capacity" => "1024",
             "checkpoint_interval" => "0",
             "cleanup_interval" => "1000",
@@ -11539,9 +11539,13 @@ impl Engine {
 
     /// Whether new results are being cached (`off`/`suspend` disable it).
     fn result_cache_active(&self) -> bool {
+        // C++ `DEFAULT_RESULT_CACHE = "off"` (`default_values.cppm:211`): the
+        // result cache is opt-in, so an unset configuration means "do not
+        // cache". This port used to default to on, which made the engine cache
+        // results the reference would recompute.
         match self.context.config.lock().unwrap().get("result_cache") {
             Some(v) => !(v.eq_ignore_ascii_case("off") || v.eq_ignore_ascii_case("suspend")),
-            None => true,
+            None => false,
         }
     }
 
@@ -14929,14 +14933,24 @@ impl Engine {
     /// counters rather than a per-connection record.
     pub fn variables(&self, scope: Scope) -> Vec<(String, String)> {
         match scope {
-            Scope::Global => variables::ALL_GLOBAL_NAMES
-                .iter()
-                .filter_map(|name| {
-                    let var = variables::GlobalVariable::from_name(name)?;
-                    let value = self.global_variable_value(var).ok()?;
-                    Some(((*name).to_string(), value))
-                })
-                .collect(),
+            Scope::Global => {
+                // C++ `ExecuteShowGlobalVariables` breaks out of the
+                // `cache_result_capacity` arm when the cache is off
+                // (`physical_show_global_variables_impl.cpp:56-60`), so the row
+                // is absent rather than zero.
+                let skip_capacity = !self.result_cache_active();
+                variables::ALL_GLOBAL_NAMES
+                    .iter()
+                    .filter_map(|name| {
+                        if skip_capacity && name.eq_ignore_ascii_case("cache_result_capacity") {
+                            return None;
+                        }
+                        let var = variables::GlobalVariable::from_name(name)?;
+                        let value = self.global_variable_value(var).ok()?;
+                        Some(((*name).to_string(), value))
+                    })
+                    .collect()
+            }
             Scope::Session => variables::ALL_SESSION_NAMES
                 .iter()
                 .filter_map(|name| {

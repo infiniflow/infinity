@@ -154,7 +154,20 @@ fn variables_listing_covers_the_name_table() {
     let dir = tempdir().unwrap();
     let engine = Engine::open(dir.path()).unwrap();
     let listed = engine.variables(Scope::Global);
-    assert_eq!(listed.len(), crate::variables::ALL_GLOBAL_NAMES.len());
+    // `cache_result_capacity` is absent while the result cache is off, which
+    // is the reference's default (`DEFAULT_RESULT_CACHE = "off"`) and its
+    // `ExecuteShowGlobalVariables` behaviour.
+    let expected = crate::variables::ALL_GLOBAL_NAMES
+        .iter()
+        .filter(|name| !name.eq_ignore_ascii_case("cache_result_capacity"))
+        .collect::<Vec<_>>();
+    assert_eq!(listed.len(), expected.len());
+    assert!(
+        !listed
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("cache_result_capacity")),
+        "the capacity row belongs to an enabled cache"
+    );
     // The names are the reference's table, in its order, and every value is
     // the one the single-name accessor returns. The live counters (open fds,
     // RSS, cache hits, transactions) are skipped: sampling them twice cannot
@@ -170,9 +183,8 @@ fn variables_listing_covers_the_name_table() {
         "unused_buffer_object",
         "query_count",
     ];
-    for (listed_name, (name, value)) in crate::variables::ALL_GLOBAL_NAMES.iter().zip(listed.iter())
-    {
-        assert_eq!(listed_name, name);
+    for (listed_name, (name, value)) in expected.iter().zip(listed.iter()) {
+        assert_eq!(**listed_name, *name);
         assert!(!value.is_empty(), "{name} must have a value");
         if !VOLATILE.contains(&name.as_str()) {
             assert_eq!(*value, global(&engine, name), "{name}");
