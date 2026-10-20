@@ -107,6 +107,11 @@ def _snapshot(conn):
     ids = _ids(t.output(["id"]).to_result())
     out["first_ids"] = ids[:3]
     out["last_ids"] = ids[-3:]
+    # The row id the engine hands out: the SDK returns the system column under
+    # the name ROW_ID, whatever the query called it.
+    out["row_id"] = [
+        int(v) for v in t.output(["id", "_row_id"]).to_result()[0]["ROW_ID"]
+    ][:3]
     return out
 
 
@@ -127,15 +132,14 @@ def _catalog_snapshot(conn):
         "column_count": meta.column_count,
         "segment_count": meta.segment_count,
         # Names and the scalar types compare exactly. The SPARSE column's type
-        # text does not: both engines read the same stored bytes but decode the
+        # text does not: both engines read the same stored bytes but render the
         # sparse DataType differently (C++ prints `Sparse(float,int8,0)`, Rust
-        # `Sparse(float,int32,8)`) - a decoder divergence tracked in
-        # SIMPLIFICATION_AUDIT.md, not something to paper over by comparing the
-        # rendered string only when it happens to agree.
+        # `Sparse(float,int32,8)`) - a divergence tracked in
+        # SIMPLIFICATION_AUDIT.md. The element type is compared, because that is
+        # the part both engines agree on and the part the index is built from.
         "columns": [
-            (name, ty)
+            (name, ty if not ty.lower().startswith("sparse") else ty.split(",")[0])
             for name, ty in zip(cols["name"], cols["type"])
-            if not ty.lower().startswith("sparse")
         ],
     }
 
@@ -272,6 +276,7 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
         "title",
         "body",
         "vec",
+        "sp",
         "score",
     ], before["columns"]
     assert [c[1] for c in before["columns"]] == [
@@ -279,10 +284,12 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
         "Varchar",
         "Varchar",
         "Embedding(float,4)",
+        "Sparse(float",
         "Float",
     ], before["columns"]
     assert before["first_ids"] == [0, 1, 2], before["first_ids"]
     assert before["last_ids"] == [ROWS - 3, ROWS - 2, ROWS - 1], before["last_ids"]
+    assert before["row_id"] == [0, 1, 2], before["row_id"]
 
     # The handover is the directory as the first engine left it, redo log
     # included: the reference derives `checkpoint_ts` from a checkpoint entry in
