@@ -2000,16 +2000,19 @@ fn parse_value(cell: &str) -> Value {
     }
 }
 
-/// Sorts a posting list by row id and keeps the last frequency for repeated
-/// rows. An UPDATE appends the rewritten row's terms without removing the old
-/// entry (the old one must keep counting toward `df` until compaction), so the
-/// query path has to collapse the duplicate.
+/// Sorts a posting list by row id and collapses repeated rows, keeping the
+/// **first** entry of each row. An UPDATE appends the rewritten row's terms
+/// without removing the old entry (the old one must keep counting toward `df`
+/// until compaction), so the query path has to collapse the duplicate; the
+/// inputs are ordered newest source first (memory tail, spilled runs, sealed
+/// segments), so keeping the first entry keeps the current text.
 fn dedupe_postings(list: &mut Vec<(u64, u32)>) {
-    list.sort_unstable_by_key(|(row, _)| *row);
+    // A stable sort: within one row the incoming order (newest first) survives.
+    list.sort_by_key(|(row, _)| *row);
     let mut out: Vec<(u64, u32)> = Vec::with_capacity(list.len());
     for (row, tf) in list.drain(..) {
-        match out.last_mut() {
-            Some((last, last_tf)) if *last == row => *last_tf = tf,
+        match out.last() {
+            Some((last, _)) if *last == row => {}
             _ => out.push((row, tf)),
         }
     }
@@ -2035,6 +2038,57 @@ fn dedupe_posting_entries(list: &mut Vec<(u64, u32, Vec<u32>)>) {
     *list = out;
 }
 
+/// Removes a spill run's transient segment files.
+fn remove_run_files(dir: &str, base_name: &str) {
+    for suffix in [
+        infinity_storage::inverted_format::FULLTEXT_DICT_SUFFIX,
+        infinity_storage::inverted_format::FULLTEXT_POSTING_SUFFIX,
+        infinity_storage::inverted_format::FULLTEXT_LENGTH_SUFFIX,
+        infinity_storage::fulltext_segment::FULLTEXT_ROW_SUFFIX,
+    ] {
+        let _ = std::fs::remove_file(infinity_storage::inverted_format::fulltext_chunk_file(
+            dir, base_name, suffix,
+        ));
+    }
+}
+
+/// One spilled sorted run: the memory tail written as the regular segment file
+/// family under a transient base name, then read back through a
+/// [`infinity_storage::fulltext_segment::SegmentIndexReader`].
+///
+/// C++: one run of the spill file `MemoryIndexer::CommitOffline` appends
+/// (`ColumnInverter::SpillSortResults`, `memory_indexer_impl.cpp:406-412`).
+/// The port writes a whole sorted run at a time through the sealed-segment
+/// writer, so a run carries its position lists as well and `SortMerger` has
+/// nothing to re-sort — only lists from different runs to merge.
+struct SpilledRun {
+    /// Monotonic run id: a later run holds the newer copy of a re-inserted row.
+    id: u64,
+    /// Directory holding the run's files, for cleanup.
+    dir: String,
+    /// Base name of the run's `.dic` / `.pos` / `.len` / `.row` files.
+    base_name: String,
+    /// `(row id, length)` ascending, for document lengths and counts.
+    docs: Vec<(u64, u32)>,
+    /// Sum of the run's document lengths.
+    total_len: u64,
+    /// The run's postings, decoded per term on demand.
+    reader: infinity_storage::fulltext_segment::SegmentIndexReader,
+}
+
+impl SpilledRun {
+    fn doc_len(&self, row: u64) -> Option<u32> {
+        self.docs
+            .binary_search_by_key(&row, |(r, _)| *r)
+            .ok()
+            .map(|i| self.docs[i].1)
+    }
+
+    fn remove(&self) {
+        remove_run_files(&self.dir, &self.base_name);
+    }
+}
+
 /// The reference's memory indexer: the **unsealed** segment of one text
 /// column, holding `term -> [(doc, tf, positions)]`, each document's length
 /// and the corpus statistics.
@@ -2050,11 +2104,28 @@ struct MemoryIndexer {
     total_len: u64,
     /// Approximate bytes held by this segment, for the memindex budget.
     bytes: usize,
+    /// The sorted runs the tail was spilled into, oldest first. Their postings
+    /// stay on disk and are read on demand, so a column that outgrows the
+    /// budget keeps indexing instead of going dark.
+    runs: Vec<SpilledRun>,
+    /// Id of the next spill file; monotonic, so a later run sorts after an
+    /// earlier one even when the tail holds fewer documents.
+    next_run_id: u64,
+    /// `row -> id of the newest run holding its current text`, only for rows
+    /// that were re-inserted after they were spilled (an UPDATE rewrites the
+    /// row id). [`IN_TAIL`] means the current copy sits in the memory tail.
+    /// Entries from an older run are stale and are skipped, which is how an
+    /// out-of-order re-insert (`InsertGap`) keeps the runs consistent.
+    newest: HashMap<u64, u64>,
     /// A spilled segment loaded back from disk (`MemoryIndexer::Load`). Its
     /// postings are read on demand: the on-disk form stores frequencies but no
     /// position lists (see `fulltext_segment`'s module docs).
     spilled: Option<infinity_storage::fulltext_segment::SegmentIndexReader>,
 }
+
+/// [`MemoryIndexer::newest`] marker: the row's current copy is in the memory
+/// tail, so every spilled run holds a stale one.
+const IN_TAIL: u64 = u64::MAX;
 
 impl MemoryIndexer {
     fn new() -> Self {
@@ -2082,6 +2153,11 @@ impl MemoryIndexer {
         }
         self.total_len += toks.len() as u64;
         self.live.insert(seq);
+        // A row that is rewritten after it was spilled leaves a stale copy in
+        // an older run; mark the tail as its current source.
+        if !self.runs.is_empty() && self.run_containing(seq).is_some() {
+            self.newest.insert(seq, IN_TAIL);
+        }
         let mut pos: HashMap<&str, Vec<u32>> = HashMap::new();
         for (term, at) in &toks {
             pos.entry(term.as_str()).or_default().push(*at);
@@ -2102,42 +2178,83 @@ impl MemoryIndexer {
         self.live.remove(&seq);
     }
 
-    /// C++: `GetDocCount`.
+    /// C++: `GetDocCount` of the resident tail. The spilled runs are counted by
+    /// [`Self::pending_docs`], because the segment they will be merged into has
+    /// not been written yet.
+    #[allow(dead_code)] // the unit tests read the tail's count
     fn doc_count(&self) -> usize {
         self.n_docs
     }
 
-    /// C++: `MemUsed`.
+    /// Documents the next sealed segment will hold: the tail plus every run.
+    fn pending_docs(&self) -> usize {
+        self.n_docs + self.runs.iter().map(|run| run.docs.len()).sum::<usize>()
+    }
+
+    /// Token count the next sealed segment will hold.
+    fn pending_len(&self) -> u64 {
+        self.total_len + self.runs.iter().map(|run| run.total_len).sum::<u64>()
+    }
+
+    /// C++: `MemUsed` — the resident bytes, i.e. the tail's. The runs live on
+    /// disk, so they do not count against the budget.
     fn mem_used(&self) -> usize {
         self.bytes
     }
 
-    fn is_empty(&self) -> bool {
-        self.docs.is_empty()
-    }
-
-    /// Drops the segment (the budget-exhausted path and `Reset`).
-    fn reset(&mut self) {
+    /// Drops the tail, keeping the spilled runs.
+    fn clear_tail(&mut self) {
         self.postings.clear();
         self.postings.shrink_to_fit();
         self.docs.clear();
         self.live.clear();
-        self.spilled = None;
         self.bytes = 0;
         self.n_docs = 0;
         self.total_len = 0;
     }
 
-    /// C++: `MemoryIndexer::Dump(false, spill)` — writes the segment as the
-    /// C++ file family ([`infinity_storage::fulltext_segment::write_segment_index`]).
-    /// Positions travel with each posting (`.pos`), so a sealed segment can
-    /// answer phrase queries.
-    #[allow(dead_code)] // the product spill path; exercised by `memory_indexer_ut`.
-    fn dump(&self, dir: &str, base_name: &str) -> bool {
-        if self.docs.is_empty() {
-            return false;
+    /// C++: `MemoryIndexer::Reset` — drops the segment and its spill files.
+    fn reset(&mut self) {
+        self.clear_tail();
+        self.spilled = None;
+        self.newest.clear();
+        for run in self.runs.drain(..) {
+            run.remove();
         }
-        let base_row_id = self.docs.keys().copied().min().unwrap_or(0);
+    }
+
+    /// The newest run whose documents include `row`, if any. Runs only hold the
+    /// rows written since the previous spill, so this is looked up only when the
+    /// column has spilled at all (a handful of runs in practice).
+    fn run_containing(&self, row: u64) -> Option<u64> {
+        self.runs
+            .iter()
+            .rev()
+            .find(|run| run.doc_len(row).is_some())
+            .map(|run| run.id)
+    }
+
+    /// `false` when a newer source already holds `row`'s current text, i.e. the
+    /// run's entry is a stale copy of a re-inserted document.
+    fn run_entry_is_current(&self, run_id: u64, row: u64) -> bool {
+        match self.newest.get(&row) {
+            Some(newest) => *newest <= run_id && *newest != IN_TAIL,
+            None => true,
+        }
+    }
+
+    /// The tail as the segment writer wants it: documents by row id and the
+    /// postings by term, a re-inserted row collapsed to one entry.
+    #[allow(clippy::type_complexity)]
+    fn segment_payload(
+        &self,
+    ) -> Option<(
+        Vec<(u64, u32)>,
+        std::collections::BTreeMap<String, Vec<infinity_storage::fulltext_segment::PostingEntry>>,
+    )> {
+        if self.docs.is_empty() {
+            return None;
+        }
         let mut docs: Vec<(u64, u32)> = self.docs.iter().map(|(row, len)| (*row, *len)).collect();
         docs.sort_unstable_by_key(|(row, _)| *row);
         let mut postings: std::collections::BTreeMap<
@@ -2152,38 +2269,244 @@ impl MemoryIndexer {
             dedupe_posting_entries(&mut hits);
             postings.insert(term.clone(), hits);
         }
+        Some((docs, postings))
+    }
+
+    /// C++: the spill half of `MemoryIndexer::Dump` (`Dump(false, spill = true)`)
+    /// and `CommitOffline` — writes the resident tail as one sorted run under a
+    /// transient base name and resets the budget accounting, so indexing
+    /// continues past the budget instead of stopping.
+    ///
+    /// Returns `false`, leaving the tail untouched, when the run cannot be
+    /// written (no directory, disk error): the caller then keeps the documents
+    /// in memory rather than lose them.
+    fn spill(&mut self, dir: &str) -> bool {
+        let Some((docs, postings)) = self.segment_payload() else {
+            return false;
+        };
+        let total_len: u64 = docs.iter().map(|(_, len)| u64::from(*len)).sum();
+        let base_row_id = docs[0].0;
+        let base_name = format!(
+            "spill_{:08x}{}",
+            self.next_run_id,
+            infinity_storage::inverted_format::FULLTEXT_SPILL_SUFFIX
+        );
+        let flags = infinity_storage::inverted_format::TermMetaFlags::default();
+        if infinity_storage::fulltext_segment::write_segment_index(
+            dir,
+            &base_name,
+            base_row_id,
+            &docs,
+            &postings,
+            flags,
+        )
+        .is_err()
+        {
+            return false;
+        }
+        let Ok(reader) = infinity_storage::fulltext_segment::SegmentIndexReader::open(
+            dir,
+            &base_name,
+            base_row_id,
+            flags,
+        ) else {
+            remove_run_files(dir, &base_name);
+            return false;
+        };
+        let run_id = self.next_run_id;
+        self.runs.push(SpilledRun {
+            id: run_id,
+            dir: dir.to_string(),
+            base_name,
+            docs,
+            total_len,
+            reader,
+        });
+        self.next_run_id += 1;
+        // The rows that were waiting for a newer copy have one now: this run.
+        let spilled: Vec<u64> = self
+            .runs
+            .last()
+            .map(|run| run.docs.iter().map(|(row, _)| *row).collect())
+            .unwrap_or_default();
+        for row in spilled {
+            if self.newest.contains_key(&row) {
+                self.newest.insert(row, run_id);
+            }
+        }
+        self.clear_tail();
+        true
+    }
+
+    /// One term's `(row, tf, positions)` list out of a sealed segment or a
+    /// spill run, positions included (`Lookup(term, fetch_position = true)`).
+    ///
+    /// `positions` already decodes the document list to delimit each document's
+    /// occurrences, so its length *is* the term frequency and the second lookup
+    /// is only needed for a term written without a position list.
+    fn reader_posting_entries(
+        reader: &infinity_storage::fulltext_segment::SegmentIndexReader,
+        term: &str,
+    ) -> Option<Vec<infinity_storage::fulltext_segment::PostingEntry>> {
+        if let Ok(Some(list)) = reader.positions(term) {
+            if !list.is_empty() {
+                return Some(
+                    list.into_iter()
+                        .map(|(row, positions)| (row, positions.len() as u32, positions))
+                        .collect(),
+                );
+            }
+        }
+        let hits = reader.postings(term).ok()?;
+        if hits.is_empty() {
+            return None;
+        }
+        Some(
+            hits.into_iter()
+                .map(|(row, tf)| (row, tf, Vec::new()))
+                .collect(),
+        )
+    }
+
+    /// C++: `SortMerger` (`OfflineDump`, `memory_indexer_impl.cpp:792-812`) —
+    /// merges the spilled runs and the resident tail (plus a `Load`ed spill
+    /// segment) into one sorted posting stream, which is what the seal path
+    /// writes into the segment.
+    ///
+    /// Sources are ranked oldest to newest and a re-inserted row keeps only its
+    /// newest entry, so a row that was spilled and then rewritten ends up with
+    /// exactly one posting list (the `InsertGap` case: an out-of-order or
+    /// re-inserted document must not leave a stale copy in a run).
+    #[allow(clippy::type_complexity)]
+    fn merged_segment(
+        &self,
+    ) -> Option<(
+        Vec<(u64, u32)>,
+        std::collections::BTreeMap<String, Vec<infinity_storage::fulltext_segment::PostingEntry>>,
+    )> {
+        if self.docs.is_empty() && self.runs.is_empty() && self.spilled.is_none() {
+            return None;
+        }
+        // Document lengths, oldest source first so the newest write wins.
+        let mut lengths: std::collections::BTreeMap<u64, u32> = std::collections::BTreeMap::new();
         if let Some(reader) = &self.spilled {
-            if let Ok(terms) = reader.terms() {
-                for term in terms {
-                    if postings.contains_key(&term) {
-                        continue;
-                    }
-                    if let Ok(hits) = reader.postings(&term) {
-                        // The reader exposes positions separately
-                        // (`Lookup(term, fetch_position = true)`), so a spilled
-                        // segment keeps them when it is merged into the dump.
-                        let mut by_row: std::collections::HashMap<u64, Vec<u32>> = reader
-                            .positions(&term)
-                            .ok()
-                            .flatten()
-                            .map(|list| list.into_iter().collect())
-                            .unwrap_or_default();
-                        let mut with_positions: Vec<
-                            infinity_storage::fulltext_segment::PostingEntry,
-                        > = hits
-                            .into_iter()
-                            .map(|(row, tf)| (row, tf, by_row.remove(&row).unwrap_or_default()))
-                            .collect();
-                        dedupe_posting_entries(&mut with_positions);
-                        postings.insert(term, with_positions);
-                    }
+            for row in reader.rows() {
+                if let Some(len) = reader.doc_len_of_row(*row) {
+                    lengths.insert(*row, len);
                 }
             }
+        }
+        for run in &self.runs {
+            lengths.extend(run.docs.iter().copied());
+        }
+        lengths.extend(self.docs.iter().map(|(row, len)| (*row, *len)));
+        let docs: Vec<(u64, u32)> = lengths.into_iter().collect();
+
+        // `spilled` (a `Load`ed dump) is the oldest source, then the runs in
+        // creation order, then the tail. Each source's dictionary is walked
+        // once, so every term is decoded at most once per source.
+        let tail_rank = self.runs.len() as u32 + 1;
+        let mut entries_by_term: std::collections::BTreeMap<String, Vec<SourcedEntry>> =
+            std::collections::BTreeMap::new();
+        if let Some(reader) = &self.spilled {
+            for term in reader.terms().unwrap_or_default() {
+                if let Some(hits) = Self::reader_posting_entries(reader, &term) {
+                    entries_by_term
+                        .entry(term)
+                        .or_default()
+                        .extend(hits.into_iter().map(|(row, tf, pos)| (0, row, tf, pos)));
+                }
+            }
+        }
+        for (i, run) in self.runs.iter().enumerate() {
+            let rank = i as u32 + 1;
+            for term in run.reader.terms().unwrap_or_default() {
+                let Some(hits) = Self::reader_posting_entries(&run.reader, &term) else {
+                    continue;
+                };
+                let current: Vec<SourcedEntry> = hits
+                    .into_iter()
+                    // A re-inserted row's older copy is a stale posting: the
+                    // segment must hold exactly one list per document.
+                    .filter(|(row, _, _)| self.run_entry_is_current(run.id, *row))
+                    .map(|(row, tf, pos)| (rank, row, tf, pos))
+                    .collect();
+                if !current.is_empty() {
+                    entries_by_term.entry(term).or_default().extend(current);
+                }
+            }
+        }
+        for (term, list) in &self.postings {
+            entries_by_term.entry(term.clone()).or_default().extend(
+                list.iter()
+                    .map(|(row, tf, pos)| (tail_rank, *row, *tf, pos.clone())),
+            );
+        }
+
+        let mut postings: std::collections::BTreeMap<
+            String,
+            Vec<infinity_storage::fulltext_segment::PostingEntry>,
+        > = std::collections::BTreeMap::new();
+        for (term, entries) in entries_by_term {
+            if !entries.is_empty() {
+                postings.insert(term, dedupe_sourced_entries(entries));
+            }
+        }
+        Some((docs, postings))
+    }
+
+    /// C++: `GetColumnLength` for the unsealed segment — the tail wins over the
+    /// runs, the runs over each other newest first, and a stale copy of a
+    /// re-inserted row is ignored.
+    fn doc_len_of(&self, row: u64) -> Option<u32> {
+        if let Some(len) = self.docs.get(&row) {
+            return Some(*len);
+        }
+        self.runs
+            .iter()
+            .rev()
+            .filter(|run| self.run_entry_is_current(run.id, row))
+            .find_map(|run| run.doc_len(row))
+    }
+
+    /// The term's `(row, tf)` list from the unsealed segment, newest source
+    /// first: the tail, then the runs from the newest to the oldest. A stale
+    /// copy in an older run is dropped, so a term that only lived in the old
+    /// text of a re-inserted row disappears.
+    fn postings_newest_first(&self, term: &str) -> Vec<(u64, u32)> {
+        let mut hits: Vec<(u64, u32)> = self
+            .postings
+            .get(term)
+            .map(|list| list.iter().map(|(row, tf, _)| (*row, *tf)).collect())
+            .unwrap_or_default();
+        for run in self.runs.iter().rev() {
+            let Ok(list) = run.reader.postings(term) else {
+                continue;
+            };
+            hits.extend(
+                list.into_iter()
+                    .filter(|(row, _)| self.run_entry_is_current(run.id, *row)),
+            );
+        }
+        hits
+    }
+
+    /// C++: `MemoryIndexer::Dump(false, spill)` — writes the segment as the
+    /// C++ file family ([`infinity_storage::fulltext_segment::write_segment_index`]).
+    /// Positions travel with each posting (`.pos`), so a sealed segment can
+    /// answer phrase queries. The spilled runs are merged in first.
+    #[allow(dead_code)] // the product spill path; exercised by `memory_indexer_ut`.
+    fn dump(&self, dir: &str, base_name: &str) -> bool {
+        let Some((docs, postings)) = self.merged_segment() else {
+            return false;
+        };
+        if docs.is_empty() {
+            return false;
         }
         infinity_storage::fulltext_segment::write_segment_index(
             dir,
             base_name,
-            base_row_id,
+            docs[0].0,
             &docs,
             &postings,
             infinity_storage::inverted_format::TermMetaFlags::default(),
@@ -2217,18 +2540,15 @@ impl MemoryIndexer {
     }
 
     /// C++: `InMemIndexSegmentReader::GetSegmentPosting` — the term's
-    /// `(row id, term frequency)` list from the spilled reader and/or the
-    /// in-memory postings (a re-inserted row wins over its spilled copy).
+    /// `(row id, term frequency)` list from the in-memory tail, the spill runs
+    /// and/or the loaded reader (a re-inserted row wins over its older copies).
     #[allow(dead_code)] // `InMemIndexSegmentReader`; exercised by `memory_indexer_ut`.
     fn segment_posting(&self, term: &str) -> Option<Vec<(u64, u32)>> {
-        let mut hits: Vec<(u64, u32)> = Vec::new();
+        let mut hits: Vec<(u64, u32)> = self.postings_newest_first(term);
         if let Some(reader) = &self.spilled {
             if let Ok(mut list) = reader.postings(term) {
                 hits.append(&mut list);
             }
-        }
-        if let Some(list) = self.postings.get(term) {
-            hits.extend(list.iter().map(|(row, tf, _)| (*row, *tf)));
         }
         if hits.is_empty() {
             return None;
@@ -2236,6 +2556,42 @@ impl MemoryIndexer {
         dedupe_postings(&mut hits);
         Some(hits)
     }
+}
+
+/// One posting entry tagged with the source that produced it: `(source rank,
+/// row id, term frequency, positions)`. A higher rank is newer.
+type SourcedEntry = (u32, u64, u32, Vec<u32>);
+
+/// Merges one term's entries from several sources: for a re-inserted row the
+/// entry with the highest source rank wins (the newest spill run, or the
+/// in-memory tail), so a stale copy in an older run is dropped. Entries from
+/// the same source keep the [`dedupe_posting_entries`] rule (last frequency,
+/// union of the positions), which is what a duplicate inside one tail means.
+fn dedupe_sourced_entries(
+    mut entries: Vec<SourcedEntry>,
+) -> Vec<infinity_storage::fulltext_segment::PostingEntry> {
+    entries.sort_by_key(|(rank, row, _, _)| (*row, *rank));
+    let mut out: Vec<SourcedEntry> = Vec::with_capacity(entries.len());
+    for (rank, row, tf, mut positions) in entries {
+        match out.last_mut() {
+            Some((last_rank, last_row, last_tf, last_positions)) if *last_row == row => {
+                if rank > *last_rank {
+                    *last_rank = rank;
+                    *last_tf = tf;
+                    *last_positions = positions;
+                } else {
+                    *last_tf = tf;
+                    last_positions.append(&mut positions);
+                    last_positions.sort_unstable();
+                    last_positions.dedup();
+                }
+            }
+            _ => out.push((rank, row, tf, positions)),
+        }
+    }
+    out.into_iter()
+        .map(|(_, row, tf, positions)| (row, tf, positions))
+        .collect()
 }
 
 /// How a full-text column's documents and queries are tokenised: the legacy
@@ -2285,9 +2641,13 @@ impl TextTokenizer {
 /// C++: the `MemoryIndexer` + `IndexSegmentReader` pair held by a column.
 struct TextIndex {
     tokenizer: TextTokenizer,
-    /// The unsealed segment.
+    /// The unsealed segment: the memory tail plus the spill runs it was
+    /// written to when the budget was reached.
     mem: MemoryIndexer,
-    disabled: bool,
+    /// Bytes the memory tail may hold before it is spilled to a sorted run.
+    /// `TEXT_INDEX_BUDGET_BYTES` in production; the tests lower it so a handful
+    /// of documents crosses it.
+    budget: usize,
     /// The sealed segments, oldest first: each owns one on-disk index
     /// (`.dic`, `.pos`, `.len`) exactly like the reference's per-segment
     /// indexes.
@@ -2373,43 +2733,32 @@ impl TextIndex {
         Self {
             tokenizer,
             mem: MemoryIndexer::new(),
-            disabled: false,
+            budget: TEXT_INDEX_BUDGET_BYTES,
             reader: ColumnIndexReader::default(),
             dir,
             overridden: Default::default(),
         }
     }
 
-    /// Documents in the column across the sealed segments and the memory tail.
+    /// Documents in the column across the sealed segments and the unsealed
+    /// segment (the memory tail plus its spill runs).
     fn total_docs(&self) -> usize {
-        self.mem.doc_count() + self.reader.doc_count()
+        self.mem.pending_docs() + self.reader.doc_count()
     }
 
     /// Writes the current (unsealed) segment's index to disk and clears the
-    /// in-memory postings. Returns `false` (leaving everything in memory) if the
-    /// files cannot be written, so a failure never loses results.
+    /// in-memory postings. The spill runs are merged into the segment first.
+    /// Returns `false` (leaving everything in memory) if the files cannot be
+    /// written, so a failure never loses results.
     fn seal(&mut self) -> bool {
-        if self.mem.is_empty() {
+        let Some((docs, postings)) = self.mem.merged_segment() else {
+            return false;
+        };
+        if docs.is_empty() {
             return false;
         }
-        let base_row_id = match self.mem.docs.keys().min() {
-            Some(&row) => row,
-            None => return false,
-        };
-        let mut docs: Vec<(u64, u32)> = self.mem.docs.iter().map(|(d, l)| (*d, *l)).collect();
-        docs.sort_unstable_by_key(|(d, _)| *d);
-        let mut postings: std::collections::BTreeMap<
-            String,
-            Vec<infinity_storage::fulltext_segment::PostingEntry>,
-        > = std::collections::BTreeMap::new();
-        for (term, list) in &self.mem.postings {
-            let mut hits: Vec<infinity_storage::fulltext_segment::PostingEntry> = list
-                .iter()
-                .map(|(d, tf, pos)| (*d, *tf, pos.clone()))
-                .collect();
-            dedupe_posting_entries(&mut hits);
-            postings.insert(term.clone(), hits);
-        }
+        let base_row_id = docs[0].0;
+        let total_len = self.mem.pending_len();
         let base_name = format!("ft_{base_row_id:016x}");
         let flags = infinity_storage::inverted_format::TermMetaFlags::default();
         if infinity_storage::fulltext_segment::write_segment_index(
@@ -2432,45 +2781,52 @@ impl TextIndex {
         ) else {
             return false;
         };
+        // The new segment now carries the current text of every row it holds,
+        // so those rows are no longer shadowed by an older sealed copy.
+        for (row, _) in &docs {
+            self.overridden.remove(row);
+        }
         self.reader.segments.push(SealedSegment {
             docs: docs.len() as u32,
-            total_len: self.mem.total_len,
+            total_len,
             reader,
         });
         self.mem.reset();
         true
     }
 
-    /// Seals once the unsealed segment reaches its size budget or the
-    /// configured `mem_index_capacity` row count.
+    /// Seals once the unsealed segment (runs included) reaches its size budget
+    /// or the configured `mem_index_capacity` row count.
     fn maybe_seal(&mut self, capacity: usize) {
         if self.mem.mem_used() >= text_segment_bytes()
-            || (capacity > 0 && self.mem.doc_count() >= capacity)
+            || (capacity > 0 && self.mem.pending_docs() >= capacity)
         {
             self.seal();
         }
     }
 
     /// Postings and corpus statistics for `terms`, merging every sealed segment
-    /// with the memory tail. Stale copies of re-indexed rows are dropped.
+    /// with the unsealed one. Stale copies of re-indexed rows are dropped.
     fn merge(&self, terms: &[String]) -> MergedIndex {
-        let n_docs = self.mem.n_docs + self.reader.doc_count();
-        let total_len = self.mem.total_len + self.reader.total_len();
+        let n_docs = self.mem.pending_docs() + self.reader.doc_count();
+        let total_len = self.mem.pending_len() + self.reader.total_len();
         let mut postings: HashMap<String, Vec<(u64, u32)>> = HashMap::new();
         let mut doc_len: HashMap<u64, u32> = HashMap::new();
         for term in terms {
-            let mut list: Vec<(u64, u32)> = self
-                .mem
-                .postings
-                .get(term)
-                .map(|l| l.iter().map(|(d, tf, _)| (*d, *tf)).collect())
-                .unwrap_or_default();
-            list.append(&mut self.reader.postings(term));
-            list.retain(|(d, _)| !self.overridden.contains(d));
+            let mut list = self.mem.postings_newest_first(term);
+            // A re-indexed row's *sealed* copy is stale, but the copy in the
+            // unsealed segment is the current text: only the sealed one is
+            // dropped (the memory index already resolved its own duplicates).
+            list.extend(
+                self.reader
+                    .postings(term)
+                    .into_iter()
+                    .filter(|(d, _)| !self.overridden.contains(d)),
+            );
             dedupe_postings(&mut list);
             for (d, _) in &list {
-                if let Some(l) = self.mem.docs.get(d) {
-                    doc_len.insert(*d, *l);
+                if let Some(l) = self.mem.doc_len_of(*d) {
+                    doc_len.insert(*d, l);
                     continue;
                 }
                 let dl = self.reader.doc_len(*d).unwrap_or(1);
@@ -3946,19 +4302,24 @@ fn index_key(table: &str, column: &str) -> String {
 }
 
 /// Indexes one document's tokens: length plus `(doc, tf, positions)` postings.
+///
+/// C++: `MemoryIndexer::Insert` followed by the spill `CommitOffline` performs
+/// when a batch fills the memory budget. A column that outgrows the budget is
+/// spilled to a sorted run and **keeps indexing**: it never goes dark, so a
+/// query can always answer from the postings instead of re-tokenising rows.
 fn index_row(index: &mut TextIndex, seq: u64, text: &str) {
-    if index.disabled {
+    let budget = index.budget;
+    if index.mem.insert(seq, text, &index.tokenizer, budget) {
         return;
     }
-    // `MemoryIndexer::Insert` fails when the segment would exceed the budget;
-    // the reference would spill, the port stops indexing this column.
-    if !index
-        .mem
-        .insert(seq, text, &index.tokenizer, TEXT_INDEX_BUDGET_BYTES)
-    {
-        index.mem.reset();
-        index.disabled = true;
+    if index.mem.spill(&index.dir) && index.mem.insert(seq, text, &index.tokenizer, budget) {
+        return;
     }
+    // Either the run could not be written (no directory, disk error) or this
+    // single document is larger than the whole budget. Dropping it would
+    // silently lose results, so keep it in memory past the budget; the seal
+    // path still writes it.
+    index.mem.insert(seq, text, &index.tokenizer, usize::MAX);
 }
 
 /// Marks a document deleted. Its postings and length stay: the reference's

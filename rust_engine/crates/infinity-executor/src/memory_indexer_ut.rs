@@ -3,9 +3,18 @@
 //! `SpillLoadTest` indexes five paragraphs, dumps the segment, loads it into a
 //! fresh `MemoryIndexer` and checks the three reference postings through a
 //! `PostingIterator`.
+//!
+//! The rest of the file covers the audit's item 13: the memory indexer used to
+//! *stop indexing* a column once its byte budget was reached (`index_row` reset
+//! the segment and set `disabled`). It now spills the resident tail to a sorted
+//! run and keeps going (`MemoryIndexer::Insert` → `Spill` in the reference), and
+//! the seal path merges the runs (`SortMerger`) before writing the segment.
 
-use crate::{MemoryIndexer, TextTokenizer};
-use infinity_storage::fulltext_segment::PostingIterator;
+use crate::{index_row, Engine, MemoryIndexer, QueryResult, TextIndex, TextTokenizer};
+use infinity_storage::fulltext_segment::{PostingIterator, SegmentIndexReader};
+use infinity_storage::inverted_format::{TermMetaFlags, FULLTEXT_SPILL_SUFFIX};
+use std::collections::BTreeMap;
+use std::path::Path;
 use tempfile::tempdir;
 
 /// `MemoryIndexerTest::SpillLoadTest`.
@@ -45,4 +54,262 @@ fn spill_load_test() {
             assert_eq!(iter.current_tf(), *tf, "term {term} doc {doc}");
         }
     }
+}
+
+/// Files under `dir`, keyed by file name: the sealed segment's bytes.
+fn segment_bytes(dir: &Path) -> BTreeMap<String, Vec<u8>> {
+    let mut out = BTreeMap::new();
+    for entry in std::fs::read_dir(dir).unwrap().flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            out.insert(name, std::fs::read(&path).unwrap());
+        }
+    }
+    out
+}
+
+/// The rows of a `SELECT count(*)`.
+fn count_rows(e: &Engine, sql: &str) -> usize {
+    for r in e.execute(sql).unwrap() {
+        if let QueryResult::Rows { rows, .. } = r {
+            return rows[0][0].parse().unwrap();
+        }
+    }
+    panic!("no rows for {sql}");
+}
+
+/// Audit item 13: crossing `TEXT_INDEX_BUDGET_BYTES` used to reset the segment
+/// and set `disabled`, so the column stopped being indexed for the rest of the
+/// process and every later query fell back to re-tokenising rows. The tail is
+/// now spilled to a sorted run and the budget resets.
+#[test]
+fn an_index_that_exceeds_its_budget_keeps_indexing() {
+    let dir = tempdir().unwrap();
+    let dir_str = dir.path().to_string_lossy().into_owned();
+    let mut index = TextIndex::new(dir_str, TextTokenizer::default());
+    // A budget a couple of documents wide, so the column crosses it repeatedly.
+    index.budget = 256;
+    for row in 0..40u64 {
+        index_row(&mut index, row, "alpha beta gamma delta epsilon");
+    }
+    assert!(
+        !index.mem.runs.is_empty(),
+        "the column must spill instead of stopping"
+    );
+
+    // A term that only appears after the budget was crossed.
+    index_row(&mut index, 100, "zebrafish");
+    let merged = index.merge(&["zebrafish".to_string(), "alpha".to_string()]);
+    assert_eq!(merged.postings["zebrafish"], vec![(100, 1)]);
+    assert_eq!(merged.postings["alpha"].len(), 40);
+    // Every document is still in the unsealed segment, and the resident tail
+    // stays around the budget: the rest is on disk.
+    assert_eq!(index.total_docs(), 41);
+    assert!(
+        index.mem.mem_used() <= index.budget + 256,
+        "tail held {} bytes for a {}-byte budget",
+        index.mem.mem_used(),
+        index.budget
+    );
+}
+
+/// Two spills, then a seal: the runs are merged into one posting stream in
+/// doc-id order, with each document's tf and positions. The sealed segment is
+/// byte for byte what a single big budget produces.
+#[test]
+fn spilled_runs_merge_in_doc_id_order() {
+    let texts: Vec<String> = (0..40u64)
+        .map(|row| match row % 3 {
+            0 => "shared alpha shared beta".to_string(),
+            1 => "gamma shared".to_string(),
+            _ => "shared delta shared echo shared".to_string(),
+        })
+        .collect();
+
+    let spill_dir = tempdir().unwrap();
+    let mut spilled = TextIndex::new(
+        spill_dir.path().to_string_lossy().into_owned(),
+        TextTokenizer::default(),
+    );
+    spilled.budget = 160;
+    for (row, text) in texts.iter().enumerate() {
+        index_row(&mut spilled, row as u64, text);
+    }
+    assert!(
+        spilled.mem.runs.len() >= 2,
+        "expected at least two spills, got {}",
+        spilled.mem.runs.len()
+    );
+    assert!(spilled.seal());
+
+    let whole_dir = tempdir().unwrap();
+    let mut whole = TextIndex::new(
+        whole_dir.path().to_string_lossy().into_owned(),
+        TextTokenizer::default(),
+    );
+    whole.budget = usize::MAX;
+    for (row, text) in texts.iter().enumerate() {
+        index_row(&mut whole, row as u64, text);
+    }
+    assert!(whole.mem.runs.is_empty());
+    assert!(whole.seal());
+
+    assert_eq!(
+        segment_bytes(spill_dir.path()),
+        segment_bytes(whole_dir.path()),
+        "the merged runs must produce the same sealed segment"
+    );
+
+    let reader = SegmentIndexReader::open(
+        spill_dir.path().to_str().unwrap(),
+        "ft_0000000000000000",
+        0,
+        TermMetaFlags::default(),
+    )
+    .unwrap();
+    let expected: Vec<(u64, u32)> = (0..40u64)
+        .map(|row| {
+            (
+                row,
+                match row % 3 {
+                    0 => 2,
+                    1 => 1,
+                    _ => 3,
+                },
+            )
+        })
+        .collect();
+    assert_eq!(reader.postings("shared").unwrap(), expected);
+    let positions = reader.positions("shared").unwrap().unwrap();
+    assert_eq!(
+        positions.iter().map(|(row, _)| *row).collect::<Vec<_>>(),
+        (0..40u64).collect::<Vec<_>>()
+    );
+    assert_eq!(positions[0], (0, vec![0, 2]));
+    assert_eq!(positions[1], (1, vec![1]));
+    assert_eq!(positions[2], (2, vec![0, 2, 4]));
+}
+
+/// The `InsertGap` case: a document id at or below the run's maximum arrives
+/// again. The seal must reflect the *new* text only, not the copy the run holds.
+#[test]
+fn a_reinserted_doc_does_not_corrupt_a_spilled_run() {
+    let dir = tempdir().unwrap();
+    let dir_str = dir.path().to_string_lossy().into_owned();
+    let mut index = TextIndex::new(dir_str.clone(), TextTokenizer::default());
+    index.budget = usize::MAX; // spill by hand, so the run is deterministic
+    index_row(&mut index, 5, "alpha beta");
+    index_row(&mut index, 6, "filler text");
+    assert!(index.mem.spill(&dir_str));
+    assert_eq!(index.mem.runs.len(), 1);
+    index_row(&mut index, 5, "gamma delta");
+    assert!(index.seal());
+
+    let reader =
+        SegmentIndexReader::open(&dir_str, "ft_0000000000000005", 5, TermMetaFlags::default())
+            .unwrap();
+    // Exactly one posting list for doc 5, and it is the second text's.
+    assert!(reader.postings("alpha").unwrap().is_empty());
+    assert!(reader.postings("beta").unwrap().is_empty());
+    assert_eq!(reader.postings("gamma").unwrap(), vec![(5, 1)]);
+    assert_eq!(
+        reader.positions("gamma").unwrap().unwrap(),
+        vec![(5, vec![0])]
+    );
+    assert_eq!(
+        reader.positions("delta").unwrap().unwrap(),
+        vec![(5, vec![1])]
+    );
+    // The run's other document is untouched.
+    assert_eq!(reader.postings("filler").unwrap(), vec![(6, 1)]);
+    assert_eq!(reader.rows().to_vec(), vec![5, 6]);
+
+    // Byte for byte what indexing the new text only would have written.
+    let reference_dir = tempdir().unwrap();
+    let mut reference = TextIndex::new(
+        reference_dir.path().to_string_lossy().into_owned(),
+        TextTokenizer::default(),
+    );
+    reference.budget = usize::MAX;
+    index_row(&mut reference, 6, "filler text");
+    index_row(&mut reference, 5, "gamma delta");
+    assert!(reference.seal());
+    assert_eq!(
+        segment_bytes(dir.path()),
+        segment_bytes(reference_dir.path())
+    );
+}
+
+/// A restart: the seal merged the runs into the sealed segment, so the spill
+/// files are gone and a fresh engine still finds the terms.
+#[test]
+fn terms_from_spilled_runs_survive_a_restart() {
+    let dir = tempdir().unwrap();
+    let index_dir;
+    {
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ft_restart (doc VARCHAR);").unwrap();
+        e.execute("CREATE INDEX ft_restart_idx ON ft_restart (doc) USING FULLTEXT;")
+            .unwrap();
+        let shared = e
+            .text_index_for("ft_restart", "doc", e.index_tokenizer("ft_restart", "doc"))
+            .unwrap();
+        index_dir = {
+            let mut guard = shared.write().unwrap();
+            guard.budget = 256;
+            guard.dir.clone()
+        };
+        for row in 0..40 {
+            e.execute(&format!(
+                "INSERT INTO ft_restart VALUES ('alpha beta gamma {row}');"
+            ))
+            .unwrap();
+        }
+        // A term that only appears after the budget was crossed.
+        e.execute("INSERT INTO ft_restart VALUES ('zebrafish');")
+            .unwrap();
+        let mut guard = shared.write().unwrap();
+        assert!(
+            !guard.mem.runs.is_empty(),
+            "the inserts must have spilled the tail"
+        );
+        assert!(guard.seal());
+    }
+
+    // The spill files are transient: the sealed segment holds the postings.
+    let files = segment_bytes(Path::new(&index_dir));
+    assert!(
+        !files
+            .keys()
+            .any(|name| name.contains(FULLTEXT_SPILL_SUFFIX)),
+        "spill files left behind: {:?}",
+        files.keys()
+    );
+    let base_name = files
+        .keys()
+        .find(|name| name.ends_with(".dic"))
+        .expect("a sealed dictionary")
+        .trim_end_matches(".dic")
+        .to_string();
+    let reader =
+        SegmentIndexReader::open(&index_dir, &base_name, 0, TermMetaFlags::default()).unwrap();
+    assert!(reader.lookup("zebrafish").unwrap().is_some());
+
+    // A fresh process finds the terms of the spilled runs again.
+    let e = Engine::open(dir.path()).unwrap();
+    assert_eq!(
+        count_rows(
+            &e,
+            "SELECT count(*) FROM ft_restart WHERE filter_fulltext('doc', 'zebrafish');"
+        ),
+        1
+    );
+    assert_eq!(
+        count_rows(
+            &e,
+            "SELECT count(*) FROM ft_restart WHERE filter_fulltext('doc', 'alpha');"
+        ),
+        40
+    );
 }
