@@ -1747,10 +1747,6 @@ impl Engine {
         } else {
             None
         };
-        let (count, chunk) = match from_memory {
-            Some(v) => v,
-            None => self.cpp_hnsw_chunk(&table, &column, &self.hnsw_options(&table, index_name))?,
-        };
         let db_id = self.database_id_of(&table);
         let dir = self
             .blocks_root()
@@ -1760,9 +1756,17 @@ impl Engine {
             source: e,
         })?;
         let chunks = hnsw_chunks(&dir);
+        // A checkpoint only mirrors an index that has no chunk yet. Check that
+        // before building: the build decodes every row and graph, which on a
+        // long import is the dominant transient (Gate C RSS) and is discarded
+        // here anyway.
         if !new_chunk && !force_append && !chunks.is_empty() {
-            return Ok(count);
+            return Ok(0);
         }
+        let (count, chunk) = match from_memory {
+            Some(v) => v,
+            None => self.cpp_hnsw_chunk(&table, &column, &self.hnsw_options(&table, index_name))?,
+        };
         let name = format!(
             "chunk_{}.idx",
             chunks.last().map(|(id, _)| id + 1).unwrap_or(0)

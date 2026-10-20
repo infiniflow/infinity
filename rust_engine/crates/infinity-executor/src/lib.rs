@@ -13303,10 +13303,16 @@ impl Engine {
     /// Sets the column-block cache budget (the reference's
     /// `[buffer] buffer_manager_size`).
     pub fn set_buffer_manager_size(&self, bytes: usize) {
-        self.context.buffer.lock().unwrap().set_budget(bytes);
+        // The reference has one `BufferManager` pool that both the data blocks
+        // and the index buffers allocate from, so their sum is bounded by
+        // `buffer_manager_size`. The port keeps two caches, so the budget is
+        // split between them instead of granting each the full size.
+        let blocks = bytes / 2;
+        let hnsw = bytes - blocks;
+        self.context.buffer.lock().unwrap().set_budget(blocks);
         self.context
             .hnsw_budget
-            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+            .store(hnsw, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
