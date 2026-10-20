@@ -109,8 +109,8 @@
 
 | # | 条目 | 状态 | 提交 / 说明 |
 |---|---|---|---|
-| 22 | 不存在 `PhysicalOperator`/`OperatorState` 模型 | ⏳ | 见下「算子模型迁移切片」 |
-| 23 | 非 `Eq` 谓词不从索引回答、掩码全 false 退回全部行 | ✅（整数）/ 🔄 类型化键待合并（分支 `secfloat`） | planner 侧本来就支持范围（严格界改写成 `<=`/`>=`、区间合并）。已落地：`SecondarySegmentReader::range`（`54454e892`，不动字节格式）、`SecondaryIndex::for_each_in_order`（字节序≠数值序，测试钉住）、执行器 `index_range_lookup`/`live_row_in_range`/`index_scan_range_rows` 接线（`948731581`）、测试 `a6f638ef7`（`SET CONFIG result_cache off` 后才真正打到 chunk）。**随后发现更严重的问题**：参考侧只对 Varchar 哈希，`KeepOrderedSelf = {Boolean,TinyInt,SmallInt,Integer,BigInt,Float,Double}` 与 `ConvertToOrderedI32 = {Date,Time}`、`ConvertToOrderedI64 = {DateTime,Timestamp}` 都是**原样有序键**；Rust 却一律 `hash_varchar` 成 8 字节 u64，导致 **C++ 写的 FLOAT/DOUBLE/DATE/TIME 次级块在 Rust 侧根本读不了**（宽度都不对）。分支 `secfloat` 用 `KeyKind::{U64,F32,F64,I32,I64}` 修正：原始 IEEE/整型位、按类型比较（浮点用 `total_cmp`，否则负数会排到正数之后）、`Segment` 按 `#pragma pack(1)` 是 12/20 字节，U64 路径**字节不变**（C++ PGM 尾 fixture 仍过）。**剩余**：VARCHAR 范围与 C++ 一致地退回全表过滤，不是缺陷；`secondary_index_data.rs` 的类级 shim 仍只建模 U64 |
+| 22 | 不存在 `PhysicalOperator`/`OperatorState` 模型 | 🔄 4/8 已合并（`faf32f441`） | 已在 main：`chunk.rs`（`DataChunk`，8192，`Value` 单元格）、`operators/mod.rs`（`PhysicalOperatorType`/`OperatorState`/`OperatorStates::take_prev` 清空语义/`execute_task`/`run_fragment`）、`project`/`filter`/`limit`/`top` 四个算子与 `lower()`，`run_plan` 在 `lower()` 覆盖时走新路径、否则逐 stage 回退；`covers()` 校验算子链与 `decompose()` 的 stage 列表一致，避免两条视图静默分叉。617 个 executor 测试绿（+45 新增），Gate A 1752/1546。**进行中**：聚合算子（`operators/aggregate.rs` 已提交但未接 lowering）、Sort、TableScan、删除旧 `Stage`/`Source`/`pipeline` |
+| 23 | 非 `Eq` 谓词不从索引回答、掩码全 false 退回全部行 | ✅ | 整数范围先落地（`54454e892` 范围读 + `948731581` 执行器接线 + `a6f638ef7` 测试）。随后发现更严重的问题：参考侧只对 Varchar 哈希，FLOAT/DOUBLE 走 `KeepOrderedSelf`、DATE/TIME 走 `ConvertToOrderedI32`、DATETIME/TIMESTAMP 走 `ConvertToOrderedI64`，都是**原样有序键**；Rust 一律哈希成 8 字节 u64，导致 C++ 写的这些类型次级块在 Rust 侧**宽度都不对、根本读不了**。`23854bf09` 合并 `KeyKind::{U64,F32,F64,I32,I64}`：原始 IEEE/整型位、浮点按 `total_cmp` 比较（否则负数排到正数之后）、`Segment` 按 `#pragma pack(1)` 为 12/16/20 字节、U64 路径字节不变。手工构造的 C++ 形状 fixture（f32/f64/i32/i64）都能打开，且用 U64 打开会**结构化失败**而不是读到垃圾。**剩余**：VARCHAR 范围与参考一致地退回全表过滤（不是缺陷）；日期/时间的**严格** `<`/`>` 仍回退，因为 planner 的严格界重写是字符串字典序（`\"1970-01-00\"` 不是合法日期），需要在 planner 侧按列类型重写——已登记 |
 | 24 | `FastRoughFilterEvaluator` 无生产实现/调用方 | ✅（已登记） | `ApplyFastRoughFilter::build`/求值器已实现且单测覆盖，但 Rust 没有列级 min/max + bloom 统计可供 `IndexCatalog` 填充（C++ 由 block 级统计提供），默认管线挂空 catalog ⇒ 只能折叠字面 false；`Optimizer::with_catalog` 无生产调用方。已登记：只影响跳块性能，不影响结果 |
 | 25 | `ResultCacheGetter` 仅测试构造 | ✅（已登记） | 生产用语句级结果缓存（语句文本为键、任何写原语失效），比 C++ 的计划级缓存（begin-ts + 表键 + 列投影）更粗但更保守；`Optimizer::with_result_cache` 作为 public API 保留。已登记 |
 | 26 | `SHOW SEGMENTS/BLOCKS` 只有合成元数据 | ✅ | `d385fb7c8`：真实段/块元数据 + `FormatByteSize` 移植 |
@@ -146,7 +146,7 @@
 
 并行 agent 在同一工作树里改同一个热点文件（`infinity-executor/src/lib.rs`）时，`git add <file>` 会把**别人尚未提交的 hunk 一起带走**：`948731581`（BMP 选项）实际包含了 bindctx-15 的整套整数范围索引扫描。两次复现（另一次是 `d05c0f227` 把已提交的 `memindex_pending` 修复回退，后由 `760e878b7` 恢复）。为此：本条目的功能归属以哈希链 `54454e892` → `948731581` → `a6f638ef7` 为准；后续热点文件同时只允许一个 agent 写，其余待命，且每个 agent 提交后要 `git show <hash>` 复核删除行是否属于别人。
 
-| P1 | `result_cache` 默认值与参考相反 | `Engine::result_cache_active()` 在配置缺失时返回 true；C++ `DEFAULT_RESULT_CACHE = "off"`（`src/common/default_values.cppm:211`） | 默认配置下 Rust 会缓存结果、C++ 不缓存；`SHOW VARIABLES` 在 C++ 里会整行跳过 `cache_result_capacity`（`physical_show_global_variables_impl.cpp:56-60`），Rust 仍列出。**影响**：缓存失效时机与变量行数的语义偏差，不影响查询结果。已修一半：`cache_result_capacity` 不再泄漏 `usize::MAX`（`80dddcc71`）。翻转默认值会改变所有测试的缓存行为，需单独决策 |
+| P1 | `result_cache` 默认值与参考相反 | `Engine::result_cache_active()`；C++ `DEFAULT_RESULT_CACHE = "off"`（`src/common/default_values.cppm:211`） | **已修**（`fd4d8677f`）：配置缺失时不再缓存、`SHOW CONFIG` 默认改为 off、缓存关闭时按 `ExecuteShowGlobalVariables` 整行省略 `cache_result_capacity`；同时 `cache_result_capacity` 不再泄漏 `usize::MAX` 哨兵（`80dddcc71`） |
 
 ## 处置口径
 
