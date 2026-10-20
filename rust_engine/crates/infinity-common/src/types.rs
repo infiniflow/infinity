@@ -41,8 +41,11 @@ impl DateTOld {
     }
 }
 
-/// C++: `TimeT` (`src/parser/type/datetime/time_type.h`): microseconds since
-/// midnight.
+/// C++: `TimeT` (`src/parser/type/datetime/time_type.h:79`): **seconds** since
+/// midnight, in `0..=86399`. `DateTimeT::GetEpochTime()` adds it to
+/// `date * 86400`, which only holds if the unit is a second — the earlier note
+/// here said microseconds, which would have made every temporal secondary key
+/// 10^6 times too large.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TimeT {
     pub value: i32,
