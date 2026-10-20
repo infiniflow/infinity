@@ -9,6 +9,7 @@
 use infinity_common::Result;
 use infinity_planner::LogicalPlan;
 
+use super::aggregate::Aggregate;
 use super::filter::Filter;
 use super::limit::Limit;
 use super::project::Projection;
@@ -46,6 +47,20 @@ pub fn lower(plan: &LogicalPlan) -> Result<Option<Lowered>> {
             }
             LogicalPlan::Filter { input, predicate } => {
                 operators.push(Box::new(Filter::new(predicate.clone())));
+                cursor = input;
+            }
+            LogicalPlan::Aggregate {
+                input,
+                group_keys,
+                group_names,
+                aggs,
+            } => {
+                let aggregate =
+                    Aggregate::new(group_keys.clone(), group_names.clone(), aggs.clone());
+                if names.is_none() {
+                    names = Some(aggregate.output_names());
+                }
+                operators.push(Box::new(aggregate));
                 cursor = input;
             }
             LogicalPlan::Limit { .. } | LogicalPlan::Offset { .. } => {
@@ -89,8 +104,7 @@ pub fn lower(plan: &LogicalPlan) -> Result<Option<Lowered>> {
                 operators.reverse();
                 return Ok(Some((operators, names)));
             }
-            // Not ported yet: `Aggregate`, and a `Sort` that is not fused into
-            // a `Top` (slice 6 gives sort its own operator).
+            // Not ported yet: a `Sort` that is not fused into a `Top`.
             _ => return Ok(None),
         }
     }
@@ -141,6 +155,7 @@ pub(crate) fn covers(operators: &[Box<dyn PhysicalOperator>], stages: &[crate::S
             PhysicalOperatorType::Filter if matches!(stage, crate::Stage::Filter(..)) => {}
             PhysicalOperatorType::Limit
                 if matches!(stage, crate::Stage::Limit(_) | crate::Stage::Offset(_)) => {}
+            PhysicalOperatorType::Aggregate if matches!(stage, crate::Stage::Aggregate { .. }) => {}
             PhysicalOperatorType::Top if matches!(stage, crate::Stage::Sort { .. }) => {
                 // The fused sort, plus the limit/offset budgets above it.
                 stage_index += 1;
@@ -217,14 +232,29 @@ mod tests {
     }
 
     #[test]
-    fn an_aggregate_falls_back_to_the_stage_pipeline() {
+    fn lowers_an_aggregate_and_keeps_the_single_fallback() {
+        use infinity_parser::AggFunc;
+
         let plan = LogicalPlan::Aggregate {
             input: Box::new(scan()),
             group_keys: vec![Expr::Column(0)],
             group_names: vec!["c1".into()],
-            aggs: Vec::new(),
+            aggs: vec![(AggFunc::Count, Vec::new(), false, "count".into())],
         };
-        assert!(lower(&plan).unwrap().is_none());
+        let (operators, names) = lower(&plan).unwrap().unwrap();
+        assert_eq!(operators.len(), 1);
+        assert_eq!(
+            operators[0].operator_type(),
+            super::super::PhysicalOperatorType::Aggregate
+        );
+        // Without a projection above it, the aggregate names the output.
+        assert_eq!(names, vec!["c1".to_string(), "count".to_string()]);
+        let stages = vec![crate::Stage::Aggregate {
+            group_keys: vec![Expr::Column(0)],
+            group_names: vec!["c1".into()],
+            aggs: vec![(AggFunc::Count, Vec::new(), false, "count".into())],
+        }];
+        assert!(covers(&operators, &stages));
     }
 
     #[test]

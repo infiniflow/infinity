@@ -17826,6 +17826,50 @@ mod tests {
         );
     }
 
+    /// GROUP BY and global aggregates run through the aggregate operator, keep
+    /// first-seen group order, and still produce one row over an empty relation.
+    #[test]
+    fn run_plan_executes_a_group_by_through_the_operator_model() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE og (a INT, b INT);").unwrap();
+        e.execute("INSERT INTO og VALUES (1, 10), (2, 20), (3, 10), (4, 20), (5, 30);")
+            .unwrap();
+
+        let before = crate::operators::operator_run_count();
+        assert_eq!(
+            rows(&e, "SELECT b, count(*) FROM og GROUP BY b;"),
+            vec![
+                vec!["10".to_string(), "2".to_string()],
+                vec!["20".to_string(), "2".to_string()],
+                vec!["30".to_string(), "1".to_string()],
+            ]
+        );
+        assert_eq!(crate::operators::operator_run_count(), before + 1);
+        assert!(crate::operators::last_chain()
+            .contains(&crate::operators::PhysicalOperatorType::Aggregate));
+        // Global aggregates: one row, also when nothing matches.
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM og;"),
+            vec![vec!["5".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT sum(a), avg(a), min(a), max(a) FROM og;"),
+            vec![vec![
+                "15".to_string(),
+                "3.000000".to_string(),
+                "1".to_string(),
+                "5".to_string()
+            ]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM og WHERE a > 99;"),
+            vec![vec!["0".to_string()]]
+        );
+        // GROUP BY over an empty relation has no groups at all.
+        assert!(rows(&e, "SELECT b, count(*) FROM og WHERE a > 99 GROUP BY b;").is_empty());
+    }
+
     fn seed(e: &Engine) {
         e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
         for (i, n) in [(1, "c"), (2, "a"), (3, "b"), (4, "a")] {

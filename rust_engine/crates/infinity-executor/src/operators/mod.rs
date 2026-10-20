@@ -13,6 +13,7 @@
 //! stores it root-first and therefore walks `operator_count - 1 ..= 0`
 //! backwards. Walking `0..len` here is the same traversal.
 
+pub mod aggregate;
 pub mod filter;
 pub mod limit;
 pub mod lower;
@@ -57,6 +58,8 @@ pub enum PhysicalOperatorType {
     Filter,
     Limit,
     Top,
+    Aggregate,
+    Sort,
 }
 
 impl PhysicalOperatorType {
@@ -68,6 +71,8 @@ impl PhysicalOperatorType {
             PhysicalOperatorType::Filter => "Filter",
             PhysicalOperatorType::Limit => "Limit",
             PhysicalOperatorType::Top => "Top",
+            PhysicalOperatorType::Aggregate => "Aggregate",
+            PhysicalOperatorType::Sort => "Sort",
         }
     }
 }
