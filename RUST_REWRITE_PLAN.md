@@ -528,6 +528,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 - 快照基线：`infinity-cli conformance ../test/sql/snapshot` = `statement ok 171/171`、`statement error 8/8`、query 0/0（snapshot 用例只含语句）。
 - 长跑导入档：`test_multiple_index_types_import` 2/5 通过。5.toml 档在 2026-10-19 20:30 的本机重跑（`-k 5.toml`，bwrap，release）：**21/50 个 insert 批**后服务端收到 **SIGTERM**（日志 `Terminated`，无 panic、无 SIGKILL、连接随后被拒），引擎 RSS 峰值 **7.8 GB**，同机 `earlyoom -M 2000000,1000000` 仍在运行，采样到 `MemAvailable` 降至 ~2 GB；批耗时从 21 s 增至 69 s。更早一轮在 `MemAvailable` 最低 **1.96 GB** 时也在 batch 31 被杀，因此是宿主看门狗杀掉了最大进程，而非引擎 panic。CI 无 earlyoom；引擎侧目标（内存不随导入无限增长）已满足，但 5.toml 的完整 50 批判定必须在 CI 机复跑。
 - 内存/写入修复：⓪`Insert` 的向量/张量/稀疏值走数值 `Literal::Vector`，不再把每个 float 先格式化成字符串再经 SQL 解析（5000 行批次 21–26 s → 19 s，峰值 ~2 GB 不变，索引状态占主导）；①HNSW 检查点不再重建全表图，而是序列化**内存段**（`HnswIndexInMem`），成本从 O(表) 降为 O(上次检查点后的行)；②`flush()` 每个检查点无条件 dump 所有 HNSW 内存段并清空，新增插入重新建立段；③索引尾部的 dump 先于块镜像执行，镜像失败不再阻塞内存回收。
+- **测量纪律（强制）**：内存/性能类用例（本档与 Gate E）必须让引擎把数据写到**磁盘目录**，不得用 `bwrap --tmpfs /var` 之类的内存盘承载 `/var/infinity`。5.toml 档数据量约 20 GB，tmpfs 放不下：C++ 参考引擎在 tmpfs 下 5 分 50 秒即失联（峰值 ~5.2 GB），换磁盘目录后可跑到 **9.47 GB / >30 分钟**；Rust 同口径峰值 12.6–15 GB。`run_gate_c.sh` 已用 `INFINITY_GATE_C_WORK`（缺省 `mktemp -d`，磁盘）绑定 `/var/infinity`，只把 `/var` 本身做成 tmpfs 作为挂载点。
 - 对象存储（MinIO HTTP/HTTPS）：删本地 `data/` 后重启可逐字节还原。
 
 ### 8.5 Gate D — 并发与稳定性
