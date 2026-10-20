@@ -499,7 +499,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 |---|---|---|
 | **A** | 全部 `test/sql/**/*.slt` 通过 | ✅ 1752 statement ok / 129 statement error / 1546 query（100%） |
 | **B** | 未修改的 Python/Go SDK + HTTP 全绿 | ✅ PySDK 逐文件全绿；Go 375/375；HTTP 全绿 |
-| **C** | 重启 / 快照 / 索引 chunk 生命周期 / 对象存储 / **跨引擎兼容** | ⚠️ 仅剩重档：快照基线 171/171+8/8；重启套件 basic/alter/cleanup/compact/snapshot/system_snapshot **30/30**、insert_import **12/12**、memidx **10/10** 全绿；新增跨引擎（C++↔Rust）**2/2 通过**；`test_fulltext_realtime` 因本机旧 `tmp/gt_res_list_10000.pkl` 未通过（需干净工作区复跑，其余 5/6 通过）。**5.toml 重档**在磁盘数据目录下 Rust 峰值 12.6–15 GB（C++ 参考 9.47 GB、30 分钟未跑完），无通过结论——需 ≥32 GB 空闲内存的 CI 机复跑 |
+| **C** | 重启 / 快照 / 索引 chunk 生命周期 / 对象存储 / **跨引擎兼容** | ⚠️ 仅剩重档：快照基线 171/171+8/8；重启套件 basic/alter/cleanup/compact/snapshot/system_snapshot **30/30**、insert_import **12/12**、memidx **10/10** 全绿；新增跨引擎（C++↔Rust）**2/2 通过**；`test_fulltext` **6/6**（`test_fulltext_realtime` 清掉本机旧 `tmp/gt_res_list_10000.pkl` 后 13.1 s 通过）。**5.toml 重档**在磁盘数据目录下 Rust 峰值 12.6–15 GB（C++ 参考 9.47 GB、30 分钟未跑完），无通过结论——需 ≥32 GB 空闲内存的 CI 机复跑 |
 | **D** | 并发：loom + miri + sanitizer + `parallel_test` | ✅ loom 1、miri 39、ASan/TSAN 各 39；`parallel_test` 全绿 |
 | **E** | 对 C++ golden `<7%` | ✅ +2.87%（最新；此前 +4.00% / +6.71% / +4.59% / +2.93% / +4.75%，insert 抖动时 +22.04%，见 §8.6） |
 | **F** | fmt / clippy `-D warnings` / `cargo deny` | ✅ 全绿（cargo-deny 0.20.2，schema v2） |
