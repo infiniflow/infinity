@@ -46,10 +46,11 @@ fn open_is_writable_and_accepts_writes() {
     assert_eq!(engine.storage_mode(), StorageMode::Writable);
 
     create_table(&engine);
-    engine
-        .execute("INSERT INTO st VALUES (1, 'a');")
-        .unwrap();
-    assert_eq!(rows(&engine, "SELECT id FROM st;"), vec![vec!["1".to_string()]]);
+    engine.execute("INSERT INTO st VALUES (1, 'a');").unwrap();
+    assert_eq!(
+        rows(&engine, "SELECT id FROM st;"),
+        vec![vec!["1".to_string()]]
+    );
 }
 
 /// A follower/learner replica: `kWritable` writes are rejected with 8007 while
@@ -61,15 +62,16 @@ fn readable_rejects_writes_but_allows_reads() {
     let dir = tempdir().unwrap();
     let engine = Engine::open(dir.path()).unwrap();
     create_table(&engine);
-    engine
-        .execute("INSERT INTO st VALUES (1, 'a');")
-        .unwrap();
+    engine.execute("INSERT INTO st VALUES (1, 'a');").unwrap();
 
     engine.set_storage_mode(StorageMode::Readable).unwrap();
     assert_eq!(engine.storage_mode(), StorageMode::Readable);
 
     // SELECT is unaffected.
-    assert_eq!(rows(&engine, "SELECT id FROM st;"), vec![vec!["1".to_string()]]);
+    assert_eq!(
+        rows(&engine, "SELECT id FROM st;"),
+        vec![vec!["1".to_string()]]
+    );
 
     for sql in [
         "INSERT INTO st VALUES (2, 'b');",
@@ -89,16 +91,16 @@ fn readable_rejects_writes_but_allows_reads() {
         .unwrap_err();
     assert_eq!(error.status_code(), INVALID_NODE_ROLE);
     // A checkpoint needs `kWritable` (`physical_flush_impl.cpp:42-52`) ...
-    assert_eq!(
-        engine.flush().unwrap_err().status_code(),
-        INVALID_NODE_ROLE
-    );
+    assert_eq!(engine.flush().unwrap_err().status_code(), INVALID_NODE_ROLE);
     // ... while cleanup runs on a read-only replica too
     // (`background_process_impl.cpp:109`).
     engine.cleanup().unwrap();
 
     // Nothing was published.
-    assert_eq!(rows(&engine, "SELECT count(*) FROM st;"), vec![vec!["1".to_string()]]);
+    assert_eq!(
+        rows(&engine, "SELECT count(*) FROM st;"),
+        vec![vec!["1".to_string()]]
+    );
 }
 
 /// `ReaderToWriter` (`storage_impl.cpp:600-712`): writes come back.
@@ -113,10 +115,11 @@ fn returning_to_writable_restores_writes() {
 
     engine.set_storage_mode(StorageMode::Writable).unwrap();
     assert_eq!(engine.storage_mode(), StorageMode::Writable);
-    engine
-        .execute("INSERT INTO st VALUES (1, 'a');")
-        .unwrap();
-    assert_eq!(rows(&engine, "SELECT id FROM st;"), vec![vec!["1".to_string()]]);
+    engine.execute("INSERT INTO st VALUES (1, 'a');").unwrap();
+    assert_eq!(
+        rows(&engine, "SELECT id FROM st;"),
+        vec![vec!["1".to_string()]]
+    );
 }
 
 /// `kUnInitialized` only moves to `kAdmin` (`storage_impl.cpp:813-818`); the
@@ -163,7 +166,9 @@ fn admin_allows_reads_but_not_writes() {
         rows(&engine, "SELECT count(*) FROM st;"),
         vec![vec!["0".to_string()]]
     );
-    let error = engine.execute("INSERT INTO st VALUES (1, 'a');").unwrap_err();
+    let error = engine
+        .execute("INSERT INTO st VALUES (1, 'a');")
+        .unwrap_err();
     assert_eq!(error.status_code(), INVALID_NODE_ROLE);
     // Admin is below `kReadable`, so even the replica-level cleanup is refused.
     assert_eq!(
