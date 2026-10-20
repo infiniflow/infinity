@@ -92,7 +92,7 @@
 | 12 | `QueryBuilder`/短语/布尔迭代器不在产品路径 | 🔄 | `cf5bffed0`：`filter_fulltext` 的索引过滤现在真的构造 `Or`/`And` 查询树——裸 term 列表是 `OrQueryNode`，只有 `operator=and` 才是 `AndQueryNode`，布尔词是算子而不是 term（C++ `SearchDriver::AnalyzeAndBuildQueryNode`）。这条 bug 在索引过滤放行所有行时是隐形的，接上真实 postings 后立刻让 Gate A 掉到 1539/1546（`'second text'` 丢掉所有单 term 行）。**MATCH 的 WAND 路径仍只处理单 term，其余整行重分词扫**；短语/布尔迭代器的产品化仍未做 |
 | 13 | `MemoryIndexer` 无 spill-to-sorted-runs / `InsertGap` | ⏳ | `FULLTEXT_SPILL_SUFFIX` 声明未用，`SortMerger` 无调用方 |
 | 14 | BMW 无块级最大值、非增量 | 🔄 | `wand.rs` 移植中（per-block maxima + `Next/NextShallow`） |
-| 15 | `StandardAnalyzer` 用 Porter2 顶替 `STEM_LANG_PORT` | ⏳ | 只影响 `standard-porter`；rust-stemmers 无原版 Porter 算法 |
+| 15 | `StandardAnalyzer` 用 Porter2 顶替 `STEM_LANG_PORT` | ✅（已登记） | 仅 `standard-porter` 受影响（`standard` 与其余 17 种语言都是同族 Snowball 算法）。按 §3.6 登记进 `CLASS_MAP.md`「有意的设计变更」：手写原版 Porter 或引新依赖的风险大于收益；若不接受需单独决策 |
 
 ### 索引
 
@@ -111,8 +111,8 @@
 |---|---|---|---|
 | 22 | 不存在 `PhysicalOperator`/`OperatorState` 模型 | ⏳ | 见下「算子模型迁移切片」 |
 | 23 | 非 `Eq` 谓词不从索引回答、掩码全 false 退回全部行 | ✅（整数）/ ⏳（其余类型） | 掩码全 false 返回空集（`ac909e68b`）。**审计的诊断是错的**：planner 侧完全支持范围（`classify_compare` 对非 varchar 任意比较都 indexable，严格界改写成 `<=`/`>=`，`simplify_secondary` 合并成一个 `Secondary { ranges }`）。真正缺口在执行器：`select()` 只对裸 `col = literal` 走索引。已补：`SecondarySegmentReader::range`（`54454e892`，复用内部 `lower_bound`，**不动字节格式**，故意不用 PGM hint）、`SecondaryIndex::for_each_in_order`（文档写明字节序≠数值序，测试钉住）、`index_range_lookup`/`live_row_in_range`/`index_scan_range_rows` 与 `select()` 接线（`948731581`，属并入他人提交，本文件的 attribution 以本条为准）、测试 `a6f638ef7`（`SET CONFIG result_cache off` 后才真正打到 chunk；round 0 覆盖 chunk+tail 合并，round 1 纯 chunk）。**剩余缺口**：float/date/varchar 的 chunk key 是 `hash_varchar`，范围扫描必须改磁盘格式，属单独决策——这些类型的 `EXPLAIN` 仍会显示 `INDEX SCAN` 而实际走全表+内存过滤 |
-| 24 | `FastRoughFilterEvaluator` 无生产实现/调用方 | ⏳ | 默认规则空 `IndexCatalog`，只能折叠字面 false |
-| 25 | `ResultCacheGetter` 仅测试构造 | ⏳ | 生产是「整条 `QueryResult` 按语句文本做键」，无 begin-ts/表键/列投影 |
+| 24 | `FastRoughFilterEvaluator` 无生产实现/调用方 | ✅（已登记） | `ApplyFastRoughFilter::build`/求值器已实现且单测覆盖，但 Rust 没有列级 min/max + bloom 统计可供 `IndexCatalog` 填充（C++ 由 block 级统计提供），默认管线挂空 catalog ⇒ 只能折叠字面 false；`Optimizer::with_catalog` 无生产调用方。已登记：只影响跳块性能，不影响结果 |
+| 25 | `ResultCacheGetter` 仅测试构造 | ✅（已登记） | 生产用语句级结果缓存（语句文本为键、任何写原语失效），比 C++ 的计划级缓存（begin-ts + 表键 + 列投影）更粗但更保守；`Optimizer::with_result_cache` 作为 public API 保留。已登记 |
 | 26 | `SHOW SEGMENTS/BLOCKS` 只有合成元数据 | ✅ | `d385fb7c8`：真实段/块元数据 + `FormatByteSize` 移植 |
 | 27 | `BindContext` 无对应类 | ✅ | `2d09f0b8c`：`infinity-planner/src/bind_context.rs` 逐字段/逐方法移植 `binding.cppm`+`bind_context.cppm`（计数委托根 context、`get_cte` 认 `masked_name_set`、`add_bind_context` 重名报错、`resolve_column_id` 的 Ambiguous/`doesn't exist.` 文案、`bound_search` 的 distance/similarity 冲突规则）；`plan_select` 与 `QueryBinder::bind_select` 都先建根 context，`t.c` 限定列从此可绑定，两表同名未限定列报 ambiguous。11 个类级测试 + 1 个绑定器测试。未移植字段（`column_types_`/`table_info_`/`block_index_`/`expression_binder_`）已登记进 `CLASS_MAP.md`「有意的设计变更」 |
 | 28 | `BGTaskProcessor` 从未 attach | ⏳ | `cleanup_interval`/`compact_interval` 解析但不调度；接线方案研究中 |

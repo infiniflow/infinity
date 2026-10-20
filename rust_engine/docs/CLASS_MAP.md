@@ -109,6 +109,9 @@
 | C++ | Rust | 原因 |
 |---|---|---|
 | `TaskScheduler` / `FragmentContext` / `BlockingQueue` | Tokio `mpsc` + `JoinSet` + 按边并发管线 | §4.4 D4（用户已批准） |
+| `standard-porter` 的 `STEM_LANG_PORT`（libstemmer 原版 Porter） | `rust_stemmers::Algorithm::English`（Porter2） | 仅 `standard-porter` 受影响：少数词的词干与参考不同（Porter2 与 Porter 的 step 1c/5b 规则有别）。`standard`（`STEM_LANG_ENGLISH`）与其余 17 种语言都用 Snowball 同族算法，字节一致；为单一分词器引入一份手写 Porter 实现（或新依赖）风险大于收益，若不接受此差异需单独决定 |
+| `ApplyFastRoughFilter` 的统计来源 | `infinity_planner::index_scan::IndexCatalog`，默认管线为空（`FastRoughFilterRule::default()`） | Rust 侧没有列级 min/max + bloom 统计可填充 catalog（C++ 由 block 级统计提供，见 `apply_fast_rough_filter_impl.cpp`）。`ApplyFastRoughFilter::build`/求值器已实现且有单测，绑定真实 catalog 的 `Optimizer::with_catalog` 无生产调用方，因此默认只能折叠字面 false。**影响**：不做块级跳过，只影响性能不影响结果；补此缺口需要先物化统计层 |
+| `ResultCacheGetter` 的缓存粒度 | 语句级结果缓存（`format!("{qualified:?}")` 为键，任何写原语失效），plan 级规则仅以 `Optimizer::with_result_cache` 暴露、默认不安装 | C++ 是计划级缓存（begin-ts + 表键 + 列投影）。**影响**：同一语句不同参数不共享缓存，且任何写入后整体失效（更保守）；结果语义一致，热路径重复查询仍命中。按计划级重做需要把缓存键下移到 `ColumnBinding` 级 |
 | `BindContext` 的 `column_types_` / `table_info_` / `block_index_` / `expression_binder_` 字段，`select_expression_`（`ParsedExpr *`），`bound_cte_set_`（`shared_ptr` 身份集），`correlated_column_exprs_`（`ColumnExpression` 指针），`parent_` 裸指针 + 根 context 计数 | 去掉前四个字段；`select_expression: Vec<SelectItem>`；`bound_cte_set: HashSet<String>`（按 alias，等价于以其为键的 CTE 对象身份）；`correlated_column_exprs: Vec<ResolvedColumn>`；`parent/left_child/right_child: Rc<BindContext>`，三个计数器与 `knn_table_index` 为 `Cell`，相关列对为 `RefCell` | Rust 侧无 `DataType`/`TableInfo`/`BlockIndex`/`ExpressionBinder`，也没有可承托绑定的 `ColumnExpression`（`Expr::Column` 只有位置）；`ExprAst` 表达不了 `*` 与聚合，故 select list 用 `SelectItem`。`&self` 下的“委托根 context 自增”只能靠 `Cell`/`RefCell`，语义（同一序列、不重号）不变 |
 | 倒排 `fst` 打包/读取 | `fst` crate 数据路径 + 自实现 C++ 尾块 CRC-32/IEEE | §4.2（已批准；校验和不兼容，数据路径复用） |
 | SIMD 距离核 / 压缩 / mmap | `simsimd`/`faer`、`lz4_flex`、`memmap2` | §3.4（仅底层原语，控制流仍自研） |
