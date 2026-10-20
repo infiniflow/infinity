@@ -1853,24 +1853,28 @@ fn compare_parts(expr: &Expr) -> Option<(&Expr, CmpOp, &Expr)> {
 }
 
 fn parse_fulltext_query(text: &str, options: &str) -> FulltextQuery {
+    // C++ `SearchDriver::AnalyzeAndBuildQueryNode` (infinity syntax,
+    // search_driver_impl.cpp:262) turns several analyzed terms into an
+    // `OrQueryNode`; only `operator=and` asks for `AndQueryNode`. The boolean
+    // keywords are operators in that grammar, not terms.
     let terms: Vec<String> = text
         .split_whitespace()
         .map(|t| {
             t.trim_matches(|c| c == '"' || c == '\'' || c == '(' || c == ')')
                 .to_ascii_lowercase()
         })
-        .filter(|t| !t.is_empty())
+        .filter(|t| !t.is_empty() && t != "or" && t != "and" && t != "not")
         .collect();
-    let or = options
+    let and = options
         .split(';')
-        .any(|p| p.trim().eq_ignore_ascii_case("operator=or"));
+        .any(|p| p.trim().eq_ignore_ascii_case("operator=and"));
     let queries: Vec<FulltextQuery> = terms.into_iter().map(FulltextQuery::Term).collect();
     if queries.is_empty() {
         FulltextQuery::Term(String::new())
-    } else if or {
-        FulltextQuery::Or(queries)
-    } else {
+    } else if and {
         FulltextQuery::And(queries)
+    } else {
+        FulltextQuery::Or(queries)
     }
 }
 
