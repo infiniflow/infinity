@@ -613,6 +613,9 @@ impl BindContext {
     }
 
     /// Merge `other` into this bind context.
+    ///
+    /// A duplicate is an internal invariant violation, not a user error: C++
+    /// raises `UnrecoverableError` here, which the SDKs report with code 1.
     pub fn add_bind_context(&mut self, other: &BindContext) -> Result<()> {
         for table_name in &other.table_names {
             self.table_names.push(table_name.clone());
@@ -620,7 +623,9 @@ impl BindContext {
 
         for (table_name, table_index) in &other.table_name2table_index {
             if self.table_name2table_index.contains_key(table_name) {
-                return Err(Error::Invalid(format!("{table_name} was bound before")));
+                return Err(Error::Unrecoverable(format!(
+                    "{table_name} was bound before"
+                )));
             }
             self.table_name2table_index
                 .insert(table_name.clone(), *table_index);
@@ -628,7 +633,7 @@ impl BindContext {
 
         for (table_index, table_name) in &other.table_table_index2table_name {
             if self.table_table_index2table_name.contains_key(table_index) {
-                return Err(Error::Invalid(format!(
+                return Err(Error::Unrecoverable(format!(
                     "Table index: {table_index} is bound before"
                 )));
             }
@@ -638,7 +643,7 @@ impl BindContext {
 
         for (binding_name, binding) in &other.binding_by_name {
             if self.binding_by_name.contains_key(binding_name) {
-                return Err(Error::Invalid(format!(
+                return Err(Error::Unrecoverable(format!(
                     "Table: {binding_name} was bound before"
                 )));
             }
@@ -1025,7 +1030,32 @@ mod tests {
         let mut duplicate = BindContext::make(None);
         duplicate.add_table_binding("t1", 9, vec!["id".to_string()]);
         let err = merged.add_bind_context(&duplicate).unwrap_err();
-        assert_eq!(err.to_string(), "invalid argument: t1 was bound before");
+        // `UnrecoverableError` in C++: the bare message, code 1.
+        assert_eq!(err.to_string(), "t1 was bound before");
+        assert_eq!(err.status_code(), 1);
+
+        // A distinct name reusing a bound table index.
+        let mut duplicate_index = BindContext::make(None);
+        duplicate_index.add_table_binding("t3", 1, vec!["id".to_string()]);
+        assert_eq!(
+            merged
+                .add_bind_context(&duplicate_index)
+                .unwrap_err()
+                .to_string(),
+            "Table index: 1 is bound before"
+        );
+
+        // A distinct table name reusing a bound binding name: a view registers a
+        // binding without a table entry, so only `binding_by_name` collides.
+        let mut duplicate_binding = BindContext::make(None);
+        duplicate_binding.add_view_binding("t1", 50, vec!["id".to_string()]);
+        assert_eq!(
+            merged
+                .add_bind_context(&duplicate_binding)
+                .unwrap_err()
+                .to_string(),
+            "Table: t1 was bound before"
+        );
     }
 
     /// `GetCTE` returns a CTE only when this scope's `masked_name_set` names it,
