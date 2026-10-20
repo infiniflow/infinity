@@ -275,6 +275,32 @@ mod tests {
     }
 
     #[test]
+    fn the_substrate_of_a_directory_is_detected() {
+        let dir = tempdir().unwrap();
+        // Nothing there yet: no substrate to detect.
+        assert_eq!(StoreBackend::detect(&dir.path().join("catalog")), None);
+
+        // A fjall store: a `keyspaces` directory.
+        let fjall = dir.path().join("fjall");
+        FjallMetaStore::open(&fjall, "catalog").unwrap();
+        assert_eq!(StoreBackend::detect(&fjall), Some(StoreBackend::Fjall));
+
+        // A RocksDB store: `CURRENT` and a `MANIFEST-*`.
+        let rocks = dir.path().join("rocks");
+        std::fs::create_dir_all(&rocks).unwrap();
+        std::fs::write(rocks.join("CURRENT"), b"MANIFEST-000001\n").unwrap();
+        std::fs::write(rocks.join("MANIFEST-000001"), b"").unwrap();
+        assert_eq!(StoreBackend::detect(&rocks), Some(StoreBackend::RocksDb));
+
+        // RocksDB is looked for first: a directory that carries both markers
+        // is read as a RocksDB, because that is what the reference writes.
+        let both = dir.path().join("both");
+        std::fs::create_dir_all(both.join("keyspaces")).unwrap();
+        std::fs::write(both.join("CURRENT"), b"MANIFEST-000001\n").unwrap();
+        assert_eq!(StoreBackend::detect(&both), Some(StoreBackend::RocksDb));
+    }
+
+    #[test]
     fn compressed_values_roundtrip() {
         let (_d, s) = open();
         // A row-shaped value: thousands of repeated float fields.

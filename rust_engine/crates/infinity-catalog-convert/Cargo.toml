@@ -1,0 +1,15 @@
+[package]
+name = "infinity-catalog-convert"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "infinity-catalog-convert"
+path = "src/main.rs"
+
+[dependencies]
+infinity-common.workspace = true
+# The converter is the only thing that needs the RocksDB substrate: the engine
+# can stay on fjall, and the interop becomes an explicit conversion step.
+infinity-storage = { workspace = true, features = ["rocksdb-store"] }
