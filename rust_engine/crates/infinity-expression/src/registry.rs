@@ -202,7 +202,9 @@ mod tests {
             check_function("Foobar").unwrap_err(),
             "unknown function 'Foobar'"
         );
-        assert!(matches!(func("extract_weekday_of_month", vec![]), Err(e) if e.contains("extract_weekday_of_month")));
+        assert!(
+            matches!(func("extract_weekday_of_month", vec![]), Err(e) if e.contains("extract_weekday_of_month"))
+        );
     }
 
     /// Every scalar the crate implements still evaluates; one representative per family.
@@ -213,10 +215,7 @@ mod tests {
         assert_eq!(
             call(
                 "POW",
-                vec![
-                    Expr::Literal(Value::Int(2)),
-                    Expr::Literal(Value::Int(10))
-                ]
+                vec![Expr::Literal(Value::Int(2)), Expr::Literal(Value::Int(10))]
             )
             .eval(&row),
             Value::Float(1024.0)
@@ -259,15 +258,33 @@ mod tests {
     #[test]
     fn case_insensitive_and_aliases_resolve() {
         for name in [
-            "abs", "Abs", "ABS", // upper case wins in C++ but lookup lower-cases
-            "length", "char_length", "CHAR_LENGTH", // one FunctionSet in C++
-            "char_position", "strpos", "instr",
-            "pow", "power",
-            "trunc", "truncate",
-            "substring", "substr",
-            "datepart", "date_part",
-            "weekofyear", "dayofmonth", "dayofweek", "dayofyear", "is_null",
-            "json_extract_string", "json_exists_path", "md5", "regex", "fde",
+            "abs",
+            "Abs",
+            "ABS", // upper case wins in C++ but lookup lower-cases
+            "length",
+            "char_length",
+            "CHAR_LENGTH", // one FunctionSet in C++
+            "char_position",
+            "strpos",
+            "instr",
+            "pow",
+            "power",
+            "trunc",
+            "truncate",
+            "substring",
+            "substr",
+            "datepart",
+            "date_part",
+            "weekofyear",
+            "dayofmonth",
+            "dayofweek",
+            "dayofyear",
+            "is_null",
+            "json_extract_string",
+            "json_exists_path",
+            "md5",
+            "regex",
+            "fde",
         ] {
             assert!(is_known_function(name), "{name} should resolve");
         }
