@@ -5,19 +5,26 @@
 //! ```text
 //! u32 unique_key_count
 //! u64 keys[unique_key_count]        (the reference's OrderedKeyType)
-//! per key: i32 bitmap_size, then the portable Roaring bytes
+//! per key: i32 bitmap_size, then Bitmap::WriteAdv's bytes
 //! ```
 //!
-//! `RoaringBitmap::WriteAdv` writes `u32 count`, `i32 size`, then
-//! `roaring::Roaring::write` (`roaring_bitmap.cppm:298`). The portable layout
-//! used here is the no-run form CRoaring reads:
+//! `secondary_index_data_impl.cpp:321` sizes each write with
+//! `Bitmap::GetSizeInBytes()` and then fills it with `Bitmap::WriteAdv`
+//! (`roaring_bitmap.cppm:283`, `:298`). For `Bitmap = RoaringBitmap<false>`
+//! that is:
 //!
 //! ```text
-//! u32 cookie = 12346, u32 container_count
-//! per container: u16 key, u16 (cardinality - 1)
-//! per container: u32 offset (from the start of the container data)
-//! containers: u16[card] for card <= 4096, else 8192 bytes of bitset
+//! u32 count_        the row universe of the chunk (max offset + 1)
+//! i32 size          bytes of the portable bitmap that follow
+//! portable bitmap   roaring::Roaring::write (CRoaring portable format)
 //! ```
+//!
+//! `count_` is the value the bitmap was constructed with: `InsertData` builds
+//! `Bitmap bitmap(max_offset + 1)` over the whole chunk
+//! (`secondary_index_data_impl.cpp:433-444`), so every bitmap in one chunk
+//! carries the same `count_`. `GetSizeInBytes()` also calls `RunOptimize()`
+//! first, so the portable image is CRoaring's post-run-optimisation encoding;
+//! the writer below reproduces that byte for byte.
 
 use memmap2::Mmap;
 use std::fs::File;
@@ -26,9 +33,39 @@ use std::path::Path;
 use crate::cpp_format::FormatError;
 
 const SERIAL_COOKIE_NO_RUNCONTAINER: u32 = 12346;
+const SERIAL_COOKIE: u32 = 12347;
+const NO_OFFSET_THRESHOLD: usize = 4;
 const ARRAY_MAX_CARD: usize = 4096;
+const BITSET_SIZE: usize = 8192;
 
-/// Encodes `values` (ascending, distinct) as a portable Roaring bitmap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ContainerKind {
+    Array,
+    Bitset,
+    Run,
+}
+
+/// The maximal runs of consecutive values in an ascending container.
+fn container_runs(values: &[u16]) -> Vec<(u16, u16)> {
+    let mut runs = Vec::new();
+    let mut start = values[0];
+    let mut prev = values[0];
+    for &v in &values[1..] {
+        if v == prev + 1 {
+            prev = v;
+        } else {
+            runs.push((start, prev - start));
+            start = v;
+            prev = v;
+        }
+    }
+    runs.push((start, prev - start));
+    runs
+}
+
+/// Encodes `values` (ascending, distinct) exactly as `RunOptimize()` followed
+/// by `roaring::Roaring::write` does (`ra_portable_serialize`,
+/// `convert_run_optimize` in CRoaring 4.7).
 fn encode_roaring(values: &[u32]) -> Vec<u8> {
     // Group by the high 16 bits.
     let mut containers: Vec<(u16, Vec<u16>)> = Vec::new();
@@ -40,43 +77,110 @@ fn encode_roaring(values: &[u32]) -> Vec<u8> {
             _ => containers.push((key, vec![low])),
         }
     }
+
+    // Pick a representation per container: run containers win when strictly
+    // smaller than the array/bitset container CRoaring currently holds.
+    let mut kinds = Vec::with_capacity(containers.len());
+    let mut blobs: Vec<Vec<u8>> = Vec::with_capacity(containers.len());
+    for (_, list) in &containers {
+        let card = list.len();
+        let runs = container_runs(list);
+        let size_as_run = 2 + runs.len() * 4;
+        let size_current = if card <= ARRAY_MAX_CARD {
+            card * 2
+        } else {
+            BITSET_SIZE
+        };
+        if size_as_run < size_current {
+            let mut blob = Vec::with_capacity(size_as_run);
+            blob.extend_from_slice(&(runs.len() as u16).to_le_bytes());
+            for (start, length) in &runs {
+                blob.extend_from_slice(&start.to_le_bytes());
+                blob.extend_from_slice(&length.to_le_bytes());
+            }
+            kinds.push(ContainerKind::Run);
+            blobs.push(blob);
+        } else if card <= ARRAY_MAX_CARD {
+            let mut blob = Vec::with_capacity(card * 2);
+            for v in list {
+                blob.extend_from_slice(&v.to_le_bytes());
+            }
+            kinds.push(ContainerKind::Array);
+            blobs.push(blob);
+        } else {
+            let mut words = [0u64; 1024];
+            for v in list {
+                words[*v as usize / 64] |= 1u64 << (*v as usize % 64);
+            }
+            let mut blob = Vec::with_capacity(BITSET_SIZE);
+            for word in words {
+                blob.extend_from_slice(&word.to_le_bytes());
+            }
+            kinds.push(ContainerKind::Bitset);
+            blobs.push(blob);
+        }
+    }
+
+    let n = containers.len();
+    let has_run = kinds.contains(&ContainerKind::Run);
     let mut out = Vec::new();
-    out.extend_from_slice(&SERIAL_COOKIE_NO_RUNCONTAINER.to_le_bytes());
-    out.extend_from_slice(&(containers.len() as u32).to_le_bytes());
+    if has_run {
+        let cookie = SERIAL_COOKIE | ((n as u32 - 1) << 16);
+        out.extend_from_slice(&cookie.to_le_bytes());
+        let run_bitmap_len = n.div_ceil(8);
+        let mut run_bitmap = vec![0u8; run_bitmap_len];
+        for (i, kind) in kinds.iter().enumerate() {
+            if *kind == ContainerKind::Run {
+                run_bitmap[i / 8] |= 1 << (i % 8);
+            }
+        }
+        out.extend_from_slice(&run_bitmap);
+    } else {
+        out.extend_from_slice(&SERIAL_COOKIE_NO_RUNCONTAINER.to_le_bytes());
+        out.extend_from_slice(&(n as u32).to_le_bytes());
+    }
+
     for (key, list) in &containers {
         out.extend_from_slice(&key.to_le_bytes());
         out.extend_from_slice(&((list.len() as u16).wrapping_sub(1)).to_le_bytes());
     }
-    // Container data starts after the offset table.
-    let header = 8 + containers.len() * 4 + containers.len() * 4;
-    let mut data = Vec::new();
-    let mut offsets = Vec::with_capacity(containers.len());
-    for (_, list) in &containers {
-        offsets.push((header + data.len()) as u32);
-        if list.len() <= ARRAY_MAX_CARD {
-            for v in list {
-                data.extend_from_slice(&v.to_le_bytes());
-            }
-        } else {
-            let mut bits = vec![0u64; 1024];
-            for v in list {
-                bits[*v as usize / 64] |= 1u64 << (*v as usize % 64);
-            }
-            for w in bits {
-                data.extend_from_slice(&w.to_le_bytes());
-            }
+
+    let header = out.len();
+    let offsets_len = if !has_run || n >= NO_OFFSET_THRESHOLD {
+        n * 4
+    } else {
+        0
+    };
+    let mut at = (header + offsets_len) as u32;
+    let mut offsets = Vec::with_capacity(n);
+    for blob in &blobs {
+        offsets.push(at);
+        at += blob.len() as u32;
+    }
+    if offsets_len > 0 {
+        for o in offsets {
+            out.extend_from_slice(&o.to_le_bytes());
         }
     }
-    for o in offsets {
-        out.extend_from_slice(&o.to_le_bytes());
+    for blob in &blobs {
+        out.extend_from_slice(blob);
     }
-    out.extend_from_slice(&data);
     out
 }
 
-/// Decodes the portable bitmap written by [`encode_roaring`].
+/// Decodes a portable bitmap, accepting both CRoaring cookies (with and
+/// without run containers) and every container type.
 fn decode_roaring(buf: &[u8]) -> Result<Vec<u32>, FormatError> {
-    let at = |o: usize| -> Result<u32, FormatError> {
+    let read_u16 = |o: usize| -> Result<u16, FormatError> {
+        if o + 2 > buf.len() {
+            return Err(FormatError::Truncated {
+                need: o + 2,
+                got: buf.len(),
+            });
+        }
+        Ok(u16::from_le_bytes(buf[o..o + 2].try_into().unwrap()))
+    };
+    let read_u32 = |o: usize| -> Result<u32, FormatError> {
         if o + 4 > buf.len() {
             return Err(FormatError::Truncated {
                 need: o + 4,
@@ -85,51 +189,103 @@ fn decode_roaring(buf: &[u8]) -> Result<Vec<u32>, FormatError> {
         }
         Ok(u32::from_le_bytes(buf[o..o + 4].try_into().unwrap()))
     };
-    let cookie = at(0)?;
-    if cookie != SERIAL_COOKIE_NO_RUNCONTAINER {
-        return Err(FormatError::BadMagic(cookie as u64));
-    }
-    let n = at(4)? as usize;
-    let mut out = Vec::new();
-    for i in 0..n {
-        let hdr = 8 + i * 4;
-        if hdr + 4 > buf.len() {
+
+    let cookie = read_u32(0)?;
+    let (n, run_bitmap): (usize, Option<&[u8]>) = if cookie == SERIAL_COOKIE_NO_RUNCONTAINER {
+        (read_u32(4)? as usize, None)
+    } else if cookie & 0xffff == SERIAL_COOKIE {
+        let n = ((cookie >> 16) & 0xffff) as usize + 1;
+        let len = n.div_ceil(8);
+        if 4 + len > buf.len() {
             return Err(FormatError::Truncated {
-                need: hdr + 4,
+                need: 4 + len,
                 got: buf.len(),
             });
         }
-        let key = u16::from_le_bytes(buf[hdr..hdr + 2].try_into().unwrap()) as u32;
-        let card = u16::from_le_bytes(buf[hdr + 2..hdr + 4].try_into().unwrap()) as usize + 1;
-        let off = at(8 + n * 4 + i * 4)? as usize;
-        if card <= ARRAY_MAX_CARD {
-            if off + card * 2 > buf.len() {
+        (n, Some(&buf[4..4 + len]))
+    } else {
+        return Err(FormatError::BadMagic(cookie as u64));
+    };
+
+    let has_run = run_bitmap.is_some();
+    let descs_at = if has_run {
+        4 + n.div_ceil(8)
+    } else {
+        8
+    };
+    let offsets_at = descs_at + n * 4;
+    if offsets_at > buf.len() {
+        return Err(FormatError::Truncated {
+            need: offsets_at,
+            got: buf.len(),
+        });
+    }
+    let with_offsets = !has_run || n >= NO_OFFSET_THRESHOLD;
+    let data_at = offsets_at + if with_offsets { n * 4 } else { 0 };
+    if data_at > buf.len() {
+        return Err(FormatError::Truncated {
+            need: data_at,
+            got: buf.len(),
+        });
+    }
+
+    let mut out = Vec::new();
+    let mut cursor = data_at;
+    for i in 0..n {
+        let desc = descs_at + i * 4;
+        let key = read_u16(desc)? as u32;
+        let card = read_u16(desc + 2)? as usize + 1;
+        let is_run = run_bitmap.is_some_and(|bits| bits[i / 8] & (1 << (i % 8)) != 0);
+        if with_offsets {
+            let off = read_u32(offsets_at + i * 4)? as usize;
+            if off < data_at || off > buf.len() {
                 return Err(FormatError::Truncated {
-                    need: off + card * 2,
+                    need: off,
                     got: buf.len(),
                 });
             }
+            cursor = off;
+        }
+
+        if is_run {
+            if cursor + 2 > buf.len() {
+                return Err(FormatError::Truncated {
+                    need: cursor + 2,
+                    got: buf.len(),
+                });
+            }
+            let n_runs = read_u16(cursor)? as usize;
+            cursor += 2;
+            for _ in 0..n_runs {
+                let start = read_u16(cursor)? as u32;
+                let length = read_u16(cursor + 2)? as u32;
+                cursor += 4;
+                for v in start..=start + length {
+                    out.push((key << 16) | v);
+                }
+            }
+        } else if card <= ARRAY_MAX_CARD {
             for j in 0..card {
-                let low = u16::from_le_bytes(buf[off + j * 2..off + j * 2 + 2].try_into().unwrap())
-                    as u32;
+                let low = read_u16(cursor + j * 2)? as u32;
                 out.push((key << 16) | low);
             }
+            cursor += card * 2;
         } else {
-            if off + 8192 > buf.len() {
+            if cursor + BITSET_SIZE > buf.len() {
                 return Err(FormatError::Truncated {
-                    need: off + 8192,
+                    need: cursor + BITSET_SIZE,
                     got: buf.len(),
                 });
             }
             for w in 0..1024 {
-                let word =
-                    u64::from_le_bytes(buf[off + w * 8..off + w * 8 + 8].try_into().unwrap());
+                let word = u64::from_le_bytes(buf[cursor + w * 8..cursor + w * 8 + 8].try_into().unwrap());
                 for b in 0..64 {
                     if word & (1u64 << b) != 0 {
                         out.push((key << 16) | ((w * 64 + b) as u32));
                     }
                 }
             }
+            cursor += BITSET_SIZE;
         }
     }
     Ok(out)
@@ -142,11 +298,23 @@ pub fn write_lowcard_segment(path: &Path, entries: &[(u64, Vec<u32>)]) -> Result
     for (key, _) in entries {
         out.extend_from_slice(&key.to_le_bytes());
     }
+    // `InsertData` sizes every bitmap with the chunk-wide row universe
+    // (`max_offset + 1`), so all `count_` prefixes in a chunk are equal.
+    let max_offset = entries
+        .iter()
+        .flat_map(|(_, offsets)| offsets.iter().copied())
+        .max()
+        .unwrap_or(0);
+    let count = max_offset.wrapping_add(1);
     for (_, offsets) in entries {
         let mut sorted = offsets.clone();
         sorted.sort_unstable();
         sorted.dedup();
         let bitmap = encode_roaring(&sorted);
+        // `bitmap_size = GetSizeInBytes() = sizeof(count_) + sizeof(i32) + portable`.
+        let bitmap_size = 4 + 4 + bitmap.len();
+        out.extend_from_slice(&(bitmap_size as i32).to_le_bytes());
+        out.extend_from_slice(&count.to_le_bytes());
         out.extend_from_slice(&(bitmap.len() as i32).to_le_bytes());
         out.extend_from_slice(&bitmap);
     }
@@ -220,12 +388,21 @@ impl LowCardReader {
         // Walk to this key's bitmap: every earlier entry carries a size prefix.
         let mut at = 4 + self.count * 8;
         for _ in 0..lo {
+            if at + 4 > self.map.len() {
+                return Vec::new();
+            }
             let size = i32::from_le_bytes(self.map[at..at + 4].try_into().unwrap()) as usize;
             at += 4 + size;
         }
-        let size = i32::from_le_bytes(self.map[at..at + 4].try_into().unwrap()) as usize;
-        at += 4;
-        decode_roaring(&self.map[at..at + size]).unwrap_or_default()
+        // `i32 bitmap_size`, then `WriteAdv`: `u32 count_`, `i32 size`, bitmap.
+        if at + 12 > self.map.len() {
+            return Vec::new();
+        }
+        let bitmap_size = i32::from_le_bytes(self.map[at..at + 4].try_into().unwrap()) as usize;
+        let size = i32::from_le_bytes(self.map[at + 8..at + 12].try_into().unwrap()) as usize;
+        let start = at + 12;
+        let end = (start + size).min(at + 4 + bitmap_size).min(self.map.len());
+        decode_roaring(&self.map[start..end]).unwrap_or_default()
     }
 }
 
@@ -269,6 +446,93 @@ mod tests {
         assert_eq!(decode_roaring(&encode_roaring(&small)).unwrap(), small);
         let dense: Vec<u32> = (0..10000).collect();
         assert_eq!(decode_roaring(&encode_roaring(&dense)).unwrap(), dense);
+    }
+
+    /// Bytes of `Bitmap::WriteAdv` for the offsets `{3, 7}` with
+    /// `count_ = 8`, captured from CRoaring 4.7 (`GetSizeInBytes` +
+    /// `roaring::Roaring::write`): `u32 count_`, `i32 size`, portable image.
+    const CPP_WRITE_ADV_ARRAY: &[u8] = &[
+        8, 0, 0, 0, 20, 0, 0, 0, 0x3a, 0x30, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0x10, 0, 0, 0, 3, 0,
+        7, 0,
+    ];
+
+    /// `Bitmap::WriteAdv` for the offsets `0..10000`, which CRoaring stores as
+    /// a single run container (`count_ = 10000`, portable size 15).
+    const CPP_WRITE_ADV_RUN: &[u8] = &[
+        0x10, 0x27, 0, 0, 15, 0, 0, 0, 0x3b, 0x30, 0, 0, 1, 0, 0, 0x0f, 0x27, 1, 0, 0, 0,
+        0x0f, 0x27,
+    ];
+
+    /// The writer must emit `SaveIndexInner`'s exact framing and bytes.
+    #[test]
+    fn write_adv_framing_matches_cpp() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("framing.idx");
+
+        write_lowcard_segment(&path, &[(42u64, vec![3, 7])]).unwrap();
+        let mut expected = Vec::new();
+        expected.extend_from_slice(&1u32.to_le_bytes());
+        expected.extend_from_slice(&42u64.to_le_bytes());
+        // bitmap_size = GetSizeInBytes() = 4 + 4 + portable, then WriteAdv.
+        expected.extend_from_slice(&(28i32).to_le_bytes());
+        expected.extend_from_slice(CPP_WRITE_ADV_ARRAY);
+        assert_eq!(std::fs::read(&path).unwrap(), expected);
+
+        write_lowcard_segment(&path, &[(7u64, (0..10000).collect())]).unwrap();
+        let mut expected = Vec::new();
+        expected.extend_from_slice(&1u32.to_le_bytes());
+        expected.extend_from_slice(&7u64.to_le_bytes());
+        expected.extend_from_slice(&(23i32).to_le_bytes());
+        expected.extend_from_slice(CPP_WRITE_ADV_RUN);
+        assert_eq!(std::fs::read(&path).unwrap(), expected);
+    }
+
+    /// A chunk written by the reference (`SaveIndexInner`) must decode.
+    #[test]
+    fn reads_cpp_shaped_chunk() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cpp.idx");
+        let key = 0x0123_4567_89ab_cdefu64;
+        let mut chunk = Vec::new();
+        chunk.extend_from_slice(&1u32.to_le_bytes());
+        chunk.extend_from_slice(&key.to_le_bytes());
+        chunk.extend_from_slice(&28i32.to_le_bytes());
+        chunk.extend_from_slice(CPP_WRITE_ADV_ARRAY);
+        std::fs::write(&path, &chunk).unwrap();
+
+        let reader = LowCardReader::open(&path).unwrap();
+        assert_eq!(reader.len(), 1);
+        assert_eq!(reader.lookup(key), vec![3, 7]);
+        assert!(reader.lookup(key + 1).is_empty());
+
+        // A run-optimised image (a shape only CRoaring's `RunOptimize` emits)
+        // must decode as well.
+        let mut chunk = Vec::new();
+        chunk.extend_from_slice(&1u32.to_le_bytes());
+        chunk.extend_from_slice(&key.to_le_bytes());
+        chunk.extend_from_slice(&23i32.to_le_bytes());
+        chunk.extend_from_slice(CPP_WRITE_ADV_RUN);
+        std::fs::write(&path, &chunk).unwrap();
+
+        let reader = LowCardReader::open(&path).unwrap();
+        assert_eq!(reader.lookup(key), (0..10000).collect::<Vec<u32>>());
+    }
+
+    /// Every bitmap in a chunk carries the chunk-wide `max_offset + 1`.
+    #[test]
+    fn count_prefix_is_chunk_wide_row_universe() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("count.idx");
+        write_lowcard_segment(&path, &[(1u64, vec![3, 7]), (5, vec![10, 11, 12])]).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let first = 4 + 2 * 8;
+        let second = first + 4 + i32::from_le_bytes(bytes[first..first + 4].try_into().unwrap()) as usize;
+        for at in [first, second] {
+            let count = u32::from_le_bytes(bytes[at + 4..at + 8].try_into().unwrap());
+            assert_eq!(count, 13, "count_ at {at}");
+        }
+        let reader = LowCardReader::open(&path).unwrap();
+        assert_eq!(reader.lookup(5), vec![10, 11, 12]);
     }
 
     #[test]
