@@ -87,8 +87,8 @@
 | # | 条目 | 状态 | 提交 / 说明 |
 |---|---|---|---|
 | 9 | 封盘段不存位置（`add_position` 无参数） | ✅ | `a16e1b361`（writer/reader 位置流）+ `ac909e68b`（executor 两条 seal 路径携带位置、spill 合并读 `positions()`）；一次性格式破坏已声明 |
-| 10 | `RowFulltextProvider::postings` 返回所有行 | 🔄 | `RowFulltextProvider` 改走列倒排索引的 `Lookup` 并按扫描行 id 求交；同列两个不同分词器的索引回退为保留该行。实现完成，待提交哈希（workspace 被并发编辑阻塞）|
-| 11 | `index_delims` 抹平分析器 | 🔄 | `TextIndex` 增加 `TextTokenizer { delims, analyzer }`，insert/query 都走 `AnalyzerPool::get_analyzer`。实现完成，待提交哈希 |
+| 10 | `RowFulltextProvider::postings` 返回所有行 | ✅ | `80a2e24c0`：改走列倒排索引的 `merge`（C++ `ColumnIndexReader::Lookup`）并按扫描得到的 row id 求交——陈旧 posting 不会放行未物化的行；同列两个分词器不同的索引经 `guard.tokenizer != tokenizer` 判定为「不能回答」，回退为保留该行由残余谓词裁决。测试 `fulltext_index_filter_reads_postings_by_row_id` |
+| 11 | `index_delims` 抹平分析器 | ✅ | `d05c0f227`：`TextTokenizer` 增加 `analyzer: Option<String>`，`index_analyzer` 从表元数据取索引的 `ANALYZER` 选项（`standard`/`keyword`/`whitespace` 仍走分隔符路径），`tokenize_text`/`tokenize_index_text`/`tokenize_index_positions` 统一问 `AnalyzerPool::get_analyzer(name)`；写侧与查询侧同一 tokenizer，等值保护仍有效。测试 `an_ik_fulltext_index_is_tokenised_by_its_analyzer`（`热爱` 产生 posting、整段中文不被当作一个标准 token） |
 | 12 | `QueryBuilder`/短语/布尔迭代器不在产品路径 | ⏳ | MATCH 仍只走「单 term WAND，否则整行重分词」 |
 | 13 | `MemoryIndexer` 无 spill-to-sorted-runs / `InsertGap` | ⏳ | `FULLTEXT_SPILL_SUFFIX` 声明未用，`SortMerger` 无调用方 |
 | 14 | BMW 无块级最大值、非增量 | 🔄 | `wand.rs` 移植中（per-block maxima + `Next/NextShallow`） |
@@ -103,14 +103,14 @@
 | 18 | PGM 单层、`levels_offsets` 恒 0 | ✅ | 同上：真正的 `PGMIndex<u64,64,4,float>` 递归层级 + C++ 字节 fixture（1 级/2 级各一） |
 | 19 | Plaid `MergeChunks`/`DiskMerger` 零调用 | ⏳ | 引擎仍从 tail 重建整块；接线方案研究中 |
 | 20 | `InitAbstractIndexT` 硬编码 M/ef_construction | ✅ | `04ee86483`：从索引选项读取并写入 chunk 头 |
-| 21 | BMP 搜索选项恒 default | 🔄 | `parse_bmp_search_options` 解析 `alpha/beta/use_tail`，WITH 优先于 option 字符串，超范围忽略；磁盘路径原先硬编码 0.9 一并修正。实现完成，待提交哈希 |
+| 21 | BMP 搜索选项恒 default | ✅ | `948731581`：`parse_bmp_search_options` 实现 `BMPUtil::ParseBmpSearchOptions`（`alpha`/`beta`/`use_tail`，WITH 优先于 option 字符串，越界忽略，`use_tail` 只认 `T`/`F`），内存与磁盘两条 sparse 路径都用它（磁盘路径原先硬编码 0.9）；顺带修了稀疏 option 串被整条丢弃的解析 bug。测试 `match_sparse_alpha_option_reaches_the_bmp_search`（`alpha=0` 改变 `SCORE()`） |
 
 ### 规划 / 执行 / 网络
 
 | # | 条目 | 状态 | 提交 / 说明 |
 |---|---|---|---|
 | 22 | 不存在 `PhysicalOperator`/`OperatorState` 模型 | ⏳ | 见下「算子模型迁移切片」 |
-| 23 | 非 `Eq` 谓词不下推、掩码全 false 退回全部行 | 🔄 | `ac909e68b`：掩码全 false 返回空集（已收敛一半）；非等值谓词仍取全表内存过滤 |
+| 23 | 非 `Eq` 谓词不从索引回答、掩码全 false 退回全部行 | ✅（整数）/ ⏳（其余类型） | 掩码全 false 返回空集（`ac909e68b`）。**审计的诊断是错的**：planner 侧完全支持范围（`classify_compare` 对非 varchar 任意比较都 indexable，严格界改写成 `<=`/`>=`，`simplify_secondary` 合并成一个 `Secondary { ranges }`）。真正缺口在执行器：`select()` 只对裸 `col = literal` 走索引。已补：`SecondarySegmentReader::range`（`54454e892`，复用内部 `lower_bound`，**不动字节格式**，故意不用 PGM hint）、`SecondaryIndex::for_each_in_order`（文档写明字节序≠数值序，测试钉住）、`index_range_lookup`/`live_row_in_range`/`index_scan_range_rows` 与 `select()` 接线（`948731581`，属并入他人提交，本文件的 attribution 以本条为准）、测试 `a6f638ef7`（`SET CONFIG result_cache off` 后才真正打到 chunk；round 0 覆盖 chunk+tail 合并，round 1 纯 chunk）。**剩余缺口**：float/date/varchar 的 chunk key 是 `hash_varchar`，范围扫描必须改磁盘格式，属单独决策——这些类型的 `EXPLAIN` 仍会显示 `INDEX SCAN` 而实际走全表+内存过滤 |
 | 24 | `FastRoughFilterEvaluator` 无生产实现/调用方 | ⏳ | 默认规则空 `IndexCatalog`，只能折叠字面 false |
 | 25 | `ResultCacheGetter` 仅测试构造 | ⏳ | 生产是「整条 `QueryResult` 按语句文本做键」，无 begin-ts/表键/列投影 |
 | 26 | `SHOW SEGMENTS/BLOCKS` 只有合成元数据 | ✅ | `d385fb7c8`：真实段/块元数据 + `FormatByteSize` 移植 |
@@ -141,6 +141,10 @@
 | P1 | HTTP `/variables/*`、`/instance/{buffer,objects,queries,transactions,profiles,memindex,files,logs,memory}`、`/admin/logs` 等 14 条路由返回 501 | `infinity-server/src/http.rs`（`d385fb7c8`） | 缺 `Engine` accessor：`SetScope` 私有、`buffer_objects`/`active_transactions`/`profiles`/`memory_indexes`/`all_files`/`logs`/分配器统计。参考实现有 27 条路由 |
 | P2 | `global_variable_value()` 对 `buffer_object_count`/`unused_buffer_object`/`active_txn_count`/`total_rollback_count`/`bg_task_count`/`system_memory_usage`/`open_file_count`/`cpu_usage` 硬编码 `"0"` | `infinity-executor/src/lib.rs` | `SHOW VARIABLES`/HTTP 会报假值；需上面同一批 accessor |
 | P2 | `SHOW SEGMENTS` 的 `status` 恒为字面量 `"No value"` | `physical_show_segments_impl.cpp:37` | 参考实现本身也读已删除的 `SegmentEntry::status_`，属参考侧遗留，非遗漏 |
+
+### 提交归属（2026-10-20）
+
+并行 agent 在同一工作树里改同一个热点文件（`infinity-executor/src/lib.rs`）时，`git add <file>` 会把**别人尚未提交的 hunk 一起带走**：`948731581`（BMP 选项）实际包含了 bindctx-15 的整套整数范围索引扫描。两次复现（另一次是 `d05c0f227` 把已提交的 `memindex_pending` 修复回退，后由 `760e878b7` 恢复）。为此：本条目的功能归属以哈希链 `54454e892` → `948731581` → `a6f638ef7` 为准；后续热点文件同时只允许一个 agent 写，其余待命，且每个 agent 提交后要 `git show <hash>` 复核删除行是否属于别人。
 
 ## 处置口径
 
