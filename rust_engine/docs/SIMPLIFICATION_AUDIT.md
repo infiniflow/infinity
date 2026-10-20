@@ -77,7 +77,7 @@
 | 2 | `TxnManager` 无 rollback/registry | ✅ | `74a4728b2`：`rollback`、txn registry、范围冲突检查（从 WAL 重建） |
 | 3 | `MetaStore`/`KVStore` 无批量 delete / 非原子 DDL | 🔄 | `6316ae8f0` 已给 store 侧 `atomic_batch`+`merge`；checkpoint-only 包装 `DeferredCatalogStore` 已转发 `atomic_batch`（保持 undo 日志完整）。**DDL 消费方仍逐键写**，待 executor 改为一次批量提交 |
 | 4 | `BufferObj`/`BufferHandle` 缺 mmap/快照状态 | ✅ | `fff4b4ff8`：`ToMmap/Mmap/Munmap`、`save_snapshot` |
-| 5 | `Storage` 无状态机 | ⏳ | 缺 `Get/SetStorageMode`、`InitToAdmin`/`AdminToReader`/`ReaderToWriter`、`RecoverMemIndex`、`AttachCatalog(ts)`；接线方案研究中 |
+| 5 | `Storage` 无状态机 | ✅（准入守卫级） | `21ddc380c`：`StorageMode{kUnInitialized,kAdmin,kReadable,kWritable}` + `Storage::get/set_storage_mode`（`storage_impl.cpp:805-877` 的合法迁移表，同模式为 no-op，非法迁移报错）+ `accepts_writes/accepts_cleanup`；`Engine::ensure_writable`（8007 `InvalidNodeRole`）挂在 `execute()` 的写语句与 `flush`/`cleanup`/`optimize_indexes`/`compact_table`/`insert_literals`/`insert_rows`/`EngineTxn::commit` 上，`UnInitialized` 时为 fatal。5 个测试（默认 Writable、Readable 拒写但可读、回 Writable 恢复、`UnInit→Writable` 非法、Admin 只读）。**未复刻**：`InitToAdmin`/`AdminToReaderBottom`/`AdminToWriter` 的子系统重建与 `AttachCatalog(ts)`（Rust 在 `open()` 一次性建好），已登记进 `CLASS_MAP.md` |
 | 6 | `BufferManager` 缺对象管理/分片 | ✅ | `fff4b4ff8`：分片 `lru_caches_`、`RequestSpace`、`buffered_object_count`/`unused_buffer_object` |
 | 7 | `VarBufferManager` 是类型别名 | ✅ | `24429ee91`：真正的 outline-backed manager + `free_success` 预算钩子 |
 | 8 | `BlockVersion` 只有 `SpillToFile` | ✅ | `b20b5632f`：checkpoint 剪枝 `save_to_file(ckp_ts)`、`commit_row_count`、`restore_from_snapshot` |
