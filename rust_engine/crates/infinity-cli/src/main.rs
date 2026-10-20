@@ -173,21 +173,22 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
             }
         });
     }
-    // `[storage] optimize_interval` — the background optimizer appends a merged
-    // index chunk once the memory dumps have left more than one behind.
-    let opt = parse_interval_secs(&toml_value(&text, "optimize_interval").unwrap_or_default());
-    if opt > 0 {
-        let weak = Arc::downgrade(&engine);
-        std::thread::spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_secs(opt));
-            match weak.upgrade() {
-                Some(e) => {
-                    let _ = e.optimize_indexes();
-                }
-                None => break,
-            }
-        });
-    }
+    // `[storage] cleanup_interval` / `compact_interval` / `optimize_interval`:
+    // the reference's periodic triggers behind `PeriodicTriggerThread`
+    // (`periodic_trigger_thread_impl.cpp:49-74`), plus the background processor
+    // the memory-index quota dumps through (`BGMemIndexTracer::TriggerDump`).
+    // The checkpoint trigger above stays on its own thread because
+    // `trim_allocator` is CLI-only (`infinity-executor` forbids unsafe code):
+    // folding the checkpoint into the scheduler would drop the page release
+    // after each dump (Gate C).
+    let cleanup = parse_interval_secs(&toml_value(&text, "cleanup_interval").unwrap_or_default());
+    let compact = parse_interval_secs(&toml_value(&text, "compact_interval").unwrap_or_default());
+    let optimize = parse_interval_secs(&toml_value(&text, "optimize_interval").unwrap_or_default());
+    engine.start_background_tasks(
+        std::time::Duration::from_secs(cleanup),
+        std::time::Duration::from_secs(compact),
+        std::time::Duration::from_secs(optimize),
+    );
     let server = infinity_server::Server::bind_with_engine(&addr, engine)?;
     println!("serving on {}", server.local_addr()?);
     server.run();

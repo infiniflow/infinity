@@ -3598,6 +3598,11 @@ struct Context {
     query_count: std::sync::atomic::AtomicU64,
     /// `connected_timestamp` session variable: when the engine was opened.
     connected_at: String,
+    /// Commit timestamp of the last cleanup (`BGTaskProcessor::last_cleanup_ts_`,
+    /// `src/storage/bg_task/background_process.cppm:53-65`). The cleanup
+    /// trigger skips a tick when nothing committed since
+    /// (`periodic_trigger_impl.cpp:48-59`).
+    last_cleanup_ts: std::sync::atomic::AtomicU64,
 }
 
 /// The engine: catalog + transaction manager + KV store + a Tokio runtime.
@@ -4126,6 +4131,7 @@ impl Engine {
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs().to_string())
                     .unwrap_or_default(),
+                last_cleanup_ts: std::sync::atomic::AtomicU64::new(0),
             },
             dir,
             wal_enabled: options.wal_enabled,
@@ -13985,8 +13991,90 @@ impl Engine {
         }
     }
 
+    /// Queues a [`CleanupTask`]. Returns `false` when no processor is attached
+    /// or it is shutting down.
+    pub fn submit_cleanup(&self) -> bool {
+        self.submit_task(|engine| Box::new(CleanupTask { engine }))
+    }
+
+    /// Queues an [`OptimizeTask`]. Returns `false` when no processor is
+    /// attached or it is shutting down.
+    pub fn submit_optimize_indexes(&self) -> bool {
+        self.submit_task(|engine| Box::new(OptimizeTask { engine }))
+    }
+
+    fn submit_task(
+        &self,
+        make: impl FnOnce(std::sync::Weak<Engine>) -> Box<dyn BgTask>,
+    ) -> bool {
+        let Some(processor) = self.bg_processor.lock().unwrap().clone() else {
+            return false;
+        };
+        let engine = self.self_weak.lock().unwrap().clone();
+        processor.submit(make(engine))
+    }
+
+    /// Whether a transaction committed since the last cleanup.
+    ///
+    /// C++ `CleanupPeriodicTrigger::CreateCleanupTask`
+    /// (`periodic_trigger_impl.cpp:48-59`): the trigger only builds a cleanup
+    /// task when the oldest alive timestamp moved past the last cleanup
+    /// timestamp, so an idle server does not checkpoint on every tick.
+    pub fn needs_cleanup(&self) -> bool {
+        self.txn.current_ts()
+            > self
+                .context
+                .last_cleanup_ts
+                .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Starts the background task processor and the periodic trigger thread.
+    ///
+    /// C++: `Storage::AdminToWriter` starts `BGTaskProcessor`, the compaction /
+    /// optimization / dump-index processors and `PeriodicTriggerThread`
+    /// (`src/storage/storage_impl.cpp:357-430`); the trigger thread then wakes
+    /// every second and fires each trigger whose interval has elapsed
+    /// (`periodic_trigger_thread_impl.cpp:49-74`).
+    ///
+    /// Only the CLI calls this: [`Engine::open_with_options`] stays
+    /// deterministic for tests and embedded callers.
+    ///
+    /// `compact_interval` is accepted but does nothing: `NotifyCompactTask`
+    /// walks every database and table and compacts the segments
+    /// `NewCompactionAlg` selects (`compaction_process_impl.cpp:86-210`), and
+    /// neither the selection heuristic nor the per-table walk exists here yet
+    /// (TODO(item 1b)). Passing `Duration::ZERO` disables a trigger.
+    pub fn start_background_tasks(
+        self: &Arc<Self>,
+        cleanup_interval: std::time::Duration,
+        compact_interval: std::time::Duration,
+        optimize_interval: std::time::Duration,
+    ) {
+        let processor = Arc::new(BGTaskProcessor::new(1));
+        processor.start();
+        self.attach_bg_task_processor(processor);
+        let engine = Arc::downgrade(self);
+        let spawned = std::thread::Builder::new()
+            .name("infinity-trigger".to_string())
+            .spawn(move || {
+                trigger_loop(engine, cleanup_interval, compact_interval, optimize_interval)
+            });
+        if let Err(error) = spawned {
+            eprintln!("background trigger thread not started: {error}");
+        }
+    }
+
     /// Dumps every in-memory index (the body of the reference's dump task).
+    ///
+    /// Takes `flush_lock` as well as the caller's `batch_lock`: a checkpoint
+    /// ([`Self::flush_storage`]) seals the same memory tails and rewrites the
+    /// same chunk files under that lock, so without it a background dump and a
+    /// checkpoint could seal concurrently and produce duplicate chunk names or
+    /// a lost tail. The lock order is always `batch_lock` then `flush_lock`
+    /// (the dump task holds the former, the checkpoint the latter), so the two
+    /// cannot deadlock.
     fn dump_all_memory_indexes(&self) {
+        let _serial = self.storage.flush_lock.lock().unwrap();
         self.seal_multivector_indexes();
         self.seal_sparse_indexes();
         self.seal_secondary_indexes();
@@ -14396,7 +14484,14 @@ impl Engine {
         // (`background_process_impl.cpp:109`); only `kAdmin` is rejected.
         self.ensure_cleanup_allowed()?;
         self.flush_storage()?;
-        self.cleanup_cpp_index_chunks()
+        let cleaned = self.cleanup_cpp_index_chunks();
+        // `BGTaskProcessor` records the cleanup timestamp so the trigger can
+        // skip ticks with nothing new to reclaim
+        // (`background_process_impl.cpp:126-138`, `last_cleanup_ts_`).
+        self.context
+            .last_cleanup_ts
+            .store(self.txn.current_ts(), std::sync::atomic::Ordering::Relaxed);
+        cleaned
     }
 }
 
@@ -16152,6 +16247,99 @@ impl BgTask for DumpMemIndexTask {
             engine.dump_all_memory_indexes();
         }
         self.pending.store(0, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// Background `CleanupTask` (`src/storage/bg_task/bg_task.cppm:107-114`).
+///
+/// The trigger submits it once a transaction has committed since the last
+/// cleanup ([`Engine::needs_cleanup`]); the task itself runs
+/// [`Engine::cleanup`], which records the new timestamp. A failure is reported
+/// rather than propagated: the reference calls `UnrecoverableError`, and the
+/// port has no process-wide abort for a background thread.
+pub struct CleanupTask {
+    engine: std::sync::Weak<Engine>,
+}
+
+impl BgTask for CleanupTask {
+    fn name(&self) -> &str {
+        "CleanupTask"
+    }
+
+    fn run(self: Box<Self>) {
+        if let Some(engine) = self.engine.upgrade() {
+            if let Err(error) = engine.cleanup() {
+                eprintln!("background cleanup failed: {error}");
+            }
+        }
+    }
+}
+
+/// Background `NotifyOptimizeTask` (`src/storage/bg_task/bg_task.cppm:136-143`),
+/// the periodic index optimizer: `NewNotifyOptimize` runs
+/// `txn->OptimizeAllIndexes()` (`optimization_process_impl.cpp:91-145`), which
+/// [`Engine::optimize_indexes`] mirrors for the index mirrors it ports.
+pub struct OptimizeTask {
+    engine: std::sync::Weak<Engine>,
+}
+
+impl BgTask for OptimizeTask {
+    fn name(&self) -> &str {
+        "OptimizeTask"
+    }
+
+    fn run(self: Box<Self>) {
+        if let Some(engine) = self.engine.upgrade() {
+            if let Err(error) = engine.optimize_indexes() {
+                eprintln!("background optimize failed: {error}");
+            }
+        }
+    }
+}
+
+/// The reference's `PeriodicTriggerThread::Run`
+/// (`periodic_trigger_thread_impl.cpp:49-74`): wake every second and fire each
+/// trigger whose interval elapsed.
+///
+/// The engine is upgraded per tick and dropped before the sleep, so the thread
+/// stops as soon as the last `Arc<Engine>` goes away instead of keeping the
+/// engine alive through a strong handle.
+fn trigger_loop(
+    engine: std::sync::Weak<Engine>,
+    cleanup_interval: std::time::Duration,
+    compact_interval: std::time::Duration,
+    optimize_interval: std::time::Duration,
+) {
+    const TICK: std::time::Duration = std::time::Duration::from_secs(1);
+    let mut last_cleanup = std::time::Instant::now();
+    let mut last_compact = std::time::Instant::now();
+    let mut last_optimize = std::time::Instant::now();
+    loop {
+        {
+            let Some(engine) = engine.upgrade() else {
+                return;
+            };
+            if !optimize_interval.is_zero() && last_optimize.elapsed() >= optimize_interval {
+                last_optimize = std::time::Instant::now();
+                engine.submit_optimize_indexes();
+            }
+            if !compact_interval.is_zero() && last_compact.elapsed() >= compact_interval {
+                last_compact = std::time::Instant::now();
+                // TODO(item 1b): `NotifyCompactTask` walks every database and
+                // table and compacts the segments `NewCompactionAlg` selects
+                // (`compaction_process_impl.cpp:86-210`); neither the walk nor
+                // the selection heuristic is ported, so the interval is wired
+                // but fires nothing.
+            }
+            if !cleanup_interval.is_zero()
+                && last_cleanup.elapsed() >= cleanup_interval
+                && engine.needs_cleanup()
+            {
+                last_cleanup = std::time::Instant::now();
+                engine.submit_cleanup();
+            }
+        }
+        std::thread::sleep(TICK);
     }
 }
 

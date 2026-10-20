@@ -80,6 +80,71 @@ fn cleanup_removes_the_dropped_table_files() {
     assert!(!e.table_exists("tb2"));
 }
 
+/// The same cleanup, but as the reference runs it: submitted to the background
+/// processor and waited for with `drain` instead of called inline. This is what
+/// the periodic trigger does in production
+/// (`CleanupPeriodicTrigger::Trigger` → `BGTaskProcessor::Submit`).
+#[test]
+fn background_cleanup_task_removes_dropped_files() {
+    let dir = tempdir().unwrap();
+    let engine = Arc::new(Engine::open(dir.path()).unwrap());
+    engine
+        .execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .unwrap();
+    engine
+        .execute("CREATE TABLE tb2 (col1 INT, col2 VARCHAR);")
+        .unwrap();
+    append_block(&engine, "default_db.tb1");
+    append_block(&engine, "default_db.tb2");
+    engine.flush().unwrap();
+
+    let exist_paths = engine.table_files("default_db.tb1");
+    let delete_paths = engine.table_files("default_db.tb2");
+    assert!(!exist_paths.is_empty(), "tb1 has no data files");
+    assert!(!delete_paths.is_empty(), "tb2 has no data files");
+
+    engine.execute("DROP TABLE default_db.tb2;").unwrap();
+    engine.flush().unwrap();
+
+    let processor = Arc::new(BGTaskProcessor::new(1));
+    processor.start();
+    engine.attach_bg_task_processor(Arc::clone(&processor));
+    assert!(engine.submit_cleanup(), "cleanup was not queued");
+    engine.drain_background_tasks();
+
+    for path in &delete_paths {
+        assert!(!path.exists(), "dropped table file survived: {path:?}");
+    }
+    for path in &exist_paths {
+        assert!(path.exists(), "surviving table file was removed: {path:?}");
+    }
+    processor.stop();
+}
+
+/// `start_background_tasks` attaches a processor (so the memory-index quota
+/// starts proposing dumps instead of dumping inline) and spawns the periodic
+/// trigger thread. The intervals are zero here so no trigger fires and the test
+/// does not depend on timing.
+#[test]
+fn start_background_tasks_sets_processor() {
+    let dir = tempdir().unwrap();
+    let engine = Arc::new(Engine::open(dir.path()).unwrap());
+    // No processor by default: `Engine::open` must stay deterministic.
+    assert!(!engine.submit_cleanup());
+
+    engine.start_background_tasks(
+        std::time::Duration::ZERO,
+        std::time::Duration::ZERO,
+        std::time::Duration::ZERO,
+    );
+    assert!(engine.submit_optimize_indexes(), "no processor attached");
+    engine.drain_background_tasks();
+
+    // Dropping the engine stops the processor (`BGTaskProcessor::drop`) and the
+    // trigger thread, which only holds a `Weak` and exits on its next tick.
+    drop(engine);
+}
+
 /// C++: `compact_segments_task_ut.cpp:73` (`bg_compact`).
 ///
 /// Eleven imports form eleven segments; compaction merges them (`segment_count`
