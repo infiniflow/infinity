@@ -21,7 +21,7 @@
 //! |---|---|---|---|
 //! | `U64` (INT/UINT/VARCHAR/JSON) | `u64` / `float` | 8 | `{u64,f32,u32}` = 16 |
 //! | `F32` (FLOAT) | `float` / `float` | 4 | `{f32,f32,u32}` = 12 |
-//! | `F64` (DOUBLE) | `double` / `double` | 8 | `{f64,f64,u32}` = 24 (4 bytes of padding) |
+//! | `F64` (DOUBLE) | `double` / `double` | 8 | `{f64,f64,u32}` = 20 |
 //!
 //! and `levels_offsets` is a `std::vector<size_t>`, i.e. 8 bytes per entry.
 //!
@@ -106,13 +106,13 @@ impl KeyKind {
     }
 
     /// `sizeof(Segment)` for `PGMIndex<K, 64, 4, Floating>`: `{K key; Floating
-    /// slope; u32 intercept;}`, padded to the struct's alignment. `f64` keys
-    /// make it 24 bytes (4 bytes after the intercept).
+    /// slope; u32 intercept;}` under `#pragma pack(push, 1)`, so there is no
+    /// padding: `8+4+4`, `4+4+4`, `8+8+4`.
     pub fn segment_width(self) -> usize {
         match self {
             KeyKind::U64 => 16,
             KeyKind::F32 => 12,
-            KeyKind::F64 => 24,
+            KeyKind::F64 => 20,
         }
     }
 
@@ -840,13 +840,11 @@ fn flat_tail(kind: KeyKind, entries: &[(Key, u32)]) -> Vec<u8> {
                 out.extend_from_slice(&intercept.to_le_bytes());
             }
         }
-        // `{f64 key; f64 slope; u32 intercept}` is 24 bytes: 4 of padding.
         _ => {
             for (key, slope, intercept) in &segments {
                 out.extend_from_slice(&key.as_f64().to_bits().to_le_bytes());
                 out.extend_from_slice(&slope.to_bits().to_le_bytes());
                 out.extend_from_slice(&intercept.to_le_bytes());
-                out.extend_from_slice(&[0u8; 4]);
             }
         }
     }
@@ -1367,8 +1365,8 @@ mod tests {
         assert_eq!(&bytes[..n * 8], &keys[..]);
         let tail_at = n * 8 + n * 4;
         assert_eq!(&bytes[tail_at..tail_at + 4], &(n as u32).to_le_bytes()[..]);
-        // 1 segment + sentinel, 24 bytes each.
-        assert_eq!(bytes.len(), tail_at + 4 + 8 + 4 + 2 * 24 + 4 + 2 * 8);
+        // 1 segment + sentinel, 20 bytes each (`#pragma pack(1)`: no padding).
+        assert_eq!(bytes.len(), tail_at + 4 + 8 + 4 + 2 * 20 + 4 + 2 * 8);
 
         let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F64).unwrap();
         assert_eq!(reader.len(), n);
@@ -1450,6 +1448,39 @@ mod tests {
         // The kind is not in the file: reading the same bytes as u64 keys must
         // not silently succeed with garbage.
         assert!(SecondarySegmentReader::open(&path).is_err());
+    }
+
+    /// The `DOUBLE` twin of `cpp_shaped_float_chunk_opens`: 8-byte keys and
+    /// 20-byte packed `{f64, f64, u32}` segments (`pgm_index.hpp:225`).
+    #[test]
+    fn cpp_shaped_double_chunk_opens() {
+        let keys = [-3.5f64, 1.5, 2.5];
+        let mut chunk = Vec::new();
+        for key in keys {
+            chunk.extend_from_slice(&key.to_bits().to_le_bytes());
+        }
+        for off in 0..keys.len() as u32 {
+            chunk.extend_from_slice(&off.to_le_bytes());
+        }
+        chunk.extend_from_slice(&(keys.len() as u32).to_le_bytes());
+        chunk.extend_from_slice(&keys[0].to_bits().to_le_bytes());
+        chunk.extend_from_slice(&1u32.to_le_bytes());
+        chunk.extend_from_slice(&keys[0].to_bits().to_le_bytes());
+        chunk.extend_from_slice(&0.0f64.to_bits().to_le_bytes());
+        chunk.extend_from_slice(&0u32.to_le_bytes());
+        chunk.extend_from_slice(&2u32.to_le_bytes());
+        chunk.extend_from_slice(&0u64.to_le_bytes());
+        chunk.extend_from_slice(&1u64.to_le_bytes());
+        assert_eq!(chunk.len(), 3 * 8 + 3 * 4 + 4 + 8 + 4 + 20 + 4 + 16);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_cpp_f64.idx");
+        std::fs::write(&path, &chunk).unwrap();
+
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F64).unwrap();
+        assert_eq!(reader.len(), 3);
+        assert_eq!(reader.lookup(Key::F64(2.5)), vec![2]);
+        assert_eq!(reader.range(Key::F64(-4.0), Key::F64(2.0)), vec![0, 1]);
     }
 
     /// An empty typed chunk round-trips (`n = 0`, one sentinel segment).
