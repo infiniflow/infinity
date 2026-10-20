@@ -65,15 +65,19 @@
 - `infinity-storage::wal_entry` 零调用方。
 - `infinity-planner::result_cache::ResultCacheGetter`、`index_scan::FastRoughFilterEvaluator` 零生产调用方。
 
-## 进度
+## 进度（2026-10-20）
 
-| 条目 | 状态 | 提交/说明 |
+| 条目 | 状态 | 提交 / 说明 |
 |---|---|---|
-| 索引 · `InitAbstractIndexT` 硬编码 M/ef_construction | ✅ 已修 | `04ee86483`：从索引选项读取并写进 chunk 头；`HnswIndex::ef_construction()` 提供真值 |
-| 索引过滤 · 掩码全 false 时返回全部行 | ✅ 已修 | 改为返回空集（`PhysicalIndexScan` 语义）；等 storage 侧 agent 落盘后统一跑 Gate A |
-| 低基数 chunk / PGM 层级 / 全文 positions / EMVB OPQ | 🔄 进行中 | 三个并行 agent 分别改 `secondary_lowcard.rs`+`secondary_segment.rs`、`fulltext_segment.rs`+`inverted_format/**`、`emvb*.rs` |
-| WAL 类型化 redo / TxnManager | 🔄 进行中 | agent 负责 `wal.rs`/`wal_entry.rs`/`infinity-txn/**` |
-| 其余（MetaStore 原子删除、算子模型、`RowFulltextProvider`、`index_delims` 分派、HTTP/admin、bg_task 调度…） | ⏳ 待办 | 见上方清单 |
+| 索引 · `InitAbstractIndexT` 硬编码 M/ef_construction | ✅ | `04ee86483`：从索引选项读取并写入 chunk 头 |
+| 索引过滤 · 掩码全 false 退回全部行 | ✅ | `ac909e68b`：返回空集（`PhysicalIndexScan` 语义） |
+| 次级 · 低基数缺 `count_`（且未 run-optimise） | ✅ | `d13b21834`：`WriteAdv` 逐字节（`count_` 为 chunk 级 `max_offset+1`，run/array/bitset 选择 + cookie 复刻）；fixture 由 CRoaring 实测生成 |
+| 次级 · PGM 单层、`levels_offsets` 恒 0 | ✅ | `d13b21834`：真正的 `PGMIndex<u64,64,4,float>` 递归层级 + C++ 字节 fixture（1 级/2 级各一） |
+| 全文 · 封盘段不存位置 | ✅ | `a16e1b361`（writer/reader 位置流）+ `ac909e68b`（executor 两条 seal 路径携带位置、spill 合并读 `positions()`）；一次性格式破坏已声明 |
+| EMVB · OPQ 写成单位阵 | ✅ | `a19d08364`：OPQ 训练（6 轮 + 通用 `JacobiSVD` 移植）、查询侧 `R^T q`、R 存 chunk；`R=U·V^T` 对符号/排序不变，字节差异只剩随机 k-means（C++ 自身也不可复现） |
+| `infinity-expression` · 未知函数静默 NULL | ✅ | `3168c6e59`（注册表 67+16+14 特殊名）、`8866b848a`（planner 两个 `Func` 分支强制）、`22eb9ce9f`（补 `CREATE_TIMESTAMP` 等）、`94987cb24`（`UNNEST`）；语料反向扫描 3407 条记录、64 个函数名，未覆盖集合为空 |
+| WAL / TxnManager · 无类型化 redo、无 rollback/registry | ✅ | `74a4728b2`：`WalCmd` Append/Delete 类型化 + `KvBatch(Catalog)` 容器、`WalEntryIterator` 回放、`rollback`/txn registry/范围冲突检查（从 WAL 重建） |
+| 其余（MetaStore 原子批量、BufferObj/BufferManager 对象管理、VarBuffer、BlockVersion、HTTP/admin、ShowSegments/Blocks、`RowFulltextProvider`、`index_delims`、BMP 选项、算子模型、Plaid merge 接线、bg_task 调度、BMW 块最大值、MemoryIndexer spill、BindContext） | 🔄 / ⏳ | 三个并行 agent 分别处理 storage 辅助类、server 路由与 SHOW 元信息、executor 查询侧三项；其余见上方清单 |
 
 ## 处置口径
 
