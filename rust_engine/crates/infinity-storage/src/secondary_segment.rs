@@ -22,6 +22,8 @@
 //! | `U64` (INT/UINT/VARCHAR/JSON) | `u64` / `float` | 8 | `{u64,f32,u32}` = 16 |
 //! | `F32` (FLOAT) | `float` / `float` | 4 | `{f32,f32,u32}` = 12 |
 //! | `F64` (DOUBLE) | `double` / `double` | 8 | `{f64,f64,u32}` = 20 |
+//! | `I32` (DATE/TIME) | `i32` / `float` | 4 | `{i32,f32,u32}` = 12 |
+//! | `I64` (DATETIME/TIMESTAMP) | `i64` / `float` | 8 | `{i64,f32,u32}` = 16 |
 //!
 //! and `levels_offsets` is a `std::vector<size_t>`, i.e. 8 bytes per entry.
 //!
@@ -94,14 +96,20 @@ pub enum KeyKind {
     U64,
     F32,
     F64,
+    /// `ConvertToOrderedI32` (`DateT`, `TimeT`): a raw signed 4-byte key, the
+    /// day count for a DATE and the second of the day for a TIME.
+    I32,
+    /// `ConvertToOrderedI64` (`DateTimeT`, `TimestampT`): a raw signed 8-byte
+    /// key, `days * 86400 + seconds` (`GetEpochTime`).
+    I64,
 }
 
 impl KeyKind {
     /// `sizeof(OrderedKeyType)`.
     pub fn key_width(self) -> usize {
         match self {
-            KeyKind::U64 | KeyKind::F64 => 8,
-            KeyKind::F32 => 4,
+            KeyKind::U64 | KeyKind::F64 | KeyKind::I64 => 8,
+            KeyKind::F32 | KeyKind::I32 => 4,
         }
     }
 
@@ -110,8 +118,11 @@ impl KeyKind {
     /// padding: `8+4+4`, `4+4+4`, `8+8+4`.
     pub fn segment_width(self) -> usize {
         match self {
-            KeyKind::U64 => 16,
-            KeyKind::F32 => 12,
+            // `{u64, f32, u32}`, `{i64, f32, u32}`
+            KeyKind::U64 | KeyKind::I64 => 16,
+            // `{f32, f32, u32}`, `{i32, f32, u32}`
+            KeyKind::F32 | KeyKind::I32 => 12,
+            // `{f64, f64, u32}` — `Floating` is `double` only for `double` keys.
             KeyKind::F64 => 20,
         }
     }
@@ -145,6 +156,8 @@ pub enum Key {
     U64(u64),
     F32(f32),
     F64(f64),
+    I32(i32),
+    I64(i64),
 }
 
 impl Key {
@@ -153,12 +166,16 @@ impl Key {
             Key::U64(_) => KeyKind::U64,
             Key::F32(_) => KeyKind::F32,
             Key::F64(_) => KeyKind::F64,
+            Key::I32(_) => KeyKind::I32,
+            Key::I64(_) => KeyKind::I64,
         }
     }
 
     pub fn order(&self, other: &Key) -> Ordering {
         match (self, other) {
             (Key::U64(a), Key::U64(b)) => a.cmp(b),
+            (Key::I32(a), Key::I32(b)) => a.cmp(b),
+            (Key::I64(a), Key::I64(b)) => a.cmp(b),
             _ => self.as_f64().total_cmp(&other.as_f64()),
         }
     }
@@ -168,6 +185,8 @@ impl Key {
             Key::U64(v) => v as f64,
             Key::F32(v) => v as f64,
             Key::F64(v) => v,
+            Key::I32(v) => f64::from(v),
+            Key::I64(v) => v as f64,
         }
     }
 
@@ -184,6 +203,8 @@ impl Key {
             }
             KeyKind::F32 => (self.as_f64() as f32).to_bits().to_le_bytes().to_vec(),
             KeyKind::F64 => self.as_f64().to_bits().to_le_bytes().to_vec(),
+            KeyKind::I32 => (self.as_f64() as i32).to_le_bytes().to_vec(),
+            KeyKind::I64 => (self.as_f64() as i64).to_le_bytes().to_vec(),
         }
     }
 }
@@ -814,39 +835,35 @@ fn write_chunk(path: &Path, out: &[u8]) -> Result<(), FormatError> {
 /// `f32::MAX`/`f64::MAX`, so only infinity sorts past every stored key.
 fn flat_tail(kind: KeyKind, entries: &[(Key, u32)]) -> Vec<u8> {
     let n = entries.len();
-    let mut segments: Vec<(Key, f64, u32)> = Vec::new();
+    let mut segments: Vec<(Key, u32)> = Vec::new();
     let mut start = 0usize;
     while start < n {
-        segments.push((entries[start].0, 0.0, start as u32));
+        segments.push((entries[start].0, start as u32));
         start += PGM_EPSILON as usize;
     }
-    segments.push((Key::F64(f64::INFINITY), 0.0, n as u32));
+    // The reference's sentinel: any key past the last maps to `n`.
+    let sentinel = match kind {
+        KeyKind::I32 => Key::I32(i32::MAX),
+        KeyKind::I64 => Key::I64(i64::MAX),
+        KeyKind::F32 | KeyKind::F64 | KeyKind::U64 => Key::F64(f64::INFINITY),
+    };
+    segments.push((sentinel, n as u32));
 
     let mut out = Vec::new();
     // `PGMWithExtraFunction::Save` order: `n`, `first_key`, the segment count,
-    // the segments, then the level table.
+    // the segments, then the level table. `K` is the key type and `Floating`
+    // is `double` only when `K` is `double` (`secondary_index_pgm.cppm:33-45`).
     out.extend_from_slice(&(n as u32).to_le_bytes());
-    let first = entries.first().map_or(0.0, |(key, _)| key.as_f64());
-    match kind {
-        KeyKind::F32 => out.extend_from_slice(&(first as f32).to_bits().to_le_bytes()),
-        _ => out.extend_from_slice(&first.to_bits().to_le_bytes()),
-    }
+    let first = entries.first().map(|(key, _)| *key).unwrap_or(Key::U64(0));
+    out.extend_from_slice(&first.to_le_bytes_in(kind));
     out.extend_from_slice(&(segments.len() as u32).to_le_bytes());
-    match kind {
-        KeyKind::F32 => {
-            for (key, slope, intercept) in &segments {
-                out.extend_from_slice(&(key.as_f64() as f32).to_bits().to_le_bytes());
-                out.extend_from_slice(&(*slope as f32).to_bits().to_le_bytes());
-                out.extend_from_slice(&intercept.to_le_bytes());
-            }
+    for (key, intercept) in &segments {
+        out.extend_from_slice(&key.to_le_bytes_in(kind));
+        match kind {
+            KeyKind::F64 => out.extend_from_slice(&0.0f64.to_bits().to_le_bytes()),
+            _ => out.extend_from_slice(&0.0f32.to_bits().to_le_bytes()),
         }
-        _ => {
-            for (key, slope, intercept) in &segments {
-                out.extend_from_slice(&key.as_f64().to_bits().to_le_bytes());
-                out.extend_from_slice(&slope.to_bits().to_le_bytes());
-                out.extend_from_slice(&intercept.to_le_bytes());
-            }
-        }
+        out.extend_from_slice(&intercept.to_le_bytes());
     }
     out.extend_from_slice(&2u32.to_le_bytes());
     out.extend_from_slice(&0u64.to_le_bytes());
@@ -984,6 +1001,8 @@ impl SecondarySegmentReader {
             KeyKind::F64 => Key::F64(f64::from_bits(u64::from_le_bytes(
                 self.map[at..at + 8].try_into().unwrap(),
             ))),
+            KeyKind::I32 => Key::I32(i32::from_le_bytes(self.map[at..at + 4].try_into().unwrap())),
+            KeyKind::I64 => Key::I64(i64::from_le_bytes(self.map[at..at + 8].try_into().unwrap())),
         }
     }
 
@@ -1481,6 +1500,149 @@ mod tests {
         assert_eq!(reader.len(), 3);
         assert_eq!(reader.lookup(Key::F64(2.5)), vec![2]);
         assert_eq!(reader.range(Key::F64(-4.0), Key::F64(2.0)), vec![0, 1]);
+    }
+
+    /// `DATE`/`TIME` (`ConvertToOrderedI32`) is a raw signed 4-byte key and
+    /// `DATETIME`/`TIMESTAMP` (`ConvertToOrderedI64`) a raw signed 8-byte one.
+    /// Negative keys — dates before 1970 — must sort first, and both bounds of
+    /// a range are inclusive.
+    #[test]
+    fn i32_chunk_keeps_raw_signed_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_i32.idx");
+        let entries = vec![
+            (Key::I32(-20), 10u32),
+            (Key::I32(0), 11),
+            (Key::I32(19_000), 12),
+        ];
+        write_secondary_segment_typed(&path, KeyKind::I32, &entries).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let n = entries.len();
+        let keys: Vec<u8> = entries
+            .iter()
+            .flat_map(|(key, _)| match key {
+                Key::I32(v) => v.to_le_bytes(),
+                _ => unreachable!(),
+            })
+            .collect();
+        assert_eq!(&bytes[..n * 4], &keys[..], "raw i32 LE, 4 bytes each");
+        let tail_at = n * 4 + n * 4;
+        assert_eq!(&bytes[tail_at..tail_at + 4], &(n as u32).to_le_bytes()[..]);
+        assert_eq!(
+            &bytes[tail_at + 4..tail_at + 8],
+            &(-20i32).to_le_bytes()[..]
+        );
+        // 1 segment + sentinel, 12 bytes each (`{i32, f32, u32}`).
+        assert_eq!(bytes.len(), tail_at + 4 + 4 + 4 + 2 * 12 + 4 + 2 * 8);
+
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::I32).unwrap();
+        assert_eq!(reader.len(), n);
+        assert_eq!(reader.first_key(), Key::I32(-20));
+        assert_eq!(reader.lookup(Key::I32(-20)), vec![10]);
+        // The sign-bit trap again: -20 sorts before 0 and 19000.
+        assert_eq!(reader.range(Key::I32(-20), Key::I32(0)), vec![10, 11]);
+        assert_eq!(reader.range(Key::I32(0), Key::I32(19_000)), vec![11, 12]);
+        // Nothing between 1 and 18999.
+        assert!(reader.range(Key::I32(1), Key::I32(18_999)).is_empty());
+        assert!(
+            SecondarySegmentReader::open(&path).is_err(),
+            "kind is required"
+        );
+    }
+
+    /// The `DATETIME`/`TIMESTAMP` twin: 8-byte signed keys, 16-byte
+    /// `{i64, f32, u32}` segments.
+    #[test]
+    fn i64_chunk_keeps_raw_signed_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_i64.idx");
+        let entries = vec![
+            (Key::I64(-86_400), 10u32),
+            (Key::I64(0), 11),
+            (Key::I64(1_700_000_000), 12),
+        ];
+        write_secondary_segment_typed(&path, KeyKind::I64, &entries).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let n = entries.len();
+        let keys: Vec<u8> = entries
+            .iter()
+            .flat_map(|(key, _)| match key {
+                Key::I64(v) => v.to_le_bytes(),
+                _ => unreachable!(),
+            })
+            .collect();
+        assert_eq!(&bytes[..n * 8], &keys[..], "raw i64 LE, 8 bytes each");
+        let tail_at = n * 8 + n * 4;
+        // 1 segment + sentinel, 16 bytes each (`{i64, f32, u32}`).
+        assert_eq!(bytes.len(), tail_at + 4 + 8 + 4 + 2 * 16 + 4 + 2 * 8);
+
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::I64).unwrap();
+        assert_eq!(reader.first_key(), Key::I64(-86_400));
+        assert_eq!(reader.range(Key::I64(-86_400), Key::I64(0)), vec![10, 11]);
+        assert_eq!(reader.lookup(Key::I64(1_700_000_000)), vec![12]);
+    }
+
+    /// C++-shaped `DATE`/`TIME` chunk (`PGMWithExtraFunction<i32>::Save`):
+    /// 4-byte keys, 12-byte packed segments.
+    #[test]
+    fn cpp_shaped_i32_chunk_opens() {
+        let keys = [-20i32, 0, 19_000];
+        let mut chunk = Vec::new();
+        for key in keys {
+            chunk.extend_from_slice(&key.to_le_bytes());
+        }
+        for off in 0..keys.len() as u32 {
+            chunk.extend_from_slice(&off.to_le_bytes());
+        }
+        chunk.extend_from_slice(&(keys.len() as u32).to_le_bytes());
+        chunk.extend_from_slice(&keys[0].to_le_bytes());
+        chunk.extend_from_slice(&1u32.to_le_bytes());
+        chunk.extend_from_slice(&keys[0].to_le_bytes());
+        chunk.extend_from_slice(&0.0f32.to_bits().to_le_bytes());
+        chunk.extend_from_slice(&0u32.to_le_bytes());
+        chunk.extend_from_slice(&2u32.to_le_bytes());
+        chunk.extend_from_slice(&0u64.to_le_bytes());
+        chunk.extend_from_slice(&1u64.to_le_bytes());
+        assert_eq!(chunk.len(), 3 * 4 + 3 * 4 + 4 + 4 + 4 + 12 + 4 + 16);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_cpp_i32.idx");
+        std::fs::write(&path, &chunk).unwrap();
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::I32).unwrap();
+        assert_eq!(reader.len(), 3);
+        assert_eq!(reader.lookup(Key::I32(0)), vec![1]);
+        assert_eq!(reader.range(Key::I32(-20), Key::I32(0)), vec![0, 1]);
+    }
+
+    /// C++-shaped `DATETIME`/`TIMESTAMP` chunk: 8-byte keys, 16-byte segments.
+    #[test]
+    fn cpp_shaped_i64_chunk_opens() {
+        let keys = [-86_400i64, 0, 1_700_000_000];
+        let mut chunk = Vec::new();
+        for key in keys {
+            chunk.extend_from_slice(&key.to_le_bytes());
+        }
+        for off in 0..keys.len() as u32 {
+            chunk.extend_from_slice(&off.to_le_bytes());
+        }
+        chunk.extend_from_slice(&(keys.len() as u32).to_le_bytes());
+        chunk.extend_from_slice(&keys[0].to_le_bytes());
+        chunk.extend_from_slice(&1u32.to_le_bytes());
+        chunk.extend_from_slice(&keys[0].to_le_bytes());
+        chunk.extend_from_slice(&0.0f32.to_bits().to_le_bytes());
+        chunk.extend_from_slice(&0u32.to_le_bytes());
+        chunk.extend_from_slice(&2u32.to_le_bytes());
+        chunk.extend_from_slice(&0u64.to_le_bytes());
+        chunk.extend_from_slice(&1u64.to_le_bytes());
+        assert_eq!(chunk.len(), 3 * 8 + 3 * 4 + 4 + 8 + 4 + 16 + 4 + 16);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_cpp_i64.idx");
+        std::fs::write(&path, &chunk).unwrap();
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::I64).unwrap();
+        assert_eq!(reader.len(), 3);
+        assert_eq!(reader.lookup(Key::I64(1_700_000_000)), vec![2]);
+        assert_eq!(reader.range(Key::I64(-86_400), Key::I64(0)), vec![0, 1]);
     }
 
     /// An empty typed chunk round-trips (`n = 0`, one sentinel segment).

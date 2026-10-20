@@ -5227,18 +5227,39 @@ impl Engine {
         } else if key_kind != KeyKind::U64 {
             // FLOAT/DOUBLE keep the raw value ordered, like the reference's
             // `KeepOrderedSelf` (`secondary_index_data.cppm:38`): a 4-byte f32
-            // or an 8-byte f64, compared as a float.
+            // or an 8-byte f64, compared as a float. DATE/TIME and
+            // DATETIME/TIMESTAMP are the `ConvertToOrderedI32`/`I64` kinds: the
+            // ordered day (or day+second) count, also raw.
             let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
-                let value = match row.get(col_idx) {
-                    Some(Value::Float(f)) => *f,
-                    Some(Value::Int(i)) => *i as f64,
-                    _ => continue,
-                };
-                let key = if key_kind == KeyKind::F32 {
-                    Key::F32(value as f32)
-                } else {
-                    Key::F64(value)
+                let key = match key_kind {
+                    KeyKind::F32 | KeyKind::F64 => {
+                        let value = match row.get(col_idx) {
+                            Some(Value::Float(f)) => *f,
+                            Some(Value::Int(i)) => *i as f64,
+                            _ => continue,
+                        };
+                        if key_kind == KeyKind::F32 {
+                            Key::F32(value as f32)
+                        } else {
+                            Key::F64(value)
+                        }
+                    }
+                    _ => {
+                        let text = match row.get(col_idx) {
+                            Some(Value::Str(s)) => s.clone(),
+                            Some(other) => other.to_slt_string(),
+                            None => continue,
+                        };
+                        let Some(value) = temporal_key(&type_upper, &text) else {
+                            continue;
+                        };
+                        if key_kind == KeyKind::I32 {
+                            Key::I32(value as i32)
+                        } else {
+                            Key::I64(value)
+                        }
+                    }
                 };
                 by_segment
                     .entry((seq as u64) >> 32)
@@ -5556,7 +5577,7 @@ impl Engine {
                             Ok(v) => Key::U64(ordered_i64_key(v)),
                             Err(_) => continue,
                         }
-                    } else if tail_kind != KeyKind::U64 {
+                    } else if tail_kind == KeyKind::F32 || tail_kind == KeyKind::F64 {
                         // FLOAT/DOUBLE: the raw value is the key.
                         let Ok(v) = text.trim().parse::<f64>() else {
                             continue;
@@ -5565,6 +5586,16 @@ impl Engine {
                             Key::F32(v as f32)
                         } else {
                             Key::F64(v)
+                        }
+                    } else if tail_kind == KeyKind::I32 || tail_kind == KeyKind::I64 {
+                        // DATE/TIME: the ordered day/second count.
+                        let Some(v) = temporal_key(&ty, text) else {
+                            continue;
+                        };
+                        if tail_kind == KeyKind::I32 {
+                            Key::I32(v as i32)
+                        } else {
+                            Key::I64(v)
                         }
                     } else {
                         // VARCHAR/JSON: the reference hashes the key.
@@ -5832,8 +5863,9 @@ impl Engine {
                     let key = match reader.kind() {
                         KeyKind::F32 => Key::F32(*f as f32),
                         KeyKind::F64 => Key::F64(*f),
-                        // A hashed varchar chunk cannot hold a float key.
-                        KeyKind::U64 => continue,
+                        // Neither a hashed varchar nor a date/time chunk can
+                        // hold a float key.
+                        KeyKind::U64 | KeyKind::I32 | KeyKind::I64 => continue,
                     };
                     for off in reader.lookup(key) {
                         let id = base | u64::from(off);
@@ -5864,11 +5896,32 @@ impl Engine {
                     }
                 }
             } else {
-                // VARCHAR/JSON chunks store the reference's u64 key hash.
-                let ordered = Key::U64(infinity_storage::secondary_segment::hash_varchar(&want));
+                // VARCHAR/JSON chunks store the reference's u64 key hash; a
+                // DATE/TIME chunk stores the ordered day/second count, so the
+                // literal text is converted the same way the writer did.
+                let column_type = col
+                    .and_then(|ci| {
+                        self.column_types(table)
+                            .ok()
+                            .and_then(|t| t.get(ci).cloned())
+                    })
+                    .unwrap_or_default();
+                let hashed = Key::U64(infinity_storage::secondary_segment::hash_varchar(&want));
+                let temporal = temporal_key(&column_type, &want);
                 if let Some(segments) = &disk {
                     for (base, reader) in segments {
-                        for off in reader.lookup(ordered) {
+                        let key = match reader.kind() {
+                            KeyKind::I32 => match temporal {
+                                Some(v) => Key::I32(v as i32),
+                                None => continue,
+                            },
+                            KeyKind::I64 => match temporal {
+                                Some(v) => Key::I64(v),
+                                None => continue,
+                            },
+                            _ => hashed,
+                        };
+                        for off in reader.lookup(key) {
                             let id = base | u64::from(off);
                             if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
                                 out.push(id);
@@ -5924,11 +5977,12 @@ impl Engine {
     /// already merged by `FilterExpressionPushDown`).
     ///
     /// `INT`/`UINT` keys are order-mapped, `FLOAT`/`DOUBLE` keys are the raw
-    /// value (`KeyKind`, matching the reference's `ConvertToOrderedType`), so
-    /// both can be range-scanned. `VARCHAR`/`JSON` keys are hashes and cannot,
-    /// so they return `None` here and the caller keeps the full-scan path —
-    /// `EXPLAIN`'s `INDEX SCAN` is truthful for an integer or float range and
-    /// still overstates a varchar/json one.
+    /// value and `DATE`/`TIME`/`DATETIME`/`TIMESTAMP` the reference's ordered
+    /// day (or day+second) count (`KeyKind`, matching
+    /// `ConvertToOrderedType`), so all of them can be range-scanned.
+    /// `VARCHAR`/`JSON` keys are hashes and cannot, so they return `None` here
+    /// and the caller keeps the full-scan path — `EXPLAIN`'s `INDEX SCAN` is
+    /// truthful for the ordered kinds and still overstates a varchar/json one.
     fn index_range_lookup(
         &self,
         table: &str,
@@ -5938,8 +5992,7 @@ impl Engine {
         let tkey = self.table_key(table);
         let schema = self.table_schema(table).unwrap_or_default();
         let col = schema.iter().position(|c| c == column)?;
-        // Same classification as the chunk writer: an integer lookup key is the
-        // order-mapped `u64`, a float one is the raw value.
+        // Same classification as the chunk writer.
         let column_type = self
             .column_types(table)
             .ok()
@@ -5947,34 +6000,21 @@ impl Engine {
             .map(|ty| ty.trim().to_ascii_uppercase())
             .unwrap_or_default();
         let kind = secondary_key_kind(&column_type);
-        // `secondary_key_kind` only returns a float kind for FLOAT/DOUBLE.
-        let float_column = kind != KeyKind::U64;
-        if !float_column
-            && kind == KeyKind::U64
+        if kind == KeyKind::U64
             && !(column_type.starts_with("INT") || column_type.starts_with("UINT"))
         {
             // A hashed key has no order to scan.
             return None;
         }
-        // Bounds: an integer range's open ends are `Value::Int(i64::MIN/MAX)`
-        // (the planner's `lower_bound`/`upper_bound`), a float range's are
-        // `Value::Float`. Both are kept in the comparison domain of the chunk.
+        // Bounds: `Value::Int(i64::MIN/MAX)` for the planner's open ends,
+        // `Value::Float` for a float column and the literal's text for a
+        // date/time one. `bound_key` puts each in the chunk's own domain.
         let keys: Vec<(Key, Key)> = ranges
             .iter()
             .filter_map(|(lo, hi)| {
-                if float_column {
-                    let lo = value_as_f64(lo)?;
-                    let hi = value_as_f64(hi)?;
-                    (lo <= hi).then_some((Key::F64(lo), Key::F64(hi)))
-                } else {
-                    match (lo, hi) {
-                        (Value::Int(lo), Value::Int(hi)) if lo <= hi => Some((
-                            Key::U64(ordered_i64_key(*lo)),
-                            Key::U64(ordered_i64_key(*hi)),
-                        )),
-                        _ => None,
-                    }
-                }
+                let lo = bound_key(kind, &column_type, lo)?;
+                let hi = bound_key(kind, &column_type, hi)?;
+                (lo.order(&hi) != std::cmp::Ordering::Greater).then_some((lo, hi))
             })
             .collect();
         if keys.is_empty() {
@@ -6000,24 +6040,29 @@ impl Engine {
                     let Some(text) = std::str::from_utf8(key).ok() else {
                         return;
                     };
-                    let inside = if float_column {
-                        let Ok(value) = text.trim().parse::<f64>() else {
-                            return;
-                        };
-                        ranges.iter().any(|(lo, hi)| {
-                            matches!((value_as_f64(lo), value_as_f64(hi)),
-                                (Some(lo), Some(hi)) if lo <= value && value <= hi)
-                        })
-                    } else {
-                        let Ok(value) = text.trim().parse::<i64>() else {
-                            return;
-                        };
-                        ranges.iter().any(|(lo, hi)| match (lo, hi) {
-                            (Value::Int(lo), Value::Int(hi)) => *lo <= value && value <= *hi,
-                            _ => false,
-                        })
+                    let key = match kind {
+                        KeyKind::U64 => match text.trim().parse::<i64>() {
+                            Ok(v) => Key::U64(ordered_i64_key(v)),
+                            Err(_) => return,
+                        },
+                        KeyKind::F32 | KeyKind::F64 => match text.trim().parse::<f64>() {
+                            Ok(v) if kind == KeyKind::F32 => Key::F32(v as f32),
+                            Ok(v) => Key::F64(v),
+                            Err(_) => return,
+                        },
+                        KeyKind::I32 => match temporal_key(&column_type, text) {
+                            Some(v) => Key::I32(v as i32),
+                            None => return,
+                        },
+                        KeyKind::I64 => match temporal_key(&column_type, text) {
+                            Some(v) => Key::I64(v),
+                            None => return,
+                        },
                     };
-                    if inside {
+                    if keys.iter().any(|(lo, hi)| {
+                        lo.order(&key) != std::cmp::Ordering::Greater
+                            && key.order(hi) != std::cmp::Ordering::Greater
+                    }) {
                         tail.extend_from_slice(ids);
                     }
                 });
@@ -6031,7 +6076,7 @@ impl Engine {
                 for (start, end) in &keys {
                     for off in reader.range(*start, *end) {
                         let id = base | u64::from(off);
-                        if self.live_row_in_range(table, id, col, ranges, float_column)
+                        if self.live_row_in_range(table, id, col, ranges, kind, &column_type)
                             && seen.insert(id)
                         {
                             out.push(id);
@@ -6041,7 +6086,8 @@ impl Engine {
             }
         }
         for id in tail {
-            if self.live_row_in_range(table, id, col, ranges, float_column) && seen.insert(id) {
+            if self.live_row_in_range(table, id, col, ranges, kind, &column_type) && seen.insert(id)
+            {
                 out.push(id);
             }
         }
@@ -6086,15 +6132,16 @@ impl Engine {
     /// `live_row_matches` for a range probe: the row is live and the column's
     /// current value falls in one of `ranges`. UPDATE re-appends and DROP
     /// COLUMN re-keys, so a chunk or tail entry alone is not authoritative.
-    /// `float_column` selects how the stored cell is parsed, matching
-    /// `index_range_lookup`'s key kind.
+    /// `kind` (and the declared type it came from) selects how the stored cell
+    /// is read: the ordered integer, a float, or a date/time text.
     fn live_row_in_range(
         &self,
         table: &str,
         id: u64,
         col: usize,
         ranges: &[(Value, Value)],
-        float_column: bool,
+        kind: KeyKind,
+        declared: &str,
     ) -> bool {
         if self
             .storage
@@ -6123,22 +6170,35 @@ impl Engine {
         let Some(field) = field else {
             return false;
         };
-        if float_column {
-            let Ok(value) = field.parse::<f64>() else {
-                return false;
-            };
-            return ranges.iter().any(|(lo, hi)| {
-                matches!((value_as_f64(lo), value_as_f64(hi)),
-                    (Some(lo), Some(hi)) if lo <= value && value <= hi)
-            });
+        match kind {
+            KeyKind::U64 => {
+                let Ok(value) = field.parse::<i64>() else {
+                    return false;
+                };
+                ranges.iter().any(|(lo, hi)| match (lo, hi) {
+                    (Value::Int(lo), Value::Int(hi)) => *lo <= value && value <= *hi,
+                    _ => false,
+                })
+            }
+            KeyKind::F32 | KeyKind::F64 => {
+                let Ok(value) = field.parse::<f64>() else {
+                    return false;
+                };
+                ranges.iter().any(|(lo, hi)| {
+                    matches!((value_as_f64(lo), value_as_f64(hi)),
+                        (Some(lo), Some(hi)) if lo <= value && value <= hi)
+                })
+            }
+            KeyKind::I32 | KeyKind::I64 => {
+                let Some(value) = temporal_key(declared, &field) else {
+                    return false;
+                };
+                ranges.iter().any(|(lo, hi)| {
+                    matches!((temporal_bound(declared, lo), temporal_bound(declared, hi)),
+                        (Some(lo), Some(hi)) if lo <= value && value <= hi)
+                })
+            }
         }
-        let Ok(value) = field.parse::<i64>() else {
-            return false;
-        };
-        ranges.iter().any(|(lo, hi)| match (lo, hi) {
-            (Value::Int(lo), Value::Int(hi)) => *lo <= value && value <= *hi,
-            _ => false,
-        })
     }
 
     fn fetch_rows_by_ids(&self, table: &str, ids: &[u64]) -> Result<Vec<Vec<Value>>> {
@@ -15741,8 +15801,86 @@ fn secondary_key_kind(declared: &str) -> infinity_storage::secondary_segment::Ke
         KeyKind::F32
     } else if ty.starts_with("double") {
         KeyKind::F64
+    } else if ty.starts_with("datetime") || ty.starts_with("timestamp") {
+        // `ConvertToOrderedI64`: `GetEpochTime()`, an ordered `i64`.
+        KeyKind::I64
+    } else if ty.starts_with("date") || ty.starts_with("time") {
+        // `ConvertToOrderedI32`: `DateT`/`TimeT::GetValue()`, an `i32`.
+        KeyKind::I32
     } else {
         KeyKind::U64
+    }
+}
+
+/// The reference's ordered key for a date/time text (`ConvertToOrderedKeyValue`):
+/// `DateT::GetValue()` is the day count since 1970, `TimeT::GetValue()` the
+/// second of the day, and `DateTimeT`/`TimestampT::GetEpochTime()` is
+/// `days * 86400 + seconds`.
+fn temporal_key(declared: &str, text: &str) -> Option<i64> {
+    let ty = declared.trim().to_ascii_lowercase();
+    let text = text.trim();
+    let mut date = infinity_common::types::DateT::default();
+    if ty.starts_with("datetime") || ty.starts_with("timestamp") {
+        let (date_text, time_text) = text.split_once(' ')?;
+        date.from_string(date_text.trim()).ok()?;
+        Some(i64::from(date.value) * 86_400 + i64::from(seconds_since_midnight(time_text)?))
+    } else if ty.starts_with("time") {
+        Some(i64::from(seconds_since_midnight(text)?))
+    } else {
+        date.from_string(text).ok()?;
+        Some(i64::from(date.value))
+    }
+}
+
+/// `HH:MM:SS[.ffffff]` -> seconds since midnight, the `TimeT` value.
+fn seconds_since_midnight(text: &str) -> Option<i32> {
+    let mut parts = text.trim().split(':');
+    let hour: i32 = parts.next()?.trim().parse().ok()?;
+    let minute: i32 = parts.next()?.trim().parse().ok()?;
+    let second: i32 = parts.next()?.trim().split('.').next()?.parse().ok()?;
+    if !(0..24).contains(&hour) || !(0..60).contains(&minute) || !(0..60).contains(&second) {
+        return None;
+    }
+    Some(hour * 3600 + minute * 60 + second)
+}
+
+/// A range bound as a chunk key of `kind`.
+fn bound_key(
+    kind: infinity_storage::secondary_segment::KeyKind,
+    declared: &str,
+    value: &Value,
+) -> Option<infinity_storage::secondary_segment::Key> {
+    use infinity_storage::secondary_segment::{Key, KeyKind};
+    match kind {
+        KeyKind::U64 => match value {
+            Value::Int(i) => Some(Key::U64(ordered_i64_key(*i))),
+            _ => None,
+        },
+        // A float bound stays `f64`: `Key::order` widens an `F32` key, so a
+        // bound that `f32` cannot represent must not clip a boundary row.
+        KeyKind::F32 | KeyKind::F64 => value_as_f64(value).map(Key::F64),
+        // The planner's open ends are `i64::MIN`/`i64::MAX`, and those must
+        // clamp to the *i32* limits: `i64::MAX as i32` is -1 and
+        // `i64::MIN as i32` is 0, either of which would invert or empty the
+        // interval.
+        //
+        // A strict bound (`d < '1970-01-01'`) is declined by `temporal_key`:
+        // the planner rewrites it to `<=` its lexicographic predecessor, which
+        // is not a date. The residual filter still answers it, so the rows stay
+        // right and only the acceleration is lost.
+        KeyKind::I32 => temporal_bound(declared, value)
+            .map(|v| Key::I32(v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32)),
+        KeyKind::I64 => temporal_bound(declared, value).map(Key::I64),
+    }
+}
+
+/// A date/time bound: the planner passes the literal's text for a finite bound
+/// and `Value::Int(i64::MIN/MAX)` for an open end.
+fn temporal_bound(declared: &str, value: &Value) -> Option<i64> {
+    match value {
+        Value::Int(i) => Some(*i),
+        Value::Str(text) => temporal_key(declared, text),
+        _ => None,
     }
 }
 
@@ -18348,6 +18486,96 @@ mod tests {
         // The float and double columns really did seal chunks.
         assert!(!e.secondary_chunk_meta("t_indexed", "f").is_empty());
         assert!(!e.secondary_chunk_meta("t_indexed", "d").is_empty());
+    }
+
+    /// A date/time range is answered from the ordered index: `DATE`/`TIME` use
+    /// the reference's 4-byte day/second key (`ConvertToOrderedI32`) and
+    /// `DATETIME` its 8-byte epoch key (`ConvertToOrderedI64`), so
+    /// `WHERE d >= … AND d <= …` narrows instead of scanning. Dates before 1970
+    /// are negative keys, which is the case a hash-based key could never order.
+    #[test]
+    fn temporal_range_scan_matches_the_unindexed_oracle() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("SET CONFIG result_cache off;").unwrap();
+        for table in ["t_indexed", "t_plain"] {
+            e.execute(&format!(
+                "CREATE TABLE {table} (id INT, d DATE, tm TIME, ts DATETIME);"
+            ))
+            .unwrap();
+        }
+        // Consecutive days around the epoch; the time of day advances by an
+        // hour per row.
+        let days = [
+            "1969-12-29",
+            "1969-12-30",
+            "1969-12-31",
+            "1970-01-01",
+            "1970-01-02",
+            "1970-01-03",
+            "1970-01-04",
+            "1970-01-05",
+            "1970-01-06",
+            "1970-01-07",
+        ];
+        let insert = |e: &Engine, from: usize, to: usize| {
+            for (i, day) in days.iter().enumerate().take(to).skip(from) {
+                let time = format!("{:02}:00:00", i);
+                for table in ["t_indexed", "t_plain"] {
+                    e.execute(&format!(
+                        "INSERT INTO {table} VALUES ({i}, '{day}', '{time}', '{day} {time}');"
+                    ))
+                    .unwrap();
+                }
+            }
+        };
+        // 0..7 are sealed by `CREATE INDEX`; 7..10 land in the memory tail.
+        insert(&e, 0, 7);
+        for column in ["id", "d", "tm", "ts"] {
+            e.execute(&format!(
+                "CREATE INDEX idx_{column} ON t_indexed ({column});"
+            ))
+            .unwrap();
+        }
+        insert(&e, 7, 10);
+
+        let cases: [(&str, Vec<i64>); 7] = [
+            // Pre-epoch dates are negative keys.
+            ("d < '1970-01-01'", vec![0, 1, 2]),
+            ("d >= '1969-12-30' AND d <= '1970-01-01'", vec![1, 2, 3]),
+            ("d = '1970-01-02'", vec![4]),
+            // A datetime bound compares the day and the second of the day.
+            // Row 5 is 05:00:00 on 01-03, past the upper bound.
+            (
+                "ts >= '1970-01-01 00:00:00' AND ts <= '1970-01-03 02:00:00'",
+                vec![3, 4],
+            ),
+            ("tm >= '02:00:00'", vec![2, 3, 4, 5, 6, 7, 8, 9]),
+            ("d BETWEEN '1970-01-05' AND '1970-01-06'", vec![7, 8]),
+            // A strict date bound cannot be pushed down: the planner's rewrite
+            // is lexicographic for a string literal, so this one is answered by
+            // the residual filter (correct rows, no index narrowing).
+            ("d > '1970-01-04'", vec![7, 8, 9]),
+        ];
+        for round in 0..2 {
+            for (predicate, expected) in &cases {
+                assert_eq!(
+                    &ids_of(&e, "t_indexed", predicate),
+                    expected,
+                    "round {round}: {predicate}"
+                );
+                assert_eq!(
+                    ids_of(&e, "t_indexed", predicate),
+                    ids_of(&e, "t_plain", predicate),
+                    "round {round}: oracle disagrees for {predicate}"
+                );
+            }
+            e.flush().unwrap();
+        }
+        // Equality on a date column rides the same ordered key.
+        assert_eq!(ids_of(&e, "t_indexed", "d = '1969-12-31'"), vec![2]);
+        assert!(!e.secondary_chunk_meta("t_indexed", "d").is_empty());
+        assert!(!e.secondary_chunk_meta("t_indexed", "ts").is_empty());
     }
 
     /// A range the ordered scan cannot answer — a hashed varchar key, or a

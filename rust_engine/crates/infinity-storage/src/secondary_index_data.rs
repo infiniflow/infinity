@@ -100,6 +100,11 @@ impl HighCardinalityReader {
         0
     }
 
+    /// `U64` keys only: this shim models the reference's `u64`-ordered
+    /// high-cardinality path. The live engine path is
+    /// `infinity-executor`'s `index_lookup`/`index_range_lookup`, which pass a
+    /// kind — `F32`/`F64` (raw float) and `I32`/`I64` (date/time) chunks are
+    /// **not** representable through this wrapper.
     pub fn lookup(&self, key: u64) -> Vec<u32> {
         self.reader.lookup(Key::U64(key))
     }
