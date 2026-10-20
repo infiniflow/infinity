@@ -517,7 +517,11 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 ### 8.4 Gate C — 持久化与恢复
 
-- 2026-10-20 本机复跑（bwrap，仓库根目录为 cwd —— 此前脚本在 `python/` 下运行，`test/data/...` 全部落空导致 compact 用例导入 0 行，已修 `run_gate_c.sh`）：`test_basic` 1/1、`test_alter` 6/6、`test_cleanup` 10/10、`test_compact` 3/3、`test_snapshot` 7/7、`test_system_snapshot_restart` 3/3 全绿；`test_memidx` 5/10、`test_fulltext` 4/6、`test_insert_import` 0/12 失败，失败点分别落在：运行器 `kill -9` 在服务端已被 137 退出后再杀同 pid 抛异常（`infinity_runner.py:105`）、缺 `test/data/csv/enwiki_10w.csv` 数据集、`insert/import False error`（`infinity_runner.py:1294`，导入前置条件不满足）。这三组是运行器/数据集问题，不是引擎断言失败；需在 CI 的完整数据集上复跑。
+- 2026-10-20 本机复跑（bwrap，仓库根目录为 cwd；此前脚本在 `python/` 下运行，`test/data/...` 全部落空导致 compact 用例导入 0 行，已修 `run_gate_c.sh`）：`test_basic` 1/1、`test_alter` 6/6、`test_cleanup` 10/10、`test_compact` 3/3、`test_snapshot` 7/7、`test_system_snapshot_restart` 3/3、`test_insert_import` 12/12（需补回 `test/data/jsonl/test_table.jsonl`）、`test_memidx` 8/10、`test_fulltext` 5/6（需 `test/data/csv/enwiki-10w.csv`）。
+- 仍未闭合的三例：
+  1. `test_memidx::test_mem_indexer`：part3 重启后 `count(*)` 为 11（正确），插入 `c1=12` 后仍返回 11 —— 重启后的插入对 `count(*)` 不可见（引擎问题）。
+  2. `test_memidx::test_optimize_from_different_database`：跨库 optimize 用例失败（待定位）。
+  3. `test_fulltext::test_fulltext_realtime`：本机缓存的 `tmp/gt_res_list_10000.pkl` 与实际结果不一致（引擎返回 `[94,95,78]`，与重新生成的 ground truth 一致；用例仍断言旧的 `[354,357,384]`），需在干净工作区（无 `tmp/*.pkl`）复跑。
 - 快照基线：`infinity-cli conformance ../test/sql/snapshot` = `statement ok 171/171`、`statement error 8/8`、query 0/0（snapshot 用例只含语句）。
 - 长跑导入档：`test_multiple_index_types_import` 2/5 通过。5.toml 档在 2026-10-19 20:30 的本机重跑（`-k 5.toml`，bwrap，release）：**21/50 个 insert 批**后服务端收到 **SIGTERM**（日志 `Terminated`，无 panic、无 SIGKILL、连接随后被拒），引擎 RSS 峰值 **7.8 GB**，同机 `earlyoom -M 2000000,1000000` 仍在运行，采样到 `MemAvailable` 降至 ~2 GB；批耗时从 21 s 增至 69 s。更早一轮在 `MemAvailable` 最低 **1.96 GB** 时也在 batch 31 被杀，因此是宿主看门狗杀掉了最大进程，而非引擎 panic。CI 无 earlyoom；引擎侧目标（内存不随导入无限增长）已满足，但 5.toml 的完整 50 批判定必须在 CI 机复跑。
 - 内存/写入修复：⓪`Insert` 的向量/张量/稀疏值走数值 `Literal::Vector`，不再把每个 float 先格式化成字符串再经 SQL 解析（5000 行批次 21–26 s → 19 s，峰值 ~2 GB 不变，索引状态占主导）；①HNSW 检查点不再重建全表图，而是序列化**内存段**（`HnswIndexInMem`），成本从 O(表) 降为 O(上次检查点后的行)；②`flush()` 每个检查点无条件 dump 所有 HNSW 内存段并清空，新增插入重新建立段；③索引尾部的 dump 先于块镜像执行，镜像失败不再阻塞内存回收。
