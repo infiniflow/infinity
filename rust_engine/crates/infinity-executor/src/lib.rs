@@ -1,13 +1,16 @@
 //! `infinity-executor`: parser -> planner -> execution (M2).
 //!
-//! A `SELECT` runs as a **bounded, per-edge-concurrent** pipeline: the scan
-//! (producer) and the operator chain (consumer) run concurrently over a bounded
-//! `tokio::sync::mpsc` channel, so a full channel applies backpressure instead of
-//! deadlocking (plan §3 D4 / PoC A: "both ends of a bounded exchange must run
-//! concurrently, independent of consumer type").
+//! A `SELECT` runs as a push-based physical operator chain, mirroring the
+//! reference (`PhysicalOperator::Execute` driven by `FragmentTask::OnExecute`):
+//! `run_plan` lowers the optimized `LogicalPlan` into a chain of operators
+//! (`operators::lower`), builds the fragment's source (`operators::scan`), and
+//! runs one task over them. Operators exchange [`chunk::DataChunk`]s capped at
+//! `DEFAULT_VECTOR_SIZE` rows: filter, projection and limit stream chunk by
+//! chunk, limit stops the source cursor once its budget is spent, and aggregate,
+//! sort and top accumulate only what they need.
 //!
-//! Blocking operators (join, aggregate, sort) materialize; streaming operators
-//! (filter, projection, limit) are applied over the materialized set.
+//! Execution is single-threaded per fragment; the reference's task scheduler is
+//! the part of the model that is not ported (see `docs/CLASS_MAP.md`).
 
 #![forbid(unsafe_code)]
 
@@ -19,7 +22,7 @@ use std::sync::{Arc, Mutex};
 
 use infinity_catalog::{Catalog, SparseStore as CatalogSparseStore};
 use infinity_common::{Error, Result};
-use infinity_expression::{aggregate, Expr, Value};
+use infinity_expression::{Expr, Value};
 use infinity_index::{Index, SecondaryIndex};
 use infinity_parser::lexer::{tokenize, Token};
 use infinity_parser::parser::render_tokens_as_sql;
@@ -239,47 +242,6 @@ pub enum QueryResult {
     Rows {
         columns: Vec<String>,
         rows: Vec<Vec<String>>,
-    },
-}
-
-#[derive(Debug, Clone)]
-enum Stage {
-    Filter(Expr),
-    Projection(Vec<Expr>, Vec<String>),
-    Aggregate {
-        group_keys: Vec<Expr>,
-        group_names: Vec<String>,
-        aggs: Vec<(AggFunc, Vec<usize>, bool, String)>,
-    },
-    Sort {
-        keys: Vec<(infinity_expression::Expr, bool)>,
-    },
-    Limit(u64),
-    Offset(u64),
-}
-
-/// The relation that feeds the operator stages.
-#[derive(Debug, Clone)]
-enum Source {
-    Values {
-        columns: Vec<String>,
-        rows: Vec<Vec<Value>>,
-    },
-    Table {
-        columns: Vec<String>,
-        table: String,
-    },
-    Join {
-        columns: Vec<String>,
-        left: String,
-        right: String,
-        /// Columns each side's scan produces after pruning, used to line the
-        /// fetched rows up with the pruned scan (C++ `BindingRemapper`).
-        left_columns: Vec<String>,
-        right_columns: Vec<String>,
-        left_key: usize,
-        right_key: usize,
-        left_width: usize,
     },
 }
 
@@ -3934,8 +3896,6 @@ fn scalar_only(types: &[String]) -> bool {
 /// configuration, buffer manager and service handles. `Engine` composes it
 /// instead of owning these fields directly.
 struct Context {
-    /// Tokio exchange capacity per pipeline edge.
-    exchange_capacity: usize,
     /// Bounded LRU cache of decoded column blocks (the reference's
     /// `BufferManager`), sized by `[buffer] buffer_manager_size`.
     buffer: Mutex<
@@ -3979,7 +3939,6 @@ pub struct Engine {
     /// Catalog + KV store (the reference's `Storage`).
     storage: Storage,
     txn: TxnManager,
-    rt: tokio::runtime::Runtime,
     /// the engine's data directory (root of the C++-format block mirror)
     dir: PathBuf,
     /// `false` for the reference's `NEW_CONFIG_NOWAL_PATH`: catalog DDL is
@@ -4598,11 +4557,6 @@ impl Engine {
         // must not resurrect rows that were deleted after they were logged.
         let applied = txn.applied_ts()?;
         txn.recover(applied)?;
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(2)
-            .enable_all()
-            .build()
-            .map_err(|e| Error::Invalid(format!("tokio runtime: {e}")))?;
         let engine = Self {
             storage: Storage {
                 catalog,
@@ -4616,9 +4570,7 @@ impl Engine {
                 mode: Mutex::new(StorageMode::Writable),
             },
             txn,
-            rt,
             context: Context {
-                exchange_capacity: options.exchange_capacity.max(1),
                 buffer: Mutex::new(infinity_storage::buffer::BufferManager::new(
                     8 * 1024 * 1024 * 1024,
                 )),
@@ -9317,93 +9269,12 @@ impl Engine {
         Ok((columns, rows))
     }
 
-    /// Decomposes a plan into its source relation and ordered operator stages.
-    fn decompose(plan: LogicalPlan) -> (Source, Vec<Stage>) {
-        let mut stages = Vec::new();
-        let mut cur = plan;
-        loop {
-            match cur {
-                LogicalPlan::Limit { input, n } => {
-                    stages.push(Stage::Limit(n));
-                    cur = *input;
-                }
-                LogicalPlan::Offset { input, n } => {
-                    stages.push(Stage::Offset(n));
-                    cur = *input;
-                }
-                LogicalPlan::Sort { input, keys } => {
-                    stages.push(Stage::Sort { keys });
-                    cur = *input;
-                }
-                LogicalPlan::Aggregate {
-                    input,
-                    group_keys,
-                    group_names,
-                    aggs,
-                } => {
-                    stages.push(Stage::Aggregate {
-                        group_keys,
-                        group_names,
-                        aggs,
-                    });
-                    cur = *input;
-                }
-                LogicalPlan::Projection {
-                    input,
-                    exprs,
-                    names,
-                } => {
-                    stages.push(Stage::Projection(exprs, names));
-                    cur = *input;
-                }
-                LogicalPlan::Filter { input, predicate } => {
-                    stages.push(Stage::Filter(predicate));
-                    cur = *input;
-                }
-                LogicalPlan::Scan { table, columns } => {
-                    stages.reverse();
-                    return (Source::Table { columns, table }, stages);
-                }
-                LogicalPlan::Join {
-                    left,
-                    right,
-                    left_key,
-                    right_key,
-                    left_width,
-                } => {
-                    let (lt, lc) = scan_of(&left);
-                    let (rt, rc) = scan_of(&right);
-                    let mut columns = lc.clone();
-                    columns.extend(rc.clone());
-                    stages.reverse();
-                    return (
-                        Source::Join {
-                            columns,
-                            left: lt,
-                            right: rt,
-                            left_columns: lc,
-                            right_columns: rc,
-                            left_key,
-                            right_key,
-                            left_width,
-                        },
-                        stages,
-                    );
-                }
-                LogicalPlan::Values { columns, rows } => {
-                    stages.reverse();
-                    return (Source::Values { columns, rows }, stages);
-                }
-            }
-        }
-    }
-
     /// Runs an optimized plan.
     ///
     /// `source_columns` is the unpruned column list the caller materialised its
     /// rows from (C++ keeps that binding in the scan and remaps down to the
     /// pruned list); `candidate` is the index scan the planner selected for this
-    /// scan, which has to run before the operator stages.
+    /// scan, which the scan operator applies before handing rows to the chain.
     fn run_plan(
         &self,
         plan: LogicalPlan,
@@ -9446,36 +9317,32 @@ impl Engine {
         let plan = optimizer.optimize(plan)?;
         #[cfg(test)]
         LAST_PLAN_DEBUG.with(|slot| *slot.borrow_mut() = Some(format!("{plan:?}")));
-        // The operator model (C++ `PhysicalOperator`/`OperatorState`) covers a
-        // subset of the plan shapes; the stage pipeline below stays the fallback
-        // for everything it has not ported yet.
-        let lowered = if crate::operators::enabled() {
-            crate::operators::lower::lower(&plan)?
-        } else {
-            None
-        };
-        let (source, stages) = Self::decompose(plan);
-        // The fragment's source operator owns the read: the table scan fetches
-        // the rows, applies the index filter and aligns them onto the pruned
-        // layout; a join pairs the two sides; `VALUES` supplies its own rows.
+        // Lower the plan to the operator chain and build the fragment's source.
+        // `lower` is total: every `LogicalPlan` node has an operator.
+        let crate::operators::lower::Lowered {
+            operators,
+            names,
+            source,
+        } = crate::operators::lower::lower(&plan)?;
         let spec = match source {
-            Source::Values { columns, rows } => {
+            crate::operators::lower::SourceKind::Values { columns, rows } => {
                 crate::operators::scan::SourceSpec::Values { columns, rows }
             }
-            Source::Table { columns, table } => crate::operators::scan::SourceSpec::Table(
-                Box::new(crate::operators::scan::TableScan {
-                    table,
-                    columns,
-                    source_columns,
-                    override_rows,
-                    candidate,
-                    index_positions,
-                    fulltext_index_column,
-                    fulltext_substring,
-                    unmatchable,
-                }),
-            ),
-            Source::Join {
+            crate::operators::lower::SourceKind::Table { table, columns } => {
+                crate::operators::scan::SourceSpec::Table(Box::new(
+                    crate::operators::scan::TableScan {
+                        table,
+                        columns,
+                        source_columns,
+                        override_rows,
+                        candidate,
+                        index_positions,
+                        fulltext_index_column,
+                        fulltext_substring,
+                    },
+                ))
+            }
+            crate::operators::lower::SourceKind::Join {
                 columns,
                 left,
                 right,
@@ -9502,22 +9369,8 @@ impl Engine {
             spec,
             crate::chunk::DEFAULT_VECTOR_SIZE,
         );
-        let columns = source.columns().to_vec();
-        if let Some((operators, names)) = lowered {
-            // The lowered chain must cover exactly the stages `decompose`
-            // found, otherwise the two views of the plan disagree and the
-            // stage pipeline is authoritative.
-            if crate::operators::lower::covers(&operators, &stages) {
-                return crate::operators::run_operators(operators, names, &mut source);
-            }
-        }
-        let rows = source.collect_rows()?;
-        self.rt.block_on(pipeline(
-            columns,
-            rows,
-            stages,
-            self.context.exchange_capacity,
-        ))
+        source.set_unmatchable(unmatchable);
+        crate::operators::run_operators(operators, names, &mut source)
     }
 
     /// Maintains declared indexes on insert.
@@ -15728,13 +15581,6 @@ fn parse_filter_predicate(text: &str) -> Result<infinity_parser::Predicate> {
     }
 }
 
-fn scan_of(plan: &LogicalPlan) -> (String, Vec<String>) {
-    match plan {
-        LogicalPlan::Scan { table, columns } => (table.clone(), columns.clone()),
-        _ => (String::new(), Vec::new()),
-    }
-}
-
 /// The predicate `Filter(Scan)` applies above a scan, if the plan has one.
 fn scan_predicate_of(plan: &LogicalPlan) -> Option<Expr> {
     match plan {
@@ -17372,109 +17218,6 @@ fn vector_score(q: &[f64], v: &[f64], metric: &str) -> (f64, f64) {
             (1.0 / (1.0 + d), d)
         }
     }
-}
-
-/// Runs the operator stages over rows received from a bounded producer/consumer
-/// exchange. The producer task and consumer run concurrently; a full channel
-/// backpressures the producer rather than deadlocking.
-async fn pipeline(
-    columns: Vec<String>,
-    rows: Vec<Vec<Value>>,
-    stages: Vec<Stage>,
-    _cap: usize,
-) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
-    // The source is already materialized, and every stage is a synchronous
-    // transform. The previous per-row `mpsc` hop cost ~1 µs/row (20k rows:
-    // ~20 ms) without overlapping any work; the reference's pipeline stages
-    // are likewise in-process calls over a `DataBlock`.
-    let mut data: Vec<Vec<Value>> = rows;
-
-    let mut cols = columns;
-    for stage in &stages {
-        match stage {
-            Stage::Filter(expr) => data.retain(|r| expr.eval_predicate(r)),
-            Stage::Projection(exprs, names) => {
-                // `SELECT *` compiles to the identity projection; copying every
-                // row again doubles the cost of a full-table select.
-                let width = data.first().map(Vec::len).unwrap_or(0);
-                let identity = exprs.len() == width
-                    && exprs
-                        .iter()
-                        .enumerate()
-                        .all(|(i, e)| matches!(e, Expr::Column(j) if *j == i));
-                if !identity {
-                    data = data
-                        .iter()
-                        .map(|r| exprs.iter().map(|e| e.eval(r)).collect())
-                        .collect();
-                }
-                cols = names.clone();
-            }
-            Stage::Aggregate {
-                group_keys,
-                group_names,
-                aggs,
-            } => {
-                let (new_cols, new_rows) = apply_aggregate(&data, group_keys, group_names, aggs);
-                cols = new_cols;
-                data = new_rows;
-            }
-            Stage::Sort { keys } => sort_rows(&mut data, keys),
-            Stage::Limit(n) => data.truncate(*n as usize),
-            Stage::Offset(n) => {
-                let k = (*n as usize).min(data.len());
-                data.drain(0..k);
-            }
-        }
-    }
-
-    Ok((cols, data))
-}
-
-fn apply_aggregate(
-    rows: &[Vec<Value>],
-    group_keys: &[Expr],
-    group_names: &[String],
-    aggs: &[(AggFunc, Vec<usize>, bool, String)],
-) -> (Vec<String>, Vec<Vec<Value>>) {
-    let mut names: Vec<String> = group_names.to_vec();
-    for (_, _, _, label) in aggs {
-        names.push(label.clone());
-    }
-
-    if group_keys.is_empty() {
-        let row: Vec<Value> = aggs
-            .iter()
-            .map(|(f, cols, distinct, _)| aggregate(*f, cols, *distinct, rows))
-            .collect();
-        return (names, vec![row]);
-    }
-    // group by the tuple of key columns, preserving first-seen order
-    let mut order: Vec<Vec<Value>> = Vec::new();
-    let mut groups: Vec<(Vec<Value>, Vec<Vec<Value>>)> = Vec::new();
-    for r in rows {
-        let key: Vec<Value> = group_keys.iter().map(|k| k.eval(r)).collect();
-        let idx = match order.iter().position(|o| *o == key) {
-            Some(i) => i,
-            None => {
-                order.push(key.clone());
-                groups.push((key.clone(), Vec::new()));
-                groups.len() - 1
-            }
-        };
-        groups[idx].1.push(r.clone());
-    }
-    let out = groups
-        .into_iter()
-        .map(|(key, grp)| {
-            let mut row = key;
-            for (f, cols, distinct, _) in aggs {
-                row.push(aggregate(*f, cols, *distinct, &grp));
-            }
-            row
-        })
-        .collect();
-    (names, out)
 }
 
 pub(crate) fn sort_rows(rows: &mut [Vec<Value>], keys: &[(infinity_expression::Expr, bool)]) {

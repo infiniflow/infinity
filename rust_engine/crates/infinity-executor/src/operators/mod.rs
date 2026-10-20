@@ -22,8 +22,6 @@ pub mod scan;
 pub mod sort;
 pub mod top;
 
-use std::sync::OnceLock;
-
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
 
@@ -244,6 +242,20 @@ pub trait ChunkSource {
     /// exhausted the call sets `state.complete` (the batch handed out together
     /// with `complete` is still consumed by the chain).
     fn next(&mut self, state: &mut SourceState) -> Result<()>;
+
+    /// Reads the whole relation. Used when the plan has no operator above the
+    /// scan, where the source *is* the result.
+    fn collect(&mut self) -> Result<Vec<Vec<Value>>> {
+        let mut state = SourceState::default();
+        let mut rows = Vec::new();
+        while !state.complete {
+            self.next(&mut state)?;
+            for block in std::mem::take(&mut state.data_blocks) {
+                rows.extend(block.into_rows());
+            }
+        }
+        Ok(rows)
+    }
 }
 
 /// A source that hands out already materialised rows, one chunk per pull.
@@ -364,6 +376,10 @@ pub fn run_operators(
             *chain.borrow_mut() = operators.iter().map(|op| op.operator_type()).collect();
         });
     }
+    if operators.is_empty() {
+        // A plan with no operator above the scan: the source is the result.
+        return Ok((names, source.collect()?));
+    }
     for operator in &mut operators {
         operator.init()?;
     }
@@ -377,17 +393,6 @@ pub fn run_operators(
         .flat_map(DataChunk::into_rows)
         .collect();
     Ok((names, rows))
-}
-
-/// Whether `run_plan` should execute through the operator model. Set
-/// `INFINITY_OPERATOR_MODEL=0` to force the legacy stage pipeline (used to
-/// bisect a regression between the two drivers).
-pub fn enabled() -> bool {
-    static ENABLED: OnceLock<bool> = OnceLock::new();
-    *ENABLED.get_or_init(|| match std::env::var("INFINITY_OPERATOR_MODEL") {
-        Ok(value) => !matches!(value.trim(), "0" | "false" | "off" | "no"),
-        Err(_) => true,
-    })
 }
 
 #[cfg(test)]
@@ -467,15 +472,6 @@ mod tests {
         let taken = states.take_prev(0);
         assert_eq!(taken.len(), 1);
         assert!(states.source.data_blocks.is_empty());
-    }
-
-    #[test]
-    fn a_disabled_flag_keeps_the_legacy_path_available() {
-        // The flag is read once per process; only assert the shape of the
-        // helper so the fallback stays reachable in a fresh process.
-        if std::env::var("INFINITY_OPERATOR_MODEL").is_err() {
-            assert!(enabled());
-        }
     }
 
     /// LIMIT 10 over 100k rows must not evaluate the projection 100k times:

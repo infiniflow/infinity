@@ -1,12 +1,13 @@
-//! Lowers a [`LogicalPlan`] into the physical operator chain.
+//! Lowers a [`LogicalPlan`] into the physical operator chain and the source it
+//! reads from.
 //!
-//! The reference builds this chain in `PhysicalPlanner` and the fragment
-//! context wires one state per operator (`fragment_context_impl.cpp:494`). Only
-//! the operators that have been ported are accepted here; anything else returns
-//! `None` so `run_plan` keeps using the stage pipeline (the migration is
-//! deliberately incremental: the fixture has to stay green at every step).
+//! The reference builds this chain in `PhysicalPlanner` and the fragment context
+//! wires one state per operator (`fragment_context_impl.cpp:494`). `lower` is
+//! total: every `LogicalPlan` node maps onto an operator or onto the fragment's
+//! source.
 
 use infinity_common::Result;
+use infinity_expression::Value;
 use infinity_planner::LogicalPlan;
 
 use super::aggregate::Aggregate;
@@ -15,16 +16,56 @@ use super::limit::Limit;
 use super::project::Projection;
 use super::sort::Sort;
 use super::top::Top;
-use super::{PhysicalOperator, PhysicalOperatorType};
+use super::PhysicalOperator;
 
-/// A lowered plan: the operator chain in execution order (scan first) and the
-/// names of the columns it produces.
-pub type Lowered = (Vec<Box<dyn PhysicalOperator>>, Vec<String>);
+/// The relation under the operator chain, in the shape the source operator
+/// needs. The plan-time scan parameters (index candidate, override rows, …)
+/// stay with the caller, which owns them.
+#[derive(Debug, Clone)]
+pub enum SourceKind {
+    Values {
+        columns: Vec<String>,
+        rows: Vec<Vec<Value>>,
+    },
+    Table {
+        table: String,
+        columns: Vec<String>,
+    },
+    Join {
+        columns: Vec<String>,
+        left: String,
+        right: String,
+        /// Columns each side's scan produces after pruning, used to line the
+        /// fetched rows up with the pruned scan (C++ `BindingRemapper`).
+        left_columns: Vec<String>,
+        right_columns: Vec<String>,
+        left_key: usize,
+        right_key: usize,
+        left_width: usize,
+    },
+}
+
+impl SourceKind {
+    /// The columns the source emits.
+    pub fn columns(&self) -> &[String] {
+        match self {
+            SourceKind::Values { columns, .. }
+            | SourceKind::Table { columns, .. }
+            | SourceKind::Join { columns, .. } => columns,
+        }
+    }
+}
+
+/// A lowered plan: the operator chain in execution order (scan first), the
+/// names of the columns it produces, and the source it reads from.
+pub struct Lowered {
+    pub operators: Vec<Box<dyn PhysicalOperator>>,
+    pub names: Vec<String>,
+    pub source: SourceKind,
+}
 
 /// The operator chain for `plan`.
-///
-/// `None` means the plan uses a construct this slice has not ported yet.
-pub fn lower(plan: &LogicalPlan) -> Result<Option<Lowered>> {
+pub fn lower(plan: &LogicalPlan) -> Result<Lowered> {
     // Built root-first while walking the plan downwards, then reversed.
     let mut operators: Vec<Box<dyn PhysicalOperator>> = Vec::new();
     // The output names are the ones of the projection nearest the root.
@@ -84,31 +125,62 @@ pub fn lower(plan: &LogicalPlan) -> Result<Option<Lowered>> {
                     }
                 }
             }
-            LogicalPlan::Scan { columns, .. } | LogicalPlan::Values { columns, .. } => {
-                if operators.is_empty() {
-                    return Ok(None);
-                }
-                let names = names.unwrap_or_else(|| columns.clone());
-                operators.reverse();
-                return Ok(Some((operators, names)));
-            }
-            LogicalPlan::Join { .. } => {
-                // The join columns are the two scans' column lists
-                // concatenated (see `Engine::decompose`).
-                let Some(columns) = leaf_columns(cursor) else {
-                    return Ok(None);
-                };
-                if operators.is_empty() {
-                    return Ok(None);
-                }
-                let names = names.unwrap_or(columns);
-                operators.reverse();
-                return Ok(Some((operators, names)));
-            }
             LogicalPlan::Sort { input, keys } => {
                 // A sort that is not fused into a `Top`.
                 operators.push(Box::new(Sort::new(keys.clone())));
                 cursor = input;
+            }
+            LogicalPlan::Scan { table, columns } => {
+                operators.reverse();
+                let names = names.unwrap_or_else(|| columns.clone());
+                return Ok(Lowered {
+                    operators,
+                    names,
+                    source: SourceKind::Table {
+                        table: table.clone(),
+                        columns: columns.clone(),
+                    },
+                });
+            }
+            LogicalPlan::Values { columns, rows } => {
+                operators.reverse();
+                let names = names.unwrap_or_else(|| columns.clone());
+                return Ok(Lowered {
+                    operators,
+                    names,
+                    source: SourceKind::Values {
+                        columns: columns.clone(),
+                        rows: rows.clone(),
+                    },
+                });
+            }
+            LogicalPlan::Join {
+                left,
+                right,
+                left_key,
+                right_key,
+                left_width,
+            } => {
+                let (left_table, left_columns) = leaf_scan(left);
+                let (right_table, right_columns) = leaf_scan(right);
+                let mut columns = left_columns.clone();
+                columns.extend(right_columns.clone());
+                operators.reverse();
+                let names = names.unwrap_or_else(|| columns.clone());
+                return Ok(Lowered {
+                    operators,
+                    names,
+                    source: SourceKind::Join {
+                        columns,
+                        left: left_table,
+                        right: right_table,
+                        left_columns,
+                        right_columns,
+                        left_key: *left_key,
+                        right_key: *right_key,
+                        left_width: *left_width,
+                    },
+                });
             }
         }
     }
@@ -142,152 +214,27 @@ fn fuse_top(plan: &LogicalPlan) -> Option<FusedTop<'_>> {
     }
 }
 
-/// Whether the lowered chain covers exactly the stages `Engine::decompose`
-/// finds, so `run_plan` knows the two views of the plan agree.
-///
-/// A `Top` covers the `Sort` it was fused with plus every `Limit`/`Offset`
-/// above it; the other operators cover one stage each.
-pub(crate) fn covers(operators: &[Box<dyn PhysicalOperator>], stages: &[crate::Stage]) -> bool {
-    let mut operator_index = 0;
-    let mut stage_index = 0;
-    while operator_index < operators.len() {
-        let Some(stage) = stages.get(stage_index) else {
-            return false;
-        };
-        match operators[operator_index].operator_type() {
-            PhysicalOperatorType::Projection if matches!(stage, crate::Stage::Projection(..)) => {}
-            PhysicalOperatorType::Filter if matches!(stage, crate::Stage::Filter(..)) => {}
-            PhysicalOperatorType::Limit
-                if matches!(stage, crate::Stage::Limit(_) | crate::Stage::Offset(_)) => {}
-            PhysicalOperatorType::Aggregate if matches!(stage, crate::Stage::Aggregate { .. }) => {}
-            PhysicalOperatorType::Sort if matches!(stage, crate::Stage::Sort { .. }) => {}
-            PhysicalOperatorType::Top if matches!(stage, crate::Stage::Sort { .. }) => {
-                // The fused sort, plus the limit/offset budgets above it.
-                stage_index += 1;
-                while stage_index < stages.len()
-                    && matches!(
-                        stages[stage_index],
-                        crate::Stage::Limit(_) | crate::Stage::Offset(_)
-                    )
-                {
-                    stage_index += 1;
-                }
-                operator_index += 1;
-                continue;
-            }
-            _ => return false,
-        }
-        operator_index += 1;
-        stage_index += 1;
-    }
-    stage_index == stages.len()
-}
-
-/// The column list the relation under `plan` produces.
-fn leaf_columns(plan: &LogicalPlan) -> Option<Vec<String>> {
+/// A join side's table and columns. A side that is not a bare scan has no
+/// columns here, which is how the reference treats it too.
+fn leaf_scan(plan: &LogicalPlan) -> (String, Vec<String>) {
     match plan {
-        LogicalPlan::Scan { columns, .. } | LogicalPlan::Values { columns, .. } => {
-            Some(columns.clone())
-        }
-        LogicalPlan::Join { left, right, .. } => {
-            let mut columns = leaf_columns(left)?;
-            columns.extend(leaf_columns(right)?);
-            Some(columns)
-        }
-        LogicalPlan::Filter { input, .. }
-        | LogicalPlan::Projection { input, .. }
-        | LogicalPlan::Aggregate { input, .. }
-        | LogicalPlan::Sort { input, .. }
-        | LogicalPlan::Limit { input, .. }
-        | LogicalPlan::Offset { input, .. } => leaf_columns(input),
+        LogicalPlan::Scan { table, columns } => (table.clone(), columns.clone()),
+        _ => (String::new(), Vec::new()),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use infinity_expression::{Expr, Value};
+    use infinity_expression::Expr;
+    use infinity_parser::AggFunc;
+    use infinity_parser::CmpOp;
 
     fn scan() -> LogicalPlan {
         LogicalPlan::Scan {
             table: "t".into(),
             columns: vec!["c1".into(), "c2".into()],
         }
-    }
-
-    #[test]
-    fn lowers_a_projection_over_a_scan() {
-        let plan = LogicalPlan::Projection {
-            input: Box::new(scan()),
-            exprs: vec![Expr::Column(1)],
-            names: vec!["c2".into()],
-        };
-        let (operators, names) = lower(&plan).unwrap().unwrap();
-        assert_eq!(operators.len(), 1);
-        assert_eq!(
-            operators[0].operator_type(),
-            super::super::PhysicalOperatorType::Projection
-        );
-        assert_eq!(names, vec!["c2".to_string()]);
-    }
-
-    #[test]
-    fn a_scan_without_a_projection_is_not_lowered() {
-        assert!(lower(&scan()).unwrap().is_none());
-    }
-
-    #[test]
-    fn lowers_an_aggregate_and_keeps_the_single_fallback() {
-        use infinity_parser::AggFunc;
-
-        let plan = LogicalPlan::Aggregate {
-            input: Box::new(scan()),
-            group_keys: vec![Expr::Column(0)],
-            group_names: vec!["c1".into()],
-            aggs: vec![(AggFunc::Count, Vec::new(), false, "count".into())],
-        };
-        let (operators, names) = lower(&plan).unwrap().unwrap();
-        assert_eq!(operators.len(), 1);
-        assert_eq!(
-            operators[0].operator_type(),
-            super::super::PhysicalOperatorType::Aggregate
-        );
-        // Without a projection above it, the aggregate names the output.
-        assert_eq!(names, vec!["c1".to_string(), "count".to_string()]);
-        let stages = vec![crate::Stage::Aggregate {
-            group_keys: vec![Expr::Column(0)],
-            group_names: vec!["c1".into()],
-            aggs: vec![(AggFunc::Count, Vec::new(), false, "count".into())],
-        }];
-        assert!(covers(&operators, &stages));
-    }
-
-    #[test]
-    fn lowers_a_filter() {
-        let plan = LogicalPlan::Projection {
-            input: Box::new(LogicalPlan::Filter {
-                input: Box::new(scan()),
-                predicate: Expr::Cmp(
-                    Box::new(Expr::Column(0)),
-                    infinity_parser::CmpOp::Gt,
-                    Box::new(Expr::Literal(Value::Int(1))),
-                ),
-            }),
-            exprs: vec![Expr::Column(1)],
-            names: vec!["c2".into()],
-        };
-        let (operators, names) = lower(&plan).unwrap().unwrap();
-        assert_eq!(operators.len(), 2);
-        // Execution order: the filter sits nearest the scan.
-        assert_eq!(
-            operators[0].operator_type(),
-            super::super::PhysicalOperatorType::Filter
-        );
-        assert_eq!(
-            operators[1].operator_type(),
-            super::super::PhysicalOperatorType::Projection
-        );
-        assert_eq!(names, vec!["c2".to_string()]);
     }
 
     fn projection(input: LogicalPlan) -> LogicalPlan {
@@ -298,21 +245,99 @@ mod tests {
         }
     }
 
+    fn kinds(lowered: &Lowered) -> Vec<super::super::PhysicalOperatorType> {
+        lowered
+            .operators
+            .iter()
+            .map(|operator| operator.operator_type())
+            .collect()
+    }
+
+    #[test]
+    fn lowers_a_projection_over_a_scan() {
+        let plan = LogicalPlan::Projection {
+            input: Box::new(scan()),
+            exprs: vec![Expr::Column(1)],
+            names: vec!["c2".into()],
+        };
+        let lowered = lower(&plan).unwrap();
+        assert_eq!(
+            kinds(&lowered),
+            vec![super::super::PhysicalOperatorType::Projection]
+        );
+        assert_eq!(lowered.names, vec!["c2".to_string()]);
+        match &lowered.source {
+            SourceKind::Table { table, columns } => {
+                assert_eq!(table, "t");
+                assert_eq!(columns, &["c1".to_string(), "c2".to_string()]);
+            }
+            other => panic!("expected a table scan, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_scan_without_a_projection_lowers_to_an_empty_chain() {
+        let lowered = lower(&scan()).unwrap();
+        assert!(lowered.operators.is_empty());
+        assert_eq!(lowered.names, vec!["c1".to_string(), "c2".to_string()]);
+    }
+
+    #[test]
+    fn lowers_a_filter() {
+        let plan = LogicalPlan::Projection {
+            input: Box::new(LogicalPlan::Filter {
+                input: Box::new(scan()),
+                predicate: Expr::Cmp(
+                    Box::new(Expr::Column(0)),
+                    CmpOp::Gt,
+                    Box::new(Expr::Literal(Value::Int(1))),
+                ),
+            }),
+            exprs: vec![Expr::Column(1)],
+            names: vec!["c2".into()],
+        };
+        let lowered = lower(&plan).unwrap();
+        // Execution order: the filter sits nearest the scan.
+        assert_eq!(
+            kinds(&lowered),
+            vec![
+                super::super::PhysicalOperatorType::Filter,
+                super::super::PhysicalOperatorType::Projection
+            ]
+        );
+        assert_eq!(lowered.names, vec!["c2".to_string()]);
+    }
+
+    #[test]
+    fn lowers_an_aggregate() {
+        let plan = LogicalPlan::Aggregate {
+            input: Box::new(scan()),
+            group_keys: vec![Expr::Column(0)],
+            group_names: vec!["c1".into()],
+            aggs: vec![(AggFunc::Count, Vec::new(), false, "count".into())],
+        };
+        let lowered = lower(&plan).unwrap();
+        assert_eq!(
+            kinds(&lowered),
+            vec![super::super::PhysicalOperatorType::Aggregate]
+        );
+        // Without a projection above it, the aggregate names the output.
+        assert_eq!(lowered.names, vec!["c1".to_string(), "count".to_string()]);
+    }
+
     #[test]
     fn lowers_a_limit_over_a_projection() {
         let plan = LogicalPlan::Limit {
             input: Box::new(projection(scan())),
             n: 5,
         };
-        let (operators, _) = lower(&plan).unwrap().unwrap();
-        assert_eq!(operators.len(), 2);
+        let lowered = lower(&plan).unwrap();
         assert_eq!(
-            operators[0].operator_type(),
-            super::super::PhysicalOperatorType::Projection
-        );
-        assert_eq!(
-            operators[1].operator_type(),
-            super::super::PhysicalOperatorType::Limit
+            kinds(&lowered),
+            vec![
+                super::super::PhysicalOperatorType::Projection,
+                super::super::PhysicalOperatorType::Limit
+            ]
         );
     }
 
@@ -325,16 +350,14 @@ mod tests {
             }),
             n: 5,
         };
-        let (operators, _) = lower(&plan).unwrap().unwrap();
-        // Two stages, two operators (offset first, then the limit).
-        assert_eq!(operators.len(), 3);
+        let lowered = lower(&plan).unwrap();
         assert_eq!(
-            operators[1].operator_type(),
-            super::super::PhysicalOperatorType::Limit
-        );
-        assert_eq!(
-            operators[2].operator_type(),
-            super::super::PhysicalOperatorType::Limit
+            kinds(&lowered),
+            vec![
+                super::super::PhysicalOperatorType::Projection,
+                super::super::PhysicalOperatorType::Limit,
+                super::super::PhysicalOperatorType::Limit
+            ]
         );
     }
 
@@ -347,11 +370,13 @@ mod tests {
             }),
             n: 10,
         };
-        let (operators, _) = lower(&plan).unwrap().unwrap();
-        assert_eq!(operators.len(), 2);
+        let lowered = lower(&plan).unwrap();
         assert_eq!(
-            operators[1].operator_type(),
-            super::super::PhysicalOperatorType::Top
+            kinds(&lowered),
+            vec![
+                super::super::PhysicalOperatorType::Projection,
+                super::super::PhysicalOperatorType::Top
+            ]
         );
     }
 
@@ -361,57 +386,19 @@ mod tests {
             input: Box::new(projection(scan())),
             keys: vec![(Expr::Column(0), true)],
         };
-        let (operators, names) = lower(&plan).unwrap().unwrap();
-        assert_eq!(operators.len(), 2);
+        let lowered = lower(&plan).unwrap();
         assert_eq!(
-            operators[1].operator_type(),
-            super::super::PhysicalOperatorType::Sort
+            kinds(&lowered),
+            vec![
+                super::super::PhysicalOperatorType::Projection,
+                super::super::PhysicalOperatorType::Sort
+            ]
         );
-        assert_eq!(names, vec!["c1".to_string()]);
-        let stages = vec![
-            crate::Stage::Projection(vec![Expr::Column(0)], vec!["c1".into()]),
-            crate::Stage::Sort {
-                keys: vec![(Expr::Column(0), true)],
-            },
-        ];
-        assert!(covers(&operators, &stages));
+        assert_eq!(lowered.names, vec!["c1".to_string()]);
     }
 
     #[test]
-    fn covers_accepts_the_chain_it_produced() {
-        let plan = LogicalPlan::Limit {
-            input: Box::new(LogicalPlan::Sort {
-                input: Box::new(projection(scan())),
-                keys: vec![(Expr::Column(0), true)],
-            }),
-            n: 10,
-        };
-        let (operators, _) = lower(&plan).unwrap().unwrap();
-        let stages = vec![
-            crate::Stage::Projection(vec![Expr::Column(0)], vec!["c1".into()]),
-            crate::Stage::Sort {
-                keys: vec![(Expr::Column(0), true)],
-            },
-            crate::Stage::Limit(10),
-        ];
-        assert!(covers(&operators, &stages));
-        // A chain longer than the stage list is rejected...
-        assert!(!covers(&operators, &stages[..1]));
-        // ...and so is one whose operator does not match the stage below it.
-        let mut with_aggregate = stages.clone();
-        with_aggregate.insert(
-            1,
-            crate::Stage::Aggregate {
-                group_keys: vec![Expr::Column(0)],
-                group_names: vec!["c1".into()],
-                aggs: Vec::new(),
-            },
-        );
-        assert!(!covers(&operators, &with_aggregate));
-    }
-
-    #[test]
-    fn a_projection_over_values_lowers() {
+    fn a_projection_over_values_lowers_with_a_values_source() {
         let plan = LogicalPlan::Projection {
             input: Box::new(LogicalPlan::Values {
                 columns: vec!["a".into()],
@@ -420,8 +407,50 @@ mod tests {
             exprs: vec![Expr::Column(0)],
             names: vec!["a".into()],
         };
-        let (operators, names) = lower(&plan).unwrap().unwrap();
-        assert_eq!(operators.len(), 1);
-        assert_eq!(names, vec!["a".to_string()]);
+        let lowered = lower(&plan).unwrap();
+        assert_eq!(lowered.operators.len(), 1);
+        assert_eq!(lowered.names, vec!["a".to_string()]);
+        match &lowered.source {
+            SourceKind::Values { columns, rows } => {
+                assert_eq!(columns, &["a".to_string()]);
+                assert_eq!(rows, &vec![vec![Value::Int(1)]]);
+            }
+            other => panic!("expected a values source, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_join_becomes_a_join_source() {
+        let plan = LogicalPlan::Projection {
+            input: Box::new(LogicalPlan::Join {
+                left: Box::new(LogicalPlan::Scan {
+                    table: "l".into(),
+                    columns: vec!["a".into()],
+                }),
+                right: Box::new(LogicalPlan::Scan {
+                    table: "r".into(),
+                    columns: vec!["b".into()],
+                }),
+                left_key: 0,
+                right_key: 0,
+                left_width: 1,
+            }),
+            exprs: vec![Expr::Column(0), Expr::Column(1)],
+            names: vec!["a".into(), "b".into()],
+        };
+        let lowered = lower(&plan).unwrap();
+        match &lowered.source {
+            SourceKind::Join {
+                columns,
+                left,
+                right,
+                ..
+            } => {
+                assert_eq!(left, "l");
+                assert_eq!(right, "r");
+                assert_eq!(columns, &["a".to_string(), "b".to_string()]);
+            }
+            other => panic!("expected a join source, got {other:?}"),
+        }
     }
 }

@@ -40,8 +40,6 @@ pub struct TableScan {
     /// The full-text column the candidate's index filter reads.
     pub fulltext_index_column: Option<String>,
     pub fulltext_substring: bool,
-    /// The predicate cannot match anything, so the scan yields no row.
-    pub unmatchable: bool,
 }
 
 impl TableScan {
@@ -130,6 +128,8 @@ pub struct PhysicalSource<'a> {
     /// Rows still to hand out; filled by the first pull.
     rows: Option<std::vec::IntoIter<Vec<Value>>>,
     batch: usize,
+    /// The predicate cannot match anything, so the source yields no row.
+    unmatchable: bool,
 }
 
 impl<'a> PhysicalSource<'a> {
@@ -145,7 +145,14 @@ impl<'a> PhysicalSource<'a> {
             columns,
             rows: None,
             batch: batch.max(1),
+            unmatchable: false,
         }
+    }
+
+    /// Marks the source as yielding no row (the planner proved the predicate
+    /// cannot match).
+    pub fn set_unmatchable(&mut self, unmatchable: bool) {
+        self.unmatchable = unmatchable;
     }
 
     /// The columns the source emits.
@@ -154,18 +161,10 @@ impl<'a> PhysicalSource<'a> {
     }
 
     fn materialise(&mut self) -> Result<Vec<Vec<Value>>> {
-        let unmatchable;
         let rows = match &mut self.spec {
-            SourceSpec::Values { rows, .. } => {
-                unmatchable = false;
-                std::mem::take(rows)
-            }
-            SourceSpec::Table(scan) => {
-                unmatchable = scan.unmatchable;
-                scan.rows(self.engine)?
-            }
+            SourceSpec::Values { rows, .. } => std::mem::take(rows),
+            SourceSpec::Table(scan) => scan.rows(self.engine)?,
             SourceSpec::Join(join) => {
-                unmatchable = false;
                 let lrows = crate::align_rows(
                     self.engine.fetch_rows(&join.left)?,
                     &join.left_columns,
@@ -185,18 +184,10 @@ impl<'a> PhysicalSource<'a> {
                 )
             }
         };
-        if unmatchable {
+        if self.unmatchable {
             return Ok(Vec::new());
         }
         Ok(rows)
-    }
-
-    /// Reads the whole relation (used by the stage pipeline fallback).
-    pub fn collect_rows(&mut self) -> Result<Vec<Vec<Value>>> {
-        match self.rows.take() {
-            Some(rows) => Ok(rows.collect()),
-            None => self.materialise(),
-        }
     }
 }
 
@@ -300,11 +291,10 @@ mod tests {
             index_positions: None,
             fulltext_index_column: None,
             fulltext_substring: false,
-            unmatchable: false,
         };
         let mut source = PhysicalSource::new(&engine, SourceSpec::Table(Box::new(scan)), 8192);
         assert_eq!(
-            source.collect_rows().unwrap(),
+            source.collect().unwrap(),
             vec![vec![Value::Int(10)], vec![Value::Int(20)]]
         );
     }
@@ -323,10 +313,10 @@ mod tests {
             index_positions: None,
             fulltext_index_column: None,
             fulltext_substring: false,
-            unmatchable: true,
         };
         let mut source = PhysicalSource::new(&engine, SourceSpec::Table(Box::new(scan)), 8192);
-        assert!(source.collect_rows().unwrap().is_empty());
+        source.set_unmatchable(true);
+        assert!(source.collect().unwrap().is_empty());
     }
 
     #[test]
@@ -343,9 +333,8 @@ mod tests {
             index_positions: None,
             fulltext_index_column: None,
             fulltext_substring: false,
-            unmatchable: false,
         };
         let mut source = PhysicalSource::new(&engine, SourceSpec::Table(Box::new(scan)), 8192);
-        assert_eq!(source.collect_rows().unwrap(), vec![vec![Value::Int(42)]]);
+        assert_eq!(source.collect().unwrap(), vec![vec![Value::Int(42)]]);
     }
 }
