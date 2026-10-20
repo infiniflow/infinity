@@ -3105,6 +3105,48 @@ fn sparse_doc_bytes(doc: &[(i32, f32)]) -> usize {
     doc.len() * 8
 }
 
+/// C++ `BMPUtil::ParseBmpSearchOptions`: the per-query `MATCH SPARSE` options
+/// `alpha` / `beta` / `use_tail`, from the legacy option string and the SQL
+/// `WITH (…)` clause (the latter wins, like `KnnScanOptions::parse`). An
+/// `alpha`/`beta` outside `[0, 1]` and a `use_tail` other than `T`/`F` are
+/// ignored, exactly like the reference's warnings do.
+fn parse_bmp_search_options(
+    with_opts: Option<&str>,
+    params: &str,
+) -> infinity_index::sparse::BmpSearchOptions {
+    let mut options = infinity_index::sparse::BmpSearchOptions::default();
+    let unit = |value: &str| -> Option<f32> {
+        value
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .filter(|v| (0.0..=1.0).contains(v))
+    };
+    for source in [Some(params), with_opts].into_iter().flatten() {
+        for part in source.split(';') {
+            let Some((key, value)) = part.split_once('=') else {
+                continue;
+            };
+            if key.trim().eq_ignore_ascii_case("alpha") {
+                if let Some(alpha) = unit(value) {
+                    options.alpha = alpha;
+                }
+            } else if key.trim().eq_ignore_ascii_case("beta") {
+                if let Some(beta) = unit(value) {
+                    options.beta = beta;
+                }
+            } else if key.trim().eq_ignore_ascii_case("use_tail") {
+                match value.trim() {
+                    "T" => options.use_tail = true,
+                    "F" => options.use_tail = false,
+                    _ => {}
+                }
+            }
+        }
+    }
+    options
+}
+
 impl SparseIndex {
     fn new(
         dir: PathBuf,
@@ -3201,17 +3243,21 @@ impl SparseIndex {
     }
 
     /// Top-k over sealed chunks and the memory tail, skipping tombstones.
+    /// `options` is the query's `alpha` / `beta` / `use_tail`
+    /// (`BMPUtil::ParseBmpSearchOptions`).
     fn search(
         &self,
         query: &[(i32, f32)],
         k: usize,
         dead: &std::collections::HashSet<u64>,
+        options: infinity_index::sparse::BmpSearchOptions,
     ) -> Vec<(u64, f32)> {
         let mut hits: Vec<(u64, f32)> = Vec::new();
         for (segment, reader) in &self.sealed {
             // Ask for enough candidates that tombstoned rows cannot starve the
-            // top-k; `search` clamps to the chunk's document count.
-            for (row, score) in reader.search(query, k + dead.len(), 0.9) {
+            // top-k; `search` clamps to the chunk's document count. The on-disk
+            // reader implements the `alpha` pruning of `BMPHandler::SearchKnn`.
+            for (row, score) in reader.search(query, k + dead.len(), options.alpha) {
                 let seq = (segment << 32) | u64::from(row as u32);
                 if !dead.contains(&seq) {
                     hits.push((seq, score));
@@ -3243,11 +3289,10 @@ impl SparseIndex {
             });
         }
         if let Some(tail) = guard.as_ref() {
-            for (doc, score) in tail.alg.search_knn(
-                &qv,
-                k + dead.len(),
-                infinity_index::sparse::BmpSearchOptions::default(),
-            ) {
+            // The memory index is a `BMPAlg` too, so `use_tail`/`beta` apply to
+            // its own unsealed tail exactly as `bmp_search` does in the
+            // reference.
+            for (doc, score) in tail.alg.search_knn(&qv, k + dead.len(), options) {
                 if let Some(seq) = tail.seqs.get(doc) {
                     if !dead.contains(seq) {
                         hits.push((*seq, score));
@@ -5066,9 +5111,10 @@ impl Engine {
                 // The processor is shutting down and dropped the task, so no
                 // worker will clear the proposed-dump flag: clear it here or
                 // the quota never proposes another dump.
-                self.context
-                    .memindex_pending
-                    .store(0, std::sync::atomic::Ordering::Relaxed);
+                self.context.memindex_pending.store(
+                    0,
+                    std::sync::atomic::Ordering::Relaxed,
+                );
             }
             return;
         }
@@ -5167,6 +5213,138 @@ impl Engine {
         Some(out)
     }
 
+    /// The row ids of a range predicate the planner already pushed down: the
+    /// `Secondary` evaluator carries the merged intervals, so nothing is parsed
+    /// here. `None` means "not answerable from the index", and the caller keeps
+    /// the full scan.
+    fn index_scan_range_rows(
+        &self,
+        table: &str,
+        evaluator: &infinity_planner::index_scan::IndexFilterEvaluator,
+        scan_columns: &[String],
+    ) -> Option<Vec<u64>> {
+        let infinity_planner::index_scan::IndexFilterEvaluator::Secondary(secondary) = evaluator
+        else {
+            return None;
+        };
+        if secondary.json || secondary.ranges.is_empty() {
+            return None;
+        }
+        // A single-point range is `col = v`. Deliberately left to
+        // `index_lookup` above: that path predates the range read and stays
+        // authoritative for equality, so the two cannot diverge. Deleting this
+        // branch makes `=` take the range path, which is a behaviour change to
+        // make on purpose, not by accident.
+        if secondary.ranges.len() == 1 {
+            let (lo, hi) = &secondary.ranges[0];
+            if lo == hi {
+                return None;
+            }
+        }
+        let column = scan_columns.get(secondary.column_id)?;
+        self.index_range_lookup(table, column, &secondary.ranges)
+    }
+
+    /// Rows whose indexed key falls in one of `ranges` (inclusive bounds,
+    /// already merged by `FilterExpressionPushDown`).
+    ///
+    /// Only `INT`/`UINT` keys are order-preserving in the sealed chunks
+    /// (`build_index` encodes `(v as u64) ^ (1 << 63)`); every other kind
+    /// stores `hash_varchar`, so it returns `None` there and the caller keeps
+    /// the full-scan path. `EXPLAIN`'s `INDEX SCAN` is therefore truthful for
+    /// an integer range and still overstates a float/date/varchar one.
+    fn index_range_lookup(
+        &self,
+        table: &str,
+        column: &str,
+        ranges: &[(Value, Value)],
+    ) -> Option<Vec<u64>> {
+        let tkey = self.table_key(table);
+        let schema = self.table_schema(table).unwrap_or_default();
+        let col = schema.iter().position(|c| c == column)?;
+        // Same gate as the chunk writer: only an integer key is ordered.
+        let column_type = self
+            .column_types(table)
+            .ok()
+            .and_then(|types| types.get(col).cloned())
+            .map(|ty| ty.trim().to_ascii_uppercase())
+            .unwrap_or_default();
+        if !(column_type.starts_with("INT") || column_type.starts_with("UINT")) {
+            return None;
+        }
+        // The planner's open ends are `Value::Int(i64::MIN)` /
+        // `Value::Int(i64::MAX)`, so every bound of an integer range is an
+        // `Int`; anything else means this range is not ours.
+        let keys: Vec<(u64, u64)> = ranges
+            .iter()
+            .filter_map(|(lo, hi)| match (lo, hi) {
+                (Value::Int(lo), Value::Int(hi)) if lo <= hi => Some((
+                    (*lo as u64) ^ (1u64 << 63),
+                    (*hi as u64) ^ (1u64 << 63),
+                )),
+                _ => None,
+            })
+            .collect();
+        if keys.is_empty() {
+            return None;
+        }
+        // Snapshot the sealed readers (cheap `Arc` clones) and the matching
+        // part of the memory tail, so the row lookup runs without the lock.
+        let (disk, tail): (Option<SecondaryDiskChunks>, Vec<u64>) = {
+            let tables = self.tables.lock().unwrap();
+            let reg = tables.get(&tkey).map(|e| &e.secondary)?;
+            let known = reg.indexes.contains_key(column)
+                || reg.disk.contains_key(column)
+                || reg.low.contains_key(column);
+            if !known {
+                return None;
+            }
+            // The tail is keyed by the literal's decimal text, so its byte
+            // order is not numeric order (`"10"` sorts before `"9"`): every
+            // visited key is decoded and compared, never sliced at a bound.
+            let mut tail = Vec::new();
+            if let Some(index) = reg.indexes.get(column) {
+                index.for_each_in_order(|key, ids| {
+                    let Some(value) = std::str::from_utf8(key)
+                        .ok()
+                        .and_then(|key| key.parse::<i64>().ok())
+                    else {
+                        return;
+                    };
+                    let inside = ranges.iter().any(|(lo, hi)| match (lo, hi) {
+                        (Value::Int(lo), Value::Int(hi)) => *lo <= value && value <= *hi,
+                        _ => false,
+                    });
+                    if inside {
+                        tail.extend_from_slice(ids);
+                    }
+                });
+            }
+            (reg.disk.get(column).cloned(), tail)
+        };
+        let mut out: Vec<u64> = Vec::new();
+        let mut seen: std::collections::HashSet<u64> = Default::default();
+        if let Some(segments) = &disk {
+            for (base, reader) in segments {
+                for (start, end) in &keys {
+                    for off in reader.range(*start, *end) {
+                        let id = base | u64::from(off);
+                        if self.live_row_in_range(table, id, col, ranges) && seen.insert(id) {
+                            out.push(id);
+                        }
+                    }
+                }
+            }
+        }
+        for id in tail {
+            if self.live_row_in_range(table, id, col, ranges) && seen.insert(id) {
+                out.push(id);
+            }
+        }
+        out.sort_unstable();
+        Some(out)
+    }
+
     /// A chunk or tail entry is a hit only when the row is live and still holds
     /// the probed value (UPDATE re-appends, DROP COLUMN re-keys).
     fn live_row_matches(&self, table: &str, id: u64, col: Option<usize>, want: &str) -> bool {
@@ -5199,6 +5377,50 @@ impl Engine {
             }
             None => true,
         }
+    }
+
+    /// `live_row_matches` for a range probe: the row is live and the column's
+    /// current value falls in one of `ranges`. UPDATE re-appends and DROP
+    /// COLUMN re-keys, so a chunk or tail entry alone is not authoritative.
+    /// Only integer values are compared, matching `index_range_lookup`'s gate.
+    fn live_row_in_range(
+        &self,
+        table: &str,
+        id: u64,
+        col: usize,
+        ranges: &[(Value, Value)],
+    ) -> bool {
+        if self
+            .storage
+            .store
+            .get(&del_key(table, id as usize))
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            return false;
+        }
+        let Some(raw) = self
+            .storage
+            .store
+            .get(&row_key(table, id as usize))
+            .ok()
+            .flatten()
+        else {
+            return false;
+        };
+        let field = String::from_utf8_lossy(&raw)
+            .split('\t')
+            .nth(col)
+            .map(str::trim)
+            .map(str::to_string);
+        let Some(value) = field.and_then(|field| field.parse::<i64>().ok()) else {
+            return false;
+        };
+        ranges.iter().any(|(lo, hi)| match (lo, hi) {
+            (Value::Int(lo), Value::Int(hi)) => *lo <= value && value <= *hi,
+            _ => false,
+        })
     }
 
     fn fetch_rows_by_ids(&self, table: &str, ids: &[u64]) -> Result<Vec<Vec<Value>>> {
@@ -8149,6 +8371,29 @@ impl Engine {
                                 .is_some_and(|i| regex.columns.contains_key(&i));
                         candidate = Some(pushed);
                     }
+                }
+            }
+        }
+        // index scan: the planner already merged the predicate into per-column
+        // intervals (`Secondary { ranges }`), so an integer range is answered
+        // from the sealed chunks and the tail instead of materialising the
+        // whole table. This has to run after `IndexScanBuilder` (the candidate
+        // only exists from here on) and before `run_plan`; `=` never gets here
+        // (see `index_scan_range_rows`).
+        if override_rows.is_none() && join.is_none() {
+            if let (Some(t), Some((_, scan_columns)), Some(candidate)) =
+                (from.as_ref(), scan_source.as_ref(), candidate.as_ref())
+            {
+                if let Some(ids) =
+                    self.index_scan_range_rows(t, &candidate.evaluator, scan_columns)
+                {
+                    let mut rows = self.fetch_rows_by_ids(t, &ids)?;
+                    if rowid_col {
+                        for (r, id) in rows.iter_mut().zip(ids.iter()) {
+                            r.push(Value::Int(*id as i64));
+                        }
+                    }
+                    override_rows = Some(rows);
                 }
             }
         }
@@ -12856,9 +13101,24 @@ impl Engine {
             n as usize
         };
         // `MATCH VECTOR` carries its options after `topn`; `SPARSE`/`TENSOR`
-        // carry them in the last argument.
+        // carry them in the last argument (the reference's `opt_params` list).
+        // The SQL form may omit `topn`, in which case the options are the final
+        // string — a bare `'ip'` has no `=` and is not an option bag.
         let params_idx = if is_tensor || is_sparse { 3 } else { 4 };
-        let params = arg_str(m.args.get(params_idx)).unwrap_or_default();
+        let params = arg_str(m.args.get(params_idx)).unwrap_or_else(|| {
+            if is_tensor || is_sparse {
+                m.args
+                    .iter()
+                    .rev()
+                    .find_map(|arg| match arg {
+                        ExprAst::Literal(Literal::Str(s)) if s.contains('=') => Some(s.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            }
+        });
         for part in params.split(';').filter(|p| !p.trim().is_empty()) {
             let key = part
                 .split('=')
@@ -12878,6 +13138,8 @@ impl Engine {
                     | "similarity"
                     | "alpha"
                     | "beta"
+                    // `BMPUtil::ParseBmpSearchOptions`'s tail switch.
+                    | "use_tail"
                     // index hints the SDK passes through; the planner picks the
                     // index itself, so they are accepted and ignored.
                     | "index_name"
@@ -13027,7 +13289,11 @@ impl Engine {
                     .unwrap_or_default();
                 let index = self.sparse_index_for(table, &column, width)?;
                 let dead = self.tombstone_set(table)?;
-                let hits = index.read().unwrap().search(&qv, topn.max(1), &dead);
+                let bmp_options = parse_bmp_search_options(with_opts, &params);
+                let hits = index
+                    .read()
+                    .unwrap()
+                    .search(&qv, topn.max(1), &dead, bmp_options);
                 let scored: Vec<(u64, f64)> = hits
                     .into_iter()
                     .map(|(seq, score)| (seq, f64::from(score)))
@@ -13226,6 +13492,8 @@ impl Engine {
                 .map(|e| e.write_batches)
                 .unwrap_or(0);
             let query_i32: Vec<(i32, f32)> = qv.iter().map(|(t, v)| (*t as i32, *v)).collect();
+            // The query's `alpha` prunes the on-disk scan (`BmpSearchOptions`).
+            let bmp_options = parse_bmp_search_options(with_opts, &params);
             for (segment, mut docs) in segments {
                 docs.sort_by_key(|(row, _)| *row);
                 let term_num = docs
@@ -13259,7 +13527,7 @@ impl Engine {
                 let Ok(reader) = infinity_storage::bmp_cpp::BmpCppReader::open(&path, width) else {
                     continue;
                 };
-                for (row, score) in reader.search(&query_i32, topn.max(1), 0.9) {
+                for (row, score) in reader.search(&query_i32, topn.max(1), bmp_options.alpha) {
                     let id = ((segment << 32) | row as u64) as usize;
                     let score = score as f64;
                     best.entry(id)
@@ -16352,6 +16620,132 @@ mod tests {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 2),
             other => panic!("{other:?}"),
         }
+        // The same after reopen: the integer range reads the chunks that were
+        // rebuilt from the catalog, not a memory tail.
+        assert_eq!(
+            query_column(&e2, "SELECT id FROM t WHERE id >= 2 AND id <= 3 ORDER BY id;"),
+            vec!["2".to_string(), "3".to_string()]
+        );
+    }
+
+    /// The first column of a one-column query over `t`.
+    fn query_column(e: &Engine, sql: &str) -> Vec<String> {
+        match &e.execute(sql).unwrap()[0] {
+            QueryResult::Rows { rows, .. } => rows.iter().map(|row| row[0].clone()).collect(),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// The `id` column of a `WHERE`-filtered select over `t`, in `id` order.
+    fn ids(e: &Engine, predicate: &str) -> Vec<i64> {
+        query_column(e, &format!("SELECT id FROM t WHERE {predicate} ORDER BY id;"))
+            .into_iter()
+            .map(|id| id.parse().expect("id is an integer"))
+            .collect()
+    }
+
+    /// `(id, ROW_ID())` pairs, optionally filtered, in `id` order.
+    fn id_and_row_id(e: &Engine, predicate: Option<&str>) -> Vec<(i64, i64)> {
+        let filter = predicate.map(|p| format!("WHERE {p}")).unwrap_or_default();
+        match &e.execute(&format!(
+            "SELECT id, ROW_ID() FROM t {filter} ORDER BY id;"
+        ))
+        .unwrap()[0]
+        {
+            QueryResult::Rows { rows, .. } => rows
+                .iter()
+                .map(|row| {
+                    (
+                        row[0].parse().expect("id is an integer"),
+                        row[1].parse().expect("ROW_ID() is an integer"),
+                    )
+                })
+                .collect(),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// A range predicate is answered from the secondary index instead of a
+    /// full scan: every interval the planner merged must produce the same rows
+    /// as the residual filter, both from the memory tail and from the sealed
+    /// chunks.
+    #[test]
+    fn index_range_scan_answers_from_sealed_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        for i in 0..200 {
+            e.execute(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
+                .unwrap();
+        }
+        e.execute("CREATE INDEX idx_id ON t (id);").unwrap();
+        let cases: [(&str, Vec<i64>); 7] = [
+            ("id >= 10 AND id <= 12", vec![10, 11, 12]),
+            ("id BETWEEN 5 AND 7", vec![5, 6, 7]),
+            ("id > 197", vec![198, 199]),
+            ("id < 3", vec![0, 1, 2]),
+            ("id <= 0", vec![0]),
+            (
+                "(id >= 1 AND id <= 2) OR (id >= 198 AND id <= 199)",
+                vec![1, 2, 198, 199],
+            ),
+            ("id >= 1000", vec![]),
+        ];
+        // Round 0 reads the memory tail; `flush` seals it into PGM chunks, so
+        // round 1 reads the ordered key array through `range`.
+        for round in 0..2 {
+            for (predicate, expected) in &cases {
+                assert_eq!(
+                    &ids(&e, predicate),
+                    expected,
+                    "round {round}: {predicate}"
+                );
+            }
+            e.flush().unwrap();
+        }
+        // `=` keeps its own path, and must still agree with the range path.
+        assert_eq!(ids(&e, "id = 42"), vec![42]);
+        // `ROW_ID()` must ride along with the narrowed rows.
+        let all = id_and_row_id(&e, None);
+        assert_eq!(
+            id_and_row_id(&e, Some("id >= 10 AND id <= 12")),
+            all[10..=12].to_vec()
+        );
+    }
+
+    /// A range the ordered scan cannot answer — a hash-keyed float column, or a
+    /// column with no index at all — must still return the right rows through
+    /// the fallback.
+    #[test]
+    fn range_on_an_unordered_key_falls_back() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT, score FLOAT, note INT);")
+            .unwrap();
+        for i in 0..50 {
+            e.execute(&format!(
+                "INSERT INTO t VALUES ({i}, {i}.5, {i});"
+            ))
+            .unwrap();
+        }
+        e.execute("CREATE INDEX idx_score ON t (score);").unwrap();
+        for round in 0..2 {
+            // The planner pushes the float range down (a secondary column), but
+            // the chunks hold `hash_varchar` keys: the executor declines it and
+            // the full scan has to be right.
+            assert_eq!(
+                ids(&e, "score >= 10.5 AND score <= 12.5"),
+                vec![10, 11, 12],
+                "round {round}: float range"
+            );
+            // No index on `note`: there is no candidate at all.
+            assert_eq!(
+                ids(&e, "note >= 45"),
+                vec![45, 46, 47, 48, 49],
+                "round {round}: unindexed column"
+            );
+            e.flush().unwrap();
+        }
     }
 
     #[test]
@@ -18057,6 +18451,59 @@ mod tests {
         // it, or the index was built with the standard analyzer.
         let run = "我们热爱中华人民共和国".to_string();
         assert!(guard.merge(std::slice::from_ref(&run)).postings[&run].is_empty());
+    }
+
+    /// `alpha` is a real `BmpSearchOptions` field, not a hard-coded constant:
+    /// `alpha=0` prunes at the first full block, so the higher-scoring tail is
+    /// never scored. C++ `BMPUtil::ParseBmpSearchOptions` +
+    /// `BmpAlg::SearchKnn`'s `ub_score * alpha < min_score` break.
+    #[test]
+    fn match_sparse_alpha_option_reaches_the_bmp_search() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+            .unwrap();
+        // Block 0 (16 docs) has a loose bound: `10` peaks in one document and
+        // `20` in another, so its bound is 2.0 while its best document scores
+        // 1.0. Block 1 holds four documents scoring 2.0 on the same query.
+        let mut values = String::new();
+        for id in 1..=16 {
+            let doc = match id {
+                1 => "[10:1.0]".to_string(),
+                2 => "[20:1.0]".to_string(),
+                _ => "[10:0.1]".to_string(),
+            };
+            values.push_str(&format!("({id}, {doc}),"));
+        }
+        for id in 17..=20 {
+            values.push_str(&format!("({id}, [10:1.0,20:1.0]),"));
+        }
+        e.execute(&format!(
+            "INSERT INTO sp VALUES {};",
+            values.trim_end_matches(',')
+        ))
+        .unwrap();
+        let score = |opts: &str| -> f64 {
+            rows(
+                &e,
+                &format!(
+                    "SELECT SCORE() FROM sp SEARCH MATCH SPARSE \
+                     (v, [10:1.0,20:1.0], 'ip', '{opts}');"
+                ),
+            )[0][0]
+                .parse()
+                .unwrap()
+        };
+        assert_eq!(score("topn=1"), 2.0);
+        // `alpha=0` prunes block 1 (bound 0 * 2.0 < the k-th score 1.0), so the
+        // exact answer is never scored evidence that the option reached
+        // `BmpAlg`/`BmpCppReader::search` instead of a hard-coded 0.9.
+        assert_eq!(score("topn=1;alpha=0"), 1.0);
+        // `beta` and `use_tail` are parsed too; out-of-range values are ignored.
+        let options = parse_bmp_search_options(Some("alpha=0.5;beta=0.25"), "alpha=0.9;use_tail=F");
+        assert_eq!((options.alpha, options.beta, options.use_tail), (0.5, 0.25, false));
+        let ignored = parse_bmp_search_options(None, "alpha=7;beta=-1;use_tail=X");
+        assert_eq!((ignored.alpha, ignored.beta, ignored.use_tail), (1.0, 1.0, true));
     }
 
     /// A column declared `DEFAULT ''` keeps the empty string, not NULL.
