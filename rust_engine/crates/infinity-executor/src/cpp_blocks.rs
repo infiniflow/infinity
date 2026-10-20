@@ -1963,7 +1963,7 @@ impl Engine {
             .ok_or_else(|| Error::NotFound(format!("column '{}'", im.column)))?;
         let index_id = self.cpp_index_position(&table, index_name)?;
         let db_id = self.database_id_of(&table);
-        let delims = self.index_delims(&table, &im.column);
+        let tokenizer = crate::TextTokenizer::new(self.index_delims(&table, &im.column));
         let rows = self.fetch_rows_with_ids(&table)?;
 
         // term -> document ordinals, in term order (the FST requires sorted keys)
@@ -1972,7 +1972,7 @@ impl Engine {
         let mut lengths: Vec<u32> = Vec::with_capacity(rows.len());
         for (doc, (_, row)) in rows.iter().enumerate() {
             let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
-            let terms = crate::tokenize_index_text(&text, &delims);
+            let terms = crate::tokenize_index_text(&text, &tokenizer);
             lengths.push(terms.len() as u32);
             for t in terms {
                 postings.entry(t).or_default().push(doc as u32);

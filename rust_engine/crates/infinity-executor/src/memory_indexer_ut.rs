@@ -4,7 +4,7 @@
 //! fresh `MemoryIndexer` and checks the three reference postings through a
 //! `PostingIterator`.
 
-use crate::MemoryIndexer;
+use crate::{MemoryIndexer, TextTokenizer};
 use infinity_storage::fulltext_segment::PostingIterator;
 use tempfile::tempdir;
 
@@ -30,7 +30,7 @@ fn spill_load_test() {
     let mut indexer = MemoryIndexer::new();
     // The reference inserts rows 0..=4 in three calls.
     for (row, paragraph) in paragraphs.iter().enumerate() {
-        assert!(indexer.insert(row as u64, paragraph, &None, usize::MAX));
+        assert!(indexer.insert(row as u64, paragraph, &TextTokenizer::default(), usize::MAX));
     }
     assert!(indexer.dump(dir_str, "chunk1"));
 

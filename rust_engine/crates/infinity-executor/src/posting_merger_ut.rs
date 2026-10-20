@@ -6,7 +6,7 @@
 //! position assertion reads the memory index that produced the segment (the
 //! same data the reference decodes back from its position list).
 
-use crate::MemoryIndexer;
+use crate::{MemoryIndexer, TextTokenizer};
 use infinity_storage::fulltext_segment::{PostingMerger, SegmentIndexReader};
 use infinity_storage::inverted_format::TermMetaFlags;
 use tempfile::tempdir;
@@ -24,7 +24,7 @@ fn basic() {
     let mut segment_postings: Vec<Vec<(u64, u32)>> = Vec::new();
     for (index, paragraph) in paragraphs.iter().enumerate() {
         let mut indexer = MemoryIndexer::new();
-        assert!(indexer.insert(index as u64, paragraph, &None, usize::MAX));
+        assert!(indexer.insert(index as u64, paragraph, &TextTokenizer::default(), usize::MAX));
         assert!(indexer.dump(dir_str, &format!("chunk{}", index + 1)));
 
         // The segment's only term is `a`; its positions are the reference's

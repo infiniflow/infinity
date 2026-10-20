@@ -2060,8 +2060,14 @@ impl MemoryIndexer {
 
     /// C++: `MemoryIndexer::Insert` for one document. Returns `false` when the
     /// document would push the segment past `budget`, leaving it unchanged.
-    fn insert(&mut self, seq: u64, text: &str, delims: &Option<Vec<char>>, budget: usize) -> bool {
-        let toks = tokenize_index_positions(text, delims);
+    fn insert(
+        &mut self,
+        seq: u64,
+        text: &str,
+        tokenizer: &TextTokenizer,
+        budget: usize,
+    ) -> bool {
+        let toks = tokenize_index_positions(text, tokenizer);
         // ~32 B per posting entry plus the positions and the term string.
         let mut cost = 64usize;
         for (term, _) in &toks {
@@ -2235,11 +2241,34 @@ impl MemoryIndexer {
     }
 }
 
+/// How a full-text column's documents and queries are tokenised: the legacy
+/// delimiter split (`keyword` / `whitespace`, including `whitespace-<chars>`)
+/// with `None` for the standard tokenizer. The index carries it so the
+/// materialised postings and the query agree on the token boundaries.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct TextTokenizer {
+    /// `Some([])` splits on whitespace, `Some(chars)` only on `chars`,
+    /// `None` uses the standard tokenizer.
+    delims: Option<Vec<char>>,
+}
+
+impl TextTokenizer {
+    fn new(delims: Option<Vec<char>>) -> Self {
+        Self { delims }
+    }
+
+    /// A `keyword` / `whitespace` field splits only on its delimiters and
+    /// scores a constant boost per matching document.
+    fn keyword(&self) -> bool {
+        matches!(self.delims, Some(ref delims) if delims.is_empty())
+    }
+}
+
 /// In-memory inverted index for one text column: a [`MemoryIndexer`] for the
 /// unsealed segment plus the sealed on-disk segments.
 /// C++: the `MemoryIndexer` + `IndexSegmentReader` pair held by a column.
 struct TextIndex {
-    delims: Option<Vec<char>>,
+    tokenizer: TextTokenizer,
     /// The unsealed segment.
     mem: MemoryIndexer,
     disabled: bool,
@@ -2324,9 +2353,9 @@ struct MergedIndex {
 }
 
 impl TextIndex {
-    fn new(dir: String, delims: Option<Vec<char>>) -> Self {
+    fn new(dir: String, tokenizer: TextTokenizer) -> Self {
         Self {
-            delims,
+            tokenizer,
             mem: MemoryIndexer::new(),
             disabled: false,
             reader: ColumnIndexReader::default(),
@@ -3755,7 +3784,7 @@ fn index_row(index: &mut TextIndex, seq: u64, text: &str) {
     // the reference would spill, the port stops indexing this column.
     if !index
         .mem
-        .insert(seq, text, &index.delims, TEXT_INDEX_BUDGET_BYTES)
+        .insert(seq, text, &index.tokenizer, TEXT_INDEX_BUDGET_BYTES)
     {
         index.mem.reset();
         index.disabled = true;
@@ -6441,13 +6470,13 @@ impl Engine {
             if !columns.iter().any(|c| c == name) {
                 continue;
             }
-            let delims = self.index_delims(table, name);
-            let qterms = tokenize_index_text(&query, &delims);
+            let tokenizer = TextTokenizer::new(self.index_delims(table, name));
+            let qterms = tokenize_index_text(&query, &tokenizer);
             for row in rows.iter_mut() {
                 let Some(text) = row.get(i).cloned() else {
                     continue;
                 };
-                row[i] = highlight_text(&text, &qterms, &delims);
+                row[i] = highlight_text(&text, &qterms, &tokenizer.delims);
             }
         }
     }
@@ -7153,8 +7182,8 @@ impl Engine {
                 // moved the cost into the first query and produced an index that
                 // did not exist on disk until somebody searched.
                 if has_rows && index_type.eq_ignore_ascii_case("FULLTEXT") {
-                    let delims = self.index_delims(table, column);
-                    self.text_index_for(table, column, delims)?;
+                    let tokenizer = TextTokenizer::new(self.index_delims(table, column));
+                    self.text_index_for(table, column, tokenizer)?;
                 }
                 if has_rows && index_type.eq_ignore_ascii_case("HNSW") {
                     self.build_hnsw_index(table, column)?;
@@ -8242,6 +8271,15 @@ impl Engine {
                     }),
                     None => None,
                 });
+        // The column a full-text index filter reads, if the candidate has one:
+        // its inverted index is what the evaluator must query.
+        let fulltext_index_column: Option<String> = candidate
+            .as_ref()
+            .and_then(|candidate| fulltext_column(&candidate.index_filter))
+            .and_then(|i| {
+                plan_scan_of(&plan)
+                    .and_then(|(_, columns)| columns.get(i).cloned())
+            });
         // The production optimizer: the C++ rule order (fast-rough filter,
         // column pruning, lazy load, binder remap) plus the legacy plan-only
         // rewrites (limit push-down, filter-below-sort, constant folding).
@@ -8254,14 +8292,45 @@ impl Engine {
         let (columns, mut rows) = match source {
             Source::Values { columns, rows } => (columns, rows),
             Source::Table { columns, table } => {
-                let mut rows = match override_rows {
-                    Some(rows) => rows,
-                    None => self.fetch_rows(&table)?,
+                // A full-text index filter answers from the column's inverted
+                // index, which is keyed by the storage row id (C++
+                // `IndexFilterEvaluatorFulltext` queries the `ColumnIndexReader`),
+                // so the scan needs the ids alongside the rows.
+                let needs_ids =
+                    candidate.is_some() && fulltext_index_column.is_some() && !fulltext_substring;
+                let (mut rows, row_ids) = match override_rows {
+                    Some(rows) => (rows, None),
+                    None if needs_ids => {
+                        let pairs = self.fetch_rows_with_ids(&table)?;
+                        let ids: Vec<usize> = pairs.iter().map(|(id, _)| *id).collect();
+                        (
+                            pairs.into_iter().map(|(_, row)| row).collect(),
+                            Some(ids),
+                        )
+                    }
+                    None => (self.fetch_rows(&table)?, None),
                 };
                 // The index filter refers to the pre-`LazyLoad` scan layout, so
                 // it maps back onto the unpruned row before the rows compact.
                 if let (Some(candidate), Some(positions)) = (&candidate, &index_positions) {
-                    rows = apply_index_filter(rows, candidate, positions, fulltext_substring)?;
+                    let tokenizer = fulltext_index_column
+                        .as_ref()
+                        .map(|column| TextTokenizer::new(self.index_delims(&table, column)));
+                    let fulltext_index = match (&fulltext_index_column, &row_ids, &tokenizer) {
+                        (Some(column), Some(_), Some(tokenizer)) if !fulltext_substring => Some((
+                            self.text_index_for(&table, column, tokenizer.clone())?,
+                            tokenizer.clone(),
+                        )),
+                        _ => None,
+                    };
+                    rows = apply_index_filter(
+                        rows,
+                        row_ids.as_deref(),
+                        fulltext_index.as_ref(),
+                        candidate,
+                        positions,
+                        fulltext_substring,
+                    )?;
                 }
                 if let Some(full) = &source_columns {
                     rows = align_rows(rows, &columns, full);
@@ -9039,7 +9108,7 @@ impl Engine {
         &self,
         table: &str,
         column: &str,
-        delims: Option<Vec<char>>,
+        tokenizer: TextTokenizer,
     ) -> Result<SharedTextIndex> {
         let key = index_key(table, column);
         let tkey = self.table_key(table);
@@ -9066,7 +9135,7 @@ impl Engine {
             .join(key.replace('/', "_"))
             .to_string_lossy()
             .into_owned();
-        let mut index = TextIndex::new(dir, delims);
+        let mut index = TextIndex::new(dir, tokenizer);
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, col)? {
             let text = match cells.get(col) {
                 Some(Value::Str(s)) => s.clone(),
@@ -10854,20 +10923,22 @@ impl Engine {
         // delimiters (the C++ `WhitespaceAnalyzer` does not also split on
         // whitespace — see `whitespace_analyzer_impl.cpp`); anything else uses
         // the standard tokenizer.
-        let delims: Option<Vec<char>> = match_columns(&m.column)
+        let tokenizer: TextTokenizer = match_columns(&m.column)
             .iter()
-            .find_map(|c| self.index_delims(table, c));
+            .map(|c| TextTokenizer::new(self.index_delims(table, c)))
+            .find(|tok| tok.delims.is_some())
+            .unwrap_or_default();
         // One unit per quoted phrase / bare word. The analyzer decides what a
         // `"a b"` group tokenises to, so quotes are stripped first.
         let units: Vec<(bool, Vec<String>, f64)> = query_units(&query)
             .into_iter()
-            .map(|(phrase, text, boost)| (phrase, tokenize_text(&text, &delims), boost))
+            .map(|(phrase, text, boost)| (phrase, tokenize_text(&text, &tokenizer), boost))
             .filter(|(_, toks, _)| !toks.is_empty())
             .collect();
-        // One entry per matched column: `(schema index, field boost, delimiters)`.
+        // One entry per matched column: `(schema index, field boost, tokeniser)`.
         // `similarity=boolean` scores each field on its own, so a `keyword`
         // column next to a `standard` one must not share the other's analyzer.
-        let field_specs: Vec<(usize, f64, Option<Vec<char>>)> = m
+        let field_specs: Vec<(usize, f64, TextTokenizer)> = m
             .column
             .split(',')
             .filter_map(|spec| {
@@ -10885,7 +10956,7 @@ impl Engine {
                     .and_then(|v| v.trim().parse::<f64>().ok())
                     .unwrap_or(1.0);
                 let ci = schema.iter().position(|s| s == name)?;
-                Some((ci, boost, self.index_delims(table, name)))
+                Some((ci, boost, TextTokenizer::new(self.index_delims(table, name))))
             })
             .collect();
         let terms: Vec<String> = units
@@ -10984,7 +11055,7 @@ impl Engine {
         // boolean similarity are applied inside the scoring loop. BM25 scores
         // each field separately and sums, like `BM25Ranker`.
         if rank_features.is_empty()
-            && !matches!(&delims, Some(d) if d.is_empty())
+            && !tokenizer.keyword()
             && !field_specs.is_empty()
             && units
                 .iter()
@@ -11186,7 +11257,7 @@ impl Engine {
                     let ftoks = tokenize_index_text(&text, d);
                     let fset: std::collections::HashSet<&str> =
                         ftoks.iter().map(|x| x.as_str()).collect();
-                    let kw = matches!(d, Some(dd) if dd.is_empty());
+                    let kw = d.keyword();
                     let matched = terms.iter().filter(|t| fset.contains(t.as_str())).count();
                     if matched > 0 {
                         bhits += matched;
@@ -11204,7 +11275,7 @@ impl Engine {
                         Some(other) => other.to_slt_string(),
                         None => String::new(),
                     };
-                    tokenize_index_positions(&text, &delims)
+                    tokenize_index_positions(&text, &tokenizer)
                 })
                 .collect();
             docs.push((seq, fields, live, filters_hold, rank_bonus, bhits, bscore));
@@ -11254,7 +11325,7 @@ impl Engine {
         };
         // A `keyword`/`whitespace` field scores constantly: one field-boost
         // point per matching document (not per query term).
-        let keyword_field = matches!(&delims, Some(d) if d.is_empty());
+        let keyword_field = tokenizer.keyword();
         let mut scored: Vec<(usize, f64)> = Vec::new();
         for (seq, fields, live, filters_hold, rank_bonus, bool_hits, bool_score) in &docs {
             // Filters and the live check were evaluated while the row was in
@@ -11405,14 +11476,14 @@ impl Engine {
             return self.search_field_query_bm25(table, query, pred, params, hidden);
         }
         let schema = self.table_schema(table)?;
-        let mut fields: Vec<(String, usize, Option<Vec<char>>)> = Vec::new();
+        let mut fields: Vec<(String, usize, TextTokenizer)> = Vec::new();
         for (_, terms) in groups {
             for (f, _) in terms {
                 if f.is_empty() || fields.iter().any(|(n, _, _)| n == f) {
                     continue;
                 }
                 if let Some(ci) = schema.iter().position(|s| s == f) {
-                    let d = self.index_delims(table, f);
+                    let d = TextTokenizer::new(self.index_delims(table, f));
                     fields.push((f.clone(), ci, d));
                 }
             }
@@ -11482,7 +11553,7 @@ impl Engine {
                     }
                 }
                 for (fi, (name, _, d)) in fields.iter().enumerate() {
-                    let kw = matches!(d, Some(dd) if dd.is_empty());
+                    let kw = d.keyword();
                     let mut matched = 0usize;
                     for (f, t) in terms {
                         if f == name || f.is_empty() {
@@ -11577,7 +11648,7 @@ impl Engine {
                 Some(FieldGroupField {
                     ci: schema.iter().position(|s| s == name)?,
                     name: name.clone(),
-                    delims: self.index_delims(table, name),
+                    tokenizer: TextTokenizer::new(self.index_delims(table, name)),
                     df: HashMap::new(),
                     avg_len: 1.0,
                 })
@@ -11613,7 +11684,7 @@ impl Engine {
                         Some(other) => other.to_slt_string(),
                         None => String::new(),
                     };
-                    tokenize_index_positions(&text, &field.delims)
+                    tokenize_index_positions(&text, &field.tokenizer)
                 })
                 .collect();
             for (fi, field_tokens) in tokens.iter().enumerate() {
@@ -14072,31 +14143,71 @@ impl infinity_planner::index_scan::SecondaryIndexProvider for RowSecondaryProvid
     }
 }
 
-/// A full-text index over already-materialised rows. `postings` mirrors the
-/// row-local `filter_fulltext` term semantics, so it can only ever admit rows
-/// the predicate itself would admit.
+/// A full-text index over already-materialised rows. `postings` answers from
+/// the column's inverted index (`ColumnIndexReader::Lookup` in the reference),
+/// exactly like `IndexFilterEvaluatorFulltext`, so the filter narrows the
+/// candidates instead of waving every row through.
 struct RowFulltextProvider<'a> {
     rows: &'a [Vec<Value>],
     column: usize,
+    /// The storage sequence id of each row, aligned with `rows`. The inverted
+    /// index is keyed by it, so a posting can only select a row the scan
+    /// actually materialised (a stale posting must not admit a foreign row).
+    row_ids: Option<&'a [usize]>,
+    /// The column's inverted index and the tokeniser the filter asks for. The
+    /// index was built with the analyzer its column was created with; a column
+    /// may carry two full-text indexes, so only a matching tokeniser proves it
+    /// can answer this filter.
+    index: Option<&'a (SharedTextIndex, TextTokenizer)>,
     /// A sparse-gram index matches a literal run contiguously; a term index
     /// matches whole tokens.
     substring: bool,
 }
 
+impl RowFulltextProvider<'_> {
+    /// C++ `ColumnIndexReader::Lookup(term, false)`: the row ids whose documents
+    /// contain `term`, with stale copies of re-indexed rows removed.
+    fn index_postings(&self, term: &str) -> Option<std::collections::HashSet<usize>> {
+        let (index, tokenizer) = self.index?;
+        self.row_ids?;
+        let guard = index.read().ok()?;
+        if &guard.tokenizer != tokenizer {
+            return None;
+        }
+        let merged = guard.merge(&[term.to_string()]);
+        Some(
+            merged
+                .postings
+                .get(term)
+                .map(|list| list.iter().map(|(doc, _)| *doc as usize).collect())
+                .unwrap_or_default(),
+        )
+    }
+}
+
 impl infinity_planner::index_scan::FulltextIndex for RowFulltextProvider<'_> {
     fn postings(&self, term: &str) -> Vec<u32> {
         let needle = term.to_lowercase();
+        // The term index answers from the postings; a sparse-gram index
+        // (seeded by `RegexIndexRewrite`, or named with `col@index`) is a
+        // literal-run test over the text.
+        let postings = self.index_postings(&needle);
         let mut out = Vec::new();
         for (i, row) in self.rows.iter().enumerate() {
-            let text = match row.get(self.column) {
-                Some(Value::Str(s)) => s.clone(),
-                Some(other) => other.to_slt_string(),
-                None => continue,
+            let hit = if let (Some(postings), Some(ids)) = (&postings, self.row_ids) {
+                ids.get(i).is_some_and(|id| postings.contains(id))
+            } else if self.substring {
+                let text = match row.get(self.column) {
+                    Some(Value::Str(s)) => s.clone(),
+                    Some(other) => other.to_slt_string(),
+                    None => continue,
+                };
+                text.to_lowercase().contains(&needle)
+            } else {
+                // No usable index for this filter: keep the row and let the
+                // residual predicate decide rather than dropping it.
+                true
             };
-            // Only a sparse-gram index (seeded by `RegexIndexRewrite`) proves a
-            // literal run contiguously; a term query cannot safely narrow rows
-            // here, so it keeps them and lets the residual predicate decide.
-            let hit = !self.substring || text.to_lowercase().contains(&needle);
             if hit {
                 out.push(i as u32);
             }
@@ -14129,6 +14240,8 @@ fn fulltext_column(expr: &Expr) -> Option<usize> {
 /// yields exactly the rows its evaluator selects).
 fn apply_index_filter(
     rows: Vec<Vec<Value>>,
+    row_ids: Option<&[usize]>,
+    fulltext_index: Option<&(SharedTextIndex, TextTokenizer)>,
     candidate: &infinity_planner::index_scan::IndexScanCandidate,
     positions: &[usize],
     fulltext_substring: bool,
@@ -14148,6 +14261,8 @@ fn apply_index_filter(
         column: fulltext_column(&candidate.index_filter)
             .and_then(|i| positions.get(i).copied())
             .unwrap_or(0),
+        row_ids,
+        index: fulltext_index,
         substring: fulltext_substring,
     };
     ctx = ctx.with_fulltext(&fulltext);
@@ -14649,7 +14764,8 @@ fn standard_tokenize(s: &str) -> Vec<String> {
 }
 
 /// Query-side tokens: the standard analyzer's stem replaces the word.
-fn tokenize_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
+fn tokenize_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
+    let delims = &tokenizer.delims;
     // The C++ default analyzer is `standard` (`index_full_text_impl.cpp:68`) — a
     // `StandardAnalyzer` with `STEM_LANG_ENGLISH` (`analyzer_pool_impl.cpp:266-289`)
     // — so the `None` (standard) case stems English and drops the word form.
@@ -14670,7 +14786,8 @@ fn tokenize_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
 /// stem that differs (`multiple`->`multipl`, `many`->`mani`, `words`->`word`,
 /// `another`->`anoth`), and `doc_len_sum` is 21 rather than 15. Query terms stay
 /// stem-only (a boolean query for `second text multiple` scores 3, not 4).
-fn tokenize_index_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
+fn tokenize_index_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
+    let delims = &tokenizer.delims;
     if delims.is_some() {
         return split_words(s, delims);
     }
@@ -14683,7 +14800,8 @@ fn tokenize_index_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
 /// original and its stem at the same offset (`common_analyzer_impl.cpp`
 /// re-uses `offset_` for both), so both share a position; `offset_` itself
 /// advances once per raw token. Phrase queries need this.
-fn tokenize_index_positions(s: &str, delims: &Option<Vec<char>>) -> Vec<(String, u32)> {
+fn tokenize_index_positions(s: &str, tokenizer: &TextTokenizer) -> Vec<(String, u32)> {
+    let delims = &tokenizer.delims;
     if delims.is_some() {
         return split_words(s, delims)
             .into_iter()
@@ -15033,7 +15151,7 @@ fn query_units(query: &str) -> Vec<(bool, String, f64)> {
 struct FieldGroupField {
     name: String,
     ci: usize,
-    delims: Option<Vec<char>>,
+    tokenizer: TextTokenizer,
     df: HashMap<String, usize>,
     avg_len: f64,
 }
@@ -15042,7 +15160,7 @@ impl FieldGroupField {
     /// `keyword` / `whitespace` fields split on whitespace and score a constant
     /// boost per matching document (the named-column path's `keyword_field`).
     fn keyword(&self) -> bool {
-        matches!(self.delims, Some(ref delims) if delims.is_empty())
+        self.tokenizer.keyword()
     }
 }
 
@@ -15854,6 +15972,64 @@ mod tests {
             "SELECT id FROM g WHERE filter_fulltext('doc','harmful chemical','operator=and');",
         );
         assert_eq!(regular.len(), 2);
+    }
+
+    /// The index filter answers a term from the column's postings
+    /// (`ColumnIndexReader::Lookup` in the reference), not from "every row".
+    /// Before the port it returned every position for a term index, so the
+    /// filter never narrowed the candidate set.
+    #[test]
+    fn fulltext_index_filter_reads_postings_by_row_id() {
+        use infinity_planner::index_scan::FulltextIndex;
+        let dir = tempdir().unwrap();
+        let mut index = TextIndex::new(
+            dir.path().to_string_lossy().into_owned(),
+            TextTokenizer::default(),
+        );
+        index_row(&mut index, 7, "alpha beta");
+        index_row(&mut index, 9, "gamma delta");
+        // A posting for a row the scan did not materialise must not admit
+        // anything: the postings are intersected with the scan's own row ids.
+        index_row(&mut index, 42, "alpha stale");
+        let index: SharedTextIndex = std::sync::Arc::new(std::sync::RwLock::new(index));
+        let rows = vec![
+            vec![Value::Str("alpha beta".into())],
+            vec![Value::Str("gamma delta".into())],
+        ];
+        let ids = vec![7usize, 9];
+        let tokenizer = TextTokenizer::default();
+        let index = (index, tokenizer.clone());
+        let provider = RowFulltextProvider {
+            rows: &rows,
+            column: 0,
+            row_ids: Some(&ids),
+            index: Some(&index),
+            substring: false,
+        };
+        assert_eq!(provider.postings("alpha"), vec![0]);
+        assert_eq!(provider.postings("gamma"), vec![1]);
+        assert!(provider.postings("absent").is_empty());
+        // An index built with another analyzer cannot answer this filter, so the
+        // rows stay and the residual predicate decides.
+        let other = TextTokenizer::new(Some(Vec::new()));
+        let mismatched = (index.0.clone(), other);
+        let provider = RowFulltextProvider {
+            rows: &rows,
+            column: 0,
+            row_ids: Some(&ids),
+            index: Some(&mismatched),
+            substring: false,
+        };
+        assert_eq!(provider.postings("alpha"), vec![0, 1]);
+        // Without an index (or ids) the term cannot be resolved either.
+        let blind = RowFulltextProvider {
+            rows: &rows,
+            column: 0,
+            row_ids: None,
+            index: None,
+            substring: false,
+        };
+        assert_eq!(blind.postings("alpha"), vec![0, 1]);
     }
 
     #[test]
@@ -17745,7 +17921,7 @@ mod tests {
     /// engine (doc_len 2,4,6,5,4 and doc_len_sum 21 on the five-row probe).
     #[test]
     fn analyzer_emits_word_and_stem_only_on_the_index_side() {
-        let none: Option<Vec<char>> = None;
+        let none = TextTokenizer::default();
         assert_eq!(
             tokenize_index_text("second text multiple", &none),
             vec!["second", "text", "multiple", "multipl"]
@@ -17775,11 +17951,11 @@ mod tests {
     /// joins them with `" ... "`.
     #[test]
     fn highlight_keeps_hit_sentences_and_marks_terms() {
-        let none: Option<Vec<char>> = None;
+        let none = TextTokenizer::default();
         let q = tokenize_index_text("anarchism", &none);
         let text = "Anarchism is a philosophy. Cats sleep. Anarchism spread.";
         assert_eq!(
-            highlight_text(text, &q, &none),
+            highlight_text(text, &q, &none.delims),
             "<em>Anarchism</em> is a philosophy.  ... <em>Anarchism</em> spread."
         );
     }
@@ -17800,7 +17976,7 @@ mod tests {
     fn memory_indexer_records_tf_positions_and_length() {
         // C++ `column_inverter_ut.cpp`: tf, positions and the document length
         // come out of one insertion.
-        let delims = Some(vec![' ']);
+        let delims = TextTokenizer::new(Some(vec![' ']));
         let mut mem = MemoryIndexer::new();
         assert!(mem.insert(10, "alpha beta alpha", &delims, usize::MAX));
         assert_eq!(mem.doc_count(), 1);
@@ -18265,7 +18441,7 @@ mod tests {
         ];
         let mut mem = MemoryIndexer::new();
         for (i, paragraph) in paragraphs.iter().enumerate() {
-            assert!(mem.insert(i as u64, paragraph, &None, usize::MAX));
+            assert!(mem.insert(i as u64, paragraph, &TextTokenizer::default(), usize::MAX));
         }
         let expected: [(&str, &[(u64, u32)]); 3] = [
             ("fst", &[(0, 4), (1, 2), (2, 2)]),
@@ -18290,7 +18466,7 @@ mod tests {
         let paragraph = "A B C A B C A B C A B C A B C A B C A B C";
         let mut mem = MemoryIndexer::new();
         for i in 0..8192u64 {
-            assert!(mem.insert(i, paragraph, &None, usize::MAX));
+            assert!(mem.insert(i, paragraph, &TextTokenizer::default(), usize::MAX));
         }
         let a = &mem.postings["a"];
         assert_eq!(a.len(), 8192);
@@ -18317,7 +18493,7 @@ mod tests {
         ];
         let mut mem = MemoryIndexer::new();
         for (i, paragraph) in paragraphs.iter().enumerate() {
-            assert!(mem.insert(i as u64, paragraph, &None, usize::MAX));
+            assert!(mem.insert(i as u64, paragraph, &TextTokenizer::default(), usize::MAX));
         }
         let expected: [(&str, &[(u64, u32)]); 3] = [
             ("fst", &[(0, 4), (1, 2), (2, 2)]),
@@ -18335,7 +18511,7 @@ mod tests {
 
     #[test]
     fn memory_indexer_delete_keeps_the_postings() {
-        let delims = Some(vec![' ']);
+        let delims = TextTokenizer::new(Some(vec![' ']));
         let mut mem = MemoryIndexer::new();
         assert!(mem.insert(7, "alpha", &delims, usize::MAX));
         mem.delete(7);

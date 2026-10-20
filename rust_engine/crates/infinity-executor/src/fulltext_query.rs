@@ -27,6 +27,7 @@ use crate::query_builder::{
     TermQueryNode,
 };
 use crate::tokenize_index_positions;
+use crate::TextTokenizer;
 
 /// The reference's `FulltextQueryOperatorOption`. `InfinitySyntax` runs the
 /// query-string grammar; `Or`/`And` analyze the whole query text and combine
@@ -232,7 +233,7 @@ impl SearchDriver {
                     _ => Ok(Vec::new()),
                 }
             }
-            _ => Ok(tokenize_index_positions(text, &None)),
+            _ => Ok(tokenize_index_positions(text, &TextTokenizer::default())),
         }
     }
 
@@ -768,7 +769,7 @@ impl MemorySegment {
     /// Indexes one document with the standard analyzer, recording both the
     /// word and its stem at the word's position.
     pub fn insert(&mut self, doc: u64, text: &str) {
-        let tokens = tokenize_index_positions(text, &None);
+        let tokens = tokenize_index_positions(text, &TextTokenizer::default());
         self.total_len += tokens.len() as u64;
         self.docs.insert(doc, tokens.len() as u32);
         let mut positions: HashMap<&str, Vec<u32>> = HashMap::new();
@@ -1030,7 +1031,10 @@ mod tests {
     #[test]
     fn root_terms_keep_the_shortest_form_per_position() {
         // `tokenize_index_positions` emits `harmful` and `harm` at one offset.
-        let terms = root_terms(tokenize_index_positions("harmful chemical", &None));
+        let terms = root_terms(tokenize_index_positions(
+            "harmful chemical",
+            &TextTokenizer::default(),
+        ));
         assert_eq!(
             terms,
             vec![("harm".to_string(), 0), ("chemic".to_string(), 1)]
