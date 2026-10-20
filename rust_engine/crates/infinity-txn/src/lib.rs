@@ -478,18 +478,28 @@ impl TxnManager {
     /// wal", `wal_manager_impl.cpp:670`). The entry therefore has to survive the
     /// truncation that follows it, and the log must never be left empty.
     pub fn append_checkpoint(&self, max_commit_ts: TxnTimeStamp) -> Result<()> {
-        if max_commit_ts == 0 {
+        // The caller usually passes the KV's applied marker, which stays 0
+        // until a recovery runs; the manager's own high-water marks are always
+        // current.
+        let ts = max_commit_ts
+            .max(self.max_applied.load(Ordering::SeqCst))
+            .max(self.last_appended.load(Ordering::SeqCst));
+        if ts == 0 {
             return Ok(());
         }
-        let entry = WalEntry::new(
-            -1,
-            max_commit_ts,
-            vec![WalCmd::Checkpoint { max_commit_ts }],
-        );
-        let mut wal = self.wal.lock().unwrap();
-        wal.append(&entry)?;
-        self.last_appended.fetch_max(max_commit_ts, Ordering::SeqCst);
-        wal.flush()
+        let entry = WalEntry::new(-1, ts, vec![WalCmd::Checkpoint { max_commit_ts: ts }]);
+        let mut buf = Vec::with_capacity(entry.size_in_bytes());
+        entry.write_adv(&mut buf);
+        // `wal.log` is the reference's file: one checkpoint entry, nothing this
+        // engine would have to be understood for.
+        // The directory may not exist yet: tests open a bare path, and the
+        // first checkpoint is what creates the file.
+        if let Some(parent) = self.checkpoint_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+        }
+        std::fs::write(&self.checkpoint_path, &buf)
+            .map_err(|e| Error::io(&self.checkpoint_path, e))?;
+        Ok(())
     }
 
     /// Drops the WAL prefix that the KV store already holds. The caller must
@@ -528,6 +538,12 @@ impl TxnManager {
         // can be dropped by the next checkpoint.
         let applied = self.max_applied.load(Ordering::SeqCst);
         self.synced.fetch_max(applied, Ordering::SeqCst);
+        // The reference refuses to open a writable directory that has data but
+        // no checkpoint entry in `wal/wal.log` (`GetReplayEntries`,
+        // `wal_manager_impl.cpp:670`), and it takes `max_checkpoint_ts` from
+        // that entry. Publish it after every checkpoint, so the directory is
+        // readable by the reference even if the process is killed next.
+        self.append_checkpoint(applied)?;
         Ok(())
     }
 
