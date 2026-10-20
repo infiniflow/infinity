@@ -91,7 +91,7 @@
 | 11 | `index_delims` 抹平分析器 | ✅ | `d05c0f227`：`TextTokenizer` 增加 `analyzer: Option<String>`，`index_analyzer` 从表元数据取索引的 `ANALYZER` 选项（`standard`/`keyword`/`whitespace` 仍走分隔符路径），`tokenize_text`/`tokenize_index_text`/`tokenize_index_positions` 统一问 `AnalyzerPool::get_analyzer(name)`；写侧与查询侧同一 tokenizer，等值保护仍有效。测试 `an_ik_fulltext_index_is_tokenised_by_its_analyzer`（`热爱` 产生 posting、整段中文不被当作一个标准 token） |
 | 12 | `QueryBuilder`/短语/布尔迭代器不在产品路径 | 🔄 | `cf5bffed0`：`filter_fulltext` 的索引过滤现在真的构造 `Or`/`And` 查询树——裸 term 列表是 `OrQueryNode`，只有 `operator=and` 才是 `AndQueryNode`，布尔词是算子而不是 term（C++ `SearchDriver::AnalyzeAndBuildQueryNode`）。这条 bug 在索引过滤放行所有行时是隐形的，接上真实 postings 后立刻让 Gate A 掉到 1539/1546（`'second text'` 丢掉所有单 term 行）。**MATCH 的 WAND 路径仍只处理单 term，其余整行重分词扫**；短语/布尔迭代器的产品化仍未做 |
 | 13 | `MemoryIndexer` 无 spill-to-sorted-runs / `InsertGap` | ⏳ | `FULLTEXT_SPILL_SUFFIX` 声明未用，`SortMerger` 无调用方 |
-| 14 | BMW 无块级最大值、非增量 | 🔄 | `wand.rs` 移植中（per-block maxima + `Next/NextShallow`） |
+| 14 | BMW 无块级最大值、非增量 | ✅ | `ee9a8d3f2`：`MAX_DOC_PER_RECORD=128` 的块级最大值（`TermDocIterator::BlockMaxBM25Score` 的 `f1/(1+max_tf)+f3/(1+max_pct_u16)+f4`，`pct` 按编码器 `ceil(x*65535)` 存）、`FindPivotOptimized` + 前缀和的 score upper bound、增量 `next(Option<u64>)`/`NextShallow`、块跳（seek 到 `up_to` 为止，保证后续 pivot 需要的 doc 仍可达）。测试：`top_k_in_the_first_block_never_scores_later_blocks`（2000 doc 只解码 128 次）、`wand_matches_full_scan_on_a_random_corpus`（5 term × topn × delta × minimum_should_match × BM25/boolean 与全扫逐位比对）、`block_maximum_bounds_every_score_in_the_block`（剪枝的安全性质）。Gate A 1546/1546 |
 | 15 | `StandardAnalyzer` 用 Porter2 顶替 `STEM_LANG_PORT` | ✅（已登记） | 仅 `standard-porter` 受影响（`standard` 与其余 17 种语言都是同族 Snowball 算法）。按 §3.6 登记进 `CLASS_MAP.md`「有意的设计变更」：手写原版 Porter 或引新依赖的风险大于收益；若不接受需单独决策 |
 
 ### 索引
