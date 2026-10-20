@@ -2002,27 +2002,56 @@ pub fn route(
         // ---- variables (`ShowGlobalVariablesHandler`,
         //      `ShowGlobalVariableHandler`, `SetGlobalVariableHandler`, the
         //      session pair, http_server_impl.cpp:2540-2830) ----
-        ("GET", ["variables", scope]) if matches!(*scope, "global" | "session") => {
-            // `Engine::show_variable` exists but takes the private
-            // `variables::SetScope`, so the listing cannot be driven from this
-            // crate yet; the session/global variable tables live in
-            // `src/main/variables.cppm`.
-            not_supported(
-                &format!("GET /variables/{scope}"),
-                "Engine::variables(SetScope) / a public `variables::SetScope`",
-            )
+        // The reference flattens the SHOW VARIABLES rows into the response
+        // object (`json_response[config_name] = config_value`), so the body is
+        // `{"error_code":0,"<name>":"<value>",…}` — not a list.
+        ("GET", ["variables", scope]) if variables_scope(scope).is_some() => {
+            let scope = variables_scope(scope).expect("checked above");
+            let vars = engine.variables(scope);
+            let body = vars
+                .iter()
+                .map(|(name, value)| {
+                    format!("\"{}\":\"{}\"", json_escape(name), json_escape(value))
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            (200, format!("{{\"error_code\":0,{body}}}"))
         }
-        ("GET", ["variables", scope, _name]) if matches!(*scope, "global" | "session") => {
-            not_supported(
-                &format!("GET /variables/{scope}/{{variable_name}}"),
-                "Engine::show_variable with a public `variables::SetScope`",
-            )
+        ("GET", ["variables", scope, name]) if variables_scope(scope).is_some() => {
+            let scope = variables_scope(scope).expect("checked above");
+            match engine.show_variable(name, scope) {
+                Ok(result) => {
+                    let value = match result {
+                        QueryResult::Rows { rows, .. } => rows
+                            .first()
+                            .and_then(|r| r.first())
+                            .cloned()
+                            .unwrap_or_default(),
+                        _ => String::new(),
+                    };
+                    (
+                        200,
+                        format!(
+                            "{{\"error_code\":0,\"{}\":\"{}\"}}",
+                            json_escape(name),
+                            json_escape(&value)
+                        ),
+                    )
+                }
+                Err(e) => engine_err(&e),
+            }
         }
-        ("SET", ["variables", scope]) if matches!(*scope, "global" | "session") => {
-            not_supported(
-                &format!("SET /variables/{scope}"),
-                "a SET VARIABLE / ENGINE SET statement (the parser has none)",
-            )
+        // `SetVariableOrConfig` with a one-field body; the reference answers
+        // 3076 "No variable will be set" for any other arity.
+        ("SET", ["variables", scope]) if variables_scope(scope).is_some() => {
+            let scope = variables_scope(scope).expect("checked above");
+            let Some((name, value)) = single_variable(&doc) else {
+                return err_response(3076, "No variable will be set");
+            };
+            match engine.set_variables(scope, &[(name, value)]) {
+                Ok(()) => (200, ok_json()),
+                Err(e) => engine_err(&e),
+            }
         }
         // ---- snapshots (`ListSnapshotsHandler`, `ShowSnapshotHandler`,
         //      `Create*SnapshotHandler`, http_server_impl.cpp:3491-3860) ----
@@ -2143,67 +2172,147 @@ pub fn route(
             }
         }
         // ---- instance (`*Handler` in http_server_impl.cpp:2917-3465) ----
-        // The reference serves these from `SHOW BUFFER` / `SHOW QUERIES` / …
-        // and from the buffer manager, none of which the engine exposes yet.
+        // Each row shape below is the `SHOW …` statement the C++ handler runs:
+        // `SHOW BUFFER` (path, status, size, buffered_type, type), `SHOW
+        // PROFILES`, `SHOW MEMINDEX`, `SHOW QUERIES`, `SHOW QUERY <id>`, `SHOW
+        // TRANSACTIONS`, `SHOW TRANSACTION <id>`, `SHOW OBJECTS`, `SHOW FILES`,
+        // `SHOW MEMORY` (`physical_show_impl.cpp:160-240`).
         ("POST", ["instance", "flush"]) => match engine.flush() {
             Ok(()) => (200, ok_json()),
             Err(e) => engine_err(&e),
         },
-        ("GET", ["instance", "buffer"]) => not_supported(
-            "GET /instance/buffer",
-            "Engine::buffer_objects() over BufferManager (SHOW BUFFER)",
+        ("GET", ["instance", "buffer"]) => (
+            200,
+            format!("{{\"error_code\":0,\"buffer\":[{}]}}", buffer_rows(engine)),
         ),
-        ("GET", ["instance", "profiles"]) => not_supported(
-            "GET /instance/profiles",
-            "Engine::profiles() (SHOW PROFILES)",
+        ("GET", ["instance", "profiles"]) => (
+            200,
+            format!(
+                "{{\"error_code\":0,\"profiles\":[{}]}}",
+                profile_rows(engine)
+            ),
         ),
-        ("GET", ["instance", "memindex"]) => not_supported(
-            "GET /instance/memindex",
-            "Engine::memory_indexes() (SHOW MEMINDEX)",
+        ("GET", ["instance", "memindex"]) => (
+            200,
+            format!("{{\"error_code\":0,\"index\":[{}]}}", memory_index_rows(engine)),
         ),
-        ("GET", ["instance", "queries"]) => not_supported(
-            "GET /instance/queries",
-            "Engine::running_queries() (SHOW QUERIES)",
+        ("GET", ["instance", "queries"]) => (
+            200,
+            format!(
+                "{{\"error_code\":0,\"queries\":[{}]}}",
+                query_rows(engine)
+            ),
         ),
-        ("GET", ["instance", "queries", _id]) => not_supported(
-            "GET /instance/queries/{query_id}",
-            "Engine::query_profile(id) (SHOW QUERY <id>)",
+        ("GET", ["instance", "queries", id]) => match id.parse::<u64>() {
+            Ok(id) => match engine.query_profile(id) {
+                Some(row) => (
+                    200,
+                    format!(
+                        "{{\"error_code\":0,\"query\":{}}}",
+                        query_row_json(&row)
+                    ),
+                ),
+                None => err_response(3088, &format!("query {id} does not exist")),
+            },
+            Err(_) => err_response(3014, &format!("invalid query id '{id}'")),
+        },
+        ("GET", ["instance", "transactions"]) => (
+            200,
+            format!(
+                "{{\"error_code\":0,\"transactions\":[{}]}}",
+                transaction_rows(engine)
+            ),
         ),
-        ("GET", ["instance", "transactions"]) => not_supported(
-            "GET /instance/transactions",
-            "Engine::active_transactions() (SHOW TRANSACTIONS)",
+        ("GET", ["instance", "transactions", id]) => match id.parse::<u64>() {
+            Ok(id) => match engine.transaction_detail(id) {
+                Some(info) => (
+                    200,
+                    format!(
+                        "{{\"error_code\":0,\"transaction\":{{\"transaction_id\":{},\"transaction_text\":\"{}\"}}}}",
+                        info.txn_id,
+                        json_escape(&info.txn_text)
+                    ),
+                ),
+                None => err_response(3088, &format!("transaction {id} does not exist")),
+            },
+            Err(_) => err_response(3014, &format!("invalid transaction id '{id}'")),
+        },
+        // `ShowObjectsHandler` reads the persistence manager's object table in
+        // the reference; this engine has no persistence manager, and the objects
+        // it actually keeps resident are the buffered blocks, so the same rows as
+        // `/instance/buffer` are served here.
+        ("GET", ["instance", "objects"]) => (
+            200,
+            format!("{{\"error_code\":0,\"objects\":[{}]}}", buffer_rows(engine)),
         ),
-        ("GET", ["instance", "transactions", _id]) => not_supported(
-            "GET /instance/transactions/{transaction_id}",
-            "Engine::transaction_detail(id) (SHOW TRANSACTION <id>)",
+        // The C++ route takes `{object_name}` as one path segment; a buffered
+        // block's path has several, so the remaining segments are joined back
+        // together and matched as a path suffix (`data/db_1/tbl_0/seg_0/blk_0`)
+        // when they are not the absolute path.
+        ("GET", ["instance", "objects", tail @ ..]) if !tail.is_empty() => {
+            let name = tail.join("/");
+            let found = engine.buffer_object(&name).or_else(|| {
+                engine
+                    .buffer_objects()
+                    .into_iter()
+                    .find(|row| row.object_path.to_string_lossy().ends_with(&name))
+            });
+            match found {
+                Some(row) => (
+                    200,
+                    format!(
+                        "{{\"error_code\":0,\"object\":{}}}",
+                        buffer_row_json(
+                            &row.object_path.to_string_lossy(),
+                            row.buffered_status.as_str(),
+                            row.object_size,
+                            row.buffered_type.as_str(),
+                            row.file_type.as_str(),
+                        )
+                    ),
+                ),
+                None => err_response(3088, &format!("object '{name}' does not exist")),
+            }
+        }
+        ("GET", ["instance", "files"]) => (
+            200,
+            format!("{{\"error_code\":0,\"files\":[{}]}}", file_rows(engine)),
         ),
-        ("GET", ["instance", "objects"]) => not_supported(
-            "GET /instance/objects",
-            "Engine::buffer_objects() (the buffer manager's object table)",
-        ),
-        ("GET", ["instance", "objects", _name]) => not_supported(
-            "GET /instance/objects/{object_name}",
-            "Engine::buffer_object(name)",
-        ),
-        ("GET", ["instance", "files"]) => not_supported(
-            "GET /instance/files",
-            "Engine::all_files() (every data file with its size)",
-        ),
+        // `SHOW LOGS` is the **WAL** dump in the reference (transaction_id,
+        // commit_ts, command_type, command_text), not a log-file listing.
         ("GET", ["instance", "logs"]) => not_supported(
             "GET /instance/logs",
-            "Engine::logs() (the log file's index/filename/type rows)",
+            "a textual rendering of `WalCmd` (the typed WAL stores the command \
+             payload, but `wal_entry.rs` has no `ToString`, so the `text` column \
+             of SHOW LOGS cannot be filled)",
         ),
-        ("GET", ["instance", "memory"]) => not_supported(
-            "GET /instance/memory",
-            "Engine::allocator_stats() from the global memory tracker",
-        ),
+        // `SHOW MEMORY`: `GlobalResourceUsage`'s two counters. The reference
+        // prints "Not activate" when its `INFINITY_STATS` build flag is off; the
+        // port always keeps the counters, so the real numbers are reported.
+        ("GET", ["instance", "memory"]) => {
+            let usage = infinity_executor::global_resource_usage::GlobalResourceUsage::instance();
+            (
+                200,
+                format!(
+                    "{{\"error_code\":0,\"memory_objects\":\"{}\",\"memory_allocation\":\"{}\"}}",
+                    usage.get_object_count(),
+                    usage.get_raw_memory_count()
+                ),
+            )
+        }
+        // `ShowMemoryObjectsHandler` / `ShowMemoryAllocationsHandler` enumerate
+        // the per-object allocator (C++ `NewCatalog`'s memory tracker). This
+        // port has no allocator hook: `GlobalResourceUsage` keeps two totals
+        // and no per-object map, so there are no rows to serve.
         ("GET", ["instance", "memory", "objects"]) => not_supported(
             "GET /instance/memory/objects",
-            "Engine::memory_objects() from the global memory tracker",
+            "a per-object allocator tracker (the port only keeps \
+             GlobalResourceUsage's two totals, with no per-object map)",
         ),
         ("GET", ["instance", "memory", "allocations"]) => not_supported(
             "GET /instance/memory/allocations",
-            "Engine::memory_allocations() from the global memory tracker",
+            "a per-allocation tracker (the port only keeps \
+             GlobalResourceUsage's two totals, with no allocation records)",
         ),
         // ---- admin (`Admin*Handler`, http_server_impl.cpp:3861-4240) ----
         ("GET", ["admin", "nodes"]) => {
@@ -2252,20 +2361,216 @@ pub fn route(
             Err(e) => err_response(e.code(), &e.to_string()),
         },
         ("GET", ["admin", "configs"]) => (200, configs_json(engine)),
-        ("GET", ["admin", "variables"]) => not_supported(
-            "GET /admin/variables",
-            "Engine::variables(SetScope) / a public `variables::SetScope`",
-        ),
-        ("GET", ["admin", "variables", _name]) => not_supported(
-            "GET /admin/variables/{variable_name}",
-            "Engine::show_variable with a public `variables::SetScope`",
-        ),
+        // `AdminShowNodeVariablesHandler` / `AdminShowNodeVariableHandler` read
+        // the same variable table as the `/variables/*` routes.
+        ("GET", ["admin", "variables"]) => {
+            let vars = engine.variables(infinity_executor::Scope::Global);
+            let body = vars
+                .iter()
+                .map(|(name, value)| {
+                    format!("\"{}\":\"{}\"", json_escape(name), json_escape(value))
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            (200, format!("{{\"error_code\":0,{body}}}"))
+        }
+        ("GET", ["admin", "variables", name]) => {
+            match engine.show_variable(name, infinity_executor::Scope::Global) {
+                Ok(QueryResult::Rows { rows, .. }) => {
+                    let value = rows
+                        .first()
+                        .and_then(|r| r.first())
+                        .cloned()
+                        .unwrap_or_default();
+                    (
+                        200,
+                        format!(
+                            "{{\"error_code\":0,\"{}\":\"{}\"}}",
+                            json_escape(name),
+                            json_escape(&value)
+                        ),
+                    )
+                }
+                Ok(_) => err_response(3088, &format!("variable '{name}' does not exist")),
+                Err(e) => engine_err(&e),
+            }
+        }
+        // `AdminShowLogsHandler` lists the node's log **files** (index,
+        // filename, type) from the log directory. This engine logs to stderr
+        // through `tracing` and keeps no log-file directory or index, so there
+        // is no row to serve.
         ("GET", ["admin", "logs"]) => not_supported(
             "GET /admin/logs",
-            "Engine::logs() (SHOW LOGS for the node's log files)",
+            "a log-file directory/index (the engine logs to stderr; C++ \
+             AdminShowLogs lists the files under the node's log dir)",
         ),
         _ => (404, "{\"error\":\"not found\"}".to_string()),
     }
+}
+
+/// The `SetScope` behind a `/variables/<scope>` path segment.
+fn variables_scope(scope: &str) -> Option<infinity_executor::Scope> {
+    match scope {
+        "global" => Some(infinity_executor::Scope::Global),
+        "session" => Some(infinity_executor::Scope::Session),
+        _ => None,
+    }
+}
+
+/// The one field of a `SET /variables/<scope>` body, with its value spelled the
+/// way the reference reads it (`simdjson` string / number / bool).
+fn single_variable(doc: &Json) -> Option<(String, String)> {
+    let obj = doc.as_obj()?;
+    if obj.len() != 1 {
+        return None;
+    }
+    let (name, value) = &obj[0];
+    let value = match value {
+        Json::Str(s) => s.clone(),
+        Json::Num(n) if n.fract() == 0.0 => format!("{}", *n as i64),
+        Json::Num(n) => format!("{n}"),
+        Json::Bool(b) => b.to_string(),
+        _ => return None,
+    };
+    Some((name.clone(), value))
+}
+
+/// One `SHOW BUFFER` row (`physical_show_buffer_impl.cpp`).
+fn buffer_row_json(
+    path: &str,
+    status: &str,
+    size: usize,
+    buffered_type: &str,
+    file_type: &str,
+) -> String {
+    format!(
+        "{{\"path\":\"{}\",\"status\":\"{}\",\"size\":{},\"buffered_type\":\"{}\",\"type\":\"{}\"}}",
+        json_escape(path),
+        json_escape(status),
+        size,
+        json_escape(buffered_type),
+        json_escape(file_type)
+    )
+}
+
+fn buffer_rows(engine: &Engine) -> String {
+    engine
+        .buffer_objects()
+        .iter()
+        .map(|row| {
+            buffer_row_json(
+                &row.object_path.to_string_lossy(),
+                row.buffered_status.as_str(),
+                row.object_size,
+                row.buffered_type.as_str(),
+                row.file_type.as_str(),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// One `SHOW QUERIES` row (`physical_show_queries_impl.cpp`).
+fn query_row_json(row: &infinity_executor::diagnostics::QueryRow) -> String {
+    format!(
+        "{{\"session_id\":{},\"query_id\":{},\"query_kind\":\"{}\",\"start_time\":\"{}\",\"time_consumption\":\"{}\"}}",
+        row.session_id,
+        row.query_id,
+        json_escape(&row.query_kind),
+        json_escape(&row.start_time),
+        json_escape(&row.time_consumption)
+    )
+}
+
+fn query_rows(engine: &Engine) -> String {
+    engine
+        .running_queries()
+        .iter()
+        .map(query_row_json)
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// `SHOW PROFILES`. The reference emits one column per query phase; the port
+/// records one wall-clock duration per finished statement, so a row carries the
+/// statement and that duration.
+fn profile_rows(engine: &Engine) -> String {
+    engine
+        .profiles()
+        .iter()
+        .enumerate()
+        .map(|(i, row)| {
+            format!(
+                "{{\"record_no\":\"{i}\",\"query_id\":{},\"query_kind\":\"{}\",\"query_text\":\"{}\",\"time_consumption\":\"{}\"}}",
+                row.query_id,
+                json_escape(&row.query_kind),
+                json_escape(&row.query_text),
+                json_escape(&infinity_executor::diagnostics::elapsed_to_string(
+                    std::time::Duration::from_nanos(row.duration_ns.max(0) as u64)
+                ))
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// `SHOW MEMINDEX` rows: `index_name`, `table_name`, `db_name`, `size`,
+/// `row_count` (`physical_show_impl.cpp:172`).
+fn memory_index_rows(engine: &Engine) -> String {
+    engine
+        .memory_indexes()
+        .iter()
+        .map(|row| {
+            let (db, table) = match row.table.split_once('.') {
+                Some((db, table)) => (db, table),
+                None => ("", row.table.as_str()),
+            };
+            format!(
+                "{{\"index_name\":\"{}\",\"table_name\":\"{}\",\"db_name\":\"{}\",\"size\":{},\"row_count\":{}}}",
+                json_escape(&row.index),
+                json_escape(table),
+                json_escape(db),
+                row.mem_used,
+                row.row_count
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// `SHOW TRANSACTIONS` rows: `transaction_id`, `transaction_text`.
+fn transaction_rows(engine: &Engine) -> String {
+    engine
+        .active_transactions()
+        .iter()
+        .map(|info| {
+            format!(
+                "{{\"transaction_id\":{},\"transaction_text\":\"{}\"}}",
+                info.txn_id,
+                json_escape(&info.txn_text)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// `SHOW FILES` rows: `file_name`, `object_name`, `offset`, `size`. Without a
+/// persistence manager a file is its own object at offset 0.
+fn file_rows(engine: &Engine) -> String {
+    engine
+        .all_files()
+        .iter()
+        .map(|(path, size)| {
+            let name = path.to_string_lossy();
+            format!(
+                "{{\"file_name\":\"{}\",\"object_name\":\"{}\",\"offset\":0,\"size\":{}}}",
+                json_escape(&name),
+                json_escape(&name),
+                size
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn ok_json() -> String {
@@ -2385,7 +2690,13 @@ mod tests {
         assert_eq!(s, 200, "{b}");
         assert_eq!(b, "{\"log_level\":\"info\",\"error_code\":0}");
 
-        let (s, b) = route(&engine, &peer, "POST", "/configs", "{\"log_level\":\"debug\"}");
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "POST",
+            "/configs",
+            "{\"log_level\":\"debug\"}",
+        );
         assert_eq!(s, 200, "{b}");
         let (_, b) = route(&engine, &peer, "GET", "/configs/log_level", "");
         assert!(b.contains("\"debug\""), "{b}");
@@ -2475,8 +2786,7 @@ mod tests {
         assert!(b.contains("does not exist"), "{b}");
     }
 
-    /// `/instance/*`: `flush` is real, the `SHOW BUFFER`/`SHOW QUERIES`-backed
-    /// families report 3032 `kNotSupported` until the engine exposes them.
+    /// `/instance/*`: every route the engine can answer serves real rows.
     #[test]
     fn http_instance_routes() {
         let dir = tempdir().unwrap();
@@ -2489,19 +2799,108 @@ mod tests {
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");
 
+        // The checkpoint wrote the block mirror; reading it back buffers the
+        // block, so the buffer/objects routes must list the object the test
+        // itself touched.
+        engine.read_cpp_blocks("t").unwrap();
+        let (s, b) = route(&engine, &peer, "GET", "/instance/buffer", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"error_code\":0"), "{b}");
+        assert!(b.contains("\"buffer\":[{\"path\":\""), "{b}");
+        assert!(b.contains("/seg_0/blk_0\""), "{b}");
+        assert!(b.contains("\"status\":\"Loaded\""), "{b}");
+        assert!(b.contains("\"buffered_type\":\"Persistent\""), "{b}");
+        assert!(b.contains("\"type\":\"data\""), "{b}");
+        assert!(!b.contains("\"size\":0,"), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/instance/objects", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"objects\":[{\"path\":\""), "{b}");
+        assert!(b.contains("/seg_0/blk_0\""), "{b}");
+
+        // The object is addressable by its path suffix (the C++ route takes one
+        // path segment, a block path has several).
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "GET",
+            "/instance/objects/data/db_1/tbl_0/seg_0/blk_0",
+            "",
+        );
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"object\":{\"path\":\""), "{b}");
+        assert!(b.contains("\"status\":\"Loaded\""), "{b}");
+        let (s, b) = route(&engine, &peer, "GET", "/instance/objects/data/nope", "");
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("\"error_code\":3088"), "{b}");
+
+        // Files: the block mirror and the catalog are on disk, with sizes.
+        let (s, b) = route(&engine, &peer, "GET", "/instance/files", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.starts_with("{\"error_code\":0,\"files\":["), "{b}");
+        assert!(b.contains("/blk_0/"), "{b}");
+        assert!(b.contains("\"object_name\":\""), "{b}");
+
+        // No index / query / transaction exists yet: an empty list, not an error.
+        for (path, key) in [
+            ("/instance/memindex", "index"),
+            ("/instance/queries", "queries"),
+            ("/instance/transactions", "transactions"),
+            ("/instance/profiles", "profiles"),
+        ] {
+            let (s, b) = route(&engine, &peer, "GET", path, "");
+            assert_eq!(s, 200, "{path}: {b}");
+            assert!(b.contains(&format!("\"{key}\":[")), "{path}: {b}");
+        }
+
+        // With profiling on, a finished statement is in the history and is
+        // addressable through `SHOW QUERY <id>`.
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "SET",
+            "/variables/global",
+            "{\"profile\":true}",
+        );
+        assert_eq!(s, 200, "{b}");
+        engine.execute("SELECT 1;").unwrap();
+        let (s, b) = route(&engine, &peer, "GET", "/instance/profiles", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"query_kind\":\"SELECT\""), "{b}");
+        assert!(b.contains("\"query_text\":\"SELECT 1;\""), "{b}");
+        let select_id = engine
+            .profiles()
+            .iter()
+            .find(|p| p.query_kind == "SELECT")
+            .expect("the SELECT is in the profile history")
+            .query_id;
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "GET",
+            &format!("/instance/queries/{select_id}"),
+            "",
+        );
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains(&format!("\"query_id\":{select_id}")), "{b}");
+        assert!(b.contains("\"query_kind\":\"SELECT\""), "{b}");
+        let (s, b) = route(&engine, &peer, "GET", "/instance/queries/999", "");
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("\"error_code\":3088"), "{b}");
+        let (s, b) = route(&engine, &peer, "GET", "/instance/transactions/1", "");
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("\"error_code\":3088"), "{b}");
+
+        // Memory: the port's two real counters.
+        let (s, b) = route(&engine, &peer, "GET", "/instance/memory", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"memory_objects\":\""), "{b}");
+        assert!(b.contains("\"memory_allocation\":\""), "{b}");
+
+        // The three routes with no data source keep 501 / 3032, and say what is
+        // missing.
         for path in [
-            "/instance/buffer",
-            "/instance/profiles",
-            "/instance/memindex",
-            "/instance/queries",
-            "/instance/queries/1",
-            "/instance/transactions",
-            "/instance/transactions/1",
-            "/instance/objects",
-            "/instance/objects/0.col",
-            "/instance/files",
             "/instance/logs",
-            "/instance/memory",
             "/instance/memory/objects",
             "/instance/memory/allocations",
         ] {
@@ -2513,24 +2912,84 @@ mod tests {
         }
     }
 
-    /// `/variables/*` needs `variables::SetScope` exported from the executor.
+    /// `/variables/*`: the listing is the reference's flat object, one name is
+    /// its own `{"<name>":"<value>"}` body, and SET follows the engine's rules.
     #[test]
-    fn http_variable_routes_report_the_missing_accessor() {
+    fn http_variable_routes_serve_the_engine_table() {
         let dir = tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         let peer = leader();
-        for (method, path) in [
-            ("GET", "/variables/global"),
-            ("GET", "/variables/global/query_count"),
-            ("GET", "/variables/session"),
-            ("GET", "/variables/session/query_count"),
-            ("SET", "/variables/global"),
-            ("SET", "/variables/session"),
-        ] {
-            let (s, b) = route(&engine, &peer, method, path, "{\"query_count\":1}");
-            assert_eq!(s, 501, "{path}: {b}");
-            assert!(b.contains("\"error_code\":3032"), "{path}: {b}");
-        }
+
+        let (s, b) = route(&engine, &peer, "GET", "/variables/global", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(
+            b.starts_with("{\"error_code\":0,\"active_txn_count\":\"0\""),
+            "{b}"
+        );
+        assert!(b.contains("\"schedule_policy\":\"round robin\""), "{b}");
+        // A live counter, not a constant: the engine has an RSS and open files.
+        assert!(b.contains("\"system_memory_usage\":\""), "{b}");
+        assert!(!b.contains("\"system_memory_usage\":\"0\""), "{b}");
+        assert!(!b.contains("\"open_file_count\":\"0\""), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/variables/global/query_count", "");
+        assert_eq!(s, 200, "{b}");
+        assert_eq!(b.matches("query_count").count(), 1, "{b}");
+        assert!(b.starts_with("{\"error_code\":0,\"query_count\":\""), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/variables/session", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"connected_timestamp\":\""), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/variables/session/query_count", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.starts_with("{\"error_code\":0,\"query_count\":\""), "{b}");
+
+        // An unknown name is the reference's "No system variable" error.
+        let (s, b) = route(&engine, &peer, "GET", "/variables/global/nope", "");
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("No system variable: nope"), "{b}");
+
+        // SET profile works, SET a read-only variable is 3076.
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "SET",
+            "/variables/global",
+            "{\"profile\":true}",
+        );
+        assert_eq!(s, 200, "{b}");
+        let (_, b) = route(&engine, &peer, "GET", "/variables/global/profile", "");
+        assert!(b.contains("\"profile\":\"true\""), "{b}");
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "SET",
+            "/variables/global",
+            "{\"query_count\":9}",
+        );
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("\"error_code\":3076"), "{b}");
+        // Two fields is "No variable will be set".
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "SET",
+            "/variables/global",
+            "{\"a\":1,\"b\":2}",
+        );
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("No variable will be set"), "{b}");
+        // Session variables are read-only.
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "SET",
+            "/variables/session",
+            "{\"query_count\":1}",
+        );
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("\"error_code\":3076"), "{b}");
     }
 
     /// `/admin/*` (`AdminShowCurrentNodeHandler`, `AdminListAllNodesHandler`,
@@ -2561,11 +3020,23 @@ mod tests {
         let (s, b) = route(&engine, &peer, "GET", "/admin/node/ghost", "");
         assert_eq!(s, 500, "{b}");
 
-        let (s, b) = route(&engine, &peer, "POST", "/admin/node/current", "{\"role\":\"admin\"}");
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "POST",
+            "/admin/node/current",
+            "{\"role\":\"admin\"}",
+        );
         assert_eq!(s, 200, "{b}");
         let (_, b) = route(&engine, &peer, "GET", "/admin/node/current", "");
         assert!(b.contains("\"role\":\"admin\""), "{b}");
-        let (s, b) = route(&engine, &peer, "POST", "/admin/node/current", "{\"role\":\"nope\"}");
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "POST",
+            "/admin/node/current",
+            "{\"role\":\"nope\"}",
+        );
         assert_eq!(s, 500, "{b}");
         let (s, b) = route(&engine, &peer, "POST", "/admin/node/current", "{}");
         assert_eq!(s, 500, "{b}");
@@ -2579,11 +3050,27 @@ mod tests {
         assert!(s == 200 || s == 500, "{b}");
         assert!(b.contains("\"error_code\":"), "{b}");
 
-        for path in ["/admin/variables", "/admin/variables/query_count", "/admin/logs"] {
-            let (s, b) = route(&engine, &peer, "GET", path, "");
-            assert_eq!(s, 501, "{path}: {b}");
-            assert!(b.contains("\"error_code\":3032"), "{path}: {b}");
-        }
+        // The node's variables are the engine's global table.
+        let (s, b) = route(&engine, &peer, "GET", "/admin/variables", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(
+            b.starts_with("{\"error_code\":0,\"active_txn_count\":\"0\""),
+            "{b}"
+        );
+        assert!(b.contains("\"schedule_policy\":\"round robin\""), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/admin/variables/query_count", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.starts_with("{\"error_code\":0,\"query_count\":\""), "{b}");
+        let (s, b) = route(&engine, &peer, "GET", "/admin/variables/nope", "");
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("No system variable: nope"), "{b}");
+
+        // No log-file directory exists, so the log listing keeps 3032.
+        let (s, b) = route(&engine, &peer, "GET", "/admin/logs", "");
+        assert_eq!(s, 501, "{b}");
+        assert!(b.contains("\"error_code\":3032"), "{b}");
+        assert!(b.contains("needs "), "{b}");
     }
 
     /// `GET /segments` / `GET /segments/{id}/blocks` reuse the real
@@ -2607,9 +3094,18 @@ mod tests {
             .unwrap();
         engine.flush().unwrap();
 
-        let (s, b) = route(&engine, &peer, "GET", "/databases/default_db/tables/t/segments", "");
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "GET",
+            "/databases/default_db/tables/t/segments",
+            "",
+        );
         assert_eq!(s, 200, "{b}");
-        assert!(b.starts_with("{\"error_code\":0,\"table_name\":\"t\",\"segments\":[{"), "{b}");
+        assert!(
+            b.starts_with("{\"error_code\":0,\"table_name\":\"t\",\"segments\":[{"),
+            "{b}"
+        );
         // Two real segments, each holding its own row.
         assert_eq!(b.matches("\"row_count\":\"1\"").count(), 2, "{b}");
         assert!(!b.contains("\"segment_id\":0"), "no synthetic segment: {b}");
@@ -2622,7 +3118,10 @@ mod tests {
             "",
         );
         assert_eq!(s, 200, "{b}");
-        assert!(b.starts_with("{\"error_code\":0,\"segment_id\":0,\"blocks\":[{"), "{b}");
+        assert!(
+            b.starts_with("{\"error_code\":0,\"segment_id\":0,\"blocks\":[{"),
+            "{b}"
+        );
         assert!(b.contains("\"row_count\":\"2\""), "{b}");
         assert!(b.contains("\"size\":\""), "{b}");
     }
