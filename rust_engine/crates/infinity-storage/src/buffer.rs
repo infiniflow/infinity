@@ -1186,6 +1186,43 @@ pub struct BufferObjectInfo {
     pub object_size: usize,
 }
 
+impl BufferStatus {
+    /// C++ `BufferStatusToString` (`buffer_obj.cppm:52`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BufferStatus::Loaded => "Loaded",
+            BufferStatus::Unloaded => "Unloaded",
+            BufferStatus::Freed => "Freed",
+            BufferStatus::New => "New",
+            BufferStatus::Clean => "Clean",
+        }
+    }
+}
+
+impl BufferType {
+    /// C++ `BufferTypeToString` (`buffer_obj.cppm:67`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BufferType::Persistent => "Persistent",
+            BufferType::Ephemeral => "Ephemeral",
+            BufferType::Temp => "Temporary",
+            BufferType::ToMmap => "ToMmap",
+            BufferType::Mmap => "Mmap",
+        }
+    }
+}
+
+impl FileWorkerType {
+    /// C++ `FileWorkerType2Str` (`file_worker_type.cppm:41`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FileWorkerType::DataFile => "data",
+            FileWorkerType::VarFile => "var",
+            FileWorkerType::Invalid => "",
+        }
+    }
+}
+
 /// Allocates [`BufferObj`]s under one memory limit.
 ///
 /// C++: the allocation/accounting half of `BufferManager`.
@@ -1427,6 +1464,10 @@ pub struct BufferManager<V> {
     used: usize,
     tick: u64,
     entries: HashMap<BlockId, (Arc<V>, usize, u64)>,
+    /// C++ `BufferManager::total_request_count_`: `Get` calls, hits and misses.
+    total_request_count: u64,
+    /// C++ `BufferManager::cache_miss_count_`.
+    cache_miss_count: u64,
 }
 
 impl<V> BufferManager<V> {
@@ -1436,7 +1477,46 @@ impl<V> BufferManager<V> {
             used: 0,
             tick: 0,
             entries: HashMap::new(),
+            total_request_count: 0,
+            cache_miss_count: 0,
         }
+    }
+
+    /// C++ `BufferManager::BufferedObjectCount`: the blocks this cache holds.
+    pub fn buffered_object_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// C++ `BufferManager::WaitingGCObjectCount`, adapted to this cache: the
+    /// reference queues an object for GC when its last handle is dropped; this
+    /// cache evicts inline ([`Self::evict`]) and has no such queue, so the
+    /// observable equivalent is "cached but referenced by nobody else" — the
+    /// blocks whose only owner is the cache itself.
+    pub fn unreferenced_object_count(&self) -> usize {
+        self.entries
+            .values()
+            .filter(|(value, _, _)| Arc::strong_count(value) == 1)
+            .count()
+    }
+
+    /// `(block id, bytes)` of every cached block: one `SHOW BUFFERS` row each.
+    pub fn cached_objects(&self) -> Vec<(BlockId, usize)> {
+        let mut rows: Vec<(BlockId, usize)> = self
+            .entries
+            .iter()
+            .map(|(id, (_, bytes, _))| (*id, *bytes))
+            .collect();
+        rows.sort_by_key(|(id, _)| (id.db_id, id.table_id, id.segment_id, id.block_id));
+        rows
+    }
+
+    /// C++ `BufferManager::TotalRequestCount` / `CacheMissCount`.
+    pub fn total_request_count(&self) -> u64 {
+        self.total_request_count
+    }
+
+    pub fn cache_miss_count(&self) -> u64 {
+        self.cache_miss_count
     }
 
     pub fn set_budget(&mut self, budget: usize) {
@@ -1456,7 +1536,14 @@ impl<V> BufferManager<V> {
     pub fn get(&mut self, key: &BlockId) -> Option<Arc<V>> {
         self.tick += 1;
         let tick = self.tick;
-        let entry = self.entries.get_mut(key)?;
+        self.total_request_count += 1;
+        let entry = match self.entries.get_mut(key) {
+            Some(entry) => entry,
+            None => {
+                self.cache_miss_count += 1;
+                return None;
+            }
+        };
         entry.2 = tick;
         Some(entry.0.clone())
     }

@@ -173,9 +173,13 @@ mod bg_task_ut;
 #[cfg(test)]
 mod storage_mode_ut;
 
+#[cfg(test)]
+mod accessors_ut;
+
 mod explain_search;
 
 pub mod analyzer;
+pub mod diagnostics;
 pub mod fulltext_query;
 pub mod global_resource_usage;
 mod hnsw_mem;
@@ -184,6 +188,8 @@ mod profiler;
 pub mod query_builder;
 pub use infinity_expression::regex_literal;
 mod variables;
+/// The variable scope `SHOW VARIABLE` / `SET VARIABLE` take (C++ `SetScope`).
+pub use variables::SetScope as Scope;
 mod wand;
 
 mod cpp_blocks;
@@ -4003,6 +4009,95 @@ pub struct Engine {
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
+    /// The previous `cpu_usage` sample: `(process cpu ticks, wall clock)`.
+    /// C++'s `SystemInfo::CPUUsage` sleeps 200 ms between two snapshots; an
+    /// accessor must not block, so this engine keeps the previous sample and
+    /// reports the delta since the last call instead.
+    cpu_sample: Mutex<Option<CpuSample>>,
+    /// Running queries and the finished-statement history.
+    queries: Mutex<diagnostics::QueryRegistry>,
+    /// `profile` global variable (C++ `NewCatalog::SetProfile`): while it is
+    /// on, a finished statement is appended to the profile history. The
+    /// running-query registry is kept either way, as `SHOW QUERIES` needs it.
+    profile_enabled: std::sync::atomic::AtomicBool,
+}
+
+/// A `cpu_usage` sample: the process's utime+stime ticks and when they were
+/// read.
+#[derive(Debug, Clone, Copy)]
+struct CpuSample {
+    ticks: u64,
+    at: std::time::Instant,
+}
+
+/// Linux `USER_HZ`, the unit of the `utime`/`stime` fields of `/proc/self/stat`
+/// (`sysconf(_SC_CLK_TCK)`; 100 on every supported Linux target).
+const CLOCK_TICKS_PER_SEC: f64 = 100.0;
+
+/// Resident set size in bytes: `VmRSS` from `/proc/self/status`, the exact
+/// field C++'s `SystemInfo::MemoryUsage` (`src/metrics/system_info_impl.cpp:305`)
+/// parses, with `/proc/self/statm` (field 2 = resident pages) as the fallback
+/// for a kernel that does not publish `VmRSS`. Both report the same quantity.
+fn process_rss_bytes() -> u64 {
+    if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
+        for line in status.lines() {
+            if let Some(rest) = line.strip_prefix("VmRSS:") {
+                let kb: u64 = rest
+                    .split_whitespace()
+                    .next()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0);
+                return kb * 1024;
+            }
+        }
+    }
+    let Ok(statm) = std::fs::read_to_string("/proc/self/statm") else {
+        return 0;
+    };
+    let pages: u64 = statm
+        .split_whitespace()
+        .nth(1)
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    // 4 KiB is the page size of every Linux target this engine builds for.
+    pages * 4096
+}
+
+/// Open file descriptors, the way C++'s `SystemInfo::OpenFileCount`
+/// (`src/metrics/system_info_impl.cpp:357`) counts entries in `/proc/<pid>/fd`.
+fn open_file_count() -> u64 {
+    std::fs::read_dir("/proc/self/fd")
+        .map(|entries| entries.filter(|e| e.is_ok()).count() as u64)
+        .unwrap_or(0)
+}
+
+/// The process's CPU time in clock ticks: `/proc/self/stat` fields 14 (utime)
+/// and 15 (stime), the first two of the four C++ `cpu_cost_of_process` sums
+/// (`utime + stime + cutime + cstime`); the children counters stay out because
+/// this process forks nothing.
+fn process_cpu_ticks() -> Option<u64> {
+    let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
+    // The command name is parenthesised and may contain spaces, so the fields
+    // after it start at the last ')'. Field 14 of the whole line is field 12
+    // after the command name (state=3, ppid=4, …).
+    let tail = &stat[stat.rfind(')')? + 1..];
+    let fields: Vec<&str> = tail.split_whitespace().collect();
+    let utime: u64 = fields.get(11)?.parse().ok()?;
+    let stime: u64 = fields.get(12)?.parse().ok()?;
+    Some(utime + stime)
+}
+
+/// Logical CPUs the kernel reports online (`nproc`), from `/proc/cpuinfo`'s
+/// `processor` lines.
+fn online_cpu_count() -> u64 {
+    let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") else {
+        return 1;
+    };
+    let count = cpuinfo
+        .lines()
+        .filter(|l| l.starts_with("processor"))
+        .count() as u64;
+    count.max(1)
 }
 
 /// What a pending snapshot restore recreates (the reference's `kRestoreTable`,
@@ -4293,8 +4388,17 @@ impl<'a> EngineTxn<'a> {
         Ok(())
     }
 
-    /// `NewTxn::Rollback`: discards every staged write.
-    pub fn rollback(self) {}
+    /// `NewTxn::Rollback`: discards every staged write and counts the rollback
+    /// (`NewTxnManager::RollBackTxn` bumps `total_rollbacked_txn_count`, which
+    /// `SHOW VARIABLE total_rollback_count` reports).
+    pub fn rollback(mut self) {
+        if let Some(txn) = self.txn.take() {
+            let _ = self.engine.txn.rollback(txn);
+        }
+        self.appends.clear();
+        self.deletes.clear();
+        self.dumps.clear();
+    }
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -4510,6 +4614,9 @@ impl Engine {
             batch_lock: Mutex::new(()),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
             vector_cache: Mutex::new(HashMap::new()),
+            cpu_sample: Mutex::new(None),
+            queries: Mutex::new(diagnostics::QueryRegistry::default()),
+            profile_enabled: std::sync::atomic::AtomicBool::new(false),
         };
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
@@ -14546,7 +14653,9 @@ impl Engine {
                 match var {
                     variables::SessionVariable::QueryCount => self.query_count().to_string(),
                     variables::SessionVariable::TotalCommitCount => self.total_commit_count(),
-                    variables::SessionVariable::TotalRollbackCount => "0".to_string(),
+                    variables::SessionVariable::TotalRollbackCount => {
+                        self.txn.total_rollbacked_txn_count().to_string()
+                    }
                     variables::SessionVariable::ConnectedTime => self.context.connected_at.clone(),
                 }
             }
@@ -14569,6 +14678,15 @@ impl Engine {
 
     /// One global variable's value; the names come from
     /// `PhysicalShow::ExecuteShowGlobalVariable`.
+    ///
+    /// Every value is read from the subsystem that owns it — the buffer cache,
+    /// the transaction manager, the background processor, the query registry,
+    /// `/proc` — so `SHOW VARIABLE` and `GET /variables/*` report engine state
+    /// instead of a constant. The two variables this port cannot answer are
+    /// `running_compact_task` / `running_optimize_task`: the reference runs them
+    /// on the compaction/optimization processors, and this engine has one
+    /// [`BGTaskProcessor`] and no compact/optimize processor at all, so no task
+    /// of those kinds can be running.
     fn global_variable_value(&self, var: variables::GlobalVariable) -> Result<String> {
         use variables::GlobalVariable as G;
         Ok(match var {
@@ -14580,25 +14698,46 @@ impl Engine {
             }
             G::SchedulePolicy => "round robin".to_string(),
             G::NextTxnId => self.txn.current_transaction_id().to_string(),
-            G::BufferedObjectCount => "0".to_string(),
-            G::UnusedBufferObjectCount => "0".to_string(),
-            G::ActiveTxnCount => "0".to_string(),
+            // C++ `BufferManager::BufferedObjectCount`.
+            G::BufferedObjectCount => self
+                .context
+                .buffer
+                .lock()
+                .unwrap()
+                .buffered_object_count()
+                .to_string(),
+            // C++ `BufferManager::WaitingGCObjectCount`, adapted to the block
+            // cache (see `BufferManager::unreferenced_object_count`).
+            G::UnusedBufferObjectCount => self
+                .context
+                .buffer
+                .lock()
+                .unwrap()
+                .unreferenced_object_count()
+                .to_string(),
+            G::ActiveTxnCount => self.txn.active_txn_count().to_string(),
             G::CurrentTs => self.txn.current_ts().to_string(),
             G::TotalCommitCount => self.total_commit_count(),
-            G::TotalRollbackCount => "0".to_string(),
+            G::TotalRollbackCount => self.txn.total_rollbacked_txn_count().to_string(),
             G::ActiveWalFilename => self
                 .txn
                 .wal_path()
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default(),
-            G::ProfileRecordCapacity => "0".to_string(),
-            G::BackgroundTaskCount
-            | G::RunningBgTask
-            | G::RunningCompactTask
-            | G::RunningOptimizeTask => "0".to_string(),
-            G::SystemMemoryUsage | G::OpenFileCount => "0".to_string(),
-            G::CpuUsage => "0".to_string(),
+            G::ProfileRecordCapacity => self.profile_capacity().to_string(),
+            // C++ `BGTaskProcessor::RunningTaskCount` for the dump-index
+            // processor. Both names report it: `bg_task_count` is the
+            // aggregate (the reference sums its four processors) and
+            // `running_bg_task` the dump-index one.
+            G::BackgroundTaskCount | G::RunningBgTask => self.bg_task_count().to_string(),
+            // No compaction/optimization processor exists in this port, so
+            // neither can have a running task (see the doc comment).
+            G::RunningCompactTask | G::RunningOptimizeTask => "0".to_string(),
+            G::SystemMemoryUsage => process_rss_bytes().to_string(),
+            G::OpenFileCount => open_file_count().to_string(),
+            // C++ `SystemInfo::CPUUsage() * 100` (see `Self::cpu_usage`).
+            G::CpuUsage => format!("{}", self.cpu_usage() * 100.0),
             G::JeProf => "on".to_string(),
             G::FollowerNum => "0".to_string(),
             G::ResultCache => self
@@ -14611,9 +14750,71 @@ impl Engine {
                 .unwrap_or_else(|| "off".to_string()),
             G::CacheResultCapacity => self.result_cache_capacity().to_string(),
             G::CacheResultNum => self.result_cache.lock().unwrap().len().to_string(),
-            G::MemoryCacheMiss | G::DiskCacheMiss => "0/0".to_string(),
-            G::EnableProfile => "false".to_string(),
+            // C++ reads the same two counters from the buffer manager; both
+            // names report `misses/requests` over the block cache.
+            G::MemoryCacheMiss | G::DiskCacheMiss => {
+                let buffer = self.context.buffer.lock().unwrap();
+                format!(
+                    "{}/{}",
+                    buffer.cache_miss_count(),
+                    buffer.total_request_count()
+                )
+            }
+            G::EnableProfile => self
+                .profile_enabled
+                .load(std::sync::atomic::Ordering::Relaxed)
+                .to_string(),
         })
+    }
+
+    /// Tasks queued or running on the attached `BGTaskProcessor`; `0` when the
+    /// engine has none (no background work can be in flight).
+    fn bg_task_count(&self) -> usize {
+        self.bg_processor
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|p| p.running_task_count())
+            .unwrap_or(0)
+    }
+
+    /// Size of the finished-statement history (`profile_record_capacity`).
+    fn profile_capacity(&self) -> usize {
+        self.queries.lock().unwrap().capacity()
+    }
+
+    /// Process CPU usage since the previous call, as a fraction of one CPU.
+    ///
+    /// C++ `SystemInfo::CPUUsage` (`src/metrics/system_info_impl.cpp:335`)
+    /// samples `utime + stime` (fields 14/15 of `/proc/self/stat`) and the
+    /// machine's total CPU time 200 ms apart and returns
+    /// `Δprocess / Δtotal * hardware_concurrency`. Blocking the caller for
+    /// 200 ms is not acceptable for an accessor, so the denominator is the
+    /// wall clock since the previous call instead:
+    ///
+    /// ```text
+    /// cpu_usage = (Δticks / CLOCK_TCK) / Δseconds / online_cpus
+    /// ```
+    ///
+    /// i.e. the share of the machine's CPUs this process used over the
+    /// interval, on the same 0..1 scale. The first call has no previous sample
+    /// and returns 0.
+    fn cpu_usage(&self) -> f64 {
+        let Some(ticks) = process_cpu_ticks() else {
+            return 0.0;
+        };
+        let now = std::time::Instant::now();
+        let mut sample = self.cpu_sample.lock().unwrap();
+        let previous = sample.replace(CpuSample { ticks, at: now });
+        let Some(previous) = previous else {
+            return 0.0;
+        };
+        let elapsed = now.duration_since(previous.at).as_secs_f64();
+        if elapsed <= 0.0 {
+            return 0.0;
+        }
+        let cpu_seconds = ticks.saturating_sub(previous.ticks) as f64 / CLOCK_TICKS_PER_SEC;
+        (cpu_seconds / elapsed / online_cpu_count() as f64).clamp(0.0, 1.0)
     }
 
     /// `SHOW DATABASES`: `<database, dir, comment>`, as
