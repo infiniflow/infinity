@@ -769,6 +769,13 @@ pub struct IndexDefValue {
     pub base: IndexBaseValue,
     /// The subtype's own fields, in no particular order (`compact()` sorts).
     pub extra: Vec<(String, Json)>,
+    /// The `(db_id, table_id)` the record's key carries, when it was read from
+    /// the C++ key space (`catalog|idx|{db}|{tbl}|{name}|{ts}`).
+    ///
+    /// The index base does not name its table, so without this the table can
+    /// only be guessed from the indexed column's name - and two tables with a
+    /// column of the same name then give the index to the wrong one.
+    pub owner: Option<(String, String)>,
 }
 
 impl IndexDefValue {
@@ -776,6 +783,7 @@ impl IndexDefValue {
         Self {
             base,
             extra: Vec::new(),
+            owner: None,
         }
     }
 
@@ -1060,7 +1068,11 @@ pub fn index_def_from_json(j: &Json) -> Option<IndexDefValue> {
         .filter(|(k, _)| !INDEX_BASE_KEYS.contains(&k.as_str()))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
-    Some(IndexDefValue { base, extra })
+    Some(IndexDefValue {
+        base,
+        extra,
+        owner: None,
+    })
 }
 
 /// Decodes a full record from its stored bytes.

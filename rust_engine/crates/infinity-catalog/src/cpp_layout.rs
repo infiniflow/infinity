@@ -1019,7 +1019,10 @@ pub fn read_cpp_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
         let index_id = String::from_utf8_lossy(&v).to_string();
         let tag = key::catalog_index_tag_key(fields[2], fields[3], &index_id, "index_base");
         if let Some(bytes) = store.get(tag.as_bytes())? {
-            if let Some(def) = value_format::index_def_from_bytes(&bytes) {
+            if let Some(mut def) = value_format::index_def_from_bytes(&bytes) {
+                // The record's key names the table the index belongs to; the
+                // index base does not.
+                def.owner = Some((fields[2].to_string(), fields[3].to_string()));
                 out.push(def);
             }
         }
@@ -1264,12 +1267,22 @@ fn json_string(text: &str) -> String {
 /// Maps a C++ index record onto the engine's `IndexMeta`, resolving the owning
 /// table from the C++ tables (which carry db/table names and columns).
 pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<IndexMeta> {
-    let table = def.base.column_names.first().and_then(|c| {
-        cpp_tables
+    // The record's key says which table the index belongs to; only a record
+    // without one (a hand-written one) falls back to guessing from the
+    // indexed column's name - and two tables with a column of the same name
+    // would then give the index to the wrong table.
+    let table = match &def.owner {
+        Some((db_id, table_id)) => cpp_tables
             .iter()
-            .find(|t| t.columns.iter().any(|col| &col.column_name == c))
-            .map(|t| format!("{}.{}", t.db_name, t.table_name))
-    })?;
+            .find(|t| t.db_id.to_string() == *db_id && t.table_id.to_string() == *table_id)
+            .map(|t| format!("{}.{}", t.db_name, t.table_name)),
+        None => def.base.column_names.first().and_then(|c| {
+            cpp_tables
+                .iter()
+                .find(|t| t.columns.iter().any(|col| &col.column_name == c))
+                .map(|t| format!("{}.{}", t.db_name, t.table_name))
+        }),
+    }?;
     let column = def.base.column_names.first().cloned().unwrap_or_default();
     // Carry the options the engine tracks on `IndexMeta`.
     let opt = |k: &str| {
