@@ -22,7 +22,7 @@ use std::path::Path;
 
 use crate::cpp_format::FormatError;
 use crate::secondary_lowcard::{write_lowcard_segment, LowCardReader};
-use crate::secondary_segment::{write_secondary_segment, SecondarySegmentReader};
+use crate::secondary_segment::{write_secondary_segment, Key, SecondarySegmentReader};
 
 /// Order-preserving map of a signed integer into `u64`: `i64::MIN` -> 0.
 pub fn ordered_i64(value: i64) -> u64 {
@@ -101,7 +101,7 @@ impl HighCardinalityReader {
     }
 
     pub fn lookup(&self, key: u64) -> Vec<u32> {
-        self.reader.lookup(key)
+        self.reader.lookup(Key::U64(key))
     }
 }
 

@@ -36,6 +36,7 @@ thread_local! {
     static LAST_PLAN_DEBUG: std::cell::RefCell<Option<String>> =
         const { std::cell::RefCell::new(None) };
 }
+use infinity_storage::secondary_segment::{Key, KeyKind};
 #[cfg(not(feature = "rocksdb-store"))]
 use infinity_storage::FjallMetaStore;
 use infinity_storage::MetaStore;
@@ -5143,25 +5144,29 @@ impl Engine {
         &self,
         table: &str,
         column: &str,
-        by_segment: HashMap<u64, Vec<(u64, u32)>>,
+        kind: infinity_storage::secondary_segment::KeyKind,
+        by_segment: HashMap<u64, Vec<(infinity_storage::secondary_segment::Key, u32)>>,
     ) {
+        use infinity_storage::secondary_segment::write_secondary_segment_typed;
         let dir = self
             .dir
             .join("secondary")
             .join(index_key(table, column).replace('/', "_"));
         let mut readers = Vec::new();
         for (segment, mut entries) in by_segment {
-            entries.sort_unstable_by_key(|(k, _)| *k);
+            // `Key::cmp` is the chunk's own order: u64 for integers and hashed
+            // text, the float order for a FLOAT/DOUBLE column.
+            entries.sort_by(|a, b| a.0.order(&b.0));
             let path = dir.join(format!("seg_{segment}_{}.idx", entries.len()));
             // Always rewrite: the name does not capture the data, and a stale
             // chunk from an earlier run would shadow this one.
-            if infinity_storage::secondary_segment::write_secondary_segment(&path, &entries)
-                .is_err()
-            {
+            if write_secondary_segment_typed(&path, kind, &entries).is_err() {
                 continue;
             }
             if let Ok(reader) =
-                infinity_storage::secondary_segment::SecondarySegmentReader::open(&path)
+                infinity_storage::secondary_segment::SecondarySegmentReader::open_with_kind(
+                    &path, kind,
+                )
             {
                 readers.push((segment << 32, Arc::new(reader)));
             }
@@ -5204,24 +5209,47 @@ impl Engine {
             .unwrap_or_default();
         let int_column = type_upper.starts_with("INT") || type_upper.starts_with("UINT");
         let is_bool = type_upper.starts_with("BOOL");
+        let key_kind = secondary_key_kind(&type_upper);
         if int_column {
-            let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
+            let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
                 let Some(Value::Int(v)) = row.get(col_idx) else {
                     continue;
                 };
                 // Order-preserving mapping of i64 into u64.
-                let ordered = (*v as u64) ^ (1u64 << 63);
+                let ordered = ordered_i64_key(*v);
                 by_segment
                     .entry((seq as u64) >> 32)
                     .or_default()
-                    .push((ordered, (seq as u64 & 0xffff_ffff) as u32));
+                    .push((Key::U64(ordered), (seq as u64 & 0xffff_ffff) as u32));
             }
-            self.write_secondary_pgm_chunks(table, column, by_segment);
+            self.write_secondary_pgm_chunks(table, column, KeyKind::U64, by_segment);
+        } else if key_kind != KeyKind::U64 {
+            // FLOAT/DOUBLE keep the raw value ordered, like the reference's
+            // `KeepOrderedSelf` (`secondary_index_data.cppm:38`): a 4-byte f32
+            // or an 8-byte f64, compared as a float.
+            let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
+            for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
+                let value = match row.get(col_idx) {
+                    Some(Value::Float(f)) => *f,
+                    Some(Value::Int(i)) => *i as f64,
+                    _ => continue,
+                };
+                let key = if key_kind == KeyKind::F32 {
+                    Key::F32(value as f32)
+                } else {
+                    Key::F64(value)
+                };
+                by_segment
+                    .entry((seq as u64) >> 32)
+                    .or_default()
+                    .push((key, (seq as u64 & 0xffff_ffff) as u32));
+            }
+            self.write_secondary_pgm_chunks(table, column, key_kind, by_segment);
         } else if !is_bool {
             // VARCHAR (and JSON) keys are hashed to u64, exactly like the
             // reference's `std::hash<std::string_view>` (`ConvertToOrderedKeyValue`).
-            let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
+            let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
                 let Some(v) = row.get(col_idx) else {
                     continue;
@@ -5230,9 +5258,9 @@ impl Engine {
                 by_segment
                     .entry((seq as u64) >> 32)
                     .or_default()
-                    .push((ordered, (seq as u64 & 0xffff_ffff) as u32));
+                    .push((Key::U64(ordered), (seq as u64 & 0xffff_ffff) as u32));
             }
-            self.write_secondary_pgm_chunks(table, column, by_segment);
+            self.write_secondary_pgm_chunks(table, column, KeyKind::U64, by_segment);
         }
         // Boolean columns use the low-cardinality variant.
         self.tables
@@ -5498,6 +5526,7 @@ impl Engine {
                 .unwrap_or_default();
             let is_bool = ty.starts_with("BOOL");
             let is_int = ty.starts_with("INT") || ty.starts_with("UINT");
+            let tail_kind = secondary_key_kind(&ty);
             let key = index_key(&im.table, &column);
             let tail = match self
                 .tables
@@ -5517,19 +5546,29 @@ impl Engine {
             let base = tail.values().flatten().min().copied().unwrap_or(0);
             let row_count: usize = tail.values().map(Vec::len).sum();
             if !is_bool {
-                let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
+                let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
                 for (raw_key, ids) in &tail {
                     let Some(text) = std::str::from_utf8(raw_key).ok() else {
                         continue;
                     };
                     let ordered = if is_int {
                         match text.trim().parse::<i64>() {
-                            Ok(v) => (v as u64) ^ (1u64 << 63),
+                            Ok(v) => Key::U64(ordered_i64_key(v)),
                             Err(_) => continue,
+                        }
+                    } else if tail_kind != KeyKind::U64 {
+                        // FLOAT/DOUBLE: the raw value is the key.
+                        let Ok(v) = text.trim().parse::<f64>() else {
+                            continue;
+                        };
+                        if tail_kind == KeyKind::F32 {
+                            Key::F32(v as f32)
+                        } else {
+                            Key::F64(v)
                         }
                     } else {
                         // VARCHAR/JSON: the reference hashes the key.
-                        infinity_storage::secondary_segment::hash_varchar(text)
+                        Key::U64(infinity_storage::secondary_segment::hash_varchar(text))
                     };
                     for id in ids {
                         by_segment
@@ -5548,16 +5587,20 @@ impl Engine {
                     .unwrap_or(0);
                 let mut readers = Vec::new();
                 for (segment, mut entries) in by_segment {
-                    entries.sort_unstable_by_key(|(k, _)| *k);
+                    entries.sort_by(|a, b| a.0.order(&b.0));
                     let path = dir.join(format!("seg_{segment}_tail{chunk}.idx"));
                     chunk += 1;
-                    if infinity_storage::secondary_segment::write_secondary_segment(&path, &entries)
-                        .is_err()
+                    if infinity_storage::secondary_segment::write_secondary_segment_typed(
+                        &path, tail_kind, &entries,
+                    )
+                    .is_err()
                     {
                         continue;
                     }
                     if let Ok(reader) =
-                        infinity_storage::secondary_segment::SecondarySegmentReader::open(&path)
+                        infinity_storage::secondary_segment::SecondarySegmentReader::open_with_kind(
+                            &path, tail_kind,
+                        )
                     {
                         readers.push((segment << 32, Arc::new(reader)));
                     }
@@ -5770,10 +5813,29 @@ impl Engine {
         // Sealed chunks are authoritative for the rows they cover; the memory
         // map only holds the tail written since the last dump.
         if let Literal::Int(v) = value {
-            let ordered = (*v as u64) ^ (1u64 << 63);
+            let ordered = Key::U64(ordered_i64_key(*v));
             if let Some(segments) = &disk {
                 for (base, reader) in segments {
                     for off in reader.lookup(ordered) {
+                        let id = base | u64::from(off);
+                        if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
+                            out.push(id);
+                        }
+                    }
+                }
+            }
+        } else if let Literal::Float(f) = value {
+            // FLOAT/DOUBLE chunks keep the raw key, and each reader knows its
+            // width (`SecondarySegmentReader::kind`).
+            if let Some(segments) = &disk {
+                for (base, reader) in segments {
+                    let key = match reader.kind() {
+                        KeyKind::F32 => Key::F32(*f as f32),
+                        KeyKind::F64 => Key::F64(*f),
+                        // A hashed varchar chunk cannot hold a float key.
+                        KeyKind::U64 => continue,
+                    };
+                    for off in reader.lookup(key) {
                         let id = base | u64::from(off);
                         if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
                             out.push(id);
@@ -5803,7 +5865,7 @@ impl Engine {
                 }
             } else {
                 // VARCHAR/JSON chunks store the reference's u64 key hash.
-                let ordered = infinity_storage::secondary_segment::hash_varchar(&want);
+                let ordered = Key::U64(infinity_storage::secondary_segment::hash_varchar(&want));
                 if let Some(segments) = &disk {
                     for (base, reader) in segments {
                         for off in reader.lookup(ordered) {
@@ -5861,11 +5923,12 @@ impl Engine {
     /// Rows whose indexed key falls in one of `ranges` (inclusive bounds,
     /// already merged by `FilterExpressionPushDown`).
     ///
-    /// Only `INT`/`UINT` keys are order-preserving in the sealed chunks
-    /// (`build_index` encodes `(v as u64) ^ (1 << 63)`); every other kind
-    /// stores `hash_varchar`, so it returns `None` there and the caller keeps
-    /// the full-scan path. `EXPLAIN`'s `INDEX SCAN` is therefore truthful for
-    /// an integer range and still overstates a float/date/varchar one.
+    /// `INT`/`UINT` keys are order-mapped, `FLOAT`/`DOUBLE` keys are the raw
+    /// value (`KeyKind`, matching the reference's `ConvertToOrderedType`), so
+    /// both can be range-scanned. `VARCHAR`/`JSON` keys are hashes and cannot,
+    /// so they return `None` here and the caller keeps the full-scan path —
+    /// `EXPLAIN`'s `INDEX SCAN` is truthful for an integer or float range and
+    /// still overstates a varchar/json one.
     fn index_range_lookup(
         &self,
         table: &str,
@@ -5875,26 +5938,43 @@ impl Engine {
         let tkey = self.table_key(table);
         let schema = self.table_schema(table).unwrap_or_default();
         let col = schema.iter().position(|c| c == column)?;
-        // Same gate as the chunk writer: only an integer key is ordered.
+        // Same classification as the chunk writer: an integer lookup key is the
+        // order-mapped `u64`, a float one is the raw value.
         let column_type = self
             .column_types(table)
             .ok()
             .and_then(|types| types.get(col).cloned())
             .map(|ty| ty.trim().to_ascii_uppercase())
             .unwrap_or_default();
-        if !(column_type.starts_with("INT") || column_type.starts_with("UINT")) {
+        let kind = secondary_key_kind(&column_type);
+        // `secondary_key_kind` only returns a float kind for FLOAT/DOUBLE.
+        let float_column = kind != KeyKind::U64;
+        if !float_column
+            && kind == KeyKind::U64
+            && !(column_type.starts_with("INT") || column_type.starts_with("UINT"))
+        {
+            // A hashed key has no order to scan.
             return None;
         }
-        // The planner's open ends are `Value::Int(i64::MIN)` /
-        // `Value::Int(i64::MAX)`, so every bound of an integer range is an
-        // `Int`; anything else means this range is not ours.
-        let keys: Vec<(u64, u64)> = ranges
+        // Bounds: an integer range's open ends are `Value::Int(i64::MIN/MAX)`
+        // (the planner's `lower_bound`/`upper_bound`), a float range's are
+        // `Value::Float`. Both are kept in the comparison domain of the chunk.
+        let keys: Vec<(Key, Key)> = ranges
             .iter()
-            .filter_map(|(lo, hi)| match (lo, hi) {
-                (Value::Int(lo), Value::Int(hi)) if lo <= hi => {
-                    Some(((*lo as u64) ^ (1u64 << 63), (*hi as u64) ^ (1u64 << 63)))
+            .filter_map(|(lo, hi)| {
+                if float_column {
+                    let lo = value_as_f64(lo)?;
+                    let hi = value_as_f64(hi)?;
+                    (lo <= hi).then_some((Key::F64(lo), Key::F64(hi)))
+                } else {
+                    match (lo, hi) {
+                        (Value::Int(lo), Value::Int(hi)) if lo <= hi => Some((
+                            Key::U64(ordered_i64_key(*lo)),
+                            Key::U64(ordered_i64_key(*hi)),
+                        )),
+                        _ => None,
+                    }
                 }
-                _ => None,
             })
             .collect();
         if keys.is_empty() {
@@ -5911,22 +5991,32 @@ impl Engine {
             if !known {
                 return None;
             }
-            // The tail is keyed by the literal's decimal text, so its byte
-            // order is not numeric order (`"10"` sorts before `"9"`): every
-            // visited key is decoded and compared, never sliced at a bound.
+            // The tail is keyed by the literal's text, so its byte order is not
+            // numeric order (`"10"` sorts before `"9"`): every visited key is
+            // decoded and compared, never sliced at a bound.
             let mut tail = Vec::new();
             if let Some(index) = reg.indexes.get(column) {
                 index.for_each_in_order(|key, ids| {
-                    let Some(value) = std::str::from_utf8(key)
-                        .ok()
-                        .and_then(|key| key.parse::<i64>().ok())
-                    else {
+                    let Some(text) = std::str::from_utf8(key).ok() else {
                         return;
                     };
-                    let inside = ranges.iter().any(|(lo, hi)| match (lo, hi) {
-                        (Value::Int(lo), Value::Int(hi)) => *lo <= value && value <= *hi,
-                        _ => false,
-                    });
+                    let inside = if float_column {
+                        let Ok(value) = text.trim().parse::<f64>() else {
+                            return;
+                        };
+                        ranges.iter().any(|(lo, hi)| {
+                            matches!((value_as_f64(lo), value_as_f64(hi)),
+                                (Some(lo), Some(hi)) if lo <= value && value <= hi)
+                        })
+                    } else {
+                        let Ok(value) = text.trim().parse::<i64>() else {
+                            return;
+                        };
+                        ranges.iter().any(|(lo, hi)| match (lo, hi) {
+                            (Value::Int(lo), Value::Int(hi)) => *lo <= value && value <= *hi,
+                            _ => false,
+                        })
+                    };
                     if inside {
                         tail.extend_from_slice(ids);
                     }
@@ -5941,7 +6031,9 @@ impl Engine {
                 for (start, end) in &keys {
                     for off in reader.range(*start, *end) {
                         let id = base | u64::from(off);
-                        if self.live_row_in_range(table, id, col, ranges) && seen.insert(id) {
+                        if self.live_row_in_range(table, id, col, ranges, float_column)
+                            && seen.insert(id)
+                        {
                             out.push(id);
                         }
                     }
@@ -5949,7 +6041,7 @@ impl Engine {
             }
         }
         for id in tail {
-            if self.live_row_in_range(table, id, col, ranges) && seen.insert(id) {
+            if self.live_row_in_range(table, id, col, ranges, float_column) && seen.insert(id) {
                 out.push(id);
             }
         }
@@ -5994,13 +6086,15 @@ impl Engine {
     /// `live_row_matches` for a range probe: the row is live and the column's
     /// current value falls in one of `ranges`. UPDATE re-appends and DROP
     /// COLUMN re-keys, so a chunk or tail entry alone is not authoritative.
-    /// Only integer values are compared, matching `index_range_lookup`'s gate.
+    /// `float_column` selects how the stored cell is parsed, matching
+    /// `index_range_lookup`'s key kind.
     fn live_row_in_range(
         &self,
         table: &str,
         id: u64,
         col: usize,
         ranges: &[(Value, Value)],
+        float_column: bool,
     ) -> bool {
         if self
             .storage
@@ -6026,7 +6120,19 @@ impl Engine {
             .nth(col)
             .map(str::trim)
             .map(str::to_string);
-        let Some(value) = field.and_then(|field| field.parse::<i64>().ok()) else {
+        let Some(field) = field else {
+            return false;
+        };
+        if float_column {
+            let Ok(value) = field.parse::<f64>() else {
+                return false;
+            };
+            return ranges.iter().any(|(lo, hi)| {
+                matches!((value_as_f64(lo), value_as_f64(hi)),
+                    (Some(lo), Some(hi)) if lo <= value && value <= hi)
+            });
+        }
+        let Ok(value) = field.parse::<i64>() else {
             return false;
         };
         ranges.iter().any(|(lo, hi)| match (lo, hi) {
@@ -15623,6 +15729,39 @@ fn column_kind_of(declared: &str) -> infinity_planner::index_scan::ColumnKind {
     }
 }
 
+/// The secondary-chunk key kind of a declared column type — the reference's
+/// `ConvertToOrderedType<T>` (`secondary_index_data.cppm:38-118`): `FLOAT` and
+/// `DOUBLE` keep their raw, ordered value (`KeepOrderedSelf`), `INT`/`UINT` are
+/// order-mapped and everything else is hashed to a `u64` (`U64` here), which is
+/// the reference's `ConvertToHashU64` for `VARCHAR`.
+fn secondary_key_kind(declared: &str) -> infinity_storage::secondary_segment::KeyKind {
+    use infinity_storage::secondary_segment::KeyKind;
+    let ty = declared.trim().to_ascii_lowercase();
+    if ty.starts_with("float") {
+        KeyKind::F32
+    } else if ty.starts_with("double") {
+        KeyKind::F64
+    } else {
+        KeyKind::U64
+    }
+}
+
+/// Order-preserving map of a signed integer into `u64`: `i64::MIN` -> 0.
+fn ordered_i64_key(value: i64) -> u64 {
+    (value as u64) ^ (1u64 << 63)
+}
+
+/// A range bound as `f64`: the planner emits `Value::Float` for a float
+/// column and `Value::Int` for an integer one, and both appear in a
+/// comparison against a float chunk after a cast was unwound.
+fn value_as_f64(value: &Value) -> Option<f64> {
+    match value {
+        Value::Float(f) => Some(*f),
+        Value::Int(i) => Some(*i as f64),
+        _ => None,
+    }
+}
+
 /// Inserts `predicate` directly above the base scan of `plan`. The predicate
 /// is bound against the scan's output, so it cannot be wrapped around the root
 /// when the root re-projects.
@@ -18040,9 +18179,14 @@ mod tests {
 
     /// The `id` column of a `WHERE`-filtered select over `t`, in `id` order.
     fn ids(e: &Engine, predicate: &str) -> Vec<i64> {
+        ids_of(e, "t", predicate)
+    }
+
+    /// The `id` column of a `WHERE`-filtered select over `table`, in `id` order.
+    fn ids_of(e: &Engine, table: &str, predicate: &str) -> Vec<i64> {
         query_column(
             e,
-            &format!("SELECT id FROM t WHERE {predicate} ORDER BY id;"),
+            &format!("SELECT id FROM {table} WHERE {predicate} ORDER BY id;"),
         )
         .into_iter()
         .map(|id| id.parse().expect("id is an integer"))
@@ -18124,29 +18268,111 @@ mod tests {
         );
     }
 
-    /// A range the ordered scan cannot answer — a hash-keyed float column, or a
+    /// A `FLOAT`/`DOUBLE` chunk keeps the raw value ordered (the reference's
+    /// `KeepOrderedSelf`), so a range predicate is answered from the index and
+    /// must agree with the same table carrying no index at all. An integer
+    /// range keeps working beside them, and a varchar range still falls back
+    /// because its keys are hashes.
+    #[test]
+    fn float_range_scan_matches_the_unindexed_oracle() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("SET CONFIG result_cache off;").unwrap();
+        for table in ["t_indexed", "t_plain"] {
+            e.execute(&format!(
+                "CREATE TABLE {table} (id INT, f FLOAT, d DOUBLE, tag VARCHAR);"
+            ))
+            .unwrap();
+        }
+        // 0..60 exist when the indexes are built, so they are sealed into
+        // chunks; 60..80 land in the memory tail until the first `flush`.
+        for i in 0..60 {
+            for table in ["t_indexed", "t_plain"] {
+                e.execute(&format!(
+                    "INSERT INTO {table} VALUES ({i}, {i}.5, {i}.5, 'tag{i}');"
+                ))
+                .unwrap();
+            }
+        }
+        for column in ["id", "f", "d", "tag"] {
+            e.execute(&format!(
+                "CREATE INDEX idx_{column} ON t_indexed ({column});"
+            ))
+            .unwrap();
+        }
+        for i in 60..80 {
+            for table in ["t_indexed", "t_plain"] {
+                e.execute(&format!(
+                    "INSERT INTO {table} VALUES ({i}, {i}.5, {i}.5, 'tag{i}');"
+                ))
+                .unwrap();
+            }
+        }
+        let cases: [(&str, Vec<i64>); 6] = [
+            // 1.5 and 3.5 themselves do not satisfy a strict bound.
+            ("f > 1.5 AND f < 3.5", vec![2]),
+            ("f >= 1.5 AND f <= 3.5", vec![1, 2, 3]),
+            ("f BETWEEN 70.5 AND 71.5", vec![70, 71]),
+            ("d >= 10.5 AND d <= 12.5", vec![10, 11, 12]),
+            // A range that matches nothing must stay empty.
+            ("f < 0.5", vec![]),
+            ("id > 76", vec![77, 78, 79]),
+        ];
+        for round in 0..2 {
+            for (predicate, expected) in &cases {
+                assert_eq!(
+                    &ids_of(&e, "t_indexed", predicate),
+                    expected,
+                    "round {round}: {predicate}"
+                );
+                // The unindexed twin is the oracle for the same rows.
+                assert_eq!(
+                    ids_of(&e, "t_indexed", predicate),
+                    ids_of(&e, "t_plain", predicate),
+                    "round {round}: oracle disagrees for {predicate}"
+                );
+            }
+            e.flush().unwrap();
+        }
+        // VARCHAR keys are hashes: the range cannot use the index, but the rows
+        // still have to be right (lexicographic, so `tag8`/`tag9` are above
+        // `tag78` — the oracle decides, not a hand-written list).
+        assert_eq!(
+            ids_of(&e, "t_indexed", "tag > 'tag78'"),
+            ids_of(&e, "t_plain", "tag > 'tag78'")
+        );
+        assert_eq!(ids_of(&e, "t_indexed", "tag = 'tag42'"), vec![42]);
+        // Equality on a float/double column is the `index_lookup` path.
+        assert_eq!(ids_of(&e, "t_indexed", "f = 2.5"), vec![2]);
+        assert_eq!(ids_of(&e, "t_indexed", "d = 42.5"), vec![42]);
+        // The float and double columns really did seal chunks.
+        assert!(!e.secondary_chunk_meta("t_indexed", "f").is_empty());
+        assert!(!e.secondary_chunk_meta("t_indexed", "d").is_empty());
+    }
+
+    /// A range the ordered scan cannot answer — a hashed varchar key, or a
     /// column with no index at all — must still return the right rows through
-    /// the fallback.
+    /// the fallback. A float range used to be in this list; it is answered from
+    /// the index now (`float_range_scan_matches_the_unindexed_oracle`).
     #[test]
     fn range_on_an_unordered_key_falls_back() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.execute("SET CONFIG result_cache off;").unwrap();
-        e.execute("CREATE TABLE t (id INT, score FLOAT, note INT);")
+        e.execute("CREATE TABLE t (id INT, tag VARCHAR, note INT);")
             .unwrap();
         for i in 0..50 {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, {i}.5, {i});"))
+            e.execute(&format!("INSERT INTO t VALUES ({i}, 'tag{i}', {i});"))
                 .unwrap();
         }
-        e.execute("CREATE INDEX idx_score ON t (score);").unwrap();
+        e.execute("CREATE INDEX idx_tag ON t (tag);").unwrap();
         for round in 0..2 {
-            // The planner pushes the float range down (a secondary column), but
-            // the chunks hold `hash_varchar` keys: the executor declines it and
-            // the full scan has to be right.
+            // A varchar chunk stores a hash of the key, so there is no order to
+            // scan: the rows must still be right.
             assert_eq!(
-                ids(&e, "score >= 10.5 AND score <= 12.5"),
-                vec![10, 11, 12],
-                "round {round}: float range"
+                ids(&e, "tag BETWEEN 'tag48' AND 'tag49'"),
+                vec![48, 49],
+                "round {round}: varchar range"
             );
             // No index on `note`: there is no candidate at all.
             assert_eq!(

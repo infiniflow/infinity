@@ -5,26 +5,43 @@
 //! Layout of one chunk (`chunk_{n}.idx`, no header):
 //!
 //! ```text
-//! keys     n * u64            ordered keys (the reference's OrderedKeyType)
+//! keys     n * key_width      ordered keys (the reference's OrderedKeyType)
 //! offsets  n * u32            segment offsets, parallel to `keys`
 //! pgm      u32 n
-//!          u64 first_key
-//!          u32 segment_count, segment_count * (u64 key, f32 slope, u32 intercept)
+//!          first_key          key_width bytes
+//!          u32 segment_count, segment_count * (K key, Floating slope, u32 intercept)
 //!          u32 level_count,   level_count * u64
 //! ```
 //!
-//! `Segment` is written from `#pragma pack(push, 1) struct Segment { K key;
-//! Floating slope; uint32_t intercept; }`, i.e. 16 bytes with no padding, and
-//! `levels_offsets` is a `std::vector<size_t>`, i.e. 8 bytes per entry.
+//! `key_width` and the `Segment` size depend on the column's key type, which is
+//! what [`KeyKind`] carries — the reference instantiates `PGMIndex<K, 64, 4,
+//! Floating>` per type (`secondary_index_pgm.cppm:33-45`):
 //!
-//! The model itself is a `PGMIndex<K, 64, 4, float>`: the bottom level is a
+//! | key kind | `K` / `Floating` | key width | `Segment` |
+//! |---|---|---|---|
+//! | `U64` (INT/UINT/VARCHAR/JSON) | `u64` / `float` | 8 | `{u64,f32,u32}` = 16 |
+//! | `F32` (FLOAT) | `float` / `float` | 4 | `{f32,f32,u32}` = 12 |
+//! | `F64` (DOUBLE) | `double` / `double` | 8 | `{f64,f64,u32}` = 24 (4 bytes of padding) |
+//!
+//! and `levels_offsets` is a `std::vector<size_t>`, i.e. 8 bytes per entry.
+//!
+//! The model itself is a `PGMIndex<K, 64, 4, Floating>`: the bottom level is a
 //! segmentation with `epsilon = 64`, every level above it is segmented with
 //! `epsilon_recursive = 4` over the first key of the level below, and each
-//! level ends with the reference's sentinel segment (`key = u64::MAX`,
+//! level ends with the reference's sentinel segment (`key = K::MAX`,
 //! `slope = 0`, `intercept = last_n`). `levels_offsets` holds the start of
 //! each level in `segments[]` followed by `segments.len()`.
+//!
+//! Only the `U64` model is *built* the way the reference builds it (and is
+//! byte-identical to it, see the tests). A `F32`/`F64` chunk gets a flat model
+//! — one segment per 64 keys with `slope = 0` and `intercept = first index` —
+//! which is exact for any monotone key array and readable by the reference,
+//! but is not the fit the reference would produce. The reader does not consult
+//! the typed model at all: it binary-searches the key array, which is what
+//! makes it correct for a chunk the reference wrote.
 
 use memmap2::Mmap;
+use std::cmp::Ordering;
 use std::fs::File;
 use std::path::Path;
 
@@ -63,6 +80,113 @@ use crate::cpp_format::FormatError;
 
 const PGM_EPSILON: u64 = 64;
 const PGM_EPSILON_RECURSIVE: u64 = 4;
+
+/// How a chunk stores its keys — the reference's `ConvertToOrderedType<T>`
+/// (`storage/secondary_index/secondary_index_data.cppm:38-118`).
+///
+/// `U64` is the engine's order-mapped integer key, and the hash the reference
+/// stores for `VARCHAR`/`JSON` (`ConvertToHashU64`). `F32`/`F64` are the
+/// reference's `KeepOrderedSelf` types `FloatT`/`DoubleT`: the key array holds
+/// the raw IEEE bit pattern and the key *compares as a float*, which is what
+/// makes a chunk written by the reference readable here and vice versa.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyKind {
+    U64,
+    F32,
+    F64,
+}
+
+impl KeyKind {
+    /// `sizeof(OrderedKeyType)`.
+    pub fn key_width(self) -> usize {
+        match self {
+            KeyKind::U64 | KeyKind::F64 => 8,
+            KeyKind::F32 => 4,
+        }
+    }
+
+    /// `sizeof(Segment)` for `PGMIndex<K, 64, 4, Floating>`: `{K key; Floating
+    /// slope; u32 intercept;}`, padded to the struct's alignment. `f64` keys
+    /// make it 24 bytes (4 bytes after the intercept).
+    pub fn segment_width(self) -> usize {
+        match self {
+            KeyKind::U64 => 16,
+            KeyKind::F32 => 12,
+            KeyKind::F64 => 24,
+        }
+    }
+
+    /// Width of the tail's `first_key`, i.e. `sizeof(K)`.
+    pub fn first_key_width(self) -> usize {
+        self.key_width()
+    }
+
+    /// The size of an empty chunk's tail: `n`, `first_key`, `segment_count`,
+    /// `level_count` and no arrays.
+    pub fn empty_tail_len(self) -> usize {
+        4 + self.first_key_width() + 4 + 4
+    }
+}
+
+/// A chunk key. `U64` covers the order-mapped integer and the hashed
+/// varchar/json key; `F32`/`F64` are raw float keys.
+///
+/// Comparison: two `U64` keys compare as integers, anything else compares as
+/// `f64` (an `F32` widens exactly) using [`f64::total_cmp`]. Comparing calls
+/// from *different* domains (an integer key against a float key) is only
+/// meaningful for callers that already know the column kind; every in-tree
+/// caller passes the column's own kind.
+///
+/// `total_cmp` and not a raw `to_bits` comparison: the sign bit is the high
+/// bit, so comparing bit patterns as integers puts every negative float
+/// *after* every positive one. `-3.5` must sort before `-1.0`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Key {
+    U64(u64),
+    F32(f32),
+    F64(f64),
+}
+
+impl Key {
+    pub fn kind(self) -> KeyKind {
+        match self {
+            Key::U64(_) => KeyKind::U64,
+            Key::F32(_) => KeyKind::F32,
+            Key::F64(_) => KeyKind::F64,
+        }
+    }
+
+    pub fn order(&self, other: &Key) -> Ordering {
+        match (self, other) {
+            (Key::U64(a), Key::U64(b)) => a.cmp(b),
+            _ => self.as_f64().total_cmp(&other.as_f64()),
+        }
+    }
+
+    pub fn as_f64(self) -> f64 {
+        match self {
+            Key::U64(v) => v as f64,
+            Key::F32(v) => v as f64,
+            Key::F64(v) => v,
+        }
+    }
+
+    /// The raw little-endian bytes this key occupies in a chunk, at the key
+    /// width of `kind`.
+    fn to_le_bytes_in(self, kind: KeyKind) -> Vec<u8> {
+        match kind {
+            KeyKind::U64 => {
+                let bits = match self {
+                    Key::U64(v) => v,
+                    other => other.as_f64() as u64,
+                };
+                bits.to_le_bytes().to_vec()
+            }
+            KeyKind::F32 => (self.as_f64() as f32).to_bits().to_le_bytes().to_vec(),
+            KeyKind::F64 => self.as_f64().to_bits().to_le_bytes().to_vec(),
+        }
+    }
+}
 
 /// One piecewise-linear segment: a key, a slope and an intercept.
 ///
@@ -620,6 +744,10 @@ fn pgm_add_eps(x: u64, epsilon: u64, size: u64) -> u64 {
 }
 
 /// Writes one secondary-index chunk for `(key, offset)` pairs sorted by key.
+///
+/// This is the `U64` chunk the engine has always written (order-mapped integer
+/// and hashed varchar/json keys). Use [`write_secondary_segment_typed`] for a
+/// float/double column.
 pub fn write_secondary_segment(path: &Path, entries: &[(u64, u32)]) -> Result<(), FormatError> {
     let keys: Vec<u64> = entries.iter().map(|(k, _)| *k).collect();
     let pgm = Pgm::build(&keys);
@@ -632,6 +760,43 @@ pub fn write_secondary_segment(path: &Path, entries: &[(u64, u32)]) -> Result<()
     }
     out.extend_from_slice(&pgm.encode());
 
+    write_chunk(path, &out)
+}
+
+/// Writes one secondary-index chunk with `kind`-sized keys; `entries` must be
+/// sorted by [`Key::cmp`].
+///
+/// A `U64` chunk is byte-identical to [`write_secondary_segment`]. A
+/// `F32`/`F64` chunk stores the raw IEEE bit pattern of each key and a flat
+/// PGM tail (see the module comment): the framing is the reference's, the
+/// model is not its fit.
+pub fn write_secondary_segment_typed(
+    path: &Path,
+    kind: KeyKind,
+    entries: &[(Key, u32)],
+) -> Result<(), FormatError> {
+    if kind == KeyKind::U64 {
+        let entries: Vec<(u64, u32)> = entries
+            .iter()
+            .map(|(key, off)| match key {
+                Key::U64(v) => (*v, *off),
+                other => (other.as_f64() as u64, *off),
+            })
+            .collect();
+        return write_secondary_segment(path, &entries);
+    }
+    let mut out = Vec::with_capacity(entries.len() * (kind.key_width() + 4) + 64);
+    for (key, _) in entries {
+        out.extend_from_slice(&key.to_le_bytes_in(kind));
+    }
+    for (_, off) in entries {
+        out.extend_from_slice(&off.to_le_bytes());
+    }
+    out.extend_from_slice(&flat_tail(kind, entries));
+    write_chunk(path, &out)
+}
+
+fn write_chunk(path: &Path, out: &[u8]) -> Result<(), FormatError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| FormatError::Io(format!("{}: {e}", parent.display())))?;
@@ -639,44 +804,145 @@ pub fn write_secondary_segment(path: &Path, entries: &[(u64, u32)]) -> Result<()
     std::fs::write(path, out).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
 }
 
+/// A flat, exact `PGMWithExtraFunction<K>::Save` tail for a typed chunk: one
+/// segment per `PGM_EPSILON` keys with `slope = 0`, so the model predicts the
+/// first index of the segment and the reference's `[pos - 64, pos + 64]` window
+/// still covers every key of it. Appended: the reference's sentinel
+/// `{key: K::MAX, slope: 0, intercept: n}`.
+///
+/// `K::MAX` (`+inf`) is not `u64::MAX`: a float key may legitimately be
+/// `f32::MAX`/`f64::MAX`, so only infinity sorts past every stored key.
+fn flat_tail(kind: KeyKind, entries: &[(Key, u32)]) -> Vec<u8> {
+    let n = entries.len();
+    let mut segments: Vec<(Key, f64, u32)> = Vec::new();
+    let mut start = 0usize;
+    while start < n {
+        segments.push((entries[start].0, 0.0, start as u32));
+        start += PGM_EPSILON as usize;
+    }
+    segments.push((Key::F64(f64::INFINITY), 0.0, n as u32));
+
+    let mut out = Vec::new();
+    // `PGMWithExtraFunction::Save` order: `n`, `first_key`, the segment count,
+    // the segments, then the level table.
+    out.extend_from_slice(&(n as u32).to_le_bytes());
+    let first = entries.first().map_or(0.0, |(key, _)| key.as_f64());
+    match kind {
+        KeyKind::F32 => out.extend_from_slice(&(first as f32).to_bits().to_le_bytes()),
+        _ => out.extend_from_slice(&first.to_bits().to_le_bytes()),
+    }
+    out.extend_from_slice(&(segments.len() as u32).to_le_bytes());
+    match kind {
+        KeyKind::F32 => {
+            for (key, slope, intercept) in &segments {
+                out.extend_from_slice(&(key.as_f64() as f32).to_bits().to_le_bytes());
+                out.extend_from_slice(&(*slope as f32).to_bits().to_le_bytes());
+                out.extend_from_slice(&intercept.to_le_bytes());
+            }
+        }
+        // `{f64 key; f64 slope; u32 intercept}` is 24 bytes: 4 of padding.
+        _ => {
+            for (key, slope, intercept) in &segments {
+                out.extend_from_slice(&key.as_f64().to_bits().to_le_bytes());
+                out.extend_from_slice(&slope.to_bits().to_le_bytes());
+                out.extend_from_slice(&intercept.to_le_bytes());
+                out.extend_from_slice(&[0u8; 4]);
+            }
+        }
+    }
+    out.extend_from_slice(&2u32.to_le_bytes());
+    out.extend_from_slice(&0u64.to_le_bytes());
+    out.extend_from_slice(&(segments.len() as u64).to_le_bytes());
+    out
+}
+
+/// Structurally validates a `PGMWithExtraFunction<K>::Save` tail at `at`
+/// (`secondary_index_pgm.cppm:129-150`) against `kind`'s element widths, and
+/// requires it to end exactly at EOF. The model is not decoded: a typed chunk
+/// is searched by binary search, so only the framing has to match.
+fn validate_tail(buf: &[u8], at: usize, kind: KeyKind) -> Result<(), FormatError> {
+    let short = |need: usize| FormatError::Truncated {
+        need,
+        got: buf.len(),
+    };
+    let read_u32 = |p: usize| -> Result<u32, FormatError> {
+        if p + 4 > buf.len() {
+            return Err(short(p + 4));
+        }
+        Ok(u32::from_le_bytes(buf[p..p + 4].try_into().unwrap()))
+    };
+    if at + 4 + kind.first_key_width() + 4 > buf.len() {
+        return Err(short(at + 4 + kind.first_key_width() + 4));
+    }
+    let seg_at = at + 4 + kind.first_key_width();
+    let seg_count = read_u32(seg_at)? as usize;
+    let levels_at = seg_at + 4 + seg_count * kind.segment_width();
+    let level_count = read_u32(levels_at)? as usize;
+    let end = levels_at + 4 + level_count * 8;
+    if end != buf.len() {
+        return Err(short(end));
+    }
+    Ok(())
+}
+
 /// A chunk mapped read-only; lookups use the PGM then a binary search.
 pub struct SecondarySegmentReader {
     map: Mmap,
     row_count: usize,
-    pgm: Pgm,
+    kind: KeyKind,
+    /// Only a `U64` chunk decodes its model; a typed chunk is validated and
+    /// then searched by binary search (`validate_tail`).
+    pgm: Option<Pgm>,
 }
 
 impl SecondarySegmentReader {
     #[allow(unsafe_code)]
     pub fn open(path: &Path) -> Result<Self, FormatError> {
+        Self::open_with_kind(path, KeyKind::U64)
+    }
+
+    /// Opens a chunk whose key array holds `kind`-sized keys. The chunk has no
+    /// header, so the kind has to come from the column's declared type.
+    #[allow(unsafe_code)]
+    pub fn open_with_kind(path: &Path, kind: KeyKind) -> Result<Self, FormatError> {
         let file =
             File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
         // SAFETY: read-only mapping of an immutable chunk file.
         let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
-        if map.len() < 20 {
+        let min = kind.empty_tail_len();
+        if map.len() < min {
             return Err(FormatError::Truncated {
-                need: 20,
+                need: min,
                 got: map.len(),
             });
         }
         // The chunk carries no header, so locate the PGM tail by trying the
-        // plausible array lengths: `n * u64` keys and `n * u32` offsets
+        // plausible array lengths: `n * key_width` keys and `n * u32` offsets
         // precede a tail whose header repeats `n` and ends exactly at EOF.
+        // With typed keys the tail's stride changes, which is why the width
+        // comes from `kind` and not from a constant.
+        let stride = kind.key_width() + 4;
         let mut row_count = None;
-        for n in 0..=map.len() / 12 {
-            let pgm_at = n * 12;
-            if pgm_at + 16 > map.len() {
+        for n in 0..=map.len() / stride {
+            let pgm_at = n * stride;
+            if pgm_at + 4 > map.len() {
                 break;
             }
             let pgm_n = u32::from_le_bytes(map[pgm_at..pgm_at + 4].try_into().unwrap()) as usize;
             if pgm_n != n {
                 continue;
             }
-            if let Ok((_, _, _, level_count, offsets_at)) = Pgm::header(&map, pgm_at) {
-                if offsets_at + level_count * 8 == map.len() {
-                    row_count = Some(n);
-                    break;
-                }
+            let ok = match kind {
+                KeyKind::U64 => Pgm::header(&map, pgm_at)
+                    .map(|(_, _, _, level_count, offsets_at)| {
+                        offsets_at + level_count * 8 == map.len()
+                    })
+                    .unwrap_or(false),
+                _ => validate_tail(&map, pgm_at, kind).is_ok(),
+            };
+            if ok {
+                row_count = Some(n);
+                break;
             }
         }
         let Some(row_count) = row_count else {
@@ -685,10 +951,14 @@ impl SecondarySegmentReader {
                 got: map.len(),
             });
         };
-        let pgm = Pgm::decode(&map, row_count * 12)?;
+        let pgm = match kind {
+            KeyKind::U64 => Some(Pgm::decode(&map, row_count * stride)?),
+            _ => None,
+        };
         Ok(Self {
             map,
             row_count,
+            kind,
             pgm,
         })
     }
@@ -701,36 +971,55 @@ impl SecondarySegmentReader {
         self.row_count == 0
     }
 
-    fn key(&self, i: usize) -> u64 {
-        let at = i * 8;
-        u64::from_le_bytes(self.map[at..at + 8].try_into().unwrap())
+    /// The key kind this chunk was opened with.
+    pub fn kind(&self) -> KeyKind {
+        self.kind
+    }
+
+    fn key(&self, i: usize) -> Key {
+        let at = i * self.kind.key_width();
+        match self.kind {
+            KeyKind::U64 => Key::U64(u64::from_le_bytes(self.map[at..at + 8].try_into().unwrap())),
+            KeyKind::F32 => Key::F32(f32::from_bits(u32::from_le_bytes(
+                self.map[at..at + 4].try_into().unwrap(),
+            ))),
+            KeyKind::F64 => Key::F64(f64::from_bits(u64::from_le_bytes(
+                self.map[at..at + 8].try_into().unwrap(),
+            ))),
+        }
     }
 
     fn offset(&self, i: usize) -> u32 {
-        let at = self.row_count * 8 + i * 4;
+        let at = self.row_count * self.kind.key_width() + i * 4;
         u32::from_le_bytes(self.map[at..at + 4].try_into().unwrap())
     }
 
     /// All segment offsets whose key equals `key`.
-    pub fn lookup(&self, key: u64) -> Vec<u32> {
-        if self.row_count == 0 || self.pgm.segments.is_empty() {
+    pub fn lookup(&self, key: Key) -> Vec<u32> {
+        if self.row_count == 0 {
             return Vec::new();
         }
         // The reference searches [lower_bound_, upper_bound_) from the PGM and
         // then walks to the exact range; the model guarantees that a present
-        // key lies inside that window.
-        let (_, lo, _hi) = self.pgm.search(key);
-        let mut i = self.lower_bound(lo.min(self.row_count), self.row_count, key);
+        // key lies inside that window. A typed chunk has no decoded model, so
+        // it searches the ordered key array directly.
+        let mut i = match (&self.pgm, key) {
+            (Some(pgm), Key::U64(key)) if !pgm.segments.is_empty() => {
+                let (_, lo, _hi) = pgm.search(key);
+                self.lower_bound(lo.min(self.row_count), self.row_count, &Key::U64(key))
+            }
+            _ => self.lower_bound(0, self.row_count, &key),
+        };
         let mut out = Vec::new();
-        while i < self.row_count && self.key(i) == key {
+        while i < self.row_count && self.key(i).order(&key) == Ordering::Equal {
             out.push(self.offset(i));
             i += 1;
         }
         // A model miss (key outside the predicted range) falls back to a full
         // binary search over the mapped keys.
         if out.is_empty() {
-            let mut i = self.lower_bound(0, self.row_count, key);
-            while i < self.row_count && self.key(i) == key {
+            let mut i = self.lower_bound(0, self.row_count, &key);
+            while i < self.row_count && self.key(i).order(&key) == Ordering::Equal {
                 out.push(self.offset(i));
                 i += 1;
             }
@@ -745,28 +1034,23 @@ impl SecondarySegmentReader {
     /// The keys array is sorted, so the result is exactly the two binary
     /// searches below; no PGM hint is used because the model only bounds a
     /// *present* key, and a range query must also be correct for a bound that
-    /// falls between two keys. `start > end` is empty.
-    pub fn range(&self, start: u64, end: u64) -> Vec<u32> {
-        if self.row_count == 0 || start > end {
+    /// falls between two keys. A `start` after `end` is empty.
+    pub fn range(&self, start: Key, end: Key) -> Vec<u32> {
+        if self.row_count == 0 || start.order(&end) == Ordering::Greater {
             return Vec::new();
         }
-        let begin = self.lower_bound(0, self.row_count, start);
-        // `lower_bound(end + 1)` is the first key past the range; `end` may be
-        // `u64::MAX`, where there is no such key.
-        let stop = match end.checked_add(1) {
-            Some(after) => self.lower_bound(begin, self.row_count, after),
-            None => self.row_count,
-        };
+        let begin = self.lower_bound(0, self.row_count, &start);
+        let stop = self.upper_bound(begin, self.row_count, &end);
         (begin..stop).map(|i| self.offset(i)).collect()
     }
 
     /// `partition_point` over the mapped keys: first index in `[lo, hi)` whose
     /// key is `>= key`.
-    fn lower_bound(&self, lo: usize, hi: usize, key: u64) -> usize {
+    fn lower_bound(&self, lo: usize, hi: usize, key: &Key) -> usize {
         let (mut lo, mut hi) = (lo, hi);
         while lo < hi {
             let mid = (lo + hi) / 2;
-            if self.key(mid) < key {
+            if self.key(mid).order(key) == Ordering::Less {
                 lo = mid + 1;
             } else {
                 hi = mid;
@@ -775,15 +1059,40 @@ impl SecondarySegmentReader {
         lo
     }
 
-    /// First key (useful for range scans).
-    pub fn first_key(&self) -> u64 {
-        self.pgm.first_key
+    /// First index in `[lo, hi)` whose key is `> key`.
+    fn upper_bound(&self, lo: usize, hi: usize, key: &Key) -> usize {
+        let (mut lo, mut hi) = (lo, hi);
+        while lo < hi {
+            let mid = (lo + hi) / 2;
+            if self.key(mid).order(key) == Ordering::Greater {
+                hi = mid;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        lo
+    }
+
+    /// First key of the chunk (useful for range scans).
+    pub fn first_key(&self) -> Key {
+        if self.row_count == 0 {
+            return Key::U64(0);
+        }
+        self.key(0)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn u64_lookup(reader: &SecondarySegmentReader, key: u64) -> Vec<u32> {
+        reader.lookup(Key::U64(key))
+    }
+
+    fn u64_range(reader: &SecondarySegmentReader, lo: u64, hi: u64) -> Vec<u32> {
+        reader.range(Key::U64(lo), Key::U64(hi))
+    }
 
     #[test]
     fn varchar_hash_matches_libstdcxx() {
@@ -844,11 +1153,11 @@ mod tests {
         assert_eq!(reader.len(), 500);
         for i in [0usize, 1, 63, 64, 250, 499] {
             let key = entries[i].0;
-            let hits = reader.lookup(key);
+            let hits = u64_lookup(&reader, key);
             assert_eq!(hits, vec![entries[i].1], "key {key}");
         }
-        assert!(reader.lookup(1).is_empty());
-        assert!(reader.lookup(u64::MAX).is_empty());
+        assert!(u64_lookup(&reader, 1).is_empty());
+        assert!(u64_lookup(&reader, u64::MAX).is_empty());
     }
 
     #[test]
@@ -858,8 +1167,8 @@ mod tests {
         let entries = vec![(1u64, 10u32), (1, 11), (2, 12), (3, 13)];
         write_secondary_segment(&path, &entries).unwrap();
         let reader = SecondarySegmentReader::open(&path).unwrap();
-        assert_eq!(reader.lookup(1), vec![10, 11]);
-        assert_eq!(reader.lookup(3), vec![13]);
+        assert_eq!(u64_lookup(&reader, 1), vec![10, 11]);
+        assert_eq!(u64_lookup(&reader, 3), vec![13]);
     }
 
     /// A chunk laid out by the reference (`keys`, `offsets`, then the PGM tail
@@ -882,15 +1191,15 @@ mod tests {
 
         let reader = SecondarySegmentReader::open(&path).unwrap();
         assert_eq!(reader.len(), 1000);
-        assert_eq!(reader.first_key(), 2);
-        assert_eq!(reader.lookup(2), vec![0]);
-        assert_eq!(reader.lookup(250_002), vec![500]);
-        assert_eq!(reader.lookup(998_003), vec![999]);
+        assert_eq!(reader.first_key(), Key::U64(2));
+        assert_eq!(u64_lookup(&reader, 2), vec![0]);
+        assert_eq!(u64_lookup(&reader, 250_002), vec![500]);
+        assert_eq!(u64_lookup(&reader, 998_003), vec![999]);
         for (i, key) in keys.iter().enumerate() {
-            assert_eq!(reader.lookup(*key), vec![i as u32], "key {key}");
+            assert_eq!(u64_lookup(&reader, *key), vec![i as u32], "key {key}");
         }
-        assert!(reader.lookup(4).is_empty());
-        assert!(reader.lookup(0).is_empty());
+        assert!(u64_lookup(&reader, 4).is_empty());
+        assert!(u64_lookup(&reader, 0).is_empty());
     }
 
     /// An empty index writes only the empty PGM header; the reference's
@@ -904,8 +1213,8 @@ mod tests {
         let reader = SecondarySegmentReader::open(&path).unwrap();
         assert_eq!(reader.len(), 0);
         assert!(reader.is_empty());
-        assert!(reader.lookup(7).is_empty());
-        assert!(reader.range(0, u64::MAX).is_empty());
+        assert!(u64_lookup(&reader, 7).is_empty());
+        assert!(u64_range(&reader, 0, u64::MAX).is_empty());
     }
 
     /// `range` is inclusive at both ends and reports the offsets in stored
@@ -918,19 +1227,19 @@ mod tests {
         write_secondary_segment(&path, &entries).unwrap();
         let reader = SecondarySegmentReader::open(&path).unwrap();
 
-        assert_eq!(reader.range(2, 5), vec![11, 12, 13]);
-        assert_eq!(reader.range(2, 2), vec![11]);
-        assert_eq!(reader.range(1, 8), vec![10, 11, 12, 13, 14]);
+        assert_eq!(u64_range(&reader, 2, 5), vec![11, 12, 13]);
+        assert_eq!(u64_range(&reader, 2, 2), vec![11]);
+        assert_eq!(u64_range(&reader, 1, 8), vec![10, 11, 12, 13, 14]);
         // Bounds that fall between two keys still cover the keys between them.
-        assert_eq!(reader.range(3, 4), vec![12]);
-        assert_eq!(reader.range(4, 7), vec![13]);
+        assert_eq!(u64_range(&reader, 3, 4), vec![12]);
+        assert_eq!(u64_range(&reader, 4, 7), vec![13]);
         // Both ends outside the key domain.
-        assert!(reader.range(0, 0).is_empty());
-        assert!(reader.range(9, 100).is_empty());
+        assert!(u64_range(&reader, 0, 0).is_empty());
+        assert!(u64_range(&reader, 9, 100).is_empty());
         // An unbounded upper end.
-        assert_eq!(reader.range(5, u64::MAX), vec![13, 14]);
+        assert_eq!(u64_range(&reader, 5, u64::MAX), vec![13, 14]);
         // An inverted range is empty, not the whole chunk.
-        assert!(reader.range(5, 2).is_empty());
+        assert!(u64_range(&reader, 5, 2).is_empty());
     }
 
     /// Every offset of a duplicated key is reported by `range`, as by
@@ -942,9 +1251,9 @@ mod tests {
         let entries = vec![(1u64, 10u32), (2, 11), (2, 12), (2, 13), (3, 14)];
         write_secondary_segment(&path, &entries).unwrap();
         let reader = SecondarySegmentReader::open(&path).unwrap();
-        assert_eq!(reader.range(2, 2), vec![11, 12, 13]);
-        assert_eq!(reader.range(2, 3), vec![11, 12, 13, 14]);
-        assert_eq!(reader.range(1, 3), vec![10, 11, 12, 13, 14]);
+        assert_eq!(u64_range(&reader, 2, 2), vec![11, 12, 13]);
+        assert_eq!(u64_range(&reader, 2, 3), vec![11, 12, 13, 14]);
+        assert_eq!(u64_range(&reader, 1, 3), vec![10, 11, 12, 13, 14]);
     }
 
     /// The binary searches must also answer over a multi-level PGM chunk
@@ -967,12 +1276,191 @@ mod tests {
         let reader = SecondarySegmentReader::open(&path).unwrap();
 
         // `i * i + 2` for i in 3..=5 is 11, 18, 27.
-        assert_eq!(reader.range(11, 27), vec![3, 4, 5]);
-        assert_eq!(reader.range(2, 2), vec![0]);
+        assert_eq!(u64_range(&reader, 11, 27), vec![3, 4, 5]);
+        assert_eq!(u64_range(&reader, 2, 2), vec![0]);
         // Keys 3 (i = 1) and 6 (i = 2) both fall inside.
-        assert_eq!(reader.range(3, 6), vec![1, 2]);
+        assert_eq!(u64_range(&reader, 3, 6), vec![1, 2]);
         // Everything, and nothing.
-        assert_eq!(reader.range(0, u64::MAX).len(), 1000);
-        assert!(reader.range(999_000, u64::MAX).is_empty());
+        assert_eq!(u64_range(&reader, 0, u64::MAX).len(), 1000);
+        assert!(u64_range(&reader, 999_000, u64::MAX).is_empty());
+    }
+
+    fn f32_entries() -> Vec<(Key, u32)> {
+        vec![
+            (Key::F32(-3.5), 10),
+            (Key::F32(-1.0), 11),
+            (Key::F32(1.5), 12),
+            (Key::F32(2.5), 13),
+        ]
+    }
+
+    /// A `FLOAT` chunk stores 4-byte raw IEEE keys, not the 8-byte order-mapped
+    /// key the integer path uses: this is the layout the reference's
+    /// `ConvertToOrderedType<FloatT>` = `float` produces, and what the old
+    /// reader could not parse.
+    #[test]
+    fn float_chunk_keeps_raw_ordered_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_f32.idx");
+        let entries = f32_entries();
+        write_secondary_segment_typed(&path, KeyKind::F32, &entries).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+
+        let n = entries.len();
+        // Key region: n * 4 bytes of raw f32.
+        let keys: Vec<u8> = entries
+            .iter()
+            .flat_map(|(key, _)| match key {
+                Key::F32(v) => v.to_bits().to_le_bytes(),
+                _ => unreachable!(),
+            })
+            .collect();
+        assert_eq!(&bytes[..n * 4], &keys[..]);
+        assert_eq!(
+            &bytes[..4],
+            &(-3.5f32).to_bits().to_le_bytes()[..],
+            "raw f32 LE"
+        );
+        // Offsets follow, 4 bytes each.
+        for (i, (_, off)) in entries.iter().enumerate() {
+            let at = n * 4 + i * 4;
+            assert_eq!(&bytes[at..at + 4], &off.to_le_bytes()[..]);
+        }
+        // The tail starts with `n`, then a 4-byte `first_key`.
+        let tail_at = n * 4 + n * 4;
+        assert_eq!(&bytes[tail_at..tail_at + 4], &(n as u32).to_le_bytes()[..]);
+        assert_eq!(
+            &bytes[tail_at + 4..tail_at + 8],
+            &(-3.5f32).to_bits().to_le_bytes()[..]
+        );
+        // 1 segment for the 4 keys + the sentinel, 12 bytes each; two levels.
+        assert_eq!(bytes.len(), tail_at + 4 + 4 + 4 + 2 * 12 + 4 + 2 * 8);
+
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F32).unwrap();
+        assert_eq!(reader.len(), n);
+        assert_eq!(reader.kind(), KeyKind::F32);
+        assert_eq!(reader.first_key(), Key::F32(-3.5));
+    }
+
+    /// Same for `DOUBLE`, whose key is 8 bytes but *raw* (not order-mapped) and
+    /// whose `Segment` is 24 bytes because `double slope` pads the struct.
+    #[test]
+    fn double_chunk_keeps_raw_ordered_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_f64.idx");
+        let entries = vec![
+            (Key::F64(-3.5), 10u32),
+            (Key::F64(1.5), 11),
+            (Key::F64(2.5), 12),
+        ];
+        write_secondary_segment_typed(&path, KeyKind::F64, &entries).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let n = entries.len();
+
+        let keys: Vec<u8> = entries
+            .iter()
+            .flat_map(|(key, _)| match key {
+                Key::F64(v) => v.to_bits().to_le_bytes(),
+                _ => unreachable!(),
+            })
+            .collect();
+        assert_eq!(&bytes[..n * 8], &keys[..]);
+        let tail_at = n * 8 + n * 4;
+        assert_eq!(&bytes[tail_at..tail_at + 4], &(n as u32).to_le_bytes()[..]);
+        // 1 segment + sentinel, 24 bytes each.
+        assert_eq!(bytes.len(), tail_at + 4 + 8 + 4 + 2 * 24 + 4 + 2 * 8);
+
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F64).unwrap();
+        assert_eq!(reader.len(), n);
+        assert_eq!(reader.first_key(), Key::F64(-3.5));
+    }
+
+    /// Typed keys compare as floats: negatives sort before positives (a raw
+    /// `to_bits` integer comparison would invert them), both range bounds are
+    /// inclusive, and a duplicated key yields every offset.
+    #[test]
+    fn float_lookup_and_range_compare_as_floats() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_f32_range.idx");
+        let entries = vec![
+            (Key::F32(-3.5), 10u32),
+            (Key::F32(-1.0), 11),
+            (Key::F32(1.0), 12),
+            (Key::F32(1.0), 13),
+            (Key::F32(2.0), 14),
+            (Key::F32(3.5), 15),
+        ];
+        write_secondary_segment_typed(&path, KeyKind::F32, &entries).unwrap();
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F32).unwrap();
+        let range = |lo: f32, hi: f32| reader.range(Key::F32(lo), Key::F32(hi));
+
+        // The sign-bit trap: -3.5 must come before -1.0, and both before 1.0.
+        assert_eq!(range(-4.0, -1.0), vec![10, 11]);
+        assert_eq!(range(-3.5, -3.5), vec![10]);
+        // Inclusive at both ends, and a duplicated key reports every offset.
+        assert_eq!(range(1.0, 2.0), vec![12, 13, 14]);
+        assert_eq!(reader.lookup(Key::F32(1.0)), vec![12, 13]);
+        assert_eq!(reader.lookup(Key::F32(1.5)), Vec::<u32>::new());
+        // Across zero, and past the last key.
+        assert_eq!(range(-1.0, 1.0), vec![11, 12, 13]);
+        assert!(range(4.0, 10.0).is_empty());
+        assert!(range(2.0, 1.0).is_empty(), "inverted range");
+    }
+
+    /// A chunk laid out the way `PGMWithExtraFunction<float>::Save` writes it
+    /// (`secondary_index_pgm.cppm:129`): `f32` keys, then offsets, then `n`,
+    /// `first_key`, `{f32 key, f32 slope, u32 intercept}` segments and the
+    /// level table. Opens and answers lookups and ranges.
+    ///
+    /// The model's slope/intercept are synthetic (0), not what
+    /// `PGMIndex<float, 64, 4, float>` would fit: producing genuine reference
+    /// output needs the C++ toolchain. The reader binary-searches a typed
+    /// chunk, so what this fixture proves is that the *layout* (key width,
+    /// segment width, level table) is the reference's.
+    #[test]
+    fn cpp_shaped_float_chunk_opens() {
+        let keys = [-3.5f32, 1.5, 2.5];
+        let mut chunk = Vec::new();
+        for key in keys {
+            chunk.extend_from_slice(&key.to_bits().to_le_bytes());
+        }
+        for off in 0..keys.len() as u32 {
+            chunk.extend_from_slice(&off.to_le_bytes());
+        }
+        chunk.extend_from_slice(&(keys.len() as u32).to_le_bytes());
+        chunk.extend_from_slice(&keys[0].to_bits().to_le_bytes());
+        chunk.extend_from_slice(&1u32.to_le_bytes()); // one segment
+        chunk.extend_from_slice(&keys[0].to_bits().to_le_bytes());
+        chunk.extend_from_slice(&0.0f32.to_bits().to_le_bytes());
+        chunk.extend_from_slice(&0u32.to_le_bytes());
+        chunk.extend_from_slice(&2u32.to_le_bytes()); // level table
+        chunk.extend_from_slice(&0u64.to_le_bytes());
+        chunk.extend_from_slice(&1u64.to_le_bytes());
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_cpp_f32.idx");
+        std::fs::write(&path, &chunk).unwrap();
+
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F32).unwrap();
+        assert_eq!(reader.len(), 3);
+        assert_eq!(reader.lookup(Key::F32(1.5)), vec![1]);
+        assert_eq!(reader.range(Key::F32(-4.0), Key::F32(2.0)), vec![0, 1]);
+        assert_eq!(reader.range(Key::F32(-4.0), Key::F32(3.0)), vec![0, 1, 2]);
+
+        // The kind is not in the file: reading the same bytes as u64 keys must
+        // not silently succeed with garbage.
+        assert!(SecondarySegmentReader::open(&path).is_err());
+    }
+
+    /// An empty typed chunk round-trips (`n = 0`, one sentinel segment).
+    #[test]
+    fn empty_typed_chunk_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty_f32.idx");
+        write_secondary_segment_typed(&path, KeyKind::F32, &[]).unwrap();
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F32).unwrap();
+        assert_eq!(reader.len(), 0);
+        assert!(reader.lookup(Key::F32(1.0)).is_empty());
+        assert!(reader.range(Key::F32(-1.0), Key::F32(1.0)).is_empty());
     }
 }
