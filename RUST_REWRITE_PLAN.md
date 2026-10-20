@@ -546,6 +546,16 @@ query(sql) → parse → logical → optimize → physical → fragments
 - 读路径修复：①标量表的已解码行缓存（内存 DataBlock 等价物，写入批后增量维护、按扫描路径解码、任何重写行的操作都失效）；②`SelectResponse` 仅在存在 NULL 时发送 `bitmasks`（与 C++ `ProcessColumnFieldType` 一致），消除 SDK 对 2 万行逐元素的有效性判断；③`malloc_trim` 改为每 8 个写入批一次；④`SELECT *` 的恒等投影不再复制一遍行。
 - 关键修复：①计划 pipeline 不再把已物化的行逐行走 `mpsc`（20k 行约省 20 ms）；②Thrift 传输改为 `BufReader`/`BufWriter`，消除 `list<bool>` 位图逐元素一次 `write` 系统调用（插入与 select 同时受益）。
 - 读路径分解（20k 行、release）：`fetch_rows` 6–7 ms，进程内 `SELECT *` **8.9 ms**（C++ 9.1 ms，已同级）；服务端 `exec` 12–18 ms + 列编码 0.3 ms；其余为客户端/传输。点查首次 7.7 ms（一次全表扫描），重复 18 µs（结果缓存）。
+- **逐索引类型的构建/查询对比（新增）**：`tools/bench_index_types.py`（同一 SDK 驱动，C++ 与 Rust 各跑一遍；20000 行、50 次查询、单线程）。golden：`rust_engine/golden/cpp_0.7.4_index_bench.txt`，候选：`rust_engine/golden/rust_index_bench.txt`。
+
+  | 索引 | C++ 建索引 | Rust 建索引 | C++ 查询 | Rust 查询 |
+  |---|---|---|---|---|
+  | FULLTEXT | 0.694 s | 0.015 s | 16.8 ms | 0.187 ms |
+  | HNSW | 0.313 s | 0.008 s | 0.64 ms | 0.25 ms |
+  | SECONDARY | 0.024 s | 0.018 s | 0.69 ms | 0.58 ms |
+  | BMP（稀疏） | 0.026 s | 0.039 s | 0.48 ms | 0.16 ms |
+
+  **口径说明（重要）**：构建耗时不可直接比较——C++ 在 `CREATE INDEX` 时物化整表，Rust 的全文/部分索引在首次查询时才物化（脚本已用一次预热查询把这份成本挪出计时窗口）；因此 Rust 的"建索引"看起来接近 0。查询延迟可比：SECONDARY 同量级（0.84×）、HNSW 0.38×、BMP 0.33×、FULLTEXT 0.01×（C++ 该路径每次查询有固定的对象构造开销，20k 文档规模下占主导）。若要比较构建，需要先显式触发物化再计时。
 - 根因与 #91 相同：行存 + 每次全表扫描/逐行解码；C++ 以列存块 + 列裁剪读。`run_gate_e.sh` 在有 golden 时必须走 SDK 驱动（此前误用 CLI 内部 bench，阶段不同、比较无效）。
 
 ### 8.7 Gate F — 工程质量
