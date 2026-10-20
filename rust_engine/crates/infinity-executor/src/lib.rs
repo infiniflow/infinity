@@ -4401,6 +4401,38 @@ impl<'a> EngineTxn<'a> {
     }
 }
 
+/// Deregisters a statement from the query registry when it returns, and records
+/// its duration in the profile history while `profile` is on.
+///
+/// C++: the `DeferFn` that calls `SessionManager::RemoveQueryRecord` plus
+/// `QueryProfiler`'s history enqueue (`query_context_impl.cpp:180-260`).
+struct QueryGuard<'a> {
+    engine: &'a Engine,
+    query_id: u64,
+    query_kind: String,
+    query_text: String,
+    started: std::time::Instant,
+}
+
+impl Drop for QueryGuard<'_> {
+    fn drop(&mut self) {
+        let mut registry = self.engine.queries.lock().unwrap();
+        registry.remove_running(self.query_id);
+        if self
+            .engine
+            .profile_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            registry.push_finished(diagnostics::ProfileRow {
+                query_id: self.query_id,
+                query_kind: self.query_kind.clone(),
+                query_text: self.query_text.clone(),
+                duration_ns: self.started.elapsed().as_nanos().min(i64::MAX as u128) as i64,
+            });
+        }
+    }
+}
+
 fn index_key(table: &str, column: &str) -> String {
     format!("{table}.{column}")
 }
@@ -6068,7 +6100,7 @@ impl Engine {
                     out.extend(hit);
                     continue;
                 }
-                let res = self.execute_stmt(&qualified)?;
+                let res = self.execute_stmt(&qualified, sql)?;
                 // Only small results are worth caching: retaining (and later
                 // cloning on a hit) a whole-table `SELECT *` keeps hundreds of
                 // megabytes to gigabytes alive.
@@ -6087,7 +6119,7 @@ impl Engine {
             if mutating {
                 self.result_cache.lock().unwrap().clear();
             }
-            out.push(self.execute_stmt(&qualified)?);
+            out.push(self.execute_stmt(&qualified, sql)?);
             // Durability: a committed mutation must survive a crash, so both the
             // catalog and the row/meta KV are fsynced before acknowledging.
             if mutating {
@@ -7324,7 +7356,13 @@ impl Engine {
         self.txn.commit(txn)
     }
 
-    fn execute_stmt(&self, stmt: &Statement) -> Result<QueryResult> {
+    /// Runs one statement with the query registry open around it (C++
+    /// `QueryContext::QueryStatement`, `query_context_impl.cpp:180-205`): the
+    /// statement is visible to `SHOW QUERIES` while it runs, and its wall-clock
+    /// duration moves to the profile history when it returns — including on the
+    /// error path, because the guard deregisters on drop.
+    fn execute_stmt(&self, stmt: &Statement, sql: &str) -> Result<QueryResult> {
+        let _query = self.begin_query(stmt, sql);
         let mut res = self.execute_stmt_inner(stmt)?;
         if let Statement::Select {
             highlight,
@@ -7338,6 +7376,34 @@ impl Engine {
             }
         }
         Ok(res)
+    }
+
+    /// Registers a statement with the query registry and returns the guard that
+    /// deregisters it. C++ `SessionManager::AddQueryRecord` + `RemoveQueryRecord`.
+    fn begin_query<'a>(&'a self, stmt: &Statement, sql: &str) -> QueryGuard<'a> {
+        let kind = diagnostics::statement_kind(stmt).to_string();
+        let text = sql.trim().to_string();
+        let started = std::time::Instant::now();
+        let started_wall = std::time::SystemTime::now();
+        let query_id = {
+            let mut registry = self.queries.lock().unwrap();
+            let query_id = registry.next_id();
+            registry.add_running(diagnostics::RunningQuery {
+                query_id,
+                query_kind: kind.clone(),
+                query_text: text.clone(),
+                started,
+                started_wall,
+            });
+            query_id
+        };
+        QueryGuard {
+            engine: self,
+            query_id,
+            query_kind: kind,
+            query_text: text,
+            started,
+        }
     }
 
     /// `HIGHLIGHT col, …`: replaces each named output column with its text
@@ -14650,14 +14716,8 @@ impl Engine {
             variables::SetScope::Session => {
                 let var = variables::SessionVariable::from_name(&key)
                     .ok_or_else(|| Error::Invalid(format!("No system variable: {key}")))?;
-                match var {
-                    variables::SessionVariable::QueryCount => self.query_count().to_string(),
-                    variables::SessionVariable::TotalCommitCount => self.total_commit_count(),
-                    variables::SessionVariable::TotalRollbackCount => {
-                        self.txn.total_rollbacked_txn_count().to_string()
-                    }
-                    variables::SessionVariable::ConnectedTime => self.context.connected_at.clone(),
-                }
+                self.session_variable_value(var)
+                    .ok_or_else(|| Error::Invalid(format!("No system variable: {key}")))?
             }
         };
         Ok(QueryResult::Rows {
@@ -14670,6 +14730,20 @@ impl Engine {
         self.context
             .query_count
             .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// One session variable's value; the names come from
+    /// `PhysicalShow::ExecuteShowSessionVariable`. `None` for a variable the
+    /// reference does not register.
+    fn session_variable_value(&self, var: variables::SessionVariable) -> Option<String> {
+        Some(match var {
+            variables::SessionVariable::QueryCount => self.query_count().to_string(),
+            variables::SessionVariable::TotalCommitCount => self.total_commit_count(),
+            variables::SessionVariable::TotalRollbackCount => {
+                self.txn.total_rollbacked_txn_count().to_string()
+            }
+            variables::SessionVariable::ConnectedTime => self.context.connected_at.clone(),
+        })
     }
 
     fn total_commit_count(&self) -> String {
@@ -14815,6 +14889,298 @@ impl Engine {
         }
         let cpu_seconds = ticks.saturating_sub(previous.ticks) as f64 / CLOCK_TICKS_PER_SEC;
         (cpu_seconds / elapsed / online_cpu_count() as f64).clamp(0.0, 1.0)
+    }
+
+    // -----------------------------------------------------------------
+    // Diagnostics accessors: what `SHOW BUFFERS`, `SHOW FILES`,
+    // `SHOW MEMINDEX`, `SHOW QUERIES`, `SHOW TRANSACTIONS` and the HTTP
+    // `/instance/*` routes read.
+    // -----------------------------------------------------------------
+
+    /// Every variable at `scope`, as `SHOW VARIABLES` lists it.
+    ///
+    /// C++: `PhysicalShow::ExecuteShowGlobalVariables` /
+    /// `ExecuteShowSessionVariables` (`physical_show_*variables_impl.cpp`),
+    /// which walk `VarUtil::global_name_map_` / `session_name_map_`. The rows
+    /// are `(name, value)`; the reference's third column (a description) is
+    /// not part of the HTTP envelope, which reads only the first two.
+    ///
+    /// Session scope is per-`Engine`: this engine serves one session, so its
+    /// session counters are the engine's own `query_count` and transaction
+    /// counters rather than a per-connection record.
+    pub fn variables(&self, scope: Scope) -> Vec<(String, String)> {
+        match scope {
+            Scope::Global => variables::ALL_GLOBAL_NAMES
+                .iter()
+                .filter_map(|name| {
+                    let var = variables::GlobalVariable::from_name(name)?;
+                    let value = self.global_variable_value(var).ok()?;
+                    Some(((*name).to_string(), value))
+                })
+                .collect(),
+            Scope::Session => variables::ALL_SESSION_NAMES
+                .iter()
+                .filter_map(|name| {
+                    let var = variables::SessionVariable::from_name(name)?;
+                    let value = self.session_variable_value(var)?;
+                    Some(((*name).to_string(), value))
+                })
+                .collect(),
+        }
+    }
+
+    /// `SET VARIABLE <name> <value>` at `scope`.
+    ///
+    /// C++: `PhysicalCommand::ExecuteSet` (`physical_command_impl.cpp:68-150`).
+    /// Every session variable is read-only; of the global variables only
+    /// `profile` (bool) and `profile_record_capacity` (non-negative int) are
+    /// settable, and an unknown name is `kInvalidCommand` (3076). Setting
+    /// `result_cache`/the other knobs is `SET CONFIG`, which this engine
+    /// already serves.
+    pub fn set_variables(&self, scope: Scope, values: &[(String, String)]) -> Result<()> {
+        for (name, value) in values {
+            let name = name.to_ascii_lowercase();
+            match scope {
+                Scope::Session => {
+                    if variables::SessionVariable::from_name(&name).is_none() {
+                        return Err(Error::Invalid(format!("Unknown session variable: {name}")));
+                    }
+                    return Err(Error::Invalid(format!(
+                        "Session variable: {name} is read-only"
+                    )));
+                }
+                Scope::Global => {
+                    let Some(var) = variables::GlobalVariable::from_name(&name) else {
+                        return Err(Error::Invalid(format!("unknown global variable {name}")));
+                    };
+                    match var {
+                        variables::GlobalVariable::EnableProfile => {
+                            let enabled = match value.to_ascii_lowercase().as_str() {
+                                "true" | "on" | "1" => true,
+                                "false" | "off" | "0" => false,
+                                other => {
+                                    return Err(Error::Invalid(format!(
+                                        "Global variable: {name} expects a boolean, got '{other}'"
+                                    )))
+                                }
+                            };
+                            self.profile_enabled
+                                .store(enabled, std::sync::atomic::Ordering::Relaxed);
+                        }
+                        variables::GlobalVariable::ProfileRecordCapacity => {
+                            let capacity: i64 = value.parse().map_err(|_| {
+                                Error::Invalid(format!(
+                                    "Global variable: {name} expects an integer, got '{value}'"
+                                ))
+                            })?;
+                            if capacity < 0 {
+                                return Err(Error::Invalid(format!(
+                                    "Try to set profile record capacity with invalid value {capacity}"
+                                )));
+                            }
+                            self.queries.lock().unwrap().resize(capacity as usize);
+                        }
+                        _ => {
+                            return Err(Error::Invalid(format!(
+                                "Global variable: {name} is read-only"
+                            )))
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// `SHOW BUFFERS`: one row per block the engine's buffer cache holds.
+    ///
+    /// C++: `PhysicalShow::ExecuteShowBuffer` (`physical_show_buffer_impl.cpp`)
+    /// over `BufferManager::GetBufferObjectsInfo`. The reference's buffer
+    /// objects are file-backed; this engine caches decoded blocks
+    /// (`BlockIndex::get_block`), so a row describes one cached block: its
+    /// block directory as the path, the size of the decoded columns, and
+    /// `Loaded`/`Persistent`/`data` for the state fields — the block is
+    /// resident and owned by the cache, backed by a data file.
+    pub fn buffer_objects(&self) -> Vec<infinity_storage::buffer::BufferObjectInfo> {
+        use infinity_storage::buffer::{
+            BufferObjectInfo, BufferStatus, BufferType, FileWorkerType,
+        };
+        let root = self.blocks_root();
+        self.context
+            .buffer
+            .lock()
+            .unwrap()
+            .cached_objects()
+            .into_iter()
+            .map(|(id, size)| BufferObjectInfo {
+                object_path: root.join(infinity_storage::cpp_format::block_dir(
+                    id.db_id,
+                    id.table_id,
+                    id.segment_id,
+                    id.block_id,
+                )),
+                buffered_status: BufferStatus::Loaded,
+                buffered_type: BufferType::Persistent,
+                file_type: FileWorkerType::DataFile,
+                object_size: size,
+            })
+            .collect()
+    }
+
+    /// `SHOW OBJECT <name>`: the buffered block whose path is `name`.
+    pub fn buffer_object(&self, name: &str) -> Option<infinity_storage::buffer::BufferObjectInfo> {
+        self.buffer_objects()
+            .into_iter()
+            .find(|row| row.object_path.to_string_lossy() == name)
+    }
+
+    /// `SHOW FILES`: every file under the engine directory with its size.
+    ///
+    /// C++: `PhysicalShow::ExecuteShowPersistenceFiles`
+    /// (`physical_show_persistence_files_impl.cpp`) over
+    /// `PersistenceManager::GetAllFiles`. The port keeps its files on the local
+    /// disk and has no persistence manager, so the walk over the data directory
+    /// is the equivalent source: each row is `(absolute path, size in bytes)`,
+    /// sorted for a stable response.
+    pub fn all_files(&self) -> Vec<(PathBuf, usize)> {
+        let mut out = Vec::new();
+        let mut stack = vec![self.dir.clone()];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                match entry.file_type() {
+                    Ok(t) if t.is_dir() => stack.push(path),
+                    Ok(t) if t.is_file() => {
+                        let size = entry.metadata().map(|m| m.len() as usize).unwrap_or(0);
+                        out.push((path, size));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        out.sort();
+        out
+    }
+
+    /// `SHOW MEMINDEX`: the in-memory part of each index, with its row count.
+    ///
+    /// C++: `PhysicalShow::ExecuteShowMemIndex`
+    /// (`physical_show_mem_index_impl.cpp`) over
+    /// `MemIndexTracer::GetMemIndexTracerInfo`. The reference lists its HNSW
+    /// tracer only (and returns `NotSupport` under the new catalog); this port
+    /// walks the catalog's indexes and reports the rows each index family keeps
+    /// unsealed in memory, which is the same information for a superset of
+    /// index types.
+    pub fn memory_indexes(&self) -> Vec<diagnostics::MemoryIndexRow> {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+            return Vec::new();
+        };
+        let tables = self.tables.lock().unwrap();
+        let mut out = Vec::new();
+        for meta in indexes {
+            let Some(entry) = tables.get(&meta.table) else {
+                continue;
+            };
+            let kind = meta.index_type.to_ascii_uppercase();
+            let (row_count, mem_used) = match kind.as_str() {
+                "HNSW" => entry
+                    .hnsw_mem
+                    .get(&meta.column)
+                    .map(|h| {
+                        let h = h.lock().unwrap();
+                        (h.len(), h.mem_usage())
+                    })
+                    .unwrap_or((0, 0)),
+                "FULLTEXT" => entry
+                    .text
+                    .get(&meta.column)
+                    .map(|t| {
+                        let t = t.read().unwrap();
+                        // `mem_used` is the segment's byte estimate; the token
+                        // count is the corpus length BM25 scores against.
+                        (t.mem.doc_count(), t.mem.mem_used())
+                    })
+                    .unwrap_or((0, 0)),
+                "SPARSE" | "BMP" => entry
+                    .sparse
+                    .get(&meta.column)
+                    .map(|s| {
+                        let s = s.read().unwrap();
+                        (s.doc_count(), 0)
+                    })
+                    .unwrap_or((0, 0)),
+                "MULTIVECTOR" => entry
+                    .mv
+                    .get(&meta.column)
+                    .map(|m| {
+                        let m = m.read().unwrap();
+                        (m.doc_count(), 0)
+                    })
+                    .unwrap_or((0, 0)),
+                "IVF" => entry
+                    .ivf_mem
+                    .get(&meta.column)
+                    .map(|rows| (rows.len(), 0))
+                    .unwrap_or((0, 0)),
+                _ => (0, 0),
+            };
+            // A secondary index keeps no in-memory rows in this port: its rows
+            // are written straight into the sealed chunk.
+            if row_count == 0 && mem_used == 0 {
+                continue;
+            }
+            out.push(diagnostics::MemoryIndexRow {
+                table: meta.table.clone(),
+                index: meta.name.clone(),
+                index_type: kind,
+                row_count,
+                mem_used,
+            });
+        }
+        out.sort_by(|a, b| (&a.table, &a.index).cmp(&(&b.table, &b.index)));
+        out
+    }
+
+    /// `SHOW TRANSACTIONS`: the live transactions, ordered by id.
+    ///
+    /// C++: `PhysicalShow::ExecuteShowTransactions` over
+    /// `NewTxnManager::GetTxnInfoArray`.
+    pub fn active_transactions(&self) -> Vec<infinity_txn::TxnInfo> {
+        self.txn.get_txn_info_array()
+    }
+
+    /// `SHOW TRANSACTION <id>`.
+    ///
+    /// C++: `NewTxnManager::GetTxnInfoByID`; `None` when no such transaction is
+    /// live (the reference's `SessionNotFound`/not-found path).
+    pub fn transaction_detail(&self, id: u64) -> Option<infinity_txn::TxnInfo> {
+        self.txn.get_txn_info_by_id(id)
+    }
+
+    /// `SHOW QUERIES`: the statements executing right now.
+    ///
+    /// C++: `PhysicalShow::ExecuteShowQueries` over
+    /// `SessionManager::QueryRecords`.
+    pub fn running_queries(&self) -> Vec<diagnostics::QueryRow> {
+        self.queries.lock().unwrap().running()
+    }
+
+    /// `SHOW QUERY <id>`: a running or just-finished statement.
+    pub fn query_profile(&self, id: u64) -> Option<diagnostics::QueryRow> {
+        self.queries.lock().unwrap().query(id)
+    }
+
+    /// `SHOW PROFILES`: the finished statements recorded while `profile` is on.
+    ///
+    /// C++: `PhysicalShow::ExecuteShowProfiles` over
+    /// `NewCatalog::GetProfileRecords`. The reference keeps one row per query
+    /// phase; this port records the statement's wall-clock duration, the only
+    /// phase timing that exists here.
+    pub fn profiles(&self) -> Vec<diagnostics::ProfileRow> {
+        self.queries.lock().unwrap().profiles()
     }
 
     /// `SHOW DATABASES`: `<database, dir, comment>`, as

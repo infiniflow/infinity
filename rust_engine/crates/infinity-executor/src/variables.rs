@@ -86,6 +86,46 @@ impl GlobalVariable {
     }
 }
 
+/// Every global variable name, in the order C++'s `global_name_map_` (a
+/// `std::map`) iterates them, i.e. alphabetical.
+pub const ALL_GLOBAL_NAMES: [&str; 27] = [
+    "active_txn_count",
+    "active_wal_filename",
+    "bg_task_count",
+    "buffer_object_count",
+    "buffer_usage",
+    "cache_result_capacity",
+    "cache_result_num",
+    "cpu_usage",
+    "current_timestamp",
+    "disk_cache_miss",
+    "follower_number",
+    "jeprof",
+    "memory_cache_miss",
+    "next_transaction_id",
+    "open_file_count",
+    "profile",
+    "profile_record_capacity",
+    "query_count",
+    "result_cache",
+    "running_bg_task",
+    "running_compact_task",
+    "schedule_policy",
+    "session_count",
+    "system_memory_usage",
+    "total_commit_count",
+    "total_rollback_count",
+    "unused_buffer_object",
+];
+
+/// Every session variable name, in `VarUtil::session_name_map_` order.
+pub const ALL_SESSION_NAMES: [&str; 4] = [
+    "connected_timestamp",
+    "query_count",
+    "total_commit_count",
+    "total_rollback_count",
+];
+
 /// C++: `SessionVariable` (`src/main/variables.cppm:54`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionVariable {

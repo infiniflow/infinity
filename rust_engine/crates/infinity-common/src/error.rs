@@ -137,6 +137,18 @@ impl Error {
             {
                 3013
             }
+            // 3076 INVALID_COMMAND: `SET VARIABLE` on an unknown name, a
+            // read-only variable, or a value of the wrong type. The reference's
+            // `PhysicalCommand` reports `Status::InvalidCommand`
+            // (`physical_command_impl.cpp:74-145`, `status.cppm:127`).
+            Error::Invalid(m)
+                if m.starts_with("Unknown session variable: ")
+                    || m.starts_with("Session variable: ")
+                    || m.starts_with("unknown global variable ")
+                    || m.starts_with("Global variable: ") =>
+            {
+                3076
+            }
             Error::Invalid(_) => 3014,
             // 3016 DUPLICATE_DATABASE_NAME.
             Error::Catalog(m) if m.starts_with("database") && m.ends_with("already exists") => 3016,

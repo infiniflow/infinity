@@ -145,3 +145,242 @@ fn global_variables_report_real_counts() {
     assert!(session(&engine, "query_count").parse::<u64>().unwrap() >= 1);
     assert_eq!(session(&engine, "total_rollback_count"), "1");
 }
+
+/// `SHOW VARIABLES` lists every name in the reference's table, and every value
+/// is the one the single-name accessor returns.
+#[test]
+fn variables_listing_covers_the_name_table() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+    let listed = engine.variables(Scope::Global);
+    assert_eq!(listed.len(), crate::variables::ALL_GLOBAL_NAMES.len());
+    // The names are the reference's table, in its order, and every value is
+    // the one the single-name accessor returns. The live counters (open fds,
+    // RSS, cache hits, transactions) are skipped: sampling them twice cannot
+    // return the same number.
+    const VOLATILE: [&str; 9] = [
+        "active_txn_count",
+        "buffer_object_count",
+        "cpu_usage",
+        "disk_cache_miss",
+        "memory_cache_miss",
+        "open_file_count",
+        "system_memory_usage",
+        "unused_buffer_object",
+        "query_count",
+    ];
+    for (listed_name, (name, value)) in crate::variables::ALL_GLOBAL_NAMES.iter().zip(listed.iter())
+    {
+        assert_eq!(listed_name, name);
+        assert!(!value.is_empty(), "{name} must have a value");
+        if !VOLATILE.contains(&name.as_str()) {
+            assert_eq!(*value, global(&engine, name), "{name}");
+        }
+    }
+    let sessions = engine.variables(Scope::Session);
+    assert_eq!(sessions.len(), crate::variables::ALL_SESSION_NAMES.len());
+}
+
+/// `SET VARIABLE` follows `PhysicalCommand`'s rules: session variables are
+/// read-only, `profile` and `profile_record_capacity` are settable, every other
+/// global variable is read-only, and an unknown name is an error.
+#[test]
+fn set_variables_follows_the_reference_rules() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+
+    engine
+        .set_variables(Scope::Global, &[("profile".into(), "true".into())])
+        .unwrap();
+    assert_eq!(global(&engine, "profile"), "true");
+    engine
+        .set_variables(
+            Scope::Global,
+            &[("profile_record_capacity".into(), "2".into())],
+        )
+        .unwrap();
+    assert_eq!(global(&engine, "profile_record_capacity"), "2");
+
+    let error = engine
+        .set_variables(Scope::Global, &[("cpu_usage".into(), "1".into())])
+        .unwrap_err();
+    assert_eq!(error.status_code(), 3076);
+    assert!(error
+        .to_string()
+        .ends_with("Global variable: cpu_usage is read-only"));
+
+    let error = engine
+        .set_variables(Scope::Global, &[("no_such_var".into(), "1".into())])
+        .unwrap_err();
+    assert_eq!(error.status_code(), 3076);
+    assert!(error
+        .to_string()
+        .ends_with("unknown global variable no_such_var"));
+
+    let error = engine
+        .set_variables(Scope::Session, &[("query_count".into(), "1".into())])
+        .unwrap_err();
+    assert_eq!(error.status_code(), 3076);
+    assert!(error
+        .to_string()
+        .ends_with("Session variable: query_count is read-only"));
+}
+
+/// `SHOW TRANSACTIONS` / `SHOW TRANSACTION <id>` read the transaction manager's
+/// registry.
+#[test]
+fn transaction_accessors_expose_the_live_transaction() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+    assert!(engine.active_transactions().is_empty());
+
+    let txn = engine.begin_txn();
+    let active = engine.active_transactions();
+    assert_eq!(active.len(), 1);
+    let id = active[0].txn_id;
+    assert_eq!(
+        engine.transaction_detail(id).map(|t| t.txn_id),
+        Some(id),
+        "SHOW TRANSACTION <id> must find the live transaction"
+    );
+    assert!(engine.transaction_detail(id + 1000).is_none());
+    txn.rollback();
+    assert!(engine.active_transactions().is_empty());
+}
+
+/// `SHOW QUERIES` / `SHOW QUERY <id>` / `SHOW PROFILES` are backed by the real
+/// registry: a returned statement leaves the running set and, with profiling
+/// on, lands in the profile history.
+#[test]
+fn query_registry_lists_running_and_finished_statements() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+    engine
+        .set_variables(Scope::Global, &[("profile".into(), "true".into())])
+        .unwrap();
+
+    assert!(engine.running_queries().is_empty());
+    engine.execute("SELECT 1;").unwrap();
+    assert!(
+        engine.running_queries().is_empty(),
+        "a returned statement is no longer running"
+    );
+
+    let profiles = engine.profiles();
+    assert_eq!(profiles.len(), 1);
+    assert_eq!(profiles[0].query_kind, "SELECT");
+    assert_eq!(profiles[0].query_text, "SELECT 1;");
+
+    // The id of a finished statement still resolves.
+    let row = engine
+        .query_profile(profiles[0].query_id)
+        .expect("SHOW QUERY <id> of a finished statement");
+    assert_eq!(row.session_id, crate::diagnostics::SESSION_ID);
+    assert_eq!(row.query_kind, "SELECT");
+
+    // The history is bounded by `profile_record_capacity`.
+    engine
+        .set_variables(
+            Scope::Global,
+            &[("profile_record_capacity".into(), "2".into())],
+        )
+        .unwrap();
+    for _ in 0..3 {
+        engine.execute("SELECT 2;").unwrap();
+    }
+    assert_eq!(engine.profiles().len(), 2);
+    assert_eq!(engine.profiles()[0].query_text, "SELECT 2;");
+}
+
+/// A statement that fails still deregisters: the error path must not leak a
+/// registry row.
+#[test]
+fn failed_statements_leave_the_registry() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+    assert!(engine.execute("SELECT * FROM missing_table;").is_err());
+    assert!(engine.running_queries().is_empty());
+}
+
+/// `SHOW BUFFERS` / `SHOW OBJECT <name>`: the rows come from the block cache,
+/// and the object the test touched is addressable by its path.
+#[test]
+fn buffer_objects_describe_the_block_cache() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+    engine.execute("CREATE TABLE bo (id INT);").unwrap();
+    engine.execute("INSERT INTO bo VALUES (7);").unwrap();
+    engine.flush().unwrap();
+    engine.read_cpp_blocks("bo").unwrap();
+
+    let objects = engine.buffer_objects();
+    assert_eq!(objects.len(), 1, "one block was written and read");
+    let row = &objects[0];
+    assert!(row.object_size > 0);
+    let block_path = row.object_path.to_string_lossy().into_owned();
+    assert!(
+        block_path.contains("/seg_0/blk_0") && row.object_path.is_dir(),
+        "the path is the block's C++-layout directory: {block_path}"
+    );
+    let path = row.object_path.to_string_lossy().into_owned();
+    let by_name = engine
+        .buffer_object(&path)
+        .expect("SHOW OBJECT <name> for a buffered block");
+    assert_eq!(by_name.object_size, row.object_size);
+    assert!(engine.buffer_object("no/such/block").is_none());
+}
+
+/// `SHOW FILES`: every file under the engine directory with its size.
+#[test]
+fn all_files_walks_the_engine_directory() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+    let files = engine.all_files();
+    assert!(!files.is_empty(), "an open engine has files on disk");
+    for (path, size) in &files {
+        assert!(path.starts_with(dir.path()), "{}", path.display());
+        assert_eq!(
+            std::fs::metadata(path).map(|m| m.len()).unwrap_or(0),
+            *size as u64,
+            "{}",
+            path.display()
+        );
+    }
+    engine.execute("CREATE TABLE af (id INT);").unwrap();
+    engine.execute("INSERT INTO af VALUES (1);").unwrap();
+    engine.flush().unwrap();
+    assert!(
+        engine
+            .all_files()
+            .iter()
+            .any(|(path, size)| path.to_string_lossy().contains("/blk_") && *size > 0),
+        "the checkpoint writes the block mirror"
+    );
+}
+
+/// `SHOW MEMINDEX`: the in-memory part of each index the test created, with the
+/// rows it holds.
+#[test]
+fn memory_indexes_report_the_in_memory_rows() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+    engine
+        .execute("CREATE TABLE mi (id INT, body VARCHAR, v EMBEDDING(2));")
+        .unwrap();
+    engine
+        .execute("CREATE INDEX mi_ft ON mi (body) USING FULLTEXT;")
+        .unwrap();
+    engine
+        .execute("INSERT INTO mi VALUES (1, 'hello world', [1.0, 0.0]);")
+        .unwrap();
+
+    let rows = engine.memory_indexes();
+    let fulltext = rows
+        .iter()
+        .find(|r| r.index == "mi_ft")
+        .expect("the full-text index keeps an in-memory segment");
+    assert_eq!(fulltext.table, "default_db.mi");
+    assert_eq!(fulltext.index_type, "FULLTEXT");
+    assert_eq!(fulltext.row_count, 1);
+    assert!(fulltext.mem_used > 0, "the segment holds one document");
+}
