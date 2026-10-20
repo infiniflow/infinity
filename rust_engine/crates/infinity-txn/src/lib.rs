@@ -2,11 +2,10 @@
 //!
 //! Mirrors the engine's order (plan 附录 A.4): **WriteWAL (serial) -> CommitBottom
 //! (KV atomic write)**. Every commit appends a *typed* command list
-//! (`WalCmd`, [`infinity_storage::wal_entry`]) to the framed WAL, exactly the
-//! shape the reference writes from `NewTxnManager::SendToWAL` /
-//! `WalManager::SubmitTxn`; recovery reads it back through
-//! [`WalEntryIterator::make_framed`] and replays each command, instead of
-//! replaying a raw KV put batch.
+//! (`WalCmd`, [`infinity_storage::wal_entry`]) to the WAL, in the reference's
+//! own `WalEntry` byte layout; recovery reads it back through
+//! [`WalEntryIterator::make`] and replays each command, instead of replaying a
+//! raw KV put batch.
 //!
 //! Commands the committing layer can identify are emitted typed: row puts
 //! become [`WalCmd::Append`] (the row blob rides in the block's single varchar
@@ -30,8 +29,7 @@ use std::sync::{Arc, Mutex};
 use infinity_common::{Error, Result, TxnTimeStamp};
 use infinity_storage::data_block::{BlockValue, Column, ColumnVector, DataBlock};
 use infinity_storage::{
-    decode_kv_batch, KvBatchKind, MetaStore, WalCmd, WalEntry, WalEntryIterator, WalManager,
-    WalRecord, WalRowId,
+    KvBatchKind, MetaStore, WalCmd, WalEntry, WalEntryIterator, WalManager, WalRowId,
 };
 
 /// Row record prefix of the engine's KV keys (`row:{table}:{seq:016}`).
@@ -162,7 +160,11 @@ impl TxnManager {
             })
             .unwrap_or(0);
         let max_ts = recs.iter().map(|r| r.commit_ts).max().unwrap_or(0);
-        let max_id = recs.iter().map(|r| r.txn_id).max().unwrap_or(0);
+        let max_id = recs
+            .iter()
+            .map(|r| r.txn_id.max(0) as u64)
+            .max()
+            .unwrap_or(0);
         let mut write_ts = HashMap::new();
         for rec in &recs {
             for key in record_write_keys(rec) {
@@ -293,11 +295,7 @@ impl TxnManager {
         );
         {
             let mut wal = self.wal.lock().unwrap();
-            wal.append(&WalRecord::new(
-                txn.id,
-                commit_ts,
-                entry.encode_cmd_payload(),
-            ))?;
+            wal.append(&entry)?;
             self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
         }
         let mut writes = txn.writes.clone();
@@ -388,13 +386,12 @@ impl TxnManager {
     }
 
     /// Replays the WAL into the KV store for all records after `checkpoint_ts`.
-    /// Each record is decoded through [`WalEntryIterator::make_framed`] and its
-    /// typed commands are applied; legacy records surface as a `KvBatch`, so
-    /// an old log still replays. Idempotent: re-applying is safe.
+    /// Each record is decoded through [`WalEntryIterator::make`] and its typed
+    /// commands are applied. Idempotent: re-applying is safe.
     pub fn recover(&self, checkpoint_ts: TxnTimeStamp) -> Result<usize> {
         let mut applied = 0;
         for path in segment_paths(&self.wal_path)? {
-            let mut iter = WalEntryIterator::make_framed(&path, false)?;
+            let mut iter = WalEntryIterator::make(&path, false)?;
             while iter.has_next() {
                 let Some(entry) = iter.next() else {
                     break; // torn / corrupt tail
@@ -687,20 +684,10 @@ fn delete_writes(db_name: &str, table_name: &str, row_ids: &[WalRowId]) -> Vec<(
         .collect()
 }
 
-/// Keys a WAL record wrote, used to rebuild the conflict state on open.
-fn record_write_keys(rec: &WalRecord) -> Vec<Vec<u8>> {
-    let decoded = WalEntry::decode_cmd_payload(rec.txn_id as i64, rec.commit_ts, &rec.payload)
-        .map(|entry| entry.cmds)
-        .or_else(|| {
-            decode_kv_batch(&rec.payload).map(|writes| {
-                vec![WalCmd::KvBatch {
-                    kind: KvBatchKind::Other,
-                    writes,
-                }]
-            })
-        });
+/// Keys a WAL entry wrote, used to rebuild the conflict state on open.
+fn record_write_keys(entry: &WalEntry) -> Vec<Vec<u8>> {
     let mut keys = Vec::new();
-    for cmd in decoded.unwrap_or_default() {
+    for cmd in &entry.cmds {
         match cmd {
             WalCmd::Append {
                 db_name,
@@ -708,10 +695,10 @@ fn record_write_keys(rec: &WalRecord) -> Vec<Vec<u8>> {
                 row_ranges,
                 ..
             } => {
-                let table = join_table(&db_name, &table_name);
+                let table = join_table(db_name, table_name);
                 for (base, count) in row_ranges {
                     let base_seq = base.to_u64();
-                    for offset in 0..count {
+                    for offset in 0..*count {
                         keys.push(row_key(&table, base_seq + offset));
                     }
                 }
@@ -722,12 +709,12 @@ fn record_write_keys(rec: &WalRecord) -> Vec<Vec<u8>> {
                 row_ids,
                 ..
             } => {
-                let table = join_table(&db_name, &table_name);
+                let table = join_table(db_name, table_name);
                 for row_id in row_ids {
                     keys.push(del_key(&table, row_id.to_u64()));
                 }
             }
-            WalCmd::KvBatch { writes, .. } => keys.extend(writes.into_iter().map(|(k, _)| k)),
+            WalCmd::KvBatch { writes, .. } => keys.extend(writes.iter().map(|(k, _)| k.clone())),
             _ => {}
         }
     }
@@ -771,7 +758,7 @@ fn segment_paths(wal_path: &std::path::Path) -> Result<Vec<PathBuf>> {
 }
 
 /// Reads every sealed segment in timestamp order, then the active log.
-fn read_all_segments(wal_path: &std::path::Path) -> Result<Vec<WalRecord>> {
+fn read_all_segments(wal_path: &std::path::Path) -> Result<Vec<WalEntry>> {
     let mut out = Vec::new();
     for path in segment_paths(wal_path)? {
         out.extend(WalManager::read_all(&path)?);

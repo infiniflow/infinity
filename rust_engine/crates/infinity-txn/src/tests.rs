@@ -1,7 +1,7 @@
 //! Tests for the commit pipeline, the typed WAL and the transaction manager.
 
 use super::*;
-use infinity_storage::{encode_kv_batch, FjallMetaStore};
+use infinity_storage::FjallMetaStore;
 use tempfile::tempdir;
 
 fn manager(dir: &std::path::Path) -> TxnManager {
@@ -191,7 +191,7 @@ fn append_is_a_typed_command_and_replays_the_same_rows() {
     }
 
     // The record is a typed Append with one coalesced row range.
-    let mut iter = WalEntryIterator::make_framed(dir.path().join("wal.log"), false).unwrap();
+    let mut iter = WalEntryIterator::make(dir.path().join("wal.log"), false).unwrap();
     let entry = iter.next().expect("one record");
     assert!(!iter.has_next());
     assert_eq!(entry.cmds.len(), 1);
@@ -237,7 +237,7 @@ fn delete_is_a_typed_command_and_replays_the_tombstones() {
         m.commit(t).unwrap();
         assert_eq!(store.scan_prefix(b"del:").unwrap().len(), 2);
     }
-    let mut iter = WalEntryIterator::make_framed(dir.path().join("wal.log"), false).unwrap();
+    let mut iter = WalEntryIterator::make(dir.path().join("wal.log"), false).unwrap();
     let entry = iter.next().expect("one record");
     match &entry.cmds[0] {
         WalCmd::Delete {
@@ -274,7 +274,7 @@ fn catalog_writes_are_carried_as_a_kv_batch() {
         t.put(key.clone(), value.clone());
         m.commit(t).unwrap();
     }
-    let mut iter = WalEntryIterator::make_framed(dir.path().join("wal.log"), false).unwrap();
+    let mut iter = WalEntryIterator::make(dir.path().join("wal.log"), false).unwrap();
     let entry = iter.next().expect("one record");
     match &entry.cmds[0] {
         WalCmd::KvBatch { kind, writes } => {
@@ -287,29 +287,6 @@ fn catalog_writes_are_carried_as_a_kv_batch() {
     let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
     m.recover(0).unwrap();
     assert_eq!(store.get(&key).unwrap(), Some(value));
-}
-
-/// A WAL file written by the old (KV batch) format still replays, and a torn
-/// tail of it stops the replay instead of panicking.
-#[test]
-fn legacy_kv_batch_records_still_replay() {
-    let dir = tempdir().unwrap();
-    let wal = dir.path().join("wal.log");
-    let legacy = encode_kv_batch(&[
-        (b"k1".to_vec(), b"v1".to_vec()),
-        (b"k2".to_vec(), b"v2".to_vec()),
-    ]);
-    {
-        let mut w = WalManager::open(&wal).unwrap();
-        w.append(&WalRecord::new(1, 10, legacy)).unwrap();
-        w.append(&WalRecord::new(2, 20, b"\x10\x00".to_vec()))
-            .unwrap(); // torn batch
-    }
-    let store = Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
-    let m = TxnManager::open(&wal, store.clone()).unwrap();
-    assert_eq!(m.recover(0).unwrap(), 1);
-    assert_eq!(store.get(b"k1").unwrap(), Some(b"v1".to_vec()));
-    assert_eq!(store.get(b"k2").unwrap(), Some(b"v2".to_vec()));
 }
 
 #[test]

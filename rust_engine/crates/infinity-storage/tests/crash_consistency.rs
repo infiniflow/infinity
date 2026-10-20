@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use infinity_storage::{FjallMetaStore, MetaStore, WalManager, WalRecord};
+use infinity_storage::{FjallMetaStore, KvBatchKind, MetaStore, WalCmd, WalEntry, WalManager};
 
 /// Where the simulated process died.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,16 +36,25 @@ fn txn_key(id: u64) -> Vec<u8> {
     format!("txn:{id}").into_bytes()
 }
 
-/// Encodes a block id plus its bytes into a WAL payload.
-fn payload(block_id: u64, data: &[u8]) -> Vec<u8> {
-    let mut p = block_id.to_le_bytes().to_vec();
-    p.extend_from_slice(data);
-    p
+/// The block id a replayed entry re-creates. The entry carries an exact KV
+/// write batch, so the test exercises the entry framing and the replay prefix,
+/// not a command codec.
+fn block_id_of(entry: &WalEntry) -> u64 {
+    let WalCmd::KvBatch { writes, .. } = &entry.cmds[0] else {
+        panic!("expected a KvBatch command, got {:?}", entry.cmds);
+    };
+    u64::from_le_bytes(writes[0].0[..8].try_into().unwrap())
 }
 
-fn decode_payload(p: &[u8]) -> (u64, Vec<u8>) {
-    let id = u64::from_le_bytes(p[..8].try_into().unwrap());
-    (id, p[8..].to_vec())
+fn entry(txn_id: u64, block_id: u64, data: &[u8]) -> WalEntry {
+    WalEntry::new(
+        txn_id as i64,
+        txn_id + 1,
+        vec![WalCmd::KvBatch {
+            kind: KvBatchKind::Other,
+            writes: vec![(block_id.to_le_bytes().to_vec(), data.to_vec())],
+        }],
+    )
 }
 
 /// Runs the commit protocol for one transaction, stopping at the requested
@@ -59,8 +68,7 @@ fn commit_until(dir: &Path, kv: &FjallMetaStore, txn_id: u64, data: &[u8], stop:
     }
     let mut wal = WalManager::open(dir.join("wal.log")).unwrap();
     // commit_ts = txn_id + 1 so it is strictly greater than the checkpoint 0.
-    wal.append(&WalRecord::new(txn_id, txn_id + 1, payload(block_id, data)))
-        .unwrap();
+    wal.append(&entry(txn_id, block_id, data)).unwrap();
     wal.flush().unwrap();
     if stop == Stop::AfterWal {
         return;
@@ -81,12 +89,17 @@ fn recover(dir: &Path, kv: &FjallMetaStore) -> Vec<u64> {
         .map(|v| u64::from_le_bytes(v.try_into().unwrap()))
         .unwrap_or(0);
     let mut replayed = Vec::new();
-    WalManager::replay_since(dir.join("wal.log"), checkpoint, |rec| {
-        let (block_id, data) = decode_payload(&rec.payload);
-        kvs_put_missing_block(dir, block_id, &data);
-        kv.put(&txn_key(rec.txn_id), &rec.commit_ts.to_le_bytes())
-            .unwrap();
-        replayed.push(rec.txn_id);
+    WalManager::replay_since(dir.join("wal.log"), checkpoint, |entry| {
+        let WalCmd::KvBatch { writes, .. } = &entry.cmds[0] else {
+            panic!("expected a KvBatch command, got {:?}", entry.cmds);
+        };
+        kvs_put_missing_block(dir, block_id_of(entry), &writes[0].1);
+        kv.put(
+            &txn_key(entry.txn_id.max(0) as u64),
+            &entry.commit_ts.to_le_bytes(),
+        )
+        .unwrap();
+        replayed.push(entry.txn_id.max(0) as u64);
         Ok(())
     })
     .unwrap();
@@ -163,12 +176,13 @@ fn torn_wal_tail_stops_replay_at_the_durable_prefix() {
     let dir = tempfile::tempdir().unwrap();
     let t = dir.path();
     commit_until(t, &open_kv(t), 1, b"row", Stop::AfterWal);
-    // append a half-written frame (crash mid-append)
+    // append a half-written entry (crash mid-append): the leading size claims
+    // a record the file does not hold
     let mut f = fs::OpenOptions::new()
         .append(true)
         .open(t.join("wal.log"))
         .unwrap();
-    std::io::Write::write_all(&mut f, &[0x57, 0x41, 0x4c, 0x31, 0x00]).unwrap();
+    std::io::Write::write_all(&mut f, &64i32.to_le_bytes()).unwrap();
     let kv = open_kv(t);
     // only the intact transaction replays; the torn tail is dropped
     assert_eq!(recover(t, &kv), vec![1]);
