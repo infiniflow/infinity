@@ -1028,8 +1028,18 @@ pub(crate) fn plan_select_bound(
                     // `table.column` reference (the bound `ColumnExpression`
                     // carries `column_name`, not the identifier text).
                     let (position, column_name) = scope.resolve(name)?;
+                    // `#_row_id` is this port's internal name for the SQL
+                    // `_row_id`; the reference exposes it without a marker, and
+                    // clients read results by the name they wrote, so a
+                    // resolved hidden column is labelled with the typed
+                    // spelling instead of leaking the `#_` prefix.
+                    let label = if column_name.starts_with("#_") {
+                        ColumnIdentifier::parse(name).column_name
+                    } else {
+                        column_name
+                    };
                     exprs.push(Expr::Column(position));
-                    names.push(column_name);
+                    names.push(label);
                 }
                 SelectItem::Func { name, args } => {
                     let e = ExprAst::Func {
