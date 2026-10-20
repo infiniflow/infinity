@@ -1590,13 +1590,15 @@ fn handle_connection(
                         read_table_args(&mut ip)?
                     };
                     let _ = (sid, &db);
-                    let segs = engine
+                    let rows = engine
                         .as_ref()
-                        .map(|e| e.segments(&table))
+                        .map(|e| show_segments_rows(e, &table))
                         .unwrap_or_default();
-                    let rows: Vec<Vec<String>> =
-                        segs.iter().map(|(id, _)| vec![id.to_string()]).collect();
-                    let resp = select_response_from_typed(&["segment_id".to_string()], &[], &rows);
+                    let columns: Vec<String> =
+                        SHOW_SEGMENTS_COLUMNS.iter().map(|c| c.to_string()).collect();
+                    let types: Vec<String> =
+                        SHOW_SEGMENTS_TYPES.iter().map(|t| t.to_string()).collect();
+                    let resp = select_response_from_typed(&columns, &types, &rows);
                     write_result_response(&mut writer, seq, "ShowSegments", &resp)?;
                 }
                 "ShowBlocks" => {
@@ -1605,17 +1607,15 @@ fn handle_connection(
                         read_block_args(&mut ip)?
                     };
                     let _ = (sid, &db);
-                    // 8192 rows per block: the reference reports one block per
-                    // 8192-row chunk of the segment.
-                    let blocks = engine
+                    let rows = engine
                         .as_ref()
-                        .map(|e| {
-                            e.segment_rows(&table, segment.max(0) as usize)
-                                .div_ceil(8192)
-                        })
-                        .unwrap_or(0);
-                    let rows: Vec<Vec<String>> = (0..blocks).map(|i| vec![i.to_string()]).collect();
-                    let resp = select_response_from_typed(&["block_id".to_string()], &[], &rows);
+                        .map(|e| show_blocks_rows(e, &table, segment.max(0) as u32))
+                        .unwrap_or_default();
+                    let columns: Vec<String> =
+                        SHOW_BLOCKS_COLUMNS.iter().map(|c| c.to_string()).collect();
+                    let types: Vec<String> =
+                        SHOW_BLOCKS_TYPES.iter().map(|t| t.to_string()).collect();
+                    let resp = select_response_from_typed(&columns, &types, &rows);
                     write_result_response(&mut writer, seq, "ShowBlocks", &resp)?;
                 }
                 "Import" => {
@@ -5466,6 +5466,122 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// `SHOW SEGMENTS` / `SHOW BLOCKS` metadata
+// (C++ `physical_show_segments_impl.cpp`, `physical_show_blocks_impl.cpp`)
+// ---------------------------------------------------------------------------
+
+/// `Utility::FormatByteSize` (`src/common/utility/utility_impl.cpp:40`): `0`
+/// renders as `0B`, everything else as `%.2f` with a binary suffix.
+pub fn format_byte_size(byte_size: u64) -> String {
+    const SUFFIXES: [&str; 9] = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    if byte_size == 0 {
+        return "0B".to_string();
+    }
+    let mut index = 0usize;
+    let mut size = byte_size as f64;
+    while size >= 1024.0 && index + 1 < SUFFIXES.len() {
+        size /= 1024.0;
+        index += 1;
+    }
+    format!("{size:.2}{}", SUFFIXES[index])
+}
+
+/// Bytes held by the segment and block directories of `table`'s C++ mirror
+/// (`data/db_x/tbl_y/seg_z/blk_n/{column}.col`).
+///
+/// The reference sums the sizes of the files a `SegmentInfo`/`BlockInfo`
+/// carries (`physical_show_blocks_impl.cpp:60`, `Utility::FormatByteSize`).
+pub fn segment_block_bytes(
+    engine: &Engine,
+    table: &str,
+) -> (HashMap<u32, u64>, HashMap<(u32, u32), u64>) {
+    let mut segments: HashMap<u32, u64> = HashMap::new();
+    let mut blocks: HashMap<(u32, u32), u64> = HashMap::new();
+    for path in engine.table_files(table) {
+        let bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        let parts: Vec<String> = path
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().into_owned())
+            .collect();
+        let Some(segment) = parts
+            .iter()
+            .find_map(|c| c.strip_prefix("seg_").and_then(|v| v.parse::<u32>().ok()))
+        else {
+            // `idx_*` mirror directories have no block layout.
+            continue;
+        };
+        *segments.entry(segment).or_insert(0) += bytes;
+        if let Some(block) = parts
+            .iter()
+            .find_map(|c| c.strip_prefix("blk_").and_then(|v| v.parse::<u32>().ok()))
+        {
+            *blocks.entry((segment, block)).or_insert(0) += bytes;
+        }
+    }
+    (segments, blocks)
+}
+
+/// The column set of `SHOW SEGMENTS`, in the reference's order
+/// (`physical_show_impl.cpp:112`: `id`, `status`, `size`).
+///
+/// `row_count` is appended: the reference drops it from the list form only
+/// because its `status`/`size` cells are stubs (`"No value"` / `"TODO"`),
+/// while `SHOW SEGMENT <id>` does report it
+/// (`physical_show_segment_detail_impl.cpp`).
+pub const SHOW_SEGMENTS_COLUMNS: [&str; 4] = ["id", "status", "size", "row_count"];
+pub const SHOW_SEGMENTS_TYPES: [&str; 4] = ["bigint", "varchar", "varchar", "bigint"];
+
+/// The column set of `SHOW BLOCKS` (`physical_show_impl.cpp:130`).
+pub const SHOW_BLOCKS_COLUMNS: [&str; 3] = ["id", "size", "row_count"];
+pub const SHOW_BLOCKS_TYPES: [&str; 3] = ["bigint", "varchar", "bigint"];
+
+/// Rows of `SHOW SEGMENTS`: one row per live segment, with its real row count
+/// and the bytes its directory occupies.
+pub fn show_segments_rows(engine: &Engine, table: &str) -> Vec<Vec<String>> {
+    let (segment_bytes, _) = segment_block_bytes(engine, table);
+    engine
+        .segments(table)
+        .into_iter()
+        .map(|(segment_id, rows)| {
+            vec![
+                segment_id.to_string(),
+                // `physical_show_segments_impl.cpp:37`: the status cell reads
+                // the removed `SegmentEntry::status_`, so the reference always
+                // prints this string. Reporting it keeps the column truthful
+                // instead of inventing a sealed/unsealed state the engine does
+                // not track per segment.
+                "No value".to_string(),
+                format_byte_size(segment_bytes.get(&segment_id).copied().unwrap_or(0)),
+                rows.to_string(),
+            ]
+        })
+        .collect()
+}
+
+/// Rows of `SHOW BLOCKS <segment>`: the segment's real blocks
+/// (`BlockIndex`/`BlockMeta`) with their row counts and on-disk sizes.
+///
+/// Blocks exist once the C++-format mirror has been written (a flush or
+/// checkpoint), exactly as in the reference where blocks appear at dump time.
+pub fn show_blocks_rows(engine: &Engine, table: &str, segment: u32) -> Vec<Vec<String>> {
+    let (_, block_bytes) = segment_block_bytes(engine, table);
+    engine
+        .block_ids(table, segment)
+        .into_iter()
+        .map(|block_id| {
+            let rows = engine
+                .block_row_count(table, segment, block_id as u16)
+                .unwrap_or(0);
+            vec![
+                block_id.to_string(),
+                format_byte_size(block_bytes.get(&(segment, block_id)).copied().unwrap_or(0)),
+                rows.to_string(),
+            ]
+        })
+        .collect()
+}
+
 /// Builds a `SelectResponse` with declared column type *text* available, so
 /// non-scalar columns (embedding/vector/...) are announced with their physical
 /// descriptor and packed as their live element stream.
@@ -7971,5 +8087,231 @@ mod tests {
                 }),
             }
         );
+    }
+
+    // -------- `SHOW SEGMENTS` / `SHOW BLOCKS` over the wire --------
+
+    /// Decodes one `ColumnField` inside a `SelectResponse` into its values.
+    fn read_column_field<R: Read>(
+        ip: &mut TBinaryInputProtocol<R>,
+    ) -> Result<(String, Vec<String>)> {
+        let (mut column_type, mut name) = (0i32, String::new());
+        let mut chunk: Vec<u8> = Vec::new();
+        ip.read_struct_begin().map_err(tw)?;
+        loop {
+            let f = ip.read_field_begin().map_err(tw)?;
+            if f.field_type == TType::Stop {
+                break;
+            }
+            match f.id {
+                Some(1) if f.field_type == TType::I32 => {
+                    column_type = ip.read_i32().map_err(tw)?;
+                }
+                Some(2) if f.field_type == TType::List => {
+                    let list = ip.read_list_begin().map_err(tw)?;
+                    if list.size > 0 {
+                        let first = ip.read_bytes().map_err(tw)?;
+                        chunk = first;
+                        for _ in 1..list.size {
+                            let _ = ip.read_bytes().map_err(tw)?;
+                        }
+                    }
+                }
+                Some(3) if f.field_type == TType::String => {
+                    name = ip.read_string().map_err(tw)?;
+                }
+                _ => ip.skip(f.field_type).map_err(tw)?,
+            }
+            ip.read_field_end().map_err(tw)?;
+        }
+        ip.read_struct_end().map_err(tw)?;
+        Ok((name, decode_column(column_type, &chunk)))
+    }
+
+    /// Unpacks the column chunk for the two types `SHOW SEGMENTS`/`SHOW BLOCKS`
+    /// declare (BigInt, Varchar).
+    fn decode_column(column_type: i32, chunk: &[u8]) -> Vec<String> {
+        match column_type {
+            4 => chunk
+                .chunks_exact(8)
+                .map(|b| i64::from_le_bytes(b.try_into().unwrap()).to_string())
+                .collect(),
+            9 => {
+                let mut out = Vec::new();
+                let mut i = 0usize;
+                while i + 4 <= chunk.len() {
+                    let n = u32::from_le_bytes(chunk[i..i + 4].try_into().unwrap()) as usize;
+                    i += 4;
+                    if i + n > chunk.len() {
+                        break;
+                    }
+                    out.push(String::from_utf8_lossy(&chunk[i..i + n]).into_owned());
+                    i += n;
+                }
+                out
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// Reads a `<Method>_result` REPLY and returns the `SelectResponse`'s
+    /// column fields as `(name, values)`.
+    fn read_show_reply<R: Read>(r: &mut R, method: &str) -> Result<Vec<(String, Vec<String>)>> {
+        let mut ip = TBinaryInputProtocol::new(r, true);
+        let msg = ip.read_message_begin().map_err(tw)?;
+        assert_eq!(msg.name, method);
+        ip.read_struct_begin().map_err(tw)?;
+        let mut out = Vec::new();
+        loop {
+            let f = ip.read_field_begin().map_err(tw)?;
+            if f.field_type == TType::Stop {
+                break;
+            }
+            if f.id == Some(0) && f.field_type == TType::Struct {
+                ip.read_struct_begin().map_err(tw)?;
+                loop {
+                    let g = ip.read_field_begin().map_err(tw)?;
+                    if g.field_type == TType::Stop {
+                        break;
+                    }
+                    if g.id == Some(4) && g.field_type == TType::List {
+                        let list = ip.read_list_begin().map_err(tw)?;
+                        for _ in 0..list.size {
+                            out.push(read_column_field(&mut ip)?);
+                        }
+                    } else {
+                        ip.skip(g.field_type).map_err(tw)?;
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+            } else {
+                ip.skip(f.field_type).map_err(tw)?;
+            }
+            ip.read_field_end().map_err(tw)?;
+        }
+        ip.read_struct_end().map_err(tw)?;
+        Ok(out)
+    }
+
+    /// Writes a `Show*Request { session_id, db_name, table_name, segment_id? }`
+    /// CALL and returns the decoded reply.
+    fn show_call(
+        addr: &str,
+        method: &str,
+        table: &str,
+        segment: Option<i64>,
+    ) -> Result<Vec<(String, Vec<String>)>> {
+        use std::net::TcpStream;
+        let mut stream = TcpStream::connect(addr).unwrap();
+        let mut buf = Vec::new();
+        {
+            let mut o = TBinaryOutputProtocol::new(&mut buf, true);
+            o.write_message_begin(&TMessageIdentifier::new(method, TMessageType::Call, 7))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new(format!("{method}_args")))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("request", TType::Struct, 1i16))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new(format!("{method}Request")))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("session_id", TType::I64, 1i16))
+                .map_err(tw)?;
+            o.write_i64(1).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("db_name", TType::String, 2i16))
+                .map_err(tw)?;
+            o.write_string("default_db").map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("table_name", TType::String, 3i16))
+                .map_err(tw)?;
+            o.write_string(table).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            if let Some(segment) = segment {
+                o.write_field_begin(&TFieldIdentifier::new("segment_id", TType::I64, 4i16))
+                    .map_err(tw)?;
+                o.write_i64(segment).map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+            }
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.flush().map_err(tw)?;
+        }
+        stream.write_all(&buf).map_err(io)?;
+        read_show_reply(&mut stream, method)
+    }
+
+    /// `ShowSegments`/`ShowBlocks` report the real segment and block metadata
+    /// (`physical_show_segments_impl.cpp`, `physical_show_blocks_impl.cpp`):
+    /// one row per live segment with its row count, and one row per block of
+    /// that segment with the block's row count — not `rows / 8192`.
+    #[test]
+    fn thrift_show_segments_and_blocks_report_real_metadata() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        engine.execute("CREATE TABLE t (id INT);").unwrap();
+        // An `INSERT` appends to the open segment; a `COPY` seals the segment
+        // it writes, so `INSERT` + `COPY` leaves two segments of one row each
+        // (the C++ row-id allocator behaves the same way).
+        engine.execute("INSERT INTO t VALUES (1);").unwrap();
+        let csv = dir.path().join("one_row.csv");
+        std::fs::write(&csv, "2\n").unwrap();
+        engine
+            .execute(&format!(
+                "COPY t FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                csv.display()
+            ))
+            .unwrap();
+        let segments = engine.segments("t");
+        assert_eq!(segments.len(), 2, "{segments:?}");
+        // Blocks are materialised by the C++-format mirror (a flush or
+        // checkpoint), as in the reference.
+        engine.flush().unwrap();
+        let segment0 = segments[0].0;
+        let blocks = engine.block_ids("t", segment0);
+        assert!(!blocks.is_empty(), "flush must create blocks");
+        let block_rows = engine.block_row_count("t", segment0, blocks[0] as u16);
+
+        let server = Server::bind_with_engine("127.0.0.1:0", engine.clone()).unwrap();
+        let addr = server.local_addr().unwrap();
+        std::thread::spawn(move || server.run());
+
+        let cols = show_call(&addr, "ShowSegments", "t", None).unwrap();
+        let names: Vec<&str> = cols.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(
+            names,
+            SHOW_SEGMENTS_COLUMNS.to_vec(),
+            "C++ physical_show_impl.cpp:112 column set"
+        );
+        let ids = &cols[0].1;
+        let status = &cols[1].1;
+        let sizes = &cols[2].1;
+        let rows = &cols[3].1;
+        assert_eq!(ids.len(), 2, "{cols:?}");
+        assert_eq!(rows, &vec!["1".to_string(), "1".to_string()], "{cols:?}");
+        // Real on-disk size, formatted like `Utility::FormatByteSize`.
+        assert!(sizes.iter().all(|s| s.ends_with('B')), "{sizes:?}");
+        // The reference's status cell is the removed `SegmentEntry::status_`.
+        assert_eq!(status, &vec!["No value".to_string(); 2]);
+
+        let cols = show_call(&addr, "ShowBlocks", "t", Some(i64::from(segment0))).unwrap();
+        let names: Vec<&str> = cols.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(
+            names,
+            SHOW_BLOCKS_COLUMNS.to_vec(),
+            "C++ physical_show_impl.cpp:130 column set"
+        );
+        let ids = &cols[0].1;
+        assert_eq!(ids.len(), blocks.len(), "{cols:?}");
+        assert_eq!(ids[0], blocks[0].to_string());
+        assert_eq!(
+            cols[2].1[0],
+            block_rows.unwrap_or(0).to_string(),
+            "the block's real row count"
+        );
+        assert!(cols[1].1[0].ends_with('B'), "{:?}", cols[1].1);
     }
 }

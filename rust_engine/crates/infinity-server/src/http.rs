@@ -2,7 +2,13 @@
 //! framework dependency) so it builds offline; a production front-end will use a
 //! real HTTP stack (axum/hyper) per the plan's dependency table.
 //!
-//! Routes:
+//! Routes mirror `src/network/http_server_impl.cpp` (§4249-4357): the
+//! database/table/column/index/docs families, `SHOW SEGMENTS`/`SHOW BLOCKS`,
+//! `/configs`, `/snapshots/*`, `/variables/*`, `/instance/*` and `/admin/*`.
+//! A route whose data has no engine accessor yet answers with the reference's
+//! error envelope and error code 3032 (`kNotSupported`) instead of a
+//! fabricated value.
+//!
 //!   `GET  /health`  -> `ok`
 //!   `POST /query`   body `{"sql": "..."}` -> `{"columns":[...],"rows":[[...]]}` or `{"error":"..."}`
 
@@ -12,18 +18,40 @@ use std::sync::Arc;
 
 use infinity_executor::{Engine, QueryResult};
 
-use crate::{Error, Result};
+use crate::peer::{NodeRole, PeerManager};
+use crate::{
+    show_blocks_rows, show_segments_rows, Error, Result, SHOW_BLOCKS_COLUMNS, SHOW_SEGMENTS_COLUMNS,
+};
 
 /// A tiny HTTP server that runs SQL against an [`Engine`].
 pub struct HttpServer {
     listener: TcpListener,
     engine: Arc<Engine>,
+    /// Cluster state behind `/admin/node*` (C++ `AdminShowCurrentNodeHandler`
+    /// &co). A standalone HTTP front end is the leader of an empty cluster,
+    /// the same node `Server::bind` registers for `SHOW CURRENT NODE`.
+    peer: Arc<PeerManager>,
 }
 
 impl HttpServer {
     pub fn bind(addr: &str, engine: Arc<Engine>) -> Result<Self> {
         let listener = TcpListener::bind(addr).map_err(|e| Error::io(addr, e))?;
-        Ok(Self { listener, engine })
+        let bound = listener.local_addr().map_err(|e| Error::io(addr, e))?;
+        let peer = Arc::new(PeerManager::new(
+            "leader",
+            bound.ip().to_string(),
+            i64::from(bound.port()),
+        ));
+        Ok(Self {
+            listener,
+            engine,
+            peer,
+        })
+    }
+
+    /// The peer/cluster registry the admin routes report.
+    pub fn peer(&self) -> Arc<PeerManager> {
+        Arc::clone(&self.peer)
     }
 
     pub fn local_addr(&self) -> Result<String> {
@@ -40,8 +68,9 @@ impl HttpServer {
                 Ok(s) => {
                     let _ = s.set_nodelay(true);
                     let engine = self.engine.clone();
+                    let peer = self.peer.clone();
                     std::thread::spawn(move || {
-                        let _ = handle(s, &engine);
+                        let _ = handle(s, &engine, &peer);
                     });
                 }
                 Err(_) => continue,
@@ -454,6 +483,112 @@ fn err_response(code: i64, msg: &str) -> (u16, String) {
             json_escape(msg)
         ),
     )
+}
+
+/// 3032 `kNotSupported` (`src/common/status.cppm:83`).
+const NOT_SUPPORTED: i64 = 3032;
+
+/// The reference's error envelope for a route this build cannot serve: the
+/// value would have to be fabricated, so the route says what data it needs
+/// instead. `needs` names the engine accessor that would make it real.
+fn not_supported(route: &str, needs: &str) -> (u16, String) {
+    (
+        501,
+        format!(
+            "{{\"error_code\":{NOT_SUPPORTED},\"error_msg\":\"{} is not supported in this build: needs {}\"}}",
+            json_escape(route),
+            json_escape(needs)
+        ),
+    )
+}
+
+/// The configuration knobs `SHOW CONFIGS` reports before anything is set
+/// (`Engine::config_get`'s defaults), in the reference's alphabetical order.
+const CONFIG_KEYS: [&str; 5] = [
+    "cache_result_capacity",
+    "checkpoint_interval",
+    "cleanup_interval",
+    "log_level",
+    "result_cache",
+];
+
+/// `ShowConfigsHandler`: `{"<config>": "<value>", …, "error_code": 0}`.
+fn configs_json(engine: &Engine) -> String {
+    let mut pairs: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    for key in CONFIG_KEYS {
+        if let Some(v) = engine.config_get(key) {
+            pairs.insert(key.to_string(), v);
+        }
+    }
+    for (k, v) in engine.config_all() {
+        pairs.insert(k, v);
+    }
+    let body = pairs
+        .iter()
+        .map(|(k, v)| format!("\"{}\":\"{}\"", json_escape(k), json_escape(v)))
+        .collect::<Vec<_>>()
+        .join(",");
+    if body.is_empty() {
+        "{\"error_code\":0}".to_string()
+    } else {
+        format!("{{{body},\"error_code\":0}}")
+    }
+}
+
+/// The single-field body of `POST /configs` (`SetConfigHandler`): the name and
+/// its JSON literal, or the reference's 3076 "No config will be set".
+fn single_field(doc: &Json) -> Option<(String, String)> {
+    let obj = doc.as_obj()?;
+    if obj.len() != 1 {
+        return None;
+    }
+    let (name, value) = &obj[0];
+    let literal = match value {
+        Json::Str(s) => quote_sql(s),
+        Json::Num(n) if n.fract() == 0.0 => format!("{}", *n as i64),
+        Json::Num(n) => format!("{n}"),
+        Json::Bool(b) => b.to_string(),
+        _ => return None,
+    };
+    Some((name.clone(), literal))
+}
+
+/// Appends the rows of a `SHOW …` result as `(column, value)` pairs — the
+/// `/variables/<scope>` body is one flat object, not a list.
+/// Quotes a snapshot name for SQL. `CREATE SNAPSHOT "snap-1" …` is the form
+/// the parser accepts for names that are not bare identifiers.
+fn snapshot_sql(name: &str) -> String {
+    if safe_ident(name).is_some() {
+        name.to_string()
+    } else {
+        format!("\"{}\"", name.replace('"', "\"\""))
+    }
+}
+
+/// `NodeInfo` as the reference's node objects (`AdminListAllNodesHandler`).
+fn node_json(node: &crate::peer::NodeInfo) -> String {
+    format!(
+        "{{\"name\":\"{}\",\"role\":\"{}\",\"status\":\"{}\",\"address\":\"{}:{}\",\"last_update\":\"{}\",\"heartbeat\":{}}}",
+        json_escape(node.node_name()),
+        json_escape(&node.node_role().to_string()),
+        json_escape(&node.node_status().to_string()),
+        json_escape(node.node_ip()),
+        node.node_port(),
+        node.update_ts(),
+        node.heartbeat_count()
+    )
+}
+
+/// Maps the `role` field of `POST /admin/node/current` onto a [`NodeRole`].
+fn parse_role(text: &str) -> Option<NodeRole> {
+    match text.to_ascii_lowercase().as_str() {
+        "admin" => Some(NodeRole::Admin),
+        "standalone" => Some(NodeRole::Standalone),
+        "leader" => Some(NodeRole::Leader),
+        "follower" => Some(NodeRole::Follower),
+        "learner" => Some(NodeRole::Learner),
+        _ => None,
+    }
 }
 
 fn engine_err(e: &Error) -> (u16, String) {
@@ -958,7 +1093,13 @@ fn count_of(results: Vec<QueryResult>) -> i64 {
 }
 
 /// Routes a request to `(status, body)`.
-pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, String) {
+pub fn route(
+    engine: &Engine,
+    peer: &PeerManager,
+    method: &str,
+    path: &str,
+    body: &str,
+) -> (u16, String) {
     if method == "GET" && path == "/health" {
         return (200, "ok".to_string());
     }
@@ -1597,24 +1738,68 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
-            // one segment per table in this engine; report its blocks
-            let rows = engine.row_count(&format!("{db}.{table}")).unwrap_or(0);
+            // `ShowSegmentsListHandler`: the `SHOW SEGMENTS` rows, plus the
+            // table name.
+            let rows = show_segments_rows(engine, &format!("{db}.{table}"));
+            let items = rows
+                .iter()
+                .map(|row| {
+                    let fields: Vec<String> = row
+                        .iter()
+                        .enumerate()
+                        .map(|(i, v)| {
+                            format!(
+                                "\"{}\":\"{}\"",
+                                json_escape(SHOW_SEGMENTS_COLUMNS[i]),
+                                json_escape(v)
+                            )
+                        })
+                        .collect();
+                    format!("{{{}}}", fields.join(","))
+                })
+                .collect::<Vec<_>>()
+                .join(",");
             (
                 200,
                 format!(
-                    "{{\"error_code\":0,\"error_msg\":\"OK\",\"segments\":[{{\"segment_id\":0,\"row_count\":{rows},\"block_count\":1,\"status\":\"sealed\"}}]}}"
+                    "{{\"error_code\":0,\"table_name\":\"{}\",\"segments\":[{}]}}",
+                    json_escape(&table),
+                    items
                 ),
             )
         }
-        ("GET", ["databases", db, "tables", table, "segments", _seg, "blocks"]) => {
+        ("GET", ["databases", db, "tables", table, "segments", seg, "blocks"]) => {
             let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
-            let rows = engine.row_count(&format!("{db}.{table}")).unwrap_or(0);
+            let Ok(segment) = seg.parse::<u32>() else {
+                return err_response(3037, "invalid segment id");
+            };
+            // `ShowBlocksListHandler`.
+            let rows = show_blocks_rows(engine, &format!("{db}.{table}"), segment);
+            let items = rows
+                .iter()
+                .map(|row| {
+                    let fields: Vec<String> = row
+                        .iter()
+                        .enumerate()
+                        .map(|(i, v)| {
+                            format!(
+                                "\"{}\":\"{}\"",
+                                json_escape(SHOW_BLOCKS_COLUMNS[i]),
+                                json_escape(v)
+                            )
+                        })
+                        .collect();
+                    format!("{{{}}}", fields.join(","))
+                })
+                .collect::<Vec<_>>()
+                .join(",");
             (
                 200,
                 format!(
-                    "{{\"error_code\":0,\"error_msg\":\"OK\",\"blocks\":[{{\"block_id\":0,\"row_count\":{rows}}}]}}"
+                    "{{\"error_code\":0,\"segment_id\":{segment},\"blocks\":[{}]}}",
+                    items
                 ),
             )
         }
@@ -1790,6 +1975,295 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                 Err(e) => e,
             }
         }
+        // ---- configs (`ShowConfigsHandler` / `ShowConfigHandler` /
+        //      `SetConfigHandler`, http_server_impl.cpp:2469-2900) ----
+        ("GET", ["configs"]) => (200, configs_json(engine)),
+        ("GET", ["configs", name]) => match engine.config_get(name) {
+            Some(value) => (
+                200,
+                format!(
+                    "{{\"{}\":\"{}\",\"error_code\":0}}",
+                    json_escape(name),
+                    json_escape(&value)
+                ),
+            ),
+            None => err_response(1008, &format!("Option: {name} doesn't exist.")),
+        },
+        ("POST", ["configs"]) => {
+            let Some((name, literal)) = single_field(&doc) else {
+                return err_response(3076, "No config will be set");
+            };
+            let sql = format!("SET CONFIG {} {literal};", name.to_ascii_lowercase());
+            match run(&sql) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        // ---- variables (`ShowGlobalVariablesHandler`,
+        //      `ShowGlobalVariableHandler`, `SetGlobalVariableHandler`, the
+        //      session pair, http_server_impl.cpp:2540-2830) ----
+        ("GET", ["variables", scope]) if matches!(*scope, "global" | "session") => {
+            // `Engine::show_variable` exists but takes the private
+            // `variables::SetScope`, so the listing cannot be driven from this
+            // crate yet; the session/global variable tables live in
+            // `src/main/variables.cppm`.
+            not_supported(
+                &format!("GET /variables/{scope}"),
+                "Engine::variables(SetScope) / a public `variables::SetScope`",
+            )
+        }
+        ("GET", ["variables", scope, _name]) if matches!(*scope, "global" | "session") => {
+            not_supported(
+                &format!("GET /variables/{scope}/{{variable_name}}"),
+                "Engine::show_variable with a public `variables::SetScope`",
+            )
+        }
+        ("SET", ["variables", scope]) if matches!(*scope, "global" | "session") => {
+            not_supported(
+                &format!("SET /variables/{scope}"),
+                "a SET VARIABLE / ENGINE SET statement (the parser has none)",
+            )
+        }
+        // ---- snapshots (`ListSnapshotsHandler`, `ShowSnapshotHandler`,
+        //      `Create*SnapshotHandler`, http_server_impl.cpp:3491-3860) ----
+        ("GET", ["snapshots"]) => match engine.snapshot_names() {
+            Ok(names) => {
+                let items = names
+                    .iter()
+                    .map(|n| format!("{{\"name\":\"{}\"}}", json_escape(n)))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                (
+                    200,
+                    format!("{{\"error_code\":0,\"error_msg\":\"\",\"snapshots\":[{items}]}}"),
+                )
+            }
+            Err(e) => engine_err(&e),
+        },
+        ("GET", ["snapshots", name]) => match engine.snapshot_names() {
+            Ok(names) if names.iter().any(|n| n == name) => (
+                200,
+                format!(
+                    "{{\"error_code\":0,\"error_msg\":\"\",\"snapshot\":{{\"name\":\"{}\"}}}}",
+                    json_escape(name)
+                ),
+            ),
+            Ok(_) => err_response(3037, &format!("snapshot '{name}' does not exist")),
+            Err(e) => engine_err(&e),
+        },
+        ("POST", ["snapshots"]) => {
+            let db = doc.get("db_name").and_then(Json::as_str).unwrap_or("default_db");
+            let table = doc
+                .get("table_name")
+                .and_then(Json::as_str)
+                .unwrap_or_default();
+            let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
+                return err_response(3037, "snapshot_name is required");
+            };
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return err_response(3037, "invalid table name");
+            };
+            let sql = format!(
+                "CREATE SNAPSHOT {} ON TABLE {db}.{table};",
+                snapshot_sql(snapshot)
+            );
+            match run(&sql) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("POST", ["snapshots", "restore"]) => {
+            let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
+                return err_response(3037, "snapshot_name is required");
+            };
+            match run(&format!(
+                "RESTORE TABLE SNAPSHOT {};",
+                snapshot_sql(snapshot)
+            )) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("POST", ["snapshots", "system"]) => {
+            let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
+                return err_response(3037, "snapshot_name is required");
+            };
+            match run(&format!(
+                "CREATE SNAPSHOT {} ON SYSTEM;",
+                snapshot_sql(snapshot)
+            )) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("POST", ["snapshots", "system", "restore"]) => {
+            let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
+                return err_response(3037, "snapshot_name is required");
+            };
+            match run(&format!(
+                "RESTORE SYSTEM SNAPSHOT {};",
+                snapshot_sql(snapshot)
+            )) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("POST", ["snapshots", "database"]) => {
+            let db = doc.get("db_name").and_then(Json::as_str).unwrap_or("default_db");
+            let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
+                return err_response(3037, "snapshot_name is required");
+            };
+            let Some(db) = safe_ident(db) else {
+                return err_response(3003, "invalid database name");
+            };
+            match run(&format!(
+                "CREATE SNAPSHOT {} ON DATABASE {db};",
+                snapshot_sql(snapshot)
+            )) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("POST", ["snapshots", "database", "restore"]) => {
+            let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
+                return err_response(3037, "snapshot_name is required");
+            };
+            match run(&format!(
+                "RESTORE DATABASE SNAPSHOT {};",
+                snapshot_sql(snapshot)
+            )) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("DELETE", ["snapshots", name]) => {
+            match run(&format!("DROP SNAPSHOT {};", snapshot_sql(name))) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        // ---- instance (`*Handler` in http_server_impl.cpp:2917-3465) ----
+        // The reference serves these from `SHOW BUFFER` / `SHOW QUERIES` / …
+        // and from the buffer manager, none of which the engine exposes yet.
+        ("POST", ["instance", "flush"]) => match engine.flush() {
+            Ok(()) => (200, ok_json()),
+            Err(e) => engine_err(&e),
+        },
+        ("GET", ["instance", "buffer"]) => not_supported(
+            "GET /instance/buffer",
+            "Engine::buffer_objects() over BufferManager (SHOW BUFFER)",
+        ),
+        ("GET", ["instance", "profiles"]) => not_supported(
+            "GET /instance/profiles",
+            "Engine::profiles() (SHOW PROFILES)",
+        ),
+        ("GET", ["instance", "memindex"]) => not_supported(
+            "GET /instance/memindex",
+            "Engine::memory_indexes() (SHOW MEMINDEX)",
+        ),
+        ("GET", ["instance", "queries"]) => not_supported(
+            "GET /instance/queries",
+            "Engine::running_queries() (SHOW QUERIES)",
+        ),
+        ("GET", ["instance", "queries", _id]) => not_supported(
+            "GET /instance/queries/{query_id}",
+            "Engine::query_profile(id) (SHOW QUERY <id>)",
+        ),
+        ("GET", ["instance", "transactions"]) => not_supported(
+            "GET /instance/transactions",
+            "Engine::active_transactions() (SHOW TRANSACTIONS)",
+        ),
+        ("GET", ["instance", "transactions", _id]) => not_supported(
+            "GET /instance/transactions/{transaction_id}",
+            "Engine::transaction_detail(id) (SHOW TRANSACTION <id>)",
+        ),
+        ("GET", ["instance", "objects"]) => not_supported(
+            "GET /instance/objects",
+            "Engine::buffer_objects() (the buffer manager's object table)",
+        ),
+        ("GET", ["instance", "objects", _name]) => not_supported(
+            "GET /instance/objects/{object_name}",
+            "Engine::buffer_object(name)",
+        ),
+        ("GET", ["instance", "files"]) => not_supported(
+            "GET /instance/files",
+            "Engine::all_files() (every data file with its size)",
+        ),
+        ("GET", ["instance", "logs"]) => not_supported(
+            "GET /instance/logs",
+            "Engine::logs() (the log file's index/filename/type rows)",
+        ),
+        ("GET", ["instance", "memory"]) => not_supported(
+            "GET /instance/memory",
+            "Engine::allocator_stats() from the global memory tracker",
+        ),
+        ("GET", ["instance", "memory", "objects"]) => not_supported(
+            "GET /instance/memory/objects",
+            "Engine::memory_objects() from the global memory tracker",
+        ),
+        ("GET", ["instance", "memory", "allocations"]) => not_supported(
+            "GET /instance/memory/allocations",
+            "Engine::memory_allocations() from the global memory tracker",
+        ),
+        // ---- admin (`Admin*Handler`, http_server_impl.cpp:3861-4240) ----
+        ("GET", ["admin", "nodes"]) => {
+            let nodes = peer
+                .list_nodes()
+                .iter()
+                .map(node_json)
+                .collect::<Vec<_>>()
+                .join(",");
+            (200, format!("{{\"error_code\":0,\"nodes\":[{nodes}]}}"))
+        }
+        ("GET", ["admin", "node", "current"]) => match peer.this_node() {
+            Some(node) => (200, format!("{{\"error_code\":0,\"node\":{}}}", node_json(&node))),
+            None => err_response(3037, "node is not initialized"),
+        },
+        ("POST", ["admin", "node", "current"]) => {
+            let Some(role) = doc.get("role").and_then(Json::as_str) else {
+                return err_response(3037, "Field 'role' is required");
+            };
+            let Some(role) = parse_role(role) else {
+                return err_response(3037, &format!("Invalid node role {role}"));
+            };
+            match peer.change_role(role) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => err_response(e.code(), &e.to_string()),
+            }
+        }
+        ("GET", ["admin", "node", name]) => {
+            let found = peer
+                .list_nodes()
+                .into_iter()
+                .find(|n| n.node_name() == *name);
+            match found {
+                Some(node) => (200, format!("{{\"error_code\":0,\"node\":{}}}", node_json(&node))),
+                None => err_response(3037, &format!("node '{name}' does not exist")),
+            }
+        }
+        ("DELETE", ["admin", "node", name]) => match peer.terminate_peer(name) {
+            Ok(_) => (
+                200,
+                format!(
+                    "{{\"error_code\":0,\"message\":\"Node {} removed successfully.\"}}",
+                    json_escape(name)
+                ),
+            ),
+            Err(e) => err_response(e.code(), &e.to_string()),
+        },
+        ("GET", ["admin", "configs"]) => (200, configs_json(engine)),
+        ("GET", ["admin", "variables"]) => not_supported(
+            "GET /admin/variables",
+            "Engine::variables(SetScope) / a public `variables::SetScope`",
+        ),
+        ("GET", ["admin", "variables", _name]) => not_supported(
+            "GET /admin/variables/{variable_name}",
+            "Engine::show_variable with a public `variables::SetScope`",
+        ),
+        ("GET", ["admin", "logs"]) => not_supported(
+            "GET /admin/logs",
+            "Engine::logs() (SHOW LOGS for the node's log files)",
+        ),
         _ => (404, "{\"error\":\"not found\"}".to_string()),
     }
 }
@@ -1798,7 +2272,7 @@ fn ok_json() -> String {
     "{\"error_code\":0,\"error_msg\":\"OK\"}".to_string()
 }
 
-fn handle(mut stream: TcpStream, engine: &Engine) -> Result<()> {
+fn handle(mut stream: TcpStream, engine: &Engine, peer: &PeerManager) -> Result<()> {
     let mut buf = Vec::new();
     let mut tmp = [0u8; 1024];
     // read until end of headers
@@ -1836,7 +2310,7 @@ fn handle(mut stream: TcpStream, engine: &Engine) -> Result<()> {
     }
     let body = String::from_utf8_lossy(&buf[header_end..]).to_string();
 
-    let (status, resp_body) = route(engine, method, path, &body);
+    let (status, resp_body) = route(engine, peer, method, path, &body);
     let reason = if status == 200 { "OK" } else { "Error" };
     let response = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -1859,26 +2333,298 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
+    /// A standalone node, the same registry `Server::bind` installs.
+    fn leader() -> PeerManager {
+        PeerManager::new("leader", "127.0.0.1", 23820)
+    }
+
     #[test]
     fn route_query_and_health() {
         let dir = tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
         engine
             .execute("CREATE TABLE t (id INT, name VARCHAR);")
             .unwrap();
         engine.execute("INSERT INTO t VALUES (1, 'a');").unwrap();
 
-        let (s, b) = route(&engine, "POST", "/query", "{\"sql\":\"SELECT * FROM t;\"}");
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "POST",
+            "/query",
+            "{\"sql\":\"SELECT * FROM t;\"}",
+        );
         assert_eq!(s, 200);
         assert!(b.contains("\"columns\":[\"id\",\"name\"]"), "{b}");
         assert!(b.contains("[\"1\",\"a\"]"), "{b}");
 
         assert_eq!(
-            route(&engine, "GET", "/health", ""),
+            route(&engine, &peer, "GET", "/health", ""),
             (200, "ok".to_string())
         );
-        assert_eq!(route(&engine, "POST", "/query", "{}").0, 400);
-        assert_eq!(route(&engine, "GET", "/nope", "").0, 404);
+        assert_eq!(route(&engine, &peer, "POST", "/query", "{}").0, 400);
+        assert_eq!(route(&engine, &peer, "GET", "/nope", "").0, 404);
+    }
+
+    /// `/configs` (`ShowConfigsHandler`, `ShowConfigHandler`,
+    /// `SetConfigHandler` in `src/network/http_server_impl.cpp`).
+    #[test]
+    fn http_config_routes() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
+
+        let (s, b) = route(&engine, &peer, "GET", "/configs", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.starts_with("{\"cache_result_capacity\":"), "{b}");
+        assert!(b.contains("\"log_level\":\"info\""), "{b}");
+        assert!(b.contains("\"error_code\":0"), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/configs/log_level", "");
+        assert_eq!(s, 200, "{b}");
+        assert_eq!(b, "{\"log_level\":\"info\",\"error_code\":0}");
+
+        let (s, b) = route(&engine, &peer, "POST", "/configs", "{\"log_level\":\"debug\"}");
+        assert_eq!(s, 200, "{b}");
+        let (_, b) = route(&engine, &peer, "GET", "/configs/log_level", "");
+        assert!(b.contains("\"debug\""), "{b}");
+
+        // Unknown knob: the reference's InvalidConfig (1008).
+        let (s, b) = route(&engine, &peer, "GET", "/configs/nope", "");
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("\"error_code\":1008"), "{b}");
+        // Two fields is "No config will be set" (3076).
+        let (s, b) = route(&engine, &peer, "POST", "/configs", "{\"a\":1,\"b\":2}");
+        assert!(s != 200, "{b}");
+        assert!(b.contains("\"error_code\":3076"), "{b}");
+    }
+
+    /// `/snapshots*` (`ListSnapshotsHandler`, `ShowSnapshotHandler`,
+    /// `CreateTableSnapshotHandler`, `RestoreTableSnapshotHandler`,
+    /// `DropSnapshotHandler`).
+    #[test]
+    fn http_snapshot_routes() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
+        engine.execute("CREATE TABLE t (id INT);").unwrap();
+        engine.execute("INSERT INTO t VALUES (1);").unwrap();
+
+        let (s, b) = route(&engine, &peer, "GET", "/snapshots", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"snapshots\":[]"), "{b}");
+
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "POST",
+            "/snapshots",
+            "{\"db_name\":\"default_db\",\"table_name\":\"t\",\"snapshot_name\":\"snap0\"}",
+        );
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"error_code\":0"), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/snapshots", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("{\"name\":\"snap0\"}"), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/snapshots/snap0", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"snapshot\":{\"name\":\"snap0\"}"), "{b}");
+
+        // Restoring into an existing table fails (DROP TABLE first), so the
+        // restore path is exercised after dropping it.
+        engine.execute("DROP TABLE t;").unwrap();
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "POST",
+            "/snapshots/restore",
+            "{\"snapshot_name\":\"snap0\"}",
+        );
+        assert_eq!(s, 200, "{b}");
+        assert_eq!(
+            engine.execute("SELECT * FROM t;").unwrap().len(),
+            1,
+            "the restored table serves its rows"
+        );
+
+        // Database and system snapshots share the engine's snapshot store.
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "POST",
+            "/snapshots/database",
+            "{\"db_name\":\"default_db\",\"snapshot_name\":\"dbsnap\"}",
+        );
+        assert_eq!(s, 200, "{b}");
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "POST",
+            "/snapshots/system",
+            "{\"snapshot_name\":\"sysnap\"}",
+        );
+        assert_eq!(s, 200, "{b}");
+
+        let (s, b) = route(&engine, &peer, "DELETE", "/snapshots/snap0", "");
+        assert_eq!(s, 200, "{b}");
+        let (s, b) = route(&engine, &peer, "GET", "/snapshots/snap0", "");
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("does not exist"), "{b}");
+    }
+
+    /// `/instance/*`: `flush` is real, the `SHOW BUFFER`/`SHOW QUERIES`-backed
+    /// families report 3032 `kNotSupported` until the engine exposes them.
+    #[test]
+    fn http_instance_routes() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
+        engine.execute("CREATE TABLE t (id INT);").unwrap();
+        engine.execute("INSERT INTO t VALUES (1);").unwrap();
+
+        let (s, b) = route(&engine, &peer, "POST", "/instance/flush", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"error_code\":0"), "{b}");
+
+        for path in [
+            "/instance/buffer",
+            "/instance/profiles",
+            "/instance/memindex",
+            "/instance/queries",
+            "/instance/queries/1",
+            "/instance/transactions",
+            "/instance/transactions/1",
+            "/instance/objects",
+            "/instance/objects/0.col",
+            "/instance/files",
+            "/instance/logs",
+            "/instance/memory",
+            "/instance/memory/objects",
+            "/instance/memory/allocations",
+        ] {
+            let (s, b) = route(&engine, &peer, "GET", path, "");
+            assert_eq!(s, 501, "{path}: {b}");
+            assert!(b.contains("\"error_code\":3032"), "{path}: {b}");
+            assert!(b.contains("not supported in this build"), "{path}: {b}");
+            assert!(b.contains("needs "), "{path}: {b}");
+        }
+    }
+
+    /// `/variables/*` needs `variables::SetScope` exported from the executor.
+    #[test]
+    fn http_variable_routes_report_the_missing_accessor() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
+        for (method, path) in [
+            ("GET", "/variables/global"),
+            ("GET", "/variables/global/query_count"),
+            ("GET", "/variables/session"),
+            ("GET", "/variables/session/query_count"),
+            ("SET", "/variables/global"),
+            ("SET", "/variables/session"),
+        ] {
+            let (s, b) = route(&engine, &peer, method, path, "{\"query_count\":1}");
+            assert_eq!(s, 501, "{path}: {b}");
+            assert!(b.contains("\"error_code\":3032"), "{path}: {b}");
+        }
+    }
+
+    /// `/admin/*` (`AdminShowCurrentNodeHandler`, `AdminListAllNodesHandler`,
+    /// `AdminShowNodeByNameHandler`, `AdminSetNodeRoleHandler`,
+    /// `AdminRemoveNodeHandler`, `AdminShowNodeConfigsHandler`).
+    #[test]
+    fn http_admin_routes() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
+
+        let (s, b) = route(&engine, &peer, "GET", "/admin/nodes", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.starts_with("{\"error_code\":0,\"nodes\":[{"), "{b}");
+        assert!(b.contains("\"name\":\"leader\""), "{b}");
+        assert!(b.contains("\"role\":\"leader\""), "{b}");
+        assert!(b.contains("\"status\":\"alive\""), "{b}");
+        assert!(b.contains("\"address\":\"127.0.0.1:23820\""), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/admin/node/current", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.starts_with("{\"error_code\":0,\"node\":{"), "{b}");
+        assert!(b.contains("\"role\":\"leader\""), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/admin/node/leader", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"name\":\"leader\""), "{b}");
+        let (s, b) = route(&engine, &peer, "GET", "/admin/node/ghost", "");
+        assert_eq!(s, 500, "{b}");
+
+        let (s, b) = route(&engine, &peer, "POST", "/admin/node/current", "{\"role\":\"admin\"}");
+        assert_eq!(s, 200, "{b}");
+        let (_, b) = route(&engine, &peer, "GET", "/admin/node/current", "");
+        assert!(b.contains("\"role\":\"admin\""), "{b}");
+        let (s, b) = route(&engine, &peer, "POST", "/admin/node/current", "{\"role\":\"nope\"}");
+        assert_eq!(s, 500, "{b}");
+        let (s, b) = route(&engine, &peer, "POST", "/admin/node/current", "{}");
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("Field 'role' is required"), "{b}");
+
+        let (s, b) = route(&engine, &peer, "GET", "/admin/configs", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"log_level\""), "{b}");
+
+        let (s, b) = route(&engine, &peer, "DELETE", "/admin/node/leader", "");
+        assert!(s == 200 || s == 500, "{b}");
+        assert!(b.contains("\"error_code\":"), "{b}");
+
+        for path in ["/admin/variables", "/admin/variables/query_count", "/admin/logs"] {
+            let (s, b) = route(&engine, &peer, "GET", path, "");
+            assert_eq!(s, 501, "{path}: {b}");
+            assert!(b.contains("\"error_code\":3032"), "{path}: {b}");
+        }
+    }
+
+    /// `GET /segments` / `GET /segments/{id}/blocks` reuse the real
+    /// `SHOW SEGMENTS` / `SHOW BLOCKS` metadata (`ShowSegmentsListHandler`,
+    /// `ShowBlocksListHandler`).
+    #[test]
+    fn http_segment_and_block_routes_report_real_metadata() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
+        engine.execute("CREATE TABLE t (id INT);").unwrap();
+        engine.execute("INSERT INTO t VALUES (1);").unwrap();
+        // A `COPY` seals its segment, so the table ends up with two segments.
+        let csv = dir.path().join("one_row.csv");
+        std::fs::write(&csv, "2\n").unwrap();
+        engine
+            .execute(&format!(
+                "COPY t FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                csv.display()
+            ))
+            .unwrap();
+        engine.flush().unwrap();
+
+        let (s, b) = route(&engine, &peer, "GET", "/databases/default_db/tables/t/segments", "");
+        assert_eq!(s, 200, "{b}");
+        assert!(b.starts_with("{\"error_code\":0,\"table_name\":\"t\",\"segments\":[{"), "{b}");
+        // Two real segments, each holding its own row.
+        assert_eq!(b.matches("\"row_count\":\"1\"").count(), 2, "{b}");
+        assert!(!b.contains("\"segment_id\":0"), "no synthetic segment: {b}");
+
+        let (s, b) = route(
+            &engine,
+            &peer,
+            "GET",
+            "/databases/default_db/tables/t/segments/0/blocks",
+            "",
+        );
+        assert_eq!(s, 200, "{b}");
+        assert!(b.starts_with("{\"error_code\":0,\"segment_id\":0,\"blocks\":[{"), "{b}");
+        assert!(b.contains("\"row_count\":\"2\""), "{b}");
+        assert!(b.contains("\"size\":\""), "{b}");
     }
 
     #[test]
