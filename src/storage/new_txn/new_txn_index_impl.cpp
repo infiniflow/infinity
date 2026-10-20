@@ -2771,9 +2771,21 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
     }
 
-    // The popped mem index is intentionally NOT cleared here: it is owned by the transaction
-    // until the dump is committed (PostCommit clears it), so that an aborted dump can put it
-    // back instead of silently losing the rows it contains.
+    if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kDumpMemIndex) {
+        // The popped mem index is intentionally NOT cleared here: it is owned by the transaction
+        // until the dump is committed (PostCommit clears it), so that an aborted dump can put it
+        // back instead of silently losing the rows it contains.
+        return Status::OK();
+    }
+    // Other callers (build index, replay) have no rollback path: the chunk is already written, so
+    // release the in-memory index and the tracer reservation that kept it alive right away.
+    mem_index->ClearMemIndex();
+    auto *storage = InfinityContext::instance().storage();
+    if (storage != nullptr) {
+        if (auto *memindex_tracer = storage->memindex_tracer(); memindex_tracer != nullptr) {
+            memindex_tracer->DumpDone(mem_index);
+        }
+    }
     return Status::OK();
 }
 

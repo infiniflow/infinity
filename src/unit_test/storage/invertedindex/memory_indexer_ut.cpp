@@ -263,8 +263,11 @@ TEST_P(MemoryIndexerTest, SpillLoadTest) {
 // Regression test for the "rows silently missing from the fulltext index" bug:
 //  - one failed inversion must not stall the sorted ring (a missing sequence number used to
 //    block every later Put(), so the index silently stopped being updated), and
-//  - the failed task must be re-inverted by Dump() with its original doc ids, otherwise the
-//    dumped chunk claims the row while containing none of its postings (permanently invisible).
+//  - the failed task must be re-inverted with its original doc ids, otherwise the dumped chunk
+//    claims the row while containing none of its postings (permanently invisible).
+// The retry happens in MarkInvertFailed, while the ring still misses this sequence number and no
+// later doc can have been committed: doc lists are delta encoded, so appending the postings
+// after the placeholder had been released would write a smaller doc id behind a larger one.
 TEST_P(MemoryIndexerTest, InvertFailureRetriedOnDump) {
     auto indexer = std::make_unique<MemoryIndexer>(GetFullDataDir(), "invert_failure", RowID(0U, 0U), flag_, "standard");
     std::shared_ptr<ColumnVector> column_vector = MakeColumnVector(wiki_paragraphs_);
@@ -292,7 +295,9 @@ TEST_P(MemoryIndexerTest, InvertFailureRetriedOnDump) {
     auto failed_task = submit(2, 1);
     ASSERT_EQ(failed_task->doc_count_, 2u);
     indexer->MarkInvertFailed(failed_task->seq_inserted_, column_vector, failed_task->offset_, failed_task->row_cnt_, failed_task->doc_count_);
-    EXPECT_TRUE(indexer->HasFailedInvertTasks());
+    // The retry succeeds right away, before the placeholder is queued, so nothing is left for the
+    // dump-time fallback (which would append row 2 behind rows 3-4 and break doc order).
+    EXPECT_FALSE(indexer->HasFailedInvertTasks());
 
     // Rows 3-4 come after the hole and must still reach the posting table. Bounded wait: with a
     // poisoned ring this has to fail the test instead of hanging it.
@@ -305,8 +310,8 @@ TEST_P(MemoryIndexerTest, InvertFailureRetriedOnDump) {
     {
         auto reader = std::make_shared<InMemIndexSegmentReader>(SegmentID(0), indexer.get());
         SegmentPosting seg_posting;
-        // "morphological" only occurs in row 2, whose inversion failed.
-        EXPECT_FALSE(reader->GetSegmentPosting("morphological", seg_posting));
+        // "morphological" only occurs in row 2, which was re-inverted in place.
+        ASSERT_TRUE(reader->GetSegmentPosting("morphological", seg_posting));
         // "recognize" only occurs in row 3, which is after the failed sequence number.
         SegmentPosting after_hole_posting;
         ASSERT_TRUE(reader->GetSegmentPosting("recognize", after_hole_posting));

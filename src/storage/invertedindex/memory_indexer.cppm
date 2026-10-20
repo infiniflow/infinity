@@ -176,9 +176,10 @@ private:
         u32 start_doc_id_{0};
     };
 
-    // Re-invert all failed tasks. Called by Dump() after all in-flight tasks are committed and
-    // before the chunk is written, so a transient inversion failure can never turn into a chunk
-    // that claims rows it does not contain.
+    // Re-invert the tasks that could not even be re-inverted synchronously in MarkInvertFailed.
+    // Called by Dump() after all in-flight tasks are committed and before the chunk is written.
+    // Retried postings are appended to the shared posting writers, whose doc lists are delta
+    // encoded, so the retry is only valid while no larger doc id has been generated yet.
     void RetryFailedInvertTasks();
 
 private:
@@ -200,6 +201,10 @@ private:
     mutable std::mutex mutex_;
     // Guarded by mutex_. Tasks whose inversion threw; re-inverted by Dump().
     std::vector<FailedInvertTask> failed_invert_tasks_;
+    // Upper bound (exclusive) of the doc ids already generated into the shared posting writers.
+    // Written by CommitSync (single writer, guarded by mutex_commit_) and read by
+    // RetryFailedInvertTasks to decide whether a retry can still keep the doc lists ordered.
+    std::atomic<u32> generated_doc_end_{0};
     std::mutex mutex_commit_;
     std::shared_mutex mutex_commit_sync_share_;
 

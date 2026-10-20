@@ -383,7 +383,29 @@ void MemoryIndexer::MarkInvertFailed(u64 seq,
                                      u32 row_offset,
                                      u32 row_count,
                                      u32 start_doc_id) {
-    {
+    // Retry once right here, before the placeholder is queued. The ring still misses this
+    // sequence number, so no later document can have been committed yet and the shared posting
+    // writers only hold smaller doc ids; appending these postings therefore keeps every doc list
+    // ordered (doc lists are delta encoded, a smaller doc id appended later would corrupt them).
+    bool recovered = false;
+    try {
+        PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
+        auto retry_inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
+        retry_inverter->InitAnalyzer(analyzer_);
+        size_t column_length_sum = retry_inverter->InvertColumn(column_vector, row_offset, row_count, start_doc_id);
+        retry_inverter->MergePrepare();
+        retry_inverter->Sort();
+        retry_inverter->GeneratePosting();
+        term_cnt_ += column_length_sum;
+        recovered = true;
+        LOG_WARN(fmt::format("MemoryIndexer: re-inverted failed task in place, seq={}, start_doc_id={}, row_count={}", seq, start_doc_id, row_count));
+    } catch (const std::exception &e) {
+        LOG_ERROR(fmt::format("MemoryIndexer: in-place retry of failed inversion failed, seq={}, error: {}", seq, e.what()));
+    } catch (...) {
+        LOG_ERROR(fmt::format("MemoryIndexer: in-place retry of failed inversion failed, seq={}, unknown error", seq));
+    }
+
+    if (!recovered) {
         std::unique_lock<std::mutex> lock(mutex_);
         failed_invert_tasks_.push_back(FailedInvertTask{column_vector, row_offset, row_count, start_doc_id});
     }
@@ -427,7 +449,22 @@ void MemoryIndexer::RetryFailedInvertTasks() {
                          index_name_,
                          base_row_id_.ToUint64(),
                          doc_count_));
+    const u32 generated_doc_end = generated_doc_end_.load();
     for (const FailedInvertTask &failed_task : failed_tasks) {
+        // Doc lists are delta encoded, so a posting can only be appended when every doc already
+        // written has a smaller id. If a later document has been generated since the failure, the
+        // retry would append a smaller id and corrupt the list: refuse to write such a chunk.
+        if (failed_task.start_doc_id_ < generated_doc_end) {
+            UnrecoverableError(fmt::format("MemoryIndexer: failed inversion can no longer be retried in doc order, db={}, table={}, index={}, "
+                                           "base_row_id={}, start_doc_id={}, row_count={}, already generated doc end={}",
+                                           db_name_,
+                                           table_name_,
+                                           index_name_,
+                                           base_row_id_.ToUint64(),
+                                           failed_task.start_doc_id_,
+                                           failed_task.row_count_,
+                                           generated_doc_end));
+        }
         try {
             PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
             auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
@@ -514,6 +551,9 @@ size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
         for (auto &inverter : inverters) {
             mem_usage_change.Add(inverter->GeneratePosting());
             num_generated += inverter->GetMerged();
+            // Remember how far the shared posting writers have progressed. Only CommitSync writes
+            // this (under mutex_commit_), so a plain max is enough.
+            generated_doc_end_.store(std::max(generated_doc_end_.load(), inverter->GetBeginDocID() + inverter->GetDocCount()));
 
             inverter->ReleaseSemas();
         }
