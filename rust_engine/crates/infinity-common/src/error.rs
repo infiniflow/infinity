@@ -39,6 +39,13 @@ pub enum Error {
     #[error("invalid argument: {0}")]
     Invalid(String),
 
+    /// The reference's `Status::InvalidNodeRole` (8007): the operation needs a
+    /// node role the storage is not in (e.g. a write on a non-writable node).
+    /// `Status::InvalidNodeRole` keeps the bare message, so `Display` does too;
+    /// the SDK dispatches on the code, not the text.
+    #[error("{0}")]
+    InvalidNodeRole(String),
+
     /// C++: `UnrecoverableException` (`src/common/utility/exception.cppm`).
     /// Its `what()` is the bare message.
     #[error("{0}")]
@@ -151,6 +158,9 @@ impl Error {
             }
             // 4002 TXN_CONFLICT.
             Error::TxnConflict(_) => 4002,
+            // 8007 INVALID_NODE_ROLE (`ErrorCode::kInvalidNodeRole`,
+            // `src/common/status.cppm:213`).
+            Error::InvalidNodeRole(_) => 8007,
             // Everything else keeps the generic code the reference uses for
             // internal failures.
             _ => 1,
@@ -173,5 +183,15 @@ mod tests {
             Error::Unexpected("recoverable error".to_string()).to_string(),
             "Unexpected error: recoverable error"
         );
+    }
+
+    /// `ErrorCode::kInvalidNodeRole` is 8007 (`src/common/status.cppm:213`) and
+    /// `Status::InvalidNodeRole` carries the bare message, so the wire code and
+    /// the wire text both match the reference (the SDK dispatches on the code).
+    #[test]
+    fn invalid_node_role_maps_to_8007() {
+        let error = Error::InvalidNodeRole("Attempt to write on non-writable node".to_string());
+        assert_eq!(error.status_code(), 8007);
+        assert_eq!(error.to_string(), "Attempt to write on non-writable node");
     }
 }
