@@ -170,10 +170,16 @@ func TestParseExprArithmetic(t *testing.T) {
 		{"division_slim", "c1/2", "/(c1, 2)"},
 		{"modulo_slim", "c1%2", "%(c1, 2)"},
 
-		// Multiple operations (right associative - parser behavior)
-		{"chain_addition", "c1 + c2 + c3", "+(c1, +(c2, c3))"},
-		{"chain_subtraction", "c1 - c2 - c3", "-(c1, -(c2, c3))"},
-		{"chain_multiplication", "c1 * c2 * c3", "*(c1, *(c2, c3))"},
+		// Multiple operations (left associative)
+		{"chain_addition", "c1 + c2 + c3", "+(+(c1, c2), c3)"},
+		{"chain_subtraction", "c1 - c2 - c3", "-(-(c1, c2), c3)"},
+		{"chain_multiplication", "c1 * c2 * c3", "*(*(c1, c2), c3)"},
+		{"chain_division", "c1 / c2 / c3", "/(/(c1, c2), c3)"},
+		{"sub_then_add", "c1 - c2 + c3", "+(-(c1, c2), c3)"},
+		{"mul_then_div", "c1 * c2 / c3", "/(*(c1, c2), c3)"},
+		{"div_then_mod", "c1 / c2 % c3", "%(/(c1, c2), c3)"},
+		{"chain_sub_negative", "c1 - c2 - -5", "-(-(c1, c2), -(5))"},
+		{"chain_sub_slim", "c1-c2-c3", "-(-(c1, c2), c3)"},
 
 		// Mixed operations (precedence)
 		{"add_mul_precedence", "c1 + c2 * c3", "+(c1, *(c2, c3))"},
@@ -194,16 +200,16 @@ func TestParseExprArithmetic(t *testing.T) {
 		{"mul_reverse", "2 * c1", "*(2, c1)"},
 		{"div_reverse", "100 / c1", "/(100, c1)"},
 
-		// Multiple terms (right associative - parser behavior)
-		{"three_terms_add", "c1 + c2 + c3", "+(c1, +(c2, c3))"},
-		{"mixed_three_terms", "c1 + c2 - c3", "+(c1, -(c2, c3))"},
-		{"four_terms", "c1 + c2 + c3 + c4", "+(c1, +(c2, +(c3, c4)))"},
+		// Multiple terms (left associative)
+		{"three_terms_add", "c1 + c2 + c3", "+(+(c1, c2), c3)"},
+		{"mixed_three_terms", "c1 + c2 - c3", "-(+(c1, c2), c3)"},
+		{"four_terms", "c1 + c2 + c3 + c4", "+(+(+(c1, c2), c3), c4)"},
 
 		// Complex expressions
 		{"complex_nested", "c1 * c2 + c3 * c4", "+(*(c1, c2), *(c3, c4))"},
 		{"complex_nested2", "(c1 + c2) * (c3 - c4)", "*(+(c1, c2), -(c3, c4))"},
-		// Complex expression with all operators - parser groups right due to equal precedence
-		{"all_operators", "c1 + c2 - c3 * c4 / c5 % c6", "+(c1, -(c2, *(c3, /(c4, %(c5, c6)))))"},
+		// Complex expression with all operators - equal precedence groups left
+		{"all_operators", "c1 + c2 - c3 * c4 / c5 % c6", "-(+(c1, c2), %(/(*(c3, c4), c5), c6))"},
 
 		// Arithmetic with floats
 		{"add_float", "c1 + 3.14", "+(c1, 3.140000)"},
@@ -862,6 +868,7 @@ func TestCondition(t *testing.T) {
 		// Arithmetic in conditions
 		{"addition in condition", "c1 + c2 > 10", ">(+(c1, c2), 10)"},
 		{"subtraction in condition", "c1 - c2 = 0", "=(-(c1, c2), 0)"},
+		{"chained subtraction in condition", "c1 - c2 - c3 > 0", ">(-(-(c1, c2), c3), 0)"},
 		{"multiplication in condition", "c1 * 2 < 100", "<(*(c1, 2), 100)"},
 		{"complex arithmetic", "(c1 + c2) * c3 > 100", ">(*(+(c1, c2), c3), 100)"},
 		// String comparisons
