@@ -8,6 +8,7 @@ pub mod json;
 pub mod md5;
 pub mod regex;
 pub mod regex_literal;
+pub mod registry;
 pub mod scalar;
 
 use std::cmp::Ordering;
@@ -104,7 +105,9 @@ pub enum Expr {
     In(Box<Expr>, Vec<Expr>, bool),
     /// `a <op> b` arithmetic.
     Binary(Box<Expr>, BinOp, Box<Expr>),
-    /// A scalar function call; unknown functions evaluate to NULL.
+    /// A scalar function call. Build it through [`registry::func`], which rejects
+    /// names this crate does not implement (a typo is a bind-time error, as in the
+    /// reference binder); [`crate::Expr::eval`] only evaluates known names.
     Func {
         name: String,
         args: Vec<Expr>,
@@ -851,8 +854,9 @@ fn like_match(text: &str, pattern: &str, escape: char) -> bool {
     dp[t.len()][p.len()]
 }
 
-/// Evaluates a scalar function. Only a small, deterministic set is implemented;
-/// anything unknown yields NULL (so parsing breadth never breaks execution).
+/// Evaluates a scalar function. The name must be one of the functions registered
+/// in [`registry`]: callers construct calls through [`registry::func`], which
+/// rejects an unknown name at bind time instead of letting it evaluate to NULL.
 fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
     let a0 = || args.first().map(|e| e.eval(row)).unwrap_or(Value::Null);
     let a1 = || args.get(1).map(|e| e.eval(row)).unwrap_or(Value::Null);
@@ -1098,6 +1102,9 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             };
             cast_value(&a0(), &ty)
         }
+        // `registry::func` rejects every other name, so this arm is unreachable for
+        // calls built through it; a hand-built expression still yields NULL rather
+        // than panicking.
         _ => Value::Null,
     }
 }
