@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 use crate::bg_task::{BGTaskProcessor, BgTask};
 use crate::{Engine, QueryResult, Scope};
+use infinity_parser::Literal;
 use tempfile::tempdir;
 
 /// The value behind `SHOW VARIABLE <name>` at global scope.
@@ -383,4 +384,44 @@ fn memory_indexes_report_the_in_memory_rows() {
     assert_eq!(fulltext.index_type, "FULLTEXT");
     assert_eq!(fulltext.row_count, 1);
     assert!(fulltext.mem_used > 0, "the segment holds one document");
+}
+
+/// `total_rollback_count` must move exactly once per rollback.
+///
+/// `TxnManager::rollback` removes the transaction's registry slot and then
+/// drops the `Txn`, whose `Drop` removes the slot again — so a counter bumped in
+/// both places would double count. `Txn::drop` only releases the slot; the
+/// counter is bumped by `rollback` alone, as `NewTxnManager::RollBackTxn` does in
+/// the reference (`~NewTxn` is empty, `new_txn_impl.cpp:128`).
+#[test]
+fn rollback_counter_moves_exactly_once_per_rollback() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+    engine.execute("CREATE TABLE rb (id INT);").unwrap();
+
+    let txn = engine.begin_txn();
+    assert_eq!(number(&engine, "active_txn_count"), 1);
+    txn.rollback();
+    assert_eq!(number(&engine, "total_rollback_count"), 1);
+    assert_eq!(number(&engine, "active_txn_count"), 0);
+
+    // A commit is not a rollback, and the counter stays where it was.
+    let mut txn = engine.begin_txn();
+    txn.append("rb", vec![vec![Literal::Int(1)]]).unwrap();
+    txn.commit().unwrap();
+    assert_eq!(number(&engine, "total_rollback_count"), 1);
+    assert_eq!(number(&engine, "total_commit_count"), 1);
+
+    // Dropping an uncommitted transaction releases its slot without counting a
+    // rollback (only an explicit rollback does).
+    {
+        let _txn = engine.begin_txn();
+        assert_eq!(number(&engine, "active_txn_count"), 1);
+    }
+    assert_eq!(number(&engine, "active_txn_count"), 0);
+    assert_eq!(number(&engine, "total_rollback_count"), 1);
+
+    // A second rollback moves it again, by exactly one.
+    engine.begin_txn().rollback();
+    assert_eq!(number(&engine, "total_rollback_count"), 2);
 }
