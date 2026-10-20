@@ -161,7 +161,10 @@ mod tests {
                     let n = sq_decode(&codes, 0, d, bits);
                     let step = if a[d] > 0.0 { a[d] } else { 1.0 };
                     let error = (r[d] - (a[d] * n + b[d])).abs();
-                    assert!(error <= step * 0.75, "bits {bits} dim {d}: {error} > {step}");
+                    assert!(
+                        error <= step * 0.75,
+                        "bits {bits} dim {d}: {error} > {step}"
+                    );
                 }
             }
         }
@@ -173,7 +176,7 @@ mod tests {
     fn scalar_quantized_chunk_ranks_the_nearest_vector() {
         let dims = 2;
         let centroids = vec![1.0, 0.0, 0.0, 1.0];
-        let vectors = vec![
+        let vectors = [
             (10u32, vec![1.0f32, 0.0]),
             (11, vec![0.9, 0.1]),
             (20, vec![0.0, 1.0]),
@@ -183,7 +186,12 @@ mod tests {
         let mut residuals: Vec<Vec<f32>> = Vec::new();
         for (i, (_, v)) in vectors.iter().enumerate() {
             let c = assign[i] * dims;
-            residuals.push(v.iter().zip(&centroids[c..c + dims]).map(|(x, c)| x - c).collect());
+            residuals.push(
+                v.iter()
+                    .zip(&centroids[c..c + dims])
+                    .map(|(x, c)| x - c)
+                    .collect(),
+            );
         }
         let (a, b) = train_scalar_quantization(&residuals, dims, 8);
         let mut parts = vec![IvfSqPartData::default(); 2];
@@ -268,7 +276,11 @@ fn sq_decode(codes: &[u8], base: usize, j: usize, bits: u8) -> f32 {
 /// (`IVF_Parts_Storage_Info<kScalarQuantization>` constructor): per dimension,
 /// the min/max after dropping the `training_num/200 + 1` extreme values at each
 /// end, then `a = (max - min) / 2^bits` and `b = min + a / 2`.
-pub fn train_scalar_quantization(residuals: &[Vec<f32>], dims: usize, bits: u8) -> (Vec<f32>, Vec<f32>) {
+pub fn train_scalar_quantization(
+    residuals: &[Vec<f32>],
+    dims: usize,
+    bits: u8,
+) -> (Vec<f32>, Vec<f32>) {
     let n = residuals.len();
     let exclude = (n / 200 + 1).min(n);
     let parts = 1u32 << bits;
@@ -280,7 +292,10 @@ pub fn train_scalar_quantization(residuals: &[Vec<f32>], dims: usize, bits: u8) 
         // `std::priority_queue<f32>` keeps the `exclude` smallest values and
         // `top()` is the largest of them; the mirror heap keeps the `exclude`
         // largest and its `top()` is the smallest of them.
-        let start = column.get(exclude.saturating_sub(1)).copied().unwrap_or(column[0]);
+        let start = column
+            .get(exclude.saturating_sub(1))
+            .copied()
+            .unwrap_or(column[0]);
         let end = column
             .get(n.saturating_sub(exclude))
             .copied()
@@ -368,15 +383,16 @@ impl IvfSqIndex {
             let c = &self.centroids[at..at + self.dims];
             // `c + b` and the prefactors the reference hoists out of the loop.
             let c_plus_b: Vec<f32> = c.iter().zip(&self.b).map(|(c, b)| c + b).collect();
-            let b_plus_c_minus_x: Vec<f32> = c_plus_b
-                .iter()
-                .zip(query)
-                .map(|(cb, x)| cb - x)
-                .collect();
+            let b_plus_c_minus_x: Vec<f32> =
+                c_plus_b.iter().zip(query).map(|(cb, x)| cb - x).collect();
             let dot_x_c_b: f32 = query.iter().zip(&c_plus_b).map(|(x, y)| x * y).sum();
             let c_plus_b_l2: f32 = c_plus_b.iter().map(|v| v * v).sum();
             let b_plus_c_minus_x_l2: f32 = b_plus_c_minus_x.iter().map(|v| v * v).sum();
-            let c_plus_b_mult_a_2: Vec<f32> = c_plus_b.iter().zip(&self.a).map(|(cb, a)| 2.0 * cb * a).collect();
+            let c_plus_b_mult_a_2: Vec<f32> = c_plus_b
+                .iter()
+                .zip(&self.a)
+                .map(|(cb, a)| 2.0 * cb * a)
+                .collect();
             let a_mult_b_plus_c_minus_x_2: Vec<f32> = b_plus_c_minus_x
                 .iter()
                 .zip(&self.a)
@@ -389,8 +405,8 @@ impl IvfSqIndex {
                     // dot(x, v) = dot(x, c + b) + dot(v, e) + dot(x * a, code)
                     "ip" => {
                         let mut d = dot_x_c_b + part.dot_v_e.get(i).copied().unwrap_or(0.0);
-                        for j in 0..self.dims {
-                            d += x_mult_a[j] * sq_decode(&part.codes, base, j, self.sq_bits);
+                        for (j, xa) in x_mult_a.iter().enumerate() {
+                            d += xa * sq_decode(&part.codes, base, j, self.sq_bits);
                         }
                         d
                     }
@@ -438,6 +454,7 @@ impl IvfSqIndex {
 pub enum IvfSegment {
     Plain(IvfIndex),
     Scalar(IvfSqIndex),
+    Product(IvfPqIndex),
 }
 
 impl IvfSegment {
@@ -446,6 +463,7 @@ impl IvfSegment {
         match self {
             IvfSegment::Plain(index) => index.candidates(query, k, nprobe, metric),
             IvfSegment::Scalar(index) => index.candidates(query, k, nprobe, metric),
+            IvfSegment::Product(index) => index.candidates(query, k, nprobe, metric),
         }
     }
 
@@ -459,6 +477,344 @@ impl IvfSegment {
                 .flat_map(|p| p.iter().map(|(offset, _)| *offset))
                 .collect(),
             IvfSegment::Scalar(index) => index.offsets().collect(),
+            IvfSegment::Product(index) => index.offsets().collect(),
         }
+    }
+}
+
+/// Product-quantized IVF chunk (`IndexIVFStorageOption::Type::kProductQuantization`).
+///
+/// The residuals are split into `subspace_num` subspaces; each subspace keeps
+/// `real_centroid_num` codewords and every vector stores one code per subspace
+/// (`ivf_index_storage_parts_impl.cpp:302-430,1080-1215`).
+pub struct IvfPqIndex {
+    pub dims: usize,
+    pub centroids: Vec<f32>,
+    pub centroid_count: usize,
+    pub subspace_num: usize,
+    pub real_centroid_num: usize,
+    /// `[subspace][centroid][sub_dim]` — `subspace_centroids_data_`.
+    pub codewords: Vec<f32>,
+    /// `-0.5 * ||centroid||^2` per `[subspace][centroid]`.
+    pub norms_neg_half: Vec<f32>,
+    /// 4, 8, 12 or 16 bits per code.
+    pub bits: u8,
+    pub parts: Vec<IvfPqPartData>,
+}
+
+/// One part of a product-quantized chunk.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct IvfPqPartData {
+    pub offsets: Vec<u32>,
+    /// Packed code words, `subspace_num` codes per vector.
+    pub codes: Vec<u8>,
+}
+
+/// Bytes one vector's code words occupy (the reference's row memory cost).
+pub fn pq_bytes_per_vector(subspace_num: usize, bits: u8) -> usize {
+    match bits {
+        0..=4 => subspace_num.div_ceil(2),
+        5..=8 => subspace_num,
+        9..=12 => subspace_num * 3 / 2 + subspace_num % 2,
+        _ => subspace_num * 2,
+    }
+}
+
+/// Reads code `subspace` of vector `idx` (`PQ_Code_StorageT::ExtractCodes`).
+fn pq_code(codes: &[u8], idx: usize, subspace: usize, subspace_num: usize, bits: u8) -> u32 {
+    match bits {
+        0..=4 => {
+            let pos = idx * subspace_num + subspace;
+            let byte = codes[pos >> 1];
+            u32::from(if pos & 1 == 1 { byte >> 4 } else { byte & 0xf })
+        }
+        5..=8 => u32::from(codes[idx * subspace_num + subspace]),
+        9..=12 => {
+            let half = idx * subspace_num * 3;
+            let mut byte_pos = half >> 1;
+            let mut is_odd = half & 1 == 1;
+            for _ in 0..subspace {
+                byte_pos += if is_odd { 2 } else { 1 };
+                is_odd = !is_odd;
+            }
+            let pack_16 = u32::from(codes[byte_pos]) | (u32::from(codes[byte_pos + 1]) << 8);
+            if is_odd {
+                pack_16 >> 4
+            } else {
+                pack_16 & 0xfff
+            }
+        }
+        _ => {
+            let at = (idx * subspace_num + subspace) * 2;
+            u32::from(u16::from_le_bytes([codes[at], codes[at + 1]]))
+        }
+    }
+}
+
+/// Writes one vector's codes (`PQ_Code_StorageT::AppendCodes`), returning the
+/// packed bytes for that vector.
+fn pq_pack(codes: &[u32], subspace_num: usize, bits: u8) -> Vec<u8> {
+    let mut out = vec![0u8; pq_bytes_per_vector(subspace_num, bits)];
+    match bits {
+        0..=4 => {
+            for (i, code) in codes.iter().enumerate() {
+                let pos = i;
+                if pos & 1 == 1 {
+                    out[pos >> 1] |= (*code as u8) << 4;
+                } else {
+                    out[pos >> 1] |= *code as u8;
+                }
+            }
+        }
+        5..=8 => {
+            for (i, code) in codes.iter().enumerate() {
+                out[i] = *code as u8;
+            }
+        }
+        9..=12 => {
+            let mut byte_pos = 0usize;
+            let mut is_odd = false;
+            for code in codes {
+                let write_16 = if is_odd { code << 4 } else { *code };
+                out[byte_pos] |= (write_16 & 0xff) as u8;
+                out[byte_pos + 1] |= (write_16 >> 8) as u8;
+                byte_pos += if is_odd { 2 } else { 1 };
+                is_odd = !is_odd;
+            }
+        }
+        _ => {
+            for (i, code) in codes.iter().enumerate() {
+                out[i * 2..i * 2 + 2].copy_from_slice(&(*code as u16).to_le_bytes());
+            }
+        }
+    }
+    out
+}
+
+/// Trains the per-subspace codebooks on residuals
+/// (`IVF_Parts_Storage_Info<kProductQuantization>::TrainResidual`).
+///
+/// `real_centroid_num` is `min(2^bits, training_num)`; below that threshold the
+/// reference copies the training residuals instead of running k-means. The
+/// k-means itself follows the deterministic seeding this crate already uses for
+/// IVF centroids.
+pub fn train_product_quantization(
+    residuals: &[Vec<f32>],
+    dims: usize,
+    subspace_num: usize,
+    bits: u8,
+) -> (usize, Vec<f32>, Vec<f32>) {
+    let subspace_dim = dims / subspace_num.max(1);
+    let expect = 1usize << bits;
+    let real = expect.min(residuals.len().max(1));
+    let mut codewords = vec![0.0f32; dims * real];
+    let mut norms = vec![0.0f32; subspace_num * real];
+    for j in 0..subspace_num {
+        let at = j * subspace_dim;
+        let mut samples: Vec<&[f32]> = residuals
+            .iter()
+            .map(|r| &r[at..at + subspace_dim])
+            .collect();
+        let centroids: Vec<Vec<f32>> = if residuals.len() <= expect {
+            samples.iter().take(real).map(|s| s.to_vec()).collect()
+        } else {
+            let mut assign = vec![0usize; samples.len()];
+            let mut centroids: Vec<Vec<f32>> = (0..real)
+                .map(|c| samples[c * samples.len() / real].to_vec())
+                .collect();
+            for _ in 0..10 {
+                let mut changed = false;
+                for (i, s) in samples.iter().enumerate() {
+                    let mut best = 0usize;
+                    let mut best_d = f32::INFINITY;
+                    for (c, cent) in centroids.iter().enumerate() {
+                        let d = l2_sq(s, cent);
+                        if d < best_d {
+                            best_d = d;
+                            best = c;
+                        }
+                    }
+                    if assign[i] != best {
+                        assign[i] = best;
+                        changed = true;
+                    }
+                }
+                let mut sums = vec![vec![0.0f64; subspace_dim]; real];
+                let mut counts = vec![0usize; real];
+                for (i, s) in samples.iter().enumerate() {
+                    counts[assign[i]] += 1;
+                    for (d, x) in s.iter().enumerate() {
+                        sums[assign[i]][d] += *x as f64;
+                    }
+                }
+                for c in 0..real {
+                    if counts[c] > 0 {
+                        centroids[c] = sums[c]
+                            .iter()
+                            .map(|s| (*s / counts[c] as f64) as f32)
+                            .collect();
+                    }
+                }
+                if !changed {
+                    break;
+                }
+            }
+            centroids
+        };
+        for (c, centroid) in centroids.iter().enumerate().take(real) {
+            let dst = (j * real + c) * subspace_dim;
+            codewords[dst..dst + subspace_dim].copy_from_slice(centroid);
+            norms[j * real + c] = -0.5 * centroid.iter().map(|x| x * x).sum::<f32>();
+        }
+        samples.clear();
+    }
+    (real, codewords, norms)
+}
+
+/// The nearest codeword of each subspace for one residual, packed
+/// (`IVF_Part_Storage_PQ::AppendOneEmbedding`).
+pub fn encode_product_quantized(
+    residual: &[f32],
+    dims: usize,
+    subspace_num: usize,
+    real: usize,
+    codewords: &[f32],
+    bits: u8,
+) -> Vec<u8> {
+    let subspace_dim = dims / subspace_num.max(1);
+    let mut codes = Vec::with_capacity(subspace_num);
+    for j in 0..subspace_num {
+        let at = j * subspace_dim;
+        let slice = &residual[at..at + subspace_dim];
+        let mut best = 0usize;
+        let mut best_d = f32::INFINITY;
+        for c in 0..real {
+            let dst = (j * real + c) * subspace_dim;
+            let d = l2_sq(slice, &codewords[dst..dst + subspace_dim]);
+            if d < best_d {
+                best_d = d;
+                best = c;
+            }
+        }
+        codes.push(best as u32);
+    }
+    pq_pack(&codes, subspace_num, bits)
+}
+
+impl IvfPqIndex {
+    fn score_centroid(&self, query: &[f32], centroid: usize, metric: &str) -> f32 {
+        let at = centroid * self.dims;
+        let c = &self.centroids[at..at + self.dims];
+        match metric {
+            "ip" => dot(query, c),
+            "cosine" => cosine(query, c),
+            _ => -l2_sq(query, c),
+        }
+    }
+
+    /// `IVF_Parts_Storage_Info::GetIPTable`: the inner product of `v` with every
+    /// codeword, indexed `[subspace][centroid]`.
+    fn ip_table(&self, v: &[f32]) -> Vec<f32> {
+        let subspace_dim = self.dims / self.subspace_num.max(1);
+        let mut table = vec![0.0f32; self.subspace_num * self.real_centroid_num];
+        for j in 0..self.subspace_num {
+            let at = j * subspace_dim;
+            let slice = &v[at..at + subspace_dim];
+            for c in 0..self.real_centroid_num {
+                let dst = (j * self.real_centroid_num + c) * subspace_dim;
+                table[j * self.real_centroid_num + c] =
+                    dot(slice, &self.codewords[dst..dst + subspace_dim]);
+            }
+        }
+        table
+    }
+
+    /// Top-k candidate row offsets (`SearchIndexT` for `kProductQuantization`).
+    pub fn candidates(&self, query: &[f32], k: usize, nprobe: usize, metric: &str) -> Vec<u32> {
+        if k == 0
+            || self.dims == 0
+            || query.len() != self.dims
+            || self.centroid_count == 0
+            || self.parts.is_empty()
+            || self.subspace_num == 0
+        {
+            return Vec::new();
+        }
+        let nprobe = nprobe.clamp(1, self.centroid_count);
+        let mut centroids: Vec<(usize, f32)> = (0..self.centroid_count)
+            .map(|c| (c, self.score_centroid(query, c, metric)))
+            .collect();
+        centroids.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        let query_l2: f32 = query.iter().map(|x| x * x).sum();
+        let query_table = self.ip_table(query);
+        let mut hits: Vec<(u32, f32)> = Vec::new();
+        for (part_id, _) in centroids.into_iter().take(nprobe) {
+            let Some(part) = self.parts.get(part_id) else {
+                continue;
+            };
+            let at = part_id * self.dims;
+            let c = &self.centroids[at..at + self.dims];
+            // The two tables the reference builds once per part.
+            let centroid_table = self.ip_table(c);
+            let centroid_l2: f32 = c.iter().map(|x| x * x).sum();
+            let residual: Vec<f32> = query.iter().zip(c).map(|(q, c)| q - c).collect();
+            let residual_l2: f32 = residual.iter().map(|x| x * x).sum();
+            let residual_table = self.ip_table(&residual);
+            let query_centroid_ip = dot(query, c);
+            for (i, offset) in part.offsets.iter().enumerate() {
+                let score = match metric {
+                    "ip" => {
+                        let mut d = query_centroid_ip;
+                        for j in 0..self.subspace_num {
+                            let code =
+                                pq_code(&part.codes, i, j, self.subspace_num, self.bits) as usize;
+                            d += query_table[j * self.real_centroid_num + code];
+                        }
+                        d
+                    }
+                    "cosine" => {
+                        let mut ip = query_centroid_ip;
+                        let mut target_l2 = centroid_l2 * 0.5;
+                        for j in 0..self.subspace_num {
+                            let code =
+                                pq_code(&part.codes, i, j, self.subspace_num, self.bits) as usize;
+                            let idx = j * self.real_centroid_num + code;
+                            ip += query_table[idx];
+                            target_l2 += centroid_table[idx] - self.norms_neg_half[idx];
+                        }
+                        target_l2 *= 2.0;
+                        ip / (query_l2 * target_l2).sqrt().max(f32::MIN_POSITIVE)
+                    }
+                    _ => {
+                        let mut d = residual_l2 * 0.5;
+                        for j in 0..self.subspace_num {
+                            let code =
+                                pq_code(&part.codes, i, j, self.subspace_num, self.bits) as usize;
+                            let idx = j * self.real_centroid_num + code;
+                            d -= residual_table[idx] + self.norms_neg_half[idx];
+                        }
+                        d *= 2.0;
+                        -d
+                    }
+                };
+                hits.push((*offset, score));
+            }
+        }
+        hits.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        hits.truncate(k);
+        hits.into_iter().map(|(offset, _)| offset).collect()
+    }
+
+    /// Every row offset the chunk covers.
+    pub fn offsets(&self) -> impl Iterator<Item = u32> + '_ {
+        self.parts.iter().flat_map(|p| p.offsets.iter().copied())
     }
 }

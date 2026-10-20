@@ -1058,6 +1058,17 @@ fn decode_value(
     }
 }
 
+/// The IVF index options the mirror has to honour
+/// (`IndexIVFCentroidOption` + `IndexIVFStorageOption`).
+struct IvfOptions {
+    storage: String,
+    sq_bits: u8,
+    pq_subspace_num: usize,
+    pq_bits: u8,
+    ratio: f32,
+    min_points: usize,
+}
+
 impl Engine {
     /// Root of the C++-format block mirror. The C++ engine keeps the table
     /// data under `<data_dir>/data/db_{db}/…`, next to `<data_dir>/catalog`.
@@ -2247,10 +2258,7 @@ impl Engine {
         &self,
         table: &str,
         column: &str,
-        storage: &str,
-        sq_bits: u8,
-        ratio: f32,
-        min_points: usize,
+        options: &IvfOptions,
     ) -> Result<(usize, Vec<u8>)> {
         let vectors = self.cpp_column_vectors(table, column)?;
         if vectors.is_empty() {
@@ -2261,8 +2269,8 @@ impl Engine {
         let dim = vectors[0].1.len();
         // C++ `IVF_Index_Data::Train`: `min(sqrt(n) * ratio, n / min_points)`,
         // raised to 1 when that underflows (`ivf_index_data_impl.cpp:195-201`).
-        let k = ((vectors.len() as f64).sqrt() * ratio as f64)
-            .min((vectors.len() / min_points.max(1)) as f64) as usize;
+        let k = ((vectors.len() as f64).sqrt() * options.ratio as f64)
+            .min((vectors.len() / options.min_points.max(1)) as f64) as usize;
         let k = k.clamp(1, vectors.len());
         // Deterministic seeding: pick k evenly spaced vectors.
         let mut centroids: Vec<Vec<f32>> = (0..k)
@@ -2314,11 +2322,21 @@ impl Engine {
             dimension: dim as u32,
             centroid_count: k as u32,
         };
-        if storage.eq_ignore_ascii_case("scalar_quantization") {
+        if options.storage.eq_ignore_ascii_case("scalar_quantization")
+            || options.storage.eq_ignore_ascii_case("product_quantization")
+        {
             let flat: Vec<f32> = centroids.iter().flatten().copied().collect();
-            let chunk = Self::encode_ivf_scalar_quantized(
-                &header, &flat, &vectors, &assign, sq_bits,
-            )?;
+            let chunk = if options.storage.eq_ignore_ascii_case("scalar_quantization") {
+                Self::encode_ivf_scalar_quantized(
+                    &header,
+                    &flat,
+                    &vectors,
+                    &assign,
+                    options.sq_bits,
+                )?
+            } else {
+                Self::encode_ivf_product_quantized(&header, &flat, &vectors, &assign, options)?
+            };
             return Ok((vectors.len(), chunk));
         }
         let mut parts = vec![knn_format::IvfPlainPart::default(); k];
@@ -2378,6 +2396,112 @@ impl Engine {
             .map_err(|e| Error::Invalid(format!("cannot encode IVF chunk: {e}")))
     }
 
+    /// Product-quantized chunk (`IVF_Part_Storage_PQ`): train one codebook per
+    /// subspace on the residuals, store one code per subspace and the
+    /// `-0.5 * ||c||^2` weights the search formulas need.
+    fn encode_ivf_product_quantized(
+        header: &knn_format::IvfChunkHeader,
+        centroids: &[f32],
+        vectors: &[(u32, Vec<f32>)],
+        assign: &[usize],
+        options: &IvfOptions,
+    ) -> Result<Vec<u8>> {
+        let dim = header.dimension as usize;
+        let residuals: Vec<Vec<f32>> = vectors
+            .iter()
+            .zip(assign)
+            .map(|((_, v), part)| {
+                let at = part * dim;
+                v.iter()
+                    .zip(&centroids[at..at + dim])
+                    .map(|(x, c)| x - c)
+                    .collect()
+            })
+            .collect();
+        let (real, codewords, norms) = infinity_index::ivf::train_product_quantization(
+            &residuals,
+            dim,
+            options.pq_subspace_num,
+            options.pq_bits,
+        );
+        let word_size = if options.pq_bits > 12 { 2 } else { 1 };
+        let mut parts: Vec<knn_format::IvfPqPart> = (0..header.centroid_count)
+            .map(|_| knn_format::IvfPqPart {
+                segment_offsets: Vec::new(),
+                last_code_id: 0,
+                codes: Vec::new(),
+                word_size,
+            })
+            .collect();
+        for (i, (label, _)) in vectors.iter().enumerate() {
+            let codes = infinity_index::ivf::encode_product_quantized(
+                &residuals[i],
+                dim,
+                options.pq_subspace_num,
+                real,
+                &codewords,
+                options.pq_bits,
+            );
+            let part = &mut parts[assign[i]];
+            part.segment_offsets.push(*label);
+            part.codes.extend_from_slice(&codes);
+            part.last_code_id += options.pq_subspace_num as u64;
+        }
+        let codebook = knn_format::IvfPqCodebook {
+            real_subspace_centroid_num: real as u32,
+            codewords,
+            subspace_weights: norms,
+        };
+        knn_format::encode_ivf_pq_chunk(header, centroids, &codebook, &parts)
+            .map_err(|e| Error::Invalid(format!("cannot encode IVF chunk: {e}")))
+    }
+
+    /// Decodes one product-quantized chunk into a searchable segment.
+    fn decode_ivf_pq_chunk(
+        bytes: &[u8],
+        options: &IvfOptions,
+    ) -> Option<infinity_index::ivf::IvfSegment> {
+        if bytes.len() < 20 {
+            return None;
+        }
+        let u32_at = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+        let dim = u32_at(8) as usize;
+        let centroid_count = u32_at(12) as usize;
+        if dim == 0 || centroid_count == 0 {
+            return None;
+        }
+        let real = u32_at(16 + centroid_count * dim * 4) as usize;
+        let word_size = if options.pq_bits > 12 { 2 } else { 1 };
+        let chunk = knn_format::decode_ivf_pq_chunk(
+            bytes,
+            word_size,
+            dim * real,
+            real * options.pq_subspace_num,
+        )
+        .ok()?;
+        let parts = chunk
+            .parts
+            .into_iter()
+            .map(|part| infinity_index::ivf::IvfPqPartData {
+                offsets: part.segment_offsets,
+                codes: part.codes,
+            })
+            .collect();
+        Some(infinity_index::ivf::IvfSegment::Product(
+            infinity_index::ivf::IvfPqIndex {
+                dims: dim,
+                centroids: chunk.centroids,
+                centroid_count,
+                subspace_num: options.pq_subspace_num,
+                real_centroid_num: chunk.codebook.real_subspace_centroid_num as usize,
+                codewords: chunk.codebook.codewords,
+                norms_neg_half: chunk.codebook.subspace_weights,
+                bits: options.pq_bits,
+                parts,
+            },
+        ))
+    }
+
     /// Writes `table`'s index as a C++ IVF chunk file (`kPlain`) under
     /// `…/idx_{id}/seg_0/chunk_0.idx`, returning how many vectors were written.
     pub fn write_cpp_ivf_index(&self, table: &str, index_name: &str) -> Result<usize> {
@@ -2399,10 +2523,8 @@ impl Engine {
             })
             .map(|im| im.column)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
-        let (storage, sq_bits, ratio, min_points) = self.ivf_storage_option(&table, index_name);
-        let (count, chunk) = self.cpp_ivf_chunk(
-            &table, &column, &storage, sq_bits, ratio, min_points,
-        )?;
+        let options = self.ivf_storage_option(&table, index_name);
+        let (count, chunk) = self.cpp_ivf_chunk(&table, &column, &options)?;
         let db_id = self.database_id_of(&table);
         let dir = self
             .blocks_root()
@@ -2428,14 +2550,20 @@ impl Engine {
         let Some(dir) = self.cpp_hnsw_dir(table, index_name) else {
             return Vec::new();
         };
-        let (storage, sq_bits, _, _) = self.ivf_storage_option(table, index_name);
+        let options = self.ivf_storage_option(table, index_name);
         let mut out = Vec::new();
         for (_, path) in hnsw_chunks(&dir) {
             let Ok(bytes) = std::fs::read(&path) else {
                 continue;
             };
-            if storage.eq_ignore_ascii_case("scalar_quantization") {
-                if let Some(segment) = Self::decode_ivf_sq_chunk(&bytes, sq_bits) {
+            if options.storage.eq_ignore_ascii_case("scalar_quantization") {
+                if let Some(segment) = Self::decode_ivf_sq_chunk(&bytes, options.sq_bits) {
+                    out.push(segment);
+                }
+                continue;
+            }
+            if options.storage.eq_ignore_ascii_case("product_quantization") {
+                if let Some(segment) = Self::decode_ivf_pq_chunk(&bytes, &options) {
                     out.push(segment);
                 }
                 continue;
@@ -2470,7 +2598,12 @@ impl Engine {
                 })
                 .collect();
             out.push(infinity_index::ivf::IvfSegment::Plain(
-                infinity_index::ivf::IvfIndex::new(dims, header.centroid_count as usize, flat, parts),
+                infinity_index::ivf::IvfIndex::new(
+                    dims,
+                    header.centroid_count as usize,
+                    flat,
+                    parts,
+                ),
             ));
         }
         out
@@ -2479,7 +2612,7 @@ impl Engine {
     /// The index's IVF options (`IndexIVFStorageOption` + the centroid option),
     /// defaulting exactly like the reference: plain storage and
     /// `centroids_num_ratio = 1.0` / `min_points_per_centroid = 32`.
-    fn ivf_storage_option(&self, table: &str, index_name: &str) -> (String, u8, f32, usize) {
+    fn ivf_storage_option(&self, table: &str, index_name: &str) -> IvfOptions {
         let table = self.qualified_table(table);
         let options = self
             .storage
@@ -2502,26 +2635,32 @@ impl Engine {
                 .find(|(k, _)| k.eq_ignore_ascii_case(key))
                 .map(|(_, v)| v.trim().trim_matches(|c| c == '\'' || c == '"').to_string())
         };
-        let storage = find("STORAGE_TYPE").unwrap_or_else(|| "plain".to_string());
-        let bits = find("SCALAR_QUANTIZATION_BITS")
-            .and_then(|v| v.parse::<u8>().ok())
-            .filter(|b| *b == 4 || *b == 8)
-            .unwrap_or(8);
-        let ratio = find("CENTROIDS_NUM_RATIO")
-            .and_then(|v| v.parse::<f32>().ok())
-            .unwrap_or(1.0);
-        let min_points = find("MIN_POINTS_PER_CENTROID")
-            .and_then(|v| v.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(32);
-        (storage, bits, ratio, min_points)
+        IvfOptions {
+            storage: find("STORAGE_TYPE").unwrap_or_else(|| "plain".to_string()),
+            sq_bits: find("SCALAR_QUANTIZATION_BITS")
+                .and_then(|v| v.parse::<u8>().ok())
+                .filter(|b| *b == 4 || *b == 8)
+                .unwrap_or(8),
+            pq_subspace_num: find("PRODUCT_QUANTIZATION_SUBSPACE_NUM")
+                .and_then(|v| v.parse::<usize>().ok())
+                .filter(|v| *v > 0)
+                .unwrap_or(1),
+            pq_bits: find("PRODUCT_QUANTIZATION_SUBSPACE_BITS")
+                .and_then(|v| v.parse::<u8>().ok())
+                .filter(|b| [4u8, 8, 12, 16].contains(b))
+                .unwrap_or(8),
+            ratio: find("CENTROIDS_NUM_RATIO")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(1.0),
+            min_points: find("MIN_POINTS_PER_CENTROID")
+                .and_then(|v| v.parse::<usize>().ok())
+                .filter(|v| *v > 0)
+                .unwrap_or(32),
+        }
     }
 
     /// Decodes one scalar-quantized chunk into a searchable segment.
-    fn decode_ivf_sq_chunk(
-        bytes: &[u8],
-        sq_bits: u8,
-    ) -> Option<infinity_index::ivf::IvfSegment> {
+    fn decode_ivf_sq_chunk(bytes: &[u8], sq_bits: u8) -> Option<infinity_index::ivf::IvfSegment> {
         let chunk = knn_format::decode_ivf_sq_chunk(bytes, sq_bits).ok()?;
         let dims = chunk.header.dimension as usize;
         if dims == 0 {

@@ -16949,6 +16949,42 @@ mod tests {
         );
     }
 
+    /// `storage_type = product_quantization` writes the C++ PQ chunk layout
+    /// (per-subspace codebook + packed codes) and searches it.
+    #[test]
+    fn a_product_quantized_ivf_index_mirrors_and_serves_candidates() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ivpq (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute(
+            "INSERT INTO ivpq VALUES (1,[0.0,0.0,0.0,0.0]),(2,[1.0,0.0,0.0,0.0]),\
+             (3,[0.0,1.0,0.0,0.0]),(4,[0.0,0.0,1.0,0.0]),\
+             (5,[0.0,0.0,0.0,1.0]),(6,[1.0,1.0,0.0,0.0]),\
+             (7,[0.0,0.0,1.0,1.0]),(8,[2.0,2.0,2.0,2.0]);",
+        )
+        .unwrap();
+        e.execute(
+            "CREATE INDEX ivpq_idx ON ivpq (v) USING IVF WITH \
+             (metric = l2, storage_type = product_quantization, \
+             product_quantization_subspace_num = 2, \
+             product_quantization_subspace_bits = 12);",
+        )
+        .unwrap();
+        e.flush().unwrap();
+        let segments = e.load_ivf_indexes("ivpq", "ivpq_idx");
+        assert!(
+            matches!(
+                segments.as_slice(),
+                [infinity_index::ivf::IvfSegment::Product(_)]
+            ),
+            "expected one PQ segment"
+        );
+        let q = "SELECT id FROM ivpq SEARCH MATCH VECTOR \
+                 (v, [0.0,0.0,0.0,0.95], 'float', 'l2', 1) WITH (nprobe = 16);";
+        assert_eq!(rows(&e, q), vec![vec!["5".to_string()]]);
+    }
+
     /// `storage_type = scalar_quantization` writes the C++ SQ chunk layout and
     /// searches it (residual codes + `dot_v_e`), instead of silently mirroring
     /// the index as plain storage.
