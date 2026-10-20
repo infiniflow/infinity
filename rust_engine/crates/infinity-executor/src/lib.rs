@@ -9455,51 +9455,26 @@ impl Engine {
             None
         };
         let (source, stages) = Self::decompose(plan);
-        let (columns, mut rows) = match source {
-            Source::Values { columns, rows } => (columns, rows),
-            Source::Table { columns, table } => {
-                // A full-text index filter answers from the column's inverted
-                // index, which is keyed by the storage row id (C++
-                // `IndexFilterEvaluatorFulltext` queries the `ColumnIndexReader`),
-                // so the scan needs the ids alongside the rows.
-                let needs_ids =
-                    candidate.is_some() && fulltext_index_column.is_some() && !fulltext_substring;
-                let (mut rows, row_ids) = match override_rows {
-                    Some(rows) => (rows, None),
-                    None if needs_ids => {
-                        let pairs = self.fetch_rows_with_ids(&table)?;
-                        let ids: Vec<usize> = pairs.iter().map(|(id, _)| *id).collect();
-                        (pairs.into_iter().map(|(_, row)| row).collect(), Some(ids))
-                    }
-                    None => (self.fetch_rows(&table)?, None),
-                };
-                // The index filter refers to the pre-`LazyLoad` scan layout, so
-                // it maps back onto the unpruned row before the rows compact.
-                if let (Some(candidate), Some(positions)) = (&candidate, &index_positions) {
-                    let tokenizer = fulltext_index_column
-                        .as_ref()
-                        .map(|column| self.index_tokenizer(&table, column));
-                    let fulltext_index = match (&fulltext_index_column, &row_ids, &tokenizer) {
-                        (Some(column), Some(_), Some(tokenizer)) if !fulltext_substring => Some((
-                            self.text_index_for(&table, column, tokenizer.clone())?,
-                            tokenizer.clone(),
-                        )),
-                        _ => None,
-                    };
-                    rows = apply_index_filter(
-                        rows,
-                        row_ids.as_deref(),
-                        fulltext_index.as_ref(),
-                        candidate,
-                        positions,
-                        fulltext_substring,
-                    )?;
-                }
-                if let Some(full) = &source_columns {
-                    rows = align_rows(rows, &columns, full);
-                }
-                (columns, rows)
+        // The fragment's source operator owns the read: the table scan fetches
+        // the rows, applies the index filter and aligns them onto the pruned
+        // layout; a join pairs the two sides; `VALUES` supplies its own rows.
+        let spec = match source {
+            Source::Values { columns, rows } => {
+                crate::operators::scan::SourceSpec::Values { columns, rows }
             }
+            Source::Table { columns, table } => crate::operators::scan::SourceSpec::Table(
+                Box::new(crate::operators::scan::TableScan {
+                    table,
+                    columns,
+                    source_columns,
+                    override_rows,
+                    candidate,
+                    index_positions,
+                    fulltext_index_column,
+                    fulltext_substring,
+                    unmatchable,
+                }),
+            ),
             Source::Join {
                 columns,
                 left,
@@ -9509,34 +9484,34 @@ impl Engine {
                 left_key,
                 right_key,
                 left_width,
-            } => {
-                let lrows = align_rows(
-                    self.fetch_rows(&left)?,
-                    &left_columns,
-                    &self.table_schema(&left)?,
-                );
-                let rrows = align_rows(
-                    self.fetch_rows(&right)?,
-                    &right_columns,
-                    &self.table_schema(&right)?,
-                );
-                (
+            } => crate::operators::scan::SourceSpec::Join(Box::new(
+                crate::operators::scan::JoinScan {
                     columns,
-                    nested_loop_join(&lrows, &rrows, left_key, right_key, left_width),
-                )
-            }
+                    left,
+                    right,
+                    left_columns,
+                    right_columns,
+                    left_key,
+                    right_key,
+                    left_width,
+                },
+            )),
         };
-        if unmatchable {
-            rows.clear();
-        }
+        let mut source = crate::operators::scan::PhysicalSource::new(
+            self,
+            spec,
+            crate::chunk::DEFAULT_VECTOR_SIZE,
+        );
+        let columns = source.columns().to_vec();
         if let Some((operators, names)) = lowered {
             // The lowered chain must cover exactly the stages `decompose`
             // found, otherwise the two views of the plan disagree and the
             // stage pipeline is authoritative.
             if crate::operators::lower::covers(&operators, &stages) {
-                return crate::operators::run_rows(operators, names, columns.len(), rows);
+                return crate::operators::run_operators(operators, names, &mut source);
             }
         }
+        let rows = source.collect_rows()?;
         self.rt.block_on(pipeline(
             columns,
             rows,

@@ -18,6 +18,7 @@ pub mod filter;
 pub mod limit;
 pub mod lower;
 pub mod project;
+pub mod scan;
 pub mod sort;
 pub mod top;
 
@@ -346,16 +347,15 @@ pub fn run_fragment(
     Ok(())
 }
 
-/// Runs a lowered chain over already materialised rows and returns the result
-/// in the `run_plan` shape.
+/// Runs a lowered chain over a fragment source and returns the result in the
+/// `run_plan` shape.
 ///
-/// The rows are handed out chunk by chunk, so an operator that completes early
-/// (LIMIT) leaves the rest of the relation untouched.
-pub fn run_rows(
+/// The source hands rows out chunk by chunk, so an operator that completes
+/// early (LIMIT) stops the scan cursor too.
+pub fn run_operators(
     mut operators: Vec<Box<dyn PhysicalOperator>>,
     names: Vec<String>,
-    width: usize,
-    rows: Vec<Vec<Value>>,
+    source: &mut dyn ChunkSource,
 ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
     #[cfg(test)]
     {
@@ -369,8 +369,7 @@ pub fn run_rows(
     }
     let mut ctx = OperatorContext::default();
     let mut states = OperatorStates::new(&operators);
-    let mut source = RowsSource::new(rows, width, ctx.block_capacity);
-    run_fragment(&operators, &mut ctx, &mut states, &mut source)?;
+    run_fragment(&operators, &mut ctx, &mut states, source)?;
     // Nothing consumes the head's output, so it is still in its own state.
     let head = operators.len() - 1;
     let rows = std::mem::take(&mut states.state_mut(head).data_blocks)
