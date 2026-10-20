@@ -29,7 +29,7 @@
 |---|---|
 | SQL 功能（Gate A） | ✅ 1752 statement ok / 129 statement error / 1546 query 全部通过 |
 | SDK 协议（Gate B） | ✅ 未修改的 Python / Go SDK 与 HTTP 模式全绿 |
-| 持久化恢复（Gate C） | ⚠️ 常规用例全绿；对齐 `mem_index_capacity` 后 5.toml 重档导入 RSS 3.0 GB、整轮峰值 ~8.2 GB，但 30 GB 开发机仍被宿主 `earlyoom -M 2000000` 在约 17 分钟处以 SIGTERM 终止（日志无 panic）；需在无看门狗的 CI 机复跑 |
+| 持久化恢复（Gate C） | ⚠️ 常规用例（含跨引擎兼容）全绿；仅 5.toml 重档未闭合：磁盘目录下 Rust 峰值 12.6–15 GB（C++ 9.47 GB、>30 min 未跑完），本机 30 GB + earlyoom 无法判定，需 CI 复跑 |
 | 并发稳定（Gate D） | ✅ loom + miri + ASan/TSAN + `parallel_test` |
 | 性能（Gate E） | ✅ 对 C++ golden **+4.59%**（最新；+2.93% / +4.75% 亦通过，门限 `<7%`）：insert 持平、全量 select +81%、点查 +394% |
 | 工程质量（Gate F） | ✅ fmt / clippy / deny |
@@ -499,7 +499,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 |---|---|---|
 | **A** | 全部 `test/sql/**/*.slt` 通过 | ✅ 1752 statement ok / 129 statement error / 1546 query（100%） |
 | **B** | 未修改的 Python/Go SDK + HTTP 全绿 | ✅ PySDK 逐文件全绿；Go 375/375；HTTP 全绿 |
-| **C** | 重启 / 快照 / 索引 chunk 生命周期 / 对象存储 | ⚠️ 本机：快照基线 171/171+8/8，重启套件 basic/alter/cleanup/compact/snapshot/system_snapshot 全绿（30 例）；memidx/fulltext/insert_import 的失败均为运行器 `kill -9` 竞态或缺失数据集（§8.4）。5.toml 重档仍被宿主 `earlyoom -M 2000000` 终止（21/50，无 panic）。两者都需 CI 复跑 |
+| **C** | 重启 / 快照 / 索引 chunk 生命周期 / 对象存储 / **跨引擎兼容** | ⚠️ 仅剩重档：快照基线 171/171+8/8；重启套件 basic/alter/cleanup/compact/snapshot/system_snapshot **30/30**、insert_import **12/12**、memidx **10/10** 全绿；新增跨引擎（C++↔Rust）**2/2 通过**；`test_fulltext_realtime` 因本机旧 `tmp/gt_res_list_10000.pkl` 未通过（需干净工作区复跑，其余 5/6 通过）。**5.toml 重档**在磁盘数据目录下 Rust 峰值 12.6–15 GB（C++ 参考 9.47 GB、30 分钟未跑完），无通过结论——需 ≥32 GB 空闲内存的 CI 机复跑 |
 | **D** | 并发：loom + miri + sanitizer + `parallel_test` | ✅ loom 1、miri 39、ASan/TSAN 各 39；`parallel_test` 全绿 |
 | **E** | 对 C++ golden `<7%` | ✅ +2.87%（最新；此前 +4.00% / +6.71% / +4.59% / +2.93% / +4.75%，insert 抖动时 +22.04%，见 §8.6） |
 | **F** | fmt / clippy `-D warnings` / `cargo deny` | ✅ 全绿（cargo-deny 0.20.2，schema v2） |
