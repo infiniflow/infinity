@@ -2060,13 +2060,7 @@ impl MemoryIndexer {
 
     /// C++: `MemoryIndexer::Insert` for one document. Returns `false` when the
     /// document would push the segment past `budget`, leaving it unchanged.
-    fn insert(
-        &mut self,
-        seq: u64,
-        text: &str,
-        tokenizer: &TextTokenizer,
-        budget: usize,
-    ) -> bool {
+    fn insert(&mut self, seq: u64, text: &str, tokenizer: &TextTokenizer, budget: usize) -> bool {
         let toks = tokenize_index_positions(text, tokenizer);
         // ~32 B per posting entry plus the positions and the term string.
         let mut cost = 64usize;
@@ -5111,10 +5105,9 @@ impl Engine {
                 // The processor is shutting down and dropped the task, so no
                 // worker will clear the proposed-dump flag: clear it here or
                 // the quota never proposes another dump.
-                self.context.memindex_pending.store(
-                    0,
-                    std::sync::atomic::Ordering::Relaxed,
-                );
+                self.context
+                    .memindex_pending
+                    .store(0, std::sync::atomic::Ordering::Relaxed);
             }
             return;
         }
@@ -8538,10 +8531,7 @@ impl Engine {
         let fulltext_index_column: Option<String> = candidate
             .as_ref()
             .and_then(|candidate| fulltext_column(&candidate.index_filter))
-            .and_then(|i| {
-                plan_scan_of(&plan)
-                    .and_then(|(_, columns)| columns.get(i).cloned())
-            });
+            .and_then(|i| plan_scan_of(&plan).and_then(|(_, columns)| columns.get(i).cloned()));
         // The production optimizer: the C++ rule order (fast-rough filter,
         // column pruning, lazy load, binder remap) plus the legacy plan-only
         // rewrites (limit push-down, filter-below-sort, constant folding).
@@ -8565,10 +8555,7 @@ impl Engine {
                     None if needs_ids => {
                         let pairs = self.fetch_rows_with_ids(&table)?;
                         let ids: Vec<usize> = pairs.iter().map(|(id, _)| *id).collect();
-                        (
-                            pairs.into_iter().map(|(_, row)| row).collect(),
-                            Some(ids),
-                        )
+                        (pairs.into_iter().map(|(_, row)| row).collect(), Some(ids))
                     }
                     None => (self.fetch_rows(&table)?, None),
                 };
@@ -18511,9 +18498,15 @@ mod tests {
         assert_eq!(score("topn=1;alpha=0"), 1.0);
         // `beta` and `use_tail` are parsed too; out-of-range values are ignored.
         let options = parse_bmp_search_options(Some("alpha=0.5;beta=0.25"), "alpha=0.9;use_tail=F");
-        assert_eq!((options.alpha, options.beta, options.use_tail), (0.5, 0.25, false));
+        assert_eq!(
+            (options.alpha, options.beta, options.use_tail),
+            (0.5, 0.25, false)
+        );
         let ignored = parse_bmp_search_options(None, "alpha=7;beta=-1;use_tail=X");
-        assert_eq!((ignored.alpha, ignored.beta, ignored.use_tail), (1.0, 1.0, true));
+        assert_eq!(
+            (ignored.alpha, ignored.beta, ignored.use_tail),
+            (1.0, 1.0, true)
+        );
     }
 
     /// A column declared `DEFAULT ''` keeps the empty string, not NULL.
