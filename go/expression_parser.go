@@ -172,9 +172,11 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 		}
 	}
 
-	// Check for arithmetic operators
-	for _, op := range []string{"+", "-", "*", "/", "%"} {
-		if left, right, found := splitByOperator(expr, op); found {
+	// Check for arithmetic operators, lowest precedence group first. Operators
+	// of equal precedence are left associative, so "c1 - c2 - c3" is
+	// "(c1 - c2) - c3": split at the rightmost operator of the group.
+	for _, ops := range [][]string{{"+", "-"}, {"*", "/", "%"}} {
+		if left, right, op, found := splitByLastOperator(expr, ops); found {
 			return &Expression{
 				Type:     ExprTypeBinary,
 				Operator: op,
@@ -851,6 +853,70 @@ func splitByOperator(expr, op string) (*Expression, *Expression, bool) {
 	}
 
 	return nil, nil, false
+}
+
+// splitByLastOperator splits an expression at the rightmost top-level
+// occurrence of any of the given single-character operators, respecting
+// parentheses and string literals. Splitting at the rightmost operator makes
+// operators of equal precedence left associative.
+func splitByLastOperator(expr string, ops []string) (*Expression, *Expression, string, bool) {
+	expr = strings.TrimSpace(expr)
+
+	var positions []int
+	parenCount := 0
+	inString := false
+	stringQuote := byte(0)
+
+	for i := 0; i < len(expr); i++ {
+		ch := expr[i]
+
+		// Handle string literals
+		if !inString && (ch == '\'' || ch == '"') {
+			inString = true
+			stringQuote = ch
+			continue
+		} else if inString && ch == stringQuote {
+			// Check for escaped quote (e.g., 'it''s')
+			if i+1 < len(expr) && expr[i+1] == stringQuote {
+				i++ // Skip the next quote
+				continue
+			}
+			inString = false
+			stringQuote = 0
+			continue
+		}
+
+		// Skip processing when inside a string literal
+		if inString {
+			continue
+		}
+
+		if ch == '(' {
+			parenCount++
+		} else if ch == ')' {
+			parenCount--
+		} else if parenCount == 0 {
+			for _, op := range ops {
+				if ch == op[0] {
+					positions = append(positions, i)
+					break
+				}
+			}
+		}
+	}
+
+	// Try the rightmost operator first. An operator that leaves an
+	// unparsable side, such as the unary minus in "c1 - -5", is skipped.
+	for j := len(positions) - 1; j >= 0; j-- {
+		i := positions[j]
+		left, err1 := parseExpressionInternal(strings.TrimSpace(expr[:i]))
+		right, err2 := parseExpressionInternal(strings.TrimSpace(expr[i+1:]))
+		if err1 == nil && err2 == nil {
+			return left, right, string(expr[i]), true
+		}
+	}
+
+	return nil, nil, "", false
 }
 
 // isAlpha checks if a byte is an alphabetic character
