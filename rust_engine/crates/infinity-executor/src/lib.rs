@@ -795,6 +795,27 @@ fn is_sparse_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().starts_with("SPARSE")
 }
 
+/// The bound a `SPARSE` column declares, in either spelling:
+/// `SPARSE(elem,index,bound)` (the C++ layout text) or `sparse,bound,elem,index`
+/// (the SQL spelling). `None` when the type declares no bound.
+fn sparse_declared_bound(type_text: &str) -> Option<usize> {
+    let text = type_text.trim();
+    if let Some(inner) = text
+        .strip_prefix("SPARSE(")
+        .or_else(|| text.strip_prefix("sparse("))
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        let bound = inner.split(',').nth(2)?;
+        return bound.trim().parse().ok().filter(|b| *b > 0);
+    }
+    let mut parts = text.split(',');
+    let head = parts.next()?;
+    if !head.trim().eq_ignore_ascii_case("sparse") {
+        return None;
+    }
+    parts.next()?.trim().parse().ok().filter(|b| *b > 0)
+}
+
 /// Canonical sparse rendering: `(empty)` when there is nothing, otherwise
 /// `[i:v,…]` sorted by index. Returns `None` for an invalid vector (negative or
 /// duplicated indices).
@@ -3409,6 +3430,13 @@ struct SparseIndex {
     /// The catalog's `SparseStoreType` for this column.
     store: CatalogSparseStore,
     dir: PathBuf,
+    /// The term space declared by the column type (`SPARSE(elem,index,bound)`),
+    /// or 0 when the column declares no bound. The reference sizes the BMP
+    /// inverted table by the declared bound (`BMPAlg` is constructed with the
+    /// column's dimension), not by the distinct terms a chunk happens to hold,
+    /// and its reader walks the file without a length field: a term count that
+    /// is short of the reference's shifts every following section.
+    terms: usize,
     /// `ROW_ID -> (term, weight)` for documents not yet dumped.
     tail: std::collections::BTreeMap<u64, Vec<(i32, f32)>>,
     /// One mmap reader per dumped chunk, with the `ROW_ID` segment it covers.
@@ -3492,6 +3520,7 @@ impl SparseIndex {
             width,
             store,
             dir,
+            terms: 0,
             tail: Default::default(),
             sealed: Vec::new(),
             next_chunk,
@@ -3544,12 +3573,13 @@ impl SparseIndex {
         self.tail_generation += 1;
         for (segment, mut docs) in by_segment {
             docs.sort_by_key(|(row, _)| *row);
-            let term_num = docs
+            let term_num = (docs
                 .iter()
                 .flat_map(|(_, e)| e.iter().map(|(t, _)| *t + 1))
                 .max()
                 .unwrap_or(0)
-                .max(1) as usize;
+                .max(1) as usize)
+                .max(self.terms);
             let name = format!("seg_{segment}_{}_{}.bmp", self.next_chunk, docs.len());
             self.next_chunk += 1;
             let path = self.dir.join(name);
@@ -10477,6 +10507,14 @@ impl Engine {
             }
         }
         let mut index = SparseIndex::new(dir, width, store);
+        // The column type carries the declared bound (`SPARSE(float,int8,8)`);
+        // the reference uses it as the index's term space.
+        index.terms = self
+            .column_types(table)
+            .ok()
+            .and_then(|t| t.get(ci).cloned())
+            .and_then(|text| sparse_declared_bound(&text))
+            .unwrap_or(0);
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
             // A NULL sparse cell has no postings; only stored values are indexed.
             let Some(Value::Str(text)) = cells.get(ci) else {
