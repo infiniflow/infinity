@@ -1963,7 +1963,7 @@ impl Engine {
             .ok_or_else(|| Error::NotFound(format!("column '{}'", im.column)))?;
         let index_id = self.cpp_index_position(&table, index_name)?;
         let db_id = self.database_id_of(&table);
-        let tokenizer = crate::TextTokenizer::new(self.index_delims(&table, &im.column));
+        let tokenizer = self.index_tokenizer(&table, &im.column);
         let rows = self.fetch_rows_with_ids(&table)?;
 
         // term -> document ordinals, in term order (the FST requires sorted keys)

@@ -2243,24 +2243,43 @@ impl MemoryIndexer {
 
 /// How a full-text column's documents and queries are tokenised: the legacy
 /// delimiter split (`keyword` / `whitespace`, including `whitespace-<chars>`)
-/// with `None` for the standard tokenizer. The index carries it so the
-/// materialised postings and the query agree on the token boundaries.
+/// plus, when the index was created with a real analyzer family, that analyzer.
+///
+/// C++: the analyzer `AnalyzerPool::GetAnalyzer` returns for the index's
+/// `ANALYZER` option (`column_inverter_impl.cpp` builds the inverter with it).
+/// `delims` alone could not express it: `None` doubles for both "standard" and
+/// every CJK/n-gram family, which tokenised an `ik` index with the standard
+/// analyzer on both the write and the query side.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct TextTokenizer {
     /// `Some([])` splits on whitespace, `Some(chars)` only on `chars`,
     /// `None` uses the standard tokenizer.
     delims: Option<Vec<char>>,
+    /// The analyzer the index was created with, when it is not one of the
+    /// families `delims` already reproduces.
+    analyzer: Option<String>,
 }
 
 impl TextTokenizer {
-    fn new(delims: Option<Vec<char>>) -> Self {
-        Self { delims }
+    fn new(delims: Option<Vec<char>>, analyzer: Option<String>) -> Self {
+        Self { delims, analyzer }
     }
 
     /// A `keyword` / `whitespace` field splits only on its delimiters and
     /// scores a constant boost per matching document.
     fn keyword(&self) -> bool {
         matches!(self.delims, Some(ref delims) if delims.is_empty())
+    }
+
+    /// C++ `Analyzer::Analyze`: the real analyzer's terms, when one is
+    /// configured **and** can be constructed (the dictionary-driven families
+    /// need their resource files).
+    fn analyze(&self, text: &str) -> Option<Vec<analyzer::Term>> {
+        let name = self.analyzer.as_deref()?;
+        analyzer::AnalyzerPool::instance()
+            .get_analyzer(name)
+            .ok()
+            .map(|analyzer| analyzer.analyze(text))
     }
 }
 
@@ -5039,18 +5058,10 @@ impl Engine {
                 return;
             }
             let engine = self.self_weak.lock().unwrap().clone();
-            let queued = processor.submit(Box::new(DumpMemIndexTask {
+            processor.submit(Box::new(DumpMemIndexTask {
                 engine,
                 pending: Arc::clone(&self.context.memindex_pending),
             }));
-            if !queued {
-                // The processor is shutting down and dropped the task, so no
-                // worker will clear the proposed-dump flag: clear it here or
-                // the quota never proposes another dump.
-                self.context
-                    .memindex_pending
-                    .store(0, std::sync::atomic::Ordering::Relaxed);
-            }
             return;
         }
         self.dump_all_memory_indexes();
@@ -6470,7 +6481,7 @@ impl Engine {
             if !columns.iter().any(|c| c == name) {
                 continue;
             }
-            let tokenizer = TextTokenizer::new(self.index_delims(table, name));
+            let tokenizer = self.index_tokenizer(table, name);
             let qterms = tokenize_index_text(&query, &tokenizer);
             for row in rows.iter_mut() {
                 let Some(text) = row.get(i).cloned() else {
@@ -7182,7 +7193,7 @@ impl Engine {
                 // moved the cost into the first query and produced an index that
                 // did not exist on disk until somebody searched.
                 if has_rows && index_type.eq_ignore_ascii_case("FULLTEXT") {
-                    let tokenizer = TextTokenizer::new(self.index_delims(table, column));
+                    let tokenizer = self.index_tokenizer(table, column);
                     self.text_index_for(table, column, tokenizer)?;
                 }
                 if has_rows && index_type.eq_ignore_ascii_case("HNSW") {
@@ -8315,7 +8326,7 @@ impl Engine {
                 if let (Some(candidate), Some(positions)) = (&candidate, &index_positions) {
                     let tokenizer = fulltext_index_column
                         .as_ref()
-                        .map(|column| TextTokenizer::new(self.index_delims(&table, column)));
+                        .map(|column| self.index_tokenizer(&table, column));
                     let fulltext_index = match (&fulltext_index_column, &row_ids, &tokenizer) {
                         (Some(column), Some(_), Some(tokenizer)) if !fulltext_substring => Some((
                             self.text_index_for(&table, column, tokenizer.clone())?,
@@ -10809,6 +10820,30 @@ impl Engine {
         }
     }
 
+    /// The tokeniser a column's full-text index uses: the delimiters
+    /// `index_delims` derives plus the analyzer the index was created with.
+    /// C++: `AnalyzerPool::GetAnalyzer` handed to the column's inverter.
+    fn index_tokenizer(&self, table: &str, column: &str) -> TextTokenizer {
+        TextTokenizer::new(
+            self.index_delims(table, column),
+            self.index_analyzer(table, column),
+        )
+    }
+
+    /// The analyzer name a column was indexed with, when it is a family the
+    /// delimiter split does not reproduce (`ik`, `rag-chinese`, `ngram`,
+    /// `japanese`, …). `standard` *is* the default path and `keyword` /
+    /// `whitespace` are carried by the delimiters.
+    fn index_analyzer(&self, table: &str, column: &str) -> Option<String> {
+        let key = self.table_key(table);
+        let guard = self.tables.lock().unwrap();
+        let analyzer = guard.get(&key)?.analyzers.get(column)?.to_ascii_lowercase();
+        match analyzer.split('-').next().unwrap_or("") {
+            "standard" | "keyword" | "whitespace" | "" => None,
+            _ => Some(analyzer),
+        }
+    }
+
     /// Selects rows for `SEARCH MATCH TEXT` by term presence. This reproduces
     /// the *row set* (any query term, `minimum_should_match`, `topn`); the exact
     /// BM25 ordering/threshold needs the iresearch scorer, so a query carrying
@@ -10921,12 +10956,13 @@ impl Engine {
         // `whitespace`/`keyword` split only on whitespace (so `2023-01-01` stays
         // one token); `whitespace-<chars>` splits **only** on the listed
         // delimiters (the C++ `WhitespaceAnalyzer` does not also split on
-        // whitespace — see `whitespace_analyzer_impl.cpp`); anything else uses
-        // the standard tokenizer.
+        // whitespace — see `whitespace_analyzer_impl.cpp`); a column indexed
+        // with a real analyzer (`ik`, `rag-chinese`, `ngram`, …) tokenises with
+        // that analyzer; anything else uses the standard tokenizer.
         let tokenizer: TextTokenizer = match_columns(&m.column)
             .iter()
-            .map(|c| TextTokenizer::new(self.index_delims(table, c)))
-            .find(|tok| tok.delims.is_some())
+            .map(|c| self.index_tokenizer(table, c))
+            .find(|tok| tok.delims.is_some() || tok.analyzer.is_some())
             .unwrap_or_default();
         // One unit per quoted phrase / bare word. The analyzer decides what a
         // `"a b"` group tokenises to, so quotes are stripped first.
@@ -10956,7 +10992,7 @@ impl Engine {
                     .and_then(|v| v.trim().parse::<f64>().ok())
                     .unwrap_or(1.0);
                 let ci = schema.iter().position(|s| s == name)?;
-                Some((ci, boost, TextTokenizer::new(self.index_delims(table, name))))
+                Some((ci, boost, self.index_tokenizer(table, name)))
             })
             .collect();
         let terms: Vec<String> = units
@@ -11483,7 +11519,7 @@ impl Engine {
                     continue;
                 }
                 if let Some(ci) = schema.iter().position(|s| s == f) {
-                    let d = TextTokenizer::new(self.index_delims(table, f));
+                    let d = self.index_tokenizer(table, f);
                     fields.push((f.clone(), ci, d));
                 }
             }
@@ -11648,7 +11684,7 @@ impl Engine {
                 Some(FieldGroupField {
                     ci: schema.iter().position(|s| s == name)?,
                     name: name.clone(),
-                    tokenizer: TextTokenizer::new(self.index_delims(table, name)),
+                    tokenizer: self.index_tokenizer(table, name),
                     df: HashMap::new(),
                     avg_len: 1.0,
                 })
@@ -14765,6 +14801,16 @@ fn standard_tokenize(s: &str) -> Vec<String> {
 
 /// Query-side tokens: the standard analyzer's stem replaces the word.
 fn tokenize_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
+    // A column indexed with a real analyzer (`ik`, `rag-chinese`, `ngram`, …)
+    // tokenises the query with that same analyzer (`Analyzer::Analyze`); the
+    // delimiter families below are the ones the analyzer reproduces.
+    if let Some(terms) = tokenizer.analyze(s) {
+        return terms
+            .into_iter()
+            .map(|term| term.text)
+            .filter(|term| !term.is_empty())
+            .collect();
+    }
     let delims = &tokenizer.delims;
     // The C++ default analyzer is `standard` (`index_full_text_impl.cpp:68`) — a
     // `StandardAnalyzer` with `STEM_LANG_ENGLISH` (`analyzer_pool_impl.cpp:266-289`)
@@ -14787,6 +14833,13 @@ fn tokenize_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
 /// `another`->`anoth`), and `doc_len_sum` is 21 rather than 15. Query terms stay
 /// stem-only (a boolean query for `second text multiple` scores 3, not 4).
 fn tokenize_index_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
+    if let Some(terms) = tokenizer.analyze(s) {
+        return terms
+            .into_iter()
+            .map(|term| term.text)
+            .filter(|term| !term.is_empty())
+            .collect();
+    }
     let delims = &tokenizer.delims;
     if delims.is_some() {
         return split_words(s, delims);
@@ -14801,6 +14854,13 @@ fn tokenize_index_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
 /// re-uses `offset_` for both), so both share a position; `offset_` itself
 /// advances once per raw token. Phrase queries need this.
 fn tokenize_index_positions(s: &str, tokenizer: &TextTokenizer) -> Vec<(String, u32)> {
+    if let Some(terms) = tokenizer.analyze(s) {
+        return terms
+            .into_iter()
+            .filter(|term| !term.text.is_empty())
+            .map(|term| (term.text, term.word_offset))
+            .collect();
+    }
     let delims = &tokenizer.delims;
     if delims.is_some() {
         return split_words(s, delims)
@@ -16011,7 +16071,7 @@ mod tests {
         assert!(provider.postings("absent").is_empty());
         // An index built with another analyzer cannot answer this filter, so the
         // rows stay and the residual predicate decides.
-        let other = TextTokenizer::new(Some(Vec::new()));
+        let other = TextTokenizer::new(Some(Vec::new()), None);
         let mismatched = (index.0.clone(), other);
         let provider = RowFulltextProvider {
             rows: &rows,
@@ -17960,6 +18020,37 @@ mod tests {
         );
     }
 
+    /// A column indexed with `ik` must be tokenised by the IK analyzer on both
+    /// the write and the query side. `index_delims` alone mapped every family
+    /// but `keyword`/`whitespace` onto the standard analyzer, so the index
+    /// stored one token per Chinese run (the standard byte table lets every
+    /// UTF-8 byte through) and no `中华` posting existed.
+    #[test]
+    fn an_ik_fulltext_index_is_tokenised_by_its_analyzer() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ik_t (doc VARCHAR);").unwrap();
+        e.execute("INSERT INTO ik_t VALUES ('我们热爱中华人民共和国');")
+            .unwrap();
+        e.execute("CREATE INDEX ik_idx ON ik_t (doc) USING FULLTEXT WITH (analyzer='ik');")
+            .unwrap();
+        let tokenizer = e.index_tokenizer("ik_t", "doc");
+        assert_eq!(tokenizer.analyzer.as_deref(), Some("ik"));
+        let index = e.text_index_for("ik_t", "doc", tokenizer).unwrap();
+        let guard = index.read().unwrap();
+        // The analyzer's own words (`我们就热爱` -> 我们/热爱/中华人民共和国);
+        // the standard analyzer cannot produce any of them.
+        let word = "热爱".to_string();
+        assert_eq!(
+            guard.merge(std::slice::from_ref(&word)).postings[&word].len(),
+            1
+        );
+        // The whole run is exactly one standard token; the index must not hold
+        // it, or the index was built with the standard analyzer.
+        let run = "我们热爱中华人民共和国".to_string();
+        assert!(guard.merge(std::slice::from_ref(&run)).postings[&run].is_empty());
+    }
+
     /// A column declared `DEFAULT ''` keeps the empty string, not NULL.
     #[test]
     fn empty_string_default_survives_a_catalog_round_trip() {
@@ -17976,7 +18067,7 @@ mod tests {
     fn memory_indexer_records_tf_positions_and_length() {
         // C++ `column_inverter_ut.cpp`: tf, positions and the document length
         // come out of one insertion.
-        let delims = TextTokenizer::new(Some(vec![' ']));
+        let delims = TextTokenizer::new(Some(vec![' ']), None);
         let mut mem = MemoryIndexer::new();
         assert!(mem.insert(10, "alpha beta alpha", &delims, usize::MAX));
         assert_eq!(mem.doc_count(), 1);
@@ -18511,7 +18602,7 @@ mod tests {
 
     #[test]
     fn memory_indexer_delete_keeps_the_postings() {
-        let delims = TextTokenizer::new(Some(vec![' ']));
+        let delims = TextTokenizer::new(Some(vec![' ']), None);
         let mut mem = MemoryIndexer::new();
         assert!(mem.insert(7, "alpha", &delims, usize::MAX));
         mem.delete(7);
