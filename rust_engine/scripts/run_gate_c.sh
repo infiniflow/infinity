@@ -33,18 +33,37 @@ if [[ -d "$root/python/restart_test" ]]; then
     data="${INFINITY_GATE_C_DATA:-$(mktemp -d)}"
     mkdir -p "$data/tmp"
     cp "$root"/test/data/csv/* "$data/" 2>/dev/null || true
-    echo "restart_test: bwrap sandbox, fixtures at $data"
+    # `/var/infinity` must live on disk, not on a tmpfs: these suites import
+    # tens of thousands of rows and several indexes, and a RAM-backed data dir
+    # both reports ENOSPC and competes with the engine for memory (the memidx
+    # and import cases are sized for the reference's on-disk layout).
+    work="${INFINITY_GATE_C_WORK:-$(mktemp -d)}"
+    mkdir -p "$work/test_data" "$work/log"
+    echo "restart_test: bwrap sandbox, fixtures at $data, data dir $work"
     # `--unshare-pid` is required: the harness kills *every* process named
     # `infinity` before each start, which fails on an unprivileged user when a
     # foreign process matches. A private PID namespace scopes that to the run.
+    # `--tmpfs /var` only provides the writable mount point; `/var/infinity`
+    # itself is replaced by the disk-backed directory right after.
     run=( bwrap --dev-bind / / --tmpfs /var --dir /var/infinity \
-          --bind "$data" /var/infinity/test_data --dir /var/infinity/log \
+          --bind "$work" /var/infinity \
+          --bind "$data" /var/infinity/test_data \
           --unshare-pid --proc /proc \
           -- "${run[@]}" )
   fi
   ( cd "$root" && "${run[@]}" ) || status=1
 else
   echo "SKIP: python/restart_test not present"
+fi
+
+# 2b. cross-engine compatibility: the same data directory opened by the other
+#     engine (C++ <-> Rust), with several index types and new inserts.
+if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
+  ( cd "$root" && INFINITY_CPP_BIN="${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" \
+      "$py" -m pytest -q python/restart_test/test_cross_engine_compat.py \
+      --infinity_path="$shim" ) || status=1
+else
+  echo "SKIP: no C++ binary at INFINITY_CPP_BIN (cross-engine compatibility)"
 fi
 
 # 3. object storage (MinIO): requires the CI minio service
