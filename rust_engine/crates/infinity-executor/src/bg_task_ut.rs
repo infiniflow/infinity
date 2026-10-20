@@ -156,6 +156,65 @@ fn background_process_start_stop() {
     assert_eq!(processor.running_task_count(), 0);
 }
 
+struct PanickingTask;
+
+impl BgTask for PanickingTask {
+    fn name(&self) -> &str {
+        "PanickingTask"
+    }
+
+    fn run(self: Box<Self>) {
+        panic!("task failure");
+    }
+}
+
+/// A task that unwinds must not leave the running-task counter raised: the
+/// counter is what `drain()` and `stop()` wait on, so a skipped decrement hangs
+/// the shutdown of the process (the `PlaidIndex` `expect` in a background dump
+/// is the reachable case).
+#[test]
+fn a_panicking_task_does_not_wedge_drain() {
+    let processor = Arc::new(BGTaskProcessor::new(1));
+    processor.start();
+    assert!(processor.submit(Box::new(PanickingTask)));
+
+    // Bound the wait: a wedged `drain()` would otherwise hang the test run
+    // instead of failing it.
+    let (tx, rx) = std::sync::mpsc::channel();
+    let draining = Arc::clone(&processor);
+    std::thread::spawn(move || {
+        draining.drain();
+        let _ = tx.send(());
+    });
+    rx.recv_timeout(std::time::Duration::from_secs(5))
+        .expect("drain() wedged on a panicking task");
+    assert_eq!(processor.running_task_count(), 0);
+
+    // The worker survived the unwind and still serves the queue.
+    let counter = Arc::new(AtomicUsize::new(0));
+    assert!(processor.submit(Box::new(CountTask(Arc::clone(&counter)))));
+    processor.drain();
+    assert_eq!(counter.load(Ordering::SeqCst), 1);
+    processor.stop();
+}
+
+/// A submission made after `stop()` is reported instead of silently dropped,
+/// so a caller that set a pending-work flag can clear it.
+#[test]
+fn submit_after_stop_is_rejected() {
+    let processor = Arc::new(BGTaskProcessor::new(1));
+    processor.start();
+    let counter = Arc::new(AtomicUsize::new(0));
+    assert!(processor.submit(Box::new(CountTask(Arc::clone(&counter)))));
+    processor.drain();
+    assert_eq!(counter.load(Ordering::SeqCst), 1);
+
+    processor.stop();
+    assert!(!processor.submit(Box::new(CountTask(Arc::clone(&counter)))));
+    assert_eq!(counter.load(Ordering::SeqCst), 1);
+    assert_eq!(processor.running_task_count(), 0);
+}
+
 /// C++: `dump_index_task_2_ut.cpp:63`
 /// (`DumpMemIndexTaskTest2.DISABLED_SLOW_row_cnt_exceed_memory_quota`).
 ///

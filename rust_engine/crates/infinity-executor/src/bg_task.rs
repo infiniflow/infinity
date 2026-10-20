@@ -71,13 +71,19 @@ impl BGTaskProcessor {
     }
 
     /// Queues `task` and wakes a worker.
-    pub fn submit(&self, task: Box<dyn BgTask>) {
+    ///
+    /// Returns `false` when the pool is shutting down and `task` was dropped
+    /// without running: callers that set a "proposed work" flag before
+    /// submitting must clear it again, or the flag stays set for the rest of
+    /// the process and stops new work from being proposed.
+    pub fn submit(&self, task: Box<dyn BgTask>) -> bool {
         let mut state = self.shared.state.lock().unwrap();
         if state.shutdown {
-            return;
+            return false;
         }
         state.queue.push_back(task);
         self.shared.ready.notify_one();
+        true
     }
 
     /// Blocks until the queue is empty and every running task has finished.
@@ -114,6 +120,36 @@ impl Drop for BGTaskProcessor {
     }
 }
 
+/// Keeps the running-task counter truthful when a task unwinds.
+///
+/// `State::running` and `State::queue` are what [`BGTaskProcessor::drain`] and
+/// [`BGTaskProcessor::running_task_count`] wait on, so a decrement that is
+/// skipped by a panic leaves the counter above zero forever and makes `drain`
+/// (and therefore `Stop`) block for the lifetime of the process. The guard
+/// performs the decrement and the final wake-up on every exit path.
+struct RunningGuard(Arc<Shared>);
+
+impl Drop for RunningGuard {
+    fn drop(&mut self) {
+        let mut state = self.0.state.lock().unwrap();
+        state.running -= 1;
+        if state.queue.is_empty() && state.running == 0 {
+            self.0.ready.notify_all();
+        }
+    }
+}
+
+/// The message carried by a caught panic payload.
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        message
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.as_str()
+    } else {
+        "non-string panic payload"
+    }
+}
+
 fn worker(shared: Arc<Shared>) {
     loop {
         let mut state = shared.state.lock().unwrap();
@@ -131,13 +167,21 @@ fn worker(shared: Arc<Shared>) {
         state.running += 1;
         drop(state);
 
-        task.run();
-
-        let mut state = shared.state.lock().unwrap();
-        state.running -= 1;
-        if state.queue.is_empty() && state.running == 0 {
-            shared.ready.notify_all();
+        // A panicking task must not take the worker down with it: the thread
+        // would die with `running` still incremented, and every later `drain`
+        // or `stop` would hang (Plaid's `expect("PLAID mode has a quantizer")`
+        // in `plaid/index.rs` is reachable from a background dump). Catch the
+        // unwind, report it, and keep serving the queue.
+        let name = task.name().to_string();
+        let guard = RunningGuard(Arc::clone(&shared));
+        if let Err(payload) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| task.run()))
+        {
+            eprintln!(
+                "background task '{name}' panicked: {}",
+                panic_message(payload.as_ref())
+            );
         }
+        drop(guard);
     }
 }
 

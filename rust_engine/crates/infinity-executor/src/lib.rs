@@ -5010,10 +5010,18 @@ impl Engine {
                 return;
             }
             let engine = self.self_weak.lock().unwrap().clone();
-            processor.submit(Box::new(DumpMemIndexTask {
+            let queued = processor.submit(Box::new(DumpMemIndexTask {
                 engine,
                 pending: Arc::clone(&self.context.memindex_pending),
             }));
+            if !queued {
+                // The processor is shutting down and dropped the task, so no
+                // worker will clear the proposed-dump flag: clear it here or
+                // the quota never proposes another dump.
+                self.context
+                    .memindex_pending
+                    .store(0, std::sync::atomic::Ordering::Relaxed);
+            }
             return;
         }
         self.dump_all_memory_indexes();
