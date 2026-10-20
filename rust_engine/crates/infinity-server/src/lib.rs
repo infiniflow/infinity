@@ -1594,8 +1594,10 @@ fn handle_connection(
                         .as_ref()
                         .map(|e| show_segments_rows(e, &table))
                         .unwrap_or_default();
-                    let columns: Vec<String> =
-                        SHOW_SEGMENTS_COLUMNS.iter().map(|c| c.to_string()).collect();
+                    let columns: Vec<String> = SHOW_SEGMENTS_COLUMNS
+                        .iter()
+                        .map(|c| c.to_string())
+                        .collect();
                     let types: Vec<String> =
                         SHOW_SEGMENTS_TYPES.iter().map(|t| t.to_string()).collect();
                     let resp = select_response_from_typed(&columns, &types, &rows);
