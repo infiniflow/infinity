@@ -24,7 +24,12 @@ fn basic() {
     let mut segment_postings: Vec<Vec<(u64, u32)>> = Vec::new();
     for (index, paragraph) in paragraphs.iter().enumerate() {
         let mut indexer = MemoryIndexer::new();
-        assert!(indexer.insert(index as u64, paragraph, &TextTokenizer::default(), usize::MAX));
+        assert!(indexer.insert(
+            index as u64,
+            paragraph,
+            &TextTokenizer::default(),
+            usize::MAX
+        ));
         assert!(indexer.dump(dir_str, &format!("chunk{}", index + 1)));
 
         // The segment's only term is `a`; its positions are the reference's
