@@ -59,9 +59,20 @@ fi
 # 2b. cross-engine compatibility: the same data directory opened by the other
 #     engine (C++ <-> Rust), with several index types and new inserts.
 if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
-  ( cd "$root" && INFINITY_CPP_BIN="${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" \
-      "$py" -m pytest -q python/restart_test/test_cross_engine_compat.py \
-      --infinity_path="$shim" ) || status=1
+  # The reference reads the *C++-layout* catalog (`catalog| db| tbl| col| idx|`
+  # in RocksDB). That backend only exists behind the `rocksdb-store` feature;
+  # without it the engine opens a fjall catalog, starts on an empty schema and
+  # no handover can pass. Build the feature-enabled binary for this leg only,
+  # so the rest of Gate C keeps exercising the default backend.
+  if cargo build -q --release -p infinity-cli --features rocksdb-store; then
+    ( cd "$root" && INFINITY_SERVER_BIN="$root/rust_engine/target/release/infinity" \
+        INFINITY_CPP_BIN="${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" \
+        "$py" -m pytest -q python/restart_test/test_cross_engine_compat.py \
+        --infinity_path="$shim" ) || status=1
+  else
+    echo "FAIL: could not build the rocksdb-store binary the cross-engine leg needs"
+    status=1
+  fi
 else
   echo "SKIP: no C++ binary at INFINITY_CPP_BIN (cross-engine compatibility)"
 fi
