@@ -13354,7 +13354,9 @@ impl Engine {
         self.seal_multivector_indexes();
         self.seal_sparse_indexes();
         self.seal_secondary_indexes();
-        self.dump_hnsw_segments();
+        // HNSW memory segments are sealed per write batch
+        // ([`Self::note_index_insert`], the reference's `AppendMemIndex`).
+        // Sealing them here too produced one chunk per buffered row group.
     }
 
     /// `ChunkIndexMetaInfo` of the sealed secondary chunks: `(base row id,
@@ -13639,12 +13641,14 @@ impl Engine {
                 }
             };
             if dump && self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
-                // The dumped segment leaves memory; rows written after this
-                // checkpoint form the next one.
+                // The dumped segment leaves memory; these rows start the next
+                // one, so the counter keeps this batch's bytes instead of
+                // resetting to zero (`AppendMemIndex` accounts the new segment
+                // from the first row it receives).
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.column);
-                    e.index_pending_bytes.insert(im.column.clone(), 0);
+                    e.index_pending_bytes.insert(im.column.clone(), bytes);
                     e.hnsw_probed = false;
                 }
             }
@@ -16961,6 +16965,37 @@ mod tests {
             rows(&e, q),
             vec![vec!["5".to_string()], vec!["2".to_string()]]
         );
+    }
+
+    /// `memindex_memory_quota` seals one HNSW chunk per *write batch*, not per
+    /// row: the per-row check sealed a one-row segment (the first row already
+    /// exceeded a 1 KB quota), and the post-dump counter reset left the next
+    /// batch unaccounted, so a 3-batch import produced 3+ chunks instead of 2.
+    #[test]
+    fn the_memindex_quota_seals_one_hnsw_chunk_per_batch() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1024);
+        e.execute("CREATE TABLE hc (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let row = "(2,[0.1,0.2,0.3,-0.2])";
+        e.execute(&format!(
+            "INSERT INTO hc VALUES {row},{row},{row},{row},{row},{row};"
+        ))
+        .unwrap();
+        e.execute(
+            "CREATE INDEX hx ON hc (c2) USING HNSW WITH (M = 16, ef_construction = 20, \
+             metric = l2, block_size = 1);",
+        )
+        .unwrap();
+        for _ in 0..3 {
+            e.execute(&format!(
+                "INSERT INTO hc VALUES {row},{row},{row},{row},{row},{row};"
+            ))
+            .unwrap();
+        }
+        // Batch 1 buffers, batch 2 and 3 seal the previous segment.
+        assert_eq!(e.hnsw_chunk_ids("hc", "hx").len(), 2);
     }
 
     /// A write that reaches the engine through the Thrift/import primitives
