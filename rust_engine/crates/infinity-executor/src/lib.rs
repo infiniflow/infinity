@@ -198,6 +198,9 @@ mod cpp_blocks;
 /// The batch of rows the physical operators exchange (C++ `DataBlock`).
 pub mod chunk;
 
+/// The push-based physical operator model (C++ `PhysicalOperator`).
+pub mod operators;
+
 /// Result of executing one statement.
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueryResult {
@@ -9443,6 +9446,14 @@ impl Engine {
         let plan = optimizer.optimize(plan)?;
         #[cfg(test)]
         LAST_PLAN_DEBUG.with(|slot| *slot.borrow_mut() = Some(format!("{plan:?}")));
+        // The operator model (C++ `PhysicalOperator`/`OperatorState`) covers a
+        // subset of the plan shapes; the stage pipeline below stays the fallback
+        // for everything it has not ported yet.
+        let lowered = if crate::operators::enabled() {
+            crate::operators::lower::lower(&plan)?
+        } else {
+            None
+        };
         let (source, stages) = Self::decompose(plan);
         let (columns, mut rows) = match source {
             Source::Values { columns, rows } => (columns, rows),
@@ -9517,6 +9528,14 @@ impl Engine {
         };
         if unmatchable {
             rows.clear();
+        }
+        if let Some((operators, names)) = lowered {
+            // The lowered chain must cover exactly the stages `decompose`
+            // found, otherwise the two views of the plan disagree and the
+            // stage pipeline is authoritative.
+            if operators.len() == stages.len() {
+                return crate::operators::run_rows(operators, names, columns.len(), rows);
+            }
         }
         self.rt.block_on(pipeline(
             columns,
@@ -17698,6 +17717,34 @@ mod tests {
         let debug = LAST_PLAN_DEBUG.with(|slot| slot.borrow().clone()).unwrap();
         assert!(debug.contains("columns: [\"a\"]"), "{debug}");
         assert!(!debug.contains("\"b\""), "{debug}");
+    }
+
+    /// The operator model must actually drive the query, not just exist: a
+    /// plan that `operators::lower` understands runs through
+    /// `operators::run_rows`, and produces the same rows as before.
+    #[test]
+    fn run_plan_executes_a_projection_through_the_operator_model() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE om (a INT, b INT);").unwrap();
+        e.execute("INSERT INTO om VALUES (1, 2), (3, 4);").unwrap();
+        let before = crate::operators::operator_run_count();
+        let plan = LogicalPlan::Projection {
+            input: Box::new(LogicalPlan::Scan {
+                table: "default_db.om".to_string(),
+                columns: vec!["a".to_string(), "b".to_string()],
+            }),
+            exprs: vec![infinity_expression::Expr::Binary(
+                Box::new(infinity_expression::Expr::Column(0)),
+                infinity_parser::BinOp::Add,
+                Box::new(infinity_expression::Expr::Column(1)),
+            )],
+            names: vec!["sum".to_string()],
+        };
+        let (columns, rows) = e.run_plan(plan, None, None, None, false, false).unwrap();
+        assert_eq!(columns, vec!["sum".to_string()]);
+        assert_eq!(rows, vec![vec![Value::Int(3)], vec![Value::Int(7)]]);
+        assert_eq!(crate::operators::operator_run_count(), before + 1);
     }
 
     fn seed(e: &Engine) {
