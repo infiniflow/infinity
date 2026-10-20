@@ -378,11 +378,7 @@ void MemoryIndexer::InsertGap(u32 row_count) {
     doc_count_ += row_count;
 }
 
-void MemoryIndexer::MarkInvertFailed(u64 seq,
-                                     const std::shared_ptr<ColumnVector> &column_vector,
-                                     u32 row_offset,
-                                     u32 row_count,
-                                     u32 start_doc_id) {
+void MemoryIndexer::MarkInvertFailed(u64 seq, const std::shared_ptr<ColumnVector> &column_vector, u32 row_offset, u32 row_count, u32 start_doc_id) {
     // Retry once right here, before the ring slot is filled. The ring still misses this sequence
     // number, so no later document can have been committed yet and the shared posting writers
     // only hold smaller doc ids: queueing the recovered inverter therefore keeps every doc list

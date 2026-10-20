@@ -363,12 +363,7 @@ TEST_P(MemoryIndexerTest, AppendTaskKeepsIndexerWhenMemIndexIsCleared) {
     ASSERT_NE(task->memory_indexer_, nullptr);
     AppendMemIndexBatch batch;
     batch.InsertTask(task.get());
-    task->memory_indexer_->AsyncInsertBottom(task->input_column_,
-                                             task->offset_,
-                                             task->row_cnt_,
-                                             task->seq_inserted_,
-                                             task->doc_count_,
-                                             &batch);
+    task->memory_indexer_->AsyncInsertBottom(task->input_column_, task->offset_, task->row_cnt_, task->seq_inserted_, task->doc_count_, &batch);
     batch.WaitForCompletion();
     task->memory_indexer_->CommitSync();
 
