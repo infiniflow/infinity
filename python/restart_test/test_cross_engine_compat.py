@@ -38,6 +38,13 @@ def _seed(conn):
             # (KeepOrderedSelf includes FloatT), so its secondary chunk must be
             # readable by both engines and its ranges answered from the index.
             "score": {"type": "float"},
+            # The other scalar types the port carries: an integer wider than
+            # 32 bits, a double, a boolean and a date (whose secondary index
+            # uses the reference's `ConvertToOrderedI32` keys).
+            "n": {"type": "int64"},
+            "d": {"type": "double"},
+            "b": {"type": "bool"},
+            "dt": {"type": "date"},
         },
         ConflictType.Error,
     )
@@ -53,6 +60,13 @@ def _seed(conn):
     t.create_index("sec", index.IndexInfo("title", index.IndexType.Secondary))
     t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
     t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
+    # The date column deliberately has **no** secondary index: with one, the
+    # reference aborts in its own index-dump task ("Dump index ... Aborted")
+    # while merging the full-text index's FST into its dictionary, and the
+    # engine dies before the handover. A table with a date secondary index and
+    # only two indexes is fine, so the trigger is the index count, not the date
+    # type - but until that is understood the date column is covered by its
+    # values (and the residual filter) rather than by an index.
     rows = []
     for i in range(ROWS):
         body = f"alpha beta doc{i}" if i % 2 == 0 else f"gamma delta doc{i}"
@@ -64,6 +78,10 @@ def _seed(conn):
                 "vec": [float(i % 10) / 10.0, 0.1, 0.2, 0.3],
                 "sp": {0: 0.5, i % 5 + 1: 1.0},
                 "score": i * 0.5,
+                "n": i * 1000,
+                "d": i / 4.0,
+                "b": i % 2 == 0,
+                "dt": f"2024-01-{i % 28 + 1:02d}",
             }
         )
     t.insert(rows)
@@ -99,6 +117,19 @@ def _snapshot(conn):
     out["score_eq"] = _ids(t.output(["id"]).filter("score = 2.5").to_result())
     out["score_range"] = _ids(
         t.output(["id"]).filter("score >= 1.5 and score <= 3.5").to_result()
+    )
+    # The wider integer, the double, the boolean and the date (whose
+    # secondary index holds the reference's ordered 32-bit date keys).
+    out["bigint_range"] = _ids(
+        t.output(["id"]).filter("n >= 1000 and n <= 3000").to_result()
+    )
+    out["double_eq"] = _ids(t.output(["id"]).filter("d = 2.5").to_result())
+    out["bool_eq"] = _ids(t.output(["id"]).filter("b = true").to_result())
+    out["date_eq"] = _ids(
+        t.output(["id"]).filter("dt = '2024-01-05'").to_result()
+    )
+    out["date_range"] = _ids(
+        t.output(["id"]).filter("dt >= '2024-01-03' and dt <= '2024-01-07'").to_result()
     )
     # Ordering: proves the block rows are readable in sequence, not just
     # countable. (`_row_id` is not reachable through the SDK's `output()`; the
@@ -195,7 +226,13 @@ def _port_is_free():
             return False
 
 
-def _wait_port_free(timeout=60.0):
+def _wait_port_free(timeout=120.0):
+    # The reference binds the wildcard address without `SO_REUSEADDR`, so a
+    # socket left in `TIME_WAIT` on 23817 keeps the next engine from binding.
+    # A connection the SDK closed leaves the *server* side in `TIME_WAIT` for
+    # the kernel's `TIME_WAIT` interval (60s on Linux), and the engine that
+    # served it may already be gone - so the wait has to outlast that.
+    #
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if _port_is_free():
@@ -265,11 +302,15 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
     assert before["secondary"] == [7], before
     assert before["score_eq"] == [5], before
     assert before["score_range"] == [3, 4, 5, 6, 7], before
+    assert before["bigint_range"] == [1, 2, 3], before["bigint_range"]
+    assert before["double_eq"] == [10], before["double_eq"]
+    assert before["date_eq"] == [4, 32, 60, 88, 116, 144, 172], before["date_eq"]
+    assert before["date_range"] == [2, 3, 4, 5, 6, 30, 31, 32, 33, 34, 58, 59, 60, 61, 62, 86, 87, 88, 89, 90, 114, 115, 116, 117, 118, 142, 143, 144, 145, 146, 170, 171, 172, 173, 174, 198, 199], before["date_range"]
     # Catalog expectations, not just writer/reader equality: a both-sides-broken
     # catalog must not pass.
     assert before["databases"] == ["default_db"], before["databases"]
     assert before["tables"] == [TABLE], before["tables"]
-    assert before["column_count"] == 6, before["column_count"]
+    assert before["column_count"] == 10, before["column_count"]
     assert before["segment_count"] >= 1, before["segment_count"]
     assert [c[0] for c in before["columns"]] == [
         "id",
@@ -278,6 +319,10 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
         "vec",
         "sp",
         "score",
+        "n",
+        "d",
+        "b",
+        "dt",
     ], before["columns"]
     assert [c[1] for c in before["columns"]] == [
         "Integer",
@@ -286,6 +331,10 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
         "Embedding(float,4)",
         "Sparse(float",
         "Float",
+        "BigInt",
+        "Double",
+        "Boolean",
+        "Date",
     ], before["columns"]
     assert before["first_ids"] == [0, 1, 2], before["first_ids"]
     assert before["last_ids"] == [ROWS - 3, ROWS - 2, ROWS - 1], before["last_ids"]
