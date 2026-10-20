@@ -126,15 +126,22 @@ pub const EXTRACT_FIELDS: &[&str] = &[
 /// before an expression is compiled, and the planner turns the search
 /// pseudo-columns and the full-text filters into hidden columns or dedicated
 /// [`crate::Expr`] nodes. C++ knows them through `AddSpecialFunction`, so they
-/// must not be reported as unknown.
+/// must not be reported as unknown. The remaining C++ specials
+/// (`CREATE_TIMESTAMP`, `DELETE_TIMESTAMP`, the `*_FACTORS` columns) are listed
+/// for the same reason even though this planner does not resolve them yet.
 pub const SPECIAL_FUNCTIONS: &[&str] = &[
+    "CREATE_TIMESTAMP",
+    "DELETE_TIMESTAMP",
     "DISTANCE",
+    "DISTANCE_FACTORS",
     "EXISTS",
     "FILTER_FULLTEXT",
     "FILTER_TEXT",
     "ROW_ID",
     "SCORE",
+    "SCORE_FACTORS",
     "SIMILARITY",
+    "SIMILARITY_FACTORS",
     "SUBQUERY",
 ];
 
@@ -266,6 +273,10 @@ mod tests {
         // special functions resolved by the planner / executor
         assert!(is_known_function("subquery"));
         assert!(is_known_function("Exists"));
+        // the remaining names from C++ `RegisterSpecialFunction`
+        assert!(is_known_function("create_timestamp"));
+        assert!(is_known_function("DELETE_TIMESTAMP"));
+        assert!(is_known_function("similarity_factors"));
     }
 
     /// The whitelist has no duplicates and every entry resolves case-insensitively.
