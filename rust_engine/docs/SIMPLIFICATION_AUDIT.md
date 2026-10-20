@@ -79,6 +79,14 @@
 | WAL / TxnManager · 无类型化 redo、无 rollback/registry | ✅ | `74a4728b2`：`WalCmd` Append/Delete 类型化 + `KvBatch(Catalog)` 容器、`WalEntryIterator` 回放、`rollback`/txn registry/范围冲突检查（从 WAL 重建） |
 | 其余（MetaStore 原子批量、BufferObj/BufferManager 对象管理、VarBuffer、BlockVersion、HTTP/admin、ShowSegments/Blocks、`RowFulltextProvider`、`index_delims`、BMP 选项、算子模型、Plaid merge 接线、bg_task 调度、BMW 块最大值、MemoryIndexer spill、BindContext） | 🔄 / ⏳ | 三个并行 agent 分别处理 storage 辅助类、server 路由与 SHOW 元信息、executor 查询侧三项；其余见上方清单 |
 
+### 2026-10-20 后续发现（审计时未列，同样属于「名义存在但不接线」）
+
+| 优先级 | 条目 | 证据 | 影响 |
+|---|---|---|---|
+| P1 | HTTP `/variables/*`、`/instance/{buffer,objects,queries,transactions,profiles,memindex,files,logs,memory}`、`/admin/logs` 等 14 条路由返回 501 | `infinity-server/src/http.rs`（`d385fb7c8`） | 缺 `Engine` accessor：`SetScope` 私有、`buffer_objects`/`active_transactions`/`profiles`/`memory_indexes`/`all_files`/`logs`/分配器统计。参考实现有 27 条路由 |
+| P2 | `global_variable_value()` 对 `buffer_object_count`/`unused_buffer_object`/`active_txn_count`/`total_rollback_count`/`bg_task_count`/`system_memory_usage`/`open_file_count`/`cpu_usage` 硬编码 `"0"` | `infinity-executor/src/lib.rs` | `SHOW VARIABLES`/HTTP 会报假值；需上面同一批 accessor |
+| P2 | `SHOW SEGMENTS` 的 `status` 恒为字面量 `"No value"` | `physical_show_segments_impl.cpp:37` | 参考实现本身也读已删除的 `SegmentEntry::status_`，属参考侧遗留，非遗漏 |
+
 ## 处置口径
 
 1. **P0 全部要改**（磁盘格式/结果正确性/互操作），改完补针对性回归（C++ 写、Rust 读；Rust 写、C++ 读）。
