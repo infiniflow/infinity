@@ -336,10 +336,16 @@ impl BufferObj {
     /// C++ `BufferObj::AddBufferSize`: charge `add_size` to the pool and
     /// report whether the request was satisfied. Only a var-file payload
     /// grows this way.
+    ///
+    /// The payload size grows with the charge, so the pool's `used` and
+    /// `GetBufferSize` stay in lockstep (the reference's worker leaves its
+    /// `buffer_size_` stale until the next save, which would break the Rust
+    /// pool's "used == resident bytes" invariant).
     pub fn add_buffer_size(&self, add_size: usize) -> Result<bool> {
         if self.worker_type() != FileWorkerType::VarFile {
             return Err(Error::Storage("Invalid file worker type".into()));
         }
+        self.bytes.fetch_add(add_size, Ordering::AcqRel);
         Ok(self.request_space(add_size))
     }
 
@@ -372,7 +378,7 @@ impl BufferObj {
     /// C++ `BufferObj::Load`: allocates (or reads back) the payload and pins
     /// it. Under memory pressure the pool first frees GC-queued buffers; if
     /// none can be freed the request fails with `Storage`.
-    pub fn load(&self) -> Result<BufferHandle<'_>> {
+    pub fn load(&self) -> Result<BufferHandle> {
         self.count_request();
         if self.kind() == BufferType::Mmap {
             return self.load_mmap();
@@ -411,7 +417,7 @@ impl BufferObj {
             .store(BufferStatus::Loaded as u8, Ordering::Release);
         drop(data);
         self.rc.fetch_add(1, Ordering::AcqRel);
-        Ok(BufferHandle { obj: self })
+        self.handle()
     }
 
     /// C++ `BufferManager::AddRequestCount` / `AddCacheMissCount`: a `Freed`
@@ -431,7 +437,7 @@ impl BufferObj {
 
     /// C++ `BufferObj::LoadNoLock` for a `kMmap` payload: map the file (once)
     /// and pin it. The mapped bytes are *not* charged to the budget.
-    fn load_mmap(&self) -> Result<BufferHandle<'_>> {
+    fn load_mmap(&self) -> Result<BufferHandle> {
         let mut data = self.data.lock().unwrap();
         match self.status() {
             BufferStatus::Unloaded | BufferStatus::Loaded => {}
@@ -450,7 +456,7 @@ impl BufferObj {
             .store(BufferStatus::Loaded as u8, Ordering::Release);
         drop(data);
         self.rc.fetch_add(1, Ordering::AcqRel);
-        Ok(BufferHandle { obj: self })
+        self.handle()
     }
 
     /// C++ `BufferObj::ToMmap`: this buffer will read from its file instead of
@@ -548,6 +554,20 @@ impl BufferObj {
         Ok(true)
     }
 
+    /// Build the handle that pins this object.
+    ///
+    /// C++ hands the handle a raw `BufferObj*`; the Rust handle owns an `Arc`
+    /// so it can outlive the borrow, which is what lets a manager hold one for
+    /// its lifetime (the reference's `std::optional<BufferHandle>`).
+    fn handle(&self) -> Result<BufferHandle> {
+        let obj = self
+            .self_ref
+            .get()
+            .and_then(Weak::upgrade)
+            .ok_or_else(|| Error::Storage("BufferObj is not owned by a BufferPool".into()))?;
+        Ok(BufferHandle { obj })
+    }
+
     /// The resident payload, or an error when it was freed.
     fn resident(&self) -> Result<Vec<u8>> {
         self.data
@@ -555,6 +575,24 @@ impl BufferObj {
             .unwrap()
             .clone()
             .ok_or_else(|| Error::Storage("Buffer is not resident".into()))
+    }
+
+    /// C++ `BufferObj::SetData(void *data)`: adopt an already-allocated
+    /// payload for a `New` buffer. The bytes were charged by whoever built
+    /// them (`AddBufferSize` for a growing var-file payload), so this charges
+    /// nothing.
+    pub fn set_data(&self, payload: Vec<u8>) -> Result<()> {
+        if self.status() != BufferStatus::New {
+            return Err(Error::Storage(format!(
+                "Invalid status: {:?}",
+                self.status()
+            )));
+        }
+        *self.data.lock().unwrap() = Some(payload);
+        self.status
+            .store(BufferStatus::Loaded as u8, Ordering::Release);
+        self.kind.store(KIND_EPHEMERAL, Ordering::Release);
+        Ok(())
     }
 
     /// C++ `BufferObj::Save`: writes an ephemeral payload to its data path and
@@ -1040,14 +1078,27 @@ impl Drop for BufferObj {
     }
 }
 
+impl std::fmt::Debug for BufferObj {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BufferObj")
+            .field("id", &self.id)
+            .field("status", &self.status())
+            .field("kind", &self.kind())
+            .field("rc", &self.rc())
+            .field("bytes", &self.size())
+            .field("path", &self.data_path())
+            .finish()
+    }
+}
+
 /// A pinned [`BufferObj`]. Dropping it decrements the object's reference count.
 ///
 /// C++: `BufferHandle` (`src/storage/buffer/buffer_handle.cppm`).
-pub struct BufferHandle<'a> {
-    obj: &'a BufferObj,
+pub struct BufferHandle {
+    obj: Arc<BufferObj>,
 }
 
-impl<'a> BufferHandle<'a> {
+impl BufferHandle {
     /// C++ `GetData()`.
     pub fn data(&self) -> MutexGuard<'_, Option<Vec<u8>>> {
         self.obj.data.lock().unwrap()
@@ -1113,12 +1164,12 @@ impl<'a> BufferHandle<'a> {
         Ok(Some(payload[offset..offset + size].to_vec()))
     }
 
-    pub fn obj(&self) -> &'a BufferObj {
-        self.obj
+    pub fn obj(&self) -> &BufferObj {
+        &self.obj
     }
 }
 
-impl Drop for BufferHandle<'_> {
+impl Drop for BufferHandle {
     fn drop(&mut self) {
         self.obj.release_handle();
     }
