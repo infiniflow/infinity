@@ -11545,7 +11545,26 @@ impl Engine {
         }
     }
 
-    /// Maximum cached entries (`cache_result_capacity`); unbounded by default.
+    /// `cache_result_capacity` as `SHOW VARIABLES` reports it.
+    ///
+    /// [`Self::result_cache_capacity`] returns `usize::MAX` as the internal
+    /// "unbounded" sentinel, which used to leak into the variable table as
+    /// 18446744073709551615. The reference reports the configured capacity
+    /// (`ResultCacheManager::cache_num_capacity`, default
+    /// `DEFAULT_CACHE_RESULT_CAPACITY`), so the sentinel must not be visible.
+    fn reported_result_cache_capacity(&self) -> usize {
+        self.context
+            .config
+            .lock()
+            .unwrap()
+            .get("cache_result_capacity")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1024)
+    }
+
+    /// Maximum cached entries (`cache_result_capacity`); `usize::MAX` means
+    /// unbounded. Only the internal cache check uses this sentinel — see
+    /// [`Self::reported_result_cache_capacity`] for what a client sees.
     fn result_cache_capacity(&self) -> usize {
         self.context
             .config
@@ -14822,7 +14841,7 @@ impl Engine {
                 .get("result_cache")
                 .cloned()
                 .unwrap_or_else(|| "off".to_string()),
-            G::CacheResultCapacity => self.result_cache_capacity().to_string(),
+            G::CacheResultCapacity => self.reported_result_cache_capacity().to_string(),
             G::CacheResultNum => self.result_cache.lock().unwrap().len().to_string(),
             // C++ reads the same two counters from the buffer manager; both
             // names report `misses/requests` over the block cache.

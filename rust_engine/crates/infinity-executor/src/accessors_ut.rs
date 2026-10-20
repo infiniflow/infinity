@@ -425,3 +425,30 @@ fn rollback_counter_moves_exactly_once_per_rollback() {
     engine.begin_txn().rollback();
     assert_eq!(number(&engine, "total_rollback_count"), 2);
 }
+
+/// `cache_result_capacity` must report the configured capacity, not the
+/// internal "unbounded" sentinel. `result_cache_capacity()` returns
+/// `usize::MAX` when nothing is configured, and that value used to be printed
+/// verbatim (18446744073709551615) by `SHOW VARIABLES` and `GET /variables/*`.
+#[test]
+fn cache_result_capacity_reports_the_configuration_not_the_sentinel() {
+    let dir = tempdir().unwrap();
+    let engine = Engine::open(dir.path()).unwrap();
+    assert_eq!(
+        engine
+            .global_variable_value(crate::variables::GlobalVariable::CacheResultCapacity)
+            .unwrap(),
+        "1024",
+        "the reference's default capacity, never usize::MAX"
+    );
+    engine
+        .execute("SET CONFIG cache_result_capacity 64;")
+        .unwrap();
+    assert_eq!(
+        engine
+            .global_variable_value(crate::variables::GlobalVariable::CacheResultCapacity)
+            .unwrap(),
+        "64",
+        "a configured capacity is reported as configured"
+    );
+}
