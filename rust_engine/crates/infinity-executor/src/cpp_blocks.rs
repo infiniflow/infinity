@@ -1118,7 +1118,7 @@ impl Engine {
             })
             .collect::<Result<_>>()?;
 
-        let rows = self.fetch_rows_with_ids(&table)?;
+        let mut rows = self.fetch_rows_with_ids(&table)?;
         // The row ids this snapshot covers, in block order. Reads use them to
         // tell block-resident rows from rows written after the checkpoint.
         let block_rows: Vec<usize> = rows.iter().map(|(seq, _)| *seq).collect();
@@ -1138,7 +1138,13 @@ impl Engine {
         let _ = std::fs::remove_dir_all(&seg_dir);
 
         let mut written = 0usize;
-        for (block_index, chunk) in rows.chunks(DEFAULT_BLOCK_CAPACITY).enumerate() {
+        // Drain the snapshot block by block so each block's values are freed
+        // once it is encoded: holding the whole table's decoded rows while the
+        // texts are rendered doubled the transient on a long import.
+        let mut block_index = 0usize;
+        while !rows.is_empty() {
+            let take = rows.len().min(DEFAULT_BLOCK_CAPACITY);
+            let chunk: Vec<(usize, Vec<Value>)> = rows.drain(..take).collect();
             let texts: Vec<Vec<String>> = chunk
                 .iter()
                 .map(|(_, row)| row.iter().map(|v| v.to_slt_string()).collect())
@@ -1163,6 +1169,7 @@ impl Engine {
                 }
             })?;
             written += chunk.len();
+            block_index += 1;
         }
         // The mirror has new block files; the table's block map must rescan.
         let mut tables = self.tables.lock().unwrap();
