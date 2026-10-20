@@ -550,12 +550,12 @@ query(sql) → parse → logical → optimize → physical → fragments
 
   | 索引 | C++ 建索引 | Rust 建索引 | C++ 查询 | Rust 查询 |
   |---|---|---|---|---|
-  | FULLTEXT | 0.694 s | 0.015 s | 16.8 ms | 0.187 ms |
-  | HNSW | 0.313 s | 0.008 s | 0.64 ms | 0.25 ms |
-  | SECONDARY | 0.024 s | 0.018 s | 0.69 ms | 0.58 ms |
-  | BMP（稀疏） | 0.026 s | 0.039 s | 0.48 ms | 0.16 ms |
+  | FULLTEXT | 0.694 s | 0.069 s | 16.8 ms | 0.19 ms |
+  | HNSW | 0.313 s | **3.59 s** | 0.64 ms | 0.26 ms |
+  | SECONDARY | 0.024 s | 0.020 s | 0.69 ms | 0.88 ms |
+  | BMP（稀疏） | 0.026 s | 0.043 s | 0.48 ms | 0.28 ms |
 
-  **口径说明（重要）**：构建耗时不可直接比较——C++ 在 `CREATE INDEX` 时物化整表，Rust 的全文/部分索引在首次查询时才物化（脚本已用一次预热查询把这份成本挪出计时窗口）；因此 Rust 的"建索引"看起来接近 0。查询延迟可比：SECONDARY 同量级（0.84×）、HNSW 0.38×、BMP 0.33×、FULLTEXT 0.01×（C++ 该路径每次查询有固定的对象构造开销，20k 文档规模下占主导）。若要比较构建，需要先显式触发物化再计时。
+  **口径**：两个引擎现在都在 `CREATE INDEX` 时物化（此前 Rust 的 FULLTEXT/HNSW 是首次查询才建，已按 §3.6 改为 DDL 建索引，见 `create_index_builds_fulltext_and_hnsw_from_existing_rows`）。因此构建耗时可直接比较：FULLTEXT 快 10×、SECONDARY/BMP 同量级，但 **HNSW 构图慢 11×**（3.59 s vs 0.313 s，M=16/ef_construction=200、20k×4 维）——这是当前最明确的一项建索引性能缺口，根因是逐点插入建图（`HnswIndexInMem::insert`）没有参考实现的批量构建路径。查询延迟均不慢于 C++。
 - 根因与 #91 相同：行存 + 每次全表扫描/逐行解码；C++ 以列存块 + 列裁剪读。`run_gate_e.sh` 在有 golden 时必须走 SDK 驱动（此前误用 CLI 内部 bench，阶段不同、比较无效）。
 
 ### 8.7 Gate F — 工程质量

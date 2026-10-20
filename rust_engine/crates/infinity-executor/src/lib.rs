@@ -7091,10 +7091,20 @@ impl Engine {
                 }
                 // a functional-index target is not a plain column, so there is
                 // no materialised index to build
-                if is_secondary_kind(index_type)
-                    && self.table_schema(table)?.iter().any(|c| c == column)
-                {
+                let has_rows = self.table_schema(table)?.iter().any(|c| c == column);
+                if is_secondary_kind(index_type) && has_rows {
                     self.build_index(table, column)?;
+                }
+                // C++ `IndexBuilder`: a full-text or HNSW index is materialised
+                // by `CREATE INDEX`, not by the first query. Building lazily
+                // moved the cost into the first query and produced an index that
+                // did not exist on disk until somebody searched.
+                if has_rows && index_type.eq_ignore_ascii_case("FULLTEXT") {
+                    let delims = self.index_delims(table, column);
+                    self.text_index_for(table, column, delims)?;
+                }
+                if has_rows && index_type.eq_ignore_ascii_case("HNSW") {
+                    self.build_hnsw_index(table, column)?;
                 }
                 // A multi-vector index is materialised when it is created, so
                 // queries only read segment files; later inserts go to the
@@ -8785,6 +8795,21 @@ impl Engine {
             .unwrap()
             .insert(key, shared.clone());
         Ok(shared)
+    }
+
+    /// `IndexBuilder`: builds the HNSW index of `column` from every live row.
+    /// The rows go through the same append hook as an insert, so the graph is
+    /// the reference's in-memory segment; the next dump seals it into a chunk.
+    fn build_hnsw_index(&self, table: &str, column: &str) -> Result<()> {
+        let schema = self.table_schema(table)?;
+        let Some(ci) = schema.iter().position(|c| c == column) else {
+            return Ok(());
+        };
+        for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
+            let texts: Vec<String> = cells.iter().map(|v| v.to_slt_string()).collect();
+            self.note_hnsw_insert(table, seq as u64, &texts);
+        }
+        Ok(())
     }
 
     /// Feeds an inserted/rewritten row into the in-memory HNSW segment of every
@@ -16965,6 +16990,37 @@ mod tests {
             rows(&e, q),
             vec![vec!["5".to_string()], vec!["2".to_string()]]
         );
+    }
+
+    /// `CREATE INDEX` materialises the index (C++ `IndexBuilder`); the first
+    /// query must not be what builds it.
+    #[test]
+    fn create_index_builds_fulltext_and_hnsw_from_existing_rows() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE bi (c1 INT, body VARCHAR, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute(
+            "INSERT INTO bi VALUES (1,'alpha beta',[0.1,0.2,0.3,0.4]),\
+             (2,'alpha gamma',[0.4,0.3,0.2,0.1]),\
+             (3,'delta',[0.0,0.0,0.0,0.0]);",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX bi_ft ON bi (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute(
+            "CREATE INDEX bi_v ON bi (v) USING HNSW WITH (M=16, ef_construction=20, metric=l2);",
+        )
+        .unwrap();
+
+        // No query has run yet: both indexes already hold every live row.
+        let tables = e.tables.lock().unwrap();
+        let entry = tables.get("default_db.bi").unwrap();
+        let text = entry.text.get("body").unwrap().read().unwrap();
+        assert_eq!(text.total_docs(), 3);
+        drop(text);
+        let mem = entry.hnsw_mem.get("v").unwrap().lock().unwrap();
+        assert_eq!(mem.rows().len(), 3, "HNSW memory segment must be seeded");
     }
 
     /// `memindex_memory_quota` seals one HNSW chunk per *write batch*, not per
