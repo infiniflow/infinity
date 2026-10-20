@@ -14506,6 +14506,12 @@ impl Engine {
         let applied = self.txn.applied_ts()?;
         self.storage.catalog.flush()?;
         self.txn.flush()?;
+        // The reference's checkpoint writes a `kNewCheckpoint` entry and keeps
+        // it: `GetReplayEntries` derives `max_checkpoint_ts` from that entry and
+        // refuses to open a writable directory that has data but no checkpoint.
+        // Appending it before the truncation means the truncation can drop the
+        // prefix while the entry itself survives, and the log is never empty.
+        let _ = self.txn.append_checkpoint(applied);
         let _ = self.txn.truncate_wal_up_to(applied);
         // Dump the index memory tails first. The caller only logs a `flush`
         // error, so a failing block mirror (e.g. an unsupported column type)
@@ -15506,7 +15512,14 @@ impl Engine {
     /// periodic checkpoint loop so a slow `flush` cannot let the log grow
     /// unbounded; only fsynced records are dropped.
     pub fn checkpoint_wal(&self) {
-        let _ = self.txn.truncate_wal_up_to(self.txn.synced_ts());
+        // The reference's checkpoint appends a `kNewCheckpoint` entry and then
+        // drops everything up to it. The entry is what makes the directory
+        // readable by the reference (`GetReplayEntries` takes
+        // `max_checkpoint_ts` from it and refuses a writable directory without
+        // one); truncating alone leaves an empty log, which it also rejects.
+        let ts = self.txn.synced_ts();
+        let _ = self.txn.append_checkpoint(ts);
+        let _ = self.txn.truncate_wal_up_to(ts);
     }
 
     /// Runs the reference's optimize pass over the index mirrors: a mirror
