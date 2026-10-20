@@ -14,7 +14,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use infinity_catalog::cpp_layout::{CppBlock, CppSegment, CppSegmentSet, CPP_MIRROR_TS};
+use infinity_catalog::cpp_layout::{
+    CppBlock, CppIndexChunk, CppIndexSegment, CppSegment, CppSegmentSet, CPP_MIRROR_TS,
+};
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
 use infinity_index::hnsw_handler::HnswHandler;
@@ -128,6 +130,43 @@ pub struct LoadedVectorIndex {
 /// multi-gigabyte table would double its disk footprint; the mirror is a
 /// best-effort interop artifact, not the system of record.
 const MIRROR_BUDGET_BYTES: usize = 1024 * 1024 * 1024;
+
+/// The widest chunk file in `dir` with extension `ext`.
+///
+/// Both private mirrors name their chunks after the row count they cover
+/// (`seg_0_200.idx`, `seg_0_0_200.bmp`), so the trailing numeric field is the
+/// row count of that run; the widest run is the one that covers a full
+/// checkpoint. Returns `(path, row count)` with the count `None` when the name
+/// carries no number (a spill tail).
+fn widest_run(dir: &Path, ext: &str) -> Option<(PathBuf, Option<u64>)> {
+    let mut best: Option<(PathBuf, Option<u64>)> = None;
+    for entry in std::fs::read_dir(dir).ok()?.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.ends_with(ext) {
+            continue;
+        }
+        let count = name
+            .trim_end_matches(ext)
+            .rsplit('_')
+            .next()
+            .and_then(|f| f.parse::<u64>().ok());
+        let better = match (&best, count) {
+            (None, _) => true,
+            (Some((_, Some(prev))), Some(n)) => n > *prev,
+            (Some((_, None)), Some(_)) => true,
+            _ => false,
+        };
+        if better {
+            best = Some((entry.path(), count));
+        }
+    }
+    best
+}
+
+/// Bytes of `path`, or 0 when it cannot be read.
+fn file_len(path: &Path) -> u64 {
+    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+}
 
 /// Rough encoded bytes per row, from the declared column types.
 fn estimated_row_bytes(types: &[String]) -> usize {
@@ -1353,11 +1392,115 @@ impl Engine {
                 let _ = self.write_cpp_ivf_index(&im.table, &im.name);
             }
         }
+        // Publish the chunk layer of every index mirror. The reference only
+        // enumerates the chunks listed in `idx_chunk|…|chunk_info`, and a scan
+        // whose chunk file is missing reads a zero-length buffer (the BMP path
+        // indexes `res[block_offset]` of an empty vector and aborts). Some
+        // mirrors are already in the reference's byte layout but live in their
+        // own directory (`secondary/…`, `sparse/…`), so copy them into
+        // `idx_{id}/seg_0/chunk_0.idx`.
+        for meta in self.storage.catalog.list_tables()? {
+            let _ = self.publish_cpp_index_chunks(&meta.name, meta.id);
+        }
         Ok(())
     }
 
-    /// Loads a table's rows back **from its C++ block files** into the engine's
-    /// own row store, returning how many rows were inserted.
+    /// Mirrors each index's sealed chunk into `idx_{id}/seg_0/chunk_0.idx` and
+    /// records it in the catalog. Best effort per index: a mirror this engine
+    /// does not have simply publishes nothing.
+    fn publish_cpp_index_chunks(&self, table: &str, table_id: u64) -> Result<()> {
+        let db_id = self.database_id_of(table);
+        let root = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{table_id}"));
+        let rows = self.approx_row_count(table);
+        let mut published = Vec::new();
+        for im in self.storage.catalog.list_indexes()? {
+            if im.table != table && im.table != self.qualified_table(table) {
+                continue;
+            }
+            let Ok(index_id) = self.cpp_index_position(table, &im.name) else {
+                continue;
+            };
+            let seg_dir = root.join(format!("idx_{index_id}/seg_0"));
+            let private =
+                crate::index_key(&self.qualified_table(table), &im.column).replace('/', "_");
+            let mut chunk: Option<(u64, u64)> = None; // (row count, index size)
+            if im.index_type.eq_ignore_ascii_case("SECONDARY") {
+                // The spill runs are already the reference's chunk layout
+                // (`write_secondary_segment_typed`); the widest run is the one
+                // that covers the snapshot.
+                let dir = self.dir.join("secondary").join(&private);
+                if let Some((path, n)) = widest_run(&dir, ".idx") {
+                    if std::fs::create_dir_all(&seg_dir).is_ok()
+                        && std::fs::copy(&path, seg_dir.join("chunk_0.idx")).is_ok()
+                    {
+                        chunk = Some((
+                            n.unwrap_or(rows as u64),
+                            file_len(&seg_dir.join("chunk_0.idx")),
+                        ));
+                    }
+                }
+            } else if im.index_type.eq_ignore_ascii_case("BMP") {
+                let dir = self.dir.join("sparse").join(&private);
+                if let Some((path, n)) = widest_run(&dir, ".bmp") {
+                    if std::fs::create_dir_all(&seg_dir).is_ok()
+                        && std::fs::copy(&path, seg_dir.join("chunk_0.idx")).is_ok()
+                    {
+                        chunk = Some((
+                            n.unwrap_or(rows as u64),
+                            file_len(&seg_dir.join("chunk_0.idx")),
+                        ));
+                    }
+                }
+            } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
+                // Written in place by `write_cpp_fulltext_index`; its files are
+                // named after the chunk's base name, not `chunk_0.idx`.
+                if seg_dir
+                    .join(cpp_format::fulltext_base_name(0, None) + ".dic")
+                    .exists()
+                {
+                    chunk = Some((rows as u64, 0));
+                }
+            } else {
+                let path = seg_dir.join("chunk_0.idx");
+                if path.exists() {
+                    chunk = Some((rows as u64, file_len(&path)));
+                }
+            }
+            let Some((row_count, index_size)) = chunk else {
+                continue;
+            };
+            published.push(CppIndexSegment {
+                index_id: index_id as u64,
+                segment_id: 0,
+                chunks: vec![CppIndexChunk {
+                    chunk_id: 0,
+                    base_name: if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
+                        cpp_format::fulltext_base_name(0, None)
+                    } else {
+                        format!("{}_{:016}", im.name, 0)
+                    },
+                    base_row_id: 0,
+                    row_count,
+                    term_count: 0,
+                    index_size,
+                }],
+            });
+        }
+        if published.is_empty() {
+            return Ok(());
+        }
+        self.storage.catalog.publish_cpp_index_segments(
+            &CppSegmentSet {
+                db_id: db_id.to_string(),
+                table_id: table_id.to_string(),
+                segments: Vec::new(),
+            },
+            &published,
+        )?;
+        Ok(())
+    }
     ///
     /// This is the interop direction §2.6.1 cares about: a `db_*/tbl_*/seg_*/
     /// blk_*` directory written by the C++ engine (or by [`Self::write_cpp_blocks`])
