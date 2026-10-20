@@ -140,11 +140,12 @@ pub use mvcc::{BlockVersion, CreateField};
 pub use virtual_store::{
     string_to_storage_type, Compressor, FileAccessMode, FileHandle, StorageType, VirtualStore,
 };
-pub use wal::{WalManager, WalRecord, WAL_MAGIC};
+pub use wal::{WalManager, WalRecord, WAL_FRAME_HEADER_LEN, WAL_MAGIC};
 pub use wal_entry::{
-    append_entries, WalBlockInfo, WalChunkIndexInfo, WalCmd, WalColumnDef, WalCommandType,
-    WalEntry, WalEntryIterator, WalIndexBase, WalListIterator, WalRowId, WalSegmentIndexInfo,
-    WalSegmentInfo, WalTableDef, WAL_ENTRY_HEADER_LEN,
+    append_entries, decode_kv_batch, encode_kv_batch, KvBatchKind, WalBlockInfo, WalChunkIndexInfo,
+    WalCmd, WalColumnDef, WalCommandType, WalEntry, WalEntryIterator, WalIndexBase,
+    WalListIterator, WalRowId, WalSegmentIndexInfo, WalSegmentInfo, WalTableDef,
+    WAL_CMD_PAYLOAD_MAGIC, WAL_ENTRY_HEADER_LEN,
 };
 
 #[cfg(test)]

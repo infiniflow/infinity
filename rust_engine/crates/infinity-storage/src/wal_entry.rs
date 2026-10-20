@@ -42,6 +42,11 @@ use crate::data_block::{BlockValue, Column, ColumnVector, DataBlock};
 /// `WalEntryHeader` (`wal_entry.cppm:879`) is 24 bytes on the wire.
 pub const WAL_ENTRY_HEADER_LEN: usize = 24;
 
+/// Discriminator of a typed command payload inside the engine's framed WAL
+/// (`"CMD1"`). Legacy payloads are a bare KV write batch and never start with
+/// a `u32` key length equal to this value.
+pub const WAL_CMD_PAYLOAD_MAGIC: u32 = 0x3144_4D43;
+
 /// C++: `WalCommandType` (`wal_entry.cppm:42`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i8)]
@@ -71,6 +76,13 @@ pub enum WalCommandType {
     RestoreTableSnapshot = 113,
     RestoreDatabaseSnapshot = 114,
     RestoreSystemSnapshot = 115,
+    /// **Rust-engine extension** (no C++ counterpart; 102 is unused by the
+    /// reference enum). Carries the exact KV write batch of the commands the
+    /// committing layer can identify but not encode in one of the typed
+    /// payloads above (catalog/DDL records, whose codec lives in
+    /// `infinity-catalog`, and data values that are not valid UTF-8 row text).
+    /// Replay applies the batch as-is; see [`KvBatchKind`].
+    KvBatch = 102,
 }
 
 impl WalCommandType {
@@ -101,6 +113,7 @@ impl WalCommandType {
             113 => Self::RestoreTableSnapshot,
             114 => Self::RestoreDatabaseSnapshot,
             115 => Self::RestoreSystemSnapshot,
+            102 => Self::KvBatch,
             _ => return None,
         })
     }
@@ -120,6 +133,20 @@ impl WalRowId {
         Self {
             segment_id,
             segment_offset,
+        }
+    }
+
+    /// The engine's packed row sequence (`segment_id << 32 | segment_offset`),
+    /// the `seq` in the `row:{table}:{seq}` / `del:{table}:{seq}` keys.
+    pub fn to_u64(self) -> u64 {
+        ((self.segment_id as u64) << 32) | self.segment_offset as u64
+    }
+
+    /// Inverse of [`WalRowId::to_u64`].
+    pub fn from_u64(seq: u64) -> Self {
+        Self {
+            segment_id: (seq >> 32) as u32,
+            segment_offset: seq as u32,
         }
     }
 }
@@ -198,6 +225,31 @@ impl WalIndexBase {
             index_type: index_type.into(),
             params,
         }
+    }
+}
+
+/// What a [`WalCmd::KvBatch`] carries. Rust-engine extension; see
+/// [`WalCommandType::KvBatch`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum KvBatchKind {
+    /// Catalog / DDL records (`db:`, `tbl:`, `tblname:`, `idx:`, counters…).
+    /// Their value codec lives in `infinity-catalog` (`TableMeta::encode`),
+    /// and replaying them as typed `WalCmdCreateTableV2`/… needs the catalog
+    /// operations the executor owns, so the exact records ride along here.
+    Catalog = 1,
+    /// Any other record the committing layer cannot type (snapshot blobs,
+    /// non-UTF-8 row values, …).
+    Other = 2,
+}
+
+impl KvBatchKind {
+    fn from_u8(v: u8) -> Option<Self> {
+        Some(match v {
+            1 => Self::Catalog,
+            2 => Self::Other,
+            _ => return None,
+        })
     }
 }
 
@@ -365,6 +417,13 @@ pub enum WalCmd {
     Cleanup {
         timestamp: TxnTimeStamp,
     },
+    /// Rust-engine extension: an exact KV write batch that could not be
+    /// expressed as one of the typed commands above. Replay applies the writes
+    /// atomically, so nothing is silently dropped.
+    KvBatch {
+        kind: KvBatchKind,
+        writes: Vec<(Vec<u8>, Vec<u8>)>,
+    },
 }
 
 impl WalCmd {
@@ -386,6 +445,7 @@ impl WalCmd {
             WalCmd::AddColumns { .. } => WalCommandType::AddColumnsV2,
             WalCmd::DropColumns { .. } => WalCommandType::DropColumnsV2,
             WalCmd::Cleanup { .. } => WalCommandType::Cleanup,
+            WalCmd::KvBatch { .. } => WalCommandType::KvBatch,
         }
     }
 }
@@ -431,6 +491,61 @@ impl WalEntry {
 
     pub fn is_checkpoint(&self) -> bool {
         self.checkpoint_ts().is_some()
+    }
+
+    /// Serializes the command list for the engine's framed WAL
+    /// (`[magic,size,crc][txn_id,commit_ts][payload]`, see
+    /// [`crate::wal::WalManager`]).
+    ///
+    /// The frame already carries `txn_id`/`commit_ts` and its own CRC, so the
+    /// payload is the `"CMD1"` discriminator followed by the same
+    /// `[cmd_count][cmd…]` body the reference writes after its
+    /// `WalEntryHeader` (`wal_entry_impl.cpp:2193`). The discriminator is what
+    /// separates a typed payload from the legacy bare KV write batch the
+    /// commit path used to write: a legacy batch starts with a `u32` key
+    /// length, which can never equal `"CMD1"`.
+    pub fn encode_cmd_payload(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(8 + self.size_in_bytes());
+        out.extend_from_slice(&WAL_CMD_PAYLOAD_MAGIC.to_le_bytes());
+        put_i32(&mut out, self.cmds.len() as i32);
+        for cmd in &self.cmds {
+            encode_cmd(&mut out, cmd);
+        }
+        out
+    }
+
+    /// Inverse of [`WalEntry::encode_cmd_payload`]. Returns `None` when the
+    /// payload is not a typed command payload (a legacy KV write batch) or is
+    /// damaged, so a torn old-format tail is skipped rather than panicking.
+    pub fn decode_cmd_payload(
+        txn_id: i64,
+        commit_ts: TxnTimeStamp,
+        payload: &[u8],
+    ) -> Option<Self> {
+        if payload.len() < 8 {
+            return None;
+        }
+        let magic = u32::from_le_bytes(payload[0..4].try_into().ok()?);
+        if magic != WAL_CMD_PAYLOAD_MAGIC {
+            return None;
+        }
+        let mut cursor = Cursor::new(&payload[4..]);
+        let count = cursor.i32()?;
+        if count < 0 {
+            return None;
+        }
+        let mut cmds = Vec::with_capacity(count as usize);
+        for _ in 0..count {
+            cmds.push(decode_cmd(&mut cursor)?);
+        }
+        if cursor.pos != cursor.buf.len() {
+            return None; // trailing garbage: treat as damaged
+        }
+        Some(Self {
+            txn_id,
+            commit_ts,
+            cmds,
+        })
     }
 
     fn encode_entry<S: Sink>(&self, sink: &mut S) {
@@ -512,12 +627,27 @@ impl WalEntry {
 /// C++: `WalEntryIterator` (`wal_entry.cppm:927`). Forward iteration starts at
 /// offset 0; backward iteration starts at end-of-file and steps over the
 /// trailing size copies.
+///
+/// [`WalEntryIterator::make_framed`] reads the engine's framed log
+/// (`[magic,size,crc][txn_id,commit_ts][payload]`) instead, decoding each
+/// frame's typed command payload. Both modes expose the same [`WalEntry`]
+/// stream, which is what recovery replays.
 #[derive(Debug)]
 pub struct WalEntryIterator {
     file_name: PathBuf,
     is_backward: bool,
     off: usize,
     buf: Vec<u8>,
+    /// Set by [`WalEntryIterator::make_framed`]: the already-decoded framed
+    /// log plus the byte offset of each record.
+    framed: Option<FramedState>,
+}
+
+#[derive(Debug)]
+struct FramedState {
+    entries: Vec<WalEntry>,
+    offsets: Vec<usize>,
+    pos: usize,
 }
 
 impl WalEntryIterator {
@@ -531,6 +661,38 @@ impl WalEntryIterator {
             is_backward,
             off,
             buf,
+            framed: None,
+        })
+    }
+
+    /// Reads the engine's framed log (`crate::wal`) as a stream of typed
+    /// [`WalEntry`] values. Records written before the typed payload existed
+    /// surface as a single [`WalCmd::KvBatch`] carrying their exact writes, so
+    /// nothing is dropped. A torn or corrupt frame — including a torn tail of
+    /// the old format — stops the iteration.
+    pub fn make_framed(wal_path: impl AsRef<Path>, is_backward: bool) -> Result<Self> {
+        let file_name = wal_path.as_ref().to_path_buf();
+        let (buf, entries, offsets) = match std::fs::read(&file_name) {
+            Ok(buf) => {
+                let (entries, offsets) = decode_framed(&buf);
+                (buf, entries, offsets)
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                (Vec::new(), Vec::new(), Vec::new())
+            }
+            Err(e) => return Err(Error::io(&file_name, e)),
+        };
+        let pos = if is_backward { entries.len() } else { 0 };
+        Ok(Self {
+            file_name,
+            is_backward,
+            off: 0,
+            buf,
+            framed: Some(FramedState {
+                entries,
+                offsets,
+                pos,
+            }),
         })
     }
 
@@ -540,6 +702,13 @@ impl WalEntryIterator {
 
     /// C++: `WalEntryIterator::HasNext` (`wal_entry.cppm:938`).
     pub fn has_next(&self) -> bool {
+        if let Some(framed) = &self.framed {
+            return if self.is_backward {
+                framed.pos > 0
+            } else {
+                framed.pos < framed.entries.len()
+            };
+        }
         if self.is_backward {
             self.off > 0
         } else {
@@ -549,7 +718,10 @@ impl WalEntryIterator {
 
     /// C++: `WalEntryIterator::GetOffset` (`wal_entry.cppm:942`).
     pub fn get_offset(&self) -> usize {
-        self.off
+        match &self.framed {
+            Some(framed) => framed.offsets.get(framed.pos).copied().unwrap_or(0),
+            None => self.off,
+        }
     }
 
     /// C++: `WalEntryIterator::Next` (`wal_entry_impl.cpp:2447`). Returns
@@ -557,6 +729,22 @@ impl WalEntryIterator {
     /// [`Self::get_all_entries`] can stop there.
     #[allow(clippy::should_implement_trait)] // the C++ name is `Next`
     pub fn next(&mut self) -> Option<WalEntry> {
+        if let Some(framed) = &mut self.framed {
+            return if self.is_backward {
+                if framed.pos == 0 {
+                    None
+                } else {
+                    framed.pos -= 1;
+                    Some(framed.entries[framed.pos].clone())
+                }
+            } else {
+                if framed.pos >= framed.entries.len() {
+                    return None;
+                }
+                framed.pos += 1;
+                Some(framed.entries[framed.pos - 1].clone())
+            };
+        }
         if self.is_backward {
             if self.off < 4 {
                 return None;
@@ -605,12 +793,64 @@ impl WalEntryIterator {
     /// C++: `WalEntryIterator::IsGood` (`wal_entry_impl.cpp:2518`): true when
     /// the whole file was consumed.
     pub fn is_good(&self) -> bool {
+        if let Some(framed) = &self.framed {
+            return if self.is_backward {
+                framed.pos == 0
+            } else {
+                framed.pos == framed.entries.len()
+            };
+        }
         if self.is_backward {
             self.off == 0
         } else {
             self.off == self.buf.len()
         }
     }
+}
+
+/// Walks the `[magic,size,checksum][content]` frames of the engine's WAL and
+/// decodes each content as a typed command payload. Content that is not a
+/// typed payload is decoded as the legacy bare KV write batch; anything else
+/// stops the walk (torn or corrupt tail).
+fn decode_framed(buf: &[u8]) -> (Vec<WalEntry>, Vec<usize>) {
+    let mut entries = Vec::new();
+    let mut offsets = Vec::new();
+    let mut cursor = 0usize;
+    while cursor + crate::wal::WAL_FRAME_HEADER_LEN <= buf.len() {
+        let magic = u32::from_le_bytes(buf[cursor..cursor + 4].try_into().unwrap());
+        if magic != crate::wal::WAL_MAGIC {
+            break;
+        }
+        let size = u32::from_le_bytes(buf[cursor + 4..cursor + 8].try_into().unwrap()) as usize;
+        let checksum = u32::from_le_bytes(buf[cursor + 8..cursor + 12].try_into().unwrap());
+        let end = cursor + crate::wal::WAL_FRAME_HEADER_LEN + size;
+        if end > buf.len() {
+            break; // torn tail
+        }
+        let content = &buf[cursor + crate::wal::WAL_FRAME_HEADER_LEN..end];
+        if content.len() < 16 || crc32_ieee(content) != checksum {
+            break; // corrupt
+        }
+        let txn_id = i64::from_le_bytes(content[0..8].try_into().unwrap());
+        let commit_ts = u64::from_le_bytes(content[8..16].try_into().unwrap());
+        let payload = &content[16..];
+        let entry = WalEntry::decode_cmd_payload(txn_id, commit_ts, payload).or_else(|| {
+            decode_kv_batch(payload).map(|writes| WalEntry {
+                txn_id,
+                commit_ts,
+                cmds: vec![WalCmd::KvBatch {
+                    kind: KvBatchKind::Other,
+                    writes,
+                }],
+            })
+        });
+        if let Some(entry) = entry {
+            offsets.push(cursor);
+            entries.push(entry);
+        }
+        cursor = end;
+    }
+    (entries, offsets)
 }
 
 /// C++: `WalListIterator` (`wal_entry.cppm:957`). Walks the WAL files from the
@@ -1623,6 +1863,16 @@ fn encode_cmd<S: Sink>(sink: &mut S, cmd: &WalCmd) {
             }
         }
         WalCmd::Cleanup { timestamp } => put_u64(sink, *timestamp),
+        WalCmd::KvBatch { kind, writes } => {
+            put_u8(sink, *kind as u8);
+            put_len(sink, writes.len());
+            for (key, value) in writes {
+                put_len(sink, key.len());
+                sink.put(key);
+                put_len(sink, value.len());
+                sink.put(value);
+            }
+        }
     }
 }
 
@@ -1877,8 +2127,63 @@ fn decode_cmd(cursor: &mut Cursor<'_>) -> Option<WalCmd> {
         WalCommandType::Cleanup => WalCmd::Cleanup {
             timestamp: cursor.u64()?,
         },
+        WalCommandType::KvBatch => {
+            let kind = KvBatchKind::from_u8(cursor.u8()?)?;
+            let count = cursor.len()?;
+            let mut writes = Vec::with_capacity(count);
+            for _ in 0..count {
+                let key_len = cursor.len()?;
+                let key = cursor.take(key_len)?.to_vec();
+                let value_len = cursor.len()?;
+                let value = cursor.take(value_len)?.to_vec();
+                writes.push((key, value));
+            }
+            WalCmd::KvBatch { kind, writes }
+        }
         _ => return None,
     })
+}
+
+/// Encodes a KV write batch as `[klen: u32][key][vlen: u32][value]…`. This is
+/// the payload the commit path wrote before typed commands existed; legacy WAL
+/// records are still decoded with it.
+pub fn encode_kv_batch(writes: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for (key, value) in writes {
+        out.extend_from_slice(&(key.len() as u32).to_le_bytes());
+        out.extend_from_slice(key);
+        out.extend_from_slice(&(value.len() as u32).to_le_bytes());
+        out.extend_from_slice(value);
+    }
+    out
+}
+
+/// Inverse of [`encode_kv_batch`]. Returns `None` when `buf` is not a
+/// well-formed batch (e.g. a typed payload or a torn record).
+pub fn decode_kv_batch(buf: &[u8]) -> Option<Vec<(Vec<u8>, Vec<u8>)>> {
+    let mut rest = buf;
+    let mut out = Vec::new();
+    while !rest.is_empty() {
+        if rest.len() < 4 {
+            return None;
+        }
+        let klen = u32::from_le_bytes(rest[0..4].try_into().ok()?) as usize;
+        rest = &rest[4..];
+        if rest.len() < klen + 4 {
+            return None;
+        }
+        let key = rest[..klen].to_vec();
+        rest = &rest[klen..];
+        let vlen = u32::from_le_bytes(rest[0..4].try_into().ok()?) as usize;
+        rest = &rest[4..];
+        if rest.len() < vlen {
+            return None;
+        }
+        let value = rest[..vlen].to_vec();
+        rest = &rest[vlen..];
+        out.push((key, value));
+    }
+    Some(out)
 }
 
 /// Appends `entries` to the WAL file at `path` (test/replay helper mirroring
@@ -2119,6 +2424,55 @@ mod tests {
         commit_tss
     }
 
+    /// The command encoding is byte-for-byte the reference's writer
+    /// (`WalEntry::WriteAdv` at `wal_entry_impl.cpp:2193` +
+    /// `WalCmdDeleteV2::WriteAdv` at `:1345`). The expected frame is spelled
+    /// out field by field — `[size][checksum][txn_id][commit_ts][cmd_count]`
+    /// `[type][db_name][db_id][table_name][table_id][row_count]`
+    /// `[segment_id][segment_offset][size]` — and the checksum is filled in
+    /// with the shared CRC-32/IEEE (`crc32_ieee`), which is what
+    /// `CRC32IEEE::makeCRC` computes with the checksum field zeroed.
+    #[test]
+    fn delete_entry_matches_the_cpp_writer_byte_for_byte() {
+        let entry = WalEntry::new(
+            3,
+            7,
+            vec![WalCmd::Delete {
+                db_name: "db1".to_string(),
+                db_id: "1".to_string(),
+                table_name: "tbl1".to_string(),
+                table_id: "2".to_string(),
+                row_ids: vec![WalRowId::new(1, 3)],
+            }],
+        );
+
+        let size = 70i32;
+        let mut expected = Vec::new();
+        expected.extend_from_slice(&size.to_le_bytes()); // size_
+        expected.extend_from_slice(&0u32.to_le_bytes()); // checksum_, patched below
+        expected.extend_from_slice(&3i64.to_le_bytes()); // txn_id_
+        expected.extend_from_slice(&7u64.to_le_bytes()); // commit_ts_
+        expected.extend_from_slice(&1i32.to_le_bytes()); // cmd count
+        expected.push(25); // WalCommandType::DELETE_V2
+        for text in ["db1", "1", "tbl1", "2"] {
+            expected.extend_from_slice(&(text.len() as i32).to_le_bytes());
+            expected.extend_from_slice(text.as_bytes());
+        }
+        expected.extend_from_slice(&1i32.to_le_bytes()); // row id count
+        expected.extend_from_slice(&1u32.to_le_bytes()); // segment_id
+        expected.extend_from_slice(&3u32.to_le_bytes()); // segment_offset
+        expected.extend_from_slice(&size.to_le_bytes()); // trailing size copy
+        assert_eq!(expected.len(), size as usize);
+        let checksum = crc32_ieee(&expected);
+        expected[4..8].copy_from_slice(&checksum.to_le_bytes());
+
+        let mut written = Vec::new();
+        entry.write_adv(&mut written);
+        assert_eq!(written, expected);
+        assert_eq!(entry.size_in_bytes(), size as usize);
+        assert_eq!(WalEntry::read_adv(&written), Some((entry, size as usize)));
+    }
+
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:212` (`ReadWriteV2`).
     #[test]
     fn read_write_v2_roundtrips_every_command() {
@@ -2269,6 +2623,13 @@ mod tests {
                     column_ids: vec![3, 4],
                     table_key: "table_key".to_string(),
                     column_keys: vec!["column_key1".to_string(), "column_key2".to_string()],
+                },
+                WalCmd::KvBatch {
+                    kind: KvBatchKind::Catalog,
+                    writes: vec![
+                        (b"tbl:1".to_vec(), b"value".to_vec()),
+                        (b"idx:2".to_vec(), Vec::new()),
+                    ],
                 },
             ],
         );

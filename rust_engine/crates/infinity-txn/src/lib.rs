@@ -1,8 +1,20 @@
 //! `infinity-txn`: the transaction commit pipeline.
 //!
 //! Mirrors the engine's order (plan 附录 A.4): **WriteWAL (serial) -> CommitBottom
-//! (KV atomic write)**. Recovery replays WAL records with `commit_ts > checkpoint`
-//! into the KV store idempotently.
+//! (KV atomic write)**. Every commit appends a *typed* command list
+//! (`WalCmd`, [`infinity_storage::wal_entry`]) to the framed WAL, exactly the
+//! shape the reference writes from `NewTxnManager::SendToWAL` /
+//! `WalManager::SubmitTxn`; recovery reads it back through
+//! [`WalEntryIterator::make_framed`] and replays each command, instead of
+//! replaying a raw KV put batch.
+//!
+//! Commands the committing layer can identify are emitted typed: row puts
+//! become [`WalCmd::Append`] (the row blob rides in the block's single varchar
+//! column, the engine stores rows as encoded text) and tombstones become
+//! [`WalCmd::Delete`]. Catalog/DDL records are carried in a
+//! [`WalCmd::KvBatch`] because their value codec lives in `infinity-catalog`
+//! and replaying them as `WalCmdCreateTableV2`/… needs catalog operations the
+//! executor owns; the batch is applied verbatim so nothing is dropped.
 
 #![forbid(unsafe_code)]
 
@@ -16,53 +28,49 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use infinity_common::{Error, Result, TxnTimeStamp};
-use infinity_storage::{MetaStore, WalManager, WalRecord};
+use infinity_storage::data_block::{BlockValue, Column, ColumnVector, DataBlock};
+use infinity_storage::{
+    decode_kv_batch, KvBatchKind, MetaStore, WalCmd, WalEntry, WalEntryIterator, WalManager,
+    WalRecord, WalRowId,
+};
 
-/// Encode a batch of writes into a WAL payload.
-fn encode_writes(writes: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
-    let mut out = Vec::new();
-    for (k, v) in writes {
-        out.extend_from_slice(&(k.len() as u32).to_le_bytes());
-        out.extend_from_slice(k);
-        out.extend_from_slice(&(v.len() as u32).to_le_bytes());
-        out.extend_from_slice(v);
-    }
-    out
+/// Row record prefix of the engine's KV keys (`row:{table}:{seq:016}`).
+const ROW_PREFIX: &str = "row:";
+/// Tombstone prefix (`del:{table}:{seq:016}`).
+const DEL_PREFIX: &str = "del:";
+
+/// C++: `TxnInfo` (`new_txn_manager.cppm`): what `SHOW TRANSACTIONS` reads
+/// from the manager's `txn_map_`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TxnInfo {
+    pub txn_id: u64,
+    /// The statement text the transaction was started with.
+    pub txn_text: String,
+    pub begin_ts: TxnTimeStamp,
 }
 
-fn decode_writes(mut buf: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let mut out = Vec::new();
-    while !buf.is_empty() {
-        if buf.len() < 4 {
-            return Err(Error::Wal("truncated write batch".into()));
-        }
-        let klen = u32::from_le_bytes(buf[0..4].try_into().unwrap()) as usize;
-        buf = &buf[4..];
-        if buf.len() < klen + 4 {
-            return Err(Error::Wal("truncated write key".into()));
-        }
-        let k = buf[..klen].to_vec();
-        buf = &buf[klen..];
-        let vlen = u32::from_le_bytes(buf[0..4].try_into().unwrap()) as usize;
-        buf = &buf[4..];
-        if buf.len() < vlen {
-            return Err(Error::Wal("truncated write value".into()));
-        }
-        let v = buf[..vlen].to_vec();
-        buf = &buf[vlen..];
-        out.push((k, v));
-    }
-    Ok(out)
+/// Keys a transaction read, for the conflict check (`NewTxn`'s read set).
+#[derive(Default)]
+struct ReadSet {
+    keys: Vec<Vec<u8>>,
+    prefixes: Vec<Vec<u8>>,
 }
 
 /// A pending transaction.
 pub struct Txn {
     pub id: u64,
     pub begin_ts: TxnTimeStamp,
+    /// The statement text (C++ `NewTxn::txn_text_`), for `SHOW TRANSACTIONS`.
+    pub txn_text: String,
     writes: Vec<(Vec<u8>, Vec<u8>)>,
     /// Tombstones this transaction writes. They are validated against newer
     /// commits at commit time (`NewTxn::CommitTxn` conflict check).
     deletes: Vec<Vec<u8>>,
+    reads: ReadSet,
+    /// The manager's active-transaction registry (C++ `txn_map_`). Dropping a
+    /// transaction that was neither committed nor rolled back releases its
+    /// slot, as `~NewTxn` calls `RollBackTxn` in the reference.
+    active: Arc<Mutex<HashMap<u64, TxnInfo>>>,
 }
 
 impl Txn {
@@ -75,11 +83,28 @@ impl Txn {
     pub fn delete(&mut self, key: impl Into<Vec<u8>>) {
         self.deletes.push(key.into());
     }
+    /// Records a read of `key`, so a commit by a transaction that overlaps
+    /// this one's lifetime invalidates the commit (C++ `NewTxn::GetStore`).
+    pub fn read(&mut self, key: impl Into<Vec<u8>>) {
+        self.reads.keys.push(key.into());
+    }
+    /// Records a read of every key under `prefix` (C++ `NewTxn` range read).
+    pub fn read_prefix(&mut self, prefix: impl Into<Vec<u8>>) {
+        self.reads.prefixes.push(prefix.into());
+    }
     pub fn len(&self) -> usize {
         self.writes.len() + self.deletes.len()
     }
     pub fn is_empty(&self) -> bool {
         self.writes.is_empty() && self.deletes.is_empty()
+    }
+}
+
+impl Drop for Txn {
+    fn drop(&mut self) {
+        if let Ok(mut active) = self.active.lock() {
+            active.remove(&self.id);
+        }
     }
 }
 
@@ -102,16 +127,30 @@ pub struct TxnManager {
     /// `total_commit_count`: successful commits since open (the reference's
     /// `NewTxnManager::total_committed_txn_count`).
     total_committed: AtomicU64,
-    /// Last commit timestamp that touched each tombstone key. Conflict checks
-    /// compare it with a transaction's `begin_ts` (in-memory, like `NewTxn`'s
-    /// conflict sets).
-    delete_ts: Mutex<HashMap<Vec<u8>, TxnTimeStamp>>,
-    /// Serialises delete validation + commit so the first committer wins.
-    delete_lock: Mutex<()>,
+    /// `NewTxnManager::total_rollbacked_txn_count`.
+    total_rolled_back: AtomicU64,
+    /// Last commit timestamp that wrote each key. C++ keeps the same
+    /// information as per-transaction stores and compares them in
+    /// `CheckConflict1`; keyed by key it answers the same question for the
+    /// engine's KV-shaped writes. Rebuilt from the WAL on open (see
+    /// [`TxnManager::open`]), never persisted separately.
+    write_ts: Mutex<HashMap<Vec<u8>, TxnTimeStamp>>,
+    /// C++ `NewTxnManager::txn_map_`: the live transactions, in begin order for
+    /// `SHOW TRANSACTIONS`.
+    active: Arc<Mutex<HashMap<u64, TxnInfo>>>,
+    /// Serialises conflict validation + commit so the first committer wins.
+    commit_lock: Mutex<()>,
 }
 
 impl TxnManager {
-    /// Opens the manager, seeding counters from any existing WAL (recovery).
+    /// Opens the manager, seeding counters from any existing WAL (recovery)
+    /// and rebuilding the conflict state from it.
+    ///
+    /// C++ rebuilds its conflict view from the replayed `WalEntry`s as well
+    /// (`NewTxnManager::ReplayWalEntries`); nothing is persisted separately.
+    /// Records truncated by a checkpoint do not need to be rebuilt: a new
+    /// transaction's `begin_ts` is the WAL/KV high-water mark, so an older
+    /// commit can never be "newer than begin_ts".
     pub fn open(wal_path: impl Into<PathBuf>, store: Arc<dyn MetaStore>) -> Result<Self> {
         let wal_path = wal_path.into();
         let recs = read_all_segments(&wal_path)?;
@@ -124,6 +163,12 @@ impl TxnManager {
             .unwrap_or(0);
         let max_ts = recs.iter().map(|r| r.commit_ts).max().unwrap_or(0);
         let max_id = recs.iter().map(|r| r.txn_id).max().unwrap_or(0);
+        let mut write_ts = HashMap::new();
+        for rec in &recs {
+            for key in record_write_keys(rec) {
+                write_ts.insert(key, rec.commit_ts);
+            }
+        }
         let wal = WalManager::open(&wal_path)?;
         Ok(Self {
             store,
@@ -137,58 +182,127 @@ impl TxnManager {
             last_appended: AtomicU64::new(max_ts),
             synced: AtomicU64::new(applied_ts),
             total_committed: AtomicU64::new(0),
-            delete_ts: Mutex::new(HashMap::new()),
-            delete_lock: Mutex::new(()),
+            total_rolled_back: AtomicU64::new(0),
+            write_ts: Mutex::new(write_ts),
+            active: Arc::new(Mutex::new(HashMap::new())),
+            commit_lock: Mutex::new(()),
         })
     }
 
     pub fn begin(&self) -> Txn {
+        self.begin_with_text("")
+    }
+
+    /// C++: `NewTxnManager::BeginTxnShared` — registers the transaction in
+    /// `txn_map_` so `SHOW TRANSACTIONS` and `active_txn_count` see it.
+    pub fn begin_with_text(&self, txn_text: impl Into<String>) -> Txn {
         let id = self.next_txn_id.fetch_add(1, Ordering::SeqCst);
         // `NewTxn::BeginTS`: the timestamp of the last commit. A commit
         // allocates a strictly larger timestamp, so a write transaction's
         // begin is below its commit.
         let begin_ts = self.next_ts.load(Ordering::SeqCst).saturating_sub(1);
+        let info = TxnInfo {
+            txn_id: id,
+            txn_text: txn_text.into(),
+            begin_ts,
+        };
+        self.active.lock().unwrap().insert(id, info.clone());
         Txn {
             id,
             begin_ts,
+            txn_text: info.txn_text,
             writes: Vec::new(),
             deletes: Vec::new(),
+            reads: ReadSet::default(),
+            active: self.active.clone(),
         }
     }
 
-    /// Commits: append to WAL (serial), then apply atomically to KV. Returns the
-    /// commit timestamp.
-    pub fn commit(&self, txn: Txn) -> Result<TxnTimeStamp> {
-        if txn.is_empty() {
-            return Err(Error::Txn("empty transaction".into()));
-        }
-        let _delete_guard = if txn.deletes.is_empty() {
-            None
-        } else {
-            Some(self.delete_lock.lock().unwrap())
-        };
-        if !txn.deletes.is_empty() {
-            let seen = self.delete_ts.lock().unwrap();
-            for key in &txn.deletes {
-                if let Some(&ts) = seen.get(key) {
-                    if ts > txn.begin_ts {
-                        return Err(Error::TxnConflict(format!(
-                            "row changed by a newer transaction (begin_ts={})",
-                            txn.begin_ts
-                        )));
-                    }
-                }
+    /// C++: `NewTxnManager::CheckConflict1` — `true` when some transaction
+    /// committed after `txn.begin_ts` touched a key or key range the
+    /// transaction read or wrote.
+    fn conflict(&self, txn: &Txn, seen: &HashMap<Vec<u8>, TxnTimeStamp>) -> Option<String> {
+        let newer = |key: &[u8]| seen.get(key).is_some_and(|ts| *ts > txn.begin_ts);
+        for (key, _) in &txn.writes {
+            if newer(key) {
+                return Some(format!(
+                    "key {} written by a newer transaction (begin_ts={})",
+                    key_text(key),
+                    txn.begin_ts
+                ));
             }
         }
+        for key in &txn.deletes {
+            if newer(key) {
+                return Some(format!(
+                    "key {} deleted by a newer transaction (begin_ts={})",
+                    key_text(key),
+                    txn.begin_ts
+                ));
+            }
+        }
+        for key in &txn.reads.keys {
+            if newer(key) {
+                return Some(format!(
+                    "key {} read by this transaction changed (begin_ts={})",
+                    key_text(key),
+                    txn.begin_ts
+                ));
+            }
+        }
+        for prefix in &txn.reads.prefixes {
+            if seen
+                .iter()
+                .any(|(key, ts)| *ts > txn.begin_ts && key.starts_with(prefix))
+            {
+                return Some(format!(
+                    "range {} read by this transaction changed (begin_ts={})",
+                    key_text(prefix),
+                    txn.begin_ts
+                ));
+            }
+        }
+        None
+    }
+
+    /// Commits: validate against newer transactions, append the typed command
+    /// list to the WAL (serial), then apply the batch atomically to the KV.
+    /// Returns the commit timestamp.
+    pub fn commit(&self, txn: Txn) -> Result<TxnTimeStamp> {
+        // C++ distinguishes a read-only transaction (no WAL record, commit ts
+        // `current_ts + 1`, `GetReadCommitTS`) from an empty one.
+        let read_only = txn.is_empty();
+        if read_only && txn.reads.keys.is_empty() && txn.reads.prefixes.is_empty() {
+            return Err(Error::Txn("empty transaction".into()));
+        }
+        let _commit = self.commit_lock.lock().unwrap();
+        {
+            let seen = self.write_ts.lock().unwrap();
+            if let Some(reason) = self.conflict(&txn, &seen) {
+                return Err(Error::TxnConflict(reason));
+            }
+        }
+        if read_only {
+            return Ok(self.current_ts() + 1);
+        }
         let commit_ts = self.next_ts.fetch_add(1, Ordering::SeqCst);
+        let entry = WalEntry::new(
+            txn.id as i64,
+            commit_ts,
+            build_commands(&txn.writes, &txn.deletes),
+        );
+        {
+            let mut wal = self.wal.lock().unwrap();
+            wal.append(&WalRecord::new(
+                txn.id,
+                commit_ts,
+                entry.encode_cmd_payload(),
+            ))?;
+            self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
+        }
         let mut writes = txn.writes.clone();
         for key in &txn.deletes {
             writes.push((key.clone(), b"1".to_vec()));
-        }
-        let payload = encode_writes(&writes);
-        {
-            let mut wal = self.wal.lock().unwrap();
-            wal.append(&WalRecord::new(txn.id, commit_ts, payload))?;
         }
         // The applied-timestamp marker rides along with the batch, so a replay
         // after a reopen never re-applies records that are already in the KV.
@@ -196,8 +310,11 @@ impl TxnManager {
         let applied = applied.max(commit_ts);
         writes.push((APPLIED_TS_KEY.to_vec(), applied.to_le_bytes().to_vec()));
         self.store.atomic_write(&writes)?;
-        if !txn.deletes.is_empty() {
-            let mut seen = self.delete_ts.lock().unwrap();
+        {
+            let mut seen = self.write_ts.lock().unwrap();
+            for (key, _) in &txn.writes {
+                seen.insert(key.clone(), commit_ts);
+            }
             for key in &txn.deletes {
                 seen.insert(key.clone(), commit_ts);
             }
@@ -206,9 +323,57 @@ impl TxnManager {
         Ok(commit_ts)
     }
 
+    /// C++: `NewTxnManager::RollBackTxn`. Drops the transaction's writes and
+    /// releases its registry slot and conflict bookkeeping, so a later
+    /// transaction neither sees it as active nor conflicts with it.
+    pub fn rollback(&self, txn: Txn) -> Result<()> {
+        if let Ok(mut active) = self.active.lock() {
+            active.remove(&txn.id);
+        }
+        self.total_rolled_back.fetch_add(1, Ordering::Relaxed);
+        // `txn` is dropped here; its `Drop` removes the slot a second time,
+        // which is a no-op.
+        drop(txn);
+        Ok(())
+    }
+
+    /// C++: `NewTxnManager::ActiveTxnCount`.
+    pub fn active_txn_count(&self) -> usize {
+        self.active.lock().unwrap().len()
+    }
+
+    /// C++: `NewTxnManager::GetTxnInfoArray` (`SHOW TRANSACTIONS`).
+    pub fn get_txn_info_array(&self) -> Vec<TxnInfo> {
+        let mut out: Vec<TxnInfo> = self.active.lock().unwrap().values().cloned().collect();
+        out.sort_by_key(|info| info.txn_id);
+        out
+    }
+
+    /// C++: `NewTxnManager::GetTxnInfoByID`.
+    pub fn get_txn_info_by_id(&self, txn_id: u64) -> Option<TxnInfo> {
+        self.active.lock().unwrap().get(&txn_id).cloned()
+    }
+
+    /// C++: `NewTxnManager::GetOldestAliveTS` — the oldest begin timestamp
+    /// among live transactions (0 when idle).
+    pub fn oldest_alive_ts(&self) -> TxnTimeStamp {
+        self.active
+            .lock()
+            .unwrap()
+            .values()
+            .map(|info| info.begin_ts)
+            .min()
+            .unwrap_or(0)
+    }
+
     /// C++: `NewTxnManager::total_committed_txn_count`.
     pub fn total_committed_txn_count(&self) -> u64 {
         self.total_committed.load(Ordering::Relaxed)
+    }
+
+    /// C++: `NewTxnManager::total_rollbacked_txn_count`.
+    pub fn total_rollbacked_txn_count(&self) -> u64 {
+        self.total_rolled_back.load(Ordering::Relaxed)
     }
 
     /// C++: `NewTxnManager::current_transaction_id` — the id the next `begin`
@@ -223,15 +388,55 @@ impl TxnManager {
     }
 
     /// Replays the WAL into the KV store for all records after `checkpoint_ts`.
-    /// Idempotent: re-applying is safe.
+    /// Each record is decoded through [`WalEntryIterator::make_framed`] and its
+    /// typed commands are applied; legacy records surface as a `KvBatch`, so
+    /// an old log still replays. Idempotent: re-applying is safe.
     pub fn recover(&self, checkpoint_ts: TxnTimeStamp) -> Result<usize> {
         let mut applied = 0;
-        for rec in read_all_segments(&self.wal_path)? {
-            if rec.commit_ts > checkpoint_ts {
-                let writes = decode_writes(&rec.payload)?;
-                if !writes.is_empty() {
-                    self.store.atomic_write(&writes)?;
+        for path in segment_paths(&self.wal_path)? {
+            let mut iter = WalEntryIterator::make_framed(&path, false)?;
+            while iter.has_next() {
+                let Some(entry) = iter.next() else {
+                    break; // torn / corrupt tail
+                };
+                if entry.commit_ts <= checkpoint_ts {
+                    continue;
                 }
+                let mut writes = Vec::new();
+                for cmd in &entry.cmds {
+                    match cmd {
+                        WalCmd::Append {
+                            db_name,
+                            table_name,
+                            row_ranges,
+                            block,
+                            ..
+                        } => writes.extend(append_writes(db_name, table_name, row_ranges, block)?),
+                        WalCmd::Delete {
+                            db_name,
+                            table_name,
+                            row_ids,
+                            ..
+                        } => writes.extend(delete_writes(db_name, table_name, row_ids)),
+                        WalCmd::KvBatch { writes: batch, .. } => writes.extend(batch.clone()),
+                        WalCmd::Checkpoint { .. } => {}
+                        other => {
+                            // Not emitted by this engine; replaying it needs
+                            // catalog/index operations the executor owns.
+                            return Err(Error::Wal(format!(
+                                "cannot replay typed command {:?} without the executor",
+                                other.command_type()
+                            )));
+                        }
+                    }
+                }
+                writes.push((
+                    APPLIED_TS_KEY.to_vec(),
+                    entry.commit_ts.to_le_bytes().to_vec(),
+                ));
+                self.store.atomic_write(&writes)?;
+                self.max_applied
+                    .fetch_max(entry.commit_ts, Ordering::SeqCst);
                 applied += 1;
             }
         }
@@ -299,6 +504,240 @@ impl TxnManager {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Commit -> typed commands
+// ---------------------------------------------------------------------------
+
+/// Splits `row:{table}:{seq}` / `del:{table}:{seq}` into `(table, seq)`.
+fn parse_row_key<'a>(key: &'a [u8], prefix: &str) -> Option<(&'a str, u64)> {
+    let s = std::str::from_utf8(key).ok()?;
+    let rest = s.strip_prefix(prefix)?;
+    let (table, seq) = rest.rsplit_once(':')?;
+    if table.is_empty() {
+        return None;
+    }
+    Some((table, seq.parse().ok()?))
+}
+
+/// The engine's row key for `table`/`seq` (`row:{table}:{seq:016}`).
+fn row_key(table: &str, seq: u64) -> Vec<u8> {
+    format!("row:{table}:{seq:016}").into_bytes()
+}
+
+/// The engine's tombstone key for `table`/`seq` (`del:{table}:{seq:016}`).
+fn del_key(table: &str, seq: u64) -> Vec<u8> {
+    format!("del:{table}:{seq:016}").into_bytes()
+}
+
+/// `(db_name, table_name)` out of the encoded `db.table` key part.
+fn split_table(table: &str) -> (String, String) {
+    match table.split_once('.') {
+        Some((db, name)) => (db.to_string(), name.to_string()),
+        None => (String::new(), table.to_string()),
+    }
+}
+
+/// Inverse of [`split_table`]: the engine's `db.table` key part.
+fn join_table(db_name: &str, table_name: &str) -> String {
+    if db_name.is_empty() {
+        table_name.to_string()
+    } else {
+        format!("{db_name}.{table_name}")
+    }
+}
+
+/// Classifies a txn's KV writes + tombstones into typed WAL commands.
+///
+/// Row records become one [`WalCmd::Append`] per contiguous table run (the
+/// stored row text occupies a single varchar column of the block, because the
+/// engine persists rows as encoded text, not columnar vectors) and
+/// [`WalCmd::Delete`] carries the row ids. Everything else keeps its exact
+/// records in a [`WalCmd::KvBatch`].
+fn build_commands(writes: &[(Vec<u8>, Vec<u8>)], deletes: &[Vec<u8>]) -> Vec<WalCmd> {
+    struct AppendGroup {
+        table: String,
+        rows: Vec<(u64, String)>,
+    }
+
+    let mut groups: Vec<AppendGroup> = Vec::new();
+    let mut kv: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
+    let mut kv_kind = KvBatchKind::Other;
+
+    for (key, value) in writes {
+        match (parse_row_key(key, ROW_PREFIX), std::str::from_utf8(value)) {
+            (Some((table, seq)), Ok(text)) => match groups.last_mut() {
+                Some(group) if group.table == table => group.rows.push((seq, text.to_string())),
+                _ => groups.push(AppendGroup {
+                    table: table.to_string(),
+                    rows: vec![(seq, text.to_string())],
+                }),
+            },
+            _ => {
+                kv_kind = batch_kind(key);
+                kv.push((key.clone(), value.clone()));
+            }
+        }
+    }
+
+    let mut cmds: Vec<WalCmd> = groups
+        .into_iter()
+        .map(|group| build_append(&group.table, &group.rows))
+        .collect();
+
+    let mut del_groups: Vec<(String, Vec<u64>)> = Vec::new();
+    for key in deletes {
+        match parse_row_key(key, DEL_PREFIX) {
+            Some((table, seq)) => match del_groups.last_mut() {
+                Some((name, ids)) if name == table => ids.push(seq),
+                _ => del_groups.push((table.to_string(), vec![seq])),
+            },
+            None => kv.push((key.clone(), b"1".to_vec())),
+        }
+    }
+    for (table, seqs) in del_groups {
+        let (db_name, table_name) = split_table(&table);
+        cmds.push(WalCmd::Delete {
+            db_name,
+            db_id: String::new(),
+            table_name,
+            table_id: String::new(),
+            row_ids: seqs.into_iter().map(WalRowId::from_u64).collect(),
+        });
+    }
+
+    if !kv.is_empty() {
+        cmds.push(WalCmd::KvBatch {
+            kind: kv_kind,
+            writes: kv,
+        });
+    }
+    cmds
+}
+
+/// Catalog / DDL keys of the engine's KV (`infinity-catalog`).
+fn batch_kind(key: &[u8]) -> KvBatchKind {
+    const CATALOG: [&[u8]; 5] = [b"db:", b"tbl:", b"tblname:", b"idx:", b"catalog|"];
+    if CATALOG.iter().any(|p| key.starts_with(p)) {
+        KvBatchKind::Catalog
+    } else {
+        KvBatchKind::Other
+    }
+}
+
+/// C++: `WalCmdAppendV2` — `row_ranges_` plus the `DataBlock`. The block holds
+/// one varchar column with the engine's encoded row text.
+fn build_append(table: &str, rows: &[(u64, String)]) -> WalCmd {
+    let mut block = DataBlock::new(vec![Column::Str(ColumnVector::new())], rows.len());
+    for (_, text) in rows {
+        block
+            .append_value(0, BlockValue::Str(text.clone()))
+            .expect("block capacity matches the row count");
+    }
+    block.finalize();
+    // Contiguous row ids are one range, as the reference writes them.
+    let mut row_ranges: Vec<(WalRowId, u64)> = Vec::new();
+    for (seq, _) in rows {
+        match row_ranges.last_mut() {
+            Some((base, count)) if base.to_u64() + *count == *seq => *count += 1,
+            _ => row_ranges.push((WalRowId::from_u64(*seq), 1)),
+        }
+    }
+    let (db_name, table_name) = split_table(table);
+    WalCmd::Append {
+        db_name,
+        db_id: String::new(),
+        table_name,
+        table_id: String::new(),
+        row_ranges,
+        block,
+    }
+}
+
+/// Replay of [`WalCmd::Append`]: row keys and their stored row text.
+fn append_writes(
+    db_name: &str,
+    table_name: &str,
+    row_ranges: &[(WalRowId, u64)],
+    block: &DataBlock,
+) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    let table = join_table(db_name, table_name);
+    let mut out = Vec::new();
+    let mut row = 0usize;
+    for (base, count) in row_ranges {
+        let base_seq = base.to_u64();
+        for offset in 0..*count {
+            let Some(BlockValue::Str(text)) = block.get_value(0, row) else {
+                return Err(Error::Wal(format!(
+                    "append command for {table} is missing row {row} of its block"
+                )));
+            };
+            out.push((row_key(&table, base_seq + offset), text.into_bytes()));
+            row += 1;
+        }
+    }
+    Ok(out)
+}
+
+/// Replay of [`WalCmd::Delete`]: the tombstones the commit wrote.
+fn delete_writes(db_name: &str, table_name: &str, row_ids: &[WalRowId]) -> Vec<(Vec<u8>, Vec<u8>)> {
+    let table = join_table(db_name, table_name);
+    row_ids
+        .iter()
+        .map(|row_id| (del_key(&table, row_id.to_u64()), b"1".to_vec()))
+        .collect()
+}
+
+/// Keys a WAL record wrote, used to rebuild the conflict state on open.
+fn record_write_keys(rec: &WalRecord) -> Vec<Vec<u8>> {
+    let decoded = WalEntry::decode_cmd_payload(rec.txn_id as i64, rec.commit_ts, &rec.payload)
+        .map(|entry| entry.cmds)
+        .or_else(|| {
+            decode_kv_batch(&rec.payload).map(|writes| {
+                vec![WalCmd::KvBatch {
+                    kind: KvBatchKind::Other,
+                    writes,
+                }]
+            })
+        });
+    let mut keys = Vec::new();
+    for cmd in decoded.unwrap_or_default() {
+        match cmd {
+            WalCmd::Append {
+                db_name,
+                table_name,
+                row_ranges,
+                ..
+            } => {
+                let table = join_table(&db_name, &table_name);
+                for (base, count) in row_ranges {
+                    let base_seq = base.to_u64();
+                    for offset in 0..count {
+                        keys.push(row_key(&table, base_seq + offset));
+                    }
+                }
+            }
+            WalCmd::Delete {
+                db_name,
+                table_name,
+                row_ids,
+                ..
+            } => {
+                let table = join_table(&db_name, &table_name);
+                for row_id in row_ids {
+                    keys.push(del_key(&table, row_id.to_u64()));
+                }
+            }
+            WalCmd::KvBatch { writes, .. } => keys.extend(writes.into_iter().map(|(k, _)| k)),
+            _ => {}
+        }
+    }
+    keys
+}
+
+fn key_text(key: &[u8]) -> String {
+    String::from_utf8_lossy(key).into_owned()
+}
+
 /// Sealed WAL segments next to `wal_path`, as `(path, seal timestamp)`, oldest
 /// first. `rotate()` names them `wal.log.{seal_ts}`.
 fn sealed_segments(wal_path: &std::path::Path) -> Result<Vec<(PathBuf, TxnTimeStamp)>> {
@@ -321,13 +760,22 @@ fn sealed_segments(wal_path: &std::path::Path) -> Result<Vec<(PathBuf, TxnTimeSt
     Ok(out)
 }
 
+/// Every WAL file in replay order: sealed segments first, then the active log.
+fn segment_paths(wal_path: &std::path::Path) -> Result<Vec<PathBuf>> {
+    let mut out: Vec<PathBuf> = sealed_segments(wal_path)?
+        .into_iter()
+        .map(|(path, _)| path)
+        .collect();
+    out.push(wal_path.to_path_buf());
+    Ok(out)
+}
+
 /// Reads every sealed segment in timestamp order, then the active log.
 fn read_all_segments(wal_path: &std::path::Path) -> Result<Vec<WalRecord>> {
     let mut out = Vec::new();
-    for (path, _) in sealed_segments(wal_path)? {
+    for path in segment_paths(wal_path)? {
         out.extend(WalManager::read_all(&path)?);
     }
-    out.extend(WalManager::read_all(wal_path)?);
     Ok(out)
 }
 
@@ -335,148 +783,7 @@ fn read_all_segments(wal_path: &std::path::Path) -> Result<Vec<WalRecord>> {
 const APPLIED_TS_KEY: &[u8] = b"meta:applied_ts";
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use infinity_storage::FjallMetaStore;
-    use tempfile::tempdir;
-
-    fn manager(dir: &std::path::Path) -> TxnManager {
-        let store = Arc::new(FjallMetaStore::open(dir.join("kv"), "default").unwrap());
-        TxnManager::open(dir.join("wal.log"), store).unwrap()
-    }
-
-    #[test]
-    fn commit_applies_to_kv() {
-        let dir = tempdir().unwrap();
-        {
-            let store: Arc<dyn MetaStore> =
-                Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
-            let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
-            let mut t = m.begin();
-            t.put(b"a".to_vec(), b"1".to_vec());
-            t.put(b"b".to_vec(), b"2".to_vec());
-            let ts = m.commit(t).unwrap();
-            assert!(ts >= 1);
-            // commit is visible in the KV store immediately
-            assert_eq!(store.get(b"a").unwrap(), Some(b"1".to_vec()));
-            assert_eq!(store.get(b"b").unwrap(), Some(b"2".to_vec()));
-        }
-        // reopen after the handle is released
-        let m2 = manager(dir.path());
-        assert_eq!(m2.recover(0).unwrap(), 1); // idempotent re-apply
-    }
-
-    #[test]
-    fn recovery_replays_wal_after_reopen() {
-        let dir = tempdir().unwrap();
-        {
-            let m = manager(dir.path());
-            for i in 0..3u64 {
-                let mut t = m.begin();
-                t.put(format!("k{i}").into_bytes(), format!("v{i}").into_bytes());
-                m.commit(t).unwrap();
-            }
-        }
-        // fresh manager + fresh store: KV empty, WAL has 3 -> recover
-        let store = Arc::new(FjallMetaStore::open(dir.path().join("kv2"), "default").unwrap());
-        let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
-        assert_eq!(m.recover(0).unwrap(), 3);
-        assert_eq!(store.get(b"k0").unwrap(), Some(b"v0".to_vec()));
-        assert_eq!(store.get(b"k2").unwrap(), Some(b"v2".to_vec()));
-        // idempotent
-        assert_eq!(m.recover(0).unwrap(), 3);
-    }
-
-    #[test]
-    fn concurrent_commits_are_serialized_and_durable() {
-        use std::collections::BTreeSet;
-        let dir = tempdir().unwrap();
-        const THREADS: u64 = 4;
-        const PER: u64 = 25;
-        {
-            let store: Arc<dyn MetaStore> =
-                Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
-            let mgr =
-                Arc::new(TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap());
-            let handles: Vec<_> = (0..THREADS)
-                .map(|t| {
-                    let mgr = mgr.clone();
-                    std::thread::spawn(move || {
-                        for j in 0..PER {
-                            let mut tx = mgr.begin();
-                            tx.put(
-                                format!("k{t}_{j}").into_bytes(),
-                                format!("v{t}_{j}").into_bytes(),
-                            );
-                            mgr.commit(tx).unwrap();
-                        }
-                    })
-                })
-                .collect();
-            for h in handles {
-                h.join().unwrap();
-            }
-            mgr.flush().unwrap();
-        }
-        // all rows are durable in KV
-        let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
-        assert_eq!(
-            store.scan_prefix(b"k").unwrap().len(),
-            (THREADS * PER) as usize
-        );
-
-        // WAL has one record per commit, with unique commit timestamps
-        let recs = WalManager::read_all(dir.path().join("wal.log")).unwrap();
-        assert_eq!(recs.len(), (THREADS * PER) as usize);
-        let ts: BTreeSet<u64> = recs.iter().map(|r| r.commit_ts).collect();
-        assert_eq!(
-            ts.len(),
-            (THREADS * PER) as usize,
-            "commit timestamps must be unique"
-        );
-    }
-
-    #[test]
-    fn truncated_wal_recovers_exactly_the_valid_prefix() {
-        let dir = tempdir().unwrap();
-        let wal = dir.path().join("wal.log");
-        {
-            let store: Arc<dyn MetaStore> =
-                Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
-            let m = TxnManager::open(&wal, store).unwrap();
-            for i in 0..10u64 {
-                let mut t = m.begin();
-                t.put(format!("k{i}").into_bytes(), format!("v{i}").into_bytes());
-                m.commit(t).unwrap();
-            }
-        }
-        let full = std::fs::read(&wal).unwrap();
-        // simulate a crash that truncates the WAL at many different offsets
-        for cut in (0..full.len()).step_by(5) {
-            let d2 = tempdir().unwrap();
-            let wal2 = d2.path().join("wal.log");
-            std::fs::write(&wal2, &full[..cut]).unwrap();
-            let store: Arc<dyn MetaStore> =
-                Arc::new(FjallMetaStore::open(d2.path().join("kv"), "default").unwrap());
-            let m = TxnManager::open(&wal2, store.clone()).unwrap();
-            m.recover(0).unwrap();
-            let expected = WalManager::read_all(&wal2).unwrap().len();
-            let got = store.scan_prefix(b"k").unwrap().len();
-            assert_eq!(
-                got, expected,
-                "cut={cut}: recovered {got} rows, expected {expected}"
-            );
-        }
-    }
-
-    #[test]
-    fn empty_txn_rejected() {
-        let dir = tempdir().unwrap();
-        let m = manager(dir.path());
-        assert!(m.commit(m.begin()).is_err());
-    }
-}
+mod tests;
 
 /// Loom concurrency-model test (run with `RUSTFLAGS="--cfg loom"`):
 ///   RUSTFLAGS="--cfg loom" cargo test -p infinity-txn --lib loom
@@ -511,30 +818,5 @@ mod loom_model {
             all.sort_unstable();
             assert_eq!(all, vec![0, 1, 2, 3], "commit timestamps must be unique");
         });
-    }
-
-    #[test]
-    fn concurrent_deletes_conflict() {
-        let dir = tempdir().unwrap();
-        let m = manager(dir.path());
-        let mut t1 = m.begin();
-        t1.delete(b"row:1".to_vec());
-        let mut t2 = m.begin();
-        t2.delete(b"row:1".to_vec());
-        m.commit(t1).unwrap();
-        assert!(matches!(m.commit(t2), Err(Error::TxnConflict(_))));
-
-        // A transaction that starts after the winner is not stale.
-        let mut t3 = m.begin();
-        t3.delete(b"row:1".to_vec());
-        m.commit(t3).unwrap();
-
-        // Disjoint keys never conflict.
-        let mut t4 = m.begin();
-        t4.delete(b"row:2".to_vec());
-        let mut t5 = m.begin();
-        t5.delete(b"row:3".to_vec());
-        m.commit(t5).unwrap();
-        m.commit(t4).unwrap();
     }
 }

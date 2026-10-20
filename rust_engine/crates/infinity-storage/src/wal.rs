@@ -5,6 +5,13 @@
 //!   `content = txn_id:u64 | commit_ts:u64 | payload`
 //!   `checksum = CRC-32/IEEE(content)`
 //!
+//! The payload is a *typed* command payload (`WalEntry::encode_cmd_payload`,
+//! magic `"CMD1"` + command list) as the reference writes
+//! (`src/storage/wal/wal_entry.cppm:42`). Records written before that change
+//! carry a bare KV write batch; they are still readable and replay through the
+//! legacy path ([`crate::wal_entry::WalEntry::decode_cmd_payload`] returns
+//! `None` for them). The framing itself is unchanged.
+//!
 //! The reader stops at the first torn / corrupt / foreign frame, so a crash
 //! during append leaves a valid prefix. Appends are serialized by `&mut self`
 //! (single writer), matching the engine's serial `WriteWAL` stage.
@@ -19,7 +26,9 @@ use crate::crc::crc32_ieee;
 
 /// Frame magic (`"WAL1"`).
 pub const WAL_MAGIC: u32 = 0x5741_4C31;
-const HEADER_LEN: usize = 12; // magic + size + checksum
+/// `magic + size + checksum`.
+pub const WAL_FRAME_HEADER_LEN: usize = 12;
+const HEADER_LEN: usize = WAL_FRAME_HEADER_LEN;
 
 /// A single redo-log record.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,7 +67,7 @@ impl WalRecord {
 }
 
 /// Serializes the decoding of a WAL frame stream.
-fn decode_records(mut buf: &[u8]) -> Vec<WalRecord> {
+pub(crate) fn decode_records(mut buf: &[u8]) -> Vec<WalRecord> {
     let mut out = Vec::new();
     loop {
         if buf.len() < HEADER_LEN {
