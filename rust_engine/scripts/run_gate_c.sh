@@ -26,7 +26,9 @@ if [[ -d "$root/python/restart_test" ]]; then
     if [[ -x "$root/.venv/bin/python" ]]; then py="$root/.venv/bin/python"; else py="python3"; fi
   fi
   shim="$here/infinity_rust_shim.sh"
-  run=( "$py" -m pytest -q restart_test --infinity_path="$shim" )
+  # cwd is the repository root: the suites address fixtures as
+  # `test/data/...`, so running from `python/` silently imports nothing.
+  run=( "$py" -m pytest -q python/restart_test --infinity_path="$shim" )
   if command -v bwrap >/dev/null 2>&1; then
     data="${INFINITY_GATE_C_DATA:-$(mktemp -d)}"
     mkdir -p "$data/tmp"
@@ -40,7 +42,7 @@ if [[ -d "$root/python/restart_test" ]]; then
           --unshare-pid --proc /proc \
           -- "${run[@]}" )
   fi
-  ( cd "$root/python" && "${run[@]}" ) || status=1
+  ( cd "$root" && "${run[@]}" ) || status=1
 else
   echo "SKIP: python/restart_test not present"
 fi
