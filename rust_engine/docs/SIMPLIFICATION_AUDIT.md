@@ -65,6 +65,16 @@
 - `infinity-storage::wal_entry` 零调用方。
 - `infinity-planner::result_cache::ResultCacheGetter`、`index_scan::FastRoughFilterEvaluator` 零生产调用方。
 
+## 进度
+
+| 条目 | 状态 | 提交/说明 |
+|---|---|---|
+| 索引 · `InitAbstractIndexT` 硬编码 M/ef_construction | ✅ 已修 | `04ee86483`：从索引选项读取并写进 chunk 头；`HnswIndex::ef_construction()` 提供真值 |
+| 索引过滤 · 掩码全 false 时返回全部行 | ✅ 已修 | 改为返回空集（`PhysicalIndexScan` 语义）；等 storage 侧 agent 落盘后统一跑 Gate A |
+| 低基数 chunk / PGM 层级 / 全文 positions / EMVB OPQ | 🔄 进行中 | 三个并行 agent 分别改 `secondary_lowcard.rs`+`secondary_segment.rs`、`fulltext_segment.rs`+`inverted_format/**`、`emvb*.rs` |
+| WAL 类型化 redo / TxnManager | 🔄 进行中 | agent 负责 `wal.rs`/`wal_entry.rs`/`infinity-txn/**` |
+| 其余（MetaStore 原子删除、算子模型、`RowFulltextProvider`、`index_delims` 分派、HTTP/admin、bg_task 调度…） | ⏳ 待办 | 见上方清单 |
+
 ## 处置口径
 
 1. **P0 全部要改**（磁盘格式/结果正确性/互操作），改完补针对性回归（C++ 写、Rust 读；Rust 写、C++ 读）。
