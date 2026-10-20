@@ -15,7 +15,7 @@ use crate::subquery::{
     BoundSubquery, CorrelatedExpressionsDetector, DepthColumn, SubqueryExpr, SubqueryPlan,
     SubqueryType,
 };
-use crate::{output_schema, plan_select, resolve_column, ColumnBinding, LogicalPlan};
+use crate::{output_schema, resolve_column, BindContext, ColumnBinding, LogicalPlan};
 
 /// C++ `BoundDeleteStatement`: the target table and the bound predicate.
 #[derive(Debug, Clone, PartialEq)]
@@ -80,8 +80,13 @@ impl QueryBinder {
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<BoundSelectStatement> {
-        let plan = plan_select(
-            items, tables, join, where_pred, group_by, having, order_by, limit, offset,
+        // Step 1 of `BindSelect`: the root bind context, with one table binding
+        // per FROM/JOIN entry. Every column of the statement is then resolved
+        // through it, so a qualified `table.column` binds and an unqualified
+        // name two tables produce is rejected as ambiguous.
+        let context = BindContext::from_tables(tables);
+        let plan = crate::plan_select_bound(
+            &context, items, tables, join, where_pred, group_by, having, order_by, limit, offset,
         )?;
         Ok(BoundSelectStatement::new(plan))
     }
@@ -92,7 +97,8 @@ impl QueryBinder {
         tables: &[(String, Vec<String>)],
         join: Option<&JoinClause>,
     ) -> Result<LogicalPlan> {
-        crate::build_source(tables, join)
+        let context = BindContext::from_tables(tables);
+        crate::build_source(&context, tables, join)
     }
 
     /// C++ `BindInsert`: resolves the target column list and checks every row.
@@ -549,6 +555,131 @@ mod tests {
                 ..
             } => assert_eq!((left_key, right_key, left_width), (0, 0, 1)),
             other => panic!("expected join, got {other:?}"),
+        }
+    }
+
+    /// C++ `BindSelect`: the root `BindContext` resolves the select list, so a
+    /// qualified `t1.col` binds to that table's column and a column both joined
+    /// tables produce is ambiguous when written unqualified.
+    #[test]
+    fn binds_qualified_columns_through_the_bind_context() {
+        let binder = QueryBinder::new();
+        let tables = vec![
+            ("t1".to_string(), vec!["id".to_string(), "name".to_string()]),
+            (
+                "t2".to_string(),
+                vec!["id".to_string(), "other".to_string()],
+            ),
+        ];
+        let join = JoinClause {
+            table: "t2".into(),
+            left: "id".into(),
+            right: "id".into(),
+            kind: infinity_parser::JoinKind::Inner,
+        };
+
+        // `t1.name`: the flat tuple is (t1.id, t1.name, t2.id, t2.other), so the
+        // scan of `t1` keeps `name`.
+        let bound = binder
+            .bind_select(
+                &[SelectItem::Column("t1.name".into())],
+                &tables,
+                Some(&join),
+                None,
+                &[],
+                None,
+                &[],
+                None,
+                None,
+            )
+            .unwrap();
+        assert_eq!(bound.output_names, vec!["name".to_string()]);
+        // The join key keeps `t1.id`; `t1.name` binds at flat position 1, and
+        // nothing on the right side is read.
+        match &bound.plan {
+            LogicalPlan::Projection { exprs, .. } => assert_eq!(exprs, &[Expr::Column(1)]),
+            other => panic!("expected a projection, got {other:?}"),
+        }
+        assert_eq!(
+            scan_columns(&bound.plan, "t2").as_deref(),
+            Some(&["id".to_string()][..]),
+            "{:?}",
+            bound.plan
+        );
+
+        // A qualified column in WHERE binds the same way.
+        let bound = binder
+            .bind_select(
+                &[SelectItem::Star],
+                &tables,
+                Some(&join),
+                Some(&Predicate::simple("t2.other", CmpOp::Eq, Literal::Int(1))),
+                &[],
+                None,
+                &[],
+                None,
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            scan_columns(&bound.plan, "t2").as_deref(),
+            Some(&["id".to_string(), "other".to_string()][..]),
+            "{:?}",
+            bound.plan
+        );
+
+        // `id` exists in both tables: unqualified is ambiguous.
+        let err = binder
+            .bind_select(
+                &[SelectItem::Column("id".into())],
+                &tables,
+                Some(&join),
+                None,
+                &[],
+                None,
+                &[],
+                None,
+                None,
+            )
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("Ambiguous column table_name: id"),
+            "{err}"
+        );
+
+        // Qualifying it resolves.
+        assert!(binder
+            .bind_select(
+                &[SelectItem::Column("t2.id".into())],
+                &tables,
+                Some(&join),
+                None,
+                &[],
+                None,
+                &[],
+                None,
+                None,
+            )
+            .is_ok());
+    }
+
+    /// The scan of `table` anywhere in `plan`.
+    fn scan_columns(plan: &LogicalPlan, table: &str) -> Option<Vec<String>> {
+        match plan {
+            LogicalPlan::Scan {
+                table: scanned,
+                columns,
+            } => (scanned == table).then(|| columns.clone()),
+            LogicalPlan::Join { left, right, .. } => {
+                scan_columns(left, table).or_else(|| scan_columns(right, table))
+            }
+            LogicalPlan::Filter { input, .. }
+            | LogicalPlan::Sort { input, .. }
+            | LogicalPlan::Limit { input, .. }
+            | LogicalPlan::Offset { input, .. }
+            | LogicalPlan::Projection { input, .. }
+            | LogicalPlan::Aggregate { input, .. } => scan_columns(input, table),
+            LogicalPlan::Values { .. } => None,
         }
     }
 

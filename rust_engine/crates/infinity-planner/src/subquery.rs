@@ -14,6 +14,10 @@ use infinity_common::{Error, Result};
 use infinity_expression::Value;
 use infinity_parser::{BinOp, CmpOp};
 
+// `SubqueryUnnest` resolves its table indexes through a `BindContext`, so this
+// module re-exports the type its public API takes.
+pub use crate::bind_context::BindContext;
+use crate::bind_context::ResolvedColumn;
 use crate::ColumnBinding;
 
 /// C++ `ColumnExpression::depth`: `0` is local, `1` refers to the enclosing
@@ -782,26 +786,6 @@ impl DependentJoinFlattener {
 // SubqueryUnnest
 // ---------------------------------------------------------------------------
 
-/// C++ `BindContext` (the correlated-column part).
-#[derive(Debug, Clone, Default)]
-pub struct BindContext {
-    pub correlated_column_exprs: Vec<DepthColumn>,
-    pub correlated_column_map: HashMap<ColumnBinding, usize>,
-    next_table_index: usize,
-}
-
-impl BindContext {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn generate_table_index(&mut self) -> usize {
-        let idx = self.next_table_index;
-        self.next_table_index += 1;
-        idx
-    }
-}
-
 /// C++ `SubqueryUnnest`.
 pub struct SubqueryUnnest;
 
@@ -928,17 +912,31 @@ impl SubqueryUnnest {
                 ));
             }
         }
-        context.correlated_column_exprs = subquery.correlated_columns.clone();
-        context.correlated_column_map = subquery
+        context.correlated_column_exprs.borrow_mut().clear();
+        context.correlated_column_exprs.borrow_mut().extend(
+            subquery
+                .correlated_columns
+                .iter()
+                .map(|column| ResolvedColumn {
+                    // The depth-annotated subquery tree carries no names;
+                    // C++ takes them from the bound `ColumnExpression`.
+                    table_name: String::new(),
+                    table_index: column.binding.table_idx,
+                    column_name: String::new(),
+                    column_index: column.binding.column_idx,
+                    depth: column.depth as usize,
+                }),
+        );
+        *context.correlated_column_map.borrow_mut() = subquery
             .correlated_columns
             .iter()
             .enumerate()
-            .map(|(i, c)| (c.binding, i))
+            .map(|(index, column)| (column.binding, index))
             .collect();
 
         let mut flattener = DependentJoinFlattener::new(
-            context.correlated_column_exprs.clone(),
-            context.correlated_column_map.clone(),
+            subquery.correlated_columns.clone(),
+            context.correlated_column_map.borrow().clone(),
         );
         flattener.detect_correlated_expressions(&subquery.plan)?;
         let dependent = flattener.push_dependent_join(subquery.plan.clone())?;

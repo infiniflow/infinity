@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bind_context;
 pub mod binder;
 pub mod column;
 pub mod column_binding;
@@ -12,7 +13,12 @@ pub mod regex_rewrite;
 pub mod result_cache;
 pub mod subquery;
 
+pub use bind_context::{
+    BindContext, Binding, BindingType, ColumnIdentifier, CommonTableExpressionInfo, ResolvedColumn,
+};
 pub use column_binding::ColumnBinding;
+
+use std::collections::HashMap;
 
 use infinity_common::{Error, Result};
 use infinity_expression::{Expr, Value};
@@ -144,40 +150,105 @@ pub fn resolve_column(schema: &[String], name: &str) -> Result<usize> {
     }
 }
 
-/// Resolves a select-list column, mapping the `_row_id` system column onto the
-/// hidden `#_row_id` scan column the executor appends for `ROW_ID()`.
-fn resolve_output_column(schema: &[String], name: &str) -> Result<usize> {
-    if name.eq_ignore_ascii_case("_row_id") {
-        if let Some(i) = schema.iter().position(|c| c == "#_row_id") {
-            return Ok(i);
+/// Column resolution for one `FROM` clause: the flat schema plus the
+/// [`BindContext`] that produced it.
+///
+/// C++ `ExpressionBinder` carries the `BindContext` and binds a
+/// `ColumnIdentifier` through `BindContext::ResolveColumnId`. The Rust
+/// expression compiler speaks positions, so a resolved binding is mapped onto
+/// its position in the flat `FROM` tuple (`combined_schema`).
+pub(crate) struct ColumnScope<'a> {
+    names: &'a [String],
+    ctx: Option<&'a BindContext>,
+    /// table index -> position of that table's first column in `names`.
+    offsets: HashMap<usize, usize>,
+}
+
+impl<'a> ColumnScope<'a> {
+    /// A schema without a bind context: names resolve positionally, as they did
+    /// before `BindContext` existed (DML paths, projection output schemas).
+    fn plain(names: &'a [String]) -> Self {
+        Self {
+            names,
+            ctx: None,
+            offsets: HashMap::new(),
         }
     }
-    resolve_column(schema, name)
+
+    fn bound(names: &'a [String], ctx: &'a BindContext) -> Self {
+        Self {
+            names,
+            ctx: Some(ctx),
+            offsets: ctx.flat_offsets(),
+        }
+    }
+
+    /// The position of a column reference and the column's own name. A
+    /// qualified reference (`table.column`) binds through its table.
+    fn resolve(&self, name: &str) -> Result<(usize, String)> {
+        let Some(ctx) = self.ctx else {
+            return Ok((resolve_column(self.names, name)?, name.to_string()));
+        };
+        // `_row_id` is the SQL name of the hidden `#_row_id` scan column the
+        // executor appends for `ROW_ID()`.
+        let name = match self.hidden_row_id() {
+            Some(hidden) if name.eq_ignore_ascii_case("_row_id") => hidden,
+            _ => name,
+        };
+        let identifier = ColumnIdentifier::parse(name);
+        match ctx.resolve_column_id(&identifier, 0)? {
+            Some(column) => {
+                let offset = self.offsets.get(&column.table_index).copied().unwrap_or(0);
+                Ok((offset + column.column_index, column.column_name))
+            }
+            None => match self.position(name) {
+                // A hidden scan column is not a binding but is in the schema.
+                Some(position) => Ok((position, identifier.column_name)),
+                None => Err(Error::Invalid(format!("{identifier} doesn't exist."))),
+            },
+        }
+    }
+
+    fn hidden_row_id(&self) -> Option<&'a str> {
+        self.names
+            .iter()
+            .find(|name| *name == "#_row_id")
+            .map(String::as_str)
+    }
+
+    /// The position of a plain (unqualified) name, or `None`.
+    fn position(&self, name: &str) -> Option<usize> {
+        self.names.iter().position(|column| column == name)
+    }
 }
 
 /// Compiles a parsed scalar expression against a table schema.
 pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
+    compile_expr_in(e, &ColumnScope::plain(schema))
+}
+
+fn compile_expr_in(e: &ExprAst, scope: &ColumnScope<'_>) -> Result<Expr> {
     Ok(match e {
-        ExprAst::Column(c) => Expr::Column(resolve_output_column(schema, c)?),
+        ExprAst::Column(c) => Expr::Column(scope.resolve(c)?.0),
         ExprAst::Literal(l) => Expr::Literal(Value::from_literal(l)),
         ExprAst::Binary(a, op, b) => Expr::Binary(
-            Box::new(compile_expr(a, schema)?),
+            Box::new(compile_expr_in(a, scope)?),
             *op,
-            Box::new(compile_expr(b, schema)?),
+            Box::new(compile_expr_in(b, scope)?),
         ),
         ExprAst::Cmp(a, op, b) => Expr::Cmp(
-            Box::new(compile_expr(a, schema)?),
+            Box::new(compile_expr_in(a, scope)?),
             *op,
-            Box::new(compile_expr(b, schema)?),
+            Box::new(compile_expr_in(b, scope)?),
         ),
-        ExprAst::Not(a) => Expr::Not(Box::new(compile_expr(a, schema)?)),
+        ExprAst::Not(a) => Expr::Not(Box::new(compile_expr_in(a, scope)?)),
         ExprAst::And(a, b) => Expr::And(
-            Box::new(compile_expr(a, schema)?),
-            Box::new(compile_expr(b, schema)?),
+            Box::new(compile_expr_in(a, scope)?),
+            Box::new(compile_expr_in(b, scope)?),
         ),
         ExprAst::Or(a, b) => Expr::Or(
-            Box::new(compile_expr(a, schema)?),
-            Box::new(compile_expr(b, schema)?),
+            Box::new(compile_expr_in(a, scope)?),
+            Box::new(compile_expr_in(b, scope)?),
         ),
         ExprAst::Func { name, args } => {
             // `filter_text(col, '…')` / `filter_fulltext(col, '…')` resolve the
@@ -230,7 +301,7 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
                         }
                     }
                     if let (Some(i), ExprAst::Literal(Literal::Str(query))) =
-                        (schema.iter().position(|c| c == &col_name), q)
+                        (scope.position(&col_name), q)
                     {
                         return Ok(Expr::FullText(i, query.clone(), opts));
                     }
@@ -239,8 +310,8 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
             // `regex(col, '…')` resolves the column at compile time.
             if up == "REGEX" {
                 if let (Some(ExprAst::Column(col)), Some(pat)) = (args.first(), args.get(1)) {
-                    if let Some(i) = schema.iter().position(|c| c == col) {
-                        return Ok(Expr::Regex(i, Box::new(compile_expr(pat, schema)?)));
+                    if let Some(i) = scope.position(col) {
+                        return Ok(Expr::Regex(i, Box::new(compile_expr_in(pat, scope)?)));
                     }
                 }
             }
@@ -253,7 +324,7 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
                 _ => None,
             };
             if let Some(h) = hidden {
-                if let Some(i) = schema.iter().position(|c| c == h) {
+                if let Some(i) = scope.position(h) {
                     return Ok(Expr::Column(i));
                 }
             }
@@ -262,7 +333,7 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
             // NULL per row, as the reference binder does.
             let compiled: Vec<Expr> = args
                 .iter()
-                .map(|a| compile_expr(a, schema))
+                .map(|a| compile_expr_in(a, scope))
                 .collect::<Result<Vec<_>>>()?;
             infinity_expression::registry::func(name, compiled).map_err(Error::Invalid)?
         }
@@ -271,36 +342,40 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
 
 /// Compiles a parsed boolean predicate against a table schema.
 pub fn predicate_expr(pred: &Predicate, schema: &[String]) -> Result<Expr> {
+    predicate_expr_in(pred, &ColumnScope::plain(schema))
+}
+
+fn predicate_expr_in(pred: &Predicate, scope: &ColumnScope<'_>) -> Result<Expr> {
     Ok(match pred {
         Predicate::Cmp(l, op, r) => Expr::Cmp(
-            Box::new(compile_expr(l, schema)?),
+            Box::new(compile_expr_in(l, scope)?),
             *op,
-            Box::new(compile_expr(r, schema)?),
+            Box::new(compile_expr_in(r, scope)?),
         ),
-        Predicate::IsTrue(e) => compile_expr(e, schema)?,
-        Predicate::IsNull(e, neg) => Expr::IsNull(Box::new(compile_expr(e, schema)?), *neg),
+        Predicate::IsTrue(e) => compile_expr_in(e, scope)?,
+        Predicate::IsNull(e, neg) => Expr::IsNull(Box::new(compile_expr_in(e, scope)?), *neg),
         Predicate::Like(a, pat, esc, neg) => Expr::Like(
-            Box::new(compile_expr(a, schema)?),
-            Box::new(compile_expr(pat, schema)?),
+            Box::new(compile_expr_in(a, scope)?),
+            Box::new(compile_expr_in(pat, scope)?),
             *esc,
             *neg,
         ),
         Predicate::In(a, vals, neg) => Expr::In(
-            Box::new(compile_expr(a, schema)?),
+            Box::new(compile_expr_in(a, scope)?),
             vals.iter()
-                .map(|v| compile_expr(v, schema))
+                .map(|v| compile_expr_in(v, scope))
                 .collect::<Result<Vec<_>>>()?,
             *neg,
         ),
         Predicate::Bool(a, BoolOp::And, b) => Expr::And(
-            Box::new(predicate_expr(a, schema)?),
-            Box::new(predicate_expr(b, schema)?),
+            Box::new(predicate_expr_in(a, scope)?),
+            Box::new(predicate_expr_in(b, scope)?),
         ),
         Predicate::Bool(a, BoolOp::Or, b) => Expr::Or(
-            Box::new(predicate_expr(a, schema)?),
-            Box::new(predicate_expr(b, schema)?),
+            Box::new(predicate_expr_in(a, scope)?),
+            Box::new(predicate_expr_in(b, scope)?),
         ),
-        Predicate::Not(p) => Expr::Not(Box::new(predicate_expr(p, schema)?)),
+        Predicate::Not(p) => Expr::Not(Box::new(predicate_expr_in(p, scope)?)),
     })
 }
 
@@ -333,7 +408,7 @@ fn expr_has_agg(e: &ExprAst) -> bool {
 /// Registers every aggregate found in `e` (recursively) into `aggs`/`index`.
 fn gather_agg(
     e: &ExprAst,
-    schema: &[String],
+    scope: &ColumnScope<'_>,
     aggs: &mut Vec<(AggFunc, Vec<usize>, bool, String)>,
     index: &mut std::collections::HashMap<String, usize>,
     base: usize,
@@ -352,29 +427,29 @@ fn gather_agg(
                 if !index.contains_key(&label) {
                     let idxs: Vec<usize> = arg_vec
                         .iter()
-                        .map(|c| resolve_column(schema, c))
+                        .map(|c| scope.resolve(c).map(|(idx, _)| idx))
                         .collect::<Result<Vec<_>>>()?;
                     index.insert(label.clone(), base + aggs.len());
                     aggs.push((f, idxs, false, label));
                 }
             } else {
                 for a in args {
-                    gather_agg(a, schema, aggs, index, base)?;
+                    gather_agg(a, scope, aggs, index, base)?;
                 }
             }
         }
         ExprAst::Binary(a, _, b) => {
-            gather_agg(a, schema, aggs, index, base)?;
-            gather_agg(b, schema, aggs, index, base)?;
+            gather_agg(a, scope, aggs, index, base)?;
+            gather_agg(b, scope, aggs, index, base)?;
         }
         ExprAst::Cmp(a, _, b) => {
-            gather_agg(a, schema, aggs, index, base)?;
-            gather_agg(b, schema, aggs, index, base)?;
+            gather_agg(a, scope, aggs, index, base)?;
+            gather_agg(b, scope, aggs, index, base)?;
         }
-        ExprAst::Not(a) => gather_agg(a, schema, aggs, index, base)?,
+        ExprAst::Not(a) => gather_agg(a, scope, aggs, index, base)?,
         ExprAst::And(a, b) | ExprAst::Or(a, b) => {
-            gather_agg(a, schema, aggs, index, base)?;
-            gather_agg(b, schema, aggs, index, base)?;
+            gather_agg(a, scope, aggs, index, base)?;
+            gather_agg(b, scope, aggs, index, base)?;
         }
         _ => {}
     }
@@ -655,7 +730,9 @@ fn item_agg_expr(
 pub fn item_label(it: &SelectItem) -> String {
     match it {
         SelectItem::Aggregate(a) => agg_label(a.func, &a.args),
-        SelectItem::Column(c) => c.clone(),
+        // A qualified `table.column` is named after the column, as the bound
+        // `ColumnExpression` is.
+        SelectItem::Column(c) => ColumnIdentifier::parse(c).column_name,
         // The C++ engine names an un-aliased function column after the
         // expression text (`year(c1)`, `Cast(c3 AS Varchar)`), not the bare name.
         SelectItem::Func { name, args } => key_text(&ExprAst::Func {
@@ -668,7 +745,13 @@ pub fn item_label(it: &SelectItem) -> String {
     }
 }
 
+/// C++ `BuildFromClause`: one scan per table, joined on the clause keys.
+///
+/// A join key may be qualified (`a.id = b.id`), so it binds through `context`;
+/// an unqualified key still searches only the side it belongs to, as the
+/// reference's per-child bind contexts do.
 pub(crate) fn build_source(
+    context: &BindContext,
     tables: &[(String, Vec<String>)],
     join: Option<&JoinClause>,
 ) -> Result<LogicalPlan> {
@@ -679,8 +762,8 @@ pub(crate) fn build_source(
             columns: cols.clone(),
         }),
         ([(lt, lcols), (rt, rcols)], Some(j)) => {
-            let left_key = resolve_column(lcols, &j.left)?;
-            let right_key = resolve_column(rcols, &j.right)?;
+            let left_key = join_key(context, lt, lcols, &j.left)?;
+            let right_key = join_key(context, rt, rcols, &j.right)?;
             Ok(LogicalPlan::Join {
                 left: Box::new(LogicalPlan::Scan {
                     table: lt.clone(),
@@ -699,10 +782,47 @@ pub(crate) fn build_source(
     }
 }
 
+/// One side of a join key: its position in that side's scan.
+fn join_key(context: &BindContext, table: &str, columns: &[String], key: &str) -> Result<usize> {
+    if !key.contains('.') {
+        return resolve_column(columns, key);
+    }
+    let identifier = ColumnIdentifier::parse(key);
+    let resolved = context
+        .resolve_column_id(&identifier, 0)?
+        .ok_or_else(|| Error::Invalid(format!("{identifier} doesn't exist.")))?;
+    match context.table_name2table_index.get(table) {
+        Some(&table_index) if table_index == resolved.table_index => Ok(resolved.column_index),
+        _ => Err(Error::Invalid(format!("{identifier} doesn't exist."))),
+    }
+}
+
 /// Plans a `SELECT`. `tables` is the list of `(table, columns)` in FROM/JOIN
 /// order; pass an empty slice for a constant `SELECT` with no FROM.
 #[allow(clippy::too_many_arguments)]
 pub fn plan_select(
+    items: &[SelectItem],
+    tables: &[(String, Vec<String>)],
+    join: Option<&JoinClause>,
+    where_pred: Option<&Predicate>,
+    group_by: &[ExprAst],
+    having: Option<&Predicate>,
+    order_by: &[OrderKey],
+    limit: Option<u64>,
+    offset: Option<u64>,
+) -> Result<LogicalPlan> {
+    // C++ `BindSelect` opens a root bind context and registers one table
+    // binding per FROM/JOIN entry before any expression is bound.
+    let context = BindContext::from_tables(tables);
+    plan_select_bound(
+        &context, items, tables, join, where_pred, group_by, having, order_by, limit, offset,
+    )
+}
+
+/// `plan_select` with the root bind context supplied by the caller.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn plan_select_bound(
+    context: &BindContext,
     items: &[SelectItem],
     tables: &[(String, Vec<String>)],
     join: Option<&JoinClause>,
@@ -760,7 +880,11 @@ pub fn plan_select(
     }
 
     let schema = combined_schema(tables);
-    let mut plan = build_source(tables, join)?;
+    // Every column reference of the select statement binds through the context,
+    // so a qualified `table.column` and an ambiguous unqualified name resolve
+    // (or fail) as the reference does.
+    let scope = ColumnScope::bound(&schema, context);
+    let mut plan = build_source(context, tables, join)?;
     let mut out_names = schema.clone();
     // (visible width, visible names) when ORDER BY needed a hidden column
     let mut hidden_order: Option<(usize, Vec<String>)> = None;
@@ -768,7 +892,7 @@ pub fn plan_select(
     if let Some(pred) = where_pred {
         plan = LogicalPlan::Filter {
             input: Box::new(plan),
-            predicate: predicate_expr(pred, &schema)?,
+            predicate: predicate_expr_in(pred, &scope)?,
         };
     }
 
@@ -799,11 +923,12 @@ pub fn plan_select(
         let base_cols = schema.len();
         let mut agg_schema = schema.clone();
         agg_schema.extend(pre_exprs.iter().map(key_text));
+        let agg_scope = ColumnScope::bound(&agg_schema, context);
         if !pre_exprs.is_empty() {
             let mut exprs: Vec<Expr> = (0..schema.len()).map(Expr::Column).collect();
             let mut names: Vec<String> = schema.clone();
             for e in &pre_exprs {
-                exprs.push(compile_expr(e, &schema)?);
+                exprs.push(compile_expr_in(e, &scope)?);
                 names.push(key_text(e));
             }
             plan = LogicalPlan::Projection {
@@ -817,7 +942,7 @@ pub fn plan_select(
         let group_texts: Vec<String> = group_by.iter().map(key_text).collect();
         let group_keys: Vec<Expr> = group_by
             .iter()
-            .map(|e| compile_expr(e, &agg_schema))
+            .map(|e| compile_expr_in(e, &agg_scope))
             .collect::<Result<Vec<_>>>()?;
         let base = group_by.len();
         let mut aggs: Vec<(AggFunc, Vec<usize>, bool, String)> = Vec::new();
@@ -833,7 +958,7 @@ pub fn plan_select(
                             .enumerate()
                             .map(|(j, c)| match a.arg_exprs.get(j).and_then(|o| o.as_ref()) {
                                 Some(e) => Ok(base_cols + pre_pos[&key_text(e)]),
-                                None => resolve_column(&agg_schema, c),
+                                None => agg_scope.resolve(c).map(|(idx, _)| idx),
                             })
                             .collect::<Result<Vec<_>>>()?;
                         agg_index.insert(label.clone(), base + aggs.len());
@@ -841,7 +966,7 @@ pub fn plan_select(
                     }
                 }
                 SelectItem::Expr(e) => {
-                    gather_agg(e, &schema, &mut aggs, &mut agg_index, base)?;
+                    gather_agg(e, &scope, &mut aggs, &mut agg_index, base)?;
                 }
                 SelectItem::Column(c) => {
                     if !group_texts.iter().any(|g| g == c) {
@@ -899,8 +1024,12 @@ pub fn plan_select(
         for it in items {
             match it {
                 SelectItem::Column(name) => {
-                    exprs.push(Expr::Column(resolve_output_column(&schema, name)?));
-                    names.push(name.clone());
+                    // The output column keeps the column's own name, even for a
+                    // `table.column` reference (the bound `ColumnExpression`
+                    // carries `column_name`, not the identifier text).
+                    let (position, column_name) = scope.resolve(name)?;
+                    exprs.push(Expr::Column(position));
+                    names.push(column_name);
                 }
                 SelectItem::Func { name, args } => {
                     let e = ExprAst::Func {
@@ -911,7 +1040,7 @@ pub fn plan_select(
                     // does (`year(c1)`, `datepart(c4, c1)`) — the SDK reads
                     // results by that name.
                     names.push(item_label(it));
-                    exprs.push(compile_expr(&e, &schema)?);
+                    exprs.push(compile_expr_in(&e, &scope)?);
                 }
                 SelectItem::Literal(l) => {
                     names.push(format!("c{}", exprs.len()));
@@ -919,7 +1048,7 @@ pub fn plan_select(
                 }
                 SelectItem::Expr(e) => {
                     names.push(key_text(e));
-                    exprs.push(compile_expr(e, &schema)?);
+                    exprs.push(compile_expr_in(e, &scope)?);
                 }
                 SelectItem::Star => {
                     for (i, c) in schema.iter().enumerate() {
@@ -942,14 +1071,14 @@ pub fn plan_select(
                 Some(_) => continue,
                 None => ok.column.clone(),
             };
-            if names.iter().any(|n| n == &col) {
-                continue;
-            }
-            let Ok(idx) = resolve_column(&schema, &col) else {
+            let Ok((idx, column_name)) = scope.resolve(&col) else {
                 continue;
             };
+            if names.iter().any(|n| n == &column_name) {
+                continue;
+            }
             exprs.push(Expr::Column(idx));
-            names.push(col);
+            names.push(column_name);
         }
         if names.len() > visible {
             hidden_order = Some((visible, names[..visible].to_vec()));
