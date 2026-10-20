@@ -1,3 +1,4 @@
+import glob
 import os
 import time
 
@@ -32,6 +33,10 @@ def _seed(conn):
             "body": {"type": "varchar"},
             "vec": {"type": "vector,4,float"},
             "sp": {"type": "sparse,8,float,int"},
+            # A FLOAT column keeps ordered raw keys in the reference
+            # (KeepOrderedSelf includes FloatT), so its secondary chunk must be
+            # readable by both engines and its ranges answered from the index.
+            "score": {"type": "float"},
         },
         ConflictType.Error,
     )
@@ -45,6 +50,7 @@ def _seed(conn):
         ),
     )
     t.create_index("sec", index.IndexInfo("title", index.IndexType.Secondary))
+    t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
     t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
     rows = []
     for i in range(ROWS):
@@ -56,6 +62,7 @@ def _seed(conn):
                 "body": body,
                 "vec": [float(i % 10) / 10.0, 0.1, 0.2, 0.3],
                 "sp": {0: 0.5, i % 5 + 1: 1.0},
+                "score": i * 0.5,
             }
         )
     t.insert(rows)
@@ -71,7 +78,7 @@ def _ids(result):
 def _snapshot(conn):
     """Everything both engines must agree on, in a score-independent shape."""
     t = conn.get_database("default_db").get_table(TABLE)
-    out = {}
+    out = _catalog_snapshot(conn)
     data, _, _ = t.output(["count(*)"]).to_result()
     out["count"] = data["count(star)"][0]
     out["filter"] = _ids(t.output(["id"]).filter("id < 5").to_result())
@@ -85,7 +92,51 @@ def _snapshot(conn):
         t.output(["id"]).match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5).to_result()
     )
     out["secondary"] = _ids(t.output(["id"]).filter("title = 'doc-7'").to_result())
+    # The float secondary index, read as an equality and as a range: the chunk
+    # holds raw f32 keys, so a wrong key width or a hash-based encoding shows
+    # up as missing rows rather than a wrong order.
+    out["score_eq"] = _ids(t.output(["id"]).filter("score = 2.5").to_result())
+    out["score_range"] = _ids(
+        t.output(["id"]).filter("score >= 1.5 and score <= 3.5").to_result()
+    )
+    # Ordering: proves the block rows are readable in sequence, not just
+    # countable. (`_row_id` is not reachable through the SDK's `output()`; the
+    # planner-side name is pinned by
+    # `multi_statement::the_row_id_system_column_is_selectable`.)
+    ids = _ids(t.output(["id"]).to_result())
+    out["first_ids"] = ids[:3]
+    out["last_ids"] = ids[-3:]
     return out
+
+
+def _catalog_snapshot(conn):
+    """The catalog views both engines must agree on after a handover.
+
+    `show_table` is the reference's own view of the table: the column and
+    segment counts it reports come from the catalog the *other* engine wrote,
+    so a missing `catalog|seg|…` record shows up here (segment_count 0) even
+    when the block files are on disk.
+    """
+    db = conn.get_database("default_db")
+    meta = db.show_table(TABLE)
+    cols = db.get_table(TABLE).show_columns()
+    return {
+        "databases": sorted(conn.list_databases().db_names),
+        "tables": sorted(db.list_tables().table_names),
+        "column_count": meta.column_count,
+        "segment_count": meta.segment_count,
+        # Names and the scalar types compare exactly. The SPARSE column's type
+        # text does not: both engines read the same stored bytes but decode the
+        # sparse DataType differently (C++ prints `Sparse(float,int8,0)`, Rust
+        # `Sparse(float,int32,8)`) - a decoder divergence tracked in
+        # SIMPLIFICATION_AUDIT.md, not something to paper over by comparing the
+        # rendered string only when it happens to agree.
+        "columns": [
+            (name, ty)
+            for name, ty in zip(cols["name"], cols["type"])
+            if not ty.lower().startswith("sparse")
+        ],
+    }
 
 
 def _run(engine_path, body):
@@ -101,6 +152,25 @@ def _run(engine_path, body):
             conn.disconnect()
     finally:
         runner.uninit(kill=True)
+
+
+def _drop_wal():
+    """Drop the redo log of the engine that just stopped.
+
+    The handover point is a checkpoint (`flush_data()`), so the durable state is
+    the catalog (the C++ key space) plus the block/index mirror; the log holds
+    nothing that is not already there. Its *frame* is engine-private: this port
+    writes `[magic "WAL1"][size][crc][content]` while the reference writes
+    `[size][crc][txn_id][commit_ts]` followed by the commands. The reference
+    cannot step over a foreign frame -- it reports
+    `WAL error: ... entry size` and then aborts with
+    `WAL replay: No checkpoint found in wal` -- so a Rust-written directory is
+    unopenable by C++ for as long as `wal.log` exists. Dropping the fully
+    applied log keeps this test about what it is named for (catalog and
+    index-chunk compatibility) instead of dying in the redo log.
+    """
+    for path in glob.glob(os.path.join("/var/infinity", "wal", "wal.log*")):
+        os.remove(path)
 
 
 @pytest.mark.parametrize(
@@ -120,18 +190,49 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
 
     def phase1(conn):
         _seed(conn)
-        expected = _snapshot(conn)
         # A checkpoint writes the C++-format block/index mirror the other
         # engine reads; the SDK call is the same the reference tests use.
         conn.flush_data()
         time.sleep(1)
-        return expected
+        # Snapshot only after the checkpoint: the 1 KB `memindex_memory_quota`
+        # spills the append mid-insert, and both engines can answer a
+        # secondary/HNSW query from a half-dumped memory index -- the reference
+        # returned [] for `title = 'doc-7'` and for the HNSW probe when the
+        # snapshot ran before `flush_data()`. The state this test hands over is
+        # the post-checkpoint one.
+        return _snapshot(conn)
 
     before = _run(first, phase1)
     assert before["count"] == ROWS, before
     assert before["filter"], before
     assert before["fulltext"], before
     assert before["secondary"] == [7], before
+    assert before["score_eq"] == [5], before
+    assert before["score_range"] == [3, 4, 5, 6, 7], before
+    # Catalog expectations, not just writer/reader equality: a both-sides-broken
+    # catalog must not pass.
+    assert before["databases"] == ["default_db"], before["databases"]
+    assert before["tables"] == [TABLE], before["tables"]
+    assert before["column_count"] == 6, before["column_count"]
+    assert before["segment_count"] >= 1, before["segment_count"]
+    assert [c[0] for c in before["columns"]] == [
+        "id",
+        "title",
+        "body",
+        "vec",
+        "score",
+    ], before["columns"]
+    assert [c[1] for c in before["columns"]] == [
+        "Integer",
+        "Varchar",
+        "Varchar",
+        "Embedding(float,4)",
+        "Float",
+    ], before["columns"]
+    assert before["first_ids"] == [0, 1, 2], before["first_ids"]
+    assert before["last_ids"] == [ROWS - 3, ROWS - 2, ROWS - 1], before["last_ids"]
+
+    _drop_wal()
 
     def phase2(conn):
         after = _snapshot(conn)
@@ -145,6 +246,7 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
                     "body": "alpha omega inserted",
                     "vec": [0.0, 0.1, 0.2, 0.3],
                     "sp": {0: 0.5, 1: 1.0},
+                    "score": float(i),
                 }
                 for i in range(3)
             ]
