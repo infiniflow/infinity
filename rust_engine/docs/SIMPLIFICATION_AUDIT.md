@@ -149,6 +149,9 @@
 
 | P1 | `result_cache` 默认值与参考相反 | `Engine::result_cache_active()`；C++ `DEFAULT_RESULT_CACHE = "off"`（`src/common/default_values.cppm:211`） | **已修**（`fd4d8677f`）：配置缺失时不再缓存、`SHOW CONFIG` 默认改为 off、缓存关闭时按 `ExecuteShowGlobalVariables` 整行省略 `cache_result_capacity`；同时 `cache_result_capacity` 不再泄漏 `usize::MAX` 哨兵（`80dddcc71`） |
 
+| P1 | Rust 写出的目录缺 C++ 的段/块 catalog | `infinity-catalog/src/cpp_layout.rs`：`next_segment_id`/`unsealed_segment_id` 硬编码 0（`:619-620`），且不写 `catalog|seg|{db}|{tbl}|{seg}`、`seg|…|{tag}`、`catalog|blk|…`、`blk|…|{tag}`、`blk_col|…|{tag}`（格式见 `src/storage/common/kv_code_impl.cpp:129-162`） | C++ 靠 `TableMeta::GetSegmentIDs1` 枚举段，没有段记录就看不到任何数据：跨引擎测试 `rust-then-cpp` 方向 count=0，而 Rust 侧一切正常。已加入 catalog 断言（`show_table` 的 segment_count）把这个缺口变成可测的失败 |
+| P2 | SPARSE 列的 `show_columns` 类型文本两引擎不一致 | 同一份 C++ 写出的 catalog：C++ 打印 `Sparse(float,int8,0)`，Rust 打印 `Sparse(float,int32,8)` | 两边读的是同一份存储字节，说明 Rust 对 `SparseT`（elem/index/bound 三元）的解码与参考的编码不一致；索引类型被读成 int32、bound 读成 8，而参考自己显示 int8/0。跨引擎测试暂时把 SPARSE 的类型文本排除在比对之外并在此登记 |
+
 ## 处置口径
 
 1. **P0 全部要改**（磁盘格式/结果正确性/互操作），改完补针对性回归（C++ 写、Rust 读；Rust 写、C++ 读）。
