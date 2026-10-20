@@ -51,6 +51,21 @@ pub enum BufferType {
     Persistent,
     /// Spilled to a temporary file, to be moved to its final path on save.
     Temp,
+    /// `kToMmap`: the payload is still resident but the next unload frees it
+    /// and switches to the mapped form.
+    ToMmap,
+    /// `kMmap`: reads come from the mapped file, not from the budget.
+    Mmap,
+}
+
+/// C++ `FileWorkerType`, as reported by `BufferObjectInfo`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FileWorkerType {
+    Invalid,
+    /// `DataFileWorker`: a fixed-size payload.
+    DataFile,
+    /// `VarFileWorker`: a payload that grows on append.
+    VarFile,
 }
 
 /// C++ `FileWorker`: the payload file of a [`BufferObj`].
@@ -128,15 +143,27 @@ impl FileWorker {
     pub fn is_variable(&self) -> bool {
         self.variable
     }
+
+    /// C++ `FileWorker::Type`.
+    pub fn worker_type(&self) -> FileWorkerType {
+        if self.variable {
+            FileWorkerType::VarFile
+        } else {
+            FileWorkerType::DataFile
+        }
+    }
 }
 
 /// The shared budget of a [`BufferPool`].
 struct PoolState {
     budget: usize,
     used: usize,
-    /// C++ `LRUCache::gc_list_`: buffers whose last handle was dropped, in
-    /// unload order. Weak so the pool does not keep them alive.
-    gc_queue: VecDeque<Weak<BufferObj>>,
+    /// C++ `BufferManager::lru_caches_`: the GC queues are sharded by
+    /// `buffer id % lru_count`, and `RequestSpace` sweeps them round-robin so
+    /// one hot shard cannot pin the whole budget.
+    gc_shards: Vec<VecDeque<Weak<BufferObj>>>,
+    /// C++ `BufferManager::round_robin_`: the shard the next sweep starts at.
+    round_robin: usize,
     /// C++ `BufferManager::temp_set_`: payloads spilled to the temp dir and
     /// not yet moved to their data path.
     temps: Vec<Weak<BufferObj>>,
@@ -146,7 +173,13 @@ struct PoolState {
     /// C++ `BufferManager::clean_list_`: buffers picked for cleanup whose data
     /// file `RemoveClean` deletes.
     clean: Vec<Weak<BufferObj>>,
+    /// C++ `BufferManager::total_request_count_` / `cache_miss_count_`.
+    total_request_count: u64,
+    cache_miss_count: u64,
 }
+
+/// C++ `DEFAULT_BUFFER_MANAGER_LRU_COUNT` (`common/default_values.cppm:200`).
+pub const DEFAULT_LRU_COUNT: usize = 7;
 
 static NEXT_BUFFER_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -170,7 +203,9 @@ pub struct BufferObj {
     /// Spill/persist target of an anonymous buffer. File workers carry their
     /// own data/spill paths.
     path: Option<PathBuf>,
-    worker: Option<FileWorker>,
+    /// C++ `file_worker_`; behind a lock because
+    /// [`BufferObj::update_file_worker_info`] rewrites its size on restart.
+    worker: Mutex<Option<FileWorker>>,
     /// Whether `path` is an auto-created temp file this object must delete.
     owns_path: bool,
     /// Charged bytes: the payload size (`GetMemoryCost`).
@@ -184,6 +219,8 @@ pub struct BufferObj {
 const KIND_EPHEMERAL: u8 = 0;
 const KIND_PERSISTENT: u8 = 1;
 const KIND_TEMP: u8 = 2;
+const KIND_TO_MMAP: u8 = 3;
+const KIND_MMAP: u8 = 4;
 
 impl BufferObj {
     fn new(
@@ -202,7 +239,9 @@ impl BufferObj {
                 Some(std::env::temp_dir().join(format!("infinity_buffer_{id}.bin"))),
                 true,
             ),
-            (None, None, BufferType::Persistent) => (None, false),
+            (None, None, BufferType::Persistent | BufferType::ToMmap | BufferType::Mmap) => {
+                (None, false)
+            }
         };
         Self {
             id,
@@ -213,11 +252,13 @@ impl BufferObj {
                 BufferType::Ephemeral => KIND_EPHEMERAL,
                 BufferType::Persistent => KIND_PERSISTENT,
                 BufferType::Temp => KIND_TEMP,
+                BufferType::ToMmap => KIND_TO_MMAP,
+                BufferType::Mmap => KIND_MMAP,
             }),
             rc: AtomicUsize::new(0),
             obj_rc: AtomicUsize::new(0),
             path,
-            worker,
+            worker: Mutex::new(worker),
             owns_path,
             bytes: AtomicUsize::new(bytes),
             data_size: AtomicUsize::new(bytes),
@@ -244,8 +285,62 @@ impl BufferObj {
         match self.kind.load(Ordering::Acquire) {
             KIND_EPHEMERAL => BufferType::Ephemeral,
             KIND_PERSISTENT => BufferType::Persistent,
-            _ => BufferType::Temp,
+            KIND_TEMP => BufferType::Temp,
+            KIND_TO_MMAP => BufferType::ToMmap,
+            _ => BufferType::Mmap,
         }
+    }
+
+    /// C++ `BufferObj::SetType` (only the tests and
+    /// [`BufferPool::change_buffer_object_state`] use it).
+    pub fn set_type(&self, kind: BufferType) {
+        let kind = match kind {
+            BufferType::Ephemeral => KIND_EPHEMERAL,
+            BufferType::Persistent => KIND_PERSISTENT,
+            BufferType::Temp => KIND_TEMP,
+            BufferType::ToMmap => KIND_TO_MMAP,
+            BufferType::Mmap => KIND_MMAP,
+        };
+        self.kind.store(kind, Ordering::Release);
+    }
+
+    /// C++ `BufferObj::SetStatus`.
+    pub fn set_status(&self, status: BufferStatus) {
+        self.status.store(status as u8, Ordering::Release);
+    }
+
+    /// C++ `FileWorker::Type` of this object's worker (`kInvalid` when it has
+    /// none).
+    pub fn worker_type(&self) -> FileWorkerType {
+        self.worker_info()
+            .map_or(FileWorkerType::Invalid, |w| w.worker_type())
+    }
+
+    /// The clone of the file worker this object was created with.
+    fn worker_info(&self) -> Option<FileWorker> {
+        self.worker.lock().unwrap().clone()
+    }
+
+    /// C++ `BufferObj::UpdateFileWorkerInfo`: on restart the caller hands in a
+    /// fresh worker; a `VarFileWorker` keeps the size it grew to.
+    pub fn update_file_worker_info(&self, worker: FileWorker) {
+        let mut slot = self.worker.lock().unwrap();
+        if let Some(current) = slot.as_mut() {
+            if current.variable && worker.variable {
+                current.buffer_size = worker.buffer_size;
+                self.bytes.store(worker.buffer_size, Ordering::Release);
+            }
+        }
+    }
+
+    /// C++ `BufferObj::AddBufferSize`: charge `add_size` to the pool and
+    /// report whether the request was satisfied. Only a var-file payload
+    /// grows this way.
+    pub fn add_buffer_size(&self, add_size: usize) -> Result<bool> {
+        if self.worker_type() != FileWorkerType::VarFile {
+            return Err(Error::Storage("Invalid file worker type".into()));
+        }
+        Ok(self.request_space(add_size))
     }
 
     /// C++ `BufferObj::rc()`: live handles.
@@ -263,16 +358,14 @@ impl BufferObj {
     }
 
     fn data_path(&self) -> Option<PathBuf> {
-        self.worker
-            .as_ref()
-            .map(FileWorker::file_path)
+        self.worker_info()
+            .map(|w| w.file_path())
             .or_else(|| self.path.clone())
     }
 
     fn spill_path(&self) -> Option<PathBuf> {
-        self.worker
-            .as_ref()
-            .map(FileWorker::spill_path)
+        self.worker_info()
+            .map(|w| w.spill_path())
             .or_else(|| self.path.clone())
     }
 
@@ -280,6 +373,10 @@ impl BufferObj {
     /// it. Under memory pressure the pool first frees GC-queued buffers; if
     /// none can be freed the request fails with `Storage`.
     pub fn load(&self) -> Result<BufferHandle<'_>> {
+        self.count_request();
+        if self.kind() == BufferType::Mmap {
+            return self.load_mmap();
+        }
         let mut data = self.data.lock().unwrap();
         if data.is_none() {
             // A buffer being loaded must not be its own GC victim. The
@@ -315,6 +412,149 @@ impl BufferObj {
         drop(data);
         self.rc.fetch_add(1, Ordering::AcqRel);
         Ok(BufferHandle { obj: self })
+    }
+
+    /// C++ `BufferManager::AddRequestCount` / `AddCacheMissCount`: a `Freed`
+    /// or `New` load misses; an `Mmap` payload is mapped, so it is never
+    /// counted as a miss (the reference returns before its status switch).
+    fn count_request(&self) {
+        let miss = match self.status() {
+            BufferStatus::Freed | BufferStatus::New => self.kind() != BufferType::Mmap,
+            _ => false,
+        };
+        let mut state = self.state.lock().unwrap();
+        state.total_request_count += 1;
+        if miss {
+            state.cache_miss_count += 1;
+        }
+    }
+
+    /// C++ `BufferObj::LoadNoLock` for a `kMmap` payload: map the file (once)
+    /// and pin it. The mapped bytes are *not* charged to the budget.
+    fn load_mmap(&self) -> Result<BufferHandle<'_>> {
+        let mut data = self.data.lock().unwrap();
+        match self.status() {
+            BufferStatus::Unloaded | BufferStatus::Loaded => {}
+            BufferStatus::Freed | BufferStatus::New => {
+                drop(data);
+                self.mmap_()?;
+                data = self.data.lock().unwrap();
+            }
+            status => {
+                return Err(Error::Storage(format!(
+                    "Invalid status: {status:?} for a mapped buffer"
+                )))
+            }
+        }
+        self.status
+            .store(BufferStatus::Loaded as u8, Ordering::Release);
+        drop(data);
+        self.rc.fetch_add(1, Ordering::AcqRel);
+        Ok(BufferHandle { obj: self })
+    }
+
+    /// C++ `BufferObj::ToMmap`: this buffer will read from its file instead of
+    /// the budget. A loaded payload is marked `ToMmap` so the mapping happens
+    /// when its last handle drops; an unloaded one is freed and mapped here.
+    pub fn to_mmap(&self) -> Result<()> {
+        if matches!(
+            self.kind(),
+            BufferType::Mmap | BufferType::ToMmap | BufferType::Ephemeral
+        ) {
+            return Ok(());
+        }
+        if self.kind() != BufferType::Persistent {
+            return Err(Error::Storage(format!(
+                "Invalid buffer type: {:?}",
+                self.kind()
+            )));
+        }
+        match self.status() {
+            BufferStatus::Loaded => self.kind.store(KIND_TO_MMAP, Ordering::Release),
+            BufferStatus::Unloaded => {
+                self.remove_from_gc_queue();
+                self.release_resident();
+                self.status
+                    .store(BufferStatus::Freed as u8, Ordering::Release);
+                self.kind.store(KIND_MMAP, Ordering::Release);
+            }
+            BufferStatus::Freed => self.kind.store(KIND_MMAP, Ordering::Release),
+            status => {
+                return Err(Error::Storage(format!(
+                    "Invalid status: {status:?} for ToMmap"
+                )))
+            }
+        }
+        Ok(())
+    }
+
+    /// C++ `FileWorker::Mmap`: map the data file into `data`. Idempotent.
+    pub fn mmap_(&self) -> Result<()> {
+        let mut data = self.data.lock().unwrap();
+        if data.is_some() {
+            return Ok(());
+        }
+        let path = self.data_path();
+        let payload = match &path {
+            Some(path) if path.exists() => std::fs::read(path).map_err(|e| Error::io(path, e))?,
+            _ => vec![0u8; self.size()],
+        };
+        self.bytes.store(payload.len(), Ordering::Release);
+        *data = Some(payload);
+        self.kind.store(KIND_MMAP, Ordering::Release);
+        Ok(())
+    }
+
+    /// C++ `FileWorker::Munmap`: drop the mapped view (the file stays).
+    pub fn munmap_(&self) {
+        let mut data = self.data.lock().unwrap();
+        *data = None;
+    }
+
+    /// C++ `BufferObj::SaveSnapshot`: copy this payload into a table
+    /// snapshot directory.
+    ///
+    /// A resident payload is written from memory; a `Temp` payload from its
+    /// spill file; a `Persistent`/`Mmap` one from its data file. Returns
+    /// whether the snapshot copy was made.
+    pub fn save_snapshot(&self, dest: &std::path::Path) -> Result<bool> {
+        let source = match self.status() {
+            BufferStatus::Loaded | BufferStatus::Unloaded => {
+                if self.kind() == BufferType::Mmap {
+                    self.data_path()
+                } else {
+                    self.write_to(Some(dest.to_path_buf()), &self.resident()?)?;
+                    return Ok(true);
+                }
+            }
+            BufferStatus::Freed => match self.kind() {
+                BufferType::Temp => self.spill_path(),
+                BufferType::Mmap | BufferType::Persistent => self.data_path(),
+                kind => {
+                    return Err(Error::Storage(format!(
+                        "Invalid buffer type for snapshot: {kind:?}"
+                    )))
+                }
+            },
+            status => return Err(Error::Storage(format!("Invalid buffer status: {status:?}"))),
+        };
+        let Some(source) = source else {
+            return Err(Error::Storage("Snapshot source has no path".into()));
+        };
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+        }
+        std::fs::copy(&source, dest).map_err(|e| Error::io(dest, e))?;
+        Ok(true)
+    }
+
+    /// The resident payload, or an error when it was freed.
+    fn resident(&self) -> Result<Vec<u8>> {
+        self.data
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| Error::Storage("Buffer is not resident".into()))
     }
 
     /// C++ `BufferObj::Save`: writes an ephemeral payload to its data path and
@@ -369,6 +609,9 @@ impl BufferObj {
                     return Err(Error::Storage("Invalid buffer status: Clean".into()));
                 }
             },
+            // `Save` only touches ephemeral/temp payloads; a mapped buffer is
+            // already backed by its file.
+            BufferType::ToMmap | BufferType::Mmap => return Ok(false),
         }
         Ok(write)
     }
@@ -410,16 +653,32 @@ impl BufferObj {
                 self.kind.store(KIND_TEMP, Ordering::Release);
                 self.pool_add_temp();
             }
+            kind => return Err(Error::Storage(format!("Invalid buffer type: {kind:?}"))),
         }
         let freed = data.take().is_some();
         drop(data);
         if freed {
-            let mut state = self.state.lock().unwrap();
-            state.used = state.used.saturating_sub(self.size());
+            self.release_budget();
         }
         self.status
             .store(BufferStatus::Freed as u8, Ordering::Release);
         Ok(())
+    }
+
+    /// Return this buffer's charged bytes to the pool.
+    fn release_budget(&self) {
+        let mut state = self.state.lock().unwrap();
+        state.used = state.used.saturating_sub(self.size());
+    }
+
+    /// C++ `BufferObj::FreeInMemory` plus the pool accounting: drop the
+    /// resident payload and return its budget. The mapped bytes of a `kMmap`
+    /// buffer are never charged, so they are not returned here.
+    fn release_resident(&self) {
+        let freed = self.data.lock().unwrap().take().is_some();
+        if freed && self.kind() != BufferType::Mmap {
+            self.release_budget();
+        }
     }
 
     /// C++ `CheckState`: the status/reference-count invariants.
@@ -482,16 +741,22 @@ impl BufferObj {
         if prev > 1 {
             return Ok(());
         }
+        // C++ returns early for `kMmap`: unmap, schedule the file for
+        // deletion, and never touch the budget (the bytes were not charged).
+        if self.kind() == BufferType::Mmap {
+            self.munmap_();
+            self.status
+                .store(BufferStatus::Clean as u8, Ordering::Release);
+            self.pool_add_clean();
+            return Ok(());
+        }
         match self.status() {
             BufferStatus::Clean => return Ok(()),
             BufferStatus::New | BufferStatus::Freed => {}
             BufferStatus::Unloaded => {
-                let mut data = self.data.lock().unwrap();
-                let freed = data.take().is_some();
-                drop(data);
+                let freed = self.data.lock().unwrap().take().is_some();
                 if freed {
-                    let mut state = self.state.lock().unwrap();
-                    state.used = state.used.saturating_sub(self.size());
+                    self.release_budget();
                 }
             }
             BufferStatus::Loaded => {
@@ -561,8 +826,7 @@ impl BufferObj {
             std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
         }
         let len = if self
-            .worker
-            .as_ref()
+            .worker_info()
             .is_some_and(|worker| !worker.is_variable())
         {
             self.data_size.load(Ordering::Acquire).min(payload.len())
@@ -604,17 +868,44 @@ impl BufferObj {
             free_space
         };
         let mut freed = 0;
-        // One pass over the buffers queued when the request started; a buffer
-        // another thread is loading/cleaning is skipped (the reference's
-        // `Free` returns false) and stays queued for a later pass.
-        let mut remaining = self.state.lock().unwrap().gc_queue.len();
-        while freed + free_space < needed && remaining > 0 {
+        // C++ `BufferManager::RequestSpace` sweeps the LRU shards round-robin,
+        // one full round at most: each shard frees from the front of its GC
+        // queue until the request is satisfied. A buffer another thread is
+        // loading or cleaning is skipped (`Free` returns false) and stays
+        // queued for a later pass.
+        let (mut index, shards) = {
+            let state = self.state.lock().unwrap();
+            (state.round_robin, state.gc_shards.len())
+        };
+        let mut visited = 0;
+        while freed + free_space < needed && visited < shards {
+            freed += self.drain_shard(index, needed - freed - free_space);
+            index = (index + 1) % shards;
+            visited += 1;
+        }
+        let mut state = self.state.lock().unwrap();
+        state.round_robin = if shards == 0 { 0 } else { index };
+        state.used = state.used.wrapping_add(needed);
+        freed + free_space >= needed
+    }
+
+    /// C++ `LRUCache::RequestSpace` for one shard: free up to `want` bytes of
+    /// queued buffers, leaving the ones that cannot be freed in place.
+    fn drain_shard(&self, index: usize, want: usize) -> usize {
+        let pass = {
+            let state = self.state.lock().unwrap();
+            state.gc_shards.get(index).map_or(0, VecDeque::len)
+        };
+        let mut freed = 0;
+        for _ in 0..pass {
+            if freed >= want {
+                break;
+            }
             let victim = {
                 let mut state = self.state.lock().unwrap();
-                state.gc_queue.pop_front()
+                state.gc_shards.get_mut(index).and_then(VecDeque::pop_front)
             };
             let Some(victim) = victim else { break };
-            remaining -= 1;
             let Some(obj) = victim.upgrade() else {
                 continue;
             };
@@ -623,28 +914,45 @@ impl BufferObj {
                 freed += size;
             } else {
                 let mut state = self.state.lock().unwrap();
-                state.gc_queue.push_back(victim);
+                if let Some(shard) = state.gc_shards.get_mut(index) {
+                    shard.push_back(victim);
+                }
             }
         }
-        let mut state = self.state.lock().unwrap();
-        state.used = state.used.wrapping_add(needed);
-        freed + free_space >= needed
+        freed
+    }
+
+    /// C++ `BufferManager::LRUIdx`: which shard this buffer's GC entry lives
+    /// in.
+    fn lru_index(&self) -> usize {
+        let shards = self.state.lock().unwrap().gc_shards.len();
+        if shards == 0 {
+            0
+        } else {
+            self.id as usize % shards
+        }
     }
 
     fn push_gc_queue(&self) {
         let Some(me) = self.self_ref.get() else {
             return;
         };
+        let index = self.lru_index();
         let mut state = self.state.lock().unwrap();
-        state.gc_queue.push_back(me.clone());
+        if let Some(shard) = state.gc_shards.get_mut(index) {
+            shard.push_back(me.clone());
+        }
     }
 
     fn remove_from_gc_queue(&self) {
         let Some(me) = self.self_ref.get() else {
             return;
         };
+        let index = self.lru_index();
         let mut state = self.state.lock().unwrap();
-        state.gc_queue.retain(|weak| !Weak::ptr_eq(weak, me));
+        if let Some(shard) = state.gc_shards.get_mut(index) {
+            shard.retain(|weak| !Weak::ptr_eq(weak, me));
+        }
     }
 
     /// C++ `BufferManager::AddTemp`.
@@ -693,15 +1001,32 @@ impl BufferObj {
     }
 
     /// C++ `BufferObj::UnloadInner`: the last handle leaves the payload
-    /// resident but queues the buffer for GC.
+    /// resident but queues the buffer for GC. The two mmap kinds are special:
+    /// `ToMmap` frees now and becomes a mapped buffer, `Mmap` only drops the
+    /// mapped view.
     fn release_handle(&self) {
         let rc = self.rc.fetch_sub(1, Ordering::AcqRel).saturating_sub(1);
         if rc > 0 {
             return;
         }
-        self.status
-            .store(BufferStatus::Unloaded as u8, Ordering::Release);
-        self.push_gc_queue();
+        match self.kind() {
+            BufferType::ToMmap => {
+                self.remove_from_gc_queue();
+                self.release_resident();
+                self.status
+                    .store(BufferStatus::Freed as u8, Ordering::Release);
+                self.kind.store(KIND_MMAP, Ordering::Release);
+            }
+            BufferType::Mmap => {
+                self.status
+                    .store(BufferStatus::Unloaded as u8, Ordering::Release);
+            }
+            _ => {
+                self.status
+                    .store(BufferStatus::Unloaded as u8, Ordering::Release);
+                self.push_gc_queue();
+            }
+        }
     }
 }
 
@@ -728,14 +1053,24 @@ impl<'a> BufferHandle<'a> {
         self.obj.data.lock().unwrap()
     }
 
-    /// C++ `GetDataMut()`. Taking a mutable pointer makes the buffer
-    /// ephemeral again (the reference's `GetMutPointer`), so unflushed writes
-    /// are spilled by the GC rather than silently kept persistent. A spilled
+    /// C++ `GetDataMut()` / `BufferObj::GetMutPointer`. Taking a mutable
+    /// pointer makes the buffer ephemeral again, so unflushed writes are
+    /// spilled by the GC rather than silently kept persistent. A spilled
     /// payload is relinquished from the temp set; `RemoveClean` deletes the
     /// spill file once the buffer is saved again.
+    ///
+    /// A `kMmap` payload is first charged to the budget and copied out of the
+    /// file (the reference's `RequestSpace` + `ReadFromFile(false)`); a
+    /// failed request leaves the pool over its budget, where the reference
+    /// aborts the process.
     pub fn data_mut(&self) -> MutexGuard<'_, Option<Vec<u8>>> {
         if self.obj.kind() == BufferType::Temp {
             self.obj.pool_remove_temp();
+        } else if self.obj.kind() == BufferType::Mmap {
+            // `RequestSpace` charges the payload even when the GC cannot free
+            // enough for it, exactly like the reference (which aborts there).
+            let need = self.obj.size();
+            self.obj.request_space(need);
         }
         self.obj.kind.store(KIND_EPHEMERAL, Ordering::Release);
         self.obj.data.lock().unwrap()
@@ -789,6 +1124,17 @@ impl Drop for BufferHandle<'_> {
     }
 }
 
+/// C++ `BufferObjectInfo` (`buffer/buffer_obj.cppm:46`) — one row of
+/// `SHOW BUFFERS` / the diagnostics dump.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BufferObjectInfo {
+    pub object_path: PathBuf,
+    pub buffered_status: BufferStatus,
+    pub buffered_type: BufferType,
+    pub file_type: FileWorkerType,
+    pub object_size: usize,
+}
+
 /// Allocates [`BufferObj`]s under one memory limit.
 ///
 /// C++: the allocation/accounting half of `BufferManager`.
@@ -798,20 +1144,32 @@ pub struct BufferPool {
     /// data path, so a second `GetBufferObject` for the same file returns the
     /// existing object instead of allocating a new one.
     objects: Mutex<HashMap<PathBuf, Arc<BufferObj>>>,
+    /// C++ `BufferManager::lru_caches_.size()`.
+    lru_count: usize,
 }
 
 impl BufferPool {
     pub fn new(budget: usize) -> Self {
+        Self::with_lru_count(budget, DEFAULT_LRU_COUNT)
+    }
+
+    /// C++ `BufferManager(memory_limit, …, lru_count)`.
+    pub fn with_lru_count(budget: usize, lru_count: usize) -> Self {
+        let lru_count = lru_count.max(1);
         Self {
             state: Arc::new(Mutex::new(PoolState {
                 budget,
                 used: 0,
-                gc_queue: VecDeque::new(),
+                gc_shards: (0..lru_count).map(|_| VecDeque::new()).collect(),
+                round_robin: 0,
                 temps: Vec::new(),
                 clean_temps: Vec::new(),
                 clean: Vec::new(),
+                total_request_count: 0,
+                cache_miss_count: 0,
             })),
             objects: Mutex::new(HashMap::new()),
+            lru_count,
         }
     }
 
@@ -832,6 +1190,72 @@ impl BufferPool {
     /// C++ `BufferManager::BufferedObjectCount`.
     pub fn buffered_object_count(&self) -> usize {
         self.objects.lock().unwrap().len()
+    }
+
+    /// C++ `BufferManager::WaitingGCObjectCount`: one count per LRU shard.
+    pub fn waiting_gc_object_count(&self) -> Vec<usize> {
+        let state = self.state.lock().unwrap();
+        state.gc_shards.iter().map(VecDeque::len).collect()
+    }
+
+    /// C++ `BufferManager::TotalRequestCount` / `CacheMissCount`.
+    pub fn total_request_count(&self) -> u64 {
+        self.state.lock().unwrap().total_request_count
+    }
+
+    pub fn cache_miss_count(&self) -> u64 {
+        self.state.lock().unwrap().cache_miss_count
+    }
+
+    /// C++ `BufferManager::lru_caches_.size()`.
+    pub fn lru_count(&self) -> usize {
+        self.lru_count
+    }
+
+    /// C++ `BufferManager::GetBufferObject(const std::string &file_path)` —
+    /// the object already tracking that path, if any.
+    pub fn get_object_by_path(&self, path: impl AsRef<std::path::Path>) -> Option<Arc<BufferObj>> {
+        self.objects.lock().unwrap().get(path.as_ref()).cloned()
+    }
+
+    /// C++ `BufferManager::ChangeBufferObjectState`: after a restart the file
+    /// on disk is the truth, so the object becomes a freed persistent buffer.
+    pub fn change_buffer_object_state(&self, path: impl AsRef<std::path::Path>) {
+        if let Some(obj) = self.get_object_by_path(path) {
+            obj.set_type(BufferType::Persistent);
+            obj.set_status(BufferStatus::Freed);
+        }
+    }
+
+    /// C++ `BufferManager::GetBufferObjectsInfo`.
+    pub fn get_buffer_objects_info(&self) -> Vec<BufferObjectInfo> {
+        let objects = self.objects.lock().unwrap();
+        objects
+            .iter()
+            .map(|(path, obj)| BufferObjectInfo {
+                object_path: path.clone(),
+                buffered_status: obj.status(),
+                buffered_type: obj.kind(),
+                file_type: obj.worker_type(),
+                object_size: obj.size(),
+            })
+            .collect()
+    }
+
+    /// C++ `BufferManager::RemoveBufferObjects`: drop the objects tracking
+    /// `paths` from the dedupe map (their files stay), erroring on a path that
+    /// is not tracked.
+    pub fn remove_buffer_objects(&self, paths: &[PathBuf]) -> Result<()> {
+        let mut objects = self.objects.lock().unwrap();
+        for path in paths {
+            if objects.remove(path).is_none() {
+                return Err(Error::Storage(format!(
+                    "BufferManager::RemoveBufferObjects: object {} not found.",
+                    path.display()
+                )));
+            }
+        }
+        Ok(())
     }
 
     /// C++ `BufferManager::AllocateBufferObject` for an anonymous buffer.
@@ -1434,6 +1858,253 @@ mod tests {
             assert_eq!(block.rc(), 0);
             assert_eq!(block.status(), BufferStatus::Freed);
         }
+    }
+
+    /// C++ `BufferObj::ToMmap` on an unloaded persistent buffer: the payload
+    /// is freed now (the budget drops), the object becomes `kMmap`, and reads
+    /// afterwards come from the file without charging the pool.
+    #[test]
+    fn to_mmap_frees_the_payload_and_maps_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("blk.bin");
+        let pool = BufferPool::new(1024);
+        let obj = pool.allocate_persistent(&path, 128, BufferType::Persistent);
+        {
+            let h = obj.load().unwrap();
+            h.data_mut().as_mut().unwrap().fill(7);
+        }
+        // `GetMutPointer` made it ephemeral; `Save` writes the payload and
+        // makes it persistent again, which is what `ToMmap` requires.
+        obj.save().unwrap();
+        assert_eq!(obj.kind(), BufferType::Persistent);
+        assert_eq!(obj.status(), BufferStatus::Unloaded);
+        assert_eq!(pool.used_bytes(), 128);
+
+        obj.to_mmap().unwrap();
+        assert_eq!(obj.kind(), BufferType::Mmap);
+        assert_eq!(obj.status(), BufferStatus::Freed);
+        assert_eq!(pool.used_bytes(), 0);
+
+        // A mapped load reads the file and is not charged to the budget.
+        {
+            let h = obj.load().unwrap();
+            assert_eq!(h.data().as_ref().unwrap(), &vec![7u8; 128]);
+            assert_eq!(obj.status(), BufferStatus::Loaded);
+        }
+        assert_eq!(obj.status(), BufferStatus::Unloaded);
+        assert_eq!(pool.used_bytes(), 0);
+        obj.check_state().unwrap();
+    }
+
+    /// C++ `kToMmap`: a buffer that is still loaded only switches to the
+    /// mapped form when its last handle drops.
+    #[test]
+    fn to_mmap_on_a_loaded_buffer_switches_on_unload() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("blk.bin");
+        let pool = BufferPool::new(1024);
+        let obj = pool.allocate_persistent(&path, 64, BufferType::Persistent);
+        let handle = obj.load().unwrap();
+        obj.to_mmap().unwrap();
+        assert_eq!(obj.kind(), BufferType::ToMmap);
+        assert_eq!(obj.status(), BufferStatus::Loaded);
+        assert_eq!(pool.used_bytes(), 64);
+
+        drop(handle);
+        assert_eq!(obj.kind(), BufferType::Mmap);
+        assert_eq!(obj.status(), BufferStatus::Freed);
+        assert_eq!(pool.used_bytes(), 0);
+        // It is not queued for GC: a mapped buffer is freed on demand.
+        assert_eq!(pool.waiting_gc_object_count().iter().sum::<usize>(), 0);
+        obj.check_state().unwrap();
+    }
+
+    /// C++ `GetMutPointer` on a `kMmap` buffer: taking a mutable pointer
+    /// charges the payload and turns it back into an ephemeral buffer.
+    #[test]
+    fn data_mut_on_a_mapped_buffer_charges_the_payload() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("blk.bin");
+        let pool = BufferPool::new(1024);
+        let obj = pool.allocate_persistent(&path, 96, BufferType::Persistent);
+        {
+            let h = obj.load().unwrap();
+            h.data_mut().as_mut().unwrap()[0] = 3;
+        }
+        obj.save().unwrap();
+        obj.to_mmap().unwrap();
+        assert_eq!(pool.used_bytes(), 0);
+
+        {
+            let h = obj.load().unwrap();
+            let mut data = h.data_mut();
+            assert_eq!(data.as_ref().unwrap()[0], 3);
+            data.as_mut().unwrap()[1] = 4;
+            assert_eq!(obj.kind(), BufferType::Ephemeral);
+            assert_eq!(pool.used_bytes(), 96);
+        }
+        obj.free().unwrap();
+        assert_eq!(pool.used_bytes(), 0);
+    }
+
+    /// C++ `BufferObj::SaveSnapshot`: a resident payload is written from
+    /// memory, a spilled `Temp` payload is copied from its spill file.
+    #[test]
+    fn save_snapshot_copies_from_memory_and_from_the_spill_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let temp_dir = dir.path().join("temp");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let pool = BufferPool::new(1024);
+
+        let resident = pool.allocate(16, BufferType::Persistent);
+        {
+            let h = resident.load().unwrap();
+            h.data_mut().as_mut().unwrap().fill(9);
+        }
+        let from_memory = dir.path().join("snapshot/a.bin");
+        assert!(resident.save_snapshot(&from_memory).unwrap());
+        assert_eq!(std::fs::read(&from_memory).unwrap(), vec![9u8; 16]);
+
+        let spilled = pool
+            .allocate_file(FileWorker::data(&data_dir, &temp_dir, "", "b", 16))
+            .unwrap();
+        {
+            let h = spilled.load().unwrap();
+            h.data_mut().as_mut().unwrap().fill(5);
+            h.obj().set_data_size(16);
+        }
+        spilled.free().unwrap();
+        assert_eq!(spilled.kind(), BufferType::Temp);
+        let from_spill = dir.path().join("snapshot/b.bin");
+        assert!(spilled.save_snapshot(&from_spill).unwrap());
+        assert_eq!(std::fs::read(&from_spill).unwrap(), vec![5u8; 16]);
+    }
+
+    /// C++ `BufferManager::GetBufferObjectsInfo`, `GetBufferObject(path)`,
+    /// `ChangeBufferObjectState` and `RemoveBufferObjects`.
+    #[test]
+    fn object_manager_reports_and_removes_objects() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let temp_dir = dir.path().join("temp");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let pool = BufferPool::new(4096);
+
+        let worker = FileWorker::data(&data_dir, &temp_dir, "", "blk", 64);
+        let data_path = worker.file_path();
+        let obj = pool.allocate_file(worker).unwrap();
+        obj.add_obj_rc();
+        {
+            let h = obj.load().unwrap();
+            h.data_mut().as_mut().unwrap().fill(1);
+            h.obj().set_data_size(64);
+            h.obj().save().unwrap();
+        }
+        assert_eq!(pool.buffered_object_count(), 1);
+
+        let infos = pool.get_buffer_objects_info();
+        assert_eq!(infos.len(), 1);
+        assert_eq!(infos[0].object_path, data_path);
+        assert_eq!(infos[0].buffered_type, BufferType::Persistent);
+        assert_eq!(infos[0].buffered_status, BufferStatus::Unloaded);
+        assert_eq!(infos[0].file_type, FileWorkerType::DataFile);
+        assert_eq!(infos[0].object_size, 64);
+
+        assert_eq!(pool.get_object_by_path(&data_path).unwrap().id(), obj.id());
+        assert!(pool.get_object_by_path(dir.path().join("nope")).is_none());
+
+        // After a restart the file is the truth: persistent + freed.
+        pool.change_buffer_object_state(&data_path);
+        assert_eq!(obj.kind(), BufferType::Persistent);
+        assert_eq!(obj.status(), BufferStatus::Freed);
+
+        pool.remove_buffer_objects(std::slice::from_ref(&data_path))
+            .unwrap();
+        assert_eq!(pool.buffered_object_count(), 0);
+        assert!(pool.get_object_by_path(&data_path).is_none());
+        assert!(pool.remove_buffer_objects(&[data_path]).is_err());
+    }
+
+    /// C++ `BufferManager::AddRequestCount` / `AddCacheMissCount`: every load
+    /// is a request, a `New`/`Freed` load is a miss, `Unloaded`/`Loaded` are
+    /// hits.
+    #[test]
+    fn request_and_miss_counters() {
+        let pool = BufferPool::new(1024);
+        let obj = pool.allocate(32, BufferType::Persistent);
+        {
+            let _h = obj.load().unwrap();
+        }
+        assert_eq!(
+            (pool.total_request_count(), pool.cache_miss_count()),
+            (1, 1)
+        );
+        {
+            // `Unloaded` → a hit.
+            let _h = obj.load().unwrap();
+        }
+        assert_eq!(
+            (pool.total_request_count(), pool.cache_miss_count()),
+            (2, 1)
+        );
+        obj.free().unwrap();
+        {
+            // `Freed` → a miss again.
+            let _h = obj.load().unwrap();
+        }
+        assert_eq!(
+            (pool.total_request_count(), pool.cache_miss_count()),
+            (3, 2)
+        );
+    }
+
+    /// The GC queues are sharded (C++ `lru_caches_`), one bucket per shard.
+    #[test]
+    fn gc_queues_are_sharded() {
+        let pool = BufferPool::with_lru_count(1 << 20, 4);
+        assert_eq!(pool.lru_count(), 4);
+        for _ in 0..8 {
+            let obj = pool.allocate(8, BufferType::Persistent);
+            {
+                let _h = obj.load().unwrap();
+            }
+        }
+        let waiting = pool.waiting_gc_object_count();
+        assert_eq!(waiting.len(), 4);
+        assert_eq!(waiting.iter().sum::<usize>(), 8);
+    }
+
+    /// C++ `BufferObj::AddBufferSize` / `UpdateFileWorkerInfo`: a var-file
+    /// payload grows through the budget, and a restarting worker hands the
+    /// grown size back.
+    #[test]
+    fn var_file_budget_and_worker_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let temp_dir = dir.path().join("temp");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let pool = BufferPool::new(64);
+        let worker = FileWorker::var(&data_dir, &temp_dir, "", "var", 0);
+        let obj = pool.allocate_file(worker).unwrap();
+        assert!(obj.add_buffer_size(16).unwrap());
+        assert_eq!(pool.used_bytes(), 16);
+        // Requesting more than the budget still fails, and is still charged
+        // (the reference's `AddBufferSize` only warns).
+        assert!(!obj.add_buffer_size(128).unwrap());
+        assert_eq!(pool.used_bytes(), 144);
+
+        let restarted = FileWorker::var(&data_dir, &temp_dir, "", "var", 144);
+        obj.update_file_worker_info(restarted);
+        assert_eq!(obj.size(), 144);
+        // A data worker has no growing payload.
+        let data = pool
+            .allocate_file(FileWorker::data(&data_dir, &temp_dir, "", "d", 8))
+            .unwrap();
+        assert!(data.add_buffer_size(8).is_err());
     }
 
     /// C++: `BufferObjTest.test_hnsw_index_buffer_obj_shutdown` — the

@@ -149,9 +149,7 @@ impl BlockVersion {
             return (0, 0);
         }
         // `lower_bound` on `create_ts >= commit_ts`.
-        let index = self
-            .created
-            .partition_point(|f| f.create_ts < commit_ts);
+        let index = self.created.partition_point(|f| f.create_ts < commit_ts);
         let Some(field) = self.created.get(index) else {
             return (0, 0);
         };
@@ -229,10 +227,7 @@ impl BlockVersion {
                 }
             })
             .collect();
-        (
-            BlockVersionFile { created, deleted }.encode(),
-            !is_modified,
-        )
+        (BlockVersionFile { created, deleted }.encode(), !is_modified)
     }
 
     /// C++: `BlockVersion::SpillToFile` — the serialized `version` file.

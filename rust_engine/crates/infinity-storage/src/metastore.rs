@@ -286,8 +286,11 @@ mod tests {
     #[test]
     fn atomic_batch_tolerates_missing_deletes() {
         let (_d, s) = open();
-        s.atomic_batch(&[(b"absent".to_vec(), None), (b"k".to_vec(), Some(b"v".to_vec()))])
-            .unwrap();
+        s.atomic_batch(&[
+            (b"absent".to_vec(), None),
+            (b"k".to_vec(), Some(b"v".to_vec())),
+        ])
+        .unwrap();
         assert_eq!(s.get(b"k").unwrap(), Some(b"v".to_vec()));
     }
 
