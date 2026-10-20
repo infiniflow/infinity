@@ -23,7 +23,10 @@ fn test1() {
     let docs: Vec<(u64, u32)> = expected.iter().map(|doc| (*doc, 10)).collect();
     let postings = BTreeMap::from([(
         "term".to_string(),
-        expected.iter().map(|doc| (*doc, 3)).collect::<Vec<_>>(),
+        expected
+            .iter()
+            .map(|doc| (*doc, 3, vec![0, 1, 2]))
+            .collect::<Vec<_>>(),
     )]);
     let flags = TermMetaFlags::default();
     write_segment_index(dir_str, "posting_writer", 0, &docs, &postings, flags).unwrap();
@@ -34,8 +37,8 @@ fn test1() {
     assert_eq!(posting.total_tf(), 15);
 
     // `PostingWriter::Load` then append the tenth document.
-    for _ in 0..3 {
-        posting.add_position();
+    for position in 0..3 {
+        posting.add_position(position);
     }
     posting.end_document(10);
 
@@ -66,7 +69,9 @@ fn tf_after_skip_to_across_segments() {
         let docs: Vec<(u64, u32)> = (0..300).map(|offset| (first_row + offset, 10)).collect();
         let postings = BTreeMap::from([(
             "term".to_string(),
-            docs.iter().map(|(row, _)| (*row, 1)).collect::<Vec<_>>(),
+            docs.iter()
+                .map(|(row, _)| (*row, 1, vec![0]))
+                .collect::<Vec<_>>(),
         )]);
         let base_name = format!("segment_{segment}");
         write_segment_index(dir_str, &base_name, first_row - 1, &docs, &postings, flags).unwrap();

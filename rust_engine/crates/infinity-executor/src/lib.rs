@@ -2013,6 +2013,25 @@ fn dedupe_postings(list: &mut Vec<(u64, u32)>) {
     *list = out;
 }
 
+/// Merges duplicate rows in a `(row, tf, positions)` posting list, keeping the
+/// last frequency and the union of the positions (the seal path).
+fn dedupe_posting_entries(list: &mut Vec<(u64, u32, Vec<u32>)>) {
+    list.sort_unstable_by_key(|(row, _, _)| *row);
+    let mut out: Vec<(u64, u32, Vec<u32>)> = Vec::with_capacity(list.len());
+    for (row, tf, mut positions) in list.drain(..) {
+        match out.last_mut() {
+            Some((last, last_tf, last_positions)) if *last == row => {
+                *last_tf = tf;
+                last_positions.append(&mut positions);
+                last_positions.sort_unstable();
+                last_positions.dedup();
+            }
+            _ => out.push((row, tf, positions)),
+        }
+    }
+    *list = out;
+}
+
 /// The reference's memory indexer: the **unsealed** segment of one text
 /// column, holding `term -> [(doc, tf, positions)]`, each document's length
 /// and the corpus statistics.
@@ -2108,7 +2127,8 @@ impl MemoryIndexer {
 
     /// C++: `MemoryIndexer::Dump(false, spill)` — writes the segment as the
     /// C++ file family ([`infinity_storage::fulltext_segment::write_segment_index`]).
-    /// Position lists are not part of the on-disk format.
+    /// Positions travel with each posting (`.pos`), so a sealed segment can
+    /// answer phrase queries.
     #[allow(dead_code)] // the product spill path; exercised by `memory_indexer_ut`.
     fn dump(&self, dir: &str, base_name: &str) -> bool {
         if self.docs.is_empty() {
@@ -2117,11 +2137,16 @@ impl MemoryIndexer {
         let base_row_id = self.docs.keys().copied().min().unwrap_or(0);
         let mut docs: Vec<(u64, u32)> = self.docs.iter().map(|(row, len)| (*row, *len)).collect();
         docs.sort_unstable_by_key(|(row, _)| *row);
-        let mut postings: std::collections::BTreeMap<String, Vec<(u64, u32)>> =
-            std::collections::BTreeMap::new();
+        let mut postings: std::collections::BTreeMap<
+            String,
+            Vec<infinity_storage::fulltext_segment::PostingEntry>,
+        > = std::collections::BTreeMap::new();
         for (term, list) in &self.postings {
-            let mut hits: Vec<(u64, u32)> = list.iter().map(|(row, tf, _)| (*row, *tf)).collect();
-            dedupe_postings(&mut hits);
+            let mut hits: Vec<infinity_storage::fulltext_segment::PostingEntry> = list
+                .iter()
+                .map(|(row, tf, pos)| (*row, *tf, pos.clone()))
+                .collect();
+            dedupe_posting_entries(&mut hits);
             postings.insert(term.clone(), hits);
         }
         if let Some(reader) = &self.spilled {
@@ -2130,9 +2155,24 @@ impl MemoryIndexer {
                     if postings.contains_key(&term) {
                         continue;
                     }
-                    if let Ok(mut hits) = reader.postings(&term) {
-                        dedupe_postings(&mut hits);
-                        postings.insert(term, hits);
+                    if let Ok(hits) = reader.postings(&term) {
+                        // The reader exposes positions separately
+                        // (`Lookup(term, fetch_position = true)`), so a spilled
+                        // segment keeps them when it is merged into the dump.
+                        let mut by_row: std::collections::HashMap<u64, Vec<u32>> = reader
+                            .positions(&term)
+                            .ok()
+                            .flatten()
+                            .map(|list| list.into_iter().collect())
+                            .unwrap_or_default();
+                        let mut with_positions: Vec<
+                            infinity_storage::fulltext_segment::PostingEntry,
+                        > = hits
+                            .into_iter()
+                            .map(|(row, tf)| (row, tf, by_row.remove(&row).unwrap_or_default()))
+                            .collect();
+                        dedupe_posting_entries(&mut with_positions);
+                        postings.insert(term, with_positions);
                     }
                 }
             }
@@ -2313,11 +2353,16 @@ impl TextIndex {
         };
         let mut docs: Vec<(u64, u32)> = self.mem.docs.iter().map(|(d, l)| (*d, *l)).collect();
         docs.sort_unstable_by_key(|(d, _)| *d);
-        let mut postings: std::collections::BTreeMap<String, Vec<(u64, u32)>> =
-            std::collections::BTreeMap::new();
+        let mut postings: std::collections::BTreeMap<
+            String,
+            Vec<infinity_storage::fulltext_segment::PostingEntry>,
+        > = std::collections::BTreeMap::new();
         for (term, list) in &self.mem.postings {
-            let mut hits: Vec<(u64, u32)> = list.iter().map(|(d, tf, _)| (*d, *tf)).collect();
-            dedupe_postings(&mut hits);
+            let mut hits: Vec<infinity_storage::fulltext_segment::PostingEntry> = list
+                .iter()
+                .map(|(d, tf, pos)| (*d, *tf, pos.clone()))
+                .collect();
+            dedupe_posting_entries(&mut hits);
             postings.insert(term.clone(), hits);
         }
         let base_name = format!("ft_{base_row_id:016x}");
@@ -14099,11 +14144,12 @@ fn apply_index_filter(
     };
     ctx = ctx.with_fulltext(&fulltext);
     let mask = candidate.evaluator.evaluate(&ctx)?;
+    // The evaluator decides which rows the index scan yields (C++
+    // `PhysicalIndexScan`): an all-false mask means the scan produces nothing,
+    // even when the residual predicate would have accepted the row. Keeping
+    // every row here turned the filter into a no-op.
     if mask.count_true() == 0 {
-        // An evaluator that excludes everything carries no usable information
-        // (the index filter is only a pre-filter); the residual predicate
-        // decides.
-        return Ok(rows);
+        return Ok(Vec::new());
     }
     Ok(rows
         .into_iter()
