@@ -257,13 +257,14 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
                     return Ok(Expr::Column(i));
                 }
             }
-            Expr::Func {
-                name: name.clone(),
-                args: args
-                    .iter()
-                    .map(|a| compile_expr(a, schema))
-                    .collect::<Result<Vec<_>>>()?,
-            }
+            // A scalar call is only built through the registry, so an unknown name
+            // fails here (`unknown function '<name>'`) rather than evaluating to
+            // NULL per row, as the reference binder does.
+            let compiled: Vec<Expr> = args
+                .iter()
+                .map(|a| compile_expr(a, schema))
+                .collect::<Result<Vec<_>>>()?;
+            infinity_expression::registry::func(name, compiled).map_err(Error::Invalid)?
         }
     })
 }
@@ -475,13 +476,13 @@ fn compile_agg_expr(
                     .ok_or_else(|| Error::Invalid(format!("aggregate '{label}' not collected")))?;
                 Expr::Column(idx)
             } else {
-                Expr::Func {
-                    name: name.clone(),
-                    args: args
-                        .iter()
-                        .map(|a| compile_agg_expr(a, agg_index, group_by))
-                        .collect::<Result<Vec<_>>>()?,
-                }
+                // Same registry check as `compile_expr`: a scalar call that is not
+                // a collected aggregate still has to name a known function.
+                let compiled: Vec<Expr> = args
+                    .iter()
+                    .map(|a| compile_agg_expr(a, agg_index, group_by))
+                    .collect::<Result<Vec<_>>>()?;
+                infinity_expression::registry::func(name, compiled).map_err(Error::Invalid)?
             }
         }
     })
@@ -1073,6 +1074,109 @@ mod tests {
             err.to_string().contains("subqueries must be resolved"),
             "{err}"
         );
+    }
+
+    /// An unknown scalar function is a planning error, not a NULL column: the
+    /// reference binder rejects it in `BuildFuncExpr`
+    /// (`src/planner/expression_binder_impl.cpp:453`) through the catalog registry.
+    #[test]
+    fn unknown_scalar_function_is_rejected() {
+        let call = |name: &str, arg: ExprAst| SelectItem::Func {
+            name: name.into(),
+            args: vec![arg],
+        };
+        let err = plan_select(
+            &[call("foobar", ExprAst::Column("id".into()))],
+            &tables(),
+            None,
+            None,
+            &[],
+            None,
+            &[],
+            None,
+            None,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("unknown function 'foobar'"),
+            "{err}"
+        );
+
+        // The same call inside WHERE fails the same way.
+        let pred = Predicate::IsTrue(ExprAst::Func {
+            name: "foobar".into(),
+            args: vec![ExprAst::Column("id".into())],
+        });
+        let err = plan_select(
+            &[SelectItem::Star],
+            &tables(),
+            None,
+            Some(&pred),
+            &[],
+            None,
+            &[],
+            None,
+            None,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("unknown function 'foobar'"),
+            "{err}"
+        );
+
+        // And on the aggregate output (`compile_agg_expr`'s HAVING arm).
+        let having = Predicate::IsTrue(ExprAst::Func {
+            name: "foobar".into(),
+            args: vec![ExprAst::Literal(Literal::Int(1))],
+        });
+        let err = plan_select(
+            &[call("ABS", ExprAst::Literal(Literal::Int(1)))],
+            &tables(),
+            None,
+            None,
+            &[ExprAst::Column("id".into())],
+            Some(&having),
+            &[],
+            None,
+            None,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("unknown function 'foobar'"),
+            "{err}"
+        );
+    }
+
+    /// Functions the registry knows still plan, including the reference's
+    /// case-insensitive spellings.
+    #[test]
+    fn known_scalar_functions_still_plan() {
+        for name in ["ABS", "abs", "AbS", "char_length", "JSON_EXTRACT", "year"] {
+            let p = plan_select(
+                &[SelectItem::Func {
+                    name: name.into(),
+                    args: vec![ExprAst::Column("id".into())],
+                }],
+                &tables(),
+                None,
+                None,
+                &[],
+                None,
+                &[],
+                None,
+                None,
+            )
+            .unwrap();
+            let exprs = match p {
+                LogicalPlan::Projection { exprs, .. } => exprs,
+                other => panic!("expected a projection, got {other:?}"),
+            };
+            assert!(
+                matches!(&exprs[0], Expr::Func { name: n, .. } if n == name),
+                "{name} should compile to a scalar call, got {:?}",
+                exprs[0]
+            );
+        }
     }
 
     #[test]
