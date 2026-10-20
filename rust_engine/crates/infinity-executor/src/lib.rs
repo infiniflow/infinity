@@ -40,8 +40,6 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 use infinity_storage::secondary_segment::{Key, KeyKind};
-#[cfg(not(feature = "rocksdb-store"))]
-use infinity_storage::FjallMetaStore;
 use infinity_storage::MetaStore;
 use infinity_txn::{Txn, TxnManager};
 
@@ -4484,15 +4482,35 @@ fn is_blob_type(t: &str) -> bool {
     is_embedding_type(t) || is_tensor_type(t) || is_sparse_type(t)
 }
 
+/// The substrate a fresh data directory is created on.
+///
+/// It follows the **engine's** feature, not the store crate's: the converter
+/// needs the RocksDB substrate while the engine may stay on fjall, and the
+/// engine's catalogue semantics (the C++ key space or the native one) follow
+/// from it.
+#[cfg(feature = "rocksdb-store")]
+pub const DEFAULT_CATALOG_BACKEND: infinity_storage::metastore::StoreBackend =
+    infinity_storage::metastore::StoreBackend::RocksDb;
+/// The substrate a fresh data directory is created on.
+#[cfg(not(feature = "rocksdb-store"))]
+pub const DEFAULT_CATALOG_BACKEND: infinity_storage::metastore::StoreBackend =
+    infinity_storage::metastore::StoreBackend::Fjall;
+
 /// Open options (the reference's `InfinityContext` configuration relevant to
 /// durability).
 #[derive(Debug, Clone)]
+
 pub struct EngineOptions {
     /// When `false`, catalog DDL becomes durable only at a checkpoint
     /// (`Engine::flush`), reproducing `NEW_CONFIG_NOWAL_PATH`.
     pub wal_enabled: bool,
     /// Tokio exchange capacity per pipeline edge.
     pub exchange_capacity: usize,
+    /// The substrate a *fresh* catalog is created on.
+    ///
+    /// `None` (the default) lets the build decide. An existing directory is
+    /// always opened on the substrate it holds, whatever this says.
+    pub catalog_backend: Option<infinity_storage::metastore::StoreBackend>,
 }
 
 impl Default for EngineOptions {
@@ -4500,6 +4518,7 @@ impl Default for EngineOptions {
         Self {
             wal_enabled: true,
             exchange_capacity: 4,
+            catalog_backend: None,
         }
     }
 }
@@ -4539,12 +4558,19 @@ impl Engine {
         // C++ engine can open this directory's catalog; otherwise the catalog
         // is a native fjall store.
         let catalog_dir = dir.join("catalog");
-        #[cfg(feature = "rocksdb-store")]
-        let catalog_store: Arc<dyn MetaStore> =
-            Arc::new(infinity_storage::RocksMetaStore::open(&catalog_dir)?);
-        #[cfg(not(feature = "rocksdb-store"))]
-        let catalog_store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(&catalog_dir, "catalog")?);
+        // The substrate is a property of the directory, not of the build: a
+        // directory the reference wrote holds a RocksDB, a directory this port
+        // wrote holds a fjall store, and a fresh directory gets the build's
+        // default. One binary therefore opens both, and the build only decides
+        // what a *new* directory is made of.
+        let opened_catalog = infinity_storage::open_store(
+            &catalog_dir,
+            "catalog",
+            options.catalog_backend.unwrap_or(DEFAULT_CATALOG_BACKEND),
+        )?;
+        let catalog_on_rocks =
+            opened_catalog.backend == infinity_storage::metastore::StoreBackend::RocksDb;
+        let catalog_store: Arc<dyn MetaStore> = opened_catalog.store;
         // A no-WAL open first undoes whatever the previous process wrote after
         // its last checkpoint, then wraps the store so this process's writes
         // are journaled too. Doing the rollback in both modes is defensive: a
@@ -4559,24 +4585,22 @@ impl Engine {
             ))
         };
         let catalog = {
-            #[cfg(feature = "rocksdb-store")]
-            {
+            if catalog_on_rocks {
+                // The C++ key space *is* the catalog in a RocksDB directory:
+                // the reference wrote it and expects to read it back.
                 Catalog::with_store_cpp_only(catalog_store)
-            }
-            #[cfg(not(feature = "rocksdb-store"))]
-            {
+            } else {
                 Catalog::with_store(catalog_store)
             }
         };
         // The row/meta store: RocksDB when the `rocksdb-store` feature is on
         // (the substrate the C++ engine's catalog uses), fjall otherwise.
-        #[cfg(feature = "rocksdb-store")]
-        let store: Arc<dyn MetaStore> = Arc::new(infinity_storage::RocksMetaStore::open(
-            dir.join("persistence"),
-        )?);
-        #[cfg(not(feature = "rocksdb-store"))]
-        let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.join("persistence"), "default")?);
+        let store: Arc<dyn MetaStore> = infinity_storage::open_store(
+            &dir.join("persistence"),
+            "default",
+            options.catalog_backend.unwrap_or(DEFAULT_CATALOG_BACKEND),
+        )?
+        .store;
         let wal_dir = dir.join("wal");
         std::fs::create_dir_all(&wal_dir).map_err(|e| Error::Io {
             path: wal_dir.clone(),
@@ -4639,11 +4663,14 @@ impl Engine {
             queries: Mutex::new(diagnostics::QueryRegistry::default()),
             profile_enabled: std::sync::atomic::AtomicBool::new(false),
         };
-        engine.recover_cpp_blocks()?;
-        engine.rebuild_indexes()?;
         // If this directory was written by the C++ engine (its catalog keys are
         // in the catalog store, but the native catalog is empty), take over its
         // schema so the engine can open a C++-produced directory (§2.6.1).
+        //
+        // The import has to happen *before* the block recovery: the recovery
+        // walks the native tables, so with the schema still missing it would
+        // find no table to recover the rows of, and the directory would open
+        // with the right schema and no rows.
         if engine.storage.catalog.list_tables()?.is_empty() && !engine.storage.catalog.is_cpp_only()
         {
             let _ = engine
@@ -4651,6 +4678,8 @@ impl Engine {
                 .catalog
                 .import_cpp_layout(engine.storage.catalog.store().as_ref());
         }
+        engine.recover_cpp_blocks()?;
+        engine.rebuild_indexes()?;
         Ok(engine)
     }
 
@@ -18051,7 +18080,7 @@ mod tests {
         }
         #[cfg(not(feature = "rocksdb-store"))]
         {
-            std::sync::Arc::new(FjallMetaStore::open(dir, "catalog").unwrap())
+            std::sync::Arc::new(infinity_storage::FjallMetaStore::open(dir, "catalog").unwrap())
         }
     }
 
