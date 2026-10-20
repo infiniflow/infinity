@@ -17503,32 +17503,42 @@ fn apply_aggregate(
 }
 
 pub(crate) fn sort_rows(rows: &mut [Vec<Value>], keys: &[(infinity_expression::Expr, bool)]) {
-    rows.sort_by(|a, b| {
-        for (key, asc) in keys {
-            let x = key.eval(a);
-            let y = key.eval(b);
-            let (x, y) = (&x, &y);
-            // NULLs order before every non-NULL (so ASC → NULLS FIRST, and the
-            // reverse below gives DESC → NULLS LAST).
-            let mut ord = match (x, y) {
-                (Value::Null, Value::Null) => std::cmp::Ordering::Equal,
-                (Value::Null, _) => std::cmp::Ordering::Less,
-                (_, Value::Null) => std::cmp::Ordering::Greater,
-                // Fall back to a textual comparison for mixed types so the
-                // order stays total (e.g. an int beside a non-numeric string).
-                _ => x
-                    .partial_cmp_value(y)
-                    .unwrap_or_else(|| x.to_slt_string().cmp(&y.to_slt_string())),
-            };
-            if !*asc {
-                ord = ord.reverse();
-            }
-            if ord != std::cmp::Ordering::Equal {
-                return ord;
-            }
+    // A stable sort: rows that tie on every key keep their input order, which is
+    // the C++ `CompareTwoRowAndPreferLeft` rule.
+    rows.sort_by(|a, b| compare_rows(a, b, keys));
+}
+
+/// The ORDER BY comparison shared by the stage pipeline, `PhysicalSort` and
+/// `PhysicalTop`, so every path orders rows identically.
+pub(crate) fn compare_rows(
+    a: &[Value],
+    b: &[Value],
+    keys: &[(infinity_expression::Expr, bool)],
+) -> std::cmp::Ordering {
+    for (key, asc) in keys {
+        let x = key.eval(a);
+        let y = key.eval(b);
+        let (x, y) = (&x, &y);
+        // NULLs order before every non-NULL (so ASC → NULLS FIRST, and the
+        // reverse below gives DESC → NULLS LAST).
+        let mut ord = match (x, y) {
+            (Value::Null, Value::Null) => std::cmp::Ordering::Equal,
+            (Value::Null, _) => std::cmp::Ordering::Less,
+            (_, Value::Null) => std::cmp::Ordering::Greater,
+            // Fall back to a textual comparison for mixed types so the order
+            // stays total (e.g. an int beside a non-numeric string).
+            _ => x
+                .partial_cmp_value(y)
+                .unwrap_or_else(|| x.to_slt_string().cmp(&y.to_slt_string())),
+        };
+        if !*asc {
+            ord = ord.reverse();
         }
-        std::cmp::Ordering::Equal
-    });
+        if ord != std::cmp::Ordering::Equal {
+            return ord;
+        }
+    }
+    std::cmp::Ordering::Equal
 }
 
 /// Recursively collects the files under `dir`, sorted. A missing directory has
@@ -17868,6 +17878,42 @@ mod tests {
         );
         // GROUP BY over an empty relation has no groups at all.
         assert!(rows(&e, "SELECT b, count(*) FROM og WHERE a > 99 GROUP BY b;").is_empty());
+    }
+
+    /// ORDER BY without a limit now lowers to the sort operator, which sorts
+    /// chunk runs and merges them; ties still come out in insertion order.
+    #[test]
+    fn run_plan_executes_a_sort_through_the_operator_model() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE os (a INT, b INT);").unwrap();
+        e.execute("INSERT INTO os VALUES (1, 30), (2, 10), (3, 20), (4, 10);")
+            .unwrap();
+
+        let before = crate::operators::operator_run_count();
+        // `b` 10 comes from rows 2 and 4: insertion order keeps 2 first.
+        assert_eq!(
+            rows(&e, "SELECT a, b FROM os ORDER BY b;"),
+            vec![
+                vec!["2".to_string(), "10".to_string()],
+                vec!["4".to_string(), "10".to_string()],
+                vec!["3".to_string(), "20".to_string()],
+                vec!["1".to_string(), "30".to_string()],
+            ]
+        );
+        assert_eq!(crate::operators::operator_run_count(), before + 1);
+        assert!(
+            crate::operators::last_chain().contains(&crate::operators::PhysicalOperatorType::Sort)
+        );
+        assert_eq!(
+            rows(&e, "SELECT a, b FROM os ORDER BY b DESC;"),
+            vec![
+                vec!["1".to_string(), "30".to_string()],
+                vec!["3".to_string(), "20".to_string()],
+                vec!["2".to_string(), "10".to_string()],
+                vec!["4".to_string(), "10".to_string()],
+            ]
+        );
     }
 
     fn seed(e: &Engine) {

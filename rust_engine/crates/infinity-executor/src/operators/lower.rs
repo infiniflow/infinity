@@ -13,6 +13,7 @@ use super::aggregate::Aggregate;
 use super::filter::Filter;
 use super::limit::Limit;
 use super::project::Projection;
+use super::sort::Sort;
 use super::top::Top;
 use super::{PhysicalOperator, PhysicalOperatorType};
 
@@ -104,8 +105,11 @@ pub fn lower(plan: &LogicalPlan) -> Result<Option<Lowered>> {
                 operators.reverse();
                 return Ok(Some((operators, names)));
             }
-            // Not ported yet: a `Sort` that is not fused into a `Top`.
-            _ => return Ok(None),
+            LogicalPlan::Sort { input, keys } => {
+                // A sort that is not fused into a `Top`.
+                operators.push(Box::new(Sort::new(keys.clone())));
+                cursor = input;
+            }
         }
     }
 }
@@ -156,6 +160,7 @@ pub(crate) fn covers(operators: &[Box<dyn PhysicalOperator>], stages: &[crate::S
             PhysicalOperatorType::Limit
                 if matches!(stage, crate::Stage::Limit(_) | crate::Stage::Offset(_)) => {}
             PhysicalOperatorType::Aggregate if matches!(stage, crate::Stage::Aggregate { .. }) => {}
+            PhysicalOperatorType::Sort if matches!(stage, crate::Stage::Sort { .. }) => {}
             PhysicalOperatorType::Top if matches!(stage, crate::Stage::Sort { .. }) => {
                 // The fused sort, plus the limit/offset budgets above it.
                 stage_index += 1;
@@ -351,12 +356,25 @@ mod tests {
     }
 
     #[test]
-    fn a_sort_without_a_limit_still_falls_back() {
+    fn a_sort_without_a_limit_lowers_to_a_sort() {
         let plan = LogicalPlan::Sort {
             input: Box::new(projection(scan())),
             keys: vec![(Expr::Column(0), true)],
         };
-        assert!(lower(&plan).unwrap().is_none());
+        let (operators, names) = lower(&plan).unwrap().unwrap();
+        assert_eq!(operators.len(), 2);
+        assert_eq!(
+            operators[1].operator_type(),
+            super::super::PhysicalOperatorType::Sort
+        );
+        assert_eq!(names, vec!["c1".to_string()]);
+        let stages = vec![
+            crate::Stage::Projection(vec![Expr::Column(0)], vec!["c1".into()]),
+            crate::Stage::Sort {
+                keys: vec![(Expr::Column(0), true)],
+            },
+        ];
+        assert!(covers(&operators, &stages));
     }
 
     #[test]

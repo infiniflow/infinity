@@ -18,6 +18,7 @@ pub mod filter;
 pub mod limit;
 pub mod lower;
 pub mod project;
+pub mod sort;
 pub mod top;
 
 use std::sync::OnceLock;
