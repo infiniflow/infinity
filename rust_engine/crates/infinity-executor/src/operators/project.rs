@@ -7,6 +7,18 @@ use infinity_expression::{Expr, Value};
 use super::{OperatorContext, OperatorStates, PhysicalOperator, PhysicalOperatorType};
 use crate::chunk::DataChunk;
 
+#[cfg(test)]
+thread_local! {
+    static PROJECTED_ROWS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Rows evaluated by projections, so a test can show that LIMIT stops the work
+/// early.
+#[cfg(test)]
+pub fn projected_rows() -> usize {
+    PROJECTED_ROWS.with(|rows| rows.get())
+}
+
 /// A projection operator.
 #[derive(Debug, Clone)]
 pub struct Projection {
@@ -34,6 +46,8 @@ impl Projection {
         if self.is_identity(&block) {
             return Ok(block);
         }
+        #[cfg(test)]
+        PROJECTED_ROWS.with(|rows| rows.set(rows.get() + block.row_count()));
         let mut out = DataChunk::with_capacity(self.exprs.len(), block.capacity());
         for row in 0..block.row_count() {
             let input: Vec<_> = (0..block.column_count())

@@ -9533,7 +9533,7 @@ impl Engine {
             // The lowered chain must cover exactly the stages `decompose`
             // found, otherwise the two views of the plan disagree and the
             // stage pipeline is authoritative.
-            if operators.len() == stages.len() {
+            if crate::operators::lower::covers(&operators, &stages) {
                 return crate::operators::run_rows(operators, names, columns.len(), rows);
             }
         }
@@ -17502,7 +17502,7 @@ fn apply_aggregate(
     (names, out)
 }
 
-fn sort_rows(rows: &mut [Vec<Value>], keys: &[(infinity_expression::Expr, bool)]) {
+pub(crate) fn sort_rows(rows: &mut [Vec<Value>], keys: &[(infinity_expression::Expr, bool)]) {
     rows.sort_by(|a, b| {
         for (key, asc) in keys {
             let x = key.eval(a);
@@ -17769,6 +17769,61 @@ mod tests {
         };
         assert_eq!(columns, vec!["b".to_string()]);
         assert!(rows.is_empty());
+    }
+
+    /// LIMIT/OFFSET and ORDER BY ... LIMIT run through the limit and top
+    /// operators, and produce the same rows as the stage pipeline.
+    #[test]
+    fn run_plan_executes_limit_and_top_through_the_operator_model() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ol (a INT, b INT);").unwrap();
+        e.execute("INSERT INTO ol VALUES (1, 10), (2, 20), (3, 10), (4, 40);")
+            .unwrap();
+
+        let before = crate::operators::operator_run_count();
+        assert_eq!(
+            rows(&e, "SELECT b FROM ol LIMIT 2;"),
+            vec![vec!["10".to_string()], vec!["20".to_string()]]
+        );
+        assert_eq!(crate::operators::operator_run_count(), before + 1);
+        assert_eq!(
+            crate::operators::last_chain(),
+            vec![
+                crate::operators::PhysicalOperatorType::Limit,
+                crate::operators::PhysicalOperatorType::Projection
+            ]
+        );
+
+        assert_eq!(
+            rows(&e, "SELECT b FROM ol LIMIT 2 OFFSET 1;"),
+            vec![vec!["20".to_string()], vec!["10".to_string()]]
+        );
+        // ORDER BY ties keep insertion order (`a` 1 before `a` 3 both have 10).
+        assert_eq!(
+            rows(&e, "SELECT b FROM ol ORDER BY b LIMIT 3;"),
+            vec![
+                vec!["10".to_string()],
+                vec!["10".to_string()],
+                vec!["20".to_string()]
+            ]
+        );
+        assert_eq!(
+            rows(&e, "SELECT b FROM ol ORDER BY b DESC LIMIT 1;"),
+            vec![vec!["40".to_string()]]
+        );
+        // ORDER BY ... LIMIT collapses into one fused Top.
+        assert_eq!(
+            crate::operators::last_chain(),
+            vec![
+                crate::operators::PhysicalOperatorType::Projection,
+                crate::operators::PhysicalOperatorType::Top
+            ]
+        );
+        assert_eq!(
+            rows(&e, "SELECT b FROM ol ORDER BY b DESC LIMIT 2 OFFSET 1;"),
+            vec![vec!["20".to_string()], vec!["10".to_string()]]
+        );
     }
 
     fn seed(e: &Engine) {

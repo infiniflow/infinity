@@ -14,8 +14,10 @@
 //! backwards. Walking `0..len` here is the same traversal.
 
 pub mod filter;
+pub mod limit;
 pub mod lower;
 pub mod project;
+pub mod top;
 
 use std::sync::OnceLock;
 
@@ -27,6 +29,15 @@ use crate::chunk::DataChunk;
 #[cfg(test)]
 thread_local! {
     static OPERATOR_RUNS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static LAST_CHAIN: std::cell::RefCell<Vec<PhysicalOperatorType>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The operator types of the last chain `run_plan` executed, in execution
+/// order. Lets a test prove which operators a query really used.
+#[cfg(test)]
+pub fn last_chain() -> Vec<PhysicalOperatorType> {
+    LAST_CHAIN.with(|chain| chain.borrow().clone())
 }
 
 /// Counts how many fragments `run_plan` executed through the operator model, so
@@ -341,7 +352,12 @@ pub fn run_rows(
     rows: Vec<Vec<Value>>,
 ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
     #[cfg(test)]
-    OPERATOR_RUNS.with(|runs| runs.set(runs.get() + 1));
+    {
+        OPERATOR_RUNS.with(|runs| runs.set(runs.get() + 1));
+        LAST_CHAIN.with(|chain| {
+            *chain.borrow_mut() = operators.iter().map(|op| op.operator_type()).collect();
+        });
+    }
     for operator in &mut operators {
         operator.init()?;
     }
@@ -455,6 +471,49 @@ mod tests {
         if std::env::var("INFINITY_OPERATOR_MODEL").is_err() {
             assert!(enabled());
         }
+    }
+
+    /// LIMIT 10 over 100k rows must not evaluate the projection 100k times:
+    /// the reference stops as soon as the limit budget is spent
+    /// (`physical_limit_impl.cpp:209`).
+    #[test]
+    fn a_limit_stops_the_projection_after_one_chunk() {
+        use super::limit::Limit;
+        use super::project::Projection;
+
+        let total = 100_000;
+        let rows: Vec<Vec<Value>> = (0..total).map(|i| vec![Value::Int(i as i64)]).collect();
+        // The optimizer pushes a LIMIT below the projection (`SELECT a + 1 FROM
+        // t LIMIT 10`), so this is the chain a real query runs.
+        let operators: Vec<Box<dyn PhysicalOperator>> = vec![
+            Box::new(Limit::new(0, 10)),
+            Box::new(Projection::new(
+                vec![infinity_expression::Expr::Binary(
+                    Box::new(infinity_expression::Expr::Column(0)),
+                    infinity_parser::BinOp::Add,
+                    Box::new(infinity_expression::Expr::Literal(Value::Int(1))),
+                )],
+                vec!["a".into()],
+            )),
+        ];
+        let mut ctx = OperatorContext::default();
+        let mut states = OperatorStates::new(&operators);
+        let mut source = RowsSource::new(rows, 1, crate::chunk::DEFAULT_VECTOR_SIZE);
+        run_fragment(&operators, &mut ctx, &mut states, &mut source).unwrap();
+
+        let head = operators.len() - 1;
+        let out: Vec<Vec<Value>> = std::mem::take(&mut states.state_mut(head).data_blocks)
+            .into_iter()
+            .flat_map(DataChunk::into_rows)
+            .collect();
+        assert_eq!(out.len(), 10);
+        assert_eq!(out[0], vec![Value::Int(1)]);
+        assert_eq!(super::project::projected_rows(), 10);
+        // Only one chunk was ever converted; the rest of the table is untouched.
+        assert_eq!(
+            source.remaining(),
+            total - crate::chunk::DEFAULT_VECTOR_SIZE
+        );
     }
 
     #[test]

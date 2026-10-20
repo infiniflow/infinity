@@ -10,8 +10,10 @@ use infinity_common::Result;
 use infinity_planner::LogicalPlan;
 
 use super::filter::Filter;
+use super::limit::Limit;
 use super::project::Projection;
-use super::PhysicalOperator;
+use super::top::Top;
+use super::{PhysicalOperator, PhysicalOperatorType};
 
 /// A lowered plan: the operator chain in execution order (scan first) and the
 /// names of the columns it produces.
@@ -46,6 +48,26 @@ pub fn lower(plan: &LogicalPlan) -> Result<Option<Lowered>> {
                 operators.push(Box::new(Filter::new(predicate.clone())));
                 cursor = input;
             }
+            LogicalPlan::Limit { .. } | LogicalPlan::Offset { .. } => {
+                if let Some((keys, limit, offset, rest)) = fuse_top(cursor) {
+                    operators.push(Box::new(Top::new(keys, limit, offset)));
+                    cursor = rest;
+                } else {
+                    // A `Limit`/`Offset` on its own: the offset budget skips
+                    // rows, the limit budget keeps them.
+                    match cursor {
+                        LogicalPlan::Limit { input, n } => {
+                            operators.push(Box::new(Limit::new(0, *n)));
+                            cursor = input;
+                        }
+                        LogicalPlan::Offset { input, n } => {
+                            operators.push(Box::new(Limit::new(*n, u64::MAX)));
+                            cursor = input;
+                        }
+                        _ => unreachable!("matched Limit/Offset above"),
+                    }
+                }
+            }
             LogicalPlan::Scan { columns, .. } | LogicalPlan::Values { columns, .. } => {
                 if operators.is_empty() {
                     return Ok(None);
@@ -67,11 +89,78 @@ pub fn lower(plan: &LogicalPlan) -> Result<Option<Lowered>> {
                 operators.reverse();
                 return Ok(Some((operators, names)));
             }
-            // Not ported yet: `Aggregate` and a bare `Sort` (no operator yet)
-            // keep the stage pipeline.
+            // Not ported yet: `Aggregate`, and a `Sort` that is not fused into
+            // a `Top` (slice 6 gives sort its own operator).
             _ => return Ok(None),
         }
     }
+}
+
+/// A `Top` recognised in the plan: the sort keys, the limit, the offset and
+/// the input below the sort.
+type FusedTop<'a> = (
+    Vec<(infinity_expression::Expr, bool)>,
+    u64,
+    u64,
+    &'a LogicalPlan,
+);
+
+/// Recognises `[Limit] [Offset] Sort` and folds it into one `Top`.
+fn fuse_top(plan: &LogicalPlan) -> Option<FusedTop<'_>> {
+    let (limit, offset, rest) = match plan {
+        LogicalPlan::Limit { input, n } => match input.as_ref() {
+            LogicalPlan::Offset { input, n: offset } => (*n, *offset, input.as_ref()),
+            _ => (*n, 0, input.as_ref()),
+        },
+        LogicalPlan::Offset { input, n } => match input.as_ref() {
+            LogicalPlan::Limit { input, n: limit } => (*limit, *n, input.as_ref()),
+            _ => (u64::MAX, *n, input.as_ref()),
+        },
+        _ => return None,
+    };
+    match rest {
+        LogicalPlan::Sort { input, keys } => Some((keys.clone(), limit, offset, input.as_ref())),
+        _ => None,
+    }
+}
+
+/// Whether the lowered chain covers exactly the stages `Engine::decompose`
+/// finds, so `run_plan` knows the two views of the plan agree.
+///
+/// A `Top` covers the `Sort` it was fused with plus every `Limit`/`Offset`
+/// above it; the other operators cover one stage each.
+pub(crate) fn covers(operators: &[Box<dyn PhysicalOperator>], stages: &[crate::Stage]) -> bool {
+    let mut operator_index = 0;
+    let mut stage_index = 0;
+    while operator_index < operators.len() {
+        let Some(stage) = stages.get(stage_index) else {
+            return false;
+        };
+        match operators[operator_index].operator_type() {
+            PhysicalOperatorType::Projection if matches!(stage, crate::Stage::Projection(..)) => {}
+            PhysicalOperatorType::Filter if matches!(stage, crate::Stage::Filter(..)) => {}
+            PhysicalOperatorType::Limit
+                if matches!(stage, crate::Stage::Limit(_) | crate::Stage::Offset(_)) => {}
+            PhysicalOperatorType::Top if matches!(stage, crate::Stage::Sort { .. }) => {
+                // The fused sort, plus the limit/offset budgets above it.
+                stage_index += 1;
+                while stage_index < stages.len()
+                    && matches!(
+                        stages[stage_index],
+                        crate::Stage::Limit(_) | crate::Stage::Offset(_)
+                    )
+                {
+                    stage_index += 1;
+                }
+                operator_index += 1;
+                continue;
+            }
+            _ => return false,
+        }
+        operator_index += 1;
+        stage_index += 1;
+    }
+    stage_index == stages.len()
 }
 
 /// The column list the relation under `plan` produces.
@@ -164,6 +253,113 @@ mod tests {
             super::super::PhysicalOperatorType::Projection
         );
         assert_eq!(names, vec!["c2".to_string()]);
+    }
+
+    fn projection(input: LogicalPlan) -> LogicalPlan {
+        LogicalPlan::Projection {
+            input: Box::new(input),
+            exprs: vec![Expr::Column(0)],
+            names: vec!["c1".into()],
+        }
+    }
+
+    #[test]
+    fn lowers_a_limit_over_a_projection() {
+        let plan = LogicalPlan::Limit {
+            input: Box::new(projection(scan())),
+            n: 5,
+        };
+        let (operators, _) = lower(&plan).unwrap().unwrap();
+        assert_eq!(operators.len(), 2);
+        assert_eq!(
+            operators[0].operator_type(),
+            super::super::PhysicalOperatorType::Projection
+        );
+        assert_eq!(
+            operators[1].operator_type(),
+            super::super::PhysicalOperatorType::Limit
+        );
+    }
+
+    #[test]
+    fn an_offset_becomes_a_limit_with_an_offset_budget() {
+        let plan = LogicalPlan::Limit {
+            input: Box::new(LogicalPlan::Offset {
+                input: Box::new(projection(scan())),
+                n: 3,
+            }),
+            n: 5,
+        };
+        let (operators, _) = lower(&plan).unwrap().unwrap();
+        // Two stages, two operators (offset first, then the limit).
+        assert_eq!(operators.len(), 3);
+        assert_eq!(
+            operators[1].operator_type(),
+            super::super::PhysicalOperatorType::Limit
+        );
+        assert_eq!(
+            operators[2].operator_type(),
+            super::super::PhysicalOperatorType::Limit
+        );
+    }
+
+    #[test]
+    fn fuses_a_sort_and_its_limit_into_one_top() {
+        let plan = LogicalPlan::Limit {
+            input: Box::new(LogicalPlan::Sort {
+                input: Box::new(projection(scan())),
+                keys: vec![(Expr::Column(0), true)],
+            }),
+            n: 10,
+        };
+        let (operators, _) = lower(&plan).unwrap().unwrap();
+        assert_eq!(operators.len(), 2);
+        assert_eq!(
+            operators[1].operator_type(),
+            super::super::PhysicalOperatorType::Top
+        );
+    }
+
+    #[test]
+    fn a_sort_without_a_limit_still_falls_back() {
+        let plan = LogicalPlan::Sort {
+            input: Box::new(projection(scan())),
+            keys: vec![(Expr::Column(0), true)],
+        };
+        assert!(lower(&plan).unwrap().is_none());
+    }
+
+    #[test]
+    fn covers_accepts_the_chain_it_produced() {
+        let plan = LogicalPlan::Limit {
+            input: Box::new(LogicalPlan::Sort {
+                input: Box::new(projection(scan())),
+                keys: vec![(Expr::Column(0), true)],
+            }),
+            n: 10,
+        };
+        let (operators, _) = lower(&plan).unwrap().unwrap();
+        let stages = vec![
+            crate::Stage::Projection(vec![Expr::Column(0)], vec!["c1".into()]),
+            crate::Stage::Sort {
+                keys: vec![(Expr::Column(0), true)],
+            },
+            crate::Stage::Limit(10),
+        ];
+        assert!(covers(&operators, &stages));
+        // A chain longer than the stage list is rejected...
+        assert!(!covers(&operators, &stages[..1]));
+        // ...and so is one whose operator does not match the stage below it.
+        let mut with_aggregate = stages.clone();
+        with_aggregate.insert(
+            1,
+            crate::Stage::Aggregate {
+                group_keys: vec![Expr::Column(0)],
+                group_names: vec!["c1".into()],
+                aggs: Vec::new(),
+            },
+        );
+        assert!(!covers(&operators, &with_aggregate));
     }
 
     #[test]
