@@ -88,6 +88,10 @@ fn hnsw_record_size(dims: usize, encoding: infinity_index::vector::HnswEncoding)
 
 /// HNSW build options read from the catalog (`IndexHnsw`).
 struct HnswOptions {
+    /// `IndexHnsw::M_`.
+    m: usize,
+    /// `IndexHnsw::ef_construction_`.
+    ef_construction: usize,
     metric: infinity_index::vector::Metric,
     encoding: infinity_index::vector::HnswEncoding,
     lsg: Option<infinity_index::lsg::LsgConfig>,
@@ -96,6 +100,8 @@ struct HnswOptions {
 impl Default for HnswOptions {
     fn default() -> Self {
         Self {
+            m: 16,
+            ef_construction: 200,
             metric: infinity_index::vector::Metric::L2,
             encoding: infinity_index::vector::HnswEncoding::Plain,
             lsg: None,
@@ -1606,8 +1612,14 @@ impl Engine {
             )));
         }
         let dim = vectors[0].1.len();
-        let mut index =
-            HnswIndex::with_encoding(dim, 16, 200, 200, options.metric, options.encoding);
+        let mut index = HnswIndex::with_encoding(
+            dim,
+            options.m,
+            options.ef_construction,
+            options.ef_construction.max(64),
+            options.metric,
+            options.encoding,
+        );
         // Train LVQ/LS mean/RaBitQ centroid and the LSG averages on the whole
         // column, then build the graph with the trained store.
         let rows: Vec<Vec<f32>> = vectors.iter().map(|(_, v)| v.clone()).collect();
@@ -1657,6 +1669,10 @@ impl Engine {
             None
         };
         HnswOptions {
+            m: opt("M").and_then(|v| v.parse().ok()).unwrap_or(16),
+            ef_construction: opt("EF_CONSTRUCTION")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(200),
             metric,
             encoding,
             lsg,
@@ -2982,7 +2998,7 @@ fn file_stamp(path: &std::path::Path) -> (u64, u64) {
 fn encode_hnsw_chunk_from(index: &HnswIndex, labels: &[u32]) -> (usize, Vec<u8>) {
     let m = index.m() as u64;
     let (mmax0, mmax) = knn_format::get_mmax(m);
-    let ef_construction = 200u64.max(m);
+    let ef_construction = index.ef_construction() as u64;
     let max_layer = index.max_level() as i32;
     let enterpoint = index.entry_point().map(|e| e as i32).unwrap_or(0);
     let store_meta = index.store_meta_bytes();

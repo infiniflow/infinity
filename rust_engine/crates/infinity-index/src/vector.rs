@@ -416,6 +416,12 @@ impl HnswIndex {
     }
 
     /// C++ `InitAbstractIndexT`: plain/LVQ/RaBitQ stores for the chosen metric.
+    /// `IndexHnsw::ef_construction_` — written into the chunk header, so the
+    /// persisted graph must carry the user's value rather than a constant.
+    pub fn ef_construction(&self) -> usize {
+        self.ef_construction
+    }
+
     pub fn with_encoding(
         dims: usize,
         m: usize,
