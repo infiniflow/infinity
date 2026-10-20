@@ -527,7 +527,11 @@ fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
             &im.name,
             &table.table_name,
             &im.column,
-            opt_num("BLOCK_SIZE", 0),
+            // `IndexBMP::block_size_` is the block size the index was built
+            // with; the reference reads it back when it opens a chunk
+            // (`BMPHandler::Load`, which sizes its result vector by it), so a 0
+            // here makes every scan read an empty buffer.
+            opt_num("BLOCK_SIZE", 16),
             if opt_word("COMPRESS_TYPE", "compressed").eq_ignore_ascii_case("raw") {
                 value_format::bmp_compress::RAW
             } else {
