@@ -712,10 +712,10 @@
 | 703 | `IndexFullText` | `src/storage/definition/index_full_text.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 704 | `IndexHnsw` | `src/storage/definition/index_hnsw.cppm` | mapped | infinity_executor::data_table + infinity_storage::data_block 
 | 705 | `LSGConfig` | `src/storage/definition/index_hnsw.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 706 | `IndexIVF` | `src/storage/definition/index_ivf.cppm` | mapped | infinity_executor::data_table + infinity_storage::data_block 
-| 707 | `IndexIVFCentroidOption` | `src/storage/definition/index_ivf.cppm` | mapped | infinity_executor::data_table + infinity_storage::data_block 
-| 708 | `IndexIVFOption` | `src/storage/definition/index_ivf.cppm` | mapped | infinity_executor::data_table + infinity_storage::data_block 
-| 709 | `IndexIVFStorageOption` | `src/storage/definition/index_ivf.cppm` | mapped | infinity_executor::data_table + infinity_storage::data_block 
+| 706 | `IndexIVF` | `src/storage/definition/index_ivf.cppm` | mapped | `infinity_index::ivf_def::IndexIvf::{make,validate_column}`，由 `Engine::validate_index` 调用 
+| 707 | `IndexIVFCentroidOption` | `src/storage/definition/index_ivf.cppm` | mapped | `infinity_index::ivf_def::CentroidOption`；质心数按 `min(sqrt(n)·ratio, n/min_points)` 在镜像时取 
+| 708 | `IndexIVFOption` | `src/storage/definition/index_ivf.cppm` | mapped | `infinity_index::ivf_def::IvfOption`；`CREATE INDEX ... USING IVF` 的参数即经它解析 
+| 709 | `IndexIVFStorageOption` | `src/storage/definition/index_ivf.cppm` | mapped | `infinity_index::ivf_def::StorageOption`；镜像按 `storage_type` 写 plain/SQ/PQ，检索见 `ivf::{IvfIndex,IvfSqIndex,IvfPqIndex}` 
 | 710 | `IndexPLAID` | `src/storage/definition/index_plaid.cppm` | mapped | infinity_executor::data_table + infinity_storage::data_block 
 | 711 | `IndexSecondary` | `src/storage/definition/index_secondary.cppm` | mapped | infinity_executor::data_table + infinity_storage::data_block 
 | 712 | `IndexSecondaryFunctional` | `src/storage/definition/index_secondary_functional.cppm` | mapped | infinity_executor::data_table + infinity_storage::data_block 

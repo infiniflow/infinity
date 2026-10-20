@@ -184,7 +184,7 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 |---|---|---|---|
 | 全文倒排 | 自研 FST + `format/` + posting/block-max | `inverted_format` + `fulltext_segment`（`.dic/.pos/.len/.row`） | ✅ 字节兼容 |
 | 向量列存储 | 列/段文件 | `cpp_format` + `cpp_blocks`（真实块目录，可脱离 KV 读回） | ✅ 字节兼容（位张量与变长嵌套数组除外，按设计报错） |
-| 向量索引 | `chunk_<id>.idx` | `knn_format`（HNSW 图区、IVF plain/SQ/PQ） | ✅ 编解码字节兼容；HNSW 已用于检索，IVF 仅镜像 |
+| 向量索引 | `chunk_<id>.idx` | `knn_format`（HNSW 图区、IVF plain/SQ/PQ） | ✅ 编解码字节兼容；HNSW 与 IVF（含 SQ/PQ）均已用于检索 |
 | Catalog KV | RocksDB + C++ 键空间 | `metastore_rocks` + `catalog_format` + `value_format` + `cpp_layout` | ✅ `rocksdb-store` 下双向可读；默认构建仍为 fjall |
 | 稀疏 | BMP `ivt+fwd+doc_ids` | `bmp_cpp` | ✅ 字节兼容 + 检索 |
 | 多向量 | EMVB `SaveIndexInner` + OPQ | `emvb_segment` + `multivector_segment` | ✅ 写入与码字持久化；查询侧仍用原始 token 精确重排 |
@@ -448,7 +448,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 | **多向量** | ✅ 每 `ROW_ID` 段 `.emvb` + `.mvec`；`CREATE INDEX` 时物化，INSERT 进内存尾，`flush()` 封段 | ✅ `EMVBIndex::SaveIndexInner` 布局：粗聚类、`doc_lens`/offsets、质心分配、每质心 doc 列表、残差 PQ（8 子空间/8 bit）、OPQ 旋转 | ✅ 内存尾 | ✅ MaxSim + inner top-n；候选由持久化残差 PQ 打分（EMVB 第 2 步），最终按原始 token 精确重排 |
 | **次级** | ✅ 高基数 PGM / 低基数 Roaring 各一段；`CREATE INDEX` 物化，INSERT 进内存尾，`flush()` 封段 | ✅ `keys + offsets + PGMIndex<T,64,4>`；VARCHAR/JSON 键按 libstdc++ `std::hash<string_view>`（MurmurHash64A）存 u64；低基数用 `RoaringBitmap::WriteAdv` | ✅ 内存尾（仅上次封段后的行） | ✅ 近似位置 + 有界二分 + 全量兜底；布尔列自动走低基数；lookup 合并「封盘段 + 尾段」 |
 | **稀疏** | ✅ 每 `ROW_ID` 段一个 BMP 索引；`CREATE INDEX` 时物化，INSERT 进内存尾，`flush()` 封段 | ✅ `seg_*.bmp`，`bmp_cpp` 按 `BMPAlg::SaveToPtr` 的 `ivt+fwd+doc_ids`，地址对齐与 `GetSizeInBytesVecAligned` 一致 | ✅ 内存尾 | ✅ block-max 倒排、`kth(topk)` 阈值、上界降序、`alpha` 提前终止、`beta` 裁剪、tail；`SEARCH MATCH SPARSE` 已接入 |
-| **IVF** | ✅ 每 `chunk_<id>.idx` 一段 + 一个内存段 | ✅ plain/SQ/PQ 编解码 | ✅ 内存段：上次镜像后的向量 | ✅ **plain 检索已接入**：质心选择（l2/ip/cosine）+ `nprobe` 个 part 扫描 + 内存段并入候选 + 精确重排；SQ/PQ 仅格式编解码（镜像尚未写这两种编码） |
+| **IVF** | ✅ 每 `chunk_<id>.idx` 一段 + 一个内存段 | ✅ plain/SQ/PQ 编解码 | ✅ 内存段：上次镜像后的向量 | ✅ **plain/SQ/PQ 三种存储均已接入**：`IndexIVF::Make` 校验参数（metric 必填），`storage_type` 决定镜像写 `kPlain` / `kScalarQuantization`（残差码 + `dot_v_e`，a/b 按残差 trimmed min/max 训练）/ `kProductQuantization`（每子空间码本 + 4/8/12/16-bit 码）；质心数按 `min(sqrt(n)·ratio, n/min_points)` 取，检索 = 质心选择（l2/ip/cosine）+ `nprobe` 个 part + 内存段并入候选 + 精确重排 |
 
 **全文的段生命周期**：内存段达预算（默认 64 MiB，`INFINITY_TEXT_SEGMENT_BYTES` 覆盖）即写出 `ft_{rowid:016x}.{dic,pos,len}`；查询合并「封盘段 + 内存尾段」，语料统计与 postings 均按段合并；UPDATE 重写的行用 `overridden` 屏蔽旧副本。强制 4 KiB 预算跑完整 Gate A 仍 1752/129/1536。
 
@@ -478,7 +478,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 5. **多向量查询侧**：持久化残差码字已接入（EMVB 第 2 步：粗质心 + 子空间码字打分，见 `EmvbPqIndex::prefilter`），最终候选仍按原始 token 精确重排；PLAID（IVF 探测 + 残差精排）与 SMVE（投影 + BMP，候选按列值精确重排）已按类移植并接入 `MATCH TENSOR`。
 6. **全文非 OR 路径**：WAND 已覆盖 filter、`similarity=boolean`、`minimum_should_match`、`delta_term` 与多字段加权（`lib.rs` 的 `WandMode` + per-field 统计）；短语与 `rank_features` 仍走扫描路径（该路径本身已按索引裁剪候选行）。
-7. ~~IVF 检索~~：plain 已接入（#89）；SQ/PQ 编码的检索在镜像写出这两种编码前不可达。
+7. ~~IVF 检索~~：**已闭合**——plain/SQ/PQ 三种存储都已镜像写出并可检索（`storage_type = scalar_quantization` / `product_quantization`）；`ivf_def::IndexIvf::make` 已接入 `CREATE INDEX` 做与 C++ 相同的参数校验。
 
 #### 7.5.3 验收缺口（P2）
 

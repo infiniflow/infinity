@@ -30,7 +30,7 @@
 | `BMPAlg::SaveToPtr` | `bmp_cpp::write_bmp_file` / `BmpCppReader` | 保存/读取/`SearchKnn` | ✅ |
 | `EMVBIndex::SaveIndexInner` / `PQ::Save` | `emvb_segment::encode_emvb_refs` / `EmvbPqIndex` | 保存/预过滤 | ✅ |
 | `HnswIndex`（图区/头部） | `knn_format::encode/decode_hnsw_chunk` | 字节布局 | ✅ |
-| `IVF_Index_Storage::SearchIndex` | `infinity_index::ivf::IvfIndex::candidates` | 质心选择 + part 扫描 | ✅ |
+| `IVF_Index_Storage::SearchIndex` / `IVF_Parts_Storage_Info<kPlain|kScalarQuantization|kProductQuantization>` | `infinity_index::ivf::{IvfIndex, IvfSqIndex, IvfPqIndex}`（`IvfSegment` 统一三种存储） | 质心选择 + part 扫描；SQ = 残差码 + `dot_v_e`（a/b 按 trimmed min/max 训练），PQ = 每子空间码本 + `-0.5‖c‖²` 权重，三者都按 C++ 的 ip/cosine/l2 公式打分；`ivf_def::IndexIvf::make` 由 `CREATE INDEX` 调用做参数校验，镜像按 `storage_type` 写出对应 chunk | ✅ |
 | `Fst` 尾块/校验和 | `inverted_format` 的 FST 写入/`fst_len_from_trailer` | 保存/校验 | ✅ |
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | MurmurHash64A | ✅（g++ 值已 pin） |
 | `Utility`（`common/utility/utility.cppm`）/ `UnrecoverableException` / `RecoverableException` | `infinity_common::{trim_path, extract_u64_from_string_suffix, Error}` | `TrimPath`→`trim_path`、`ExtractU64FromStringSuffix`→`extract_u64_from_string_suffix`、`Error::Unrecoverable`（裸消息）/`Error::Unexpected`（`Unexpected error: …`） | ✅ |
