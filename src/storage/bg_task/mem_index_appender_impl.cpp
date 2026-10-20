@@ -70,7 +70,10 @@ void MemIndexAppender::Submit(std::shared_ptr<BGTask> bg_task) {
 void MemIndexAppender::Process() {
     std::deque<std::shared_ptr<BGTask>> tasks;
     StopProcessorTask *stop_task_{};
-    std::vector<MemoryIndexer *> memory_indexers;
+    // Hold a shared_ptr here: the same mem index can be popped and cleared by a concurrent
+    // mem-index dump between the two phases of the loop below, which used to leave these
+    // raw pointers dangling (use-after-free inside Ring::GetBatch).
+    std::vector<std::shared_ptr<MemoryIndexer>> memory_indexers;
     std::unordered_map<MemoryIndexer *, std::shared_ptr<AppendMemIndexBatch>> memory_indexer_map;
     while (true) {
         task_queue_.DequeueBulk(tasks);
@@ -88,13 +91,15 @@ void MemIndexAppender::Process() {
                     }
                     if (storage_mode == StorageMode::kWritable) {
                         auto append_mem_index_task = static_cast<AppendMemIndexTask *>(bg_task.get());
-                        std::shared_ptr<MemoryIndexer> memory_indexer = append_mem_index_task->mem_index_->GetFulltextIndex();
+                        // Use the indexer the task was prepared against, never re-resolve it from
+                        // mem_index_ (which may have been dumped, cleared or replaced meanwhile).
+                        std::shared_ptr<MemoryIndexer> memory_indexer = append_mem_index_task->memory_indexer_;
                         if (memory_indexer == nullptr) {
                             // Only used for full text index, currently
                             UnrecoverableError("Not inverted index");
                         }
                         if (memory_indexer_map.find(memory_indexer.get()) == memory_indexer_map.end()) {
-                            memory_indexers.push_back(memory_indexer.get());
+                            memory_indexers.push_back(memory_indexer);
                             memory_indexer_map.emplace(memory_indexer.get(), std::make_shared<AppendMemIndexBatch>());
                         }
                         AppendMemIndexBatch *append_mem_index_batch = memory_indexer_map[memory_indexer.get()].get();
@@ -115,8 +120,8 @@ void MemIndexAppender::Process() {
             }
         }
 
-        for (auto memory_indexer : memory_indexers) {
-            AppendMemIndexBatch *append_mem_index_batch = memory_indexer_map[memory_indexer].get();
+        for (auto &memory_indexer : memory_indexers) {
+            AppendMemIndexBatch *append_mem_index_batch = memory_indexer_map[memory_indexer.get()].get();
             append_mem_index_batch->WaitForCompletion();
             memory_indexer->CommitSync();
             for (auto &append_task : append_mem_index_batch->append_tasks_) {

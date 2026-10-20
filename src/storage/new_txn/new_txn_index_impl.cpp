@@ -796,6 +796,13 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     }
     LOG_INFO("AppendMemIndex: before GetMemIndex");
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex(true);
+    // GetMemIndex(true) has taken the update slot of the mem index. Release it on every exit
+    // path (including the many early returns below and exception unwinding), otherwise the
+    // slot stays taken forever and every later append / mem index dump on this index hangs.
+    struct UpdateEndGuard {
+        MemIndex *mem_index_;
+        ~UpdateEndGuard() { mem_index_->UpdateEnd(); }
+    } update_end_guard{mem_index.get()};
     LOG_INFO(fmt::format("AppendMemIndex: after GetMemIndex, ptr={}", static_cast<void *>(mem_index.get())));
     bool is_null = mem_index->IsNull();
     LOG_INFO(fmt::format("AppendMemIndex: is_null={}", is_null));
@@ -890,6 +897,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 // mem_index->GetFulltextIndex()->Insert(col_ptr, offset, row_cnt, false);
                 auto append_mem_index_task = std::make_shared<AppendMemIndexTask>(mem_index, col_ptr, offset, row_cnt);
                 memory_indexer->AsyncInsertTop(append_mem_index_task.get());
+                // Bind the indexer at submit time: seq_inserted_/doc_count_ above are only valid
+                // for this indexer. The appender must not resolve it again at dequeue time.
+                append_mem_index_task->memory_indexer_ = memory_indexer;
                 auto *mem_index_appender = InfinityContext::instance().storage()->mem_index_appender();
                 mem_index_appender->Submit(append_mem_index_task);
             }
@@ -1016,7 +1026,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             UnrecoverableError("Not implemented yet");
         }
     }
-    mem_index->UpdateEnd();
+    // UpdateEnd is invoked by update_end_guard on every exit path.
     LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateEnd: mem_index {:p}", static_cast<void *>(mem_index.get())));
 
     // // Trigger dump if necessary
@@ -2543,6 +2553,13 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetSMVEIndex() == nullptr)) {
         return Status::EmptyMemIndex();
     }
+    // Keep the popped index reachable from the transaction until it is resolved: on rollback it
+    // is put back into the catalog (its in-memory state is the only copy of these rows), on
+    // commit it is cleared by PostCommit. See PostRollback/PostCommit for kDumpMemIndex.
+    if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kDumpMemIndex) {
+        auto *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+        txn_store->dumped_mem_indexes_[segment_index_meta.segment_id()] = mem_index;
+    }
     mem_index->WaitUpdate();
     LOG_TRACE(fmt::format("NewTxn::DumpSegmentMemIndex WaitUpdate mem_index {:p}", static_cast<void *>(mem_index.get())));
 
@@ -2754,14 +2771,9 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
     }
 
-    mem_index->ClearMemIndex();
-    auto *storage = InfinityContext::instance().storage();
-    if (storage != nullptr) {
-        auto *memindex_tracer = storage->memindex_tracer();
-        if (memindex_tracer != nullptr) {
-            memindex_tracer->DumpDone(mem_index);
-        }
-    }
+    // The popped mem index is intentionally NOT cleared here: it is owned by the transaction
+    // until the dump is committed (PostCommit clears it), so that an aborted dump can put it
+    // back instead of silently losing the rows it contains.
     return Status::OK();
 }
 
@@ -2788,20 +2800,39 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
                       [](const ChunkIndexMetaInfo &lhs, const ChunkIndexMetaInfo &rhs) { return lhs.base_row_id_ < rhs.base_row_id_; });
     SegmentID segment_id = segment_meta.segment_id();
 
-    RowID start_row_id(segment_id, 0);
+    // The coverage of the dumped chunks is the union of their [base, base + row_cnt) intervals.
+    // It is not required to be contiguous: a chunk can be missing (aborted dump) or declare a
+    // narrower range than it really covers (rows without entries, e.g. nullable columns). Both
+    // used to be fatal here ("Chunk index row alignment error"); now they are treated as holes
+    // to be rebuilt, which is exactly what the recovery path is for.
+    std::vector<std::pair<SegmentOffset, SegmentOffset>> covered_ranges;
+    covered_ranges.reserve(chunk_index_meta_infos.size());
     for (const ChunkIndexMetaInfo &chunk_index_meta_info : chunk_index_meta_infos) {
-        if (chunk_index_meta_info.base_row_id_ != start_row_id) {
-            UnrecoverableError(fmt::format("Chunk index row alignment error: Expected {}.{} but got {}.{}",
-                                           start_row_id.segment_id_,
-                                           start_row_id.segment_offset_,
-                                           chunk_index_meta_info.base_row_id_.segment_id_,
-                                           chunk_index_meta_info.base_row_id_.segment_offset_));
-        }
-        start_row_id = chunk_index_meta_info.base_row_id_ + chunk_index_meta_info.row_cnt_;
+        const SegmentOffset begin = chunk_index_meta_info.base_row_id_.segment_offset_;
+        const SegmentOffset end = begin + chunk_index_meta_info.row_cnt_;
+        covered_ranges.emplace_back(begin, end);
         LOG_TRACE(fmt::format("CountMemIndexGapInSegment: Chunk index row id {}.{}, row count {}",
                               chunk_index_meta_info.base_row_id_.segment_id_,
                               chunk_index_meta_info.base_row_id_.segment_offset_,
                               chunk_index_meta_info.row_cnt_));
+    }
+    std::ranges::sort(covered_ranges);
+    std::vector<std::pair<SegmentOffset, SegmentOffset>> merged_covered_ranges;
+    merged_covered_ranges.reserve(covered_ranges.size());
+    for (const auto &[begin, end] : covered_ranges) {
+        if (!merged_covered_ranges.empty() && begin <= merged_covered_ranges.back().second) {
+            merged_covered_ranges.back().second = std::max(merged_covered_ranges.back().second, end);
+        } else {
+            merged_covered_ranges.emplace_back(begin, end);
+        }
+    }
+    for (size_t i = 1; i < merged_covered_ranges.size(); ++i) {
+        if (merged_covered_ranges[i - 1].second != merged_covered_ranges[i].first) {
+            LOG_WARN(fmt::format("CountMemIndexGapInSegment: segment {} has a gap in chunk coverage: [{}, {})",
+                                 segment_id,
+                                 merged_covered_ranges[i - 1].second,
+                                 merged_covered_ranges[i].first));
+        }
     }
 
     std::vector<BlockID> *block_ids_ptr = nullptr;
@@ -2812,27 +2843,90 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
     size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
     std::vector<BlockID> block_ids = *block_ids_ptr;
     std::ranges::sort(block_ids);
-    {
-        BlockID start_block_id = start_row_id.segment_offset_ / block_capacity;
-        BlockOffset block_offset = start_row_id.segment_offset_ % block_capacity;
-        size_t i = start_block_id;
-        if (i >= block_ids.size()) {
-            return Status::OK();
+    std::vector<size_t> block_row_cnts;
+    block_row_cnts.reserve(block_ids.size());
+    for (BlockID block_id : block_ids) {
+        BlockMeta block_meta(block_id, segment_meta);
+        size_t block_row_cnt = 0;
+        std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+        if (!status.ok()) {
+            return status;
         }
-        for (; i < block_ids.size(); ++i) {
-            BlockID block_id = block_ids[i];
-            BlockMeta block_meta(block_id, segment_meta);
-            size_t block_row_cnt = 0;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
-            if (!status.ok() || block_row_cnt == block_offset) {
-                return status;
-            }
-            append_ranges.emplace_back(RowID(segment_id, (static_cast<u32>(block_id) << BLOCK_OFFSET_SHIFT) + block_offset),
-                                       block_row_cnt - block_offset);
-            block_offset = 0;
+        block_row_cnts.push_back(block_row_cnt);
+    }
+    append_ranges = ComputeMemIndexGapRanges(segment_id, merged_covered_ranges, block_ids, block_row_cnts, block_capacity);
+    return Status::OK();
+}
+
+std::vector<std::pair<RowID, u64>> NewTxn::ComputeMemIndexGapRanges(SegmentID segment_id,
+                                                                    const std::vector<std::pair<SegmentOffset, SegmentOffset>> &covered_ranges,
+                                                                    const std::vector<BlockID> &block_ids,
+                                                                    const std::vector<size_t> &block_row_cnts,
+                                                                    size_t block_capacity) {
+    std::vector<std::pair<RowID, u64>> append_ranges;
+    if (block_capacity == 0 || block_ids.size() != block_row_cnts.size()) {
+        return append_ranges;
+    }
+    // Row ranges covered by chunks, sorted and then merged into disjoint ascending intervals.
+    std::vector<std::pair<SegmentOffset, SegmentOffset>> sorted_covered_ranges(covered_ranges);
+    std::ranges::sort(sorted_covered_ranges);
+    std::vector<std::pair<SegmentOffset, SegmentOffset>> merged_covered_ranges;
+    merged_covered_ranges.reserve(sorted_covered_ranges.size());
+    for (const auto &[begin, end] : sorted_covered_ranges) {
+        if (end <= begin) {
+            continue;
+        }
+        if (!merged_covered_ranges.empty() && begin <= merged_covered_ranges.back().second) {
+            merged_covered_ranges.back().second = std::max(merged_covered_ranges.back().second, end);
+        } else {
+            merged_covered_ranges.emplace_back(begin, end);
         }
     }
-    return Status::OK();
+
+    size_t covered_idx = 0;
+    SegmentOffset covered_rows = 0;
+    SegmentOffset emitted_rows = 0;
+    SegmentOffset total_rows = 0;
+    for (size_t i = 0; i < block_ids.size(); ++i) {
+        const SegmentOffset block_start = static_cast<SegmentOffset>(static_cast<u32>(block_ids[i]) << BLOCK_OFFSET_SHIFT);
+        const SegmentOffset block_end = block_start + static_cast<SegmentOffset>(block_row_cnts[i]);
+        total_rows += static_cast<SegmentOffset>(block_row_cnts[i]);
+        if (block_end <= block_start) {
+            continue; // empty block
+        }
+        while (covered_idx < merged_covered_ranges.size() && merged_covered_ranges[covered_idx].second <= block_start) {
+            ++covered_idx;
+        }
+        SegmentOffset cursor = block_start;
+        for (size_t j = covered_idx; j < merged_covered_ranges.size() && merged_covered_ranges[j].first < block_end; ++j) {
+            const SegmentOffset covered_begin = std::max(merged_covered_ranges[j].first, block_start);
+            const SegmentOffset covered_end = std::min(merged_covered_ranges[j].second, block_end);
+            if (covered_end <= cursor) {
+                continue;
+            }
+            if (covered_begin > cursor) {
+                append_ranges.emplace_back(RowID(segment_id, cursor), static_cast<u64>(covered_begin - cursor));
+                emitted_rows += covered_begin - cursor;
+            }
+            covered_rows += covered_end - std::max(covered_begin, cursor);
+            cursor = covered_end;
+        }
+        if (cursor < block_end) {
+            // Note: unlike the previous implementation, a block that is already fully covered
+            // does not stop the scan -- every later block is still inspected.
+            append_ranges.emplace_back(RowID(segment_id, cursor), static_cast<u64>(block_end - cursor));
+            emitted_rows += block_end - cursor;
+        }
+    }
+    // Every row that exists in the segment is either still covered by a chunk or must be rebuilt.
+    if (emitted_rows + covered_rows != total_rows) {
+        UnrecoverableError(fmt::format("Mem index gap computation is inconsistent: segment {}, emitted {}, covered {}, total rows {}",
+                                       segment_id,
+                                       emitted_rows,
+                                       covered_rows,
+                                       total_rows));
+    }
+    return append_ranges;
 }
 
 Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {

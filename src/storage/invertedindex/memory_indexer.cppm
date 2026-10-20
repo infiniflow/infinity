@@ -81,6 +81,17 @@ public:
     // InsertGap insert some empty documents. This is for abnormal case.
     void InsertGap(u32 row_count);
 
+    // Called when the inversion of one task failed. It keeps the sorted ring contiguous (a
+    // missing sequence number would stall every later commit forever) and remembers the task
+    // so that Dump() can re-invert it before the chunk is written. Doc ids are preserved,
+    // therefore a successful retry makes the row visible exactly where it belongs.
+    void MarkInvertFailed(u64 seq, const std::shared_ptr<ColumnVector> &column_vector, u32 row_offset, u32 row_count, u32 start_doc_id);
+
+    bool HasFailedInvertTasks() const {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return !failed_invert_tasks_.empty();
+    }
+
     // Commit is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
     void Commit(bool offline = false);
 
@@ -158,6 +169,18 @@ private:
 
     void TupleListToIndexFile(std::unique_ptr<SortMergerTermTuple<TermTuple, u32>> &merger);
 
+    struct FailedInvertTask {
+        std::shared_ptr<ColumnVector> column_vector_;
+        u32 row_offset_{0};
+        u32 row_count_{0};
+        u32 start_doc_id_{0};
+    };
+
+    // Re-invert all failed tasks. Called by Dump() after all in-flight tasks are committed and
+    // before the chunk is written, so a transient inversion failure can never turn into a chunk
+    // that claims rows it does not contain.
+    void RetryFailedInvertTasks();
+
 private:
     std::string index_dir_;
     std::string base_name_;
@@ -175,6 +198,8 @@ private:
     u64 inflight_tasks_{0};
     std::condition_variable cv_;
     mutable std::mutex mutex_;
+    // Guarded by mutex_. Tasks whose inversion threw; re-inverted by Dump().
+    std::vector<FailedInvertTask> failed_invert_tasks_;
     std::mutex mutex_commit_;
     std::shared_mutex mutex_commit_sync_share_;
 

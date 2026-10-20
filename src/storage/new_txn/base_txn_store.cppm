@@ -29,6 +29,7 @@ class IndexBase;
 class TableDef;
 struct EraseBaseCache;
 struct MetaKey;
+class MemIndex;
 
 export struct MemIndexRange {
     std::string index_id_{};
@@ -397,6 +398,10 @@ export struct DumpMemIndexTxnStore final : public BaseTxnStore {
     u64 index_id_{};
     std::vector<SegmentID> segment_ids_{};
     std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
+    // Mem indexes popped out of the catalog by this dump, kept alive until the transaction is
+    // resolved: a rollback must be able to put them back (their in-memory state cannot be
+    // rebuilt in place), while the commit path clears them. Never serialized to WAL.
+    std::map<SegmentID, std::shared_ptr<MemIndex>> dumped_mem_indexes_{};
     std::string table_key_{};
 
     std::string ToString() const final;
