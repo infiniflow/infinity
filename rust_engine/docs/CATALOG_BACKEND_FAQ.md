@@ -43,6 +43,26 @@ cd rust_engine && cargo build --release -p infinity-cli --features rocksdb-store
 
 ---
 
+## 2b. 探测、开关与转换
+
+**探测（自动）**：引擎打开一个目录时按目录内容选底座——先找 RocksDB 的标记（`CURRENT` / `MANIFEST-*`），没有再找 fjall 的（`keyspaces/`）。所以同一个二进制既能打开参考写的目录，也能打开本引擎写的目录；底座是**数据的属性**，不再是**构建的属性**。找不到标记（全新目录）时用构建的默认值。
+
+**开关（显式）**：`--catalog-engine=fjall|rocksdb`（或配置文件里的 `[storage] catalog_engine`）决定**新建**目录用哪种底座：
+
+```bash
+infinity serve /var/infinity --catalog-engine=rocksdb   # 写出的目录参考能直接打开
+infinity serve /var/infinity --catalog-engine=fjall     # 纯 Rust 存储
+```
+已存在的目录忽略这个开关：它按自己持有的底座打开。
+
+**转换（离线）**：`infinity-catalog-convert` 在两种底座之间搬一个数据目录的 store：
+
+```bash
+infinity-catalog-convert --dir <data-dir> --from fjall --to rocksdb   # 交给参考
+infinity-catalog-convert --dir <data-dir> --from rocksdb --to fjall   # 给纯 Rust 引擎读
+```
+复制走 `MetaStore` trait 而不是文件：fjall 对大 value 做了 LZ4 压缩，文件级拷贝会把压缩字节带进 RocksDB，参考读到的是垃圾。转换器是**唯一**依赖 RocksDB 底座的 crate，所以引擎可以只留在 fjall，跨引擎互操作变成一个显式的、可测试的步骤。目标 store 在源旁边建好再换入，失败时原目录不动；源 store 在换目录**之前**关闭——否则还没关的 store 会把 `CURRENT`/`MANIFEST` 刷进新目录，让探测选错底座。
+
 ## 3. fsync 在哪些点上
 
 **总原则**：写入路径**不**做逐条 fsync；屏障只在 checkpoint / shutdown / FLUSH。这与参考一致——参考的 WAL 走 RocksDB 且 `sync = false`，即「进程崩溃不丢、掉电可能丢」。
@@ -71,7 +91,8 @@ cd rust_engine && cargo build --release -p infinity-cli --features rocksdb-store
 3. **参考必须能在 WAL 里找到 checkpoint**：任何有数据的目录都要有 `kNewCheckpoint` 条目，`max_checkpoint_ts` 从它来。
 4. **变长列必须写 `col_{id}_out`**：`ColumnMeta::FilePaths` 会为 kVarBuffer 类型列出这个 outline 文件，缺失即 abort 整个块读取。
 5. **BMP 倒排表按列声明的 bound 定尺寸**（不是去重 term 数）：参考读该文件时段与段之间没有长度字段，term 数少一个就整体错位。
-6. **端口 23817**：参考不设 `SO_REUSEADDR`，上一个引擎没退干净就会 `Address already in use`；测试前 `pkill -x infinity`。
+6. **端口 23817**：参考不设 `SO_REUSEADDR`，上一个引擎没退干净就会 `Address already in use`；测试前 `pkill -x infinity`。另外，SDK 关闭连接后**服务端**会进 `TIME_WAIT`（Linux 60s），这期间参考绑不上 23817——所以端口等待要超过 60s。
+7. **索引数量会影响参考自己**：一张有 6 个索引的表让参考在自己的 index-dump 任务里 abort（"Dump index ... Aborted"，正在把全文索引的 FST 并进字典）。只有 2 个索引、其中一个是 DATE 次级索引时正常，所以触发条件更像是索引个数而不是类型；这条还没查清，跨引擎测试因此不给 DATE 列建次级索引。
 7. **数据目录必须落磁盘**，不能用 tmpfs（Gate C 的导入用例会把 tmpfs 撑爆并报 ENOSPC）。
 
 ---
