@@ -94,6 +94,17 @@ pub fn read_vint(buf: &[u8]) -> Result<(u64, usize), FormatError> {
     })
 }
 
+/// The number of bytes [`write_vint`] emits for `value`
+/// (`VByteCompressor::GetVInt32Length`/`GetVInt64Length`, `vbyte_compressor.cppm`).
+pub fn vint_len(mut value: u64) -> usize {
+    let mut len = 1;
+    while value >= 0x80 {
+        value >>= 7;
+        len += 1;
+    }
+    len
+}
+
 // ---------------------------------------------------------------------------
 // `.dic` — TermMeta records
 // ---------------------------------------------------------------------------
@@ -286,6 +297,17 @@ impl TermPostings {
             },
             used,
         ))
+    }
+
+    /// Bytes the position half of this slice occupies: `VInt pos_skip_len`,
+    /// `VInt pos_len` and the two streams. That is exactly
+    /// `TermMeta::pos_end - TermMeta::pos_start` in the reference
+    /// (`posting_writer_impl.cpp:58-62`).
+    pub fn pos_section_len(&self) -> usize {
+        self.pos_skiplist.len()
+            + self.pos_list.len()
+            + vint_len(self.pos_skiplist.len() as u64)
+            + vint_len(self.pos_list.len() as u64)
     }
 }
 

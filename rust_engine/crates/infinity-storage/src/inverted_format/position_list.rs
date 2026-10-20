@@ -9,7 +9,8 @@ use super::posting_slice::{
     FieldType, PostingByteSlice, PostingField, PostingFields, ReaderState, SkipListFormat,
     SkipListReader, SkipListWriter,
 };
-use crate::inverted_format::write_vint;
+use crate::cpp_format::FormatError;
+use crate::inverted_format::{decode_u32_block_all, vint_len, write_vint};
 
 /// `MAX_POS_PER_RECORD` (`index_defines.cppm:46`).
 pub const MAX_POS_PER_RECORD: usize = 128;
@@ -130,19 +131,29 @@ impl PositionListEncoder {
         decoder
     }
 
+    /// `PositionListEncoder::Dump`'s two streams, without the length prefixes:
+    /// the (`pos_skiplist`, `pos_list`) bodies the `.pos` framing wraps. Both
+    /// encoders are flushed first, exactly as `Dump` does.
+    pub fn parts(&mut self) -> (Vec<u8>, Vec<u8>) {
+        self.flush();
+        (self.skiplist.bytes().to_vec(), (*self.buffer.bytes).clone())
+    }
+
     /// `PositionListEncoder::Dump`.
     pub fn dump(&mut self, spill: bool) -> Vec<u8> {
         let mut out = Vec::new();
         if spill {
             write_vint(&mut out, u64::from(self.last_pos_in_cur_doc));
             write_vint(&mut out, u64::from(self.total_pos_count));
-        } else {
-            self.flush();
-            write_vint(&mut out, self.skiplist.bytes().len() as u64);
-            write_vint(&mut out, self.buffer.bytes.len() as u64);
+            out.extend_from_slice(self.skiplist.bytes());
+            out.extend_from_slice(&self.buffer.dump(spill));
+            return out;
         }
-        out.extend_from_slice(self.skiplist.bytes());
-        out.extend_from_slice(&self.buffer.dump(spill));
+        let (pos_skiplist, pos_list) = self.parts();
+        write_vint(&mut out, pos_skiplist.len() as u64);
+        write_vint(&mut out, pos_list.len() as u64);
+        out.extend_from_slice(&pos_skiplist);
+        out.extend_from_slice(&pos_list);
         out
     }
 
@@ -155,13 +166,30 @@ impl PositionListEncoder {
     }
 }
 
-fn vint_len(mut value: u64) -> usize {
-    let mut len = 1;
-    while value >= 0x80 {
-        value >>= 7;
-        len += 1;
+/// Decodes a dumped position-list stream (`PositionListEncoder::Dump`'s
+/// `pos_list` body) into the per-occurrence deltas it stores.
+///
+/// The stream is a run of `PostingByteSlice::DoFlush` blocks: each is the
+/// `IntEncoder<u32, SIMDBitPacking>` frame — a `u8` word count followed by the
+/// `CompositeCodec<SIMDBinaryPacking, VariableByte>` payload — holding at most
+/// `MAX_POS_PER_RECORD` delta-coded positions. The block count is not stored,
+/// so the stream is walked until its last byte (`PostingByteSliceReader`
+/// instead stops at `flush_length`, which for a sealed segment is its length).
+pub fn decode_position_list(bytes: &[u8]) -> Result<Vec<u32>, FormatError> {
+    let mut out = Vec::new();
+    let mut pos = 0usize;
+    while pos < bytes.len() {
+        let words = usize::from(bytes[pos]);
+        pos += 1;
+        let end = pos + words * 4;
+        let payload = bytes.get(pos..end).ok_or(FormatError::Truncated {
+            need: end,
+            got: bytes.len(),
+        })?;
+        out.extend_from_slice(&decode_u32_block_all(payload)?);
+        pos = end;
     }
-    len
+    Ok(out)
 }
 
 /// `InDocPositionState` (`in_doc_pos_state.cppm:13-58`).
@@ -482,6 +510,72 @@ mod tests {
             MAX_POS_PER_RECORD as u32 * SKIP_LIST_BUFFER_SIZE as u32 + 1,
             MAX_POS_PER_RECORD as u32 * SKIP_LIST_BUFFER_SIZE as u32 * 2 + 1,
         ]
+    }
+
+    #[test]
+    fn dump_frames_the_two_position_streams() {
+        // Two documents: positions `[1, 3]` then `[2]`. `AddPosition` stores the
+        // delta from the previous occurrence in the document, `EndDocument`
+        // resets it, so the stream is `[1, 2, 2]`.
+        let mut encoder = PositionListEncoder::new(OF_POSITION_LIST | OF_TERM_FREQUENCY);
+        for pos in [1u32, 3] {
+            encoder.add_position(pos);
+        }
+        encoder.end_document();
+        encoder.add_position(2);
+        encoder.end_document();
+
+        // `Dump` is the VInt-prefixed framing around the two streams.
+        let dumped = encoder.dump(false);
+        let (skiplist, pos_list) = encoder.parts();
+        let mut want = Vec::new();
+        write_vint(&mut want, skiplist.len() as u64);
+        write_vint(&mut want, pos_list.len() as u64);
+        assert_eq!((skiplist.len(), pos_list.len()), (18, 9));
+        want.extend_from_slice(&skiplist);
+        want.extend_from_slice(&pos_list);
+        assert_eq!(dumped, want);
+
+        // The position list is one 128-position block behind the
+        // `IntEncoder<u32>` word count; the values are the deltas above.
+        assert_eq!(
+            pos_list,
+            vec![0x02, 0x00, 0x00, 0x00, 0x00, 0x81, 0x82, 0x82, 0x00]
+        );
+        assert_eq!(decode_position_list(&pos_list).unwrap(), vec![1, 2, 2]);
+
+        // The skip list holds one item: the total position count and the byte
+        // size of the block it indexes (`AddItem(total_pos_count, flush_size)`).
+        assert_eq!(
+            skiplist,
+            vec![
+                0x02, 0x00, 0x00, 0x00, 0x00, 0x83, 0x00, 0x00, 0x00, // keys: [3]
+                0x02, 0x00, 0x00, 0x00, 0x00, 0x89, 0x00, 0x00, 0x00, // offsets: [9]
+            ]
+        );
+    }
+
+    #[test]
+    fn decode_position_list_walks_every_block() {
+        // More than one 128-position block, so the walk cannot rely on a
+        // length prefix.
+        let positions: Vec<u32> = (0..300).collect();
+        let mut encoder = PositionListEncoder::new(OF_POSITION_LIST | OF_TERM_FREQUENCY);
+        for pos in &positions {
+            encoder.add_position(*pos);
+        }
+        encoder.end_document();
+        let (_, pos_list) = encoder.parts();
+        let deltas = decode_position_list(&pos_list).unwrap();
+        assert_eq!(deltas.len(), positions.len());
+        let mut at = 0u32;
+        for delta in deltas {
+            at = at.wrapping_add(delta);
+        }
+        assert_eq!(at, 299);
+
+        // Truncating the last block is an error, not a short read.
+        assert!(decode_position_list(&pos_list[..pos_list.len() - 4]).is_err());
     }
 
     #[test]
