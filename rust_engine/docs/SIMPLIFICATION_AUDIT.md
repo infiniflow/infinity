@@ -140,6 +140,7 @@
 |---|---|---|---|
 | P1 | HTTP `/variables/*`、`/instance/{buffer,objects,queries,transactions,profiles,memindex,files,logs,memory}`、`/admin/logs` 等 14 条路由返回 501 | `infinity-server/src/http.rs`（`d385fb7c8`） | 缺 `Engine` accessor：`SetScope` 私有、`buffer_objects`/`active_transactions`/`profiles`/`memory_indexes`/`all_files`/`logs`/分配器统计。参考实现有 27 条路由 |
 | P2 | `global_variable_value()` 对 `buffer_object_count`/`unused_buffer_object`/`active_txn_count`/`total_rollback_count`/`bg_task_count`/`system_memory_usage`/`open_file_count`/`cpu_usage` 硬编码 `"0"` | `infinity-executor/src/lib.rs` | `SHOW VARIABLES`/HTTP 会报假值；需上面同一批 accessor |
+| P0 | WAL 帧格式是自创的，与参考的 `WalEntry` 布局完全不同 | `infinity-storage/src/wal.rs:27-95`（`WAL_MAGIC = "WAL1"`，帧 = `magic:u32 | size:u32 | crc:u32 | txn_id:u64 | commit_ts:u64 | payload`）；C++ `src/storage/wal/wal_entry_impl.cpp:2186-2240` 是 `WalEntryHeader{i32 size, u32 checksum, u64 txn_id, u64 commit_ts}` + `i32 cmd_count` + `WalCmd` 列表 + 末尾再写一次 `i32 size`，CRC32IEEE 覆盖整条（校验和字段置 0），**没有任何 magic** | `WAL1` 从第一个 Rust 提交 `71c5d044b` 就存在，是一开始就错误的设计：C++ 引擎打不开 Rust 写的 WAL，Rust 也读不了 C++ 的 WAL，所以「同一个数据目录换引擎」在崩溃恢复路径上必然失败——不是不兼容某个字段，而是两边根本不是同一种格式。要求：Rust **生成并读取与 C++ 完全相同的字节**（去掉 magic、对齐 header 字段序与宽度、末尾 size 副本、按参考的三道校验拒绝坏帧），并按 `WalCmd::WriteAdv` 对齐每种命令的负载；一次性格式破坏可接受（WAL 在 checkpoint 后是瞬态） |
 | P2 | `SHOW SEGMENTS` 的 `status` 恒为字面量 `"No value"` | `physical_show_segments_impl.cpp:37` | 参考实现本身也读已删除的 `SegmentEntry::status_`，属参考侧遗留，非遗漏 |
 
 ### 提交归属（2026-10-20）
