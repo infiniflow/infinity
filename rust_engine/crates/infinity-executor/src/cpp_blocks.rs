@@ -1801,13 +1801,18 @@ impl Engine {
         Ok(count)
     }
 
-    /// Optimizes every HNSW mirror: when the newest chunk does not cover all
-    /// live rows and the merge is affordable, writes a merged chunk with the
-    /// whole table (the reference's optimize step). A mirror whose newest
-    /// chunk already covers the table is left untouched, so repeated optimize
-    /// ticks are no-ops.
+    /// Optimizes every vector mirror: HNSW chunks are merged when the newest
+    /// one does not cover all live rows and the merge is affordable, PLAID
+    /// chunks are folded into one by [`Self::merge_cpp_plaid_index`] (the
+    /// reference's `OptimizeIndexInner` `kPLAID` case) as soon as a second
+    /// chunk exists. A mirror that is already merged is left untouched, so
+    /// repeated optimize ticks are no-ops.
     pub fn optimize_cpp_index_chunks(&self) -> Result<()> {
         for im in self.storage.catalog.list_indexes()? {
+            if im.index_type.eq_ignore_ascii_case("PLAID") {
+                let _ = self.merge_cpp_plaid_index(&im.table, &im.name);
+                continue;
+            }
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
                 continue;
             }
@@ -1864,12 +1869,40 @@ impl Engine {
         Ok(())
     }
 
-    /// Removes the HNSW chunks that a merged chunk supersedes. The reference
+    /// Removes the index chunks that a merged chunk supersedes. The reference
     /// only cleans up chunks after `optimize` merged every live row into the
     /// newest one; when the newest chunk does not cover the table, every
     /// chunk is still needed and is kept.
     pub fn cleanup_cpp_index_chunks(&self) -> Result<()> {
         for im in self.storage.catalog.list_indexes()? {
+            if im.index_type.eq_ignore_ascii_case("PLAID") {
+                // PLAID chunks carry their own document count in the header,
+                // so this mirrors `OptimizePlaidIndex`'s "the merged chunk
+                // holds every document of the older ones" without decoding.
+                // The merge drops its inputs itself; this reclaims them when
+                // that removal failed.
+                let Ok(mirror) = self.cpp_plaid_mirror(&im.table, &im.name) else {
+                    continue;
+                };
+                let chunks = hnsw_chunks(&mirror.dir);
+                let Some(((_, newest), older)) = chunks.split_last() else {
+                    continue;
+                };
+                let Some(newest_docs) = plaid_chunk_doc_num(newest) else {
+                    continue;
+                };
+                let superseded: u32 = older
+                    .iter()
+                    .filter_map(|(_, path)| plaid_chunk_doc_num(path))
+                    .sum();
+                if newest_docs < superseded {
+                    continue;
+                }
+                for (_, path) in older {
+                    let _ = std::fs::remove_file(path);
+                }
+                continue;
+            }
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
                 continue;
             }
@@ -2859,8 +2892,8 @@ impl Engine {
         Ok((total, index.to_bytes()))
     }
 
-    /// Writes `table`'s PLAID index as `idx_{id}/seg_0/chunk_0.idx`.
-    pub fn write_cpp_plaid_index(&self, table: &str, index_name: &str) -> Result<usize> {
+    /// Where a table's PLAID mirror lives and what it indexes.
+    fn cpp_plaid_mirror(&self, table: &str, index_name: &str) -> Result<PlaidMirror> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -2891,72 +2924,266 @@ impl Engine {
             .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
         let (_, dims, elem) = tensor_shape(&type_text)
             .ok_or_else(|| Error::Invalid(format!("not a tensor column: '{type_text}'")))?;
-        if elem != 6 {
+        let db_id = self.database_id_of(&table);
+        Ok(PlaidMirror {
+            dir: self
+                .blocks_root()
+                .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id)),
+            column,
+            dims: dims as u32,
+            elem,
+        })
+    }
+
+    /// Every `chunk_{id}.idx` of `table`'s PLAID mirror, decoded in chunk order.
+    fn read_plaid_chunks(&self, table: &str, index_name: &str) -> Result<Vec<PlaidChunkFile>> {
+        let mirror = self.cpp_plaid_mirror(table, index_name)?;
+        let nbits = self
+            .plaid_options(&self.qualified_table(table), index_name)
+            .nbits;
+        let mut chunks = Vec::new();
+        for (id, path) in hnsw_chunks(&mirror.dir) {
+            let bytes = std::fs::read(&path).map_err(|e| Error::Io {
+                path: path.clone(),
+                source: e,
+            })?;
+            let (index, _) =
+                PlaidIndex::from_bytes(0, mirror.dims, nbits, &bytes).map_err(|e| {
+                    Error::Invalid(format!("bad PLAID chunk '{}': {e}", path.display()))
+                })?;
+            chunks.push(PlaidChunkFile { id, path, index });
+        }
+        Ok(chunks)
+    }
+
+    /// Reads every chunk of `table`'s PLAID mirror individually.
+    pub fn read_cpp_plaid_chunks(&self, table: &str, index_name: &str) -> Result<Vec<PlaidIndex>> {
+        Ok(self
+            .read_plaid_chunks(table, index_name)?
+            .into_iter()
+            .map(|chunk| chunk.index)
+            .collect())
+    }
+
+    /// `PlaidIndex::InitializeMerge` → `MergeOneChunk` with a cumulative
+    /// `doc_offset` → `FinalizeMerge` → `CopyCentroidsFrom`, driven the way
+    /// `NewTxn::OptimizePlaidIndex` (`new_txn_index_impl.cpp:2348-2424`) drives
+    /// it.
+    fn merge_plaid_chunk_indexes(chunks: &[PlaidIndex]) -> Result<PlaidIndex> {
+        let first = chunks
+            .first()
+            .ok_or_else(|| Error::Invalid("no PLAID chunk to merge".into()))?;
+        let mut merged = PlaidIndex::new(
+            0,
+            first.embedding_dimension(),
+            first.nbits,
+            first.n_centroids(),
+            first.is_colbertsar_mode(),
+        )?;
+        merged.initialize_merge(first.n_centroids());
+        let mut doc_offset = 0u32;
+        for chunk in chunks {
+            if chunk.doc_num() == 0 {
+                continue;
+            }
+            merged.merge_one_chunk(chunk, doc_offset)?;
+            doc_offset += chunk.doc_num();
+        }
+        merged.finalize_merge();
+        // `preserve_ivf_lists = true`: `MergeOneChunk` already rebuilt them for
+        // the merged document ids.
+        merged.copy_centroids_from(
+            first.centroids_data(),
+            first.centroid_norms_neg_half(),
+            first.n_centroids(),
+            first.quantizer(),
+            true,
+        )?;
+        Ok(merged)
+    }
+
+    /// The optimize merge (`NewTxn::OptimizePlaidIndex`): folds every chunk
+    /// into one and appends it as the newest `chunk_{n}.idx`. The chunks it
+    /// folded in are dropped (the reference deprecates them in the chunk meta;
+    /// the mirror has no meta, so the files themselves are the record) —
+    /// [`Self::cleanup_cpp_index_chunks`] keeps the same rule as a safety net
+    /// for a removal that failed. Returns the merged document count.
+    pub fn merge_cpp_plaid_index(&self, table: &str, index_name: &str) -> Result<usize> {
+        let mirror = self.cpp_plaid_mirror(table, index_name)?;
+        let chunks = self.read_plaid_chunks(table, index_name)?;
+        if chunks.len() < 2 {
+            return Ok(chunks
+                .first()
+                .map(|c| c.index.doc_num() as usize)
+                .unwrap_or(0));
+        }
+        let next = chunks.last().map(|c| c.id + 1).unwrap_or(0);
+        let paths: Vec<PathBuf> = chunks.iter().map(|c| c.path.clone()).collect();
+        let indexes: Vec<PlaidIndex> = chunks.into_iter().map(|c| c.index).collect();
+        let merged = Self::merge_plaid_chunk_indexes(&indexes)?;
+        let path = mirror.dir.join(format!("chunk_{next}.idx"));
+        std::fs::write(&path, merged.to_bytes()).map_err(|e| Error::Io {
+            path: path.clone(),
+            source: e,
+        })?;
+        for old in paths {
+            let _ = std::fs::remove_file(old);
+        }
+        Ok(merged.doc_num() as usize)
+    }
+
+    /// Writes `table`'s PLAID index as `idx_{id}/seg_0/chunk_{n}.idx`, appending
+    /// one chunk per dump the way the reference's memory-index dump does: the
+    /// rows past the ones already mirrored become the new chunk, sharing the
+    /// first chunk's global centroids instead of retraining.
+    pub fn write_cpp_plaid_index(&self, table: &str, index_name: &str) -> Result<usize> {
+        let table = self.qualified_table(table);
+        let mirror = self.cpp_plaid_mirror(&table, index_name)?;
+        if mirror.elem != 6 {
             return Err(Error::Invalid(
                 "PLAID only indexes TENSOR(FLOAT, dim) columns".into(),
             ));
         }
         let options = self.plaid_options(&table, index_name);
-        let (count, bytes) = self.cpp_plaid_chunk(&table, &column, dims, &options)?;
-        let db_id = self.database_id_of(&table);
-        let dir = self
-            .blocks_root()
-            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id));
-        std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
-            path: dir.clone(),
+        std::fs::create_dir_all(&mirror.dir).map_err(|e| Error::Io {
+            path: mirror.dir.clone(),
             source: e,
         })?;
-        std::fs::write(dir.join("chunk_0.idx"), &bytes).map_err(|e| Error::Io {
-            path: dir.clone(),
+        let chunks = self.read_plaid_chunks(&table, index_name)?;
+        if chunks.is_empty() {
+            let (count, bytes) =
+                self.cpp_plaid_chunk(&table, &mirror.column, mirror.dims as usize, &options)?;
+            let path = mirror.dir.join("chunk_0.idx");
+            std::fs::write(&path, &bytes).map_err(|e| Error::Io {
+                path: path.clone(),
+                source: e,
+            })?;
+            return Ok(count);
+        }
+        // The mirrored rows are the concatenation of the chunks, so a new dump
+        // only carries the rows past that watermark. A merged newest chunk
+        // already covers the older ones and replaces them in the count.
+        let sizes: Vec<(u32, u32)> = chunks
+            .iter()
+            .map(|c| (c.index.doc_num(), c.index.total_embedding_num()))
+            .collect();
+        let (watermark, indexed) = plaid_coverage(&sizes);
+        let watermark = watermark as usize;
+        let docs = self.cpp_column_docs(&table, &mirror.column, mirror.dims as usize)?;
+        if docs.len() <= watermark {
+            return Ok(indexed as usize);
+        }
+        let fresh = &docs[watermark..];
+        let lens: Vec<u32> = fresh
+            .iter()
+            .map(|(_, tokens)| tokens.len() as u32)
+            .collect();
+        let total: usize = lens.iter().map(|len| *len as usize).sum();
+        if total == 0 {
+            return Ok(indexed as usize);
+        }
+        let flat: Vec<f32> = fresh
+            .iter()
+            .flat_map(|(_, tokens)| tokens.iter().flatten().copied())
+            .collect();
+        let first = &chunks[0].index;
+        let mut index = PlaidIndex::new(
+            0,
+            mirror.dims,
+            first.nbits,
+            first.n_centroids(),
+            first.is_colbertsar_mode(),
+        )?;
+        // `PlaidIndex::ShareGlobalCentroids`: a later chunk reuses the trained
+        // centroids and quantizer of the first one.
+        index.copy_centroids_from(
+            first.centroids_data(),
+            first.centroid_norms_neg_half(),
+            first.n_centroids(),
+            first.quantizer(),
+            false,
+        )?;
+        index.add_multiple_docs_embeddings(&flat, &lens)?;
+        let next = chunks.last().map(|c| c.id + 1).unwrap_or(0);
+        let path = mirror.dir.join(format!("chunk_{next}.idx"));
+        std::fs::write(&path, index.to_bytes()).map_err(|e| Error::Io {
+            path: path.clone(),
             source: e,
         })?;
-        Ok(count)
+        Ok(indexed as usize + total)
     }
 
-    /// Reads back a mirror written by [`Self::write_cpp_plaid_index`].
+    /// Reads back a mirror written by [`Self::write_cpp_plaid_index`]. A merged
+    /// newest chunk is read alone; otherwise the chunks are merged the same way
+    /// [`Self::merge_cpp_plaid_index`] merges them.
     pub fn read_cpp_plaid_index(&self, table: &str, index_name: &str) -> Result<PlaidIndex> {
-        let table = self.qualified_table(table);
-        let meta = self
-            .storage
-            .catalog
-            .get_table_by_name(&table)?
-            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        let index_id = self.cpp_index_position(&table, index_name)?;
-        let column = self
-            .storage
-            .catalog
-            .list_indexes()?
-            .into_iter()
-            .find(|im| {
-                im.name == index_name
-                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
-            })
-            .map(|im| im.column)
-            .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
-        let ci = meta
-            .columns
-            .iter()
-            .position(|c| c == &column)
-            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
-        let type_text = meta
-            .types
-            .get(ci)
-            .cloned()
-            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
-        let (_, dims, _) = tensor_shape(&type_text)
-            .ok_or_else(|| Error::Invalid(format!("not a tensor column: '{type_text}'")))?;
-        let options = self.plaid_options(&table, index_name);
-        let db_id = self.database_id_of(&table);
-        let path = self.blocks_root().join(format!(
-            "db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx",
-            meta.id
-        ));
-        let bytes = std::fs::read(&path)
-            .map_err(|_| Error::NotFound(format!("no PLAID mirror at {}", path.display())))?;
-        let (index, _) = PlaidIndex::from_bytes(0, dims as u32, options.nbits, &bytes)
-            .map_err(|e| Error::Invalid(format!("bad PLAID chunk: {e}")))?;
-        Ok(index)
+        let chunks = self.read_plaid_chunks(table, index_name)?;
+        let doc_nums: Vec<u32> = chunks.iter().map(|c| c.index.doc_num()).collect();
+        let mut indexes: Vec<PlaidIndex> = if plaid_merged_tail(&doc_nums) {
+            // The merge already folded every older chunk into the newest one.
+            chunks.into_iter().rev().take(1).map(|c| c.index).collect()
+        } else {
+            chunks.into_iter().map(|c| c.index).collect()
+        };
+        match indexes.len() {
+            0 => Err(Error::NotFound(format!(
+                "no PLAID mirror for '{index_name}'"
+            ))),
+            1 => Ok(indexes.remove(0)),
+            _ => Self::merge_plaid_chunk_indexes(&indexes),
+        }
     }
+}
+
+/// Where a table's PLAID mirror lives and what it indexes.
+struct PlaidMirror {
+    dir: PathBuf,
+    column: String,
+    dims: u32,
+    /// SDK `ElementType` code of the tensor element (6 = float).
+    elem: i32,
+}
+
+/// One `chunk_{id}.idx` of a PLAID mirror.
+struct PlaidChunkFile {
+    id: u64,
+    path: PathBuf,
+    index: PlaidIndex,
+}
+
+/// Whether the newest chunk of a mirror already holds every document the older
+/// ones hold, i.e. it is the output of an optimize merge. A merge drops the
+/// chunks it folded in; this is what tells a reader (and a leftover set of
+/// files whose removal failed) to count the newest chunk alone.
+fn plaid_merged_tail(doc_nums: &[u32]) -> bool {
+    match doc_nums.split_last() {
+        Some((newest, older)) if !older.is_empty() => *newest >= older.iter().sum::<u32>(),
+        _ => false,
+    }
+}
+
+/// `(documents, embeddings)` the chunks of a mirror already hold, in chunk-id
+/// order, counting a merged newest chunk instead of the ones it supersedes.
+fn plaid_coverage(sizes: &[(u32, u32)]) -> (u32, u32) {
+    let doc_nums: Vec<u32> = sizes.iter().map(|size| size.0).collect();
+    match sizes.last() {
+        Some(&newest) if plaid_merged_tail(&doc_nums) => newest,
+        _ => (
+            sizes.iter().map(|size| size.0).sum(),
+            sizes.iter().map(|size| size.1).sum(),
+        ),
+    }
+}
+
+/// `PlaidIndex::SaveIndexInner`'s header: `format_version`,
+/// `start_segment_offset`, `embedding_dimension`, `nbits`, `n_centroids`,
+/// `n_docs`. Reading the count from the header avoids decoding a chunk that
+/// cleanup only has to look at.
+fn plaid_chunk_doc_num(path: &std::path::Path) -> Option<u32> {
+    use std::io::Read;
+    let mut head = [0u8; 24];
+    std::fs::File::open(path).ok()?.read_exact(&mut head).ok()?;
+    Some(u32::from_le_bytes(head[20..24].try_into().ok()?))
 }
 
 /// PLAID index parameters from `WITH (nbits=…, n_centroids=…)`.
@@ -3752,6 +3979,171 @@ mod tests {
                 vec!["1".to_string(), "[1,2,3]".to_string()],
                 vec!["2".to_string(), "[4,5,6]".to_string()],
             ]
+        );
+    }
+
+    /// `TENSOR(FLOAT,2)` rows `lo..hi`, three tokens each.
+    fn plaid_rows(lo: usize, hi: usize) -> String {
+        let mut values = Vec::new();
+        for i in lo..hi {
+            let mut tokens = Vec::new();
+            for j in 0..3 {
+                let x = (i % 5) as f32 * 0.5 + j as f32 * 0.25;
+                let y = ((i + j) % 4) as f32 - 1.0;
+                tokens.push(format!("[{x},{y}]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        values.join(",")
+    }
+
+    /// `CREATE INDEX … USING PLAID` over `plaid_rows(0, first)` plus a second
+    /// batch, flushed between the batches.
+    fn plaid_mirror_with_two_chunks(dir: &std::path::Path) -> Engine {
+        let engine = Engine::open(dir).unwrap();
+        engine
+            .execute("CREATE TABLE pc (id INT, t TENSOR(FLOAT,2));")
+            .unwrap();
+        engine
+            .execute(&format!("INSERT INTO pc VALUES {};", plaid_rows(0, 200)))
+            .unwrap();
+        engine
+            .execute("CREATE INDEX pidx ON pc (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
+            .unwrap();
+        engine.flush().unwrap();
+        engine
+            .execute(&format!("INSERT INTO pc VALUES {};", plaid_rows(200, 260)))
+            .unwrap();
+        engine.flush().unwrap();
+        engine
+    }
+
+    /// Every mem-index dump appends a chunk (`GetAndSetNextChunkID`), and a
+    /// later chunk shares the first one's global centroids instead of
+    /// retraining them.
+    #[test]
+    fn plaid_dump_appends_a_chunk_per_batch() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = plaid_mirror_with_two_chunks(dir.path());
+
+        let chunks = engine.read_cpp_plaid_chunks("pc", "pidx").unwrap();
+        assert_eq!(chunks.len(), 2, "each flush appends one chunk");
+        assert_eq!(chunks[0].doc_num(), 200);
+        assert_eq!(chunks[1].doc_num(), 60, "only the rows past the watermark");
+        assert_eq!(chunks[1].total_embedding_num(), 180);
+        assert_eq!(
+            chunks[1].is_colbertsar_mode(),
+            chunks[0].is_colbertsar_mode()
+        );
+        assert_eq!(chunks[1].n_centroids(), chunks[0].n_centroids());
+        assert_eq!(chunks[1].centroids_data(), chunks[0].centroids_data());
+        assert_eq!(
+            chunks[1].centroid_norms_neg_half(),
+            chunks[0].centroid_norms_neg_half()
+        );
+
+        // A flush with nothing new must not append an empty chunk.
+        engine.flush().unwrap();
+        let chunks = engine.read_cpp_plaid_chunks("pc", "pidx").unwrap();
+        assert_eq!(chunks.len(), 2);
+        // The read path merges the chunks back into one index.
+        let merged = engine.read_cpp_plaid_index("pc", "pidx").unwrap();
+        assert_eq!(merged.doc_num(), 260);
+        assert_eq!(merged.total_embedding_num(), 780);
+    }
+
+    /// `OptimizePlaidIndex`: `InitializeMerge` → `MergeOneChunk` with a running
+    /// `doc_offset` → `FinalizeMerge` → `CopyCentroidsFrom`, then cleanup drops
+    /// the superseded chunks. A wrong `doc_offset` shifts every document id, so
+    /// the scores are compared document by document.
+    #[test]
+    fn plaid_optimize_merges_chunks_preserving_doc_offsets() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = plaid_mirror_with_two_chunks(dir.path());
+        let query = "SELECT id FROM pc SEARCH MATCH TENSOR \
+                     (t, [[0.5,0.0],[1.0,-1.0]], 'float', 'maxsim', 'topn=5');";
+        let before_rows = row_strings(&engine, query);
+        assert_eq!(before_rows.len(), 5);
+
+        let chunks = engine.read_cpp_plaid_chunks("pc", "pidx").unwrap();
+        assert_eq!(chunks.len(), 2);
+        let dir = engine.cpp_plaid_mirror("pc", "pidx").unwrap().dir;
+        let chunk_bytes: Vec<Vec<u8>> = (0..2)
+            .map(|id| std::fs::read(dir.join(format!("chunk_{id}.idx"))).unwrap())
+            .collect();
+        // Exact MaxSim of every mirrored document, with the id the merged index
+        // must give it: chunk 1 follows chunk 0.
+        let probe: Vec<f32> = vec![0.5, 0.0, 1.0, -1.0];
+        let mut expected: Vec<f32> = Vec::new();
+        for chunk in &chunks {
+            let ids: Vec<u32> = (0..chunk.doc_num()).collect();
+            expected.extend(chunk.exact_score_batch(&probe, 2, &ids));
+        }
+        assert_eq!(expected.len(), 260);
+        let token_offset = chunks[0].total_embedding_num();
+
+        engine.optimize_indexes().unwrap();
+        let merged = engine.read_cpp_plaid_chunks("pc", "pidx").unwrap();
+        assert_eq!(
+            merged.len(),
+            1,
+            "the merge replaces the chunks it folded in"
+        );
+        let merged = &merged[0];
+        assert_eq!(merged.doc_num(), 260);
+        assert_eq!(
+            merged.total_embedding_num(),
+            chunks[0].total_embedding_num() + chunks[1].total_embedding_num()
+        );
+        assert_eq!(merged.n_centroids(), chunks[0].n_centroids());
+        assert_eq!(merged.centroids_data(), chunks[0].centroids_data());
+        // Document 200 of the merge points just past chunk 0's tokens.
+        assert_eq!(
+            merged.doc_offsets()[200],
+            token_offset + chunks[1].doc_offsets()[0]
+        );
+        let ids: Vec<u32> = (0..260).collect();
+        let got = merged.exact_score_batch(&probe, 2, &ids);
+        for (i, score) in got.iter().enumerate() {
+            assert!(
+                (score - expected[i]).abs() < 1e-6,
+                "doc {i}: merged {score} != unmerged {}",
+                expected[i]
+            );
+        }
+
+        // A merge whose removal failed leaves the superseded chunks behind; the
+        // cleanup pass is what reclaims them.
+        std::fs::write(dir.join("chunk_0.idx"), &chunk_bytes[0]).unwrap();
+        std::fs::write(dir.join("chunk_1.idx"), &chunk_bytes[1]).unwrap();
+        assert_eq!(engine.read_cpp_plaid_chunks("pc", "pidx").unwrap().len(), 3);
+        engine.cleanup().unwrap();
+        let after = engine.read_cpp_plaid_chunks("pc", "pidx").unwrap();
+        assert_eq!(after.len(), 1, "cleanup drops the superseded chunks");
+        assert_eq!(after[0].doc_num(), 260);
+        assert_eq!(
+            row_strings(&engine, query),
+            before_rows,
+            "the search path answers the same rows after the merge"
+        );
+    }
+
+    /// The watermark a dump resumes from: chunks are additive until a merged
+    /// newest chunk covers them.
+    #[test]
+    fn plaid_coverage_counts_a_merged_newest_chunk_once() {
+        assert_eq!(plaid_coverage(&[(200, 600)]), (200, 600));
+        assert_eq!(plaid_coverage(&[(200, 600), (60, 180)]), (260, 780));
+        assert_eq!(
+            plaid_coverage(&[(200, 600), (60, 180), (260, 780)]),
+            (260, 780),
+            "the merged chunk replaces the ones it was built from"
+        );
+        // A new batch on top of a merge is additive again.
+        assert_eq!(
+            plaid_coverage(&[(260, 780), (10, 30)]),
+            (270, 810),
+            "an incremental chunk after a merge still adds up"
         );
     }
 }
