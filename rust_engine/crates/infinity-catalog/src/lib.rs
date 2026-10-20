@@ -358,6 +358,28 @@ pub struct Catalog {
 /// behind (`catalog_format.rs`).
 const CPP_KEY_PREFIXES: [&str; 5] = ["catalog|", "db|", "tbl|", "col|", "idx|"];
 
+/// One entry of a catalog commit: `Some(value)` writes the key, `None` deletes
+/// it (`MetaStore::atomic_batch`).
+pub type BatchItem = (Vec<u8>, Option<Vec<u8>>);
+
+/// Keeps only the last operation on each key of a batch.
+///
+/// A C++-layout rewrite deletes every key the layout owns and then writes the
+/// live ones back, so the same key can appear as a delete and a put in one
+/// batch. Collapsing duplicates makes the outcome (last write wins)
+/// independent of how a backend orders operations inside one commit.
+fn last_op_per_key(mut items: Vec<BatchItem>) -> Vec<BatchItem> {
+    let mut seen: std::collections::HashSet<Vec<u8>> = Default::default();
+    let mut out: Vec<BatchItem> = Vec::with_capacity(items.len());
+    for item in items.drain(..).rev() {
+        if seen.insert(item.0.clone()) {
+            out.push(item);
+        }
+    }
+    out.reverse();
+    out
+}
+
 impl Catalog {
     pub fn with_store(store: Arc<dyn MetaStore>) -> Self {
         Self {
@@ -467,42 +489,52 @@ impl Catalog {
     /// Republished the whole C++ layout from `dbs`/`tables`/`indexes` after
     /// first deleting every record the layout owns, so a dropped entity cannot
     /// survive as a stale key.
+    ///
+    /// The deletes and the rewritten records reach the store as **one**
+    /// `atomic_batch`: a crash between the sweep and the rewrite would leave a
+    /// partially emptied `catalog|`/`tbl|`/`col|` layout, which is exactly the
+    /// bytes the C++ engine reads on the next open.
     fn rewrite_cpp(
         &self,
         dbs: &[String],
         tables: &[TableMeta],
         indexes: &[IndexMeta],
     ) -> Result<()> {
-        for prefix in CPP_KEY_PREFIXES {
-            for (k, _) in self.store.scan_prefix(prefix.as_bytes())? {
-                self.store.delete(&k)?;
-            }
-        }
-        for k in ["next_database_id", "next_table_id", "meta|version"] {
-            self.store.delete(k.as_bytes())?;
-        }
-        self.write_cpp_layout_from(self.store.as_ref(), dbs, tables, indexes)?;
-        Ok(())
+        let mut batch = self.cpp_layout_sweep(self.store.as_ref())?;
+        batch.extend(self.write_cpp_layout_batch(dbs, tables, indexes)?);
+        self.store.atomic_batch(&last_op_per_key(batch))
     }
 
     /// Republishes the whole C++ layout from the **current** native catalog,
     /// deleting every record the layout owns first. A checkpoint must call
     /// this (not [`Self::write_cpp_layout`]) so a dropped database, table or
     /// index cannot survive as a stale key that `import_cpp_layout` would
-    /// resurrect on the next open.
+    /// resurrect on the next open. Like [`Self::rewrite_cpp`], the sweep and
+    /// the rewrite are one commit.
     pub fn rewrite_cpp_layout(&self, store: &dyn MetaStore) -> Result<usize> {
         let dbs = self.list_databases()?;
         let tables = self.list_tables()?;
         let indexes = self.list_indexes()?;
+        let layout = self.write_cpp_layout_batch(&dbs, &tables, &indexes)?;
+        let written = layout.len();
+        let mut batch = self.cpp_layout_sweep(store)?;
+        batch.extend(layout);
+        store.atomic_batch(&last_op_per_key(batch))?;
+        Ok(written)
+    }
+
+    /// The deletes a C++-layout rewrite performs before writing the layout.
+    fn cpp_layout_sweep(&self, store: &dyn MetaStore) -> Result<Vec<BatchItem>> {
+        let mut deletes: Vec<BatchItem> = Vec::new();
         for prefix in CPP_KEY_PREFIXES {
             for (k, _) in store.scan_prefix(prefix.as_bytes())? {
-                store.delete(&k)?;
+                deletes.push((k, None));
             }
         }
         for k in ["next_database_id", "next_table_id", "meta|version"] {
-            store.delete(k.as_bytes())?;
+            deletes.push((k.as_bytes().to_vec(), None));
         }
-        self.write_cpp_layout_from(store, &dbs, &tables, &indexes)
+        Ok(deletes)
     }
 
     fn read_counter(&self) -> Result<u64> {
@@ -513,26 +545,30 @@ impl Catalog {
             .unwrap_or(0))
     }
 
-    fn alloc_id(&self) -> Result<u64> {
+    /// The next table id, plus the counter value that must be committed with it.
+    ///
+    /// The caller holds `counter_lock` and commits both in one batch, so the
+    /// counter can never run ahead of the table record (`alloc_id` used to
+    /// commit it on its own, leaving a gap if the process died right after).
+    fn reserve_table_id(&self) -> Result<(u64, u64)> {
         if self.cpp_only {
             // No native counter: the id is one past the highest table id, which
             // is exactly what `write_cpp_layout_from` derives from the tables.
-            return Ok(self
+            let next = self
                 .cpp_tables()?
                 .iter()
                 .map(|t| t.id)
                 .max()
-                .map_or(0, |v| v + 1));
+                .map_or(0, |v| v + 1);
+            return Ok((next, next + 1));
         }
-        let _g = self.counter_lock.lock().unwrap();
         // Table ids start at 0, as the C++ engine's do; the counter holds the
         // next id to hand out.
         let mut next = self.read_counter()?;
         while self.store.get(&table_key(next))?.is_some() {
             next += 1;
         }
-        self.store.put(COUNTER_KEY, &(next + 1).to_le_bytes())?;
-        Ok(next)
+        Ok((next, next + 1))
     }
 
     /// Creates a table with the given column names; fails if the name exists.
@@ -614,7 +650,11 @@ impl Catalog {
         if self.get_view_by_name(name)?.is_some() {
             return Err(Error::Catalog(format!("view '{name}' already exists")));
         }
-        let id = self.alloc_id()?;
+        // The counter is committed in the same batch as the table, so its lock
+        // must be held until the batch lands: two concurrent `CREATE TABLE`s
+        // must not claim one id.
+        let _counter = self.counter_lock.lock().unwrap();
+        let (id, next_counter) = self.reserve_table_id()?;
         let (types, sparse_stores) = normalize_types(types, sparse_stores, columns.len());
         let meta = TableMeta {
             id,
@@ -633,10 +673,13 @@ impl Catalog {
             self.rewrite_cpp(&self.cpp_databases()?, &tables, &self.cpp_indexes()?)?;
             return Ok(meta);
         }
-        self.store.atomic_write(&[
-            (table_key(id), meta.encode()),
-            (name_key(name), id.to_le_bytes().to_vec()),
-            (COUNTER_KEY.to_vec(), (id + 1).to_le_bytes().to_vec()),
+        self.store.atomic_batch(&[
+            (table_key(id), Some(meta.encode())),
+            (name_key(name), Some(id.to_le_bytes().to_vec())),
+            (
+                COUNTER_KEY.to_vec(),
+                Some(next_counter.to_le_bytes().to_vec()),
+            ),
         ])?;
         Ok(meta)
     }
@@ -820,8 +863,10 @@ impl Catalog {
         }
         match self.get_table_by_name(name)? {
             Some(t) => {
-                self.store.delete(&table_key(t.id))?;
-                self.store.delete(&name_key(name))?;
+                // Both keys commit together: a crash can never leave the name
+                // pointing at a table record that is already gone.
+                self.store
+                    .atomic_batch(&[(table_key(t.id), None), (name_key(name), None)])?;
                 Ok(true)
             }
             None => Ok(false),
@@ -849,11 +894,13 @@ impl Catalog {
             self.rewrite_cpp(&self.cpp_databases()?, &tables, &indexes)?;
             return Ok(());
         }
-        self.store.atomic_write(&[
-            (table_key(meta.id), meta.encode()),
-            (name_key(new), meta.id.to_le_bytes().to_vec()),
+        // One batch: the new name must never exist while the old one still
+        // resolves to the same table.
+        self.store.atomic_batch(&[
+            (table_key(meta.id), Some(meta.encode())),
+            (name_key(new), Some(meta.id.to_le_bytes().to_vec())),
+            (name_key(old), None),
         ])?;
-        self.store.delete(&name_key(old))?;
         Ok(())
     }
 
@@ -971,16 +1018,18 @@ impl Catalog {
             self.rewrite_cpp(&self.cpp_databases()?, &self.cpp_tables()?, &indexes)?;
             return Ok(meta);
         }
-        self.store
-            .put(&index_key(table, name), meta.encode().as_slice())?;
+        // The declaration and the legacy-record cleanup are one commit, so the
+        // index is never listed twice after a crash.
+        let mut batch: Vec<BatchItem> = vec![(index_key(table, name), Some(meta.encode()))];
         // Drop a pre-scoping `idx:{name}` record for the same table so the
         // index is not listed twice.
         let legacy = format!("idx:{name}").into_bytes();
         if let Some(v) = self.store.get(&legacy)? {
             if IndexMeta::decode(name.as_bytes(), &v)?.table == table {
-                self.store.delete(&legacy)?;
+                batch.push((legacy, None));
             }
         }
+        self.store.atomic_batch(&batch)?;
         Ok(meta)
     }
 
@@ -1008,18 +1057,21 @@ impl Catalog {
             self.rewrite_cpp(&self.cpp_databases()?, &self.cpp_tables()?, &indexes)?;
             return Ok(true);
         }
-        let mut existed = false;
-        for (k, _) in self.store.scan_prefix(INDEX_PREFIX)? {
-            let meta = match self.store.get(&k)? {
-                Some(v) => IndexMeta::decode(&k[INDEX_PREFIX.len()..], &v)?,
-                None => continue,
-            };
+        // The name is shared by every table that owns it, so all of its
+        // records go in one commit: a crash cannot leave the index alive on
+        // half of them.
+        let mut deletes: Vec<BatchItem> = Vec::new();
+        for (k, v) in self.store.scan_prefix(INDEX_PREFIX)? {
+            let meta = IndexMeta::decode(&k[INDEX_PREFIX.len()..], &v)?;
             if meta.name == name {
-                self.store.delete(&k)?;
-                existed = true;
+                deletes.push((k, None));
             }
         }
-        Ok(existed)
+        if deletes.is_empty() {
+            return Ok(false);
+        }
+        self.store.atomic_batch(&deletes)?;
+        Ok(true)
     }
 
     /// Drops `table`'s index named `name`. Two tables may own an index with the
@@ -1038,7 +1090,7 @@ impl Catalog {
         }
         let key = index_key(table, name);
         if self.store.get(&key)?.is_some() {
-            self.store.delete(&key)?;
+            self.store.atomic_batch(&[(key, None)])?;
             return Ok(true);
         }
         // Pre-scoping record: only remove it when it belongs to this table.
@@ -1046,7 +1098,7 @@ impl Catalog {
         if let Some(v) = self.store.get(&legacy)? {
             let meta = IndexMeta::decode(name.as_bytes(), &v)?;
             if meta.table == table || meta.table == short {
-                self.store.delete(&legacy)?;
+                self.store.atomic_batch(&[(legacy, None)])?;
                 return Ok(true);
             }
         }
@@ -1305,5 +1357,271 @@ mod tests {
         assert!(c.drop_table("d").unwrap());
         assert!(c.get_table_by_name("d").unwrap().is_none());
         assert!(!c.drop_table("d").unwrap());
+    }
+
+    /// Write counters for a [`CountingStore`], so a test can assert that a DDL
+    /// commits once and touches nothing outside its batch.
+    #[derive(Default)]
+    struct Counts {
+        puts: std::sync::atomic::AtomicUsize,
+        deletes: std::sync::atomic::AtomicUsize,
+        batches: std::sync::atomic::AtomicUsize,
+        batch_items: std::sync::atomic::AtomicUsize,
+    }
+
+    impl Counts {
+        fn reset(&self) {
+            use std::sync::atomic::Ordering::SeqCst;
+            self.puts.store(0, SeqCst);
+            self.deletes.store(0, SeqCst);
+            self.batches.store(0, SeqCst);
+            self.batch_items.store(0, SeqCst);
+        }
+        fn get(&self, what: &str) -> usize {
+            use std::sync::atomic::Ordering::SeqCst;
+            match what {
+                "puts" => self.puts.load(SeqCst),
+                "deletes" => self.deletes.load(SeqCst),
+                "batches" => self.batches.load(SeqCst),
+                "items" => self.batch_items.load(SeqCst),
+                other => panic!("unknown counter {other}"),
+            }
+        }
+    }
+
+    /// Passes every operation through and counts the write calls.
+    struct CountingStore {
+        inner: Arc<dyn MetaStore>,
+        counts: Arc<Counts>,
+    }
+
+    impl MetaStore for CountingStore {
+        fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+            self.inner.get(key)
+        }
+
+        fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+            self.counts
+                .puts
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner.put(key, value)
+        }
+
+        fn delete(&self, key: &[u8]) -> Result<()> {
+            self.counts
+                .deletes
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner.delete(key)
+        }
+
+        fn atomic_batch(&self, items: &[(Vec<u8>, Option<Vec<u8>>)]) -> Result<()> {
+            self.counts
+                .batches
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.counts
+                .batch_items
+                .fetch_add(items.len(), std::sync::atomic::Ordering::SeqCst);
+            self.inner.atomic_batch(items)
+        }
+
+        fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            self.inner.scan_prefix(prefix)
+        }
+
+        fn count_prefix(&self, prefix: &[u8]) -> Result<usize> {
+            self.inner.count_prefix(prefix)
+        }
+
+        fn flush(&self) -> Result<()> {
+            self.inner.flush()
+        }
+    }
+
+    fn counting_catalog(dir: &std::path::Path, cpp_only: bool) -> (Catalog, Arc<Counts>) {
+        let inner: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(dir, "catalog").unwrap());
+        let counts = Arc::new(Counts::default());
+        let store: Arc<dyn MetaStore> = Arc::new(CountingStore {
+            inner,
+            counts: counts.clone(),
+        });
+        let catalog = if cpp_only {
+            Catalog::with_store_cpp_only(store)
+        } else {
+            Catalog::with_store(store)
+        };
+        (catalog, counts)
+    }
+
+    /// `DROP TABLE` is one commit: the name and the table record go together.
+    #[test]
+    fn drop_table_is_one_batch() {
+        let dir = tempdir().unwrap();
+        {
+            let (c, counts) = counting_catalog(dir.path(), false);
+            c.create_table("d", &cols(&["a"])).unwrap();
+            counts.reset();
+            assert!(c.drop_table("d").unwrap());
+            assert_eq!(counts.get("batches"), 1);
+            assert_eq!(counts.get("items"), 2);
+            assert_eq!(counts.get("puts"), 0);
+            assert_eq!(counts.get("deletes"), 0);
+        }
+        // What a reopened catalog sees: the name is gone, not just the record.
+        let c = Catalog::open(dir.path()).unwrap();
+        assert!(c.get_table_by_name("d").unwrap().is_none());
+        assert!(c.list_tables().unwrap().is_empty());
+    }
+
+    /// `RENAME TABLE` is one commit: the table, the new name and the removal of
+    /// the old name land together.
+    #[test]
+    fn rename_table_is_one_batch() {
+        let dir = tempdir().unwrap();
+        let (c, counts) = counting_catalog(dir.path(), false);
+        let created = c.create_table("old", &cols(&["a"])).unwrap();
+        counts.reset();
+        c.rename_table("old", "new").unwrap();
+        assert_eq!(counts.get("batches"), 1);
+        assert_eq!(counts.get("items"), 3);
+        assert_eq!(counts.get("puts"), 0);
+        assert_eq!(counts.get("deletes"), 0);
+        assert!(c.get_table_by_name("old").unwrap().is_none());
+        let renamed = c.get_table_by_name("new").unwrap().unwrap();
+        assert_eq!(renamed.id, created.id);
+        assert_eq!(renamed.name, "new");
+    }
+
+    /// `CREATE INDEX` writes the declaration and removes a legacy `idx:{name}`
+    /// record in one commit, so the index can never be listed twice.
+    #[test]
+    fn create_index_with_a_legacy_record_is_one_batch() {
+        let dir = tempdir().unwrap();
+        let (c, counts) = counting_catalog(dir.path(), false);
+        c.create_table("t", &cols(&["doc"])).unwrap();
+        let legacy = IndexMeta {
+            name: "idx".into(),
+            table: "t".into(),
+            column: "doc".into(),
+            index_type: "FULLTEXT".into(),
+            options: vec![],
+            id: 1,
+        };
+        c.store()
+            .put(b"idx:idx", &legacy.encode())
+            .expect("seed the legacy record");
+        counts.reset();
+        c.create_index_typed("idx", "t", "doc", "FULLTEXT", &[])
+            .unwrap();
+        assert_eq!(counts.get("batches"), 1);
+        assert_eq!(counts.get("items"), 2);
+        assert_eq!(counts.get("puts"), 0);
+        assert_eq!(counts.get("deletes"), 0);
+        assert!(c.store().get(b"idx:idx").unwrap().is_none());
+        assert_eq!(c.list_indexes().unwrap().len(), 1);
+    }
+
+    /// `DROP INDEX` removes the name from every table that owns it in one
+    /// commit.
+    #[test]
+    fn drop_index_across_two_tables_is_one_batch() {
+        let dir = tempdir().unwrap();
+        let (c, counts) = counting_catalog(dir.path(), false);
+        c.create_table("t1", &cols(&["doc"])).unwrap();
+        c.create_table("t2", &cols(&["doc"])).unwrap();
+        c.create_index_typed("shared", "t1", "doc", "FULLTEXT", &[])
+            .unwrap();
+        c.create_index_typed("shared", "t2", "doc", "FULLTEXT", &[])
+            .unwrap();
+        counts.reset();
+        assert!(c.drop_index("shared").unwrap());
+        assert_eq!(counts.get("batches"), 1);
+        assert_eq!(counts.get("items"), 2);
+        assert_eq!(counts.get("puts"), 0);
+        assert_eq!(counts.get("deletes"), 0);
+        assert!(c.list_indexes().unwrap().is_empty());
+    }
+
+    /// The table-qualified drop, used by `DROP TABLE` and `ALTER`, is a commit
+    /// too.
+    #[test]
+    fn drop_index_on_is_one_batch() {
+        let dir = tempdir().unwrap();
+        let (c, counts) = counting_catalog(dir.path(), false);
+        c.create_table("t", &cols(&["doc"])).unwrap();
+        c.create_index_typed("i", "t", "doc", "FULLTEXT", &[])
+            .unwrap();
+        counts.reset();
+        assert!(c.drop_index_on("t", "i").unwrap());
+        assert_eq!(counts.get("batches"), 1);
+        assert_eq!(counts.get("items"), 1);
+        assert_eq!(counts.get("puts"), 0);
+        assert_eq!(counts.get("deletes"), 0);
+        assert!(c.list_indexes().unwrap().is_empty());
+    }
+
+    /// In C++-only mode every DDL republishes the whole layout; the prefix
+    /// sweep and the rewrite are one commit, so a crash cannot leave a
+    /// partially emptied layout for the C++ engine to read.
+    #[test]
+    fn cpp_only_ddl_is_one_batch() {
+        let dir = tempdir().unwrap();
+        let (c, counts) = counting_catalog(dir.path(), true);
+        c.create_database("db2", false).unwrap();
+        c.create_table_typed(
+            "db2.t",
+            &cols(&["id", "name"]),
+            &[None, None],
+            &[false, false],
+            &["INTEGER".into(), "VARCHAR".into()],
+            &[None, None],
+        )
+        .unwrap();
+        counts.reset();
+        assert!(c.drop_table("db2.t").unwrap());
+        assert_eq!(counts.get("batches"), 1);
+        assert_eq!(counts.get("puts"), 0);
+        assert_eq!(counts.get("deletes"), 0);
+        assert!(c.get_table_by_name("db2.t").unwrap().is_none());
+        assert!(c.list_databases().unwrap().contains(&"db2".to_string()));
+    }
+
+    /// The batched writer must produce byte-identical records to the direct
+    /// one — this is the layout the C++ engine reads.
+    #[test]
+    fn write_cpp_layout_batch_matches_the_direct_writer() {
+        let src = tempdir().unwrap();
+        let dst = tempdir().unwrap();
+        let c = Catalog::open(src.path()).unwrap();
+        c.create_database("db2", false).unwrap();
+        c.create_table_typed(
+            "db2.t",
+            &cols(&["id", "name"]),
+            &[None, None],
+            &[false, false],
+            &["INTEGER".into(), "VARCHAR".into()],
+            &[None, None],
+        )
+        .unwrap();
+        c.create_index_typed("i", "db2.t", "name", "FULLTEXT", &[])
+            .unwrap();
+        let dbs = c.list_databases().unwrap();
+        let tables = c.list_tables().unwrap();
+        let indexes = c.list_indexes().unwrap();
+
+        let batch: std::collections::BTreeMap<Vec<u8>, Vec<u8>> = c
+            .write_cpp_layout_batch(&dbs, &tables, &indexes)
+            .unwrap()
+            .into_iter()
+            .map(|(k, v)| (k, v.expect("the layout writer only writes")))
+            .collect();
+
+        let direct: Arc<dyn MetaStore> =
+            Arc::new(FjallMetaStore::open(dst.path(), "catalog").unwrap());
+        c.write_cpp_layout(direct.as_ref()).unwrap();
+        let written: std::collections::BTreeMap<Vec<u8>, Vec<u8>> =
+            direct.scan_prefix(b"").unwrap().into_iter().collect();
+
+        assert!(!batch.is_empty());
+        assert_eq!(batch, written);
     }
 }

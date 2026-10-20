@@ -727,6 +727,25 @@ impl Catalog {
         Ok(written)
     }
 
+    /// The `(key, value)` pairs [`Catalog::write_cpp_layout_from`] would write,
+    /// without writing them.
+    ///
+    /// A DDL publishes the whole C++ layout at once (`rewrite_cpp`), and it must
+    /// reach the store as a single `MetaStore::atomic_batch`: a crash between
+    /// the prefix deletes and the rewrite is exactly the half-written catalog
+    /// the C++ engine would read. Going through the same writer keeps the bytes
+    /// identical to the direct path.
+    pub fn write_cpp_layout_batch(
+        &self,
+        dbs: &[String],
+        tables: &[TableMeta],
+        indexes: &[IndexMeta],
+    ) -> Result<Vec<crate::BatchItem>> {
+        let recorder = LayoutBatch::new();
+        self.write_cpp_layout_from(&recorder, dbs, tables, indexes)?;
+        Ok(recorder.into_items())
+    }
+
     /// Materializes a **C++-layout** catalog (as written by
     /// [`Catalog::write_cpp_layout`], or by the C++ engine itself) into this
     /// native catalog, so the engine can open a directory the C++ engine wrote
@@ -1372,5 +1391,53 @@ mod empty_default_probe {
                 .as_deref(),
             Some("")
         );
+    }
+}
+
+/// A `MetaStore` that records writes instead of applying them, so the C++ layout
+/// writer can feed a single `atomic_batch` (see [`Catalog::write_cpp_layout_batch`]).
+///
+/// The writer only ever calls `put` (plus one `flush`), so the read methods are
+/// unreachable in practice; they return "absent" rather than panicking.
+struct LayoutBatch(std::sync::Mutex<Vec<crate::BatchItem>>);
+
+impl LayoutBatch {
+    fn new() -> Self {
+        Self(std::sync::Mutex::new(Vec::new()))
+    }
+
+    fn into_items(self) -> Vec<crate::BatchItem> {
+        self.0.into_inner().unwrap()
+    }
+}
+
+impl MetaStore for LayoutBatch {
+    fn get(&self, _key: &[u8]) -> Result<Option<Vec<u8>>> {
+        Ok(None)
+    }
+
+    fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+        self.0
+            .lock()
+            .unwrap()
+            .push((key.to_vec(), Some(value.to_vec())));
+        Ok(())
+    }
+
+    fn delete(&self, key: &[u8]) -> Result<()> {
+        self.0.lock().unwrap().push((key.to_vec(), None));
+        Ok(())
+    }
+
+    fn scan_prefix(&self, _prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        Ok(Vec::new())
+    }
+
+    fn count_prefix(&self, _prefix: &[u8]) -> Result<usize> {
+        Ok(0)
+    }
+
+    fn flush(&self) -> Result<()> {
+        Ok(())
     }
 }
