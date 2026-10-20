@@ -150,7 +150,7 @@
 | P1 | `result_cache` 默认值与参考相反 | `Engine::result_cache_active()`；C++ `DEFAULT_RESULT_CACHE = "off"`（`src/common/default_values.cppm:211`） | **已修**（`fd4d8677f`）：配置缺失时不再缓存、`SHOW CONFIG` 默认改为 off、缓存关闭时按 `ExecuteShowGlobalVariables` 整行省略 `cache_result_capacity`；同时 `cache_result_capacity` 不再泄漏 `usize::MAX` 哨兵（`80dddcc71`） |
 
 | P1 | Rust 写出的目录 C++ 报 `segment_count = 0` | ✅ 已修 | 一串独立的缺陷叠在一起：`dc6361ab3` 写出 `catalog|seg|…`/`catalog|blk|…`/段标签/表上的 `next_segment_id`；数据库编号从 0 基改成参考的 1 基；`a3e415a40` 把每个索引的封盘 chunk 镜像进 `idx_{id}/seg_0/` 并发布 `catalog|idx_chunk|…|chunk_info`；`79a9d8808` 为变长列补上参考必读的 `col_{id}_out`（`ColumnMeta::FilePaths` 列出它，缺失即 abort 整个读路径）；`e92f34f8b` 发布真实的 BMP `block_size`（`BMPHandler::Load` 按它定结果向量大小）；`99b8a7c26` 让 BMP 倒排表按列声明的 bound 定尺寸（参考按维度建 `BMPAlg`，而参考读文件时段间没有长度字段，term 数少 2 就整体偏移 32 字节）。**证据**：跨引擎测试两个方向都通过，参考能 `RecoverMemIndex ... append_ranges 1: [(0, 200)]` |
-| P2 | SPARSE 列的 `show_columns` 类型文本两引擎不一致 | ⚠️ 仍存在（已登记） | 同一份 C++ 写出的 catalog：C++ 打印 `Sparse(float,int8,0)`，Rust 打印 `Sparse(float,int32,8)`。两边读的是同一份存储字节，说明只是**渲染**不同（参考的 `SparseInfo` 显示丢掉了 bound、把索引宽度压成 1 字节），不是解码不同。跨引擎测试因此把该列比对到元素类型（`Sparse(float`）为止，元素类型与 bound 的存储值由 BMP ivt 的 term 空间间接验证（`99b8a7c26` 使 chunk 字节数与参考一致）。 |
+| P2 | SPARSE 列的 `show_columns` 类型文本两引擎不一致 | ✅ 已修 | 参考打印 `Sparse(float,int32,8)`，端口打印 `Sparse(float,int8,0)`：`describe_type` 按**两字段** `SPARSE(elem,bound)` 解析，于是把索引类型当成了 bound（解析失败 → 0），再按 bound 反推索引宽度（→ int8）。规范写法是**三字段** `SPARSE(elem,index,bound)`，两字段形式才从 bound 反推宽度（参考的 `SparseInfo::GetIndexType`）。修正后端口与参考打印一致，`describe_type_names` 把每种类型的拼写都钉住。**影响**：此前参考读到端口写的 catalog 后，稀疏列的 bound 变成 0，于是它的稀疏索引没有段（`Cannot find segment with id: 0`）——这条 P1 的现场之一也是它造成的 |
 
 ## 处置口径
 

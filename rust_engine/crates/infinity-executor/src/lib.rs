@@ -1135,15 +1135,35 @@ fn describe_type(type_text: &str) -> String {
             "bigint" => "int64",
             _ => raw.as_str(),
         };
-        let bound: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
-        let idx = if bound <= 127 {
-            "int8"
-        } else if bound <= 32767 {
-            "int16"
-        } else if bound <= 2_147_483_647 {
-            "int32"
+        // The canonical spelling is `SPARSE(<elem>,<index>,<bound>)`; the
+        // two-field `SPARSE(<elem>,<bound>)` leaves the index to be derived
+        // from the bound (the reference's `SparseInfo::GetIndexType`).
+        let (index_text, bound_text): (Option<&str>, &str) = if parts.len() >= 3 {
+            (parts.get(1).copied(), parts.get(2).copied().unwrap_or("0"))
         } else {
-            "int64"
+            (None, parts.get(1).copied().unwrap_or("0"))
+        };
+        let bound: u64 = bound_text.parse().unwrap_or(0);
+        let idx = match index_text {
+            Some(name) => match name.to_ascii_lowercase().as_str() {
+                "int8" | "tinyint" | "uint8" => "int8",
+                "int16" | "smallint" => "int16",
+                "int" | "integer" | "int32" => "int32",
+                "int64" | "bigint" => "int64",
+                _ => "int8",
+            },
+            // No declared index: the reference derives the width from the bound.
+            None => {
+                if bound <= 127 {
+                    "int8"
+                } else if bound <= 32767 {
+                    "int16"
+                } else if bound <= 2_147_483_647 {
+                    "int32"
+                } else {
+                    "int64"
+                }
+            }
         };
         return format!("Sparse({elem},{idx},{bound})");
     }
@@ -1182,9 +1202,19 @@ fn describe_type(type_text: &str) -> String {
         "SMALLINT" => "SmallInt".to_string(),
         "INT" | "INTEGER" => "Integer".to_string(),
         "BIGINT" => "BigInt".to_string(),
+        "HUGEINT" => "HugeInt".to_string(),
+        "DECIMAL" => "Decimal".to_string(),
         "FLOAT" => "Float".to_string(),
         "DOUBLE" => "Double".to_string(),
+        "FLOAT16" => "Float16".to_string(),
+        "BFLOAT16" => "BFloat16".to_string(),
         "VARCHAR" | "TEXT" | "STRING" => "Varchar".to_string(),
+        "DATE" => "Date".to_string(),
+        "TIME" => "Time".to_string(),
+        "DATETIME" => "DateTime".to_string(),
+        "TIMESTAMP" => "Timestamp".to_string(),
+        "INTERVAL" => "Interval".to_string(),
+        "JSON" => "Json".to_string(),
         _ => {
             let mut c = base.to_ascii_lowercase();
             if let Some(f) = c.get_mut(0..1) {
@@ -20237,6 +20267,40 @@ mod tests {
             describe_type("SPARSE(FLOAT,10000000000)"),
             "Sparse(float,int64,10000000000)"
         );
+        // The three-field spelling keeps the *declared* index type; the
+        // reference prints the same text for a `sparse,8,float,int` column
+        // ("Sparse(float,int32,8)"), and the type text is part of the
+        // catalogue the two engines exchange.
+        assert_eq!(
+            describe_type("SPARSE(FLOAT,INT32,8)"),
+            "Sparse(float,int32,8)"
+        );
+        assert_eq!(
+            describe_type("SPARSE(FLOAT,INT8,8)"),
+            "Sparse(float,int8,8)"
+        );
+        // The reference's spelling of every plain type.
+        for (text, expected) in [
+            ("BOOLEAN", "Boolean"),
+            ("TINYINT", "TinyInt"),
+            ("SMALLINT", "SmallInt"),
+            ("INTEGER", "Integer"),
+            ("BIGINT", "BigInt"),
+            ("HUGEINT", "HugeInt"),
+            ("FLOAT", "Float"),
+            ("DOUBLE", "Double"),
+            ("FLOAT16", "Float16"),
+            ("BFLOAT16", "BFloat16"),
+            ("VARCHAR", "Varchar"),
+            ("DATE", "Date"),
+            ("TIME", "Time"),
+            ("DATETIME", "DateTime"),
+            ("TIMESTAMP", "Timestamp"),
+            ("INTERVAL", "Interval"),
+            ("JSON", "Json"),
+        ] {
+            assert_eq!(describe_type(text), expected, "{text}");
+        }
     }
 
     #[test]
