@@ -1275,13 +1275,7 @@ impl Engine {
             } else if im.index_type.eq_ignore_ascii_case("PLAID") {
                 let _ = self.write_cpp_plaid_index(&im.table, &im.name);
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
-                let k = im
-                    .options
-                    .iter()
-                    .find(|(key, _)| key.eq_ignore_ascii_case("CENTROID_COUNT"))
-                    .and_then(|(_, v)| v.trim().parse().ok())
-                    .unwrap_or(16);
-                let _ = self.write_cpp_ivf_index(&im.table, &im.name, k);
+                let _ = self.write_cpp_ivf_index(&im.table, &im.name);
             }
         }
         Ok(())
@@ -2253,7 +2247,10 @@ impl Engine {
         &self,
         table: &str,
         column: &str,
-        centroid_count: usize,
+        storage: &str,
+        sq_bits: u8,
+        ratio: f32,
+        min_points: usize,
     ) -> Result<(usize, Vec<u8>)> {
         let vectors = self.cpp_column_vectors(table, column)?;
         if vectors.is_empty() {
@@ -2262,7 +2259,11 @@ impl Engine {
             )));
         }
         let dim = vectors[0].1.len();
-        let k = centroid_count.clamp(1, vectors.len());
+        // C++ `IVF_Index_Data::Train`: `min(sqrt(n) * ratio, n / min_points)`,
+        // raised to 1 when that underflows (`ivf_index_data_impl.cpp:195-201`).
+        let k = ((vectors.len() as f64).sqrt() * ratio as f64)
+            .min((vectors.len() / min_points.max(1)) as f64) as usize;
+        let k = k.clamp(1, vectors.len());
         // Deterministic seeding: pick k evenly spaced vectors.
         let mut centroids: Vec<Vec<f32>> = (0..k)
             .map(|c| vectors[c * vectors.len() / k].1.clone())
@@ -2307,6 +2308,19 @@ impl Engine {
             }
         }
 
+        let header = knn_format::IvfChunkHeader {
+            row_count: vectors.len() as u32,
+            embedding_count: vectors.len() as u32,
+            dimension: dim as u32,
+            centroid_count: k as u32,
+        };
+        if storage.eq_ignore_ascii_case("scalar_quantization") {
+            let flat: Vec<f32> = centroids.iter().flatten().copied().collect();
+            let chunk = Self::encode_ivf_scalar_quantized(
+                &header, &flat, &vectors, &assign, sq_bits,
+            )?;
+            return Ok((vectors.len(), chunk));
+        }
         let mut parts = vec![knn_format::IvfPlainPart::default(); k];
         for (i, (label, v)) in vectors.iter().enumerate() {
             let part = &mut parts[assign[i]];
@@ -2315,26 +2329,58 @@ impl Engine {
                 part.vectors.extend_from_slice(&x.to_le_bytes());
             }
         }
-        let header = knn_format::IvfChunkHeader {
-            row_count: vectors.len() as u32,
-            embedding_count: vectors.len() as u32,
-            dimension: dim as u32,
-            centroid_count: k as u32,
-        };
         let flat: Vec<f32> = centroids.into_iter().flatten().collect();
         let chunk = knn_format::encode_ivf_plain_chunk(&header, &flat, &parts)
             .map_err(|e| Error::Invalid(format!("cannot encode IVF chunk: {e}")))?;
         Ok((vectors.len(), chunk))
     }
 
+    /// Scalar-quantized chunk (`IVF_Part_Storage_SQ`): train the shared
+    /// `(a, b)` affine parameters on the residuals
+    /// (`IVF_Parts_Storage_Info<kScalarQuantization>`), then store each
+    /// vector's codes plus its `dot_v_e` (`AppendOneEmbedding`).
+    fn encode_ivf_scalar_quantized(
+        header: &knn_format::IvfChunkHeader,
+        centroids: &[f32],
+        vectors: &[(u32, Vec<f32>)],
+        assign: &[usize],
+        sq_bits: u8,
+    ) -> Result<Vec<u8>> {
+        let dim = header.dimension as usize;
+        let residuals: Vec<Vec<f32>> = vectors
+            .iter()
+            .zip(assign)
+            .map(|((_, v), part)| {
+                let at = part * dim;
+                v.iter()
+                    .zip(&centroids[at..at + dim])
+                    .map(|(x, c)| x - c)
+                    .collect()
+            })
+            .collect();
+        let (a, b) = infinity_index::ivf::train_scalar_quantization(&residuals, dim, sq_bits);
+        let mut parts: Vec<knn_format::IvfSqPart> = (0..header.centroid_count)
+            .map(|_| knn_format::IvfSqPart {
+                segment_offsets: Vec::new(),
+                codes: Vec::new(),
+                dot_v_e: Vec::new(),
+            })
+            .collect();
+        for (i, (label, v)) in vectors.iter().enumerate() {
+            let (codes, dot_v_e) =
+                infinity_index::ivf::encode_scalar_quantized(v, &residuals[i], &a, &b, sq_bits);
+            let part = &mut parts[assign[i]];
+            part.segment_offsets.push(*label);
+            part.codes.extend_from_slice(&codes);
+            part.dot_v_e.push(dot_v_e);
+        }
+        knn_format::encode_ivf_sq_chunk(header, centroids, &a, &b, &parts, sq_bits)
+            .map_err(|e| Error::Invalid(format!("cannot encode IVF chunk: {e}")))
+    }
+
     /// Writes `table`'s index as a C++ IVF chunk file (`kPlain`) under
     /// `…/idx_{id}/seg_0/chunk_0.idx`, returning how many vectors were written.
-    pub fn write_cpp_ivf_index(
-        &self,
-        table: &str,
-        index_name: &str,
-        centroid_count: usize,
-    ) -> Result<usize> {
+    pub fn write_cpp_ivf_index(&self, table: &str, index_name: &str) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -2353,7 +2399,10 @@ impl Engine {
             })
             .map(|im| im.column)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
-        let (count, chunk) = self.cpp_ivf_chunk(&table, &column, centroid_count)?;
+        let (storage, sq_bits, ratio, min_points) = self.ivf_storage_option(&table, index_name);
+        let (count, chunk) = self.cpp_ivf_chunk(
+            &table, &column, &storage, sq_bits, ratio, min_points,
+        )?;
         let db_id = self.database_id_of(&table);
         let dir = self
             .blocks_root()
@@ -2375,16 +2424,22 @@ impl Engine {
         &self,
         table: &str,
         index_name: &str,
-    ) -> Vec<infinity_index::ivf::IvfIndex> {
+    ) -> Vec<infinity_index::ivf::IvfSegment> {
         let Some(dir) = self.cpp_hnsw_dir(table, index_name) else {
             return Vec::new();
         };
+        let (storage, sq_bits, _, _) = self.ivf_storage_option(table, index_name);
         let mut out = Vec::new();
         for (_, path) in hnsw_chunks(&dir) {
             let Ok(bytes) = std::fs::read(&path) else {
                 continue;
             };
-            // Plain storage only; SQ/PQ chunks are not mirrored yet.
+            if storage.eq_ignore_ascii_case("scalar_quantization") {
+                if let Some(segment) = Self::decode_ivf_sq_chunk(&bytes, sq_bits) {
+                    out.push(segment);
+                }
+                continue;
+            }
             let Ok((header, flat, parts)) = knn_format::decode_ivf_plain_chunk(&bytes, 4) else {
                 continue;
             };
@@ -2414,14 +2469,84 @@ impl Engine {
                         .collect()
                 })
                 .collect();
-            out.push(infinity_index::ivf::IvfIndex::new(
-                dims,
-                header.centroid_count as usize,
-                flat,
-                parts,
+            out.push(infinity_index::ivf::IvfSegment::Plain(
+                infinity_index::ivf::IvfIndex::new(dims, header.centroid_count as usize, flat, parts),
             ));
         }
         out
+    }
+
+    /// The index's IVF options (`IndexIVFStorageOption` + the centroid option),
+    /// defaulting exactly like the reference: plain storage and
+    /// `centroids_num_ratio = 1.0` / `min_points_per_centroid = 32`.
+    fn ivf_storage_option(&self, table: &str, index_name: &str) -> (String, u8, f32, usize) {
+        let table = self.qualified_table(table);
+        let options = self
+            .storage
+            .catalog
+            .list_indexes()
+            .ok()
+            .and_then(|list| {
+                list.into_iter()
+                    .find(|im| {
+                        im.name == index_name
+                            && (im.table == table
+                                || table.rsplit('.').next() == Some(im.table.as_str()))
+                    })
+                    .map(|im| im.options)
+            })
+            .unwrap_or_default();
+        let find = |key: &str| {
+            options
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(key))
+                .map(|(_, v)| v.trim().trim_matches(|c| c == '\'' || c == '"').to_string())
+        };
+        let storage = find("STORAGE_TYPE").unwrap_or_else(|| "plain".to_string());
+        let bits = find("SCALAR_QUANTIZATION_BITS")
+            .and_then(|v| v.parse::<u8>().ok())
+            .filter(|b| *b == 4 || *b == 8)
+            .unwrap_or(8);
+        let ratio = find("CENTROIDS_NUM_RATIO")
+            .and_then(|v| v.parse::<f32>().ok())
+            .unwrap_or(1.0);
+        let min_points = find("MIN_POINTS_PER_CENTROID")
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|v| *v > 0)
+            .unwrap_or(32);
+        (storage, bits, ratio, min_points)
+    }
+
+    /// Decodes one scalar-quantized chunk into a searchable segment.
+    fn decode_ivf_sq_chunk(
+        bytes: &[u8],
+        sq_bits: u8,
+    ) -> Option<infinity_index::ivf::IvfSegment> {
+        let chunk = knn_format::decode_ivf_sq_chunk(bytes, sq_bits).ok()?;
+        let dims = chunk.header.dimension as usize;
+        if dims == 0 {
+            return None;
+        }
+        let parts = chunk
+            .parts
+            .into_iter()
+            .map(|part| infinity_index::ivf::IvfSqPartData {
+                offsets: part.segment_offsets,
+                codes: part.codes,
+                dot_v_e: part.dot_v_e,
+            })
+            .collect();
+        Some(infinity_index::ivf::IvfSegment::Scalar(
+            infinity_index::ivf::IvfSqIndex {
+                dims,
+                centroids: chunk.centroids,
+                centroid_count: chunk.header.centroid_count as usize,
+                a: chunk.common_vec_a,
+                b: chunk.common_vec_b,
+                sq_bits,
+                parts,
+            },
+        ))
     }
 
     /// Reads back a mirror written by [`Self::write_cpp_ivf_index`], returning
@@ -3376,12 +3501,13 @@ mod tests {
             .execute("INSERT INTO iv VALUES (1, [0,0]), (2, [0,1]), (3, [10,10]), (4, [10,11]);")
             .unwrap();
         engine
-            .execute("CREATE INDEX iv_idx ON iv (v) USING IVF;")
+            .execute("CREATE INDEX iv_idx ON iv (v) USING IVF WITH (metric = l2);")
             .unwrap();
 
-        assert_eq!(engine.write_cpp_ivf_index("iv", "iv_idx", 2).unwrap(), 4);
+        assert_eq!(engine.write_cpp_ivf_index("iv", "iv_idx").unwrap(), 4);
         let (centroids, back) = engine.read_cpp_ivf_index("iv", "iv_idx").unwrap();
-        assert_eq!(centroids.len(), 4); // 2 centroids * dimension 2
+        // 4 rows: `min(sqrt(4) * 1.0, 4 / 32) = 0`, raised to 1 centroid.
+        assert_eq!(centroids.len(), 2); // 1 centroid * dimension 2
                                         // Every vector comes back, under its row id.
         let mut got: Vec<(u32, Vec<f32>)> = back;
         got.sort_by_key(|(l, _)| *l);

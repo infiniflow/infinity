@@ -93,10 +93,8 @@ impl Engine {
                 candidates.insert(*seq as usize);
             }
             for seg in &segments {
-                for part in &seg.parts {
-                    for (offset, _) in part {
-                        covered.insert(*offset as usize);
-                    }
+                for offset in seg.offsets() {
+                    covered.insert(offset as usize);
                 }
                 for offset in seg.candidates(q.query, (q.topn * 4).max(64), nprobe, q.metric) {
                     candidates.insert(offset as usize);

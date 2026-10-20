@@ -3258,7 +3258,7 @@ struct TableEntry {
     /// reference's `TableIndexMeta` chain for the index, on-disk form).
     vector: HashMap<String, Vec<Arc<crate::cpp_blocks::LoadedVectorIndex>>>,
     /// IVF chunks loaded from the C++ mirror, per column.
-    ivf: HashMap<String, Vec<Arc<infinity_index::ivf::IvfIndex>>>,
+    ivf: HashMap<String, Vec<Arc<infinity_index::ivf::IvfSegment>>>,
     /// IVF memory segment: rows written since the last mirror dump, merged
     /// with the sealed chunks at query time.
     ivf_mem: HashMap<String, Vec<(u64, Vec<f32>)>>,
@@ -10574,6 +10574,27 @@ impl Engine {
                         "{index_type} index requires a vector column, got '{ty}'"
                     )));
                 }
+                if index_type.eq_ignore_ascii_case("IVF") {
+                    // C++ `IndexIVF::Make`: `metric` is mandatory and the
+                    // storage option decides which quantization parameters are
+                    // required. Reject what the reference rejects.
+                    let lowered: Vec<(String, String)> = opts
+                        .iter()
+                        .map(|(k, v)| (k.to_ascii_lowercase(), v.clone()))
+                        .collect();
+                    let params: Vec<(&str, &str)> = lowered
+                        .iter()
+                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .collect();
+                    infinity_index::ivf_def::IndexIvf::make(
+                        column,
+                        "",
+                        "",
+                        vec![column.to_string()],
+                        &params,
+                    )
+                    .map_err(|e| Error::Invalid(e.to_string()))?;
+                }
             }
             "SECONDARY" => {
                 // A secondary index covers scalars (and JSON paths).
@@ -16926,6 +16947,43 @@ mod tests {
             rows(&e, q),
             vec![vec!["5".to_string()], vec!["2".to_string()]]
         );
+    }
+
+    /// `storage_type = scalar_quantization` writes the C++ SQ chunk layout and
+    /// searches it (residual codes + `dot_v_e`), instead of silently mirroring
+    /// the index as plain storage.
+    #[test]
+    fn a_scalar_quantized_ivf_index_mirrors_and_serves_candidates() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ivsq (id INT, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        e.execute(
+            "INSERT INTO ivsq VALUES (1,[0.0,0.0]),(2,[1.0,0.0]),\
+             (3,[0.0,1.0]),(4,[2.0,2.0]);",
+        )
+        .unwrap();
+        e.execute(
+            "CREATE INDEX ivsq_idx ON ivsq (v) USING IVF WITH \
+             (metric = l2, storage_type = scalar_quantization, \
+             scalar_quantization_bits = 8);",
+        )
+        .unwrap();
+        e.flush().unwrap();
+        // The mirror is a scalar-quantized chunk, not a plain one.
+        let segments = e.load_ivf_indexes("ivsq", "ivsq_idx");
+        assert!(
+            matches!(
+                segments.as_slice(),
+                [infinity_index::ivf::IvfSegment::Scalar(_)]
+            ),
+            "expected one SQ segment"
+        );
+        // Candidates come from the quantized codes; the executor then scores
+        // them exactly, so the top-1 is the same as an exhaustive scan.
+        let q = "SELECT id FROM ivsq SEARCH MATCH VECTOR \
+                 (v, [0.9,0.1], 'float', 'l2', 1) WITH (nprobe = 16);";
+        assert_eq!(rows(&e, q), vec![vec!["2".to_string()]]);
     }
 
     /// A sealed multi-vector chunk ranks with its persisted residual codes
