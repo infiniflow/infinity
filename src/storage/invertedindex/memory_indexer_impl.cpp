@@ -383,51 +383,59 @@ void MemoryIndexer::MarkInvertFailed(u64 seq,
                                      u32 row_offset,
                                      u32 row_count,
                                      u32 start_doc_id) {
-    // Retry once right here, before the placeholder is queued. The ring still misses this
-    // sequence number, so no later document can have been committed yet and the shared posting
-    // writers only hold smaller doc ids; appending these postings therefore keeps every doc list
+    // Retry once right here, before the ring slot is filled. The ring still misses this sequence
+    // number, so no later document can have been committed yet and the shared posting writers
+    // only hold smaller doc ids: queueing the recovered inverter therefore keeps every doc list
     // ordered (doc lists are delta encoded, a smaller doc id appended later would corrupt them).
     bool recovered = false;
+    std::shared_ptr<ColumnInverter> retry_inverter;
     try {
         PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
-        auto retry_inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
+        retry_inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
         retry_inverter->InitAnalyzer(analyzer_);
-        size_t column_length_sum = retry_inverter->InvertColumn(column_vector, row_offset, row_count, start_doc_id);
+        term_cnt_ += retry_inverter->InvertColumn(column_vector, row_offset, row_count, start_doc_id);
         retry_inverter->MergePrepare();
         retry_inverter->Sort();
-        retry_inverter->GeneratePosting();
-        term_cnt_ += column_length_sum;
         recovered = true;
         LOG_WARN(fmt::format("MemoryIndexer: re-inverted failed task in place, seq={}, start_doc_id={}, row_count={}", seq, start_doc_id, row_count));
     } catch (const std::exception &e) {
+        retry_inverter.reset();
         LOG_ERROR(fmt::format("MemoryIndexer: in-place retry of failed inversion failed, seq={}, error: {}", seq, e.what()));
     } catch (...) {
+        retry_inverter.reset();
         LOG_ERROR(fmt::format("MemoryIndexer: in-place retry of failed inversion failed, seq={}, unknown error", seq));
     }
 
-    if (!recovered) {
-        std::unique_lock<std::mutex> lock(mutex_);
-        failed_invert_tasks_.push_back(FailedInvertTask{column_vector, row_offset, row_count, start_doc_id});
-    }
-    LOG_ERROR(fmt::format("MemoryIndexer: inversion failed, db={}, table={}, index={}, base_name={}, base_row_id={}, seq={}, start_doc_id={}, "
-                          "row_count={}. Task queued for retry; it will be re-inverted before the chunk is dumped.",
-                          db_name_,
-                          table_name_,
-                          index_name_,
-                          base_name_,
-                          base_row_id_.ToUint64(),
-                          seq,
-                          start_doc_id,
-                          row_count));
+    if (recovered) {
+        // Hand the recovered inverter back to the ring instead of generating the postings here:
+        // CommitSync owns the posting generation, its memory accounting, the generated_doc_end_
+        // watermark and the commit ordering.
+        ring_sorted_.Put(seq, retry_inverter);
+    } else {
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            failed_invert_tasks_.push_back(FailedInvertTask{column_vector, row_offset, row_count, start_doc_id});
+        }
+        LOG_ERROR(fmt::format("MemoryIndexer: inversion failed, db={}, table={}, index={}, base_name={}, base_row_id={}, seq={}, start_doc_id={}, "
+                              "row_count={}. Task queued for retry; it will be re-inverted before the chunk is dumped.",
+                              db_name_,
+                              table_name_,
+                              index_name_,
+                              base_name_,
+                              base_row_id_.ToUint64(),
+                              seq,
+                              start_doc_id,
+                              row_count));
 
-    // Fill the hole in the sorted ring with an empty inverter. Ring tracks a contiguous prefix
-    // (off_ground_/off_filled_), so a permanently missing sequence number would block every
-    // later Put() and silently stop the whole index from being committed. The placeholder has
-    // merged_ == 1, so CommitSync accounts it exactly like the task it replaces.
-    PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
-    auto placeholder = std::make_shared<ColumnInverter>(provider, column_lengths_);
-    placeholder->InitAnalyzer(analyzer_);
-    ring_sorted_.Put(seq, placeholder);
+        // Fill the hole in the sorted ring with an empty inverter. Ring tracks a contiguous prefix
+        // (off_ground_/off_filled_), so a permanently missing sequence number would block every
+        // later Put() and silently stop the whole index from being committed. The placeholder has
+        // merged_ == 1, so CommitSync accounts it exactly like the task it replaces.
+        PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
+        auto placeholder = std::make_shared<ColumnInverter>(provider, column_lengths_);
+        placeholder->InitAnalyzer(analyzer_);
+        ring_sorted_.Put(seq, placeholder);
+    }
     // Proactively drain. If another thread owns the commit lock this is a no-op and the item
     // stays in the ring; the next CommitSync (or the dump barrier) will pick it up.
     CommitSync(100);
