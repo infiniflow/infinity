@@ -5278,10 +5278,9 @@ impl Engine {
         let keys: Vec<(u64, u64)> = ranges
             .iter()
             .filter_map(|(lo, hi)| match (lo, hi) {
-                (Value::Int(lo), Value::Int(hi)) if lo <= hi => Some((
-                    (*lo as u64) ^ (1u64 << 63),
-                    (*hi as u64) ^ (1u64 << 63),
-                )),
+                (Value::Int(lo), Value::Int(hi)) if lo <= hi => {
+                    Some(((*lo as u64) ^ (1u64 << 63), (*hi as u64) ^ (1u64 << 63)))
+                }
                 _ => None,
             })
             .collect();
@@ -8384,8 +8383,7 @@ impl Engine {
             if let (Some(t), Some((_, scan_columns)), Some(candidate)) =
                 (from.as_ref(), scan_source.as_ref(), candidate.as_ref())
             {
-                if let Some(ids) =
-                    self.index_scan_range_rows(t, &candidate.evaluator, scan_columns)
+                if let Some(ids) = self.index_scan_range_rows(t, &candidate.evaluator, scan_columns)
                 {
                     let mut rows = self.fetch_rows_by_ids(t, &ids)?;
                     if rowid_col {
@@ -16606,6 +16604,7 @@ mod tests {
                 .unwrap();
         }
         e.execute("CREATE INDEX idx_name ON t (name);").unwrap();
+        e.execute("CREATE INDEX idx_id ON t (id);").unwrap();
         match &e.execute("SELECT id FROM t WHERE name = 'a';").unwrap()[0] {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows, &vec![vec!["1".to_string()], vec!["3".to_string()]]);
@@ -16623,7 +16622,10 @@ mod tests {
         // The same after reopen: the integer range reads the chunks that were
         // rebuilt from the catalog, not a memory tail.
         assert_eq!(
-            query_column(&e2, "SELECT id FROM t WHERE id >= 2 AND id <= 3 ORDER BY id;"),
+            query_column(
+                &e2,
+                "SELECT id FROM t WHERE id >= 2 AND id <= 3 ORDER BY id;"
+            ),
             vec!["2".to_string(), "3".to_string()]
         );
     }
@@ -16638,19 +16640,21 @@ mod tests {
 
     /// The `id` column of a `WHERE`-filtered select over `t`, in `id` order.
     fn ids(e: &Engine, predicate: &str) -> Vec<i64> {
-        query_column(e, &format!("SELECT id FROM t WHERE {predicate} ORDER BY id;"))
-            .into_iter()
-            .map(|id| id.parse().expect("id is an integer"))
-            .collect()
+        query_column(
+            e,
+            &format!("SELECT id FROM t WHERE {predicate} ORDER BY id;"),
+        )
+        .into_iter()
+        .map(|id| id.parse().expect("id is an integer"))
+        .collect()
     }
 
     /// `(id, ROW_ID())` pairs, optionally filtered, in `id` order.
     fn id_and_row_id(e: &Engine, predicate: Option<&str>) -> Vec<(i64, i64)> {
         let filter = predicate.map(|p| format!("WHERE {p}")).unwrap_or_default();
-        match &e.execute(&format!(
-            "SELECT id, ROW_ID() FROM t {filter} ORDER BY id;"
-        ))
-        .unwrap()[0]
+        match &e
+            .execute(&format!("SELECT id, ROW_ID() FROM t {filter} ORDER BY id;"))
+            .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => rows
                 .iter()
@@ -16673,12 +16677,21 @@ mod tests {
     fn index_range_scan_answers_from_sealed_chunks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
+        // The same SQL runs twice below; keep the result cache from answering
+        // the second round, which is the one that reads all sealed chunks.
+        e.execute("SET CONFIG result_cache off;").unwrap();
         e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-        for i in 0..200 {
+        for i in 0..150 {
             e.execute(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
                 .unwrap();
         }
+        // `CREATE INDEX` builds from the rows that exist, so 0..150 land in a
+        // sealed chunk; 150..200 stay in the memory tail until `flush`.
         e.execute("CREATE INDEX idx_id ON t (id);").unwrap();
+        for i in 150..200 {
+            e.execute(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
+                .unwrap();
+        }
         let cases: [(&str, Vec<i64>); 7] = [
             ("id >= 10 AND id <= 12", vec![10, 11, 12]),
             ("id BETWEEN 5 AND 7", vec![5, 6, 7]),
@@ -16691,15 +16704,13 @@ mod tests {
             ),
             ("id >= 1000", vec![]),
         ];
-        // Round 0 reads the memory tail; `flush` seals it into PGM chunks, so
-        // round 1 reads the ordered key array through `range`.
+        // Round 0 merges the sealed chunk with the memory tail (the tail is
+        // keyed by decimal text, so it is walked and compared numerically);
+        // `flush` seals the tail, so round 1 answers purely from the ordered
+        // key arrays.
         for round in 0..2 {
             for (predicate, expected) in &cases {
-                assert_eq!(
-                    &ids(&e, predicate),
-                    expected,
-                    "round {round}: {predicate}"
-                );
+                assert_eq!(&ids(&e, predicate), expected, "round {round}: {predicate}");
             }
             e.flush().unwrap();
         }
@@ -16720,13 +16731,12 @@ mod tests {
     fn range_on_an_unordered_key_falls_back() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
+        e.execute("SET CONFIG result_cache off;").unwrap();
         e.execute("CREATE TABLE t (id INT, score FLOAT, note INT);")
             .unwrap();
         for i in 0..50 {
-            e.execute(&format!(
-                "INSERT INTO t VALUES ({i}, {i}.5, {i});"
-            ))
-            .unwrap();
+            e.execute(&format!("INSERT INTO t VALUES ({i}, {i}.5, {i});"))
+                .unwrap();
         }
         e.execute("CREATE INDEX idx_score ON t (score);").unwrap();
         for round in 0..2 {
