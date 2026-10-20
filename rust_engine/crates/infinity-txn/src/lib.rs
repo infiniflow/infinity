@@ -111,6 +111,12 @@ pub struct TxnManager {
     store: Arc<dyn MetaStore>,
     wal: Mutex<WalManager>,
     wal_path: PathBuf,
+    /// `wal/wal.log`: the file the **reference** reads. It holds exactly one
+    /// entry, the `kNewCheckpoint` command a checkpoint writes, because the
+    /// reference replays every record in that file and rejects one it cannot
+    /// decode. This engine's own redo records live in `wal.rust` instead (they
+    /// are applied at the checkpoint, so the reference has nothing to replay).
+    checkpoint_path: PathBuf,
     next_txn_id: AtomicU64,
     next_ts: AtomicU64,
     /// Monotonic high-water mark of commit timestamps applied to the KV. The
@@ -150,7 +156,12 @@ impl TxnManager {
     /// transaction's `begin_ts` is the WAL/KV high-water mark, so an older
     /// commit can never be "newer than begin_ts".
     pub fn open(wal_path: impl Into<PathBuf>, store: Arc<dyn MetaStore>) -> Result<Self> {
-        let wal_path = wal_path.into();
+        let checkpoint_path = wal_path.into();
+        // This engine's redo records go to `wal.rust` (plus `wal.rust.{ts}`
+        // segments); `wal.log` is reserved for the reference-framed checkpoint
+        // entry, so the reference never has to decode a record this engine
+        // wrote. Sealing still accepts `wal.log.{ts}` for older directories.
+        let wal_path = checkpoint_path.with_file_name("wal.rust");
         let recs = read_all_segments(&wal_path)?;
         let applied_ts = store
             .get(APPLIED_TS_KEY)?
@@ -176,6 +187,7 @@ impl TxnManager {
             store,
             wal: Mutex::new(wal),
             wal_path,
+            checkpoint_path,
             next_txn_id: AtomicU64::new(max_id + 1),
             // A checkpoint may have truncated the WAL, so the applied marker in
             // the KV store is the other source of the timestamp high-water mark.
@@ -764,7 +776,8 @@ fn sealed_segments(wal_path: &std::path::Path) -> Result<Vec<(PathBuf, TxnTimeSt
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             if let Some(ts) = name
-                .strip_prefix("wal.log.")
+                .strip_prefix("wal.rust.")
+                .or_else(|| name.strip_prefix("wal.log."))
                 .and_then(|t| t.parse::<TxnTimeStamp>().ok())
             {
                 out.push((entry.path(), ts));
