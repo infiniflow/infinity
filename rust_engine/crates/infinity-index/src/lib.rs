@@ -86,6 +86,22 @@ impl SecondaryIndex {
         self.map.values().flatten().min().copied()
     }
 
+    /// Visits every `(key, row ids)` pair in ascending **byte** order, without
+    /// cloning, so a caller can apply its own comparison.
+    ///
+    /// This order is not the order of the values the keys were built from: the
+    /// memory tail is keyed by `Literal::to_slt_string().as_bytes()`
+    /// (`infinity-executor`'s `index_lookup`), so `b"10"` sorts before
+    /// `b"9"`. A numeric range scan must decode and compare each key it visits
+    /// — it must **not** stop early or slice the walk at a bound, or it will
+    /// silently drop rows. [`Index::range`] is byte-order-only for the same
+    /// reason.
+    pub fn for_each_in_order(&self, mut f: impl FnMut(&[u8], &[RowID])) {
+        for (key, ids) in &self.map {
+            f(key, ids);
+        }
+    }
+
     /// Lowest row id and row count of `segment` (C++ `SegmentIndexMeta::
     /// GetMemIndex()` reads one segment's memory tail).
     pub fn segment_begin_and_count(&self, segment: u32) -> Option<(RowID, usize)> {
@@ -237,5 +253,46 @@ mod tests {
         assert_eq!(loaded.lookup(b"x"), &[10, 11]);
         assert_eq!(loaded.lookup(b"y"), &[12]);
         assert_eq!(loaded.key_count(), 2);
+    }
+
+    /// `for_each_in_order` walks in byte order and reports every row id of a
+    /// key exactly once.
+    #[test]
+    fn for_each_in_order_walks_keys_and_row_ids_once() {
+        let mut idx = SecondaryIndex::new();
+        // Inserted out of order; the walk is by key.
+        for (k, id) in [("c", 3u64), ("a", 1), ("b", 2), ("b", 4)] {
+            idx.insert(k.as_bytes(), id);
+        }
+        let mut seen: Vec<(String, Vec<RowID>)> = Vec::new();
+        idx.for_each_in_order(|key, ids| {
+            seen.push((String::from_utf8(key.to_vec()).unwrap(), ids.to_vec()))
+        });
+        assert_eq!(
+            seen,
+            vec![
+                ("a".to_string(), vec![1]),
+                ("b".to_string(), vec![2, 4]),
+                ("c".to_string(), vec![3]),
+            ]
+        );
+        // Every row id appears exactly once across the whole walk.
+        let mut ids: Vec<RowID> = seen.iter().flat_map(|(_, ids)| ids.clone()).collect();
+        ids.sort_unstable();
+        assert_eq!(ids, vec![1, 2, 3, 4]);
+        assert_eq!(idx.row_count(), 4);
+    }
+
+    /// The walk is **byte** order, not the numeric order of the values the
+    /// keys were encoded from: `"10"` precedes `"9"`. A range scan must decode
+    /// and compare each key rather than slice the walk.
+    #[test]
+    fn for_each_in_order_is_byte_order_not_numeric_order() {
+        let mut idx = SecondaryIndex::new();
+        idx.insert(b"9", 9);
+        idx.insert(b"10", 10);
+        let mut keys: Vec<String> = Vec::new();
+        idx.for_each_in_order(|key, _| keys.push(String::from_utf8_lossy(key).into_owned()));
+        assert_eq!(keys, vec!["10".to_string(), "9".to_string()]);
     }
 }

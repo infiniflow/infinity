@@ -738,6 +738,28 @@ impl SecondarySegmentReader {
         out
     }
 
+    /// All segment offsets whose key lies in the inclusive range
+    /// `[start, end]`, in stored order (key order, then the order duplicates
+    /// were written).
+    ///
+    /// The keys array is sorted, so the result is exactly the two binary
+    /// searches below; no PGM hint is used because the model only bounds a
+    /// *present* key, and a range query must also be correct for a bound that
+    /// falls between two keys. `start > end` is empty.
+    pub fn range(&self, start: u64, end: u64) -> Vec<u32> {
+        if self.row_count == 0 || start > end {
+            return Vec::new();
+        }
+        let begin = self.lower_bound(0, self.row_count, start);
+        // `lower_bound(end + 1)` is the first key past the range; `end` may be
+        // `u64::MAX`, where there is no such key.
+        let stop = match end.checked_add(1) {
+            Some(after) => self.lower_bound(begin, self.row_count, after),
+            None => self.row_count,
+        };
+        (begin..stop).map(|i| self.offset(i)).collect()
+    }
+
     /// `partition_point` over the mapped keys: first index in `[lo, hi)` whose
     /// key is `>= key`.
     fn lower_bound(&self, lo: usize, hi: usize, key: u64) -> usize {
@@ -883,5 +905,74 @@ mod tests {
         assert_eq!(reader.len(), 0);
         assert!(reader.is_empty());
         assert!(reader.lookup(7).is_empty());
+        assert!(reader.range(0, u64::MAX).is_empty());
+    }
+
+    /// `range` is inclusive at both ends and reports the offsets in stored
+    /// order.
+    #[test]
+    fn range_is_inclusive_at_both_ends() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_range.idx");
+        let entries = vec![(1u64, 10u32), (2, 11), (3, 12), (5, 13), (8, 14)];
+        write_secondary_segment(&path, &entries).unwrap();
+        let reader = SecondarySegmentReader::open(&path).unwrap();
+
+        assert_eq!(reader.range(2, 5), vec![11, 12, 13]);
+        assert_eq!(reader.range(2, 2), vec![11]);
+        assert_eq!(reader.range(1, 8), vec![10, 11, 12, 13, 14]);
+        // Bounds that fall between two keys still cover the keys between them.
+        assert_eq!(reader.range(3, 4), vec![12]);
+        assert_eq!(reader.range(4, 7), vec![13]);
+        // Both ends outside the key domain.
+        assert!(reader.range(0, 0).is_empty());
+        assert!(reader.range(9, 100).is_empty());
+        // An unbounded upper end.
+        assert_eq!(reader.range(5, u64::MAX), vec![13, 14]);
+        // An inverted range is empty, not the whole chunk.
+        assert!(reader.range(5, 2).is_empty());
+    }
+
+    /// Every offset of a duplicated key is reported by `range`, as by
+    /// `lookup`.
+    #[test]
+    fn range_returns_every_offset_of_a_duplicated_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_range_dup.idx");
+        let entries = vec![(1u64, 10u32), (2, 11), (2, 12), (2, 13), (3, 14)];
+        write_secondary_segment(&path, &entries).unwrap();
+        let reader = SecondarySegmentReader::open(&path).unwrap();
+        assert_eq!(reader.range(2, 2), vec![11, 12, 13]);
+        assert_eq!(reader.range(2, 3), vec![11, 12, 13, 14]);
+        assert_eq!(reader.range(1, 3), vec![10, 11, 12, 13, 14]);
+    }
+
+    /// The binary searches must also answer over a multi-level PGM chunk
+    /// written by the reference.
+    #[test]
+    fn range_walks_a_cpp_shaped_multi_level_chunk() {
+        let keys = quadratic_keys(1000);
+        let mut chunk = Vec::with_capacity(keys.len() * 12 + CPP_QUADRATIC_TAIL.len());
+        for key in &keys {
+            chunk.extend_from_slice(&key.to_le_bytes());
+        }
+        for i in 0..keys.len() as u32 {
+            chunk.extend_from_slice(&i.to_le_bytes());
+        }
+        chunk.extend_from_slice(CPP_QUADRATIC_TAIL);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_cpp_range.idx");
+        std::fs::write(&path, &chunk).unwrap();
+        let reader = SecondarySegmentReader::open(&path).unwrap();
+
+        // `i * i + 2` for i in 3..=5 is 11, 18, 27.
+        assert_eq!(reader.range(11, 27), vec![3, 4, 5]);
+        assert_eq!(reader.range(2, 2), vec![0]);
+        // Keys 3 (i = 1) and 6 (i = 2) both fall inside.
+        assert_eq!(reader.range(3, 6), vec![1, 2]);
+        // Everything, and nothing.
+        assert_eq!(reader.range(0, u64::MAX).len(), 1000);
+        assert!(reader.range(999_000, u64::MAX).is_empty());
     }
 }
