@@ -115,6 +115,14 @@ impl MetaStore for DeferredCatalogStore {
         self.inner.atomic_write(items)
     }
 
+    /// A DDL commit carries the removals too, so the journal must record every
+    /// affected key's before-image and then forward the whole batch.
+    fn atomic_batch(&self, items: &[(Vec<u8>, Option<Vec<u8>>)]) -> Result<()> {
+        let keys: Vec<Vec<u8>> = items.iter().map(|(k, _)| k.clone()).collect();
+        self.log_before(&keys)?;
+        self.inner.atomic_batch(items)
+    }
+
     fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
         self.inner.scan_prefix(prefix)
     }
@@ -188,4 +196,61 @@ pub(crate) fn rollback_pending(inner: &dyn MetaStore, catalog_dir: &Path) -> Res
     inner.flush()?;
     std::fs::remove_file(&path).map_err(|e| Error::io(&path, e))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use infinity_storage::FjallMetaStore;
+    use tempfile::tempdir;
+
+    fn open() -> (tempfile::TempDir, Arc<FjallMetaStore>) {
+        let dir = tempdir().unwrap();
+        let store = Arc::new(FjallMetaStore::open(dir.path(), "catalog").unwrap());
+        (dir, store)
+    }
+
+    /// A DDL that removes rows and adds rows is one batch, and the undo journal
+    /// must cover every key in it: without the `atomic_batch` forwarder the
+    /// wrapper fell back to the trait's per-operation default, which journals
+    /// the same keys but is not atomic. This asserts the observable part — the
+    /// whole batch is undone when the process exits before a checkpoint.
+    #[test]
+    fn atomic_batch_is_undone_by_the_journal() {
+        let (dir, inner) = open();
+        inner.put(b"tbl:keep", b"old").unwrap();
+        inner.put(b"tbl:drop", b"gone").unwrap();
+        let store = DeferredCatalogStore::new(inner.clone(), dir.path());
+        store
+            .atomic_batch(&[
+                (b"tbl:keep".to_vec(), Some(b"new".to_vec())),
+                (b"tbl:drop".to_vec(), None),
+                (b"tbl:added".to_vec(), Some(b"1".to_vec())),
+            ])
+            .unwrap();
+        assert_eq!(store.get(b"tbl:keep").unwrap(), Some(b"new".to_vec()));
+        assert_eq!(store.get(b"tbl:drop").unwrap(), None);
+
+        rollback_pending(inner.as_ref(), dir.path()).unwrap();
+        assert_eq!(inner.get(b"tbl:keep").unwrap(), Some(b"old".to_vec()));
+        assert_eq!(inner.get(b"tbl:drop").unwrap(), Some(b"gone".to_vec()));
+        assert_eq!(inner.get(b"tbl:added").unwrap(), None);
+    }
+
+    /// The checkpoint is the durability point: a flush makes the batch survive
+    /// the next open, because it removes the undo journal.
+    #[test]
+    fn a_checkpoint_keeps_the_batch() {
+        let (dir, inner) = open();
+        inner.put(b"tbl:keep", b"old").unwrap();
+        let store = DeferredCatalogStore::new(inner.clone(), dir.path());
+        store
+            .atomic_batch(&[(b"tbl:keep".to_vec(), Some(b"new".to_vec()))])
+            .unwrap();
+        store.flush().unwrap();
+        assert!(!dir.path().join(JOURNAL_FILE).exists());
+
+        rollback_pending(inner.as_ref(), dir.path()).unwrap();
+        assert_eq!(inner.get(b"tbl:keep").unwrap(), Some(b"new".to_vec()));
+    }
 }
