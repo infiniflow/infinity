@@ -4622,6 +4622,29 @@ void NewTxn::PostCommit() {
         sema->acquire();
     }
 
+    // A dump transaction owns the mem indexes it popped until it is resolved. The chunks are
+    // durable at this point, so release the in-memory copies (see PostRollback for the abort
+    // path, which puts them back instead).
+    if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kDumpMemIndex) {
+        auto *dump_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+        if (!dump_txn_store->dumped_mem_indexes_.empty()) {
+            auto *storage = InfinityContext::instance().storage();
+            for (auto &[segment_id, mem_index] : dump_txn_store->dumped_mem_indexes_) {
+                (void)segment_id;
+                if (mem_index == nullptr) {
+                    continue;
+                }
+                mem_index->ClearMemIndex();
+                if (storage != nullptr) {
+                    if (auto *memindex_tracer = storage->memindex_tracer(); memindex_tracer != nullptr) {
+                        memindex_tracer->DumpDone(mem_index);
+                    }
+                }
+            }
+            dump_txn_store->dumped_mem_indexes_.clear();
+        }
+    }
+
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     //    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     for (const std::shared_ptr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
@@ -4822,9 +4845,35 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             for (SegmentID segment_id : dump_index_txn_store->segment_ids_) {
                 SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-                std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-                if (mem_index != nullptr && mem_index->IsDumping()) {
-                    mem_index->SetIsDumping(false);
+                // Put back the mem index popped by the aborted dump: its in-memory state is the
+                // only copy of the rows the dump covered, and the chunk it produced was never
+                // committed.
+                auto dumped_iter = dump_index_txn_store->dumped_mem_indexes_.find(segment_id);
+                if (dumped_iter != dump_index_txn_store->dumped_mem_indexes_.end() && dumped_iter->second != nullptr) {
+                    std::shared_ptr<MemIndex> dumped_mem_index = dumped_iter->second;
+                    dumped_mem_index->SetIsDumping(false);
+                    if (segment_index_meta.TrySetMemIndex(dumped_mem_index)) {
+                        LOG_INFO(fmt::format("DumpMemIndex rollback: restored mem index of segment {}.{}.{}.{}",
+                                             dump_index_txn_store->db_name_,
+                                             dump_index_txn_store->table_name_,
+                                             dump_index_txn_store->index_name_,
+                                             segment_id));
+                    } else {
+                        // A newer mem index occupies the slot (an append happened after the pop),
+                        // so the two cannot be merged in place. Report it loudly; the rows stay
+                        // uncovered and are rebuilt by RecoverMemIndex on the next startup.
+                        LOG_ERROR(fmt::format("DumpMemIndex rollback: mem index of segment {}.{}.{}.{} was already replaced by a newer one; "
+                                              "rows covered by the aborted dump will only be rebuilt on next startup",
+                                              dump_index_txn_store->db_name_,
+                                              dump_index_txn_store->table_name_,
+                                              dump_index_txn_store->index_name_,
+                                              segment_id));
+                    }
+                } else {
+                    std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+                    if (mem_index != nullptr && mem_index->IsDumping()) {
+                        mem_index->SetIsDumping(false);
+                    }
                 }
 
                 if (dump_index_txn_store->chunk_infos_in_segments_.contains(segment_id)) {
@@ -4840,6 +4889,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             if (!status.ok()) {
                 UnrecoverableError("During PostRollback, cleanup failed.");
             }
+            dump_index_txn_store->dumped_mem_indexes_.clear();
             break;
         }
         case TransactionType::kOptimizeIndex: {

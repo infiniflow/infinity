@@ -173,6 +173,9 @@ private:
 public:
     std::shared_ptr<MemIndex> GetMemIndex(const std::string &mem_index_key, bool for_update);
     std::shared_ptr<MemIndex> PopMemIndex(const std::string &mem_index_key);
+    // Insert the mem index only when the key is free. Used to put back an index popped by an
+    // aborted dump. Returns false when a newer mem index already occupies the key.
+    bool TrySetMemIndex(const std::string &mem_index_key, const std::shared_ptr<MemIndex> &mem_index);
     Status DropMemIndexByMemIndexKey(const std::string &mem_index_key);
     std::vector<std::pair<std::string, std::string>> GetAllMemIndexInfo();
 
