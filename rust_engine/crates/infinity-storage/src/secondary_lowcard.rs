@@ -208,11 +208,7 @@ fn decode_roaring(buf: &[u8]) -> Result<Vec<u32>, FormatError> {
     };
 
     let has_run = run_bitmap.is_some();
-    let descs_at = if has_run {
-        4 + n.div_ceil(8)
-    } else {
-        8
-    };
+    let descs_at = if has_run { 4 + n.div_ceil(8) } else { 8 };
     let offsets_at = descs_at + n * 4;
     if offsets_at > buf.len() {
         return Err(FormatError::Truncated {
@@ -278,7 +274,8 @@ fn decode_roaring(buf: &[u8]) -> Result<Vec<u32>, FormatError> {
                 });
             }
             for w in 0..1024 {
-                let word = u64::from_le_bytes(buf[cursor + w * 8..cursor + w * 8 + 8].try_into().unwrap());
+                let word =
+                    u64::from_le_bytes(buf[cursor + w * 8..cursor + w * 8 + 8].try_into().unwrap());
                 for b in 0..64 {
                     if word & (1u64 << b) != 0 {
                         out.push((key << 16) | ((w * 64 + b) as u32));
@@ -452,15 +449,15 @@ mod tests {
     /// `count_ = 8`, captured from CRoaring 4.7 (`GetSizeInBytes` +
     /// `roaring::Roaring::write`): `u32 count_`, `i32 size`, portable image.
     const CPP_WRITE_ADV_ARRAY: &[u8] = &[
-        8, 0, 0, 0, 20, 0, 0, 0, 0x3a, 0x30, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0x10, 0, 0, 0, 3, 0,
-        7, 0,
+        8, 0, 0, 0, 20, 0, 0, 0, 0x3a, 0x30, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0x10, 0, 0, 0, 3, 0, 7,
+        0,
     ];
 
     /// `Bitmap::WriteAdv` for the offsets `0..10000`, which CRoaring stores as
     /// a single run container (`count_ = 10000`, portable size 15).
     const CPP_WRITE_ADV_RUN: &[u8] = &[
-        0x10, 0x27, 0, 0, 15, 0, 0, 0, 0x3b, 0x30, 0, 0, 1, 0, 0, 0x0f, 0x27, 1, 0, 0, 0,
-        0x0f, 0x27,
+        0x10, 0x27, 0, 0, 15, 0, 0, 0, 0x3b, 0x30, 0, 0, 1, 0, 0, 0x0f, 0x27, 1, 0, 0, 0, 0x0f,
+        0x27,
     ];
 
     /// The writer must emit `SaveIndexInner`'s exact framing and bytes.
@@ -526,7 +523,8 @@ mod tests {
         write_lowcard_segment(&path, &[(1u64, vec![3, 7]), (5, vec![10, 11, 12])]).unwrap();
         let bytes = std::fs::read(&path).unwrap();
         let first = 4 + 2 * 8;
-        let second = first + 4 + i32::from_le_bytes(bytes[first..first + 4].try_into().unwrap()) as usize;
+        let second =
+            first + 4 + i32::from_le_bytes(bytes[first..first + 4].try_into().unwrap()) as usize;
         for at in [first, second] {
             let count = u32::from_le_bytes(bytes[at + 4..at + 8].try_into().unwrap());
             assert_eq!(count, 13, "count_ at {at}");

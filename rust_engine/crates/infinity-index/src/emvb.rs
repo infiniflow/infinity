@@ -347,8 +347,7 @@ impl ResidualPqModel {
         for (sub, &code) in codes.iter().enumerate().take(self.subspace_num) {
             let lo = sub * self.sub_dim;
             let base = (sub * self.k + code as usize) * self.sub_dim;
-            out[lo..lo + self.sub_dim]
-                .copy_from_slice(&self.centroids[base..base + self.sub_dim]);
+            out[lo..lo + self.sub_dim].copy_from_slice(&self.centroids[base..base + self.sub_dim]);
         }
     }
 }
@@ -388,9 +387,7 @@ fn jacobi_svd(dim: usize, a: &mut [f32], u: &mut [f32], v: &mut [f32]) {
                     apply_on_the_right(u, dim, p, q, j_left.transpose());
                     apply_on_the_right(a, dim, p, q, j_right);
                     apply_on_the_right(v, dim, p, q, j_right);
-                    max_diag = max_diag
-                        .max(a[p * dim + p].abs())
-                        .max(a[q * dim + q].abs());
+                    max_diag = max_diag.max(a[p * dim + p].abs()).max(a[q * dim + q].abs());
                 }
             }
         }
@@ -759,12 +756,7 @@ impl EmvbView<'_> {
         let rotated: Option<Vec<Vec<f32>>> = self
             .rotation
             .filter(|r| r.len() == self.dims * self.dims)
-            .map(|r| {
-                query
-                    .iter()
-                    .map(|q| mul_row(r, self.dims, q))
-                    .collect()
-            });
+            .map(|r| query.iter().map(|q| mul_row(r, self.dims, q)).collect());
         let query = rotated.as_deref().unwrap_or(query);
         let mut table = Vec::with_capacity(query.len());
         for q in query {
@@ -1108,13 +1100,8 @@ mod tests {
     fn opq_trains_a_non_identity_rotation_and_beats_the_axis_aligned_baseline() {
         let data = anisotropic_residuals(512);
         let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
-        let rotation = OpqRotation::train(
-            OPQ_DIMS,
-            OPQ_SUBSPACE_NUM,
-            1usize << OPQ_BITS,
-            &refs,
-            20,
-        );
+        let rotation =
+            OpqRotation::train(OPQ_DIMS, OPQ_SUBSPACE_NUM, 1usize << OPQ_BITS, &refs, 20);
         assert!(!rotation.is_identity(), "OPQ left the rotation at identity");
         // The rotation the reference stores is orthogonal.
         for i in 0..OPQ_DIMS {
@@ -1149,7 +1136,8 @@ mod tests {
             .map(|i| {
                 let (r, c) = (i / dim, i % dim);
                 // Non-symmetric, well conditioned.
-                (r as f32 + 1.0) * 0.3 + (c as f32 + 1.0).powi(2) * 0.7 - if r == c { 3.0 } else { 0.0 }
+                (r as f32 + 1.0) * 0.3 + (c as f32 + 1.0).powi(2) * 0.7
+                    - if r == c { 3.0 } else { 0.0 }
             })
             .collect();
         let original = a.clone();
@@ -1173,7 +1161,11 @@ mod tests {
             assert!(s[i * dim + i] >= -1e-4, "sigma[{i}] = {}", s[i * dim + i]);
             for j in 0..dim {
                 if i != j {
-                    assert!(s[i * dim + j].abs() < 1e-3, "S[{i}][{j}] = {}", s[i * dim + j]);
+                    assert!(
+                        s[i * dim + j].abs() < 1e-3,
+                        "S[{i}][{j}] = {}",
+                        s[i * dim + j]
+                    );
                 }
             }
         }
@@ -1223,7 +1215,13 @@ mod tests {
     }
 
     impl MiniChunk {
-        fn encode(dims: usize, subspace_num: usize, bits: u32, docs: &[Vec<Vec<f32>>], r: &OpqRotation) -> Self {
+        fn encode(
+            dims: usize,
+            subspace_num: usize,
+            bits: u32,
+            docs: &[Vec<Vec<f32>>],
+            r: &OpqRotation,
+        ) -> Self {
             let k = 1usize << bits;
             let sub_dim = dims / subspace_num;
             let tokens: Vec<&[f32]> = docs.iter().flatten().map(|t| t.as_slice()).collect();
@@ -1282,7 +1280,9 @@ mod tests {
                     return None;
                 }
                 let v = (0..n)
-                    .map(|i| f32::from_le_bytes(bytes[*at + i * 4..*at + i * 4 + 4].try_into().unwrap()))
+                    .map(|i| {
+                        f32::from_le_bytes(bytes[*at + i * 4..*at + i * 4 + 4].try_into().unwrap())
+                    })
                     .collect();
                 *at += n * 4;
                 Some(v)
@@ -1327,8 +1327,7 @@ mod tests {
             let chunk = MiniChunk::encode(OPQ_DIMS, OPQ_SUBSPACE_NUM, OPQ_BITS, docs, r);
             let bytes = chunk.to_bytes();
             let (codebook, codes, rotation) =
-                MiniChunk::decode(OPQ_DIMS, OPQ_SUBSPACE_NUM, OPQ_BITS, &bytes)
-                    .expect("PQ block");
+                MiniChunk::decode(OPQ_DIMS, OPQ_SUBSPACE_NUM, OPQ_BITS, &bytes).expect("PQ block");
             let n_embeddings = docs.iter().map(|d| d.len()).sum::<usize>();
             Self {
                 dims: OPQ_DIMS,
@@ -1406,7 +1405,8 @@ mod tests {
             .search(&query, 3, EmvbSearchOptions::for_topk(3));
         assert!(!got.is_empty());
         assert_eq!(
-            got[0].0 as usize, expected,
+            got[0].0 as usize,
+            expected,
             "OPQ chunk ranked {:?}, exact MaxSim winner is {expected}",
             got.iter().map(|(d, s)| (*d, *s)).collect::<Vec<_>>()
         );
@@ -1427,19 +1427,23 @@ mod tests {
             OpqRotation::train(OPQ_DIMS, OPQ_SUBSPACE_NUM, 1usize << OPQ_BITS, &refs, 20);
         let segment = MiniSegment::new(&docs, &rotation);
         let query = vec![docs[1][0].clone()];
-        let before = segment.view().search(&query, 4, EmvbSearchOptions::for_topk(4));
+        let before = segment
+            .view()
+            .search(&query, 4, EmvbSearchOptions::for_topk(4));
 
         // Re-read the PQ block including `matrix_R_` from its bytes.
         let chunk = MiniChunk::encode(OPQ_DIMS, OPQ_SUBSPACE_NUM, OPQ_BITS, &docs, &rotation);
         let bytes = chunk.to_bytes();
-        let (_, _, loaded) = MiniChunk::decode(OPQ_DIMS, OPQ_SUBSPACE_NUM, OPQ_BITS, &bytes)
-            .expect("PQ block");
+        let (_, _, loaded) =
+            MiniChunk::decode(OPQ_DIMS, OPQ_SUBSPACE_NUM, OPQ_BITS, &bytes).expect("PQ block");
         assert_eq!(loaded, rotation);
         let reloaded = MiniSegment {
             rotation: loaded.matrix().to_vec(),
             ..segment
         };
-        let after = reloaded.view().search(&query, 4, EmvbSearchOptions::for_topk(4));
+        let after = reloaded
+            .view()
+            .search(&query, 4, EmvbSearchOptions::for_topk(4));
         assert_eq!(
             before.iter().map(|(d, _)| *d).collect::<Vec<u32>>(),
             after.iter().map(|(d, _)| *d).collect::<Vec<u32>>()

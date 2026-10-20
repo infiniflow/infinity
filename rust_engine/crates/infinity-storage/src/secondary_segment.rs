@@ -232,7 +232,9 @@ impl OptimalModel {
 
             // Hull update.
             let mut end = self.upper.len();
-            while end >= self.upper_start + 2 && cross(self.upper[end - 2], self.upper[end - 1], p1) <= 0 {
+            while end >= self.upper_start + 2
+                && cross(self.upper[end - 2], self.upper[end - 1], p1) <= 0
+            {
                 end -= 1;
             }
             self.upper.truncate(end);
@@ -258,7 +260,9 @@ impl OptimalModel {
 
             // Hull update.
             let mut end = self.lower.len();
-            while end >= self.lower_start + 2 && cross(self.lower[end - 2], self.lower[end - 1], p2) >= 0 {
+            while end >= self.lower_start + 2
+                && cross(self.lower[end - 2], self.lower[end - 1], p2) >= 0
+            {
                 end -= 1;
             }
             self.lower.truncate(end);
@@ -783,9 +787,9 @@ mod tests {
     const CPP_QUADRATIC_TAIL: &[u8] = &[
         232, 3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 59, 64,
         0, 0, 0, 3, 4, 4, 0, 0, 0, 0, 0, 161, 134, 88, 58, 200, 1, 0, 0, 255, 255, 255, 255, 255,
-        255, 255, 255, 0, 0, 0, 0, 232, 3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 120, 96, 159, 55, 0, 0,
-        0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0,
+        255, 255, 255, 0, 0, 0, 0, 232, 3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 120, 96, 159, 55, 0, 0, 0,
+        0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0,
     ];
 
     fn linear_keys(n: u64) -> Vec<u64> {

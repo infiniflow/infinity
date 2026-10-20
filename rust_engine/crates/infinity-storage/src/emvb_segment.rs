@@ -350,7 +350,7 @@ impl EmvbData {
         push_u32(&mut out, n_embeddings as u32);
         out.extend_from_slice(&self.codes);
         push_u32(&mut out, n_embeddings as u32); // next_embedding_id
-        // `OPQ::Save`: `matrix_R_`, `dim * dim` f32s.
+                                                 // `OPQ::Save`: `matrix_R_`, `dim * dim` f32s.
         for v in &self.rotation {
             out.extend_from_slice(&v.to_le_bytes());
         }
@@ -897,7 +897,8 @@ mod tests {
         assert_eq!(data.rotation.len(), dims * dims);
         let identity = OpqRotation::identity(dims);
         assert_ne!(
-            data.rotation, identity.matrix(),
+            data.rotation,
+            identity.matrix(),
             "the encoder must train OPQ, not ship the identity rotation"
         );
 
@@ -911,9 +912,11 @@ mod tests {
 
         // The same rotation reaches the search view.
         let query = vec![docs[5].1[1].clone()];
-        let in_memory = data
-            .view()
-            .search(&query, 3, infinity_index::emvb::EmvbSearchOptions::for_topk(3));
+        let in_memory = data.view().search(
+            &query,
+            3,
+            infinity_index::emvb::EmvbSearchOptions::for_topk(3),
+        );
         let reloaded = pq.prefilter(&query, 3);
         assert_eq!(in_memory[0].0 as usize, reloaded[0]);
     }
@@ -974,4 +977,3 @@ mod tests {
         );
     }
 }
-
