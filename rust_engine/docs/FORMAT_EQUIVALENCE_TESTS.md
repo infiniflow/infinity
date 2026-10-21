@@ -155,3 +155,5 @@ bwrap ... -- .venv/bin/python -m pytest -q python/restart_test/test_cross_engine
 | `INFINITY_BYTES_DET_ROWS` | `500` | 确定性测量的行数（参考在小规模上图才稳定） |
 
 测试要占 `23817`（Thrift）与 `5432/5433`（PG 线），参考不设 `SO_REUSEADDR`，所以用例之间会等端口真正释放。
+
+**环境注意**：`bwrap` 只隔离 PID/mount，**不隔离网络**。同一台机器上若有另一个进程（另一个 agent、上一轮没退干净的引擎）也在跑这些用例，它会连到本测试正在监听的 `23817` 上，把自己的表/行写进本轮的目录——表现为"多了一张不属于本测试的表"或"参考只 dump 了前几个索引"。CI 用独立 runner 不会这样；本机并发跑时只看单条用例：`pytest ...::test_xxx`。
