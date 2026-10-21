@@ -5315,14 +5315,13 @@ impl Engine {
                 let Some(Value::Int(v)) = row.get(col_idx) else {
                     continue;
                 };
-                // Order-preserving mapping of i64 into u64.
-                let ordered = ordered_i64_key(*v);
+                let ordered = integer_secondary_key(&type_upper, *v);
                 by_segment
                     .entry((seq as u64) >> 32)
                     .or_default()
-                    .push((Key::U64(ordered), (seq as u64 & 0xffff_ffff) as u32));
+                    .push((ordered, (seq as u64 & 0xffff_ffff) as u32));
             }
-            self.write_secondary_pgm_chunks(table, column, KeyKind::U64, by_segment);
+            self.write_secondary_pgm_chunks(table, column, key_kind, by_segment);
         } else if key_kind != KeyKind::U64 {
             // FLOAT/DOUBLE keep the raw value ordered, like the reference's
             // `KeepOrderedSelf` (`secondary_index_data.cppm:38`): a 4-byte f32
@@ -5673,7 +5672,7 @@ impl Engine {
                     };
                     let ordered = if is_int {
                         match text.trim().parse::<i64>() {
-                            Ok(v) => Key::U64(ordered_i64_key(v)),
+                            Ok(v) => integer_secondary_key(&ty, v),
                             Err(_) => continue,
                         }
                     } else if tail_kind == KeyKind::F32 || tail_kind == KeyKind::F64 {
@@ -5686,7 +5685,7 @@ impl Engine {
                         } else {
                             Key::F64(v)
                         }
-                    } else if tail_kind == KeyKind::I32 || tail_kind == KeyKind::I64 {
+                    } else if key_domain(&ty) == KeyDomain::Temporal {
                         // DATE/TIME: the ordered day/second count.
                         let Some(v) = temporal_key(&ty, text) else {
                             continue;
@@ -5943,7 +5942,12 @@ impl Engine {
         // Sealed chunks are authoritative for the rows they cover; the memory
         // map only holds the tail written since the last dump.
         if let Literal::Int(v) = value {
-            let ordered = Key::U64(ordered_i64_key(*v));
+            let ty = self
+                .column_types(table)
+                .ok()
+                .and_then(|types| col.and_then(|c| types.get(c).cloned()))
+                .unwrap_or_default();
+            let ordered = integer_secondary_key(&ty, *v);
             if let Some(segments) = &disk {
                 for (base, reader) in segments {
                     for off in reader.lookup(ordered) {
@@ -6009,14 +6013,25 @@ impl Engine {
                 let temporal = temporal_key(&column_type, &want);
                 if let Some(segments) = &disk {
                     for (base, reader) in segments {
-                        let key = match reader.kind() {
-                            KeyKind::I32 => match temporal {
+                        let key = match (reader.kind(), key_domain(&column_type)) {
+                            (KeyKind::I32, KeyDomain::Temporal) => match temporal {
                                 Some(v) => Key::I32(v as i32),
                                 None => continue,
                             },
-                            KeyKind::I64 => match temporal {
+                            (KeyKind::I64, KeyDomain::Temporal) => match temporal {
                                 Some(v) => Key::I64(v),
                                 None => continue,
+                            },
+                            // An integer column stores the value itself.
+                            (KeyKind::I32, KeyDomain::Integer) => match want.trim().parse::<i64>()
+                            {
+                                Ok(v) => Key::I32(v as i32),
+                                Err(_) => continue,
+                            },
+                            (KeyKind::I64, KeyDomain::Integer) => match want.trim().parse::<i64>()
+                            {
+                                Ok(v) => Key::I64(v),
+                                Err(_) => continue,
                             },
                             _ => hashed,
                         };
@@ -6144,6 +6159,14 @@ impl Engine {
                             Ok(v) => Key::U64(ordered_i64_key(v)),
                             Err(_) => return,
                         },
+                        // INTEGER/BIGINT keep the value itself; only a width
+                        // the reference does not spell stays order-mapped.
+                        KeyKind::I32 | KeyKind::I64 if key_domain(&column_type) == KeyDomain::Integer => {
+                            match text.trim().parse::<i64>() {
+                                Ok(v) => integer_secondary_key(&column_type, v),
+                                Err(_) => return,
+                            }
+                        }
                         KeyKind::F32 | KeyKind::F64 => match text.trim().parse::<f64>() {
                             Ok(v) if kind == KeyKind::F32 => Key::F32(v as f32),
                             Ok(v) => Key::F64(v),
@@ -6286,6 +6309,15 @@ impl Engine {
                 ranges.iter().any(|(lo, hi)| {
                     matches!((value_as_f64(lo), value_as_f64(hi)),
                         (Some(lo), Some(hi)) if lo <= value && value <= hi)
+                })
+            }
+            KeyKind::I32 | KeyKind::I64 if key_domain(declared) == KeyDomain::Integer => {
+                let Ok(value) = field.parse::<i64>() else {
+                    return false;
+                };
+                ranges.iter().any(|(lo, hi)| match (lo, hi) {
+                    (Value::Int(lo), Value::Int(hi)) => *lo <= value && value <= *hi,
+                    _ => false,
                 })
             }
             KeyKind::I32 | KeyKind::I64 => {
@@ -15812,8 +15844,65 @@ fn secondary_key_kind(declared: &str) -> infinity_storage::secondary_segment::Ke
     } else if ty.starts_with("date") || ty.starts_with("time") {
         // `ConvertToOrderedI32`: `DateT`/`TimeT::GetValue()`, an `i32`.
         KeyKind::I32
+    } else if ty.starts_with("bigint") {
+        // `KeepOrderedSelf<BigIntT>`: the raw `i64`.
+        KeyKind::I64
+    } else if ty.starts_with("int") {
+        // `KeepOrderedSelf<IntegerT>`: the raw `i32`. Storing the value
+        // itself (not an order-mapped `u64`) is what makes the chunk
+        // byte-identical to the reference's.
+        KeyKind::I32
     } else {
         KeyKind::U64
+    }
+}
+
+/// How a stored cell becomes a chunk's ordered key (`ConvertToOrdered`,
+/// `secondary_index_data.cppm:37-72`).
+///
+/// This is *not* [`secondary_key_kind`]: `INTEGER` and `DATE` share the `i32`
+/// chunk width but read the cell differently - the value itself versus the day
+/// count - so every place that turns a cell into a key (or a key back into a
+/// comparison) has to know which one it has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KeyDomain {
+    /// `KeepOrderedSelf` over an integral column: the value is the key.
+    Integer,
+    /// `KeepOrderedSelf` over `FloatT`/`DoubleT`: the value is the key.
+    Float,
+    /// `ConvertToOrderedI32`/`I64`: the day count or the epoch time.
+    Temporal,
+    /// `ConvertToHashU64`: `std::hash` of the varchar/json text.
+    Hashed,
+}
+
+fn key_domain(declared: &str) -> KeyDomain {
+    let ty = declared.trim().to_ascii_lowercase();
+    if ty.starts_with("float") || ty.starts_with("double") {
+        KeyDomain::Float
+    } else if ty.starts_with("date")
+        || ty.starts_with("time")
+        || ty.starts_with("datetime")
+        || ty.starts_with("timestamp")
+    {
+        KeyDomain::Temporal
+    } else if ty.starts_with("int") || ty.starts_with("uint") {
+        // `INTEGER`, `BIGINT`, `TINYINT`, `SMALLINT` and the port's `UINT`.
+        KeyDomain::Integer
+    } else {
+        KeyDomain::Hashed
+    }
+}
+
+/// An integer column's chunk key. `INTEGER` and `BIGINT` keep the value itself
+/// at the reference's width; anything else (a width the reference's
+/// `ConvertToOrdered` does not spell, e.g. `TINYINT`) falls back to the
+/// order-mapped `u64`.
+fn integer_secondary_key(declared: &str, value: i64) -> Key {
+    match secondary_key_kind(declared) {
+        KeyKind::I32 => Key::I32(value as i32),
+        KeyKind::I64 => Key::I64(value),
+        _ => Key::U64(ordered_i64_key(value)),
     }
 }
 
@@ -15864,6 +15953,17 @@ fn bound_key(
         // A float bound stays `f64`: `Key::order` widens an `F32` key, so a
         // bound that `f32` cannot represent must not clip a boundary row.
         KeyKind::F32 | KeyKind::F64 => value_as_f64(value).map(Key::F64),
+        // An integer column's bound is the literal itself.
+        KeyKind::I32 if key_domain(declared) == KeyDomain::Integer => match value {
+            Value::Int(i) => Some(Key::I32(
+                (*i).clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
+            )),
+            _ => None,
+        },
+        KeyKind::I64 if key_domain(declared) == KeyDomain::Integer => match value {
+            Value::Int(i) => Some(Key::I64(*i)),
+            _ => None,
+        },
         // The planner's open ends are `i64::MIN`/`i64::MAX`, and those must
         // clamp to the *i32* limits: `i64::MAX as i32` is -1 and
         // `i64::MIN as i32` is 0, either of which would invert or empty the

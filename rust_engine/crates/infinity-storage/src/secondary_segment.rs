@@ -209,23 +209,123 @@ impl Key {
     }
 }
 
+/// An integral key type the reference instantiates `PGMIndex<K, 64, 4, float>`
+/// with (`ConvertToOrdered`, `secondary_index_data.cppm:37-72`): `u64` for a
+/// hashed varchar/json key, `i32` for `IntegerT`/`DateT`/`TimeT` and `i64` for
+/// `BigIntT`/`DateTimeT`/`TimestampT`.
+///
+/// Over an integral `K` the reference's fit is exact integer arithmetic
+/// (`get_floating_point_segment`, `piecewise_linear_model.hpp:245-253`), so a
+/// chunk of one of these kinds is byte-reproducible. `F32`/`F64` keys are not:
+/// their fit runs in 80-bit `long double` (see [`flat_tail`]).
+trait IntegralKey:
+    Copy + Default + PartialEq + Eq + PartialOrd + std::fmt::Debug
+{
+    /// `PGMIndex::sentinel`: `numeric_limits<K>::max()`, since an integral `K`
+    /// has no infinity (`pgm_index.hpp:84`).
+    const SENTINEL: Self;
+    /// The key the reference probes before appending that sentinel,
+    /// `sentinel - 1` (`pgm_index.hpp:105`).
+    const SENTINEL_PREV: Self;
+    /// `*std::prev(last) + 1`, wrapping at `K`'s width.
+    fn next(self) -> Self;
+    /// The key widened for the corridor arithmetic, which the reference does in
+    /// `int64_t` for a 32-bit key and `__int128` for a 64-bit one.
+    fn as_i128(self) -> i128;
+    /// `size_t(slope * double(make_unsigned_t<K>(k) - key))`: for a *signed*
+    /// `K` the reference subtracts unsigned (`pgm_index.hpp:262-263`), so a
+    /// segment key above the probed key wraps instead of going negative.
+    fn approx_diff(self, key: Self) -> f64;
+    /// The tail's `first_key`, in the reference's little-endian `K`.
+    fn push_le(self, out: &mut Vec<u8>);
+    /// Widens a [`Key`] of a narrower or wider kind into this one.
+    fn from_key(key: Key) -> Self;
+}
+
+impl IntegralKey for u64 {
+    const SENTINEL: Self = u64::MAX;
+    const SENTINEL_PREV: Self = u64::MAX - 1;
+    fn next(self) -> Self {
+        self.wrapping_add(1)
+    }
+    fn as_i128(self) -> i128 {
+        self as i128
+    }
+    fn approx_diff(self, key: Self) -> f64 {
+        self.wrapping_sub(key) as f64
+    }
+    fn push_le(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.to_le_bytes());
+    }
+    fn from_key(key: Key) -> Self {
+        match key {
+            Key::U64(v) => v,
+            other => other.as_f64() as u64,
+        }
+    }
+}
+
+impl IntegralKey for i32 {
+    const SENTINEL: Self = i32::MAX;
+    const SENTINEL_PREV: Self = i32::MAX - 1;
+    fn next(self) -> Self {
+        self.wrapping_add(1)
+    }
+    fn as_i128(self) -> i128 {
+        self as i128
+    }
+    fn approx_diff(self, key: Self) -> f64 {
+        (self as u32).wrapping_sub(key as u32) as f64
+    }
+    fn push_le(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.to_le_bytes());
+    }
+    fn from_key(key: Key) -> Self {
+        match key {
+            Key::I32(v) => v,
+            other => other.as_f64() as i32,
+        }
+    }
+}
+
+impl IntegralKey for i64 {
+    const SENTINEL: Self = i64::MAX;
+    const SENTINEL_PREV: Self = i64::MAX - 1;
+    fn next(self) -> Self {
+        self.wrapping_add(1)
+    }
+    fn as_i128(self) -> i128 {
+        self as i128
+    }
+    fn approx_diff(self, key: Self) -> f64 {
+        (self as u64).wrapping_sub(key as u64) as f64
+    }
+    fn push_le(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.to_le_bytes());
+    }
+    fn from_key(key: Key) -> Self {
+        match key {
+            Key::I64(v) => v,
+            other => other.as_f64() as i64,
+        }
+    }
+}
+
 /// One piecewise-linear segment: a key, a slope and an intercept.
 ///
 /// `(#pragma pack(1)) Segment { K key; Floating slope; uint32_t intercept; }`
-/// with `K = u64` and `Floating = float` (`pgm_index.hpp:225-267`).
+/// with an integral `K` and `Floating = float` (`pgm_index.hpp:225-267`).
 #[derive(Debug, Clone, Copy)]
-struct PgmSegment {
-    key: u64,
+struct PgmSegment<X> {
+    key: X,
     slope: f32,
     intercept: u32,
 }
 
-impl PgmSegment {
+impl<X: IntegralKey> PgmSegment<X> {
     /// `Segment::operator()`: `size_t(slope * double(k - key)) + intercept`.
-    /// For `K = u64` the reference subtracts as `uint64_t`, so a smaller key
-    /// wraps exactly as here.
-    fn approx(&self, key: u64) -> u64 {
-        let stride = (self.slope as f64 * key.wrapping_sub(self.key) as f64) as u64;
+    fn approx(&self, key: X) -> u64 {
+        let stride = (self.slope as f64 * key.approx_diff(self.key)) as u64;
         stride.wrapping_add(self.intercept as u64)
     }
 }
@@ -234,9 +334,9 @@ impl PgmSegment {
 // `internal::OptimalPiecewiseLinearModel` (`piecewise_linear_model.hpp:44`)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Point {
-    x: u64,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct Point<X> {
+    x: X,
     y: u64,
 }
 
@@ -258,15 +358,15 @@ impl Slope {
     }
 }
 
-fn point_diff(a: Point, b: Point) -> Slope {
+fn point_diff<X: IntegralKey>(a: Point<X>, b: Point<X>) -> Slope {
     Slope {
-        dx: a.x as i128 - b.x as i128,
+        dx: a.x.as_i128() - b.x.as_i128(),
         dy: a.y as i128 - b.y as i128,
     }
 }
 
 /// `cross(O, A, B) = (A - O) x (B - O)` in `__int128`.
-fn cross(o: Point, a: Point, b: Point) -> i128 {
+fn cross<X: IntegralKey>(o: Point<X>, a: Point<X>, b: Point<X>) -> i128 {
     let oa = point_diff(a, o);
     let ob = point_diff(b, o);
     oa.dx
@@ -274,36 +374,36 @@ fn cross(o: Point, a: Point, b: Point) -> i128 {
         .wrapping_sub(oa.dy.wrapping_mul(ob.dx))
 }
 
-/// `OptimalPiecewiseLinearModel<u64, size_t>`.
-struct OptimalModel {
+/// `OptimalPiecewiseLinearModel<X, size_t>`.
+struct OptimalModel<X> {
     epsilon: u64,
-    lower: Vec<Point>,
-    upper: Vec<Point>,
-    first_x: u64,
-    last_x: u64,
+    lower: Vec<Point<X>>,
+    upper: Vec<Point<X>>,
+    first_x: X,
+    last_x: X,
     lower_start: usize,
     upper_start: usize,
     points_in_hull: usize,
-    rectangle: [Point; 4],
+    rectangle: [Point<X>; 4],
 }
 
-impl OptimalModel {
+impl<X: IntegralKey> OptimalModel<X> {
     fn new(epsilon: u64) -> Self {
         Self {
             epsilon,
             lower: Vec::new(),
             upper: Vec::new(),
-            first_x: 0,
-            last_x: 0,
+            first_x: X::default(),
+            last_x: X::default(),
             lower_start: 0,
             upper_start: 0,
             points_in_hull: 0,
-            rectangle: [Point { x: 0, y: 0 }; 4],
+            rectangle: [Point::default(); 4],
         }
     }
 
     /// `add_point`: returns `false` when `(x, y)` no longer fits the corridor.
-    fn add_point(&mut self, x: u64, y: u64) -> bool {
+    fn add_point(&mut self, x: X, y: u64) -> bool {
         debug_assert!(self.points_in_hull == 0 || x > self.last_x);
         self.last_x = x;
         let max_y = u64::MAX;
@@ -418,7 +518,7 @@ impl OptimalModel {
         true
     }
 
-    fn get_segment(&self) -> CanonicalSegment {
+    fn get_segment(&self) -> CanonicalSegment<X> {
         if self.points_in_hull == 1 {
             CanonicalSegment {
                 rectangle: [
@@ -440,12 +540,12 @@ impl OptimalModel {
 
 /// `OptimalPiecewiseLinearModel::CanonicalSegment`.
 #[derive(Debug, Clone, Copy)]
-struct CanonicalSegment {
-    rectangle: [Point; 4],
-    first: u64,
+struct CanonicalSegment<X> {
+    rectangle: [Point<X>; 4],
+    first: X,
 }
 
-impl CanonicalSegment {
+impl<X: IntegralKey> CanonicalSegment<X> {
     fn one_point(&self) -> bool {
         let r = &self.rectangle;
         r[0].x == r[2].x && r[0].y == r[2].y && r[1].x == r[3].x && r[1].y == r[3].y
@@ -454,7 +554,7 @@ impl CanonicalSegment {
     /// `get_floating_point_segment(origin)` for integral `X` and `Y`:
     /// returns `(slope, intercept)` before the `Segment` constructor narrows
     /// the intercept to `uint32_t` and the slope to `float`.
-    fn floating_point_segment(&self, origin: u64) -> (f64, i128) {
+    fn floating_point_segment(&self, origin: X) -> (f64, i128) {
         let r = &self.rectangle;
         if self.one_point() {
             let mid = r[0].y.wrapping_add(r[1].y) / 2;
@@ -462,7 +562,7 @@ impl CanonicalSegment {
         }
 
         let slope = point_diff(r[3], r[1]);
-        let intercept_n = slope.dy.wrapping_mul(origin as i128 - r[1].x as i128);
+        let intercept_n = slope.dy.wrapping_mul(origin.as_i128() - r[1].x.as_i128());
         let intercept_d = slope.dx;
         debug_assert!(intercept_d != 0);
         let sign = if (intercept_n < 0) ^ (intercept_d < 0) {
@@ -477,7 +577,7 @@ impl CanonicalSegment {
 }
 
 /// `Segment::Segment(const CanonicalSegment &cs)`.
-fn segment_from_canonical(cs: &CanonicalSegment) -> PgmSegment {
+fn segment_from_canonical<X: IntegralKey>(cs: &CanonicalSegment<X>) -> PgmSegment<X> {
     let key = cs.first;
     let (slope, intercept) = cs.floating_point_segment(key);
     PgmSegment {
@@ -490,22 +590,22 @@ fn segment_from_canonical(cs: &CanonicalSegment) -> PgmSegment {
 /// `internal::make_segmentation(n, start, end, epsilon, in, out)`. The
 /// reference uses `make_segmentation_par`, which falls back to this exact
 /// serial routine whenever `n < 1 << 15` or OpenMP is disabled.
-fn make_segmentation(
+fn make_segmentation<X: IntegralKey>(
     n: usize,
     start: usize,
     end: usize,
     epsilon: u64,
-    input: &dyn Fn(usize) -> u64,
-    out: &mut dyn FnMut(CanonicalSegment),
+    input: &dyn Fn(usize) -> X,
+    out: &mut dyn FnMut(CanonicalSegment<X>),
 ) -> usize {
     let mut c = 0usize;
     let mut model = OptimalModel::new(epsilon);
 
-    fn add_point(
-        model: &mut OptimalModel,
-        out: &mut dyn FnMut(CanonicalSegment),
+    fn add_point<X: IntegralKey>(
+        model: &mut OptimalModel<X>,
+        out: &mut dyn FnMut(CanonicalSegment<X>),
         c: &mut usize,
-        x: u64,
+        x: X,
         y: u64,
     ) {
         if !model.add_point(x, y) {
@@ -520,8 +620,8 @@ fn make_segmentation(
         if input(i) == input(i - 1) {
             // At the end of a run of duplicate keys `x` such that
             // `x + 1 != in(i + 1)`, map `x + 1 .. in(i + 1) - 1` to rank `i`.
-            if input(i).wrapping_add(1) < input(i + 1) {
-                add_point(&mut model, out, &mut c, input(i).wrapping_add(1), i as u64);
+            if input(i).next() < input(i + 1) {
+                add_point(&mut model, out, &mut c, input(i).next(), i as u64);
             }
         } else {
             add_point(&mut model, out, &mut c, input(i), i as u64);
@@ -532,34 +632,29 @@ fn make_segmentation(
     }
     if end == n {
         // Ensure values greater than the last one are mapped to `n`.
-        add_point(
-            &mut model,
-            out,
-            &mut c,
-            input(n - 1).wrapping_add(1),
-            n as u64,
-        );
+        add_point(&mut model, out, &mut c, input(n - 1).next(), n as u64);
     }
 
     out(model.get_segment());
     c + 1
 }
 
-/// A multi-level PGM over ascending keys, exactly as `PGMIndex<u64, 64, 4, float>`.
+/// A multi-level PGM over ascending keys, exactly as `PGMIndex<X, 64, 4, float>`
+/// for an integral `X`.
 #[derive(Debug, Default)]
-struct Pgm {
+struct Pgm<X> {
     n: u32,
-    first_key: u64,
-    segments: Vec<PgmSegment>,
+    first_key: X,
+    segments: Vec<PgmSegment<X>>,
     levels_offsets: Vec<u64>,
 }
 
-impl Pgm {
-    fn build(keys: &[u64]) -> Self {
+impl<X: IntegralKey> Pgm<X> {
+    fn build(keys: &[X]) -> Self {
         if keys.is_empty() {
             return Self::default();
         }
-        let last_key_plus_one = keys[keys.len() - 1].wrapping_add(1);
+        let last_key_plus_one = keys[keys.len() - 1].next();
         let mut segments = Vec::new();
         let mut levels_offsets = vec![0u64];
 
@@ -576,7 +671,7 @@ impl Pgm {
         while PGM_EPSILON_RECURSIVE > 0 && last_n > 1 {
             // `in_fun_rec(i) = segments[levels_offsets[len - 2] + i].key`
             let offset = levels_offsets[levels_offsets.len() - 2] as usize;
-            let level_keys: Vec<u64> = (0..last_n).map(|i| segments[offset + i].key).collect();
+            let level_keys: Vec<X> = (0..last_n).map(|i| segments[offset + i].key).collect();
             let input = |i: usize| level_keys[i];
             last_n = Self::build_level(
                 &mut segments,
@@ -598,20 +693,20 @@ impl Pgm {
 
     /// `PGMIndex::build`'s `build_level` lambda (`pgm_index.hpp:102`).
     fn build_level(
-        segments: &mut Vec<PgmSegment>,
+        segments: &mut Vec<PgmSegment<X>>,
         last_n: usize,
         epsilon: u64,
-        input: &dyn Fn(usize) -> u64,
-        last_key_plus_one: u64,
+        input: &dyn Fn(usize) -> X,
+        last_key_plus_one: X,
     ) -> usize {
         let mut n_segments = make_segmentation(last_n, 0, last_n, epsilon, input, &mut |cs| {
             segments.push(segment_from_canonical(&cs));
         });
         let last = *segments.last().expect("at least one segment");
-        if last.key == u64::MAX {
+        if last.key == X::SENTINEL {
             n_segments -= 1;
         } else {
-            if last.approx(u64::MAX - 1) < last_n as u64 {
+            if last.approx(X::SENTINEL_PREV) < last_n as u64 {
                 // Ensure keys > the last one are mapped to `last_n`.
                 segments.push(PgmSegment {
                     key: last_key_plus_one,
@@ -620,7 +715,7 @@ impl Pgm {
                 });
             }
             segments.push(PgmSegment {
-                key: u64::MAX,
+                key: X::SENTINEL,
                 slope: 0.0,
                 intercept: last_n as u32,
             });
@@ -630,7 +725,7 @@ impl Pgm {
 
     /// `segment_for_key`: the rightmost segment with `key <= k`, found by
     /// descending the recursive levels.
-    fn segment_for_key(&self, key: u64) -> usize {
+    fn segment_for_key(&self, key: X) -> usize {
         let height = self.levels_offsets.len() - 1;
         let mut it = self.levels_offsets[self.levels_offsets.len() - 2] as usize;
         let mut level = height as isize - 2;
@@ -653,11 +748,11 @@ impl Pgm {
     }
 
     /// `PGMIndex::search`: `(pos, lo, hi)` as `SecondaryIndexApproxPos`.
-    fn search(&self, key: u64) -> (usize, usize, usize) {
+    fn search(&self, key: X) -> (usize, usize, usize) {
         if self.segments.is_empty() || self.levels_offsets.len() < 2 {
             return (0, 0, 0);
         }
-        let k = key.max(self.first_key);
+        let k = if key >= self.first_key { key } else { self.first_key };
         let it = self.segment_for_key(k);
         let next_intercept = if it + 1 < self.segments.len() {
             self.segments[it + 1].intercept as u64
@@ -673,10 +768,10 @@ impl Pgm {
     fn encode(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&self.n.to_le_bytes());
-        out.extend_from_slice(&self.first_key.to_le_bytes());
+        self.first_key.push_le(&mut out);
         out.extend_from_slice(&(self.segments.len() as u32).to_le_bytes());
         for s in &self.segments {
-            out.extend_from_slice(&s.key.to_le_bytes());
+            s.key.push_le(&mut out);
             out.extend_from_slice(&s.slope.to_le_bytes());
             out.extend_from_slice(&s.intercept.to_le_bytes());
         }
@@ -686,7 +781,9 @@ impl Pgm {
         }
         out
     }
+}
 
+impl Pgm<u64> {
     /// Parses the PGM header at `at` and returns
     /// `(n, first_key, segment_count, level_count, offsets_at)`. Every field is
     /// bounds-checked against `buf`, so this is safe on arbitrary bytes.
@@ -785,26 +882,29 @@ pub fn write_secondary_segment(path: &Path, entries: &[(u64, u32)]) -> Result<()
 }
 
 /// Writes one secondary-index chunk with `kind`-sized keys; `entries` must be
-/// sorted by [`Key::cmp`].
+/// sorted by [`Key::order`].
 ///
-/// A `U64` chunk is byte-identical to [`write_secondary_segment`]. A
-/// `F32`/`F64` chunk stores the raw IEEE bit pattern of each key and a flat
-/// PGM tail (see the module comment): the framing is the reference's, the
-/// model is not its fit.
+/// An integral chunk (`U64`, `I32`, `I64`) carries the reference's own PGM fit:
+/// over an integral key that fit is exact integer arithmetic, so it is
+/// byte-reproducible. A `F32`/`F64` chunk stores the raw IEEE bit pattern of
+/// each key and a flat PGM tail (see the module comment): the framing is the
+/// reference's, the model is not its fit.
 pub fn write_secondary_segment_typed(
     path: &Path,
     kind: KeyKind,
     entries: &[(Key, u32)],
 ) -> Result<(), FormatError> {
-    if kind == KeyKind::U64 {
-        let entries: Vec<(u64, u32)> = entries
-            .iter()
-            .map(|(key, off)| match key {
-                Key::U64(v) => (*v, *off),
-                other => (other.as_f64() as u64, *off),
-            })
-            .collect();
-        return write_secondary_segment(path, &entries);
+    match kind {
+        KeyKind::U64 => {
+            let entries: Vec<(u64, u32)> = entries
+                .iter()
+                .map(|(key, off)| (u64::from_key(*key), *off))
+                .collect();
+            return write_secondary_segment(path, &entries);
+        }
+        KeyKind::I32 => return write_integral_segment::<i32>(path, entries),
+        KeyKind::I64 => return write_integral_segment::<i64>(path, entries),
+        KeyKind::F32 | KeyKind::F64 => {}
     }
     let mut out = Vec::with_capacity(entries.len() * (kind.key_width() + 4) + 64);
     for (key, _) in entries {
@@ -814,6 +914,25 @@ pub fn write_secondary_segment_typed(
         out.extend_from_slice(&off.to_le_bytes());
     }
     out.extend_from_slice(&flat_tail(kind, entries));
+    write_chunk(path, &out)
+}
+
+/// Writes an integral-key chunk: `[key][offset]…` followed by the reference's
+/// own PGM tail over those keys.
+fn write_integral_segment<X: IntegralKey>(
+    path: &Path,
+    entries: &[(Key, u32)],
+) -> Result<(), FormatError> {
+    let keys: Vec<X> = entries.iter().map(|(key, _)| X::from_key(*key)).collect();
+    let pgm = Pgm::<X>::build(&keys);
+    let mut out = Vec::with_capacity(entries.len() * (std::mem::size_of::<X>() + 4) + 64);
+    for key in &keys {
+        key.push_le(&mut out);
+    }
+    for (_, off) in entries {
+        out.extend_from_slice(&off.to_le_bytes());
+    }
+    out.extend_from_slice(&pgm.encode());
     write_chunk(path, &out)
 }
 
@@ -907,7 +1026,7 @@ pub struct SecondarySegmentReader {
     kind: KeyKind,
     /// Only a `U64` chunk decodes its model; a typed chunk is validated and
     /// then searched by binary search (`validate_tail`).
-    pgm: Option<Pgm>,
+    pgm: Option<Pgm<u64>>,
 }
 
 impl SecondarySegmentReader {

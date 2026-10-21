@@ -515,13 +515,27 @@ def _check_index(cpp, rust, index_id, kind, failures):
         return
     for name in sorted(cpp_files_for_index):
         a, b = cpp_files_for_index[name], rust_files_for_index[name]
-        if kind in ("fulltext", "secondary-u64", "bmp", "ivf"):
+        if kind in ("fulltext", "secondary-u64", "bmp"):
             # Deterministic: the layout is derived from the rows alone.
             if a != b:
                 failures.append(
                     f"idx_{index_id}/{name}: "
                     f"cpp {hashlib.md5(a).hexdigest()} ({len(a)} B) != "
                     f"rust {hashlib.md5(b).hexdigest()} ({len(b)} B)"
+                )
+        elif kind == "ivf":
+            # The centroids are a build artifact (see `_ivf_content`), so the
+            # header's *counts* and the (offset, vector) pairs are compared and
+            # the centroids are not.
+            a_c, b_c = _ivf_content(a), _ivf_content(b)
+            if a_c is None or b_c is None:
+                failures.append(f"idx_{index_id}/{name}: not a plain IVF chunk")
+            elif a_c[:3] != b_c[:3]:
+                failures.append(f"idx_{index_id}/{name}: header {a_c[:3]} != {b_c[:3]}")
+            elif a_c[3] != b_c[3]:
+                failures.append(
+                    f"idx_{index_id}/{name}: the vectors differ "
+                    f"({len(a_c[3])} vs {len(b_c[3])} pairs)"
                 )
         elif kind == "hnsw":
             # The header, the vectors and the labels are derived from the
@@ -563,6 +577,48 @@ def _bmp_doc_ids(blob):
         if struct.unpack_from("<Q", blob, at)[0] == n:
             return list(struct.unpack_from(f"<{n}I", blob, at + 8))
     return None
+
+
+def _ivf_content(blob):
+    """What a plain IVF chunk says: the header's counts and every
+    `(segment_offset, vector)` pair.
+
+    `[row_count][embedding_count][dimension][centroid_count]` then
+    `centroid_count * dimension` `f32` centroids, then each part as
+    `u32 n`, `u32[n]` offsets and `n * dimension` `f32` vectors
+    (`knn_format::encode_ivf_plain_chunk`).
+
+    The centroids are **not** part of the content: the reference samples its
+    training set with `std::random_device` + `std::mt19937` and then runs
+    k-means (`ivf_index_data_impl.cpp:212-216`), so three runs on one input
+    give three different chunks. Measured, not assumed - see
+    `test_the_reference_is_deterministic_where_the_test_assumes_it`.
+    """
+    if len(blob) < 16:
+        return None
+    row_count, embedding_count, dimension, centroid_count = struct.unpack_from(
+        "<4I", blob, 0
+    )
+    at = 16 + centroid_count * dimension * 4
+    if at > len(blob):
+        return None
+    pairs = []
+    for _ in range(centroid_count):
+        if at + 4 > len(blob):
+            return None
+        (n,) = struct.unpack_from("<I", blob, at)
+        at += 4
+        width = dimension * 4
+        if at + n * 4 + n * width > len(blob):
+            return None
+        offsets = struct.unpack_from(f"<{n}I", blob, at)
+        at += n * 4
+        for i in range(n):
+            pairs.append((offsets[i], blob[at + i * width : at + (i + 1) * width]))
+        at += n * width
+    if at != len(blob):
+        return None
+    return (row_count, embedding_count, dimension, sorted(pairs))
 
 
 def _index_content(files, kind):
@@ -624,6 +680,22 @@ def _index_content(files, kind):
                 return None
             docs.extend(ids)
         return sorted(docs)
+    if kind == "ivf":
+        # The union of every chunk's (offset, vector) pairs; the counts come
+        # from the first chunk and are the same in every chunk of an index.
+        merged = None
+        for name in sorted(files):
+            content = _ivf_content(files[name])
+            if content is None:
+                return None
+            counts, pairs = content[:3], content[3]
+            if merged is None:
+                merged = (counts, list(pairs))
+            else:
+                if merged[0][:2] != counts[:2]:
+                    return None
+                merged[1].extend(pairs)
+        return None if merged is None else (merged[0], sorted(merged[1]))
     return None
 
 
@@ -1379,6 +1451,142 @@ def test_the_bytes_after_deletes_updates_and_a_restart():
         assert cpp_catalog[key] == rust_catalog[key], (
             f"catalog {key}: {cpp_catalog[key]} != {rust_catalog[key]}"
         )
+
+
+# ---------------------------------------------------------------------------
+# The index-kind matrix: IVF, other metrics, other keys.
+# ---------------------------------------------------------------------------
+
+KIND_TABLE = "test_cross_engine_kinds"
+KIND_COLUMNS = {
+    "id": {"type": "int"},
+    "title": {"type": "varchar"},
+    "day": {"type": "date"},
+    "vec": {"type": "vector,4,float"},
+    "vec_cos": {"type": "vector,4,float"},
+    "vec_ip": {"type": "vector,4,float"},
+}
+# `idx_<n>` follows this creation order.
+KIND_INDEXES = {
+    1: "ivf",
+    2: "hnsw",  # cosine
+    3: "hnsw",  # ip
+    4: "fulltext",
+    5: "secondary-u64",  # INT key
+    6: "secondary-u32",  # DATE key
+}
+
+
+def _seed_kinds(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(KIND_TABLE, ConflictType.Ignore)
+    t = db.create_table(KIND_TABLE, KIND_COLUMNS, ConflictType.Error)
+    t.create_index("ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index(
+        "cos_idx",
+        index.IndexInfo(
+            "vec_cos", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "cosine"}
+        ),
+    )
+    t.create_index(
+        "ip_idx",
+        index.IndexInfo(
+            "vec_ip", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "ip"}
+        ),
+    )
+    t.create_index("ft_idx", index.IndexInfo("title", index.IndexType.FullText))
+    t.create_index("id_sec", index.IndexInfo("id", index.IndexType.Secondary))
+    t.create_index("day_sec", index.IndexInfo("day", index.IndexType.Secondary))
+    rows = [
+        {
+            "id": i,
+            "title": f"alpha beta {i}",
+            "day": f"2024-{i % 12 + 1:02d}-{i % 28 + 1:02d}",
+            "vec": [float(i % 7) / 7.0, 0.25, 0.5, 0.75],
+            "vec_cos": [float(i % 5) / 5.0, 0.5, 0.25, 0.75],
+            "vec_ip": [float(i % 3) / 3.0, 0.75, 0.5, 0.25],
+        }
+        for i in range(200)
+    ]
+    t.insert(rows)
+    conn.flush_data()
+    # The reference dumps its memory indexes on a worker pool, at most one
+    # non-EMVB index per round (`MemIndexTracer::MakeDumpTask`); `optimize`
+    # takes the deterministic `OptimizeIndex` path instead.
+    t.optimize()
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_index_chunks_match_for_every_index_kind():
+    """IVF, cosine/ip HNSW, a non-default analyzer, INT and DATE keys.
+
+    The byte test's table only has one HNSW with the default metric, one
+    varchar secondary and a default-analyzer full-text index. Every other kind
+    writes its own chunk layout, so each is checked here with the same class
+    rules (and one index per column, since two vector indexes on one column is
+    a combination the reference does not dump reliably).
+    """
+    cpp_root = os.path.join(ROOT, "kinds_cpp")
+    rust_root = os.path.join(ROOT, "kinds_rust")
+    _run_engine("cpp", cpp_root, 5432, seed=_seed_kinds)
+    _run_engine("rust", rust_root, 5433, seed=_seed_kinds)
+    _wait_for_index_chunks(cpp_root, len(KIND_INDEXES))
+    _wait_for_index_chunks(rust_root, len(KIND_INDEXES))
+
+    cpp_files = _files(cpp_root)
+    rust_files = _files(rust_root)
+    cpp_dir = _own_table_dir(cpp_files, len(KIND_COLUMNS))
+    rust_dir = _own_table_dir(rust_files, len(KIND_COLUMNS))
+    assert cpp_dir and rust_dir, "the index-kind table was not written"
+
+    failures = _compare_data_files(
+        _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), KIND_INDEXES
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures
+    )
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+def test_the_ivf_chunk_is_only_compared_by_content():
+    """Why the IVF chunk is in the HNSW's class, measured.
+
+    The reference samples its k-means training set with `std::random_device`
+    and `std::mt19937` (`ivf_index_data_impl.cpp:212-216`), so the centroids
+    it lands on - and, through `GetKMeansCentroids`, even their number - are
+    not a function of the rows. Three runs on one input gave three different
+    chunks of the same size, which is why the test above compares the header's
+    counts and the `(offset, vector)` pairs and not the bytes.
+
+    What *is* a function of the rows is compared here: run the reference twice
+    and the two chunks must say the same thing.
+    """
+    contents = []
+    for i in range(2):
+        root = os.path.join(ROOT, f"ivf_cpp{i}")
+        shutil.rmtree(root, ignore_errors=True)
+        _run_engine("cpp", root, 5432 + i, seed=_seed_kinds)
+        _wait_for_index_chunks(root, len(KIND_INDEXES))
+        files = _files(root)
+        dirname = _own_table_dir(files, len(KIND_COLUMNS))
+        assert dirname, "the index-kind table was not written"
+        chunks = _chunks(_under(files, dirname), 1)
+        assert chunks, "the IVF chunk was not written"
+        content = _ivf_content(chunks[sorted(chunks)[0]])
+        assert content is not None, "the IVF chunk does not parse"
+        contents.append(content)
+    assert contents[0] == contents[1], (
+        f"the reference's IVF chunk says different things: "
+        f"{contents[0][:3]} != {contents[1][:3]}"
+    )
 
 
 # ---------------------------------------------------------------------------
