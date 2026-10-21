@@ -4652,7 +4652,8 @@ fn read_embedding_literal(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Resu
     Ok(format!("[{}]", vals.join(",")))
 }
 
-/// A compact decimal for a vector literal (always with a fractional part).
+/// A compact decimal for a float literal (always with a fractional part, so
+/// the SQL lexer reads it as a float rather than an integer).
 fn fmt_number(f: f64) -> String {
     let s = format!("{f}");
     if s.contains('.') || s.contains('e') || s.contains("inf") || s.contains("NaN") {
@@ -5740,7 +5741,14 @@ impl ValueLit {
     pub fn to_sql(&self) -> String {
         match self {
             ValueLit::Int(i) => i.to_string(),
-            ValueLit::Float(f) => f.to_string(),
+            // A float must render as a *float* literal. `f.to_string()` renders
+            // `-0.0` as `-0`, and the lexer reads `-0` as an **integer** (`-0`
+            // has no '.', so it becomes `Token::Int(0)`) - the sign of a
+            // negative zero is then lost, and the reference stores the f32
+            // `-0.0` (0x800000) where the port stored `+0.0` (0x000000).
+            // `fmt_number` keeps the fractional part, so the lexer sees a
+            // float; it is the same helper the array path uses.
+            ValueLit::Float(f) => fmt_number(*f),
             ValueLit::Str(s) => format!("'{}'", s.replace('\'', "''")),
             ValueLit::Bool(b) => {
                 if *b {
@@ -8340,5 +8348,26 @@ mod tests {
             "the block's real row count"
         );
         assert!(cols[1].1[0].ends_with('B'), "{:?}", cols[1].1);
+    }
+
+    /// A float value must reach the engine as a *float*, or the sign of a
+    /// negative zero is lost: `f.to_string()` renders `-0.0` as `-0`, and the
+    /// lexer reads `-0` as an **integer** (`Token::Int(0)`). The reference
+    /// stores the f32 `-0.0` (0x800000); the port stored `+0.0` (0x000000).
+    #[test]
+    fn a_negative_zero_stays_a_float() {
+        assert_eq!(ValueLit::Float(-0.0).to_sql(), "-0.0");
+        // The lexer must read it back as a float, not as the integer 0.
+        let tokens = infinity_parser::lexer::tokenize("-0.0").unwrap();
+        assert!(
+            tokens.iter().any(|t| matches!(
+                t,
+                infinity_parser::lexer::Token::Float(f) if f.is_sign_negative() && *f == 0.0
+            )),
+            "{tokens:?}"
+        );
+        // A whole float keeps its fractional part too, so it is a float literal.
+        assert_eq!(ValueLit::Float(1.0).to_sql(), "1.0");
+        assert_eq!(ValueLit::Float(1.5).to_sql(), "1.5");
     }
 }
