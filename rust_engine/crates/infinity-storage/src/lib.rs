@@ -83,7 +83,6 @@ pub mod fulltext_segment;
 pub mod inverted_format;
 pub mod io;
 pub mod knn_format;
-pub mod libstdcxx_sort;
 pub mod memindex_tracer;
 /// A store opened on the substrate its directory actually holds.
 pub struct OpenedStore {

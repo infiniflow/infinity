@@ -155,12 +155,8 @@ pub fn encode_bmp(
         let end = (start + block_size).min(docs.len());
         // The reference's `TailFwd::ToBlockFwd` (`bmp_fwd.cppm:298`): the
         // block's `(term, offset, value)` triples in document order, then a
-        // `std::sort` whose comparator looks at the **term id only**. The
-        // comparator is not a total order, so the rows of one term come out
-        // in libstdc++'s tie-break order -- and that order is what the chunk
-        // holds. `libstdcxx_sort` reproduces the algorithm, so the bytes
-        // match; the order itself carries no meaning (both readers
-        // accumulate per row).
+        // `std::stable_sort` on the term id, so the rows of one term stay in
+        // document order. Sorting on `(term, offset)` gives exactly that.
         let mut triples: Vec<(i32, u8, f32)> = Vec::new();
         for (i, (_, entries)) in docs[start..end].iter().enumerate() {
             for (term, value) in entries {
@@ -171,9 +167,8 @@ pub fn encode_bmp(
                 triples.push((t, i as u8, *value));
             }
         }
-        crate::libstdcxx_sort::sort_by(&mut triples, |a, b| a.0 < b.0);
-        // Group consecutive equal term ids, keeping the rows in the order the
-        // sort left them.
+        triples.sort_unstable_by_key(|(t, offset, _)| (*t, *offset));
+        // Group consecutive equal term ids.
         let mut terms: Vec<(i32, Vec<(u8, f32)>)> = Vec::new();
         for (t, offset, value) in triples {
             match terms.last_mut() {

@@ -17,12 +17,12 @@ patterns counted (see `test_the_reference_is_deterministic_where_the_test_assume
   produces the same bytes on every run, so the two engines must too: **byte for
   byte identical**. This is the strong signal.
   The sparse chunk is in this class because the order of a term's rows inside a
-  block — which the reference leaves to a `std::sort` over a term-id-only
-  comparator (`ToBlockFwd`, `bmp_fwd.cppm:309`) — is reproducible: the port
-  reproduces that sort (`libstdcxx_sort.rs`). The integral-key secondary chunk
-  is here because the reference's PGM fit over a u64 key is pure `__int128`
-  arithmetic (`piecewise_linear_model.hpp:249`, the integral branch), with a
-  `u64::MAX` sentinel rather than infinity.
+  block is defined: the reference sorts the block's `(term, offset, value)`
+  triples with a **stable** sort on the term id (`ToBlockFwd`,
+  `bmp_fwd.cppm:312`), so a term's rows stay in document order. The
+  integral-key secondary chunk is here because the reference's PGM fit over a
+  u64 key is pure `__int128` arithmetic (`piecewise_linear_model.hpp:249`, the
+  integral branch), with a `u64::MAX` sentinel rather than infinity.
 * **Deterministic modulo a timestamp** — the block `version` file: the
   reference records the commit ts of the append that filled the block, the port
   records its own mirror ts. The layout must match; the ts must not be compared.
@@ -714,10 +714,9 @@ def test_the_two_engines_write_the_same_bytes():
 
     # The sparse (BMP) chunk: the whole file, byte for byte. Its inverted index
     # and its per-block postings are laid out from the rows alone — including
-    # the order of a term's rows inside a block, which the reference leaves to
-    # a `std::sort` over a term-id-only comparator (`ToBlockFwd`,
-    # `bmp_fwd.cppm:309`). The port reproduces that sort
-    # (`libstdcxx_sort.rs`), because the order is part of the bytes.
+    # the order of a term's rows inside a block, which is document order
+    # because the reference sorts the block's triples with a stable sort on
+    # the term id (`ToBlockFwd`, `bmp_fwd.cppm:312`).
     sparse = "db_1/tbl_0/idx_5/seg_0/chunk_0.idx"
     assert cpp_files[sparse] == rust_files[sparse], (
         "the sparse index chunk differs: "
