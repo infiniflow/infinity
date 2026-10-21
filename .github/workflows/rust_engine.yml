@@ -52,3 +52,57 @@ jobs:
         with:
           manifest-path: rust_engine/Cargo.toml
           command: check
+
+  cross_engine:
+    # The persistence-format gate (rust_engine/docs/FORMAT_EQUIVALENCE_TESTS.md):
+    # the reference engine and the port write the same bytes for the same input,
+    # and each can read what the other wrote.
+    #
+    # It needs the reference binary, so it builds it in the same builder image
+    # the C++ job uses, then runs the two python suites that compare the two
+    # engines' directories.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.94.1"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust_engine
+      - name: Reference engine (builder image)
+        run: |
+          docker run --cap-add=NET_ADMIN -d --name infinity_builder \
+            -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource \
+            infiniflow/infinity-x64-x64-v2-builder:latest
+          docker exec infinity_builder cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json \
+            /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json
+          docker exec infinity_builder cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_MAKE_PROGRAM=/usr/local/bin/ninja \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -S /infinity -B /infinity/cmake-build-reldeb
+          docker exec infinity_builder cmake --build /infinity/cmake-build-reldeb --target infinity -j 8
+      - name: Port (C++-compatible catalog)
+        working-directory: rust_engine
+        run: cargo build --release -p infinity-cli --features rocksdb-store
+      - name: Python SDK
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -q -r python/requirements.txt
+          .venv/bin/pip install -q -e python/infinity_sdk
+      - name: Format-equivalence suites
+        run: |
+          # `/var/infinity` must be writable and on disk; the engines bind a
+          # fixed Thrift port, so a private PID namespace keeps the harness'
+          # "kill every infinity" from touching anything else.
+          work=$(mktemp -d)
+          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "$work" /var/infinity \
+                --unshare-pid --proc /proc -- \
+                .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_bytes.py -rx
+          work=$(mktemp -d)
+          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "$work" /var/infinity \
+                --unshare-pid --proc /proc -- \
+                .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_compat.py \
+                --infinity_path=rust_engine/scripts/infinity_rust_shim.sh
+      - name: Logs
+        if: always()
+        run: docker rm -f infinity_builder || true

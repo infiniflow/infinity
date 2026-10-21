@@ -131,13 +131,11 @@ pub struct LoadedVectorIndex {
 /// best-effort interop artifact, not the system of record.
 const MIRROR_BUDGET_BYTES: usize = 1024 * 1024 * 1024;
 
-/// The sealed chunks of a private mirror, as `(chunk id, row count, path)`.
-///
 /// The secondary mirror names its dumps `seg_{segment}_{block}_{rows}.idx`: the
 /// block is the chunk the reference publishes, and the trailing field is how
 /// many rows the dump contributed. A block can be covered by several dumps, so
 /// `publish_secondary_chunks` merges them rather than copying one file.
-
+///
 /// One raw ordered key, from a chunk's key array.
 fn decode_secondary_key(
     bytes: &[u8],

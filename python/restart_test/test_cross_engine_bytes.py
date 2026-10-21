@@ -254,11 +254,34 @@ def _boot_and_seed(engine, root, pg_port, row_count, seed):
     # with "Could not bind: Address already in use".
     _wait_port_free()
     shutil.rmtree(root, ignore_errors=True)
+    _write_config(engine, root, pg_port)
+    _spawn_and_run(engine, root, seed or (lambda c: _seed(c, row_count)))
+
+
+def _write_config(engine, root, pg_port):
     for sub in ("log", "tmp"):
         os.makedirs(os.path.join(root, sub), exist_ok=True)
-    config = os.path.join(root, "engine.toml")
-    with open(config, "w") as handle:
+    with open(os.path.join(root, "engine.toml"), "w") as handle:
         handle.write(_config(root, engine, pg_port))
+
+
+def _run_phases(engine, root, pg_port, phases):
+    """Run each phase in its own engine process, over the same directory.
+
+    A phase is just a callable taking the connection; whether it ends with
+    `flush_data()` decides whether the rows it wrote reach the block files or
+    only the WAL - which is what the crash test relies on.
+    """
+    _wait_port_free()
+    shutil.rmtree(root, ignore_errors=True)
+    _write_config(engine, root, pg_port)
+    for seed in phases:
+        _spawn_and_run(engine, root, seed)
+    return root
+
+
+def _spawn_and_run(engine, root, seed):
+    config = os.path.join(root, "engine.toml")
     if engine == "rust":
         # The port's CLI takes the root as the parent of `persistence_dir`, so
         # the config already points it at `root`.
@@ -270,7 +293,7 @@ def _boot_and_seed(engine, root, pg_port, row_count, seed):
     env = dict(os.environ, INFINITY_DATA=root)
     proc = subprocess.Popen(
         argv,
-        stdout=open(os.path.join(root, "engine.log"), "w"),
+        stdout=open(os.path.join(root, "engine.log"), "a"),
         stderr=subprocess.STDOUT,
         env=env,
         # Its own process group, so the whole group can be killed below.
@@ -299,7 +322,8 @@ def _boot_and_seed(engine, root, pg_port, row_count, seed):
                 time.sleep(0.5)
         else:
             raise AssertionError(f"{engine} engine did not come up")
-        (seed or (lambda c: _seed(c, row_count)))(conn)
+        if seed is not None:
+            seed(conn)
     finally:
         if conn is not None:
             try:
@@ -441,6 +465,29 @@ def _secondary_chunk_rows(chunk, key_width, floating_width=4):
     raise AssertionError(f"no PGM model found in a {len(chunk)}-byte chunk")
 
 
+def _wait_for_index_chunks(root, indexes, timeout=60.0):
+    """Wait until every index has written at least one chunk under `root`.
+
+    The dumps run on a worker pool, so a chunk can still be missing right after
+    `flush_data()` returns - a table with six indexes needs longer than one with
+    two.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        present = {
+            int(parts[0])
+            for parts in (
+                name.split("/idx_")[1].split("/")
+                for name in _files(root)
+                if "/idx_" in name
+            )
+        }
+        if set(range(1, indexes + 1)) <= present:
+            return
+        time.sleep(1)
+    raise AssertionError(f"{root}: index chunks missing after {timeout:.0f}s")
+
+
 def _chunks(files, index_id):
     """One index's files, keyed by their path after `idx_{id}/`."""
     marker = f"idx_{index_id}/"
@@ -468,7 +515,7 @@ def _check_index(cpp, rust, index_id, kind, failures):
         return
     for name in sorted(cpp_files_for_index):
         a, b = cpp_files_for_index[name], rust_files_for_index[name]
-        if kind in ("fulltext", "secondary-u64", "bmp"):
+        if kind in ("fulltext", "secondary-u64", "bmp", "ivf"):
             # Deterministic: the layout is derived from the rows alone.
             if a != b:
                 failures.append(
@@ -1039,6 +1086,8 @@ def test_the_two_engines_write_the_same_bytes():
 
     _run_engine("cpp", cpp_root, cpp_pg)
     _run_engine("rust", rust_root, rust_pg)
+    _wait_for_index_chunks(cpp_root, len(INDEX_KINDS))
+    _wait_for_index_chunks(rust_root, len(INDEX_KINDS))
 
     cpp_files = _files(cpp_root)
     rust_files = _files(rust_root)
@@ -1218,6 +1267,209 @@ def test_the_blocks_match_across_many_blocks():
     assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
         failures
     )
+
+
+# ---------------------------------------------------------------------------
+# Deletes, updates, and a restart between the writes.
+# ---------------------------------------------------------------------------
+
+MUTATE_TABLE = "test_cross_engine_mutations"
+MUTATE_COLUMNS = {
+    "id": {"type": "int"},
+    "title": {"type": "varchar"},
+    "score": {"type": "float"},
+}
+
+
+def _rows(base, count):
+    return [
+        {
+            "id": base + i,
+            "title": f"alpha beta {base + i}",
+            "score": (base + i) * 0.5,
+        }
+        for i in range(count)
+    ]
+
+
+def _phase_initial(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(MUTATE_TABLE, ConflictType.Ignore)
+    t = db.create_table(MUTATE_TABLE, MUTATE_COLUMNS, ConflictType.Error)
+    t.create_index("sec", index.IndexInfo("score", index.IndexType.Secondary))
+    t.create_index("ft", index.IndexInfo("title", index.IndexType.FullText))
+    t.insert(_rows(0, 100))
+    conn.flush_data()
+    time.sleep(1)
+
+
+def _phase_mutate(conn):
+    """A second process: append, delete a prefix, update a range, flush."""
+    t = conn.get_database("default_db").get_table(MUTATE_TABLE)
+    t.insert(_rows(100, 100))
+    t.delete("id < 20")
+    t.update("id >= 50 and id < 60", {"score": 999.5})
+    conn.flush_data()
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+@pytest.mark.xfail(
+    strict=False,
+    reason=(
+        "the port's block mirror does not model appends: after 100 + 100 rows "
+        "and 10 updated rows the reference's `version` holds three creates "
+        "(100/200/210 rows, capacity 1843200) while the port writes one "
+        "(180 rows, capacity 8192), and the block columns differ. Tracked in "
+        "docs/FORMAT_EQUIVALENCE_TESTS.md"
+    ),
+)
+def test_the_bytes_after_deletes_updates_and_a_restart():
+    """Append, delete and update in a second run over the same directory.
+
+    Deletes live in the catalog (a bitmap), not in `data/`, and an update is a
+    delete plus an appended row, so the block files must still agree byte for
+    byte after both - and the two engines must answer the same queries.
+    """
+    roots = {}
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        roots[engine] = _run_phases(
+            engine,
+            os.path.join(ROOT, f"mut_{engine}"),
+            port,
+            [_phase_initial, _phase_mutate],
+        )
+
+    files = {engine: _files(root) for engine, root in roots.items()}
+    dirs = {
+        engine: _own_table_dir(blobs, len(MUTATE_COLUMNS))
+        for engine, blobs in files.items()
+    }
+    assert dirs["cpp"] and dirs["rust"], "the mutations table was not written"
+
+    failures = _compare_data_files(
+        _under(files["cpp"], dirs["cpp"]),
+        _under(files["rust"], dirs["rust"]),
+        {1: "secondary-f32", 2: "fulltext"},
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures
+    )
+
+    # The catalog: the same records once the ts is taken out, including the
+    # delete bitmap.
+    cpp_catalog = _normalize_catalog(
+        _table_records(_catalog_pairs(roots["cpp"], 5432), dirs["cpp"], MUTATE_TABLE),
+        {1},
+    )
+    rust_catalog = _normalize_catalog(
+        _table_records(_catalog_pairs(roots["rust"], 5433), dirs["rust"], MUTATE_TABLE),
+        {1},
+    )
+    assert set(cpp_catalog) == set(rust_catalog), (
+        f"only in cpp: {sorted(set(cpp_catalog) - set(rust_catalog))}, "
+        f"only in rust: {sorted(set(rust_catalog) - set(cpp_catalog))}"
+    )
+    for key in sorted(cpp_catalog):
+        assert cpp_catalog[key] == rust_catalog[key], (
+            f"catalog {key}: {cpp_catalog[key]} != {rust_catalog[key]}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Crash recovery: an unflushed write must survive in the WAL for the *other*
+# engine to replay.
+# ---------------------------------------------------------------------------
+
+CRASH_TABLE = "test_cross_engine_crash"
+CRASH_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}}
+
+
+def _phase_crash_base(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(CRASH_TABLE, ConflictType.Ignore)
+    t = db.create_table(CRASH_TABLE, CRASH_COLUMNS, ConflictType.Error)
+    t.insert([{"id": i, "title": f"doc-{i}"} for i in range(100)])
+    conn.flush_data()
+    time.sleep(1)
+
+
+def _phase_crash_unflushed(conn):
+    """Rows that only reach the WAL: the process is killed right after."""
+    t = conn.get_database("default_db").get_table(CRASH_TABLE)
+    t.insert([{"id": i, "title": f"doc-{i}"} for i in range(100, 150)])
+    time.sleep(1)
+
+
+def _count_rows(engine, root, pg_port, table):
+    """Start `engine` on `root` and read `count(*)` through its PG line."""
+    seen = []
+
+    def phase(_conn):
+        out = subprocess.run(
+            [
+                "psql",
+                "-h",
+                "127.0.0.1",
+                "-p",
+                str(pg_port),
+                "-U",
+                "admin",
+                "-d",
+                "default_db",
+                "-c",
+                f"select count(*) from {table}",
+            ],
+            capture_output=True,
+            text=True,
+        ).stdout
+        for line in out.splitlines():
+            line = line.strip()
+            if line.isdigit():
+                seen.append(int(line))
+
+    _spawn_and_run(engine, root, phase)
+    return seen[0] if seen else None
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+@pytest.mark.xfail(
+    strict=False,
+    reason=(
+        "measured: the reference aborts on startup when the port died with "
+        "unflushed rows - 'Failed to find object for local path "
+        ".../blk_0/version' from MetaTableObject::RestoreTableCache "
+        "(meta_tree_impl.cpp:749). The port keeps its own journal "
+        "(`wal/wal.rust`) and only mirrors a C++-shaped `wal/wal.log`, so the "
+        "reference cannot replay the missing rows. Tracked in "
+        "docs/FORMAT_EQUIVALENCE_TESTS.md"
+    ),
+)
+def test_a_crash_leaves_a_replayable_directory():
+    """Write 50 rows, kill -9 without flushing, read them with the other engine.
+
+    Both directions: what one engine wrote and did not flush, the other must
+    find after replaying the WAL.
+    """
+    for writer, reader, port in (("rust", "cpp", 5433), ("cpp", "rust", 5432)):
+        root = _run_phases(
+            writer,
+            os.path.join(ROOT, f"crash_{writer}"),
+            port,
+            [_phase_crash_base, _phase_crash_unflushed],
+        )
+        rows = _count_rows(reader, root, port, CRASH_TABLE)
+        assert rows == 150, f"{reader} sees {rows} of the 150 rows {writer} wrote"
 
 
 # ---------------------------------------------------------------------------

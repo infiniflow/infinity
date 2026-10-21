@@ -90,12 +90,18 @@
 | # | 项目 | 状态 | 验收口径 |
 |---|---|---|---|
 | 1 | 多块块层（20000 行 / 3 块） | ✅ | 3 块 × 3 列 + 3 块 version + outline 逐字节相同；chunk 边界只查不变量（见下） |
-| 2 | 全类型列矩阵 | ✅ | 16 类列的 `.col` / outline 逐字节相同；发现并修复 JSON→BSON、double 精度两处 |
-| 3 | 删除 / 更新 / 重启后再写 | ⬜ | 操作后 `data/` 逐字节相同，catalog 逻辑记录相同 |
-| 4 | 索引种类矩阵（IVF / metric / analyzer / 整数键 / NULL / 重复键） | ⬜ | 每类按对应口径通过 |
-| 5 | CI 接入 | ⬜ | workflow 在本机可复现的步骤上跑通字节 + 互读两个测试 |
+| 2 | 全类型列矩阵 | ✅ | 16 类列的 `.col` / outline 逐字节相同；发现并修复 JSON→BSON 一处，记录浮点精度一处 |
+| 3 | 删除 / 更新 / 重启后再写 | ⚠️ xfail（有测量） | 测试 `test_the_bytes_after_deletes_updates_and_a_restart` 已落地并通过 xfail 记录差异：参考的 `version` 记 3 次 create（100/200/210 行、capacity 1843200），端口只记 1 次（**180 行**、capacity 8192），块列也不同 |
+| 4 | 索引种类矩阵 | ⚠️ 部分（未过） | IVF、HNSW cosine/ip、非默认 analyzer、DATE 键的**组合**会触发参考侧"根本不再 dump 索引"（6 个索引里只写出前 1–2 个，60 s 无变化），需要逐个组合排查后才好纳入门禁 |
+| 5 | CI 接入 | ✅ | `.github/workflows/rust_engine.yml` 新增 `cross_engine` job：builder 镜像里编参考、`--features rocksdb-store` 编端口、bwrap 下跑两个测试 |
 | 6 | HNSW 图 / 浮点 PGM 的「改成可比」评估 | ✅ 结论：不做 | 见下方 |
-| 7 | WAL 崩溃恢复（跨引擎 replay） | ⬜ | kill -9 后另一个引擎能 replay，行数与内容一致 |
+| 7 | WAL 崩溃恢复（跨引擎 replay） | ⚠️ xfail（有测量） | 测试 `test_a_crash_leaves_a_replayable_directory` 已落地：端口带未 flush 行被 kill -9 后，参考启动即 abort——`Failed to find object for local path .../blk_0/version`（`MetaTableObject::RestoreTableCache`，`meta_tree_impl.cpp:749`） |
+
+### 第 3 / 4 / 7 项测出来的问题（未修，记录在案）
+
+- **块镜像不建模增量 append（第 3 项）**。端口每次 flush 都用当前行集**整体重写**块，`version` 只写一条 create；参考按 append 逐条记录（100 → 200 → 210 行），`capacity` 也是整段的槽位数（1843200）而不是 8192。另外端口写出的行数是 180（10 条被 update 的行没有以新行形式出现），参考是 210。修法要动 `write_cpp_blocks` 的镜像模型（按 append 记 create、按 update 追加新行），不是测试能绕过的。
+- **多索引组合下参考不 dump（第 4 项）**。`IVF(vec) + HNSW(vec,cos) + HNSW(vec,ip) + FULLTEXT(title,chinese) + SECONDARY(id) + SECONDARY(day)` 与"每个向量列一个索引"两种写法都试过：参考只写出前 1–2 个索引的 chunk，其余 60 s 内始终不出现（日志里没有 `AppendMemIndex`，也没有报错）。需要单独排查是"同列多向量索引"还是"DATE 列 / 非默认 analyzer"触发。
+- **崩溃后参考打不开端口的目录（第 7 项）**。参考在 `RestoreTableCache` 里要求每个块都有可打开的 `version` 文件，而端口在未 flush 时已经发布了块元数据却没写块文件，于是参考启动即 `UnrecoverableError`。端口自己的 `wal/wal.rust` 只服务自己，`wal/wal.log` 的 C++ 记录格式也还没对齐——跨引擎崩溃恢复要先把 WAL 记录格式冻结。
 
 ### 第 1 项的修正：**chunk 边界不是格式**
 
