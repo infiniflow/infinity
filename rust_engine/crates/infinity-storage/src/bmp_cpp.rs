@@ -153,21 +153,34 @@ pub fn encode_bmp(
     for b in 0..block_num {
         let start = b * block_size;
         let end = (start + block_size).min(docs.len());
-        // Group by term: a block's term list is unique and ascending in the
-        // reference's `BlockTerms`, so every document's entries of the same
-        // term must share one entry.
-        let mut grouped: std::collections::BTreeMap<i32, Vec<(u8, f32)>> =
-            std::collections::BTreeMap::new();
+        // The reference's `TailFwd::ToBlockFwd` (`bmp_fwd.cppm:298`): the
+        // block's `(term, offset, value)` triples in document order, then a
+        // `std::sort` whose comparator looks at the **term id only**. The
+        // comparator is not a total order, so the rows of one term come out
+        // in libstdc++'s tie-break order -- and that order is what the chunk
+        // holds. `libstdcxx_sort` reproduces the algorithm, so the bytes
+        // match; the order itself carries no meaning (both readers
+        // accumulate per row).
+        let mut triples: Vec<(i32, u8, f32)> = Vec::new();
         for (i, (_, entries)) in docs[start..end].iter().enumerate() {
             for (term, value) in entries {
                 let t = *term;
                 if t < 0 || t as usize >= term_num {
                     continue;
                 }
-                grouped.entry(t).or_default().push((i as u8, *value));
+                triples.push((t, i as u8, *value));
             }
         }
-        let terms: Vec<(i32, Vec<(u8, f32)>)> = grouped.into_iter().collect();
+        crate::libstdcxx_sort::sort_by(&mut triples, |a, b| a.0 < b.0);
+        // Group consecutive equal term ids, keeping the rows in the order the
+        // sort left them.
+        let mut terms: Vec<(i32, Vec<(u8, f32)>)> = Vec::new();
+        for (t, offset, value) in triples {
+            match terms.last_mut() {
+                Some((last, rows)) if *last == t => rows.push((offset, value)),
+                _ => terms.push((t, vec![(offset, value)])),
+            }
+        }
         for (t, list) in &terms {
             let max = list
                 .iter()

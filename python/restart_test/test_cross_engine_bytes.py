@@ -12,28 +12,34 @@ reference was run several times on the same input and the distinct byte
 patterns counted (see `test_the_reference_is_deterministic_where_the_test_assumes_it`).
 
 * **Deterministic** — the block columns (`.col`), the variable-length outline
-  (`col_*_out`) and the full-text chunk (`.dic`/`.pos`/`.len`). The reference
+  (`col_*_out`), the full-text chunk (`.dic`/`.pos`/`.len`), the sparse (BMP)
+  index chunk and the integral-key secondary index chunk. The reference
   produces the same bytes on every run, so the two engines must too: **byte for
   byte identical**. This is the strong signal.
+  The sparse chunk is in this class because the order of a term's rows inside a
+  block — which the reference leaves to a `std::sort` over a term-id-only
+  comparator (`ToBlockFwd`, `bmp_fwd.cppm:309`) — is reproducible: the port
+  reproduces that sort (`libstdcxx_sort.rs`). The integral-key secondary chunk
+  is here because the reference's PGM fit over a u64 key is pure `__int128`
+  arithmetic (`piecewise_linear_model.hpp:249`, the integral branch), with a
+  `u64::MAX` sentinel rather than infinity.
 * **Deterministic modulo a timestamp** — the block `version` file: the
   reference records the commit ts of the append that filled the block, the port
   records its own mirror ts. The layout must match; the ts must not be compared.
-* **Not byte comparable — compared by content** — the index chunks. Each holds
-  a *model* next to its postings, and the model is a fit the two engines
-  compute differently:
+* **Not byte comparable — compared by content** — two *models* that the
+  reference itself does not reproduce across its own builds:
   - the HNSW chunk's **graph**: the reference builds it with a
     `thread_local std::mt19937` (`hnsw_alg.cppm:107`), so which thread
     inserts which vector — and therefore which node gets which level — is up
     to the scheduler. Measured: five runs of the reference on 5000 rows
     produced **five different** HNSW chunks, while every other file was
     byte-stable.
-  - the secondary index chunks' **PGM model**: the reference fits a model over
-    the keys (`SecondaryIndexDataHighCardinalityT::SaveIndexInner`,
-    `secondary_index_data_impl.cpp:223`), the port writes a flat one
-    (`secondary_segment.rs:38`) — exact and readable, but not the same fit.
-  - the sparse (BMP) chunk's **row order within a term**: the reference
-    leaves it in the order the block's documents arrived (`ToBlockFwd`,
-    `bmp_fwd.cppm:309`), the port sorts it.
+  - the **float/double**-key secondary index chunk's **PGM model**: the
+    reference fits it in x87 80-bit `long double` and decides its segment count
+    with an undefined conversion (`size_t(inf)`). Measured: the same keys give
+    two segments under clang++-20 and three under g++, and an f64 fit differs
+    from the 80-bit one in 18 of 51 random float key sets. See the assertion
+    in the test body for the details.
 
   What must match is the **postings** — the vectors and labels, the ordered
   keys and row offsets, the terms with their rows and scores — because that is
@@ -43,10 +49,13 @@ patterns counted (see `test_the_reference_is_deterministic_where_the_test_assume
   not even byte-reproducible against *itself* here.
 
 The test therefore asserts:
-1. every deterministic file is byte identical;
+1. every deterministic file is byte identical — including the sparse index
+   chunk and the integral-key secondary index chunk;
 2. the `version` file is identical once its ts is normalized;
-3. the index chunks' postings are identical (decoded), and the full-text
-   chunk is byte identical;
+3. the two index chunks that carry a build-dependent model — the HNSW graph
+   and the float/double secondary PGM fit — still have identical **postings**
+   (decoded), and the rest of the HNSW chunk (header, vectors, labels) is byte
+   identical;
 4. the catalog's *logical* content (the key/value pairs the reference sees
    through `SHOW CATALOG 'all'`) is identical, modulo the ts the reference
    stamps on the records it wrote itself;
@@ -333,93 +342,14 @@ def _secondary_postings(chunk, row_count, key_width):
     The layout (`SecondaryIndexDataHighCardinalityT::SaveIndexInner`,
     `secondary_index_data_impl.cpp:223`): the ordered keys, then the row
     offsets, then the PGM model. The first two are the *postings* - what the
-    index says - and must match. The model is a *fit* the reference computes
-    over the keys; the port writes a flat model instead
-    (`secondary_segment.rs:38`), and a flat model is not the fit the reference
-    would produce.
+    index says - and must match byte for byte. The model behind them is
+    compared by content, because for an f32 key the reference computes it in
+    x87 80-bit `long double` and with an undefined conversion (see the
+    assertion in the test body).
     """
     keys = chunk[: row_count * key_width]
     offsets = chunk[row_count * key_width : row_count * (key_width + 4)]
     return {"keys": keys, "offsets": offsets}
-
-
-def _sparse_postings(chunk):
-    """A sparse (BMP) chunk: its inverted index and its postings.
-
-    The layout (`bmp_cpp.rs`, the module's header comment): the inverted
-    index (`ivt`), the forward index (`fwd`) and the document ids.
-
-    The `ivt` - the per-term block maxima the search uses - is laid out from
-    the rows alone, so it is compared **byte for byte**. The `fwd` part holds,
-    per block, the terms of that block with the offset of each term's row
-    inside the block and its score: the reference leaves a term's rows in the
-    order the block's documents arrived (`ToBlockFwd`, `bmp_fwd.cppm:309`) and
-    the port sorts them, so the postings are compared as a set.
-    """
-    at = 0
-
-    def u64():
-        nonlocal at
-        value = struct.unpack_from("<Q", chunk, at)[0]
-        at += 8
-        return value
-
-    def i32():
-        nonlocal at
-        value = struct.unpack_from("<i", chunk, at)[0]
-        at += 4
-        return value
-
-    def f32():
-        nonlocal at
-        value = struct.unpack_from("<f", chunk, at)[0]
-        at += 4
-        return value
-
-    term_num = u64()
-    for _ in range(term_num):
-        i32()
-    for _ in range(term_num):
-        f32()
-    prefix = [u64() for _ in range(term_num + 1)]
-    total = prefix[-1]
-    for _ in range(total):
-        i32()
-    for _ in range(total):
-        f32()
-    # The inverted index ends here: it is compared as bytes.
-    ivt = chunk[:at]
-
-    block_size = u64()
-    block_num = u64()
-    for _ in range(block_num + 1):
-        u64()
-
-    # Per block: the terms and, for each, the rows of that term in the block
-    # with their scores. The rows of a term are compared as a set.
-    postings = {}
-    for _block_id in range(block_num):
-        terms = u64()
-        term_prefix = [u64() for _ in range(terms + 1)]
-        ids = [i32() for _ in range(terms)]
-        sum_ = term_prefix[-1]
-        offsets = list(chunk[at : at + sum_])
-        at += sum_
-        values = [f32() for _ in range(sum_)]
-        for t in range(terms):
-            rows = sorted(
-                zip(
-                    offsets[term_prefix[t] : term_prefix[t + 1]],
-                    values[term_prefix[t] : term_prefix[t + 1]],
-                )
-            )
-            postings.setdefault(ids[t], set()).update(rows)
-    return {
-        "ivt": ivt,
-        "block_size": block_size,
-        "block_num": block_num,
-        "postings": {term: sorted(rows) for term, rows in sorted(postings.items())},
-    }
 
 
 def _normalize_version(blob):
@@ -740,36 +670,62 @@ def test_the_two_engines_write_the_same_bytes():
     assert cpp_hnsw["vectors"] == rust_hnsw["vectors"], "the HNSW vectors differ"
     assert cpp_hnsw["labels"] == rust_hnsw["labels"], "the HNSW labels differ"
 
-    # The secondary index chunks: the *postings* - the ordered keys and the row
-    # offsets - are what the index says, and they must match byte for byte. The
-    # PGM model behind them is a *fit* the reference computes over the keys
-    # (`SecondaryIndexDataHighCardinalityT::SaveIndexInner`,
-    # `secondary_index_data_impl.cpp:223`); the port writes a flat model
-    # instead (`secondary_segment.rs:38`), which is exact and readable but not
-    # the fit the reference would produce - so the model is compared by content
-    # (the answers) below, not by bytes.
+    # The secondary index chunks.
     #
-    # `idx_3` is the secondary index on the varchar column (a hashed u64 key),
-    # `idx_4` the one on the float column (an f32 key).
-    cpp_sec = _secondary_postings(cpp_files["db_1/tbl_0/idx_3/seg_0/chunk_0.idx"], ROWS, 8)
-    rust_sec = _secondary_postings(
-        rust_files["db_1/tbl_0/idx_3/seg_0/chunk_0.idx"], ROWS, 8
+    # `idx_3` is the secondary index on the varchar column. Its key is a
+    # hashed u64, and the reference builds the PGM model over it with the
+    # **integral** branch of `CanonicalSegment::get_floating_point_segment`
+    # (`piecewise_linear_model.hpp:249`) — pure `__int128` arithmetic, no
+    # floating point — and with a `u64::MAX` sentinel rather than infinity.
+    # That model is exactly reproducible, so the whole chunk must match.
+    sec64 = "db_1/tbl_0/idx_3/seg_0/chunk_0.idx"
+    assert cpp_files[sec64] == rust_files[sec64], (
+        "the varchar secondary index chunk differs: "
+        f"cpp {hashlib.md5(cpp_files[sec64]).hexdigest()} "
+        f"({len(cpp_files[sec64])} bytes), "
+        f"rust {hashlib.md5(rust_files[sec64]).hexdigest()} "
+        f"({len(rust_files[sec64])} bytes)"
     )
-    assert cpp_sec == rust_sec, "the varchar secondary index's postings differ"
-    cpp_sec = _secondary_postings(cpp_files["db_1/tbl_0/idx_4/seg_0/chunk_0.idx"], ROWS, 4)
-    rust_sec = _secondary_postings(
-        rust_files["db_1/tbl_0/idx_4/seg_0/chunk_0.idx"], ROWS, 4
-    )
-    assert cpp_sec == rust_sec, "the float secondary index's postings differ"
 
-    # The sparse (BMP) chunk: the postings - the terms with the rows they
-    # match and the score - must be the same. The *order* of a term's rows
-    # inside a block is not: the reference leaves them in the order the block's
-    # documents arrived (`ToBlockFwd`, `bmp_fwd.cppm:309`) and the port sorts
-    # them, so they are compared as a set.
-    cpp_sparse = _sparse_postings(cpp_files["db_1/tbl_0/idx_5/seg_0/chunk_0.idx"])
-    rust_sparse = _sparse_postings(rust_files["db_1/tbl_0/idx_5/seg_0/chunk_0.idx"])
-    assert cpp_sparse == rust_sparse, "the sparse index's postings differ"
+    # `idx_4` is the secondary index on the float column. Its key is an f32, so
+    # the reference takes the **floating-point** branch of the same function:
+    # `get_intersection()` and `get_slope_range()` in x87 80-bit `long double`,
+    # with the intercept truncated to an integer. Those bytes are a property
+    # of the reference's *build*, not of the format. Measured:
+    #
+    # * the segment count depends on the compiler: the sentinel check at
+    #   `pgm_index.hpp:112` evaluates `size_t(slope * double(inf - key))`, and
+    #   converting infinity to `size_t` is undefined behaviour. clang++-20
+    #   (what this reference is built with) yields the x86 "integer
+    #   indefinite" value 2**63, so no extra segment is added; g++ yields 0,
+    #   so one is — two segments against three, for the same keys;
+    # * the intercept depends on the width of `long double` (80-bit here,
+    #   IEEE binary128 on aarch64) and is truncated, so an f64 implementation
+    #   differs from it in 18 of 51 random float key sets.
+    #
+    # So the model is a *fit* that the reference computes differently per
+    # build, and it is compared by content (the answers) below. The
+    # **postings** — the ordered keys and the row offsets, i.e. what the index
+    # says — must match byte for byte, and they do.
+    sec32 = "db_1/tbl_0/idx_4/seg_0/chunk_0.idx"
+    assert _secondary_postings(cpp_files[sec32], ROWS, 4) == _secondary_postings(
+        rust_files[sec32], ROWS, 4
+    ), "the float secondary index's postings differ"
+
+    # The sparse (BMP) chunk: the whole file, byte for byte. Its inverted index
+    # and its per-block postings are laid out from the rows alone — including
+    # the order of a term's rows inside a block, which the reference leaves to
+    # a `std::sort` over a term-id-only comparator (`ToBlockFwd`,
+    # `bmp_fwd.cppm:309`). The port reproduces that sort
+    # (`libstdcxx_sort.rs`), because the order is part of the bytes.
+    sparse = "db_1/tbl_0/idx_5/seg_0/chunk_0.idx"
+    assert cpp_files[sparse] == rust_files[sparse], (
+        "the sparse index chunk differs: "
+        f"cpp {hashlib.md5(cpp_files[sparse]).hexdigest()} "
+        f"({len(cpp_files[sparse])} bytes), "
+        f"rust {hashlib.md5(rust_files[sparse]).hexdigest()} "
+        f"({len(rust_files[sparse])} bytes)"
+    )
 
     # The catalog: the same logical records. The reference stamps the commit
     # ts of the transaction that created a record into its key and, for some
@@ -815,11 +771,12 @@ def test_the_two_engines_write_the_same_bytes():
 def test_the_reference_is_deterministic_where_the_test_assumes_it():
     """The classification the byte comparison rests on, measured.
 
-    The byte test compares the secondary and the sparse chunk byte for byte
-    and excludes only the HNSW graph. That split is an assumption about the
-    reference, so it is checked here rather than asserted in a comment: the
-    reference is run three times on the same input and the files that come out
-    differently are counted.
+    The byte test compares the sparse chunk and the integral-key secondary
+    chunk byte for byte and excludes only the HNSW chunk (its graph) and the
+    float-key secondary chunk (its PGM model). That split is an assumption
+    about the reference, so it is checked here rather than asserted in a
+    comment: the reference is run three times on the same input and the files
+    that come out differently are counted.
 
     The HNSW chunk is the one that may differ - the reference builds the graph
     with a `thread_local std::mt19937` (`hnsw_alg.cppm:107`), so which thread
