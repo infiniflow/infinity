@@ -641,6 +641,15 @@ pub const VARCHAR_INLINE_LENGTH: usize = 13;
 /// of an inline payload (at most [`VARCHAR_INLINE_LENGTH`] bytes) or a 5-byte
 /// prefix and an outline offset. The payload is appended to `outline` only when
 /// it does not fit inline.
+///
+/// The prefix is left **zero**, as the reference leaves it: its
+/// `ColumnVector::AppendVarcharInner` (`column_vector_impl.cpp:2986`) sets
+/// only `length_` and `vector_.file_offset_` and never fills `prefix_`, so the
+/// bytes on disk are whatever the block buffer held. The reference reads a
+/// long value back from the outline through `file_offset_`
+/// (`GetVarcharInner`, `column_vector_impl.cpp:3006`) and never looks at the
+/// prefix, so it is dead weight in the file - and writing it would make the
+/// port's `.col` differ from the reference's byte for byte.
 pub fn encode_varchar_slot(payload: &[u8], outline: &mut Vec<u8>) -> [u8; 16] {
     let len = payload.len() as u64 & 0x00ff_ffff;
     let mut slot = [0u8; 16];
@@ -650,7 +659,6 @@ pub fn encode_varchar_slot(payload: &[u8], outline: &mut Vec<u8>) -> [u8; 16] {
     } else {
         let offset = outline.len() as u64;
         outline.extend_from_slice(payload);
-        slot[3..8].copy_from_slice(&payload[..5]);
         slot[8..16].copy_from_slice(&offset.to_le_bytes());
     }
     slot
@@ -1180,7 +1188,7 @@ mod tests {
     #[test]
     fn pack_varchar_column_inlines_short_and_outlines_long() {
         // ≤ `VARCHAR_INLINE_LENGTH` (13) bytes stay in the slot; a longer payload
-        // is appended to the outline with a 5-byte prefix plus its offset.
+        // is appended to the outline and the slot records only its offset.
         let long = b"this string is definitely longer than thirteen bytes";
         let (body, outline) =
             pack_column(9, &[Some(b"hello"), None, Some(b"ab"), Some(long)], 4).unwrap();
@@ -1204,10 +1212,11 @@ mod tests {
         assert_eq!(w2 & 0x00ff_ffff, 2);
         assert_eq!(&w2.to_le_bytes()[3..5], b"ab");
         assert_eq!(off2, 0);
-        // row 3: the long payload sits in the outline at 0.
+        // row 3: the long payload sits in the outline at 0. The slot's prefix
+        // stays zero, as the reference leaves it.
         let (w3, off3) = word(3);
         assert_eq!(w3 & 0x00ff_ffff, long.len() as u64);
-        assert_eq!(&w3.to_le_bytes()[3..8], &long[..5]);
+        assert_eq!(&w3.to_le_bytes()[3..8], &[0u8; 5]);
         assert_eq!(off3, 0);
         assert_eq!(body.null_bitmap[0], 0b0000_1101);
     }

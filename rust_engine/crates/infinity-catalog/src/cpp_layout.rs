@@ -4,8 +4,10 @@
 //!
 //! This is additive: the engine's own catalog storage is untouched, and
 //! [`Catalog::write_cpp_layout`] / [`read_cpp_layout`] let us prove the layout
-//! round-trips on a real catalog. The C++ global counters
-//! (`next_database_id`/`next_table_id`) are written too.
+//! round-trips on a real catalog. The C++ id counters are written too: the
+//! database counter as the `next_database_id` system tag, the table counter as
+//! the **per-database** `db|{db_id}|next_table_id` tag (the reference has no
+//! top-level `next_table_id`).
 
 use infinity_common::{Error, Result, TxnTimeStamp};
 use infinity_expression::json::Json;
@@ -481,10 +483,11 @@ fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
             &im.column,
             value_format::metric_name_of(&opt_word("METRIC", "l2")),
             value_format::hnsw_encode_name_of(&opt_word("ENCODE", "plain")),
-            value_format::hnsw_build::PLAIN,
+            value_format::hnsw_build_name_of(&opt_word("BUILD_TYPE", "plain")),
             opt_num("M", value_format::HNSW_M),
             opt_num("EF_CONSTRUCTION", value_format::HNSW_EF_CONSTRUCTION),
             opt_num("BLOCK_SIZE", value_format::HNSW_BLOCK_SIZE),
+            opt("LSG_CONFIG"),
         )),
         "FULLTEXT" => Some(IndexDefValue::full_text(
             &im.name,
@@ -703,7 +706,6 @@ impl Catalog {
                 ),
                 ("next_segment_id", 0),
                 ("unsealed_segment_id", 0),
-                ("comment", 0),
                 // `next_index_id` starts at 0 (`table_meta_impl.cpp:281-282`);
                 // the C++ reader takes it as the next id to hand out.
                 ("next_index_id", 0),
@@ -732,17 +734,25 @@ impl Catalog {
                 value.column_comment = t.comments.get(i).cloned().flatten();
                 // The C++ records NOT NULL as the `kNotNull` constraint and a
                 // default as a `ConstantExpr::Serialize()` object, so carry
-                // both across.
+                // both across. A column *without* a default still records
+                // one: the reference's `ColumnDef` replaces a missing default
+                // with a null constant
+                // (`column_def.cpp:122-124`), so the record always has the
+                // `{"type": 4}` (`LiteralType::kNull`) object.
                 if t.not_nulls.get(i).copied().unwrap_or(false) {
                     value.constraints = vec![1]; // ConstraintType::kNotNull
                 }
-                value.default = t
-                    .defaults
-                    .get(i)
-                    .cloned()
-                    .flatten()
-                    .as_deref()
-                    .and_then(default_constant_expr);
+                value.default = Some(
+                    t.defaults
+                        .get(i)
+                        .cloned()
+                        .flatten()
+                        .as_deref()
+                        .and_then(default_constant_expr)
+                        .unwrap_or_else(|| {
+                            value_format::constant_expr_json(value_format::literal::NULL, None)
+                        }),
+                );
                 store.put(
                     key::table_column_key(&db_str, &tbl_str, col, ts).as_bytes(),
                     &value_format::column_def_bytes(&value),
@@ -857,15 +867,16 @@ impl Catalog {
             }
         }
 
+        // The system tag the reference reads on startup
+        // (`MetaTree::RestoreSystemCache`, `meta_tree_impl.cpp:577`). The
+        // *table* id counter is a per-database tag (`db|{db_id}|next_table_id`,
+        // written above), not a system tag - the reference has no top-level
+        // `next_table_id`.
         store.put(
             key::NEXT_DATABASE_ID.as_bytes(),
             dbs.len().to_string().as_bytes(),
         )?;
-        store.put(
-            key::NEXT_TABLE_ID.as_bytes(),
-            next_table_id.to_string().as_bytes(),
-        )?;
-        written += 2;
+        written += 1;
         store.flush()?;
         Ok(written)
     }
@@ -1263,13 +1274,17 @@ pub fn write_cpp_index_segments(
                 chunk.chunk_id as u64,
                 "chunk_info",
             );
+            // The reference's `nlohmann::json::dump()` writes an object's
+            // keys in **sorted** order, so the record's bytes depend on the
+            // order: `base_name`, `base_row_id`, `index_size`, `row_count`,
+            // `term_count`.
             let value = format!(
-                "{{\"base_name\":{},\"base_row_id\":{},\"row_count\":{},\"term_count\":{},\"index_size\":{}}}",
+                "{{\"base_name\":{},\"base_row_id\":{},\"index_size\":{},\"row_count\":{},\"term_count\":{}}}",
                 json_string(&chunk.base_name),
                 chunk.base_row_id,
+                chunk.index_size,
                 chunk.row_count,
-                chunk.term_count,
-                chunk.index_size
+                chunk.term_count
             );
             store.put(key.as_bytes(), value.as_bytes())?;
             written += 1;
@@ -1348,6 +1363,33 @@ pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<Ind
     }
     if let Some(c) = opt("cardinality") {
         options.push(("CARDINALITY".to_string(), c));
+    }
+    // The HNSW parameters (`IndexHnsw::Serialize`,
+    // `index_hnsw_impl.cpp:278-290`). Without them the record's `M` /
+    // `ef_construction` / `encode_type` / `build_type` are lost, and the next
+    // write falls back to the defaults - so an index created with
+    // `ef_construction = 20` would be rewritten with 200, and the HNSW chunk
+    // would carry a different header than the reference's.
+    //
+    // The names are the ones `index_def_for` reads back, so the round trip is
+    // stable: a record read and written again is byte for byte the same.
+    if let Some(m) = opt("M") {
+        options.push(("M".to_string(), m));
+    }
+    if let Some(e) = opt("ef_construction") {
+        options.push(("EF_CONSTRUCTION".to_string(), e));
+    }
+    if let Some(e) = opt("encode_type") {
+        options.push(("ENCODE".to_string(), e));
+    }
+    if let Some(b) = opt("build_type") {
+        options.push(("BUILD_TYPE".to_string(), b));
+    }
+    if let Some(b) = opt("block_size") {
+        options.push(("BLOCK_SIZE".to_string(), b));
+    }
+    if let Some(l) = opt("lsg_config") {
+        options.push(("LSG_CONFIG".to_string(), l));
     }
     Some(IndexMeta {
         name: def.base.index_name.clone(),
@@ -1565,14 +1607,18 @@ mod tests {
         let written = cat.write_cpp_layout(store.as_ref()).unwrap();
         assert!(written >= 4, "wrote {written} records");
 
-        // The C++ keys are there.
+        // The C++ keys are there. The next-table-id counter is a *per
+        // database* tag (`db|{db_id}|next_table_id`,
+        // `db_meta_impl.cpp:237`), not a system tag - the reference has no
+        // top-level `next_table_id`.
         assert_eq!(
             store
-                .get(key::NEXT_TABLE_ID.as_bytes())
+                .get(key::catalog_db_tag_key("1", key::NEXT_TABLE_ID).as_bytes())
                 .unwrap()
                 .map(|v| String::from_utf8_lossy(&v).to_string()),
             Some((t.id + 1).to_string())
         );
+        assert!(store.get(key::NEXT_TABLE_ID.as_bytes()).unwrap().is_none());
         // `default_db` is the first database, so its reference id is 1.
         assert!(!store
             .scan_prefix(key::catalog_db_table_prefix("1").as_bytes())

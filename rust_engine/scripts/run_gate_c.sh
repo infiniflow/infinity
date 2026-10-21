@@ -57,7 +57,9 @@ else
 fi
 
 # 2b. cross-engine compatibility: the same data directory opened by the other
-#     engine (C++ <-> Rust), with several index types and new inserts.
+#     engine (C++ <-> Rust), with several index types and new inserts; plus the
+#     byte-level check, where the two engines write the same data and their
+#     files are compared byte for byte.
 if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
   # The reference reads the *C++-layout* catalog (`catalog| db| tbl| col| idx|`
   # in RocksDB). That backend only exists behind the `rocksdb-store` feature;
@@ -68,6 +70,7 @@ if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
     ( cd "$root" && INFINITY_SERVER_BIN="$root/rust_engine/target/release/infinity" \
         INFINITY_CPP_BIN="${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" \
         "$py" -m pytest -q python/restart_test/test_cross_engine_compat.py \
+        python/restart_test/test_cross_engine_bytes.py \
         --infinity_path="$shim" ) || status=1
   else
     echo "FAIL: could not build the rocksdb-store binary the cross-engine leg needs"

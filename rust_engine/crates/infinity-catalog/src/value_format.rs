@@ -636,6 +636,17 @@ pub fn hnsw_encode_name_of(text: &str) -> &'static str {
     }
 }
 
+/// `StringToHnswBuildType` spelling (`index_hnsw_impl.cpp:73-81`): `plain` and
+/// `lsg`, anything else is invalid - and the reference's `Serialize` writes
+/// the build type it was given, so the record must keep the spelling.
+pub fn hnsw_build_name_of(text: &str) -> &'static str {
+    match text.trim().to_ascii_lowercase().as_str() {
+        "plain" => hnsw_build::PLAIN,
+        "lsg" => hnsw_build::LSG,
+        _ => hnsw_build::PLAIN,
+    }
+}
+
 /// The `data_type` (a `LogicalType` ordinal) of a serialized `DataType` object.
 pub fn data_type_code(column_type: &Json) -> Option<i64> {
     as_int(field(column_type, "data_type")?)
@@ -802,6 +813,10 @@ impl IndexDefValue {
     }
 
     /// `IndexHnsw::Serialize()` (`index_hnsw_impl.cpp:278-290`).
+    ///
+    /// `lsg_config` is the reference's `LSGConfig::ToString()` text; the
+    /// reference writes the field only when the index has one
+    /// (`if (lsg_config_)`), so `None` leaves it out.
     #[allow(clippy::too_many_arguments)]
     pub fn hnsw(
         index_name: &str,
@@ -813,8 +828,9 @@ impl IndexDefValue {
         m: i64,
         ef_construction: i64,
         block_size: i64,
+        lsg_config: Option<String>,
     ) -> Self {
-        Self::new(IndexBaseValue::new(
+        let mut value = Self::new(IndexBaseValue::new(
             index_type::HNSW,
             index_name,
             index_file_name(table_name, index_name),
@@ -825,7 +841,11 @@ impl IndexDefValue {
         .with("encode_type", Json::Str(encode.to_string()))
         .with("M", Json::Int(m))
         .with("block_size", Json::Int(block_size))
-        .with("metric_type", Json::Str(metric.to_string()))
+        .with("metric_type", Json::Str(metric.to_string()));
+        if let Some(config) = lsg_config {
+            value = value.with("lsg_config", Json::Str(config));
+        }
+        value
     }
 
     /// An HNSW index with the C++ build defaults
@@ -841,6 +861,7 @@ impl IndexDefValue {
             HNSW_M,
             HNSW_EF_CONSTRUCTION,
             HNSW_BLOCK_SIZE,
+            None,
         )
     }
 

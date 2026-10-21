@@ -163,11 +163,6 @@ fn widest_run(dir: &Path, ext: &str) -> Option<(PathBuf, Option<u64>)> {
     best
 }
 
-/// Bytes of `path`, or 0 when it cannot be read.
-fn file_len(path: &Path) -> u64 {
-    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
-}
-
 /// The document count and the total term count of a full-text chunk, read
 /// from its `.len` file.
 ///
@@ -1585,7 +1580,8 @@ impl Engine {
             let seg_dir = root.join(format!("idx_{index_id}/seg_0"));
             let private =
                 crate::index_key(&self.qualified_table(table), &im.column).replace('/', "_");
-            let mut chunk: Option<(u64, u64, u64)> = None; // (row count, index size, term count)
+            // (row count, term count)
+            let mut chunk: Option<(u64, u64)> = None;
             if im.index_type.eq_ignore_ascii_case("SECONDARY") {
                 // The spill runs are already the reference's chunk layout
                 // (`write_secondary_segment_typed`); the widest run is the one
@@ -1595,11 +1591,7 @@ impl Engine {
                     if std::fs::create_dir_all(&seg_dir).is_ok()
                         && std::fs::copy(&path, seg_dir.join("chunk_0.idx")).is_ok()
                     {
-                        chunk = Some((
-                            n.unwrap_or(rows as u64),
-                            file_len(&seg_dir.join("chunk_0.idx")),
-                            0,
-                        ));
+                        chunk = Some((n.unwrap_or(rows as u64), 0));
                     }
                 }
             } else if im.index_type.eq_ignore_ascii_case("BMP") {
@@ -1608,11 +1600,7 @@ impl Engine {
                     if std::fs::create_dir_all(&seg_dir).is_ok()
                         && std::fs::copy(&path, seg_dir.join("chunk_0.idx")).is_ok()
                     {
-                        chunk = Some((
-                            n.unwrap_or(rows as u64),
-                            file_len(&seg_dir.join("chunk_0.idx")),
-                            0,
-                        ));
+                        chunk = Some((n.unwrap_or(rows as u64), 0));
                     }
                 }
             } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
@@ -1632,16 +1620,16 @@ impl Engine {
                     // (`TermQueryNode::CreateSearch`,
                     // `query_node_impl.cpp:435`).
                     if let Some((row_count, term_count)) = fulltext_chunk_counts(&len_path) {
-                        chunk = Some((row_count, 0, term_count));
+                        chunk = Some((row_count, term_count));
                     }
                 }
             } else {
                 let path = seg_dir.join("chunk_0.idx");
                 if path.exists() {
-                    chunk = Some((rows as u64, file_len(&path), 0));
+                    chunk = Some((rows as u64, 0));
                 }
             }
-            let Some((row_count, index_size, term_count)) = chunk else {
+            let Some((row_count, term_count)) = chunk else {
                 continue;
             };
             published.push(CppIndexSegment {
@@ -1649,15 +1637,28 @@ impl Engine {
                 segment_id: 0,
                 chunks: vec![CppIndexChunk {
                     chunk_id: 0,
+                    // Only the full-text chunk names its files: the reference
+                    // derives the other index types' file name from the chunk
+                    // id (`IndexFileName`, `chunk_index_meta_impl.cpp:52`) and
+                    // records an empty base name
+                    // (`HnswIndexInMem::GetChunkIndexMetaInfo`,
+                    // `hnsw_handler_impl.cpp:651`).
                     base_name: if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                         cpp_format::fulltext_base_name(0, None)
                     } else {
-                        format!("{}_{:016}", im.name, 0)
+                        String::new()
                     },
                     base_row_id: 0,
                     row_count,
                     term_count,
-                    index_size,
+                    // The reference records the index's size only for the
+                    // in-memory index it dumps (`GetSizeInBytes`), which is
+                    // zero for a chunk that is already on disk - and the
+                    // reference's file worker falls back to the file's own
+                    // size when it is zero
+                    // (`HnswFileWorker::HnswFileWorker`,
+                    // `hnsw_file_worker_impl.cpp:55`).
+                    index_size: 0,
                 }],
             });
         }
