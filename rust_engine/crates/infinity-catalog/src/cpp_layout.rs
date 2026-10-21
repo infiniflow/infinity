@@ -74,25 +74,6 @@ pub struct CppIndexChunk {
     /// Bytes the index occupies on disk (the HNSW/BMP/IVF workers size their
     /// buffer with it).
     pub index_size: u64,
-    /// Whether the **reference** can read this chunk's files.
-    ///
-    /// The chunk **id** key (`idx_chunk|{db}|{tbl}|{idx}|{seg}|{chunk_id}`)
-    /// is what the reference enumerates to learn a segment's chunks
-    /// (`SegmentIndexMeta::LoadChunkIDs1`,
-    /// `src/storage/catalog/meta/segment_index_meta_impl.cpp:236`): it takes
-    /// the numeric suffix of every key under the prefix and skips the tagged
-    /// ones. With the key present the reference reads the chunk's files
-    /// instead of rebuilding the index from the table's rows - so the key may
-    /// only be published for a chunk whose files the reference can read.
-    ///
-    /// The full-text chunk is the exception: the reference reads its
-    /// `.dic`/`.pos` files with its own posting format
-    /// (`ColumnIndexIterator::Init`, `column_index_iterator_impl.cpp:28`),
-    /// which the port does not write yet. Publishing the key for it would
-    /// make the reference read a posting list it cannot decode and answer
-    /// every full-text query with nothing; without the key it rebuilds the
-    /// index from the table's rows, which is correct.
-    pub readable_by_reference: bool,
 }
 
 /// The sealed chunks of one index over one segment.
@@ -1263,18 +1244,17 @@ pub fn write_cpp_index_segments(
             // The key may only be published for a chunk whose files the
             // reference can read - with the key present it reads the files
             // instead of rebuilding, so a chunk it cannot decode would make
-            // it answer with nothing.
-            if chunk.readable_by_reference {
-                let id_key = key::catalog_index_chunk_key(
-                    &set.db_id,
-                    &set.table_id,
-                    &idx_str,
-                    index.segment_id,
-                    chunk.chunk_id as u64,
-                );
-                store.put(id_key.as_bytes(), CPP_MIRROR_TS.to_string().as_bytes())?;
-                written += 1;
-            }
+            // it answer with nothing. Every chunk the port mirrors is in the
+            // reference's own byte layout, so all of them qualify.
+            let id_key = key::catalog_index_chunk_key(
+                &set.db_id,
+                &set.table_id,
+                &idx_str,
+                index.segment_id,
+                chunk.chunk_id as u64,
+            );
+            store.put(id_key.as_bytes(), CPP_MIRROR_TS.to_string().as_bytes())?;
+            written += 1;
             let key = key::catalog_index_chunk_tag_key(
                 &set.db_id,
                 &set.table_id,

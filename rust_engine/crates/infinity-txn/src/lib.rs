@@ -487,7 +487,22 @@ impl TxnManager {
         if ts == 0 {
             return Ok(());
         }
-        let entry = WalEntry::new(-1, ts, vec![WalCmd::Checkpoint { max_commit_ts: ts }]);
+        // The reference's checkpoint command carries the checkpoint
+        // transaction's **begin** ts, which is odd - its commit ts is even
+        // (`NewTxnManager::GetWriteCommitTS` hands out `current_ts + 2`).
+        // `NewTxn::Checkpoint` rejects an even checkpoint ts outright
+        // ("last checkpoint ts isn't correct", `new_txn_impl.cpp:1754`), so a
+        // directory whose checkpoint frame names an even ts makes the
+        // reference abort on startup. The frame's own commit ts is the begin
+        // ts plus one, again matching the reference.
+        let begin_ts = (ts + 1) | 1;
+        let entry = WalEntry::new(
+            -1,
+            begin_ts + 1,
+            vec![WalCmd::Checkpoint {
+                max_commit_ts: begin_ts,
+            }],
+        );
         let mut buf = Vec::with_capacity(entry.size_in_bytes());
         entry.write_adv(&mut buf);
         // `wal.log` is the reference's file: one checkpoint entry, nothing this

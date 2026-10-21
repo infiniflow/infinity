@@ -194,7 +194,7 @@ mod variables;
 pub use variables::SetScope as Scope;
 mod wand;
 
-mod cpp_blocks;
+pub mod cpp_blocks;
 
 /// The batch of rows the physical operators exchange (C++ `DataBlock`).
 pub mod chunk;

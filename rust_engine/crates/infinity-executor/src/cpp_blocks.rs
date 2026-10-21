@@ -168,6 +168,28 @@ fn file_len(path: &Path) -> u64 {
     std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
 }
 
+/// The document count and the total term count of a full-text chunk, read
+/// from its `.len` file.
+///
+/// The file is the chunk's per-document column length, a bare `u32[row_cnt]`
+/// (`RawFileWorker` in `chunk_index_meta_impl.cpp:157`). The reference
+/// records the same two numbers in the chunk info: the document count and the
+/// sum of the lengths (`MemoryIndexer::GetDocTermCount`,
+/// `memory_indexer_impl.cpp:636`).
+fn fulltext_chunk_counts(len_path: &Path) -> Option<(u64, u64)> {
+    let bytes = std::fs::read(len_path).ok()?;
+    if bytes.len() % 4 != 0 {
+        return None;
+    }
+    let mut doc_count = 0u64;
+    let mut term_count = 0u64;
+    for chunk in bytes.chunks_exact(4) {
+        doc_count += 1;
+        term_count += u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) as u64;
+    }
+    Some((doc_count, term_count))
+}
+
 /// Rough encoded bytes per row, from the declared column types.
 fn estimated_row_bytes(types: &[String]) -> usize {
     types
@@ -974,7 +996,7 @@ fn embedding_element_text(bytes: &[u8], element_type: i32) -> Option<String> {
 ///   `posting_writer_impl.cpp:52-63`). The reference slices the file by them
 ///   (`disk_segment_reader_impl.cpp:126`), so each offset has to be taken
 ///   **after** the preceding part has been appended.
-fn encode_fulltext_chunk(
+pub fn encode_fulltext_chunk(
     postings: &std::collections::BTreeMap<String, Vec<(u32, u32)>>,
     lengths: &[u32],
 ) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
@@ -1563,7 +1585,7 @@ impl Engine {
             let seg_dir = root.join(format!("idx_{index_id}/seg_0"));
             let private =
                 crate::index_key(&self.qualified_table(table), &im.column).replace('/', "_");
-            let mut chunk: Option<(u64, u64)> = None; // (row count, index size)
+            let mut chunk: Option<(u64, u64, u64)> = None; // (row count, index size, term count)
             if im.index_type.eq_ignore_ascii_case("SECONDARY") {
                 // The spill runs are already the reference's chunk layout
                 // (`write_secondary_segment_typed`); the widest run is the one
@@ -1576,6 +1598,7 @@ impl Engine {
                         chunk = Some((
                             n.unwrap_or(rows as u64),
                             file_len(&seg_dir.join("chunk_0.idx")),
+                            0,
                         ));
                     }
                 }
@@ -1588,38 +1611,39 @@ impl Engine {
                         chunk = Some((
                             n.unwrap_or(rows as u64),
                             file_len(&seg_dir.join("chunk_0.idx")),
+                            0,
                         ));
                     }
                 }
             } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                 // Written in place by `write_cpp_fulltext_index`; its files are
                 // named after the chunk's base name, not `chunk_0.idx`.
-                if seg_dir
-                    .join(cpp_format::fulltext_base_name(0, None) + ".dic")
-                    .exists()
-                {
-                    chunk = Some((rows as u64, 0));
+                let base = cpp_format::fulltext_base_name(0, None);
+                let len_path = seg_dir.join(format!("{base}.len"));
+                if seg_dir.join(format!("{base}.dic")).exists() {
+                    // The `.len` file is the chunk's per-document column length
+                    // (`u32[row_cnt]`, `RawFileWorker` in
+                    // `chunk_index_meta_impl.cpp:157`), so it carries both
+                    // numbers the reference records in the chunk info: the
+                    // document count and the total term count
+                    // (`MemoryIndexer::GetDocTermCount` sums the lengths).
+                    // The reference needs the term count: a full-text query
+                    // drops the whole search when it is zero
+                    // (`TermQueryNode::CreateSearch`,
+                    // `query_node_impl.cpp:435`).
+                    if let Some((row_count, term_count)) = fulltext_chunk_counts(&len_path) {
+                        chunk = Some((row_count, 0, term_count));
+                    }
                 }
             } else {
                 let path = seg_dir.join("chunk_0.idx");
                 if path.exists() {
-                    chunk = Some((rows as u64, file_len(&path)));
+                    chunk = Some((rows as u64, file_len(&path), 0));
                 }
             }
-            let Some((row_count, index_size)) = chunk else {
+            let Some((row_count, index_size, term_count)) = chunk else {
                 continue;
             };
-            // The reference reads a chunk's files for every index type but the
-            // full-text one, whose `.dic`/`.pos` it decodes with its own
-            // posting format (`ColumnIndexIterator::Init`,
-            // `column_index_iterator_impl.cpp:28`). The port writes that
-            // layout now, but the reference's doc list still has to line up
-            // byte for byte with it; until it does, publishing the chunk id
-            // key would make the reference read a doc list it decodes into
-            // the wrong documents, and every full-text query would come back
-            // empty. Without the key the reference rebuilds the index from
-            // the table's rows, which is correct.
-            let readable_by_reference = !im.index_type.eq_ignore_ascii_case("FULLTEXT");
             published.push(CppIndexSegment {
                 index_id: index_id as u64,
                 segment_id: 0,
@@ -1632,9 +1656,8 @@ impl Engine {
                     },
                     base_row_id: 0,
                     row_count,
-                    term_count: 0,
+                    term_count,
                     index_size,
-                    readable_by_reference,
                 }],
             });
         }
@@ -2317,8 +2340,6 @@ impl Engine {
     /// family under `{data_dir}/data/db_{db}/tbl_{tbl}/idx_{id}/seg_0/`,
     /// returning the number of documents indexed.
     pub fn write_cpp_fulltext_index(&self, table: &str, index_name: &str) -> Result<usize> {
-        use infinity_storage::inverted_format as inv;
-
         let table = self.qualified_table(table);
         let meta = self
             .storage
