@@ -211,6 +211,17 @@ def _seed(conn, row_count=ROWS):
     for start in range(0, len(rows), 8192):
         t.insert(rows[start : start + 8192])
     conn.flush_data()
+    # The reference dumps its memory indexes asynchronously, and only when the
+    # index-memory quota (`memindex_memory_quota`, 1KB here) is exceeded - and
+    # only one non-EMVB index per round (`MemIndexTracer::MakeDumpTask`,
+    # `memindex_tracer_impl.cpp:130`). At a few hundred rows the quota is
+    # crossed repeatedly, so every index lands; at a few thousand rows the
+    # growth is one-off, so only the HNSW index (the EMVB one) is dumped and
+    # the other four chunks never appear. A fixed sleep is therefore a race,
+    # and the file sets differ for a reason that has nothing to do with the
+    # format. `optimize` takes the reference's OptimizeIndex path, which dumps
+    # the memory indexes deterministically.
+    t.optimize()
 
     time.sleep(2)
 
