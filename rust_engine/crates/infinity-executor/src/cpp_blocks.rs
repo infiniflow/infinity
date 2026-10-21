@@ -131,36 +131,252 @@ pub struct LoadedVectorIndex {
 /// best-effort interop artifact, not the system of record.
 const MIRROR_BUDGET_BYTES: usize = 1024 * 1024 * 1024;
 
-/// The widest chunk file in `dir` with extension `ext`.
+/// The sealed chunks of a private mirror, as `(chunk id, row count, path)`.
 ///
-/// Both private mirrors name their chunks after the row count they cover
-/// (`seg_0_200.idx`, `seg_0_0_200.bmp`), so the trailing numeric field is the
-/// row count of that run; the widest run is the one that covers a full
-/// checkpoint. Returns `(path, row count)` with the count `None` when the name
-/// carries no number (a spill tail).
-fn widest_run(dir: &Path, ext: &str) -> Option<(PathBuf, Option<u64>)> {
-    let mut best: Option<(PathBuf, Option<u64>)> = None;
-    for entry in std::fs::read_dir(dir).ok()?.flatten() {
+/// Both private mirrors name their chunks `seg_{segment}_{block}_{rows}{ext}`
+/// (`seg_0_1_8192.idx`, `seg_0_2_3616.bmp`): the chunk id is the **block**
+/// index, which is what the reference names its `chunk_{id}.idx` after, and
+/// the trailing field is the row count that chunk covers.
+fn spill_chunks(dir: &Path, ext: &str) -> Vec<(u32, u64, PathBuf)> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return out;
+    };
+    for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
-        if !name.ends_with(ext) {
+        let Some(stem) = name.strip_suffix(ext) else {
+            continue;
+        };
+        let fields: Vec<&str> = stem.split('_').collect();
+        if fields.len() != 4 || fields[0] != "seg" {
             continue;
         }
-        let count = name
-            .trim_end_matches(ext)
-            .rsplit('_')
-            .next()
-            .and_then(|f| f.parse::<u64>().ok());
-        let better = match (&best, count) {
-            (None, _) => true,
-            (Some((_, Some(prev))), Some(n)) => n > *prev,
-            (Some((_, None)), Some(_)) => true,
-            _ => false,
+        let (Ok(_segment), Ok(block), Ok(rows)) = (
+            fields[1].parse::<u64>(),
+            fields[2].parse::<u32>(),
+            fields[3].parse::<u64>(),
+        ) else {
+            continue;
         };
-        if better {
-            best = Some((entry.path(), count));
+        out.push((block, rows, entry.path()));
+    }
+    out.sort_by_key(|(block, _, _)| *block);
+    out
+}
+
+/// Copies a private mirror's per-block chunks into `seg_dir` as
+/// `chunk_{block}.idx` and describes them for the catalog.
+fn publish_spill_chunks(seg_dir: &Path, dir: &Path, ext: &str) -> Vec<CppIndexChunk> {
+    let mut chunks = Vec::new();
+    for (block, row_count, path) in spill_chunks(dir, ext) {
+        if std::fs::create_dir_all(seg_dir).is_err() {
+            break;
+        }
+        if std::fs::copy(&path, seg_dir.join(format!("chunk_{block}.idx"))).is_err() {
+            continue;
+        }
+        chunks.push(CppIndexChunk {
+            chunk_id: block,
+            // Only the full-text chunk names its files: the reference derives
+            // the other index types' file name from the chunk id
+            // (`IndexFileName`, `chunk_index_meta_impl.cpp:52`) and records an
+            // empty base name (`HnswIndexInMem::GetChunkIndexMetaInfo`,
+            // `hnsw_handler_impl.cpp:651`).
+            base_name: String::new(),
+            base_row_id: u64::from(block) * DEFAULT_BLOCK_CAPACITY as u64,
+            row_count,
+            term_count: 0,
+            index_size: 0,
+        });
+    }
+    chunks
+}
+
+/// One raw ordered key, from a chunk's key array.
+fn decode_secondary_key(
+    bytes: &[u8],
+    kind: infinity_storage::secondary_segment::KeyKind,
+) -> Option<infinity_storage::secondary_segment::Key> {
+    use infinity_storage::secondary_segment::{Key, KeyKind};
+    Some(match kind {
+        KeyKind::U64 => Key::U64(u64::from_le_bytes(bytes.try_into().ok()?)),
+        KeyKind::I64 => Key::I64(i64::from_le_bytes(bytes.try_into().ok()?)),
+        KeyKind::I32 => Key::I32(i32::from_le_bytes(bytes.try_into().ok()?)),
+        KeyKind::F32 => Key::F32(f32::from_le_bytes(bytes.try_into().ok()?)),
+        KeyKind::F64 => Key::F64(f64::from_le_bytes(bytes.try_into().ok()?)),
+    })
+}
+
+/// Rebuilds a secondary index's published chunks: every spill run is decoded
+/// and re-bucketed by **block**, then written as `chunk_{block}.idx`.
+///
+/// The spill runs are per memory dump, so a run may straddle a block boundary
+/// or cover half of one; the reference's chunk is the block
+/// (`SecondaryIndexDataHighCardinalityT::SaveIndexInner`,
+/// `secondary_index_data_impl.cpp:223`, one per `InsertBlockData` call). The
+/// offsets stay segment-relative, so the bucketing key is `offset / 8192` and
+/// the values are written unchanged.
+fn publish_secondary_chunks(
+    seg_dir: &Path,
+    dir: &Path,
+    kind: infinity_storage::secondary_segment::KeyKind,
+) -> Vec<CppIndexChunk> {
+    use infinity_storage::secondary_segment::{
+        write_secondary_segment_typed, SecondarySegmentReader,
+    };
+    let width = kind.key_width();
+    let stride = width + 4;
+    let mut by_block: std::collections::BTreeMap<u64, Vec<_>> = Default::default();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("idx") {
+            continue;
+        }
+        let (Ok(bytes), Ok(reader)) = (
+            std::fs::read(&path),
+            SecondarySegmentReader::open_with_kind(&path, kind),
+        ) else {
+            continue;
+        };
+        let n = reader.row_count();
+        if bytes.len() < n * stride {
+            continue;
+        }
+        for i in 0..n {
+            let Some(key) = decode_secondary_key(&bytes[i * width..(i + 1) * width], kind) else {
+                continue;
+            };
+            let at = n * width + i * 4;
+            let offset = u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+            by_block
+                .entry(u64::from(offset) / DEFAULT_BLOCK_CAPACITY as u64)
+                .or_default()
+                .push((key, offset));
         }
     }
-    best
+    let mut chunks = Vec::new();
+    for (block, mut entries) in by_block {
+        if std::fs::create_dir_all(seg_dir).is_err() {
+            break;
+        }
+        entries.sort_by(|a, b| a.0.order(&b.0));
+        let path = seg_dir.join(format!("chunk_{block}.idx"));
+        if write_secondary_segment_typed(&path, kind, &entries).is_err() {
+            continue;
+        }
+        chunks.push(CppIndexChunk {
+            chunk_id: block as u32,
+            base_name: String::new(),
+            base_row_id: block * DEFAULT_BLOCK_CAPACITY as u64,
+            row_count: entries.len() as u64,
+            term_count: 0,
+            index_size: 0,
+        });
+    }
+    chunks
+}
+
+/// The full-text chunks on disk, one per block, named `ft_{base_row_id:016x}`.
+fn publish_fulltext_chunks(seg_dir: &Path) -> Vec<CppIndexChunk> {
+    let mut chunks = Vec::new();
+    let Ok(entries) = std::fs::read_dir(seg_dir) else {
+        return chunks;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let Some(hex) = name
+            .strip_prefix("ft_")
+            .and_then(|rest| rest.strip_suffix(".dic"))
+        else {
+            continue;
+        };
+        let Ok(base_row_id) = u64::from_str_radix(hex, 16) else {
+            continue;
+        };
+        let base = cpp_format::fulltext_base_name(base_row_id, None);
+        // The `.len` file is the chunk's per-document column length
+        // (`u32[row_cnt]`, `RawFileWorker` in `chunk_index_meta_impl.cpp:157`),
+        // so it carries both numbers the reference records in the chunk info:
+        // the document count and the total term count
+        // (`MemoryIndexer::GetDocTermCount` sums the lengths). The reference
+        // needs the term count: a full-text query drops the whole search when
+        // it is zero (`TermQueryNode::CreateSearch`, `query_node_impl.cpp:435`).
+        let Some((row_count, term_count)) =
+            fulltext_chunk_counts(&seg_dir.join(format!("{base}.len")))
+        else {
+            continue;
+        };
+        chunks.push(CppIndexChunk {
+            chunk_id: (base_row_id / DEFAULT_BLOCK_CAPACITY as u64) as u32,
+            base_name: base,
+            base_row_id,
+            row_count,
+            term_count,
+            index_size: 0,
+        });
+    }
+    chunks.sort_by_key(|c| c.chunk_id);
+    chunks
+}
+
+/// The `chunk_{id}.idx` files of an index that writes them in place (HNSW, IVF,
+/// PLAID). An HNSW chunk's header carries its vector count, so a multi-chunk
+/// index can be described exactly; the other kinds still write one chunk, which
+/// covers the whole snapshot.
+fn publish_chunk_files(seg_dir: &Path, rows: u64, hnsw: bool) -> Vec<CppIndexChunk> {
+    let mut ids: Vec<u32> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(seg_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let Some(id) = name
+                .strip_prefix("chunk_")
+                .and_then(|rest| rest.strip_suffix(".idx"))
+                .and_then(|id| id.parse::<u32>().ok())
+            else {
+                continue;
+            };
+            ids.push(id);
+        }
+    }
+    if !hnsw {
+        return if ids.is_empty() {
+            Vec::new()
+        } else {
+            vec![CppIndexChunk {
+                chunk_id: 0,
+                base_name: String::new(),
+                base_row_id: 0,
+                row_count: rows,
+                term_count: 0,
+                index_size: 0,
+            }]
+        };
+    }
+    ids.sort_unstable();
+    let mut chunks = Vec::new();
+    let mut base_row_id = 0u64;
+    for id in ids {
+        // `[M][ef_construction][cur_vec_num]…` — the third u64 is this chunk's
+        // vector count (`HnswHeader::cur_vec_num`, `knn_format.rs:44`).
+        let row_count = std::fs::read(seg_dir.join(format!("chunk_{id}.idx")))
+            .ok()
+            .filter(|bytes| bytes.len() >= 24)
+            .map(|bytes| u64::from_le_bytes(bytes[16..24].try_into().unwrap()))
+            .unwrap_or(0);
+        chunks.push(CppIndexChunk {
+            chunk_id: id,
+            base_name: String::new(),
+            base_row_id,
+            row_count,
+            term_count: 0,
+            index_size: 0,
+        });
+        base_row_id += row_count;
+    }
+    chunks
 }
 
 /// The document count and the total term count of a full-text chunk, read
@@ -1580,86 +1796,45 @@ impl Engine {
             let seg_dir = root.join(format!("idx_{index_id}/seg_0"));
             let private =
                 crate::index_key(&self.qualified_table(table), &im.column).replace('/', "_");
-            // (row count, term count)
-            let mut chunk: Option<(u64, u64)> = None;
-            if im.index_type.eq_ignore_ascii_case("SECONDARY") {
-                // The spill runs are already the reference's chunk layout
-                // (`write_secondary_segment_typed`); the widest run is the one
-                // that covers the snapshot.
+            // Every chunk the index sealed, not just the first: the reference
+            // keeps one chunk per block (8192 rows here), so a 20000-row table
+            // has three, and a chunk the catalog does not list is invisible to
+            // the reference's readers.
+            let chunks = if im.index_type.eq_ignore_ascii_case("SECONDARY") {
                 let dir = self.dir.join("secondary").join(&private);
-                if let Some((path, n)) = widest_run(&dir, ".idx") {
-                    if std::fs::create_dir_all(&seg_dir).is_ok()
-                        && std::fs::copy(&path, seg_dir.join("chunk_0.idx")).is_ok()
-                    {
-                        chunk = Some((n.unwrap_or(rows as u64), 0));
-                    }
-                }
+                // The chunk's key width comes from the column's declared type,
+                // exactly as the reader derives it (`SecondarySegmentReader::
+                // open_with_kind`).
+                let declared = self
+                    .table_schema(table)
+                    .ok()
+                    .and_then(|schema| {
+                        let ci = schema.iter().position(|c| c == &im.column)?;
+                        self.column_types(table).ok()?.get(ci).cloned()
+                    })
+                    .unwrap_or_default();
+                publish_secondary_chunks(&seg_dir, &dir, crate::secondary_key_kind(&declared))
             } else if im.index_type.eq_ignore_ascii_case("BMP") {
                 let dir = self.dir.join("sparse").join(&private);
-                if let Some((path, n)) = widest_run(&dir, ".bmp") {
-                    if std::fs::create_dir_all(&seg_dir).is_ok()
-                        && std::fs::copy(&path, seg_dir.join("chunk_0.idx")).is_ok()
-                    {
-                        chunk = Some((n.unwrap_or(rows as u64), 0));
-                    }
-                }
+                publish_spill_chunks(&seg_dir, &dir, ".bmp")
             } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                 // Written in place by `write_cpp_fulltext_index`; its files are
-                // named after the chunk's base name, not `chunk_0.idx`.
-                let base = cpp_format::fulltext_base_name(0, None);
-                let len_path = seg_dir.join(format!("{base}.len"));
-                if seg_dir.join(format!("{base}.dic")).exists() {
-                    // The `.len` file is the chunk's per-document column length
-                    // (`u32[row_cnt]`, `RawFileWorker` in
-                    // `chunk_index_meta_impl.cpp:157`), so it carries both
-                    // numbers the reference records in the chunk info: the
-                    // document count and the total term count
-                    // (`MemoryIndexer::GetDocTermCount` sums the lengths).
-                    // The reference needs the term count: a full-text query
-                    // drops the whole search when it is zero
-                    // (`TermQueryNode::CreateSearch`,
-                    // `query_node_impl.cpp:435`).
-                    if let Some((row_count, term_count)) = fulltext_chunk_counts(&len_path) {
-                        chunk = Some((row_count, term_count));
-                    }
-                }
+                // named after the chunk's base name, not `chunk_N.idx`.
+                publish_fulltext_chunks(&seg_dir)
             } else {
-                let path = seg_dir.join("chunk_0.idx");
-                if path.exists() {
-                    chunk = Some((rows as u64, 0));
-                }
-            }
-            let Some((row_count, term_count)) = chunk else {
-                continue;
+                publish_chunk_files(
+                    &seg_dir,
+                    rows as u64,
+                    im.index_type.eq_ignore_ascii_case("HNSW"),
+                )
             };
+            if chunks.is_empty() {
+                continue;
+            }
             published.push(CppIndexSegment {
                 index_id: index_id as u64,
                 segment_id: 0,
-                chunks: vec![CppIndexChunk {
-                    chunk_id: 0,
-                    // Only the full-text chunk names its files: the reference
-                    // derives the other index types' file name from the chunk
-                    // id (`IndexFileName`, `chunk_index_meta_impl.cpp:52`) and
-                    // records an empty base name
-                    // (`HnswIndexInMem::GetChunkIndexMetaInfo`,
-                    // `hnsw_handler_impl.cpp:651`).
-                    base_name: if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
-                        cpp_format::fulltext_base_name(0, None)
-                    } else {
-                        String::new()
-                    },
-                    base_row_id: 0,
-                    row_count,
-                    term_count,
-                    // The reference records the index's size only for the
-                    // in-memory index it dumps (`GetSizeInBytes`), which is
-                    // zero for a chunk that is already on disk - and the
-                    // reference's file worker falls back to the file's own
-                    // size when it is zero
-                    // (`HnswFileWorker::HnswFileWorker`,
-                    // `hnsw_file_worker_impl.cpp:55`).
-                    index_size: 0,
-                }],
+                chunks,
             });
         }
         if published.is_empty() {
@@ -2366,23 +2541,12 @@ impl Engine {
         let db_id = self.database_id_of(&table);
         let tokenizer = self.index_tokenizer(&table, &im.column);
         let rows = self.fetch_rows_with_ids(&table)?;
-
-        // term -> (document ordinal, the term's position in the document), in
-        // term order (the FST requires sorted keys).
-        let mut postings: std::collections::BTreeMap<String, Vec<(u32, u32)>> =
-            std::collections::BTreeMap::new();
-        let mut lengths: Vec<u32> = Vec::with_capacity(rows.len());
-        for (doc, (_, row)) in rows.iter().enumerate() {
-            let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
-            let terms = crate::tokenize_index_positions(&text, &tokenizer);
-            lengths.push(terms.len() as u32);
-            for (t, position) in terms {
-                postings.entry(t).or_default().push((doc as u32, position));
-            }
-        }
-
-        let (dic, pos, len) = encode_fulltext_chunk(&postings, &lengths);
-
+        // The reference seals one index chunk per **block**: the mem indexer is
+        // handed a block at a time, and the chunk's files are named
+        // `ft_{:016x}` after the block's first row id
+        // (`new_txn_index_impl.cpp:860`). A 20000-row table therefore has three
+        // chunks, `ft_0000000000000000`, `ft_0000000000002000`,
+        // `ft_0000000000004000` - not one chunk over the whole segment.
         let dir = self
             .blocks_root()
             .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id));
@@ -2390,16 +2554,64 @@ impl Engine {
             path: dir.clone(),
             source: e,
         })?;
-        let base = cpp_format::fulltext_base_name(0, None);
-        for (name, bytes) in [
-            (format!("{base}.dic"), &dic),
-            (format!("{base}.pos"), &pos),
-            (format!("{base}.len"), &len),
-        ] {
-            let path = dir.join(&name);
-            std::fs::write(&path, bytes).map_err(|e| Error::Io { path, source: e })?;
+        // A rewrite covers the whole snapshot, so a chunk left by an earlier,
+        // longer one would be published as a live chunk.
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let is_fulltext = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("ft_"));
+                if is_fulltext {
+                    let _ = std::fs::remove_file(path);
+                }
+            }
         }
-        Ok(rows.len())
+        let mut written = 0usize;
+        // One chunk per **physical block** (`row_id / 8192`), not one per 8192
+        // live rows: a block keeps its `base_row_id` even when rows in it were
+        // deleted, so the split follows the row ids.
+        let mut by_block: std::collections::BTreeMap<u64, Vec<&(usize, Vec<Value>)>> =
+            Default::default();
+        for row in &rows {
+            by_block
+                .entry((row.0 as u64 & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY as u64)
+                .or_default()
+                .push(row);
+        }
+        for (block, block_rows) in by_block {
+            let base_row_id = block * DEFAULT_BLOCK_CAPACITY as u64;
+            // term -> (document ordinal, the term's position in the document),
+            // in term order (the FST requires sorted keys). The document
+            // ordinal restarts at zero in every chunk: the chunk's `base_row_id`
+            // is what puts it back on the segment's row ids
+            // (`MemoryIndexer::doc_count_` counts rows within the chunk).
+            let mut postings: std::collections::BTreeMap<String, Vec<(u32, u32)>> =
+                std::collections::BTreeMap::new();
+            let mut lengths: Vec<u32> = Vec::with_capacity(block_rows.len());
+            for (doc, (_, row)) in block_rows.iter().enumerate() {
+                let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
+                let terms = crate::tokenize_index_positions(&text, &tokenizer);
+                lengths.push(terms.len() as u32);
+                for (t, position) in terms {
+                    postings.entry(t).or_default().push((doc as u32, position));
+                }
+            }
+
+            let (dic, pos, len) = encode_fulltext_chunk(&postings, &lengths);
+            let base = cpp_format::fulltext_base_name(base_row_id, None);
+            for (name, bytes) in [
+                (format!("{base}.dic"), &dic),
+                (format!("{base}.pos"), &pos),
+                (format!("{base}.len"), &len),
+            ] {
+                let path = dir.join(&name);
+                std::fs::write(&path, bytes).map_err(|e| Error::Io { path, source: e })?;
+            }
+            written += block_rows.len();
+        }
+        Ok(written)
     }
 
     /// Reads back a mirror written by [`Self::write_cpp_hnsw_index`], returning

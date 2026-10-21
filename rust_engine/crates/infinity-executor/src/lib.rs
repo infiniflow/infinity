@@ -3477,7 +3477,6 @@ struct SparseIndex {
     tail: std::collections::BTreeMap<u64, Vec<(i32, f32)>>,
     /// One mmap reader per dumped chunk, with the `ROW_ID` segment it covers.
     sealed: Vec<(u64, Arc<infinity_storage::bmp_cpp::BmpCppReader>)>,
-    next_chunk: u64,
     tail_bytes: usize,
     /// Bumped on every tail mutation; the in-memory BMP index below is rebuilt
     /// when it lags (the reference's `BMPAlg` held by the mem index).
@@ -3545,13 +3544,6 @@ impl SparseIndex {
         width: infinity_storage::bmp_cpp::IdxWidth,
         store: CatalogSparseStore,
     ) -> Self {
-        let next_chunk = std::fs::read_dir(&dir)
-            .map(|d| {
-                d.filter_map(|e| e.ok())
-                    .filter(|e| e.path().extension().is_some_and(|x| x == "bmp"))
-                    .count() as u64
-            })
-            .unwrap_or(0);
         Self {
             width,
             store,
@@ -3559,7 +3551,6 @@ impl SparseIndex {
             terms: 0,
             tail: Default::default(),
             sealed: Vec::new(),
-            next_chunk,
             tail_bytes: 0,
             tail_generation: 0,
             tail_index: std::sync::Mutex::new(None),
@@ -3591,23 +3582,34 @@ impl SparseIndex {
                 .sum::<usize>()
     }
 
-    /// Dumps the memory tail into per-segment BMP chunks.
+    /// Dumps the memory tail into one BMP chunk per block.
+    ///
+    /// The reference seals a chunk per **block**, not per segment:
+    /// `BMPIndexInMem::Dump` hands the whole in-memory `BMPAlg` to one buffer,
+    /// and the mem indexer builds a fresh one for each block
+    /// (`BMPIndexInMem::AddDocs(block_offset, …)`). The document ids inside the
+    /// chunk stay segment-relative (`MemIndexInserterIter1` yields
+    /// `block_offset + offset + i`), so only the split changes.
     fn seal(&mut self) {
         if self.tail.is_empty() {
             return;
         }
         #[allow(clippy::type_complexity)]
-        let mut by_segment: std::collections::BTreeMap<u64, Vec<(u64, Vec<(i32, f32)>)>> =
-            Default::default();
+        let mut by_chunk: std::collections::BTreeMap<
+            (u64, u64),
+            Vec<(u64, Vec<(i32, f32)>)>,
+        > = Default::default();
+        let block_rows = infinity_storage::cpp_format::DEFAULT_BLOCK_CAPACITY as u64;
         for (seq, doc) in std::mem::take(&mut self.tail) {
-            by_segment
-                .entry(seq >> 32)
+            let row = seq & 0xffff_ffff;
+            by_chunk
+                .entry((seq >> 32, row / block_rows))
                 .or_default()
-                .push((seq & 0xffff_ffff, doc));
+                .push((row, doc));
         }
         self.tail_bytes = 0;
         self.tail_generation += 1;
-        for (segment, mut docs) in by_segment {
+        for ((segment, block), mut docs) in by_chunk {
             docs.sort_by_key(|(row, _)| *row);
             let term_num = (docs
                 .iter()
@@ -3616,8 +3618,7 @@ impl SparseIndex {
                 .unwrap_or(0)
                 .max(1) as usize)
                 .max(self.terms);
-            let name = format!("seg_{segment}_{}_{}.bmp", self.next_chunk, docs.len());
-            self.next_chunk += 1;
+            let name = format!("seg_{segment}_{block}_{}.bmp", docs.len());
             let path = self.dir.join(name);
             if infinity_storage::bmp_cpp::write_bmp_file(
                 &path,
@@ -5207,23 +5208,52 @@ impl Engine {
             .dir
             .join("secondary")
             .join(index_key(table, column).replace('/', "_"));
-        let mut readers = Vec::new();
-        for (segment, mut entries) in by_segment {
-            // `Key::cmp` is the chunk's own order: u64 for integers and hashed
-            // text, the float order for a FLOAT/DOUBLE column.
-            entries.sort_by(|a, b| a.0.order(&b.0));
-            let path = dir.join(format!("seg_{segment}_{}.idx", entries.len()));
-            // Always rewrite: the name does not capture the data, and a stale
-            // chunk from an earlier run would shadow this one.
-            if write_secondary_segment_typed(&path, kind, &entries).is_err() {
-                continue;
+        // One chunk per **block**, as the reference does: the mem indexer is
+        // handed a block at a time (`InsertBlockData`,
+        // `secondary_index_in_mem_impl.cpp:104`) and dumps only that block into
+        // the chunk. The offsets stay segment-relative - the reader ORs every
+        // chunk's hits into a segment-wide bitmask (`TrunkReaderT::OutPut`,
+        // `index_filter_evaluators_impl.cpp:912`) - so only the split point
+        // changes here, not the values.
+        let block_rows = infinity_storage::cpp_format::DEFAULT_BLOCK_CAPACITY as u64;
+        // Every call rewrites the whole spill set; the file name carries the row
+        // count, so a leftover from an earlier (smaller) snapshot would publish
+        // a second chunk for the same block.
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                if entry.path().extension().is_some_and(|e| e == "idx") {
+                    let _ = std::fs::remove_file(entry.path());
+                }
             }
-            if let Ok(reader) =
-                infinity_storage::secondary_segment::SecondarySegmentReader::open_with_kind(
-                    &path, kind,
-                )
-            {
-                readers.push((segment << 32, Arc::new(reader)));
+        }
+        let mut readers = Vec::new();
+        for (segment, entries) in by_segment {
+            let mut by_block: std::collections::BTreeMap<u64, Vec<_>> = Default::default();
+            for entry in entries {
+                by_block
+                    .entry(u64::from(entry.1) / block_rows)
+                    .or_default()
+                    .push(entry);
+            }
+            for (block, mut entries) in by_block {
+                // `Key::cmp` is the chunk's own order: u64 for integers and
+                // hashed text, the float order for a FLOAT/DOUBLE column.
+                entries.sort_by(|a, b| a.0.order(&b.0));
+                let path = dir.join(format!("seg_{segment}_{block}_{}.idx", entries.len()));
+                // Always rewrite: the name does not capture the data, and a
+                // stale chunk from an earlier run would shadow this one.
+                if write_secondary_segment_typed(&path, kind, &entries).is_err() {
+                    continue;
+                }
+                if let Ok(reader) =
+                    infinity_storage::secondary_segment::SecondarySegmentReader::open_with_kind(
+                        &path, kind,
+                    )
+                {
+                    // The chunk's offsets are already segment-relative, so the
+                    // base is the segment alone.
+                    readers.push((segment << 32, Arc::new(reader)));
+                }
             }
         }
         let tkey = self.table_key(table);

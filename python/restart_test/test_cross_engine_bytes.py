@@ -16,6 +16,9 @@ patterns counted (see `test_the_reference_is_deterministic_where_the_test_assume
   index chunk and the integral-key secondary index chunk. The reference
   produces the same bytes on every run, so the two engines must too: **byte for
   byte identical**. This is the strong signal.
+  The data set is `ROWS` rows (20000 by default): three blocks and three index
+  chunks, so the multi-block and multi-chunk layouts are covered, not just the
+  first block.
   The sparse chunk is in this class because the order of a term's rows inside a
   block is defined: the reference sorts the block's `(term, offset, value)`
   triples with a **stable** sort on the term id (`ToBlockFwd`,
@@ -65,6 +68,7 @@ The test therefore asserts:
 """
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -85,7 +89,24 @@ RUST_BIN = os.environ.get("INFINITY_RUST_BIN", "rust_engine/scripts/infinity_rus
 URI = NetworkAddress("127.0.0.1", 23817)
 
 TABLE = "test_cross_engine_bytes"
-ROWS = 200
+COLUMNS = 6  # the schema in `_seed`
+# More than one block (the capacity is 8192 rows) and more than one index
+# chunk, so the multi-block and multi-chunk layouts are covered too. The
+# determinism measurement uses its own, smaller data set: the reference's HNSW
+# build stays on one thread at a few hundred rows and spreads over several
+# threads at a few thousand (which is why its graph is not byte comparable).
+ROWS = int(os.environ.get("INFINITY_BYTES_ROWS", "20000"))
+DET_ROWS = int(os.environ.get("INFINITY_BYTES_DET_ROWS", "500"))
+
+# `idx_<n>` follows the order `_seed` creates the indexes in. The value is how
+# the index's chunk is compared (see the docstring at the top of the file).
+INDEX_KINDS = {
+    1: "fulltext",
+    2: "hnsw",
+    3: "secondary-u64",
+    4: "secondary-f32",
+    5: "bmp",
+}
 
 # The engine's root: the C++ engine reads `data_dir`/`catalog_dir`/`wal_dir`
 # from its config, the port derives its root from the config's
@@ -143,7 +164,7 @@ checkpoint_interval = "0s"
 """
 
 
-def _seed(conn):
+def _seed(conn, row_count=ROWS):
     """The same table, indexes and rows for both engines."""
     db = conn.get_database("default_db")
     db.drop_table(TABLE, ConflictType.Ignore)
@@ -170,7 +191,7 @@ def _seed(conn):
     t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
     t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
     rows = []
-    for i in range(ROWS):
+    for i in range(row_count):
         rows.append(
             {
                 "id": i,
@@ -183,12 +204,18 @@ def _seed(conn):
                 "score": i * 0.5,
             }
         )
-    t.insert(rows)
+    # The engine refuses a batch of more than 8192 rows
+    # (`LogicalPlanner::insert`, "Insert batch row limit shouldn't more than
+    # 8192"), so a multi-block data set arrives as several batches - which is
+    # also how it would arrive in practice.
+    for start in range(0, len(rows), 8192):
+        t.insert(rows[start : start + 8192])
     conn.flush_data()
+
     time.sleep(2)
 
 
-def _run_engine(engine, root, pg_port):
+def _run_engine(engine, root, pg_port, row_count=ROWS):
     """Seed one engine's directory and return it."""
     shutil.rmtree(root, ignore_errors=True)
     for sub in ("log", "tmp"):
@@ -226,7 +253,7 @@ def _run_engine(engine, root, pg_port):
                 time.sleep(0.5)
         else:
             raise AssertionError(f"{engine} engine did not come up")
-        _seed(conn)
+        _seed(conn, row_count)
     finally:
         if conn is not None:
             try:
@@ -310,17 +337,18 @@ def _hnsw_regions(chunk):
     vector region, the graph region and the labels.
 
     The *header* is everything up to `max_layer`: it is derived from the
-    index's parameters alone, so it must match. The **enterpoint** is the node
-    the graph hangs from - a property of the build, not of the format, so it
-    belongs with the graph. The vector region and the labels are derived from
-    the input and must match.
+    index's parameters alone, so it must match. **`max_layer` and the
+    enterpoint are properties of the built graph** - how tall it came out and
+    which node it hangs from - so they belong with the graph (at 500 rows the
+    two engines happen to agree on both; at 8192 they already do not). The
+    vector region and the labels are derived from the input and must match.
     """
     _m, _ef, cur = struct.unpack_from("<3Q", chunk, 0)
     # The store meta is 8 bytes here (the dim), then the graph parameters.
     meta_len = 8
     mmax0, mmax = struct.unpack_from("<2Q", chunk, 24 + meta_len)
     _max_layer, _enterpoint = struct.unpack_from("<2i", chunk, 40 + meta_len)
-    header_end = 44 + meta_len  # up to and including `max_layer`
+    header_end = 40 + meta_len  # up to (not including) `max_layer`
     data_start = 48 + meta_len  # past the `enterpoint`
     # The vector region: `cur` vectors of `dim` f32. The dim is the first u32
     # of the store meta.
@@ -336,20 +364,161 @@ def _hnsw_regions(chunk):
     }
 
 
-def _secondary_postings(chunk, row_count, key_width):
-    """A secondary-index chunk's postings: the keys and the row offsets.
+def _secondary_chunk_rows(chunk, key_width, floating_width=4):
+    """The chunk's row count, taken from its PGM model and validated exactly.
 
-    The layout (`SecondaryIndexDataHighCardinalityT::SaveIndexInner`,
-    `secondary_index_data_impl.cpp:223`): the ordered keys, then the row
-    offsets, then the PGM model. The first two are the *postings* - what the
-    index says - and must match byte for byte. The model behind them is
-    compared by content, because for an f32 key the reference computes it in
-    x87 80-bit `long double` and with an undefined conversion (see the
-    assertion in the test body).
+    Layout (`SecondaryIndexDataHighCardinalityT::SaveIndexInner`,
+    `secondary_index_data_impl.cpp:223`): `n * key_width` keys, `n * u32`
+    offsets, then the model (`PGMWithExtraFunction::Save`,
+    `secondary_index_pgm.cppm:129`): `u32 n`, `K first_key`, `u32
+    segment_count`, the segments, `u32 levels_offsets_count`, then `size_t`
+    offsets. A `Segment` is `pack(1) { K key; Floating slope; u32 intercept; }`
+    and the model ends at EOF, so exactly one `n` reproduces the file length.
+
+    Deriving `n` rather than assuming a chunk capacity keeps the comparison
+    honest when the multi-chunk layout is what is being tested.
     """
-    keys = chunk[: row_count * key_width]
-    offsets = chunk[row_count * key_width : row_count * (key_width + 4)]
-    return {"keys": keys, "offsets": offsets}
+    segment_size = key_width + floating_width + 4
+    for n in range(1, len(chunk) // (key_width + 4) + 1):
+        pos = n * (key_width + 4)
+        if pos + 4 + key_width + 4 > len(chunk):
+            break
+        if struct.unpack_from("<I", chunk, pos)[0] != n:
+            continue
+        segment_count = struct.unpack_from("<I", chunk, pos + 4 + key_width)[0]
+        after = pos + 4 + key_width + 4 + segment_count * segment_size
+        if after + 4 > len(chunk):
+            continue
+        levels = struct.unpack_from("<I", chunk, after)[0]
+        if after + 4 + levels * 8 == len(chunk):
+            return n
+    raise AssertionError(f"no PGM model found in a {len(chunk)}-byte chunk")
+
+
+def _chunks(files, index_id):
+    """One index's files, keyed by their path after `idx_{id}/`."""
+    marker = f"idx_{index_id}/"
+    return {
+        name.split(marker, 1)[1]: blob for name, blob in files.items() if marker in name
+    }
+
+
+def _check_index(cpp, rust, index_id, kind, failures):
+    """Compare one index's files according to its class."""
+    cpp_files_for_index = _chunks(cpp, index_id)
+    rust_files_for_index = _chunks(rust, index_id)
+    if set(cpp_files_for_index) != set(rust_files_for_index):
+        failures.append(
+            f"idx_{index_id}: files differ: "
+            f"only in cpp {sorted(set(cpp_files_for_index) - set(rust_files_for_index))}, "
+            f"only in rust {sorted(set(rust_files_for_index) - set(cpp_files_for_index))}"
+        )
+        return
+    for name in sorted(cpp_files_for_index):
+        a, b = cpp_files_for_index[name], rust_files_for_index[name]
+        if kind in ("fulltext", "secondary-u64", "bmp"):
+            # Deterministic: the layout is derived from the rows alone.
+            if a != b:
+                failures.append(
+                    f"idx_{index_id}/{name}: "
+                    f"cpp {hashlib.md5(a).hexdigest()} ({len(a)} B) != "
+                    f"rust {hashlib.md5(b).hexdigest()} ({len(b)} B)"
+                )
+        elif kind == "hnsw":
+            # The header, the vectors and the labels are derived from the
+            # input; the graph is built, and the reference does not reproduce
+            # it (see the module docstring), so it is compared by content via
+            # `_index_answers`.
+            regions_a, regions_b = _hnsw_regions(a), _hnsw_regions(b)
+            for part in ("header", "vectors", "labels"):
+                if regions_a[part] != regions_b[part]:
+                    failures.append(f"idx_{index_id}/{name}: {part} differ")
+        elif kind in ("secondary-f32", "secondary-f64", "secondary-u32", "secondary-i64"):
+            key_width = {"secondary-f32": 4, "secondary-u32": 4, "secondary-i64": 8, "secondary-f64": 8}[kind]
+            floating_width = 8 if kind == "secondary-f64" else 4
+            n_a = _secondary_chunk_rows(a, key_width, floating_width)
+            n_b = _secondary_chunk_rows(b, key_width, floating_width)
+            if n_a != n_b:
+                failures.append(f"idx_{index_id}/{name}: {n_a} rows != {n_b}")
+                continue
+            postings = n_a * (key_width + 4)
+            # The keys and the offsets are what the index says; the model
+            # behind them is a build artifact (module docstring).
+            if a[:postings] != b[:postings]:
+                failures.append(f"idx_{index_id}/{name}: the postings differ")
+        else:  # pragma: no cover - a typo in INDEX_KINDS
+            raise AssertionError(f"unknown index kind {kind}")
+
+
+def _compare_data_files(cpp, rust, index_kinds):
+    """The files of one table (relative to its directory), by class."""
+    failures = []
+    if set(cpp) != set(rust):
+        failures.append(
+            f"file sets differ: only in cpp {sorted(set(cpp) - set(rust))}, "
+            f"only in rust {sorted(set(rust) - set(cpp))}"
+        )
+        return failures
+    for name in sorted(cpp):
+        if name.split("/")[0].startswith("idx_"):
+            continue
+        if name.endswith("/version"):
+            # Same layout, different commit ts (the reference stamps the
+            # append's ts, the port its mirror ts).
+            if _normalize_version(cpp[name]) != _normalize_version(rust[name]):
+                failures.append(f"{name}: the version layout differs")
+        elif cpp[name] != rust[name]:
+            # Block columns and the outline: laid out from the row values.
+            failures.append(
+                f"{name}: cpp {hashlib.md5(cpp[name]).hexdigest()} "
+                f"({len(cpp[name])} B) != rust "
+                f"{hashlib.md5(rust[name]).hexdigest()} ({len(rust[name])} B)"
+            )
+    index_ids = sorted(
+        int(name.split("/")[0][len("idx_") :])
+        for name in cpp
+        if name.split("/")[0].startswith("idx_")
+    )
+    for index_id in index_ids:
+        kind = index_kinds.get(index_id)
+        if kind is None:
+            failures.append(f"idx_{index_id}: no comparison class registered")
+            continue
+        _check_index(cpp, rust, index_id, kind, failures)
+    return failures
+
+
+def _own_table_dir(files, columns):
+    """The `db_{db}/tbl_{table}` directory of the table this test created.
+
+    The comparison is scoped to that table rather than to "every file under
+    `data/`": the engines listen on a fixed Thrift port, so anything else on the
+    machine that connects to it while the test runs can leave a table of its own
+    behind. Such a table is not this test's input, and its presence must not turn
+    a format difference into a false positive (or the other way round).
+
+    The table is recognised by its column count - the sixth column's `5.col` is
+    only written for this schema.
+    """
+    marker = f"{columns - 1}.col"
+    dirs = {
+        "/".join(parts[:2])
+        for parts in (name.split("/") for name in files)
+        if len(parts) == 5 and parts[4] == marker
+    }
+    assert len(dirs) <= 1, f"more than one table has {columns} columns: {sorted(dirs)}"
+    return dirs.pop() if dirs else None
+
+
+def _under(files, table_dir):
+    """The files of `table_dir`, relative to it."""
+    if table_dir is None:
+        return {}
+    return {
+        name[len(table_dir) + 1 :]: blob
+        for name, blob in files.items()
+        if name.startswith(table_dir + "/")
+    }
 
 
 def _normalize_version(blob):
@@ -597,12 +766,80 @@ def _normalize_catalog_value(value):
     return value
 
 
-def _normalize_catalog(pairs):
-    """The catalog's records, with the ts taken out of the keys and values."""
-    return {
-        _normalize_catalog_key(key): _normalize_catalog_value(value)
-        for key, value in pairs.items()
-    }
+def _table_records(pairs, table_dir, table):
+    """Only the catalog records that belong to `table_dir`'s table.
+
+    Another process can connect to the engine's fixed Thrift port and create a
+    table of its own (see `_own_table_dir`); its records are not this test's
+    input. The table's id comes from the directory the engine wrote, so the
+    filter is exact rather than name-based. `db|{n}|next_table_id` is dropped as
+    well: it counts every table in the database, not just this one.
+    """
+    db_id, table_id = table_dir.split("/")
+    db_id = db_id[len("db_") :]
+    table_id = table_id[len("tbl_") :]
+    out = {}
+    for key, value in pairs.items():
+        parts = key.split("|")
+        head = parts[0]
+        if head == "catalog" and len(parts) > 1:
+            kind = parts[1]
+            if kind == "tbl":
+                # `catalog|tbl|{db}|{name}|{ts}`
+                if len(parts) > 3 and parts[3] == table:
+                    out[key] = value
+            elif kind in ("blk", "idx", "seg", "col"):
+                # `catalog|{blk|idx|seg|col}|{db}|{table}|...`
+                if len(parts) > 3 and parts[2] == db_id and parts[3] == table_id:
+                    out[key] = value
+            elif kind == "db":
+                out[key] = value
+            continue
+        if head == "idx_chunk":
+            # `idx_chunk|{db}|{table}|...`
+            if len(parts) > 2 and parts[1] == db_id and parts[2] == table_id:
+                out[key] = value
+        elif head.startswith("table_index_tag:"):
+            # `table_index_tag: idx|{db}|{table}|...`
+            if len(parts) > 2 and parts[1] == db_id and parts[2] == table_id:
+                out[key] = value
+        elif head == "drop":
+            if table in key:
+                out[key] = value
+    return out
+
+
+def _normalize_catalog(pairs, zero_size_indexes=()):
+    """The catalog's records, with the ts taken out of the keys and values.
+
+    `index_size` is also taken out of the chunk records of the indexes in
+    `zero_size_indexes`: the reference stores `GetSizeInBytes()` of the
+    in-memory index it dumps, which for HNSW sums the *graph's* neighbour
+    counts (`GraphStoreInner::GetSizeInBytes`, `graph_store.cppm:221`) and for
+    BMP the in-memory `BMPAlg`'s vector capacities. Both are properties of the
+    built structure, not of the format - they differ per build just like the
+    graph itself - and a reader treats zero as "use the file's own size"
+    (`HnswFileWorker::HnswFileWorker`, `hnsw_file_worker_impl.cpp:55`), so the
+    port writes zero.
+    """
+    out = {}
+    for key, value in pairs.items():
+        key = _normalize_catalog_key(key)
+        value = _normalize_catalog_value(value)
+        if zero_size_indexes and key.endswith("|chunk_info"):
+            parts = key.split("|")
+            # `idx_chunk|{db}|{table}|{index}|{segment}|{chunk}|chunk_info`
+            if len(parts) > 3 and parts[3].isdigit():
+                if int(parts[3]) in zero_size_indexes:
+                    try:
+                        record = json.loads(value)
+                    except ValueError:
+                        record = None
+                    if record is not None and "index_size" in record:
+                        record["index_size"] = 0
+                        value = json.dumps(record, sort_keys=True, separators=(",", ":"))
+        out[key] = value
+    return out
 
 
 @pytest.mark.skipif(
@@ -624,119 +861,50 @@ def test_the_two_engines_write_the_same_bytes():
 
     cpp_files = _files(cpp_root)
     rust_files = _files(rust_root)
-
-    # The two engines must write the same *set* of files: the same block
-    # columns, the same outline, the same index chunks.
-    assert set(cpp_files) == set(rust_files), (
-        f"only in cpp: {sorted(set(cpp_files) - set(rust_files))}, "
-        f"only in rust: {sorted(set(rust_files) - set(cpp_files))}"
+    cpp_dir = _own_table_dir(cpp_files, COLUMNS)
+    rust_dir = _own_table_dir(rust_files, COLUMNS)
+    assert cpp_dir and rust_dir, (
+        "the table under test was not written: "
+        f"cpp dirs {sorted({n.split('/')[0] + '/' + n.split('/')[1] for n in cpp_files})}, "
+        f"rust dirs {sorted({n.split('/')[0] + '/' + n.split('/')[1] for n in rust_files})}"
     )
 
-    # The deterministic files: the block columns and the outline. These are
-    # laid out from the row values alone, so they must match byte for byte.
-    for name in sorted(cpp_files):
-        if name.endswith("/version"):
-            continue
-        if "/idx_" in name:
-            continue  # the index chunks are compared below
-        assert cpp_files[name] == rust_files[name], (
-            f"{name} differs: "
-            f"cpp {hashlib.md5(cpp_files[name]).hexdigest()} "
-            f"({len(cpp_files[name])} bytes), "
-            f"rust {hashlib.md5(rust_files[name]).hexdigest()} "
-            f"({len(rust_files[name])} bytes)"
-        )
-
-    # The `version` file: same layout, different commit ts.
-    version = "db_1/tbl_0/seg_0/blk_0/version"
-    assert _normalize_version(cpp_files[version]) == _normalize_version(
-        rust_files[version]
-    ), "the version file's layout differs"
-
-    # The full-text chunk: the reference's own encoders, byte for byte.
-    for suffix in (".dic", ".pos", ".len"):
-        name = f"db_1/tbl_0/idx_1/seg_0/ft_0000000000000000{suffix}"
-        assert cpp_files[name] == rust_files[name], f"{name} differs"
-
-    # The HNSW chunk: the header, the vectors and the labels are derived from
-    # the input, so they must match byte for byte. The *graph* is built, and the
-    # reference builds it with a `thread_local std::mt19937`
-    # (`hnsw_alg.cppm:107`): five runs of the reference on 5000 rows produce
-    # five different graphs, so it is compared by content below, not by bytes.
-    hnsw = "db_1/tbl_0/idx_2/seg_0/chunk_0.idx"
-    cpp_hnsw = _hnsw_regions(cpp_files[hnsw])
-    rust_hnsw = _hnsw_regions(rust_files[hnsw])
-    assert cpp_hnsw["header"] == rust_hnsw["header"], "the HNSW header differs"
-    assert cpp_hnsw["vectors"] == rust_hnsw["vectors"], "the HNSW vectors differ"
-    assert cpp_hnsw["labels"] == rust_hnsw["labels"], "the HNSW labels differ"
-
-    # The secondary index chunks.
-    #
-    # `idx_3` is the secondary index on the varchar column. Its key is a
-    # hashed u64, and the reference builds the PGM model over it with the
-    # **integral** branch of `CanonicalSegment::get_floating_point_segment`
-    # (`piecewise_linear_model.hpp:249`) — pure `__int128` arithmetic, no
-    # floating point — and with a `u64::MAX` sentinel rather than infinity.
-    # That model is exactly reproducible, so the whole chunk must match.
-    sec64 = "db_1/tbl_0/idx_3/seg_0/chunk_0.idx"
-    assert cpp_files[sec64] == rust_files[sec64], (
-        "the varchar secondary index chunk differs: "
-        f"cpp {hashlib.md5(cpp_files[sec64]).hexdigest()} "
-        f"({len(cpp_files[sec64])} bytes), "
-        f"rust {hashlib.md5(rust_files[sec64]).hexdigest()} "
-        f"({len(rust_files[sec64])} bytes)"
+    # The file set, the block columns, the outline, the `version` files and
+    # every index chunk, each compared according to its class. The classes and
+    # the evidence behind them are in the module docstring; the block layer is
+    # exercised at its real size (20000 rows = 3 blocks of 8192/8192/3616) and
+    # so are the per-index chunks.
+    failures = _compare_data_files(
+        _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), INDEX_KINDS
     )
-
-    # `idx_4` is the secondary index on the float column. Its key is an f32, so
-    # the reference takes the **floating-point** branch of the same function:
-    # `get_intersection()` and `get_slope_range()` in x87 80-bit `long double`,
-    # with the intercept truncated to an integer. Those bytes are a property
-    # of the reference's *build*, not of the format. Measured:
-    #
-    # * the segment count depends on the compiler: the sentinel check at
-    #   `pgm_index.hpp:112` evaluates `size_t(slope * double(inf - key))`, and
-    #   converting infinity to `size_t` is undefined behaviour. clang++-20
-    #   (what this reference is built with) yields the x86 "integer
-    #   indefinite" value 2**63, so no extra segment is added; g++ yields 0,
-    #   so one is — two segments against three, for the same keys;
-    # * the intercept depends on the width of `long double` (80-bit here,
-    #   IEEE binary128 on aarch64) and is truncated, so an f64 implementation
-    #   differs from it in 18 of 51 random float key sets.
-    #
-    # So the model is a *fit* that the reference computes differently per
-    # build, and it is compared by content (the answers) below. The
-    # **postings** — the ordered keys and the row offsets, i.e. what the index
-    # says — must match byte for byte, and they do.
-    sec32 = "db_1/tbl_0/idx_4/seg_0/chunk_0.idx"
-    assert _secondary_postings(cpp_files[sec32], ROWS, 4) == _secondary_postings(
-        rust_files[sec32], ROWS, 4
-    ), "the float secondary index's postings differ"
-
-    # The sparse (BMP) chunk: the whole file, byte for byte. Its inverted index
-    # and its per-block postings are laid out from the rows alone — including
-    # the order of a term's rows inside a block, which is document order
-    # because the reference sorts the block's triples with a stable sort on
-    # the term id (`ToBlockFwd`, `bmp_fwd.cppm:312`).
-    sparse = "db_1/tbl_0/idx_5/seg_0/chunk_0.idx"
-    assert cpp_files[sparse] == rust_files[sparse], (
-        "the sparse index chunk differs: "
-        f"cpp {hashlib.md5(cpp_files[sparse]).hexdigest()} "
-        f"({len(cpp_files[sparse])} bytes), "
-        f"rust {hashlib.md5(rust_files[sparse]).hexdigest()} "
-        f"({len(rust_files[sparse])} bytes)"
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures
     )
 
     # The catalog: the same logical records. The reference stamps the commit
     # ts of the transaction that created a record into its key and, for some
     # records, into its value; the port writes its own mirror ts. The ts is
     # the only part that may differ, so it is taken out before comparing -
-    # the key's *structure* and the value's *content* are the format.
+    # the key's *structure* and the value's *content* are the format. The
+    # `index_size` of a graph-shaped chunk (HNSW, BMP) is taken out as well,
+    # for the reason given in `_normalize_catalog`.
     #
     # The port writes the C++ key space only in its `rocksdb-store` build;
     # without it the reference opens an empty catalog and there is nothing to
     # compare, so the check is skipped rather than failed.
-    cpp_catalog = _normalize_catalog(_catalog_pairs(cpp_root, cpp_pg))
-    rust_catalog = _normalize_catalog(_catalog_pairs(rust_root, rust_pg))
+    zero_size_indexes = {
+        index_id
+        for index_id, kind in INDEX_KINDS.items()
+        if kind in ("hnsw", "bmp")
+    }
+    cpp_catalog = _normalize_catalog(
+        _table_records(_catalog_pairs(cpp_root, cpp_pg), cpp_dir, TABLE),
+        zero_size_indexes,
+    )
+    rust_catalog = _normalize_catalog(
+        _table_records(_catalog_pairs(rust_root, rust_pg), rust_dir, TABLE),
+        zero_size_indexes,
+    )
     if not rust_catalog:
         pytest.skip(
             "the port's catalog is not in the C++ key space; "
@@ -786,7 +954,7 @@ def test_the_reference_is_deterministic_where_the_test_assumes_it():
     for i in range(3):
         root = os.path.join(ROOT, f"determinism{i}")
         shutil.rmtree(root, ignore_errors=True)
-        _run_engine("cpp", root, 5432 + i)
+        _run_engine("cpp", root, 5432 + i, row_count=DET_ROWS)
         roots.append(root)
 
     digests = [_files(root) for root in roots]
@@ -800,10 +968,10 @@ def test_the_reference_is_deterministic_where_the_test_assumes_it():
     # outline, the full-text chunk, the secondary and the sparse chunks - is
     # built from the row values alone and must be reproducible.
     #
-    # Note this is measured at the byte test's own scale (a few hundred rows),
-    # where the HNSW build happens to stay on one thread. At 5000 rows the
-    # reference's HNSW chunk varies between runs - which is why the byte test
-    # compares the HNSW chunk by content and not by bytes.
+    # Note this is measured at `DET_ROWS` (500 rows) and not at the byte
+    # test's own scale: at a few thousand rows the reference's HNSW build
+    # spreads over several threads and the graph varies between runs, which is
+    # exactly why the byte test compares the HNSW chunk by content.
     assert all(
         name.endswith("idx_2/seg_0/chunk_0.idx") for name in varying
     ), f"the reference is not deterministic here: {varying}"

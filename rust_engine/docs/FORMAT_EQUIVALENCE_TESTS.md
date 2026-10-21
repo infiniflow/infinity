@@ -48,19 +48,19 @@
 
 | 格式单元 | 单块单 chunk | 多块 / 多 chunk | 多段 | 删除 / 更新 | 重启后再写 | 崩溃恢复 | 类型 / 选项矩阵 | 对象存储 |
 |---|---|---|---|---|---|---|---|---|
-| 数据文件头尾（magic / buffer_size / checksum） | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | — | ⬜ |
-| 块列 `*.col`（`[data_region][null_bitmap]`） | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 变长 outline `col_*_out` | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| `version` 文件 | ✅（ts 归一） | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | — | ⬜ |
-| 全文 `.dic/.pos/.len` | ✅ | ⬜ | ⬜ 跨段合并未冻结 | ⬜ | ⬜ | ⬜ | ⬜ analyzer / `with_positions` | ⬜ |
-| HNSW chunk | ◐ 图按内容 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ metric / build_type | ⬜ |
+| 数据文件头尾（magic / buffer_size / checksum） | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | — | ⬜ |
+| 块列 `*.col`（`[data_region][null_bitmap]`） | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 变长 outline `col_*_out` | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| `version` 文件 | ✅（ts 归一） | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | — | ⬜ |
+| 全文 `.dic/.pos/.len` | ✅ | ✅ | ⬜ 跨段合并未冻结 | ⬜ | ⬜ | ⬜ | ⬜ analyzer / `with_positions` | ⬜ |
+| HNSW chunk | ◐ 图按内容 | ◐ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ metric / build_type | ⬜ |
 | IVF chunk（plain / SQ / PQ） | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 次级索引 chunk（整数键） | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ date/datetime/uint 键 | ⬜ |
-| 次级索引 chunk（浮点键） | ◐ postings | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ double 键 | ⬜ |
-| 稀疏 BMP chunk | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ 词表规模 / block_size | ⬜ |
+| 次级索引 chunk（整数键） | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ date/datetime/uint 键 | ⬜ |
+| 次级索引 chunk（浮点键） | ◐ postings | ◐ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ double 键 | ⬜ |
+| 稀疏 BMP chunk | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ 词表规模 / block_size | ⬜ |
 | 删除位图（catalog 内） | ◐ 逻辑 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | — | — |
 | WAL 记录 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | — | ⬜ |
-| Catalog KV | ◐ 逻辑 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | — | — |
+| Catalog KV | ◐ 逻辑 | ◐ | ⬜ | ⬜ | ⬜ | ⬜ | — | — |
 
 ## 5. 缺口清单（本轮记录）
 
@@ -91,13 +91,22 @@
 
 | # | 项目 | 状态 | 验收口径 |
 |---|---|---|---|
-| 1 | 多块 / 多 chunk（20000 行） | ⬜ | 3 块 × 6 列 + 3 块 version + 每索引 3 chunk 逐字节相同 |
+| 1 | 多块 / 多 chunk（20000 行） | ✅ | 3 块 × 6 列 + 3 块 version + 每索引 3 chunk 逐字节相同（`2 passed in 36.6s`） |
 | 2 | 全类型列矩阵 | ⬜ | 每类列的 `*.col` / outline 逐字节相同 |
 | 3 | 删除 / 更新 / 重启后再写 | ⬜ | 操作后 `data/` 逐字节相同，catalog 逻辑记录相同 |
 | 4 | 索引种类矩阵（IVF / metric / analyzer / 整数键 / NULL / 重复键） | ⬜ | 每类按对应口径通过 |
 | 5 | CI 接入 | ⬜ | workflow 在本机可复现的步骤上跑通字节 + 互读两个测试 |
 | 6 | HNSW 图 / 浮点 PGM 的「改成可比」评估 | ✅ 结论：不做 | 见下方 |
 | 7 | WAL 崩溃恢复（跨引擎 replay） | ⬜ | kill -9 后另一个引擎能 replay，行数与内容一致 |
+
+### 第 1 项发现的真实缺陷（已修）
+
+把数据集从 200 行提到 20000 行立刻暴露了两件事，都不是测试写法问题：
+
+1. **端口每个索引只写一个 chunk**。参考的索引 chunk 粒度是**块**（8192 行）：`MemoryIndexer`/`SecondaryIndexInMemT`/`BMPIndexInMem` 每次只拿一个块，chunk 文件与 `chunk_info` 记录都是每块一条（全文的文件名是 `ft_{块首行号:016x}`）。端口此前把整个段的索引写成一个 chunk / 一个 `ft_0000000000000000`，20000 行时参考写 3 个、端口写 1 个，参考读目录时还会漏掉后面 2 块。
+   修法：`write_cpp_fulltext_index` 按物理块（`row_id / 8192`）写 `ft_*`；`write_secondary_pgm_chunks` 与 `SparseIndex::seal` 按块切分（offets/doc id 仍是段内绝对行号，只有切分点变）；`publish_cpp_index_chunks` 改为发布**所有** chunk（此前只发布 `chunk_0.idx`，HNSW 的 chunk_1/2 在盘上但不在 catalog 里，参考根本看不到）。
+2. **HNSW chunk 的 `max_layer` 不是格式参数**。它是建图结果（图有几层），和 enterpoint 一样属于图；200 行时两个引擎恰好一致，8192 行时一个是 2、一个是 3。测试里把它当成 header 的一部分来比是错的，已归入图区。
+3. **`index_size` 属于建图产物**。参考在 `chunk_info` 里存 `GetSizeInBytes()`，HNSW 是对**图的邻居数**求和（`GraphStoreInner::GetSizeInBytes`，`graph_store.cppm:221`），BMP 是内存 `BMPAlg` 的容量，都与图内容有关；端口写 0（读侧把 0 当"用文件自身大小"）。catalog 比对因此对该两类索引归一化 `index_size`。
 
 ### 第 6 项的结论（为什么不做字节可比）
 

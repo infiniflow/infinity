@@ -911,6 +911,12 @@ pub struct SecondarySegmentReader {
 }
 
 impl SecondarySegmentReader {
+    /// The chunk's row count, recovered from the model's tail (`n * keys`,
+    /// `n * u32` offsets, then a model that ends at EOF).
+    pub fn row_count(&self) -> usize {
+        self.row_count
+    }
+
     #[allow(unsafe_code)]
     pub fn open(path: &Path) -> Result<Self, FormatError> {
         Self::open_with_kind(path, KeyKind::U64)
