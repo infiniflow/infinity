@@ -776,6 +776,14 @@ pub struct IndexDefValue {
     /// only be guessed from the indexed column's name - and two tables with a
     /// column of the same name then give the index to the wrong one.
     pub owner: Option<(String, String)>,
+    /// The C++ index id the record's **value** carries (the per-table counter
+    /// `CREATE INDEX` hands out), when the record was read from the C++ key
+    /// space.
+    ///
+    /// The id names the index's directory (`idx_{id}/seg_0/`) and its records
+    /// (`idx|{db}|{tbl}|{id}|index_base`), so a reader that renumbered the
+    /// indexes would look for one index's chunk under another's directory.
+    pub index_id: Option<u64>,
 }
 
 impl IndexDefValue {
@@ -784,6 +792,7 @@ impl IndexDefValue {
             base,
             extra: Vec::new(),
             owner: None,
+            index_id: None,
         }
     }
 
@@ -1072,6 +1081,7 @@ pub fn index_def_from_json(j: &Json) -> Option<IndexDefValue> {
         base,
         extra,
         owner: None,
+        index_id: None,
     })
 }
 

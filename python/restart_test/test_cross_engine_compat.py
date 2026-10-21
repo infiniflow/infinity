@@ -45,6 +45,23 @@ def _seed(conn):
             "d": {"type": "double"},
             "b": {"type": "bool"},
             "dt": {"type": "date"},
+            # The two 16-bit floats. They are two bytes wide, and the port's
+            # C++-layout block reader has to know their `ColumnType` code
+            # (7 / 8) to decode them: without it the whole table's segment
+            # recovery fails and the reading engine reports zero rows.
+            "f16": {"type": "float16"},
+            "bf16": {"type": "bfloat16"},
+            # The remaining scalar types the port carries. A second pair of
+            # 16-bit floats, the two narrow integers and the three date/time
+            # types widen the table to nineteen columns - the width that used
+            # to be blamed for the missing segment record.
+            "i8": {"type": "int8"},
+            "i16": {"type": "int16"},
+            "f16b": {"type": "float16"},
+            "bf16b": {"type": "bfloat16"},
+            "tm": {"type": "time"},
+            "dtm": {"type": "datetime"},
+            "ts": {"type": "timestamp"},
         },
         ConflictType.Error,
     )
@@ -82,6 +99,18 @@ def _seed(conn):
                 "d": i / 4.0,
                 "b": i % 2 == 0,
                 "dt": f"2024-01-{i % 28 + 1:02d}",
+                # The 16-bit floats hold values a half can represent exactly
+                # (the integers below 2048), so both engines must render the
+                # same text for them.
+                "f16": float(i % 100),
+                "bf16": float(i % 100),
+                "i8": i % 100,
+                "i16": i % 100,
+                "f16b": float(i % 100),
+                "bf16b": float(i % 100),
+                "tm": f"{i % 24:02d}:{i % 60:02d}:00",
+                "dtm": f"2024-01-{i % 28 + 1:02d} {i % 24:02d}:{i % 60:02d}:00",
+                "ts": f"2024-01-{i % 28 + 1:02d} {i % 24:02d}:{i % 60:02d}:00",
             }
         )
     t.insert(rows)
@@ -131,6 +160,37 @@ def _snapshot(conn):
     out["date_range"] = _ids(
         t.output(["id"]).filter("dt >= '2024-01-03' and dt <= '2024-01-07'").to_result()
     )
+    # The 16-bit floats: their **values** must survive the handover, and a
+    # half can only hold them approximately, so the two engines have to render
+    # the same text (six decimals) rather than the same bit pattern.
+    f16, _, _ = t.output(["f16"]).to_result()
+    bf16, _, _ = t.output(["bf16"]).to_result()
+    out["f16"] = [float(v) for v in f16["f16"]][:5]
+    out["bf16"] = [float(v) for v in bf16["bf16"]][:5]
+    # A filter on a 16-bit float column: it proves the column is not only
+    # readable but usable in a predicate. (`f16` holds `i % 100`, so both 7
+    # and 107 carry the value 7.)
+    out["f16_eq"] = _ids(t.output(["id"]).filter("f16 = 7").to_result())
+    out["bf16_range"] = _ids(
+        t.output(["id"]).filter("bf16 >= 10 and bf16 <= 12").to_result()
+    )
+    # The narrow integers and the date/time types: their values have to
+    # survive the handover as well.
+    i8, _, _ = t.output(["i8"]).to_result()
+    i16, _, _ = t.output(["i16"]).to_result()
+    tm, _, _ = t.output(["tm"]).to_result()
+    dtm, _, _ = t.output(["dtm"]).to_result()
+    ts, _, _ = t.output(["ts"]).to_result()
+    out["i8"] = [int(v) for v in i8["i8"]][:5]
+    out["i16"] = [int(v) for v in i16["i16"]][:5]
+    out["tm"] = [str(v) for v in tm["tm"]][:3]
+    out["dtm"] = [str(v) for v in dtm["dtm"]][:3]
+    out["ts"] = [str(v) for v in ts["ts"]][:3]
+    # The second pair of 16-bit floats: the same values as the first pair.
+    f16b, _, _ = t.output(["f16b"]).to_result()
+    bf16b, _, _ = t.output(["bf16b"]).to_result()
+    out["f16b"] = [float(v) for v in f16b["f16b"]][:5]
+    out["bf16b"] = [float(v) for v in bf16b["bf16b"]][:5]
     # Ordering: proves the block rows are readable in sequence, not just
     # countable. (`_row_id` is not reachable through the SDK's `output()`; the
     # planner-side name is pinned by
@@ -306,11 +366,33 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
     assert before["double_eq"] == [10], before["double_eq"]
     assert before["date_eq"] == [4, 32, 60, 88, 116, 144, 172], before["date_eq"]
     assert before["date_range"] == [2, 3, 4, 5, 6, 30, 31, 32, 33, 34, 58, 59, 60, 61, 62, 86, 87, 88, 89, 90, 114, 115, 116, 117, 118, 142, 143, 144, 145, 146, 170, 171, 172, 173, 174, 198, 199], before["date_range"]
+    # The 16-bit floats: the values are exact (a half holds every integer
+    # below 2048), so the two engines must agree on them, and the filters
+    # prove the columns are usable in predicates.
+    assert before["f16"] == [0.0, 1.0, 2.0, 3.0, 4.0], before["f16"]
+    assert before["bf16"] == [0.0, 1.0, 2.0, 3.0, 4.0], before["bf16"]
+    assert before["f16_eq"] == [7, 107], before["f16_eq"]
+    assert before["bf16_range"] == [10, 11, 12, 110, 111, 112], before["bf16_range"]
+    # The narrow integers and the date/time types.
+    assert before["i8"] == [0, 1, 2, 3, 4], before["i8"]
+    assert before["i16"] == [0, 1, 2, 3, 4], before["i16"]
+    assert before["tm"] == ["00:00:00", "01:01:00", "02:02:00"], before["tm"]
+    assert (
+        before["dtm"]
+        == ["2024-01-01 00:00:00", "2024-01-02 01:01:00", "2024-01-03 02:02:00"]
+    ), before["dtm"]
+    assert (
+        before["ts"]
+        == ["2024-01-01 00:00:00", "2024-01-02 01:01:00", "2024-01-03 02:02:00"]
+    ), before["ts"]
+    # The second pair of 16-bit floats carries the same values.
+    assert before["f16b"] == [0.0, 1.0, 2.0, 3.0, 4.0], before["f16b"]
+    assert before["bf16b"] == [0.0, 1.0, 2.0, 3.0, 4.0], before["bf16b"]
     # Catalog expectations, not just writer/reader equality: a both-sides-broken
     # catalog must not pass.
     assert before["databases"] == ["default_db"], before["databases"]
     assert before["tables"] == [TABLE], before["tables"]
-    assert before["column_count"] == 10, before["column_count"]
+    assert before["column_count"] == 19, before["column_count"]
     assert before["segment_count"] >= 1, before["segment_count"]
     assert [c[0] for c in before["columns"]] == [
         "id",
@@ -323,6 +405,15 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
         "d",
         "b",
         "dt",
+        "f16",
+        "bf16",
+        "i8",
+        "i16",
+        "f16b",
+        "bf16b",
+        "tm",
+        "dtm",
+        "ts",
     ], before["columns"]
     assert [c[1] for c in before["columns"]] == [
         "Integer",
@@ -335,6 +426,15 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
         "Double",
         "Boolean",
         "Date",
+        "Float16",
+        "BFloat16",
+        "TinyInt",
+        "SmallInt",
+        "Float16",
+        "BFloat16",
+        "Time",
+        "DateTime",
+        "Timestamp",
     ], before["columns"]
     assert before["first_ids"] == [0, 1, 2], before["first_ids"]
     assert before["last_ids"] == [ROWS - 3, ROWS - 2, ROWS - 1], before["last_ids"]
@@ -358,6 +458,15 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
                     "vec": [0.0, 0.1, 0.2, 0.3],
                     "sp": {0: 0.5, 1: 1.0},
                     "score": float(i),
+                    "f16": float(i),
+                    "bf16": float(i),
+                    "i8": i,
+                    "i16": i,
+                    "f16b": float(i),
+                    "bf16b": float(i),
+                    "tm": f"0{i}:00:00",
+                    "dtm": f"2024-01-0{i + 1} 00:00:00",
+                    "ts": f"2024-01-0{i + 1} 00:00:00",
                 }
                 for i in range(3)
             ]

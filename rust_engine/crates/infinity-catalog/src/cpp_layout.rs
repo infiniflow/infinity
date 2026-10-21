@@ -74,6 +74,25 @@ pub struct CppIndexChunk {
     /// Bytes the index occupies on disk (the HNSW/BMP/IVF workers size their
     /// buffer with it).
     pub index_size: u64,
+    /// Whether the **reference** can read this chunk's files.
+    ///
+    /// The chunk **id** key (`idx_chunk|{db}|{tbl}|{idx}|{seg}|{chunk_id}`)
+    /// is what the reference enumerates to learn a segment's chunks
+    /// (`SegmentIndexMeta::LoadChunkIDs1`,
+    /// `src/storage/catalog/meta/segment_index_meta_impl.cpp:236`): it takes
+    /// the numeric suffix of every key under the prefix and skips the tagged
+    /// ones. With the key present the reference reads the chunk's files
+    /// instead of rebuilding the index from the table's rows - so the key may
+    /// only be published for a chunk whose files the reference can read.
+    ///
+    /// The full-text chunk is the exception: the reference reads its
+    /// `.dic`/`.pos` files with its own posting format
+    /// (`ColumnIndexIterator::Init`, `column_index_iterator_impl.cpp:28`),
+    /// which the port does not write yet. Publishing the key for it would
+    /// make the reference read a posting list it cannot decode and answer
+    /// every full-text query with nothing; without the key it rebuilds the
+    /// index from the table's rows, which is correct.
+    pub readable_by_reference: bool,
 }
 
 /// The sealed chunks of one index over one segment.
@@ -932,12 +951,16 @@ impl Catalog {
             let Some(meta) = index_meta_of(&def, &cpp_tables) else {
                 continue;
             };
-            self.create_index_typed(
+            // Keep the reference's id: it names the index's directory
+            // (`idx_{id}/seg_0/`) and its records, so a renumbered index
+            // would have its chunk mirror read as another index's.
+            self.create_index_typed_with_id(
                 &meta.name,
                 &meta.table,
                 &meta.column,
                 &meta.index_type,
                 &meta.options,
+                meta.id,
             )?;
         }
         Ok(imported)
@@ -1023,6 +1046,10 @@ pub fn read_cpp_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
                 // The record's key names the table the index belongs to; the
                 // index base does not.
                 def.owner = Some((fields[2].to_string(), fields[3].to_string()));
+                // The record's value is the id the reference handed out; it
+                // names the index's directory and records, so it has to
+                // survive the round trip.
+                def.index_id = index_id.parse().ok();
                 out.push(def);
             }
         }
@@ -1224,6 +1251,30 @@ pub fn write_cpp_index_segments(
         )?;
         written += 1;
         for chunk in &index.chunks {
+            // The chunk **id** key (`idx_chunk|…|{chunk_id}`, value = the
+            // commit ts) is what the reference enumerates to learn a
+            // segment's chunks (`SegmentIndexMeta::LoadChunkIDs1`,
+            // `src/storage/catalog/meta/segment_index_meta_impl.cpp:236`): it
+            // takes the numeric suffix of every key under the prefix and skips
+            // the tagged ones. Without it the reference sees no chunk at all,
+            // treats every row of the segment as an index gap and rebuilds the
+            // index from the table's rows.
+            //
+            // The key may only be published for a chunk whose files the
+            // reference can read - with the key present it reads the files
+            // instead of rebuilding, so a chunk it cannot decode would make
+            // it answer with nothing.
+            if chunk.readable_by_reference {
+                let id_key = key::catalog_index_chunk_key(
+                    &set.db_id,
+                    &set.table_id,
+                    &idx_str,
+                    index.segment_id,
+                    chunk.chunk_id as u64,
+                );
+                store.put(id_key.as_bytes(), CPP_MIRROR_TS.to_string().as_bytes())?;
+                written += 1;
+            }
             let key = key::catalog_index_chunk_tag_key(
                 &set.db_id,
                 &set.table_id,
@@ -1330,8 +1381,9 @@ pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<Ind
             def.base.index_type.clone()
         },
         options,
-        // Filled in by `Catalog::cpp_indexes` (the record does not carry it).
-        id: 0,
+        // The id the reference's record carries; `Catalog::cpp_indexes` fills
+        // in a fallback for a record that has none.
+        id: def.index_id.unwrap_or(0),
     })
 }
 

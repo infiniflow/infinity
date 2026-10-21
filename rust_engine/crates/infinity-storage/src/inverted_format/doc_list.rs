@@ -226,7 +226,15 @@ impl DocListEncoder {
             crate::inverted_format::write_vint(&mut out, self.buffer.bytes.len() as u64);
         }
         out.extend_from_slice(self.skiplist.bytes());
-        out.extend_from_slice(&self.buffer.dump(spill));
+        // The non-spill body is the **slice** stream (`ByteSliceWriter::Dump`
+        // writes the rows as they were flushed), not the posting buffer's
+        // columnar dump - the reference reads the doc list back through
+        // `PostingByteSlice::Load` (`posting_byte_slice_impl.cpp:77`).
+        if spill {
+            out.extend_from_slice(&self.buffer.dump(spill));
+        } else {
+            out.extend_from_slice(&self.buffer.bytes);
+        }
         out
     }
 

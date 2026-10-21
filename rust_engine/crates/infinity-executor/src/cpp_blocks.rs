@@ -739,6 +739,10 @@ pub fn column_type_of(type_text: &str) -> Option<i32> {
         "BIGINT" | "INT64" => 4,
         "FLOAT" | "REAL" | "FLOAT32" => 5,
         "DOUBLE" | "FLOAT64" => 6,
+        // The 16-bit floats are two bytes wide (`float16_t` / `bfloat16_t`,
+        // `src/parser/type/number/float16.h`).
+        "FLOAT16" | "FP16" | "HALF" => 7,
+        "BFLOAT16" | "BF16" => 8,
         "VARCHAR" | "TEXT" | "STRING" => 9,
         "DATE" => 16,
         "TIME" => 17,
@@ -947,6 +951,88 @@ fn embedding_element_text(bytes: &[u8], element_type: i32) -> Option<String> {
 ///
 /// NULL is represented by `None` (the caller writes a zeroed slot and clears
 /// the null bit).
+/// Encodes a full-text chunk the way the **reference** writes it: the `.dic`
+/// (the term meta region plus the FST), the `.pos` (each term's doc list
+/// followed by its position list) and the `.len` (the per-document column
+/// lengths).
+///
+/// The layout is the reference's own:
+///
+/// * `postings` maps a term to the `(document ordinal, position)` pairs it
+///   occurs at, and `lengths` holds each document's token count.
+/// * The index is created with `OPTION_FLAG_ALL` (`index_full_text.cppm:73`):
+///   the term meta carries a total term frequency and a payload, the doc list
+///   carries a per-document frequency and the position list is present. A
+///   chunk written with a different flag is read with the index's own flag, so
+///   the reader would walk the wrong fields and find no document.
+/// * The doc list and the position list are the reference's own encoders
+///   (`DocListEncoder::Dump` / `PositionListEncoder::Dump`): a skip-list
+///   header plus the row-wise byte slice.
+/// * The term meta's offsets are byte positions **inside the `.pos` file**:
+///   the doc list starts at `doc_start`, the position list at `pos_start` and
+///   the term's postings end at `pos_end` (`PostingWriter::Dump`,
+///   `posting_writer_impl.cpp:52-63`). The reference slices the file by them
+///   (`disk_segment_reader_impl.cpp:126`), so each offset has to be taken
+///   **after** the preceding part has been appended.
+fn encode_fulltext_chunk(
+    postings: &std::collections::BTreeMap<String, Vec<(u32, u32)>>,
+    lengths: &[u32],
+) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+    const OPTION_FLAG_ALL: u8 = 1 | 2 | 4 | 8 | 16 | 32;
+    let flags = infinity_storage::inverted_format::TermMetaFlags {
+        has_term_frequency: true,
+        has_term_payload: true,
+    };
+    let doc_option =
+        infinity_storage::inverted_format::doc_list::DocListFormatOption::new(OPTION_FLAG_ALL);
+    let mut pos = Vec::new();
+    let mut metas = Vec::with_capacity(postings.len());
+    let terms: Vec<(String, Vec<(u32, u32)>)> = postings
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    for (_, docs) in &terms {
+        let mut doc_encoder =
+            infinity_storage::inverted_format::doc_list::DocListEncoder::new(doc_option.clone());
+        let mut pos_encoder =
+            infinity_storage::inverted_format::position_list::PositionListEncoder::new(
+                OPTION_FLAG_ALL,
+            );
+        for (doc, position) in docs {
+            doc_encoder.add_position();
+            pos_encoder.add_position(*position);
+            doc_encoder.end_document(*doc, lengths[*doc as usize], 0);
+            pos_encoder.end_document();
+        }
+        let doc_start = pos.len() as u64;
+        let doc_bytes = doc_encoder.dump(false);
+        pos.extend_from_slice(&doc_bytes);
+        let pos_start = pos.len() as u64;
+        let pos_bytes = pos_encoder.dump(false);
+        pos.extend_from_slice(&pos_bytes);
+        let pos_end = pos.len() as u64;
+        metas.push(infinity_storage::inverted_format::TermMeta {
+            doc_freq: doc_encoder.get_df(),
+            // The total term frequency counts the occurrences, not the
+            // documents (`DocListEncoder::AddPosition`).
+            total_tf: doc_encoder.get_total_tf(),
+            payload: 0,
+            doc_start,
+            pos_start,
+            pos_end,
+        });
+    }
+    let (region, offsets) =
+        infinity_storage::inverted_format::encode_term_meta_region_with_offsets(&metas, flags);
+    let mut fst = infinity_storage::inverted_format::FstBuilder::new();
+    for (i, (term, _)) in terms.iter().enumerate() {
+        fst.insert(term.as_bytes(), offsets[i]);
+    }
+    let dic = infinity_storage::inverted_format::encode_dic(&region, &fst.finish());
+    let len = infinity_storage::inverted_format::encode_column_lengths(lengths);
+    (dic, pos, len)
+}
+
 fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option<Vec<u8>>> {
     if value.eq_ignore_ascii_case("null") {
         return Ok(None);
@@ -1031,6 +1117,14 @@ fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option
             .map_err(|_| bad())?
             .to_le_bytes()
             .to_vec(),
+        // The 16-bit floats: an IEEE half and a bfloat whose raw bits are the
+        // high half of an `f32` (`bfloat16_t`).
+        7 => crate::f32_to_f16_bits(value.trim().parse::<f32>().map_err(|_| bad())?)
+            .to_le_bytes()
+            .to_vec(),
+        8 => ((value.trim().parse::<f32>().map_err(|_| bad())?.to_bits() >> 16) as u16)
+            .to_le_bytes()
+            .to_vec(),
         16 => date_to_days(value).ok_or_else(bad)?.to_le_bytes().to_vec(),
         17 => time_to_secs(value).ok_or_else(bad)?.to_le_bytes().to_vec(),
         18 => {
@@ -1093,6 +1187,17 @@ fn decode_value(
                 // `Value::to_slt_string` renders floats with six decimals.
                 5 => format!("{:.6}", f32::from_le_bytes(slot.try_into().unwrap())),
                 6 => format!("{:.6}", f64::from_le_bytes(slot.try_into().unwrap())),
+                // The 16-bit floats are two bytes wide and render like the
+                // other floats: an IEEE half (`float16_t`) and a bfloat whose
+                // raw bits are the high half of an `f32` (`bfloat16_t`).
+                7 => format!(
+                    "{:.6}",
+                    crate::f16_bits_to_f32(u16::from_le_bytes(slot.try_into().unwrap()))
+                ),
+                8 => format!(
+                    "{:.6}",
+                    f32::from_bits((u16::from_le_bytes(slot.try_into().unwrap()) as u32) << 16)
+                ),
                 // Date/time values are stored as integers but must come back as
                 // text, matching how the engine renders them.
                 16 => cpp_format::days_to_date(i32::from_le_bytes(slot.try_into().unwrap())),
@@ -1504,6 +1609,17 @@ impl Engine {
             let Some((row_count, index_size)) = chunk else {
                 continue;
             };
+            // The reference reads a chunk's files for every index type but the
+            // full-text one, whose `.dic`/`.pos` it decodes with its own
+            // posting format (`ColumnIndexIterator::Init`,
+            // `column_index_iterator_impl.cpp:28`). The port writes that
+            // layout now, but the reference's doc list still has to line up
+            // byte for byte with it; until it does, publishing the chunk id
+            // key would make the reference read a doc list it decodes into
+            // the wrong documents, and every full-text query would come back
+            // empty. Without the key the reference rebuilds the index from
+            // the table's rows, which is correct.
+            let readable_by_reference = !im.index_type.eq_ignore_ascii_case("FULLTEXT");
             published.push(CppIndexSegment {
                 index_id: index_id as u64,
                 segment_id: 0,
@@ -1518,6 +1634,7 @@ impl Engine {
                     row_count,
                     term_count: 0,
                     index_size,
+                    readable_by_reference,
                 }],
             });
         }
@@ -1779,33 +1896,28 @@ impl Engine {
         Ok((meta.columns.clone(), rows))
     }
 
-    /// The C++ index id of `index_name` within `table`: its 1-based position
-    /// among the table's indexes, which is how `write_cpp_layout` numbers them
-    /// (`next_index_id`, `cpp_layout.rs:545-550`).
+    /// The C++ index id of `index_name` within `table`: the id the catalog
+    /// handed out at `CREATE INDEX` (`IndexMeta::id`, a per-table counter
+    /// starting at 1).
+    ///
+    /// This **must** be the catalog's id and not the index's position in some
+    /// list: the catalog publishes the id in `catalog|idx|{db}|{tbl}|{name}|{ts}`
+    /// and the reference reads the chunk of an index from `idx_{id}/seg_0/`, so
+    /// a mirror that numbered the indexes differently wrote one index's chunk
+    /// into another's directory (the HNSW chunk landed under the sparse
+    /// index) and the reference then read the sparse chunk with the HNSW
+    /// parser and aborted.
     fn cpp_index_position(&self, table: &str, index_name: &str) -> Result<usize> {
         let short = table.split('.').next_back().unwrap_or(table);
-        let mut ids: Vec<(String, u64)> = self
-            .storage
-            .catalog
-            .list_indexes()?
-            .into_iter()
+        let indexes = self.storage.catalog.list_indexes()?;
+        let id = indexes
+            .iter()
             .filter(|im| im.table == short || im.table == table)
-            .map(|im| (im.name, im.id))
-            .collect();
-        // The id is the position in a stable order: `list_indexes` is a map, and
-        // two callers that number the same table's indexes in different
-        // iteration orders wrote one index's chunk into another's directory
-        // (the HNSW chunk landed under the sparse index). Sorting by name makes
-        // the numbering match the catalog layout, which emits indexes in name
-        // order.
-        ids.sort_by(|a, b| a.0.cmp(&b.0));
-        ids.iter()
-            .position(|(n, _)| n == index_name)
-            .map(|p| match ids[p].1 {
-                0 => p + 1,
-                id => id as usize,
-            })
-            .ok_or_else(|| Error::NotFound(format!("index '{index_name}' on '{table}'")))
+            .find(|im| im.name == index_name)
+            .map(|im| im.id)
+            .filter(|id| *id > 0)
+            .ok_or_else(|| Error::NotFound(format!("index '{index_name}' on '{table}'")))?;
+        Ok(id as usize)
     }
 
     /// The vectors of `table`'s `column` as `(row id, vector)`.
@@ -2233,51 +2345,21 @@ impl Engine {
         let tokenizer = self.index_tokenizer(&table, &im.column);
         let rows = self.fetch_rows_with_ids(&table)?;
 
-        // term -> document ordinals, in term order (the FST requires sorted keys)
-        let mut postings: std::collections::BTreeMap<String, Vec<u32>> =
+        // term -> (document ordinal, the term's position in the document), in
+        // term order (the FST requires sorted keys).
+        let mut postings: std::collections::BTreeMap<String, Vec<(u32, u32)>> =
             std::collections::BTreeMap::new();
         let mut lengths: Vec<u32> = Vec::with_capacity(rows.len());
         for (doc, (_, row)) in rows.iter().enumerate() {
             let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
-            let terms = crate::tokenize_index_text(&text, &tokenizer);
+            let terms = crate::tokenize_index_positions(&text, &tokenizer);
             lengths.push(terms.len() as u32);
-            for t in terms {
-                postings.entry(t).or_default().push(doc as u32);
+            for (t, position) in terms {
+                postings.entry(t).or_default().push((doc as u32, position));
             }
         }
 
-        let flags = inv::TermMetaFlags {
-            has_term_frequency: false,
-            has_term_payload: false,
-        };
-        let mut pos = Vec::new();
-        let mut metas = Vec::with_capacity(postings.len());
-        let terms: Vec<(String, Vec<u32>)> = postings.into_iter().collect();
-        for (_, docs) in &terms {
-            let start = pos.len() as u64;
-            let tp = inv::TermPostings {
-                doc_skiplist: Vec::new(),
-                doc_list: inv::encode_u32_block(docs),
-                pos_skiplist: Vec::new(),
-                pos_list: Vec::new(),
-            };
-            pos.extend_from_slice(&tp.encode());
-            metas.push(inv::TermMeta {
-                doc_freq: docs.len() as u32,
-                total_tf: docs.len() as u32,
-                payload: 0,
-                doc_start: start,
-                pos_start: start,
-                pos_end: pos.len() as u64,
-            });
-        }
-        let (region, offsets) = inv::encode_term_meta_region_with_offsets(&metas, flags);
-        let mut fst = inv::FstBuilder::new();
-        for (i, (term, _)) in terms.iter().enumerate() {
-            fst.insert(term.as_bytes(), offsets[i]);
-        }
-        let dic = inv::encode_dic(&region, &fst.finish());
-        let len = inv::encode_column_lengths(&lengths);
+        let (dic, pos, len) = encode_fulltext_chunk(&postings, &lengths);
 
         let dir = self
             .blocks_root()
@@ -3577,6 +3659,71 @@ mod tests {
             encode_value("DATE", 16, "1970-01-02").unwrap().unwrap(),
             1i32.to_le_bytes()
         );
+    }
+
+    /// The full-text chunk's term meta offsets must address the `.pos` file.
+    ///
+    /// The reference slices the file by them
+    /// (`disk_segment_reader_impl.cpp:126`: the doc list is
+    /// `doc_start .. pos_start`, the position list `pos_start .. pos_end`), so
+    /// an offset taken before the preceding part was appended points at the
+    /// wrong bytes and the reference decodes a posting list of the wrong
+    /// length - it then reads past the end of the slice.
+    #[test]
+    fn fulltext_chunk_offsets_address_the_pos_file() {
+        let mut postings: std::collections::BTreeMap<String, Vec<(u32, u32)>> =
+            std::collections::BTreeMap::new();
+        // Two terms, so the second one's offsets are past the first one's.
+        postings.insert("alpha".to_string(), vec![(0, 0), (1, 6), (2, 12)]);
+        postings.insert("beta".to_string(), vec![(0, 6), (1, 12)]);
+        let lengths = vec![3u32, 2, 2];
+        let (dic, pos, _len) = encode_fulltext_chunk(&postings, &lengths);
+
+        // The term meta region opens the `.dic`; the first term's meta is at
+        // its start.
+        let mut at = 0usize;
+        let read_vint = |buf: &[u8], at: &mut usize| {
+            let mut value = 0u64;
+            let mut shift = 0u32;
+            loop {
+                let byte = buf[*at];
+                *at += 1;
+                value |= u64::from(byte & 0x7f) << shift;
+                if byte & 0x80 == 0 {
+                    break;
+                }
+                shift += 7;
+            }
+            value
+        };
+        let df = read_vint(&dic, &mut at) as u32;
+        let tf = read_vint(&dic, &mut at) as u32;
+        let _payload = u32::from_le_bytes(dic[at..at + 4].try_into().unwrap());
+        at += 4;
+        let doc_start = read_vint(&dic, &mut at);
+        let pos_start = read_vint(&dic, &mut at);
+        let pos_end = read_vint(&dic, &mut at);
+
+        assert_eq!(df, 3);
+        assert_eq!(tf, 3);
+        // The doc list starts at the term's first byte, and the position list
+        // starts where the doc list ends.
+        assert_eq!(doc_start, 0);
+        assert!(pos_start > doc_start);
+        assert!(pos_end > pos_start);
+        // Each offset addresses a real region of the `.pos` file: the doc list
+        // is framed by its two lengths, then the position list by its own.
+        let mut p = doc_start as usize;
+        let skiplist_len = read_vint(&pos, &mut p) as usize;
+        let doc_list_len = read_vint(&pos, &mut p) as usize;
+        assert_eq!(p + skiplist_len + doc_list_len, pos_start as usize);
+        let mut q = pos_start as usize;
+        let pos_skiplist_len = read_vint(&pos, &mut q) as usize;
+        let pos_list_len = read_vint(&pos, &mut q) as usize;
+        assert_eq!(q + pos_skiplist_len + pos_list_len, pos_end as usize);
+        // The first term's postings end where the second one's begin, so the
+        // file holds one slice per term.
+        assert!(pos_end as usize <= pos.len());
     }
 
     #[test]

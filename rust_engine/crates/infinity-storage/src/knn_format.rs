@@ -1256,6 +1256,237 @@ mod tests {
         assert!(decode_hnsw_chunk(&bad, 4, 24, 4).is_err());
     }
 
+    /// The chunk file the **reference** writes, byte for byte.
+    ///
+    /// `KnnHnsw::SaveToPtr` (`src/storage/knn_index/knn_hnsw/hnsw_alg.cppm:99`)
+    /// writes `[M][ef_construction]`, then `DataStore::SaveToPtr`
+    /// (`data_store.cppm:180`) writes `[cur_vec_num]`, the vec-store meta
+    /// (`dim` for a plain store), the graph meta (`Mmax0`, `Mmax`, `max_layer`,
+    /// `enterpoint`), the vector region, the graph region and the labels. The
+    /// graph region is `GraphStoreInner::SaveToPtr`
+    /// (`graph_store.cppm:172`): `layer_sum`, the level-0 block, then the
+    /// upper-layer records **in vertex order**.
+    fn reference_chunk_bytes(
+        m: u64,
+        ef_construction: u64,
+        cur_vec_num: u64,
+        dim: u64,
+        mmax0: u64,
+        mmax: u64,
+        max_layer: i32,
+        enterpoint: i32,
+        vectors: &[u8],
+        level0: &[u8],
+        upper: &[u8],
+        labels: &[u32],
+    ) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&m.to_le_bytes());
+        out.extend_from_slice(&ef_construction.to_le_bytes());
+        out.extend_from_slice(&cur_vec_num.to_le_bytes());
+        out.extend_from_slice(&dim.to_le_bytes());
+        out.extend_from_slice(&mmax0.to_le_bytes());
+        out.extend_from_slice(&mmax.to_le_bytes());
+        out.extend_from_slice(&max_layer.to_le_bytes());
+        out.extend_from_slice(&enterpoint.to_le_bytes());
+        out.extend_from_slice(vectors);
+        out.extend_from_slice(
+            &((upper.len() / levelx_stride(VERTEX_LX_SIZE, mmax)) as u64).to_le_bytes(),
+        );
+        out.extend_from_slice(level0);
+        out.extend_from_slice(upper);
+        out.extend_from_slice(&encode_labels(labels));
+        out
+    }
+
+    /// The port's chunk file must be the reference's, field for field.
+    ///
+    /// The reference reads a chunk with `KnnHnsw::LoadFromPtr`
+    /// (`hnsw_alg.cppm:600`), which walks the same fields and **aborts** when a
+    /// single byte is left over (`ptr_end - ptr != 0`). So the port's writer
+    /// has to produce exactly the byte sequence the reference's writer
+    /// produces - a chunk that is one field off makes the reference abort
+    /// instead of reading the index.
+    #[test]
+    fn port_chunk_matches_the_reference_layout() {
+        let m = 16u64;
+        let (mmax0, mmax) = get_mmax(m);
+        let cur_vec_num = 3u64;
+        let dim = 4u64;
+        let max_layer = 1i32;
+        let enterpoint = 2i32;
+
+        // Three vectors of four floats each - the reference's vector region is
+        // `cur_vec_num * dim * sizeof(float)` bytes.
+        let vectors: Vec<u8> = (0..12).flat_map(|i| (i as f32).to_le_bytes()).collect();
+        // Vertex 0 has no upper layer, vertex 1 has one, vertex 2 has none:
+        // the reference writes the upper records in vertex order.
+        let vertices = vec![
+            HnswGraphVertex {
+                layer_count: 0,
+                neighbors_l0: vec![1, 2],
+                upper: vec![],
+            },
+            HnswGraphVertex {
+                layer_count: 1,
+                neighbors_l0: vec![0, 2],
+                upper: vec![vec![0, 2]],
+            },
+            HnswGraphVertex {
+                layer_count: 0,
+                neighbors_l0: vec![0, 1],
+                upper: vec![],
+            },
+        ];
+        let graph = encode_graph_region(&vertices, mmax0, mmax);
+        let labels = [10u32, 11, 12];
+
+        let port = encode_hnsw_chunk_ext(
+            m,
+            200,
+            cur_vec_num,
+            mmax0,
+            mmax,
+            max_layer,
+            enterpoint,
+            &dim.to_le_bytes(),
+            &vectors,
+            &graph,
+            &labels,
+        );
+
+        // The reference's own writer: the same fields, in the same order.
+        let l0 = level0_stride(VERTEX_L0_SIZE, mmax0);
+        let lx = levelx_stride(VERTEX_LX_SIZE, mmax);
+        let mut level0 = Vec::with_capacity(cur_vec_num as usize * l0);
+        let mut upper = Vec::new();
+        for v in &vertices {
+            let mut rec = vec![0u8; l0];
+            rec[0..4].copy_from_slice(&v.layer_count.to_le_bytes());
+            rec[16..20].copy_from_slice(&(v.neighbors_l0.len() as i32).to_le_bytes());
+            for (k, n) in v.neighbors_l0.iter().enumerate() {
+                rec[20 + 4 * k..24 + 4 * k].copy_from_slice(&n.to_le_bytes());
+            }
+            level0.extend_from_slice(&rec);
+            for nbrs in &v.upper {
+                let mut urec = vec![0u8; lx];
+                urec[0..4].copy_from_slice(&(nbrs.len() as i32).to_le_bytes());
+                for (k, n) in nbrs.iter().enumerate() {
+                    urec[4 + 4 * k..8 + 4 * k].copy_from_slice(&n.to_le_bytes());
+                }
+                upper.extend_from_slice(&urec);
+            }
+        }
+        let reference = reference_chunk_bytes(
+            m,
+            200,
+            cur_vec_num,
+            dim,
+            mmax0,
+            mmax,
+            max_layer,
+            enterpoint,
+            &vectors,
+            &level0,
+            &upper,
+            &labels,
+        );
+
+        // The port's file and the reference's file have the same length and the
+        // same header.
+        assert_eq!(port.len(), reference.len());
+        assert_eq!(&port[..56], &reference[..56]);
+        // The level-0 records agree on every field the reference reads back:
+        // `layer_n_` (offset 0..4) and `neighbor_n_` + the neighbour ids
+        // (offset 16..). The `layers_p_` field (offset 8..16) is the one
+        // exception: the reference stores the byte offset of the *pointer
+        // field* inside the level-0 block (`&v->layers_p_ - graph_.get()`,
+        // `graph_store.cppm:190`) and the port stores the offset of the
+        // vertex's upper-layer block. The reference overwrites the field with
+        // a real pointer when it loads the chunk
+        // (`GraphStoreInner::LoadFromPtr`, `graph_store.cppm:387`), so the
+        // stored value is never read - but it must not be mistaken for a
+        // neighbour id either.
+        let port_graph = &port[56 + vectors.len()..];
+        let ref_graph = &reference[56 + vectors.len()..];
+        assert_eq!(port_graph.len(), ref_graph.len());
+        // The graph region opens with the `layer_sum`, then the level-0 block.
+        let level0_start = 8;
+        for v in 0..cur_vec_num as usize {
+            let (p, r) = (level0_start + v * l0, level0_start + v * l0);
+            assert_eq!(
+                &port_graph[p..p + 4],
+                &ref_graph[r..r + 4],
+                "layer_n_ of vertex {v}"
+            );
+            assert_eq!(
+                &port_graph[p + 16..p + l0],
+                &ref_graph[r + 16..r + l0],
+                "neighbours of vertex {v}"
+            );
+        }
+        // The upper-layer records follow, in vertex order, and the label
+        // array closes the file.
+        // The graph region opens with the `layer_sum`, then the level-0 block.
+        let upper_start = 8 + cur_vec_num as usize * l0;
+        assert_eq!(
+            &port_graph[upper_start..],
+            &ref_graph[upper_start..],
+            "the upper-layer records and the labels must match"
+        );
+
+        // And the port reads the reference's file back exactly, with no byte
+        // left over - the reference's own check.
+        let decoded = decode_hnsw_chunk_ext(
+            &reference,
+            8,  // the plain store's meta is the `dim` u64
+            16, // a vector is `dim` floats, four bytes each
+            VERTEX_L0_SIZE,
+            VERTEX_LX_SIZE,
+        )
+        .unwrap();
+        assert_eq!(decoded.m, m);
+        assert_eq!(decoded.ef_construction, 200);
+        assert_eq!(decoded.cur_vec_num, cur_vec_num);
+        assert_eq!(decoded.mmax0, mmax0);
+        assert_eq!(decoded.mmax, mmax);
+        assert_eq!(decoded.max_layer, max_layer);
+        assert_eq!(decoded.enterpoint, enterpoint);
+        assert_eq!(decoded.vectors, vectors);
+        assert_eq!(decoded.labels, labels.to_vec());
+    }
+
+    /// The reference aborts when a byte is left over, so the port's decoder
+    /// must not accept a chunk with trailing bytes either.
+    #[test]
+    fn port_chunk_decoder_rejects_trailing_bytes() {
+        let m = 16u64;
+        let (mmax0, mmax) = get_mmax(m);
+        let vertices = vec![HnswGraphVertex {
+            layer_count: 0,
+            neighbors_l0: vec![],
+            upper: vec![],
+        }];
+        let graph = encode_graph_region(&vertices, mmax0, mmax);
+        let file = encode_hnsw_chunk_ext(
+            m,
+            200,
+            1,
+            mmax0,
+            mmax,
+            0,
+            0,
+            &4u64.to_le_bytes(),
+            &[0u8; 16],
+            &graph,
+            &[0u32],
+        );
+        assert!(decode_hnsw_chunk_ext(&file, 8, 4, VERTEX_L0_SIZE, VERTEX_LX_SIZE).is_ok());
+        let mut extra = file.clone();
+        extra.push(0);
+        assert!(decode_hnsw_chunk_ext(&extra, 8, 4, VERTEX_L0_SIZE, VERTEX_LX_SIZE).is_err());
+    }
+
     #[test]
     fn vertex_strides_follow_the_spec() {
         // x86_64 SysV: sizeof(VertexL0) = 24, sizeof(VertexLX) = 4.

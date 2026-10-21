@@ -427,7 +427,11 @@ fn round_f16(x: f32) -> f32 {
     f16_bits_to_f32(f32_to_f16_bits(x))
 }
 
-fn f32_to_f16_bits(x: f32) -> u16 {
+/// Rounds an `f32` to IEEE-754 half precision and returns its bit pattern.
+///
+/// Shared with the C++ block writer (`cpp_blocks`), which has to pack a
+/// `FLOAT16` column the way the reference does.
+pub(crate) fn f32_to_f16_bits(x: f32) -> u16 {
     let b = x.to_bits();
     let sign = ((b >> 16) & 0x8000) as u16;
     let exp = ((b >> 23) & 0xff) as i32;
@@ -470,7 +474,11 @@ fn f32_to_f16_bits(x: f32) -> u16 {
     sign | ((e as u16) << 10) | (m as u16)
 }
 
-fn f16_bits_to_f32(h: u16) -> f32 {
+/// Decodes an IEEE-754 half-precision bit pattern into `f32`.
+///
+/// Shared with the C++ block reader (`cpp_blocks`), which has to render a
+/// `FLOAT16` column the way the reference does.
+pub(crate) fn f16_bits_to_f32(h: u16) -> f32 {
     let sign = ((h & 0x8000) as u32) << 16;
     let exp = ((h >> 10) & 0x1f) as u32;
     let mant = (h & 0x3ff) as u32;

@@ -447,14 +447,31 @@ impl Catalog {
                 out.push(meta);
             }
         }
-        // Records read back from the C++ key space do not carry the id; number
-        // them per table (1-based, as `CREATE INDEX` would).
+        // A record read back from the C++ key space carries the id the
+        // reference handed out; a record without one (a hand-written one) is
+        // numbered per table (1-based, as `CREATE INDEX` would) - skipping
+        // the ids the other records already hold, so the fallback cannot
+        // hand two indexes the same id.
         let mut next: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+        let mut taken: std::collections::HashMap<String, std::collections::HashSet<u64>> =
+            std::collections::HashMap::new();
+        for im in out.iter() {
+            if im.id > 0 {
+                taken.entry(im.table.clone()).or_default().insert(im.id);
+            }
+        }
         for im in out.iter_mut() {
             if im.id == 0 {
+                let used = taken.entry(im.table.clone()).or_default();
                 let n = next.entry(im.table.clone()).or_insert(0);
-                *n += 1;
+                loop {
+                    *n += 1;
+                    if !used.contains(n) {
+                        break;
+                    }
+                }
                 im.id = *n;
+                used.insert(*n);
             }
         }
         // Name-only indexes — the engine does not materialise an expression
@@ -1032,6 +1049,24 @@ impl Catalog {
             .map(|i| i.id)
             .max()
             .map_or(1, |v| v + 1);
+        self.create_index_typed_with_id(name, table, column, index_type, options, id)
+    }
+
+    /// Creates an index under a **given** id.
+    ///
+    /// Importing a reference-written catalog has to keep the reference's ids:
+    /// the id names the index's directory (`idx_{id}/seg_0/`) and its records
+    /// (`idx|{db}|{tbl}|{id}|index_base`), so an imported index that got a
+    /// different id would have its chunk mirror read as another index's.
+    pub fn create_index_typed_with_id(
+        &self,
+        name: &str,
+        table: &str,
+        column: &str,
+        index_type: &str,
+        options: &[(String, String)],
+        id: u64,
+    ) -> Result<IndexMeta> {
         let meta = IndexMeta {
             name: name.to_string(),
             table: table.to_string(),
