@@ -1061,6 +1061,15 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
                 // float columns render with six decimals in `.slt` output.
                 // The C++ numeric cast tolerates surrounding whitespace, so
                 // `" 2.1"` is a valid double literal.
+                // float columns render with six decimals in `.slt` output.
+                // The C++ numeric cast tolerates surrounding whitespace, so
+                // `" 2.1"` is a valid double literal.
+                //
+                // KNOWN LIMITATION: rows are stored as this `.slt` text, so a
+                // value outside the six-decimal grid is rounded at insert time
+                // and the mirror then stores the rounded value (the reference
+                // stores the typed value). See
+                // `docs/FORMAT_EQUIVALENCE_TESTS.md` §5.2.
                 Some(t) if is_float_type(t) => match s.trim().parse::<f64>() {
                     Ok(f) => format!("{f:.6}"),
                     Err(_) => s,
@@ -3477,6 +3486,8 @@ struct SparseIndex {
     tail: std::collections::BTreeMap<u64, Vec<(i32, f32)>>,
     /// One mmap reader per dumped chunk, with the `ROW_ID` segment it covers.
     sealed: Vec<(u64, Arc<infinity_storage::bmp_cpp::BmpCppReader>)>,
+    /// Monotonic suffix so a later seal never overwrites an earlier spill.
+    next_chunk: u64,
     tail_bytes: usize,
     /// Bumped on every tail mutation; the in-memory BMP index below is rebuilt
     /// when it lags (the reference's `BMPAlg` held by the mem index).
@@ -3544,6 +3555,13 @@ impl SparseIndex {
         width: infinity_storage::bmp_cpp::IdxWidth,
         store: CatalogSparseStore,
     ) -> Self {
+        let next_chunk = std::fs::read_dir(&dir)
+            .map(|d| {
+                d.filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().is_some_and(|x| x == "bmp"))
+                    .count() as u64
+            })
+            .unwrap_or(0);
         Self {
             width,
             store,
@@ -3551,6 +3569,7 @@ impl SparseIndex {
             terms: 0,
             tail: Default::default(),
             sealed: Vec::new(),
+            next_chunk,
             tail_bytes: 0,
             tail_generation: 0,
             tail_index: std::sync::Mutex::new(None),
@@ -3582,34 +3601,28 @@ impl SparseIndex {
                 .sum::<usize>()
     }
 
-    /// Dumps the memory tail into one BMP chunk per block.
+    /// Dumps the memory tail into one BMP file per `ROW_ID` segment per seal.
     ///
-    /// The reference seals a chunk per **block**, not per segment:
-    /// `BMPIndexInMem::Dump` hands the whole in-memory `BMPAlg` to one buffer,
-    /// and the mem indexer builds a fresh one for each block
-    /// (`BMPIndexInMem::AddDocs(block_offset, …)`). The document ids inside the
-    /// chunk stay segment-relative (`MemIndexInserterIter1` yields
-    /// `block_offset + offset + i`), so only the split changes.
+    /// The file is *not* the published chunk: the reference's chunk is the
+    /// block and it is extended by every dump that touches it (a 100 + 100 row
+    /// insert into one block leaves **one** chunk of 200 rows), so the publish
+    /// step rebuilds one chunk per block from the rows.
     fn seal(&mut self) {
         if self.tail.is_empty() {
             return;
         }
         #[allow(clippy::type_complexity)]
-        let mut by_chunk: std::collections::BTreeMap<
-            (u64, u64),
-            Vec<(u64, Vec<(i32, f32)>)>,
-        > = Default::default();
-        let block_rows = infinity_storage::cpp_format::DEFAULT_BLOCK_CAPACITY as u64;
+        let mut by_segment: std::collections::BTreeMap<u64, Vec<(u64, Vec<(i32, f32)>)>> =
+            Default::default();
         for (seq, doc) in std::mem::take(&mut self.tail) {
-            let row = seq & 0xffff_ffff;
-            by_chunk
-                .entry((seq >> 32, row / block_rows))
+            by_segment
+                .entry(seq >> 32)
                 .or_default()
-                .push((row, doc));
+                .push((seq & 0xffff_ffff, doc));
         }
         self.tail_bytes = 0;
         self.tail_generation += 1;
-        for ((segment, block), mut docs) in by_chunk {
+        for (segment, mut docs) in by_segment {
             docs.sort_by_key(|(row, _)| *row);
             let term_num = (docs
                 .iter()
@@ -3618,7 +3631,8 @@ impl SparseIndex {
                 .unwrap_or(0)
                 .max(1) as usize)
                 .max(self.terms);
-            let name = format!("seg_{segment}_{block}_{}.bmp", docs.len());
+            let name = format!("seg_{segment}_{}_{}.bmp", self.next_chunk, docs.len());
+            self.next_chunk += 1;
             let path = self.dir.join(name);
             if infinity_storage::bmp_cpp::write_bmp_file(
                 &path,

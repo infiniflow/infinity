@@ -133,64 +133,10 @@ const MIRROR_BUDGET_BYTES: usize = 1024 * 1024 * 1024;
 
 /// The sealed chunks of a private mirror, as `(chunk id, row count, path)`.
 ///
-/// Both private mirrors name their chunks `seg_{segment}_{block}_{rows}{ext}`
-/// (`seg_0_1_8192.idx`, `seg_0_2_3616.bmp`): the chunk id is the **block**
-/// index, which is what the reference names its `chunk_{id}.idx` after, and
-/// the trailing field is the row count that chunk covers.
-fn spill_chunks(dir: &Path, ext: &str) -> Vec<(u32, u64, PathBuf)> {
-    let mut out = Vec::new();
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return out;
-    };
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().to_string();
-        let Some(stem) = name.strip_suffix(ext) else {
-            continue;
-        };
-        let fields: Vec<&str> = stem.split('_').collect();
-        if fields.len() != 4 || fields[0] != "seg" {
-            continue;
-        }
-        let (Ok(_segment), Ok(block), Ok(rows)) = (
-            fields[1].parse::<u64>(),
-            fields[2].parse::<u32>(),
-            fields[3].parse::<u64>(),
-        ) else {
-            continue;
-        };
-        out.push((block, rows, entry.path()));
-    }
-    out.sort_by_key(|(block, _, _)| *block);
-    out
-}
-
-/// Copies a private mirror's per-block chunks into `seg_dir` as
-/// `chunk_{block}.idx` and describes them for the catalog.
-fn publish_spill_chunks(seg_dir: &Path, dir: &Path, ext: &str) -> Vec<CppIndexChunk> {
-    let mut chunks = Vec::new();
-    for (block, row_count, path) in spill_chunks(dir, ext) {
-        if std::fs::create_dir_all(seg_dir).is_err() {
-            break;
-        }
-        if std::fs::copy(&path, seg_dir.join(format!("chunk_{block}.idx"))).is_err() {
-            continue;
-        }
-        chunks.push(CppIndexChunk {
-            chunk_id: block,
-            // Only the full-text chunk names its files: the reference derives
-            // the other index types' file name from the chunk id
-            // (`IndexFileName`, `chunk_index_meta_impl.cpp:52`) and records an
-            // empty base name (`HnswIndexInMem::GetChunkIndexMetaInfo`,
-            // `hnsw_handler_impl.cpp:651`).
-            base_name: String::new(),
-            base_row_id: u64::from(block) * DEFAULT_BLOCK_CAPACITY as u64,
-            row_count,
-            term_count: 0,
-            index_size: 0,
-        });
-    }
-    chunks
-}
+/// The secondary mirror names its dumps `seg_{segment}_{block}_{rows}.idx`: the
+/// block is the chunk the reference publishes, and the trailing field is how
+/// many rows the dump contributed. A block can be covered by several dumps, so
+/// `publish_secondary_chunks` merges them rather than copying one file.
 
 /// One raw ordered key, from a chunk's key array.
 fn decode_secondary_key(
@@ -272,6 +218,55 @@ fn publish_secondary_chunks(
             base_name: String::new(),
             base_row_id: block * DEFAULT_BLOCK_CAPACITY as u64,
             row_count: entries.len() as u64,
+            term_count: 0,
+            index_size: 0,
+        });
+    }
+    chunks
+}
+
+/// Rebuilds a sparse index's published chunks: one per block, from the rows.
+///
+/// The reference's chunk is the block, and every memory dump re-dumps the block
+/// it touches (`BMPIndexInMem::Dump` hands the whole in-memory `BMPAlg` to the
+/// chunk buffer), so two 100-row inserts into one block leave **one** chunk of
+/// 200 rows. The port's spill files are per dump, so the merge happens here.
+fn publish_bmp_chunks(
+    seg_dir: &Path,
+    by_block: std::collections::BTreeMap<u64, Vec<infinity_storage::bmp_cpp::SparseDoc>>,
+    width: infinity_storage::bmp_cpp::IdxWidth,
+    term_bound: usize,
+) -> Vec<CppIndexChunk> {
+    let mut chunks = Vec::new();
+    for (block, mut docs) in by_block {
+        if std::fs::create_dir_all(seg_dir).is_err() {
+            break;
+        }
+        docs.sort_by_key(|(row, _)| *row);
+        // The term space is the column's declared bound, widened to the terms
+        // this chunk actually holds (`BMPAlg` is constructed with the bound).
+        let term_num = docs
+            .iter()
+            .flat_map(|(_, entries)| entries.iter().map(|(term, _)| *term + 1))
+            .max()
+            .unwrap_or(0)
+            .max(1)
+            .max(term_bound as i32) as usize;
+        let bytes = infinity_storage::bmp_cpp::encode_bmp(
+            infinity_index::sparse::BMP_BLOCK_SIZE,
+            width,
+            &docs,
+            term_num,
+        );
+        let path = seg_dir.join(format!("chunk_{block}.idx"));
+        if std::fs::write(&path, &bytes).is_err() {
+            continue;
+        }
+        chunks.push(CppIndexChunk {
+            chunk_id: block as u32,
+            base_name: String::new(),
+            base_row_id: block * DEFAULT_BLOCK_CAPACITY as u64,
+            row_count: docs.len() as u64,
             term_count: 0,
             index_size: 0,
         });
@@ -1266,6 +1261,18 @@ pub fn encode_fulltext_chunk(
     (dic, pos, len)
 }
 
+/// The text a cell is encoded from.
+///
+/// A float is rendered with `Display` - the shortest form that parses back to
+/// the same bits - because the block stores the raw value: `to_slt_string`'s
+/// six decimals would round the value (and the bytes) away from the reference's.
+fn mirror_cell_text(value: &Value) -> String {
+    match value {
+        Value::Float(f) => format!("{f}"),
+        other => other.to_slt_string(),
+    }
+}
+
 fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option<Vec<u8>>> {
     if value.eq_ignore_ascii_case("null") {
         return Ok(None);
@@ -1366,7 +1373,13 @@ fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option
             v.extend_from_slice(&secs.to_le_bytes());
             v
         }
-        // Varchar / Json keep their UTF-8 bytes.
+        // Json is stored as BSON, not text: the reference writes
+        // `JsonManager::to_bson` - the value wrapped in `{"data": …}`, keys
+        // sorted, small integers as `int32` (`json_manager_impl.cpp:139`).
+        _ if type_text.trim().eq_ignore_ascii_case("json") => infinity_common::json::parse(value)
+            .ok_or_else(bad)?
+            .to_bson(),
+        // Varchar keeps its UTF-8 bytes.
         _ => value.as_bytes().to_vec(),
     };
     Ok(Some(bytes))
@@ -1417,18 +1430,21 @@ fn decode_value(
                 2 => i16::from_le_bytes(slot.try_into().unwrap()).to_string(),
                 3 => i32::from_le_bytes(slot.try_into().unwrap()).to_string(),
                 4 => i64::from_le_bytes(slot.try_into().unwrap()).to_string(),
-                // `Value::to_slt_string` renders floats with six decimals.
-                5 => format!("{:.6}", f32::from_le_bytes(slot.try_into().unwrap())),
-                6 => format!("{:.6}", f64::from_le_bytes(slot.try_into().unwrap())),
+                // `Value::to_slt_string` renders floats with six decimals. That
+                // is fine for display, but a block stores the raw value: a
+                // six-decimal rendering would both lose digits here and make
+                // the port's blocks differ from the reference's.
+                5 => format!("{}", f32::from_le_bytes(slot.try_into().unwrap())),
+                6 => format!("{}", f64::from_le_bytes(slot.try_into().unwrap())),
                 // The 16-bit floats are two bytes wide and render like the
                 // other floats: an IEEE half (`float16_t`) and a bfloat whose
                 // raw bits are the high half of an `f32` (`bfloat16_t`).
                 7 => format!(
-                    "{:.6}",
+                    "{}",
                     crate::f16_bits_to_f32(u16::from_le_bytes(slot.try_into().unwrap()))
                 ),
                 8 => format!(
-                    "{:.6}",
+                    "{}",
                     f32::from_bits((u16::from_le_bytes(slot.try_into().unwrap()) as u32) << 16)
                 ),
                 // Date/time values are stored as integers but must come back as
@@ -1455,13 +1471,21 @@ fn decode_value(
             let at = row * 16;
             let w0 = u64::from_le_bytes(body.get(at..at + 8)?.try_into().ok()?);
             let len = (w0 & 0x00ff_ffff) as usize;
-            if len <= 13 {
-                let inline = &body.get(at + 3..at + 16)?[..len];
-                Some(String::from_utf8_lossy(inline).to_string())
+            let bytes = if len <= 13 {
+                &body.get(at + 3..at + 16)?[..len]
             } else {
                 let offset =
                     u64::from_le_bytes(body.get(at + 8..at + 16)?.try_into().ok()?) as usize;
-                let bytes = outline.get(offset..offset + len)?;
+                outline.get(offset..offset + len)?
+            };
+            // Json cells are BSON (`JsonManager::to_bson`), so a JSON column is
+            // rendered back to its text form; varchar is already text.
+            if type_text.trim().eq_ignore_ascii_case("json") {
+                Some(match infinity_common::json::Json::from_bson(bytes) {
+                    Some(json) => json.compact(),
+                    None => String::from_utf8_lossy(bytes).to_string(),
+                })
+            } else {
                 Some(String::from_utf8_lossy(bytes).to_string())
             }
         }
@@ -1577,7 +1601,7 @@ impl Engine {
             let chunk: Vec<(usize, Vec<Value>)> = rows.drain(..take).collect();
             let texts: Vec<Vec<String>> = chunk
                 .iter()
-                .map(|(_, row)| row.iter().map(|v| v.to_slt_string()).collect())
+                .map(|(_, row)| row.iter().map(mirror_cell_text).collect())
                 .collect();
             let block_columns =
                 self.encode_block_columns(&meta.types, &meta.ids, &types, &layouts, &texts)?;
@@ -1796,27 +1820,41 @@ impl Engine {
             let seg_dir = root.join(format!("idx_{index_id}/seg_0"));
             let private =
                 crate::index_key(&self.qualified_table(table), &im.column).replace('/', "_");
-            // Every chunk the index sealed, not just the first: the reference
-            // keeps one chunk per block (8192 rows here), so a 20000-row table
-            // has three, and a chunk the catalog does not list is invisible to
-            // the reference's readers.
+            // Every chunk the index holds, not just the first: a chunk the
+            // catalog does not list is invisible to the reference's readers.
+            //
+            // The chunk's granularity depends on the index kind. Full-text,
+            // secondary and BMP chunks are **blocks** (100 + 100 rows inserted
+            // into one block leave one chunk of 200 rows, because every dump
+            // re-dumps the block it touches); HNSW/IVF/PLAID chunks are
+            // **memory-index dumps** (the same insert leaves two chunks of 100
+            // rows each). Measured, not assumed: a probe with two flushes over
+            // one block gives `row_count` 200/200/200 for full-text, secondary
+            // and BMP and 100+100 for HNSW.
+            let declared = self
+                .table_schema(table)
+                .ok()
+                .and_then(|schema| {
+                    let ci = schema.iter().position(|c| c == &im.column)?;
+                    self.column_types(table).ok()?.get(ci).cloned()
+                })
+                .unwrap_or_default();
             let chunks = if im.index_type.eq_ignore_ascii_case("SECONDARY") {
                 let dir = self.dir.join("secondary").join(&private);
                 // The chunk's key width comes from the column's declared type,
                 // exactly as the reader derives it (`SecondarySegmentReader::
                 // open_with_kind`).
-                let declared = self
-                    .table_schema(table)
-                    .ok()
-                    .and_then(|schema| {
-                        let ci = schema.iter().position(|c| c == &im.column)?;
-                        self.column_types(table).ok()?.get(ci).cloned()
-                    })
-                    .unwrap_or_default();
                 publish_secondary_chunks(&seg_dir, &dir, crate::secondary_key_kind(&declared))
             } else if im.index_type.eq_ignore_ascii_case("BMP") {
-                let dir = self.dir.join("sparse").join(&private);
-                publish_spill_chunks(&seg_dir, &dir, ".bmp")
+                // Rebuilt from the rows: the reference's chunk is the block and
+                // every dump extends it, while the port's spill files are per
+                // dump, so merging has to happen here.
+                publish_bmp_chunks(
+                    &seg_dir,
+                    self.sparse_rows_by_block(table, &im.column),
+                    crate::sparse_idx_width(&declared),
+                    crate::sparse_declared_bound(&declared).unwrap_or(0),
+                )
             } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                 // Written in place by `write_cpp_fulltext_index`; its files are
                 // named after the chunk's base name, not `chunk_N.idx`.
@@ -1850,8 +1888,44 @@ impl Engine {
         )?;
         Ok(())
     }
+
+    /// A sparse column's documents, grouped by physical block, in the BMP
+    /// encoder's form: `(row id within the segment, [(term, value)])`.
+    fn sparse_rows_by_block(
+        &self,
+        table: &str,
+        column: &str,
+    ) -> std::collections::BTreeMap<u64, Vec<infinity_storage::bmp_cpp::SparseDoc>> {
+        let mut by_block = std::collections::BTreeMap::new();
+        let Ok(schema) = self.table_schema(table) else {
+            return by_block;
+        };
+        let Some(ci) = schema.iter().position(|c| c == column) else {
+            return by_block;
+        };
+        let Ok(rows) = self.fetch_rows_with_ids_projected_all(table, ci) else {
+            return by_block;
+        };
+        for (seq, cells) in rows {
+            let Some(Value::Str(text)) = cells.get(ci) else {
+                continue;
+            };
+            let entries: Vec<(i32, f32)> = crate::parse_sparse_str(text)
+                .into_iter()
+                .map(|(term, value)| (term as i32, value as f32))
+                .collect();
+            let row = seq as u64 & 0xffff_ffff;
+            by_block
+                .entry(row / DEFAULT_BLOCK_CAPACITY as u64)
+                .or_default()
+                .push((row, entries));
+        }
+        by_block
+    }
+
+    /// Reads a table back from the C++ block layout.
     ///
-    /// This is the interop direction §2.6.1 cares about: a `db_*/tbl_*/seg_*/
+    /// This is the interop direction §2.6.1 cares about: a `db_*/tbl_*/seg_*/`
     /// blk_*` directory written by the C++ engine (or by [`Self::write_cpp_blocks`])
     /// reconstructs the table. Values are inserted through the normal `INSERT`
     /// path, so declared types, defaults and indexes all behave as usual.

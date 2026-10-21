@@ -18,6 +18,31 @@ pub enum Json {
 }
 
 impl Json {
+    /// BSON, as `JsonManager::to_bson` writes it into a block column
+    /// (`json_manager_impl.cpp:139`): the value wrapped in `{"data": <value>}`,
+    /// keys sorted (`nlohmann::json`'s `std::map` order), integral numbers as
+    /// `int32` when they fit and `int64` otherwise.
+    pub fn to_bson(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_bson_document(&mut out, &[("data".to_string(), self.clone())]);
+        out
+    }
+
+    /// The value inside a BSON document's `data` field - the inverse of
+    /// [`Self::to_bson`]. A document without that field is returned whole.
+    pub fn from_bson(bytes: &[u8]) -> Option<Json> {
+        let (document, used) = decode_bson_document(bytes)?;
+        if used != bytes.len() {
+            return None;
+        }
+        if let Json::Obj(entries) = &document {
+            if let Some((_, value)) = entries.iter().find(|(key, _)| key == "data") {
+                return Some(value.clone());
+            }
+        }
+        Some(document)
+    }
+
     /// Compact serialization (no spaces); object keys are rendered sorted, as
     /// the reference's JSON writer does.
     pub fn compact(&self) -> String {
@@ -422,9 +447,176 @@ pub fn sparse_to_json(
     Ok(Json::Obj(entries))
 }
 
+/// BSON element type tags (`bson_type` in nlohmann's writer).
+const BSON_DOUBLE: u8 = 0x01;
+const BSON_STRING: u8 = 0x02;
+const BSON_DOCUMENT: u8 = 0x03;
+const BSON_ARRAY: u8 = 0x04;
+const BSON_BOOL: u8 = 0x08;
+const BSON_NULL: u8 = 0x0A;
+const BSON_INT32: u8 = 0x10;
+const BSON_INT64: u8 = 0x12;
+
+fn write_bson_cstring(out: &mut Vec<u8>, key: &str) {
+    out.extend_from_slice(key.as_bytes());
+    out.push(0);
+}
+
+/// `{"a": …, "b": …}` as a BSON document. Keys are written sorted, which is
+/// what `nlohmann::json`'s `std::map` does.
+fn write_bson_document(out: &mut Vec<u8>, entries: &[(String, Json)]) {
+    let start = out.len();
+    out.extend_from_slice(&[0u8; 4]);
+    let mut sorted: Vec<&(String, Json)> = entries.iter().collect();
+    sorted.sort_by(|a, b| a.0.cmp(&b.0));
+    for (key, value) in sorted {
+        write_bson_element(out, key, value);
+    }
+    out.push(0);
+    let len = (out.len() - start) as i32;
+    out[start..start + 4].copy_from_slice(&len.to_le_bytes());
+}
+
+fn write_bson_element(out: &mut Vec<u8>, key: &str, value: &Json) {
+    match value {
+        Json::Null => {
+            out.push(BSON_NULL);
+            write_bson_cstring(out, key);
+        }
+        Json::Bool(v) => {
+            out.push(BSON_BOOL);
+            write_bson_cstring(out, key);
+            out.push(u8::from(*v));
+        }
+        Json::Int(v) => {
+            // Integer literals are `number_integer`; nlohmann narrows them to
+            // `int32` when they fit, which is what the block bytes show.
+            if i32::try_from(*v).is_ok() {
+                out.push(BSON_INT32);
+                write_bson_cstring(out, key);
+                out.extend_from_slice(&(*v as i32).to_le_bytes());
+            } else {
+                out.push(BSON_INT64);
+                write_bson_cstring(out, key);
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+        Json::Float(v) => {
+            out.push(BSON_DOUBLE);
+            write_bson_cstring(out, key);
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+        Json::Str(v) => {
+            out.push(BSON_STRING);
+            write_bson_cstring(out, key);
+            out.extend_from_slice(&((v.len() + 1) as i32).to_le_bytes());
+            out.extend_from_slice(v.as_bytes());
+            out.push(0);
+        }
+        Json::Arr(items) => {
+            out.push(BSON_ARRAY);
+            write_bson_cstring(out, key);
+            let entries: Vec<(String, Json)> = items
+                .iter()
+                .enumerate()
+                .map(|(i, v)| (i.to_string(), v.clone()))
+                .collect();
+            write_bson_document(out, &entries);
+        }
+        Json::Obj(entries) => {
+            out.push(BSON_DOCUMENT);
+            write_bson_cstring(out, key);
+            write_bson_document(out, entries);
+        }
+    }
+}
+
+fn decode_bson_document(bytes: &[u8]) -> Option<(Json, usize)> {
+    let len = i32::from_le_bytes(bytes.get(0..4)?.try_into().ok()?) as usize;
+    if len < 5 || len > bytes.len() || bytes[len - 1] != 0 {
+        return None;
+    }
+    let mut pos = 4;
+    let mut entries: Vec<(String, Json)> = Vec::new();
+    while pos < len - 1 {
+        let tag = *bytes.get(pos)?;
+        pos += 1;
+        let end = bytes[pos..len].iter().position(|b| *b == 0)? + pos;
+        let key = std::str::from_utf8(&bytes[pos..end]).ok()?.to_string();
+        pos = end + 1;
+        let (value, next) = decode_bson_value(bytes, pos, tag)?;
+        pos = next;
+        entries.push((key, value));
+    }
+    if pos != len - 1 {
+        return None;
+    }
+    Some((Json::Obj(entries), len))
+}
+
+fn decode_bson_value(bytes: &[u8], pos: usize, tag: u8) -> Option<(Json, usize)> {
+    match tag {
+        BSON_NULL => Some((Json::Null, pos)),
+        BSON_BOOL => Some((Json::Bool(*bytes.get(pos)? != 0), pos + 1)),
+        BSON_INT32 => Some((
+            Json::Int(i32::from_le_bytes(bytes.get(pos..pos + 4)?.try_into().ok()?) as i64),
+            pos + 4,
+        )),
+        BSON_INT64 => Some((
+            Json::Int(i64::from_le_bytes(
+                bytes.get(pos..pos + 8)?.try_into().ok()?,
+            )),
+            pos + 8,
+        )),
+        BSON_DOUBLE => Some((
+            Json::Float(f64::from_le_bytes(
+                bytes.get(pos..pos + 8)?.try_into().ok()?,
+            )),
+            pos + 8,
+        )),
+        BSON_STRING => {
+            let len = i32::from_le_bytes(bytes.get(pos..pos + 4)?.try_into().ok()?) as usize;
+            if len == 0 {
+                return None;
+            }
+            let start = pos + 4;
+            let text = std::str::from_utf8(bytes.get(start..start + len - 1)?)
+                .ok()?
+                .to_string();
+            Some((Json::Str(text), start + len))
+        }
+        BSON_DOCUMENT => {
+            let (value, used) = decode_bson_document(bytes.get(pos..)?)?;
+            Some((value, pos + used))
+        }
+        BSON_ARRAY => {
+            let (value, used) = decode_bson_document(bytes.get(pos..)?)?;
+            let items = match value {
+                Json::Obj(entries) => entries.into_iter().map(|(_, v)| v).collect(),
+                other => vec![other],
+            };
+            Some((Json::Arr(items), pos + used))
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The exact bytes the reference writes for a JSON cell: BSON, outside
+    /// `{"data": …}`, keys sorted, small integers as `int32`. Measured from a
+    /// block the reference wrote (`col_14_out`, row 0).
+    #[test]
+    fn writes_bson_like_the_reference() {
+        let json = parse(r#"{"k":0,"n":[1,2,0],"s":"v0"}"#).unwrap();
+        let expected: &[u8] = b">\x00\x00\x00\x03data\x003\x00\x00\x00\x10k\x00\x00\x00\x00\x00\
+\x04n\x00\x1a\x00\x00\x00\x100\x00\x01\x00\x00\x00\x101\x00\x02\x00\x00\x00\x102\x00\x00\x00\
+\x00\x00\x00\x02s\x00\x03\x00\x00\x00v0\x00\x00\x00";
+        assert_eq!(json.to_bson(), expected);
+        assert_eq!(Json::from_bson(expected), Some(json));
+    }
 
     #[test]
     fn parses_and_compacts_objects() {
