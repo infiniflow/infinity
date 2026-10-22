@@ -60,10 +60,13 @@ fn assert_compacted(e: &Engine, segment: u32) {
     assert_eq!(h::count(e, "db1.tb1"), 32768);
     assert_eq!(e.segment_ids("db1.tb1"), vec![segment]);
     e.flush().unwrap();
-    assert_eq!(e.block_ids("db1.tb1", 0), vec![0, 1, 2, 3]);
+    assert_eq!(e.block_ids("db1.tb1", segment), vec![0, 1, 2, 3]);
     for block in 0..4u16 {
-        assert_eq!(e.block_row_count("db1.tb1", 0, block), Some(8192));
-        assert_eq!(e.block_visible_range("db1.tb1", 0, block), Some((0, 8192)));
+        assert_eq!(e.block_row_count("db1.tb1", segment, block), Some(8192));
+        assert_eq!(
+            e.block_visible_range("db1.tb1", segment, block),
+            Some((0, 8192))
+        );
     }
     // Count through the unindexed column: the reference reads the merged
     // segment's row count, not a duplicate-key index lookup.
@@ -292,14 +295,14 @@ fn internal_compact_skips_deleted_offsets() {
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768 - 4096);
     assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
     e.flush().unwrap();
-    assert_eq!(e.block_ids("db1.tb1", 0), vec![0, 1, 2, 3]);
+    assert_eq!(e.block_ids("db1.tb1", 1), vec![0, 1, 2, 3]);
     // The reference keeps the block's stored row count (8192) and hides the
     // tombstones from the visible range; the engine reports the same stored
     // count, and `row_count` below accounts for the deleted offsets.
     for block in 0..3u16 {
-        assert_eq!(e.block_row_count("db1.tb1", 0, block), Some(8192));
+        assert_eq!(e.block_row_count("db1.tb1", 1, block), Some(8192));
     }
-    assert_eq!(e.block_row_count("db1.tb1", 0, 3), Some(4096));
+    assert_eq!(e.block_row_count("db1.tb1", 1, 3), Some(4096));
     // Odd offsets in the first block were `col1 = 2`; the other three blocks
     // still alternate 4096/4096.
     assert_eq!(

@@ -3110,19 +3110,21 @@ mod tests {
         assert_eq!(b.matches("\"row_count\":\"1\"").count(), 2, "{b}");
         assert!(!b.contains("\"segment_id\":0"), "no synthetic segment: {b}");
 
+        // The mirror writes each segment into its own directory, so the two
+        // one-row segments have one block each.
         let (s, b) = route(
             &engine,
             &peer,
             "GET",
-            "/databases/default_db/tables/t/segments/0/blocks",
+            "/databases/default_db/tables/t/segments/1/blocks",
             "",
         );
         assert_eq!(s, 200, "{b}");
         assert!(
-            b.starts_with("{\"error_code\":0,\"segment_id\":0,\"blocks\":[{"),
+            b.starts_with("{\"error_code\":0,\"segment_id\":1,\"blocks\":[{"),
             "{b}"
         );
-        assert!(b.contains("\"row_count\":\"2\""), "{b}");
+        assert!(b.contains("\"row_count\":\"1\""), "{b}");
         assert!(b.contains("\"size\":\""), "{b}");
     }
 

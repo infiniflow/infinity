@@ -12,8 +12,10 @@ fn client(bucket: &str) -> Option<S3Client> {
         endpoint: std::env::var("INFINITY_MINIO_ENDPOINT")
             .unwrap_or_else(|_| "127.0.0.1:9005".to_string()),
         bucket: bucket.to_string(),
-        access_key: "minioadmin".into(),
-        secret_key: "minioadmin".into(),
+        access_key: std::env::var("INFINITY_MINIO_ACCESS_KEY")
+            .unwrap_or_else(|_| "minioadmin".to_string()),
+        secret_key: std::env::var("INFINITY_MINIO_SECRET_KEY")
+            .unwrap_or_else(|_| "minioadmin".to_string()),
         https: std::env::var("INFINITY_MINIO_HTTPS").ok().as_deref() == Some("1"),
     }))
 }
@@ -44,15 +46,18 @@ fn tree_sync_and_restore() {
         return;
     };
     c.ensure_bucket().unwrap();
+    // A fresh prefix per run: a bucket left over from an earlier run would
+    // legitimately skip the uploads this test counts.
+    let prefix = format!("tree-test-{}", std::process::id());
     let src = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(src.path().join("db_1/tbl_0")).unwrap();
     std::fs::write(src.path().join("db_1/tbl_0/blk_0"), b"payload").unwrap();
     std::fs::write(src.path().join("db_1/tbl_0/chunk_0.idx"), b"idx").unwrap();
-    let up = sync_tree(&c, src.path(), "tree-test").unwrap();
+    let up = sync_tree(&c, src.path(), &prefix).unwrap();
     assert!(up >= 2, "uploaded {up}");
 
     let dst = tempfile::tempdir().unwrap();
-    let down = restore_tree(&c, dst.path(), "tree-test").unwrap();
+    let down = restore_tree(&c, dst.path(), &prefix).unwrap();
     assert!(down >= 2, "restored {down}");
     assert_eq!(
         std::fs::read(dst.path().join("db_1/tbl_0/blk_0")).unwrap(),
@@ -64,5 +69,34 @@ fn tree_sync_and_restore() {
     );
 
     // A second sync with the same sizes uploads nothing.
-    assert_eq!(sync_tree(&c, src.path(), "tree-test").unwrap(), 0);
+    assert_eq!(sync_tree(&c, src.path(), &prefix).unwrap(), 0);
+}
+
+/// A file rewritten to the *same length* still has to be uploaded: RocksDB's
+/// `CURRENT` is always sixteen bytes, so a size-only comparison leaves the
+/// bucket pointing at a manifest that the sync has already deleted.
+#[test]
+fn same_size_edit_is_uploaded() {
+    let Some(c) = client("it-tree") else {
+        return;
+    };
+    c.ensure_bucket().unwrap();
+    let prefix = format!("same-size-{}", std::process::id());
+    let src = tempfile::tempdir().unwrap();
+    std::fs::write(src.path().join("CURRENT"), b"MANIFEST-000005\n").unwrap();
+    assert_eq!(sync_tree(&c, src.path(), &prefix).unwrap(), 1);
+
+    std::fs::write(src.path().join("CURRENT"), b"MANIFEST-000014\n").unwrap();
+    assert_eq!(
+        sync_tree(&c, src.path(), &prefix).unwrap(),
+        1,
+        "a same-sized rewrite must not be skipped"
+    );
+
+    let dst = tempfile::tempdir().unwrap();
+    restore_tree(&c, dst.path(), &prefix).unwrap();
+    assert_eq!(
+        std::fs::read(dst.path().join("CURRENT")).unwrap(),
+        b"MANIFEST-000014\n"
+    );
 }

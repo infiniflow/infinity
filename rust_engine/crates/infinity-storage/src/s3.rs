@@ -18,7 +18,19 @@ use hmac::{Hmac, Mac};
 use infinity_common::{Error, Result};
 use sha2::{Digest, Sha256};
 
+use crate::virtual_store::md5_hex;
+
 type HmacSha256 = Hmac<Sha256>;
+
+/// One entry of a `ListObjectsV2` response.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObjectInfo {
+    pub key: String,
+    pub size: usize,
+    /// MD5 of the body for a single-part upload, without the XML quotes.
+    /// `None` when the store did not report one.
+    pub etag: Option<String>,
+}
 
 /// Connection settings for the object store.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -407,6 +419,18 @@ impl S3Client {
 
     /// Lists every object under `prefix` as `(key, size)` pairs.
     pub fn list_objects(&self, prefix: &str) -> Result<Vec<(String, usize)>> {
+        Ok(self
+            .list_objects_detailed(prefix)?
+            .into_iter()
+            .map(|o| (o.key, o.size))
+            .collect())
+    }
+
+    /// Lists every object under `prefix` with the size and ETag the store
+    /// reports. The ETag of a single-part `PutObject` is the MD5 of the body,
+    /// which is what [`sync_tree`] compares against to decide whether a file
+    /// that kept its size still needs uploading.
+    pub fn list_objects_detailed(&self, prefix: &str) -> Result<Vec<ObjectInfo>> {
         let mut out = Vec::new();
         let mut token: Option<String> = None;
         loop {
@@ -424,8 +448,18 @@ impl S3Client {
                 let size = between(chunk, "<Size>", "</Size>")
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(0);
+                let etag = between(chunk, "<ETag>", "</ETag>")
+                    .map(|e| {
+                        // MinIO escapes the quotes of the ETag (`&#34;abc&#34;`);
+                        // AWS sends them literally.
+                        e.replace("&#34;", "\"")
+                            .replace("&quot;", "\"")
+                            .trim_matches('"')
+                            .to_ascii_lowercase()
+                    })
+                    .filter(|e| !e.is_empty());
                 if !key.is_empty() {
-                    out.push((key, size));
+                    out.push(ObjectInfo { key, size, etag });
                 }
             }
             match between(&text, "<NextContinuationToken>", "</NextContinuationToken>") {
@@ -444,8 +478,14 @@ fn between(text: &str, open: &str, close: &str) -> Option<String> {
 }
 
 /// Uploads every file under `local_root` to `<key_prefix>/<relative path>` and
-/// removes objects that no longer exist locally. Unchanged sizes are skipped,
-/// so a checkpoint over an unchanged tree costs one `ListObjectsV2`.
+/// removes objects that no longer exist locally.
+///
+/// A file is skipped only when the store already holds the same bytes: its
+/// size and ETag (the MD5 `PutObject` gives a single-part upload) both have to
+/// match. Comparing sizes alone is not enough - RocksDB's `CURRENT` is
+/// `MANIFEST-0000NN\n`, sixteen bytes whichever manifest it names, so a
+/// rotated catalog used to be uploaded without its new manifest while the old
+/// one was deleted, leaving a tree that cannot be opened.
 pub fn sync_tree(
     client: &S3Client,
     local_root: &std::path::Path,
@@ -454,14 +494,22 @@ pub fn sync_tree(
     use std::collections::BTreeSet;
     let mut local: Vec<(String, std::path::PathBuf, usize)> = Vec::new();
     collect_files(local_root, local_root, &mut local)?;
-    let remote = client.list_objects(&format!("{key_prefix}/"))?;
-    let remote_map: BTreeMap<String, usize> = remote.into_iter().collect();
+    let remote = client.list_objects_detailed(&format!("{key_prefix}/"))?;
+    let remote_map: BTreeMap<String, ObjectInfo> =
+        remote.into_iter().map(|o| (o.key.clone(), o)).collect();
     let mut uploaded = 0;
     let mut live = BTreeSet::new();
     for (rel, path, size) in &local {
         let key = format!("{key_prefix}/{rel}");
         live.insert(key.clone());
-        if remote_map.get(&key).copied() == Some(*size) {
+        if remote_map.get(&key).is_some_and(|o| o.size == *size) {
+            let body = std::fs::read(path).map_err(|e| Error::io(path, e))?;
+            let etag = remote_map[&key].etag.as_deref();
+            if etag == Some(md5_hex(&body).as_str()) {
+                continue;
+            }
+            client.put_object(&key, &body)?;
+            uploaded += 1;
             continue;
         }
         let body = std::fs::read(path).map_err(|e| Error::io(path, e))?;
@@ -477,22 +525,27 @@ pub fn sync_tree(
 }
 
 /// Downloads every object under `<key_prefix>/` into `local_root`, recreating
-/// the directory layout. Existing files of the right size are left alone.
+/// the directory layout. A local file is kept only when its bytes already
+/// match the object (size and ETag), so a half-written tree comes back
+/// consistent instead of keeping a same-sized file from an older checkpoint.
 pub fn restore_tree(
     client: &S3Client,
     local_root: &std::path::Path,
     key_prefix: &str,
 ) -> Result<usize> {
-    let objects = client.list_objects(&format!("{key_prefix}/"))?;
+    let objects = client.list_objects_detailed(&format!("{key_prefix}/"))?;
     let mut restored = 0;
-    for (key, size) in objects {
+    for ObjectInfo { key, size, etag } in objects {
         let rel = key
             .strip_prefix(&format!("{key_prefix}/"))
             .unwrap_or(&key)
             .to_string();
         let path = local_root.join(&rel);
         if std::fs::metadata(&path).map(|m| m.len() as usize).ok() == Some(size) {
-            continue;
+            let local = std::fs::read(&path).map_err(|e| Error::io(&path, e))?;
+            if etag.as_deref() == Some(md5_hex(&local).as_str()) {
+                continue;
+            }
         }
         let Some(body) = client.get_object(&key)? else {
             continue;

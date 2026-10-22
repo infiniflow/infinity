@@ -535,8 +535,24 @@ impl WalEntry {
     }
 
     /// C++: `WalEntry::ReadAdv` (`wal_entry_impl.cpp:2213`). Returns the entry
-    /// and the number of bytes it occupies.
+    /// and the number of bytes it occupies, decoding an embedded `DataBlock`
+    /// with this engine's own layout (see [`Self::read_adv_in`]).
     pub fn read_adv(buf: &[u8]) -> Option<(Self, usize)> {
+        // Both engines seal segments as `wal.log.{ts}` and both frame an entry
+        // the same way, so the file name cannot say which block layout an
+        // `AppendV2` uses. The record itself can: the reference's
+        // `DataBlock::WriteAdv` image is *not* parseable as this crate's frame
+        // (its first field after the column count is a `LogicalType`, which the
+        // port's frame reads as a row count), while the port's frame is
+        // parseable as the reference's only for a block whose row count happens
+        // to look like a type + vector type + a tail that fits. Trying the
+        // reference first therefore decodes either engine's records.
+        Self::read_adv_in(buf, DataBlockLayout::Reference)
+            .or_else(|| Self::read_adv_in(buf, DataBlockLayout::Port))
+    }
+
+    /// [`Self::read_adv`] with an explicit block layout.
+    pub fn read_adv_in(buf: &[u8], layout: DataBlockLayout) -> Option<(Self, usize)> {
         if buf.len() < WAL_ENTRY_HEADER_LEN {
             return None;
         }
@@ -569,7 +585,7 @@ impl WalEntry {
         }
         let mut cmds = Vec::with_capacity(count as usize);
         for _ in 0..count {
-            cmds.push(decode_cmd(&mut cursor)?);
+            cmds.push(decode_cmd(&mut cursor, layout)?);
         }
         Some((
             Self {
@@ -950,6 +966,10 @@ impl<'a> Cursor<'a> {
         }
         Some(len as usize)
     }
+    /// Bytes left in the payload.
+    fn remaining(&self) -> usize {
+        self.buf.len().saturating_sub(self.pos)
+    }
 }
 
 fn logical_type_code(t: LogicalType) -> (u8, u32) {
@@ -1212,9 +1232,32 @@ fn put_data_block<S: Sink>(sink: &mut S, block: &DataBlock) {
     }
 }
 
+/// How the `DataBlock` inside a `WalCmd::Append` is encoded.
+///
+/// The two engines log appends in different block layouts:
+///
+/// * [`Self::Port`] is this crate's own self-describing column frame
+///   (`put_data_block`), written to `wal.rust`.
+/// * [`Self::Reference`] is C++ `DataBlock::WriteAdv` (`data_block_impl.cpp:353`):
+///   a column count followed by the raw `ColumnVector::WriteAdv` images
+///   (`column_vector_impl.cpp:2661`) — `DataType::WriteAdv`,
+///   `ColumnVectorType`, `tail_index`, the typed slots, the var buffer and the
+///   null bitmap. This is what `wal.log`/`wal.log.{ts}` carry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DataBlockLayout {
+    Port,
+    Reference,
+}
+
 fn read_data_block(cursor: &mut Cursor<'_>) -> Option<DataBlock> {
     let column_count = cursor.len()?;
     let row_count = cursor.len()?;
+    // Every row of every column costs at least one byte in this frame, so a
+    // row count past the payload is a different layout's bytes rather than a
+    // huge block (it is what the reference's image looks like here).
+    if row_count > cursor.remaining() {
+        return None;
+    }
     let mut columns = Vec::with_capacity(column_count);
     let mut values: Vec<Vec<BlockValue>> = Vec::with_capacity(column_count);
     for _ in 0..column_count {
@@ -1240,6 +1283,273 @@ fn read_data_block(cursor: &mut Cursor<'_>) -> Option<DataBlock> {
     }
     block.finalize();
     Some(block)
+}
+
+/// Reads a `DataBlock` in the layout the reference writes into its WAL.
+///
+/// Mirrors `DataBlock::ReadAdv`/`ColumnVector::ReadAdv`
+/// (`data_block_impl.cpp:363`, `column_vector_impl.cpp:2702`): the column count,
+/// then per column the `DataType`, the `ColumnVectorType`, `tail_index`, the
+/// slots, the var buffer (only for the types that own one) and the null bitmap.
+fn read_reference_data_block(cursor: &mut Cursor<'_>) -> Option<DataBlock> {
+    let column_count = cursor.len()?;
+    let mut columns = Vec::with_capacity(column_count);
+    let mut decoded = Vec::with_capacity(column_count);
+    for _ in 0..column_count {
+        let (logical_type, values) = read_reference_column(cursor)?;
+        columns.push(empty_column(logical_type)?);
+        decoded.push(values);
+    }
+    let row_count = decoded.first().map(Vec::len).unwrap_or(0);
+    if decoded.iter().any(|values| values.len() != row_count) {
+        return None;
+    }
+    let mut block = DataBlock::new(columns, row_count);
+    for (column, values) in decoded.into_iter().enumerate() {
+        for value in values {
+            block.append_value(column, value).ok()?;
+        }
+    }
+    block.finalize();
+    Some(block)
+}
+
+/// A C++ `DataType` (`parser/type/data_type.h`): the logical type plus the
+/// type info its `WriteAdv` appends (`data_type.cpp:320`).
+struct ReferenceType {
+    logical: LogicalType,
+    /// `EmbeddingDataType` of an embedding column (`embedding_type.h:33`).
+    element: i8,
+    dimension: usize,
+    /// `DecimalInfo::scale`, needed to render a `DecimalT`.
+    scale: u32,
+}
+
+/// C++ `LogicalType` (`logical_type.h:43`) — a different numbering from this
+/// crate's own column codes.
+const LO_EMBEDDING: i8 = 23;
+
+fn read_reference_type(cursor: &mut Cursor<'_>) -> Option<ReferenceType> {
+    let code = cursor.i8()?;
+    let mut ty = ReferenceType {
+        logical: LogicalType::Invalid,
+        element: -1,
+        dimension: 0,
+        scale: 0,
+    };
+    ty.logical = match code {
+        0 => LogicalType::Boolean,
+        1 => LogicalType::TinyInt,
+        2 => LogicalType::SmallInt,
+        3 => LogicalType::Integer,
+        4 => LogicalType::BigInt,
+        5 => LogicalType::HugeInt,
+        6 => LogicalType::Decimal,
+        7 => LogicalType::Float,
+        8 => LogicalType::Double,
+        9 => LogicalType::Varchar,
+        10 => LogicalType::Date,
+        11 => LogicalType::Time,
+        12 => LogicalType::DateTime,
+        13 => LogicalType::Timestamp,
+        14 => LogicalType::Interval,
+        15 => LogicalType::Array,
+        22 => LogicalType::Uuid,
+        LO_EMBEDDING => LogicalType::Embedding(0),
+        24 => LogicalType::RowID,
+        25 => LogicalType::Mixed,
+        34 => LogicalType::Json,
+        _ => return None,
+    };
+    match code {
+        6 => {
+            // `DecimalInfo`: precision then scale, both i64.
+            let _precision = cursor.i64()?;
+            ty.scale = cursor.i64()? as u32;
+        }
+        15 => {
+            // The element type is written inline; only its bytes matter here.
+            read_reference_type(cursor)?;
+        }
+        LO_EMBEDDING => {
+            ty.element = cursor.i8()?;
+            ty.dimension = cursor.i32()? as usize;
+            ty.logical = LogicalType::Embedding(ty.dimension as u32);
+        }
+        _ => {}
+    }
+    Some(ty)
+}
+
+/// `DataType::Size()` of one slot (`data_type.cpp:227`, `LogicalTypeWidth`).
+fn reference_slot_width(ty: &ReferenceType) -> Option<usize> {
+    Some(match ty.logical {
+        LogicalType::Boolean | LogicalType::TinyInt => 1,
+        LogicalType::SmallInt => 2,
+        LogicalType::Integer | LogicalType::Float => 4,
+        LogicalType::BigInt | LogicalType::Double => 8,
+        LogicalType::HugeInt | LogicalType::Decimal | LogicalType::Uuid => 16,
+        LogicalType::Varchar | LogicalType::Json => 16,
+        LogicalType::Date | LogicalType::Time => 4,
+        LogicalType::DateTime | LogicalType::Timestamp | LogicalType::Interval => 8,
+        LogicalType::Array => 8,
+        LogicalType::RowID => 8,
+        LogicalType::Embedding(_) => reference_embedding_width(ty.element, ty.dimension)?,
+        _ => return None,
+    })
+}
+
+/// `EmbeddingType::EmbeddingSize` (`embedding_type.h:129`) for the C++
+/// `EmbeddingDataType` numbering: 0 bit, 1 int8, 2 int16, 3 int32, 4 int64,
+/// 5 float, 6 double, 7 uint8, 8 float16, 9 bfloat16.
+fn reference_embedding_width(element: i8, dimension: usize) -> Option<usize> {
+    Some(match element {
+        0 => dimension.div_ceil(8),
+        1 | 7 => dimension,
+        2 | 8 | 9 => dimension * 2,
+        3 | 5 => dimension * 4,
+        4 | 6 => dimension * 8,
+        _ => return None,
+    })
+}
+
+/// The types whose `VectorBuffer::WriteAdv` emits a heap (`vector_buffer_impl.cpp:326`).
+fn reference_has_var_buffer(logical: LogicalType) -> bool {
+    matches!(
+        logical,
+        LogicalType::Array | LogicalType::Varchar | LogicalType::Json
+    )
+}
+
+fn read_reference_column(cursor: &mut Cursor<'_>) -> Option<(LogicalType, Vec<BlockValue>)> {
+    let ty = read_reference_type(cursor)?;
+    // C++ `ColumnVectorType`: 1 flat, 2 constant, 3 compact bit.
+    let vector_type = cursor.i8()?;
+    let tail = cursor.i32()?;
+    if tail < 0 || !matches!(vector_type, 1..=3) {
+        return None;
+    }
+    let tail = tail as usize;
+    let width = reference_slot_width(&ty)?;
+    let raw = if vector_type == 3 {
+        cursor.take(tail.div_ceil(8))?
+    } else {
+        cursor.take(tail.checked_mul(width)?)?
+    };
+    let outline: &[u8] = if reference_has_var_buffer(ty.logical) {
+        let heap_len = cursor.len()?;
+        cursor.take(heap_len)?
+    } else {
+        &[]
+    };
+    let valid = read_reference_nulls(cursor)?;
+
+    let mut values = Vec::with_capacity(tail);
+    for row in 0..tail {
+        if !valid.get(row).copied().unwrap_or(true) {
+            values.push(BlockValue::Null);
+            continue;
+        }
+        if vector_type == 3 {
+            let byte = raw.get(row / 8).copied().unwrap_or(0);
+            values.push(BlockValue::Bool(byte & (1 << (row % 8)) != 0));
+            continue;
+        }
+        // A constant vector stores one value for every row.
+        let at = if vector_type == 2 { 0 } else { row };
+        let slot = raw.get(at * width..at * width + width)?;
+        values.push(reference_value(&ty, slot, outline)?);
+    }
+    Some((ty.logical, values))
+}
+
+/// C++ `Bitmask::ReadAdv` (`roaring_bitmap.cppm:325`), which stores the bitmap
+/// of **valid** rows: `[count: u32][all_true: u8][size: i32][roaring bytes]`.
+fn read_reference_nulls(cursor: &mut Cursor<'_>) -> Option<Vec<bool>> {
+    let count = cursor.u32()? as usize;
+    let all_true = cursor.u8()? != 0;
+    let mut valid = vec![true; count];
+    if all_true {
+        return Some(valid);
+    }
+    let size = cursor.len()?;
+    let bytes = cursor.take(size)?;
+    let bitmap = roaring::RoaringBitmap::deserialize_from(bytes).ok()?;
+    for (row, bit) in valid.iter_mut().enumerate() {
+        *bit = bitmap.contains(row as u32);
+    }
+    Some(valid)
+}
+
+fn reference_value(ty: &ReferenceType, slot: &[u8], outline: &[u8]) -> Option<BlockValue> {
+    fn i32_at(slot: &[u8], at: usize) -> Option<i32> {
+        Some(i32::from_le_bytes(slot.get(at..at + 4)?.try_into().ok()?))
+    }
+    Some(match ty.logical {
+        LogicalType::Boolean => BlockValue::Bool(slot.first().copied()? != 0),
+        LogicalType::TinyInt => BlockValue::TinyInt(slot.first().copied()? as i8),
+        LogicalType::SmallInt => {
+            BlockValue::SmallInt(i16::from_le_bytes(slot.get(..2)?.try_into().ok()?))
+        }
+        LogicalType::Integer => BlockValue::Int32(i32_at(slot, 0)?),
+        LogicalType::BigInt => BlockValue::Int(i64::from_le_bytes(slot.get(..8)?.try_into().ok()?)),
+        LogicalType::HugeInt => {
+            BlockValue::HugeInt(i128::from_le_bytes(slot.get(..16)?.try_into().ok()?))
+        }
+        LogicalType::Decimal => BlockValue::Decimal(infinity_common::DecimalT::new(
+            i128::from_le_bytes(slot.get(..16)?.try_into().ok()?),
+            ty.scale,
+        )),
+        LogicalType::Float => {
+            BlockValue::Float(f32::from_le_bytes(slot.get(..4)?.try_into().ok()?))
+        }
+        LogicalType::Double => {
+            BlockValue::Double(f64::from_le_bytes(slot.get(..8)?.try_into().ok()?))
+        }
+        LogicalType::Varchar => BlockValue::Str(
+            String::from_utf8(crate::cpp_format::decode_varchar_slot(slot, outline)?).ok()?,
+        ),
+        LogicalType::Date => BlockValue::Date(infinity_common::DateT::new(i32_at(slot, 0)?)),
+        LogicalType::Time => BlockValue::Time(infinity_common::TimeT::new(i32_at(slot, 0)?)),
+        LogicalType::DateTime => BlockValue::DateTime(infinity_common::DateTimeT::new(
+            i32_at(slot, 0)?,
+            i32_at(slot, 4)?,
+        )),
+        LogicalType::Timestamp => BlockValue::Timestamp(infinity_common::TimestampT::new(
+            i32_at(slot, 0)?,
+            i32_at(slot, 4)?,
+        )),
+        LogicalType::Interval => {
+            BlockValue::Interval(infinity_common::IntervalT::new(i32_at(slot, 0)?))
+        }
+        LogicalType::Uuid => BlockValue::Uuid(slot.get(..16)?.try_into().ok()?),
+        // `RowID` is a union of `u64` with `{u32 segment_offset, u32 segment_id}`
+        // on little-endian (`row_id.h:36-47`).
+        LogicalType::RowID => BlockValue::RowId(crate::data_block::RowIdT::new(
+            u32::from_le_bytes(slot.get(4..8)?.try_into().ok()?),
+            u32::from_le_bytes(slot.get(..4)?.try_into().ok()?),
+        )),
+        // `JsonType` is `{u64 length, u64 offset}` into the var buffer
+        // (`json_type.h:23`), the same shape as `Varchar` with a wider offset.
+        LogicalType::Json => {
+            let len = u64::from_le_bytes(slot.get(..8)?.try_into().ok()?) as usize;
+            let offset = u64::from_le_bytes(slot.get(8..16)?.try_into().ok()?) as usize;
+            let text = std::str::from_utf8(outline.get(offset..offset.checked_add(len)?)?).ok()?;
+            BlockValue::Json(infinity_common::json::parse(text)?)
+        }
+        // `BlockValue::Embedding` is float-only; other element types have no
+        // representation in this crate's block model.
+        LogicalType::Embedding(dim) if ty.element == 5 => {
+            let mut vector = Vec::with_capacity(dim as usize);
+            for element in 0..dim as usize {
+                vector.push(f32::from_le_bytes(
+                    slot.get(element * 4..element * 4 + 4)?.try_into().ok()?,
+                ));
+            }
+            BlockValue::Embedding(vector)
+        }
+        _ => return None,
+    })
 }
 
 fn encode_segment_info<S: Sink>(sink: &mut S, info: &WalSegmentInfo) {
@@ -1719,7 +2029,7 @@ fn encode_cmd<S: Sink>(sink: &mut S, cmd: &WalCmd) {
     }
 }
 
-fn decode_cmd(cursor: &mut Cursor<'_>) -> Option<WalCmd> {
+fn decode_cmd(cursor: &mut Cursor<'_>, layout: DataBlockLayout) -> Option<WalCmd> {
     let command_type = WalCommandType::from_i8(cursor.i8()?)?;
     Some(match command_type {
         WalCommandType::CreateDatabaseV2 => WalCmd::CreateDatabase {
@@ -1813,7 +2123,10 @@ fn decode_cmd(cursor: &mut Cursor<'_>) -> Option<WalCmd> {
                 table_name,
                 table_id,
                 row_ranges,
-                block: read_data_block(cursor)?,
+                block: match layout {
+                    DataBlockLayout::Port => read_data_block(cursor)?,
+                    DataBlockLayout::Reference => read_reference_data_block(cursor)?,
+                },
             }
         }
         WalCommandType::DeleteV2 => {

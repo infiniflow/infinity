@@ -219,19 +219,22 @@ fn test_cleanup_compact() {
     import(&e, "default_db.tb1", 1, TEXT);
     import(&e, "default_db.tb1", 1, TEXT);
     e.flush().unwrap();
-    let compacted_paths = e.table_files("default_db.tb1");
-    assert!(!compacted_paths.is_empty());
+    let source_paths = e.table_files("default_db.tb1");
+    assert!(!source_paths.is_empty());
 
     e.compact_table("default_db.tb1").unwrap();
     e.flush().unwrap();
     e.cleanup().unwrap();
 
-    // The Rust mirror keeps the merged rows in `seg_0`/`blk_*`, so the paths
-    // captured before the compaction are the rewritten ones and must exist.
-    check_files(&[], &compacted_paths);
+    // Compaction merges the two source segments into a new segment id, so the
+    // mirror rewrites the blocks under `seg_{merged}` and the cleanup removes
+    // the source segment's files - the reference deletes the merged-away
+    // segments too. What must survive is the rewritten block.
     assert_eq!(count(&e, "default_db.tb1"), 16384);
     assert_eq!(e.segment_ids("default_db.tb1"), vec![1]);
-    assert_eq!(e.block_row_count("default_db.tb1", 0, 0), Some(8192));
+    assert_eq!(e.block_row_count("default_db.tb1", 1, 0), Some(8192));
+    let compacted_paths = e.table_files("default_db.tb1");
+    check_files(&source_paths, &compacted_paths);
 
     e.execute("DROP TABLE tb1;").unwrap();
     e.flush().unwrap();

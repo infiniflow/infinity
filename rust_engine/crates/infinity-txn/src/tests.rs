@@ -332,17 +332,30 @@ fn read_sets_and_ranges_conflict() {
     let mut writer = m.begin();
     writer.put(row("default_db.t", 0), b"a".to_vec());
 
+    // A read-only transaction is never validated: the reference hands it
+    // `current_ts + 1` and returns before `CheckConflict1`
+    // (`NewTxn::Commit`, `new_txn_impl.cpp:2035-2057`).
     let mut reader = m.begin();
     reader.read(row("default_db.t", 0));
     m.commit(writer).unwrap();
-    assert!(matches!(m.commit(reader), Err(Error::TxnConflict(_))));
+    assert_eq!(m.commit(reader).unwrap(), m.current_ts() + 1);
+
+    // A *write* transaction that read the key does conflict.
+    let mut read_writer = m.begin();
+    read_writer.read(row("default_db.t", 0));
+    read_writer.put(b"unrelated".to_vec(), b"x".to_vec());
+    let mut writer2 = m.begin();
+    writer2.put(row("default_db.t", 0), b"b".to_vec());
+    m.commit(writer2).unwrap();
+    assert!(matches!(m.commit(read_writer), Err(Error::TxnConflict(_))));
 
     // A range read sees any newer write under the prefix.
     let mut ranged = m.begin();
     ranged.read_prefix(b"row:default_db.t:");
-    let mut writer2 = m.begin();
-    writer2.put(row("default_db.t", 1), b"b".to_vec());
-    m.commit(writer2).unwrap();
+    ranged.put(b"unrelated2".to_vec(), b"y".to_vec());
+    let mut writer3 = m.begin();
+    writer3.put(row("default_db.t", 1), b"b".to_vec());
+    m.commit(writer3).unwrap();
     assert!(matches!(m.commit(ranged), Err(Error::TxnConflict(_))));
 
     // A read from before the writes, committed without overlap, is fine.
@@ -392,8 +405,8 @@ fn restart_rebuilds_the_conflict_state_from_the_wal() {
     }
     let m = manager(dir.path());
     let seen = m.write_ts.lock().unwrap();
-    assert_eq!(seen.get(&row("default_db.t", 0)), Some(&1));
-    assert_eq!(seen.get(&del_key("default_db.t", 7)), Some(&1));
+    assert_eq!(seen.get(&row("default_db.t", 0)), Some(&2));
+    assert_eq!(seen.get(&del_key("default_db.t", 7)), Some(&2));
 }
 
 #[test]
@@ -409,6 +422,8 @@ fn checkpoint_ts_skips_already_applied_records() {
     }
     let store = Arc::new(FjallMetaStore::open(dir.path().join("kv2"), "default").unwrap());
     let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
-    assert_eq!(m.recover(1).unwrap(), 2);
+    // The three commits took timestamps 2, 4 and 6: replaying past the first
+    // one leaves the other two.
+    assert_eq!(m.recover(2).unwrap(), 2);
     assert_eq!(store.scan_prefix(b"row:").unwrap().len(), 2);
 }

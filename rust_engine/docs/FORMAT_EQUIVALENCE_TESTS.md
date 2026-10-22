@@ -27,7 +27,7 @@
 | **参考不确定** | IVF chunk | 参考用 `std::random_device` + `std::mt19937` 采样 k-means 训练集（`ivf_index_data_impl.cpp:212-216`），质心、连同质心个数都不是行值的函数；同一输入两次跑出两块同尺寸不同内容的 chunk |
 | **不可比** | `catalog/`（RocksDB）、`wal/`、MinIO 桶内布局 | 带 session id、LSN、提交 ts；参考对自己都不可复现。只比**逻辑内容**（`SHOW CATALOG 'all'`）与互读 |
 
-`version` 文件：布局相同，`create_ts` 不同（参考写事务提交 ts，重写版写镜像 ts），比较前把 ts 置零。
+`version` 文件：布局相同，`create_ts` 不同，比较前把 ts 置零。两方的**分配器**已经同构（§6.6），差的是**事务粒度**：参考给启动引导、首个 checkpoint、每条 DDL 都开写事务，重写版的 DDL 直接写 catalog、不占 ts。同一句脚本（`CREATE TABLE` + 200 行 insert + `flush_data()`）在参考的 WAL 里是 4（启动 checkpoint）/6（建 `default_db`）/8（CREATE TABLE）/**10**（append）/12（checkpoint），重写版是 **2**（append）/3→4（checkpoint）：插入自己拿到的 ts 就不同，镜像即使写真实提交 ts 也对不上。镜像还多一层原因——它是同一个 checkpoint 上的**一次全量重写**，`created_` 里没有逐次 append 的提交顺序可写——所以写 `0`，任何读者（`begin_ts ≥ 1`）都看得见这些行。实测把镜像 ts 换成非 0（20）会让参考启动时在 `RecoverMemIndex` 的 `RoaringBitmap::SetFalse` 越界：那个 ts 在参考的 catalog/WAL 里没有对应的提交记录。
 
 浮点键 PGM 的截距依赖参考的**编译选项**。clang 默认 `-ffp-contract=on`，参考以 `-O3` 编译时会把 `piecewise_linear_model.hpp` 里 5 处乘加（`get_intersection` 的 `a`、`b`、`i_x`、`i_y` 与 `get_floating_point_segment` 的截距）收缩成 FMA；同一份源码用 `-ffp-contract=off` 编出来，`FLOAT` 键 65 行线性输入的第一个截距是 32 而不是 31。重写版用 `f64::mul_add` 复刻收缩后的舍入，因此对齐的是**参考默认编译口径**下的字节；这条差异由 `float_intercept_matches_contracted_reference_fit` 钉住。
 
@@ -106,7 +106,7 @@
 
 | 差异 | 重写版 | 参考 | 门禁处理 |
 |---|---|---|---|
-| `version` 的 `create_ts` | 镜像 ts | 事务提交 ts | 比较前把 ts 置零 |
+| `version` 的 `create_ts` | 全量重写写 `0`（`CPP_MIRROR_TS`） | 填块那次 append 的提交 ts | 比较前把 ts 置零；见 §2 与 §6.6 |
 | `version` 删除槽的 ts | 固定 `1`（`DELETED_MIRROR_TS`） | 删除事务的提交 ts | 比较前把 ts 置零；布局一致 |
 | HNSW 图区 | 确定（插入顺序即行序） | `thread_local std::mt19937`，节点层级取决于线程调度 | header / vectors / labels 字节比，图区与查询答案按内容比 |
 | IVF 质心 | 确定 | `std::random_device` 采样，质心个数也不固定 | chunk 按内容比 |
@@ -148,6 +148,33 @@
 - 参考**没有恢复路径**：`VirtualStore::DownloadObject` 在 `src/` 里没有调用者；把参考的本地文件清空后重启，它记的是 `Init a new catalog` + 空表（日志里只有 `Uploading object meta/...`）。参考的对象存储是"备份"，不是"主存储"。
 
 所以这一列只能覆盖重写版自己的往返；跨引擎互读需要一个重写版的打包对象存储实现（`ObjCreate` + `pm|object|` + `pm|object_stat|` + 对齐/合包），且在参考能自恢复之前没有可比的另一端。
+
+### 6.6 时间戳：分配器已同构，消耗的个数不同
+
+时钟按参考的**双指针偶数制**走（`new_txn_manager_impl.cpp`）：
+
+| 项 | 参考 | 重写版 |
+|---|---|---|
+| 指针 | `current_ts_`（最后一个完成提交的 ts）+ `prepare_commit_ts_`（提交者取值的高水位） | 同（两个 `AtomicU64`） |
+| 开事务 | `begin_ts = current_ts_ + 1` | 同 |
+| 写事务提交 | `prepare_commit_ts_ += 2`，提交 ts 即新值 | 同 |
+| 只读事务提交 | `commit_ts = current_ts_ + 1`，两个指针都不动 | 同 |
+| 冲突 | 先取 ts 再查冲突，回滚也照样占掉这个 ts | 同 |
+| 提交顺序 | `CommitBottom` 按提交 ts 推进 `current_ts_` | 同 |
+| 重放 | `CommitReplayTxn` 把两个指针置成该 entry 的提交 ts | 同 |
+| 起始值 | `start_ts` = 最新 checkpoint frame 的提交 ts | 同（`max(checkpoint 提交 ts, KV 的 applied 标记)`） |
+| checkpoint | 一个写事务：命令带 `begin_ts`（奇数，`NewTxn::Checkpoint` 拒绝偶数），frame 的提交 ts 是它 +1 | 同 |
+| DDL | 每条 DDL 一个写事务 | **不开事务**，直接写 catalog（已有的引擎差异，见 `SIMPLIFICATION_AUDIT.md`） |
+| 启动 | 引导（ts 2）、首个 checkpoint（ts 4）、首次连接建 `default_db`（ts 6）各占一个写事务 | 无 |
+
+所以同一句脚本的两条 trace 是（实测，WAL 的提交 ts）：
+
+```
+参考   : 4=checkpoint(启动) 6=CreateDatabase 8=CreateTable 10=Append 12=checkpoint
+重写版 : 2=Append 3→4=checkpoint
+```
+
+值不同，但**规则**相同：每个写事务 `+2`、只读事务不推进、checkpoint 也占一个。要让值也相等，得先把 DDL 变成事务（写 typed WAL、按提交 ts 落 catalog），那是另一件事，且会改变 catalog 的字节与 replay 路径。镜像里的 ts 因此继续写 `0`/`1`，见 §2。
 
 ## 7. 怎么跑
 

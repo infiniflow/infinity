@@ -12,6 +12,7 @@
 use crate::new_catalog_ut as h;
 use crate::Engine;
 use infinity_parser::Literal;
+use infinity_storage::cpp_format::BlockVersionFile;
 use tempfile::tempdir;
 
 fn create_table(e: &Engine) {
@@ -113,15 +114,25 @@ fn update_multiple_blocks() {
         vec![vec!["8192"]]
     );
     // The reference sees blocks 0 and 1 with every other row visible and a
-    // third full block of updated rows; the engine stores the rewritten rows
-    // as new blocks. Assert the same visible totals over the mirror.
+    // third full block of updated rows. Like the reference, the engine keeps a
+    // deleted row's cells in its block and hides it through the block's
+    // `version` file (`deleted_`), so the physical total is the 16384 original
+    // rows plus the 8192 appended updates, of which 8192 slots are marked.
     e.flush().unwrap();
-    let mirrored: usize = e
+    let physical: usize = e
         .block_ids("db1.tb1", 0)
         .iter()
         .map(|b| e.block_row_count("db1.tb1", 0, *b as u16).unwrap_or(0))
         .sum();
-    assert_eq!(mirrored, 2 * 8192);
+    let deleted: usize = e
+        .table_files("db1.tb1")
+        .iter()
+        .filter(|path| path.file_name().is_some_and(|name| name == "version"))
+        .map(|path| BlockVersionFile::decode(&std::fs::read(path).unwrap()).unwrap())
+        .map(|version| version.deleted.iter().filter(|ts| **ts != 0).count())
+        .sum();
+    assert_eq!(physical, 3 * 8192);
+    assert_eq!(physical - deleted, 2 * 8192);
 }
 
 /// C++ `src/unit_test/storage/new_catalog/update_ut.cpp:581`

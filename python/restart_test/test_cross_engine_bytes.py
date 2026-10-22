@@ -33,6 +33,9 @@ patterns counted (see `test_the_reference_is_deterministic_where_the_test_assume
 * **Deterministic modulo a timestamp** — the block `version` file: the
   reference records the commit ts of the append that filled the block, the port
   records its own mirror ts. The layout must match; the ts must not be compared.
+  The values cannot agree: the reference spends a timestamp on the bootstrap,
+  the initial checkpoint and every DDL, while the port's DDL is not
+  transactional (`rust_engine/docs/FORMAT_EQUIVALENCE_TESTS.md` §6.6).
 * **Not byte comparable — compared by content** — the HNSW chunk's **graph**:
   the reference builds it with a `thread_local std::mt19937`
   (`hnsw_alg.cppm:107`), so which thread inserts which vector — and therefore
@@ -1307,12 +1310,12 @@ def test_the_two_engines_write_the_same_bytes():
 def test_the_reference_is_deterministic_where_the_test_assumes_it():
     """The classification the byte comparison rests on, measured.
 
-    The byte test compares the sparse chunk and the integral-key secondary
-    chunk byte for byte and excludes only the HNSW chunk (its graph) and the
-    float-key secondary chunk (its PGM model). That split is an assumption
-    about the reference, so it is checked here rather than asserted in a
-    comment: the reference is run three times on the same input and the files
-    that come out differently are counted.
+    The byte test compares the sparse chunk and every secondary chunk -
+    integral, date and floating point keys alike - byte for byte, and excludes
+    only the HNSW chunk (its graph). That split is an assumption about the
+    reference, so it is checked here rather than asserted in a comment: the
+    reference is run three times on the same input and the files that come out
+    differently are counted.
 
     The HNSW chunk is the one that may differ - the reference builds the graph
     with a `thread_local std::mt19937` (`hnsw_alg.cppm:107`), so which thread

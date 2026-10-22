@@ -137,9 +137,20 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
         None
     };
     if let Some(client) = &object_store {
-        match infinity_storage::s3::restore_tree(client, &root.join("data"), "data") {
-            Ok(n) => println!("object store: restored {n} file(s) from s3"),
-            Err(e) => eprintln!("object store: restore failed: {e}"),
+        // Every tree the checkpoints upload has to come back, not only the
+        // C++-format `data/`: the catalog holds the tables and the row store
+        // holds their rows, so restoring `data/` alone opens an empty engine
+        // in which the mirrored block files have nothing to belong to.
+        for (dir, prefix) in [
+            ("data", "data"),
+            ("catalog", "catalog"),
+            ("persistence", "persistence"),
+        ] {
+            match infinity_storage::s3::restore_tree(client, &root.join(dir), prefix) {
+                Ok(n) if n > 0 => println!("object store: restored {n} {prefix} file(s) from s3"),
+                Ok(_) => {}
+                Err(e) => eprintln!("object store: restoring {prefix} failed: {e}"),
+            }
         }
     }
     // `[storage] catalog_engine = "rocksdb" | "fjall"`: the substrate a fresh

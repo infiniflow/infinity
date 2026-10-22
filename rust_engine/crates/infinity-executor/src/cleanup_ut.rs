@@ -282,11 +282,14 @@ fn cleanup_and_append() {
             assert_eq!(e.segment_ids("db1.tb1"), vec![1, 2]);
             assert_eq!(e.segments("db1.tb1"), vec![(1, 2), (2, 1)]);
             assert_eq!(e.row_count("db1.tb1").unwrap(), 3);
-            // The Rust block mirror stores every segment in segment 0; after a
-            // checkpoint it holds the three live rows in one block.
+            // The block mirror writes each segment into its own directory, so
+            // after a checkpoint the three live rows sit in the two segments
+            // that hold them.
             e.flush().unwrap();
-            assert_eq!(e.block_ids("db1.tb1", 0), vec![0]);
-            assert_eq!(e.block_row_count("db1.tb1", 0, 0), Some(3));
+            assert_eq!(e.block_ids("db1.tb1", 1), vec![0]);
+            assert_eq!(e.block_row_count("db1.tb1", 1, 0), Some(2));
+            assert_eq!(e.block_ids("db1.tb1", 2), vec![0]);
+            assert_eq!(e.block_row_count("db1.tb1", 2, 0), Some(1));
         },
     );
 }
@@ -308,8 +311,8 @@ fn cleanup_and_delete() {
             assert_eq!(e.segments("db1.tb1"), vec![(2, 1)]);
             assert_eq!(e.row_count("db1.tb1").unwrap(), 1);
             e.flush().unwrap();
-            assert_eq!(e.block_ids("db1.tb1", 0), vec![0]);
-            assert_eq!(e.block_row_count("db1.tb1", 0, 0), Some(1));
+            assert_eq!(e.block_ids("db1.tb1", 2), vec![0]);
+            assert_eq!(e.block_row_count("db1.tb1", 2, 0), Some(1));
         },
     );
 }
@@ -343,7 +346,8 @@ fn cleanup_and_update() {
                 vec![vec!["1".to_string()]]
             );
             e.flush().unwrap();
-            assert_eq!(e.block_row_count("db1.tb1", 0, 0), Some(2));
+            assert_eq!(e.block_ids("db1.tb1", 3), vec![0]);
+            assert_eq!(e.block_row_count("db1.tb1", 3, 0), Some(2));
         },
     );
 }

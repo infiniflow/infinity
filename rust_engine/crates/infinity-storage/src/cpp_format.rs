@@ -249,10 +249,20 @@ impl ColumnBody {
         let mut region = vec![0u8; cap_bytes];
         region[..data.len()].copy_from_slice(data);
 
+        // The reference writes the bitmap a byte at a time: appending `n` rows
+        // at offset `o` ORs in the whole bytes `[o / 8, (o + n + 7) / 8)`, so
+        // the bits *past* the last row in that final byte are set too. Only a
+        // NULL row's own bit is ever cleared.
+        //
+        // Measured, not assumed: a 203-row block whose last three rows are
+        // NULL has 203 bits set and the highest of them at row 207 - rows
+        // 203..207 do not exist, and rows 200..202 do and are NULL.
         let mut null_bitmap = vec![0u8; Self::null_bitmap_len(capacity)];
+        let covered = valid.len().div_ceil(8).min(null_bitmap.len());
+        null_bitmap[..covered].fill(0xff);
         for (row, ok) in valid.iter().enumerate() {
-            if *ok {
-                null_bitmap[row / 8] |= 1 << (row % 8);
+            if !*ok {
+                null_bitmap[row / 8] &= !(1 << (row % 8));
             }
         }
         Ok(Self {
@@ -870,14 +880,18 @@ pub fn pack_column_with_layout(
     match layout {
         ColumnLayout::CompactBit => {
             let mut bits = vec![0u8; ColumnBody::null_bitmap_len(capacity)];
+            // Same rule as `ColumnBody::build`: every bit of an appended byte
+            // starts set and only a NULL row clears its own.
             let mut null_bitmap = vec![0u8; ColumnBody::null_bitmap_len(capacity)];
+            let covered = slots.len().div_ceil(8).min(null_bitmap.len());
+            null_bitmap[..covered].fill(0xff);
             for (row, v) in slots.iter().enumerate() {
                 let Some(v) = v else {
                     valid.push(false);
+                    null_bitmap[row / 8] &= !(1 << (row % 8));
                     continue;
                 };
                 valid.push(true);
-                null_bitmap[row / 8] |= 1 << (row % 8);
                 let on: &[u8] = v;
                 if on == b"1" || on.eq_ignore_ascii_case(b"true") {
                     bits[row / 8] |= 1 << (row % 8);
@@ -1017,16 +1031,18 @@ mod tests {
         let body = ColumnBody::build(4, 4, &data, &[true, false, true]).unwrap();
         assert_eq!(body.data.len(), 16); // padded to capacity * slot
         assert_eq!(ColumnBody::null_bitmap_len(4), 1);
-        assert_eq!(body.null_bitmap, vec![0b0000_0101]);
+        assert_eq!(body.null_bitmap, vec![0b1111_1101]);
         assert!(body.is_valid(0));
         assert!(!body.is_valid(1));
         assert!(body.is_valid(2));
-        assert!(!body.is_valid(3));
+        // The bits past the last appended row stay set: the reference ORs in
+        // whole bytes, so a padding slot is not "NULL" in the bitmap.
+        assert!(body.is_valid(3));
 
         let encoded = body.encode();
         assert_eq!(encoded.len(), 16 + 1);
         // data region first, then the bitmap
-        assert_eq!(&encoded[16..17], &[0b0000_0101]);
+        assert_eq!(&encoded[16..17], &[0b1111_1101]);
     }
 
     #[test]
@@ -1118,7 +1134,9 @@ mod tests {
         // The int column's body is `[data_region][null_bitmap]`.
         let split = split_body(&got_columns[0].body, 8192, 4);
         assert_eq!(&split.data[..12], &ints[..]);
-        assert_eq!(split.null_bitmap[0], 0b0000_0101);
+        // The reference fills every bit of the appended bytes; only row 1's
+        // own bit is cleared (`pack_*` tests below cover the same rule).
+        assert_eq!(split.null_bitmap[0], 0b1111_1101);
         assert!(got_columns[0].outline.is_empty());
 
         // The varchar column points into the raw outline file.
@@ -1166,7 +1184,7 @@ mod tests {
         assert_eq!(&body.data[0..4], &a);
         assert_eq!(&body.data[4..8], &[0, 0, 0, 0]); // NULL slot is zeroed
         assert_eq!(&body.data[8..12], &c);
-        assert_eq!(body.null_bitmap[0], 0b0000_0101);
+        assert_eq!(body.null_bitmap[0], 0b1111_1101);
     }
 
     #[test]
@@ -1182,7 +1200,7 @@ mod tests {
             pack_column(0, &[Some(b"true"), Some(b"false"), None, Some(b"1")], 4).unwrap();
         assert_eq!(body.data.len(), 1); // (capacity + 7) / 8
         assert_eq!(body.data[0], 0b0000_1001); // rows 0 and 3 are true
-        assert_eq!(body.null_bitmap[0], 0b0000_1011); // row 2 is NULL
+        assert_eq!(body.null_bitmap[0], 0b1111_1011); // row 2 is NULL
     }
 
     #[test]
@@ -1218,7 +1236,7 @@ mod tests {
         assert_eq!(w3 & 0x00ff_ffff, long.len() as u64);
         assert_eq!(&w3.to_le_bytes()[3..8], &[0u8; 5]);
         assert_eq!(off3, 0);
-        assert_eq!(body.null_bitmap[0], 0b0000_1101);
+        assert_eq!(body.null_bitmap[0], 0b1111_1101);
     }
 
     #[test]

@@ -279,20 +279,23 @@ fn txn_manager_timestamps() {
     let commit1 = e.current_ts();
     assert!(begin1 < commit1, "begin {begin1} < commit {commit1}");
 
-    // Read transaction: begin == last commit, and the (empty) commit is fine.
+    // Read transaction: `NewTxnManager::BeginTxnShared` sets
+    // `begin_ts = current_ts_ + 1` and `GetReadCommitTS` hands the same value
+    // back, so begin == commit for a reader and `current_ts_` does not move.
     let t2 = e.begin_txn();
     let begin2 = t2.begin_ts();
-    assert_eq!(begin2, commit1);
+    assert_eq!(begin2, commit1 + 1);
     t2.commit().unwrap();
-    assert_eq!(begin2, e.current_ts());
+    assert_eq!(e.current_ts(), commit1);
 
-    // Rollback transaction: the begin timestamp is the last commit and the
-    // timestamp does not advance.
+    // Rollback transaction: the begin timestamp is still `current_ts_ + 1`, and
+    // a rollback never advances either pointer.
     let t3 = e.begin_txn();
     let begin3 = t3.begin_ts();
-    assert_eq!(begin3, e.current_ts());
+    assert_eq!(begin3, e.current_ts() + 1);
     t3.rollback();
-    assert_eq!(begin3, e.current_ts());
+    assert_eq!(begin3, e.current_ts() + 1);
+    assert_eq!(e.current_ts(), commit1);
 
     // Conflicting drop: the first commits, the second fails.
     h::ok(&e, "CREATE DATABASE db1;");
@@ -308,8 +311,9 @@ fn txn_manager_timestamps() {
         .unwrap();
     t5.commit().unwrap();
     assert!(begin5 < e.current_ts());
-    // The reference finally asserts `CurrentTS() == PrepareCommitTS()`; the
-    // engine has no prepared-commit counter, so assert monotonicity instead.
+    // The reference ends with `EXPECT_EQ(CurrentTS(), PrepareCommitTS())`; with
+    // no transaction in flight both pointers sit on the last commit.
+    assert_eq!(e.current_ts(), e.prepare_commit_ts());
     assert!(e.current_ts() >= after);
 }
 

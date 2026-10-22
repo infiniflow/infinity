@@ -309,6 +309,14 @@ impl Compressor {
 }
 
 /// RFC 1321 MD5 over raw bytes, used by the snapshot compression format.
+/// Lower-case hex MD5, the form S3 reports as an object's ETag.
+pub fn md5_hex(input: &[u8]) -> String {
+    md5_bytes(input)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 fn md5_bytes(input: &[u8]) -> [u8; 16] {
     const S: [u32; 64] = [
         7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5,

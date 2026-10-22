@@ -390,9 +390,9 @@ fn delete_then_compact() {
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
     e.flush().unwrap();
-    assert_eq!(e.block_ids("db1.tb1", 0).len(), 1);
-    assert_eq!(e.block_row_count("db1.tb1", 0, 0), Some(8192));
-    assert_eq!(e.block_visible_range("db1.tb1", 0, 0), Some((0, 8192)));
+    assert_eq!(e.block_ids("db1.tb1", 1).len(), 1);
+    assert_eq!(e.block_row_count("db1.tb1", 1, 0), Some(8192));
+    assert_eq!(e.block_visible_range("db1.tb1", 1, 0), Some((0, 8192)));
     assert!(h::rows(&e, "SELECT * FROM db1.tb1 WHERE col1 = 1;").is_empty());
 }
 

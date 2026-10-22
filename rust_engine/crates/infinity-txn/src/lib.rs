@@ -118,7 +118,16 @@ pub struct TxnManager {
     /// are applied at the checkpoint, so the reference has nothing to replay).
     checkpoint_path: PathBuf,
     next_txn_id: AtomicU64,
-    next_ts: AtomicU64,
+    /// `NewTxnManager::current_ts_`: the timestamp of the last **completed**
+    /// commit. A new transaction's `begin_ts` is `current_ts + 1`, so it sees
+    /// every commit up to here and none in flight.
+    current_ts: AtomicU64,
+    /// `NewTxnManager::prepare_commit_ts_`: the high-water mark that committers
+    /// take from. A write transaction takes `+= 2`, which keeps the odd values
+    /// for read-only snapshots (`GetReadCommitTS` is `current_ts + 1`), so a
+    /// reader's snapshot can never land between a write transaction's begin and
+    /// its commit.
+    prepare_commit_ts: AtomicU64,
     /// Monotonic high-water mark of commit timestamps applied to the KV. The
     /// marker written into each batch must never regress, or a concurrent
     /// checkpoint would keep a much longer WAL than necessary.
@@ -191,7 +200,10 @@ impl TxnManager {
             next_txn_id: AtomicU64::new(max_id + 1),
             // A checkpoint may have truncated the WAL, so the applied marker in
             // the KV store is the other source of the timestamp high-water mark.
-            next_ts: AtomicU64::new(max_ts.max(applied_ts) + 1),
+            // The reference seeds both pointers from `start_ts`, the checkpoint
+            // frame's commit ts (`NewTxnManager(..., start_ts)`).
+            current_ts: AtomicU64::new(max_ts.max(applied_ts)),
+            prepare_commit_ts: AtomicU64::new(max_ts.max(applied_ts)),
             max_applied: AtomicU64::new(applied_ts),
             last_appended: AtomicU64::new(max_ts),
             synced: AtomicU64::new(applied_ts),
@@ -211,10 +223,11 @@ impl TxnManager {
     /// `txn_map_` so `SHOW TRANSACTIONS` and `active_txn_count` see it.
     pub fn begin_with_text(&self, txn_text: impl Into<String>) -> Txn {
         let id = self.next_txn_id.fetch_add(1, Ordering::SeqCst);
-        // `NewTxn::BeginTS`: the timestamp of the last commit. A commit
-        // allocates a strictly larger timestamp, so a write transaction's
-        // begin is below its commit.
-        let begin_ts = self.next_ts.load(Ordering::SeqCst).saturating_sub(1);
+        // `NewTxnManager::BeginTxnShared`: `begin_ts = current_ts_ + 1`. It is
+        // one past the last completed commit, so it is *below* this
+        // transaction's own commit timestamp (which is `current_ts_ + 2`) and
+        // above every commit that finished before it began.
+        let begin_ts = self.current_ts.load(Ordering::SeqCst) + 1;
         let info = TxnInfo {
             txn_id: id,
             txn_text: txn_text.into(),
@@ -290,16 +303,23 @@ impl TxnManager {
             return Err(Error::Txn("empty transaction".into()));
         }
         let _commit = self.commit_lock.lock().unwrap();
-        {
-            let seen = self.write_ts.lock().unwrap();
-            if let Some(reason) = self.conflict(&txn, &seen) {
-                return Err(Error::TxnConflict(reason));
-            }
-        }
         if read_only {
             return Ok(self.current_ts() + 1);
         }
-        let commit_ts = self.next_ts.fetch_add(1, Ordering::SeqCst);
+        // `NewTxnManager::GetWriteCommitTS`: `prepare_commit_ts_ += 2`, taken
+        // *before* the conflict check, so a rolled-back transaction still spends
+        // its timestamp - the reference never hands the same value out twice.
+        let commit_ts = self.prepare_commit_ts.fetch_add(2, Ordering::SeqCst) + 2;
+        {
+            let seen = self.write_ts.lock().unwrap();
+            if let Some(reason) = self.conflict(&txn, &seen) {
+                // The timestamp is spent; `CommitBottom` advances `current_ts_`
+                // past it in commit-ts order even when the transaction rolled
+                // back, so the clock keeps the same hole.
+                self.current_ts.fetch_max(commit_ts, Ordering::SeqCst);
+                return Err(Error::TxnConflict(reason));
+            }
+        }
         let entry = WalEntry::new(
             txn.id as i64,
             commit_ts,
@@ -329,6 +349,10 @@ impl TxnManager {
                 seen.insert(key.clone(), commit_ts);
             }
         }
+        // `CommitBottom` / `FinalizeTxn`: the clock moves only once the batch is
+        // in the store, so a reader's `begin_ts` is `current_ts + 1` and never
+        // sees a commit that is still being applied.
+        self.current_ts.store(commit_ts, Ordering::SeqCst);
         self.total_committed.fetch_add(1, Ordering::Relaxed);
         Ok(commit_ts)
     }
@@ -394,7 +418,14 @@ impl TxnManager {
 
     /// C++: `NewTxnManager::CurrentTS` — the timestamp of the last commit.
     pub fn current_ts(&self) -> TxnTimeStamp {
-        self.next_ts.load(Ordering::Relaxed).saturating_sub(1)
+        self.current_ts.load(Ordering::Relaxed)
+    }
+
+    /// C++: `NewTxnManager::PrepareCommitTS` — the high-water mark committers
+    /// take from. It sits one above `CurrentTS` while a write transaction is
+    /// between `GetWriteCommitTS` and `CommitBottom`, and equal to it otherwise.
+    pub fn prepare_commit_ts(&self) -> TxnTimeStamp {
+        self.prepare_commit_ts.load(Ordering::Relaxed)
     }
 
     /// Replays the WAL into the KV store for all records after `checkpoint_ts`.
@@ -452,6 +483,11 @@ impl TxnManager {
                 self.store.atomic_write(&writes)?;
                 self.max_applied
                     .fetch_max(entry.commit_ts, Ordering::SeqCst);
+                // `CommitReplayTxn`: a replayed entry moves both pointers to its
+                // own commit ts, so the live clock resumes above it.
+                self.current_ts.fetch_max(entry.commit_ts, Ordering::SeqCst);
+                self.prepare_commit_ts
+                    .fetch_max(entry.commit_ts, Ordering::SeqCst);
                 applied += 1;
             }
         }
@@ -478,27 +514,32 @@ impl TxnManager {
     /// wal", `wal_manager_impl.cpp:670`). The entry therefore has to survive the
     /// truncation that follows it, and the log must never be left empty.
     pub fn append_checkpoint(&self, max_commit_ts: TxnTimeStamp) -> Result<()> {
+        let _commit = self.commit_lock.lock().unwrap();
         // The caller usually passes the KV's applied marker, which stays 0
         // until a recovery runs; the manager's own high-water marks are always
         // current.
-        let ts = max_commit_ts
+        let floor = max_commit_ts
             .max(self.max_applied.load(Ordering::SeqCst))
-            .max(self.last_appended.load(Ordering::SeqCst));
-        if ts == 0 {
+            .max(self.last_appended.load(Ordering::SeqCst))
+            .max(self.current_ts.load(Ordering::SeqCst));
+        if floor == 0 {
             return Ok(());
         }
-        // The reference's checkpoint command carries the checkpoint
-        // transaction's **begin** ts, which is odd - its commit ts is even
-        // (`NewTxnManager::GetWriteCommitTS` hands out `current_ts + 2`).
-        // `NewTxn::Checkpoint` rejects an even checkpoint ts outright
-        // ("last checkpoint ts isn't correct", `new_txn_impl.cpp:1754`), so a
-        // directory whose checkpoint frame names an even ts makes the
-        // reference abort on startup. The frame's own commit ts is the begin
-        // ts plus one, again matching the reference.
-        let begin_ts = (ts + 1) | 1;
+        // A checkpoint is a write transaction in the reference
+        // (`NewTxn::Checkpoint`, `TransactionType::kNewCheckpoint`), so it
+        // spends a timestamp like any other: `BeginTxnShared` sets the begin ts
+        // to `current_ts_ + 1` and the commit takes `prepare_commit_ts_ += 2`.
+        // The command carries the **begin** ts (`checkpoint_ts =
+        // txn_context_ptr_->begin_ts_`), which is odd, and `NewTxn::Checkpoint`
+        // rejects an even one outright ("last checkpoint ts isn't correct",
+        // `new_txn_impl.cpp:1754`); a directory whose checkpoint frame names an
+        // even ts makes the reference abort on startup. The frame's own commit
+        // ts is the even value one above it.
+        let begin_ts = self.current_ts.load(Ordering::SeqCst) + 1;
+        let commit_ts = self.prepare_commit_ts.fetch_add(2, Ordering::SeqCst) + 2;
         let entry = WalEntry::new(
             -1,
-            begin_ts + 1,
+            commit_ts,
             vec![WalCmd::Checkpoint {
                 max_commit_ts: begin_ts,
             }],
@@ -524,6 +565,9 @@ impl TxnManager {
             file.sync_all()
                 .map_err(|e| Error::io(&self.checkpoint_path, e))?;
         }
+        // The checkpoint transaction is committed: its commit ts is the clock's
+        // new position, exactly as `CommitBottom` leaves `current_ts_`.
+        self.current_ts.store(commit_ts, Ordering::SeqCst);
         Ok(())
     }
 
@@ -560,15 +604,13 @@ impl TxnManager {
         self.wal.lock().unwrap().flush()?;
         self.store.flush()?;
         // Everything the KV holds is now durable, so the log up to this point
-        // can be dropped by the next checkpoint.
+        // can be dropped by the next checkpoint. The checkpoint entry itself is
+        // appended by the caller that owns the checkpoint (`flush_storage`,
+        // `checkpoint_wal`): a checkpoint is a write transaction in the
+        // reference and therefore spends a timestamp, so it must not be
+        // appended twice for one flush.
         let applied = self.max_applied.load(Ordering::SeqCst);
         self.synced.fetch_max(applied, Ordering::SeqCst);
-        // The reference refuses to open a writable directory that has data but
-        // no checkpoint entry in `wal/wal.log` (`GetReplayEntries`,
-        // `wal_manager_impl.cpp:670`), and it takes `max_checkpoint_ts` from
-        // that entry. Publish it after every checkpoint, so the directory is
-        // readable by the reference even if the process is killed next.
-        self.append_checkpoint(applied)?;
         Ok(())
     }
 
@@ -744,7 +786,7 @@ fn append_writes(
     for (base, count) in row_ranges {
         let base_seq = base.to_u64();
         for offset in 0..*count {
-            let Some(BlockValue::Str(text)) = block.get_value(0, row) else {
+            let Some(text) = row_text(block, row) else {
                 return Err(Error::Wal(format!(
                     "append command for {table} is missing row {row} of its block"
                 )));
@@ -754,6 +796,86 @@ fn append_writes(
         }
     }
     Ok(out)
+}
+
+/// The stored text of one block row: the columns' rendered values joined by
+/// tabs, which is the form the engine keeps in the KV store
+/// (`Engine::encode_row_stored`).
+///
+/// This engine's own append records carry that text in a single varchar column
+/// (`build_append`), so the one-column case returns the blob verbatim; the
+/// reference's `WalCmdAppendV2` carries the table's real typed columns instead
+/// (`DataBlock::WriteAdv`), so they have to be rendered back.
+fn row_text(block: &DataBlock, row: usize) -> Option<String> {
+    let mut cells = Vec::with_capacity(block.column_count());
+    for column in 0..block.column_count() {
+        cells.push(cell_text(&block.get_value(column, row)?));
+    }
+    Some(cells.join("\t"))
+}
+
+/// `.slt`/storage text of one typed value (`Literal::to_slt_string`).
+fn cell_text(value: &BlockValue) -> String {
+    match value {
+        BlockValue::Null => "null".to_string(),
+        BlockValue::Bool(v) => v.to_string(),
+        BlockValue::TinyInt(v) => v.to_string(),
+        BlockValue::SmallInt(v) => v.to_string(),
+        BlockValue::Int32(v) => v.to_string(),
+        BlockValue::Int(v) => v.to_string(),
+        BlockValue::HugeInt(v) => v.to_string(),
+        // Shortest round-trip form of the stored width: an `f32` column keeps
+        // `0.1` as `0.1` instead of the widened `0.10000000149011612`.
+        BlockValue::Float(v) => v.to_string(),
+        BlockValue::Double(v) => v.to_string(),
+        BlockValue::Decimal(v) => {
+            if v.scale == 0 {
+                v.value.to_string()
+            } else {
+                let divisor = 10u128.pow(v.scale);
+                let magnitude = v.value.unsigned_abs();
+                format!(
+                    "{}{}.{:0width$}",
+                    if v.value < 0 { "-" } else { "" },
+                    magnitude / divisor,
+                    magnitude % divisor,
+                    width = v.scale as usize
+                )
+            }
+        }
+        BlockValue::Str(v) => v.clone(),
+        BlockValue::Date(v) => infinity_storage::cpp_format::days_to_date(v.value),
+        BlockValue::Time(v) => infinity_storage::cpp_format::secs_to_time(v.value),
+        BlockValue::DateTime(v) => format!(
+            "{} {}",
+            infinity_storage::cpp_format::days_to_date(v.date),
+            infinity_storage::cpp_format::secs_to_time(v.time)
+        ),
+        BlockValue::Timestamp(v) => format!(
+            "{} {}",
+            infinity_storage::cpp_format::days_to_date(v.date),
+            infinity_storage::cpp_format::secs_to_time(v.time)
+        ),
+        BlockValue::Interval(v) => v.value.to_string(),
+        BlockValue::Uuid(v) => v.iter().map(|b| format!("{b:02x}")).collect(),
+        BlockValue::Embedding(v) => format!(
+            "[{}]",
+            v.iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        BlockValue::Array(v) => format!(
+            "[{}]",
+            v.iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        BlockValue::Mixed(v) => v.text(),
+        BlockValue::Json(v) => v.compact(),
+        BlockValue::RowId(v) => format!("{}:{}", v.segment_id, v.segment_offset),
+    }
 }
 
 /// Replay of [`WalCmd::Delete`]: the tombstones the commit wrote.
@@ -829,12 +951,22 @@ fn sealed_segments(wal_path: &std::path::Path) -> Result<Vec<(PathBuf, TxnTimeSt
     Ok(out)
 }
 
-/// Every WAL file in replay order: sealed segments first, then the active log.
+/// Every WAL file in replay order: the sealed segments (oldest first), the
+/// reference's active `wal.log`, then this engine's active `wal.rust`.
+///
+/// A directory written by the reference has `wal.log`/`wal.log.{ts}` and no
+/// `wal.rust`; one written by this engine has the mirror image (plus a
+/// `wal.log` that only carries a checkpoint entry). Reading both means a
+/// directory either engine crashed on replays the records it did not flush.
 fn segment_paths(wal_path: &std::path::Path) -> Result<Vec<PathBuf>> {
     let mut out: Vec<PathBuf> = sealed_segments(wal_path)?
         .into_iter()
         .map(|(path, _)| path)
         .collect();
+    let reference_log = wal_path.with_file_name("wal.log");
+    if reference_log.exists() {
+        out.push(reference_log);
+    }
     out.push(wal_path.to_path_buf());
     Ok(out)
 }

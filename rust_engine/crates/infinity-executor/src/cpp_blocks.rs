@@ -19,6 +19,20 @@ use infinity_catalog::cpp_layout::{
 };
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
+/// The ts a deleted block slot carries in the mirror's `version`.
+///
+/// `BlockVersion::CheckDelete` hides a slot whose ts is non-zero and not newer
+/// than the reader's, so any value in `[1, reader_ts]` works; the mirror has no
+/// per-delete commit order to stamp (the reference does, and the format test
+/// takes it out before comparing).
+const DELETED_MIRROR_TS: u64 = 1;
+
+/// Serialises mirror rewrites.
+///
+/// A commit re-mirrors its table (`refresh_cpp_block_mirror`), so two
+/// concurrent inserts on one table would interleave the block writes and the
+/// stale-directory sweep of the rewrite.
+static MIRROR_WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 use infinity_index::hnsw_handler::HnswHandler;
 use infinity_index::plaid::PlaidIndex;
 use infinity_index::vector::HnswIndex;
@@ -29,7 +43,8 @@ use infinity_storage::cpp_format::{
 };
 use infinity_storage::knn_format;
 
-use crate::Engine;
+use crate::{del_key, parse_value, row_key, Engine};
+use infinity_parser::Literal;
 
 /// `(row id, vector)` pairs read back from a vector index mirror.
 type VectorRows = Vec<(u32, Vec<f32>)>;
@@ -303,7 +318,7 @@ fn publish_fulltext_chunks(seg_dir: &Path) -> Vec<CppIndexChunk> {
             continue;
         };
         chunks.push(CppIndexChunk {
-            chunk_id: (base_row_id / DEFAULT_BLOCK_CAPACITY as u64) as u32,
+            chunk_id: 0, // assigned below, in base-row-id order
             base_name: base,
             base_row_id,
             row_count,
@@ -311,7 +326,16 @@ fn publish_fulltext_chunks(seg_dir: &Path) -> Vec<CppIndexChunk> {
             index_size: 0,
         });
     }
-    chunks.sort_by_key(|c| c.chunk_id);
+    // The reference's chunk ids are the order the chunks were dumped in, not
+    // the block each one starts at: a second run that appends 110 rows to a
+    // 100-row table dumps `ft_0000000000000064` as chunk 1, although both
+    // chunks live in block 0. Reading them back, `CountMemIndexGapInSegment`
+    // requires the chunk infos to line up end to end from row 0, so the ids
+    // have to be distinct and ascending.
+    chunks.sort_by_key(|c| c.base_row_id);
+    for (id, chunk) in chunks.iter_mut().enumerate() {
+        chunk.chunk_id = id as u32;
+    }
     chunks
 }
 
@@ -944,9 +968,26 @@ fn sql_literal(type_text: &str, value: &str) -> String {
     );
     if quoted {
         format!("'{}'", value.replace('\'', "''"))
+    } else if is_float_type_text(base)
+        && !value.contains(['.', 'e', 'E'])
+        && value.trim().parse::<i64>().is_ok()
+    {
+        // A float column's text may have lost its digits (`1`, `-0`). SQL
+        // would read that as an integer literal, which drops the sign of a
+        // negative zero and the type of the value; `.0` keeps it a float.
+        format!("{value}.0")
     } else {
         value.to_string()
     }
+}
+
+/// Whether a base type name (already uppercased, without parameters) is one of
+/// the engine's float types.
+fn is_float_type_text(base: &str) -> bool {
+    matches!(
+        base,
+        "FLOAT" | "DOUBLE" | "REAL" | "FP16" | "BF16" | "FLOAT16" | "BFLOAT16"
+    )
 }
 
 /// Maps a declared type text to the `ColumnType` code this writer packs.
@@ -1537,11 +1578,59 @@ impl Engine {
         }
     }
 
+    /// The rows a mirror rewrite should write, in row-id order.
+    ///
+    /// The block files are the authoritative copy of every row the current
+    /// mirror covers, so a rewrite takes those rows from the blocks and only
+    /// the rows appended since (or never mirrored) from the row journal. That
+    /// keeps a commit-time re-mirror idempotent: it must not copy the journal
+    /// back over cells the blocks already hold.
+    fn mirror_source_rows(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
+        let rows = self.fetch_rows_including_deleted(table)?;
+        let key = self.table_key(table);
+        let snapshot = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|entry| entry.cpp_block_rows.clone());
+        let Some(snapshot) = snapshot else {
+            return Ok(rows);
+        };
+        let schema = self.table_schema(table)?;
+        if schema.is_empty() {
+            return Ok(rows);
+        }
+        let wanted: Vec<usize> = (0..schema.len()).collect();
+        let Ok((_, block_rows)) = self.read_cpp_blocks_selected(table, &wanted) else {
+            return Ok(rows);
+        };
+        if block_rows.len() != snapshot.len() {
+            return Ok(rows);
+        }
+        let covered: std::collections::HashMap<usize, Vec<Value>> = snapshot
+            .iter()
+            .copied()
+            .zip(block_rows)
+            .map(|(id, cells)| (id, cells.iter().map(|cell| parse_value(cell)).collect()))
+            .collect();
+        Ok(rows
+            .into_iter()
+            .map(|(seq, cells)| match covered.get(&seq) {
+                Some(block_cells) if block_cells.len() == cells.len() => (seq, block_cells.clone()),
+                _ => (seq, cells),
+            })
+            .collect())
+    }
+
     /// Writes `table`'s rows into `{data_dir}/data/db_{db}/tbl_{id}/seg_0/…`
     /// in the C++ block layout, returning the number of rows written.
     ///
     /// Rows are chunked `DEFAULT_BLOCK_CAPACITY` (8192) per block, as C++ does.
     pub fn write_cpp_blocks(&self, table: &str) -> Result<usize> {
+        let _serialised = MIRROR_WRITE_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -1569,16 +1658,36 @@ impl Engine {
             })
             .collect::<Result<_>>()?;
 
-        let mut rows = self.fetch_rows_with_ids(&table)?;
+        // Every row the table ever wrote, *including* the deleted ones: the
+        // reference's block is append-only, so a deleted row's cells stay in
+        // the block and only the `version` file's `deleted_` array hides them
+        // (`BlockVersion::Delete`). An UPDATE is a delete plus an append, so
+        // its rewritten row sits at the end with a fresh id.
+        //
+        // Rows the previous mirror already covers keep their *block* values:
+        // the mirror is the authoritative copy for them (a table can be
+        // re-mirrored on every commit, and the row journal is allowed to be a
+        // lossy cache of the same rows - `try_cpp_rows` prefers the blocks for
+        // exactly that reason). New rows still come from the journal.
+        let rows = self.mirror_source_rows(&table)?;
         // The row ids this snapshot covers, in block order. Reads use them to
         // tell block-resident rows from rows written after the checkpoint.
         let block_rows: Vec<usize> = rows.iter().map(|(seq, _)| *seq).collect();
+        // `BlockVersion::Append` boundaries: one `create` per append, sized by
+        // how many of that append's rows land in the block.
+        let totals = self.append_totals(&table);
+        // Deleted row id -> its position in the mirrored row order, so the
+        // version file can mark the block slot that holds it.
+        let deleted_at: std::collections::HashMap<usize, usize> = self
+            .deleted_ids(&table)
+            .iter()
+            .filter_map(|id| {
+                let id = *id as usize;
+                block_rows.binary_search(&id).ok().map(|at| (id, at))
+            })
+            .collect();
         let db_id = self.database_id_of(&table);
         let root = self.blocks_root();
-        // Drop any previous mirror of this table's first segment so a rewrite
-        // cannot leave stale blocks behind. The recorded row ids go with it:
-        // until every block is rewritten, the mirror matches no snapshot.
-        let seg_dir = root.join(format!("db_{db_id}/tbl_{}/seg_0", meta.id));
         let tkey = self.table_key(&table);
         {
             let mut tables = self.tables.lock().unwrap();
@@ -1586,79 +1695,145 @@ impl Engine {
             entry.block_index = None;
             entry.cpp_block_rows = None;
         }
-        let _ = std::fs::remove_dir_all(&seg_dir);
-
         let mut written = 0usize;
-        let mut blocks: Vec<CppBlock> = Vec::new();
-        // Drain the snapshot block by block so each block's values are freed
-        // once it is encoded: holding the whole table's decoded rows while the
-        // texts are rendered doubled the transient on a long import.
-        let mut block_index = 0usize;
-        while !rows.is_empty() {
-            let take = rows.len().min(DEFAULT_BLOCK_CAPACITY);
-            let chunk: Vec<(usize, Vec<Value>)> = rows.drain(..take).collect();
-            let texts: Vec<Vec<String>> = chunk
-                .iter()
-                .map(|(_, row)| row.iter().map(mirror_cell_text).collect())
-                .collect();
-            let block_columns =
-                self.encode_block_columns(&meta.types, &meta.ids, &types, &layouts, &texts)?;
-            // The mirror is a full rewrite at one checkpoint, so its rows carry
-            // no per-append commit order: publishing them with ts 0 keeps them
-            // visible to a reader whose `begin_ts` is 1 (the C++
-            // `BlockVersion::GetRowCount` returns 0 when the first create entry
-            // is *newer* than `begin_ts`).
-            let version = BlockVersionFile::new(
-                &[(CPP_MIRROR_TS, chunk.len() as u32)],
-                DEFAULT_BLOCK_CAPACITY,
-            );
-            let id = BlockId {
-                db_id,
-                table_id: meta.id,
-                segment_id: 0,
-                block_id: block_index as u16,
-            };
-            self.context.buffer.lock().unwrap().invalidate(&id);
-            let block_dir = cpp_format::block_dir(db_id, meta.id, 0, id.block_id);
-            cpp_format::write_block(&root, id, &block_columns, &version).map_err(|e| {
-                Error::Io {
-                    path: root.join(&block_dir),
-                    source: e,
+        // A row id carries its segment in the high 32 bits (`segment_id << 32 |
+        // in-segment offset`) and the rows come back in id order, so each
+        // segment is a contiguous run. The reference writes one `seg_{id}/`
+        // directory per segment, with the block ids restarting at 0.
+        let mut segments: Vec<CppSegment> = Vec::new();
+        let mut global_pos = 0usize;
+        let mut rows = rows.into_iter().peekable();
+        while let Some(&(first, _)) = rows.peek() {
+            let segment_id = (first >> 32) as u32;
+            let seg_start = global_pos;
+            let mut seg_rows: Vec<(usize, Vec<Value>)> = Vec::new();
+            while let Some((seq, _)) = rows.peek() {
+                if (*seq >> 32) as u32 != segment_id {
+                    break;
                 }
-            })?;
-            // The reference opens an outline file for every variable-length
-            // column (`ColumnMeta::FilePaths` lists `col_{id}_out` for a
-            // kVarBuffer type) and aborts the whole read when it is missing,
-            // even though the file is empty for a column whose data is inline.
-            for (i, ty) in types.iter().enumerate() {
-                if is_var_buffer_type(*ty) {
-                    let path = root
-                        .join(&block_dir)
-                        .join(cpp_format::column_outline_file(meta.ids[i]));
-                    if !path.exists() {
-                        let _ = std::fs::write(&path, b"");
+                seg_rows.push(rows.next().unwrap());
+            }
+            global_pos += seg_rows.len();
+
+            let mut blocks: Vec<CppBlock> = Vec::new();
+            // Drain the segment block by block so each block's values are freed
+            // once it is encoded: holding the whole table's decoded rows while
+            // the texts are rendered doubled the transient on a long import.
+            let mut block_index = 0usize;
+            while !seg_rows.is_empty() {
+                let take = seg_rows.len().min(DEFAULT_BLOCK_CAPACITY);
+                let chunk: Vec<(usize, Vec<Value>)> = seg_rows.drain(..take).collect();
+                let texts: Vec<Vec<String>> = chunk
+                    .iter()
+                    .map(|(_, row)| row.iter().map(mirror_cell_text).collect())
+                    .collect();
+                let block_columns =
+                    self.encode_block_columns(&meta.types, &meta.ids, &types, &layouts, &texts)?;
+                // `block_start` stays in the table-wide append order the
+                // version batches are recorded in; the slot a deleted row
+                // occupies is inside its own segment's block.
+                let start = block_index * DEFAULT_BLOCK_CAPACITY;
+                let mut version = BlockVersionFile::new(
+                    &self.block_version_batches(&totals, seg_start + start, chunk.len()),
+                    DEFAULT_BLOCK_CAPACITY,
+                );
+                // The mirror is a full rewrite at one checkpoint, so its rows carry
+                // no per-append commit order: publishing them with ts 0 keeps them
+                // visible to a reader whose `begin_ts` is 1 (the C++
+                // `BlockVersion::GetRowCount` returns 0 when the first create entry
+                // is *newer* than `begin_ts`). A deleted slot takes the mirror ts
+                // the reader compares against.
+                let slot_base = seg_start + start;
+                for (&_id, &at) in deleted_at.iter() {
+                    if (slot_base..slot_base + chunk.len()).contains(&at) {
+                        version.delete(at - slot_base, DELETED_MIRROR_TS);
                     }
                 }
+                let id = BlockId {
+                    db_id,
+                    table_id: meta.id,
+                    segment_id,
+                    block_id: block_index as u16,
+                };
+                self.context.buffer.lock().unwrap().invalidate(&id);
+                let block_dir = cpp_format::block_dir(db_id, meta.id, segment_id, id.block_id);
+                // A rewrite replaces the block's contents; a file the schema no
+                // longer has (`ALTER TABLE … DROP COLUMN` leaves `1.col`
+                // behind) must not survive next to it, or the reference reads
+                // a column the catalog does not know.
+                let mut keep: Vec<String> = vec![cpp_format::VERSION_FILE.to_string()];
+                for (i, ty) in types.iter().enumerate() {
+                    keep.push(cpp_format::column_file(meta.ids[i]));
+                    if is_var_buffer_type(*ty) {
+                        keep.push(cpp_format::column_outline_file(meta.ids[i]));
+                    }
+                }
+                if let Ok(entries) = std::fs::read_dir(root.join(&block_dir)) {
+                    for entry in entries.flatten() {
+                        let name = entry.file_name().to_string_lossy().to_string();
+                        if !keep.contains(&name) {
+                            let _ = std::fs::remove_file(entry.path());
+                        }
+                    }
+                }
+                cpp_format::write_block(&root, id, &block_columns, &version).map_err(|e| {
+                    Error::Io {
+                        path: root.join(&block_dir),
+                        source: e,
+                    }
+                })?;
+                // The reference opens an outline file for every variable-length
+                // column (`ColumnMeta::FilePaths` lists `col_{id}_out` for a
+                // kVarBuffer type) and aborts the whole read when it is missing,
+                // even though the file is empty for a column whose data is inline.
+                for (i, ty) in types.iter().enumerate() {
+                    if is_var_buffer_type(*ty) {
+                        let path = root
+                            .join(&block_dir)
+                            .join(cpp_format::column_outline_file(meta.ids[i]));
+                        if !path.exists() {
+                            let _ = std::fs::write(&path, b"");
+                        }
+                    }
+                }
+                blocks.push(CppBlock {
+                    block_id: block_index as u16,
+                    commit_ts: CPP_MIRROR_TS,
+                });
+                written += chunk.len();
+                block_index += 1;
             }
-            blocks.push(CppBlock {
-                block_id: block_index as u16,
-                commit_ts: CPP_MIRROR_TS,
+            segments.push(CppSegment {
+                segment_id,
+                create_ts: CPP_MIRROR_TS,
+                blocks,
             });
-            written += chunk.len();
-            block_index += 1;
+        }
+        // Drop the segment directories this rewrite did not produce. They are
+        // removed *after* the new blocks are on disk so a concurrent reader
+        // never finds the table's only block missing; a compaction renumbers
+        // the rows into a new segment id, and leaving the source segment
+        // behind would let the reference read a second copy of the data.
+        let tbl_dir = root.join(format!("db_{db_id}/tbl_{}", meta.id));
+        let live: Vec<String> = segments
+            .iter()
+            .map(|segment| format!("seg_{}", segment.segment_id))
+            .collect();
+        if let Ok(entries) = std::fs::read_dir(&tbl_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with("seg_") && !live.contains(&name) {
+                    let _ = std::fs::remove_dir_all(entry.path());
+                }
+            }
         }
         // Publish the segment layer the C++ reader enumerates
         // (`catalog|seg|…` / `catalog|blk|…`, `GetTableSegments`): without it
         // the table opens with no segments and every query returns nothing.
-        // One segment (`seg_0`), as the mirror writes all blocks into it.
         self.storage.catalog.publish_cpp_segments(&CppSegmentSet {
             db_id: db_id.to_string(),
             table_id: meta.id.to_string(),
-            segments: vec![CppSegment {
-                segment_id: 0,
-                create_ts: CPP_MIRROR_TS,
-                blocks,
-            }],
+            segments,
         })?;
         // The mirror has new block files; the table's block map must rescan.
         let mut tables = self.tables.lock().unwrap();
@@ -1666,6 +1841,44 @@ impl Engine {
         entry.block_index = None;
         entry.cpp_block_rows = Some(std::sync::Arc::new(block_rows));
         Ok(written)
+    }
+
+    /// The `BlockVersion::Append` batches for one block: one `(ts, rows)` per
+    /// append, sized by how many of that append's rows the block holds.
+    ///
+    /// `totals` is the cumulative row count after every append. It is a hint
+    /// for the mirror rather than committed state, so when it disagrees with
+    /// the rows actually mirrored (a table written before the log existed, or
+    /// an append the process lost) the block gets one create for all of them,
+    /// which is what the mirror always wrote.
+    fn block_version_batches(
+        &self,
+        totals: &[u64],
+        block_start: usize,
+        rows_in_block: usize,
+    ) -> Vec<(u64, u32)> {
+        let end = block_start + rows_in_block;
+        let mut batches: Vec<(u64, u32)> = Vec::new();
+        let mut prev = 0u64;
+        for &total in totals {
+            if total <= prev {
+                continue;
+            }
+            let lo = prev.max(block_start as u64);
+            let hi = total.min(end as u64);
+            if hi > lo {
+                batches.push((CPP_MIRROR_TS, (hi - lo) as u32));
+            }
+            prev = total;
+            if total >= end as u64 {
+                break;
+            }
+        }
+        let sum: u64 = batches.iter().map(|(_, rows)| u64::from(*rows)).sum();
+        if sum != rows_in_block as u64 {
+            return vec![(CPP_MIRROR_TS, rows_in_block as u32)];
+        }
+        batches
     }
 
     /// Encodes one block's rows (already rendered as text) into the column
@@ -1724,6 +1937,42 @@ impl Engine {
             });
         }
         Ok(block_columns)
+    }
+
+    /// Refreshes the C++ block mirror of `table` if it already has one.
+    ///
+    /// The reference writes a block's files while the append transaction
+    /// commits (`AppendInBlock`), not at some later "flush", so a directory it
+    /// leaves behind is always readable. A mirror that exists must behave the
+    /// same way: a crash after a commit that only updated the catalog would
+    /// leave `catalog|blk|…` records for a block with no files, and the
+    /// reference aborts on that ("Failed to find object for local path
+    /// …/blk_0/version", `MetaTableObject::RestoreTableCache`).
+    ///
+    /// A table without a mirror stays without one: its columns may not be
+    /// expressible in the format, and `publish_cpp_segments` (inside
+    /// [`Self::write_cpp_blocks`]) is what would make it visible to the
+    /// reference in the first place.
+    pub fn refresh_cpp_block_mirror(&self, table: &str) -> Result<()> {
+        let table = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return Ok(());
+        };
+        let db_id = self.database_id_of(&table);
+        let root = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{}/seg_0", meta.id));
+        if !root.is_dir() {
+            return Ok(());
+        }
+        let rows = self.approx_row_count(&table);
+        if !meta.types.iter().all(|t| column_type_of(t).is_some())
+            || rows.saturating_mul(estimated_row_bytes(&meta.types)) > MIRROR_BUDGET_BYTES
+        {
+            return Ok(());
+        }
+        self.write_cpp_blocks(&table)?;
+        Ok(())
     }
 
     /// Mirrors every table into the C++ block layout.
@@ -1956,21 +2205,60 @@ impl Engine {
         Ok(rows.len())
     }
 
-    /// Best-effort recovery on startup: for every table with **no rows** but an
-    /// existing block mirror, load the mirror back.
+    /// Recovery on startup: restore every table's block mirror at the ids the
+    /// mirror itself holds.
+    ///
+    /// Opening a directory is two sources of truth, exactly as in the
+    /// reference: `RestoreTableCache` rebuilds the segments from the block
+    /// metadata, then the WAL is replayed on top. The block metadata only
+    /// records the rows a flush made durable — a crash right after an append
+    /// leaves the block's `version` at the flushed count and the newer rows in
+    /// the log — so the two have to be merged, not chosen between:
+    ///
+    /// * the replay already wrote the post-flush rows at their own ids, and
+    /// * the mirror supplies the flushed ones, which are missing from the KV
+    ///   store because their WAL records were truncated by the checkpoint.
+    ///
+    /// The restore therefore writes only the ids the store does not have, which
+    /// also makes it idempotent: a cleanly closed directory restores nothing.
     ///
     /// A table whose columns the block format cannot express simply has no
     /// mirror; that (and only that) is skipped silently.
     pub fn recover_cpp_blocks(&self) -> Result<()> {
         for meta in self.storage.catalog.list_tables()? {
-            if !self.fetch_rows_with_ids(&meta.name)?.is_empty() {
-                continue;
-            }
-            if self.read_cpp_blocks(&meta.name).is_ok() {
-                self.load_cpp_blocks(&meta.name)?;
-            }
+            self.restore_cpp_blocks(&meta.name)?;
         }
         Ok(())
+    }
+
+    /// Writes the mirror's rows that the KV store is missing, under their own
+    /// sequence ids.
+    fn restore_cpp_blocks(&self, table: &str) -> Result<usize> {
+        let table = self.qualified_table(table);
+        let Ok((_, rows)) = self.read_cpp_blocks_wanted(&table, None) else {
+            return Ok(0);
+        };
+        let types = self.column_types(&table)?;
+        let mut writes = Vec::new();
+        for (seq, cells) in rows {
+            if self.storage.store.get(&row_key(&table, seq))?.is_some() {
+                continue;
+            }
+            // A tombstone at the same id (a replayed delete, or a row
+            // renumbered by compaction) means the row is meant to be gone.
+            if self.storage.store.get(&del_key(&table, seq))?.is_some() {
+                continue;
+            }
+            // The stored form is the row's typed text; the block reader hands
+            // back exactly that per cell, so it only has to be re-joined.
+            let literals: Vec<Literal> = cells.into_iter().map(Literal::Str).collect();
+            let text = self.encode_row_stored(&table, &literals, &types)?;
+            writes.push((row_key(&table, seq), text.into_bytes()));
+        }
+        if !writes.is_empty() {
+            self.storage.store.atomic_write(&writes)?;
+        }
+        Ok(writes.len())
     }
 
     /// Reads a block through the bounded buffer manager, loading it from disk on
@@ -2011,7 +2299,8 @@ impl Engine {
     /// This never consults the KV store, so a successful read proves the mirror
     /// carries the table on its own.
     pub fn read_cpp_blocks(&self, table: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
-        self.read_cpp_blocks_wanted(table, None)
+        let (columns, rows) = self.read_cpp_blocks_wanted(table, None)?;
+        Ok((columns, rows.into_iter().map(|(_, cells)| cells).collect()))
     }
 
     /// Like [`Self::read_cpp_blocks`] but decodes only `wanted` columns; the
@@ -2022,7 +2311,8 @@ impl Engine {
         table: &str,
         wanted: &[usize],
     ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
-        self.read_cpp_blocks_wanted(table, Some(wanted))
+        let (columns, rows) = self.read_cpp_blocks_wanted(table, Some(wanted))?;
+        Ok((columns, rows.into_iter().map(|(_, cells)| cells).collect()))
     }
 
     /// Number of rows the block mirror currently holds.
@@ -2057,7 +2347,7 @@ impl Engine {
         &self,
         table: &str,
         wanted: Option<&[usize]>,
-    ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+    ) -> Result<(Vec<String>, Vec<(usize, Vec<String>)>)> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -2078,17 +2368,35 @@ impl Engine {
         let db_id = self.database_id_of(&table);
         let root = self.blocks_root();
 
-        let mut rows: Vec<Vec<String>> = Vec::new();
-        for block_index in 0..u16::MAX {
+        let mut rows: Vec<(usize, Vec<String>)> = Vec::new();
+        // The mirror is segmented (`seg_{id}/blk_{n}`), and a row's id carries
+        // its segment in the high 32 bits, so the block map - not a hardcoded
+        // `seg_0` - decides what a row's id is. Reading only `seg_0` here made
+        // a compacted table (whose rows live in the next segment id) come back
+        // at the wrong ids, and the restore then wrote a second copy of every
+        // row.
+        let blocks: Vec<(u32, u16)> = match self.block_index_for(&table) {
+            Some(index) => index
+                .lock()
+                .unwrap()
+                .metas()
+                .map(|m| (m.id.segment_id, m.id.block_id))
+                .collect(),
+            None => Vec::new(),
+        };
+        if blocks.is_empty() {
+            return Err(Error::NotFound(format!("no blocks for table '{table}'")));
+        }
+        for (at, (segment_id, block_index)) in blocks.into_iter().enumerate() {
             let id = BlockId {
                 db_id,
                 table_id: meta.id,
-                segment_id: 0,
+                segment_id,
                 block_id: block_index,
             };
             let (version, columns) = match self.read_block_cached(&table, &root, id) {
                 Ok(v) => v,
-                Err(_) if block_index == 0 => {
+                Err(_) if at == 0 => {
                     return Err(Error::NotFound(format!("no blocks for table '{table}'")))
                 }
                 Err(_) => break,
@@ -2161,7 +2469,15 @@ impl Engine {
                     };
                     out.push(value);
                 }
-                rows.push(out);
+                // A block covers a fixed `DEFAULT_BLOCK_CAPACITY` window of its
+                // segment, so the row's sequence id is the segment's base plus
+                // its window plus offset - the id the reference would have
+                // stored it under.
+                rows.push((
+                    ((segment_id as usize) << 32)
+                        | (block_index as usize * DEFAULT_BLOCK_CAPACITY + row),
+                    out,
+                ));
             }
         }
         Ok((meta.columns.clone(), rows))
@@ -2486,11 +2802,51 @@ impl Engine {
         Ok(())
     }
 
+    /// Drops `idx_{id}/seg_{s}` directories whose segment no longer exists.
+    ///
+    /// Compaction merges the source segments into a new segment id and the
+    /// reference deletes their index chunks with them; a `seg_{s}` directory
+    /// left behind still holds a full copy of the index and would be read back
+    /// as a second one.
+    fn prune_dead_segment_index_dirs(&self) -> Result<()> {
+        for meta in self.storage.catalog.list_tables()? {
+            let db_id = self.database_id_of(&meta.name);
+            let tbl_dir = self
+                .blocks_root()
+                .join(format!("db_{db_id}/tbl_{}", meta.id));
+            let live: Vec<String> = self
+                .segment_ids(&meta.name)
+                .into_iter()
+                .map(|segment| format!("seg_{segment}"))
+                .collect();
+            let Ok(entries) = std::fs::read_dir(&tbl_dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if !name.starts_with("idx_") {
+                    continue;
+                }
+                let Ok(inner) = std::fs::read_dir(entry.path()) else {
+                    continue;
+                };
+                for sub in inner.flatten() {
+                    let seg = sub.file_name().to_string_lossy().to_string();
+                    if seg.starts_with("seg_") && !live.contains(&seg) {
+                        let _ = std::fs::remove_dir_all(sub.path());
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Removes the index chunks that a merged chunk supersedes. The reference
     /// only cleans up chunks after `optimize` merged every live row into the
     /// newest one; when the newest chunk does not cover the table, every
     /// chunk is still needed and is kept.
     pub fn cleanup_cpp_index_chunks(&self) -> Result<()> {
+        self.prune_dead_segment_index_dirs()?;
         for im in self.storage.catalog.list_indexes()? {
             if im.index_type.eq_ignore_ascii_case("PLAID") {
                 // PLAID chunks carry their own document count in the header,
@@ -2612,13 +2968,18 @@ impl Engine {
         let index_id = self.cpp_index_position(&table, index_name)?;
         let db_id = self.database_id_of(&table);
         let tokenizer = self.index_tokenizer(&table, &im.column);
-        let rows = self.fetch_rows_with_ids(&table)?;
-        // The reference seals one index chunk per **block**: the mem indexer is
-        // handed a block at a time, and the chunk's files are named
-        // `ft_{:016x}` after the block's first row id
-        // (`new_txn_index_impl.cpp:860`). A 20000-row table therefore has three
-        // chunks, `ft_0000000000000000`, `ft_0000000000002000`,
-        // `ft_0000000000004000` - not one chunk over the whole segment.
+        // The reference's chunk keeps a deleted row: an UPDATE's old row stays
+        // in the chunk it was written to and only the block's `version` hides
+        // it, so the corpus the chunk indexes is every row ever appended.
+        let rows = self.fetch_rows_including_deleted(&table)?;
+        // The reference seals one chunk per **mem-index dump**, covering the
+        // rows appended since the previous one and split at block boundaries;
+        // the files are named `ft_{:016x}` after the chunk's first row id
+        // (`new_txn_index_impl.cpp:860`). A 20000-row insert therefore ends up
+        // as `ft_0000000000000000`, `ft_0000000000002000`,
+        // `ft_0000000000004000`, and a second run that appended 110 rows to a
+        // 100-row table as a single `ft_0000000000000064` - not as a rewrite
+        // of the first chunk.
         let dir = self
             .blocks_root()
             .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id));
@@ -2626,19 +2987,40 @@ impl Engine {
             path: dir.clone(),
             source: e,
         })?;
-        // A rewrite covers the whole snapshot, so a chunk left by an earlier,
-        // longer one would be published as a live chunk.
+        // How many documents the chunks already on disk cover: a dump only
+        // indexes the rows past them. A chunk that claims more rows than the
+        // table has (the table shrank) is dropped instead.
+        let mut base = 0usize;
+        let mut stale = Vec::new();
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                let is_fulltext = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("ft_"));
-                if is_fulltext {
-                    let _ = std::fs::remove_file(path);
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                let is_fulltext = name.starts_with("ft_");
+                if !is_fulltext {
+                    continue;
                 }
+                stale.push(path.clone());
+                let Some(hex) = name
+                    .strip_prefix("ft_")
+                    .and_then(|n| n.strip_suffix(".len"))
+                else {
+                    continue;
+                };
+                let Ok(start) = u64::from_str_radix(hex, 16) else {
+                    continue;
+                };
+                let docs = std::fs::metadata(&path)
+                    .map(|m| m.len() / 4)
+                    .unwrap_or_default();
+                base = base.max((start + docs) as usize);
             }
+        }
+        if base > rows.len() {
+            for path in &stale {
+                let _ = std::fs::remove_file(path);
+            }
+            base = 0;
         }
         let mut written = 0usize;
         // One chunk per **physical block** (`row_id / 8192`), not one per 8192
@@ -2646,14 +3028,16 @@ impl Engine {
         // deleted, so the split follows the row ids.
         let mut by_block: std::collections::BTreeMap<u64, Vec<&(usize, Vec<Value>)>> =
             Default::default();
-        for row in &rows {
+        for row in rows.iter().skip(base) {
             by_block
                 .entry((row.0 as u64 & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY as u64)
                 .or_default()
                 .push(row);
         }
-        for (block, block_rows) in by_block {
-            let base_row_id = block * DEFAULT_BLOCK_CAPACITY as u64;
+        for (_block, block_rows) in by_block {
+            // The chunk is named after the row it starts at, which is the
+            // block's first row only when the dump began on a block boundary.
+            let base_row_id = (block_rows[0].0 as u64) & 0xffff_ffff;
             // term -> (document ordinal, the term's position in the document),
             // in term order (the FST requires sorted keys). The document
             // ordinal restarts at zero in every chunk: the chunk's `base_row_id`

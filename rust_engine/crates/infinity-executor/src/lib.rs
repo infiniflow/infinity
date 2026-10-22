@@ -252,6 +252,18 @@ fn row_prefix(table: &str) -> Vec<u8> {
 fn del_key(table: &str, seq: usize) -> Vec<u8> {
     format!("del:{table}:{seq:016}").into_bytes()
 }
+/// The block mirror's append log: the cumulative row count after every append
+/// transaction (`u64` each). The reference's `version` gets one `create` per
+/// append (`BlockVersion::Append`), so the mirror needs the same boundaries.
+fn appends_key(table: &str) -> Vec<u8> {
+    format!("appends:{table}").into_bytes()
+}
+/// The block mirror's delete log: every row id deleted since the table was
+/// created (`u64` each). The reference marks a deleted row in the block's
+/// `deleted_` array and keeps its cells, so the mirror needs the same ids.
+fn deletes_key(table: &str) -> Vec<u8> {
+    format!("dellog:{table}").into_bytes()
+}
 fn del_prefix(table: &str) -> Vec<u8> {
     format!("del:{table}:").into_bytes()
 }
@@ -524,6 +536,23 @@ fn array_elem_is_float(type_text: &str) -> bool {
     let t = type_text.to_ascii_uppercase();
     let inner = t.split('(').nth(1).unwrap_or("").trim_end_matches(')');
     is_float_type(inner.trim())
+}
+
+/// Renders an `f64` so that parsing the text back yields the same bits.
+///
+/// Rust's `Display` for floats is the shortest representation that round-trips,
+/// which is what a stored row needs; six decimals (the `.slt` display form) is
+/// not, and the reference stores the raw typed value.
+///
+/// A value that prints without a fraction (`1`, `-0`) gets one: the stored row
+/// is parsed back by a numeric literal reader that tries integers first, which
+/// would turn `-0` into an integer zero and lose the sign.
+fn exact_float(f: f64) -> String {
+    let text = format!("{f}");
+    if f.is_finite() && !text.contains(['.', 'e', 'E']) {
+        return format!("{text}.0");
+    }
+    text
 }
 
 /// Renders a numeric token with six decimals, falling back to the raw token.
@@ -1058,21 +1087,19 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
         .map(|(i, v)| {
             let s = v.to_slt_string();
             match types.get(i) {
-                // float columns render with six decimals in `.slt` output.
-                // The C++ numeric cast tolerates surrounding whitespace, so
-                // `" 2.1"` is a valid double literal.
-                // float columns render with six decimals in `.slt` output.
-                // The C++ numeric cast tolerates surrounding whitespace, so
-                // `" 2.1"` is a valid double literal.
-                //
-                // KNOWN LIMITATION: rows are stored as this `.slt` text, so a
-                // value outside the six-decimal grid is rounded at insert time
-                // and the mirror then stores the rounded value (the reference
-                // stores the typed value). See
-                // `docs/FORMAT_EQUIVALENCE_TESTS.md` §5.2.
-                Some(t) if is_float_type(t) => match s.trim().parse::<f64>() {
-                    Ok(f) => format!("{f:.6}"),
-                    Err(_) => s,
+                // Rows are stored as text, but the reference stores the typed
+                // value, so the text has to round-trip exactly: `to_slt_string`
+                // renders six decimals for `.slt` *display* and would round a
+                // value such as `1.0 / 3.0` at insert time. Display still goes
+                // through `to_slt_string`; only storage takes this path.
+                Some(t) if is_float_type(t) => match v {
+                    Literal::Float(f) => exact_float(*f),
+                    // A value that arrived as text keeps its own digits, but is
+                    // normalised through `f64` so `1` and `1.0` store alike.
+                    _ => match s.trim().parse::<f64>() {
+                        Ok(f) => exact_float(f),
+                        Err(_) => s,
+                    },
                 },
                 Some(t) if is_array_type(t) => {
                     let rendered = brace_render(&s);
@@ -3874,6 +3901,12 @@ struct TableEntry {
     row_blob: Option<Arc<Mutex<std::fs::File>>>,
     /// `(segment, offset, sealed)` of the row-id allocator.
     row_counter: Option<(u32, u32, bool)>,
+    /// Cumulative row count after every append transaction of this table
+    /// (`appends:{table}`), loaded on first use.
+    append_totals: Option<Vec<u64>>,
+    /// Row ids deleted since the table was created (`dellog:{table}`), loaded
+    /// on first use.
+    deleted_ids: Option<Vec<u64>>,
     /// Segments allocated by the row-id allocator, by id.
     segments: std::collections::BTreeMap<u32, SegmentEntry>,
     /// Full-text analyzer per column (`CREATE INDEX … WITH (analyzer=…)`).
@@ -4427,6 +4460,19 @@ impl<'a> EngineTxn<'a> {
         for (table, seq) in &self.deletes {
             self.engine.drop_text_index_rows(table, &[*seq]);
             self.engine.drop_vector_cache_rows(table, &[*seq]);
+        }
+        // Keep the C++ block mirror current at commit, as the reference does
+        // (`AppendInBlock`), so a crash never leaves a block the catalog
+        // mentions without its files - the reference refuses to open such a
+        // directory.
+        let touched: std::collections::BTreeSet<&str> = self
+            .appends
+            .iter()
+            .map(|(table, ..)| table.as_str())
+            .chain(self.deletes.iter().map(|(table, _)| table.as_str()))
+            .collect();
+        for table in touched {
+            self.engine.refresh_cpp_block_mirror(table)?;
         }
         // The catalog is still current: perform the sealed writes now.
         for dump in &self.dumps {
@@ -6023,16 +6069,18 @@ impl Engine {
                                 None => continue,
                             },
                             // An integer column stores the value itself.
-                            (KeyKind::I32, KeyDomain::Integer) => match want.trim().parse::<i64>()
-                            {
-                                Ok(v) => Key::I32(v as i32),
-                                Err(_) => continue,
-                            },
-                            (KeyKind::I64, KeyDomain::Integer) => match want.trim().parse::<i64>()
-                            {
-                                Ok(v) => Key::I64(v),
-                                Err(_) => continue,
-                            },
+                            (KeyKind::I32, KeyDomain::Integer) => {
+                                match want.trim().parse::<i64>() {
+                                    Ok(v) => Key::I32(v as i32),
+                                    Err(_) => continue,
+                                }
+                            }
+                            (KeyKind::I64, KeyDomain::Integer) => {
+                                match want.trim().parse::<i64>() {
+                                    Ok(v) => Key::I64(v),
+                                    Err(_) => continue,
+                                }
+                            }
                             _ => hashed,
                         };
                         for off in reader.lookup(key) {
@@ -6161,7 +6209,9 @@ impl Engine {
                         },
                         // INTEGER/BIGINT keep the value itself; only a width
                         // the reference does not spell stays order-mapped.
-                        KeyKind::I32 | KeyKind::I64 if key_domain(&column_type) == KeyDomain::Integer => {
+                        KeyKind::I32 | KeyKind::I64
+                            if key_domain(&column_type) == KeyDomain::Integer =>
+                        {
                             match text.trim().parse::<i64>() {
                                 Ok(v) => integer_secondary_key(&column_type, v),
                                 Err(_) => return,
@@ -6240,13 +6290,30 @@ impl Engine {
             return false;
         };
         match col {
-            Some(ci) => {
-                String::from_utf8_lossy(&raw)
-                    .split('\t')
-                    .nth(ci)
-                    .map(str::trim)
-                    == Some(want)
-            }
+            Some(ci) => match String::from_utf8_lossy(&raw)
+                .split('\t')
+                .nth(ci)
+                .map(str::trim)
+            {
+                Some(cell) if cell == want => true,
+                // A float cell keeps the shortest text that round-trips (the
+                // reference stores the typed value), while `want` is the
+                // `.slt` six-decimal form, so values off that grid differ as
+                // text; compare them numerically instead.
+                Some(cell) => {
+                    let is_float = self
+                        .column_types(table)
+                        .ok()
+                        .and_then(|types| types.get(ci).map(|ty| is_float_type(ty)))
+                        .unwrap_or(false);
+                    is_float
+                        && matches!(
+                            (cell.parse::<f64>(), want.parse::<f64>()),
+                            (Ok(a), Ok(b)) if a == b
+                        )
+                }
+                None => false,
+            },
             None => true,
         }
     }
@@ -6920,6 +6987,94 @@ impl Engine {
     }
 
     /// Reserves a contiguous block of `n` row ids for `table`.
+    /// A `u64` list persisted under `key`, loaded once per table.
+    fn load_id_log(&self, key: &[u8]) -> Vec<u64> {
+        self.storage
+            .store
+            .get(key)
+            .ok()
+            .flatten()
+            .map(|v| {
+                v.chunks_exact(8)
+                    .map(|c| u64::from_le_bytes(c.try_into().unwrap_or([0; 8])))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn write_id_log(&self, key: &[u8], ids: &[u64]) -> Result<()> {
+        let mut bytes = Vec::with_capacity(ids.len() * 8);
+        for id in ids {
+            bytes.extend_from_slice(&id.to_le_bytes());
+        }
+        self.storage.store.put(key, &bytes)
+    }
+
+    /// The cumulative row count after every append transaction.
+    ///
+    /// The reference's block `version` records one `create` per append
+    /// (`BlockVersion::Append`), so the mirror needs the same boundaries to
+    /// write the same file. Only the boundaries are kept - the reference
+    /// stamps each one with its commit ts and the port writes its mirror ts,
+    /// which the format test takes out before comparing.
+    fn append_totals(&self, table: &str) -> Vec<u64> {
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey.clone()).or_default();
+        if entry.append_totals.is_none() {
+            entry.append_totals = Some(self.load_id_log(&appends_key(&tkey)));
+        }
+        entry.append_totals.clone().unwrap_or_default()
+    }
+
+    /// Records an append of `n` rows, so the next block mirror writes a
+    /// `create` for it.
+    fn note_append(&self, table: &str, n: usize) {
+        if n == 0 {
+            return;
+        }
+        let mut totals = self.append_totals(table);
+        let next = totals.last().copied().unwrap_or(0) + n as u64;
+        totals.push(next);
+        let tkey = self.table_key(table);
+        {
+            let mut tables = self.tables.lock().unwrap();
+            tables.entry(tkey.clone()).or_default().append_totals = Some(totals.clone());
+        }
+        // A hint for the mirror, not committed state: if the process dies
+        // before the rows do, the mirror clips every total to the rows it
+        // actually has and falls back to one create when they disagree.
+        let _ = self.write_id_log(&appends_key(&tkey), &totals);
+    }
+
+    /// Every row id deleted since the table was created.
+    fn deleted_ids(&self, table: &str) -> Vec<u64> {
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey.clone()).or_default();
+        if entry.deleted_ids.is_none() {
+            entry.deleted_ids = Some(self.load_id_log(&deletes_key(&tkey)));
+        }
+        entry.deleted_ids.clone().unwrap_or_default()
+    }
+
+    /// Records deleted rows, so the next block mirror marks their slots in
+    /// `deleted_` instead of dropping them (the reference keeps a deleted
+    /// row's cells in the block and hides it with the version file).
+    fn note_deletes(&self, table: &str, ids: &[usize]) {
+        if ids.is_empty() {
+            return;
+        }
+        let mut log = self.deleted_ids(table);
+        log.extend(ids.iter().map(|s| *s as u64));
+        let tkey = self.table_key(table);
+        {
+            let mut tables = self.tables.lock().unwrap();
+            tables.entry(tkey.clone()).or_default().deleted_ids = Some(log.clone());
+        }
+        let _ = self.write_id_log(&deletes_key(&tkey), &log);
+    }
+
     fn reserve_rows(&self, table: &str, n: usize, new_segment: bool) -> Result<usize> {
         let key = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
@@ -6948,6 +7103,9 @@ impl Engine {
             .entry(seg)
             .and_modify(|s| s.rows = s.rows.max(off))
             .or_insert(SegmentEntry { id: seg, rows: off });
+        drop(tables);
+        // One `create` per append in the mirror's `version` file.
+        self.note_append(table, n);
         Ok(base)
     }
 
@@ -7617,6 +7775,12 @@ impl Engine {
         self.bump_writes(table);
         self.note_live_rows(table, rows.len() as isize);
         self.append_row_cache(table, base, &encoded_rows);
+        // The reference writes a block's files while the append commits
+        // (`AppendInBlock`), so a directory it leaves behind is always
+        // readable. Mirror the same way: a table that already has a C++ block
+        // directory gets its new rows at commit, not at the next `flush`, so a
+        // crash right after the insert cannot leave a stale block behind.
+        self.refresh_cpp_block_mirror(table)?;
         // Give the allocator's per-batch scratch back to the OS. Trimming on
         // every batch walks the whole heap; once every few batches is enough
         // to keep RSS flat and avoids adding milliseconds to each commit.
@@ -7646,11 +7810,17 @@ impl Engine {
         self.note_live_rows(table, -(deletes.len() as isize));
         // The block mirror keeps its snapshot: deleted row ids are hidden by
         // the tombstones written here, and rows an UPDATE re-inserted arrive
-        // with fresh ids that the journal serves.
+        // with fresh ids that the journal serves. The mirror still has to mark
+        // the slots (`BlockVersion::Delete`) once the commit is durable: the
+        // reference hides a deleted row through the block's `version` file, so
+        // a directory whose version was not refreshed would show it again.
         for seq in deletes {
             txn.delete(del_key(table, *seq));
         }
-        self.txn.commit(txn)
+        self.note_deletes(table, deletes);
+        let ts = self.txn.commit(txn)?;
+        self.refresh_cpp_block_mirror(table)?;
+        Ok(ts)
     }
 
     /// Runs one statement with the query registry open around it (C++
@@ -10998,6 +11168,12 @@ impl Engine {
     /// C++ `NewTxnManager::CurrentTS`: the timestamp of the last commit.
     pub fn current_ts(&self) -> u64 {
         self.txn.current_ts()
+    }
+
+    /// C++ `NewTxnManager::PrepareCommitTS`: the high-water mark committers
+    /// take from.
+    pub fn prepare_commit_ts(&self) -> u64 {
+        self.txn.prepare_commit_ts()
     }
 
     pub fn snapshot_names(&self) -> Result<Vec<String>> {
@@ -14724,17 +14900,17 @@ impl Engine {
             infinity_storage::drop_tree_cache(&self.dir.join(sub));
         }
         // With `storage_type = "minio"` the C++-format data files are mirrored
-        // into the bucket; the row/meta KV stays local.
+        // into the bucket; the catalog and the row store follow at the end of
+        // the checkpoint, once they are flushed.
         if let Some(client) = self.context.object_store.lock().unwrap().clone() {
             let root = self.dir.join("data");
             let _ = infinity_storage::s3::sync_tree(&client, &root, "data");
-        }
-        // Mirror the catalog into the C++ key space / value encoding, in the
-        // catalog store at `<dir>/catalog` (the path the C++ engine uses). A
-        // C++-only catalog already rewrites on every DDL, so nothing is left to
-        // mirror there. Best effort: a column type the C++ encoding does not
-        // cover yet leaves the previous layout in place rather than failing the
-        // flush.
+        } // Mirror the catalog into the C++ key space / value encoding, in the
+          // catalog store at `<dir>/catalog` (the path the C++ engine uses). A
+          // C++-only catalog already rewrites on every DDL, so nothing is left to
+          // mirror there. Best effort: a column type the C++ encoding does not
+          // cover yet leaves the previous layout in place rather than failing the
+          // flush.
         if !self.storage.catalog.is_cpp_only() {
             let _ = self
                 .storage
@@ -14747,6 +14923,15 @@ impl Engine {
         // so publish it now (no-op for a normal store).
         if !self.wal_enabled {
             self.storage.catalog.flush()?;
+        }
+        // The checkpoint's other two trees. `data/` alone is not enough for a
+        // restart out of the bucket: the catalog holds the tables and the row
+        // store holds their rows, so a directory restored from `data/` alone
+        // has block files that belong to no table (measured: the table was
+        // simply absent after the local files were wiped).
+        if let Some(client) = self.context.object_store.lock().unwrap().clone() {
+            infinity_storage::s3::sync_tree(&client, &self.dir.join("catalog"), "catalog")?;
+            infinity_storage::s3::sync_tree(&client, &self.dir.join("persistence"), "persistence")?;
         }
         Ok(())
     }
@@ -15956,7 +16141,7 @@ fn bound_key(
         // An integer column's bound is the literal itself.
         KeyKind::I32 if key_domain(declared) == KeyDomain::Integer => match value {
             Value::Int(i) => Some(Key::I32(
-                (*i).clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
+                (*i).clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32,
             )),
             _ => None,
         },
