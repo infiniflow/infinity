@@ -1,8 +1,8 @@
-# 跨引擎持久化格式一致性：测试设计、覆盖矩阵与缺口清单
+# Rust 重写版的持久化格式：现状、与 C++ 参考的差异、测试覆盖
 
-> 目的：把「C++ 参考与 Rust 端口写出的磁盘格式一致」这件事变成可执行、可复现、可度量的门禁，并诚实记录**还没覆盖到**的部分。
+> 判定口径与 [`CPP_FORMAT_SPEC.md`](CPP_FORMAT_SPEC.md) 一致：C++ 参考能打开重写版的目录、重写版能打开参考的目录，查询结果一致。本文在此之上记录更强的**字节**口径、当前的覆盖范围，以及重写版与参考仍然存在的差异。差异的成因分类见 [`SIMPLIFICATION_AUDIT.md`](SIMPLIFICATION_AUDIT.md)。
 >
-> 判定口径与 [`CPP_FORMAT_SPEC.md`](CPP_FORMAT_SPEC.md) 一致（C++ 能打开 Rust 的目录，反之亦然，结果一致），这里再加一层更强的**字节**口径。审计结论（哪些差异是简化、哪些不可复刻）记在 [`SIMPLIFICATION_AUDIT.md`](SIMPLIFICATION_AUDIT.md)。
+> **现状**：同一输入下，重写版写出的块文件（`.col` / outline / `version`）、全文索引、次级索引（整数键与浮点键）、稀疏 BMP 索引与参考逐字节相同；HNSW、IVF 按内容比对；`catalog/`、`wal/` 与对象存储只保证互读。逐条差异见 §6。
 
 ---
 
@@ -14,98 +14,119 @@
 | **内容门禁** | 不可字节比的文件，解码后比「索引说了什么」 | 索引内容错、行序错、统计量错 | 文件头/元数据区的布局漂移 |
 | **互读门禁** | A 写 → B 打开 → 查询答案一致 → B 继续写 | 读路径、replay、增量写 | 只有纯字节层面的漂移 |
 
-三层缺一不可：互读能过而字节不同，说明两端对同一份数据的编码不同（历史上真实发生过：次级索引的 PGM 模型、稀疏索引的 term 内行序）。
+三层缺一不可：互读全过而字节不同，说明两端对同一份数据的编码不同；字节相同而互读失败，说明解码路径没跟上编码。
 
-## 2. 文件分类（**实测**，不是假设）
+## 2. 文件分类（实测）
 
-`test_the_reference_is_deterministic_where_the_test_assumes_it` 把参考在**同一输入**上跑多次，统计哪些文件的字节在变。分类靠这个测量支撑。
+`test_the_reference_is_deterministic_where_the_test_assumes_it` 让参考在**同一输入**上跑多次，统计哪些文件的字节在变；`test_the_port_is_deterministic_too` 对重写版做同一件事。下表由这两个测量支撑。
 
 | 类别 | 文件 | 依据 |
 |---|---|---|
-| **确定性** | 块列 `*.col`、变长 outline `col_*_out`、全文 `.dic/.pos/.len`、稀疏 BMP chunk、**整数键**次级索引 chunk、`version`（去掉 ts 后） | 只由行值/行序决定；参考自身多次运行字节相同 |
-| **参考也不确定** | HNSW chunk 的**图区** | 参考用 `thread_local std::mt19937`（`src/storage/knn_index/hnsw/hnsw_alg.cppm:107`），哪个线程插入哪条向量、因而哪个节点拿到哪一层由调度决定；5000 行时参考 5 次跑出 5 个不同的图 |
-| **构建产物** | **浮点键**次级索引 chunk 的 PGM 模型 | 见 `SIMPLIFICATION_AUDIT.md` 第 32 行：`size_t(inf)` 是 UB（clang++-20 两段 / g++ 三段），拟合在 x87 80 位 `long double` 里做且 intercept 被截断（51 组随机键里 18 组与 f64 不同） |
-| **不可比** | `catalog/`（RocksDB）、`wal/` | 带 session id、LSN、提交 ts；参考对自己都不可复现。只比**逻辑内容**（`SHOW CATALOG 'all'`）与互读 |
+| **确定性** | 块列 `*.col`、变长 outline `col_*_out`、全文 `.dic/.pos/.len`、稀疏 BMP chunk、次级索引 chunk（整数键与浮点键）、`version`（去掉 ts 后） | 只由行值/行序决定；参考自身多次运行字节相同。次级索引的 PGM 拟合也是确定的：整数键走 `__int128` 精确算术，浮点键走 `double` 算术（`LargeSigned<T>` 对浮点 `T` 就是 `double`，`piecewise_linear_model.hpp:40`）；浮点拟合的截距对**编译选项**敏感（见下），重写版按参考的默认编译口径复刻。每层顶部的守卫段取 `nextafter(last, +inf)`（`pgm_index.hpp:104-130`） |
+| **参考不确定** | HNSW chunk 的**图区** | 参考用 `thread_local std::mt19937`（`src/storage/knn_index/hnsw/hnsw_alg.cppm:107`），哪个线程插入哪条向量、因而哪个节点拿到哪一层由调度决定；5000 行时参考 5 次跑出 5 个不同的图 |
+| **参考不确定** | IVF chunk | 参考用 `std::random_device` + `std::mt19937` 采样 k-means 训练集（`ivf_index_data_impl.cpp:212-216`），质心、连同质心个数都不是行值的函数；同一输入两次跑出两块同尺寸不同内容的 chunk |
+| **不可比** | `catalog/`（RocksDB）、`wal/`、MinIO 桶内布局 | 带 session id、LSN、提交 ts；参考对自己都不可复现。只比**逻辑内容**（`SHOW CATALOG 'all'`）与互读 |
 
-`version` 文件：布局相同，只有 `create_ts` 不同（参考写事务提交 ts，端口写镜像 ts），比较前把 ts 置零。
+`version` 文件：布局相同，`create_ts` 不同（参考写事务提交 ts，重写版写镜像 ts），比较前把 ts 置零。
+
+浮点键 PGM 的截距依赖参考的**编译选项**。clang 默认 `-ffp-contract=on`，参考以 `-O3` 编译时会把 `piecewise_linear_model.hpp` 里 5 处乘加（`get_intersection` 的 `a`、`b`、`i_x`、`i_y` 与 `get_floating_point_segment` 的截距）收缩成 FMA；同一份源码用 `-ffp-contract=off` 编出来，`FLOAT` 键 65 行线性输入的第一个截距是 32 而不是 31。重写版用 `f64::mul_add` 复刻收缩后的舍入，因此对齐的是**参考默认编译口径**下的字节；这条差异由 `float_intercept_matches_contracted_reference_fit` 钉住。
+
+重写版的 **HNSW 图与 IVF 质心都确定**（插入顺序即行序，无随机源），所以重写版的自复现测量里**所有**文件都必须相同——包括参考自己都复现不了的那一块。
 
 ## 3. 测试清单
 
+下表就是门禁的全部入口，每条都必须通过。
+
 | 测试 | 数据集 | 断言 |
 |---|---|---|
-| `test_cross_engine_bytes.py::test_the_two_engines_write_the_same_bytes` | 200 行 → 1 块，5 类索引 | 块文件逐字节相同；每个索引按其类别比对（全文/整数次级/稀疏整文件，HNSW 头+向量+标签，浮点次级 postings）；目录逻辑记录相同；索引答案相同 |
+| `test_cross_engine_bytes.py::test_the_two_engines_write_the_same_bytes` | 200 行 → 1 块，5 类索引 | 块文件逐字节相同；每个索引按其类别比对（全文/次级/稀疏整文件，HNSW 头+向量+标签）；目录逻辑记录相同；索引答案相同 |
 | `::test_the_blocks_match_across_many_blocks` | 20000 行、无索引 → 3 块（8192/8192/3616） | 每块每列的 `.col`、outline、每块 `version` 逐字节相同 |
 | `::test_the_chunk_boundaries_are_timing_dependent` | 100 行 + 100 行两次 flush（一个块） | chunk 覆盖行区间无空洞、无重叠、总数 200；**不**断言固定的 chunk 数 |
 | `::test_the_columns_match_for_every_type` | 16 类列 × 200 行，含 NULL 与极值 | 每个 `.col` 与 outline 逐字节相同（NULL 槽按位图屏蔽） |
 | `::test_the_reference_is_deterministic_where_the_test_assumes_it` | 200 行，参考跑 3 次 | 只有 HNSW chunk 允许变；其余必须自复现 |
+| `::test_the_port_is_deterministic_too` | 200 行，重写版跑 3 次 | `data/` 下**每个**文件都必须逐字节相同（含 HNSW 图与 IVF chunk） |
+| `::test_the_bytes_after_deletes_updates_and_a_restart` | 100 行 + 第二次运行 DELETE 20 / UPDATE 10 | 块仍逐字节相同（210 行、3 次 create、30 个标记槽）、全文与浮点次级 chunk 相同、catalog 记录（去掉 ts）相同 |
+| `::test_the_index_chunks_match_for_every_index_kind` | IVF + HNSW(cosine) + HNSW(ip) + 全文(chinese) + 次级(int) + 次级(date) | 六类索引按各自类别比对；`_wait_for_index_chunks` 等全部 chunk 落盘 |
+| `::test_the_ivf_chunk_is_only_compared_by_content` | 上面的表，参考跑 2 次 | IVF chunk 的字节不是行值的函数，只能按内容比 |
+| `::test_a_crash_leaves_a_replayable_directory` | 100 行 flush + 50 行未 flush 后 kill -9 | 另一引擎启动后看到 150 行（双向） |
+| `::test_a_compacted_table_keeps_its_segments_apart` | 8192 行 + `COMPACT` + 50 行 | 重写版把行写进 `seg_1`/`seg_2`；非 0 段的块与参考同行的块逐字节相同；两个方向互读 8242 行；重写版重启不重复 |
+| `::test_the_port_round_trips_through_object_storage` | 200 行 + `storage_type="minio"` → 清空本地目录 → 读回 → 再写 50 行（在恢复出来的树上做 checkpoint）→ 再清空 → 读回 | 重写版从桶里恢复 `data/`+`catalog/`+`persistence/`，行数 200；第二次 checkpoint 后是 250（需要 `INFINITY_MINIO_URL`；每次跑用新桶，避免上一轮的桶污染） |
 | `test_cross_engine_compat.py` | 200 行，4 类索引 | 双向交接：A 写 → B 读 → B 再写 |
+| `infinity-storage/tests/s3_minio.rs` | 本地临时目录 + 桶 | `tree_sync_and_restore`（往返 + 二次同步上传 0 个文件）、`same_size_edit_is_uploaded`（同长度改写必须重传）、`put_get_list_delete_roundtrip`；需要 `INFINITY_MINIO_TEST=1` |
 
 ## 4. 覆盖矩阵
 
-行是格式单元，列是场景。`✅` 已覆盖且为字节门禁，`◐` 按内容比对，`⬜` 未覆盖。**本表随本节第 6 项的推进更新**。
+行是格式单元，列是场景。`✅` 已覆盖且为字节门禁，`◐` 按内容 / 互读比对，`⬜` 未纳入门禁（原因见 §5）。
 
 | 格式单元 | 单块单 chunk | 多块 / 多 chunk | 多段 | 删除 / 更新 | 重启后再写 | 崩溃恢复 | 类型 / 选项矩阵 | 对象存储 |
 |---|---|---|---|---|---|---|---|---|
-| 数据文件头尾（magic / buffer_size / checksum） | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | — | ⬜ |
-| 块列 `*.col`（`[data_region][null_bitmap]`） | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 变长 outline `col_*_out` | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| `version` 文件 | ✅（ts 归一） | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | — | ⬜ |
-| 全文 `.dic/.pos/.len` | ✅ | ✅ | ⬜ 跨段合并未冻结 | ⬜ | ⬜ | ⬜ | ⬜ analyzer / `with_positions` | ⬜ |
-| HNSW chunk | ◐ 图按内容 | ◐ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ metric / build_type | ⬜ |
-| IVF chunk（plain / SQ / PQ） | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| 次级索引 chunk（整数键） | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ date/datetime/uint 键 | ⬜ |
-| 次级索引 chunk（浮点键） | ◐ postings | ◐ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ double 键 | ⬜ |
-| 稀疏 BMP chunk | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ 词表规模 / block_size | ⬜ |
-| 删除位图（catalog 内） | ◐ 逻辑 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | — | — |
-| WAL 记录 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | — | ⬜ |
-| Catalog KV | ◐ 逻辑 | ◐ | ⬜ | ⬜ | ⬜ | ⬜ | — | — |
+| 数据文件头尾（magic / buffer_size / checksum） | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ 互读 | — | ◐ 重写版自身往返 |
+| 块列 `*.col`（`[data_region][null_bitmap]`） | ✅ | ✅ | ✅ 非 0 段块 | ✅ | ✅ | ◐ 互读 | ✅ 16 类 | ◐ |
+| 变长 outline `col_*_out` | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ | ✅ | ◐ |
+| `version` 文件 | ✅（ts 归一） | ✅ | ✅ | ✅ | ✅ | ◐ | — | ◐ |
+| 全文 `.dic/.pos/.len` | ✅ | ✅ | ⬜ 跨段合并 | ✅ | ✅ | ⬜ | ✅ analyzer / `with_positions` | ◐ |
+| HNSW chunk | ◐ 图按内容 | ◐ | ⬜ | ⬜ | ⬜ | ⬜ | ✅ metric / build_type | ◐ |
+| IVF chunk（plain / SQ / PQ） | ◐ 按内容 | ◐ | ⬜ | ⬜ | ⬜ | ⬜ | ◐ plain only | ◐ |
+| 次级索引 chunk（整数键） | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ✅ int / date 键 | ◐ |
+| 次级索引 chunk（浮点键） | ✅ | ✅ | ⬜ | ✅ | ⬜ | ⬜ | ⬜ double 键 | ◐ |
+| 稀疏 BMP chunk | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ 词表规模 / block_size | ◐ |
+| 删除位图（catalog 内） | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
+| WAL 记录 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ✅ 跨引擎 replay | — | ◐ |
+| Catalog KV | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
 
-## 5. 缺口清单（本轮记录）
+"对象存储"列的 `◐` 一律读作**重写版自身往返**（写 → 清空 → 读 → 再写 → 再读），不是跨引擎比对；跨引擎不成立的原因见 §6.5。
 
-### 5.1 明确不做字节比对（有实测理由）
+## 5. 未纳入门禁的部分
 
-1. **HNSW 图区**。参考用 `thread_local` 随机数，图本身不是唯一确定的。
-2. **浮点键 PGM 模型**。`size_t(inf)` UB + 80 位 `long double`，是构建产物。
+### 5.1 不做字节比对（有实测理由）
+
+1. **HNSW 图区**。参考用 `thread_local` 随机数，图本身不是唯一确定的；重写版的图是确定的，但两端不可能相同。
+2. **IVF 训练**。参考的 k-means 采样走 `std::random_device`，质心与质心个数都不是行值的函数。
 3. **`catalog/` 与 `wal/`**。带 ts / LSN / session id。
+4. **MinIO 桶内布局**。键名由两端各自的持久化层决定（见 §6.5）。
 
-前两项「能不能改成可比」在 §6 的第 6 项里评估：结论是**不追求字节可比**，理由写在那一项里（要复刻 libstdc++ 的 `mt19937` + uniform_int_distribution + 线程插入顺序，正是我们在稀疏索引上刚刚删掉的坏味道）。
+前两项的结论是**不追求字节可比**，理由在 §6.4：要复刻 libstdc++ 的 `mt19937` + `uniform_int_distribution` + 线程插入顺序，等于把实现细节写进格式。
 
-### 5.2 输入空间
+### 5.2 输入空间的缺口
 
-1. **块层**：原先只有 1 块（200 行 << 8192），多块 `.col`、`blk_N/version`、跨块 outline 未验证 → 第 1 项补。
-2. **段 / chunk 层**：原先只有 1 段、每索引 1 chunk；多段（周期性 dump）、多 chunk、跨段全文合并（`CPP_FORMAT_SPEC.md §9.5` 仍标 UNKNOWN）未验证 → 第 1 项补多 chunk，多段仍未覆盖。
-3. **类型**：原先只有 `int/varchar/float/vector(4,f32)/sparse(8,f32,i32)` → 第 2 项补全类型。
-4. **索引种类**：全文只测默认 analyzer；向量只测 HNSW plain f32 + l2；次级只测 varchar(u64 hash) + f32；**IVF 一次没测**（端口 `cpp_blocks.rs:2717` 已在写 `IvfChunkHeader`）→ 第 4 项补。
-5. **写序列**：原先只有「一次 bulk insert + flush」→ 第 3 项补增量写 / 更新 / 删除 / 重启后再写。
-6. **崩溃恢复**：只测干净关停 → 第 7 项补。
-7. **对象存储**（`storage_type = "minio"`）：端口的 `s3::restore_tree` 与上传从未与参考比对 → 仍未覆盖，见 §6。
+1. **跨段全文合并**：重写版把每个索引的 chunk 都写在 `idx_{id}/seg_0/`，不按段拆；参考在测试规模上只有 `seg_0`，所以没有可观测差异。要冻结这条需要 8,388,608 行级别的数据（每引擎约 1024 个块目录），本机内存与磁盘放不下两端。
+2. **多段下的索引类**（矩阵"多段"列的 ⬜）：HNSW / IVF / 次级 / 稀疏都只有单段覆盖，原因同上。
+3. **HNSW / IVF 的删除、更新、重启、崩溃恢复**：图区/质心不可字节比，这几个场景需要按内容比，目前没有用例。
+4. **次级 / 稀疏索引的删除、更新、重启、崩溃恢复**：可字节比，目前没有用例。
+5. **WAL 的字节级比对**：只做跨引擎 replay，不比字节。
 
 ### 5.3 流程
 
-1. **没有 CI**：`.github/workflows` 里没有任何 `test_cross_engine_*` 入口，字节门禁只在本机 `rust_engine/scripts/run_gate_c.sh` 跑 → 第 5 项。
-2. **端口自身确定性**没有单独断言，由「参考确定 + 两边相等」间接推出。
+1. **CI**：`.github/workflows/rust_engine.yml` 的 `cross_engine` job 在 builder 镜像里编参考、用 `--features rocksdb-store` 编重写版，并在 bwrap 下跑两个 pytest 文件。
+2. **重写版自身确定性**：由 `test_the_port_is_deterministic_too` 单独断言（3 次跑，`data/` 下每个文件都必须相同）。
 
-## 6. 推进项与验收口径
+## 6. 与 C++ 参考的差异
 
-| # | 项目 | 状态 | 验收口径 |
+### 6.1 字节层面的差异
+
+| 差异 | 重写版 | 参考 | 门禁处理 |
 |---|---|---|---|
-| 1 | 多块块层（20000 行 / 3 块） | ✅ | 3 块 × 3 列 + 3 块 version + outline 逐字节相同；chunk 边界只查不变量（见下） |
-| 2 | 全类型列矩阵 | ✅ | 16 类列的 `.col` / outline 逐字节相同；发现并修复 JSON→BSON 一处，记录浮点精度一处 |
-| 3 | 删除 / 更新 / 重启后再写 | ⚠️ xfail（有测量） | 测试 `test_the_bytes_after_deletes_updates_and_a_restart` 已落地并通过 xfail 记录差异：参考的 `version` 记 3 次 create（100/200/210 行、capacity 1843200），端口只记 1 次（**180 行**、capacity 8192），块列也不同 |
-| 4 | 索引种类矩阵 | ⚠️ 部分（未过） | IVF、HNSW cosine/ip、非默认 analyzer、DATE 键的**组合**会触发参考侧"根本不再 dump 索引"（6 个索引里只写出前 1–2 个，60 s 无变化），需要逐个组合排查后才好纳入门禁 |
-| 5 | CI 接入 | ✅ | `.github/workflows/rust_engine.yml` 新增 `cross_engine` job：builder 镜像里编参考、`--features rocksdb-store` 编端口、bwrap 下跑两个测试 |
-| 6 | HNSW 图 / 浮点 PGM 的「改成可比」评估 | ✅ 结论：不做 | 见下方 |
-| 7 | WAL 崩溃恢复（跨引擎 replay） | ⚠️ xfail（有测量） | 测试 `test_a_crash_leaves_a_replayable_directory` 已落地：端口带未 flush 行被 kill -9 后，参考启动即 abort——`Failed to find object for local path .../blk_0/version`（`MetaTableObject::RestoreTableCache`，`meta_tree_impl.cpp:749`） |
+| `version` 的 `create_ts` | 镜像 ts | 事务提交 ts | 比较前把 ts 置零 |
+| `version` 删除槽的 ts | 固定 `1`（`DELETED_MIRROR_TS`） | 删除事务的提交 ts | 比较前把 ts 置零；布局一致 |
+| HNSW 图区 | 确定（插入顺序即行序） | `thread_local std::mt19937`，节点层级取决于线程调度 | header / vectors / labels 字节比，图区与查询答案按内容比 |
+| IVF 质心 | 确定 | `std::random_device` 采样，质心个数也不固定 | chunk 按内容比 |
+| `catalog/`、`wal/` | RocksDB；redo 记录写 `wal/wal.rust`，replay 时同时读参考的 `wal/wal.log` | RocksDB；写 `wal/wal.log` | 只比逻辑内容与互读 |
+| 对象存储桶内键 | 路径树 `data/`、`catalog/`、`persistence/` | `ObjCreate` 打包 blob，本地路径映射在 KV 的 `pm\|object\|<path>` | 只做重写版自身往返 |
+| 索引 chunk 的段目录 | 全部在 `idx_{id}/seg_0/` | 路径同样带 `seg_{id}`；多段时是否按段拆分未验证 | 8M 行以下无差异，跨段未验证 |
+| 段的产生时机 | `COMPACT` 即写出 `seg_1`/`seg_2` | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切 | 见 §5.2 |
+| 不带 `rocksdb-store` feature 时 | catalog 落 fjall | 只认 RocksDB | 参考打开只剩 `system_tag`（`Database: default_db doesn't exist`）；门禁必须带 feature |
 
-### 第 3 / 4 / 7 项测出来的问题（未修，记录在案）
+### 6.2 与参考逐字节一致的部分
 
-- **块镜像不建模增量 append（第 3 项）**。端口每次 flush 都用当前行集**整体重写**块，`version` 只写一条 create；参考按 append 逐条记录（100 → 200 → 210 行），`capacity` 也是整段的槽位数（1843200）而不是 8192。另外端口写出的行数是 180（10 条被 update 的行没有以新行形式出现），参考是 210。修法要动 `write_cpp_blocks` 的镜像模型（按 append 记 create、按 update 追加新行），不是测试能绕过的。
-- **多索引组合下参考不 dump（第 4 项）**。`IVF(vec) + HNSW(vec,cos) + HNSW(vec,ip) + FULLTEXT(title,chinese) + SECONDARY(id) + SECONDARY(day)` 与"每个向量列一个索引"两种写法都试过：参考只写出前 1–2 个索引的 chunk，其余 60 s 内始终不出现（日志里没有 `AppendMemIndex`，也没有报错）。需要单独排查是"同列多向量索引"还是"DATE 列 / 非默认 analyzer"触发。
-- **崩溃后参考打不开端口的目录（第 7 项）**。参考在 `RestoreTableCache` 里要求每个块都有可打开的 `version` 文件，而端口在未 flush 时已经发布了块元数据却没写块文件，于是参考启动即 `UnrecoverableError`。端口自己的 `wal/wal.rust` 只服务自己，`wal/wal.log` 的 C++ 记录格式也还没对齐——跨引擎崩溃恢复要先把 WAL 记录格式冻结。
+- 块列 `*.col`（16 类列，含 NULL 位图、`-0.0`、极值、outline 分界）与变长 outline；
+- `version` 布局（`[create_size]` + 每次 create 的 `[ts][累计行数]` + `[capacity]` + 每槽 u64，DELETE 标槽，UPDATE = 删除 + 追加）；
+- 全文 `.dic/.pos/.len`、次级索引 chunk（整数键与浮点键，含 PGM 模型）、稀疏 BMP chunk；
+- JSON 列按 BSON 落盘（`{"data": <值>}` 外层、键排序、小整数 `int32`）；
+- 浮点列按精确值落盘，只有 SELECT 输出层按 6 位小数格式化。
 
-### 第 1 项的修正：**chunk 边界不是格式**
+### 6.3 参考的非格式行为（决定门禁怎么写）
 
-最初把 20000 行的数据接进字节门禁时，发现参考写 3 个 chunk、端口写 1 个，据此改成"按块切分"。随后同一输入在不同负载下得到**不同的切分**：
+`MemIndexTracer::MakeDumpTask`（`memindex_tracer_impl.cpp:130`）每轮只提交"全部 EMVB 索引 + **至多一个**非 EMVB 索引"，dump 又在后台线程，所以**同一输入在不同负载下 chunk 的切分不同**：
 
 | 场景 | 全文 / 次级 / BMP | HNSW |
 |---|---|---|
@@ -114,36 +135,47 @@
 | 20000 行单独跑 | 3 个 chunk（8192/8192/3616） | 3 个 chunk |
 | 20000 行在整轮测试里跑 | 1 个合并 chunk（`ft_..._4e20`，20000 行）+ 4 个次级 chunk | 3 个 chunk |
 
-dump 是**异步的**，而且 `MemIndexTracer::MakeDumpTask`（`memindex_tracer_impl.cpp:130`）每轮只提交"全部 EMVB 索引 + **至多一个**非 EMVB 索引"：第二次 insert 赶在第一次的 dump 之前还是之后、以及配额何时被跨过，决定了块是被"重新整体 dump"还是"追加一个新 chunk"、甚至决定后面几个索引有没有被 dump。**因此 chunk 边界不能作为字节门禁**，端口只需保证切分是确定且不重不漏的（200 行规模上参考稳定，所以那里仍然整文件比对）。
+因此 chunk 的数量/边界不能作为字节门禁：重写版只保证切分确定且不重不漏（200 行规模上参考稳定，那里仍整文件比对）。`_seed` 在 `flush_data()` 之后对每个索引显式 `dump_index()`（参考的 `DumpMemIndex`），再用 `_wait_for_index_chunks` 轮询到全部 chunk 落盘，不依赖固定 sleep。
 
-在这台机器上还观测到：`flush_data()` 之后的固定 sleep 是**竞态**（同样的输入两次跑出 7 个和 1 个索引文件）。`_seed` 里改走参考的 `optimize`（`OptimizeIndex`）路径后，内存索引的 dump 变成确定性的（200 / 2000 行都是 0.3 s），这也是这一项能稳定通过的前提。
+### 6.4 为什么不做 HNSW 图的字节可比
 
-### 第 2 项的产出：两个真实缺陷
+要让两引擎产出同一个图，重写版必须逐位复刻 `std::mt19937`、`std::uniform_int_distribution` 的取模方式、以及**线程插入顺序**。随机数和线程调度都不是格式的一部分。
 
-1. **JSON 列存的是 BSON，不是文本**。参考把 `{"a":1}` 存成 `JsonManager::to_bson` 的输出——外层 `{"data": <值>}` 的 BSON 文档、键按 `std::map` 排序、小整数用 `int32`（`json_manager_impl.cpp:139`）。端口此前直接存 UTF-8 文本，参考读该块时按 BSON 解析必然错。已在 `infinity-common::json` 实现 `to_bson`/`from_bson`（写入用前者、`read_cpp_blocks` 用后者还原文本），并用参考真实写出的 62 字节做了逐字节单测。
-2. **浮点列按 6 位小数落盘**（**未修，记录在案**）。端口把行存成 `.slt` 文本，`encode_row` 对浮点列渲染 `{:.6}`，所以 `-2.357142857142857` 落盘成 `-2.357143`；参考存的是原始 `f64`。改成精确渲染会连带改变 SELECT 的输出（显示也走同一份文本）并破坏两个既有用例，所以本轮只把测试数据限制在 6 位小数可精确表示的格点上（1/8 的倍数），把限制写入代码注释与本节。**修法**：行文本保留精确值，显示层再按类型格式化——属于"存储/显示解耦"，单独一项工作。
+### 6.5 对象存储的跨引擎差异（有测量）
 
-### 第 6 项的结论（为什么不做字节可比）
+- 参考的桶内键是**打包对象**：`ObjCreate()` 命名的 blob（`object_size_limit_` 触发的 8 MB compose 包），本地路径与 `(obj_key, offset, size)` 的映射写在 KV 的 `pm|object|<path>` 记录里（`KeyEncode::PMObjectKey`，`persistence_manager_impl.cpp:123`），对象统计另记 `pm|object_stat|`。
+- 重写版的桶内键是**路径树**：`data/<相对路径>`、`catalog/<相对路径>`、`persistence/<相对路径>`（`infinity_storage::s3::sync_tree`）。
+- 参考**没有恢复路径**：`VirtualStore::DownloadObject` 在 `src/` 里没有调用者；把参考的本地文件清空后重启，它记的是 `Init a new catalog` + 空表（日志里只有 `Uploading object meta/...`）。参考的对象存储是"备份"，不是"主存储"。
 
-- **HNSW 图**：要让两引擎产出同一个图，端口必须逐位复刻 `std::mt19937`、`std::uniform_int_distribution` 的取模方式、以及**线程插入顺序**。随机数和线程调度都不是格式的一部分，复刻它们等于把「libstdc++ 的实现细节」写进格式——这正是稀疏索引 `TailFwd::ToBlockFwd` 改用 `std::stable_sort` 时否掉的做法。图用内容门禁：header / vectors / labels 字节相同，图区与查询答案按内容比。
-- **浮点 PGM**：修掉 UB（哨兵不用 `inf`）能让**参考自己**跨编译器稳定，但端口仍要逐位复刻 PGM 的浮点拟合（`get_intersection`/`get_slope_range` 的运算顺序与截断）。而 PGM 只是加速定位的**索引结构**，读侧本来就会精确扫描校正（`GetResultCnt`），所以正确性不依赖模型字节。结论：postings 字节可比（已做到），模型不比。
+所以这一列只能覆盖重写版自己的往返；跨引擎互读需要一个重写版的打包对象存储实现（`ObjCreate` + `pm|object|` + `pm|object_stat|` + 对齐/合包），且在参考能自恢复之前没有可比的另一端。
 
 ## 7. 怎么跑
 
 ```bash
-# 参考（容器内）与端口
+# 参考（容器内）与重写版
 docker exec infinity_builder cmake --build /infinity/cmake-build-reldeb --target infinity
 cd rust_engine && cargo build --release -p infinity-cli --features rocksdb-store
 
-# 字节 / 全类型 / 索引矩阵 / 写序列（需要可写的 /var/infinity）
+# 字节 / 全类型 / 多块 / 写序列 / 索引矩阵 / 崩溃 / 多段（需要可写的 /var/infinity）
 work=$(mktemp -d)
 bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "$work" /var/infinity \
       --unshare-pid --proc /proc -- \
       .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_bytes.py
 
+# 对象存储往返（需要一个可用的 S3/MinIO 端点，桶名不能带下划线）
+INFINITY_MINIO_URL=127.0.0.1:9000 \
+INFINITY_MINIO_ACCESS_KEY=... INFINITY_MINIO_SECRET_KEY=... \
+bwrap ... -- .venv/bin/python -m pytest -q \
+      python/restart_test/test_cross_engine_bytes.py::test_the_port_round_trips_through_object_storage
+
 # 互读
 bwrap ... -- .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_compat.py \
       --infinity_path=rust_engine/scripts/infinity_rust_shim.sh
+
+# 重写版的 S3 测试（含"同长度改写也要上传"）
+cd rust_engine && INFINITY_MINIO_TEST=1 INFINITY_MINIO_ENDPOINT=127.0.0.1:9000 \
+      INFINITY_MINIO_ACCESS_KEY=... INFINITY_MINIO_SECRET_KEY=... \
+      cargo test -p infinity-storage --test s3_minio
 ```
 
 环境变量：
@@ -151,11 +183,17 @@ bwrap ... -- .venv/bin/python -m pytest -q python/restart_test/test_cross_engine
 | 变量 | 默认 | 作用 |
 |---|---|---|
 | `INFINITY_CPP_BIN` | `cmake-build-reldeb/src/infinity` | 参考二进制 |
-| `INFINITY_RUST_BIN` | `rust_engine/scripts/infinity_rust_shim.sh` | 端口入口 |
+| `INFINITY_RUST_BIN` | `rust_engine/scripts/infinity_rust_shim.sh` | 重写版入口（shim 跑 `rust_engine/target/release/infinity`，编它必须带 `--features rocksdb-store`） |
 | `INFINITY_BYTES_ROOT` | `/var/infinity/bytes` | 两引擎的数据根 |
-| `INFINITY_BYTES_ROWS` | `20000` | 主测试的数据集行数（>8192 才是多块） |
-| `INFINITY_BYTES_DET_ROWS` | `500` | 确定性测量的行数（参考在小规模上图才稳定） |
+| `INFINITY_BYTES_ROWS` | `200` | 字节测试的数据集行数 |
+| `INFINITY_BYTES_BLOCK_ROWS` | `20000` | 多块测试的行数（>8192 才是多块） |
+| `INFINITY_BYTES_DET_ROWS` | `200` | 确定性测量的行数 |
+| `INFINITY_MINIO_URL` | 空 | 对象存储测试的端点；为空则跳过该用例 |
+| `INFINITY_MINIO_ACCESS_KEY` / `_SECRET_KEY` | 空 | 对象存储凭据 |
+| `INFINITY_MINIO_BUCKET_PREFIX` | `infinity-bytes` | 桶名前缀（桶名不能含 `_`，重写版会拒绝并退回本地）；每次跑再拼一个时间戳后缀，上一轮的桶不会污染这一轮 |
+| `INFINITY_MINIO_TEST` | 空 | `1` 时 `cargo test --test s3_minio` 才真的连 MinIO，否则是 no-op |
+| `INFINITY_MINIO_ENDPOINT` | `127.0.0.1:9005` | 上面那组 Rust 测试的端点（与 Python 门禁的 `INFINITY_MINIO_URL` 分开） |
 
 测试要占 `23817`（Thrift）与 `5432/5433`（PG 线），参考不设 `SO_REUSEADDR`，所以用例之间会等端口真正释放。
 
-**环境注意**：`bwrap` 只隔离 PID/mount，**不隔离网络**。同一台机器上若有另一个进程（另一个 agent、上一轮没退干净的引擎）也在跑这些用例，它会连到本测试正在监听的 `23817` 上，把自己的表/行写进本轮的目录——表现为"多了一张不属于本测试的表"或"参考只 dump 了前几个索引"。CI 用独立 runner 不会这样；本机并发跑时只看单条用例：`pytest ...::test_xxx`。
+**环境注意**：`bwrap` 只隔离 PID/mount，**不隔离网络**。同一台机器上若有另一个进程（另一个 agent、上一次没退干净的引擎）也在跑这些用例，它会连到本测试正在监听的 `23817` 上，把自己的表/行写进本次的目录——表现为"多了一张不属于本测试的表"或"参考只 dump 了前几个索引"。CI 用独立 runner 不会这样；本机并发跑时只看单条用例：`pytest ...::test_xxx`。

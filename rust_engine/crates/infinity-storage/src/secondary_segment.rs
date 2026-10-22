@@ -34,13 +34,13 @@
 //! `slope = 0`, `intercept = last_n`). `levels_offsets` holds the start of
 //! each level in `segments[]` followed by `segments.len()`.
 //!
-//! Only the `U64` model is *built* the way the reference builds it (and is
-//! byte-identical to it, see the tests). A `F32`/`F64` chunk gets a flat model
-//! — one segment per 64 keys with `slope = 0` and `intercept = first index` —
-//! which is exact for any monotone key array and readable by the reference,
-//! but is not the fit the reference would produce. The reader does not consult
-//! the typed model at all: it binary-searches the key array, which is what
-//! makes it correct for a chunk the reference wrote.
+//! Every key kind is *built* the way the reference builds it and is
+//! byte-identical to it (see the tests). The fit is exact integer arithmetic
+//! for an integral key ([`Pgm`]) and `double` arithmetic for a floating-point
+//! one ([`PgmFloat`]); the latter is what the reference does once its
+//! `LargeSigned<float|double>` maps to `double` (`piecewise_linear_model.hpp:40`).
+//! The reader does not consult a typed chunk's model: it binary-searches the
+//! key array, which is what makes it correct for a chunk the reference wrote.
 
 use memmap2::Mmap;
 use std::cmp::Ordering;
@@ -189,24 +189,6 @@ impl Key {
             Key::I64(v) => v as f64,
         }
     }
-
-    /// The raw little-endian bytes this key occupies in a chunk, at the key
-    /// width of `kind`.
-    fn to_le_bytes_in(self, kind: KeyKind) -> Vec<u8> {
-        match kind {
-            KeyKind::U64 => {
-                let bits = match self {
-                    Key::U64(v) => v,
-                    other => other.as_f64() as u64,
-                };
-                bits.to_le_bytes().to_vec()
-            }
-            KeyKind::F32 => (self.as_f64() as f32).to_bits().to_le_bytes().to_vec(),
-            KeyKind::F64 => self.as_f64().to_bits().to_le_bytes().to_vec(),
-            KeyKind::I32 => (self.as_f64() as i32).to_le_bytes().to_vec(),
-            KeyKind::I64 => (self.as_f64() as i64).to_le_bytes().to_vec(),
-        }
-    }
 }
 
 /// An integral key type the reference instantiates `PGMIndex<K, 64, 4, float>`
@@ -216,11 +198,9 @@ impl Key {
 ///
 /// Over an integral `K` the reference's fit is exact integer arithmetic
 /// (`get_floating_point_segment`, `piecewise_linear_model.hpp:245-253`), so a
-/// chunk of one of these kinds is byte-reproducible. `F32`/`F64` keys are not:
-/// their fit runs in 80-bit `long double` (see [`flat_tail`]).
-trait IntegralKey:
-    Copy + Default + PartialEq + Eq + PartialOrd + std::fmt::Debug
-{
+/// chunk of one of these kinds is byte-reproducible. Floating-point keys take
+/// the `double` path instead — see [`FloatKey`].
+trait IntegralKey: Copy + Default + PartialEq + Eq + PartialOrd + std::fmt::Debug {
     /// `PGMIndex::sentinel`: `numeric_limits<K>::max()`, since an integral `K`
     /// has no infinity (`pgm_index.hpp:84`).
     const SENTINEL: Self;
@@ -327,6 +307,788 @@ impl<X: IntegralKey> PgmSegment<X> {
     fn approx(&self, key: X) -> u64 {
         let stride = (self.slope as f64 * key.approx_diff(self.key)) as u64;
         stride.wrapping_add(self.intercept as u64)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// `PGMIndex<K, 64, 4, Floating>` over floating-point keys
+// ---------------------------------------------------------------------------
+
+/// A floating-point key type the reference instantiates `PGMIndex<K, 64, 4,
+/// Floating>` with (`KeepOrderedSelf`, `secondary_index_data.cppm:74-90`):
+/// `float` for a `FLOAT` column, `double` for a `DOUBLE` one.
+///
+/// The fit runs in `double` for both, because `LargeSigned<T>` is `double`
+/// whenever `T` is floating-point (`piecewise_linear_model.hpp:39-42`): an
+/// `f32` key is widened first. Only the slope's *storage* differs — `Floating`
+/// is `float` for an `f32` key and `double` for an `f64` one
+/// (`secondary_index_pgm.cppm:33-45`).
+trait FloatKey: Copy + PartialEq + PartialOrd + std::fmt::Debug {
+    /// `PGMIndex::sentinel`: `+inf`, an IEEE key having an infinity
+    /// (`pgm_index.hpp:84`).
+    const SENTINEL: Self;
+    /// `std::nextafter(self, +inf)`.
+    fn next_after(self) -> Self;
+    /// The key widened for the corridor arithmetic, i.e. `SX(x)`.
+    fn as_f64(self) -> f64;
+    /// `K(value)` — the reference narrows a fitted `double` back to `K` where
+    /// it rebuilds a key.
+    fn from_f64(value: f64) -> Self;
+    /// `double(k - key)`: the subtraction runs in `K`, so an `f32` rounds
+    /// before the widening (`pgm_index.hpp:280-284`).
+    fn approx_delta(self, key: Self) -> f64;
+    /// The fitted `double` slope narrowed to the `Segment`'s `Floating` field.
+    fn narrow_slope(slope: f64) -> f64;
+    /// The tail's `first_key` and a segment's key, in the reference's `K`.
+    fn push_le(self, out: &mut Vec<u8>);
+    /// A `Segment`'s slope in the reference's little-endian `Floating`.
+    fn push_slope(slope: f64, out: &mut Vec<u8>);
+    /// Widens a [`Key`] of any kind into this one.
+    fn from_key(key: Key) -> Self;
+}
+
+/// `std::nextafter(x, +inf)` on the bit pattern: a positive magnitude grows, a
+/// negative one shrinks, and `±0` steps to the smallest positive subnormal.
+/// (`f32::next_up`/`f64::next_up` are newer than this crate's MSRV.)
+fn next_up_f32(x: f32) -> f32 {
+    if x.is_nan() || x == f32::INFINITY {
+        return x;
+    }
+    if x == 0.0 {
+        return f32::from_bits(1);
+    }
+    let bits = x.to_bits();
+    if x > 0.0 {
+        f32::from_bits(bits + 1)
+    } else {
+        f32::from_bits(bits - 1)
+    }
+}
+
+fn next_up_f64(x: f64) -> f64 {
+    if x.is_nan() || x == f64::INFINITY {
+        return x;
+    }
+    if x == 0.0 {
+        return f64::from_bits(1);
+    }
+    let bits = x.to_bits();
+    if x > 0.0 {
+        f64::from_bits(bits + 1)
+    } else {
+        f64::from_bits(bits - 1)
+    }
+}
+
+impl FloatKey for f32 {
+    const SENTINEL: Self = f32::INFINITY;
+    fn next_after(self) -> Self {
+        next_up_f32(self)
+    }
+    fn as_f64(self) -> f64 {
+        f64::from(self)
+    }
+    fn from_f64(value: f64) -> Self {
+        value as f32
+    }
+    fn approx_delta(self, key: Self) -> f64 {
+        f64::from(self - key)
+    }
+    fn narrow_slope(slope: f64) -> f64 {
+        f64::from(slope as f32)
+    }
+    fn push_le(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.to_bits().to_le_bytes());
+    }
+    fn push_slope(slope: f64, out: &mut Vec<u8>) {
+        out.extend_from_slice(&(slope as f32).to_bits().to_le_bytes());
+    }
+    fn from_key(key: Key) -> Self {
+        match key {
+            Key::F32(v) => v,
+            other => other.as_f64() as f32,
+        }
+    }
+}
+
+impl FloatKey for f64 {
+    const SENTINEL: Self = f64::INFINITY;
+    fn next_after(self) -> Self {
+        next_up_f64(self)
+    }
+    fn as_f64(self) -> f64 {
+        self
+    }
+    fn from_f64(value: f64) -> Self {
+        value
+    }
+    fn approx_delta(self, key: Self) -> f64 {
+        self - key
+    }
+    fn narrow_slope(slope: f64) -> f64 {
+        slope
+    }
+    fn push_le(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.to_bits().to_le_bytes());
+    }
+    fn push_slope(slope: f64, out: &mut Vec<u8>) {
+        out.extend_from_slice(&slope.to_bits().to_le_bytes());
+    }
+    fn from_key(key: Key) -> Self {
+        match key {
+            Key::F64(v) => v,
+            other => other.as_f64(),
+        }
+    }
+}
+
+/// `(#pragma pack(1)) Segment { K key; Floating slope; uint32_t intercept; }`
+/// for a floating-point `K`. The slope is kept widened and already narrowed to
+/// `Floating`, so it is bit-exact with the reference for either key width.
+#[derive(Debug, Clone, Copy)]
+struct PgmFloatSegment<K> {
+    key: K,
+    slope: f64,
+    intercept: u32,
+}
+
+impl<K: FloatKey> PgmFloatSegment<K> {
+    /// `Segment::operator()`, saturated the way the patched reference is:
+    /// `size_t(x)` is undefined for NaN/inf/out-of-range `x`, and both callers
+    /// clamp the result with `next(it)->intercept` afterwards.
+    fn approx(&self, key: K) -> u64 {
+        let estimate = self.slope * key.approx_delta(self.key);
+        if !estimate.is_finite() || estimate >= u64::MAX as f64 {
+            return u64::MAX;
+        }
+        let position = estimate as u64;
+        if position > u64::MAX - self.intercept as u64 {
+            return u64::MAX;
+        }
+        position + self.intercept as u64
+    }
+}
+
+/// A product `dx * dy` kept as `mantissa * 2^exponent` instead of a `double`.
+///
+/// With keys spanning most of the double range the product of a horizontal and
+/// a vertical difference overflows to infinity, and `inf - inf` is NaN. The
+/// reference compares such products through this exponent form
+/// (`piecewise_linear_model.hpp:44-97`); the fast path below still uses the
+/// plain `double` product whenever both products are finite, so every ordinary
+/// model is bit-for-bit the plain-`double` fit.
+#[derive(Debug, Clone, Copy)]
+struct ScaledProduct {
+    /// `|mantissa|` in `[0.5, 1)`, or `0` for a zero product.
+    mantissa: f64,
+    exponent: i32,
+}
+
+/// `std::frexp`: `x = m * 2^e` with `|m|` in `[0.5, 1)`. `(x, 0)` for a
+/// zero, NaN or infinite input, which is what the reference's fallback sees.
+fn frexp(x: f64) -> (f64, i32) {
+    if x == 0.0 || !x.is_finite() {
+        return (x, 0);
+    }
+    let bits = x.to_bits();
+    let biased = ((bits >> 52) & 0x7ff) as i32;
+    let (mantissa, exponent) = if biased == 0 {
+        // Subnormal: scaling by 2^54 makes it normal, and the exponent shifts
+        // back by the same amount.
+        let (m, e) = frexp(x * 18_014_398_509_481_984.0);
+        (m, e - 54)
+    } else {
+        (
+            f64::from_bits((bits & !(0x7ff << 52)) | (1022 << 52)),
+            biased - 1022,
+        )
+    };
+    (mantissa, exponent)
+}
+
+/// `std::ldexp(x, n)`: `x * 2^n`, exact within the normal range.
+fn ldexp(x: f64, n: i32) -> f64 {
+    let mut x = x;
+    let mut n = n;
+    while n > 1023 {
+        x *= f64::from_bits((1023 + 1023) << 52);
+        n -= 1023;
+    }
+    while n < -1022 {
+        x *= f64::from_bits((1023 - 1022) << 52);
+        n += 1022;
+    }
+    x * f64::from_bits(((1023 + n) as u64) << 52)
+}
+
+fn scale_product(dx: f64, dy: f64) -> ScaledProduct {
+    let (dx_mantissa, dx_exponent) = frexp(dx);
+    let (dy_mantissa, dy_exponent) = frexp(dy);
+    let mut mantissa = dx_mantissa * dy_mantissa;
+    let mut exponent = dx_exponent + dy_exponent;
+    // Both mantissas are in `[0.5, 1)`, so their product is in `[0.25, 1)`:
+    // renormalize so that the exponent orders like the magnitude.
+    if mantissa.abs() < 0.5 {
+        mantissa *= 2.0;
+        exponent -= 1;
+    }
+    ScaledProduct { mantissa, exponent }
+}
+
+fn compare_scaled(lhs: ScaledProduct, rhs: ScaledProduct) -> i32 {
+    if lhs.mantissa == 0.0 || rhs.mantissa == 0.0 {
+        if lhs.mantissa == 0.0 && rhs.mantissa == 0.0 {
+            return 0;
+        }
+        if lhs.mantissa == 0.0 {
+            return if rhs.mantissa.is_sign_negative() {
+                1
+            } else {
+                -1
+            };
+        }
+        return if lhs.mantissa.is_sign_negative() {
+            -1
+        } else {
+            1
+        };
+    }
+    let lhs_negative = lhs.mantissa.is_sign_negative();
+    if lhs_negative != rhs.mantissa.is_sign_negative() {
+        return if lhs_negative { -1 } else { 1 };
+    }
+    let magnitude = if lhs.exponent != rhs.exponent {
+        if lhs.exponent < rhs.exponent {
+            -1
+        } else {
+            1
+        }
+    } else if lhs.mantissa != rhs.mantissa {
+        if lhs.mantissa < rhs.mantissa {
+            -1
+        } else {
+            1
+        }
+    } else {
+        0
+    };
+    if lhs_negative {
+        -magnitude
+    } else {
+        magnitude
+    }
+}
+
+/// Compares `dx1 * dy1` with `dx2 * dy2`, falling back to [`compare_scaled`]
+/// only when a product overflows: for finite products this is exactly the
+/// plain `double` comparison.
+fn compare_products(dx1: f64, dy1: f64, dx2: f64, dy2: f64) -> i32 {
+    let lhs = dx1 * dy1;
+    let rhs = dx2 * dy2;
+    if lhs.is_finite() && rhs.is_finite() {
+        return i32::from(lhs > rhs) - i32::from(lhs < rhs);
+    }
+    compare_scaled(scale_product(dx1, dy1), scale_product(dx2, dy2))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct FloatPoint<K> {
+    x: K,
+    y: u64,
+}
+
+/// `Slope { double dx; double dy; }` — `SX` and `SY` are both `double` once the
+/// key is floating-point.
+#[derive(Debug, Clone, Copy)]
+struct FloatSlope {
+    dx: f64,
+    dy: f64,
+}
+
+impl FloatSlope {
+    /// `Slope::compare`: `compare_products(p.dx, dy, dx, p.dy)`, i.e. the
+    /// original `dy * p.dx` against `dx * p.dy`.
+    fn compare(&self, other: &FloatSlope) -> i32 {
+        compare_products(other.dx, self.dy, self.dx, other.dy)
+    }
+
+    fn lt(&self, other: &FloatSlope) -> bool {
+        self.compare(other) < 0
+    }
+
+    fn gt(&self, other: &FloatSlope) -> bool {
+        self.compare(other) > 0
+    }
+
+    /// `explicit operator double()`: `dy / dx`.
+    fn to_f64(self) -> f64 {
+        self.dy / self.dx
+    }
+}
+
+fn float_point_diff<K: FloatKey>(a: FloatPoint<K>, b: FloatPoint<K>) -> FloatSlope {
+    FloatSlope {
+        dx: a.x.as_f64() - b.x.as_f64(),
+        dy: a.y as f64 - b.y as f64,
+    }
+}
+
+/// `cross(O, A, B) = (A - O) x (B - O)`, compared without overflow.
+fn float_cross<K: FloatKey>(o: FloatPoint<K>, a: FloatPoint<K>, b: FloatPoint<K>) -> i32 {
+    let oa = float_point_diff(a, o);
+    let ob = float_point_diff(b, o);
+    compare_products(oa.dx, ob.dy, ob.dx, oa.dy)
+}
+
+/// `OptimalPiecewiseLinearModel<K, size_t>` for a floating-point `K`.
+struct FloatModel<K> {
+    epsilon: u64,
+    lower: Vec<FloatPoint<K>>,
+    upper: Vec<FloatPoint<K>>,
+    first_x: K,
+    /// The rank of `first_x`. The reference keeps only `x` in its
+    /// `CanonicalSegment`; the rank is needed for the degenerate-fit fallback
+    /// in [`float_segment_from_canonical`].
+    first_y: u64,
+    last_x: K,
+    lower_start: usize,
+    upper_start: usize,
+    points_in_hull: usize,
+    rectangle: [FloatPoint<K>; 4],
+}
+
+impl<K: FloatKey> FloatModel<K> {
+    fn new(epsilon: u64) -> Self {
+        let zero = FloatPoint {
+            x: K::from_f64(0.0),
+            y: 0,
+        };
+        Self {
+            epsilon,
+            lower: Vec::new(),
+            upper: Vec::new(),
+            first_x: zero.x,
+            first_y: 0,
+            last_x: zero.x,
+            lower_start: 0,
+            upper_start: 0,
+            points_in_hull: 0,
+            rectangle: [zero; 4],
+        }
+    }
+
+    /// `add_point`: returns `false` when `(x, y)` no longer fits the corridor.
+    fn add_point(&mut self, x: K, y: u64) -> bool {
+        debug_assert!(self.points_in_hull == 0 || x > self.last_x);
+        self.last_x = x;
+        let max_y = u64::MAX;
+        let min_y = 0u64;
+        let p1 = FloatPoint {
+            x,
+            y: if y >= max_y - self.epsilon {
+                max_y
+            } else {
+                y + self.epsilon
+            },
+        };
+        let p2 = FloatPoint {
+            x,
+            y: if y <= min_y + self.epsilon {
+                min_y
+            } else {
+                y - self.epsilon
+            },
+        };
+
+        if self.points_in_hull == 0 {
+            self.first_x = x;
+            self.first_y = y;
+            self.rectangle[0] = p1;
+            self.rectangle[1] = p2;
+            self.upper.clear();
+            self.lower.clear();
+            self.upper.push(p1);
+            self.lower.push(p2);
+            self.upper_start = 0;
+            self.lower_start = 0;
+            self.points_in_hull += 1;
+            return true;
+        }
+
+        if self.points_in_hull == 1 {
+            self.rectangle[2] = p2;
+            self.rectangle[3] = p1;
+            self.upper.push(p1);
+            self.lower.push(p2);
+            self.points_in_hull += 1;
+            return true;
+        }
+
+        let slope1 = float_point_diff(self.rectangle[2], self.rectangle[0]);
+        let slope2 = float_point_diff(self.rectangle[3], self.rectangle[1]);
+        let outside_line1 = float_point_diff(p1, self.rectangle[2]).lt(&slope1);
+        let outside_line2 = float_point_diff(p2, self.rectangle[3]).gt(&slope2);
+
+        if outside_line1 || outside_line2 {
+            self.points_in_hull = 0;
+            return false;
+        }
+
+        if float_point_diff(p1, self.rectangle[1]).lt(&slope2) {
+            // Find extreme slope.
+            let mut min = float_point_diff(self.lower[self.lower_start], p1);
+            let mut min_i = self.lower_start;
+            for i in self.lower_start + 1..self.lower.len() {
+                let val = float_point_diff(self.lower[i], p1);
+                if val.gt(&min) {
+                    break;
+                }
+                min = val;
+                min_i = i;
+            }
+
+            self.rectangle[1] = self.lower[min_i];
+            self.rectangle[3] = p1;
+            self.lower_start = min_i;
+
+            // Hull update.
+            let mut end = self.upper.len();
+            while end >= self.upper_start + 2
+                && float_cross(self.upper[end - 2], self.upper[end - 1], p1) <= 0
+            {
+                end -= 1;
+            }
+            self.upper.truncate(end);
+            self.upper.push(p1);
+        }
+
+        if float_point_diff(p2, self.rectangle[0]).gt(&slope1) {
+            // Find extreme slope.
+            let mut max = float_point_diff(self.upper[self.upper_start], p2);
+            let mut max_i = self.upper_start;
+            for i in self.upper_start + 1..self.upper.len() {
+                let val = float_point_diff(self.upper[i], p2);
+                if val.lt(&max) {
+                    break;
+                }
+                max = val;
+                max_i = i;
+            }
+
+            self.rectangle[0] = self.upper[max_i];
+            self.rectangle[2] = p2;
+            self.upper_start = max_i;
+
+            // Hull update.
+            let mut end = self.lower.len();
+            while end >= self.lower_start + 2
+                && float_cross(self.lower[end - 2], self.lower[end - 1], p2) >= 0
+            {
+                end -= 1;
+            }
+            self.lower.truncate(end);
+            self.lower.push(p2);
+        }
+
+        self.points_in_hull += 1;
+        true
+    }
+
+    fn get_segment(&self) -> CanonicalFloatSegment<K> {
+        if self.points_in_hull == 1 {
+            CanonicalFloatSegment {
+                rectangle: [
+                    self.rectangle[0],
+                    self.rectangle[1],
+                    self.rectangle[0],
+                    self.rectangle[1],
+                ],
+                first: self.first_x,
+                first_y: self.first_y,
+            }
+        } else {
+            CanonicalFloatSegment {
+                rectangle: self.rectangle,
+                first: self.first_x,
+                first_y: self.first_y,
+            }
+        }
+    }
+}
+
+/// `OptimalPiecewiseLinearModel<K, size_t>::CanonicalSegment` for a
+/// floating-point `K`.
+#[derive(Debug, Clone, Copy)]
+struct CanonicalFloatSegment<K> {
+    rectangle: [FloatPoint<K>; 4],
+    first: K,
+    /// The rank of `first`, which the reference does not keep (see
+    /// [`float_segment_from_canonical`]).
+    first_y: u64,
+}
+
+impl<K: FloatKey> CanonicalFloatSegment<K> {
+    fn one_point(&self) -> bool {
+        let r = &self.rectangle;
+        r[0].x == r[2].x && r[0].y == r[2].y && r[1].x == r[3].x && r[1].y == r[3].y
+    }
+
+    /// `get_intersection()`: the point where the two corridor edges meet.
+    ///
+    /// Every horizontal term is scaled by the same power of two, so `b` — a
+    /// ratio of two cross products — is unchanged while the products stay
+    /// finite for keys that span most of the double range
+    /// (`piecewise_linear_model.hpp:298-321`).
+    ///
+    /// The reference is compiled with `-ffp-contract=on` (clang's default), so
+    /// it fuses the second product of each `x * y - z * w` and the `+` of
+    /// `i_x`/`i_y` into an FMA. [`f64::mul_add`] reproduces that rounding.
+    fn get_intersection(&self) -> (f64, f64) {
+        let r = &self.rectangle;
+        let (p0, p1, p2, p3) = (r[0], r[1], r[2], r[3]);
+        let slope1 = float_point_diff(p2, p0);
+        let slope2 = float_point_diff(p3, p1);
+
+        if self.one_point() || slope1.compare(&slope2) == 0 {
+            return (p0.x.as_f64(), p0.y as f64);
+        }
+
+        let p0p1 = float_point_diff(p1, p0);
+        let (_, exponent) = frexp(p0p1.dx.abs().max(slope1.dx.abs()).max(slope2.dx.abs()));
+        let scaled = |dx: f64| ldexp(dx, -exponent);
+        let a = scaled(slope1.dx).mul_add(slope2.dy, -(slope1.dy * scaled(slope2.dx)));
+        let b = scaled(p0p1.dx).mul_add(slope2.dy, -(p0p1.dy * scaled(slope2.dx))) / a;
+        let i_x = b.mul_add(slope1.dx, p0.x.as_f64());
+        let i_y = b.mul_add(slope1.dy, p0.y as f64);
+        (i_x, i_y)
+    }
+
+    /// `get_slope_range()`: the two corridor slopes `dy / dx`.
+    fn get_slope_range(&self) -> (f64, f64) {
+        if self.one_point() {
+            return (0.0, 1.0);
+        }
+        let r = &self.rectangle;
+        (
+            float_point_diff(r[2], r[0]).to_f64(),
+            float_point_diff(r[3], r[1]).to_f64(),
+        )
+    }
+
+    /// `get_floating_point_segment(origin)`: the slope is the midpoint of the
+    /// corridor and the intercept is where that line predicts rank `0`.
+    /// Returns `(slope, intercept)` before the `Segment` constructor narrows
+    /// the slope to `Floating` and truncates the intercept to `uint32_t`.
+    fn floating_point_segment(&self, origin: K) -> (f64, f64) {
+        if self.one_point() {
+            let mid = self.rectangle[0].y.wrapping_add(self.rectangle[1].y) / 2;
+            return (0.0, mid as f64);
+        }
+
+        let (i_x, i_y) = self.get_intersection();
+        let (min_slope, max_slope) = self.get_slope_range();
+        let slope = (min_slope + max_slope) / 2.0;
+        // `i_y - (i_x - origin) * slope`, with the subtraction fused into an FMA
+        // like the reference build does.
+        let intercept = (i_x - origin.as_f64()).mul_add(-slope, i_y);
+        (slope, intercept)
+    }
+}
+
+/// `Segment::Segment(const CanonicalSegment &cs)`.
+fn float_segment_from_canonical<K: FloatKey>(cs: &CanonicalFloatSegment<K>) -> PgmFloatSegment<K> {
+    let key = cs.first;
+    let (slope, intercept) = cs.floating_point_segment(key);
+    // The reference converts the fitted `double` to `SY = __int128`, i.e. it
+    // truncates toward zero, and throws when the result does not fit `uint32_t`.
+    // A fit leaves that range only when the corridor's slopes overflow: a
+    // segment over a gap of one subnormal `ulp`, e.g. a single-row `DOUBLE`
+    // chunk holding `0.0`, where `1 / ulp` and `-1 / ulp` are the two
+    // infinities and their midpoint is NaN. The reference throws there and
+    // writes no chunk at all, so a flat segment at the segment's own first rank
+    // is the only thing left to write - and it keeps the search window on the
+    // segment instead of propagating a NaN.
+    let intercept = intercept.trunc();
+    if intercept.is_finite() && (0.0..=u32::MAX as f64).contains(&intercept) {
+        PgmFloatSegment {
+            key,
+            slope: K::narrow_slope(slope),
+            intercept: intercept as u32,
+        }
+    } else {
+        PgmFloatSegment {
+            key,
+            slope: 0.0,
+            intercept: cs.first_y as u32,
+        }
+    }
+}
+
+/// `internal::make_segmentation(n, start, end, epsilon, in, out)` for a
+/// floating-point key. The duplicate-run adjustment maps `nextafter(x, +inf)`
+/// (not `x + 1`) to the run's rank, and the closing point is the next
+/// representable key after the last one (`piecewise_linear_model.hpp:353-398`).
+fn make_segmentation_float<K: FloatKey>(
+    n: usize,
+    start: usize,
+    end: usize,
+    epsilon: u64,
+    input: &dyn Fn(usize) -> K,
+    out: &mut dyn FnMut(CanonicalFloatSegment<K>),
+) -> usize {
+    let mut c = 0usize;
+    let mut model = FloatModel::new(epsilon);
+
+    fn add_point<K: FloatKey>(
+        model: &mut FloatModel<K>,
+        out: &mut dyn FnMut(CanonicalFloatSegment<K>),
+        c: &mut usize,
+        x: K,
+        y: u64,
+    ) {
+        if !model.add_point(x, y) {
+            out(model.get_segment());
+            model.add_point(x, y);
+            *c += 1;
+        }
+    }
+
+    add_point(&mut model, out, &mut c, input(start), start as u64);
+    for i in start + 1..end - 1 {
+        if input(i) == input(i - 1) {
+            // At the end of a run of duplicate keys `x` such that
+            // `nextafter(x, +inf) != in(i + 1)`, map the keys in between to
+            // rank `i`.
+            let next = input(i).next_after();
+            if next < input(i + 1) {
+                add_point(&mut model, out, &mut c, next, i as u64);
+            }
+        } else {
+            add_point(&mut model, out, &mut c, input(i), i as u64);
+        }
+    }
+    if end >= start + 2 && input(end - 1) != input(end - 2) {
+        add_point(&mut model, out, &mut c, input(end - 1), (end - 1) as u64);
+    }
+    if end == n {
+        // Ensure values greater than the last one are mapped to `n`.
+        add_point(&mut model, out, &mut c, input(n - 1).next_after(), n as u64);
+    }
+
+    out(model.get_segment());
+    c + 1
+}
+
+/// A multi-level PGM over ascending floating-point keys, exactly as
+/// `PGMIndex<K, 64, 4, Floating>`.
+#[derive(Debug)]
+struct PgmFloat<K> {
+    n: u32,
+    first_key: K,
+    segments: Vec<PgmFloatSegment<K>>,
+    levels_offsets: Vec<u64>,
+}
+
+impl<K: FloatKey> PgmFloat<K> {
+    fn build(keys: &[K]) -> Self {
+        if keys.is_empty() {
+            // `PGMIndex::build` returns before pushing any segment or level.
+            return Self {
+                n: 0,
+                first_key: K::from_f64(0.0),
+                segments: Vec::new(),
+                levels_offsets: Vec::new(),
+            };
+        }
+        // `key_after_last`: the reference always takes the next representable
+        // key after the *input's* last key, at every level (`pgm_index.hpp:107`).
+        let key_after_last = keys[keys.len() - 1].next_after();
+        let mut segments = Vec::new();
+        let mut levels_offsets = vec![0u64];
+
+        let bottom = |i: usize| keys[i];
+        let mut last_n = Self::build_level(
+            &mut segments,
+            keys.len(),
+            PGM_EPSILON,
+            &bottom,
+            key_after_last,
+        );
+        levels_offsets.push(segments.len() as u64);
+
+        while PGM_EPSILON_RECURSIVE > 0 && last_n > 1 {
+            let offset = levels_offsets[levels_offsets.len() - 2] as usize;
+            let level_keys: Vec<K> = (0..last_n).map(|i| segments[offset + i].key).collect();
+            let input = |i: usize| level_keys[i];
+            last_n = Self::build_level(
+                &mut segments,
+                last_n,
+                PGM_EPSILON_RECURSIVE,
+                &input,
+                key_after_last,
+            );
+            levels_offsets.push(segments.len() as u64);
+        }
+
+        Self {
+            n: keys.len() as u32,
+            first_key: keys[0],
+            segments,
+            levels_offsets,
+        }
+    }
+
+    /// `PGMIndex::build`'s `build_level` lambda (`pgm_index.hpp:102`). The
+    /// floating-point branch probes with the next representable key instead of
+    /// `sentinel - 1`, which is `+inf` here: `size_t(+inf)` is undefined and
+    /// would make the segment count compiler-dependent.
+    fn build_level(
+        segments: &mut Vec<PgmFloatSegment<K>>,
+        last_n: usize,
+        epsilon: u64,
+        input: &dyn Fn(usize) -> K,
+        key_after_last: K,
+    ) -> usize {
+        let mut n_segments =
+            make_segmentation_float(last_n, 0, last_n, epsilon, input, &mut |cs| {
+                segments.push(float_segment_from_canonical(&cs));
+            });
+        let last = *segments.last().expect("at least one segment");
+        if last.key == K::SENTINEL {
+            n_segments -= 1;
+        } else {
+            if last.approx(key_after_last) < last_n as u64 {
+                // Ensure keys > the last one are mapped to `last_n`.
+                segments.push(PgmFloatSegment {
+                    key: key_after_last,
+                    slope: 0.0,
+                    intercept: last_n as u32,
+                });
+            }
+            segments.push(PgmFloatSegment {
+                key: K::SENTINEL,
+                slope: 0.0,
+                intercept: last_n as u32,
+            });
+        }
+        n_segments
+    }
+
+    fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&self.n.to_le_bytes());
+        self.first_key.push_le(&mut out);
+        out.extend_from_slice(&(self.segments.len() as u32).to_le_bytes());
+        for s in &self.segments {
+            s.key.push_le(&mut out);
+            K::push_slope(s.slope, &mut out);
+            out.extend_from_slice(&s.intercept.to_le_bytes());
+        }
+        out.extend_from_slice(&(self.levels_offsets.len() as u32).to_le_bytes());
+        for offset in &self.levels_offsets {
+            out.extend_from_slice(&offset.to_le_bytes());
+        }
+        out
     }
 }
 
@@ -752,7 +1514,11 @@ impl<X: IntegralKey> Pgm<X> {
         if self.segments.is_empty() || self.levels_offsets.len() < 2 {
             return (0, 0, 0);
         }
-        let k = if key >= self.first_key { key } else { self.first_key };
+        let k = if key >= self.first_key {
+            key
+        } else {
+            self.first_key
+        };
         let it = self.segment_for_key(k);
         let next_intercept = if it + 1 < self.segments.len() {
             self.segments[it + 1].intercept as u64
@@ -884,11 +1650,11 @@ pub fn write_secondary_segment(path: &Path, entries: &[(u64, u32)]) -> Result<()
 /// Writes one secondary-index chunk with `kind`-sized keys; `entries` must be
 /// sorted by [`Key::order`].
 ///
-/// An integral chunk (`U64`, `I32`, `I64`) carries the reference's own PGM fit:
-/// over an integral key that fit is exact integer arithmetic, so it is
-/// byte-reproducible. A `F32`/`F64` chunk stores the raw IEEE bit pattern of
-/// each key and a flat PGM tail (see the module comment): the framing is the
-/// reference's, the model is not its fit.
+/// Every kind carries the reference's own PGM fit: exact integer arithmetic
+/// over an integral key, `double` arithmetic over a floating-point one, so the
+/// file is byte-reproducible for all of them. A `F32`/`F64` chunk stores the
+/// raw IEEE bit pattern of each key, which is the reference's
+/// `KeepOrderedSelf`.
 pub fn write_secondary_segment_typed(
     path: &Path,
     kind: KeyKind,
@@ -900,21 +1666,13 @@ pub fn write_secondary_segment_typed(
                 .iter()
                 .map(|(key, off)| (u64::from_key(*key), *off))
                 .collect();
-            return write_secondary_segment(path, &entries);
+            write_secondary_segment(path, &entries)
         }
-        KeyKind::I32 => return write_integral_segment::<i32>(path, entries),
-        KeyKind::I64 => return write_integral_segment::<i64>(path, entries),
-        KeyKind::F32 | KeyKind::F64 => {}
+        KeyKind::I32 => write_integral_segment::<i32>(path, entries),
+        KeyKind::I64 => write_integral_segment::<i64>(path, entries),
+        KeyKind::F32 => write_float_segment::<f32>(path, entries),
+        KeyKind::F64 => write_float_segment::<f64>(path, entries),
     }
-    let mut out = Vec::with_capacity(entries.len() * (kind.key_width() + 4) + 64);
-    for (key, _) in entries {
-        out.extend_from_slice(&key.to_le_bytes_in(kind));
-    }
-    for (_, off) in entries {
-        out.extend_from_slice(&off.to_le_bytes());
-    }
-    out.extend_from_slice(&flat_tail(kind, entries));
-    write_chunk(path, &out)
 }
 
 /// Writes an integral-key chunk: `[key][offset]…` followed by the reference's
@@ -936,58 +1694,31 @@ fn write_integral_segment<X: IntegralKey>(
     write_chunk(path, &out)
 }
 
+/// Writes a floating-point chunk: the raw `K` keys, their offsets and the
+/// reference's own PGM tail over those keys.
+fn write_float_segment<K: FloatKey>(
+    path: &Path,
+    entries: &[(Key, u32)],
+) -> Result<(), FormatError> {
+    let keys: Vec<K> = entries.iter().map(|(key, _)| K::from_key(*key)).collect();
+    let pgm = PgmFloat::<K>::build(&keys);
+    let mut out = Vec::with_capacity(entries.len() * (std::mem::size_of::<K>() + 4) + 64);
+    for key in &keys {
+        key.push_le(&mut out);
+    }
+    for (_, off) in entries {
+        out.extend_from_slice(&off.to_le_bytes());
+    }
+    out.extend_from_slice(&pgm.encode());
+    write_chunk(path, &out)
+}
+
 fn write_chunk(path: &Path, out: &[u8]) -> Result<(), FormatError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| FormatError::Io(format!("{}: {e}", parent.display())))?;
     }
     std::fs::write(path, out).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
-}
-
-/// A flat, exact `PGMWithExtraFunction<K>::Save` tail for a typed chunk: one
-/// segment per `PGM_EPSILON` keys with `slope = 0`, so the model predicts the
-/// first index of the segment and the reference's `[pos - 64, pos + 64]` window
-/// still covers every key of it. Appended: the reference's sentinel
-/// `{key: K::MAX, slope: 0, intercept: n}`.
-///
-/// `K::MAX` (`+inf`) is not `u64::MAX`: a float key may legitimately be
-/// `f32::MAX`/`f64::MAX`, so only infinity sorts past every stored key.
-fn flat_tail(kind: KeyKind, entries: &[(Key, u32)]) -> Vec<u8> {
-    let n = entries.len();
-    let mut segments: Vec<(Key, u32)> = Vec::new();
-    let mut start = 0usize;
-    while start < n {
-        segments.push((entries[start].0, start as u32));
-        start += PGM_EPSILON as usize;
-    }
-    // The reference's sentinel: any key past the last maps to `n`.
-    let sentinel = match kind {
-        KeyKind::I32 => Key::I32(i32::MAX),
-        KeyKind::I64 => Key::I64(i64::MAX),
-        KeyKind::F32 | KeyKind::F64 | KeyKind::U64 => Key::F64(f64::INFINITY),
-    };
-    segments.push((sentinel, n as u32));
-
-    let mut out = Vec::new();
-    // `PGMWithExtraFunction::Save` order: `n`, `first_key`, the segment count,
-    // the segments, then the level table. `K` is the key type and `Floating`
-    // is `double` only when `K` is `double` (`secondary_index_pgm.cppm:33-45`).
-    out.extend_from_slice(&(n as u32).to_le_bytes());
-    let first = entries.first().map(|(key, _)| *key).unwrap_or(Key::U64(0));
-    out.extend_from_slice(&first.to_le_bytes_in(kind));
-    out.extend_from_slice(&(segments.len() as u32).to_le_bytes());
-    for (key, intercept) in &segments {
-        out.extend_from_slice(&key.to_le_bytes_in(kind));
-        match kind {
-            KeyKind::F64 => out.extend_from_slice(&0.0f64.to_bits().to_le_bytes()),
-            _ => out.extend_from_slice(&0.0f32.to_bits().to_le_bytes()),
-        }
-        out.extend_from_slice(&intercept.to_le_bytes());
-    }
-    out.extend_from_slice(&2u32.to_le_bytes());
-    out.extend_from_slice(&0u64.to_le_bytes());
-    out.extend_from_slice(&(segments.len() as u64).to_le_bytes());
-    out
 }
 
 /// Structurally validates a `PGMWithExtraFunction<K>::Save` tail at `at`
@@ -1285,6 +2016,121 @@ mod tests {
         assert_eq!(pgm.encode(), CPP_QUADRATIC_TAIL);
     }
 
+    /// The packed `Segment` array of a floating-point index, i.e. what the
+    /// reference's `PGMIndex::segments` holds (`#pragma pack(1)`).
+    fn float_segment_bytes<K: FloatKey>(pgm: &PgmFloat<K>) -> Vec<u8> {
+        let mut out = Vec::new();
+        for s in &pgm.segments {
+            s.key.push_le(&mut out);
+            K::push_slope(s.slope, &mut out);
+            out.extend_from_slice(&s.intercept.to_le_bytes());
+        }
+        out
+    }
+
+    /// `0, 10, …, 990` for `FLOAT`, pinned by the reference's
+    /// `TestPGMModel.LinearFloatKeys` (`src/unit_test/storage/secondary_index/
+    /// test_pgm_ut.cpp`): the fit is not the ideal line, so the intercept is
+    /// 31 rather than 0 and the guard key is `nextafter(990, +inf)`.
+    ///
+    /// `Segment` is `{f32, f32, u32}` = 12 bytes.
+    const CPP_FLOAT_LINEAR_SEGMENTS: &[u8] = &[
+        0x00, 0x00, 0x00, 0x00, 0xe9, 0xa2, 0x8b, 0x3d, 0x1f, 0x00, 0x00, 0x00, //
+        0x01, 0x80, 0x77, 0x44, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, //
+        0x00, 0x00, 0x80, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00,
+    ];
+
+    /// The `DOUBLE` twin, pinned by `TestPGMModel.LinearDoubleKeys`. Its fit
+    /// lands on intercept 32 — the same keys, a different `Floating`.
+    ///
+    /// `Segment` is `{f64, f64, u32}` = 20 bytes.
+    const CPP_DOUBLE_LINEAR_SEGMENTS: &[u8] = &[
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x75, 0xd1, 0x45, 0x17, 0x5d, 0x74, 0xb1,
+        0x3f, 0x20, 0x00, 0x00, 0x00, //
+        0x01, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x8e, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x64, 0x00, 0x00, 0x00, //
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x64, 0x00, 0x00, 0x00,
+    ];
+
+    #[test]
+    fn float_pgm_bytes_match_cpp_reference() {
+        let keys: Vec<f32> = (0..100).map(|i| i as f32 * 10.0).collect();
+        let pgm = PgmFloat::build(&keys);
+        // One fitted segment, the guard segment and the `+inf` sentinel; the
+        // recursive level has a single segment, so there is only one level.
+        assert_eq!(pgm.segments.len(), 3);
+        assert_eq!(pgm.levels_offsets, vec![0, 3]);
+        assert_eq!(float_segment_bytes(&pgm), CPP_FLOAT_LINEAR_SEGMENTS);
+        assert_eq!(pgm.first_key.to_bits(), 0f32.to_bits());
+        // `n`, `first_key`, the segment count, the segments, the level table.
+        assert_eq!(pgm.encode().len(), 4 + 4 + 4 + 3 * 12 + 4 + 2 * 8);
+    }
+
+    #[test]
+    fn double_pgm_bytes_match_cpp_reference() {
+        let keys: Vec<f64> = (0..100).map(|i| i as f64 * 10.0).collect();
+        let pgm = PgmFloat::build(&keys);
+        assert_eq!(pgm.segments.len(), 3);
+        assert_eq!(pgm.levels_offsets, vec![0, 3]);
+        assert_eq!(float_segment_bytes(&pgm), CPP_DOUBLE_LINEAR_SEGMENTS);
+        assert_eq!(pgm.encode().len(), 4 + 8 + 4 + 3 * 20 + 4 + 2 * 8);
+    }
+
+    /// The same `FLOAT` keys truncated to 65 rows, a length at which the fit is
+    /// sensitive to the reference's FMA contraction: the shipped `-O3` build
+    /// (`-ffp-contract=on`) reports intercept 31, a `-ffp-contract=off` build
+    /// 32. `TestPGMModel` does not cover this shape, so these bytes were taken
+    /// from the reference build itself.
+    ///
+    /// `Segment` is `{f32, f32, u32}` = 12 bytes.
+    const CPP_FLOAT_LINEAR_CONTRACTED_SEGMENTS: &[u8] = &[
+        0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x50, 0x3d, 0x1f, 0x00, 0x00, 0x00, //
+        0x01, 0x00, 0x20, 0x44, 0x00, 0x00, 0x00, 0x00, 0x41, 0x00, 0x00, 0x00, //
+        0x00, 0x00, 0x80, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x41, 0x00, 0x00, 0x00,
+    ];
+
+    #[test]
+    fn float_intercept_matches_contracted_reference_fit() {
+        let keys: Vec<f32> = (0..65).map(|i| i as f32 * 10.0).collect();
+        let pgm = PgmFloat::build(&keys);
+        assert_eq!(pgm.segments.len(), 3);
+        assert_eq!(
+            float_segment_bytes(&pgm),
+            CPP_FLOAT_LINEAR_CONTRACTED_SEGMENTS
+        );
+        assert_eq!(pgm.segments[0].intercept, 31);
+    }
+
+    /// Keys at a magnitude where `last + 1` would round back to `last`: the
+    /// guard segment's key must be the next *representable* key, otherwise it
+    /// is unreachable and the model carries a dead entry
+    /// (`TestPGMModel.GuardKeyFollowsLastKey`).
+    #[test]
+    fn float_guard_key_follows_last_key() {
+        let f32_keys: Vec<f32> = (0..100).map(|i| 1e30f32 + i as f32 * 1e24f32).collect();
+        let pgm = PgmFloat::build(&f32_keys);
+        assert!(pgm.segments.len() >= 3);
+        for pair in pgm.segments.windows(2) {
+            assert!(pair[0].key < pair[1].key);
+        }
+        assert_eq!(
+            pgm.segments[pgm.segments.len() - 2].key,
+            next_up_f32(1e30f32 + 99.0 * 1e24f32)
+        );
+
+        let f64_keys: Vec<f64> = (0..100).map(|i| 1e300f64 + i as f64 * 1e285f64).collect();
+        let pgm = PgmFloat::build(&f64_keys);
+        assert!(pgm.segments.len() >= 3);
+        for pair in pgm.segments.windows(2) {
+            assert!(pair[0].key < pair[1].key);
+        }
+        assert_eq!(
+            pgm.segments[pgm.segments.len() - 2].key,
+            next_up_f64(1e300f64 + 99.0 * 1e285f64)
+        );
+    }
+
     #[test]
     fn pgm_lookup_matches_binary_search() {
         let dir = tempfile::tempdir().unwrap();
@@ -1475,8 +2321,15 @@ mod tests {
             &bytes[tail_at + 4..tail_at + 8],
             &(-3.5f32).to_bits().to_le_bytes()[..]
         );
-        // 1 segment for the 4 keys + the sentinel, 12 bytes each; two levels.
-        assert_eq!(bytes.len(), tail_at + 4 + 4 + 4 + 2 * 12 + 4 + 2 * 8);
+        // `fitted segments, a guard segment for keys after the last one, then
+        // the +inf sentinel`, 12 bytes each.
+        let seg_count =
+            u32::from_le_bytes(bytes[tail_at + 8..tail_at + 12].try_into().unwrap()) as usize;
+        assert_eq!(
+            bytes.len(),
+            tail_at + 4 + 4 + 4 + seg_count * 12 + 4 + 2 * 8
+        );
+        assert!(seg_count >= 2);
 
         let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F32).unwrap();
         assert_eq!(reader.len(), n);
@@ -1509,8 +2362,14 @@ mod tests {
         assert_eq!(&bytes[..n * 8], &keys[..]);
         let tail_at = n * 8 + n * 4;
         assert_eq!(&bytes[tail_at..tail_at + 4], &(n as u32).to_le_bytes()[..]);
-        // 1 segment + sentinel, 20 bytes each (`#pragma pack(1)`: no padding).
-        assert_eq!(bytes.len(), tail_at + 4 + 8 + 4 + 2 * 20 + 4 + 2 * 8);
+        // 20 bytes each (`#pragma pack(1)`: no padding).
+        let seg_count =
+            u32::from_le_bytes(bytes[tail_at + 12..tail_at + 16].try_into().unwrap()) as usize;
+        assert_eq!(
+            bytes.len(),
+            tail_at + 4 + 8 + 4 + seg_count * 20 + 4 + 2 * 8
+        );
+        assert!(seg_count >= 2);
 
         let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F64).unwrap();
         assert_eq!(reader.len(), n);

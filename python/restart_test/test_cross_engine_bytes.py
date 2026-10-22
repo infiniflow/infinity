@@ -13,9 +13,9 @@ patterns counted (see `test_the_reference_is_deterministic_where_the_test_assume
 
 * **Deterministic** — the block columns (`.col`), the variable-length outline
   (`col_*_out`), the full-text chunk (`.dic`/`.pos`/`.len`), the sparse (BMP)
-  index chunk and the integral-key secondary index chunk. The reference
-  produces the same bytes on every run, so the two engines must too: **byte for
-  byte identical**. This is the strong signal.
+  index chunk and every secondary index chunk (integral, fixed and floating
+  point keys). The reference produces the same bytes on every run, so the two
+  engines must too: **byte for byte identical**. This is the strong signal.
   The data set is `ROWS` rows (200) with one block: the reference's index chunk
   *boundaries* are a scheduling outcome (its dump runs on a worker thread), so
   they can only be compared where they are stable - one block. The block layer
@@ -24,30 +24,23 @@ patterns counted (see `test_the_reference_is_deterministic_where_the_test_assume
   The sparse chunk is in this class because the order of a term's rows inside a
   block is defined: the reference sorts the block's `(term, offset, value)`
   triples with a **stable** sort on the term id (`ToBlockFwd`,
-  `bmp_fwd.cppm:312`), so a term's rows stay in document order. The
-  integral-key secondary chunk is here because the reference's PGM fit over a
-  u64 key is pure `__int128` arithmetic (`piecewise_linear_model.hpp:249`, the
-  integral branch), with a `u64::MAX` sentinel rather than infinity.
+  `bmp_fwd.cppm:312`), so a term's rows stay in document order. The secondary
+  chunks are here because the reference's PGM fit is reproducible: pure
+  `__int128` arithmetic over an integral key (`piecewise_linear_model.hpp:249`)
+  and pure `double` arithmetic over a floating-point one (`LargeSigned<T>` is
+  `double` for a floating `T`, `piecewise_linear_model.hpp:40`), with a
+  well-defined guard key at the top of every level (`pgm_index.hpp:104-130`).
 * **Deterministic modulo a timestamp** — the block `version` file: the
   reference records the commit ts of the append that filled the block, the port
   records its own mirror ts. The layout must match; the ts must not be compared.
-* **Not byte comparable — compared by content** — two *models* that the
-  reference itself does not reproduce across its own builds:
-  - the HNSW chunk's **graph**: the reference builds it with a
-    `thread_local std::mt19937` (`hnsw_alg.cppm:107`), so which thread
-    inserts which vector — and therefore which node gets which level — is up
-    to the scheduler. Measured: five runs of the reference on 5000 rows
-    produced **five different** HNSW chunks, while every other file was
-    byte-stable.
-  - the **float/double**-key secondary index chunk's **PGM model**: the
-    reference fits it in x87 80-bit `long double` and decides its segment count
-    with an undefined conversion (`size_t(inf)`). Measured: the same keys give
-    two segments under clang++-20 and three under g++, and an f64 fit differs
-    from the 80-bit one in 18 of 51 random float key sets. See the assertion
-    in the test body for the details.
+* **Not byte comparable — compared by content** — the HNSW chunk's **graph**:
+  the reference builds it with a `thread_local std::mt19937`
+  (`hnsw_alg.cppm:107`), so which thread inserts which vector — and therefore
+  which node gets which level — is up to the scheduler. Measured: five runs of
+  the reference on 5000 rows produced **five different** HNSW chunks, while
+  every other file was byte-stable.
 
-  What must match is the **postings** — the vectors and labels, the ordered
-  keys and row offsets, the terms with their rows and scores — because that is
+  What must match is the **postings** — the vectors and labels — because that is
   what the index *says*. The postings are compared by decoding both chunks.
 * **Not comparable at all** — the RocksDB `catalog/` directory and the `wal/`
   directory. Both carry session ids, timestamps and LSNs; the reference is
@@ -55,12 +48,11 @@ patterns counted (see `test_the_reference_is_deterministic_where_the_test_assume
 
 The test therefore asserts:
 1. every deterministic file is byte identical — including the sparse index
-   chunk and the integral-key secondary index chunk;
+   chunk and every secondary index chunk;
 2. the `version` file is identical once its ts is normalized;
-3. the two index chunks that carry a build-dependent model — the HNSW graph
-   and the float/double secondary PGM fit — still have identical **postings**
-   (decoded), and the rest of the HNSW chunk (header, vectors, labels) is byte
-   identical;
+3. the index chunk that carries a build-dependent model — the HNSW graph —
+   still has identical **postings** (decoded), and the rest of the HNSW chunk
+   (header, vectors, labels) is byte identical;
 4. the catalog's *logical* content (the key/value pairs the reference sees
    through `SHOW CATALOG 'all'`) is identical, modulo the ts the reference
    stamps on the records it wrote itself;
@@ -118,6 +110,13 @@ INDEX_KINDS = {
 # per-engine directory so the two runs cannot see each other's files.
 ROOT = os.environ.get("INFINITY_BYTES_ROOT", "/var/infinity/bytes")
 
+# Object storage (`storage_type = "minio"`). Unset means the round-trip test is
+# skipped: it needs a live S3 endpoint, which the byte gates do not.
+MINIO_URL = os.environ.get("INFINITY_MINIO_URL", "")
+MINIO_BUCKET = os.environ.get("INFINITY_MINIO_BUCKET_PREFIX", "infinity-bytes")
+MINIO_ACCESS_KEY = os.environ.get("INFINITY_MINIO_ACCESS_KEY", "")
+MINIO_SECRET_KEY = os.environ.get("INFINITY_MINIO_SECRET_KEY", "")
+
 
 def _config(root, engine, pg_port):
     """A config for one engine, rooted at `root`.
@@ -168,6 +167,22 @@ checkpoint_interval = "0s"
 """
 
 
+def _dump_indexes(t, names):
+    """Dump each index's memory tail explicitly, in creation order.
+
+    The reference's dump is otherwise driven by its memory quota and runs on a
+    worker thread: the first crossing proposes the largest index, whose size is
+    then added to `proposed_dump_size_`, and with several large indexes the
+    quota is never crossed again - measured on the six-index table, only one
+    index (the whole 200 rows in it) ever landed and the other five never
+    appeared, 60 s after the insert. `DumpIndex` is the synchronous command
+    (`Infinity::DumpIndex` -> `NewTxn::DumpMemIndex`), so the chunks the test
+    compares are the dumps it asked for rather than a scheduling outcome.
+    """
+    for name in names:
+        t.dump_index(name)
+
+
 def _seed(conn, row_count=ROWS):
     """The same table, indexes and rows for both engines."""
     db = conn.get_database("default_db")
@@ -215,15 +230,7 @@ def _seed(conn, row_count=ROWS):
     for start in range(0, len(rows), 8192):
         t.insert(rows[start : start + 8192])
     conn.flush_data()
-    # The reference dumps its memory indexes asynchronously, and only when the
-    # index-memory quota (`memindex_memory_quota`, 1KB here) is exceeded - and
-    # only one non-EMVB index per round (`MemIndexTracer::MakeDumpTask`). At a
-    # few hundred rows the quota is crossed repeatedly and every index lands;
-    # at a few thousand rows the growth is one-off, so only the HNSW index
-    # (the EMVB one) is dumped and the other four chunks never appear. A fixed
-    # sleep is therefore a race. `optimize` takes the reference's OptimizeIndex
-    # path, which dumps them deterministically.
-    t.optimize()
+    _dump_indexes(t, ["ft", "vec_idx", "sec", "score_idx", "sp_idx"])
 
     time.sleep(2)
 
@@ -546,9 +553,19 @@ def _check_index(cpp, rust, index_id, kind, failures):
             for part in ("header", "vectors", "labels"):
                 if regions_a[part] != regions_b[part]:
                     failures.append(f"idx_{index_id}/{name}: {part} differ")
-        elif kind in ("secondary-f32", "secondary-f64", "secondary-u32", "secondary-i64"):
-            key_width = {"secondary-f32": 4, "secondary-u32": 4, "secondary-i64": 8, "secondary-f64": 8}[kind]
-            floating_width = 8 if kind == "secondary-f64" else 4
+        elif kind in ("secondary-f32", "secondary-f64"):
+            # Deterministic: the raw keys, the offsets and the PGM fit are all
+            # derived from the rows (`PgmFloat` mirrors `PGMIndex<K, 64, 4,
+            # Floating>` in `double`).
+            if a != b:
+                failures.append(
+                    f"idx_{index_id}/{name}: "
+                    f"cpp {hashlib.md5(a).hexdigest()} ({len(a)} B) != "
+                    f"rust {hashlib.md5(b).hexdigest()} ({len(b)} B)"
+                )
+        elif kind in ("secondary-u32", "secondary-i64"):
+            key_width = {"secondary-u32": 4, "secondary-i64": 8}[kind]
+            floating_width = 4
             n_a = _secondary_chunk_rows(a, key_width, floating_width)
             n_b = _secondary_chunk_rows(b, key_width, floating_width)
             if n_a != n_b:
@@ -823,9 +840,11 @@ def _normalize_version(blob):
     """The block `version` file without its commit ts.
 
     Layout: `[u16 create_size]` then, per create, `[u64 create_ts][i64 rows]`,
-    then `[u16 capacity]` and one u64 per slot. Only the `create_ts` differs
-    between the engines (the reference stamps the append's commit ts, the port
-    its mirror ts), so it is replaced by zero.
+    then `[u16 capacity]` and one u64 per slot. The ts values differ between
+    the engines - the reference stamps each append's and each delete's commit
+    ts, the port its mirror ts - while *which* creates and *which* slots are
+    marked is derived from the rows. So every create ts becomes zero and every
+    non-zero delete ts becomes one.
     """
     out = bytearray(blob)
     pos = 0
@@ -834,6 +853,12 @@ def _normalize_version(blob):
     for _ in range(create_size):
         struct.pack_into("<Q", out, pos, 0)  # the create ts
         pos += 16
+    capacity = struct.unpack_from("<H", out, pos)[0]
+    pos += 2
+    for slot in range(capacity):
+        at = pos + slot * 8
+        if struct.unpack_from("<Q", out, at)[0]:
+            struct.pack_into("<Q", out, at, 1)
     return bytes(out)
 
 
@@ -1109,7 +1134,7 @@ def _table_records(pairs, table_dir, table):
     return out
 
 
-def _normalize_catalog(pairs, zero_size_indexes=()):
+def _normalize_catalog(pairs, zero_size_indexes=(), drop_chunk_info=False):
     """The catalog's records, with the ts taken out of the keys and values.
 
     `index_size` is also taken out of the chunk records of the indexes in
@@ -1121,11 +1146,20 @@ def _normalize_catalog(pairs, zero_size_indexes=()):
     graph itself - and a reader treats zero as "use the file's own size"
     (`HnswFileWorker::HnswFileWorker`, `hnsw_file_worker_impl.cpp:55`), so the
     port writes zero.
+
+    `drop_chunk_info` removes the `…|chunk_info` records instead: a chunk's
+    `base_row_id`/`row_count` are the *boundaries* the dump happened to land
+    on, and those are a scheduling outcome (see
+    `test_the_chunk_boundaries_are_timing_dependent`). A test that wants them
+    checked must assert the tiling invariant itself rather than compare this
+    record to the reference's (`_assert_chunk_tiling`).
     """
     out = {}
     for key, value in pairs.items():
         key = _normalize_catalog_key(key)
         value = _normalize_catalog_value(value)
+        if drop_chunk_info and key.endswith("|chunk_info"):
+            continue
         if zero_size_indexes and key.endswith("|chunk_info"):
             parts = key.split("|")
             # `idx_chunk|{db}|{table}|{index}|{segment}|{chunk}|chunk_info`
@@ -1140,6 +1174,39 @@ def _normalize_catalog(pairs, zero_size_indexes=()):
                         value = json.dumps(record, sort_keys=True, separators=(",", ":"))
         out[key] = value
     return out
+
+
+def _assert_chunk_tiling(pairs, index_ids, expected_rows, engine):
+    """Every index's chunk infos tile `[0, expected_rows)` exactly once.
+
+    Chunk *boundaries* are a scheduling outcome (see
+    `test_the_chunk_boundaries_are_timing_dependent`), so two engines may split
+    the same rows 100+100+10 and 210. What both must satisfy is the invariant a
+    reader relies on: chunk `k`'s `base_row_id` equals the end of chunk `k-1`,
+    starting at zero, and the last one ends at the table's row count.
+    """
+    coverage = {}
+    for key, value in pairs.items():
+        if not key.startswith("idx_chunk|") or not key.endswith("|chunk_info"):
+            continue
+        parts = key.split("|")
+        # `idx_chunk|{db}|{table}|{index}|{segment}|{chunk}|chunk_info`
+        record = json.loads(value)
+        coverage.setdefault(int(parts[3]), []).append(
+            (record["base_row_id"], record["row_count"])
+        )
+    assert set(coverage) == set(index_ids), (
+        f"{engine}: indexes with chunks {sorted(coverage)}, expected {sorted(index_ids)}"
+    )
+    for index_id, spans in coverage.items():
+        spans.sort()
+        covered = 0
+        for base, rows in spans:
+            assert base == covered, f"{engine} idx_{index_id}: gap at {covered}: {spans}"
+            covered += rows
+        assert covered == expected_rows, (
+            f"{engine} idx_{index_id}: covers {covered} of {expected_rows} rows"
+        )
 
 
 @pytest.mark.skipif(
@@ -1279,6 +1346,36 @@ def test_the_reference_is_deterministic_where_the_test_assumes_it():
     ), f"the reference is not deterministic here: {varying}"
 
 
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_port_is_deterministic_too():
+    """The port's half of the same classification, measured on its own.
+
+    The byte gate compares two engines, so it can only catch a drift the two
+    do *differently*: a value that both produce from a clock, a hash map's
+    iteration order or a thread schedule would agree today and disagree
+    tomorrow. This runs the port three times on the same input and requires
+    every file under `data/` to come out identical - including the HNSW
+    chunk, whose graph the reference itself cannot reproduce (the port's
+    build is a plain insertion in row order, with no randomness to schedule).
+    """
+    roots = []
+    for i in range(3):
+        root = os.path.join(ROOT, f"port_determinism{i}")
+        _run_engine("rust", root, 5432 + i, row_count=DET_ROWS)
+        roots.append(root)
+
+    digests = [_files(root) for root in roots]
+    names = sorted(set().union(*[set(d) for d in digests]))
+    varying = [
+        name
+        for name in names
+        if len({digest.get(name) for digest in digests}) > 1
+    ]
+    assert not varying, f"the port is not deterministic here: {varying}"
+
+
 BLOCK_TABLE = "test_cross_engine_blocks"
 BLOCK_COLUMNS = {
     "id": {"type": "int"},
@@ -1372,6 +1469,7 @@ def _phase_initial(conn):
     t.create_index("ft", index.IndexInfo("title", index.IndexType.FullText))
     t.insert(_rows(0, 100))
     conn.flush_data()
+    _dump_indexes(t, ["sec", "ft"])
     time.sleep(1)
 
 
@@ -1382,6 +1480,7 @@ def _phase_mutate(conn):
     t.delete("id < 20")
     t.update("id >= 50 and id < 60", {"score": 999.5})
     conn.flush_data()
+    _dump_indexes(t, ["sec", "ft"])
     time.sleep(2)
 
 
@@ -1391,22 +1490,19 @@ def _phase_mutate(conn):
 @pytest.mark.skipif(
     not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
 )
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "the port's block mirror does not model appends: after 100 + 100 rows "
-        "and 10 updated rows the reference's `version` holds three creates "
-        "(100/200/210 rows, capacity 1843200) while the port writes one "
-        "(180 rows, capacity 8192), and the block columns differ. Tracked in "
-        "docs/FORMAT_EQUIVALENCE_TESTS.md"
-    ),
-)
 def test_the_bytes_after_deletes_updates_and_a_restart():
     """Append, delete and update in a second run over the same directory.
 
     Deletes live in the catalog (a bitmap), not in `data/`, and an update is a
     delete plus an appended row, so the block files must still agree byte for
     byte after both - and the two engines must answer the same queries.
+
+    The block is append-only, which is what makes this a real check: a deleted
+    row's cells stay in the block and only the `version` file's `deleted_`
+    array hides it, and an UPDATE's rewritten row sits at the end with a fresh
+    id. So the block holds 210 rows (100 + 100 appended + 10 rewritten) and
+    the `version` file three creates (100/200/210) with 30 marked slots - 20
+    from the DELETE and 10 from the UPDATE that replaced them.
     """
     roots = {}
     for engine, port in (("cpp", 5432), ("rust", 5433)):
@@ -1434,15 +1530,19 @@ def test_the_bytes_after_deletes_updates_and_a_restart():
     )
 
     # The catalog: the same records once the ts is taken out, including the
-    # delete bitmap.
-    cpp_catalog = _normalize_catalog(
-        _table_records(_catalog_pairs(roots["cpp"], 5432), dirs["cpp"], MUTATE_TABLE),
-        {1},
+    # delete bitmap. The chunk infos are left out of the comparison - a chunk's
+    # boundaries are a scheduling outcome, not the format - and the invariant
+    # they must satisfy is asserted instead: the chunks tile the rows.
+    cpp_pairs = _table_records(
+        _catalog_pairs(roots["cpp"], 5432), dirs["cpp"], MUTATE_TABLE
     )
-    rust_catalog = _normalize_catalog(
-        _table_records(_catalog_pairs(roots["rust"], 5433), dirs["rust"], MUTATE_TABLE),
-        {1},
+    rust_pairs = _table_records(
+        _catalog_pairs(roots["rust"], 5433), dirs["rust"], MUTATE_TABLE
     )
+    _assert_chunk_tiling(cpp_pairs, {1, 2}, 210, "cpp")
+    _assert_chunk_tiling(rust_pairs, {1, 2}, 210, "rust")
+    cpp_catalog = _normalize_catalog(cpp_pairs, {1}, drop_chunk_info=True)
+    rust_catalog = _normalize_catalog(rust_pairs, {1}, drop_chunk_info=True)
     assert set(cpp_catalog) == set(rust_catalog), (
         f"only in cpp: {sorted(set(cpp_catalog) - set(rust_catalog))}, "
         f"only in rust: {sorted(set(rust_catalog) - set(cpp_catalog))}"
@@ -1463,15 +1563,15 @@ KIND_COLUMNS = {
     "title": {"type": "varchar"},
     "day": {"type": "date"},
     "vec": {"type": "vector,4,float"},
-    "vec_cos": {"type": "vector,4,float"},
-    "vec_ip": {"type": "vector,4,float"},
 }
-# `idx_<n>` follows this creation order.
+# `idx_<n>` follows this creation order. Three indexes on the **same** vector
+# column: a mem index is per (table, index), so the reference dumps each one
+# independently, and the port has to keep the three chunk sets apart too.
 KIND_INDEXES = {
     1: "ivf",
     2: "hnsw",  # cosine
     3: "hnsw",  # ip
-    4: "fulltext",
+    4: "fulltext",  # chinese analyzer
     5: "secondary-u64",  # INT key
     6: "secondary-u32",  # DATE key
 }
@@ -1485,35 +1585,35 @@ def _seed_kinds(conn):
     t.create_index(
         "cos_idx",
         index.IndexInfo(
-            "vec_cos", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "cosine"}
+            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "cosine"}
         ),
     )
     t.create_index(
         "ip_idx",
         index.IndexInfo(
-            "vec_ip", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "ip"}
+            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "ip"}
         ),
     )
-    t.create_index("ft_idx", index.IndexInfo("title", index.IndexType.FullText))
+    t.create_index(
+        "ft_idx",
+        index.IndexInfo("title", index.IndexType.FullText, {"analyzer": "chinese"}),
+    )
     t.create_index("id_sec", index.IndexInfo("id", index.IndexType.Secondary))
     t.create_index("day_sec", index.IndexInfo("day", index.IndexType.Secondary))
     rows = [
         {
             "id": i,
-            "title": f"alpha beta {i}",
+            "title": f"混合检索数据库 第{i}篇 文档",
             "day": f"2024-{i % 12 + 1:02d}-{i % 28 + 1:02d}",
             "vec": [float(i % 7) / 7.0, 0.25, 0.5, 0.75],
-            "vec_cos": [float(i % 5) / 5.0, 0.5, 0.25, 0.75],
-            "vec_ip": [float(i % 3) / 3.0, 0.75, 0.5, 0.25],
         }
         for i in range(200)
     ]
     t.insert(rows)
     conn.flush_data()
-    # The reference dumps its memory indexes on a worker pool, at most one
-    # non-EMVB index per round (`MemIndexTracer::MakeDumpTask`); `optimize`
-    # takes the deterministic `OptimizeIndex` path instead.
-    t.optimize()
+    # One dump per index, in creation order: the chunk set is then what the
+    # test asked for, not a race with the quota-driven background dump.
+    _dump_indexes(t, ["ivf_idx", "cos_idx", "ip_idx", "ft_idx", "id_sec", "day_sec"])
     time.sleep(2)
 
 
@@ -1529,8 +1629,8 @@ def test_the_index_chunks_match_for_every_index_kind():
     The byte test's table only has one HNSW with the default metric, one
     varchar secondary and a default-analyzer full-text index. Every other kind
     writes its own chunk layout, so each is checked here with the same class
-    rules (and one index per column, since two vector indexes on one column is
-    a combination the reference does not dump reliably).
+    rules: three vector indexes on **one** column, a full-text index with the
+    `chinese` analyzer, and an INT and a DATE secondary key.
     """
     cpp_root = os.path.join(ROOT, "kinds_cpp")
     rust_root = os.path.join(ROOT, "kinds_rust")
@@ -1615,31 +1715,26 @@ def _phase_crash_unflushed(conn):
 
 
 def _count_rows(engine, root, pg_port, table):
-    """Start `engine` on `root` and read `count(*)` through its PG line."""
+    """Start `engine` on `root` and read `count(*)` through its client."""
+    # The directory still carries the *writer's* config: the reference treats
+    # a non-empty `persistence_dir` as "the files live in objects" and would
+    # look each block file up in the KV store (`pm|object|…`), while a
+    # directory written by the port holds real files. Rewrite the config for
+    # the reader, as the byte/content gates do, so both engines open the same
+    # on-disk layout.
+    _write_config(engine, root, pg_port)
     seen = []
 
-    def phase(_conn):
-        out = subprocess.run(
-            [
-                "psql",
-                "-h",
-                "127.0.0.1",
-                "-p",
-                str(pg_port),
-                "-U",
-                "admin",
-                "-d",
-                "default_db",
-                "-c",
-                f"select count(*) from {table}",
-            ],
-            capture_output=True,
-            text=True,
-        ).stdout
-        for line in out.splitlines():
-            line = line.strip()
-            if line.isdigit():
-                seen.append(int(line))
+    def phase(conn):
+        # The reference serves the Postgres wire protocol, the port's CLI only
+        # starts Thrift, so the count goes through the Thrift client both
+        # engines share rather than through `psql`.
+        try:
+            table_handle = conn.get_database("default_db").get_table(table)
+            frame = table_handle.output(["count(*)"]).to_pl()[0]
+            seen.append(int(frame.item()))
+        except Exception:
+            seen.append(None)
 
     _spawn_and_run(engine, root, phase)
     return seen[0] if seen else None
@@ -1650,18 +1745,6 @@ def _count_rows(engine, root, pg_port, table):
 )
 @pytest.mark.skipif(
     not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
-)
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "measured: the reference aborts on startup when the port died with "
-        "unflushed rows - 'Failed to find object for local path "
-        ".../blk_0/version' from MetaTableObject::RestoreTableCache "
-        "(meta_tree_impl.cpp:749). The port keeps its own journal "
-        "(`wal/wal.rust`) and only mirrors a C++-shaped `wal/wal.log`, so the "
-        "reference cannot replay the missing rows. Tracked in "
-        "docs/FORMAT_EQUIVALENCE_TESTS.md"
-    ),
 )
 def test_a_crash_leaves_a_replayable_directory():
     """Write 50 rows, kill -9 without flushing, read them with the other engine.
@@ -1678,6 +1761,137 @@ def test_a_crash_leaves_a_replayable_directory():
         )
         rows = _count_rows(reader, root, port, CRASH_TABLE)
         assert rows == 150, f"{reader} sees {rows} of the 150 rows {writer} wrote"
+
+
+# ---------------------------------------------------------------------------
+# Segments: `COMPACT` moves the rows into a *new* segment id, so a table can
+# hold more than one `seg_{id}/` directory.
+# ---------------------------------------------------------------------------
+
+COMPACT_TABLE = "test_cross_engine_compact"
+COMPACT_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}}
+# Exactly one block: the tail insert below then starts `blk_1` in the
+# reference (which does not compact a single segment) and `blk_0` of a new
+# segment in the port, so the two blocks hold the same 50 rows.
+COMPACT_ROWS = 8192
+COMPACT_TAIL = 50
+
+
+def _phase_compact(conn):
+    """One block of rows, compact, then a tail insert in the next block."""
+    db = conn.get_database("default_db")
+    db.drop_table(COMPACT_TABLE, ConflictType.Ignore)
+    t = db.create_table(COMPACT_TABLE, COMPACT_COLUMNS, ConflictType.Error)
+    t.insert(
+        [{"id": i, "title": f"doc-{i}"} for i in range(COMPACT_ROWS)]
+    )
+    conn.flush_data()
+    time.sleep(1)
+    # The reference only has one segment here and its compaction algorithm
+    # finds nothing to merge, so this is a no-op for it; the port moves the
+    # rows into segment 1 (the next id) and writes them there.
+    t.compact()
+    time.sleep(2)
+    t.insert(
+        [
+            {"id": COMPACT_ROWS + i, "title": f"tail-{i}"}
+            for i in range(COMPACT_TAIL)
+        ]
+    )
+    conn.flush_data()
+    time.sleep(1)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_a_compacted_table_keeps_its_segments_apart():
+    """A row's id carries its segment, and its block lives under that segment.
+
+    Segment ids are handed out by compaction, and the rows move into the new
+    one, so a mirror that writes everything into `seg_0` puts the rows at the
+    wrong ids: the port then restores a second copy of every row from its own
+    blocks on the next start (measured: 500 rows out of 250).
+
+    The reference cannot produce two segments at this scale - its allocator
+    opens the next segment after `DEFAULT_SEGMENT_CAPACITY` (8,388,608) rows
+    and its compaction needs two to merge - so this is covered three ways
+    instead of byte-comparing directory trees: the port's post-compaction
+    segment directory holds the tail block, that block's bytes equal the
+    reference's block for the same rows, and each engine opens the other's
+    directory with the same row count.
+    """
+    roots = {}
+    for writer, reader, port in (("rust", "cpp", 5433), ("cpp", "rust", 5432)):
+        root = _run_phases(
+            writer,
+            os.path.join(ROOT, f"compact_{writer}"),
+            port,
+            [_phase_compact],
+        )
+        roots[writer] = (root, reader, port)
+
+    files = {engine: _files(root) for engine, (root, _, _) in roots.items()}
+    dirs = {engine: _own_table_dir(blobs, len(COMPACT_COLUMNS)) for engine, blobs in files.items()}
+    assert dirs["rust"] and dirs["cpp"], "the compact table was not written"
+
+    def segments(files, table_dir):
+        prefix = table_dir + "/"
+        return sorted(
+            {
+                name[len(prefix) :].split("/")[0]
+                for name in files
+                if name.startswith(prefix)
+                and name[len(prefix) :].startswith("seg_")
+            }
+        )
+
+    assert segments(files["rust"], dirs["rust"]) == ["seg_1", "seg_2"], (
+        f"the port did not move the rows into a new segment: "
+        f"{segments(files['rust'], dirs['rust'])}"
+    )
+    assert segments(files["cpp"], dirs["cpp"]) == ["seg_0"], (
+        f"the reference compacted a single segment: "
+        f"{segments(files['cpp'], dirs['cpp'])}"
+    )
+
+    # The tail block of the port's second segment holds the same 50 rows as the
+    # reference's second block, so its bytes must match (modulo the version ts).
+    # `_compare_data_files` keys off `…/version`, so both sides carry the same
+    # synthetic block prefix.
+    prefix = "seg_x/blk_x/"
+    tail = {
+        prefix + name: blob
+        for name, blob in _under(files["rust"], f"{dirs['rust']}/seg_2/blk_0").items()
+    }
+    cpp_tail = {
+        prefix + name: blob
+        for name, blob in _under(files["cpp"], f"{dirs['cpp']}/seg_0/blk_1").items()
+    }
+    assert set(tail) == set(cpp_tail), (
+        f"the tail block has different files: {sorted(tail)} != {sorted(cpp_tail)}"
+    )
+    failures = _compare_data_files(cpp_tail, tail, {})
+    assert not failures, (
+        "the tail block of a compacted segment differs from the reference:\n  "
+        + "\n  ".join(failures)
+    )
+
+    for writer, (root, reader, port) in roots.items():
+        rows = _count_rows(reader, root, port, COMPACT_TABLE)
+        assert rows == COMPACT_ROWS + COMPACT_TAIL, (
+            f"{reader} sees {rows} of the {COMPACT_ROWS + COMPACT_TAIL} rows "
+            f"{writer} wrote"
+        )
+    # A restart must not restore the block rows a second time at the ids the
+    # old, single-segment mirror would have used.
+    rows = _count_rows("rust", roots["rust"][0], 5433, COMPACT_TABLE)
+    assert rows == COMPACT_ROWS + COMPACT_TAIL, (
+        f"the port sees {rows} rows in its own compacted directory"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1808,11 +2022,12 @@ def _seed_types(conn):
             "c_int16": (i * 101) % 65536 - 32768,
             "c_int": (i * 100003) % 2147483647 - 1073741824,
             "c_int64": (i * 100000000003) % 9223372036854775807 - 4611686018427387904,
-            "c_float": (i % 37) * 0.5 - 9.25,
-            # Multiples of 1/8: exactly representable in the six decimals the
-            # port stores rows with (see the doc's known-limitation note), so
-            # the slot's f64 encoding is still exercised byte for byte.
-            "c_double": (i % 41) / 8.0 - 2.5,
+            # Sevenths and thirds: values that have no exact six-decimal
+            # rendering, so a store that renders rows with `{:.6}` rounds them
+            # and the slot's bits differ from the reference's. The reference
+            # stores the typed value, and so must the port.
+            "c_float": (i % 37) / 3.0 - 9.25,
+            "c_double": (i % 41) / 7.0 - 2.5,
             # Exactly representable halves, so the narrowing is well defined.
             "c_float16": (i % 21) * 0.5 - 5.0,
             "c_bfloat16": (i % 19) * 0.5 - 4.5,
@@ -1877,3 +2092,112 @@ def test_the_columns_match_for_every_type():
         failures
     )
 
+
+
+# ---------------------------------------------------------------------------
+# Object storage (`storage_type = "minio"`): what a restart out of the bucket
+# has to bring back.
+# ---------------------------------------------------------------------------
+
+OBJECT_TABLE = "test_cross_engine_object"
+
+
+def _object_config(root, engine, pg_port, bucket):
+    """`_config` plus the object-store section the reference reads."""
+    base = _config(root, engine, pg_port).replace(
+        "[storage]", '[storage]\nstorage_type = "minio"'
+    )
+    return base + f"""
+[storage.object_storage]
+url = "{MINIO_URL}"
+bucket_name = "{bucket}"
+access_key = "{MINIO_ACCESS_KEY}"
+secret_key = "{MINIO_SECRET_KEY}"
+enable_https = false
+"""
+
+
+def _write_object_config(root, engine, pg_port, bucket):
+    for sub in ("log", "tmp"):
+        os.makedirs(os.path.join(root, sub), exist_ok=True)
+    with open(os.path.join(root, "engine.toml"), "w") as handle:
+        handle.write(_object_config(root, engine, pg_port, bucket))
+
+
+def _phase_object_write(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(OBJECT_TABLE, ConflictType.Ignore)
+    t = db.create_table(OBJECT_TABLE, CRASH_COLUMNS, ConflictType.Error)
+    t.insert([{"id": i, "title": f"doc-{i}"} for i in range(200)])
+    conn.flush_data()
+    # The upload runs at the checkpoint, on the caller's thread, so returning
+    # from `flush_data` means the bucket holds the tree.
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not MINIO_URL, reason="set INFINITY_MINIO_URL to run the object-storage test"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_port_round_trips_through_object_storage():
+    """Write with the bucket bound, wipe the local directory, read it back.
+
+    The port uploads three trees at a checkpoint - `data/` (the C++-format
+    blocks), `catalog/` and `persistence/` (the row store) - and only the first
+    one used to come back, so a directory restored from the bucket had block
+    files that belonged to no table.
+
+    There is no cross-engine half to this: the reference's object mode uploads
+    its catalog (`meta/...`) but `VirtualStore::DownloadObject` has no caller
+    in `src/` - measured, a reference directory whose local files are wiped
+    starts with an empty catalog - and its object *keys* are packed blobs
+    addressed through `pm|object|<path>` records in the KV, not a path tree.
+    See `docs/FORMAT_EQUIVALENCE_TESTS.md` §5.2.7.
+    """
+    root = os.path.join(ROOT, "object_rust")
+    # A bucket per run: a leftover from an earlier run would be restored into
+    # the "empty" directory and the phases below would no longer describe a
+    # write-then-restore round trip.
+    bucket = f"{MINIO_BUCKET}-port-{int(time.time())}"
+    _wait_port_free()
+    shutil.rmtree(root, ignore_errors=True)
+    _write_object_config(root, "rust", 5433, bucket)
+    _spawn_and_run("rust", root, _phase_object_write)
+
+    shutil.rmtree(root, ignore_errors=True)
+    _write_object_config(root, "rust", 5433, bucket)
+
+    seen = []
+
+    def phase(conn):
+        frame = (
+            conn.get_database("default_db")
+            .get_table(OBJECT_TABLE)
+            .output(["count(*)"])
+            .to_pl()[0]
+        )
+        seen.append(int(frame.item()))
+
+    _spawn_and_run("rust", root, phase)
+    assert seen and seen[0] == 200, f"the restored directory holds {seen} rows"
+
+    # A checkpoint *over the restored tree*, then another restore. This is the
+    # path that used to lose data: the sync compared sizes only, and a rotated
+    # RocksDB manifest leaves a 16-byte `CURRENT` whose content still changed,
+    # so the new manifest was uploaded but the object naming the old one stayed
+    # and the old manifest was deleted - an unopenable catalog.
+    def write_more(conn):
+        conn.get_database("default_db").get_table(OBJECT_TABLE).insert(
+            [{"id": 200 + i, "title": f"doc-{200 + i}"} for i in range(50)]
+        )
+        conn.flush_data()
+        time.sleep(2)
+
+    _spawn_and_run("rust", root, write_more)
+
+    shutil.rmtree(root, ignore_errors=True)
+    _write_object_config(root, "rust", 5433, bucket)
+    _spawn_and_run("rust", root, phase)
+    assert seen[-1] == 250, f"after the second checkpoint the bucket holds {seen} rows"
