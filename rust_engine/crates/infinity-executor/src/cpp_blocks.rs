@@ -2668,11 +2668,21 @@ impl Engine {
         // a compacted table (whose rows live in the next segment id) come back
         // at the wrong ids, and the restore then wrote a second copy of every
         // row.
+        // A compaction leaves the source segments' directories in place (the
+        // reference keeps them until `Cleanup`), so the block index still lists
+        // them. A reader must skip them, exactly as the reference skips a
+        // segment whose `drop|seg|` ts is at or below its `begin_ts`.
+        let dropped = self
+            .storage
+            .catalog
+            .cpp_dropped_segments(&db_id.to_string(), &meta.id.to_string())
+            .unwrap_or_default();
         let blocks: Vec<(u32, u16)> = match self.block_index_for(&table) {
             Some(index) => index
                 .lock()
                 .unwrap()
                 .metas()
+                .filter(|m| !dropped.contains(&m.id.segment_id))
                 .map(|m| (m.id.segment_id, m.id.block_id))
                 .collect(),
             None => Vec::new(),

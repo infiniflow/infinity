@@ -524,7 +524,13 @@ fn import_with_index_rollback() {
 
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:569`
 /// (`TestTxnImport.test_insert_and_import`): an insert and an import land in
-/// three segments (`{0,1,2}`).
+/// two segments.
+///
+/// `NewTxn::Import` allocates `ceil(block_cnt / DEFAULT_BLOCK_PER_SEGMENT)`
+/// segments (`new_txn_data_impl.cpp:239`) - one for anything below 1024 blocks,
+/// i.e. below 8,388,608 rows - so a 16384-row import is a **single** segment,
+/// however many blocks it writes. The reference's own fixture shows the same:
+/// its two-block import leaves `{0}`, and the append that follows opens `{1}`.
 #[test]
 fn insert_and_import() {
     let dir = tempdir().unwrap();
@@ -535,8 +541,8 @@ fn insert_and_import() {
     let path = csv(dir.path(), "a.csv", &import_rows());
     copy(&e, "db1.tb1", &path);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 24576);
-    // INSERT stays in segment 0; the 16384-row COPY seals two new segments.
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2]);
+    // INSERT stays in segment 0; the 16384-row COPY seals one new segment.
+    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1]);
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 24576);
     assert_eq!(
         h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 5;"),
