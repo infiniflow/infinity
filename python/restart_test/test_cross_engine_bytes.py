@@ -3389,12 +3389,6 @@ def _wait_for_segment_chunks(root, indexes, segments, timeout=60.0):
     )
 
 
-def _seg_ids(result):
-    data, _, _ = result
-    key = next(k for k in data if k not in ("SCORE", "DISTANCE"))
-    return sorted(data[key])
-
-
 # Each entry returns the raw `to_result()` tuple; `_answers` extracts the id
 # column from it.
 SEG_QUERIES = {
