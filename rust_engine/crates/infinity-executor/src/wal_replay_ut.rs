@@ -219,7 +219,7 @@ fn wal_replay_compact() {
     assert_eq!(h::segment_rows(&e, "tbl1"), 16384);
     assert_eq!(e.block_ids("tbl1", 0), vec![0, 1]);
 
-    e.compact_table("default_db.tbl1").unwrap();
+    e.compact_all_segments("default_db.tbl1").unwrap();
     assert_eq!(e.segment_ids("tbl1"), vec![1]);
     assert_eq!(h::segment_rows(&e, "tbl1"), 16384);
 

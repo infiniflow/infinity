@@ -77,6 +77,7 @@ import signal
 import socket
 import struct
 import subprocess
+import tempfile
 import time
 
 import pytest
@@ -3260,3 +3261,287 @@ def test_the_port_round_trips_through_object_storage():
     _write_object_config(root, "rust", 5433, bucket)
     _spawn_and_run("rust", root, phase)
     assert seen[-1] == 250, f"after the second checkpoint the bucket holds {seen} rows"
+
+
+# ---------------------------------------------------------------------------
+# A table with more than one segment.
+#
+# The reference seals a segment when it reaches `DEFAULT_SEGMENT_CAPACITY`
+# (8,388,608 rows, `catalog_cache_impl.cpp:61`), and `COMPACT` is not a way
+# around it (`test_a_compaction_with_one_segment_is_a_no_op`). `IMPORT` is:
+# it allocates a segment of its own and seals it (`ApplySegmentIDs` →
+# `AddNewSegmentWithID`), and the next `IMPORT` allocates the following id, so
+# two small files give a two-segment table. Every index chunk is then keyed by
+# `(index, segment)` - `idx_{id}/seg_{s}/` with its own `next_chunk_id` - and a
+# query fans out over the segments and merges the postings by row id.
+# ---------------------------------------------------------------------------
+
+SEG_TABLE = "test_cross_engine_segments"
+SEG_COLUMNS = 6
+SEG_ROWS = (100, 60)
+# Creation order names the directories: `idx_1` … `idx_6`.
+SEG_INDEXES = {
+    1: "fulltext",  # body
+    2: "hnsw",  # vec
+    3: "ivf",  # vec (a second index on the same column)
+    4: "secondary-u64",  # title (a hashed varchar key)
+    5: "secondary-f32",  # score
+    6: "bmp",  # sp
+    7: "secondary-u64",  # id (an INT key)
+}
+# `index_size` is the reference's in-memory `GetSizeInBytes()` for these two
+# (the HNSW graph's neighbour counts, the BMP algorithm's vector capacities);
+# it is a build artifact, not part of the format - see `_normalize_catalog`.
+SEG_ZERO_SIZE = (2, 6)
+
+
+def _seg_words(k):
+    """Repeated short English words: a tiny term dictionary at two segments.
+
+    The vocabulary is 5 words plus one `doc{k}` token per row, so both
+    segments' dictionaries fit in memory and the cross-segment merge of a term
+    that appears in both is what the test observes.
+    """
+    words = ["the", "quick", "brown", "fox", "jumps"]
+    return " ".join(words[k % 5 :] + words[: k % 5]) + f" doc{k}"
+
+
+def _seg_csv(path, base, count):
+    """`id,title,body,vec,sp,score` — the schema `_seg_phase` creates."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as handle:
+        for i in range(count):
+            k = base + i
+            handle.write(
+                f"{k},title-{k},{_seg_words(k)},"
+                f'"[{k / 100.0}, 0.1, 0.2, 0.3]",'
+                f'"[0:0.5,{k % 5 + 1}:1.0]",'
+                f"{k * 0.5}\n"
+            )
+
+
+def _seg_phase(conn, directory):
+    db = conn.get_database("default_db")
+    db.drop_table(SEG_TABLE, ConflictType.Ignore)
+    t = db.create_table(
+        SEG_TABLE,
+        {
+            "id": {"type": "int"},
+            "title": {"type": "varchar"},
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector,4,float"},
+            "sp": {"type": "sparse,8,float,int"},
+            "score": {"type": "float"},
+        },
+        ConflictType.Error,
+    )
+    t.create_index("ft", index.IndexInfo("body", index.IndexType.FullText))
+    t.create_index(
+        "vec_idx",
+        index.IndexInfo(
+            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+        ),
+    )
+    t.create_index("ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index("sec", index.IndexInfo("title", index.IndexType.Secondary))
+    t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
+    t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
+    t.create_index("id_sec", index.IndexInfo("id", index.IndexType.Secondary))
+    # Two imports, two segments. `COPY` is the reference's import path, so the
+    # indexes are populated inside each import transaction (`PopulateIndex`)
+    # rather than by a dump: no background worker takes part, and the chunks
+    # exist as soon as `flush_data()` returns.
+    #
+    # One thread, one file at a time: the rows and the chunk boundaries are a
+    # function of this script alone, which is what the byte comparison needs
+    # (concurrent `INSERT`s would interleave the segments by commit order).
+    t.import_data(os.path.join(directory, "a.csv"))
+    t.import_data(os.path.join(directory, "b.csv"))
+    conn.flush_data()
+    time.sleep(2)
+
+
+def _segment_dirs(files, index_id):
+    """The segment directories `idx_{id}` holds, for one table's files."""
+    marker = f"idx_{index_id}/seg_"
+    return sorted(
+        {
+            name.split(marker, 1)[1].split("/")[0]
+            for name in files
+            if marker in name
+        }
+    )
+
+
+def _wait_for_segment_chunks(root, indexes, segments, timeout=60.0):
+    """Every index must have a chunk in every segment's directory."""
+    deadline = time.monotonic() + timeout
+    wanted = {str(s) for s in segments}
+    while time.monotonic() < deadline:
+        files = _files(root)
+        if all(wanted <= set(_segment_dirs(files, i)) for i in indexes):
+            return
+        time.sleep(1)
+    files = _files(root)
+    raise AssertionError(
+        f"{root}: missing segment chunks after {timeout:.0f}s: "
+        + ", ".join(f"idx_{i}: {_segment_dirs(files, i)}" for i in indexes)
+    )
+
+
+def _seg_ids(result):
+    data, _, _ = result
+    key = next(k for k in data if k not in ("SCORE", "DISTANCE"))
+    return sorted(data[key])
+
+
+# Each entry returns the raw `to_result()` tuple; `_answers` extracts the id
+# column from it.
+SEG_QUERIES = {
+    # One term in both segments: the answer is the merge of the two segments'
+    # postings, so a reader that only opens `seg_0` returns half of it.
+    "fulltext_merged": lambda t: t.output(["id"])
+    .match_text("body", "quick", 200)
+    .to_result(),
+    # A term that exists only in the second segment.
+    "fulltext_second_segment": lambda t: t.output(["id"])
+    .match_text("body", f"doc{SEG_ROWS[0] + 50}", 20)
+    .to_result(),
+    "secondary_eq": lambda t: t.output(["id"])
+    .filter(f"title = 'title-{SEG_ROWS[0] + 50}'")
+    .to_result(),
+    "secondary_range": lambda t: t.output(["id"])
+    .filter("score >= 74.5 and score <= 76.0")
+    .to_result(),
+    "sparse": lambda t: t.output(["id"])
+    .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
+    .to_result(),
+}
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_a_multi_segment_table_matches_across_segments():
+    """Two imports, two segments, seven index kinds.
+
+    Matrix column "多段": every index keeps one chunk family per segment, with
+    its own chunk ids, and a query merges them. The bytes of the **blocks**,
+    of the full-text, secondary and sparse chunks are compared as usual; the
+    HNSW header/vectors/labels and the IVF `(offset, vector)` pairs are
+    compared by content.
+
+    The catalog's `seg|…|fast_rough_filter` record is left out: `IMPORT` builds
+    a binary-fuse prefilter for the sealed segment
+    (`BuildFastRoughFilterTask::ExecuteOnNewSealedSegment`,
+    `new_txn_data_impl.cpp:1739`) and the port has no such filter; a reader
+    treats a missing one as "no filter", so it changes no answer. See
+    `docs/FORMAT_EQUIVALENCE_TESTS.md` §5.2.
+    """
+    cpp_root = os.path.join(ROOT, "segments_cpp")
+    rust_root = os.path.join(ROOT, "segments_rust")
+    directory = tempfile.mkdtemp(prefix="segments-csv-")
+    try:
+        _seg_csv(os.path.join(directory, "a.csv"), 0, SEG_ROWS[0])
+        _seg_csv(os.path.join(directory, "b.csv"), SEG_ROWS[0], SEG_ROWS[1])
+        phase = lambda conn: _seg_phase(conn, directory)  # noqa: E731
+        _run_engine("cpp", cpp_root, 5432, seed=phase)
+        _run_engine("rust", rust_root, 5433, seed=phase)
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+    segments = (0, 1)
+    _wait_for_segment_chunks(cpp_root, SEG_INDEXES, segments)
+    _wait_for_segment_chunks(rust_root, SEG_INDEXES, segments)
+
+    cpp_files = _files(cpp_root)
+    rust_files = _files(rust_root)
+    for label, files in (("cpp", cpp_files), ("rust", rust_files)):
+        for index_id in SEG_INDEXES:
+            got = _segment_dirs(files, index_id)
+            assert got == ["0", "1"], f"{label} idx_{index_id}: segments {got}"
+
+    cpp_dir = _own_table_dir(cpp_files, SEG_COLUMNS)
+    rust_dir = _own_table_dir(rust_files, SEG_COLUMNS)
+    assert cpp_dir and rust_dir, "the two-segment table was not written"
+    failures = _compare_data_files(
+        _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), SEG_INDEXES
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures
+    )
+
+    cpp_pairs = _normalize_catalog(
+        _table_records(_catalog_pairs(cpp_root, 5432), cpp_dir, SEG_TABLE),
+        zero_size_indexes=SEG_ZERO_SIZE,
+    )
+    rust_pairs = _normalize_catalog(
+        _table_records(_catalog_pairs(rust_root, 5432), rust_dir, SEG_TABLE),
+        zero_size_indexes=SEG_ZERO_SIZE,
+    )
+    if not rust_pairs:
+        pytest.skip(
+            "the port's catalog is not in the C++ key space; "
+            "build it with `--features rocksdb-store`"
+        )
+    # The import-built prefilter is not part of this comparison; see the
+    # docstring.
+    for pairs in (cpp_pairs, rust_pairs):
+        for key in list(pairs):
+            if key.endswith("|fast_rough_filter"):
+                del pairs[key]
+    only_cpp = sorted(set(cpp_pairs) - set(rust_pairs))
+    only_rust = sorted(set(rust_pairs) - set(cpp_pairs))
+    changed = [
+        f"{key}: {cpp_pairs[key]} != {rust_pairs[key]}"
+        for key in sorted(set(cpp_pairs) & set(rust_pairs))
+        if cpp_pairs[key] != rust_pairs[key]
+    ]
+    assert not (only_cpp or only_rust or changed), (
+        f"only in cpp: {only_cpp}\nonly in rust: {only_rust}\n" + "\n".join(changed)
+    )
+
+    # The chunks tile each segment exactly once, and the second segment's
+    # chunks start at `1 << 32` - the `RowID` the reference's reader expects.
+    for engine, root, port in (("cpp", cpp_root, 5432), ("rust", rust_root, 5433)):
+        pairs = _table_records(_catalog_pairs(root, port), cpp_dir, SEG_TABLE)
+        spans = {}
+        for key, value in pairs.items():
+            if not key.startswith("idx_chunk|") or not key.endswith("|chunk_info"):
+                continue
+            parts = key.split("|")
+            record = json.loads(value)
+            spans.setdefault((int(parts[3]), parts[4]), []).append(
+                (record["base_row_id"], record["row_count"])
+            )
+        for segment, count in zip(("0", "1"), SEG_ROWS):
+            for index_id in SEG_INDEXES:
+                got = sorted(spans.get((index_id, segment), []))
+                covered = 0
+                for base, rows in got:
+                    assert base == (int(segment) << 32) | covered, (
+                        f"{engine} idx_{index_id} seg_{segment}: base {base} at "
+                        f"{covered} (spans {got})"
+                    )
+                    covered += rows
+                assert covered == count, (
+                    f"{engine} idx_{index_id} seg_{segment}: covers {covered} of {count}"
+                )
+
+    # What the indexes *say* must not depend on which engine wrote them: the
+    # reference reads each directory and answers the same queries.
+    cpp_answers = _answers(cpp_root, 5432, SEG_TABLE, SEG_QUERIES)
+    rust_answers = _answers(rust_root, 5433, SEG_TABLE, SEG_QUERIES)
+    assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
+
+    # The merged full-text answer must actually contain both segments' rows: a
+    # reader that opened only `seg_0` would return `SEG_ROWS[1] / 5` fewer.
+    merged = rust_answers["fulltext_merged"]
+    assert any(i < SEG_ROWS[0] for i in merged) and any(i >= SEG_ROWS[0] for i in merged), (
+        f"the full-text answer does not span both segments: {merged}"
+    )
+    assert rust_answers["fulltext_second_segment"] == [SEG_ROWS[0] + 50]
+    assert rust_answers["secondary_eq"] == [SEG_ROWS[0] + 50]

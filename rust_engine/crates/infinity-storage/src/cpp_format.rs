@@ -239,6 +239,28 @@ impl ColumnBody {
         data: &[u8],
         valid: &[bool],
     ) -> Result<Self, FormatError> {
+        Self::build_with(capacity, slot_size, data, valid, None)
+    }
+
+    /// [`Self::build`] with an explicit bitmap **coverage**.
+    ///
+    /// `covered = Some(n)` sets the bits of rows `[0, n)` only and leaves the
+    /// tail of the last byte at zero. That is the convention of a block the
+    /// reference wrote through `IMPORT`: its column vectors are created with a
+    /// bitmask of exactly the imported row count, so the unused bits of the
+    /// final byte stay clear — and rows appended to the same block later do
+    /// **not** get a bit either (measured: `IMPORT` 100 + `INSERT` 10 leaves
+    /// the bitmap at 100 bits, `0x0f` in its thirteenth byte).
+    ///
+    /// `None` is the `INSERT` convention: every bit of every byte the rows
+    /// touch is set (see [`Self::build`]).
+    pub fn build_with(
+        capacity: usize,
+        slot_size: usize,
+        data: &[u8],
+        valid: &[bool],
+        covered: Option<usize>,
+    ) -> Result<Self, FormatError> {
         let cap_bytes = Self::data_capacity_bytes(capacity, slot_size);
         if cap_bytes < data.len() {
             return Err(FormatError::Truncated {
@@ -258,8 +280,17 @@ impl ColumnBody {
         // NULL has 203 bits set and the highest of them at row 207 - rows
         // 203..207 do not exist, and rows 200..202 do and are NULL.
         let mut null_bitmap = vec![0u8; Self::null_bitmap_len(capacity)];
-        let covered = valid.len().div_ceil(8).min(null_bitmap.len());
-        null_bitmap[..covered].fill(0xff);
+        match covered {
+            Some(bits) => {
+                for row in 0..bits.min(valid.len()) {
+                    null_bitmap[row / 8] |= 1 << (row % 8);
+                }
+            }
+            None => {
+                let bytes = valid.len().div_ceil(8).min(null_bitmap.len());
+                null_bitmap[..bytes].fill(0xff);
+            }
+        }
         for (row, ok) in valid.iter().enumerate() {
             if !*ok {
                 null_bitmap[row / 8] &= !(1 << (row % 8));
@@ -871,6 +902,18 @@ pub fn pack_column_with_layout(
     slots: &[Option<&[u8]>],
     capacity: usize,
 ) -> Result<(ColumnBody, Vec<u8>), FormatError> {
+    pack_column_with_coverage(column_type, layout, slots, capacity, None)
+}
+
+/// [`pack_column_with_layout`] with an explicit null-bitmap coverage; see
+/// [`ColumnBody::build_with`].
+pub fn pack_column_with_coverage(
+    column_type: i32,
+    layout: ColumnLayout,
+    slots: &[Option<&[u8]>],
+    capacity: usize,
+    bitmap_bits: Option<usize>,
+) -> Result<(ColumnBody, Vec<u8>), FormatError> {
     let err = || FormatError::Truncated {
         need: 0,
         got: slots.len(),
@@ -883,8 +926,17 @@ pub fn pack_column_with_layout(
             // Same rule as `ColumnBody::build`: every bit of an appended byte
             // starts set and only a NULL row clears its own.
             let mut null_bitmap = vec![0u8; ColumnBody::null_bitmap_len(capacity)];
-            let covered = slots.len().div_ceil(8).min(null_bitmap.len());
-            null_bitmap[..covered].fill(0xff);
+            match bitmap_bits {
+                Some(bits) => {
+                    for row in 0..bits.min(slots.len()) {
+                        null_bitmap[row / 8] |= 1 << (row % 8);
+                    }
+                }
+                None => {
+                    let covered = slots.len().div_ceil(8).min(null_bitmap.len());
+                    null_bitmap[..covered].fill(0xff);
+                }
+            }
             for (row, v) in slots.iter().enumerate() {
                 let Some(v) = v else {
                     valid.push(false);
@@ -916,7 +968,7 @@ pub fn pack_column_with_layout(
                 }
             }
             Ok((
-                ColumnBody::build(capacity, width, &data, &valid)?,
+                ColumnBody::build_with(capacity, width, &data, &valid, bitmap_bits)?,
                 Vec::new(),
             ))
         }
@@ -937,7 +989,10 @@ pub fn pack_column_with_layout(
                 let slot = encode_varchar_slot(payload, &mut outline);
                 data.extend_from_slice(&slot);
             }
-            Ok((ColumnBody::build(capacity, 16, &data, &valid)?, outline))
+            Ok((
+                ColumnBody::build_with(capacity, 16, &data, &valid, bitmap_bits)?,
+                outline,
+            ))
         }
         ColumnLayout::VarLen(width) if !matches!(column_type, 9 | 22) => {
             // Tensor / Sparse and friends: the caller has already built the
@@ -953,7 +1008,7 @@ pub fn pack_column_with_layout(
                 }
             }
             Ok((
-                ColumnBody::build(capacity, width, &data, &valid)?,
+                ColumnBody::build_with(capacity, width, &data, &valid, bitmap_bits)?,
                 Vec::new(),
             ))
         }

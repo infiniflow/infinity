@@ -321,7 +321,7 @@ fn update_and_compact_compose() {
     h::append(&e, "db1.tb1", alternating_block());
 
     h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col1 = 2;");
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     assert_eq!(
         h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 999;"),
@@ -333,7 +333,7 @@ fn update_and_compact_compose() {
     );
 
     // The other ordering: compact first, then update.
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     h::ok(&e, "UPDATE db1.tb1 SET col1 = 777 WHERE col1 = 1;");
     assert_eq!(
         h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 777;"),
@@ -768,7 +768,7 @@ fn disabled_slow_test_import_and_compact() {
     copy(&e, "db1.tb1", &path);
     copy(&e, "db1.tb1", &path);
 
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
         h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),

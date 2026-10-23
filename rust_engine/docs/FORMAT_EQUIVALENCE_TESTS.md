@@ -31,7 +31,7 @@
 
 内存索引的**行容量触发**保留（`[storage] mem_index_capacity`，参考默认 65536 = 8 个块）：它按行数触发（`new_txn_index_impl.cpp:1381`），是脚本的性质而不是时钟的性质，因此可复现。于是对齐用例里只剩两类 dump：脚本显式的 `DumpIndex`，以及行数越过 `mem_index_capacity` 的那次。排期固定之后，两边的 `idx_chunk|…|{chunk_id}` 也落在同一批事务上，该值与其他记录一样逐字节比（§6.1）。
 
-浮点键 PGM 的截距依赖参考的**编译选项**。clang 默认 `-ffp-contract=on`，参考以 `-O3` 编译时会把 `piecewise_linear_model.hpp` 里 5 处乘加（`get_intersection` 的 `a`、`b`、`i_x`、`i_y` 与 `get_floating_point_segment` 的截距）收缩成 FMA；同一份源码用 `-ffp-contract=off` 编出来，`FLOAT` 键 65 行线性输入的第一个截距是 32 而不是 31。重写版用 `f64::mul_add` 复刻收缩后的舍入，因此对齐的是**参考默认编译口径**下的字节；这条差异由 `float_intercept_matches_contracted_reference_fit` 钉住。
+浮点键 PGM 的截距依赖参考的**编译选项**，且只有一处真的被收缩。clang 默认 `-ffp-contract=on`；实测参考只把 `get_floating_point_segment` 的 `i_y - (i_x - origin) * slope` 编成 FMA，`get_intersection` 里 `a`、`b` 的两个叉积与 `i_x`/`i_y` 的 `p0.x + b * slope1.dx` 都按原式求值。判据是两组线性输入：都收缩时第一个截距是 31（65 行，步长 10）与 **32**（100 行，步长 0.5，与参考差 1 字节）；只收缩截距时是 31 与 31；都不收缩时是 32 与 31。重写版因此只对截距用 `f64::mul_add`，由 `float_intercept_matches_contracted_reference_fit` 与 `float_intercept_is_not_contracted_in_the_cross_products` 两条钉住。
 
 重写版的 **HNSW 图与 IVF 质心都确定**（插入顺序即行序，无随机源），所以重写版的自复现测量里**所有**文件都必须相同——包括参考自己都复现不了的那一块。
 
@@ -52,6 +52,7 @@
 | `::test_the_ivf_chunk_is_only_compared_by_content` | 上面的表，参考跑 2 次 | IVF chunk 的字节不是行值的函数，只能按内容比 |
 | `::test_a_crash_leaves_a_replayable_directory` | 100 行 flush + 50 行未 flush 后 kill -9 | 另一引擎启动后看到 150 行（双向） |
 | `::test_a_compaction_with_one_segment_is_a_no_op` | 8192 行 + `COMPACT` + 50 行 | 两个引擎都只有 `seg_0`（`NewCompactionAlg` 一个段挑不出候选，不开事务）；块与 `version` 逐字节相同；行数 8242 |
+| `::test_a_multi_segment_table_matches_across_segments` | 两次 `IMPORT`（100 + 60 行，同一线程顺序导入）→ 两个段；七类索引（全文 / HNSW / IVF / 次级 varchar·float·int / 稀疏 BMP） | 每个索引在 `seg_0`、`seg_1` 各一套 chunk，chunk id 从 0 重新开始、`base_row_id` 以 `1 << 32` 起算；块、全文、次级、稀疏 chunk 逐字节相同，HNSW 头/向量/标签与 IVF `(offset, vector)` 按内容；catalog 键值相同的部分逐键比；参考读两边目录答案一致，跨段全文合并同时返回两个段的行 |
 | `::test_the_object_directory_is_shared_with_the_reference` | 100 行 + 次级索引；两个引擎各写一次 `persistence_dir`（`storage_type = "local"`，即桶在本地的那份布局），写完删掉 `data/`，由另一个引擎读 | 对面的引擎按 `pm|object|` 解析打包对象后：行数 100、`id = 7` 命中、次级范围查询命中同一批 id；两个方向一致 |
 | `::test_the_port_round_trips_through_object_storage` | 200 行 + `storage_type="minio"` → 清空本地目录 → 读回 → 再写 50 行（在恢复出来的树上做 checkpoint）→ 再清空 → 读回 | 重写版从桶里恢复 `data/`+`catalog/`+`persistence/`，行数 200；第二次 checkpoint 后是 250（需要 `INFINITY_MINIO_URL`；每次跑用新桶，避免上一轮的桶污染） |
 | `::test_the_secondary_and_sparse_indexes_survive_deletes_updates_and_a_restart` | INT / FLOAT / DOUBLE 三个次级键 + 稀疏 BMP；第二个进程 `DELETE` 前缀 + `UPDATE` 一段，再 flush/dump | 每个 chunk 逐字节相同（DOUBLE 键走 8 字节键 + `double` 斜率）；chunk 覆盖 110 个物理行；四个索引的答案相同 |
@@ -74,12 +75,12 @@
 | 块列 `*.col`（`[data_region][null_bitmap]`） | ✅ | ✅ | ✅ 非 0 段块 | ✅ | ✅ | ◐ 互读 | ✅ 16 类 | ◐ |
 | 变长 outline `col_*_out` | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ | ✅ | ◐ |
 | `version` 文件 | ✅（含 ts） | ✅ | ✅ | ✅ | ✅ | ◐ | — | ◐ |
-| 全文 `.dic/.pos/.len` | ✅ | ✅ | ⬜ 跨段合并 | ✅ | ✅ | ◐ 重放后查询 | ✅ analyzer / `with_positions` | ◐ |
-| HNSW chunk | ◐ 图按内容 | ◐ | ⬜ | ◐ 内容+答案 | ◐ 内容+答案 | ◐ 重放后查询 | ✅ metric / build_type | ◐ |
-| IVF chunk（plain / SQ / PQ） | ◐ 按内容 | ◐ | ⬜ | ◐ 内容+答案 | ◐ 内容+答案 | ◐ 重放后查询 | ◐ plain / SQ / PQ | ◐ |
-| 次级索引 chunk（整数键） | ✅ | ✅ | ⬜ | ✅ | ✅ | ◐ 重放后查询 | ✅ int / date 键 | ◐ |
-| 次级索引 chunk（浮点键） | ✅ | ✅ | ⬜ | ✅ | ✅ | ◐ 重放后查询 | ✅ float / double 键 | ◐ |
-| 稀疏 BMP chunk | ✅ | ✅ | ⬜ | ✅ | ✅ | ◐ 重放后查询 | ✅ block_size / 词表规模 | ◐ |
+| 全文 `.dic/.pos/.len` | ✅ | ✅ | ✅ 两段各自 chunk + 跨段合并 | ✅ | ✅ | ◐ 重放后查询 | ✅ analyzer / `with_positions` | ◐ |
+| HNSW chunk | ◐ 图按内容 | ◐ | ◐ 两段，按内容 | ◐ 内容+答案 | ◐ 内容+答案 | ◐ 重放后查询 | ✅ metric / build_type | ◐ |
+| IVF chunk（plain / SQ / PQ） | ◐ 按内容 | ◐ | ◐ 两段，按内容 | ◐ 内容+答案 | ◐ 内容+答案 | ◐ 重放后查询 | ◐ plain / SQ / PQ | ◐ |
+| 次级索引 chunk（整数键） | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ 重放后查询 | ✅ int / date 键 | ◐ |
+| 次级索引 chunk（浮点键） | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ 重放后查询 | ✅ float / double 键 | ◐ |
+| 稀疏 BMP chunk | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ 重放后查询 | ✅ block_size / 词表规模 | ◐ |
 | 删除位图（catalog 内） | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
 | WAL 记录 | ◐ 帧头+删除 id 逐字节 | ◐ | ◐ | ✅ | ✅ | ✅ 跨引擎 replay | — | ◐ |
 | Catalog KV | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
@@ -99,9 +100,10 @@
 
 ### 5.2 输入空间的缺口
 
-1. **跨段全文合并**：重写版把每个索引的 chunk 都写在 `idx_{id}/seg_0/`，不按段拆；参考在测试规模上只有 `seg_0`，所以没有可观测差异。要冻结这条需要 8,388,608 行级别的数据（每引擎约 1024 个块目录），本机内存与磁盘放不下两端。
-2. **多段下的索引类**（矩阵"多段"列的 ⬜）：参考在 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）之前不会开第二段，`COMPACT` 也不是捷径——只有一个段时它不开事务（`test_a_compaction_with_one_segment_is_a_no_op`）。要覆盖这一列必须真的写入 8,388,608 行以上：本机尚未跑过这个规模。
-3. **WAL 的 Append 行载荷**：帧头（提交 ts、命令数、命令类型、库名/表名）、`Delete` 的行 id 列表、`Append` 的块头都逐字节比（`test_the_wal_entries_match_for_the_shared_commands`）；`Append` 的行数据段与 `Delete` 的结尾计数字是重写版自己的编码——两个方向都能 replay（`test_a_crash_leaves_a_replayable_directory` 与 `test_the_indexes_survive_a_crash`），但字节不同。DDL 不在比对内：参考写 `CreateTable`/`CreateIndex`，重写版写 `KvBatch`（它落盘的 catalog 键），是不同的命令而非同一命令的不同编码。
+1. **段的产生方式**：参考在 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）之前不会因为写满而开第二段，`COMPACT` 也不是捷径——只有一个段时它不开事务（`test_a_compaction_with_one_segment_is_a_no_op`）。多段用例因此走 `IMPORT`：它按 `ApplySegmentIDs` 自己分配并封存一个段（`new_txn_data_impl.cpp:241`），两次导入就是两个段，规模可以很小。
+2. **多段的规模**：`test_a_multi_segment_table_matches_across_segments` 只有两段、每段一个块、每段一个 chunk。段数更多、一段多块多 chunk、以及压缩（`COMPACT` 合并多段）后的段布局都未覆盖。8,388,608 行以上的真实多段仍未跑过。
+3. **IMPORT 的 `fast_rough_filter`**：参考在导入封存段时同步建一个 binary fuse 预过滤器并写 `seg|{db}|{tbl}|{seg}|fast_rough_filter`（`BuildFastRoughFilterTask::ExecuteOnNewSealedSegment`，`new_txn_data_impl.cpp:1739`），重写版不写这条记录。读者把"没有过滤器"当作"不过滤"（走次级索引/扫描），因此不影响答案，多段用例把它排除在 catalog 比对之外。
+4. **WAL 的 Append 行载荷**：帧头（提交 ts、命令数、命令类型、库名/表名）、`Delete` 的行 id 列表、`Append` 的块头都逐字节比（`test_the_wal_entries_match_for_the_shared_commands`）；`Append` 的行数据段与 `Delete` 的结尾计数字是重写版自己的编码——两个方向都能 replay（`test_a_crash_leaves_a_replayable_directory` 与 `test_the_indexes_survive_a_crash`），但字节不同。DDL 不在比对内：参考写 `CreateTable`/`CreateIndex`，重写版写 `KvBatch`（它落盘的 catalog 键），是不同的命令而非同一命令的不同编码。
 
 ### 5.3 流程
 
@@ -119,7 +121,8 @@
 | `catalog/`、`wal/` | RocksDB；redo 记录写 `wal/wal.rust`，replay 时同时读参考的 `wal/wal.log` | RocksDB；写 `wal/wal.log` | 只比逻辑内容与互读 |
 | 对象存储：写出的布局 | `persistence_format = "reference"` 时写 `pm\|object\|` 记录 + 打包对象（与参考同一套，128 MB 上限 / footer / stat） | `ObjCreate` 命名打包 blob，本地路径映射在 KV 的 `pm\|object\|<path>` | 对象目录用例双向比（§3） |
 | 对象存储：S3 传输 | 路径树 `data/`、`catalog/`、`persistence/` 逐文件上传 | 对象键即 `obj_key`，对象文件直接上传 | 只做重写版自身往返（无可用端点，§6.5） |
-| 索引 chunk 的段目录 | 全部在 `idx_{id}/seg_0/` | 路径同样带 `seg_{id}`；多段时是否按段拆分未验证 | 8M 行以下无差异，跨段未验证 |
+| 索引 chunk 的段目录 | 每个段一套 `idx_{id}/seg_{s}/`，chunk id 每段从 0 起 | 同左 | 两段用例逐文件比（§3） |
+| `seg\|…\|fast_rough_filter` | 不写 | `IMPORT` 时写二进制 fuse 过滤器 | 不比对；读者把缺失当作"不过滤"，答案不变（§5.2.3） |
 | 段的产生时机 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切（与参考相同）；单段 `COMPACT` 不开事务 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切 | 见 §5.2 |
 | WAL 的 `Append` 行载荷 / DDL 命令 | 行数据按 `row_id` + 文本编码，DDL 写 `KvBatch`（catalog 键值） | 行数据按块内列编码，DDL 写 `CreateTable`/`CreateIndex` | 帧头、命令类型、库/表名、`Delete` 行 id 逐字节比；行载荷与 DDL 只保证双向 replay |
 | 不带 `rocksdb-store` feature 时 | catalog 落 fjall | 只认 RocksDB | 参考打开只剩 `system_tag`（`Database: default_db doesn't exist`）；门禁必须带 feature |
@@ -129,6 +132,7 @@
 - 块列 `*.col`（16 类列，含 NULL 位图、`-0.0`、极值、outline 分界）与变长 outline；
 - `version` 文件整体（`[create_size]` + 每次 create 的 `[ts][累计行数]` + `[capacity]` + 每槽 u64，DELETE 标槽，UPDATE = 删除 + 追加）：布局一致，且 `create_ts` 与删除槽 ts 就是事务自己的提交 ts，两边逐值相同（§6.6）；
 - 全文 `.dic/.pos/.len`、次级索引 chunk（整数键与浮点键，含 PGM 模型）、稀疏 BMP chunk；
+- 块的 NULL 位图，包括 `IMPORT` 写出的块的空位图覆盖规则：参考在一次导入里按**导入行数**建位图（最后一字节的尾位是 0），`INSERT` 写的块按字节填满（尾位是 1），两条规则都复刻（`ColumnBody::build_with`）；
 - JSON 列按 BSON 落盘（`{"data": <值>}` 外层、键排序、小整数 `int32`）；
 - 浮点列按精确值落盘，只有 SELECT 输出层按 6 位小数格式化。
 
@@ -207,6 +211,8 @@
 前提是**没有"什么时候跑"的写事务**，所以对齐配置把异步任务全关掉（§2）：`optimize/cleanup/compact_interval` 与 `checkpoint_interval` 都是 `0s`，`memindex_memory_quota` 取内存索引达不到的值。剩下的 dump 只有脚本显式的 `DumpIndex` 与行数越过 `mem_index_capacity` 的那次，两者都由脚本决定，因此 `idx_chunk|…|{chunk_id}` 也落在同一批事务上，和其它记录一样逐字节比。
 
 `idx_chunk` 的值由重写版在 `DumpIndex` 时记下（`dump_ts:{表}:{索引}`），盖到已发布的 id 记录上，并把 `wal.log` 的 checkpoint 帧推进到覆盖它——参考读目录时按 `chunk_ts > begin_ts` 隐藏 chunk（`LoadChunkIDs1`），帧不覆盖就会被藏起来。
+
+`IMPORT` 的段是另一种情况：参考在导入事务里就把索引写进 chunk（`PopulateIndex` → `AddNewChunkIndex1`），所以那个段的 chunk 记录带的是**导入事务**的提交 ts（多段用例里两段分别是 22 与 24）。重写版为此记下每段被导入时的 ts（`import_ts:{表}:{段}`），发布 chunk 时取它与 `dump_ts` 的较大者——用 `INSERT` 建的表没有这条记录，行为不变。
 
 手动 `COMPACT` 两边做的也是同一件事：`ManualCompactTask` 把 `NewCompactionAlg` 挑出的候选段交给 `PhysicalCompact`（`physical_compact_impl.cpp:36`），只有一个段时挑不出候选、**不开事务**；重写版的 `compact_table` 现在同样在 `segment_ids(table).len() < 2` 时直接返回，所以 8192 行的脚本两边都留在 `seg_0`，trace 与字节完全一致（`test_a_compaction_with_one_segment_is_a_no_op`）。
 

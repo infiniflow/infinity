@@ -255,7 +255,7 @@ fn append_then_compact_preserves_rows() {
         .collect();
     insert_rows(&e, "default_db.acp", batch).unwrap();
 
-    e.compact_table("default_db.acp").unwrap();
+    e.compact_all_segments("default_db.acp").unwrap();
     assert_eq!(e.row_count("acp").unwrap(), 2000);
     assert_eq!(count(&e, "acp"), 2000);
     let last = rows(&e, "SELECT name FROM acp WHERE id = 1999;");
@@ -356,7 +356,7 @@ fn delete_then_append_and_compact() {
     insert_rows(&e, "default_db.dac", extra).unwrap();
     assert_eq!(e.row_count("dac").unwrap(), 95);
 
-    e.compact_table("default_db.dac").unwrap();
+    e.compact_all_segments("default_db.dac").unwrap();
     assert_eq!(e.row_count("dac").unwrap(), 95);
     assert_eq!(count(&e, "dac"), 95);
     assert!(rows(&e, "SELECT id FROM dac WHERE id = 9;").is_empty());
@@ -437,9 +437,9 @@ fn compaction_is_idempotent() {
         .collect();
     insert_rows(&e, "default_db.cc", batch).unwrap();
 
-    e.compact_table("default_db.cc").unwrap();
+    e.compact_all_segments("default_db.cc").unwrap();
     assert_eq!(e.row_count("cc").unwrap(), 5000);
-    e.compact_table("default_db.cc").unwrap();
+    e.compact_all_segments("default_db.cc").unwrap();
     assert_eq!(e.row_count("cc").unwrap(), 5000);
     assert_eq!(segment_rows(&e, "cc"), 5000);
     assert_eq!(count(&e, "cc"), 5000);
@@ -460,7 +460,7 @@ fn compact_then_alter_and_drop_table() {
     e.execute("CREATE TABLE cad (id INT);").unwrap();
     let batch = (0..32).map(|i| vec![Literal::Int(i)]).collect();
     insert_rows(&e, "default_db.cad", batch).unwrap();
-    e.compact_table("default_db.cad").unwrap();
+    e.compact_all_segments("default_db.cad").unwrap();
 
     e.execute("ALTER TABLE cad ADD COLUMN (name VARCHAR);")
         .unwrap();

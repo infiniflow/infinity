@@ -167,7 +167,7 @@ fn compact_reduces_the_segment_count() {
     let before = e.segment_count("default_db.tb1");
     assert_eq!(before, 11);
 
-    e.compact_table("default_db.tb1").unwrap();
+    e.compact_all_segments("default_db.tb1").unwrap();
 
     let after = e.segment_count("default_db.tb1");
     assert!(after < before);

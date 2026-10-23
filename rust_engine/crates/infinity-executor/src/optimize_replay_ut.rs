@@ -237,7 +237,7 @@ fn optimize_index_then_rename_table() {
 /// (`TestTxnOptimizeIndex.DISABLED_SLOW_optimize_index_and_compact_table`).
 #[test]
 #[ignore = "C++ DISABLED_SLOW_optimize_index_and_compact_table"]
-fn disabled_slow_optimize_index_and_compact_table() {
+fn disabled_slow_optimize_index_and_compact_all_segments() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
@@ -247,7 +247,7 @@ fn disabled_slow_optimize_index_and_compact_table() {
         e.flush().unwrap();
     }
     e.optimize_indexes().unwrap();
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
     // C++ renumbers the compacted output ({2,3} for its two live segments);

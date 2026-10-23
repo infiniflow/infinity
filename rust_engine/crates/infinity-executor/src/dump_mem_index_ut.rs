@@ -723,7 +723,7 @@ fn test_dump_index_and_compact() {
     e.flush().unwrap();
     assert_dumped(&e);
 
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
 
     assert_eq!(e.segment_count("db1.tb1"), 1);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);

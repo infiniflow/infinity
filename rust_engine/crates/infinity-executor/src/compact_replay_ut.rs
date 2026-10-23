@@ -2,7 +2,9 @@
 //! `compact_internal_ut.cpp` and `replay_compact_ut.cpp`
 //! (`TestTxnCompact`, `TestTxnCompactInternal`, `TestTxnReplayCompact`).
 //!
-//! `NewTxn::Compact` becomes [`Engine::compact_table`]; `RestartTxnMgr`
+//! `NewTxn::Compact` becomes [`Engine::compact_all_segments`] (the primitive;
+//! `COMPACT` goes through `Engine::compact_table`, which first asks whether any
+//! segment pair is worth merging). `RestartTxnMgr`
 //! becomes [`crate::new_catalog_ut::reopen`]. The reference's segment ids
 //! (`{2}` after a merge) are an allocator artefact: the Rust engine renumbers
 //! live rows into segment 0, so the ports assert the same row/block totals and
@@ -94,7 +96,7 @@ fn compact_with_index_commit() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     import_four_blocks(&e);
 
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     assert_compacted(&e, 1);
     h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
 }
@@ -127,7 +129,7 @@ fn compact_then_drop_database() {
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
     import_four_blocks(&e);
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
 
     h::ok(&e, "DROP DATABASE db1;");
     assert!(e.execute("SELECT * FROM db1.tb1;").is_err());
@@ -142,7 +144,7 @@ fn compact_then_drop_table() {
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
     import_four_blocks(&e);
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
 
     h::ok(&e, "DROP TABLE db1.tb1;");
     assert!(!e.table_exists("db1.tb1"));
@@ -158,7 +160,7 @@ fn compact_then_add_columns() {
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
     import_four_blocks(&e);
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
 
     h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col3 INT DEFAULT 3);");
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
@@ -188,7 +190,7 @@ fn compact_then_drop_columns() {
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
     import_four_blocks(&e);
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
 
     h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col2);");
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
@@ -206,7 +208,7 @@ fn compact_then_rename_table() {
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
     import_four_blocks(&e);
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
 
     h::ok(&e, "ALTER TABLE db1.tb1 RENAME TO db1.tb2;");
     assert_eq!(e.row_count("db1.tb2").unwrap(), 32768);
@@ -225,9 +227,9 @@ fn compact_and_compact() {
     create_table(&e);
     import_four_blocks(&e);
 
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     assert_compacted(&e, 1);
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     assert_compacted(&e, 2);
 }
 
@@ -240,7 +242,7 @@ fn compact_then_create_index() {
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
     import_four_blocks(&e);
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
 
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
@@ -260,7 +262,7 @@ fn compact_then_drop_index() {
     create_table(&e);
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     import_four_blocks(&e);
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
 
     h::ok(&e, "DROP INDEX index1 ON db1.tb1;");
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
@@ -291,7 +293,7 @@ fn internal_compact_skips_deleted_offsets() {
     assert_eq!(t.delete_row_ids("db1.tb1", &ids).unwrap(), 4096);
     t.commit().unwrap();
 
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768 - 4096);
     assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
     e.flush().unwrap();
@@ -336,7 +338,7 @@ fn internal_compact_with_index() {
     assert_eq!(t.delete_row_ids("db1.tb1", &ids).unwrap(), 4096);
     t.commit().unwrap();
 
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 28672);
     assert_eq!(
         h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
@@ -361,7 +363,7 @@ fn replay_compact_commit() {
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
     import_four_blocks(&e);
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     let e = h::reopen(e, dir.path());
     assert_compacted(&e, 1);
 
@@ -409,7 +411,7 @@ fn replay_compact_flush_gap() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     import_four_blocks(&e);
     e.checkpoint_wal();
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     e.checkpoint_wal();
 
     let e = h::reopen(e, dir.path());
@@ -446,7 +448,7 @@ fn disabled_slow_test_compact_with_index() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     h::ok(&e, "CREATE INDEX index2 ON db1.tb1 (col2) USING fulltext;");
     import_four_blocks(&e);
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
 
     let e = h::reopen(e, dir.path());
     assert_compacted(&e, 1);

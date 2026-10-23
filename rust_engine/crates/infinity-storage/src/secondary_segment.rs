@@ -840,9 +840,18 @@ impl<K: FloatKey> CanonicalFloatSegment<K> {
     /// finite for keys that span most of the double range
     /// (`piecewise_linear_model.hpp:298-321`).
     ///
-    /// The reference is compiled with `-ffp-contract=on` (clang's default), so
-    /// it fuses the second product of each `x * y - z * w` and the `+` of
-    /// `i_x`/`i_y` into an FMA. [`f64::mul_add`] reproduces that rounding.
+    /// The reference is compiled with `-ffp-contract=on` (clang's default),
+    /// but only `get_floating_point_segment`'s `i_y - (i_x - origin) * slope`
+    /// is actually contracted: the two cross products of `a` and `b` and the
+    /// `p0.x + b * slope1.dx` of `i_x`/`i_y` are evaluated as written.
+    ///
+    /// Measured, not assumed — a 65-key linear run (step 10) and a 100-key one
+    /// (step 0.5) disagree about which of the five sites is fused:
+    /// fusing `a`/`b`/`i_x`/`i_y` gives intercepts 31 and **32** (the 100-key
+    /// case then differs from the reference by one byte), while fusing only
+    /// the intercept gives 31 and 31, and fusing nothing gives 32 and 31. See
+    /// `float_intercept_matches_contracted_reference_fit` and
+    /// `float_intercept_is_not_contracted_in_the_cross_products`.
     fn get_intersection(&self) -> (f64, f64) {
         let r = &self.rectangle;
         let (p0, p1, p2, p3) = (r[0], r[1], r[2], r[3]);
@@ -856,10 +865,10 @@ impl<K: FloatKey> CanonicalFloatSegment<K> {
         let p0p1 = float_point_diff(p1, p0);
         let (_, exponent) = frexp(p0p1.dx.abs().max(slope1.dx.abs()).max(slope2.dx.abs()));
         let scaled = |dx: f64| ldexp(dx, -exponent);
-        let a = scaled(slope1.dx).mul_add(slope2.dy, -(slope1.dy * scaled(slope2.dx)));
-        let b = scaled(p0p1.dx).mul_add(slope2.dy, -(p0p1.dy * scaled(slope2.dx))) / a;
-        let i_x = b.mul_add(slope1.dx, p0.x.as_f64());
-        let i_y = b.mul_add(slope1.dy, p0.y as f64);
+        let a = scaled(slope1.dx) * slope2.dy - slope1.dy * scaled(slope2.dx);
+        let b = (scaled(p0p1.dx) * slope2.dy - p0p1.dy * scaled(slope2.dx)) / a;
+        let i_x = p0.x.as_f64() + b * slope1.dx;
+        let i_y = p0.y as f64 + b * slope1.dy;
         (i_x, i_y)
     }
 
@@ -2100,6 +2109,27 @@ mod tests {
             CPP_FLOAT_LINEAR_CONTRACTED_SEGMENTS
         );
         assert_eq!(pgm.segments[0].intercept, 31);
+    }
+
+    /// Only the intercept is contracted, measured on a second dataset.
+    ///
+    /// 100 keys of `i * 0.5` (a `FLOAT` secondary key over a two-segment
+    /// table) put the same first intercept one ulp away from the 65-key case:
+    /// fusing the cross products of `a`/`b` gives 32 here while the reference
+    /// writes 31, and the reference's own bytes are stable across runs. With
+    /// only the intercept fused both datasets match.
+    #[test]
+    fn float_intercept_is_not_contracted_in_the_cross_products() {
+        let keys: Vec<f32> = (0..100).map(|i| i as f32 * 0.5).collect();
+        let pgm = PgmFloat::build(&keys);
+        assert_eq!(pgm.segments[0].intercept, 31);
+        assert_eq!(
+            float_segment_bytes(&pgm),
+            [
+                0u8, 0, 0, 0, 163, 139, 174, 63, 31, 0, 0, 0, 1, 0, 70, 66, 0, 0, 0, 0, 100, 0, 0,
+                0, 0, 0, 128, 127, 0, 0, 0, 0, 100, 0, 0, 0
+            ]
+        );
     }
 
     /// Keys at a magnitude where `last + 1` would round back to `last`: the

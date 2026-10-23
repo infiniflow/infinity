@@ -287,6 +287,24 @@ fn delete_ts_key(table: &str) -> Vec<u8> {
 fn dump_ts_key(table: &str, index: &str) -> Vec<u8> {
     format!("dump_ts:{table}:{index}").into_bytes()
 }
+/// Commit ts of the `COPY` that opened `segment`, written into that segment's
+/// `idx_chunk|…|{chunk_id}` records.
+///
+/// An imported segment's chunks are produced by the import transaction itself
+/// (`NewTxn::Import` → `PopulateIndex` → `AddNewChunkIndex1`), so their ts is
+/// the import's commit ts, not a dump's. A table seeded with `INSERT` has no
+/// entry here and keeps using the `DumpIndex` ts.
+fn import_ts_key(table: &str, segment: u32) -> Vec<u8> {
+    format!("import_ts:{table}:{segment}").into_bytes()
+}
+/// One byte per append, aligned with [`appends_key`]: `1` when the append came
+/// from `COPY`/`IMPORT`, `0` when it came from `INSERT`/`UPDATE`.
+///
+/// The reference's null bitmap covers different bit ranges depending on that
+/// provenance (see `ColumnBody::build_with`), so the block mirror needs it.
+fn append_copy_key(table: &str) -> Vec<u8> {
+    format!("append_copy:{table}").into_bytes()
+}
 fn del_prefix(table: &str) -> Vec<u8> {
     format!("del:{table}:").into_bytes()
 }
@@ -3948,6 +3966,10 @@ struct TableEntry {
     /// `version` file, which is where the reference records each append's
     /// commit ts.
     append_ts: Option<Vec<u64>>,
+    /// `1` for an append written by `COPY`/`IMPORT`, `0` otherwise, one entry
+    /// per `append_totals` entry (`append_copy:{table}`). It decides the null
+    /// bitmap's coverage of the block the append opened.
+    append_copy: Option<Vec<u64>>,
     /// Row ids deleted since the table was created (`dellog:{table}`), loaded
     /// on first use.
     deleted_ids: Option<Vec<u64>>,
@@ -7196,7 +7218,7 @@ impl Engine {
 
     /// Records an append of `n` rows, so the next block mirror writes a
     /// `create` for it.
-    fn note_append(&self, table: &str, n: usize) {
+    fn note_append(&self, table: &str, n: usize, copy: bool) {
         if n == 0 {
             return;
         }
@@ -7212,6 +7234,50 @@ impl Engine {
         // before the rows do, the mirror clips every total to the rows it
         // actually has and falls back to one create when they disagree.
         let _ = self.write_id_log(&appends_key(&tkey), &totals);
+        let mut kinds = self.append_copy(table);
+        kinds.resize(totals.len(), 0);
+        if let Some(last) = kinds.last_mut() {
+            *last = u64::from(copy);
+        }
+        {
+            let mut tables = self.tables.lock().unwrap();
+            tables.entry(tkey.clone()).or_default().append_copy = Some(kinds.clone());
+        }
+        let _ = self.write_id_log(&append_copy_key(&tkey), &kinds);
+    }
+
+    /// Per-append provenance, aligned with [`Self::append_totals`].
+    fn append_copy(&self, table: &str) -> Vec<u64> {
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey.clone()).or_default();
+        if entry.append_copy.is_none() {
+            entry.append_copy = Some(self.load_id_log(&append_copy_key(&tkey)));
+        }
+        entry.append_copy.clone().unwrap_or_default()
+    }
+
+    /// The null bitmap's coverage for a block written by `COPY`/`IMPORT`.
+    ///
+    /// The reference creates an imported block's column vectors with a bitmask
+    /// of exactly the imported row count, so the unused bits of its last byte
+    /// stay clear and rows appended to the block later get no bit at all
+    /// (measured: `IMPORT` 100 + `INSERT` 10 keeps the bitmap at 100 bits).
+    /// A block opened by an `INSERT` gets every bit of every touched byte.
+    ///
+    /// `block_start` is the block's first row in the table-wide append order,
+    /// which is what `append_totals` counts (a segment's rows do not restart
+    /// it).
+    fn block_bitmap_bits(&self, table: &str, block_start: usize, rows: usize) -> Option<usize> {
+        let totals = self.append_totals(table);
+        let kinds = self.append_copy(table);
+        // The append that wrote the block's first row.
+        let idx = totals.partition_point(|total| (*total as usize) <= block_start);
+        if idx >= totals.len() || kinds.get(idx).copied() != Some(1) {
+            return None;
+        }
+        let end = (totals[idx] as usize).min(block_start + rows);
+        Some(end.saturating_sub(block_start))
     }
 
     /// The commit timestamp of every append, aligned with [`Self::append_totals`].
@@ -7245,6 +7311,20 @@ impl Engine {
             tables.entry(tkey.clone()).or_default().append_ts = Some(log.clone());
         }
         let _ = self.write_id_log(&append_ts_key(&tkey), &log);
+    }
+
+    /// Records that `segment` (and the batches after it) were written by an
+    /// import whose transaction committed at `ts`.
+    fn note_import_ts(&self, table: &str, segment: u32, ts: u64) {
+        let key = import_ts_key(&self.table_key(table), segment);
+        let _ = self.storage.store.put(&key, &ts.to_le_bytes());
+    }
+
+    /// The commit ts of the `COPY` that opened `segment`, if it was imported.
+    pub(crate) fn import_ts(&self, table: &str, segment: u32) -> Option<u64> {
+        let key = import_ts_key(&self.table_key(table), segment);
+        let bytes = self.storage.store.get(&key).ok().flatten()?;
+        Some(u64::from_le_bytes(bytes.get(..8)?.try_into().ok()?))
     }
 
     /// Every row id deleted since the table was created.
@@ -7305,6 +7385,19 @@ impl Engine {
     }
 
     fn reserve_rows(&self, table: &str, n: usize, new_segment: bool) -> Result<usize> {
+        self.reserve_rows_from(table, n, new_segment, new_segment)
+    }
+
+    /// [`Self::reserve_rows`] with the append's provenance stated separately:
+    /// `copy` is true for `COPY`/`IMPORT` (which may also continue a segment
+    /// it already opened, so it is not the same question as `new_segment`).
+    fn reserve_rows_from(
+        &self,
+        table: &str,
+        n: usize,
+        new_segment: bool,
+        copy: bool,
+    ) -> Result<usize> {
         let key = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(key).or_default();
@@ -7334,7 +7427,7 @@ impl Engine {
             .or_insert(SegmentEntry { id: seg, rows: off });
         drop(tables);
         // One `create` per append in the mirror's `version` file.
-        self.note_append(table, n);
+        self.note_append(table, n, copy);
         Ok(base)
     }
 
@@ -7990,6 +8083,9 @@ impl Engine {
         let ts = self.txn.commit(t)?;
         // The block's `version` records the append's commit ts.
         self.settle_append_ts(table, 1, ts);
+        if new_segment {
+            self.note_import_ts(table, (base >> 32) as u32, ts);
+        }
         // With no index of any kind in memory there is nothing to maintain;
         // skipping the per-row hook avoids a catalog lookup + string render for
         // every inserted row (the reference's insert path has the same guard).
@@ -8907,6 +9003,17 @@ impl Engine {
                     let r = self.copy_from(table, path, opts);
                     if r.is_ok() {
                         self.bump_writes(table);
+                        // `NewTxn::Import` populates every index of the table
+                        // inside the import transaction (`PopulateIndex` per
+                        // segment), so the chunks exist as soon as the
+                        // statement returns - that is how a 100-row import
+                        // gets a full-text and a secondary chunk without any
+                        // dump ever running. The port rebuilds its full-text,
+                        // sparse and vector chunks from the rows at checkpoint
+                        // time, but a secondary chunk is derived from spill
+                        // files that a small import never fills, so build it
+                        // here.
+                        self.populate_secondary_indexes(table);
                     }
                     r
                 } else {
@@ -11638,6 +11745,39 @@ impl Engine {
         ids
     }
 
+    /// Rows reserved in each of `table`'s segments, in segment id order.
+    ///
+    /// Deleted rows are included: the reference's index chunks keep them (a
+    /// block is append-only), so the chunk's `row_count` counts every row the
+    /// segment ever held, not the live ones.
+    pub fn segment_row_counts(&self, table: &str) -> Vec<(u32, u64)> {
+        let key = self.table_key(table);
+        let tracked: Vec<(u32, u64)> = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| {
+                e.segments
+                    .values()
+                    .map(|s| (s.id, u64::from(s.rows)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !tracked.is_empty() {
+            let mut tracked = tracked;
+            tracked.sort_unstable();
+            return tracked;
+        }
+        // No allocator history (a directory loaded from disk): derive the
+        // per-segment counts from the stored row ids, deleted rows included.
+        let mut counts: std::collections::BTreeMap<u32, u64> = Default::default();
+        for (seq, _) in self.fetch_rows_including_deleted(&key).unwrap_or_default() {
+            *counts.entry((seq >> 32) as u32).or_default() += 1;
+        }
+        counts.into_iter().collect()
+    }
+
     /// C++ `SegmentMeta::GetBlockIDs1`: the block ids of `segment`, in order.
     /// Blocks exist once the C++-format mirror has been written
     /// ([`Self::write_cpp_blocks`] / [`Self::flush`]).
@@ -12116,17 +12256,28 @@ impl Engine {
     /// keeps the segment ids the reference's fixtures assert (`{2}` after two
     /// imports are compacted, `{3}` after compacting `{2}`, and so on).
     pub fn compact_table(&self, table: &str) -> Result<()> {
-        // Compaction rewrites segments, so both the manual and the periodic
-        // task require `kWritable` (`compaction_process_impl.cpp:270-295`).
-        self.ensure_writable()?;
-        // `ManualCompactTask` hands the candidates `NewCompactionAlg` picked
-        // (`physical_compact_impl.cpp`): with a single segment there is nothing
-        // to merge, so the reference opens **no** transaction and leaves the
-        // directory untouched. Merging one segment into a new one would move
-        // every row and spend a timestamp the reference does not.
+        // `ManualCompactTask` hands `PhysicalCompact` the candidates
+        // `NewCompactionAlg` picked (`physical_compact_impl.cpp:36`): with a
+        // single segment there is nothing to merge, so the reference opens
+        // **no** transaction and leaves the directory untouched. Merging one
+        // segment into a new one would move every row and spend a timestamp the
+        // reference never spends.
         if self.segment_ids(table).len() < 2 {
             return Ok(());
         }
+        self.compact_all_segments(table)
+    }
+
+    /// `NewTxn::Compact`: merge every segment of `table` into one new segment.
+    ///
+    /// This is the primitive the reference's compaction *tests* drive directly
+    /// (`TestTxnCompact` calls `NewTxn::Compact` with explicit segment ids), so
+    /// it merges unconditionally — even a single segment, which the manual and
+    /// periodic tasks would never choose.
+    pub fn compact_all_segments(&self, table: &str) -> Result<()> {
+        // Compaction rewrites segments, so both the manual and the periodic
+        // task require `kWritable` (`compaction_process_impl.cpp:270-295`).
+        self.ensure_writable()?;
         self.invalidate_row_cache(table);
         // Rows are re-keyed below; the mirror's row-id snapshot stops matching
         // the moment the first row moves.
@@ -13642,6 +13793,25 @@ impl Engine {
             .defaults)
     }
 
+    /// Writes the chunk files of every secondary index on `table`, the way
+    /// `NewTxn::Import` populates them (`PopulateIndex(…, DumpIndexCause::
+    /// kImport)` per segment). A `COPY` is an import to the reference, so it
+    /// must leave the index readable without a later dump.
+    fn populate_secondary_indexes(&self, table: &str) {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+            return;
+        };
+        for im in indexes {
+            if im.table != table && im.table != self.qualified_table(table) {
+                continue;
+            }
+            if !im.index_type.eq_ignore_ascii_case("SECONDARY") {
+                continue;
+            }
+            let _ = self.build_index(&im.table, &im.column);
+        }
+    }
+
     /// Loads a CSV file into `table` (`COPY t FROM …`). The path may be absolute
     /// or the Infinity fixture path `/var/infinity/test_data/…`, which is mapped
     /// onto `INFINITY_DATA_DIR` (default `test/data`) if present.
@@ -13695,14 +13865,16 @@ impl Engine {
                     "import: malformed fvecs file (trailing bytes)".into(),
                 ));
             }
-            let base = self.reserve_rows(table, rows.len(), true)?;
+            let base = self.reserve_rows_from(table, rows.len(), true, true)?;
             self.note_index_insert(table, rows.len());
             let mut t = self.txn.begin();
             for (k, row) in rows.iter().enumerate() {
                 let encoded = encode_row(row, &types);
                 t.put(row_key(table, base + k), encoded.into_bytes());
             }
-            self.txn.commit(t)?;
+            let ts = self.txn.commit(t)?;
+            self.settle_append_ts(table, 1, ts);
+            self.note_import_ts(table, (base >> 32) as u32, ts);
             return Ok(QueryResult::Inserted { count: rows.len() });
         }
         let delim = opts
@@ -13779,7 +13951,7 @@ impl Engine {
                 batch.push(cells.into_iter().map(Literal::Str).collect());
             }
             if !batch.is_empty() {
-                let base = self.reserve_rows(table, batch.len(), first_batch)?;
+                let base = self.reserve_rows_from(table, batch.len(), first_batch, true)?;
                 first_batch = false;
                 self.note_index_insert(table, batch.len());
                 let mut t = self.txn.begin();
@@ -13787,7 +13959,12 @@ impl Engine {
                     let encoded = self.encode_row_stored(table, row, &types_for_scan)?;
                     t.put(row_key(table, base + k), encoded.into_bytes());
                 }
-                self.txn.commit(t)?;
+                let ts = self.txn.commit(t)?;
+                // The block's `version` and, for a fresh segment, its
+                // `catalog|seg|` record carry this transaction's commit ts
+                // (`BlockVersion::Append`, `TableMeta::AddSegmentWithID`).
+                self.settle_append_ts(table, 1, ts);
+                self.note_import_ts(table, (base >> 32) as u32, ts);
                 for (k, row) in batch.iter().enumerate() {
                     self.update_indexes_on_insert(table, base + k, row)?;
                     let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
@@ -13919,14 +14096,16 @@ impl Engine {
         if rows.is_empty() {
             return Ok(QueryResult::Inserted { count: 0 });
         }
-        let base = self.reserve_rows(table, rows.len(), true)?;
+        let base = self.reserve_rows_from(table, rows.len(), true, true)?;
         self.note_index_insert(table, rows.len());
         let mut t = self.txn.begin();
         for (k, row) in rows.iter().enumerate() {
             let encoded = self.encode_row_stored(table, row, types)?;
             t.put(row_key(table, base + k), encoded.into_bytes());
         }
-        self.txn.commit(t)?;
+        let ts = self.txn.commit(t)?;
+        self.settle_append_ts(table, 1, ts);
+        self.note_import_ts(table, (base >> 32) as u32, ts);
         for (k, row) in rows.iter().enumerate() {
             self.update_indexes_on_insert(table, base + k, row)?;
             let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();

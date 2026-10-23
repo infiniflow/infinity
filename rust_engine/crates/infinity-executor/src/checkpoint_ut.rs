@@ -442,7 +442,7 @@ fn checkpoint_internal_test_checkpoint4() {
 
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
 
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     e.flush().unwrap();
     let e = restart(e, dir.path());
     e.flush().unwrap();

@@ -38,7 +38,7 @@ use infinity_index::hnsw_handler::HnswHandler;
 use infinity_index::plaid::PlaidIndex;
 use infinity_index::vector::HnswIndex;
 use infinity_storage::cpp_format::{
-    self, date_to_days, datetime_to_pair, element_width, embedding_size, pack_column_with_layout,
+    self, date_to_days, datetime_to_pair, element_width, embedding_size, pack_column_with_coverage,
     push_embedding_element, time_to_secs, BlockColumn, BlockId, BlockVersionFile, ColumnLayout,
     RawBlockColumn, DEFAULT_BLOCK_CAPACITY,
 };
@@ -176,10 +176,16 @@ fn decode_secondary_key(
 /// `secondary_index_data_impl.cpp:223`, one per `InsertBlockData` call). The
 /// offsets stay segment-relative, so the bucketing key is `offset / 8192` and
 /// the values are written unchanged.
+///
+/// The spill file name carries the segment (`seg_{segment}_{block}_{rows}.idx`,
+/// `write_secondary_pgm_chunks`), because two segments restart their offsets
+/// at zero: only the runs of `segment` are published here, into that
+/// segment's directory.
 fn publish_secondary_chunks(
     seg_dir: &Path,
     dir: &Path,
     kind: infinity_storage::secondary_segment::KeyKind,
+    segment: u32,
 ) -> Vec<CppIndexChunk> {
     use infinity_storage::secondary_segment::{
         write_secondary_segment_typed, SecondarySegmentReader,
@@ -195,6 +201,23 @@ fn publish_secondary_chunks(
         if path.extension().and_then(|e| e.to_str()) != Some("idx") {
             continue;
         }
+        // `seg_{segment}_{block}_{rows}.idx` when `build_index` wrote it,
+        // `seg_{segment}_tail{n}.idx` when a dump sealed a memory tail; both
+        // carry the segment first, and a tail may span blocks, so the block of
+        // an entry is derived from its offset rather than from the name.
+        let name = entry.file_name().to_string_lossy().to_string();
+        let Some(rest) = name
+            .strip_prefix("seg_")
+            .and_then(|n| n.strip_suffix(".idx"))
+        else {
+            continue;
+        };
+        let Some((run_segment, _)) = rest.split_once('_') else {
+            continue;
+        };
+        if run_segment.parse::<u32>() != Ok(segment) {
+            continue;
+        };
         let (Ok(bytes), Ok(reader)) = (
             std::fs::read(&path),
             SecondarySegmentReader::open_with_kind(&path, kind),
@@ -230,7 +253,9 @@ fn publish_secondary_chunks(
         chunks.push(CppIndexChunk {
             chunk_id: block as u32,
             base_name: String::new(),
-            base_row_id: block * DEFAULT_BLOCK_CAPACITY as u64,
+            // `RowID` of the block's first row: the segment in the high bits,
+            // the in-segment offset in the low ones.
+            base_row_id: (u64::from(segment) << 32) | block * DEFAULT_BLOCK_CAPACITY as u64,
             row_count: entries.len() as u64,
             term_count: 0,
             index_size: 0,
@@ -252,6 +277,7 @@ fn publish_bmp_chunks(
     width: infinity_storage::bmp_cpp::IdxWidth,
     term_bound: usize,
     block_size: usize,
+    segment: u32,
 ) -> Vec<CppIndexChunk> {
     let mut chunks = Vec::new();
     for (block, mut docs) in by_block {
@@ -276,7 +302,7 @@ fn publish_bmp_chunks(
         chunks.push(CppIndexChunk {
             chunk_id: block as u32,
             base_name: String::new(),
-            base_row_id: block * DEFAULT_BLOCK_CAPACITY as u64,
+            base_row_id: (u64::from(segment) << 32) | block * DEFAULT_BLOCK_CAPACITY as u64,
             row_count: docs.len() as u64,
             term_count: 0,
             index_size: 0,
@@ -343,7 +369,7 @@ fn publish_fulltext_chunks(seg_dir: &Path) -> Vec<CppIndexChunk> {
 /// PLAID). An HNSW chunk's header carries its vector count, so a multi-chunk
 /// index can be described exactly; the other kinds still write one chunk, which
 /// covers the whole snapshot.
-fn publish_chunk_files(seg_dir: &Path, rows: u64, hnsw: bool) -> Vec<CppIndexChunk> {
+fn publish_chunk_files(seg_dir: &Path, rows: u64, hnsw: bool, segment: u32) -> Vec<CppIndexChunk> {
     let mut ids: Vec<u32> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(seg_dir) {
         for entry in entries.flatten() {
@@ -365,7 +391,7 @@ fn publish_chunk_files(seg_dir: &Path, rows: u64, hnsw: bool) -> Vec<CppIndexChu
             vec![CppIndexChunk {
                 chunk_id: 0,
                 base_name: String::new(),
-                base_row_id: 0,
+                base_row_id: u64::from(segment) << 32,
                 row_count: rows,
                 term_count: 0,
                 index_size: 0,
@@ -387,7 +413,7 @@ fn publish_chunk_files(seg_dir: &Path, rows: u64, hnsw: bool) -> Vec<CppIndexChu
         chunks.push(CppIndexChunk {
             chunk_id: id,
             base_name: String::new(),
-            base_row_id,
+            base_row_id: (u64::from(segment) << 32) | base_row_id,
             row_count,
             term_count: 0,
             index_size: 0,
@@ -1572,7 +1598,7 @@ impl Engine {
 
     /// Qualifies an unqualified table name with the session database, which is
     /// how the catalog and row keys are spelled.
-    fn qualified_table(&self, table: &str) -> String {
+    pub(crate) fn qualified_table(&self, table: &str) -> String {
         if table.contains('.') {
             table.to_string()
         } else {
@@ -1740,13 +1766,22 @@ impl Engine {
                     .iter()
                     .map(|(_, row)| row.iter().map(mirror_cell_text).collect())
                     .collect();
-                let block_columns =
-                    self.encode_block_columns(&meta.types, &meta.ids, &types, &layouts, &texts)?;
                 // `block_start` stays in the table-wide append order the
                 // version batches are recorded in; the slot a deleted row
                 // occupies is inside its own segment's block.
                 let start = block_index * DEFAULT_BLOCK_CAPACITY;
                 let slot_base = seg_start + start;
+                // A block opened by `COPY` keeps the reference's import-time
+                // bitmap coverage (see `ColumnBody::build_with`).
+                let bitmap_bits = self.block_bitmap_bits(&table, slot_base, chunk.len());
+                let block_columns = self.encode_block_columns(
+                    &meta.types,
+                    &meta.ids,
+                    &types,
+                    &layouts,
+                    &texts,
+                    bitmap_bits,
+                )?;
                 let batches =
                     self.block_version_batches(&totals, &append_ts, slot_base, chunk.len());
                 let mut version = BlockVersionFile::new(&batches, DEFAULT_BLOCK_CAPACITY);
@@ -1939,6 +1974,7 @@ impl Engine {
         types: &[i32],
         layouts: &[ColumnLayout],
         chunk: &[Vec<String>],
+        bitmap_bits: Option<usize>,
     ) -> Result<Vec<BlockColumn>> {
         let mut block_columns = Vec::with_capacity(types.len());
         for (col, column_type) in types.iter().enumerate() {
@@ -1970,9 +2006,14 @@ impl Engine {
                 }
             }
             let bytes: Vec<Option<&[u8]>> = slots.iter().map(|s| s.as_deref()).collect();
-            let (body, packed_outline) =
-                pack_column_with_layout(*column_type, layouts[col], &bytes, DEFAULT_BLOCK_CAPACITY)
-                    .map_err(|e| Error::Storage(format!("pack column {col}: {e}")))?;
+            let (body, packed_outline) = pack_column_with_coverage(
+                *column_type,
+                layouts[col],
+                &bytes,
+                DEFAULT_BLOCK_CAPACITY,
+                bitmap_bits,
+            )
+            .map_err(|e| Error::Storage(format!("pack column {col}: {e}")))?;
             let outline = if kind == OutlineKind::None {
                 packed_outline
             } else {
@@ -2138,7 +2179,14 @@ impl Engine {
         let root = self
             .blocks_root()
             .join(format!("db_{db_id}/tbl_{table_id}"));
-        let rows = self.approx_row_count(table);
+        // Chunks are keyed by `(index, segment)`: the reference writes each
+        // segment's index under `idx_{id}/seg_{s}/` with its own chunk ids
+        // (`SegmentIndexMeta::next_chunk_id` is per segment), so a table with
+        // two segments has two independent chunk families per index.
+        let mut segments = self.segment_row_counts(table);
+        if segments.is_empty() {
+            segments.push((0, 0));
+        }
         let mut published = Vec::new();
         for im in self.storage.catalog.list_indexes()? {
             if im.table != table && im.table != self.qualified_table(table) {
@@ -2147,7 +2195,6 @@ impl Engine {
             let Ok(index_id) = self.cpp_index_position(table, &im.name) else {
                 continue;
             };
-            let seg_dir = root.join(format!("idx_{index_id}/seg_0"));
             let private =
                 crate::index_key(&self.qualified_table(table), &im.column).replace('/', "_");
             // Every chunk the index holds, not just the first: a chunk the
@@ -2169,37 +2216,11 @@ impl Engine {
                     self.column_types(table).ok()?.get(ci).cloned()
                 })
                 .unwrap_or_default();
-            let chunks = if im.index_type.eq_ignore_ascii_case("SECONDARY") {
-                let dir = self.dir.join("secondary").join(&private);
-                // The chunk's key width comes from the column's declared type,
-                // exactly as the reader derives it (`SecondarySegmentReader::
-                // open_with_kind`).
-                publish_secondary_chunks(&seg_dir, &dir, crate::secondary_key_kind(&declared))
-            } else if im.index_type.eq_ignore_ascii_case("BMP") {
-                // Rebuilt from the rows: the reference's chunk is the block and
-                // every dump extends it, while the port's spill files are per
-                // dump, so merging has to happen here.
-                publish_bmp_chunks(
-                    &seg_dir,
-                    self.sparse_rows_by_block(table, &im.column),
-                    crate::sparse_idx_width(&declared),
-                    crate::sparse_declared_bound(&declared).unwrap_or(0),
-                    crate::index_block_size(&im),
-                )
-            } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
-                // Written in place by `write_cpp_fulltext_index`; its files are
-                // named after the chunk's base name, not `chunk_N.idx`.
-                publish_fulltext_chunks(&seg_dir)
+            let sparse = if im.index_type.eq_ignore_ascii_case("BMP") {
+                Some(self.sparse_rows_by_block(table, &im.column))
             } else {
-                publish_chunk_files(
-                    &seg_dir,
-                    rows as u64,
-                    im.index_type.eq_ignore_ascii_case("HNSW"),
-                )
+                None
             };
-            if chunks.is_empty() {
-                continue;
-            }
             // The chunk record names the transaction whose dump sealed it
             // (`SegmentIndexMeta::AddChunkIndexID1`); the port's last `DumpIndex`
             // for this index is that transaction.
@@ -2212,18 +2233,69 @@ impl Engine {
                 .filter(|v| v.len() >= 8)
                 .map(|v| u64::from_le_bytes(v[..8].try_into().unwrap()))
                 .unwrap_or(0);
-            let chunks: Vec<_> = chunks
-                .into_iter()
-                .map(|c| CppIndexChunk {
-                    commit_ts: dump_ts,
-                    ..c
-                })
-                .collect();
-            published.push(CppIndexSegment {
-                index_id: index_id as u64,
-                segment_id: 0,
-                chunks,
-            });
+            for (segment, seg_rows) in &segments {
+                let seg_dir = root.join(format!("idx_{index_id}/seg_{segment}"));
+                // A chunk's ts is the commit ts of the transaction whose dump
+                // produced it. A segment filled by `COPY` was populated inside
+                // the import transaction (`PopulateIndex`), so its chunks
+                // carry the import's ts; a later explicit dump stamps its own.
+                let chunk_ts = dump_ts.max(self.import_ts(table, *segment).unwrap_or(0));
+                let chunks = if im.index_type.eq_ignore_ascii_case("SECONDARY") {
+                    let dir = self.dir.join("secondary").join(&private);
+                    // The chunk's key width comes from the column's declared type,
+                    // exactly as the reader derives it (`SecondarySegmentReader::
+                    // open_with_kind`).
+                    publish_secondary_chunks(
+                        &seg_dir,
+                        &dir,
+                        crate::secondary_key_kind(&declared),
+                        *segment,
+                    )
+                } else if im.index_type.eq_ignore_ascii_case("BMP") {
+                    // Rebuilt from the rows: the reference's chunk is the block and
+                    // every dump extends it, while the port's spill files are per
+                    // dump, so merging has to happen here.
+                    let empty = Default::default();
+                    publish_bmp_chunks(
+                        &seg_dir,
+                        sparse
+                            .as_ref()
+                            .and_then(|m| m.get(segment))
+                            .cloned()
+                            .unwrap_or(empty),
+                        crate::sparse_idx_width(&declared),
+                        crate::sparse_declared_bound(&declared).unwrap_or(0),
+                        crate::index_block_size(&im),
+                        *segment,
+                    )
+                } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
+                    // Written in place by `write_cpp_fulltext_index`; its files are
+                    // named after the chunk's base name, not `chunk_N.idx`.
+                    publish_fulltext_chunks(&seg_dir)
+                } else {
+                    publish_chunk_files(
+                        &seg_dir,
+                        *seg_rows,
+                        im.index_type.eq_ignore_ascii_case("HNSW"),
+                        *segment,
+                    )
+                };
+                if chunks.is_empty() {
+                    continue;
+                }
+                let chunks: Vec<_> = chunks
+                    .into_iter()
+                    .map(|c| CppIndexChunk {
+                        commit_ts: chunk_ts,
+                        ..c
+                    })
+                    .collect();
+                published.push(CppIndexSegment {
+                    index_id: index_id as u64,
+                    segment_id: *segment,
+                    chunks,
+                });
+            }
         }
         if published.is_empty() {
             return Ok(());
@@ -2239,13 +2311,21 @@ impl Engine {
         Ok(())
     }
 
-    /// A sparse column's documents, grouped by physical block, in the BMP
-    /// encoder's form: `(row id within the segment, [(term, value)])`.
+    /// A sparse column's documents, grouped by segment and then by physical
+    /// block, in the BMP encoder's form: `(row id within the segment,
+    /// [(term, value)])`.
+    ///
+    /// The segment is part of the key: every segment restarts its block ids at
+    /// zero, and the reference keeps one BMP index per segment
+    /// (`idx_{id}/seg_{s}/chunk_{block}.idx`).
     fn sparse_rows_by_block(
         &self,
         table: &str,
         column: &str,
-    ) -> std::collections::BTreeMap<u64, Vec<infinity_storage::bmp_cpp::SparseDoc>> {
+    ) -> std::collections::BTreeMap<
+        u32,
+        std::collections::BTreeMap<u64, Vec<infinity_storage::bmp_cpp::SparseDoc>>,
+    > {
         let mut by_block = std::collections::BTreeMap::new();
         let Ok(schema) = self.table_schema(table) else {
             return by_block;
@@ -2266,6 +2346,8 @@ impl Engine {
                 .collect();
             let row = seq as u64 & 0xffff_ffff;
             by_block
+                .entry((seq >> 32) as u32)
+                .or_default()
                 .entry(row / DEFAULT_BLOCK_CAPACITY as u64)
                 .or_default()
                 .push((row, entries));
@@ -2610,8 +2692,18 @@ impl Engine {
         Ok(id as usize)
     }
 
-    /// The vectors of `table`'s `column` as `(row id, vector)`.
-    fn cpp_column_vectors(&self, table: &str, column: &str) -> Result<VectorRows> {
+    /// The vectors of `table`'s `column` as `(row id, vector)`, optionally
+    /// restricted to one segment.
+    ///
+    /// The label is the **in-segment** offset (`seq as u32`): the reference's
+    /// per-segment index is handed `SegmentOffset`s, and a chunk under
+    /// `idx_{id}/seg_{s}/` is read back with the segment prepended.
+    fn cpp_column_vectors(
+        &self,
+        table: &str,
+        column: &str,
+        segment: Option<u32>,
+    ) -> Result<VectorRows> {
         let schema = self.table_schema(table)?;
         let col_idx = schema
             .iter()
@@ -2619,6 +2711,11 @@ impl Engine {
             .ok_or_else(|| Error::NotFound(format!("column '{column}' on '{table}'")))?;
         let mut out = Vec::new();
         for (seq, row) in self.fetch_rows_with_ids(table)? {
+            if let Some(only) = segment {
+                if (seq >> 32) as u32 != only {
+                    continue;
+                }
+            }
             if let Some(Value::Str(s)) = row.get(col_idx) {
                 out.push((
                     seq as u32,
@@ -2640,8 +2737,9 @@ impl Engine {
         table: &str,
         column: &str,
         options: &HnswOptions,
+        segment: Option<u32>,
     ) -> Result<(usize, Vec<u8>)> {
-        let vectors = self.cpp_column_vectors(table, column)?;
+        let vectors = self.cpp_column_vectors(table, column, segment)?;
         if vectors.is_empty() {
             return Err(Error::Invalid(format!(
                 "no vectors to index in '{table}.{column}'"
@@ -2782,8 +2880,19 @@ impl Engine {
         // memory and time on every checkpoint and was the Gate C OOM driver.
         // The full rebuild remains the fallback when materialising the mirror
         // explicitly (`new_chunk == false`), e.g. after a restart.
+        //
+        // With more than one segment the buffered graph cannot be split - it
+        // was built over every row - so a dump falls back to a per-segment
+        // rebuild, which the reference's query side treats the same way (a
+        // segment's chunks are merged at search time).
         let tkey = self.table_key(&table);
-        let from_memory = if new_chunk {
+        let segments = self.segment_row_counts(&table);
+        let segments = if segments.is_empty() {
+            vec![(0, 0)]
+        } else {
+            segments
+        };
+        let from_memory = if new_chunk && segments.len() == 1 {
             let Some(mem) = self
                 .tables
                 .lock()
@@ -2807,34 +2916,50 @@ impl Engine {
             None
         };
         let db_id = self.database_id_of(&table);
-        let dir = self
-            .blocks_root()
-            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id));
-        std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
-            path: dir.clone(),
-            source: e,
-        })?;
-        let chunks = hnsw_chunks(&dir);
-        // A checkpoint only mirrors an index that has no chunk yet. Check that
-        // before building: the build decodes every row and graph, which on a
-        // long import is the dominant transient (Gate C RSS) and is discarded
-        // here anyway.
-        if !new_chunk && !force_append && !chunks.is_empty() {
-            return Ok(0);
+        let options = self.hnsw_options(&table, index_name);
+        let mut written = 0usize;
+        for (segment, rows) in &segments {
+            let dir = self.blocks_root().join(format!(
+                "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
+                meta.id
+            ));
+            std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
+                path: dir.clone(),
+                source: e,
+            })?;
+            let chunks = hnsw_chunks(&dir);
+            // A checkpoint only mirrors an index that has no chunk yet. Check
+            // that before building: the build decodes every row and graph,
+            // which on a long import is the dominant transient (Gate C RSS)
+            // and is discarded here anyway.
+            if !new_chunk && !force_append && !chunks.is_empty() {
+                continue;
+            }
+            let built = match &from_memory {
+                Some((count, chunk)) => Some((*count, chunk.clone())),
+                None => {
+                    if *rows == 0 {
+                        None
+                    } else {
+                        self.cpp_hnsw_chunk(&table, &column, &options, Some(*segment))
+                            .ok()
+                    }
+                }
+            };
+            let Some((count, chunk)) = built else {
+                continue;
+            };
+            let name = format!(
+                "chunk_{}.idx",
+                chunks.last().map(|(id, _)| id + 1).unwrap_or(0)
+            );
+            std::fs::write(dir.join(name), &chunk).map_err(|e| Error::Io {
+                path: dir.clone(),
+                source: e,
+            })?;
+            written += count;
         }
-        let (count, chunk) = match from_memory {
-            Some(v) => v,
-            None => self.cpp_hnsw_chunk(&table, &column, &self.hnsw_options(&table, index_name))?,
-        };
-        let name = format!(
-            "chunk_{}.idx",
-            chunks.last().map(|(id, _)| id + 1).unwrap_or(0)
-        );
-        std::fs::write(dir.join(name), &chunk).map_err(|e| Error::Io {
-            path: dir.clone(),
-            source: e,
-        })?;
-        Ok(count)
+        Ok(written)
     }
 
     /// Optimizes every vector mirror: HNSW chunks are merged when the newest
@@ -3083,92 +3208,114 @@ impl Engine {
         // `ft_0000000000004000`, and a second run that appended 110 rows to a
         // 100-row table as a single `ft_0000000000000064` - not as a rewrite
         // of the first chunk.
-        let dir = self
-            .blocks_root()
-            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id));
-        std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
-            path: dir.clone(),
-            source: e,
-        })?;
-        // How many documents the chunks already on disk cover: a dump only
-        // indexes the rows past them. A chunk that claims more rows than the
-        // table has (the table shrank) is dropped instead.
-        let mut base = 0usize;
-        let mut stale = Vec::new();
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                let is_fulltext = name.starts_with("ft_");
-                if !is_fulltext {
-                    continue;
-                }
-                stale.push(path.clone());
-                let Some(hex) = name
-                    .strip_prefix("ft_")
-                    .and_then(|n| n.strip_suffix(".len"))
-                else {
-                    continue;
-                };
-                let Ok(start) = u64::from_str_radix(hex, 16) else {
-                    continue;
-                };
-                let docs = std::fs::metadata(&path)
-                    .map(|m| m.len() / 4)
-                    .unwrap_or_default();
-                base = base.max((start + docs) as usize);
-            }
-        }
-        if base > rows.len() {
-            for path in &stale {
-                let _ = std::fs::remove_file(path);
-            }
-            base = 0;
-        }
-        let mut written = 0usize;
-        // One chunk per **physical block** (`row_id / 8192`), not one per 8192
-        // live rows: a block keeps its `base_row_id` even when rows in it were
-        // deleted, so the split follows the row ids.
-        let mut by_block: std::collections::BTreeMap<u64, Vec<&(usize, Vec<Value>)>> =
+        //
+        // The index is **per segment**: `MemoryIndexer` is constructed with
+        // `segment_index_meta.GetSegmentIndexDir()` and a base row id whose
+        // high bits are the segment, so an import into a second segment writes
+        // `idx_{id}/seg_1/ft_0000000100000000.*` rather than extending the
+        // first segment's chunk.
+        let mut by_segment: std::collections::BTreeMap<u32, Vec<&(usize, Vec<Value>)>> =
             Default::default();
-        for row in rows.iter().skip(base) {
-            by_block
-                .entry((row.0 as u64 & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY as u64)
+        for row in rows.iter() {
+            by_segment
+                .entry((row.0 as u64 >> 32) as u32)
                 .or_default()
                 .push(row);
         }
-        for (_block, block_rows) in by_block {
-            // The chunk is named after the row it starts at, which is the
-            // block's first row only when the dump began on a block boundary.
-            let base_row_id = (block_rows[0].0 as u64) & 0xffff_ffff;
-            // term -> (document ordinal, the term's position in the document),
-            // in term order (the FST requires sorted keys). The document
-            // ordinal restarts at zero in every chunk: the chunk's `base_row_id`
-            // is what puts it back on the segment's row ids
-            // (`MemoryIndexer::doc_count_` counts rows within the chunk).
-            let mut postings: std::collections::BTreeMap<String, Vec<(u32, u32)>> =
-                std::collections::BTreeMap::new();
-            let mut lengths: Vec<u32> = Vec::with_capacity(block_rows.len());
-            for (doc, (_, row)) in block_rows.iter().enumerate() {
-                let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
-                let terms = crate::tokenize_index_positions(&text, &tokenizer);
-                lengths.push(terms.len() as u32);
-                for (t, position) in terms {
-                    postings.entry(t).or_default().push((doc as u32, position));
+        let mut written = 0usize;
+        for (segment, seg_rows) in by_segment {
+            let dir = self.blocks_root().join(format!(
+                "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
+                meta.id
+            ));
+            std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
+                path: dir.clone(),
+                source: e,
+            })?;
+            // How many documents the chunks already on disk cover: a dump only
+            // indexes the rows past them. A chunk that claims more rows than
+            // the segment has (the table shrank) is dropped instead. The file
+            // name carries the full `RowID`, so the count has to be taken from
+            // the in-segment offset.
+            let mut base = 0usize;
+            let mut stale = Vec::new();
+            if let Ok(entries) = std::fs::read_dir(&dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                    if !name.starts_with("ft_") {
+                        continue;
+                    }
+                    stale.push(path.clone());
+                    let Some(hex) = name
+                        .strip_prefix("ft_")
+                        .and_then(|n| n.strip_suffix(".len"))
+                    else {
+                        continue;
+                    };
+                    let Ok(start) = u64::from_str_radix(hex, 16) else {
+                        continue;
+                    };
+                    let docs = std::fs::metadata(&path)
+                        .map(|m| m.len() / 4)
+                        .unwrap_or_default();
+                    base = base.max(((start & 0xffff_ffff) + docs) as usize);
                 }
             }
-
-            let (dic, pos, len) = encode_fulltext_chunk(&postings, &lengths);
-            let base = cpp_format::fulltext_base_name(base_row_id, None);
-            for (name, bytes) in [
-                (format!("{base}.dic"), &dic),
-                (format!("{base}.pos"), &pos),
-                (format!("{base}.len"), &len),
-            ] {
-                let path = dir.join(&name);
-                std::fs::write(&path, bytes).map_err(|e| Error::Io { path, source: e })?;
+            if base > seg_rows.len() {
+                for path in &stale {
+                    let _ = std::fs::remove_file(path);
+                }
+                base = 0;
             }
-            written += block_rows.len();
+            // One chunk per **physical block** (`offset / 8192`), not one per
+            // 8192 live rows: a block keeps its `base_row_id` even when rows in
+            // it were deleted, so the split follows the row ids.
+            let mut by_block: std::collections::BTreeMap<u64, Vec<&(usize, Vec<Value>)>> =
+                Default::default();
+            for row in seg_rows.iter().skip(base) {
+                by_block
+                    .entry((row.0 as u64 & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY as u64)
+                    .or_default()
+                    .push(row);
+            }
+            for (_block, block_rows) in by_block {
+                // The chunk is named after the row it starts at, which is the
+                // block's first row only when the dump began on a block
+                // boundary. The name carries the whole `RowID` - segment in
+                // the high 32 bits - which is what the reference's
+                // `MemoryIndexer` uses as its base name.
+                let base_row_id = block_rows[0].0 as u64;
+                // term -> (document ordinal, the term's position in the
+                // document), in term order (the FST requires sorted keys). The
+                // document ordinal restarts at zero in every chunk: the
+                // chunk's `base_row_id` is what puts it back on the segment's
+                // row ids (`MemoryIndexer::doc_count_` counts rows within the
+                // chunk).
+                let mut postings: std::collections::BTreeMap<String, Vec<(u32, u32)>> =
+                    std::collections::BTreeMap::new();
+                let mut lengths: Vec<u32> = Vec::with_capacity(block_rows.len());
+                for (doc, (_, row)) in block_rows.iter().enumerate() {
+                    let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
+                    let terms = crate::tokenize_index_positions(&text, &tokenizer);
+                    lengths.push(terms.len() as u32);
+                    for (t, position) in terms {
+                        postings.entry(t).or_default().push((doc as u32, position));
+                    }
+                }
+
+                let (dic, pos, len) = encode_fulltext_chunk(&postings, &lengths);
+                let base = cpp_format::fulltext_base_name(base_row_id, None);
+                for (name, bytes) in [
+                    (format!("{base}.dic"), &dic),
+                    (format!("{base}.pos"), &pos),
+                    (format!("{base}.len"), &len),
+                ] {
+                    let path = dir.join(&name);
+                    std::fs::write(&path, bytes).map_err(|e| Error::Io { path, source: e })?;
+                }
+                written += block_rows.len();
+            }
         }
         Ok(written)
     }
@@ -3428,8 +3575,9 @@ impl Engine {
         table: &str,
         column: &str,
         options: &IvfOptions,
+        segment: Option<u32>,
     ) -> Result<(usize, Vec<u8>)> {
-        let vectors = self.cpp_column_vectors(table, column)?;
+        let vectors = self.cpp_column_vectors(table, column, segment)?;
         if vectors.is_empty() {
             return Err(Error::Invalid(format!(
                 "no vectors to index in '{table}.{column}'"
@@ -3697,20 +3845,35 @@ impl Engine {
             .map(|im| im.column)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
         let options = self.ivf_storage_option(&table, index_name);
-        let (count, chunk) = self.cpp_ivf_chunk(&table, &column, &options)?;
+        // One chunk per segment: the reference trains and dumps per segment
+        // (`PopulateIvfIndexInner` is handed a `SegmentMeta`), and the chunk's
+        // offsets are in-segment (`RowID(segment, offset)`).
         let db_id = self.database_id_of(&table);
-        let dir = self
-            .blocks_root()
-            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id));
-        std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
-            path: dir.clone(),
-            source: e,
-        })?;
-        std::fs::write(dir.join("chunk_0.idx"), &chunk).map_err(|e| Error::Io {
-            path: dir.clone(),
-            source: e,
-        })?;
-        Ok(count)
+        let mut segments = self.segment_row_counts(&table);
+        if segments.is_empty() {
+            segments.push((0, 0));
+        }
+        let mut written = 0usize;
+        for (segment, rows) in segments {
+            if rows == 0 {
+                continue;
+            }
+            let (count, chunk) = self.cpp_ivf_chunk(&table, &column, &options, Some(segment))?;
+            let dir = self.blocks_root().join(format!(
+                "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
+                meta.id
+            ));
+            std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
+                path: dir.clone(),
+                source: e,
+            })?;
+            std::fs::write(dir.join("chunk_0.idx"), &chunk).map_err(|e| Error::Io {
+                path: dir.clone(),
+                source: e,
+            })?;
+            written += count;
+        }
+        Ok(written)
     }
 
     /// Reads back a mirror written by [`Self::write_cpp_ivf_index`], returning

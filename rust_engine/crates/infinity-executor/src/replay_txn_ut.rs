@@ -168,7 +168,7 @@ fn replay_flush_gap_append_compact() {
     create_table(&e);
     h::ok(&e, "CREATE INDEX index_name ON db1.tb1 (col2);");
     h::append(&e, "db1.tb1", block());
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     e.checkpoint_wal();
 
     let e = h::reopen(e, dir.path());
@@ -190,7 +190,7 @@ fn replay_flush_gap_delete_compact() {
     let mut t = e.begin_txn();
     assert_eq!(t.delete_row_ids("db1.tb1", &ids).unwrap(), 4096);
     t.commit().unwrap();
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     e.checkpoint_wal();
 
     let e = h::reopen(e, dir.path());
@@ -367,7 +367,7 @@ fn ckp_replay_compact() {
         h::append(&e, "db1.tb1", block());
         h::append(&e, "db1.tb1", block());
     }
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
 
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);

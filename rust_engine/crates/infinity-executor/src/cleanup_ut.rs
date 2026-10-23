@@ -72,7 +72,7 @@ fn pre_test(engine: &Engine) {
         .unwrap();
     insert_one(engine, "db1.tb1", 1);
     insert_one(engine, "db1.tb1", 1);
-    engine.compact_table("db1.tb1").unwrap();
+    engine.compact_all_segments("db1.tb1").unwrap();
     engine.cleanup().unwrap();
 }
 
@@ -209,7 +209,7 @@ fn cleanup_and_compact() {
     run_plans(
         pre_test,
         |e| {
-            e.compact_table("db1.tb1").unwrap();
+            e.compact_all_segments("db1.tb1").unwrap();
         },
         |e| {
             assert_eq!(e.segment_ids("db1.tb1"), vec![2]);
@@ -304,7 +304,7 @@ fn cleanup_and_delete() {
             let mut t = e.begin_txn();
             assert_eq!(t.delete_row_ids("db1.tb1", &[(1, 0)]).unwrap(), 1);
             t.commit().unwrap();
-            e.compact_table("db1.tb1").unwrap();
+            e.compact_all_segments("db1.tb1").unwrap();
         },
         |e| {
             assert_eq!(e.segment_ids("db1.tb1"), vec![2]);
@@ -331,7 +331,7 @@ fn cleanup_and_update() {
             assert_eq!(t.delete_row_ids("db1.tb1", &[(1, 0)]).unwrap(), 1);
             t.commit().unwrap();
             insert_one(e, "db1.tb1", 2);
-            e.compact_table("db1.tb1").unwrap();
+            e.compact_all_segments("db1.tb1").unwrap();
         },
         |e| {
             assert_eq!(e.segment_ids("db1.tb1"), vec![3]);

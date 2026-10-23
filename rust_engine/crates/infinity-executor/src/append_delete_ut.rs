@@ -386,7 +386,7 @@ fn delete_then_compact() {
     h::append_repeated(&e, "db1.tb1", 2, "def", 8192);
     h::ok(&e, "DELETE FROM db1.tb1 WHERE col1 = 1;");
 
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
     e.flush().unwrap();

@@ -222,7 +222,7 @@ fn test_cleanup_compact() {
     let source_paths = e.table_files("default_db.tb1");
     assert!(!source_paths.is_empty());
 
-    e.compact_table("default_db.tb1").unwrap();
+    e.compact_all_segments("default_db.tb1").unwrap();
     e.flush().unwrap();
     e.cleanup().unwrap();
 
