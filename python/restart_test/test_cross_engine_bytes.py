@@ -60,9 +60,9 @@ The test therefore asserts:
    still has identical **postings** (decoded), and the rest of the HNSW chunk
    (header, vectors, labels) is byte identical;
 4. the catalog's *logical* content (the key/value pairs the reference sees
-   through `SHOW CATALOG 'all'`) is identical, keys included: only the value
-   of `idx_chunk|…|{chunk_id}` is normalized, because the port has no dump
-   transaction to name there;
+   through `SHOW CATALOG 'all'`) is identical, keys and bare-ts values
+   included — with every background task off, both engines dump at the same
+   points, so even `idx_chunk|…|{chunk_id}` names the same transaction;
 5. the indexes are **logically** equivalent: the reference reads each
    engine's directory and must answer the same queries the same way. This
    covers everything the byte comparison cannot see.
@@ -980,9 +980,9 @@ def _catalog_pairs(root, pg_port):
     """The catalog's key/value pairs, as the reference sees them.
 
     `SHOW CATALOG 'all'` lists what the engine actually holds, which is the
-    logical content of the catalog. The reference stamps the ts it wrote on
-    its own records, so the value of a record that is *only* a ts is
-    normalized; the records that carry content are compared as they are.
+    logical content of the catalog. Every record is returned as the reference
+    reports it - including the values that are only a commit ts - so the caller
+    compares both engines' text as it stands.
 
     The reference is started on the directory to read it, so the port's
     catalog must be in the C++ key space - which is what the port's
@@ -1133,34 +1133,6 @@ def _index_answers(root, pg_port):
         _wait_port_free()
 
 
-def _normalize_catalog_value(key, value):
-    """The catalog value with the one ts the port cannot name taken out.
-
-    Every record whose value is a bare ts holds the commit ts of the write
-    that created it, and the two engines now agree on all of them —
-    `catalog|blk|…` (the append that opened the block), `catalog|seg|…` (the
-    append that opened the segment), `idx_seg|…` (the transaction that paired
-    the index with the segment) — because they allocate the same sequence for
-    the same statements (see `rust_engine/docs/FORMAT_EQUIVALENCE_TESTS.md`
-    §6.6).
-
-    The exception is `idx_chunk|…|{chunk_id}`: both engines stamp it with the
-    commit ts of the transaction whose dump sealed the chunk, but the two dump
-    *schedules* differ. The reference dumps from a background processor
-    (`DumpIndexProcessor::DoDump`), defers the full-text index to a builder
-    worker, and its `flush_data` checkpoint commits asynchronously — measured,
-    the reference's five values are 22/24/26/28/32 with the checkpoint at 30, and
-    the same script with a pause before the dumps gives 22/24/26/28/30 with the
-    checkpoint at 32. The port dumps synchronously in call order after its own
-    (synchronous) checkpoint, so it writes 24/26/28/30/32. Both values are real
-    dump ts; which index gets which is the schedule.
-    """
-    if key.startswith("idx_chunk|") and not key.endswith("|chunk_info"):
-        if re.fullmatch(r"\d+", value):
-            return "<ts>"
-    return value
-
-
 def _table_records(pairs, table_dir, table):
     """Only the catalog records that belong to `table_dir`'s table.
 
@@ -1210,9 +1182,10 @@ def _normalize_catalog(pairs, zero_size_indexes=(), drop_chunk_info=False):
     The keys of the ts-stamped records (`catalog|tbl|{db}|{name}|{ts}`,
     `catalog|idx|{db}|{tbl}|{name}|{ts}`, `tbl|col|{db}|{tbl}|{name}|{ts}`)
     embed the commit ts of the transaction that wrote them, and the two
-    engines now produce the same ts for the same statements, so the key itself
-    is compared. Only the values `_normalize_catalog_value` names are taken
-    out.
+    engines produce the same ts for the same statements, so the key itself is
+    compared. Every bare-ts value is compared too, including
+    `idx_chunk|…|{chunk_id}`: with the background tasks off both engines dump
+    at the same points, so the chunk records name the same transactions.
 
     `index_size` is also taken out of the chunk records of the indexes in
     `zero_size_indexes`: the reference stores `GetSizeInBytes()` of the
@@ -1236,7 +1209,6 @@ def _normalize_catalog(pairs, zero_size_indexes=(), drop_chunk_info=False):
     """
     out = {}
     for key, value in pairs.items():
-        value = _normalize_catalog_value(key, value)
         if drop_chunk_info and key.startswith("idx_chunk|"):
             continue
         if zero_size_indexes and key.endswith("|chunk_info"):
@@ -1331,9 +1303,8 @@ def test_the_two_engines_write_the_same_bytes():
 
     # The catalog: the same records. The keys embed the commit ts of the
     # transaction that created them and the bare-ts values are that ts too;
-    # the two engines now agree on all of them, so the keys are compared
-    # verbatim and only the values `_normalize_catalog_value` names are taken
-    # out. The `index_size` of a graph-shaped chunk (HNSW, BMP) is taken out
+    # with every background task off (see `_config`) the two engines dump at
+    # the same points, so keys and values are both compared verbatim. The `index_size` of a graph-shaped chunk (HNSW, BMP) is taken out
     # as well, for the reason given in `_normalize_catalog`.
     #
     # The port writes the C++ key space only in its `rocksdb-store` build;

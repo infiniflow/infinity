@@ -29,7 +29,7 @@
 
 `version` 文件：布局相同，ts 也相同。`created_` 的 `create_ts` 是填块那次 append 的**提交 ts**，删除槽里是删除事务的提交 ts，两个引擎对同一句脚本消耗同一条 ts 序列（启动引导、首个 checkpoint、`default_db`、每条 DDL、每次 append/delete/dump/checkpoint，见 §6.6），所以整个文件逐字节比较。唯一会破坏这个前提的是参考的**内存用量驱动 dump**：它是后台线程上的写事务，ts 在 worker 真正提交时才分配，实测会落在 append 与随后的 DELETE 之间或之后（同一脚本两次跑出不同的 `version`）。对齐用例因此把配置里的异步任务全部关掉：`[storage] optimize_interval / cleanup_interval / compact_interval` 与 `[wal] checkpoint_interval` 都写 `"0s"`（参考侧 0 = 关闭，`default_values.cppm:98-123`），并把 `[buffer] memindex_memory_quota` 设成内存索引永远达不到的值（`"2GB"`，即 buffer 大小；参考的字节数解析器拒绝 `"0"`）。
 
-内存索引的**行容量触发**保留（`[storage] mem_index_capacity`，参考默认 65536 = 8 个块）：它按行数触发（`new_txn_index_impl.cpp:1381`），是脚本的性质而不是时钟的性质，因此可复现。于是对齐用例里只剩两类 dump：脚本显式的 `DumpIndex`，以及行数越过 `mem_index_capacity` 的那次。`idx_chunk` 记录里的 ts 仍只有参考能命名（见 §6.1），门禁只对该值做归一化。
+内存索引的**行容量触发**保留（`[storage] mem_index_capacity`，参考默认 65536 = 8 个块）：它按行数触发（`new_txn_index_impl.cpp:1381`），是脚本的性质而不是时钟的性质，因此可复现。于是对齐用例里只剩两类 dump：脚本显式的 `DumpIndex`，以及行数越过 `mem_index_capacity` 的那次。排期固定之后，两边的 `idx_chunk|…|{chunk_id}` 也落在同一批事务上，该值与其他记录一样逐字节比（§6.1）。
 
 浮点键 PGM 的截距依赖参考的**编译选项**。clang 默认 `-ffp-contract=on`，参考以 `-O3` 编译时会把 `piecewise_linear_model.hpp` 里 5 处乘加（`get_intersection` 的 `a`、`b`、`i_x`、`i_y` 与 `get_floating_point_segment` 的截距）收缩成 FMA；同一份源码用 `-ffp-contract=off` 编出来，`FLOAT` 键 65 行线性输入的第一个截距是 32 而不是 31。重写版用 `f64::mul_add` 复刻收缩后的舍入，因此对齐的是**参考默认编译口径**下的字节；这条差异由 `float_intercept_matches_contracted_reference_fit` 钉住。
 
@@ -94,12 +94,12 @@
 1. **跨段全文合并**：重写版把每个索引的 chunk 都写在 `idx_{id}/seg_0/`，不按段拆；参考在测试规模上只有 `seg_0`，所以没有可观测差异。要冻结这条需要 8,388,608 行级别的数据（每引擎约 1024 个块目录），本机内存与磁盘放不下两端。
 2. **多段下的索引类**（矩阵"多段"列的 ⬜）：HNSW / IVF / 次级 / 稀疏都只有单段覆盖，原因同上。
 3. **HNSW / IVF 的删除、更新、重启、崩溃恢复**：图区/质心不可字节比，这几个场景需要按内容比，目前没有用例。
-4. **次级 / 稀疏索引的删除、更新、重启、崩溃恢复**：可字节比，目前没有用例。
+4. **次级 / 稀疏索引的删除、更新、重启、崩溃恢复**：可字节比，目前只覆盖了浮点键次级索引的删除/更新（`test_the_bytes_after_deletes_updates_and_a_restart`，矩阵 §4:73），其余组合没有用例。
 5. **WAL 的字节级比对**：只做跨引擎 replay，不比字节。
 
 ### 5.3 流程
 
-1. **CI**：`.github/workflows/rust_engine.yml` 的 `cross_engine` job 在 builder 镜像里编参考、用 `--features rocksdb-store` 编重写版，并在 bwrap 下跑两个 pytest 文件。
+1. **CI**：`.github/workflows/rust_engine.yml` 的 `cross_engine` job 在 builder 镜像里编参考、用 `--features rocksdb-store` 编重写版，并在 bwrap 下跑两个 pytest 文件。**对象存储不在 CI 里**：job 没有设 `INFINITY_MINIO_URL` / `INFINITY_MINIO_TEST`，所以 `test_the_port_round_trips_through_object_storage` 与 `s3_minio.rs` 在 CI 中都是 skip，需要手工跑（§7）。
 2. **重写版自身确定性**：由 `test_the_port_is_deterministic_too` 单独断言（3 次跑，`data/` 下每个文件都必须相同）。
 
 ## 6. 与 C++ 参考的差异
@@ -108,7 +108,6 @@
 
 | 差异 | 重写版 | 参考 | 门禁处理 |
 |---|---|---|---|
-| `idx_chunk\|…\|{chunk_id}` 的值 | 封住该 chunk 的那次 `DumpIndex` 的提交 ts（`dump_ts:{表}:{索引}` 记录，checkpoint 镜像与 dump 当次都会写） | 同上。参考的 dump 由后台 `DumpIndexProcessor` 执行、全文索引再转到构建 worker，且 `flush_data` 的 checkpoint 异步提交，实测同一脚本两次给出 22/24/26/28/32（checkpoint 在 30）与 22/24/26/28/30（checkpoint 在 32）；重写版同步按调用序 dump（24/26/28/30/32） | 只把这个值归一化成 `<ts>`；键与其它记录逐字节比。两边都是真实的 dump 提交 ts，差异是 dump 排期 |
 | HNSW 图区 | 确定（插入顺序即行序） | `thread_local std::mt19937`，节点层级取决于线程调度 | header / vectors / labels 字节比，图区与查询答案按内容比 |
 | IVF 质心 | 确定 | `std::random_device` 采样，质心个数也不固定 | chunk 按内容比 |
 | `catalog/`、`wal/` | RocksDB；redo 记录写 `wal/wal.rust`，replay 时同时读参考的 `wal/wal.log` | RocksDB；写 `wal/wal.log` | 只比逻辑内容与互读 |
@@ -170,13 +169,16 @@
 | `DumpIndex` | 每次一个写事务（`DumpIndexProcessor::DoDump` 的 `kDumpMemIndex`），索引没有内存尾巴也照样占一个 | 同（`Engine::dump_index_transaction`） |
 | UPDATE | 删除 + 追加，同一个事务 | 同（`commit_with_deletes(…, appended = 1, …)` 把两个 ts 都记进 `version`） |
 
-所以同一句脚本的 trace 现在**逐值相同**。实测（200 行、5 个索引的字节用例，WAL 的提交 ts）：
+所以同一句脚本的 trace 逐值相同。实测（200 行、5 个索引的字节用例，异步任务按 §2 关闭）：
 
 ```
 参考   : 4=checkpoint(启动) 6=CreateDatabase 8=CreateTable 10/12/14/16/18=CreateIndex
-         20=Append 22/24/26/28=DumpIndex 30=checkpoint 32=DumpIndex 36/40=checkpoint
-重写版 : 同一串
+         20=Append 22=checkpoint(flush) 24/26/28/30/32=DumpIndex 36/40/44=checkpoint
+重写版 : 4=checkpoint(启动) 6=CreateDatabase 8=CreateTable 10/12/14/16/18=CreateIndex
+         20=Append 22=checkpoint(flush) 24/26/28/30/32=DumpIndex
 ```
+
+（文件级读数会误导：重写版的 redo 记录在 `wal.rust`，`wal.log` 只保留最新一个 checkpoint 帧，后写的那帧由 `cover_with_checkpoint` 覆盖到最后一次 dump，所以 `wal.log` 里读到的是 32；参考会截断自己的 `wal.log`。逐值比较看的是两边实际消耗的提交 ts。）
 
 第二个进程接着写同一目录（append 100 / delete 20 / update 10 / flush / dump ×2）：
 
@@ -187,10 +189,9 @@
 
 这些 ts 落到字节里的地方因此全部逐字节相同：块 `version` 的 `create_ts` 与删除槽、`catalog|seg|…` / `catalog|blk|…`（开段/开块的 append）、`idx_seg|…`（把索引与该段配对的事务 = `max(index 创建 ts, segment 创建 ts)`）、`catalog|tbl|…|{ts}` / `catalog|idx|…|{ts}` / `tbl|col|…|{ts}` 键里的 ts。
 
-两处例外：
+前提是**没有"什么时候跑"的写事务**，所以对齐配置把异步任务全关掉（§2）：`optimize/cleanup/compact_interval` 与 `checkpoint_interval` 都是 `0s`，`memindex_memory_quota` 取内存索引达不到的值。剩下的 dump 只有脚本显式的 `DumpIndex` 与行数越过 `mem_index_capacity` 的那次，两者都由脚本决定，因此 `idx_chunk|…|{chunk_id}` 也落在同一批事务上，和其它记录一样逐字节比。
 
-* **参考的配额驱动 dump**（§2）：`BGMemIndexTracer::IncreaseMemoryUsage` 在后台线程上开写事务，ts 在 worker 真正提交时才分配，实测会落在 append 与随后的 DELETE 之间或之后。这不是格式，比较 ts 的用例把 `memindex_memory_quota` 设成内存索引达不到的值，只保留脚本里显式的 `DumpIndex`。
-* **`idx_chunk|…|{chunk_id}` 的值**：两边都写产出该 chunk 的 dump 事务的提交 ts（重写版在 `DumpIndex` 时记下并盖到已发布的 id 记录上，同时把 `wal.log` 的 checkpoint 帧推进到覆盖它，否则参考读目录时会按 `chunk_ts > begin_ts` 把 chunk 藏起来）。差异只在**哪个索引拿到哪个 ts**：参考的 dump 走后台队列、全文索引再延后，`flush_data` 的 checkpoint 又是异步的；实测同一脚本两次得到 22/24/26/28/32（checkpoint 30）与 22/24/26/28/30（checkpoint 32），重写版同步按调用序得到 24/26/28/30/32。门禁只把这个值归一化成 `<ts>`，键与其它记录仍逐字节比。
+`idx_chunk` 的值由重写版在 `DumpIndex` 时记下（`dump_ts:{表}:{索引}`），盖到已发布的 id 记录上，并把 `wal.log` 的 checkpoint 帧推进到覆盖它——参考读目录时按 `chunk_ts > begin_ts` 隐藏 chunk（`LoadChunkIDs1`），帧不覆盖就会被藏起来。
 
 还有一种情况不是分配差异，而是两边做的事不同：手动 `COMPACT`。参考的 `ManualCompactTask` 交给 `NewCompactionAlg` 挑候选段（`physical_compact_impl.cpp:36`），一个段时挑不出东西、**不开事务**；重写版的 `compact_table` 无条件把行搬进下一个段，因此多出一个写事务。多段用例里的表只有 8192 行（两边都是一个段），所以参考的 trace 是 `10=Append 12=checkpoint(flush) 14=Append(尾批) 16=checkpoint`，重写版在 12 与 14 之间多一个 compaction 事务。该用例只比尾块的**布局**（`_version_without_ts`），因为它的目的是验证行 id 携带段号、块落在段目录下，而不是比较 compaction 本身。
 
