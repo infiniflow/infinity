@@ -2274,6 +2274,130 @@ def test_the_indexes_survive_a_crash():
 
 
 # ---------------------------------------------------------------------------
+# The object directory: the layout the reference's `PersistenceManager` writes.
+#
+# A bucket (or its local stand-in, `storage_type = "local"` with a
+# `persistence_dir`) holds one packed object plus `pm|object|<path>` records in
+# the catalog; the data files themselves are moved out of `data/`. A directory
+# in that shape is readable by the engine that wrote it, so the gate asks each
+# engine to read the *other* one's.
+# ---------------------------------------------------------------------------
+
+OBJECT_TABLE = "test_cross_engine_objects"
+OBJECT_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}, "score": {"type": "float"}}
+OBJECT_ROWS = 100
+
+
+def _object_dir_config(root, engine, reference_format):
+    """`_config` with a persistence directory, plus the port's object-format key.
+
+    Both engines must keep their files in the object directory; only the port
+    knows `persistence_format` (the reference rejects unknown keys in
+    `[storage]` with "Unrecognized config parameter"), so the key is written
+    into the port's file alone.
+    """
+    text = _config(root, engine, 5432 if engine == "cpp" else 5433)
+    text = text.replace(
+        'persistence_dir = ""', f'persistence_dir = "{root}/persistence"'
+    )
+    if engine == "rust" and reference_format:
+        text = text.replace(
+            "[storage]", '[storage]\npersistence_format = "reference"', 1
+        )
+    return text
+
+
+def _phase_object_seed(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(OBJECT_TABLE, ConflictType.Ignore)
+    t = db.create_table(OBJECT_TABLE, OBJECT_COLUMNS, ConflictType.Error)
+    t.create_index("score_sec", index.IndexInfo("score", index.IndexType.Secondary))
+    t.insert(
+        [
+            {"id": i, "title": f"doc-{i}", "score": i * 0.5}
+            for i in range(OBJECT_ROWS)
+        ]
+    )
+    conn.flush_data()
+    time.sleep(2)
+
+
+def _object_answers(conn):
+    """Read through a block scan and through the index chunk."""
+    t = conn.get_database("default_db").get_table(OBJECT_TABLE)
+
+    def column(result, name):
+        data, _, _ = result
+        return [str(v) for v in data[name]]
+
+    count = column(t.output(["count(*)"]).to_result(), "count(star)")
+    ids = column(t.output(["id", "title"]).filter("id = 7").to_result(), "id")
+    titles = column(t.output(["id", "title"]).filter("id = 7").to_result(), "title")
+    scores = column(
+        t.output(["id"]).filter("score >= 10.0 and score <= 12.0").to_result(), "id"
+    )
+    return count[0], list(zip(ids, titles)), scores
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_object_directory_is_shared_with_the_reference():
+    """Each engine reads the other's object directory, with `data/` emptied.
+
+    The reference moves a persisted file into its object
+    (`PersistenceManager::Persist`: an 8-byte-aligned part of a packed object,
+    named by `pm|object|<path>`), and the port now writes the same records and
+    reads them back on open. The `data/` tree is deleted between the two runs,
+    so the reader can only answer by resolving the catalog's records against the
+    object file - a scan (the block columns) and the secondary index chunk are
+    both read this way.
+
+    This is the local stand-in for a bucket: the same records and the same
+    packed object are what `VirtualStore` uploads when `storage_type = minio`.
+    """
+    expected = {}
+    for writer, reader, port in (("rust", "cpp", 5432), ("cpp", "rust", 5433)):
+        root = os.path.join(ROOT, f"objects_{writer}")
+        shutil.rmtree(root, ignore_errors=True)
+        for sub in ("log", "tmp"):
+            os.makedirs(os.path.join(root, sub), exist_ok=True)
+        with open(os.path.join(root, "engine.toml"), "w") as handle:
+            handle.write(_object_dir_config(root, writer, writer == "rust"))
+        _spawn_and_run(writer, root, _phase_object_seed)
+
+        object_dir = os.path.join(root, "persistence")
+        objects = [
+            name
+            for name in os.listdir(object_dir)
+            if name != "KEY_EMPTY" and not name.endswith((".sst", ".log"))
+        ]
+        assert objects, f"{writer}: no packed object was written"
+        # The reference moves the files into the object; the port keeps its
+        # `data/` as a local cache, so only the reference can be asked to leave
+        # the directory empty.
+        if writer == "cpp":
+            assert not any(f for _, _, f in os.walk(os.path.join(root, "data"))), (
+                "the reference left data files next to its object"
+            )
+
+        shutil.rmtree(os.path.join(root, "data"), ignore_errors=True)
+        with open(os.path.join(root, "engine.toml"), "w") as handle:
+            handle.write(_object_dir_config(root, reader, reader == "rust"))
+        seen = []
+        _spawn_and_run(reader, root, lambda conn: seen.append(_object_answers(conn)))
+        count, by_id, by_score = seen[0]
+        assert count == str(OBJECT_ROWS), f"{reader} read {count} rows from {writer}'s objects"
+        assert by_id == [("7", "doc-7")], f"{reader}: {by_id}"
+        assert by_score == ["20", "21", "22", "23", "24"], f"{reader}: {by_score}"
+        expected[writer] = (count, by_id, by_score)
+    assert expected["rust"] == expected["cpp"]
+
+
+# ---------------------------------------------------------------------------
 # The index-kind matrix: IVF, other metrics, other keys.
 # ---------------------------------------------------------------------------
 

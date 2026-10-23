@@ -142,6 +142,7 @@ pub mod metastore;
 pub mod metastore_rocks;
 pub mod multivector_segment;
 pub mod mvcc;
+pub mod object_dir;
 pub mod persistence;
 pub mod rcu_map;
 pub mod result_cache;

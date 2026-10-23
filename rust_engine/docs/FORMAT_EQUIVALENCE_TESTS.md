@@ -52,6 +52,7 @@
 | `::test_the_ivf_chunk_is_only_compared_by_content` | 上面的表，参考跑 2 次 | IVF chunk 的字节不是行值的函数，只能按内容比 |
 | `::test_a_crash_leaves_a_replayable_directory` | 100 行 flush + 50 行未 flush 后 kill -9 | 另一引擎启动后看到 150 行（双向） |
 | `::test_a_compacted_table_keeps_its_segments_apart` | 8192 行 + `COMPACT` + 50 行 | 重写版把行写进 `seg_1`/`seg_2`；非 0 段的块与参考同行的块逐字节相同；两个方向互读 8242 行；重写版重启不重复 |
+| `::test_the_object_directory_is_shared_with_the_reference` | 100 行 + 次级索引；两个引擎各写一次 `persistence_dir`（`storage_type = "local"`，即桶在本地的那份布局），写完删掉 `data/`，由另一个引擎读 | 对面的引擎按 `pm|object|` 解析打包对象后：行数 100、`id = 7` 命中、次级范围查询命中同一批 id；两个方向一致 |
 | `::test_the_port_round_trips_through_object_storage` | 200 行 + `storage_type="minio"` → 清空本地目录 → 读回 → 再写 50 行（在恢复出来的树上做 checkpoint）→ 再清空 → 读回 | 重写版从桶里恢复 `data/`+`catalog/`+`persistence/`，行数 200；第二次 checkpoint 后是 250（需要 `INFINITY_MINIO_URL`；每次跑用新桶，避免上一轮的桶污染） |
 | `::test_the_secondary_and_sparse_indexes_survive_deletes_updates_and_a_restart` | INT / FLOAT / DOUBLE 三个次级键 + 稀疏 BMP；第二个进程 `DELETE` 前缀 + `UPDATE` 一段，再 flush/dump | 每个 chunk 逐字节相同（DOUBLE 键走 8 字节键 + `double` 斜率）；chunk 覆盖 110 个物理行；四个索引的答案相同 |
 | `::test_the_vector_indexes_survive_deletes_updates_and_a_restart` | HNSW（`vec`）+ IVF（`vec2`）；第二个进程删除 + 改向量 + 追加 | HNSW 的 header/vectors/labels 与 IVF 的 header 计数、`(offset, vector)` 对相同；两个索引的 top-k 答案相同；行数相同 |
@@ -81,7 +82,7 @@
 | WAL 记录 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ✅ 跨引擎 replay | — | ◐ |
 | Catalog KV | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
 
-"对象存储"列的 `◐` 一律读作**重写版自身往返**（写 → 清空 → 读 → 再写 → 再读），不是跨引擎比对；跨引擎不成立的原因见 §6.5。
+"对象存储"列的 `◐` 现在指**跨引擎对象目录**：任一引擎写出的 `pm|object|` + 打包对象，另一个引擎删掉 `data/` 后也能读出来（§3 的对象目录用例）。MinIO 传输层仍只有重写版自身往返，原因见 §6.5。
 
 ## 5. 未纳入门禁的部分
 
@@ -90,7 +91,7 @@
 1. **HNSW 图区**。参考用 `thread_local` 随机数，图本身不是唯一确定的；重写版的图是确定的，但两端不可能相同。
 2. **IVF 训练**。参考的 k-means 采样走 `std::random_device`，质心与质心个数都不是行值的函数。
 3. **`catalog/` 与 `wal/`**。带 ts / LSN / session id。
-4. **MinIO 桶内布局**。键名由两端各自的持久化层决定（见 §6.5）。
+4. **MinIO 桶内布局**。对象布局（`pm|object|` + 打包对象）已经对齐并由 §3 的对象目录用例双向验证；桶只是这套布局的远端传输，见 §6.5。
 
 前两项的结论是**不追求字节可比**，理由在 §6.4：要复刻 libstdc++ 的 `mt19937` + `uniform_int_distribution` + 线程插入顺序，等于把实现细节写进格式。
 
@@ -144,13 +145,18 @@
 
 要让两引擎产出同一个图，重写版必须逐位复刻 `std::mt19937`、`std::uniform_int_distribution` 的取模方式、以及**线程插入顺序**。随机数和线程调度都不是格式的一部分。
 
-### 6.5 对象存储的跨引擎差异（有测量）
+### 6.5 对象存储：同一套对象布局
 
-- 参考的桶内键是**打包对象**：`ObjCreate()` 命名的 blob（`object_size_limit_` 触发的 8 MB compose 包），本地路径与 `(obj_key, offset, size)` 的映射写在 KV 的 `pm|object|<path>` 记录里（`KeyEncode::PMObjectKey`，`persistence_manager_impl.cpp:123`），对象统计另记 `pm|object_stat|`。
-- 重写版的桶内键是**路径树**：`data/<相对路径>`、`catalog/<相对路径>`、`persistence/<相对路径>`（`infinity_storage::s3::sync_tree`）。
-- 参考**没有恢复路径**：`VirtualStore::DownloadObject` 在 `src/` 里没有调用者；把参考的本地文件清空后重启，它记的是 `Init a new catalog` + 空表（日志里只有 `Uploading object meta/...`）。参考的对象存储是"备份"，不是"主存储"。
+参考的持久化层（`PersistenceManager`，`src/storage/persistence/persistence_manager_impl.cpp`）不把数据文件留在 `data/`，而是：
 
-所以这一列只能覆盖重写版自己的往返；跨引擎互读需要一个重写版的打包对象存储实现（`ObjCreate` + `pm|object|` + `pm|object_stat|` + 对齐/合包），且在参考能自恢复之前没有可比的另一端。
+- 把文件按 8 字节对齐拼进**对象**，或整个搬过去；对象文件的文件名就是 `obj_key`；
+- 在 catalog 里写 `pm|object|<相对 data_dir 的路径>` → `{"obj_key","part_offset","part_size"}`，空文件记 `KEY_EMPTY`；
+- 另写 `pm|object_stat|<obj_key>` → `{"deleted_ranges":[],"obj_size","parts"}`；
+- 对象目录就是 `persistence_dir`（本地模式），换成 `storage_type = "minio"` 时同一份布局在桶里（`VirtualStore` 只换传输）。
+
+重写版现在读写同一套布局：`[storage] persistence_format = "reference"`（参考会拒绝 `[storage]` 里的未知键，所以这个键只写进重写版的配置）让引擎在打开时按 `pm|object|` 把缺的 `data/` 文件从对象里取出来，并在每次 checkpoint 后把 `data/` 重新打包成一个对象、重写这些记录。`test_the_object_directory_is_shared_with_the_reference` 双向验证：任一引擎写出的对象目录，删掉 `data/` 后另一个引擎都能按对象答出同样的行与索引结果。
+
+剩下的差异只有传输层：重写版的 S3 客户端（`infinity_storage::s3`）仍按路径树上传播 `data/`、`catalog/`、`persistence/`，没有把打包对象与 `pm|object|` 记录发到桶里。要覆盖这一段需要一个可用的 S3 端点（用例需要 `INFINITY_MINIO_URL`），而 MinIO 开源版已归档、本机也没有可用的替代端点，所以这一列在门禁里仍是重写版自身的往返。
 
 ### 6.6 时间戳：两个引擎消耗同一条序列
 

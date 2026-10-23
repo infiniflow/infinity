@@ -160,8 +160,22 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     if let Some(flag) = catalog_backend_flag(&std::env::args().collect::<Vec<_>>())? {
         backend = Some(flag);
     }
+    // `[storage] persistence_format = "reference"`: publish the data files the
+    // way the reference's `PersistenceManager` does (`pm|object|` records plus
+    // one packed object under `persistence_dir`), and materialise them again on
+    // open. That is the layout a bucket holds, so a directory written this way
+    // is what the other engine reads from its object store.
+    let object_dir = if toml_value(&text, "persistence_format")
+        .unwrap_or_default()
+        .eq_ignore_ascii_case("reference")
+    {
+        Some(root.join("persistence"))
+    } else {
+        None
+    };
     let options = infinity_executor::EngineOptions {
         catalog_backend: backend,
+        object_dir,
         ..Default::default()
     };
     let engine = Arc::new(Engine::open_with_options(&root, options)?);

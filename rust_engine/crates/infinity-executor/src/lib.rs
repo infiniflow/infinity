@@ -4086,6 +4086,10 @@ pub struct Engine {
     txn: TxnManager,
     /// the engine's data directory (root of the C++-format block mirror)
     dir: PathBuf,
+    /// The reference's object directory, when this engine publishes its data
+    /// files through `pm|object|` instead of leaving `data/` private
+    /// (`EngineOptions::object_dir`).
+    object_dir: Option<PathBuf>,
     /// `false` for the reference's `NEW_CONFIG_NOWAL_PATH`: catalog DDL is
     /// durable only through a checkpoint (`flush`), not on commit.
     wal_enabled: bool,
@@ -4666,6 +4670,13 @@ pub struct EngineOptions {
     /// `None` (the default) lets the build decide. An existing directory is
     /// always opened on the substrate it holds, whatever this says.
     pub catalog_backend: Option<infinity_storage::metastore::StoreBackend>,
+    /// The reference's object directory (`pm|object|` + one file per object).
+    ///
+    /// `Some` makes the engine speak that layout: at open it materialises any
+    /// `data/` file the records describe but the directory does not hold, and
+    /// at every checkpoint it republishes `data/` as one object. `None` keeps
+    /// the plain directory the other gates use.
+    pub object_dir: Option<std::path::PathBuf>,
 }
 
 impl Default for EngineOptions {
@@ -4674,6 +4685,7 @@ impl Default for EngineOptions {
             wal_enabled: true,
             exchange_capacity: 4,
             catalog_backend: None,
+            object_dir: None,
         }
     }
 }
@@ -4748,6 +4760,15 @@ impl Engine {
                 Catalog::with_store(catalog_store)
             }
         };
+        // The reference keeps its data files in objects and describes them in
+        // `pm|object|`; open the `data/` tree before anything reads a block.
+        if let Some(object_dir) = options.object_dir.as_ref() {
+            infinity_storage::object_dir::unpack(
+                catalog.store().as_ref(),
+                &dir.join("data"),
+                object_dir,
+            )?;
+        }
         // The row/meta store: RocksDB when the `rocksdb-store` feature is on
         // (the substrate the C++ engine's catalog uses), fjall otherwise.
         let store: Arc<dyn MetaStore> = infinity_storage::open_store(
@@ -4804,6 +4825,7 @@ impl Engine {
                 last_cleanup_ts: std::sync::atomic::AtomicU64::new(0),
             },
             dir,
+            object_dir: options.object_dir.clone(),
             wal_enabled: options.wal_enabled,
             index_epoch: std::sync::atomic::AtomicU64::new(0),
             result_cache: Mutex::new(HashMap::new()),
@@ -15158,6 +15180,17 @@ impl Engine {
         // The C++ block mirror is best-effort: large tables are skipped by its
         // budget and the row store remains authoritative.
         let mirror = self.flush_cpp_blocks();
+        // `EngineOptions::object_dir`: publish this checkpoint's data files as
+        // the reference's `pm|object|` records + one packed object.
+        if let Some(object_dir) = self.object_dir.as_ref() {
+            if let Err(e) = infinity_storage::object_dir::pack(
+                self.storage.catalog.store().as_ref(),
+                &self.dir.join("data"),
+                object_dir,
+            ) {
+                eprintln!("object dir: packing failed: {e}");
+            }
+        }
         // The mirror writes the vector/IVF chunks, so reload after it.
         self.reload_vector_indexes();
         // Write back the row sidecars: dirty file pages cannot be reclaimed and
