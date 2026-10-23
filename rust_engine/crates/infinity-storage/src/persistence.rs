@@ -205,8 +205,8 @@ pub struct PersistenceManager {
     /// directory that is not shared with the reference).
     store: Option<Arc<dyn MetaStore>>,
     workspace: PathBuf,
-    /// Data-dir prefix with a trailing separator, as in the reference.
-    local_data_dir: String,
+    /// Data-dir prefix (`RemovePrefix` strips it from a path).
+    local_data_dir: PathBuf,
     object_size_limit: usize,
     inner: Mutex<Inner>,
 }
@@ -220,10 +220,7 @@ impl PersistenceManager {
     ) -> Result<Self> {
         let workspace = workspace.as_ref().to_path_buf();
         fs::create_dir_all(&workspace).map_err(|e| Error::io(&workspace, e))?;
-        let mut local_data_dir = data_dir.as_ref().to_string_lossy().into_owned();
-        if !local_data_dir.ends_with('/') {
-            local_data_dir.push('/');
-        }
+        let local_data_dir = data_dir.as_ref().to_path_buf();
         let manager = Self {
             store: None,
             workspace,
@@ -319,27 +316,29 @@ impl PersistenceManager {
 
     /// C++ `RemovePrefix`: strip the data-dir prefix, keep relative paths, and
     /// return an empty string for an absolute path outside the data dir.
-    fn remove_prefix(&self, path: &str) -> String {
-        if let Some(rest) = path.strip_prefix(&self.local_data_dir) {
-            return rest.to_string();
+    fn remove_prefix(&self, path: &Path) -> String {
+        if let Ok(rest) = path.strip_prefix(&self.local_data_dir) {
+            return rest.to_string_lossy().replace('\\', "/");
         }
-        if !path.starts_with('/') {
-            return path.to_string();
+        if path.is_relative() {
+            return path.to_string_lossy().replace('\\', "/");
         }
         String::new()
     }
 
     /// C++ `Persist`: store `tmp_file_path` under the key `file_path`.
+    #[must_use]
     pub fn persist(
         &self,
-        file_path: &str,
+        file_path: &Path,
         tmp_file_path: impl AsRef<Path>,
     ) -> Result<PersistWriteResult> {
         let tmp_file_path = tmp_file_path.as_ref();
         let local_path = self.remove_prefix(file_path);
         if local_path.is_empty() {
             return Err(Error::Unrecoverable(format!(
-                "Failed to find local path of {local_path}"
+                "Failed to find local path of {}",
+                file_path.display()
             )));
         }
         let src_size = fs::metadata(tmp_file_path)
@@ -415,6 +414,7 @@ impl PersistenceManager {
     }
 
     /// C++ `CurrentObjFinalize`.
+    #[must_use]
     pub fn current_obj_finalize(&self) -> PersistWriteResult {
         let mut result = PersistWriteResult::default();
         let mut inner = self.inner.lock().unwrap();
@@ -423,7 +423,8 @@ impl PersistenceManager {
     }
 
     /// C++ `GetObjCache`: look up the address and take a reference.
-    pub fn get_obj_cache(&self, file_path: &str) -> PersistReadResult {
+    #[must_use]
+    pub fn get_obj_cache(&self, file_path: &Path) -> PersistReadResult {
         let local_path = self.remove_prefix(file_path);
         let mut result = PersistReadResult::default();
         if local_path.is_empty() {
@@ -446,11 +447,13 @@ impl PersistenceManager {
     }
 
     /// C++ `PutObjCache`: release the reference taken by [`Self::get_obj_cache`].
-    pub fn put_obj_cache(&self, file_path: &str) -> Result<PersistWriteResult> {
+    #[must_use]
+    pub fn put_obj_cache(&self, file_path: &Path) -> Result<PersistWriteResult> {
         let local_path = self.remove_prefix(file_path);
         if local_path.is_empty() {
             return Err(Error::Unrecoverable(format!(
-                "Failed to find file path of {file_path}"
+                "Failed to find file path of {}",
+                file_path.display()
             )));
         }
         let mut inner = self.inner.lock().unwrap();
@@ -483,11 +486,13 @@ impl PersistenceManager {
     }
 
     /// C++ `Cleanup`: forget a local path and record the part as deleted.
-    pub fn cleanup(&self, file_path: &str) -> Result<PersistWriteResult> {
+    #[must_use]
+    pub fn cleanup(&self, file_path: &Path) -> Result<PersistWriteResult> {
         let local_path = self.remove_prefix(file_path);
         if local_path.is_empty() {
             return Err(Error::Unrecoverable(format!(
-                "Failed to find local path of {local_path}"
+                "Failed to find local path of {}",
+                file_path.display()
             )));
         }
         let mut result = PersistWriteResult::default();
@@ -507,11 +512,13 @@ impl PersistenceManager {
     }
 
     /// C++ `GetFileSize`.
-    pub fn get_file_size(&self, file_path: &str) -> Result<usize> {
+    #[must_use]
+    pub fn get_file_size(&self, file_path: &Path) -> Result<usize> {
         let local_path = self.remove_prefix(file_path);
         if local_path.is_empty() {
             return Err(Error::Unrecoverable(format!(
-                "Failed to find local path of {local_path}"
+                "Failed to find local path of {}",
+                file_path.display()
             )));
         }
         let inner = self.inner.lock().unwrap();
@@ -699,7 +706,7 @@ impl PersistenceManager {
                 .collect()
         };
         for (rel, addr) in files {
-            let target = Path::new(&self.local_data_dir).join(&rel);
+            let target = self.local_data_dir.join(&rel);
             if target.exists() {
                 continue;
             }
@@ -733,7 +740,7 @@ impl PersistenceManager {
     /// The port's checkpoint step: publish every file under the data directory
     /// (`try_compose = true`, in path order) and seal the current object.
     pub fn persist_directory(&self) -> Result<usize> {
-        let root = Path::new(&self.local_data_dir).to_path_buf();
+        let root = self.local_data_dir.clone();
         let mut files: Vec<PathBuf> = Vec::new();
         let mut stack = vec![root];
         while let Some(dir) = stack.pop() {
@@ -761,35 +768,27 @@ impl PersistenceManager {
             let key = path.to_string_lossy().to_string();
             let tmp = spool.join(unique_key());
             fs::copy(path, &tmp).map_err(|e| Error::io(&tmp, e))?;
-            let result = self.persist(&key, &tmp)?;
-            PersistResultHandler::new(self).handle_write_result(&result)?;
+            let result = self.persist(Path::new(&key), &tmp)?;
+            self.apply_write_result(&result)?;
             written += 1;
         }
         let result = self.current_obj_finalize();
-        PersistResultHandler::new(self).handle_write_result(&result)?;
+        self.apply_write_result(&result)?;
         Ok(written)
     }
 }
 
-/// C++ `PersistResultHandler`: applies the side effects of a persist/cleanup.
-pub struct PersistResultHandler<'a> {
-    pm: &'a PersistenceManager,
-}
-
-impl<'a> PersistResultHandler<'a> {
-    pub fn new(pm: &'a PersistenceManager) -> Self {
-        Self { pm }
-    }
-
-    /// C++ `HandleWriteResult`. In the local profile `persist_keys` are already
-    /// on disk; dropped objects are removed from the local cache.
-    pub fn handle_write_result(&self, result: &PersistWriteResult) -> Result<()> {
+impl PersistenceManager {
+    /// C++ `PersistResultHandler::HandleWriteResult`: local uploads are already
+    /// in place for a local workspace; the objects the cleanup dropped are
+    /// removed.
+    pub fn apply_write_result(&self, result: &PersistWriteResult) -> Result<()> {
         for key in result
             .drop_keys
             .iter()
             .chain(result.drop_from_remote_keys.iter())
         {
-            let path = self.pm.get_obj_path(key);
+            let path = self.get_obj_path(key);
             match fs::remove_file(&path) {
                 Ok(()) => {}
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -799,8 +798,9 @@ impl<'a> PersistResultHandler<'a> {
         Ok(())
     }
 
-    /// C++ `HandleReadResult`: local objects are always cached.
-    pub fn handle_read_result(&self, result: PersistReadResult) -> ObjAddr {
+    /// C++ `PersistResultHandler::HandleReadResult`: a local object is always
+    /// cached, so the address is returned unchanged.
+    pub fn resolve_read(&self, result: PersistReadResult) -> ObjAddr {
         result.obj_addr
     }
 }
@@ -859,10 +859,9 @@ mod tests {
         }
 
         /// C++ `PersistenceManagerTest::CheckObjData`.
-        fn check_obj_data(&self, local_file_path: &str, data: &str) {
-            let handler = PersistResultHandler::new(&self.pm);
+        fn check_obj_data(&self, local_file_path: &Path, data: &str) {
             let result = self.pm.get_obj_cache(local_file_path);
-            let obj_addr = handler.handle_read_result(result);
+            let obj_addr = self.pm.resolve_read(result);
             let obj_path = self.pm.get_obj_path(&obj_addr.obj_key);
             assert!(obj_path.exists());
             assert_eq!(obj_addr.part_size, data.len());
@@ -881,7 +880,7 @@ mod tests {
             assert_eq!(String::from_utf8(buffer).unwrap(), data);
 
             let res = self.pm.put_obj_cache(local_file_path).unwrap();
-            handler.handle_write_result(&res).unwrap();
+            self.pm.apply_write_result(&res).unwrap();
         }
     }
 
@@ -891,20 +890,19 @@ mod tests {
         let persist_str = "Persistence Manager Test";
         let file_path = fixture.write_file("persist_file", persist_str);
 
-        let result = fixture.pm.persist(&file_path, &file_path).expect("persist");
-        PersistResultHandler::new(&fixture.pm)
-            .handle_write_result(&result)
-            .unwrap();
+        let result = fixture
+            .pm
+            .persist(Path::new(&file_path), Path::new(&file_path))
+            .expect("persist");
+        &fixture.pm.apply_write_result(&result).unwrap();
         let obj_addr = &result.obj_addr;
         assert!(obj_addr.valid());
         assert_eq!(obj_addr.part_size, persist_str.len());
 
         let result2 = fixture.pm.current_obj_finalize();
-        PersistResultHandler::new(&fixture.pm)
-            .handle_write_result(&result2)
-            .unwrap();
+        &fixture.pm.apply_write_result(&result2).unwrap();
 
-        fixture.check_obj_data(&file_path, persist_str);
+        fixture.check_obj_data(Path::new(&file_path), persist_str);
     }
 
     #[test]
@@ -920,10 +918,11 @@ mod tests {
             file_paths.push(file_path.clone());
             persist_strs.push(persist_str);
 
-            let result = fixture.pm.persist(&file_path, &file_path).expect("persist");
-            PersistResultHandler::new(&fixture.pm)
-                .handle_write_result(&result)
-                .unwrap();
+            let result = fixture
+                .pm
+                .persist(Path::new(&file_path), Path::new(&file_path))
+                .expect("persist");
+            &fixture.pm.apply_write_result(&result).unwrap();
             assert!(result.obj_addr.valid());
             assert_eq!(result.obj_addr.part_size, persist_strs[i].len());
             obj_addrs.push(result.obj_addr);
@@ -932,12 +931,10 @@ mod tests {
         assert_eq!(file_paths.len(), obj_addrs.len());
 
         let result = fixture.pm.current_obj_finalize();
-        PersistResultHandler::new(&fixture.pm)
-            .handle_write_result(&result)
-            .unwrap();
+        &fixture.pm.apply_write_result(&result).unwrap();
 
         for (path, data) in file_paths.iter().zip(persist_strs.iter()) {
-            fixture.check_obj_data(path, data);
+            fixture.check_obj_data(Path::new(path), data);
         }
     }
 
@@ -960,10 +957,10 @@ mod tests {
                 let obj_addrs = &obj_addrs;
                 let pm = &fixture.pm;
                 scope.spawn(move || {
-                    let result = pm.persist(file_path, file_path).expect("persist");
-                    PersistResultHandler::new(pm)
-                        .handle_write_result(&result)
-                        .unwrap();
+                    let result = pm
+                        .persist(Path::new(file_path), Path::new(file_path))
+                        .expect("persist");
+                    pm.apply_write_result(&result).unwrap();
                     assert!(result.obj_addr.valid());
                     assert_eq!(result.obj_addr.part_size, persist_str.len());
                     obj_addrs
@@ -978,12 +975,10 @@ mod tests {
         assert_eq!(file_paths.len(), obj_addrs.lock().unwrap().len());
 
         let result = fixture.pm.current_obj_finalize();
-        PersistResultHandler::new(&fixture.pm)
-            .handle_write_result(&result)
-            .unwrap();
+        &fixture.pm.apply_write_result(&result).unwrap();
 
         for (path, data) in file_paths.iter().zip(persist_strs.iter()) {
-            fixture.check_obj_data(path, data);
+            fixture.check_obj_data(Path::new(path), data);
         }
     }
 
@@ -998,10 +993,11 @@ mod tests {
         for i in 0..10 {
             let persist_str = format!("Persistence Manager Test {i}");
             let file_path = fixture.write_file(&format!("persist_file{i}"), &persist_str);
-            let result = fixture.pm.persist(&file_path, &file_path).expect("persist");
-            PersistResultHandler::new(&fixture.pm)
-                .handle_write_result(&result)
-                .unwrap();
+            let result = fixture
+                .pm
+                .persist(Path::new(&file_path), Path::new(&file_path))
+                .expect("persist");
+            &fixture.pm.apply_write_result(&result).unwrap();
             assert!(result.obj_addr.valid());
             assert_eq!(result.obj_addr.part_size, persist_str.len());
             file_paths.push(file_path);
@@ -1019,12 +1015,10 @@ mod tests {
         assert_eq!(file_paths.len(), obj_addrs.len());
 
         let result = fixture.pm.current_obj_finalize();
-        PersistResultHandler::new(&fixture.pm)
-            .handle_write_result(&result)
-            .unwrap();
+        &fixture.pm.apply_write_result(&result).unwrap();
 
         for (path, data) in file_paths.iter().zip(persist_strs.iter()) {
-            fixture.check_obj_data(path, data);
+            fixture.check_obj_data(Path::new(path), data);
         }
         for obj_path in &obj_paths {
             assert!(Path::new(obj_path).exists());
@@ -1034,10 +1028,8 @@ mod tests {
         // only depends on the recorded ranges.
         file_paths.rotate_left(3);
         for file_path in &file_paths {
-            let result = fixture.pm.cleanup(file_path).expect("cleanup");
-            PersistResultHandler::new(&fixture.pm)
-                .handle_write_result(&result)
-                .unwrap();
+            let result = fixture.pm.cleanup(Path::new(file_path)).expect("cleanup");
+            &fixture.pm.apply_write_result(&result).unwrap();
         }
         for obj_path in &obj_paths {
             assert!(!Path::new(obj_path).exists(), "{obj_path} still exists");
@@ -1079,7 +1071,10 @@ mod tests {
     fn empty_file_maps_to_key_empty() {
         let fixture = Fixture::new();
         let path = fixture.write_file("empty", "");
-        let result = fixture.pm.persist(&path, &path).expect("persist");
+        let result = fixture
+            .pm
+            .persist(Path::new(&path), Path::new(&path))
+            .expect("persist");
         assert_eq!(result.obj_addr.obj_key, KEY_EMPTY);
         assert_eq!(result.obj_addr.part_size, 0);
         assert_eq!(result.persist_keys, vec![KEY_EMPTY.to_string()]);
@@ -1090,7 +1085,10 @@ mod tests {
         let fixture = Fixture::new();
         let data = "x".repeat(OBJ_SIZE_LIMIT);
         let path = fixture.write_file("big", &data);
-        let result = fixture.pm.persist(&path, &path).expect("persist");
+        let result = fixture
+            .pm
+            .persist(Path::new(&path), Path::new(&path))
+            .expect("persist");
         assert_ne!(result.obj_addr.obj_key, KEY_EMPTY);
         assert_eq!(result.obj_addr.part_offset, 0);
         assert_eq!(result.obj_addr.part_size, OBJ_SIZE_LIMIT);
@@ -1107,13 +1105,17 @@ mod tests {
         let fixture = Fixture::new();
         let first = fixture.write_file("a", "first part");
         let second = fixture.write_file("b", "second");
-        fixture.pm.persist(&first, &first).unwrap();
-        let result = fixture.pm.persist(&second, &second).unwrap();
+        fixture
+            .pm
+            .persist(Path::new(&first), Path::new(&first))
+            .unwrap();
+        let result = fixture
+            .pm
+            .persist(Path::new(&second), Path::new(&second))
+            .unwrap();
         let object = fixture.pm.get_obj_path(&result.obj_addr.obj_key);
         let sealed = fixture.pm.current_obj_finalize();
-        PersistResultHandler::new(&fixture.pm)
-            .handle_write_result(&sealed)
-            .unwrap();
+        &fixture.pm.apply_write_result(&sealed).unwrap();
         let bytes = fs::read(&object).unwrap();
         // Two parts -> a `u32 = 1` footer after the aligned payload.
         assert_eq!(&bytes[bytes.len() - 4..], &1u32.to_le_bytes());
@@ -1131,9 +1133,17 @@ mod tests {
         let chunk = "y".repeat(70);
         let first = fixture.write_file("c1", &chunk);
         let second = fixture.write_file("c2", &chunk);
-        let a = fixture.pm.persist(&first, &first).unwrap().obj_addr;
+        let a = fixture
+            .pm
+            .persist(Path::new(&first), Path::new(&first))
+            .unwrap()
+            .obj_addr;
         // 70 + 70 > 128: the second file does not fit in the current object.
-        let b = fixture.pm.persist(&second, &second).unwrap().obj_addr;
+        let b = fixture
+            .pm
+            .persist(Path::new(&second), Path::new(&second))
+            .unwrap()
+            .obj_addr;
         assert_ne!(a.obj_key, b.obj_key);
         assert_eq!(b.part_offset, 0);
         let stat = fixture.pm.inner.lock().unwrap();
@@ -1164,7 +1174,7 @@ mod tests {
                 OBJ_SIZE_LIMIT,
             )
             .unwrap();
-            let result = pm.persist(&file.to_string_lossy(), &spool).unwrap();
+            let result = pm.persist(&file, &spool).unwrap();
             assert!(!result.obj_addr.obj_key.is_empty());
         }
 
@@ -1176,7 +1186,7 @@ mod tests {
             OBJ_SIZE_LIMIT,
         )
         .unwrap();
-        assert_eq!(pm.get_file_size(&file.to_string_lossy()).unwrap(), 7);
+        assert_eq!(pm.get_file_size(&file).unwrap(), 7);
         fs::remove_file(&file).unwrap();
         assert_eq!(pm.restore_missing_files().unwrap(), 1);
         assert_eq!(fs::read(&file).unwrap(), b"payload");

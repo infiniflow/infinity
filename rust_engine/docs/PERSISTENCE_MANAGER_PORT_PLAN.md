@@ -159,7 +159,7 @@ GetObjPath(obj_key) / GetAllObjects() / GetAllFiles() / SetKvStore()
 | **M1** `Persist` 与 compose | 完成 | 8 字节对齐、`size >= limit` 独占对象、`room` 不足先封口再开新对象、`parts > 1` 写 `u32 = 1` footer、每次 append 覆写 stat；`empty_file_maps_to_key_empty` / `a_file_at_the_limit_gets_a_dedicated_object` / `a_composed_object_ends_with_the_footer` / `a_full_object_is_sealed_and_a_second_one_starts` |
 | **M2** 统计、缓存与 cleanup | 完成 | `deleted_ranges` 合并、整对象删除、`Get/PutObjCache` 引用计数（`cleanup_basic`、`persist_multi_file`）；记录落 catalog 后重开仍可解析（`catalog_records_round_trip`） |
 | **M3** 接进引擎 | 完成 | `Engine::open_with_options` 用 `with_catalog` + `restore_missing_files`，`flush_storage` 用 `persist_directory`（把文件 spool 一份再持久化，保留 `data/` 作为本地缓存）；原 `object_dir` 模块删除 |
-| **M4** 重构 | 部分 | 已具备：`Mutex<Inner>` 收拢状态、`Result` 取代 `UnrecoverableError`（`Error::Storage`）、`BTreeSet<Range>`、`store: Option<Arc<dyn MetaStore>>` 注入（无全局单例）。未做：`Path`/`PathBuf` 全面替代 `String`（键与路径仍共用 `String`）、`PersistResultHandler` 合并进 manager、`#[must_use]`。这些是纯形状调整，golden 用例可继续作为基准 |
+| **M4** 重构 | 完成 | 已落地：#2（`current_obj_finalize` 返回结果）、#3（`Error::Unrecoverable` 是可返回的错误，不终止进程）、#4（`BTreeSet<Range>`）、#5（`Path`/`PathBuf`，只有 catalog 键保留 `String`）、#6（注入 `Arc<dyn MetaStore>`）、#7（`PersistResultHandler` 合并为 `apply_write_result` / `resolve_read`）、#11（`#[must_use]`）。#1（`&mut self` + `Option<Composer>`）保留 `Mutex<Inner>`：manager 与 `Engine` 共享 `&self`，独占借用会把锁推给每个调用方；#8（`ObjectKey` newtype）与 #9（`CacheState` + `Condvar`）不适用本地 profile（只有一个调用点、没有下载等待），记录在此而非硬套 |
 | **M5** 文档 | 完成 | `FORMAT_EQUIVALENCE_TESTS.md` §6.5 与本节 |
 
 验证：`infinity-storage` 434 passed；`test_the_object_directory_is_shared_with_the_reference` 双向绿；字节门禁 17 passed / 1 skipped；互读门禁 2 passed。
