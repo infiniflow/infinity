@@ -4086,10 +4086,10 @@ pub struct Engine {
     txn: TxnManager,
     /// the engine's data directory (root of the C++-format block mirror)
     dir: PathBuf,
-    /// The reference's object directory, when this engine publishes its data
-    /// files through `pm|object|` instead of leaving `data/` private
+    /// The persistence layer (`PersistenceManager`), when this engine publishes
+    /// its data files through `pm|object|` instead of leaving `data/` private
     /// (`EngineOptions::object_dir`).
-    object_dir: Option<PathBuf>,
+    persistence: Option<infinity_storage::persistence::PersistenceManager>,
     /// `false` for the reference's `NEW_CONFIG_NOWAL_PATH`: catalog DDL is
     /// durable only through a checkpoint (`flush`), not on commit.
     wal_enabled: bool,
@@ -4762,13 +4762,19 @@ impl Engine {
         };
         // The reference keeps its data files in objects and describes them in
         // `pm|object|`; open the `data/` tree before anything reads a block.
-        if let Some(object_dir) = options.object_dir.as_ref() {
-            infinity_storage::object_dir::unpack(
-                catalog.store().as_ref(),
-                &dir.join("data"),
-                object_dir,
-            )?;
-        }
+        let persistence = match options.object_dir.as_ref() {
+            Some(object_dir) => {
+                let pm = infinity_storage::persistence::PersistenceManager::with_catalog(
+                    catalog.store().clone(),
+                    object_dir,
+                    dir.join("data"),
+                    infinity_storage::persistence::DEFAULT_OBJECT_SIZE_LIMIT,
+                )?;
+                pm.restore_missing_files()?;
+                Some(pm)
+            }
+            None => None,
+        };
         // The row/meta store: RocksDB when the `rocksdb-store` feature is on
         // (the substrate the C++ engine's catalog uses), fjall otherwise.
         let store: Arc<dyn MetaStore> = infinity_storage::open_store(
@@ -4825,7 +4831,7 @@ impl Engine {
                 last_cleanup_ts: std::sync::atomic::AtomicU64::new(0),
             },
             dir,
-            object_dir: options.object_dir.clone(),
+            persistence,
             wal_enabled: options.wal_enabled,
             index_epoch: std::sync::atomic::AtomicU64::new(0),
             result_cache: Mutex::new(HashMap::new()),
@@ -15181,14 +15187,10 @@ impl Engine {
         // budget and the row store remains authoritative.
         let mirror = self.flush_cpp_blocks();
         // `EngineOptions::object_dir`: publish this checkpoint's data files as
-        // the reference's `pm|object|` records + one packed object.
-        if let Some(object_dir) = self.object_dir.as_ref() {
-            if let Err(e) = infinity_storage::object_dir::pack(
-                self.storage.catalog.store().as_ref(),
-                &self.dir.join("data"),
-                object_dir,
-            ) {
-                eprintln!("object dir: packing failed: {e}");
+        // the reference does (`pm|object|` + packed objects).
+        if let Some(pm) = self.persistence.as_ref() {
+            if let Err(e) = pm.persist_directory() {
+                eprintln!("object dir: persisting failed: {e}");
             }
         }
         // The mirror writes the vector/IVF chunks, so reload after it.

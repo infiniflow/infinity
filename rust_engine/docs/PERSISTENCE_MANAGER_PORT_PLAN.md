@@ -12,9 +12,9 @@
 | 文件（C++） | 行数量级 | 职责 | 现状（Rust） |
 |---|---|---|---|
 | `src/storage/persistence/persistence_manager.cppm` / `_impl.cpp` | ~700 | `PersistenceManager`：`ObjAddr` 编解码、compose 状态机、`pm\|object\|` 记录、引用计数、cleanup | 只有 `infinity_storage::object_dir`（`unpack` + 简化 `pack`） |
-| `obj_status.cppm` / `_impl.cpp` | ~150 | `ObjStat`（`obj_size/parts/ref_count/deleted_ranges`）、`ObjCached`、`Range` | 无（`pack` 里内联写一条 stat JSON） |
-| `obj_stat_accessor.cppm` / `_impl.cpp` | ~200 | `ObjectStats`：`obj_key → ObjStat` 的内存表 + KV 持久化、`Get/GetNoCount/PutNew/PutNoCount/Invalidate/Release` | 无 |
-| `persist_result_handler.cppm` / `_impl.cpp` | ~100 | `PersistWriteResult` 的落地动作：本地上传/删除、远端删除；读时按需下载并置缓存位 | 无 |
+| `obj_status.cppm` / `_impl.cpp` | ~150 | `ObjStat`（`obj_size/parts/ref_count/deleted_ranges`）、`ObjCached`、`Range` | `ObjStat` / `Range` / `to_json` / `from_json` 已实现，值格式与参考逐字节一致 |
+| `obj_stat_accessor.cppm` / `_impl.cpp` | ~200 | `ObjectStats`：`obj_key → ObjStat` 的内存表 + KV 持久化、`Get/GetNoCount/PutNew/PutNoCount/Invalidate/Release` | 合并进 `PersistenceManager::Inner`（`files` / `objects`），`persist`/`finalize`/`cleanup` 同步写 KV；`ref_count` 只在内存 |
+| `persist_result_handler.cppm` / `_impl.cpp` | ~100 | `PersistWriteResult` 的落地动作：本地上传/删除、远端删除；读时按需下载并置缓存位 | `PersistResultHandler` 已实现（本地 profile：删掉被丢弃的对象；读到的对象视为已缓存） |
 | `src/storage/io/virtual_store*.cppm` / `virtual_store_impl.cpp` | ~600 | `VirtualStore`：local / MinIO 两套同名 API（`Exists/Open/Read/Write/UploadObject/DownloadObject/RemoveObject/ListObjects`） | 部分：`infinity_storage::s3`（自有客户端 + `sync_tree/restore_tree`），**无**同名抽象 |
 | `src/storage/io/object_storage_process*.cppm` / `object_storage_task.cppm` | ~250 | 单线程队列，执行 `Download/Upload/Copy/Remove/LocalDrop` | 无（同步调用） |
 | 调用方：`buffer/file_worker/file_worker_impl.cpp`、`invertedindex/{memory_indexer,column_index_merger,column_index_iterator}_impl.cpp`、`catalog/meta/chunk_index_meta_impl.cpp`、`common/snapshot_info_impl.cpp` | — | `Persist`（写）、`GetObjCache`/`PutObjCache`（读时缓存与引用计数）、`Cleanup`（删） | 端口直接在 `data/` 上读写，checkpoint 时整体 `pack` |
@@ -150,6 +150,19 @@ GetObjPath(obj_key) / GetAllObjects() / GetAllFiles() / SetKvStore()
 | **M5** | 文档与门禁更新（`FORMAT_EQUIVALENCE_TESTS.md` §6.5、覆盖矩阵） | 文档如实描述 compose 规则 |
 
 ---
+
+## 7.1 实施状态（2026-10-23）
+
+| 里程碑 | 状态 | 说明 |
+|---|---|---|
+| **M0** 数据类型与编解码 | 完成 | `ObjAddr::serialize/deserialize`、`ObjStat::to_json/from_json`、`Range`/`ObjCached`；`obj_addr_json_matches_the_reference` / `obj_stat_json_matches_the_reference` 钉住参考实测的两种值 |
+| **M1** `Persist` 与 compose | 完成 | 8 字节对齐、`size >= limit` 独占对象、`room` 不足先封口再开新对象、`parts > 1` 写 `u32 = 1` footer、每次 append 覆写 stat；`empty_file_maps_to_key_empty` / `a_file_at_the_limit_gets_a_dedicated_object` / `a_composed_object_ends_with_the_footer` / `a_full_object_is_sealed_and_a_second_one_starts` |
+| **M2** 统计、缓存与 cleanup | 完成 | `deleted_ranges` 合并、整对象删除、`Get/PutObjCache` 引用计数（`cleanup_basic`、`persist_multi_file`）；记录落 catalog 后重开仍可解析（`catalog_records_round_trip`） |
+| **M3** 接进引擎 | 完成 | `Engine::open_with_options` 用 `with_catalog` + `restore_missing_files`，`flush_storage` 用 `persist_directory`（把文件 spool 一份再持久化，保留 `data/` 作为本地缓存）；原 `object_dir` 模块删除 |
+| **M4** 重构 | 部分 | 已具备：`Mutex<Inner>` 收拢状态、`Result` 取代 `UnrecoverableError`（`Error::Storage`）、`BTreeSet<Range>`、`store: Option<Arc<dyn MetaStore>>` 注入（无全局单例）。未做：`Path`/`PathBuf` 全面替代 `String`（键与路径仍共用 `String`）、`PersistResultHandler` 合并进 manager、`#[must_use]`。这些是纯形状调整，golden 用例可继续作为基准 |
+| **M5** 文档 | 完成 | `FORMAT_EQUIVALENCE_TESTS.md` §6.5 与本节 |
+
+验证：`infinity-storage` 434 passed；`test_the_object_directory_is_shared_with_the_reference` 双向绿；字节门禁 17 passed / 1 skipped；互读门禁 2 passed。
 
 ## 8 风险与取舍
 

@@ -15,16 +15,24 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use infinity_common::{Error, Result};
+
+use crate::MetaStore;
 
 /// Alignment of a part inside a composed object (`PersistenceManager::ObjAlignment`).
 pub const OBJ_ALIGNMENT: usize = 8;
 
 /// The address used for an empty file (`ObjAddr::KeyEmpty`).
 pub const KEY_EMPTY: &str = "KEY_EMPTY";
+/// Catalog prefix of the path → object mapping (`KeyEncode::PMObjectKey`).
+pub const PM_OBJECT_PREFIX: &str = "pm|object|";
+/// Catalog prefix of the per-object statistics (`KeyEncode::PMObjectStatKey`).
+pub const PM_OBJECT_STAT_PREFIX: &str = "pm|object_stat|";
+/// `DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT` (`default_values.cppm:218`).
+pub const DEFAULT_OBJECT_SIZE_LIMIT: usize = 128 * 1024 * 1024;
 
 fn align_up(value: usize) -> usize {
     (value + OBJ_ALIGNMENT - 1) & !(OBJ_ALIGNMENT - 1)
@@ -39,6 +47,30 @@ pub struct ObjAddr {
 }
 
 impl ObjAddr {
+    /// C++ `ObjAddr::Serialize` (`persistence_manager_impl.cpp:41`).
+    pub fn serialize(&self) -> String {
+        format!(
+            "{{\"obj_key\":\"{}\",\"part_offset\":{},\"part_size\":{}}}",
+            self.obj_key, self.part_offset, self.part_size
+        )
+    }
+
+    /// C++ `ObjAddr::Deserialize` (`persistence_manager_impl.cpp:48`).
+    pub fn deserialize(text: &str) -> Option<Self> {
+        let field = |name: &str| -> Option<&str> {
+            let key = format!("\"{name}\":");
+            let start = text.find(&key)? + key.len();
+            let rest = &text[start..];
+            let end = rest.find([',', '}'])?;
+            Some(rest[..end].trim())
+        };
+        Some(Self {
+            obj_key: field("obj_key")?.trim_matches('"').to_string(),
+            part_offset: field("part_offset")?.parse().ok()?,
+            part_size: field("part_size")?.parse().ok()?,
+        })
+    }
+
     pub fn valid(&self) -> bool {
         !self.obj_key.is_empty()
     }
@@ -108,6 +140,44 @@ pub struct ObjStat {
 }
 
 impl ObjStat {
+    /// C++ `ObjStat::ToString`: the value stored under `pm|object_stat|`.
+    /// `ref_count` is in memory only and is deliberately absent.
+    pub fn to_json(&self) -> String {
+        let ranges: Vec<String> = self
+            .deleted_ranges
+            .iter()
+            .map(|r| format!("{{\"start\":{},\"end\":{}}}", r.start, r.end))
+            .collect();
+        format!(
+            "{{\"deleted_ranges\":[{}],\"obj_size\":{},\"parts\":{}}}",
+            ranges.join(","),
+            self.obj_size,
+            self.parts
+        )
+    }
+
+    /// Parses a `pm|object_stat|` value.
+    pub fn from_json(text: &str) -> Option<Self> {
+        let field = |name: &str| -> Option<usize> {
+            let key = format!("\"{name}\":");
+            let start = text.find(&key)? + key.len();
+            let rest = &text[start..];
+            let end = rest.find([',', '}'])?;
+            rest[..end].trim().parse().ok()
+        };
+        let mut stat = Self::new(field("obj_size")?, field("parts")?, 0);
+        let mut rest = text;
+        while let Some(start) = rest.find("{\"start\":") {
+            let tail = &rest[start + 9..];
+            let s: usize = tail.split(',').next()?.trim().parse().ok()?;
+            let e_start = tail.find("\"end\":")? + 6;
+            let e: usize = tail[e_start..].split('}').next()?.trim().parse().ok()?;
+            stat.deleted_ranges.insert(Range { start: s, end: e });
+            rest = &tail[e_start..];
+        }
+        Some(stat)
+    }
+
     fn new(obj_size: usize, parts: usize, ref_count: usize) -> Self {
         Self {
             obj_size,
@@ -130,6 +200,10 @@ struct Inner {
 
 /// Pack local files into bounded objects and track their deletion.
 pub struct PersistenceManager {
+    /// The catalog the `pm|object|` / `pm|object_stat|` records live in.
+    /// `None` keeps the mapping in memory only (the unit tests and a
+    /// directory that is not shared with the reference).
+    store: Option<Arc<dyn MetaStore>>,
     workspace: PathBuf,
     /// Data-dir prefix with a trailing separator, as in the reference.
     local_data_dir: String,
@@ -151,6 +225,7 @@ impl PersistenceManager {
             local_data_dir.push('/');
         }
         let manager = Self {
+            store: None,
             workspace,
             local_data_dir,
             object_size_limit,
@@ -172,6 +247,74 @@ impl PersistenceManager {
     /// C++ `GetObjPath`.
     pub fn get_obj_path(&self, obj_key: &str) -> PathBuf {
         self.workspace.join(obj_key)
+    }
+
+    /// Writes `pm|object|<rel>`; the in-memory map stays authoritative.
+    fn record_file(&self, rel: &str, addr: &ObjAddr) {
+        if let Some(store) = self.store.as_ref() {
+            let key = format!("{PM_OBJECT_PREFIX}{rel}");
+            let _ = store.put(key.as_bytes(), addr.serialize().as_bytes());
+        }
+    }
+
+    fn forget_file(&self, rel: &str) {
+        if let Some(store) = self.store.as_ref() {
+            let key = format!("{PM_OBJECT_PREFIX}{rel}");
+            let _ = store.delete(key.as_bytes());
+        }
+    }
+
+    /// Writes `pm|object_stat|<key>`.
+    fn record_stat(&self, key: &str, stat: &ObjStat) {
+        if let Some(store) = self.store.as_ref() {
+            if key == KEY_EMPTY {
+                return;
+            }
+            let key = format!("{PM_OBJECT_STAT_PREFIX}{key}");
+            let _ = store.put(key.as_bytes(), stat.to_json().as_bytes());
+        }
+    }
+
+    fn forget_stat(&self, key: &str) {
+        if let Some(store) = self.store.as_ref() {
+            let key = format!("{PM_OBJECT_STAT_PREFIX}{key}");
+            let _ = store.delete(key.as_bytes());
+        }
+    }
+
+    /// A manager whose mapping lives in `store` (the catalog), as the
+    /// reference keeps it. The records are loaded on construction, so a
+    /// directory the other engine persisted opens with its objects known.
+    pub fn with_catalog(
+        store: Arc<dyn MetaStore>,
+        workspace: impl AsRef<Path>,
+        data_dir: impl AsRef<Path>,
+        object_size_limit: usize,
+    ) -> Result<Self> {
+        let mut manager = Self::new(workspace, data_dir, object_size_limit)?;
+        manager.store = Some(store);
+        manager.load_records()?;
+        Ok(manager)
+    }
+
+    fn load_records(&self) -> Result<()> {
+        let Some(store) = self.store.as_ref() else {
+            return Ok(());
+        };
+        let mut inner = self.inner.lock().unwrap();
+        for (key, value) in store.scan_prefix(PM_OBJECT_PREFIX.as_bytes())? {
+            let rel = String::from_utf8_lossy(&key[PM_OBJECT_PREFIX.len()..]).to_string();
+            if let Some(addr) = ObjAddr::deserialize(&String::from_utf8_lossy(&value)) {
+                inner.files.insert(rel, addr);
+            }
+        }
+        for (key, value) in store.scan_prefix(PM_OBJECT_STAT_PREFIX.as_bytes())? {
+            let obj_key = String::from_utf8_lossy(&key[PM_OBJECT_STAT_PREFIX.len()..]).to_string();
+            if let Some(stat) = ObjStat::from_json(&String::from_utf8_lossy(&value)) {
+                inner.objects.insert(obj_key, stat);
+            }
+        }
+        Ok(())
     }
 
     /// C++ `RemovePrefix`: strip the data-dir prefix, keep relative paths, and
@@ -214,6 +357,7 @@ impl PersistenceManager {
                 part_offset: 0,
                 part_size: 0,
             };
+            self.record_file(&local_path, &obj_addr);
             inner.files.insert(local_path, obj_addr.clone());
             result.persist_keys.push(KEY_EMPTY.to_string());
             result.obj_addr = obj_addr;
@@ -226,9 +370,10 @@ impl PersistenceManager {
                 part_offset: 0,
                 part_size: src_size,
             };
-            inner
-                .objects
-                .insert(obj_key.clone(), ObjStat::new(src_size, 1, 0));
+            let stat = ObjStat::new(src_size, 1, 0);
+            self.record_stat(&obj_key, &stat);
+            inner.objects.insert(obj_key.clone(), stat);
+            self.record_file(&local_path, &obj_addr);
             inner.files.insert(local_path, obj_addr.clone());
             result.persist_keys.push(obj_key);
             result.obj_addr = obj_addr;
@@ -249,7 +394,9 @@ impl PersistenceManager {
                 inner.current_object_parts,
                 inner.current_object_ref_count,
             );
+            self.record_stat(&obj_addr.obj_key, &stat);
             inner.objects.insert(obj_addr.obj_key.clone(), stat);
+            self.record_file(&local_path, &obj_addr);
             inner.files.insert(local_path, obj_addr.clone());
             result.obj_addr = obj_addr;
         }
@@ -348,6 +495,7 @@ impl PersistenceManager {
         let Some(obj_addr) = inner.files.remove(&local_path) else {
             return Ok(result);
         };
+        self.forget_file(&local_path);
         self.cleanup_locked(
             &mut inner,
             &obj_addr,
@@ -428,14 +576,13 @@ impl PersistenceManager {
             out.write_all(&1u32.to_le_bytes())
                 .expect("failed to write composed object footer");
         }
-        inner.objects.insert(
-            inner.current_object_key.clone(),
-            ObjStat::new(
-                inner.current_object_size,
-                inner.current_object_parts,
-                inner.current_object_ref_count,
-            ),
+        let stat = ObjStat::new(
+            inner.current_object_size,
+            inner.current_object_parts,
+            inner.current_object_ref_count,
         );
+        self.record_stat(&inner.current_object_key, &stat);
+        inner.objects.insert(inner.current_object_key.clone(), stat);
         inner.current_object_key = unique_key();
         inner.current_object_size = 0;
         inner.current_object_parts = 0;
@@ -529,10 +676,98 @@ impl PersistenceManager {
             }
             drop_from_remote_keys.push(obj_addr.obj_key.clone());
             inner.objects.remove(&obj_addr.obj_key);
+            self.forget_stat(&obj_addr.obj_key);
         } else {
+            self.record_stat(&obj_addr.obj_key, &stat);
             inner.objects.insert(obj_addr.obj_key.clone(), stat);
         }
         Ok(())
+    }
+
+    /// The port's open-time step: materialise every `data/` file the records
+    /// describe but the directory does not hold. The reference reads through
+    /// `GetObjCache` instead; for a directory both engines share, restoring the
+    /// files is what makes the port's block readers work.
+    pub fn restore_missing_files(&self) -> Result<usize> {
+        let mut restored = 0usize;
+        let files: Vec<(String, ObjAddr)> = {
+            let inner = self.inner.lock().unwrap();
+            inner
+                .files
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect()
+        };
+        for (rel, addr) in files {
+            let target = Path::new(&self.local_data_dir).join(&rel);
+            if target.exists() {
+                continue;
+            }
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+            }
+            if addr.obj_key == KEY_EMPTY || addr.part_size == 0 {
+                fs::write(&target, b"").map_err(|e| Error::io(&target, e))?;
+                restored += 1;
+                continue;
+            }
+            let object = self.get_obj_path(&addr.obj_key);
+            let blob = match fs::read(&object) {
+                Ok(blob) => blob,
+                Err(_) => continue, // no object to restore from: leave it missing
+            };
+            let start = addr.part_offset;
+            let end = start + addr.part_size;
+            if end > blob.len() {
+                return Err(Error::Storage(format!(
+                    "object {} is shorter than its record for '{rel}'",
+                    addr.obj_key
+                )));
+            }
+            fs::write(&target, &blob[start..end]).map_err(|e| Error::io(&target, e))?;
+            restored += 1;
+        }
+        Ok(restored)
+    }
+
+    /// The port's checkpoint step: publish every file under the data directory
+    /// (`try_compose = true`, in path order) and seal the current object.
+    pub fn persist_directory(&self) -> Result<usize> {
+        let root = Path::new(&self.local_data_dir).to_path_buf();
+        let mut files: Vec<PathBuf> = Vec::new();
+        let mut stack = vec![root];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    files.push(path);
+                }
+            }
+        }
+        files.sort();
+        // `persist` consumes its `tmp_file_path` (the reference's spool file),
+        // while the port's `data/` is also its local cache: spool a copy and
+        // persist that, so the checkpoint does not delete the files it just
+        // wrote.
+        let spool = self.workspace.join(".spool");
+        fs::create_dir_all(&spool).map_err(|e| Error::io(&spool, e))?;
+        let mut written = 0usize;
+        for path in &files {
+            let key = path.to_string_lossy().to_string();
+            let tmp = spool.join(unique_key());
+            fs::copy(path, &tmp).map_err(|e| Error::io(&tmp, e))?;
+            let result = self.persist(&key, &tmp)?;
+            PersistResultHandler::new(self).handle_write_result(&result)?;
+            written += 1;
+        }
+        let result = self.current_obj_finalize();
+        PersistResultHandler::new(self).handle_write_result(&result)?;
+        Ok(written)
     }
 }
 
@@ -807,5 +1042,143 @@ mod tests {
         for obj_path in &obj_paths {
             assert!(!Path::new(obj_path).exists(), "{obj_path} still exists");
         }
+    }
+    // -----------------------------------------------------------------------
+    // The records and the compose rules, against the values the reference
+    // wrote (measured on a 100-row table with `storage_type = "local"`).
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn obj_addr_json_matches_the_reference() {
+        let addr = ObjAddr {
+            obj_key: "01a167be-0114-7d50-b77c-82b3a6d8948e".to_string(),
+            part_offset: 65560,
+            part_size: 33816,
+        };
+        let text = addr.serialize();
+        assert_eq!(
+            text,
+            "{\"obj_key\":\"01a167be-0114-7d50-b77c-82b3a6d8948e\",\"part_offset\":65560,\"part_size\":33816}"
+        );
+        assert_eq!(ObjAddr::deserialize(&text), Some(addr));
+    }
+
+    #[test]
+    fn obj_stat_json_matches_the_reference() {
+        let stat = ObjStat::new(231496, 3, 0);
+        assert_eq!(
+            stat.to_json(),
+            "{\"deleted_ranges\":[],\"obj_size\":231496,\"parts\":3}"
+        );
+        let parsed = ObjStat::from_json(&stat.to_json()).unwrap();
+        assert_eq!((parsed.obj_size, parsed.parts), (231496, 3));
+        assert!(parsed.deleted_ranges.is_empty());
+    }
+
+    #[test]
+    fn empty_file_maps_to_key_empty() {
+        let fixture = Fixture::new();
+        let path = fixture.write_file("empty", "");
+        let result = fixture.pm.persist(&path, &path).expect("persist");
+        assert_eq!(result.obj_addr.obj_key, KEY_EMPTY);
+        assert_eq!(result.obj_addr.part_size, 0);
+        assert_eq!(result.persist_keys, vec![KEY_EMPTY.to_string()]);
+    }
+
+    #[test]
+    fn a_file_at_the_limit_gets_a_dedicated_object() {
+        let fixture = Fixture::new();
+        let data = "x".repeat(OBJ_SIZE_LIMIT);
+        let path = fixture.write_file("big", &data);
+        let result = fixture.pm.persist(&path, &path).expect("persist");
+        assert_ne!(result.obj_addr.obj_key, KEY_EMPTY);
+        assert_eq!(result.obj_addr.part_offset, 0);
+        assert_eq!(result.obj_addr.part_size, OBJ_SIZE_LIMIT);
+        // The object holds exactly that file (no alignment padding, no footer).
+        let object = fixture.pm.get_obj_path(&result.obj_addr.obj_key);
+        assert_eq!(
+            fs::metadata(&object).unwrap().len() as usize,
+            OBJ_SIZE_LIMIT
+        );
+    }
+
+    #[test]
+    fn a_composed_object_ends_with_the_footer() {
+        let fixture = Fixture::new();
+        let first = fixture.write_file("a", "first part");
+        let second = fixture.write_file("b", "second");
+        fixture.pm.persist(&first, &first).unwrap();
+        let result = fixture.pm.persist(&second, &second).unwrap();
+        let object = fixture.pm.get_obj_path(&result.obj_addr.obj_key);
+        let sealed = fixture.pm.current_obj_finalize();
+        PersistResultHandler::new(&fixture.pm)
+            .handle_write_result(&sealed)
+            .unwrap();
+        let bytes = fs::read(&object).unwrap();
+        // Two parts -> a `u32 = 1` footer after the aligned payload.
+        assert_eq!(&bytes[bytes.len() - 4..], &1u32.to_le_bytes());
+        // The footer starts at `current_object_size_`, the end of the last
+        // part, not at the next aligned offset (`CurrentObjFinalizeNoLock`).
+        assert_eq!(
+            bytes.len(),
+            (result.obj_addr.part_offset + result.obj_addr.part_size) as usize + 4
+        );
+    }
+
+    #[test]
+    fn a_full_object_is_sealed_and_a_second_one_starts() {
+        let fixture = Fixture::new();
+        let chunk = "y".repeat(70);
+        let first = fixture.write_file("c1", &chunk);
+        let second = fixture.write_file("c2", &chunk);
+        let a = fixture.pm.persist(&first, &first).unwrap().obj_addr;
+        // 70 + 70 > 128: the second file does not fit in the current object.
+        let b = fixture.pm.persist(&second, &second).unwrap().obj_addr;
+        assert_ne!(a.obj_key, b.obj_key);
+        assert_eq!(b.part_offset, 0);
+        let stat = fixture.pm.inner.lock().unwrap();
+        assert_eq!(stat.objects.get(&a.obj_key).map(|s| s.parts), Some(1));
+    }
+
+    #[test]
+    fn catalog_records_round_trip() {
+        let tmp = tempdir().unwrap();
+        let workspace = tmp.path().join("persistence");
+        let data_dir = tmp.path().join("data");
+        fs::create_dir_all(data_dir.join("db_1/tbl_0/seg_0/blk_0")).unwrap();
+        let catalog = tmp.path().join("catalog");
+        fs::create_dir_all(&catalog).unwrap();
+        let store = Arc::new(crate::FjallMetaStore::open(&catalog, "catalog").unwrap());
+
+        let file = data_dir.join("db_1/tbl_0/seg_0/blk_0/version");
+        fs::write(&file, b"payload").unwrap();
+        // `persist` consumes the spool file, as the reference does.
+        let spool = tmp.path().join("spool");
+        fs::write(&spool, b"payload").unwrap();
+
+        {
+            let pm = PersistenceManager::with_catalog(
+                store.clone() as Arc<dyn MetaStore>,
+                &workspace,
+                &data_dir,
+                OBJ_SIZE_LIMIT,
+            )
+            .unwrap();
+            let result = pm.persist(&file.to_string_lossy(), &spool).unwrap();
+            assert!(!result.obj_addr.obj_key.is_empty());
+        }
+
+        // A second manager sees the record and can rebuild the data file.
+        let pm = PersistenceManager::with_catalog(
+            store.clone() as Arc<dyn MetaStore>,
+            &workspace,
+            &data_dir,
+            OBJ_SIZE_LIMIT,
+        )
+        .unwrap();
+        assert_eq!(pm.get_file_size(&file.to_string_lossy()).unwrap(), 7);
+        fs::remove_file(&file).unwrap();
+        assert_eq!(pm.restore_missing_files().unwrap(), 1);
+        assert_eq!(fs::read(&file).unwrap(), b"payload");
     }
 }
