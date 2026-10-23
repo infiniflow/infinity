@@ -251,6 +251,7 @@ fn publish_bmp_chunks(
     by_block: std::collections::BTreeMap<u64, Vec<infinity_storage::bmp_cpp::SparseDoc>>,
     width: infinity_storage::bmp_cpp::IdxWidth,
     term_bound: usize,
+    block_size: usize,
 ) -> Vec<CppIndexChunk> {
     let mut chunks = Vec::new();
     for (block, mut docs) in by_block {
@@ -267,12 +268,7 @@ fn publish_bmp_chunks(
             .unwrap_or(0)
             .max(1)
             .max(term_bound as i32) as usize;
-        let bytes = infinity_storage::bmp_cpp::encode_bmp(
-            infinity_index::sparse::BMP_BLOCK_SIZE,
-            width,
-            &docs,
-            term_num,
-        );
+        let bytes = infinity_storage::bmp_cpp::encode_bmp(block_size, width, &docs, term_num);
         let path = seg_dir.join(format!("chunk_{block}.idx"));
         if std::fs::write(&path, &bytes).is_err() {
             continue;
@@ -2188,6 +2184,7 @@ impl Engine {
                     self.sparse_rows_by_block(table, &im.column),
                     crate::sparse_idx_width(&declared),
                     crate::sparse_declared_bound(&declared).unwrap_or(0),
+                    crate::index_block_size(&im),
                 )
             } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                 // Written in place by `write_cpp_fulltext_index`; its files are

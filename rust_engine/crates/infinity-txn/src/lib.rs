@@ -118,6 +118,11 @@ pub struct TxnManager {
     /// Both are the same store in a build that keeps them together.
     catalog_store: Arc<dyn MetaStore>,
     wal: Mutex<WalManager>,
+    /// The catalog ids of the tables this engine knows (`db.tbl` →
+    /// `(db_id, table_id)`). The reference stamps them into every `Append` /
+    /// `Delete` command (`WalCmdAppend::db_id_` / `table_id_`); a reader that
+    /// resolves a table by id needs them, so an empty string is a real loss.
+    table_ids: Mutex<HashMap<String, (String, String)>>,
     wal_path: PathBuf,
     /// `wal/wal.log`: the file the **reference** reads. It holds exactly one
     /// entry, the `kNewCheckpoint` command a checkpoint writes, because the
@@ -210,6 +215,7 @@ impl TxnManager {
         Ok(Self {
             catalog_store: store.clone(),
             store,
+            table_ids: Mutex::new(HashMap::new()),
             wal: Mutex::new(wal),
             wal_path,
             checkpoint_path,
@@ -358,6 +364,17 @@ impl TxnManager {
     /// an existing name stages no store but still takes a write commit ts,
     /// `NewTxn::Commit` -> `GetWriteCommitTS`), so the timestamp is spent and
     /// the log keeps the entry.
+    /// Records the catalog ids the reference stamps into `Append`/`Delete`
+    /// (`WalCmdAppend::db_id_` / `table_id_`). The caller registers a table as
+    /// soon as its catalog record exists, so every later DML entry names it the
+    /// way the reference does.
+    pub fn register_table_ids(&self, table: &str, db_id: &str, table_id: &str) {
+        self.table_ids
+            .lock()
+            .unwrap()
+            .insert(table.to_string(), (db_id.to_string(), table_id.to_string()));
+    }
+
     pub fn commit_at(&self, txn: Txn, commit_ts: TxnTimeStamp) -> Result<TxnTimeStamp> {
         let _commit = self.commit_lock.lock().unwrap();
         {
@@ -373,7 +390,7 @@ impl TxnManager {
         let entry = WalEntry::new(
             txn.id as i64,
             commit_ts,
-            build_commands(&txn.writes, &txn.deletes),
+            build_commands(&txn.writes, &txn.deletes, &self.table_ids.lock().unwrap()),
         );
         {
             let mut wal = self.wal.lock().unwrap();
@@ -834,7 +851,11 @@ fn join_table(db_name: &str, table_name: &str) -> String {
 /// engine persists rows as encoded text, not columnar vectors) and
 /// [`WalCmd::Delete`] carries the row ids. Everything else keeps its exact
 /// records in a [`WalCmd::KvBatch`].
-fn build_commands(writes: &[(Vec<u8>, Vec<u8>)], deletes: &[Vec<u8>]) -> Vec<WalCmd> {
+fn build_commands(
+    writes: &[(Vec<u8>, Vec<u8>)],
+    deletes: &[Vec<u8>],
+    table_ids: &HashMap<String, (String, String)>,
+) -> Vec<WalCmd> {
     struct AppendGroup {
         table: String,
         rows: Vec<(u64, String)>,
@@ -862,7 +883,7 @@ fn build_commands(writes: &[(Vec<u8>, Vec<u8>)], deletes: &[Vec<u8>]) -> Vec<Wal
 
     let mut cmds: Vec<WalCmd> = groups
         .into_iter()
-        .map(|group| build_append(&group.table, &group.rows))
+        .map(|group| build_append(&group.table, &group.rows, table_ids))
         .collect();
 
     let mut del_groups: Vec<(String, Vec<u64>)> = Vec::new();
@@ -882,11 +903,15 @@ fn build_commands(writes: &[(Vec<u8>, Vec<u8>)], deletes: &[Vec<u8>]) -> Vec<Wal
     }
     for (table, seqs) in del_groups {
         let (db_name, table_name) = split_table(&table);
+        let (db_id, table_id) = table_ids
+            .get(&table)
+            .cloned()
+            .unwrap_or_else(|| (String::new(), String::new()));
         cmds.push(WalCmd::Delete {
             db_name,
-            db_id: String::new(),
+            db_id,
             table_name,
-            table_id: String::new(),
+            table_id,
             row_ids: seqs.into_iter().map(WalRowId::from_u64).collect(),
         });
     }
@@ -918,7 +943,11 @@ fn batch_kind(key: &[u8]) -> KvBatchKind {
 
 /// C++: `WalCmdAppendV2` — `row_ranges_` plus the `DataBlock`. The block holds
 /// one varchar column with the engine's encoded row text.
-fn build_append(table: &str, rows: &[(u64, String)]) -> WalCmd {
+fn build_append(
+    table: &str,
+    rows: &[(u64, String)],
+    table_ids: &HashMap<String, (String, String)>,
+) -> WalCmd {
     let mut block = DataBlock::new(vec![Column::Str(ColumnVector::new())], rows.len());
     for (_, text) in rows {
         block
@@ -935,11 +964,15 @@ fn build_append(table: &str, rows: &[(u64, String)]) -> WalCmd {
         }
     }
     let (db_name, table_name) = split_table(table);
+    let (db_id, table_id) = table_ids
+        .get(table)
+        .cloned()
+        .unwrap_or_else(|| (String::new(), String::new()));
     WalCmd::Append {
         db_name,
-        db_id: String::new(),
+        db_id,
         table_name,
-        table_id: String::new(),
+        table_id,
         row_ranges,
         block,
     }

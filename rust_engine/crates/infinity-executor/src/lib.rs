@@ -1739,6 +1739,18 @@ fn sparse_store_hints(columns: &[ColumnDef]) -> Vec<Option<CatalogSparseStore>> 
 }
 
 /// Width of a sparse column's index element (`SPARSE(FLOAT, INT8)` etc.).
+/// `WITH (block_size = N)` of a BMP index (`IndexBMP::Init`, `index_bmp_impl.cpp:43`).
+/// The reference groups a term's postings into blocks of this many documents;
+/// the default is `BMP_BLOCK_SIZE`.
+fn index_block_size(im: &infinity_catalog::IndexMeta) -> usize {
+    im.options
+        .iter()
+        .find(|(k, _)| k.trim().eq_ignore_ascii_case("block_size"))
+        .and_then(|(_, v)| v.trim().parse::<usize>().ok())
+        .filter(|n| (1..=256).contains(n))
+        .unwrap_or(infinity_index::sparse::BMP_BLOCK_SIZE)
+}
+
 fn sparse_idx_width(type_text: &str) -> infinity_storage::bmp_cpp::IdxWidth {
     use infinity_storage::bmp_cpp::IdxWidth;
     let t = type_text.to_ascii_uppercase();
@@ -3522,6 +3534,8 @@ impl MultiVectorIndex {
 /// (`TableMeta::sparse_stores`) when the index is rebuilt.
 struct SparseIndex {
     width: infinity_storage::bmp_cpp::IdxWidth,
+    /// `WITH (block_size = N)`: documents per `BlockFwd` block.
+    block_size: usize,
     /// The catalog's `SparseStoreType` for this column.
     store: CatalogSparseStore,
     dir: PathBuf,
@@ -3604,6 +3618,7 @@ impl SparseIndex {
         dir: PathBuf,
         width: infinity_storage::bmp_cpp::IdxWidth,
         store: CatalogSparseStore,
+        block_size: usize,
     ) -> Self {
         let next_chunk = std::fs::read_dir(&dir)
             .map(|d| {
@@ -3614,6 +3629,7 @@ impl SparseIndex {
             .unwrap_or(0);
         Self {
             width,
+            block_size,
             store,
             dir,
             terms: 0,
@@ -3686,7 +3702,7 @@ impl SparseIndex {
             let path = self.dir.join(name);
             if infinity_storage::bmp_cpp::write_bmp_file(
                 &path,
-                infinity_index::sparse::BMP_BLOCK_SIZE,
+                self.block_size,
                 self.width,
                 &docs,
                 term_num,
@@ -4872,6 +4888,11 @@ impl Engine {
         engine.txn.append_checkpoint(0)?;
         if !engine.storage.catalog.has_database_record("default_db")? {
             engine.ddl_commit(|| engine.storage.catalog.create_database("default_db", false))?;
+        }
+        // The reference stamps `db_id`/`table_id` into every row command; a
+        // directory opened here has to name its tables the same way.
+        for meta in engine.storage.catalog.list_tables().unwrap_or_default() {
+            engine.register_table_ids(&meta);
         }
         Ok(engine)
     }
@@ -6944,7 +6965,7 @@ impl Engine {
         if self.storage.catalog.get_table_by_name(name)?.is_none() {
             self.clear_orphan_rows(name)?;
         }
-        self.storage.catalog.create_table_typed_with_sparse_stores(
+        let meta = self.storage.catalog.create_table_typed_with_sparse_stores(
             name,
             columns,
             defaults,
@@ -6952,7 +6973,24 @@ impl Engine {
             types,
             comments,
             sparse_stores,
-        )
+        )?;
+        self.register_table_ids(&meta);
+        Ok(meta)
+    }
+
+    /// Tells the WAL which catalog ids name `meta`'s table: the reference
+    /// stamps them into every `Append`/`Delete` (`WalCmdAppend::db_id_` /
+    /// `table_id_`), and a reader that resolves a table by id needs them.
+    fn register_table_ids(&self, meta: &infinity_catalog::TableMeta) {
+        let db = meta
+            .name
+            .split('.')
+            .next()
+            .unwrap_or("default_db")
+            .to_string();
+        let db_id = self.database_id(&db);
+        self.txn
+            .register_table_ids(&meta.name, &db_id.to_string(), &meta.id.to_string());
     }
 
     /// Drops a table and purges its stored rows, tombstones, secondary-index
@@ -8378,6 +8416,9 @@ impl Engine {
                     }
                     Ok(())
                 })?;
+                if let Some(meta) = self.storage.catalog.get_table_by_name(new_name)? {
+                    self.register_table_ids(&meta);
+                }
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -11124,7 +11165,15 @@ impl Engine {
                 }
             }
         }
-        let mut index = SparseIndex::new(dir, width, store);
+        let block_size = self
+            .storage
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .find(|im| im.column == *column && im.index_type.eq_ignore_ascii_case("BMP"))
+            .map(|im| index_block_size(&im))
+            .unwrap_or(infinity_index::sparse::BMP_BLOCK_SIZE);
+        let mut index = SparseIndex::new(dir, width, store, block_size);
         // The column type carries the declared bound (`SPARSE(float,int8,8)`);
         // the reference uses it as the index's term space.
         index.terms = self

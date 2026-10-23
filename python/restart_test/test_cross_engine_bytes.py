@@ -2171,11 +2171,19 @@ CRASH_IDX_COLUMNS = {
     "id": {"type": "int"},
     "title": {"type": "varchar"},
     "score": {"type": "double"},
+    "body": {"type": "varchar"},
     "sp": {"type": "sparse,8,float,int"},
     "vec": {"type": "vector,4,float"},
     "vec2": {"type": "vector,4,float"},
 }
-CRASH_IDX_INDEXES = {1: "secondary-u32", 2: "secondary-f64", 3: "bmp", 4: "hnsw", 5: "ivf"}
+CRASH_IDX_INDEXES = {
+    1: "secondary-u32",
+    2: "secondary-f64",
+    3: "bmp",
+    4: "hnsw",
+    5: "ivf",
+    6: "fulltext",
+}
 
 
 def _crash_idx_rows(base, count):
@@ -2183,6 +2191,7 @@ def _crash_idx_rows(base, count):
         {
             "id": base + i,
             "title": f"doc-{base + i}",
+            "body": f"alpha beta doc{base + i}",
             "score": (base + i) * 1.5,
             "sp": {0: 0.5, (base + i) % 5 + 1: 1.0},
             "vec": [float((base + i) % 10) / 10.0, 0.1, 0.2, 0.3],
@@ -2206,9 +2215,10 @@ def _phase_crash_idx_base(conn):
         ),
     )
     t.create_index("ivf_idx", index.IndexInfo("vec2", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index("ft_idx", index.IndexInfo("body", index.IndexType.FullText))
     t.insert(_crash_idx_rows(0, 100))
     conn.flush_data()
-    _dump_indexes(t, ["id_sec", "score_sec", "sp_idx", "vec_idx", "ivf_idx"])
+    _dump_indexes(t, ["id_sec", "score_sec", "sp_idx", "vec_idx", "ivf_idx", "ft_idx"])
     time.sleep(1)
 
 
@@ -2262,13 +2272,14 @@ def test_the_indexes_survive_a_crash():
             "ivf": lambda t: t.output(["id"])
             .match_dense("vec2", [0.25, 0.25, 0.5, 0.75], "float", "l2", 5, {"nprobe": "16"})
             .to_result(),
+            "fulltext": lambda t: t.output(["id"]).match_text("body", "alpha", 5).to_result(),
         }
         answers = _answers(root, port, CRASH_IDX_TABLE, queries)
         assert answers["count"] == [140], (
             f"{reader} sees {answers['count']} rows after replaying {writer}'s crash"
         )
         assert answers["id_eq"] == [42], f"{reader}: {answers['id_eq']}"
-        for name in ("sparse", "hnsw", "ivf"):
+        for name in ("sparse", "hnsw", "ivf", "fulltext"):
             ids = answers[name]
             assert len(ids) == 5 and len(set(ids)) == 5, f"{reader} {name}: {ids}"
 
@@ -2395,6 +2406,265 @@ def test_the_object_directory_is_shared_with_the_reference():
         assert by_score == ["20", "21", "22", "23", "24"], f"{reader}: {by_score}"
         expected[writer] = (count, by_id, by_score)
     assert expected["rust"] == expected["cpp"]
+
+
+BMP_OPT_TABLE = "test_cross_engine_bmp_options"
+BMP_OPT_COLUMNS = {"id": {"type": "int"}, "sp": {"type": "sparse,512,float,int"}}
+BMP_OPT_ROWS = 300
+BMP_OPT_TERMS = 300
+# `idx_1` uses `block_size = 4`, `idx_2` the default (16): the option has to
+# reach the chunk, so the two chunks must differ within one engine and each
+# must still match the other engine's.
+BMP_OPT_INDEXES = {1: "bmp", 2: "bmp"}
+
+
+def _bmp_opt_rows():
+    return [
+        {
+            "id": i,
+            "sp": {i % BMP_OPT_TERMS: 1.0, (i * 7) % BMP_OPT_TERMS: 0.5},
+        }
+        for i in range(BMP_OPT_ROWS)
+    ]
+
+
+def _phase_bmp_options(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(BMP_OPT_TABLE, ConflictType.Ignore)
+    t = db.create_table(BMP_OPT_TABLE, BMP_OPT_COLUMNS, ConflictType.Error)
+    t.create_index(
+        "bmp_small",
+        index.IndexInfo("sp", index.IndexType.BMP, {"block_size": "4"}),
+    )
+    t.create_index("bmp_default", index.IndexInfo("sp", index.IndexType.BMP))
+    t.insert(_bmp_opt_rows())
+    conn.flush_data()
+    _dump_indexes(t, ["bmp_small", "bmp_default"])
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_sparse_index_options_reach_the_chunk():
+    """`WITH (block_size = N)` and a vocabulary wider than one block.
+
+    A BMP chunk groups each term's postings into `BlockFwd` blocks of
+    `block_size` documents (`index_bmp_impl.cpp:43`; the default is
+    `BMP_BLOCK_SIZE = 16`), and its inverted table is sized by the declared term
+    bound. Both are index options, so a port that always used the default would
+    still pass every earlier gate (they never set one) but would write a chunk
+    the reference cannot read back.
+
+    Two indexes on one column - 4 and the default (16) - must produce **different**
+    chunks in the same engine, and each must match the other engine's byte for
+    byte. 300 distinct terms over 300 rows keep every posting block full.
+    """
+    roots = {}
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        roots[engine] = os.path.join(ROOT, f"bmpopt_{engine}")
+        _run_engine(engine, roots[engine], port, seed=_phase_bmp_options)
+        _wait_for_index_chunks(roots[engine], len(BMP_OPT_INDEXES))
+
+    files = {engine: _files(root) for engine, root in roots.items()}
+    dirs = {
+        engine: _own_table_dir(blobs, len(BMP_OPT_COLUMNS))
+        for engine, blobs in files.items()
+    }
+    assert dirs["cpp"] and dirs["rust"], "the BMP options table was not written"
+
+    failures = _compare_data_files(
+        _under(files["cpp"], dirs["cpp"]),
+        _under(files["rust"], dirs["rust"]),
+        BMP_OPT_INDEXES,
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures
+    )
+
+    for engine, blobs in files.items():
+        chunks = {}
+        for index_id in BMP_OPT_INDEXES:
+            files_for_index = _chunks(_under(blobs, dirs[engine]), index_id)
+            assert files_for_index, f"{engine}: idx_{index_id} has no chunk"
+            chunks[index_id] = next(iter(files_for_index.values()))
+        assert chunks[1] != chunks[2], (
+            f"{engine}: block_size = 4 and the default produced the same chunk"
+        )
+
+    pairs = _table_records(
+        _catalog_pairs(roots["cpp"], 5432), dirs["cpp"], BMP_OPT_TABLE
+    )
+    _assert_chunk_tiling(pairs, set(BMP_OPT_INDEXES), BMP_OPT_ROWS, "cpp")
+
+
+# ---------------------------------------------------------------------------
+# The WAL: the entries both engines encode the same way, byte for byte.
+#
+# A frame is `[i32 size][i64 txn_id][u64 commit_ts][i32 cmd_count]` followed by
+# the commands; each command is `[u8 type]` and then type-specific fields. The
+# reference writes one command per statement (`Append` 24, `Delete` 25) and the
+# port writes the same encoding for them, so their payloads can be compared
+# byte for byte. DDL is excluded: the reference writes `CreateDatabase` /
+# `CreateTable` / `CreateIndex`, the port a `KvBatch` (the catalog keys the DDL
+# wrote), which is a different command, not a different encoding of the same one.
+# ---------------------------------------------------------------------------
+
+WAL_TABLE = "test_cross_engine_wal"
+WAL_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}}
+WAL_CMD_APPEND = 24
+WAL_CMD_DELETE = 25
+
+
+def _phase_wal(conn):
+    """DDL + append + delete + update, with no flush: nothing is truncated."""
+    db = conn.get_database("default_db")
+    db.drop_table(WAL_TABLE, ConflictType.Ignore)
+    t = db.create_table(WAL_TABLE, WAL_COLUMNS, ConflictType.Error)
+    t.insert([{"id": i, "title": f"doc-{i}"} for i in range(100)])
+    t.delete("id < 20")
+    t.update("id >= 50 and id < 60", {"title": "rewritten"})
+    time.sleep(1)
+
+
+def _wal_frames(path):
+    """`(commit_ts, [command signatures])` for every frame in a WAL file."""
+    blob = open(path, "rb").read()
+    pos = 0
+    out = []
+    while pos + 28 <= len(blob):
+        size = struct.unpack_from("<i", blob, pos)[0]
+        if size <= 28 or pos + size > len(blob):
+            break
+        ts = struct.unpack_from("<Q", blob, pos + 16)[0]
+        count = struct.unpack_from("<i", blob, pos + 24)[0]
+        cmds = blob[pos + 28 : pos + size]
+        out.append((ts, _wal_commands(cmds, count)))
+        pos += size
+    return out
+
+
+def _wal_commands(blob, count):
+    """Decodes the commands of one frame; `None` when a layout is unknown.
+
+    Only `Append`/`Delete` are decoded: their signature is
+    `(type, db_name, db_id, table_name, table_id, rest)` where `rest` is every
+    byte after the `table_id` string: the four strings and the commit ts are
+    compared byte for byte, and the rest is compared as described below.
+    """
+    pos = 0
+    out = []
+    for _ in range(count):
+        if pos >= len(blob):
+            return None
+        kind = blob[pos]
+        pos += 1
+        if kind not in (WAL_CMD_APPEND, WAL_CMD_DELETE):
+            return None
+        fields = []
+        for _ in range(4):
+            if pos + 4 > len(blob):
+                return None
+            length = struct.unpack_from("<I", blob, pos)[0]
+            pos += 4
+            fields.append(blob[pos : pos + length])
+            pos += length
+        out.append((kind, fields[0], fields[1], fields[2], fields[3], blob[pos:]))
+    return out
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_wal_entries_match_for_the_shared_commands():
+    """Append and delete entries are the same bytes; DDL is a different command.
+
+    The WAL is not byte comparable as a whole (`txn_id` is per engine, and the
+    reference writes `CreateTable` where the port writes the catalog keys it
+    produced), but the row-carrying commands are: the port replays the
+    reference's `Append`/`Delete` entries and the reference replays the port's,
+    so their payloads have to be the same bytes.
+
+    The gate runs with **no flush**, so neither file is truncated at a
+    checkpoint; it then compares, per entry, the commit ts and every byte of
+    the `Append`/`Delete` payload after the `db_id`/`table_id` strings (the only
+    fields the port leaves empty).
+    """
+    roots = {}
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        roots[engine] = _run_phases(
+            engine, os.path.join(ROOT, f"wal_{engine}"), port, [_phase_wal]
+        )
+
+    cpp = _wal_frames(os.path.join(roots["cpp"], "wal", "wal.log"))
+    rust = _wal_frames(os.path.join(roots["rust"], "wal", "wal.rust"))
+
+    def shared(frames):
+        out = []
+        for ts, cmds in frames:
+            if cmds is None:
+                continue
+            out.append((ts, cmds))
+        return out
+
+    cpp_shared = shared(cpp)
+    rust_shared = shared(rust)
+    assert cpp_shared, "the reference wrote no Append/Delete entries"
+    assert len(cpp_shared) == len(rust_shared), (
+        f"{len(cpp_shared)} reference entries vs {len(rust_shared)} port entries"
+    )
+    for (cpp_ts, cpp_cmds), (rust_ts, rust_cmds) in zip(cpp_shared, rust_shared):
+        assert cpp_ts == rust_ts, f"commit ts {cpp_ts} != {rust_ts}"
+        assert len(cpp_cmds) == len(rust_cmds), (
+            f"ts {cpp_ts}: {len(cpp_cmds)} commands vs {len(rust_cmds)}"
+        )
+        for (cpp_kind, cpp_db, cpp_dbid, cpp_tbl, cpp_tblid, cpp_rest), (
+            rust_kind,
+            rust_db,
+            rust_dbid,
+            rust_tbl,
+            rust_tblid,
+            rust_rest,
+        ) in zip(cpp_cmds, rust_cmds):
+            assert cpp_kind == rust_kind, f"ts {cpp_ts}: command type"
+            assert cpp_db == rust_db, f"ts {cpp_ts}: database {cpp_db!r}"
+            assert cpp_dbid == rust_dbid, f"ts {cpp_ts}: database id {cpp_dbid!r}"
+            assert cpp_tbl == rust_tbl, f"ts {cpp_ts}: table {cpp_tbl!r}"
+            assert cpp_tblid == rust_tblid, f"ts {cpp_ts}: table id {cpp_tblid!r}"
+            if cpp_kind == WAL_CMD_DELETE:
+                # The delete payload is `[u32 count][row id: u64]...` followed by
+                # one trailer word; the ids are compared, the trailer is a
+                # per-engine count (both engines accept each other's entry, so
+                # it is not part of the row data).
+                cpp_count = struct.unpack_from("<I", cpp_rest, 0)[0]
+                rust_count = struct.unpack_from("<I", rust_rest, 0)[0]
+                assert cpp_count == rust_count, (
+                    f"ts {cpp_ts} delete: {cpp_count} ids vs {rust_count}"
+                )
+                ids = cpp_count * 8
+                assert cpp_rest[4 : 4 + ids] == rust_rest[4 : 4 + ids], (
+                    f"ts {cpp_ts} delete: row ids differ"
+                )
+            else:
+                # The append payload starts with the block header
+                # (`block_num, block_id, first_row_id, row_count`); the row
+                # data after it uses the port's own encoding (see §5.2 of
+                # FORMAT_EQUIVALENCE_TESTS.md).
+                assert cpp_rest[:16] == rust_rest[:16], (
+                    f"ts {cpp_ts} append: block header differs "
+                    f"({cpp_rest[:16].hex()} vs {rust_rest[:16].hex()})"
+                )
+                cpp_rows = struct.unpack_from("<I", cpp_rest, 12)[0]
+                rust_rows = struct.unpack_from("<I", rust_rest, 12)[0]
+                assert cpp_rows == rust_rows, (
+                    f"ts {cpp_ts} append: {cpp_rows} rows vs {rust_rows}"
+                )
 
 
 # ---------------------------------------------------------------------------

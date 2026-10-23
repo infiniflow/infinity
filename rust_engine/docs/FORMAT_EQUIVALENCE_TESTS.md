@@ -58,7 +58,9 @@
 | `::test_the_vector_indexes_survive_deletes_updates_and_a_restart` | HNSW（`vec`）+ IVF（`vec2`）；第二个进程删除 + 改向量 + 追加 | HNSW 的 header/vectors/labels 与 IVF 的 header 计数、`(offset, vector)` 对相同；两个索引的 top-k 答案相同；行数相同 |
 | `::test_the_quantized_ivf_indexes_mirror_and_answer` | IVF `scalar_quantization(8 bits)` + `product_quantization(2×8 bits)`；第二个进程删除前缀、改写一段、追加 40 行 | 两引擎都发布了 chunk、chunk 覆盖 260 个物理行；`nprobe=16` 查到 10 个合法 id 且**不含已删除的 id**（量化码依赖随机质心，邻居不作逐 id 比较，删除位图必须生效） |
 | `::test_the_quantized_ivf_indexes_survive_a_crash` | 上一张表 + 30 行未 flush + 删除 10 行后 kill -9，双向交接 | 另一引擎 replay 后 220 行；SQ / PQ 各返回 10 个合法 id，且不含未 flush 阶段删除的 id |
-| `::test_the_indexes_survive_a_crash` | 100 行 flush + dump → 50 行未 flush + 删除 10 行后 kill -9，双向交接；5 个索引（次级 INT / DOUBLE、BMP、HNSW、IVF） | 另一引擎 replay 后 140 行；次级等值仍命中已 flush 的行；稀疏 / HNSW / IVF 返回 5 个合法 id |
+| `::test_the_indexes_survive_a_crash` | 100 行 flush + dump → 50 行未 flush + 删除 10 行后 kill -9，双向交接；6 个索引（次级 INT / DOUBLE、BMP、HNSW、IVF、全文） | 另一引擎 replay 后 140 行；次级等值仍命中已 flush 的行；稀疏 / HNSW / IVF / 全文各返回 5 个合法 id |
+| `::test_the_sparse_index_options_reach_the_chunk` | 300 行、300 个不同 term、列声明 `sparse,512,...`；同一列上两个 BMP 索引：`block_size = 4` 与默认（16） | 同一引擎里两个 chunk 必须**不同**（选项确实进了 chunk）；各自与另一引擎的同名 chunk 逐字节相同；chunk 盖住 300 行 |
+| `::test_the_wal_entries_match_for_the_shared_commands` | 建表 + 100 行 append + 20 行 delete + 10 行 update，**不** flush（WAL 不被 checkpoint 截断） | 每条 `Append` / `Delete` 的提交 ts、命令类型、库名/表名逐字节相同；`Delete` 的行 id 列表逐字节相同；`Append` 的块头（`block_num/block_id/first_row_id/row_count`）逐字节相同 |
 | `test_cross_engine_compat.py` | 200 行，4 类索引 | 双向交接：A 写 → B 读 → B 再写 |
 | `infinity-storage/tests/s3_minio.rs` | 本地临时目录 + 桶 | `tree_sync_and_restore`（往返 + 二次同步上传 0 个文件）、`same_size_edit_is_uploaded`（同长度改写必须重传）、`put_get_list_delete_roundtrip`；需要 `INFINITY_MINIO_TEST=1` |
 
@@ -72,14 +74,14 @@
 | 块列 `*.col`（`[data_region][null_bitmap]`） | ✅ | ✅ | ✅ 非 0 段块 | ✅ | ✅ | ◐ 互读 | ✅ 16 类 | ◐ |
 | 变长 outline `col_*_out` | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ | ✅ | ◐ |
 | `version` 文件 | ✅（含 ts） | ✅ | ✅ | ✅ | ✅ | ◐ | — | ◐ |
-| 全文 `.dic/.pos/.len` | ✅ | ✅ | ⬜ 跨段合并 | ✅ | ✅ | ⬜ | ✅ analyzer / `with_positions` | ◐ |
+| 全文 `.dic/.pos/.len` | ✅ | ✅ | ⬜ 跨段合并 | ✅ | ✅ | ◐ 重放后查询 | ✅ analyzer / `with_positions` | ◐ |
 | HNSW chunk | ◐ 图按内容 | ◐ | ⬜ | ◐ 内容+答案 | ◐ 内容+答案 | ◐ 重放后查询 | ✅ metric / build_type | ◐ |
 | IVF chunk（plain / SQ / PQ） | ◐ 按内容 | ◐ | ⬜ | ◐ 内容+答案 | ◐ 内容+答案 | ◐ 重放后查询 | ◐ plain / SQ / PQ | ◐ |
 | 次级索引 chunk（整数键） | ✅ | ✅ | ⬜ | ✅ | ✅ | ◐ 重放后查询 | ✅ int / date 键 | ◐ |
 | 次级索引 chunk（浮点键） | ✅ | ✅ | ⬜ | ✅ | ✅ | ◐ 重放后查询 | ✅ float / double 键 | ◐ |
-| 稀疏 BMP chunk | ✅ | ✅ | ⬜ | ✅ | ✅ | ◐ 重放后查询 | ⬜ 词表规模 / block_size | ◐ |
+| 稀疏 BMP chunk | ✅ | ✅ | ⬜ | ✅ | ✅ | ◐ 重放后查询 | ✅ block_size / 词表规模 | ◐ |
 | 删除位图（catalog 内） | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
-| WAL 记录 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ✅ 跨引擎 replay | — | ◐ |
+| WAL 记录 | ◐ 帧头+删除 id 逐字节 | ◐ | ◐ | ✅ | ✅ | ✅ 跨引擎 replay | — | ◐ |
 | Catalog KV | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
 
 "对象存储"列的 `◐` 现在指**跨引擎对象目录**：任一引擎写出的 `pm|object|` + 打包对象，另一个引擎删掉 `data/` 后也能读出来（§3 的对象目录用例）。MinIO 传输层仍只有重写版自身往返，原因见 §6.5。
@@ -99,7 +101,7 @@
 
 1. **跨段全文合并**：重写版把每个索引的 chunk 都写在 `idx_{id}/seg_0/`，不按段拆；参考在测试规模上只有 `seg_0`，所以没有可观测差异。要冻结这条需要 8,388,608 行级别的数据（每引擎约 1024 个块目录），本机内存与磁盘放不下两端。
 2. **多段下的索引类**（矩阵"多段"列的 ⬜）：HNSW / IVF / 次级 / 稀疏都只有单段覆盖。参考在 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）之前不会开第二段，本机造不出两个段；`COMPACT` 能造段，但那只覆盖了块层（`test_a_compacted_table_keeps_its_segments_apart`）。
-3. **WAL 的字节级比对**：只做跨引擎 replay，不比字节。
+3. **WAL 的 Append 行载荷**：帧头（提交 ts、命令数、命令类型、库名/表名）、`Delete` 的行 id 列表、`Append` 的块头都逐字节比（`test_the_wal_entries_match_for_the_shared_commands`）；`Append` 的行数据段与 `Delete` 的结尾计数字是重写版自己的编码——两个方向都能 replay（`test_a_crash_leaves_a_replayable_directory` 与 `test_the_indexes_survive_a_crash`），但字节不同。DDL 不在比对内：参考写 `CreateTable`/`CreateIndex`，重写版写 `KvBatch`（它落盘的 catalog 键），是不同的命令而非同一命令的不同编码。
 
 ### 5.3 流程
 
@@ -119,6 +121,7 @@
 | 对象存储：S3 传输 | 路径树 `data/`、`catalog/`、`persistence/` 逐文件上传 | 对象键即 `obj_key`，对象文件直接上传 | 只做重写版自身往返（无可用端点，§6.5） |
 | 索引 chunk 的段目录 | 全部在 `idx_{id}/seg_0/` | 路径同样带 `seg_{id}`；多段时是否按段拆分未验证 | 8M 行以下无差异，跨段未验证 |
 | 段的产生时机 | `COMPACT` 即写出 `seg_1`/`seg_2` | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切 | 见 §5.2 |
+| WAL 的 `Append` 行载荷 / DDL 命令 | 行数据按 `row_id` + 文本编码，DDL 写 `KvBatch`（catalog 键值） | 行数据按块内列编码，DDL 写 `CreateTable`/`CreateIndex` | 帧头、命令类型、库/表名、`Delete` 行 id 逐字节比；行载荷与 DDL 只保证双向 replay |
 | 不带 `rocksdb-store` feature 时 | catalog 落 fjall | 只认 RocksDB | 参考打开只剩 `system_tag`（`Database: default_db doesn't exist`）；门禁必须带 feature |
 
 ### 6.2 与参考逐字节一致的部分
