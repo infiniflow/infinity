@@ -106,7 +106,11 @@
 1. **段的产生方式**：参考在 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）之前不会因为写满而开第二段；`COMPACT` 的候选由 `NewCompactionAlg` 按 DBT 挑（同层至少 `DBT_COMPACTION_M = 4` 个段），少于四个时不开事务。多段门禁因此走 `IMPORT`：它按 `ApplySegmentIDs` 自己分配并封存一个段（`new_txn_data_impl.cpp:241`）。
 2. **多段的规模**：`test_a_multi_segment_table_matches_across_segments` 是 3 段、每段一块一个 chunk；`test_a_segment_with_many_blocks_keeps_one_chunk_per_index` 是一段三块一个 chunk；`test_a_compacted_table_matches_and_keeps_its_sources` 是 4 段压成 1 段；`test_a_table_larger_than_a_segment_starts_a_second_one` 是 8,388,700 行按容量切出的两段（1024 + 1 块，无索引，需 `INFINITY_BYTES_HUGE=1`）。仍未覆盖：**带索引**的 8M 行表（索引 chunk 会按 `mem_index_capacity` 切，规模是分钟级）、以及三段以上的容量切分。
 3. **`fast_rough_filter` 的二进制值**：记录本身已经对齐（段级 `seg|…|fast_rough_filter` 与块级 `blk|…|fast_rough_filter`，`BuildFastRoughFilterTask::ExecuteOnNewSealedSegment`，`new_txn_data_impl.cpp:1739`），字节由 `fast_rough_filter.rs` 的单测钉住（用参考抓下来的 130 字节记录做 fixture）。门禁只能确认**记录存在**：`show catalog 'all'` 把二进制值渲染成空串，比不了内容。另有两处未覆盖——`CREATE TABLE … (c BOOLEAN/DECIMAL /* bloom_filter */)` 打开的 binary-fuse 半区（门禁的 schema 不用它，重写版固定写"存在但未构建"）、以及 `HUGEINT` 以上的极值比较。
-4. **WAL 的 Append 行载荷**：帧头（提交 ts、命令数、命令类型、库名/表名）、`Delete` 的行 id 列表、`Append` 的块头都逐字节比（`test_the_wal_entries_match_for_the_shared_commands`）；`Append` 的行数据段与 `Delete` 的结尾计数字是重写版自己的编码——两个方向都能 replay（`test_a_crash_leaves_a_replayable_directory` 与 `test_the_indexes_survive_a_crash`），但字节不同。DDL 不在比对内：参考写 `CreateTable`/`CreateIndex`，重写版写 `KvBatch`（它落盘的 catalog 键），是不同的命令而非同一命令的不同编码。
+4. **压缩的候选集**：`compact_table` 判空用 DBT 规则（同层 ≥ 4 段才挑），但一旦有候选就合并**全部**存活段；参考只合并它挑中的那 4 个。段数 > 4 时两者的段划分因此不同（数据一致、段号不同）。4 段用例是两边一致的唯一点。
+5. **`Cleanup` 之后的目录**：重写版的 `reclaim_deprecated_segments` 直接删掉被压缩段的文件与 `catalog\|seg\|` / `blk\|` / `seg\|` / `idx_chunk\|` 记录、连 `drop\|` 标记一起删；参考的 `NewCatalog::CleanSegment` 还会写 `drop\|idx_chunk\|…` 之类"已删"标记。这一步没有逐记录比（门禁只覆盖到 `Cleanup` 之前）。
+6. **PLAID / EMVB / MULTIVECTOR 索引 chunk**：镜像里有写入代码（`write_cpp_plaid_index`、multivector chunk），但字节门禁只覆盖全文、HNSW、IVF（plain/SQ/PQ）、次级（int/float/double/date）、稀疏 BMP。PLAID 需要 sparse-vector 数据、EMVB/MULTIVECTOR 需要 embedding 列，目前只有重写版自身的单测。
+7. **快照（`CREATE TABLE/DATABASE/SYSTEM SNAPSHOT`）**：参考的快照是 `data/snapshot/…` 下的文件副本 + JSON 清单（`SnapshotInfo::RestoreSnapshotFiles`），重写版把它存成 KV 里的 `snap:` 记录。两种机制互不兼容，也没有任何跨引擎用例。
+8. **WAL 的 Append 行载荷**：帧头（提交 ts、命令数、命令类型、库名/表名）、`Delete` 的行 id 列表、`Append` 的块头都逐字节比（`test_the_wal_entries_match_for_the_shared_commands`）；`Append` 的行数据段与 `Delete` 的结尾计数字是重写版自己的编码——两个方向都能 replay（`test_a_crash_leaves_a_replayable_directory` 与 `test_the_indexes_survive_a_crash`），但字节不同。DDL 不在比对内：参考写 `CreateTable`/`CreateIndex`，重写版写 `KvBatch`（它落盘的 catalog 键），是不同的命令而非同一命令的不同编码。
 
 ### 5.3 流程
 
@@ -219,7 +223,7 @@
 
 `IMPORT` 的段是另一种情况：参考在导入事务里就把索引写进 chunk（`PopulateIndex` → `AddNewChunkIndex1`），所以那个段的 chunk 记录带的是**导入事务**的提交 ts（多段用例里两段分别是 22 与 24）。重写版为此记下每段被导入时的 ts（`import_ts:{表}:{段}`），发布 chunk 时取它与 `dump_ts` 的较大者——用 `INSERT` 建的表没有这条记录，行为不变。
 
-手动 `COMPACT` 两边做的也是同一件事：`ManualCompactTask` 把 `NewCompactionAlg` 挑出的候选段交给 `PhysicalCompact`（`physical_compact_impl.cpp:36`），只有一个段时挑不出候选、**不开事务**；重写版的 `compact_table` 现在同样在 `segment_ids(table).len() < 2` 时直接返回，所以 8192 行的脚本两边都留在 `seg_0`，trace 与字节完全一致（`test_a_compaction_with_one_segment_is_a_no_op`）。
+手动 `COMPACT` 两边做的也是同一件事：`ManualCompactTask` 把 `NewCompactionAlg` 挑出的候选段交给 `PhysicalCompact`（`physical_compact_impl.cpp:36`），挑不出候选时**不开事务**（DBT：同一层至少 4 个段）；重写版的 `compact_table` 用同一条 DBT 规则判空，所以 8192 行的单段脚本两边都留在 `seg_0`，trace 与字节完全一致（`test_a_compaction_with_one_segment_is_a_no_op`）。
 
 ## 7. 怎么跑
 
