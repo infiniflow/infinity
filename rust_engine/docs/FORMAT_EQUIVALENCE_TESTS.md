@@ -106,7 +106,7 @@
 
 | 差异 | 重写版 | 参考 | 门禁处理 |
 |---|---|---|---|
-| `idx_chunk\|…\|{chunk_id}` 的值 | `0` | 产出该 chunk 的 dump 事务的提交 ts | 只把这个值归一化成 `<ts>`；键与其它记录逐字节比。重写版的 chunk 是 checkpoint 时的一次性重写，没有"产出它的那个 dump 事务"可指 |
+| `idx_chunk\|…\|{chunk_id}` 的值 | 封住该 chunk 的那次 `DumpIndex` 的提交 ts（`dump_ts:{表}:{索引}` 记录，checkpoint 镜像与 dump 当次都会写） | 同上。参考的 dump 由后台 `DumpIndexProcessor` 执行、全文索引再转到构建 worker，且 `flush_data` 的 checkpoint 异步提交，实测同一脚本两次给出 22/24/26/28/32（checkpoint 在 30）与 22/24/26/28/30（checkpoint 在 32）；重写版同步按调用序 dump（24/26/28/30/32） | 只把这个值归一化成 `<ts>`；键与其它记录逐字节比。两边都是真实的 dump 提交 ts，差异是 dump 排期 |
 | HNSW 图区 | 确定（插入顺序即行序） | `thread_local std::mt19937`，节点层级取决于线程调度 | header / vectors / labels 字节比，图区与查询答案按内容比 |
 | IVF 质心 | 确定 | `std::random_device` 采样，质心个数也不固定 | chunk 按内容比 |
 | `catalog/`、`wal/` | RocksDB；redo 记录写 `wal/wal.rust`，replay 时同时读参考的 `wal/wal.log` | RocksDB；写 `wal/wal.log` | 只比逻辑内容与互读 |
@@ -188,7 +188,7 @@
 两处例外：
 
 * **参考的配额驱动 dump**（§2）：`BGMemIndexTracer::IncreaseMemoryUsage` 在后台线程上开写事务，ts 在 worker 真正提交时才分配，实测会落在 append 与随后的 DELETE 之间或之后。这不是格式，比较 ts 的用例把 `memindex_memory_quota` 设成内存索引达不到的值，只保留脚本里显式的 `DumpIndex`。
-* **`idx_chunk|…|{chunk_id}` 的值**：参考写产出该 chunk 的 dump 事务的提交 ts。重写版的 chunk 是 checkpoint 时的一次性重写，没有"产出它的那个 dump 事务"可指，写 `0`；门禁只把这个值归一化成 `<ts>`，键与其它记录仍逐字节比。
+* **`idx_chunk|…|{chunk_id}` 的值**：两边都写产出该 chunk 的 dump 事务的提交 ts（重写版在 `DumpIndex` 时记下并盖到已发布的 id 记录上，同时把 `wal.log` 的 checkpoint 帧推进到覆盖它，否则参考读目录时会按 `chunk_ts > begin_ts` 把 chunk 藏起来）。差异只在**哪个索引拿到哪个 ts**：参考的 dump 走后台队列、全文索引再延后，`flush_data` 的 checkpoint 又是异步的；实测同一脚本两次得到 22/24/26/28/32（checkpoint 30）与 22/24/26/28/30（checkpoint 32），重写版同步按调用序得到 24/26/28/30/32。门禁只把这个值归一化成 `<ts>`，键与其它记录仍逐字节比。
 
 还有一种情况不是分配差异，而是两边做的事不同：手动 `COMPACT`。参考的 `ManualCompactTask` 交给 `NewCompactionAlg` 挑候选段（`physical_compact_impl.cpp:36`），一个段时挑不出东西、**不开事务**；重写版的 `compact_table` 无条件把行搬进下一个段，因此多出一个写事务。多段用例里的表只有 8192 行（两边都是一个段），所以参考的 trace 是 `10=Append 12=checkpoint(flush) 14=Append(尾批) 16=checkpoint`，重写版在 12 与 14 之间多一个 compaction 事务。该用例只比尾块的**布局**（`_version_without_ts`），因为它的目的是验证行 id 携带段号、块落在段目录下，而不是比较 compaction 本身。
 

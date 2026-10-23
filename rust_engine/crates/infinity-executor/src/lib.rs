@@ -277,6 +277,16 @@ fn append_ts_key(table: &str) -> Vec<u8> {
 fn delete_ts_key(table: &str) -> Vec<u8> {
     format!("delete_ts:{table}").into_bytes()
 }
+/// Commit timestamp of the last `DumpIndex` that sealed this index, written
+/// into the `idx_chunk|…|{chunk_id}` catalog value.
+///
+/// The reference stamps that value with the commit ts of the transaction whose
+/// memory dump produced the chunk (`SegmentIndexMeta::AddChunkIndexID1`). The
+/// port's chunks are re-published by the checkpoint mirror, so the transaction
+/// that last sealed the index is the closest real ts it can name.
+fn dump_ts_key(table: &str, index: &str) -> Vec<u8> {
+    format!("dump_ts:{table}:{index}").into_bytes()
+}
 fn del_prefix(table: &str) -> Vec<u8> {
     format!("del:{table}:").into_bytes()
 }
@@ -5692,6 +5702,19 @@ impl Engine {
         let version = self.dump_version(table, index)?;
         let ts = self.txn.reserve_commit_ts();
         self.txn.commit_at(self.txn.begin(), ts)?;
+        // Remember the ts: the `idx_chunk|…|{chunk_id}` record names the
+        // transaction whose dump sealed the chunk, and it is this one.
+        let tkey = self.table_key(table);
+        self.storage
+            .store
+            .put(&dump_ts_key(&tkey, index), &ts.to_le_bytes())?;
+        // The chunk record the reference writes in this transaction
+        // (`AddChunkIndexID1`): the chunks already published for the index now
+        // belong to `ts`.
+        self.stamp_cpp_chunk_ts(&tkey, index, ts)?;
+        // A reader hides a chunk stamped above its `begin_ts`, which it takes
+        // from the newest checkpoint frame - the dump's ts must be covered.
+        self.txn.cover_with_checkpoint(ts)?;
         if is_secondary_kind(&version.index.index_type) {
             self.dump_index(table, index)?;
         }

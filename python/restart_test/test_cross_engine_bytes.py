@@ -1109,10 +1109,16 @@ def _normalize_catalog_value(key, value):
     the same statements (see `rust_engine/docs/FORMAT_EQUIVALENCE_TESTS.md`
     §6.6).
 
-    The exception is `idx_chunk|…|{chunk_id}`: the reference stamps the
-    commit ts of the background transaction whose memory dump produced the
-    chunk. The port's mirror is a single rewrite at checkpoint time, not a
-    per-index dump chain, so it has no such transaction to name and writes 0.
+    The exception is `idx_chunk|…|{chunk_id}`: both engines stamp it with the
+    commit ts of the transaction whose dump sealed the chunk, but the two dump
+    *schedules* differ. The reference dumps from a background processor
+    (`DumpIndexProcessor::DoDump`), defers the full-text index to a builder
+    worker, and its `flush_data` checkpoint commits asynchronously — measured,
+    the reference's five values are 22/24/26/28/32 with the checkpoint at 30, and
+    the same script with a pause before the dumps gives 22/24/26/28/30 with the
+    checkpoint at 32. The port dumps synchronously in call order after its own
+    (synchronous) checkpoint, so it writes 24/26/28/30/32. Both values are real
+    dump ts; which index gets which is the schedule.
     """
     if key.startswith("idx_chunk|") and not key.endswith("|chunk_info"):
         if re.fullmatch(r"\d+", value):

@@ -234,6 +234,7 @@ fn publish_secondary_chunks(
             row_count: entries.len() as u64,
             term_count: 0,
             index_size: 0,
+            commit_ts: 0,
         });
     }
     chunks
@@ -283,6 +284,7 @@ fn publish_bmp_chunks(
             row_count: docs.len() as u64,
             term_count: 0,
             index_size: 0,
+            commit_ts: 0,
         });
     }
     chunks
@@ -325,6 +327,7 @@ fn publish_fulltext_chunks(seg_dir: &Path) -> Vec<CppIndexChunk> {
             row_count,
             term_count,
             index_size: 0,
+            commit_ts: 0,
         });
     }
     // The reference's chunk ids are the order the chunks were dumped in, not
@@ -370,6 +373,7 @@ fn publish_chunk_files(seg_dir: &Path, rows: u64, hnsw: bool) -> Vec<CppIndexChu
                 row_count: rows,
                 term_count: 0,
                 index_size: 0,
+                commit_ts: 0,
             }]
         };
     }
@@ -391,6 +395,7 @@ fn publish_chunk_files(seg_dir: &Path, rows: u64, hnsw: bool) -> Vec<CppIndexChu
             row_count,
             term_count: 0,
             index_size: 0,
+            commit_ts: 0,
         });
         base_row_id += row_count;
     }
@@ -2079,6 +2084,41 @@ impl Engine {
     /// Mirrors each index's sealed chunk into `idx_{id}/seg_0/chunk_0.idx` and
     /// records it in the catalog. Best effort per index: a mirror this engine
     /// does not have simply publishes nothing.
+    /// Re-stamps the index's published `idx_chunk|…|{chunk_id}` records with
+    /// `ts`, the commit timestamp of the dump transaction that just sealed it.
+    ///
+    /// The reference writes that record inside the dump transaction itself
+    /// (`SegmentIndexMeta::AddChunkIndexID1`). The port's mirror re-publishes the
+    /// whole chunk layer at checkpoint time, so a dump that happens *after* the
+    /// last checkpoint must touch the records it already published; the next
+    /// mirror preserves the value from [`dump_ts_key`].
+    pub(crate) fn stamp_cpp_chunk_ts(&self, table: &str, index: &str, ts: u64) -> Result<()> {
+        let table = self.qualified_table(table);
+        let db_id = self.database_id_of(&table);
+        let table_id = self
+            .storage
+            .catalog
+            .get_table_by_name(&table)?
+            .map(|m| m.id)
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let index_id = self.cpp_index_position(&table, index)?;
+        let store = self.storage.catalog.store();
+        let prefix = format!("idx_chunk|{db_id}|{table_id}|{index_id}|");
+        let value = ts.to_string().into_bytes();
+        for (key, _) in store.scan_prefix(prefix.as_bytes())? {
+            let text = String::from_utf8_lossy(&key).to_string();
+            // Only the id records (numeric suffix); `…|chunk_info` and
+            // `…|next_chunk_id` are owned by the mirror.
+            let Some(suffix) = text.rsplit('|').next() else {
+                continue;
+            };
+            if suffix.parse::<u64>().is_ok() {
+                store.put(&key, &value)?;
+            }
+        }
+        Ok(())
+    }
+
     fn publish_cpp_index_chunks(&self, table: &str, table_id: u64) -> Result<()> {
         let db_id = self.database_id_of(table);
         let root = self
@@ -2145,6 +2185,25 @@ impl Engine {
             if chunks.is_empty() {
                 continue;
             }
+            // The chunk record names the transaction whose dump sealed it
+            // (`SegmentIndexMeta::AddChunkIndexID1`); the port's last `DumpIndex`
+            // for this index is that transaction.
+            let dump_ts = self
+                .storage
+                .store
+                .get(&crate::dump_ts_key(&self.qualified_table(table), &im.name))
+                .ok()
+                .flatten()
+                .filter(|v| v.len() >= 8)
+                .map(|v| u64::from_le_bytes(v[..8].try_into().unwrap()))
+                .unwrap_or(0);
+            let chunks: Vec<_> = chunks
+                .into_iter()
+                .map(|c| CppIndexChunk {
+                    commit_ts: dump_ts,
+                    ..c
+                })
+                .collect();
             published.push(CppIndexSegment {
                 index_id: index_id as u64,
                 segment_id: 0,

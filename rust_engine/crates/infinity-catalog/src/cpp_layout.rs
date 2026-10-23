@@ -75,6 +75,11 @@ pub struct CppIndexChunk {
     /// Bytes the index occupies on disk (the HNSW/BMP/IVF workers size their
     /// buffer with it).
     pub index_size: u64,
+    /// Commit ts of the transaction that sealed the chunk, written as the
+    /// `idx_chunk|…|{chunk_id}` value (`SegmentIndexMeta::AddChunkIndexID1`,
+    /// `segment_index_meta_impl.cpp:129`). `0` means "no transaction to name" —
+    /// the reader then sees the chunk from any `begin_ts`.
+    pub commit_ts: u64,
 }
 
 /// The sealed chunks of one index over one segment.
@@ -1344,13 +1349,13 @@ pub fn write_cpp_index_segments(
             //
             // The value is the commit ts of the transaction whose memory
             // dump produced the chunk (`SegmentIndexMeta::AddChunkIndexID1`,
-            // `segment_index_meta_impl.cpp:129`). The reference dumps each
-            // index in its own background transaction, so the values are the
-            // dump schedule (measured: four indexes at 22/24/26/28 and the
-            // full-text one at 32, after a checkpoint); the port's mirror is
-            // a single rewrite at checkpoint time and has no such
-            // transaction to name, so it writes 0 — like a reader started
-            // from an empty WAL, which sees every chunk either way.
+            // `segment_index_meta_impl.cpp:129`). `chunk.commit_ts` carries it:
+            // the executor records the ts of the `DumpIndex` that sealed the
+            // index and hands it to the mirror. The mirror writes the record at
+            // every checkpoint, and a dump that happens afterwards stamps the
+            // records it already published (the value is preserved here). A
+            // chunk with no dump behind it keeps 0 — a reader sees it from any
+            // `begin_ts`.
             let id_key = key::catalog_index_chunk_key(
                 &set.db_id,
                 &set.table_id,
@@ -1358,7 +1363,7 @@ pub fn write_cpp_index_segments(
                 index.segment_id,
                 chunk.chunk_id as u64,
             );
-            store.put(id_key.as_bytes(), CPP_MIRROR_TS.to_string().as_bytes())?;
+            store.put(id_key.as_bytes(), chunk.commit_ts.to_string().as_bytes())?;
             written += 1;
             let key = key::catalog_index_chunk_tag_key(
                 &set.db_id,

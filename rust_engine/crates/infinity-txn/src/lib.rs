@@ -578,6 +578,50 @@ impl TxnManager {
             .unwrap_or(0))
     }
 
+    /// Re-publishes the checkpoint frame so it covers `max_commit_ts`, without
+    /// spending a timestamp.
+    ///
+    /// A reader derives its `begin_ts` from the newest checkpoint frame and
+    /// hides a catalog record stamped above it (`SegmentIndexMeta::LoadChunkIDs1`
+    /// skips a chunk whose ts is greater). A `DumpIndex` commits after the last
+    /// checkpoint and stamps the chunk records it sealed, so the frame has to be
+    /// advanced for those chunks to stay readable. This writes no transaction of
+    /// its own - the sequence of allocated timestamps must not move.
+    pub fn cover_with_checkpoint(&self, max_commit_ts: TxnTimeStamp) -> Result<()> {
+        let _commit = self.commit_lock.lock().unwrap();
+        let current = self.current_ts.load(Ordering::SeqCst);
+        if max_commit_ts < current {
+            return Ok(());
+        }
+        // The frame's own commit ts is the clock's current position: this is not
+        // a transaction of its own, so it must not move the clock (a frame
+        // stamped ahead of it would make the next open start past the WAL).
+        self.write_checkpoint_frame(max_commit_ts, max_commit_ts + 1)
+    }
+
+    /// Writes the `wal.log` checkpoint frame (`commit_ts` = the frame's own
+    /// stamp, `max_commit_ts` = the newest transaction it covers) and fsyncs it.
+    fn write_checkpoint_frame(
+        &self,
+        commit_ts: TxnTimeStamp,
+        max_commit_ts: TxnTimeStamp,
+    ) -> Result<()> {
+        let entry = WalEntry::new(-1, commit_ts, vec![WalCmd::Checkpoint { max_commit_ts }]);
+        let mut buf = Vec::with_capacity(entry.size_in_bytes());
+        entry.write_adv(&mut buf);
+        if let Some(parent) = self.checkpoint_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+        }
+        use std::io::Write;
+        let mut file = std::fs::File::create(&self.checkpoint_path)
+            .map_err(|e| Error::io(&self.checkpoint_path, e))?;
+        file.write_all(&buf)
+            .map_err(|e| Error::io(&self.checkpoint_path, e))?;
+        file.sync_all()
+            .map_err(|e| Error::io(&self.checkpoint_path, e))?;
+        Ok(())
+    }
+
     /// C++ `NewCheckpoint`: append the checkpoint entry the reference keeps.
     ///
     /// `GetReplayEntries` derives `last_commit_ts`/`max_checkpoint_ts` from the
