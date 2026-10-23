@@ -75,7 +75,7 @@
 | 格式单元 | 单块单 chunk | 多块 / 多 chunk | 多段 | 删除 / 更新 | 重启后再写 | 崩溃恢复 | 类型 / 选项矩阵 | 对象存储 |
 |---|---|---|---|---|---|---|---|---|
 | 数据文件头尾（magic / buffer_size / checksum） | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ 互读 | — | ◐ 跨引擎对象目录 |
-| 块列 `*.col`（`[data_region][null_bitmap]`） | ✅ | ✅ | ✅ 非 0 段块 | ✅ | ✅ | ◐ 互读 | ✅ 16 类 | ◐ |
+| 块列 `*.col`（`[data_region][null_bitmap]`） | ✅ | ✅ | ✅ 非 0 段块 + 8M 容量切分 | ✅ | ✅ | ◐ 互读 | ✅ 16 类 | ◐ |
 | 变长 outline `col_*_out` | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ | ✅ | ◐ |
 | `version` 文件 | ✅（含 ts） | ✅ | ✅ | ✅ | ✅ | ◐ | — | ◐ |
 | 全文 `.dic/.pos/.len` | ✅ | ✅ | ✅ 两段各自 chunk + 跨段合并 | ✅ | ✅ | ◐ 重放后查询 | ✅ analyzer / `with_positions` | ◐ |
@@ -260,6 +260,7 @@ cd rust_engine && INFINITY_MINIO_TEST=1 INFINITY_MINIO_ENDPOINT=127.0.0.1:9000 \
 | `INFINITY_BYTES_ROWS` | `200` | 字节测试的数据集行数 |
 | `INFINITY_BYTES_BLOCK_ROWS` | `20000` | 多块测试的行数（>8192 才是多块） |
 | `INFINITY_BYTES_DET_ROWS` | `200` | 确定性测量的行数 |
+| `INFINITY_BYTES_HUGE` | 空 | 设为 `1` 才跑 8,388,700 行的容量切分用例（约 3.5 分钟、每引擎约 70 MB） |
 | `INFINITY_MINIO_URL` | 空 | 对象存储测试的端点；为空则跳过该用例 |
 | `INFINITY_MINIO_ACCESS_KEY` / `_SECRET_KEY` | 空 | 对象存储凭据 |
 | `INFINITY_MINIO_BUCKET_PREFIX` | `infinity-bytes` | 桶名前缀（桶名不能含 `_`，重写版会拒绝并退回本地）；每次跑再拼一个时间戳后缀，上一轮的桶不会污染这一轮 |
