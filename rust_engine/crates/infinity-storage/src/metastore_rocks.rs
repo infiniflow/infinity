@@ -93,6 +93,22 @@ impl MetaStore for RocksMetaStore {
         Ok(out)
     }
 
+    fn scan_range(&self, start: &[u8], end: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        let mut out = Vec::new();
+        let iter = self.db.iterator(rocksdb::IteratorMode::From(
+            start,
+            rocksdb::Direction::Forward,
+        ));
+        for item in iter {
+            let (k, v) = item.map_err(re)?;
+            if k.as_ref() >= end {
+                break;
+            }
+            out.push((k.to_vec(), v.to_vec()));
+        }
+        Ok(out)
+    }
+
     fn flush(&self) -> Result<()> {
         // `flush` + WAL sync is the durability barrier the trait contract wants:
         // `flush` moves the memtable into an SST, and only `flush_wal(true)`

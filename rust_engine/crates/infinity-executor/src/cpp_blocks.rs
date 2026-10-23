@@ -141,11 +141,10 @@ pub struct LoadedVectorIndex {
     pub stamp: (u64, u64),
 }
 
-/// A table whose estimated encoded size exceeds this keeps only the engine's
-/// own row store. The C++ block mirror duplicates every row, so mirroring a
-/// multi-gigabyte table would double its disk footprint; the mirror is a
-/// best-effort interop artifact, not the system of record.
-const MIRROR_BUDGET_BYTES: usize = 1024 * 1024 * 1024;
+// The mirror has no size cap: the reference mirrors every table it writes
+// (`AppendInBlock`, `AppendInSegment`), so a port-written directory must hold
+// blocks for every table too. Its memory stays a block, not a table, because
+// `write_cpp_blocks` reads one block's rows at a time.
 
 /// The secondary mirror names its dumps `seg_{segment}_{block}_{rows}.idx`: the
 /// block is the chunk the reference publishes, and the trailing field is how
@@ -486,30 +485,6 @@ fn fulltext_chunk_counts(len_path: &Path) -> Option<(u64, u64)> {
         term_count += u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) as u64;
     }
     Some((doc_count, term_count))
-}
-
-/// Rough encoded bytes per row, from the declared column types.
-fn estimated_row_bytes(types: &[String]) -> usize {
-    types
-        .iter()
-        .map(|t| {
-            let up = t.trim().to_ascii_uppercase();
-            let dim = crate::type_dim(t).unwrap_or(0);
-            if dim > 0
-                && (up.starts_with("VECTOR")
-                    || up.starts_with("EMBEDDING")
-                    || up.starts_with("MULTIVECTOR")
-                    || up.starts_with("TENSOR"))
-            {
-                return dim * 4;
-            }
-            if up.starts_with("SPARSE") {
-                return dim * 8;
-            }
-            64
-        })
-        .sum::<usize>()
-        .max(1)
 }
 
 /// `chunk_{id}.idx` files under `dir`, ordered by chunk id. The reference
@@ -1655,42 +1630,52 @@ impl Engine {
     /// the rows appended since (or never mirrored) from the row journal. That
     /// keeps a commit-time re-mirror idempotent: it must not copy the journal
     /// back over cells the blocks already hold.
-    fn mirror_source_rows(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
-        let rows = self.fetch_rows_including_deleted(table)?;
-        let key = self.table_key(table);
-        let snapshot = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&key)
-            .and_then(|entry| entry.cpp_block_rows.clone());
-        let Some(snapshot) = snapshot else {
-            return Ok(rows);
-        };
-        let schema = self.table_schema(table)?;
-        if schema.is_empty() {
-            return Ok(rows);
-        }
-        let wanted: Vec<usize> = (0..schema.len()).collect();
-        let Ok((_, block_rows)) = self.read_cpp_blocks_selected(table, &wanted) else {
-            return Ok(rows);
-        };
-        if block_rows.len() != snapshot.len() {
-            return Ok(rows);
-        }
-        let covered: std::collections::HashMap<usize, Vec<Value>> = snapshot
-            .iter()
-            .copied()
-            .zip(block_rows)
-            .map(|(id, cells)| (id, cells.iter().map(|cell| parse_value(cell)).collect()))
-            .collect();
-        Ok(rows
+    /// One block's rows: the journal's values for the ids in the block's
+    /// window, with the block already on disk winning for the ids it holds.
+    ///
+    /// The window is a contiguous run of `DEFAULT_BLOCK_CAPACITY` row ids
+    /// (`segment << 32 | block * capacity + n`), which is exactly what the
+    /// reference's block covers. Reading it this way is what bounds the mirror's
+    /// memory: a table is mirrored block by block, the way the reference streams
+    /// the rows through its buffer manager.
+    fn mirror_block_rows(
+        &self,
+        table: &str,
+        meta: &infinity_catalog::TableMeta,
+        types: &[i32],
+        segment_id: u32,
+        block_index: u16,
+        start: u64,
+        end: u64,
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
+        let first = ((segment_id as usize) << 32) | start as usize;
+        let last = ((segment_id as usize) << 32) | end as usize;
+        let mut journal: std::collections::BTreeMap<usize, Vec<Value>> = self
+            .fetch_rows_including_deleted_range(table, first, last)?
             .into_iter()
-            .map(|(seq, cells)| match covered.get(&seq) {
-                Some(block_cells) if block_cells.len() == cells.len() => (seq, block_cells.clone()),
-                _ => (seq, cells),
-            })
-            .collect())
+            .collect();
+        // The mirror is the authoritative copy of the rows it already holds
+        // (`try_cpp_rows` prefers it for the same reason): a re-mirror must not
+        // copy a lossy journal back over cells the blocks already have.
+        let id = BlockId {
+            db_id: self.database_id_of(table),
+            table_id: meta.id,
+            segment_id,
+            block_id: block_index,
+        };
+        let root = self.blocks_root();
+        let held = self
+            .decode_block_cells(table, &root, meta, types, id, None)
+            .unwrap_or_default();
+        let mut out = Vec::with_capacity(held.len().max(journal.len()));
+        for (seq, cells) in held {
+            journal.remove(&seq);
+            out.push((seq, cells.iter().map(|cell| parse_value(cell)).collect()));
+        }
+        // Rows the block does not hold yet (appended since the last mirror).
+        out.extend(journal);
+        out.sort_unstable_by_key(|(seq, _)| *seq);
+        Ok(out)
     }
 
     /// Writes `table`'s rows into `{data_dir}/data/db_{db}/tbl_{id}/seg_0/…`
@@ -1730,38 +1715,36 @@ impl Engine {
 
         // Every row the table ever wrote, *including* the deleted ones: the
         // reference's block is append-only, so a deleted row's cells stay in
-        // the block and only the `version` file's `deleted_` array hides them
+        // the block and only the `version` file's `deleted_` array hides it
         // (`BlockVersion::Delete`). An UPDATE is a delete plus an append, so
         // its rewritten row sits at the end with a fresh id.
         //
-        // Rows the previous mirror already covers keep their *block* values:
-        // the mirror is the authoritative copy for them (a table can be
-        // re-mirrored on every commit, and the row journal is allowed to be a
-        // lossy cache of the same rows - `try_cpp_rows` prefers the blocks for
-        // exactly that reason). New rows still come from the journal.
-        let rows = self.mirror_source_rows(&table)?;
-        // The row ids this snapshot covers, in block order. Reads use them to
-        // tell block-resident rows from rows written after the checkpoint.
-        let block_rows: Vec<usize> = rows.iter().map(|(seq, _)| *seq).collect();
+        // The rows come one **block** at a time (`mirror_block_rows`), the way
+        // the reference streams them through its buffer manager, so the
+        // mirror's memory is a block and not a table. Rows the previous mirror
+        // already covers keep their *block* values: the mirror is the
+        // authoritative copy for them (a table can be re-mirrored on every
+        // commit, and the row journal is allowed to be a lossy cache of the
+        // same rows - `try_cpp_rows` prefers the blocks for exactly that
+        // reason). New rows come from the journal.
+        let mut block_rows: Vec<usize> = Vec::new();
         // `BlockVersion::Append` boundaries: one `create` per append, sized by
         // how many of that append's rows land in the block. Each carries the
         // append transaction's commit ts, like the reference
         // (`BlockVersion::Append(commit_ts, …)`, `new_txn_data_impl.cpp:957`).
         let totals = self.append_totals(&table);
         let append_ts = self.append_ts(&table);
-        // Deleted row id -> its position in the mirrored row order and the
-        // commit ts of the transaction that deleted it, so the version file
-        // can mark the block slot that holds it (`BlockVersion::Delete`).
+        // Deleted row id -> the commit ts of the transaction that deleted it,
+        // so the version file marks the block slot that holds it
+        // (`BlockVersion::Delete`).
         let delete_ts = self.delete_ts(&table);
-        let deleted_at: std::collections::HashMap<usize, (usize, u64)> = self
+        let deleted_at: std::collections::HashMap<usize, u64> = self
             .deleted_ids(&table)
             .iter()
             .enumerate()
-            .filter_map(|(k, id)| {
-                let id = *id as usize;
-                let at = block_rows.binary_search(&id).ok()?;
+            .map(|(k, id)| {
                 let ts = delete_ts.get(k).copied().unwrap_or(0);
-                Some((id, (at, if ts == 0 { DELETED_MIRROR_TS } else { ts })))
+                (*id as usize, if ts == 0 { DELETED_MIRROR_TS } else { ts })
             })
             .collect();
         let db_id = self.database_id_of(&table);
@@ -1775,25 +1758,17 @@ impl Engine {
         }
         let mut written = 0usize;
         // A row id carries its segment in the high 32 bits (`segment_id << 32 |
-        // in-segment offset`) and the rows come back in id order, so each
-        // segment is a contiguous run. The reference writes one `seg_{id}/`
-        // directory per segment, with the block ids restarting at 0.
+        // in-segment offset`). The reference writes one `seg_{id}/` directory
+        // per segment, with the block ids restarting at 0, and a segment's
+        // blocks tile `[0, rows)` - so the allocator's per-segment counts are
+        // enough to know every block's id window without reading the table.
         let mut segments: Vec<CppSegment> = Vec::new();
         let mut global_pos = 0usize;
-        let mut rows = rows.into_iter().peekable();
-        while let Some(&(first, _)) = rows.peek() {
-            let segment_id = (first >> 32) as u32;
+        let mut counts = self.segment_row_counts(&table);
+        counts.sort_unstable();
+        for (segment_id, seg_rows_total) in counts {
             let seg_start = global_pos;
-            let mut seg_rows: Vec<(usize, Vec<Value>)> = Vec::new();
-            while let Some((seq, _)) = rows.peek() {
-                if (*seq >> 32) as u32 != segment_id {
-                    break;
-                }
-                seg_rows.push(rows.next().unwrap());
-            }
-            global_pos += seg_rows.len();
-
-            let seg_rows_total = seg_rows.len() as u64;
+            global_pos += seg_rows_total as usize;
             let mut blocks: Vec<CppBlock> = Vec::new();
             // The ts the segment was created with: the commit ts of the append
             // that opened it (`TableMeta::AddSegmentWithID(commit_ts, …)`).
@@ -1822,19 +1797,30 @@ impl Engine {
             // Drain the segment block by block so each block's values are freed
             // once it is encoded: holding the whole table's decoded rows while
             // the texts are rendered doubled the transient on a long import.
-            let mut block_index = 0usize;
-            while !seg_rows.is_empty() {
-                let take = seg_rows.len().min(DEFAULT_BLOCK_CAPACITY);
-                let chunk: Vec<(usize, Vec<Value>)> = seg_rows.drain(..take).collect();
-                let texts: Vec<Vec<String>> = chunk
-                    .iter()
-                    .map(|(_, row)| row.iter().map(mirror_cell_text).collect())
-                    .collect();
+            let block_count = (seg_rows_total as usize).div_ceil(DEFAULT_BLOCK_CAPACITY);
+            for block_index in 0..block_count {
                 // `block_start` stays in the table-wide append order the
                 // version batches are recorded in; the slot a deleted row
                 // occupies is inside its own segment's block.
                 let start = block_index * DEFAULT_BLOCK_CAPACITY;
+                let end = (start + DEFAULT_BLOCK_CAPACITY).min(seg_rows_total as usize);
                 let slot_base = seg_start + start;
+                let chunk = self.mirror_block_rows(
+                    &table,
+                    &meta,
+                    &types,
+                    segment_id,
+                    block_index as u16,
+                    start as u64,
+                    end as u64,
+                )?;
+                block_rows.extend(chunk.iter().map(|(seq, _)| *seq));
+                let texts: Vec<Vec<String>> = chunk
+                    .iter()
+                    .map(|(_, row): &(usize, Vec<Value>)| {
+                        row.iter().map(mirror_cell_text).collect()
+                    })
+                    .collect();
                 // A block opened by `COPY` keeps the reference's import-time
                 // bitmap coverage (see `ColumnBody::build_with`).
                 let bitmap_bits = self.block_bitmap_bits(&table, slot_base, chunk.len());
@@ -1849,9 +1835,11 @@ impl Engine {
                 let batches =
                     self.block_version_batches(&totals, &append_ts, slot_base, chunk.len());
                 let mut version = BlockVersionFile::new(&batches, DEFAULT_BLOCK_CAPACITY);
-                for (&_id, &(at, ts)) in deleted_at.iter() {
-                    if (slot_base..slot_base + chunk.len()).contains(&at) {
-                        version.delete(at - slot_base, ts);
+                // The slot of a deleted row is its in-segment offset inside the
+                // block (`BlockVersion::Delete`); the id window is the block's.
+                for (seq, _) in &chunk {
+                    if let Some(ts) = deleted_at.get(seq) {
+                        version.delete(((*seq as u64 & 0xffff_ffff) - start as u64) as usize, *ts);
                     }
                 }
                 // The block's own record carries the ts of the append that
@@ -1934,7 +1922,6 @@ impl Engine {
                     commit_ts: block_ts,
                 });
                 written += chunk.len();
-                block_index += 1;
             }
             // `first_delete_ts` is the commit ts of the first delete that
             // touched this segment (`SegmentMeta::CommitFirstDeleteTS`): a
@@ -2156,10 +2143,7 @@ impl Engine {
         if !root.is_dir() {
             return Ok(());
         }
-        let rows = self.approx_row_count(&table);
-        if !meta.types.iter().all(|t| column_type_of(t).is_some())
-            || rows.saturating_mul(estimated_row_bytes(&meta.types)) > MIRROR_BUDGET_BYTES
-        {
+        if !meta.types.iter().all(|t| column_type_of(t).is_some()) {
             return Ok(());
         }
         self.write_cpp_blocks(&table)?;
@@ -2174,11 +2158,7 @@ impl Engine {
     /// mis-encoded.
     pub fn flush_cpp_blocks(&self) -> Result<()> {
         for meta in self.storage.catalog.list_tables()? {
-            let rows = self.approx_row_count(&meta.name);
-            let per_row = estimated_row_bytes(&meta.types);
-            if meta.types.iter().all(|t| column_type_of(t).is_some())
-                && rows.saturating_mul(per_row) <= MIRROR_BUDGET_BYTES
-            {
+            if meta.types.iter().all(|t| column_type_of(t).is_some()) {
                 self.write_cpp_blocks(&meta.name)?;
                 // The mirror now covers every row; the IVF memory segment is
                 // redundant and would double-count candidates.
@@ -2636,6 +2616,97 @@ impl Engine {
         Ok(rows)
     }
 
+    /// The cells of one mirror block, in row order, as the block reader renders
+    /// them (`null` for a NULL slot).
+    ///
+    /// A block covers a fixed `DEFAULT_BLOCK_CAPACITY` window of its segment, so
+    /// row `n` of block `b` is the id `segment << 32 | b * capacity + n` - the id
+    /// the reference stored it under.
+    fn decode_block_cells(
+        &self,
+        table: &str,
+        root: &Path,
+        meta: &infinity_catalog::TableMeta,
+        types: &[i32],
+        id: BlockId,
+        wanted: Option<&[usize]>,
+    ) -> Option<Vec<(usize, Vec<String>)>> {
+        let (version, columns) = self.read_block_cached(table, root, id).ok()?;
+        let row_count: usize = version
+            .created
+            .last()
+            .map(|c| c.cumulative_row_count as usize)
+            .unwrap_or(0);
+        let mut out = Vec::with_capacity(row_count);
+        for row in 0..row_count {
+            let mut cells = Vec::with_capacity(types.len());
+            for (col, column_type) in types.iter().enumerate() {
+                if let Some(wanted) = wanted {
+                    if !wanted.contains(&col) {
+                        cells.push("null".to_string());
+                        continue;
+                    }
+                }
+                let column_id = meta.ids.get(col).copied().unwrap_or(col as u64);
+                let raw = columns.iter().find(|c| c.column_id == column_id)?;
+                let layout = layout_of(&meta.types[col], *column_type)?;
+                let body = cpp_format::split_body_for_layout(
+                    raw.body.as_slice(),
+                    DEFAULT_BLOCK_CAPACITY,
+                    layout,
+                );
+                let value = if body.null_bitmap.len() > row / 8
+                    && body.null_bitmap[row / 8] & (1 << (row % 8)) == 0
+                {
+                    "null".to_string()
+                } else {
+                    // Tensor / sparse slots point into the column's outline.
+                    match outline_kind(&meta.types[col]) {
+                        OutlineKind::Tensor => {
+                            let at = row * 8;
+                            let slot = body.data.get(at..at + 8).unwrap_or(&[]);
+                            decode_tensor_value(&meta.types[col], slot, &raw.outline)
+                                .unwrap_or_else(|| "null".into())
+                        }
+                        OutlineKind::TensorArray => {
+                            let at = row * 8;
+                            let slot = body.data.get(at..at + 8).unwrap_or(&[]);
+                            decode_tensorarray_value(&meta.types[col], slot, &raw.outline)
+                                .unwrap_or_else(|| "null".into())
+                        }
+                        OutlineKind::Sparse => {
+                            let at = row * 16;
+                            let slot = body.data.get(at..at + 16).unwrap_or(&[]);
+                            decode_sparse_value(&meta.types[col], slot, &raw.outline)
+                                .unwrap_or_else(|| "null".into())
+                        }
+                        OutlineKind::Array => {
+                            let at = row * 8;
+                            let slot = body.data.get(at..at + 8).unwrap_or(&[]);
+                            decode_array_value(&meta.types[col], slot, &raw.outline)
+                                .unwrap_or_else(|| "null".into())
+                        }
+                        OutlineKind::None => decode_value(
+                            &meta.types[col],
+                            *column_type,
+                            &body.data,
+                            row,
+                            &raw.outline,
+                        )
+                        .unwrap_or_else(|| "null".into()),
+                    }
+                };
+                cells.push(value);
+            }
+            out.push((
+                ((id.segment_id as usize) << 32)
+                    | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + row),
+                cells,
+            ));
+        }
+        Some(out)
+    }
+
     fn read_cpp_blocks_wanted(
         &self,
         table: &str,
@@ -2697,90 +2768,12 @@ impl Engine {
                 segment_id,
                 block_id: block_index,
             };
-            let (version, columns) = match self.read_block_cached(&table, &root, id) {
-                Ok(v) => v,
-                Err(_) if at == 0 => {
+            match self.decode_block_cells(&table, &root, &meta, &types, id, wanted) {
+                Some(cells) => rows.extend(cells),
+                None if at == 0 => {
                     return Err(Error::NotFound(format!("no blocks for table '{table}'")))
                 }
-                Err(_) => break,
-            };
-            let row_count: usize = version
-                .created
-                .last()
-                .map(|c| c.cumulative_row_count as usize)
-                .unwrap_or(0);
-            for row in 0..row_count {
-                let mut out = Vec::with_capacity(types.len());
-                for (col, column_type) in types.iter().enumerate() {
-                    if let Some(wanted) = wanted {
-                        if !wanted.contains(&col) {
-                            out.push("null".to_string());
-                            continue;
-                        }
-                    }
-                    let column_id = meta.ids.get(col).copied().unwrap_or(col as u64);
-                    let Some(raw) = columns.iter().find(|c| c.column_id == column_id) else {
-                        return Err(Error::Invalid(format!("block is missing column {col}")));
-                    };
-                    let layout = layout_of(&meta.types[col], *column_type)
-                        .ok_or_else(|| Error::Invalid("unsupported column layout".into()))?;
-                    let body = cpp_format::split_body_for_layout(
-                        &raw.body,
-                        DEFAULT_BLOCK_CAPACITY,
-                        layout,
-                    );
-                    let value = if body.null_bitmap.len() > row / 8
-                        && body.null_bitmap[row / 8] & (1 << (row % 8)) == 0
-                    {
-                        "null".to_string()
-                    } else {
-                        // Tensor / sparse slots point into the column's outline.
-                        match outline_kind(&meta.types[col]) {
-                            OutlineKind::Tensor => {
-                                let at = row * 8;
-                                let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                                decode_tensor_value(&meta.types[col], slot, &raw.outline)
-                                    .unwrap_or_else(|| "null".into())
-                            }
-                            OutlineKind::TensorArray => {
-                                let at = row * 8;
-                                let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                                decode_tensorarray_value(&meta.types[col], slot, &raw.outline)
-                                    .unwrap_or_else(|| "null".into())
-                            }
-                            OutlineKind::Sparse => {
-                                let at = row * 16;
-                                let slot = body.data.get(at..at + 16).unwrap_or(&[]);
-                                decode_sparse_value(&meta.types[col], slot, &raw.outline)
-                                    .unwrap_or_else(|| "null".into())
-                            }
-                            OutlineKind::Array => {
-                                let at = row * 8;
-                                let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                                decode_array_value(&meta.types[col], slot, &raw.outline)
-                                    .unwrap_or_else(|| "null".into())
-                            }
-                            OutlineKind::None => decode_value(
-                                &meta.types[col],
-                                *column_type,
-                                &body.data,
-                                row,
-                                &raw.outline,
-                            )
-                            .unwrap_or_else(|| "null".into()),
-                        }
-                    };
-                    out.push(value);
-                }
-                // A block covers a fixed `DEFAULT_BLOCK_CAPACITY` window of its
-                // segment, so the row's sequence id is the segment's base plus
-                // its window plus offset - the id the reference would have
-                // stored it under.
-                rows.push((
-                    ((segment_id as usize) << 32)
-                        | (block_index as usize * DEFAULT_BLOCK_CAPACITY + row),
-                    out,
-                ));
+                None => break,
             }
         }
         Ok((meta.columns.clone(), rows))

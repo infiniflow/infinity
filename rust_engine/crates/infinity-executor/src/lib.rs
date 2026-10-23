@@ -7487,27 +7487,6 @@ impl Engine {
         Ok(base)
     }
 
-    /// Upper bound on the rows ever reserved for `table`, from the in-memory
-    /// allocator (no scan). Used to decide whether the C++ block mirror is worth
-    /// its duplicate copy of a large table.
-    fn approx_row_count(&self, table: &str) -> usize {
-        let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let Some(entry) = tables.get(&key) else {
-            return 0;
-        };
-        // Segment ids are monotonic and a compacted table lives in a high-id
-        // segment, so `segment_id << 32 | offset` is not the row count. Sum the
-        // per-segment counts instead.
-        if !entry.segments.is_empty() {
-            return entry.segments.values().map(|s| s.rows as usize).sum();
-        }
-        match entry.row_counter {
-            Some((seg, off, _)) => ((seg as u64) << 32 | off as u64) as usize,
-            None => 0,
-        }
-    }
-
     /// Records a write batch (`COPY`/`INSERT`) against `table`.
     fn bump_writes(&self, table: &str) {
         let key = self.table_key(table);
@@ -10370,6 +10349,42 @@ impl Engine {
     /// Like `fetch_rows_with_ids`, but including tombstoned rows. Full-text
     /// corpus statistics keep counting deleted documents, as the reference's
     /// segments do until compaction, so the scan path must see them too.
+    /// [`Self::fetch_rows_including_deleted`] over one id window
+    /// `[first, last)`, in id order.
+    ///
+    /// The block mirror reads one block's window at a time, so a table of any
+    /// size is mirrored with a block's worth of memory - the same shape as the
+    /// reference, which streams the rows through its buffer manager.
+    fn fetch_rows_including_deleted_range(
+        &self,
+        table: &str,
+        first: usize,
+        last: usize,
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
+        let prefix = row_prefix(table);
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let mut rows = Vec::new();
+        for (k, v) in self
+            .storage
+            .store
+            .scan_range(&row_key(table, first), &row_key(table, last))?
+        {
+            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
+                .parse()
+                .unwrap_or(0);
+            let mut cells = self.parse_stored_row(table, &defaults, &v)?;
+            while cells.len() < defaults.len() {
+                let i = cells.len();
+                cells.push(match defaults.get(i).and_then(|d| d.as_deref()) {
+                    Some(d) => Value::from_literal(&default_literal(d)),
+                    None => Value::Null,
+                });
+            }
+            rows.push((seq, cells));
+        }
+        Ok(rows)
+    }
+
     fn fetch_rows_including_deleted(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();

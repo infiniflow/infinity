@@ -55,7 +55,7 @@
 | `::test_a_multi_segment_table_matches_across_segments` | 两次 `IMPORT`（100 + 60 行，同一线程顺序导入）→ 两个段；七类索引（全文 / HNSW / IVF / 次级 varchar·float·int / 稀疏 BMP） | 每个索引在 `seg_0`、`seg_1` 各一套 chunk，chunk id 从 0 重新开始、`base_row_id` 以 `1 << 32` 起算；块、全文、次级、稀疏 chunk 逐字节相同，HNSW 头/向量/标签与 IVF `(offset, vector)` 按内容；catalog 键值相同的部分逐键比；参考读两边目录答案一致，跨段全文合并同时返回两个段的行 |
 | `::test_a_segment_with_many_blocks_keeps_one_chunk_per_index` | 一次 `IMPORT` 20000 行 → 一段 3 块 | 每个索引在该段只有**一个** chunk（`row_count` 20000、`base_row_id` 0）——`PopulateIndex` 按 `mem_index_capacity`/段末 dumps 一次，不是每块一个；块、全文、次级、稀疏逐字节相同；参考读两边答案一致 |
 | `::test_a_compacted_table_matches_and_keeps_its_sources` | 4 次 `IMPORT`（100+60+40+30）后 `COMPACT` | `NewCompactionAlg` 需要同层 4 个段才挑候选；合并段 id = 5、ts 是该压缩事务；四个源段保留文件与 catalog 记录、只多 `drop\|seg\|…` 与 `drop\|idx_seg\|…`，`(index, segment)` 配对记录被删（参考读目录时据此不看旧段）；新段每个索引一个 230 行 chunk |
-| `::test_a_table_larger_than_a_segment_starts_a_second_one`（`INFINITY_BYTES_HUGE=1`） | 一次 `IMPORT` 8,388,700 行、单列无索引 → 1024 块在 `seg_0`、92 行在 `seg_1` | 容量 8,388,608 行触发第二段（`TableCache::PrepareAppendNolock`），整条导入仍是一个事务；两引擎的块数（1024 + 1）、块字节、`version` 相同；两侧答案一致。本机实测 3m38s、每引擎约 70 MB 块文件；单列是为了留在重写版镜像的 1 GB 预算内（每列按 64 B/行估） |
+| `::test_a_table_larger_than_a_segment_starts_a_second_one`（`INFINITY_BYTES_HUGE=1`） | 一次 `IMPORT` 8,388,700 行、两列无索引 → 1024 块在 `seg_0`、92 行在 `seg_1` | 容量 8,388,608 行触发第二段（`TableCache::PrepareAppendNolock`），整条导入仍是一个事务；两引擎的块数（1024 + 1）、块字节、`version` 相同；两侧答案一致 |
 | `::test_the_object_directory_is_shared_with_the_reference` | 100 行 + 次级索引；两个引擎各写一次 `persistence_dir`（`storage_type = "local"`，即桶在本地的那份布局），写完删掉 `data/`，由另一个引擎读 | 对面的引擎按 `pm|object|` 解析打包对象后：行数 100、`id = 7` 命中、次级范围查询命中同一批 id；两个方向一致 |
 | `::test_the_port_round_trips_through_object_storage` | 200 行 + `storage_type="minio"` → 清空本地目录 → 读回 → 再写 50 行（在恢复出来的树上做 checkpoint）→ 再清空 → 读回 | 重写版从桶里恢复 `data/`+`catalog/`+`persistence/`，行数 200；第二次 checkpoint 后是 250（需要 `INFINITY_MINIO_URL`；每次跑用新桶，避免上一轮的桶污染） |
 | `::test_the_secondary_and_sparse_indexes_survive_deletes_updates_and_a_restart` | INT / FLOAT / DOUBLE 三个次级键 + 稀疏 BMP；第二个进程 `DELETE` 前缀 + `UPDATE` 一段，再 flush/dump | 每个 chunk 逐字节相同（DOUBLE 键走 8 字节键 + `double` 斜率）；chunk 覆盖 110 个物理行；四个索引的答案相同 |
@@ -129,6 +129,7 @@
 | 对象存储：写出的布局 | `persistence_format = "reference"` 时写 `pm\|object\|` 记录 + 打包对象（与参考同一套，128 MB 上限 / footer / stat） | `ObjCreate` 命名打包 blob，本地路径映射在 KV 的 `pm\|object\|<path>` | 对象目录用例双向比（§3） |
 | 对象存储：S3 传输 | 路径树 `data/`、`catalog/`、`persistence/` 逐文件上传 | 对象键即 `obj_key`，对象文件直接上传 | 只做重写版自身往返（无可用端点，§6.5） |
 | 索引 chunk 的段目录 | 每个段一套 `idx_{id}/seg_{s}/`，chunk id 每段从 0 起 | 同左 | 多段用例逐文件比（§3） |
+| 块镜像的大小上限 | 没有：每张表都镜像，内存按块（一次 range scan 一个块） | 没有：写入即落块 | 8,388,700 行用例（§3） |
 | 索引 chunk 的粒度 | `IMPORT` 的段：全文按 `mem_index_capacity` 切、次级/稀疏整段一个；`INSERT` 的段：按块 | 同左 | 一段三块用例（§3） |
 | 压缩后的段布局 | 合并段 = 最大段号 + 1，块/版本/chunk 都带压缩事务的 ts；源段保留文件与记录，另写 `drop\|seg\|` 与 `drop\|idx_seg\|`、删 `(index, segment)` 配对；`Cleanup` 才回收 | 同左 | 4 段压缩用例（§3） |
 | `seg\|…\|fast_rough_filter` / `blk\|…` | 与参考同字节（`fast_rough_filter.rs`） | `IMPORT`/压缩时建 | 门禁只断言记录存在（`show catalog` 渲染二进制为空），字节由单测 fixture 钉住（§5.2.3） |

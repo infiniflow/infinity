@@ -95,6 +95,20 @@ pub trait MetaStore: Send + Sync {
     }
     /// All `(key, value)` pairs whose key starts with `prefix`, in key order.
     fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
+    /// All `(key, value)` pairs with `start <= key < end`, in key order.
+    ///
+    /// The block mirror reads one block's rows at a time instead of loading a
+    /// whole table: the reference streams its rows through the buffer manager
+    /// (`NewTxn::Import` -> `AppendInBlock`), so a table of any size is
+    /// mirrored with O(block) memory. A backend that cannot bound the scan
+    /// falls back to the prefix walk below.
+    fn scan_range(&self, start: &[u8], end: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        Ok(self
+            .scan_prefix(start)?
+            .into_iter()
+            .take_while(|(key, _)| key.as_slice() < end)
+            .collect())
+    }
     /// Number of keys with `prefix`. Counting (`SELECT count(*)`, `SHOW TABLE`)
     /// must not read the row values, which can be tens of kilobytes each.
     fn count_prefix(&self, prefix: &[u8]) -> Result<usize> {
@@ -252,6 +266,15 @@ impl MetaStore for FjallMetaStore {
     fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
         let mut out = Vec::new();
         for kv in self.ks.prefix(prefix) {
+            let (k, v) = kv.into_inner().map_err(fe)?;
+            out.push((k.to_vec(), decode_value(&v)));
+        }
+        Ok(out)
+    }
+
+    fn scan_range(&self, start: &[u8], end: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        let mut out = Vec::new();
+        for kv in self.ks.range(start.to_vec()..end.to_vec()) {
             let (k, v) = kv.into_inner().map_err(fe)?;
             out.push((k.to_vec(), decode_value(&v)));
         }
