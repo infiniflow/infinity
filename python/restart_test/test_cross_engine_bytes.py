@@ -867,15 +867,27 @@ BLOCK_CAPACITY = 8192
 
 
 def _mask_null_slots(blob):
-    """Zero the data slot of every NULL row of a `.col` file.
+    """Zero the bytes of a `.col` file that no reader looks at.
 
     Layout (`CPP_FORMAT_SPEC.md §8.3`): `[buffer header 16][data
     8192 * slot][null bitmap 1024][checksum 8]`, where a set bit means
-    **non-NULL** (`cpp_format.rs`). The reference appends values into the block
-    buffer and leaves a NULL's slot untouched, so the slot keeps the *previous*
-    row's bytes - deterministic, but invisible to a reader (the bitmap decides).
-    The comparison treats those bytes as a don't-care rather than making "which
-    leftover a NULL keeps" part of the format.
+    **non-NULL** (`cpp_format.rs`).
+
+    Two kinds of byte are left over rather than written:
+
+    * a NULL row's slot - the reference appends values into the block buffer
+      and leaves a NULL's slot untouched, so it keeps the *previous* row's
+      bytes;
+    * the padding of a `Varchar` slot (`[u24 length][5-byte prefix][u64
+      offset]`, `src/parser/type/complex/varchar.h`): an *inlined* value fills
+      `[3, 3 + length)` and leaves the rest of the 13-byte inline area, a
+      **non-inlined** one writes `[3, 8)` (the prefix) only - measured, two
+      runs on the same 20000-row file differ in both places (`42 cd cc cc 3d`
+      vs another leftover). Nothing reads them: a query reads the outline, and
+      `Varchar::ToString` - the only user of the prefix - is a test helper.
+
+    Both are a don't-care to a reader, so the comparison zeroes them rather
+    than making "which leftover a slot keeps" part of the format.
 
     A layout whose data region is not a whole number of bytes per row (the
     bit-packed boolean) is returned unchanged.
@@ -889,9 +901,16 @@ def _mask_null_slots(blob):
     bitmap = blob[base : base + bitmap_len]
     out = bytearray(blob)
     for row in range(BLOCK_CAPACITY):
+        at = 16 + row * width
         if not (bitmap[row // 8] >> (row % 8) & 1):
-            at = 16 + row * width
             out[at : at + width] = b"\0" * width
+            continue
+        if width == 16:
+            length = int.from_bytes(blob[at : at + 3], "little")
+            if length > 13:
+                out[at + 3 : at + 8] = b"\0" * 5
+            elif length <= width - 3:
+                out[at + 3 + length : at + width] = b"\0" * (width - 3 - length)
     return bytes(out)
 
 
@@ -1149,7 +1168,12 @@ def _table_records(pairs, table_dir, table):
             if len(parts) > 2 and parts[1] == db_id and parts[2] == table_id:
                 out[key] = value
         elif head == "drop":
-            if table in key:
+            # `drop|seg|{db}/{table}/{segment}` and
+            # `drop|idx_seg|{db}/{table}/{index}/{segment}`: a compaction's
+            # deprecation marks, keyed by ids rather than by name.
+            if len(parts) > 2 and parts[2].startswith(f"{db_id}/{table_id}/"):
+                out[key] = value
+            elif table in key:
                 out[key] = value
     return out
 
@@ -3271,14 +3295,19 @@ def test_the_port_round_trips_through_object_storage():
 # around it (`test_a_compaction_with_one_segment_is_a_no_op`). `IMPORT` is:
 # it allocates a segment of its own and seals it (`ApplySegmentIDs` →
 # `AddNewSegmentWithID`), and the next `IMPORT` allocates the following id, so
-# two small files give a two-segment table. Every index chunk is then keyed by
+# three small files give a three-segment table. Every index chunk is then keyed by
 # `(index, segment)` - `idx_{id}/seg_{s}/` with its own `next_chunk_id` - and a
 # query fans out over the segments and merges the postings by row id.
 # ---------------------------------------------------------------------------
 
 SEG_TABLE = "test_cross_engine_segments"
 SEG_COLUMNS = 6
-SEG_ROWS = (100, 60)
+# One `IMPORT` per entry, so the table has as many segments as this tuple has
+# entries. Three is the smallest number that shows the fan-out is not a
+# two-way special case.
+SEG_ROWS = (100, 60, 40)
+SEG_STARTS = tuple(sum(SEG_ROWS[:i]) for i in range(len(SEG_ROWS)))
+SEG_SEGMENTS = tuple(str(i) for i in range(len(SEG_ROWS)))
 # Creation order names the directories: `idx_1` … `idx_6`.
 SEG_INDEXES = {
     1: "fulltext",  # body
@@ -3347,7 +3376,7 @@ def _seg_phase(conn, directory):
     t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
     t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
     t.create_index("id_sec", index.IndexInfo("id", index.IndexType.Secondary))
-    # Two imports, two segments. `COPY` is the reference's import path, so the
+    # One import per segment (three here). `COPY` is the reference's import path, so the
     # indexes are populated inside each import transaction (`PopulateIndex`)
     # rather than by a dump: no background worker takes part, and the chunks
     # exist as soon as `flush_data()` returns.
@@ -3355,8 +3384,8 @@ def _seg_phase(conn, directory):
     # One thread, one file at a time: the rows and the chunk boundaries are a
     # function of this script alone, which is what the byte comparison needs
     # (concurrent `INSERT`s would interleave the segments by commit order).
-    t.import_data(os.path.join(directory, "a.csv"))
-    t.import_data(os.path.join(directory, "b.csv"))
+    for name in ("a.csv", "b.csv", "c.csv"):
+        t.import_data(os.path.join(directory, name))
     conn.flush_data()
     time.sleep(2)
 
@@ -3399,10 +3428,17 @@ SEG_QUERIES = {
     .to_result(),
     # A term that exists only in the second segment.
     "fulltext_second_segment": lambda t: t.output(["id"])
-    .match_text("body", f"doc{SEG_ROWS[0] + 50}", 20)
+    .match_text("body", f"doc{SEG_STARTS[1] + 50}", 20)
+    .to_result(),
+    # ... and one that exists only in the third.
+    "fulltext_third_segment": lambda t: t.output(["id"])
+    .match_text("body", f"doc{SEG_STARTS[2] + 30}", 20)
     .to_result(),
     "secondary_eq": lambda t: t.output(["id"])
-    .filter(f"title = 'title-{SEG_ROWS[0] + 50}'")
+    .filter(f"title = 'title-{SEG_STARTS[1] + 50}'")
+    .to_result(),
+    "secondary_eq_third": lambda t: t.output(["id"])
+    .filter(f"title = 'title-{SEG_STARTS[2] + 30}'")
     .to_result(),
     "secondary_range": lambda t: t.output(["id"])
     .filter("score >= 74.5 and score <= 76.0")
@@ -3420,7 +3456,7 @@ SEG_QUERIES = {
     not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
 )
 def test_a_multi_segment_table_matches_across_segments():
-    """Two imports, two segments, seven index kinds.
+    """Three imports, three segments, seven index kinds.
 
     Matrix column "多段": every index keeps one chunk family per segment, with
     its own chunk ids, and a query merges them. The bytes of the **blocks**,
@@ -3439,15 +3475,17 @@ def test_a_multi_segment_table_matches_across_segments():
     rust_root = os.path.join(ROOT, "segments_rust")
     directory = tempfile.mkdtemp(prefix="segments-csv-")
     try:
-        _seg_csv(os.path.join(directory, "a.csv"), 0, SEG_ROWS[0])
-        _seg_csv(os.path.join(directory, "b.csv"), SEG_ROWS[0], SEG_ROWS[1])
+        for name, start, count in zip(
+            ("a.csv", "b.csv", "c.csv"), SEG_STARTS, SEG_ROWS
+        ):
+            _seg_csv(os.path.join(directory, name), start, count)
         phase = lambda conn: _seg_phase(conn, directory)  # noqa: E731
         _run_engine("cpp", cpp_root, 5432, seed=phase)
         _run_engine("rust", rust_root, 5433, seed=phase)
     finally:
         shutil.rmtree(directory, ignore_errors=True)
 
-    segments = (0, 1)
+    segments = tuple(range(len(SEG_ROWS)))
     _wait_for_segment_chunks(cpp_root, SEG_INDEXES, segments)
     _wait_for_segment_chunks(rust_root, SEG_INDEXES, segments)
 
@@ -3456,7 +3494,7 @@ def test_a_multi_segment_table_matches_across_segments():
     for label, files in (("cpp", cpp_files), ("rust", rust_files)):
         for index_id in SEG_INDEXES:
             got = _segment_dirs(files, index_id)
-            assert got == ["0", "1"], f"{label} idx_{index_id}: segments {got}"
+            assert got == list(SEG_SEGMENTS), f"{label} idx_{index_id}: segments {got}"
 
     cpp_dir = _own_table_dir(cpp_files, SEG_COLUMNS)
     rust_dir = _own_table_dir(rust_files, SEG_COLUMNS)
@@ -3511,7 +3549,7 @@ def test_a_multi_segment_table_matches_across_segments():
             spans.setdefault((int(parts[3]), parts[4]), []).append(
                 (record["base_row_id"], record["row_count"])
             )
-        for segment, count in zip(("0", "1"), SEG_ROWS):
+        for segment, count in zip(SEG_SEGMENTS, SEG_ROWS):
             for index_id in SEG_INDEXES:
                 got = sorted(spans.get((index_id, segment), []))
                 covered = 0
@@ -3534,8 +3572,329 @@ def test_a_multi_segment_table_matches_across_segments():
     # The merged full-text answer must actually contain both segments' rows: a
     # reader that opened only `seg_0` would return `SEG_ROWS[1] / 5` fewer.
     merged = rust_answers["fulltext_merged"]
-    assert any(i < SEG_ROWS[0] for i in merged) and any(i >= SEG_ROWS[0] for i in merged), (
-        f"the full-text answer does not span both segments: {merged}"
+    for start in SEG_STARTS:
+        assert any(i >= start for i in merged), (
+            f"the full-text answer does not reach segment at {start}: {merged}"
+        )
+    assert rust_answers["fulltext_second_segment"] == [SEG_STARTS[1] + 50]
+    assert rust_answers["fulltext_third_segment"] == [SEG_STARTS[2] + 30]
+    assert rust_answers["secondary_eq"] == [SEG_STARTS[1] + 50]
+    assert rust_answers["secondary_eq_third"] == [SEG_STARTS[2] + 30]
+
+
+# ---------------------------------------------------------------------------
+# One segment, several blocks.
+#
+# `IMPORT` writes one block per 8192 rows and `PopulateIndex` then builds the
+# indexes for the whole segment: full-text dumps once per `mem_index_capacity`
+# (`new_txn_index_impl.cpp:1381`), secondary and sparse dump once after their
+# block loop (`PopulateSecondaryIndexInner`, `PopulateBMPIndexInner`). So a
+# 20000-row import is **one** segment of three blocks with **one** chunk per
+# index - not one chunk per block, which is what a memory-index dump produces.
+# ---------------------------------------------------------------------------
+
+BLOCK_SEG_TABLE = "test_cross_engine_block_segment"
+BLOCK_SEG_ROWS = 20000
+BLOCK_SEG_BLOCKS = 3
+
+
+def _block_seg_phase(conn, directory):
+    db = conn.get_database("default_db")
+    db.drop_table(BLOCK_SEG_TABLE, ConflictType.Ignore)
+    t = db.create_table(
+        BLOCK_SEG_TABLE,
+        {
+            "id": {"type": "int"},
+            "title": {"type": "varchar"},
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector,4,float"},
+            "sp": {"type": "sparse,8,float,int"},
+            "score": {"type": "float"},
+        },
+        ConflictType.Error,
     )
-    assert rust_answers["fulltext_second_segment"] == [SEG_ROWS[0] + 50]
-    assert rust_answers["secondary_eq"] == [SEG_ROWS[0] + 50]
+    t.create_index("ft", index.IndexInfo("body", index.IndexType.FullText))
+    t.create_index(
+        "vec_idx",
+        index.IndexInfo(
+            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+        ),
+    )
+    t.create_index("ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index("sec", index.IndexInfo("title", index.IndexType.Secondary))
+    t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
+    t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
+    t.create_index("id_sec", index.IndexInfo("id", index.IndexType.Secondary))
+    t.import_data(os.path.join(directory, "big.csv"))
+    conn.flush_data()
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_a_segment_with_many_blocks_keeps_one_chunk_per_index():
+    """20000 rows in one `IMPORT`: three blocks, one segment, one chunk each.
+
+    The chunk count follows `PopulateFtIndexInner` / `PopulateSecondaryIndexInner`
+    / `PopulateBMPIndexInner`, not the block count: at 20000 rows the memory
+    indexers never reach `mem_index_capacity` (65536), so every index dumps
+    once, with `row_count` 20000 and `base_row_id` 0. Getting this wrong is
+    invisible at one block, which is why the other gates never caught it.
+    """
+    cpp_root = os.path.join(ROOT, "block_segment_cpp")
+    rust_root = os.path.join(ROOT, "block_segment_rust")
+    directory = tempfile.mkdtemp(prefix="block-segment-csv-")
+    try:
+        _seg_csv(os.path.join(directory, "big.csv"), 0, BLOCK_SEG_ROWS)
+        phase = lambda conn: _block_seg_phase(conn, directory)  # noqa: E731
+        _run_engine("cpp", cpp_root, 5432, seed=phase)
+        _run_engine("rust", rust_root, 5433, seed=phase)
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+    _wait_for_segment_chunks(cpp_root, SEG_INDEXES, (0,))
+    _wait_for_segment_chunks(rust_root, SEG_INDEXES, (0,))
+
+    cpp_files, rust_files = _files(cpp_root), _files(rust_root)
+    for label, files in (("cpp", cpp_files), ("rust", rust_files)):
+        blocks = {
+            "/".join(name.split("/")[:4])
+            for name in files
+            if "/seg_" in name and "/blk_" in name
+        }
+        assert len(blocks) == BLOCK_SEG_BLOCKS, f"{label}: blocks {sorted(blocks)}"
+        for index_id in SEG_INDEXES:
+            assert _segment_dirs(files, index_id) == ["0"], (
+                f"{label} idx_{index_id}: segments {_segment_dirs(files, index_id)}"
+            )
+
+    cpp_dir = _own_table_dir(cpp_files, SEG_COLUMNS)
+    rust_dir = _own_table_dir(rust_files, SEG_COLUMNS)
+    failures = _compare_data_files(
+        _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), SEG_INDEXES
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures
+    )
+
+    # One chunk per index, covering the whole segment.
+    for engine, root in (("cpp", cpp_root), ("rust", rust_root)):
+        pairs = _table_records(_catalog_pairs(root, 5432), cpp_dir, BLOCK_SEG_TABLE)
+        chunks = {}
+        for key, value in pairs.items():
+            if not key.startswith("idx_chunk|") or not key.endswith("|chunk_info"):
+                continue
+            record = json.loads(value)
+            index_id = int(key.split("|")[3])
+            chunks.setdefault(index_id, []).append(
+                (record["base_row_id"], record["row_count"])
+            )
+        assert set(chunks) == set(SEG_INDEXES), f"{engine}: indexes {sorted(chunks)}"
+        for index_id, spans in chunks.items():
+            assert spans == [(0, BLOCK_SEG_ROWS)], (
+                f"{engine} idx_{index_id}: chunks {spans}, expected one 20000-row chunk"
+            )
+
+    # What the chunks say: the reference reads each directory and answers the
+    # same, including a row from the last (partial) block.
+    queries = {
+        "count": lambda t: t.output(["count(*)"]).to_result(),
+        "last_block": lambda t: t.output(["id"])
+        .match_text("body", f"doc{BLOCK_SEG_ROWS - 1}", 20)
+        .to_result(),
+        "first_block": lambda t: t.output(["id"])
+        .match_text("body", "doc7", 20)
+        .to_result(),
+        "secondary_range": lambda t: t.output(["id"])
+        .filter(f"id >= {BLOCK_SEG_ROWS - 5}")
+        .to_result(),
+        "sparse": lambda t: t.output(["id"])
+        .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
+        .to_result(),
+    }
+    cpp_answers = _answers(cpp_root, 5432, BLOCK_SEG_TABLE, queries)
+    rust_answers = _answers(rust_root, 5433, BLOCK_SEG_TABLE, queries)
+    assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
+    assert cpp_answers["count"] == [BLOCK_SEG_ROWS]
+    assert cpp_answers["last_block"] == [BLOCK_SEG_ROWS - 1]
+
+
+# ---------------------------------------------------------------------------
+# After a compaction.
+#
+# `NewCompactionAlg` needs `DBT_COMPACTION_M` (4) segments in one layer
+# (`new_compaction_alg_impl.cpp:44`, `default_values.cppm:190`), so the fixture
+# imports four times. `NewTxn::Compact` then renumbers every row into a new
+# segment (id 4), populates the indexes for it inside the same transaction and
+# marks the four sources deprecated with `drop|seg|…` / `drop|idx_seg|…`; their
+# files and catalog records stay until `Cleanup` removes them.
+# ---------------------------------------------------------------------------
+
+MERGED_TABLE = "test_cross_engine_compacted"
+MERGED_ROWS = (100, 60, 40, 30)
+MERGED_STARTS = tuple(sum(MERGED_ROWS[:i]) for i in range(len(MERGED_ROWS)))
+# The four source segments plus the merged one.
+MERGED_SEGMENTS = ("0", "1", "2", "3", "4")
+
+
+def _merged_phase(conn, directory):
+    db = conn.get_database("default_db")
+    db.drop_table(MERGED_TABLE, ConflictType.Ignore)
+    t = db.create_table(
+        MERGED_TABLE,
+        {
+            "id": {"type": "int"},
+            "title": {"type": "varchar"},
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector,4,float"},
+            "sp": {"type": "sparse,8,float,int"},
+            "score": {"type": "float"},
+        },
+        ConflictType.Error,
+    )
+    t.create_index("ft", index.IndexInfo("body", index.IndexType.FullText))
+    t.create_index(
+        "vec_idx",
+        index.IndexInfo(
+            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+        ),
+    )
+    t.create_index("ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index("sec", index.IndexInfo("title", index.IndexType.Secondary))
+    t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
+    t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
+    t.create_index("id_sec", index.IndexInfo("id", index.IndexType.Secondary))
+    for name in ("a.csv", "b.csv", "c.csv", "d.csv"):
+        t.import_data(os.path.join(directory, name))
+    conn.flush_data()
+    time.sleep(1)
+    t.compact()
+    conn.flush_data()
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_a_compacted_table_matches_and_keeps_its_sources():
+    """Four segments compact into one; the sources become deprecated garbage.
+
+    The merged segment is `max(segment id) + 1` and its blocks, versions and
+    index chunks are the ones the compaction transaction produced: every index
+    gets a chunk covering all 230 rows with the compaction's commit ts. The
+    four source segments keep their files and catalog records - a reference
+    reading the directory at a later ts skips them because of `drop|seg|…`.
+    """
+    cpp_root = os.path.join(ROOT, "compacted_cpp")
+    rust_root = os.path.join(ROOT, "compacted_rust")
+    directory = tempfile.mkdtemp(prefix="compacted-csv-")
+    try:
+        for name, start, count in zip(
+            ("a.csv", "b.csv", "c.csv", "d.csv"), MERGED_STARTS, MERGED_ROWS
+        ):
+            _seg_csv(os.path.join(directory, name), start, count)
+        phase = lambda conn: _merged_phase(conn, directory)  # noqa: E731
+        _run_engine("cpp", cpp_root, 5432, seed=phase)
+        _run_engine("rust", rust_root, 5433, seed=phase)
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+    _wait_for_segment_chunks(cpp_root, SEG_INDEXES, range(5))
+    _wait_for_segment_chunks(rust_root, SEG_INDEXES, range(5))
+
+    cpp_files, rust_files = _files(cpp_root), _files(rust_root)
+    for label, files in (("cpp", cpp_files), ("rust", rust_files)):
+        blocks = {
+            "/".join(name.split("/")[:3])
+            for name in files
+            if "/seg_" in name and "/blk_" in name
+        }
+        assert len(blocks) == 5, f"{label}: block directories {sorted(blocks)}"
+        for index_id in SEG_INDEXES:
+            got = _segment_dirs(files, index_id)
+            assert got == list(MERGED_SEGMENTS), (
+                f"{label} idx_{index_id}: segments {got}"
+            )
+
+    cpp_dir = _own_table_dir(cpp_files, SEG_COLUMNS)
+    rust_dir = _own_table_dir(rust_files, SEG_COLUMNS)
+    failures = _compare_data_files(
+        _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), SEG_INDEXES
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures
+    )
+
+    # The catalog carries the same records, deprecation marks included.
+    def records(engine_root, table_dir):
+        pairs = _normalize_catalog(
+            _table_records(_catalog_pairs(engine_root, 5432), table_dir, MERGED_TABLE),
+            zero_size_indexes=SEG_ZERO_SIZE,
+        )
+        for key in list(pairs):
+            if key.endswith("|fast_rough_filter"):
+                del pairs[key]
+        return pairs
+
+    cpp_pairs = records(cpp_root, cpp_dir)
+    rust_pairs = records(rust_root, rust_dir)
+    only_cpp = sorted(set(cpp_pairs) - set(rust_pairs))
+    only_rust = sorted(set(rust_pairs) - set(cpp_pairs))
+    changed = [
+        f"{key}: {cpp_pairs[key]} != {rust_pairs[key]}"
+        for key in sorted(set(cpp_pairs) & set(rust_pairs))
+        if cpp_pairs[key] != rust_pairs[key]
+    ]
+    assert not (only_cpp or only_rust or changed), (
+        f"only in cpp: {only_cpp}\nonly in rust: {only_rust}\n" + "\n".join(changed)
+    )
+    dropped = {
+        key.rsplit("/", 1)[1] for key in cpp_pairs if key.startswith("drop|seg|")
+    }
+    assert dropped == {"0", "1", "2", "3"}, f"unexpected deprecation marks: {dropped}"
+    deprecated_pairs = {key for key in cpp_pairs if key.startswith("drop|idx_seg|")}
+    assert len(deprecated_pairs) == len(SEG_INDEXES) * 4, (
+        "expected one deprecation mark per (index, source segment): "
+        f"{sorted(deprecated_pairs)}"
+    )
+
+    # Every index's merged chunk covers all rows, with the compaction's ts.
+    merged = {}
+    for key, value in cpp_pairs.items():
+        if key.startswith("idx_chunk|") and key.endswith("|chunk_info"):
+            parts = key.split("|")
+            if parts[4] == "4":
+                merged.setdefault(int(parts[3]), []).append(json.loads(value))
+    assert set(merged) == set(SEG_INDEXES), f"indexes with a merged chunk: {sorted(merged)}"
+    for index_id, spans in merged.items():
+        assert [(s["base_row_id"], s["row_count"]) for s in spans] == [
+            (4 << 32, sum(MERGED_ROWS))
+        ], f"idx_{index_id}: {spans}"
+
+    queries = {
+        "count": lambda t: t.output(["count(*)"]).to_result(),
+        "fulltext_second": lambda t: t.output(["id"])
+        .match_text("body", f"doc{MERGED_STARTS[1] + 50}", 20)
+        .to_result(),
+        "fulltext_last": lambda t: t.output(["id"])
+        .match_text("body", f"doc{MERGED_STARTS[3] + 20}", 20)
+        .to_result(),
+        "secondary": lambda t: t.output(["id"])
+        .filter(f"title = 'title-{MERGED_STARTS[2] + 10}'")
+        .to_result(),
+        "sparse": lambda t: t.output(["id"])
+        .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
+        .to_result(),
+    }
+    cpp_answers = _answers(cpp_root, 5432, MERGED_TABLE, queries)
+    rust_answers = _answers(rust_root, 5433, MERGED_TABLE, queries)
+    assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
+    assert cpp_answers["count"] == [sum(MERGED_ROWS)]
+    assert cpp_answers["fulltext_last"] == [MERGED_STARTS[3] + 20]

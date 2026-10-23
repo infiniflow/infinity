@@ -758,6 +758,23 @@ impl Catalog {
         crate::cpp_layout::write_cpp_index_segments(self.store.as_ref(), set, indexes)
     }
 
+    /// Marks `segments` as deprecated at `ts` (a compaction's commit ts), for
+    /// the table and for each of `index_ids`.
+    pub fn cpp_drop_segments(
+        &self,
+        set: &crate::cpp_layout::CppSegmentSet,
+        index_ids: &[u64],
+        segments: &[u32],
+        ts: u64,
+    ) -> Result<usize> {
+        crate::cpp_layout::write_cpp_drops(self.store.as_ref(), set, index_ids, segments, ts)
+    }
+
+    /// The segments of `db_id`.`table_id` a compaction deprecated.
+    pub fn cpp_dropped_segments(&self, db_id: &str, table_id: &str) -> Result<Vec<u32>> {
+        crate::cpp_layout::cpp_dropped_segments(self.store.as_ref(), db_id, table_id)
+    }
+
     /// The deletes a C++-layout rewrite performs before writing the layout.
     fn cpp_layout_sweep(&self, store: &dyn MetaStore) -> Result<Vec<BatchItem>> {
         let mut deletes: Vec<BatchItem> = Vec::new();

@@ -15,6 +15,23 @@ use crate::Engine;
 use infinity_parser::Literal;
 use tempfile::tempdir;
 
+/// Names of the `seg_*` directories under `root`, at any depth.
+fn walkdir(root: &std::path::Path) -> Vec<String> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            out.push(name);
+            out.extend(walkdir(&path));
+        }
+    }
+    out
+}
+
 fn create_table(e: &Engine) {
     h::ok(e, "CREATE DATABASE db1;");
     h::ok(e, "CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);");
@@ -215,6 +232,61 @@ fn compact_then_rename_table() {
     assert_eq!(
         h::rows(&e, "SELECT count(*) FROM db1.tb2 WHERE col1 = 1;"),
         vec![vec!["16384"]]
+    );
+}
+
+/// `NewCompactionAlg` (DBT): a compaction needs four segments in one layer.
+///
+/// `DBTCompactionAlg::GetCompactableSegments` returns nothing until a layer
+/// holds `DBT_COMPACTION_M` (4) segments, so `COMPACT` on a two- or
+/// three-segment table opens no transaction - the reference's own
+/// `test_a_compaction_with_one_segment_is_a_no_op` covers the one-segment case
+/// end to end. Four 8192-row segments all land in layer 0 (`row_cnt / 8192 ==
+/// 1`), so the fourth import makes them compactable.
+#[test]
+fn compaction_needs_four_segments_in_one_layer() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    create_table(&e);
+    for _ in 0..3 {
+        e.import_literals("db1.tb1", None, const_block(1, "abc"))
+            .unwrap();
+    }
+    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2]);
+    e.compact_table("db1.tb1").unwrap();
+    assert_eq!(
+        e.segment_ids("db1.tb1"),
+        vec![0, 1, 2],
+        "three segments are not a compaction candidate"
+    );
+
+    e.import_literals("db1.tb1", None, const_block(2, "abcdefghijklmnopqrstuvwxyz"))
+        .unwrap();
+    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2, 3]);
+    // The mirror is what a compaction leaves behind on disk, so write it first.
+    e.flush().unwrap();
+    e.compact_table("db1.tb1").unwrap();
+    assert_eq!(e.segment_ids("db1.tb1"), vec![4]);
+    assert_eq!(h::count(&e, "db1.tb1"), 4 * 8192);
+    // The source segments stay on disk, deprecated: a reader at a later ts
+    // ignores them, and `Cleanup` is what reclaims them.
+    e.flush().unwrap();
+    let mut dirs: Vec<String> = Vec::new();
+    for entry in walkdir(&dir.path().join("data")) {
+        if entry.starts_with("seg_") {
+            dirs.push(entry);
+        }
+    }
+    dirs.sort();
+    assert_eq!(
+        dirs,
+        vec![
+            "seg_0".to_string(),
+            "seg_1".to_string(),
+            "seg_2".to_string(),
+            "seg_3".to_string(),
+            "seg_4".to_string()
+        ]
     );
 }
 

@@ -297,6 +297,16 @@ fn dump_ts_key(table: &str, index: &str) -> Vec<u8> {
 fn import_ts_key(table: &str, segment: u32) -> Vec<u8> {
     format!("import_ts:{table}:{segment}").into_bytes()
 }
+/// Rows `segment` held when the `COPY` that wrote it committed.
+///
+/// The reference's index chunks for an imported segment are one per
+/// `mem_index_capacity` (full-text) or one for the whole segment (secondary,
+/// sparse), *not* one per block: `PopulateFtIndexInner` dumps when the memory
+/// indexer reaches the capacity and `Populate{Secondary,BMP}IndexInner` dump
+/// once, after their block loop. The mirror needs the extent to reproduce that.
+fn import_rows_key(table: &str, segment: u32) -> Vec<u8> {
+    format!("import_rows:{table}:{segment}").into_bytes()
+}
 /// One byte per append, aligned with [`appends_key`]: `1` when the append came
 /// from `COPY`/`IMPORT`, `0` when it came from `INSERT`/`UPDATE`.
 ///
@@ -3966,8 +3976,9 @@ struct TableEntry {
     /// `version` file, which is where the reference records each append's
     /// commit ts.
     append_ts: Option<Vec<u64>>,
-    /// `1` for an append written by `COPY`/`IMPORT`, `0` otherwise, one entry
-    /// per `append_totals` entry (`append_copy:{table}`). It decides the null
+    /// `1` for a **bulk** append (`COPY`/`IMPORT`, or the single append a
+    /// compaction writes), `0` for an `INSERT`/`UPDATE`, one entry per
+    /// `append_totals` entry (`append_copy:{table}`). It decides the null
     /// bitmap's coverage of the block the append opened.
     append_copy: Option<Vec<u64>>,
     /// Row ids deleted since the table was created (`dellog:{table}`), loaded
@@ -7327,6 +7338,41 @@ impl Engine {
         Some(u64::from_le_bytes(bytes.get(..8)?.try_into().ok()?))
     }
 
+    /// Records how many rows `segment` held when its `COPY` finished.
+    fn note_import_rows(&self, table: &str, segment: u32, rows: u64) {
+        let key = import_rows_key(&self.table_key(table), segment);
+        let _ = self.storage.store.put(&key, &rows.to_le_bytes());
+    }
+
+    /// The imported extent of `segment`, when it still holds exactly the rows a
+    /// `COPY` wrote (`None` once an `INSERT` appended to it).
+    pub(crate) fn imported_extent(
+        &self,
+        table: &str,
+        segment: u32,
+        rows: u64,
+    ) -> Option<u64> {
+        let key = import_rows_key(&self.table_key(table), segment);
+        let bytes = self.storage.store.get(&key).ok().flatten()?;
+        let imported = u64::from_le_bytes(bytes.get(..8)?.try_into().ok()?);
+        (imported == rows).then_some(imported)
+    }
+
+    /// After a `COPY`: every segment whose row count grew was written by this
+    /// statement, so its imported extent is its current row count.
+    fn settle_import_extent(&self, table: &str, before: &[(u32, u64)]) {
+        for (segment, rows) in self.segment_row_counts(table) {
+            let previous = before
+                .iter()
+                .find(|(id, _)| *id == segment)
+                .map(|(_, r)| *r)
+                .unwrap_or(0);
+            if rows > previous {
+                self.note_import_rows(table, segment, rows);
+            }
+        }
+    }
+
     /// Every row id deleted since the table was created.
     fn deleted_ids(&self, table: &str) -> Vec<u64> {
         let tkey = self.table_key(table);
@@ -7408,18 +7454,32 @@ impl Engine {
                 ((next >> 32) as u32, (next & 0xffff_ffff) as u32, false)
             }
         };
-        // The C++ row id is `segment_id << 32 | offset`. A `COPY` always seals
-        // the segment it writes, and an `INSERT` that follows one opens a new
+        // The C++ row id is `segment_id << 32 | offset`. A `COPY` seals the
+        // segment it writes, and an `INSERT` that follows one opens a new
         // segment, while consecutive `INSERT`s keep appending to the same one —
         // which is why two `COPY`s of 99 rows yield ids 0…98 and
         // 4294967296…4294967394, but two one-row `INSERT`s yield 0 and 1.
-        if (new_segment && off > 0) || (!new_segment && sealed) {
+        //
+        // A `COPY` that arrives in several batches is still **one** statement
+        // (the reference's `Import` writes every block in one transaction), so
+        // only its first batch opens a segment; the rest continue it.
+        let opens_segment = new_segment && off > 0;
+        let after_sealed_segment = !copy && sealed;
+        if opens_segment || after_sealed_segment {
+            seg += 1;
+            off = 0;
+        }
+        // Exactly `DEFAULT_SEGMENT_CAPACITY` rows seal a segment
+        // (`catalog_cache_impl.cpp:61`): the next append opens the following
+        // one, which is how a table larger than 8,388,608 rows gets its second
+        // segment without any compaction.
+        if off as usize >= Self::SEGMENT_ROW_CAPACITY {
             seg += 1;
             off = 0;
         }
         let base = ((seg as usize) << 32) | off as usize;
         off = off.saturating_add(n as u32);
-        entry.row_counter = Some((seg, off, new_segment));
+        entry.row_counter = Some((seg, off, copy));
         entry
             .segments
             .entry(seg)
@@ -12257,15 +12317,58 @@ impl Engine {
     /// imports are compacted, `{3}` after compacting `{2}`, and so on).
     pub fn compact_table(&self, table: &str) -> Result<()> {
         // `ManualCompactTask` hands `PhysicalCompact` the candidates
-        // `NewCompactionAlg` picked (`physical_compact_impl.cpp:36`): with a
-        // single segment there is nothing to merge, so the reference opens
-        // **no** transaction and leaves the directory untouched. Merging one
-        // segment into a new one would move every row and spend a timestamp the
-        // reference never spends.
-        if self.segment_ids(table).len() < 2 {
+        // `NewCompactionAlg` picked (`physical_compact_impl.cpp:36`). When it
+        // picks nothing the reference opens **no** transaction and leaves the
+        // directory untouched; merging anyway would move every row and spend a
+        // timestamp it never spends.
+        if self.compaction_candidates(table).is_empty() {
             return Ok(());
         }
         self.compact_all_segments(table)
+    }
+
+    /// `NewCompactionAlg` (`DBTCompactionAlg`): the segments a manual or
+    /// periodic compaction would merge.
+    ///
+    /// Each segment lands in `layer(row_count) = max(0, ln(row_count / 8192) /
+    /// ln(4))`; the first layer holding at least `DBT_COMPACTION_M` (4)
+    /// segments donates its first four, unless they together exceed a
+    /// segment's capacity (`new_compaction_alg_impl.cpp:44-79`,
+    /// `DBT_COMPACTION_M/C/S` in `default_values.cppm:190-192`).
+    ///
+    /// Three tiny segments therefore compact to nothing while four compact to
+    /// one - which is why the gate that exercises compaction imports four
+    /// times.
+    fn compaction_candidates(&self, table: &str) -> Vec<u32> {
+        const M: usize = 4;
+        const S: u64 = infinity_storage::cpp_format::DEFAULT_BLOCK_CAPACITY as u64;
+        let mut layers: std::collections::BTreeMap<i32, Vec<(u32, u64)>> = Default::default();
+        for (segment, rows) in self.segment_row_counts(table) {
+            // `DBTConfig::CalculateLayer`: `log(row_cnt / s_) / log(c)` with
+            // **integer** division inside the log, truncated to `int` and
+            // floored at 0 (`-inf` for a segment smaller than one block casts
+            // to `INT_MIN` and floors to 0).
+            let blocks = rows / S;
+            let layer = if blocks <= 1 {
+                0
+            } else {
+                ((blocks as f64).ln() / 4f64.ln()) as i32
+            };
+            layers.entry(layer.max(0)).or_default().push((segment, rows));
+        }
+        for layer in layers.values() {
+            if layer.len() < M {
+                continue;
+            }
+            let picked = &layer[..M];
+            if picked.iter().map(|(_, rows)| *rows).sum::<u64>()
+                > Self::SEGMENT_ROW_CAPACITY as u64
+            {
+                return Vec::new();
+            }
+            return picked.iter().map(|(segment, _)| *segment).collect();
+        }
+        Vec::new()
     }
 
     /// `NewTxn::Compact`: merge every segment of `table` into one new segment.
@@ -12283,13 +12386,12 @@ impl Engine {
         // the moment the first row moves.
         self.invalidate_block_mirror(table);
         let rows = self.fetch_rows_with_ids(table)?;
+        // The segments this compaction consumes: the reference keeps their
+        // files and catalog records and only marks them deprecated.
+        let sources = self.segment_ids(table);
         // `SegmentMeta` ids are never reused: the merged segment takes the next
         // id after every segment this table has ever used.
-        let next_seg = self
-            .segment_ids(table)
-            .into_iter()
-            .max()
-            .map_or(0, |id| id + 1);
+        let next_seg = sources.iter().copied().max().map_or(0, |id| id + 1);
         // The new segment starts at its own row-id base (`segment_id << 32`).
         let base = (next_seg as usize) << 32;
         // Renumber through the transaction so WAL replay reproduces the
@@ -12309,9 +12411,11 @@ impl Engine {
             t.put(row_key(table, new), v);
             t.put(del_key(table, *old), b"1".to_vec());
         }
-        if !rows.is_empty() {
-            self.txn.commit(t)?;
-        }
+        let compact_ts = if !rows.is_empty() {
+            self.txn.commit(t)?
+        } else {
+            0
+        };
         // Drop every source position that no compacted row reuses. The
         // destination positions are exactly `[base, base + rows.len())`; every
         // other key is an old copy (including rows deleted before the
@@ -12350,17 +12454,158 @@ impl Engine {
             }
             // Compaction renumbered every row.
             entry.row_cache = None;
-            // Block-level indexes refer to the old row ids.
+            // Every structure keyed by a row id refers to the old ids now:
+            // block-level indexes, the in-memory secondary tails, the full-text
+            // inverted index, the sparse documents and the vector buffers.
             entry.secondary.indexes.clear();
+            entry.secondary.disk.clear();
+            entry.text.clear();
+            entry.sparse.clear();
+            entry.mv.clear();
+            entry.hnsw_mem.clear();
             entry.vector.clear();
+            entry.ivf.clear();
+            entry.ivf_mem.clear();
             entry.block_index = None;
             entry.cpp_block_rows = None;
             entry.live_rows = Some(rows.len());
+        }
+        // The merged rows are one append of the compaction transaction: the
+        // reference writes every block of the new segment with that commit ts
+        // as its single `create`, so the mirror's append log restarts here
+        // instead of carrying the source segments' appends.
+        if !rows.is_empty() {
+            let tkey = self.table_key(table);
+            {
+                let mut tables = self.tables.lock().unwrap();
+                let entry = tables.entry(tkey.clone()).or_default();
+                entry.append_totals = Some(vec![rows.len() as u64]);
+                entry.append_ts = Some(vec![compact_ts]);
+                // A merge writes the new segment's blocks from the merged rows
+                // in one go, like an import: the null bitmap covers exactly
+                // those rows (tail bits of the last byte stay clear).
+                entry.append_copy = Some(vec![1]);
+            }
+            let _ = self.write_id_log(&appends_key(&tkey), &[rows.len() as u64]);
+            let _ = self.write_id_log(&append_ts_key(&tkey), &[compact_ts]);
+            let _ = self.write_id_log(&append_copy_key(&tkey), &[1]);
+            // `PopulateIndex` runs inside the compaction transaction too, so the
+            // new segment's chunks carry its ts and cover the whole segment.
+            self.note_import_ts(table, next_seg, compact_ts);
+            self.note_import_rows(table, next_seg, rows.len() as u64);
+        }
+        // `drop|seg|…` / `drop|idx_seg|…` at the compaction's ts: the source
+        // segments stay on disk until `Cleanup`, and a reader at a later ts
+        // ignores them because of these records.
+        if !sources.is_empty() {
+            let db_id = self.database_id_of(table);
+            let table_id = self
+                .storage
+                .catalog
+                .get_table_by_name(table)?
+                .map(|m| m.id)
+                .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+            let index_ids: Vec<u64> = self
+                .storage
+                .catalog
+                .list_indexes()?
+                .iter()
+                .filter(|im| im.table == table || im.table == self.qualified_table(table))
+                .map(|im| im.id)
+                .collect();
+            self.storage.catalog.cpp_drop_segments(
+                &infinity_catalog::cpp_layout::CppSegmentSet {
+                    db_id: db_id.to_string(),
+                    table_id: table_id.to_string(),
+                    segments: Vec::new(),
+                },
+                &index_ids,
+                &sources,
+                compact_ts,
+            )?;
         }
         // The merge renumbered every row, so every index posting now points at
         // a dead row id. Rebuild the declared indexes from the merged rows.
         self.rebuild_indexes()?;
         self.result_cache.lock().unwrap().clear();
+        Ok(())
+    }
+
+    /// `Cleanup` reclaims the segments a compaction deprecated.
+    ///
+    /// `NewTxn::Compact` only marks them (`drop|seg|…`); `NewCatalog::
+    /// CleanSegment` is what removes the segment's blocks, its index chunks and
+    /// the mark itself. The port therefore keeps the source directories while
+    /// the table is merely compacted (`write_cpp_blocks`) and drops them here.
+    fn reclaim_deprecated_segments(&self) -> Result<()> {
+        for meta in self.storage.catalog.list_tables()? {
+            let db_id = self.database_id_of(&meta.name);
+            let dropped = self
+                .storage
+                .catalog
+                .cpp_dropped_segments(&db_id.to_string(), &meta.id.to_string())?;
+            if dropped.is_empty() {
+                continue;
+            }
+            let index_ids: Vec<u64> = self
+                .storage
+                .catalog
+                .list_indexes()?
+                .iter()
+                .filter(|im| im.table == meta.name || im.table == self.qualified_table(&meta.name))
+                .map(|im| im.id)
+                .collect();
+            let store = self.storage.store.clone();
+            let root = self.blocks_root();
+            for segment in &dropped {
+                for prefix in [
+                    format!("catalog|blk|{db_id}|{}|{segment}|", meta.id),
+                    format!("seg|{db_id}|{}|{segment}|", meta.id),
+                ] {
+                    for (k, _) in store.scan_prefix(prefix.as_bytes())? {
+                        store.delete(&k)?;
+                    }
+                }
+                store.delete(
+                    infinity_storage::catalog_format::catalog_segment_key(
+                        &db_id.to_string(),
+                        &meta.id.to_string(),
+                        *segment,
+                    )
+                    .as_bytes(),
+                )?;
+                for index_id in &index_ids {
+                    let prefix =
+                        format!("idx_chunk|{db_id}|{}|{index_id}|{segment}|", meta.id);
+                    for (k, _) in store.scan_prefix(prefix.as_bytes())? {
+                        store.delete(&k)?;
+                    }
+                    store.delete(
+                        infinity_catalog::cpp_layout::cpp_dropped_index_segment_key(
+                            &db_id.to_string(),
+                            &meta.id.to_string(),
+                            *index_id,
+                            *segment,
+                        )
+                        .as_bytes(),
+                    )?;
+                    let _ = std::fs::remove_dir_all(
+                        root.join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}", meta.id)),
+                    );
+                }
+                store.delete(
+                    infinity_catalog::cpp_layout::cpp_dropped_segment_key(
+                        &db_id.to_string(),
+                        &meta.id.to_string(),
+                        *segment,
+                    )
+                    .as_bytes(),
+                )?;
+                let _ = std::fs::remove_dir_all(
+                    root.join(format!("db_{db_id}/tbl_{}/seg_{segment}", meta.id)),
+                );
+            }
+        }
         Ok(())
     }
 
@@ -13816,6 +14061,23 @@ impl Engine {
     /// or the Infinity fixture path `/var/infinity/test_data/…`, which is mapped
     /// onto `INFINITY_DATA_DIR` (default `test/data`) if present.
     fn copy_from(&self, table: &str, path: &str, opts: &[(String, String)]) -> Result<QueryResult> {
+        // `NewTxn::Import` is **one** transaction: it writes every block and
+        // commits once. The extent each segment ends up with is what decides
+        // how many index chunks the mirror publishes for it.
+        let before = self.segment_row_counts(table);
+        let result = self.copy_from_inner(table, path, opts);
+        if result.is_ok() {
+            self.settle_import_extent(table, &before);
+        }
+        result
+    }
+
+    fn copy_from_inner(
+        &self,
+        table: &str,
+        path: &str,
+        opts: &[(String, String)],
+    ) -> Result<QueryResult> {
         if self.storage.catalog.get_table_by_name(table)?.is_none() {
             return Err(Error::NotFound(format!("table '{table}'")));
         }
@@ -13906,6 +14168,11 @@ impl Engine {
         let mut reader = std::io::BufReader::new(file);
         let mut total = 0usize;
         let mut first_batch = true;
+        // The statement's single commit ts: `NewTxn::Import` commits once, so
+        // every batch after the first reuses it instead of spending another
+        // (`commit_at`). Otherwise the sequence would drift by the number of
+        // extra batches and every later transaction would be stamped wrong.
+        let mut statement_ts: Option<u64> = None;
         loop {
             let mut batch: Vec<Vec<Literal>> = Vec::with_capacity(Self::COPY_BATCH_ROWS);
             let mut eof = false;
@@ -13959,7 +14226,14 @@ impl Engine {
                     let encoded = self.encode_row_stored(table, row, &types_for_scan)?;
                     t.put(row_key(table, base + k), encoded.into_bytes());
                 }
-                let ts = self.txn.commit(t)?;
+                let ts = match statement_ts {
+                    Some(ts) => self.txn.commit_at(t, ts)?,
+                    None => {
+                        let ts = self.txn.commit(t)?;
+                        statement_ts = Some(ts);
+                        ts
+                    }
+                };
                 // The block's `version` and, for a fresh segment, its
                 // `catalog|seg|` record carry this transaction's commit ts
                 // (`BlockVersion::Append`, `TableMeta::AddSegmentWithID`).
@@ -16456,6 +16730,7 @@ impl Engine {
         // (`background_process_impl.cpp:109`); only `kAdmin` is rejected.
         self.ensure_cleanup_allowed()?;
         self.flush_storage()?;
+        self.reclaim_deprecated_segments()?;
         let cleaned = self.cleanup_cpp_index_chunks();
         // `BGTaskProcessor` records the cleanup timestamp so the trigger can
         // skip ticks with nothing new to reclaim

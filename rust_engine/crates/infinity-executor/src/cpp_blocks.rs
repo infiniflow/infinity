@@ -186,6 +186,7 @@ fn publish_secondary_chunks(
     dir: &Path,
     kind: infinity_storage::secondary_segment::KeyKind,
     segment: u32,
+    single_chunk: bool,
 ) -> Vec<CppIndexChunk> {
     use infinity_storage::secondary_segment::{
         write_secondary_segment_typed, SecondarySegmentReader,
@@ -240,6 +241,30 @@ fn publish_secondary_chunks(
                 .push((key, offset));
         }
     }
+    // `PopulateSecondaryIndexInner` inserts every block of the segment into
+    // one in-memory index and dumps **once**, so an imported segment has a
+    // single chunk covering all of its blocks (`InsertBlockData` is called per
+    // block, `Dump` once after the loop).
+    if single_chunk {
+        let mut entries: Vec<_> = by_block.into_values().flatten().collect();
+        if entries.is_empty() || std::fs::create_dir_all(seg_dir).is_err() {
+            return Vec::new();
+        }
+        entries.sort_by(|a, b| a.0.order(&b.0));
+        let path = seg_dir.join("chunk_0.idx");
+        if write_secondary_segment_typed(&path, kind, &entries).is_err() {
+            return Vec::new();
+        }
+        return vec![CppIndexChunk {
+            chunk_id: 0,
+            base_name: String::new(),
+            base_row_id: u64::from(segment) << 32,
+            row_count: entries.len() as u64,
+            term_count: 0,
+            index_size: 0,
+            commit_ts: 0,
+        }];
+    }
     let mut chunks = Vec::new();
     for (block, mut entries) in by_block {
         if std::fs::create_dir_all(seg_dir).is_err() {
@@ -278,7 +303,24 @@ fn publish_bmp_chunks(
     term_bound: usize,
     block_size: usize,
     segment: u32,
+    single_chunk: bool,
 ) -> Vec<CppIndexChunk> {
+    // `PopulateBMPIndexInner` adds every block of the segment to one
+    // `BMPIndexInMem` and dumps once, so an imported segment's sparse chunk
+    // covers all of its blocks.
+    let by_block: std::collections::BTreeMap<u64, Vec<infinity_storage::bmp_cpp::SparseDoc>> =
+        match single_chunk {
+            true => {
+                let docs: Vec<infinity_storage::bmp_cpp::SparseDoc> =
+                    by_block.into_values().flatten().collect();
+                if docs.is_empty() {
+                    Default::default()
+                } else {
+                    [(0u64, docs)].into_iter().collect()
+                }
+            }
+            false => by_block,
+        };
     let mut chunks = Vec::new();
     for (block, mut docs) in by_block {
         if std::fs::create_dir_all(seg_dir).is_err() {
@@ -1881,9 +1923,19 @@ impl Engine {
         // the rows into a new segment id, and leaving the source segment
         // behind would let the reference read a second copy of the data.
         let tbl_dir = root.join(format!("db_{db_id}/tbl_{}", meta.id));
+        // A segment a compaction deprecated keeps its directory: the reference
+        // only writes `drop|seg|…` and leaves the files for `Cleanup`
+        // (`NewTxn::Compact` -> deprecated segment list; `Cleanup` removes
+        // them). Deleting it here would make a reader at an older ts lose rows.
+        let dropped = self
+            .storage
+            .catalog
+            .cpp_dropped_segments(&db_id.to_string(), &meta.id.to_string())
+            .unwrap_or_default();
         let live: Vec<String> = segments
             .iter()
             .map(|segment| format!("seg_{}", segment.segment_id))
+            .chain(dropped.iter().map(|segment| format!("seg_{segment}")))
             .collect();
         if let Ok(entries) = std::fs::read_dir(&tbl_dir) {
             for entry in entries.flatten() {
@@ -2240,6 +2292,10 @@ impl Engine {
                 // the import transaction (`PopulateIndex`), so its chunks
                 // carry the import's ts; a later explicit dump stamps its own.
                 let chunk_ts = dump_ts.max(self.import_ts(table, *segment).unwrap_or(0));
+                // A segment that still holds exactly what one `COPY` wrote gets
+                // the import's chunk layout (one per capacity for full-text, one
+                // for the whole segment for secondary and sparse).
+                let imported = self.imported_extent(table, *segment, *seg_rows).is_some();
                 let chunks = if im.index_type.eq_ignore_ascii_case("SECONDARY") {
                     let dir = self.dir.join("secondary").join(&private);
                     // The chunk's key width comes from the column's declared type,
@@ -2250,6 +2306,7 @@ impl Engine {
                         &dir,
                         crate::secondary_key_kind(&declared),
                         *segment,
+                        imported,
                     )
                 } else if im.index_type.eq_ignore_ascii_case("BMP") {
                     // Rebuilt from the rows: the reference's chunk is the block and
@@ -2267,6 +2324,7 @@ impl Engine {
                         crate::sparse_declared_bound(&declared).unwrap_or(0),
                         crate::index_block_size(&im),
                         *segment,
+                        imported,
                     )
                 } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                     // Written in place by `write_cpp_fulltext_index`; its files are
@@ -3268,18 +3326,53 @@ impl Engine {
                 }
                 base = 0;
             }
-            // One chunk per **physical block** (`offset / 8192`), not one per
-            // 8192 live rows: a block keeps its `base_row_id` even when rows in
-            // it were deleted, so the split follows the row ids.
+            // The rows of `segment` are cut into chunks the way the reference
+            // cuts them:
+            //
+            // * an **imported** extent is dumped once per `mem_index_capacity`
+            //   (`PopulateFtIndexInner` checks the size after each block), so an
+            //   import smaller than the capacity is a single chunk spanning
+            //   every block of the segment;
+            // * rows appended later (or a segment no `COPY` wrote) are dumped
+            //   per **physical block** (`offset / 8192`): the memory indexer is
+            //   handed one block at a time, and a block keeps its `base_row_id`
+            //   even when rows in it were deleted.
+            let mut ranges: Vec<Vec<&(usize, Vec<Value>)>> = Vec::new();
+            let imported = self.imported_extent(&table, segment, seg_rows.len() as u64);
+            let tail_start = match imported {
+                Some(head) if base < head as usize => {
+                    let capacity = self.memindex_capacity().max(1);
+                    let head = head as usize;
+                    let mut start = base;
+                    let mut at = base;
+                    let mut accumulated = 0usize;
+                    while at < head {
+                        let take = (head - at).min(DEFAULT_BLOCK_CAPACITY);
+                        at += take;
+                        accumulated += take;
+                        if accumulated >= capacity {
+                            ranges.push(seg_rows[start..at].to_vec());
+                            start = at;
+                            accumulated = 0;
+                        }
+                    }
+                    if at > start {
+                        ranges.push(seg_rows[start..at].to_vec());
+                    }
+                    at
+                }
+                _ => base,
+            };
             let mut by_block: std::collections::BTreeMap<u64, Vec<&(usize, Vec<Value>)>> =
                 Default::default();
-            for row in seg_rows.iter().skip(base) {
+            for row in seg_rows.iter().skip(tail_start) {
                 by_block
                     .entry((row.0 as u64 & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY as u64)
                     .or_default()
                     .push(row);
             }
-            for (_block, block_rows) in by_block {
+            ranges.extend(by_block.into_values());
+            for block_rows in ranges {
                 // The chunk is named after the row it starts at, which is the
                 // block's first row only when the dump began on a block
                 // boundary. The name carries the whole `RowID` - segment in

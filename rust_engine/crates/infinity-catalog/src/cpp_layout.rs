@@ -1211,15 +1211,107 @@ pub fn read_cpp_segments(store: &dyn MetaStore) -> Result<Vec<CppSegmentSet>> {
 /// The C++ reader derives a block's column files from the column ids and its
 /// row count from the block's `version` file (`ColumnMeta::FilePaths`,
 /// `GetBlockRowCount`), so there are no per-block column records to write.
+/// `drop|seg|{db}/{table}/{segment}` — the commit ts at which `segment` was
+/// deprecated by a compaction (`NewTxn::Compact` -> the WAL's deprecated
+/// segment list). A reader whose `begin_ts` is at or above it ignores the
+/// segment; the files and the catalog records stay until `Cleanup`.
+pub fn cpp_dropped_segment_key(db_id: &str, table_id: &str, segment_id: u32) -> String {
+    format!("drop|seg|{db_id}/{table_id}/{segment_id}")
+}
+
+/// `drop|idx_seg|{db}/{table}/{index}/{segment}` — the same for one index's
+/// copy of a deprecated segment (`drop|idx_seg|1/0/1/0 = 32` in a probe of a
+/// four-segment table compacted at ts 32).
+pub fn cpp_dropped_index_segment_key(
+    db_id: &str,
+    table_id: &str,
+    index_id: u64,
+    segment_id: u32,
+) -> String {
+    format!("drop|idx_seg|{db_id}/{table_id}/{index_id}/{segment_id}")
+}
+
+/// Records `segments` as deprecated at `ts`, for the table and for each of its
+/// indexes. The reference writes this inside the compaction transaction and
+/// keeps the source segments' files and catalog records until `Cleanup`.
+pub fn write_cpp_drops(
+    store: &dyn MetaStore,
+    set: &CppSegmentSet,
+    index_ids: &[u64],
+    segments: &[u32],
+    ts: u64,
+) -> Result<usize> {
+    let value = ts.to_string();
+    let mut written = 0usize;
+    for segment in segments {
+        store.put(
+            cpp_dropped_segment_key(&set.db_id, &set.table_id, *segment).as_bytes(),
+            value.as_bytes(),
+        )?;
+        written += 1;
+        for index_id in index_ids {
+            store.put(
+                cpp_dropped_index_segment_key(&set.db_id, &set.table_id, *index_id, *segment)
+                    .as_bytes(),
+                value.as_bytes(),
+            )?;
+            written += 1;
+            // The reference drops the `(index, segment)` pair itself
+            // (`TableIndexMeta::RemoveSegmentIndexID1`), which is what
+            // `GetTableIndexSegments` enumerates - it never consults
+            // `drop|idx_seg|`. The chunk records stay: only the pair is gone.
+            let pair = key::catalog_index_segment_key(
+                &set.db_id,
+                &set.table_id,
+                &index_id.to_string(),
+                *segment,
+            );
+            for (k, _) in store.scan_prefix(format!("{pair}|").as_bytes())? {
+                store.delete(&k)?;
+            }
+            store.delete(pair.as_bytes())?;
+        }
+    }
+    Ok(written)
+}
+
+/// The segments of `table` that a compaction deprecated (and `Cleanup` has not
+/// reclaimed yet).
+pub fn cpp_dropped_segments(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_id: &str,
+) -> Result<Vec<u32>> {
+    let prefix = format!("drop|seg|{db_id}/{table_id}/");
+    let mut out = Vec::new();
+    for (k, _) in store.scan_prefix(prefix.as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        if let Some(id) = key.rsplit('/').next().and_then(|s| s.parse::<u32>().ok()) {
+            out.push(id);
+        }
+    }
+    out.sort_unstable();
+    Ok(out)
+}
+
 pub fn write_cpp_segments(store: &dyn MetaStore, set: &CppSegmentSet) -> Result<usize> {
     let mut written = 0usize;
     // A mirror rewrite can leave fewer blocks (or segments) than the previous
-    // one, so start from an empty segment layer for the table.
+    // one, so start from an empty segment layer for the table - except for the
+    // segments a compaction deprecated, whose records the reference keeps until
+    // `Cleanup` (the `drop|seg|` record is what makes a reader ignore them).
+    let dropped = cpp_dropped_segments(store, &set.db_id, &set.table_id)?;
     for prefix in [
         key::catalog_segment_prefix(&set.db_id, &set.table_id),
         format!("catalog|blk|{}|{}|", set.db_id, set.table_id),
     ] {
         for (k, _) in store.scan_prefix(prefix.as_bytes())? {
+            let key = String::from_utf8_lossy(&k).to_string();
+            let mut parts = key.split('|').skip(2);
+            let segment = parts.nth(2).and_then(|s| s.parse::<u32>().ok());
+            if segment.is_some_and(|s| dropped.contains(&s)) {
+                continue;
+            }
             store.delete(&k)?;
         }
     }
