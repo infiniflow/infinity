@@ -51,7 +51,7 @@
 | `::test_the_index_chunks_match_for_every_index_kind` | IVF + HNSW(cosine) + HNSW(ip) + 全文(chinese) + 次级(int) + 次级(date) | 六类索引按各自类别比对；`_wait_for_index_chunks` 等全部 chunk 落盘 |
 | `::test_the_ivf_chunk_is_only_compared_by_content` | 上面的表，参考跑 2 次 | IVF chunk 的字节不是行值的函数，只能按内容比 |
 | `::test_a_crash_leaves_a_replayable_directory` | 100 行 flush + 50 行未 flush 后 kill -9 | 另一引擎启动后看到 150 行（双向） |
-| `::test_a_compacted_table_keeps_its_segments_apart` | 8192 行 + `COMPACT` + 50 行 | 重写版把行写进 `seg_1`/`seg_2`；非 0 段的块与参考同行的块逐字节相同；两个方向互读 8242 行；重写版重启不重复 |
+| `::test_a_compaction_with_one_segment_is_a_no_op` | 8192 行 + `COMPACT` + 50 行 | 两个引擎都只有 `seg_0`（`NewCompactionAlg` 一个段挑不出候选，不开事务）；块与 `version` 逐字节相同；行数 8242 |
 | `::test_the_object_directory_is_shared_with_the_reference` | 100 行 + 次级索引；两个引擎各写一次 `persistence_dir`（`storage_type = "local"`，即桶在本地的那份布局），写完删掉 `data/`，由另一个引擎读 | 对面的引擎按 `pm|object|` 解析打包对象后：行数 100、`id = 7` 命中、次级范围查询命中同一批 id；两个方向一致 |
 | `::test_the_port_round_trips_through_object_storage` | 200 行 + `storage_type="minio"` → 清空本地目录 → 读回 → 再写 50 行（在恢复出来的树上做 checkpoint）→ 再清空 → 读回 | 重写版从桶里恢复 `data/`+`catalog/`+`persistence/`，行数 200；第二次 checkpoint 后是 250（需要 `INFINITY_MINIO_URL`；每次跑用新桶，避免上一轮的桶污染） |
 | `::test_the_secondary_and_sparse_indexes_survive_deletes_updates_and_a_restart` | INT / FLOAT / DOUBLE 三个次级键 + 稀疏 BMP；第二个进程 `DELETE` 前缀 + `UPDATE` 一段，再 flush/dump | 每个 chunk 逐字节相同（DOUBLE 键走 8 字节键 + `double` 斜率）；chunk 覆盖 110 个物理行；四个索引的答案相同 |
@@ -100,7 +100,7 @@
 ### 5.2 输入空间的缺口
 
 1. **跨段全文合并**：重写版把每个索引的 chunk 都写在 `idx_{id}/seg_0/`，不按段拆；参考在测试规模上只有 `seg_0`，所以没有可观测差异。要冻结这条需要 8,388,608 行级别的数据（每引擎约 1024 个块目录），本机内存与磁盘放不下两端。
-2. **多段下的索引类**（矩阵"多段"列的 ⬜）：HNSW / IVF / 次级 / 稀疏都只有单段覆盖。参考在 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）之前不会开第二段，本机造不出两个段；`COMPACT` 能造段，但那只覆盖了块层（`test_a_compacted_table_keeps_its_segments_apart`）。
+2. **多段下的索引类**（矩阵"多段"列的 ⬜）：参考在 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）之前不会开第二段，`COMPACT` 也不是捷径——只有一个段时它不开事务（`test_a_compaction_with_one_segment_is_a_no_op`）。要覆盖这一列必须真的写入 8,388,608 行以上：本机尚未跑过这个规模。
 3. **WAL 的 Append 行载荷**：帧头（提交 ts、命令数、命令类型、库名/表名）、`Delete` 的行 id 列表、`Append` 的块头都逐字节比（`test_the_wal_entries_match_for_the_shared_commands`）；`Append` 的行数据段与 `Delete` 的结尾计数字是重写版自己的编码——两个方向都能 replay（`test_a_crash_leaves_a_replayable_directory` 与 `test_the_indexes_survive_a_crash`），但字节不同。DDL 不在比对内：参考写 `CreateTable`/`CreateIndex`，重写版写 `KvBatch`（它落盘的 catalog 键），是不同的命令而非同一命令的不同编码。
 
 ### 5.3 流程
@@ -120,7 +120,7 @@
 | 对象存储：写出的布局 | `persistence_format = "reference"` 时写 `pm\|object\|` 记录 + 打包对象（与参考同一套，128 MB 上限 / footer / stat） | `ObjCreate` 命名打包 blob，本地路径映射在 KV 的 `pm\|object\|<path>` | 对象目录用例双向比（§3） |
 | 对象存储：S3 传输 | 路径树 `data/`、`catalog/`、`persistence/` 逐文件上传 | 对象键即 `obj_key`，对象文件直接上传 | 只做重写版自身往返（无可用端点，§6.5） |
 | 索引 chunk 的段目录 | 全部在 `idx_{id}/seg_0/` | 路径同样带 `seg_{id}`；多段时是否按段拆分未验证 | 8M 行以下无差异，跨段未验证 |
-| 段的产生时机 | `COMPACT` 即写出 `seg_1`/`seg_2` | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切 | 见 §5.2 |
+| 段的产生时机 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切（与参考相同）；单段 `COMPACT` 不开事务 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切 | 见 §5.2 |
 | WAL 的 `Append` 行载荷 / DDL 命令 | 行数据按 `row_id` + 文本编码，DDL 写 `KvBatch`（catalog 键值） | 行数据按块内列编码，DDL 写 `CreateTable`/`CreateIndex` | 帧头、命令类型、库/表名、`Delete` 行 id 逐字节比；行载荷与 DDL 只保证双向 replay |
 | 不带 `rocksdb-store` feature 时 | catalog 落 fjall | 只认 RocksDB | 参考打开只剩 `system_tag`（`Database: default_db doesn't exist`）；门禁必须带 feature |
 
@@ -208,7 +208,7 @@
 
 `idx_chunk` 的值由重写版在 `DumpIndex` 时记下（`dump_ts:{表}:{索引}`），盖到已发布的 id 记录上，并把 `wal.log` 的 checkpoint 帧推进到覆盖它——参考读目录时按 `chunk_ts > begin_ts` 隐藏 chunk（`LoadChunkIDs1`），帧不覆盖就会被藏起来。
 
-还有一种情况不是分配差异，而是两边做的事不同：手动 `COMPACT`。参考的 `ManualCompactTask` 交给 `NewCompactionAlg` 挑候选段（`physical_compact_impl.cpp:36`），一个段时挑不出东西、**不开事务**；重写版的 `compact_table` 无条件把行搬进下一个段，因此多出一个写事务。多段用例里的表只有 8192 行（两边都是一个段），所以参考的 trace 是 `10=Append 12=checkpoint(flush) 14=Append(尾批) 16=checkpoint`，重写版在 12 与 14 之间多一个 compaction 事务。该用例只比尾块的**布局**（`_version_without_ts`），因为它的目的是验证行 id 携带段号、块落在段目录下，而不是比较 compaction 本身。
+手动 `COMPACT` 两边做的也是同一件事：`ManualCompactTask` 把 `NewCompactionAlg` 挑出的候选段交给 `PhysicalCompact`（`physical_compact_impl.cpp:36`），只有一个段时挑不出候选、**不开事务**；重写版的 `compact_table` 现在同样在 `segment_ids(table).len() < 2` 时直接返回，所以 8192 行的脚本两边都留在 `seg_0`，trace 与字节完全一致（`test_a_compaction_with_one_segment_is_a_no_op`）。
 
 ## 7. 怎么跑
 

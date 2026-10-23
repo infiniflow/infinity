@@ -894,38 +894,6 @@ def _mask_null_slots(blob):
     return bytes(out)
 
 
-def _version_without_ts(blob):
-    """The block `version` file with its commit ts masked out.
-
-    Layout: `[u16 create_size]` then, per create, `[u64 create_ts][i64 rows]`,
-    then `[u16 capacity]` and one u64 per slot. Every create ts becomes zero
-    and every non-zero delete ts becomes one.
-
-    The compact test is the only caller, and it needs it because the two
-    engines do a different amount of work there: the port's `compact_table`
-    moves the rows into a new segment, while the reference's
-    `ManualCompactTask` asks `NewCompactionAlg` for candidates and finds a
-    single segment, so it opens no transaction at all
-    (`physical_compact_impl.cpp:36`, `compaction_process_impl.cpp`). The
-    port's tail rows are therefore written one transaction - two timestamps -
-    later. *Which* creates and *which* slots are marked still follows from the
-    rows, so that part stays compared.
-    """
-    out = bytearray(blob)
-    pos = 0
-    create_size = struct.unpack_from("<H", out, pos)[0]
-    pos += 2
-    for _ in range(create_size):
-        struct.pack_into("<Q", out, pos, 0)  # the create ts
-        pos += 16
-    capacity = struct.unpack_from("<H", out, pos)[0]
-    pos += 2
-    for slot in range(capacity):
-        at = pos + slot * 8
-        if struct.unpack_from("<Q", out, at)[0]:
-            struct.pack_into("<Q", out, at, 1)
-    return bytes(out)
-
 
 def _reader_config(root, pg_port):
     """A config for *reading* an engine's directory with the reference.
@@ -2920,99 +2888,66 @@ def _phase_compact(conn):
     not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
 )
 @pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
     not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
 )
-def test_a_compacted_table_keeps_its_segments_apart():
-    """A row's id carries its segment, and its block lives under that segment.
+def test_a_compaction_with_one_segment_is_a_no_op():
+    """`COMPACT` merges segments; with a single segment it does nothing.
 
-    Segment ids are handed out by compaction, and the rows move into the new
-    one, so a mirror that writes everything into `seg_0` puts the rows at the
-    wrong ids: the port then restores a second copy of every row from its own
-    blocks on the next start (measured: 500 rows out of 250).
+    The reference's manual compaction hands `NewCompactionAlg` the segments to
+    merge: one segment yields no candidate, so no transaction is opened, no row
+    moves and no timestamp is spent. The port used to move every row into a new
+    segment unconditionally, which produced two segments, one extra commit ts
+    and a `version` file the reference could not match.
 
-    The reference cannot produce two segments at this scale - its allocator
-    opens the next segment after `DEFAULT_SEGMENT_CAPACITY` (8,388,608) rows
-    and its compaction needs two to merge - so this is covered three ways
-    instead of byte-comparing directory trees: the port's post-compaction
-    segment directory holds the tail block, that block's bytes equal the
-    reference's block for the same rows, and each engine opens the other's
-    directory with the same row count.
+    The test runs 8192 rows + `COMPACT` + a 50-row tail and asserts that both
+    engines stay in `seg_0`, write the same bytes (the tail lands in `blk_1`)
+    and answer the same, i.e. the compaction changed nothing.
     """
     roots = {}
-    for writer, reader, port in (("rust", "cpp", 5433), ("cpp", "rust", 5432)):
-        root = _run_phases(
-            writer,
-            os.path.join(ROOT, f"compact_{writer}"),
-            port,
-            [_phase_compact],
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        roots[engine] = _run_phases(
+            engine, os.path.join(ROOT, f"compact_{engine}"), port, [_phase_compact]
         )
-        roots[writer] = (root, reader, port)
 
-    files = {engine: _files(root) for engine, (root, _, _) in roots.items()}
-    dirs = {engine: _own_table_dir(blobs, len(COMPACT_COLUMNS)) for engine, blobs in files.items()}
-    assert dirs["rust"] and dirs["cpp"], "the compact table was not written"
+    files = {engine: _files(root) for engine, root in roots.items()}
+    dirs = {
+        engine: _own_table_dir(blobs, len(COMPACT_COLUMNS))
+        for engine, blobs in files.items()
+    }
+    assert dirs["cpp"] and dirs["rust"], "the compacted table was not written"
 
-    def segments(files, table_dir):
-        prefix = table_dir + "/"
-        return sorted(
+    for engine, blobs in files.items():
+        segments = sorted(
             {
-                name[len(prefix) :].split("/")[0]
-                for name in files
-                if name.startswith(prefix)
-                and name[len(prefix) :].startswith("seg_")
+                name.split("/")[0]
+                for name in _under(blobs, dirs[engine])
+                if name.startswith("seg_")
             }
         )
-
-    assert segments(files["rust"], dirs["rust"]) == ["seg_1", "seg_2"], (
-        f"the port did not move the rows into a new segment: "
-        f"{segments(files['rust'], dirs['rust'])}"
-    )
-    assert segments(files["cpp"], dirs["cpp"]) == ["seg_0"], (
-        f"the reference compacted a single segment: "
-        f"{segments(files['cpp'], dirs['cpp'])}"
-    )
-
-    # The tail block of the port's second segment holds the same 50 rows as the
-    # reference's second block, so its bytes must match. The `version` file is
-    # the one exception: the port compacted (one write transaction) where the
-    # reference had nothing to merge (none), so the tail rows' `create_ts` is
-    # two higher - `_version_without_ts` has the details and masks only the ts.
-    # `_compare_data_files` keys off `…/version`, so both sides carry the same
-    # synthetic block prefix.
-    prefix = "seg_x/blk_x/"
-    tail = {
-        prefix + name: _version_without_ts(blob)
-        if name.split("/")[-1] == "version"
-        else blob
-        for name, blob in _under(files["rust"], f"{dirs['rust']}/seg_2/blk_0").items()
-    }
-    cpp_tail = {
-        prefix + name: _version_without_ts(blob)
-        if name.split("/")[-1] == "version"
-        else blob
-        for name, blob in _under(files["cpp"], f"{dirs['cpp']}/seg_0/blk_1").items()
-    }
-    assert set(tail) == set(cpp_tail), (
-        f"the tail block has different files: {sorted(tail)} != {sorted(cpp_tail)}"
-    )
-    failures = _compare_data_files(cpp_tail, tail, {})
-    assert not failures, (
-        "the tail block of a compacted segment differs from the reference:\n  "
-        + "\n  ".join(failures)
-    )
-
-    for writer, (root, reader, port) in roots.items():
-        rows = _count_rows(reader, root, port, COMPACT_TABLE)
-        assert rows == COMPACT_ROWS + COMPACT_TAIL, (
-            f"{reader} sees {rows} of the {COMPACT_ROWS + COMPACT_TAIL} rows "
-            f"{writer} wrote"
+        assert segments == ["seg_0"], (
+            f"{engine}: a single-segment COMPACT created {segments}"
         )
-    # A restart must not restore the block rows a second time at the ids the
-    # old, single-segment mirror would have used.
-    rows = _count_rows("rust", roots["rust"][0], 5433, COMPACT_TABLE)
-    assert rows == COMPACT_ROWS + COMPACT_TAIL, (
-        f"the port sees {rows} rows in its own compacted directory"
+
+    failures = _compare_data_files(
+        _under(files["cpp"], dirs["cpp"]),
+        _under(files["rust"], dirs["rust"]),
+        {},
     )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures
+    )
+
+    queries = {"count": lambda t: t.output(["count(*)"]).to_result()}
+    cpp_answers = _answers(roots["cpp"], 5432, COMPACT_TABLE, queries)
+    rust_answers = _answers(roots["rust"], 5433, COMPACT_TABLE, queries)
+    assert cpp_answers == rust_answers == {"count": [COMPACT_ROWS + COMPACT_TAIL]}, (
+        f"cpp {cpp_answers} vs rust {rust_answers}"
+    )
+
+
 
 
 # ---------------------------------------------------------------------------

@@ -12119,6 +12119,14 @@ impl Engine {
         // Compaction rewrites segments, so both the manual and the periodic
         // task require `kWritable` (`compaction_process_impl.cpp:270-295`).
         self.ensure_writable()?;
+        // `ManualCompactTask` hands the candidates `NewCompactionAlg` picked
+        // (`physical_compact_impl.cpp`): with a single segment there is nothing
+        // to merge, so the reference opens **no** transaction and leaves the
+        // directory untouched. Merging one segment into a new one would move
+        // every row and spend a timestamp the reference does not.
+        if self.segment_ids(table).len() < 2 {
+            return Ok(());
+        }
         self.invalidate_row_cache(table);
         // Rows are re-keyed below; the mirror's row-id snapshot stops matching
         // the moment the first row moves.
