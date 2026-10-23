@@ -158,6 +158,8 @@
 
 剩下的差异只有传输层：重写版的 S3 客户端（`infinity_storage::s3`）仍按路径树上传播 `data/`、`catalog/`、`persistence/`，没有把打包对象与 `pm|object|` 记录发到桶里。要覆盖这一段需要一个可用的 S3 端点（用例需要 `INFINITY_MINIO_URL`），而 MinIO 开源版已归档、本机也没有可用的替代端点，所以这一列在门禁里仍是重写版自身的往返。
 
+参考的 compose 规则（128 MB 上限、独占对象、`parts > 1` 的 4 字节 footer、逐次 append 的统计记录、引用计数与 `deleted_ranges`）与完整移植步骤见 [`PERSISTENCE_MANAGER_PORT_PLAN.md`](PERSISTENCE_MANAGER_PORT_PLAN.md)；当前 `object_dir` 只实现了其中的记录格式与 8 字节对齐。
+
 ### 6.6 时间戳：两个引擎消耗同一条序列
 
 时钟按参考的**双指针偶数制**走（`new_txn_manager_impl.cpp`）：
