@@ -1431,7 +1431,7 @@ impl Catalog {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cpp_layout::{CppBlock, CppSegment, CppSegmentSet, CPP_MIRROR_TS};
+    use crate::cpp_layout::{CppBlock, CppSegment, CppSegmentSet, CPP_MIRROR_TS, UNCOMMIT_TS};
     use tempfile::tempdir;
 
     fn cols(names: &[&str]) -> Vec<String> {
@@ -1891,6 +1891,7 @@ mod tests {
             segments: vec![CppSegment {
                 segment_id: 0,
                 create_ts: CPP_MIRROR_TS,
+                first_delete_ts: UNCOMMIT_TS,
                 blocks: vec![
                     CppBlock {
                         block_id: 0,
@@ -1952,6 +1953,7 @@ mod tests {
             segments: vec![CppSegment {
                 segment_id: 0,
                 create_ts: CPP_MIRROR_TS,
+                first_delete_ts: UNCOMMIT_TS,
                 blocks: vec![
                     CppBlock {
                         block_id: 0,
@@ -1994,6 +1996,7 @@ mod tests {
             segments: vec![CppSegment {
                 segment_id: 0,
                 create_ts: CPP_MIRROR_TS,
+                first_delete_ts: UNCOMMIT_TS,
                 blocks: vec![CppBlock {
                     block_id: 0,
                     commit_ts: CPP_MIRROR_TS,

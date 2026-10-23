@@ -53,6 +53,10 @@
 | `::test_a_crash_leaves_a_replayable_directory` | 100 行 flush + 50 行未 flush 后 kill -9 | 另一引擎启动后看到 150 行（双向） |
 | `::test_a_compacted_table_keeps_its_segments_apart` | 8192 行 + `COMPACT` + 50 行 | 重写版把行写进 `seg_1`/`seg_2`；非 0 段的块与参考同行的块逐字节相同；两个方向互读 8242 行；重写版重启不重复 |
 | `::test_the_port_round_trips_through_object_storage` | 200 行 + `storage_type="minio"` → 清空本地目录 → 读回 → 再写 50 行（在恢复出来的树上做 checkpoint）→ 再清空 → 读回 | 重写版从桶里恢复 `data/`+`catalog/`+`persistence/`，行数 200；第二次 checkpoint 后是 250（需要 `INFINITY_MINIO_URL`；每次跑用新桶，避免上一轮的桶污染） |
+| `::test_the_secondary_and_sparse_indexes_survive_deletes_updates_and_a_restart` | INT / FLOAT / DOUBLE 三个次级键 + 稀疏 BMP；第二个进程 `DELETE` 前缀 + `UPDATE` 一段，再 flush/dump | 每个 chunk 逐字节相同（DOUBLE 键走 8 字节键 + `double` 斜率）；chunk 覆盖 110 个物理行；四个索引的答案相同 |
+| `::test_the_vector_indexes_survive_deletes_updates_and_a_restart` | HNSW（`vec`）+ IVF（`vec2`）；第二个进程删除 + 改向量 + 追加 | HNSW 的 header/vectors/labels 与 IVF 的 header 计数、`(offset, vector)` 对相同；两个索引的 top-k 答案相同；行数相同 |
+| `::test_the_quantized_ivf_indexes_mirror_and_answer` | IVF `scalar_quantization(8 bits)` + `product_quantization(2×8 bits)`，200 行 | 两引擎都发布了 chunk、chunk 覆盖全部行；参考能在各自目录上按 `nprobe=16` 查到 5 个合法 id（量化码依赖随机质心，答案不作逐 id 比较） |
+| `::test_the_indexes_survive_a_crash` | 100 行 flush + dump → 50 行未 flush + 删除 10 行后 kill -9，双向交接；5 个索引（次级 INT / DOUBLE、BMP、HNSW、IVF） | 另一引擎 replay 后 140 行；次级等值仍命中已 flush 的行；稀疏 / HNSW / IVF 返回 5 个合法 id |
 | `test_cross_engine_compat.py` | 200 行，4 类索引 | 双向交接：A 写 → B 读 → B 再写 |
 | `infinity-storage/tests/s3_minio.rs` | 本地临时目录 + 桶 | `tree_sync_and_restore`（往返 + 二次同步上传 0 个文件）、`same_size_edit_is_uploaded`（同长度改写必须重传）、`put_get_list_delete_roundtrip`；需要 `INFINITY_MINIO_TEST=1` |
 
@@ -67,11 +71,11 @@
 | 变长 outline `col_*_out` | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ | ✅ | ◐ |
 | `version` 文件 | ✅（含 ts） | ✅ | ✅ | ✅ | ✅ | ◐ | — | ◐ |
 | 全文 `.dic/.pos/.len` | ✅ | ✅ | ⬜ 跨段合并 | ✅ | ✅ | ⬜ | ✅ analyzer / `with_positions` | ◐ |
-| HNSW chunk | ◐ 图按内容 | ◐ | ⬜ | ⬜ | ⬜ | ⬜ | ✅ metric / build_type | ◐ |
-| IVF chunk（plain / SQ / PQ） | ◐ 按内容 | ◐ | ⬜ | ⬜ | ⬜ | ⬜ | ◐ plain only | ◐ |
-| 次级索引 chunk（整数键） | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ✅ int / date 键 | ◐ |
-| 次级索引 chunk（浮点键） | ✅ | ✅ | ⬜ | ✅ | ⬜ | ⬜ | ⬜ double 键 | ◐ |
-| 稀疏 BMP chunk | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ 词表规模 / block_size | ◐ |
+| HNSW chunk | ◐ 图按内容 | ◐ | ⬜ | ◐ 内容+答案 | ◐ 内容+答案 | ◐ 重放后查询 | ✅ metric / build_type | ◐ |
+| IVF chunk（plain / SQ / PQ） | ◐ 按内容 | ◐ | ⬜ | ◐ 内容+答案 | ◐ 内容+答案 | ◐ 重放后查询 | ◐ plain / SQ / PQ | ◐ |
+| 次级索引 chunk（整数键） | ✅ | ✅ | ⬜ | ✅ | ✅ | ◐ 重放后查询 | ✅ int / date 键 | ◐ |
+| 次级索引 chunk（浮点键） | ✅ | ✅ | ⬜ | ✅ | ✅ | ◐ 重放后查询 | ✅ float / double 键 | ◐ |
+| 稀疏 BMP chunk | ✅ | ✅ | ⬜ | ✅ | ✅ | ◐ 重放后查询 | ⬜ 词表规模 / block_size | ◐ |
 | 删除位图（catalog 内） | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
 | WAL 记录 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ✅ 跨引擎 replay | — | ◐ |
 | Catalog KV | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
@@ -93,8 +97,8 @@
 
 1. **跨段全文合并**：重写版把每个索引的 chunk 都写在 `idx_{id}/seg_0/`，不按段拆；参考在测试规模上只有 `seg_0`，所以没有可观测差异。要冻结这条需要 8,388,608 行级别的数据（每引擎约 1024 个块目录），本机内存与磁盘放不下两端。
 2. **多段下的索引类**（矩阵"多段"列的 ⬜）：HNSW / IVF / 次级 / 稀疏都只有单段覆盖，原因同上。
-3. **HNSW / IVF 的删除、更新、重启、崩溃恢复**：图区/质心不可字节比，这几个场景需要按内容比，目前没有用例。
-4. **次级 / 稀疏索引的删除、更新、重启、崩溃恢复**：可字节比，目前只覆盖了浮点键次级索引的删除/更新（`test_the_bytes_after_deletes_updates_and_a_restart`，矩阵 §4:73），其余组合没有用例。
+3. **IVF（SQ / PQ）的删除、更新、重启、崩溃恢复**：量化码依赖随机质心，只能像 plain IVF 那样按内容比；这条路径还没有用例（plain IVF 与其余四类索引已有）。
+4. **多段下的索引**（矩阵"多段"列的 ⬜）：见上一条。
 5. **WAL 的字节级比对**：只做跨引擎 replay，不比字节。
 
 ### 5.3 流程
@@ -187,7 +191,7 @@
 重写版 : 同一串
 ```
 
-这些 ts 落到字节里的地方因此全部逐字节相同：块 `version` 的 `create_ts` 与删除槽、`catalog|seg|…` / `catalog|blk|…`（开段/开块的 append）、`idx_seg|…`（把索引与该段配对的事务 = `max(index 创建 ts, segment 创建 ts)`）、`catalog|tbl|…|{ts}` / `catalog|idx|…|{ts}` / `tbl|col|…|{ts}` 键里的 ts。
+这些 ts 落到字节里的地方因此全部逐字节相同：块 `version` 的 `create_ts` 与删除槽、`catalog|seg|…` / `catalog|blk|…`（开段/开块的 append）、`idx_seg|…`（把索引与该段配对的事务 = `max(index 创建 ts, segment 创建 ts)`）、`catalog|tbl|…|{ts}` / `catalog|idx|…|{ts}` / `tbl|col|…|{ts}` 键里的 ts、`seg|…|first_delete_ts`（第一次删到该段的事务；不写它参考就不看块的删除标记，已删的行会被读回来）。
 
 前提是**没有"什么时候跑"的写事务**，所以对齐配置把异步任务全关掉（§2）：`optimize/cleanup/compact_interval` 与 `checkpoint_interval` 都是 `0s`，`memindex_memory_quota` 取内存索引达不到的值。剩下的 dump 只有脚本显式的 `DumpIndex` 与行数越过 `mem_index_capacity` 的那次，两者都由脚本决定，因此 `idx_chunk|…|{chunk_id}` 也落在同一批事务上，和其它记录一样逐字节比。
 

@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use infinity_catalog::cpp_layout::{
-    CppBlock, CppIndexChunk, CppIndexSegment, CppSegment, CppSegmentSet, CPP_MIRROR_TS,
+    CppBlock, CppIndexChunk, CppIndexSegment, CppSegment, CppSegmentSet, CPP_MIRROR_TS, UNCOMMIT_TS,
 };
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
@@ -1820,9 +1820,27 @@ impl Engine {
                 written += chunk.len();
                 block_index += 1;
             }
+            // `first_delete_ts` is the commit ts of the first delete that
+            // touched this segment (`SegmentMeta::CommitFirstDeleteTS`): a
+            // reader whose `begin_ts` is below it skips the block's delete
+            // flags, so leaving it at UNCOMMIT_TS resurrects deleted rows.
+            let touched = self
+                .deleted_ids(&table)
+                .iter()
+                .any(|id| (*id >> 32) as u32 == segment_id);
+            let first_delete_ts = if touched {
+                self.delete_ts(&table)
+                    .into_iter()
+                    .filter(|ts| *ts != 0)
+                    .min()
+                    .unwrap_or(UNCOMMIT_TS)
+            } else {
+                UNCOMMIT_TS
+            };
             segments.push(CppSegment {
                 segment_id,
                 create_ts: seg_create_ts,
+                first_delete_ts,
                 blocks,
             });
         }

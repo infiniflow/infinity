@@ -708,10 +708,13 @@ def _index_content(files, kind):
             "secondary-f64": 8,
             "secondary-u64": 8,
         }[kind]
+        # The PGM's `Floating` is `LargeSigned<K>`: 4 bytes for a `float` key,
+        # 8 for a `double` one (`secondary_segment.rs` writes `{f64,f64,u32}`).
+        floating_width = 8 if kind == "secondary-f64" else 4
         postings = []
         for name in sorted(files):
             blob = files[name]
-            n = _secondary_chunk_rows(blob, key_width)
+            n = _secondary_chunk_rows(blob, key_width, floating_width)
             for i in range(n):
                 postings.append(
                     blob[i * key_width : (i + 1) * key_width]
@@ -1166,6 +1169,12 @@ def _table_records(pairs, table_dir, table):
             # `idx_chunk|{db}|{table}|...`
             if len(parts) > 2 and parts[1] == db_id and parts[2] == table_id:
                 out[key] = value
+        elif head == "seg":
+            # `seg|{db}|{table}|{segment}|{tag}`: `first_delete_ts` is the
+            # watermark a reader uses to decide whether to look at the block's
+            # delete flags at all (`SegmentMeta::CommitFirstDeleteTS`).
+            if len(parts) > 3 and parts[1] == db_id and parts[2] == table_id:
+                out[key] = value
         elif head.startswith("table_index_tag:"):
             # `table_index_tag: idx|{db}|{table}|...`
             if len(parts) > 2 and parts[1] == db_id and parts[2] == table_id:
@@ -1304,7 +1313,8 @@ def test_the_two_engines_write_the_same_bytes():
     # The catalog: the same records. The keys embed the commit ts of the
     # transaction that created them and the bare-ts values are that ts too;
     # with every background task off (see `_config`) the two engines dump at
-    # the same points, so keys and values are both compared verbatim. The `index_size` of a graph-shaped chunk (HNSW, BMP) is taken out
+    # the same points, so keys and values are both compared verbatim. The
+    # `index_size` of a graph-shaped chunk (HNSW, BMP) is taken out
     # as well, for the reason given in `_normalize_catalog`.
     #
     # The port writes the C++ key space only in its `rocksdb-store` build;
@@ -1610,6 +1620,572 @@ def test_the_bytes_after_deletes_updates_and_a_restart():
         assert cpp_catalog[key] == rust_catalog[key], (
             f"catalog {key}: {cpp_catalog[key]} != {rust_catalog[key]}"
         )
+
+
+def _answers(root, pg_port, table, queries):
+    """Run `queries` against `table` with the reference reading `root`.
+
+    Same contract as `_index_answers` - what the chunks *say* must not depend
+    on which engine wrote them - but parameterised by table and query set so
+    the vector and double-key cases below can use it.
+    """
+    _wait_port_free()
+    config = os.path.join(root, "reader.toml")
+    with open(config, "w") as handle:
+        handle.write(_reader_config(root, pg_port))
+    proc = subprocess.Popen(
+        [CPP_BIN, f"--config={config}"],
+        stdout=open(os.path.join(root, "answers.log"), "w"),
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    conn = None
+    try:
+        for _ in range(120):
+            if proc.poll() is not None:
+                raise AssertionError(f"engine exited:\n{_log_tail(root)}")
+            try:
+                conn = infinity.connect(URI)
+                conn.get_database("default_db").list_tables()
+                break
+            except Exception:
+                if conn is not None:
+                    try:
+                        conn.disconnect()
+                    except Exception:
+                        pass
+                    conn = None
+                time.sleep(0.5)
+        else:
+            raise AssertionError(f"the engine did not come up on {root}")
+
+        handle = conn.get_database("default_db").get_table(table)
+
+        def ids(result):
+            data, _, _ = result
+            key = next(k for k in data if k not in ("SCORE", "DISTANCE"))
+            return sorted(data[key])
+
+        return {name: ids(query(handle)) for name, query in queries.items()}
+    finally:
+        if conn is not None:
+            try:
+                conn.disconnect()
+            except Exception:
+                pass
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+        try:
+            proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            pass
+        time.sleep(1)
+        _wait_port_free()
+
+
+# ---------------------------------------------------------------------------
+# Indexes under DELETE / UPDATE / a restart, and the variants the default seed
+# does not create (a DOUBLE secondary key, IVF with SQ/PQ storage).
+#
+# §4 of `rust_engine/docs/FORMAT_EQUIVALENCE_TESTS.md` marks these empty: the
+# gates above exercise one block and one dump, so nothing below a restart had
+# been compared for any index but a float-key secondary.
+# ---------------------------------------------------------------------------
+
+IDX_TABLE = "test_cross_engine_index_mutations"
+IDX_COLUMNS = {
+    "id": {"type": "int"},
+    "title": {"type": "varchar"},
+    "score": {"type": "float"},
+    "amount": {"type": "double"},
+    "sp": {"type": "sparse,8,float,int"},
+}
+# Creation order names the directories: `idx_1` … `idx_4`.
+IDX_INDEXES = {
+    1: "secondary-u32",  # id
+    2: "secondary-f32",  # score
+    3: "secondary-f64",  # amount: a DOUBLE key (`LargeSigned<double>`)
+    4: "bmp",            # sp
+}
+
+
+def _idx_rows(base, count):
+    return [
+        {
+            "id": base + i,
+            "title": f"doc-{base + i}",
+            "score": (base + i) * 0.5,
+            "amount": (base + i) * 1.25,
+            "sp": {0: 0.5, (base + i) % 5 + 1: 1.0},
+        }
+        for i in range(count)
+    ]
+
+
+def _phase_idx_initial(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(IDX_TABLE, ConflictType.Ignore)
+    t = db.create_table(IDX_TABLE, IDX_COLUMNS, ConflictType.Error)
+    t.create_index("id_sec", index.IndexInfo("id", index.IndexType.Secondary))
+    t.create_index("score_sec", index.IndexInfo("score", index.IndexType.Secondary))
+    t.create_index("amount_sec", index.IndexInfo("amount", index.IndexType.Secondary))
+    t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
+    t.insert(_idx_rows(0, 100))
+    conn.flush_data()
+    _dump_indexes(t, ["id_sec", "score_sec", "amount_sec", "sp_idx"])
+    time.sleep(1)
+
+
+def _phase_idx_mutate(conn):
+    """A second process: delete a prefix, rewrite a range, flush, dump."""
+    t = conn.get_database("default_db").get_table(IDX_TABLE)
+    t.delete("id < 20")
+    t.update(
+        "id >= 20 and id < 30",
+        {
+            "title": "rewritten",
+            "score": 777.5,
+            "amount": 888.25,
+            "sp": {0: 1.5, 2: 2.0},
+        },
+    )
+    conn.flush_data()
+    _dump_indexes(t, ["id_sec", "score_sec", "amount_sec", "sp_idx"])
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_secondary_and_sparse_indexes_survive_deletes_updates_and_a_restart():
+    """An INT, a FLOAT and a DOUBLE secondary key plus a BMP index, mutated.
+
+    The delete goes to the catalog's bitmap and the update re-appends the row,
+    so a second run produces chunks that mix "the rows of the block" with "the
+    rows appended after the last dump". Both engines must land on the same
+    bytes: the PGM fit, the raw keys and the sparse postings are all derived
+    from the rows, not from the dump schedule.
+
+    The DOUBLE key is the case the default seed misses: its keys are 8 bytes
+    and the PGM runs `LargeSigned<double>`, not the `float` path.
+    """
+    roots = {}
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        roots[engine] = _run_phases(
+            engine,
+            os.path.join(ROOT, f"idxmut_{engine}"),
+            port,
+            [_phase_idx_initial, _phase_idx_mutate],
+        )
+
+    files = {engine: _files(root) for engine, root in roots.items()}
+    dirs = {
+        engine: _own_table_dir(blobs, len(IDX_COLUMNS))
+        for engine, blobs in files.items()
+    }
+    assert dirs["cpp"] and dirs["rust"], "the mutated index table was not written"
+
+    failures = _compare_data_files(
+        _under(files["cpp"], dirs["cpp"]),
+        _under(files["rust"], dirs["rust"]),
+        IDX_INDEXES,
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures
+    )
+
+    # 100 rows + the 10 the UPDATE re-appended; the 20 deletes only mark slots.
+    cpp_pairs = _table_records(
+        _catalog_pairs(roots["cpp"], 5432), dirs["cpp"], IDX_TABLE
+    )
+    rust_pairs = _table_records(
+        _catalog_pairs(roots["rust"], 5433), dirs["rust"], IDX_TABLE
+    )
+    _assert_chunk_tiling(cpp_pairs, set(IDX_INDEXES), 110, "cpp")
+    _assert_chunk_tiling(rust_pairs, set(IDX_INDEXES), 110, "rust")
+
+    # The answers too: a chunk that parses but says something else is a format
+    # difference the byte comparison of a *different* chunk boundary cannot see.
+    queries = {
+        "id_eq": lambda t: t.output(["id"]).filter("id = 42").to_result(),
+        "score_range": lambda t: t.output(["id"])
+        .filter("score >= 10.0 and score <= 12.0")
+        .to_result(),
+        "amount_eq": lambda t: t.output(["id"]).filter("amount = 52.5").to_result(),
+        "sparse": lambda t: t.output(["id"])
+        .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
+        .to_result(),
+    }
+    cpp_answers = _answers(roots["cpp"], 5432, IDX_TABLE, queries)
+    rust_answers = _answers(roots["rust"], 5433, IDX_TABLE, queries)
+    assert cpp_answers == rust_answers, (
+        f"the mutated indexes answer differently:\n"
+        f"  cpp:  {cpp_answers}\n  rust: {rust_answers}"
+    )
+
+
+VEC_TABLE = "test_cross_engine_vector_mutations"
+VEC_COLUMNS = {
+    "id": {"type": "int"},
+    "vec": {"type": "vector,4,float"},
+    "vec2": {"type": "vector,4,float"},
+}
+# An HNSW on `vec` and an IVF on `vec2`, so each is queried on its own column
+# (the planner picks the index for the column, not for the table).
+VEC_INDEXES = {1: "hnsw", 2: "ivf"}
+
+
+def _vec_rows(base, count):
+    return [
+        {
+            "id": base + i,
+            "vec": [float((base + i) % 10) / 10.0, 0.1, 0.2, 0.3],
+            "vec2": [float((base + i) % 7) / 7.0, 0.25, 0.5, 0.75],
+        }
+        for i in range(count)
+    ]
+
+
+def _phase_vec_initial(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(VEC_TABLE, ConflictType.Ignore)
+    t = db.create_table(VEC_TABLE, VEC_COLUMNS, ConflictType.Error)
+    t.create_index(
+        "vec_hnsw",
+        index.IndexInfo(
+            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+        ),
+    )
+    t.create_index("vec_ivf", index.IndexInfo("vec2", index.IndexType.IVF, {"metric": "l2"}))
+    t.insert(_vec_rows(0, 100))
+    conn.flush_data()
+    _dump_indexes(t, ["vec_hnsw", "vec_ivf"])
+    time.sleep(1)
+
+
+def _phase_vec_mutate(conn):
+    t = conn.get_database("default_db").get_table(VEC_TABLE)
+    t.delete("id < 20")
+    t.update(
+        "id >= 20 and id < 30",
+        {
+            "vec": [0.9, 0.9, 0.9, 0.9],
+            "vec2": [0.8, 0.8, 0.8, 0.8],
+        },
+    )
+    t.insert(_vec_rows(100, 20))
+    conn.flush_data()
+    _dump_indexes(t, ["vec_hnsw", "vec_ivf"])
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_vector_indexes_survive_deletes_updates_and_a_restart():
+    """HNSW and IVF after a second run deletes, rewrites and appends rows.
+
+    Neither chunk is byte comparable (the graph is built with a thread-local
+    RNG, the IVF centroids are sampled with `random_device`), so the gate works
+    the way §1 of the document splits content from bytes: the derived regions
+    are byte compared (HNSW header/vectors/labels, IVF header counts and the
+    `(offset, vector)` pairs) and the answers are compared by asking the
+    reference to read each engine's directory.
+
+    This is the case §4 leaves empty for both index kinds: every earlier gate
+    dumps once, before any delete or update.
+    """
+    roots = {}
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        roots[engine] = _run_phases(
+            engine,
+            os.path.join(ROOT, f"vecmut_{engine}"),
+            port,
+            [_phase_vec_initial, _phase_vec_mutate],
+        )
+
+    files = {engine: _files(root) for engine, root in roots.items()}
+    dirs = {
+        engine: _own_table_dir(blobs, len(VEC_COLUMNS))
+        for engine, blobs in files.items()
+    }
+    assert dirs["cpp"] and dirs["rust"], "the mutated vector table was not written"
+
+    failures = _compare_data_files(
+        _under(files["cpp"], dirs["cpp"]),
+        _under(files["rust"], dirs["rust"]),
+        VEC_INDEXES,
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures
+    )
+
+    queries = {
+        # The query vector is one of the rewritten rows, so an index that still
+        # holds the pre-update vectors answers a different id.
+        "hnsw": lambda t: t.output(["id"])
+        .match_dense("vec", [0.9, 0.9, 0.9, 0.9], "float", "l2", 5)
+        .to_result(),
+        "ivf": lambda t: t.output(["id"])
+        .match_dense("vec2", [0.8, 0.8, 0.8, 0.8], "float", "l2", 5, {"nprobe": "16"})
+        .to_result(),
+        "count": lambda t: t.output(["count(*)"]).to_result(),
+    }
+    cpp_answers = _answers(roots["cpp"], 5432, VEC_TABLE, queries)
+    rust_answers = _answers(roots["rust"], 5433, VEC_TABLE, queries)
+    assert cpp_answers == rust_answers, (
+        f"the mutated vector indexes answer differently:\n"
+        f"  cpp:  {cpp_answers}\n  rust: {rust_answers}"
+    )
+
+
+QUANT_TABLE = "test_cross_engine_quantized_ivf"
+QUANT_COLUMNS = {
+    "id": {"type": "int"},
+    "sq": {"type": "vector,8,float"},
+    "pq": {"type": "vector,8,float"},
+}
+QUANT_INDEXES = {1: "ivf", 2: "ivf"}  # both: chunk existence + answers
+QUANT_ROWS = 200
+
+
+def _quant_rows():
+    return [
+        {
+            "id": i,
+            # A deterministic spread over the unit cube; the dimension is 8 so
+            # two PQ subspaces of 4 dimensions divide it evenly.
+            "sq": [((i * (j + 3)) % 17) / 17.0 for j in range(8)],
+            "pq": [((i * (j + 5)) % 13) / 13.0 for j in range(8)],
+        }
+        for i in range(QUANT_ROWS)
+    ]
+
+
+def _phase_quant(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(QUANT_TABLE, ConflictType.Ignore)
+    t = db.create_table(QUANT_TABLE, QUANT_COLUMNS, ConflictType.Error)
+    t.create_index(
+        "sq_idx",
+        index.IndexInfo(
+            "sq",
+            index.IndexType.IVF,
+            {
+                "metric": "l2",
+                "storage_type": "scalar_quantization",
+                "scalar_quantization_bits": "8",
+            },
+        ),
+    )
+    t.create_index(
+        "pq_idx",
+        index.IndexInfo(
+            "pq",
+            index.IndexType.IVF,
+            {
+                "metric": "l2",
+                "storage_type": "product_quantization",
+                "product_quantization_subspace_num": "2",
+                "product_quantization_subspace_bits": "8",
+            },
+        ),
+    )
+    t.insert(_quant_rows())
+    conn.flush_data()
+    _dump_indexes(t, ["sq_idx", "pq_idx"])
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_quantized_ivf_indexes_mirror_and_answer():
+    """IVF with `scalar_quantization` and `product_quantization` storage.
+
+    The quantization codes are derived from the k-means centroids, and the
+    reference samples those with `std::random_device`, so neither the SQ nor the
+    PQ chunk is byte comparable (the plain IVF chunk is compared by its header
+    and `(offset, vector)` pairs instead). What the port must reproduce is the
+    *layout* the reference reads - chunk present, header well formed - and the
+    answer: the reference opens each directory and runs a `nprobe` search.
+
+    Before this case the gate only covered `storage_type = plain`; SQ and PQ
+    write a different chunk layout (`IvfIndexInMem` quantizes the vectors and
+    stores the codes, not the raw vectors).
+    """
+    roots = {}
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        roots[engine] = os.path.join(ROOT, f"quant_{engine}")
+        _run_engine(engine, roots[engine], port, seed=_phase_quant)
+
+    for root in roots.values():
+        _wait_for_index_chunks(root, len(QUANT_INDEXES))
+
+    files = {engine: _files(root) for engine, root in roots.items()}
+    dirs = {
+        engine: _own_table_dir(blobs, len(QUANT_COLUMNS))
+        for engine, blobs in files.items()
+    }
+    assert dirs["cpp"] and dirs["rust"], "the quantized table was not written"
+    # Every index must have published a chunk in both directories.
+    for engine, blobs in files.items():
+        present = {
+            int(name.split("idx_")[1].split("/")[0])
+            for name in blobs
+            if "/idx_" in name
+        }
+        assert set(QUANT_INDEXES) <= present, (
+            f"{engine}: indexes {sorted(present)} do not cover {sorted(QUANT_INDEXES)}"
+        )
+    # The chunk records must tile the rows exactly once in both.
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        pairs = _table_records(
+            _catalog_pairs(roots[engine], port), dirs[engine], QUANT_TABLE
+        )
+        _assert_chunk_tiling(pairs, set(QUANT_INDEXES), QUANT_ROWS, engine)
+
+    probe = [0.5] * 8
+    queries = {
+        "sq": lambda t: t.output(["id"])
+        .match_dense("sq", probe, "float", "l2", 5, {"nprobe": "16"})
+        .to_result(),
+        "pq": lambda t: t.output(["id"])
+        .match_dense("pq", probe, "float", "l2", 5, {"nprobe": "16"})
+        .to_result(),
+        "count": lambda t: t.output(["count(*)"]).to_result(),
+    }
+    # The *answers* cannot be compared id for id: both the centroids and the
+    # quantization ranges are sampled with `std::random_device`, so two runs of
+    # the reference itself return different neighbours (the same reason its IVF
+    # chunk is not byte comparable). What must hold is that the reference can
+    # open the port's directory, probe the index and get a well-formed answer.
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        answers = _answers(roots[engine], port, QUANT_TABLE, queries)
+        assert answers["count"] == [QUANT_ROWS], f"{engine}: {answers['count']}"
+        for name in ("sq", "pq"):
+            ids = answers[name]
+            assert len(ids) == 5, f"{engine} {name}: expected 5 ids, got {ids}"
+            assert len(set(ids)) == len(ids), f"{engine} {name}: duplicate ids {ids}"
+            assert all(0 <= i < QUANT_ROWS for i in ids), f"{engine} {name}: {ids}"
+
+
+CRASH_IDX_TABLE = "test_cross_engine_index_crash"
+CRASH_IDX_COLUMNS = {
+    "id": {"type": "int"},
+    "title": {"type": "varchar"},
+    "score": {"type": "double"},
+    "sp": {"type": "sparse,8,float,int"},
+    "vec": {"type": "vector,4,float"},
+    "vec2": {"type": "vector,4,float"},
+}
+CRASH_IDX_INDEXES = {1: "secondary-u32", 2: "secondary-f64", 3: "bmp", 4: "hnsw", 5: "ivf"}
+
+
+def _crash_idx_rows(base, count):
+    return [
+        {
+            "id": base + i,
+            "title": f"doc-{base + i}",
+            "score": (base + i) * 1.5,
+            "sp": {0: 0.5, (base + i) % 5 + 1: 1.0},
+            "vec": [float((base + i) % 10) / 10.0, 0.1, 0.2, 0.3],
+            "vec2": [float((base + i) % 7) / 7.0, 0.25, 0.5, 0.75],
+        }
+        for i in range(count)
+    ]
+
+
+def _phase_crash_idx_base(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(CRASH_IDX_TABLE, ConflictType.Ignore)
+    t = db.create_table(CRASH_IDX_TABLE, CRASH_IDX_COLUMNS, ConflictType.Error)
+    t.create_index("id_sec", index.IndexInfo("id", index.IndexType.Secondary))
+    t.create_index("score_sec", index.IndexInfo("score", index.IndexType.Secondary))
+    t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
+    t.create_index(
+        "vec_idx",
+        index.IndexInfo(
+            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+        ),
+    )
+    t.create_index("ivf_idx", index.IndexInfo("vec2", index.IndexType.IVF, {"metric": "l2"}))
+    t.insert(_crash_idx_rows(0, 100))
+    conn.flush_data()
+    _dump_indexes(t, ["id_sec", "score_sec", "sp_idx", "vec_idx", "ivf_idx"])
+    time.sleep(1)
+
+
+def _phase_crash_idx_unflushed(conn):
+    """Rows and a delete that only reach the WAL: the process dies right after."""
+    t = conn.get_database("default_db").get_table(CRASH_IDX_TABLE)
+    t.insert(_crash_idx_rows(100, 50))
+    t.delete("id < 10")
+    time.sleep(1)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_indexes_survive_a_crash():
+    """An unflushed insert and delete, replayed by the *other* engine.
+
+    The WAL carries the rows and the delete; the index chunks on disk only
+    cover the flushed prefix, so the reading engine has to replay the tail and
+    still answer from the indexes. Both directions are checked, and the answers
+    must be well formed: 140 live rows (100 − 10 deleted + 50 appended), a
+    secondary equality that still finds a flushed row, a sparse search and an
+    HNSW search that return `top_k` distinct ids.
+
+    Before this case the crash gate only counted rows on a table without
+    indexes, so nothing proved the delete bitmap and the chunk layer survive a
+    replay.
+    """
+    for writer, reader, port in (("rust", "cpp", 5433), ("cpp", "rust", 5432)):
+        root = _run_phases(
+            writer,
+            os.path.join(ROOT, f"idxcrash_{writer}"),
+            port,
+            [_phase_crash_idx_base, _phase_crash_idx_unflushed],
+        )
+        # The reader needs the config for its own engine (the directory still
+        # carries the writer's), as `_count_rows` does.
+        _write_config(reader, root, port)
+        queries = {
+            "count": lambda t: t.output(["count(*)"]).to_result(),
+            "id_eq": lambda t: t.output(["id"]).filter("id = 42").to_result(),
+            "sparse": lambda t: t.output(["id"])
+            .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
+            .to_result(),
+            "hnsw": lambda t: t.output(["id"])
+            .match_dense("vec", [0.1, 0.1, 0.2, 0.3], "float", "l2", 5)
+            .to_result(),
+            "ivf": lambda t: t.output(["id"])
+            .match_dense("vec2", [0.25, 0.25, 0.5, 0.75], "float", "l2", 5, {"nprobe": "16"})
+            .to_result(),
+        }
+        answers = _answers(root, port, CRASH_IDX_TABLE, queries)
+        assert answers["count"] == [140], (
+            f"{reader} sees {answers['count']} rows after replaying {writer}'s crash"
+        )
+        assert answers["id_eq"] == [42], f"{reader}: {answers['id_eq']}"
+        for name in ("sparse", "hnsw", "ivf"):
+            ids = answers[name]
+            assert len(ids) == 5 and len(set(ids)) == 5, f"{reader} {name}: {ids}"
 
 
 # ---------------------------------------------------------------------------

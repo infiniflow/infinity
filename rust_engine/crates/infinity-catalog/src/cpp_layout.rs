@@ -50,6 +50,11 @@ pub struct CppSegment {
     pub segment_id: u32,
     /// Value of the `catalog|seg|…` record (the reference's create timestamp).
     pub create_ts: u64,
+    /// Commit ts of the first delete that touched this segment
+    /// (`SegmentMeta::CommitFirstDeleteTS`), or [`UNCOMMIT_TS`] when none did.
+    /// A reader whose `begin_ts` is below it may skip the block's delete
+    /// flags, so an unset value would resurrect deleted rows.
+    pub first_delete_ts: u64,
     pub blocks: Vec<CppBlock>,
 }
 
@@ -1186,6 +1191,7 @@ pub fn read_cpp_segments(store: &dyn MetaStore) -> Result<Vec<CppSegmentSet>> {
         set.segments.push(CppSegment {
             segment_id,
             create_ts,
+            first_delete_ts: UNCOMMIT_TS,
             blocks,
         });
     }
@@ -1230,7 +1236,7 @@ pub fn write_cpp_segments(store: &dyn MetaStore, set: &CppSegmentSet) -> Result<
                 "first_delete_ts",
             )
             .as_bytes(),
-            UNCOMMIT_TS.to_string().as_bytes(),
+            seg.first_delete_ts.to_string().as_bytes(),
         )?;
         written += 2;
         for block in &seg.blocks {
