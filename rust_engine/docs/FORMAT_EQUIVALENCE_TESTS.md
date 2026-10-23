@@ -55,7 +55,8 @@
 | `::test_the_port_round_trips_through_object_storage` | 200 行 + `storage_type="minio"` → 清空本地目录 → 读回 → 再写 50 行（在恢复出来的树上做 checkpoint）→ 再清空 → 读回 | 重写版从桶里恢复 `data/`+`catalog/`+`persistence/`，行数 200；第二次 checkpoint 后是 250（需要 `INFINITY_MINIO_URL`；每次跑用新桶，避免上一轮的桶污染） |
 | `::test_the_secondary_and_sparse_indexes_survive_deletes_updates_and_a_restart` | INT / FLOAT / DOUBLE 三个次级键 + 稀疏 BMP；第二个进程 `DELETE` 前缀 + `UPDATE` 一段，再 flush/dump | 每个 chunk 逐字节相同（DOUBLE 键走 8 字节键 + `double` 斜率）；chunk 覆盖 110 个物理行；四个索引的答案相同 |
 | `::test_the_vector_indexes_survive_deletes_updates_and_a_restart` | HNSW（`vec`）+ IVF（`vec2`）；第二个进程删除 + 改向量 + 追加 | HNSW 的 header/vectors/labels 与 IVF 的 header 计数、`(offset, vector)` 对相同；两个索引的 top-k 答案相同；行数相同 |
-| `::test_the_quantized_ivf_indexes_mirror_and_answer` | IVF `scalar_quantization(8 bits)` + `product_quantization(2×8 bits)`，200 行 | 两引擎都发布了 chunk、chunk 覆盖全部行；参考能在各自目录上按 `nprobe=16` 查到 5 个合法 id（量化码依赖随机质心，答案不作逐 id 比较） |
+| `::test_the_quantized_ivf_indexes_mirror_and_answer` | IVF `scalar_quantization(8 bits)` + `product_quantization(2×8 bits)`；第二个进程删除前缀、改写一段、追加 40 行 | 两引擎都发布了 chunk、chunk 覆盖 260 个物理行；`nprobe=16` 查到 10 个合法 id 且**不含已删除的 id**（量化码依赖随机质心，邻居不作逐 id 比较，删除位图必须生效） |
+| `::test_the_quantized_ivf_indexes_survive_a_crash` | 上一张表 + 30 行未 flush + 删除 10 行后 kill -9，双向交接 | 另一引擎 replay 后 220 行；SQ / PQ 各返回 10 个合法 id，且不含未 flush 阶段删除的 id |
 | `::test_the_indexes_survive_a_crash` | 100 行 flush + dump → 50 行未 flush + 删除 10 行后 kill -9，双向交接；5 个索引（次级 INT / DOUBLE、BMP、HNSW、IVF） | 另一引擎 replay 后 140 行；次级等值仍命中已 flush 的行；稀疏 / HNSW / IVF 返回 5 个合法 id |
 | `test_cross_engine_compat.py` | 200 行，4 类索引 | 双向交接：A 写 → B 读 → B 再写 |
 | `infinity-storage/tests/s3_minio.rs` | 本地临时目录 + 桶 | `tree_sync_and_restore`（往返 + 二次同步上传 0 个文件）、`same_size_edit_is_uploaded`（同长度改写必须重传）、`put_get_list_delete_roundtrip`；需要 `INFINITY_MINIO_TEST=1` |
@@ -96,10 +97,8 @@
 ### 5.2 输入空间的缺口
 
 1. **跨段全文合并**：重写版把每个索引的 chunk 都写在 `idx_{id}/seg_0/`，不按段拆；参考在测试规模上只有 `seg_0`，所以没有可观测差异。要冻结这条需要 8,388,608 行级别的数据（每引擎约 1024 个块目录），本机内存与磁盘放不下两端。
-2. **多段下的索引类**（矩阵"多段"列的 ⬜）：HNSW / IVF / 次级 / 稀疏都只有单段覆盖，原因同上。
-3. **IVF（SQ / PQ）的删除、更新、重启、崩溃恢复**：量化码依赖随机质心，只能像 plain IVF 那样按内容比；这条路径还没有用例（plain IVF 与其余四类索引已有）。
-4. **多段下的索引**（矩阵"多段"列的 ⬜）：见上一条。
-5. **WAL 的字节级比对**：只做跨引擎 replay，不比字节。
+2. **多段下的索引类**（矩阵"多段"列的 ⬜）：HNSW / IVF / 次级 / 稀疏都只有单段覆盖。参考在 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）之前不会开第二段，本机造不出两个段；`COMPACT` 能造段，但那只覆盖了块层（`test_a_compacted_table_keeps_its_segments_apart`）。
+3. **WAL 的字节级比对**：只做跨引擎 replay，不比字节。
 
 ### 5.3 流程
 

@@ -1957,23 +1957,21 @@ QUANT_INDEXES = {1: "ivf", 2: "ivf"}  # both: chunk existence + answers
 QUANT_ROWS = 200
 
 
-def _quant_rows():
+def _quant_rows(base, count):
     return [
         {
-            "id": i,
+            "id": base + i,
             # A deterministic spread over the unit cube; the dimension is 8 so
             # two PQ subspaces of 4 dimensions divide it evenly.
             "sq": [((i * (j + 3)) % 17) / 17.0 for j in range(8)],
             "pq": [((i * (j + 5)) % 13) / 13.0 for j in range(8)],
         }
-        for i in range(QUANT_ROWS)
+        for i in range(count)
     ]
 
 
-def _phase_quant(conn):
-    db = conn.get_database("default_db")
-    db.drop_table(QUANT_TABLE, ConflictType.Ignore)
-    t = db.create_table(QUANT_TABLE, QUANT_COLUMNS, ConflictType.Error)
+def _quant_indexes(t):
+    """The two quantized IVF indexes, on their own column each."""
     t.create_index(
         "sq_idx",
         index.IndexInfo(
@@ -1999,10 +1997,46 @@ def _phase_quant(conn):
             },
         ),
     )
-    t.insert(_quant_rows())
+
+
+def _phase_quant_initial(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(QUANT_TABLE, ConflictType.Ignore)
+    t = db.create_table(QUANT_TABLE, QUANT_COLUMNS, ConflictType.Error)
+    _quant_indexes(t)
+    t.insert(_quant_rows(0, QUANT_ROWS))
+    conn.flush_data()
+    _dump_indexes(t, ["sq_idx", "pq_idx"])
+    time.sleep(1)
+
+
+def _quant_mutated_vector(i):
+    return [((i * (j + 7)) % 19) / 19.0 for j in range(8)]
+
+
+def _phase_quant_mutate(conn):
+    """A second process: delete a prefix, rewrite a range, append a batch."""
+    t = conn.get_database("default_db").get_table(QUANT_TABLE)
+    t.delete("id < 20")
+    t.update(
+        "id >= 20 and id < 40",
+        {
+            "sq": _quant_mutated_vector(7),
+            "pq": _quant_mutated_vector(11),
+        },
+    )
+    t.insert(_quant_rows(QUANT_ROWS, 40))
     conn.flush_data()
     _dump_indexes(t, ["sq_idx", "pq_idx"])
     time.sleep(2)
+
+
+def _phase_quant_unflushed(conn):
+    """Rows and a delete that only reach the WAL: the process dies right after."""
+    t = conn.get_database("default_db").get_table(QUANT_TABLE)
+    t.insert(_quant_rows(QUANT_ROWS + 40, 30))
+    t.delete("id >= 100 and id < 110")
+    time.sleep(1)
 
 
 @pytest.mark.skipif(
@@ -2018,17 +2052,23 @@ def test_the_quantized_ivf_indexes_mirror_and_answer():
     reference samples those with `std::random_device`, so neither the SQ nor the
     PQ chunk is byte comparable (the plain IVF chunk is compared by its header
     and `(offset, vector)` pairs instead). What the port must reproduce is the
-    *layout* the reference reads - chunk present, header well formed - and the
-    answer: the reference opens each directory and runs a `nprobe` search.
+    *layout* the reference reads - chunk present, header well formed - and a
+    well-formed answer to a `nprobe` search.
 
-    Before this case the gate only covered `storage_type = plain`; SQ and PQ
-    write a different chunk layout (`IvfIndexInMem` quantizes the vectors and
-    stores the codes, not the raw vectors).
+    A second process then deletes a prefix, rewrites a range and appends a
+    batch, and the index is dumped again. That half *is* comparable: the row
+    ids a quantized search returns are approximate, but a deleted row must never
+    appear, so the answer is checked against the delete bitmap rather than
+    against the reference's choice of neighbours.
     """
     roots = {}
     for engine, port in (("cpp", 5432), ("rust", 5433)):
-        roots[engine] = os.path.join(ROOT, f"quant_{engine}")
-        _run_engine(engine, roots[engine], port, seed=_phase_quant)
+        roots[engine] = _run_phases(
+            engine,
+            os.path.join(ROOT, f"quant_{engine}"),
+            port,
+            [_phase_quant_initial, _phase_quant_mutate],
+        )
 
     for root in roots.values():
         _wait_for_index_chunks(root, len(QUANT_INDEXES))
@@ -2049,36 +2089,81 @@ def test_the_quantized_ivf_indexes_mirror_and_answer():
         assert set(QUANT_INDEXES) <= present, (
             f"{engine}: indexes {sorted(present)} do not cover {sorted(QUANT_INDEXES)}"
         )
-    # The chunk records must tile the rows exactly once in both.
+
+    # 200 rows + 20 rewritten by the UPDATE + 40 appended; the 20 deletes only
+    # mark slots.
     for engine, port in (("cpp", 5432), ("rust", 5433)):
         pairs = _table_records(
             _catalog_pairs(roots[engine], port), dirs[engine], QUANT_TABLE
         )
-        _assert_chunk_tiling(pairs, set(QUANT_INDEXES), QUANT_ROWS, engine)
+        _assert_chunk_tiling(pairs, set(QUANT_INDEXES), 260, engine)
 
     probe = [0.5] * 8
     queries = {
         "sq": lambda t: t.output(["id"])
-        .match_dense("sq", probe, "float", "l2", 5, {"nprobe": "16"})
+        .match_dense("sq", probe, "float", "l2", 10, {"nprobe": "16"})
         .to_result(),
         "pq": lambda t: t.output(["id"])
-        .match_dense("pq", probe, "float", "l2", 5, {"nprobe": "16"})
+        .match_dense("pq", probe, "float", "l2", 10, {"nprobe": "16"})
         .to_result(),
         "count": lambda t: t.output(["count(*)"]).to_result(),
     }
-    # The *answers* cannot be compared id for id: both the centroids and the
-    # quantization ranges are sampled with `std::random_device`, so two runs of
-    # the reference itself return different neighbours (the same reason its IVF
-    # chunk is not byte comparable). What must hold is that the reference can
-    # open the port's directory, probe the index and get a well-formed answer.
     for engine, port in (("cpp", 5432), ("rust", 5433)):
         answers = _answers(roots[engine], port, QUANT_TABLE, queries)
-        assert answers["count"] == [QUANT_ROWS], f"{engine}: {answers['count']}"
+        assert answers["count"] == [220], f"{engine}: {answers['count']}"
         for name in ("sq", "pq"):
             ids = answers[name]
-            assert len(ids) == 5, f"{engine} {name}: expected 5 ids, got {ids}"
+            assert len(ids) == 10, f"{engine} {name}: expected 10 ids, got {ids}"
             assert len(set(ids)) == len(ids), f"{engine} {name}: duplicate ids {ids}"
-            assert all(0 <= i < QUANT_ROWS for i in ids), f"{engine} {name}: {ids}"
+            # The delete bitmap must reach the quantized path: ids < 20 were
+            # deleted in the second process, so no probe may return them.
+            assert all(i >= 20 for i in ids), f"{engine} {name}: deleted ids {ids}"
+            assert all(i < 240 for i in ids), f"{engine} {name}: {ids}"
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_quantized_ivf_indexes_survive_a_crash():
+    """An unflushed insert and delete replayed under the quantized indexes.
+
+    Same shape as `test_the_indexes_survive_a_crash`, but the two indexes are
+    SQ and PQ: the WAL carries rows and a delete, the chunks on disk only cover
+    the flushed prefix, and the reading engine has to replay the tail and then
+    answer from the quantized chunks without returning a deleted row.
+    """
+    for writer, reader, port in (("rust", "cpp", 5433), ("cpp", "rust", 5432)):
+        root = _run_phases(
+            writer,
+            os.path.join(ROOT, f"quantcrash_{writer}"),
+            port,
+            [_phase_quant_initial, _phase_quant_unflushed],
+        )
+        _write_config(reader, root, port)
+        probe = [0.5] * 8
+        queries = {
+            "count": lambda t: t.output(["count(*)"]).to_result(),
+            "sq": lambda t: t.output(["id"])
+            .match_dense("sq", probe, "float", "l2", 10, {"nprobe": "16"})
+            .to_result(),
+            "pq": lambda t: t.output(["id"])
+            .match_dense("pq", probe, "float", "l2", 10, {"nprobe": "16"})
+            .to_result(),
+        }
+        answers = _answers(root, port, QUANT_TABLE, queries)
+        # 200 flushed − 10 deleted + 30 appended.
+        assert answers["count"] == [220], (
+            f"{reader} sees {answers['count']} rows after replaying {writer}'s crash"
+        )
+        for name in ("sq", "pq"):
+            ids = answers[name]
+            assert len(ids) == 10 and len(set(ids)) == 10, f"{reader} {name}: {ids}"
+            assert all(not (100 <= i < 110) for i in ids), (
+                f"{reader} {name}: deleted ids came back: {ids}"
+            )
 
 
 CRASH_IDX_TABLE = "test_cross_engine_index_crash"
