@@ -140,7 +140,7 @@
 | 20000 行单独跑 | 3 个 chunk（8192/8192/3616） | 3 个 chunk |
 | 20000 行在整轮测试里跑 | 1 个合并 chunk（`ft_..._4e20`，20000 行）+ 4 个次级 chunk | 3 个 chunk |
 
-因此 chunk 的数量/边界不能作为字节门禁：重写版只保证切分确定且不重不漏（200 行规模上参考稳定，那里仍整文件比对）。`_seed` 在 `flush_data()` 之后对每个索引显式 `dump_index()`（参考的 `DumpMemIndex`），再用 `_wait_for_index_chunks` 轮询到全部 chunk 落盘，不依赖固定 sleep。
+表中的差异来自**配额驱动的后台 dump**（`memindex_memory_quota` 很小、又和其他引擎抢 CPU）；对齐门禁现在把它关掉（§2），只剩显式 `DumpIndex` 与行容量触发，切分是确定的。因此 chunk 的数量/边界仍不能作为通用的字节门禁（参考在别的配置下会变）：重写版只保证切分确定且不重不漏，200 行规模上参考稳定，那里整文件比对。`_seed` 在 `flush_data()` 之后对每个索引显式 `dump_index()`（参考的 `DumpMemIndex`），再用 `_wait_for_index_chunks` 轮询到全部 chunk 落盘，不依赖固定 sleep。
 
 ### 6.4 为什么不做 HNSW 图的字节可比
 
