@@ -195,6 +195,7 @@ pub use variables::SetScope as Scope;
 mod wand;
 
 pub mod cpp_blocks;
+pub(crate) mod fast_rough_filter;
 
 /// The batch of rows the physical operators exchange (C++ `DataBlock`).
 pub mod chunk;
@@ -12555,12 +12556,15 @@ impl Engine {
                 .filter(|im| im.table == meta.name || im.table == self.qualified_table(&meta.name))
                 .map(|im| im.id)
                 .collect();
-            let store = self.storage.store.clone();
+            // The records being reclaimed live in the C++ key space, i.e. the
+            // catalog store, not in the row store.
+            let store = self.storage.catalog.store().clone();
             let root = self.blocks_root();
             for segment in &dropped {
                 for prefix in [
                     format!("catalog|blk|{db_id}|{}|{segment}|", meta.id),
                     format!("seg|{db_id}|{}|{segment}|", meta.id),
+                    format!("blk|{db_id}|{}|{segment}|", meta.id),
                 ] {
                     for (k, _) in store.scan_prefix(prefix.as_bytes())? {
                         store.delete(&k)?;

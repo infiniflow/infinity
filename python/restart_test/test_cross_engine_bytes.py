@@ -3464,12 +3464,11 @@ def test_a_multi_segment_table_matches_across_segments():
     HNSW header/vectors/labels and the IVF `(offset, vector)` pairs are
     compared by content.
 
-    The catalog's `seg|…|fast_rough_filter` record is left out: `IMPORT` builds
-    a binary-fuse prefilter for the sealed segment
+    The catalog's `seg|…|fast_rough_filter` records are part of the comparison:
+    `IMPORT` builds the segment's and every block's prefilter
     (`BuildFastRoughFilterTask::ExecuteOnNewSealedSegment`,
-    `new_txn_data_impl.cpp:1739`) and the port has no such filter; a reader
-    treats a missing one as "no filter", so it changes no answer. See
-    `docs/FORMAT_EQUIVALENCE_TESTS.md` §5.2.
+    `new_txn_data_impl.cpp:1739`), and the port writes the same bytes
+    (`fast_rough_filter.rs`).
     """
     cpp_root = os.path.join(ROOT, "segments_cpp")
     rust_root = os.path.join(ROOT, "segments_rust")
@@ -3519,12 +3518,6 @@ def test_a_multi_segment_table_matches_across_segments():
             "the port's catalog is not in the C++ key space; "
             "build it with `--features rocksdb-store`"
         )
-    # The import-built prefilter is not part of this comparison; see the
-    # docstring.
-    for pairs in (cpp_pairs, rust_pairs):
-        for key in list(pairs):
-            if key.endswith("|fast_rough_filter"):
-                del pairs[key]
     only_cpp = sorted(set(cpp_pairs) - set(rust_pairs))
     only_rust = sorted(set(rust_pairs) - set(cpp_pairs))
     changed = [
@@ -3838,9 +3831,6 @@ def test_a_compacted_table_matches_and_keeps_its_sources():
             _table_records(_catalog_pairs(engine_root, 5432), table_dir, MERGED_TABLE),
             zero_size_indexes=SEG_ZERO_SIZE,
         )
-        for key in list(pairs):
-            if key.endswith("|fast_rough_filter"):
-                del pairs[key]
         return pairs
 
     cpp_pairs = records(cpp_root, cpp_dir)
@@ -3898,3 +3888,111 @@ def test_a_compacted_table_matches_and_keeps_its_sources():
     assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
     assert cpp_answers["count"] == [sum(MERGED_ROWS)]
     assert cpp_answers["fulltext_last"] == [MERGED_STARTS[3] + 20]
+
+
+# ---------------------------------------------------------------------------
+# A table larger than one segment.
+#
+# `DEFAULT_SEGMENT_CAPACITY` is 8,388,608 rows (1024 blocks of 8192,
+# `default_values.cppm:69`) and `TableCache::PrepareAppendNolock` seals a
+# segment exactly at that count, so the next append opens the following one.
+# One `IMPORT` of 8,388,700 rows therefore lands 1024 blocks in `seg_0` and the
+# remaining 92 rows in `seg_1`, all in one transaction.
+#
+# The test is opt-in (`INFINITY_BYTES_HUGE=1`): it writes ~140 MB per engine and
+# takes minutes, which is more than a default gate run should cost.
+# ---------------------------------------------------------------------------
+
+HUGE_TABLE = "test_cross_engine_huge"
+HUGE_SEGMENT_CAPACITY = 8192 * 1024
+HUGE_ROWS = HUGE_SEGMENT_CAPACITY + 92
+HUGE_ENABLED = os.environ.get("INFINITY_BYTES_HUGE", "") not in ("", "0")
+
+
+def _huge_csv(path, rows):
+    """`id, score` for `rows` rows, written in one pass."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", buffering=1 << 20) as handle:
+        for i in range(rows):
+            handle.write(f"{i},{i % 1000}\n")
+
+
+def _huge_phase(conn, directory):
+    db = conn.get_database("default_db")
+    db.drop_table(HUGE_TABLE, ConflictType.Ignore)
+    t = db.create_table(
+        HUGE_TABLE,
+        {"id": {"type": "int"}, "score": {"type": "int"}},
+        ConflictType.Error,
+    )
+    t.import_data(os.path.join(directory, "huge.csv"))
+    conn.flush_data()
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not HUGE_ENABLED, reason="set INFINITY_BYTES_HUGE=1 to run the 8M-row gate"
+)
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_a_table_larger_than_a_segment_starts_a_second_one():
+    """8,388,700 rows in one `IMPORT`: 1024 blocks in `seg_0`, 92 rows in `seg_1`.
+
+    Both engines seal `seg_0` at `DEFAULT_SEGMENT_CAPACITY` and open `seg_1` for
+    the tail, all inside the import transaction: one commit ts, one `create`
+    per block, and the same block ids in each segment (0…1023, then 0).
+    """
+    cpp_root = os.path.join(ROOT, "huge_cpp")
+    rust_root = os.path.join(ROOT, "huge_rust")
+    directory = tempfile.mkdtemp(prefix="huge-csv-")
+    try:
+        _huge_csv(os.path.join(directory, "huge.csv"), HUGE_ROWS)
+        phase = lambda conn: _huge_phase(conn, directory)  # noqa: E731
+        _run_engine("cpp", cpp_root, 5432, seed=phase)
+        _run_engine("rust", rust_root, 5433, seed=phase)
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+    cpp_files, rust_files = _files(cpp_root), _files(rust_root)
+    for label, files in (("cpp", cpp_files), ("rust", rust_files)):
+        blocks = [
+            name.split("/")[:4]
+            for name in files
+            if "/seg_" in name and "/blk_" in name and name.endswith("/version")
+        ]
+        segments = sorted({"seg_0", "seg_1"} & {parts[2] for parts in blocks})
+        assert segments == ["seg_0", "seg_1"], f"{label}: segments {segments}"
+        per_segment = {
+            segment: sum(1 for parts in blocks if parts[2] == segment)
+            for segment in segments
+        }
+        assert per_segment == {"seg_0": 1024, "seg_1": 1}, (
+            f"{label}: blocks per segment {per_segment}"
+        )
+
+    # Only the last block of each segment needs comparing in full: the other
+    # 1024 are the same 8192-row shape, and the comparison below walks them all
+    # through the masked `.col` compare anyway.
+    cpp_dir = _own_table_dir(cpp_files, 2)
+    rust_dir = _own_table_dir(rust_files, 2)
+    failures = _compare_data_files(
+        _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), {}
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures[:20]
+    )
+
+    queries = {
+        "count": lambda t: t.output(["count(*)"]).to_result(),
+        "last": lambda t: t.output(["id"]).filter(f"id = {HUGE_ROWS - 1}").to_result(),
+        "first": lambda t: t.output(["id"]).filter("id = 0").to_result(),
+    }
+    cpp_answers = _answers(cpp_root, 5432, HUGE_TABLE, queries)
+    rust_answers = _answers(rust_root, 5433, HUGE_TABLE, queries)
+    assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
+    assert cpp_answers["count"] == [HUGE_ROWS]
+    assert cpp_answers["last"] == [HUGE_ROWS - 1]

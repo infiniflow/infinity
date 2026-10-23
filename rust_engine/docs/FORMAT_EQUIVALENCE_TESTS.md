@@ -104,7 +104,7 @@
 
 1. **段的产生方式**：参考在 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）之前不会因为写满而开第二段；`COMPACT` 的候选由 `NewCompactionAlg` 按 DBT 挑（同层至少 `DBT_COMPACTION_M = 4` 个段），少于四个时不开事务。多段门禁因此走 `IMPORT`：它按 `ApplySegmentIDs` 自己分配并封存一个段（`new_txn_data_impl.cpp:241`）。
 2. **多段的规模**：`test_a_multi_segment_table_matches_across_segments` 是 3 段、每段一块一个 chunk；`test_a_segment_with_many_blocks_keeps_one_chunk_per_index` 是一段三块一个 chunk；`test_a_compacted_table_matches_and_keeps_its_sources` 是 4 段压成 1 段。**8,388,608 行以上的真实多段仍未跑过**（需要按行容量切分写入，见 §5.2.3）。
-3. **IMPORT 的 `fast_rough_filter`**：参考在导入封存段时同步建一个 binary fuse 预过滤器并写 `seg|{db}|{tbl}|{seg}|fast_rough_filter`（段级）与 `blk|…|fast_rough_filter`（块级，`BuildFastRoughFilterTask::ExecuteOnNewSealedSegment`，`new_txn_data_impl.cpp:1739`），重写版不写这些记录。读者把"没有过滤器"当作"不过滤"（走次级索引/扫描），因此不影响答案；门禁把它们排除在 catalog 比对之外。
+3. **`fast_rough_filter` 的二进制值**：记录本身已经对齐（段级 `seg|…|fast_rough_filter` 与块级 `blk|…|fast_rough_filter`，`BuildFastRoughFilterTask::ExecuteOnNewSealedSegment`，`new_txn_data_impl.cpp:1739`），字节由 `fast_rough_filter.rs` 的单测钉住（用参考抓下来的 130 字节记录做 fixture）。门禁只能确认**记录存在**：`show catalog 'all'` 把二进制值渲染成空串，比不了内容。另有两处未覆盖——`CREATE TABLE … (c BOOLEAN/DECIMAL /* bloom_filter */)` 打开的 binary-fuse 半区（门禁的 schema 不用它，重写版固定写"存在但未构建"）、以及 `HUGEINT` 以上的极值比较。
 4. **WAL 的 Append 行载荷**：帧头（提交 ts、命令数、命令类型、库名/表名）、`Delete` 的行 id 列表、`Append` 的块头都逐字节比（`test_the_wal_entries_match_for_the_shared_commands`）；`Append` 的行数据段与 `Delete` 的结尾计数字是重写版自己的编码——两个方向都能 replay（`test_a_crash_leaves_a_replayable_directory` 与 `test_the_indexes_survive_a_crash`），但字节不同。DDL 不在比对内：参考写 `CreateTable`/`CreateIndex`，重写版写 `KvBatch`（它落盘的 catalog 键），是不同的命令而非同一命令的不同编码。
 
 ### 5.3 流程
@@ -126,7 +126,7 @@
 | 索引 chunk 的段目录 | 每个段一套 `idx_{id}/seg_{s}/`，chunk id 每段从 0 起 | 同左 | 多段用例逐文件比（§3） |
 | 索引 chunk 的粒度 | `IMPORT` 的段：全文按 `mem_index_capacity` 切、次级/稀疏整段一个；`INSERT` 的段：按块 | 同左 | 一段三块用例（§3） |
 | 压缩后的段布局 | 合并段 = 最大段号 + 1，块/版本/chunk 都带压缩事务的 ts；源段保留文件与记录，另写 `drop\|seg\|` 与 `drop\|idx_seg\|`、删 `(index, segment)` 配对；`Cleanup` 才回收 | 同左 | 4 段压缩用例（§3） |
-| `seg\|…\|fast_rough_filter` | 不写 | `IMPORT` 时写二进制 fuse 过滤器 | 不比对；读者把缺失当作"不过滤"，答案不变（§5.2.3） |
+| `seg\|…\|fast_rough_filter` / `blk\|…` | 与参考同字节（`fast_rough_filter.rs`） | `IMPORT`/压缩时建 | 门禁只断言记录存在（`show catalog` 渲染二进制为空），字节由单测 fixture 钉住（§5.2.3） |
 | 段的产生时机 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切（与参考相同）；单段 `COMPACT` 不开事务 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切 | 见 §5.2 |
 | WAL 的 `Append` 行载荷 / DDL 命令 | 行数据按 `row_id` + 文本编码，DDL 写 `KvBatch`（catalog 键值） | 行数据按块内列编码，DDL 写 `CreateTable`/`CreateIndex` | 帧头、命令类型、库/表名、`Delete` 行 id 逐字节比；行载荷与 DDL 只保证双向 replay |
 | 不带 `rocksdb-store` feature 时 | catalog 落 fjall | 只认 RocksDB | 参考打开只剩 `system_tag`（`Database: default_db doesn't exist`）；门禁必须带 feature |

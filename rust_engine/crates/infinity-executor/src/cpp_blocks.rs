@@ -1793,10 +1793,29 @@ impl Engine {
             }
             global_pos += seg_rows.len();
 
+            let seg_rows_total = seg_rows.len() as u64;
             let mut blocks: Vec<CppBlock> = Vec::new();
             // The ts the segment was created with: the commit ts of the append
             // that opened it (`TableMeta::AddSegmentWithID(commit_ts, …)`).
             let mut seg_create_ts = CPP_MIRROR_TS;
+            // The reference's prefilter (`BuildFastRoughFilterTask`): one per
+            // block and one per segment, built when the segment is **sealed**.
+            // An import seals every segment it commits
+            // (`PrepareCommitImport` -> `ExecuteOnNewSealedSegment`), an
+            // `INSERT` only seals one that reaches `DEFAULT_SEGMENT_CAPACITY`
+            // (`CommitBottomAppend`), and an unsealed segment has no filter at
+            // all. A rewrite can leave fewer blocks than the previous one, so
+            // start clean either way.
+            for (k, _) in self.storage.catalog.store().scan_prefix(
+                format!("blk|{}|{}|{}|", db_id, meta.id, segment_id).as_bytes(),
+            )? {
+                self.storage.catalog.store().delete(&k)?;
+            }
+            let sealed = self
+                .imported_extent(&table, segment_id, seg_rows_total)
+                .is_some()
+                || seg_rows_total as usize == Self::SEGMENT_ROW_CAPACITY;
+            let mut seg_filters = crate::fast_rough_filter::Filters::new(&meta.types);
             // Drain the segment block by block so each block's values are freed
             // once it is encoded: holding the whole table's decoded rows while
             // the texts are rendered doubled the transient on a long import.
@@ -1886,6 +1905,28 @@ impl Engine {
                         }
                     }
                 }
+                if sealed {
+                    let mut block_filters =
+                        crate::fast_rough_filter::Filters::new(&meta.types);
+                    for (_, cells) in &chunk {
+                        block_filters.add_row(cells);
+                    }
+                    // `segment_meta->begin_ts()` is the creating transaction's
+                    // begin ts, one below its commit ts - the same for every
+                    // block of the segment.
+                    let build_time = seg_create_ts.saturating_sub(1);
+                    if let Err(e) = self.storage.catalog.store().put(
+                        format!(
+                            "blk|{}|{}|{}|{}|fast_rough_filter",
+                            db_id, meta.id, segment_id, block_index
+                        )
+                        .as_bytes(),
+                        &block_filters.encode(build_time),
+                    ) {
+                        eprintln!("[FRF] put failed: {e}");
+                    }
+                    seg_filters.merge(&block_filters);
+                }
                 blocks.push(CppBlock {
                     block_id: block_index as u16,
                     commit_ts: block_ts,
@@ -1910,6 +1951,13 @@ impl Engine {
             } else {
                 UNCOMMIT_TS
             };
+            if sealed && seg_create_ts != CPP_MIRROR_TS {
+                let _ = self.storage.catalog.store().put(
+                    format!("seg|{}|{}|{}|fast_rough_filter", db_id, meta.id, segment_id)
+                        .as_bytes(),
+                    &seg_filters.encode(seg_create_ts.saturating_sub(1)),
+                );
+            }
             segments.push(CppSegment {
                 segment_id,
                 create_ts: seg_create_ts,
@@ -4643,6 +4691,7 @@ fn encode_hnsw_chunk_from(index: &HnswIndex, labels: &[u32]) -> (usize, Vec<u8>)
 mod tests {
     use super::*;
     use crate::QueryResult;
+    use tempfile::tempdir;
 
     fn row_strings(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
         let mut out = Vec::new();
@@ -4652,6 +4701,46 @@ mod tests {
             }
         }
         out
+    }
+
+    /// The mirror writes the reference's prefilter records for every segment
+    /// and block it mirrors.
+    #[test]
+    fn the_mirror_writes_the_fast_rough_filter_records() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.insert_literals(
+            "default_db.t",
+            None,
+            (0..10)
+                .map(|i| {
+                    vec![
+                        infinity_parser::Literal::Int(i),
+                        infinity_parser::Literal::Str(format!("doc-{i}")),
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        e.flush().unwrap();
+        let store = e.catalog().store();
+        let prefix = b"seg|1|0|0|fast_rough_filter";
+        let record = store.get(prefix).unwrap().expect("segment prefilter");
+        // [u32 total][u64 build_time] then the empty probabilistic half and the
+        // min/max half over (id, name).
+        assert_eq!(
+            u32::from_le_bytes(record[0..4].try_into().unwrap()) as usize,
+            record.len()
+        );
+        // `[u32 total][u32 column_count]` opens each half; the count is the
+        // second word of the probabilistic half.
+        assert_eq!(record[16], 2, "two columns");
+        let block = store
+            .get(b"blk|1|0|0|0|fast_rough_filter")
+            .unwrap()
+            .expect("block prefilter");
+        assert_eq!(block, record);
     }
 
     #[test]
