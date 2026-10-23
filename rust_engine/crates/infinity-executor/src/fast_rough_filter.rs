@@ -21,7 +21,6 @@
 //! transaction that created it minus one (`segment_meta->begin_ts()`).
 
 use infinity_expression::Value;
-use infinity_storage::MetaStore;
 
 /// `InnerMinMaxDataFilterVariant`: the index of each alternative in
 /// `std::variant<monostate, TinyIntT, SmallIntT, IntegerT, BigIntT, HugeIntT,
@@ -67,21 +66,6 @@ fn variant_of(type_text: &str) -> Option<u8> {
         "DOUBLE" | "FLOAT64" => variant::DOUBLE,
         _ => return None,
     })
-}
-
-/// `sizeof(InnerValueType)` for one variant.
-fn slot_size(variant: u8) -> usize {
-    match variant {
-        variant::TINY_INT => 1,
-        variant::SMALL_INT => 2,
-        variant::INTEGER | variant::DATE | variant::TIME => 4,
-        variant::BIG_INT | variant::DATE_TIME | variant::TIMESTAMP => 8,
-        variant::HUGE_INT => 16,
-        variant::VARCHAR => VARCHAR_STORED + 1,
-        variant::FLOAT => 4,
-        variant::DOUBLE => 8,
-        _ => 0,
-    }
 }
 
 /// One column's `InnerMinMaxDataFilterVarcharType`: 16 stored bytes plus the
@@ -228,7 +212,13 @@ fn split_time(text: &str) -> Option<(u32, u32, u32)> {
     Some((
         parts.next()?.parse().ok()?,
         parts.next()?.parse().ok()?,
-        parts.next().unwrap_or("0").split('.').next()?.parse().ok()?,
+        parts
+            .next()
+            .unwrap_or("0")
+            .split('.')
+            .next()?
+            .parse()
+            .ok()?,
     ))
 }
 
@@ -282,7 +272,10 @@ fn encode(variant: u8, bound: &Bound, out: &mut Vec<u8>) {
 /// min and `lowest()` for the max, exactly as the reference starts them.
 fn initial(variant: u8) -> (Bound, Bound) {
     match variant {
-        variant::TINY_INT => (Bound::Integral(i8::MAX as i64), Bound::Integral(i8::MIN as i64)),
+        variant::TINY_INT => (
+            Bound::Integral(i8::MAX as i64),
+            Bound::Integral(i8::MIN as i64),
+        ),
         variant::SMALL_INT => (
             Bound::Integral(i16::MAX as i64),
             Bound::Integral(i16::MIN as i64),
@@ -295,9 +288,10 @@ fn initial(variant: u8) -> (Bound, Bound) {
             (Bound::Integral(i64::MAX), Bound::Integral(i64::MIN))
         }
         variant::DATE | variant::TIME => (Bound::Day(i32::MAX), Bound::Day(i32::MIN)),
-        variant::DATE_TIME | variant::TIMESTAMP => {
-            (Bound::Stamp(i32::MAX, i32::MAX), Bound::Stamp(i32::MIN, i32::MIN))
-        }
+        variant::DATE_TIME | variant::TIMESTAMP => (
+            Bound::Stamp(i32::MAX, i32::MAX),
+            Bound::Stamp(i32::MIN, i32::MIN),
+        ),
         variant::FLOAT => (Bound::Real(f32::MAX as f64), Bound::Real(f32::MIN as f64)),
         variant::DOUBLE => (Bound::Real(f64::MAX), Bound::Real(f64::MIN)),
         _ => (Bound::Text(Text::highest()), Bound::Text(Text::lowest())),
@@ -319,10 +313,12 @@ impl Filters {
         Filters {
             columns: types
                 .iter()
-                .map(|t| variant_of(t).map(|v| {
-                    let (min, max) = initial(v);
-                    (v, min, max)
-                }))
+                .map(|t| {
+                    variant_of(t).map(|v| {
+                        let (min, max) = initial(v);
+                        (v, min, max)
+                    })
+                })
                 .collect(),
             types: types.len(),
         }
@@ -377,7 +373,8 @@ impl Filters {
             let Some((variant, min, max)) = slot else {
                 continue;
             };
-            let Some((_, other_min, other_max)) = other.columns.get(column).and_then(|c| c.as_ref())
+            let Some((_, other_min, other_max)) =
+                other.columns.get(column).and_then(|c| c.as_ref())
             else {
                 continue;
             };
@@ -429,7 +426,8 @@ impl Filters {
     }
 }
 
-/// [`Filters`] over one set of rows, for tests and one-shot builds.
+/// [`Filters`] over one set of rows (the tests' entry point).
+#[cfg(test)]
 pub fn build(types: &[String], rows: &[(usize, Vec<Value>)], build_time: u64) -> Vec<u8> {
     let mut filters = Filters::new(types);
     for (_, cells) in rows {

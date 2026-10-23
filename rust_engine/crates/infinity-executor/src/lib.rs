@@ -7347,12 +7347,7 @@ impl Engine {
 
     /// The imported extent of `segment`, when it still holds exactly the rows a
     /// `COPY` wrote (`None` once an `INSERT` appended to it).
-    pub(crate) fn imported_extent(
-        &self,
-        table: &str,
-        segment: u32,
-        rows: u64,
-    ) -> Option<u64> {
+    pub(crate) fn imported_extent(&self, table: &str, segment: u32, rows: u64) -> Option<u64> {
         let key = import_rows_key(&self.table_key(table), segment);
         let bytes = self.storage.store.get(&key).ok().flatten()?;
         let imported = u64::from_le_bytes(bytes.get(..8)?.try_into().ok()?);
@@ -8145,7 +8140,15 @@ impl Engine {
         // The block's `version` records the append's commit ts.
         self.settle_append_ts(table, 1, ts);
         if new_segment {
-            self.note_import_ts(table, (base >> 32) as u32, ts);
+            // An import seals the segment it writes, so it also has an extent
+            // (and, with it, the sealed-segment prefilter).
+            let segment = (base >> 32) as u32;
+            self.note_import_ts(table, segment, ts);
+            self.note_import_rows(
+                table,
+                segment,
+                (base as u64 & 0xffff_ffff) + rows.len() as u64,
+            );
         }
         // With no index of any kind in memory there is nothing to maintain;
         // skipping the per-row hook avoids a catalog lookup + string render for
@@ -12355,15 +12358,17 @@ impl Engine {
             } else {
                 ((blocks as f64).ln() / 4f64.ln()) as i32
             };
-            layers.entry(layer.max(0)).or_default().push((segment, rows));
+            layers
+                .entry(layer.max(0))
+                .or_default()
+                .push((segment, rows));
         }
         for layer in layers.values() {
             if layer.len() < M {
                 continue;
             }
             let picked = &layer[..M];
-            if picked.iter().map(|(_, rows)| *rows).sum::<u64>()
-                > Self::SEGMENT_ROW_CAPACITY as u64
+            if picked.iter().map(|(_, rows)| *rows).sum::<u64>() > Self::SEGMENT_ROW_CAPACITY as u64
             {
                 return Vec::new();
             }
@@ -12579,8 +12584,7 @@ impl Engine {
                     .as_bytes(),
                 )?;
                 for index_id in &index_ids {
-                    let prefix =
-                        format!("idx_chunk|{db_id}|{}|{index_id}|{segment}|", meta.id);
+                    let prefix = format!("idx_chunk|{db_id}|{}|{index_id}|{segment}|", meta.id);
                     for (k, _) in store.scan_prefix(prefix.as_bytes())? {
                         store.delete(&k)?;
                     }
@@ -12593,9 +12597,10 @@ impl Engine {
                         )
                         .as_bytes(),
                     )?;
-                    let _ = std::fs::remove_dir_all(
-                        root.join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}", meta.id)),
-                    );
+                    let _ = std::fs::remove_dir_all(root.join(format!(
+                        "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
+                        meta.id
+                    )));
                 }
                 store.delete(
                     infinity_catalog::cpp_layout::cpp_dropped_segment_key(

@@ -1806,9 +1806,12 @@ impl Engine {
             // (`CommitBottomAppend`), and an unsealed segment has no filter at
             // all. A rewrite can leave fewer blocks than the previous one, so
             // start clean either way.
-            for (k, _) in self.storage.catalog.store().scan_prefix(
-                format!("blk|{}|{}|{}|", db_id, meta.id, segment_id).as_bytes(),
-            )? {
+            for (k, _) in self
+                .storage
+                .catalog
+                .store()
+                .scan_prefix(format!("blk|{}|{}|{}|", db_id, meta.id, segment_id).as_bytes())?
+            {
                 self.storage.catalog.store().delete(&k)?;
             }
             let sealed = self
@@ -1906,8 +1909,7 @@ impl Engine {
                     }
                 }
                 if sealed {
-                    let mut block_filters =
-                        crate::fast_rough_filter::Filters::new(&meta.types);
+                    let mut block_filters = crate::fast_rough_filter::Filters::new(&meta.types);
                     for (_, cells) in &chunk {
                         block_filters.add_row(cells);
                     }
@@ -4703,14 +4705,15 @@ mod tests {
         out
     }
 
-    /// The mirror writes the reference's prefilter records for every segment
-    /// and block it mirrors.
+    /// The mirror writes the reference's prefilter records for every **sealed**
+    /// segment and block it mirrors - here an imported one; an `INSERT` that
+    /// has not reached the segment capacity leaves no filter.
     #[test]
     fn the_mirror_writes_the_fast_rough_filter_records() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-        e.insert_literals(
+        e.import_literals(
             "default_db.t",
             None,
             (0..10)
@@ -4741,6 +4744,17 @@ mod tests {
             .unwrap()
             .expect("block prefilter");
         assert_eq!(block, record);
+
+        // An `INSERT`-filled segment that is not full has no filter at all.
+        e.execute("CREATE TABLE u (id INT);").unwrap();
+        e.insert_literals(
+            "default_db.u",
+            None,
+            vec![vec![infinity_parser::Literal::Int(1)]],
+        )
+        .unwrap();
+        e.flush().unwrap();
+        assert!(store.get(b"seg|1|1|0|fast_rough_filter").unwrap().is_none());
     }
 
     #[test]

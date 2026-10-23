@@ -260,8 +260,12 @@ fn compaction_needs_four_segments_in_one_layer() {
         "three segments are not a compaction candidate"
     );
 
-    e.import_literals("db1.tb1", None, const_block(2, "abcdefghijklmnopqrstuvwxyz"))
-        .unwrap();
+    e.import_literals(
+        "db1.tb1",
+        None,
+        const_block(2, "abcdefghijklmnopqrstuvwxyz"),
+    )
+    .unwrap();
     assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2, 3]);
     // The mirror is what a compaction leaves behind on disk, so write it first.
     e.flush().unwrap();
