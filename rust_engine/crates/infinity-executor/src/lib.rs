@@ -264,6 +264,19 @@ fn appends_key(table: &str) -> Vec<u8> {
 fn deletes_key(table: &str) -> Vec<u8> {
     format!("dellog:{table}").into_bytes()
 }
+/// The commit timestamp of every append, one per entry of [`appends_key`].
+///
+/// A block's `version` file carries one `create` per append **stamped with
+/// that append's commit timestamp**, so the mirror has to remember it; the
+/// row-id log alone only knows the boundaries.
+fn append_ts_key(table: &str) -> Vec<u8> {
+    format!("append_ts:{table}").into_bytes()
+}
+/// The commit timestamp of every delete, one per entry of [`deletes_key`]. The
+/// mirror writes it into the deleted slot, as `BlockVersion::Delete` does.
+fn delete_ts_key(table: &str) -> Vec<u8> {
+    format!("delete_ts:{table}").into_bytes()
+}
 fn del_prefix(table: &str) -> Vec<u8> {
     format!("del:{table}:").into_bytes()
 }
@@ -3904,9 +3917,17 @@ struct TableEntry {
     /// Cumulative row count after every append transaction of this table
     /// (`appends:{table}`), loaded on first use.
     append_totals: Option<Vec<u64>>,
+    /// Commit timestamp of every append, one entry per `append_totals` entry
+    /// (`append_ts:{table}`). The block mirror writes it into the block's
+    /// `version` file, which is where the reference records each append's
+    /// commit ts.
+    append_ts: Option<Vec<u64>>,
     /// Row ids deleted since the table was created (`dellog:{table}`), loaded
     /// on first use.
     deleted_ids: Option<Vec<u64>>,
+    /// Commit timestamp of every delete, one entry per `deleted_ids` entry
+    /// (`delete_ts:{table}`).
+    delete_ts: Option<Vec<u64>>,
     /// Segments allocated by the row-id allocator, by id.
     segments: std::collections::BTreeMap<u32, SegmentEntry>,
     /// Full-text analyzer per column (`CREATE INDEX … WITH (analyzer=…)`).
@@ -4440,7 +4461,32 @@ impl<'a> EngineTxn<'a> {
             self.engine.note_live_rows(table, -(*count as isize));
         }
         if !txn.is_empty() {
-            self.engine.txn.commit(txn)?;
+            let ts = self.engine.txn.commit(txn)?;
+            // The block's `version` carries each append's and each delete's
+            // commit ts (`BlockVersion::Append` / `Delete`).
+            let mut append_counts: std::collections::BTreeMap<&str, usize> = Default::default();
+            for (table, ..) in &self.appends {
+                *append_counts.entry(table.as_str()).or_default() += 1;
+            }
+            for (table, count) in append_counts {
+                self.engine.settle_append_ts(table, count, ts);
+            }
+            let mut delete_counts: std::collections::BTreeMap<&str, usize> = Default::default();
+            for (table, _) in &self.deletes {
+                *delete_counts.entry(table.as_str()).or_default() += 1;
+            }
+            for (table, count) in delete_counts {
+                self.engine.settle_delete_ts(table, count, ts);
+            }
+        } else if !self.dumps.is_empty() {
+            // A dump is a write transaction of its own in the reference:
+            // `DumpIndexProcessor::DoDump` opens one with
+            // `BeginTxnShared(…, kDumpMemIndex)` and commits it, so it spends
+            // a commit ts whether or not the index had a tail to seal (the
+            // WAL keeps the `DumpIndex` entry). Spending it here is what keeps
+            // every later statement's ts where the reference has it.
+            let ts = self.engine.txn.reserve_commit_ts();
+            self.engine.txn.commit_at(txn, ts)?;
         }
         for (table, base, encoded, rows) in &self.appends {
             if self.engine.any_in_memory_index() || self.engine.has_index_declaration(table) {
@@ -4705,7 +4751,8 @@ impl Engine {
             path: wal_dir.clone(),
             source: e,
         })?;
-        let txn = TxnManager::open(wal_dir.join("wal.log"), store.clone())?;
+        let txn = TxnManager::open(wal_dir.join("wal.log"), store.clone())?
+            .with_catalog_store(catalog.store().clone());
         // Only replay what the KV store has not applied yet: a clean restart
         // must not resurrect rows that were deleted after they were logged.
         let applied = txn.applied_ts()?;
@@ -4779,6 +4826,15 @@ impl Engine {
         }
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
+        // `Storage::Init` finishes with two write transactions: the startup
+        // checkpoint and (on a directory that has no system timestamp yet) the
+        // creation of `default_db`. Both spend a timestamp, and a directory the
+        // reference wrote carries their commit ts in the WAL and in the catalog
+        // keys, so skipping them would shift every later timestamp by two.
+        engine.txn.append_checkpoint(0)?;
+        if !engine.storage.catalog.has_database_record("default_db")? {
+            engine.ddl_commit(|| engine.storage.catalog.create_database("default_db", false))?;
+        }
         Ok(engine)
     }
 
@@ -5620,6 +5676,26 @@ impl Engine {
             index: index_meta,
             optimize_epoch: self.index_epoch.load(std::sync::atomic::Ordering::SeqCst),
         })
+    }
+
+    /// The `DumpIndex` RPC: C++ `NewTxn::DumpMemIndex` inside a transaction of
+    /// its own (`DumpIndexProcessor::DoDump` opens one with
+    /// `BeginTxnShared(…, kDumpMemIndex)`).
+    ///
+    /// That transaction is a **write** transaction whether or not the index
+    /// has a memory tail to seal, so the statement spends a commit ts either
+    /// way; the reference's WAL keeps the `DumpIndex` entry and the ts is what
+    /// every later statement is numbered from. Only a secondary index has a
+    /// tail the port seals here - the other kinds are mirrored in full at
+    /// checkpoint time - but all of them still spend the timestamp.
+    pub fn dump_index_transaction(&self, table: &str, index: &str) -> Result<()> {
+        let version = self.dump_version(table, index)?;
+        let ts = self.txn.reserve_commit_ts();
+        self.txn.commit_at(self.txn.begin(), ts)?;
+        if is_secondary_kind(&version.index.index_type) {
+            self.dump_index(table, index)?;
+        }
+        Ok(())
     }
 
     /// Applies one `DumpMemIndex`: seals the target index's memory tail.
@@ -6811,7 +6887,9 @@ impl Engine {
         comments: &[Option<String>],
         sparse_stores: &[Option<infinity_catalog::SparseStore>],
     ) -> Result<infinity_catalog::TableMeta> {
-        let _ddl = self.ddl_lock.lock().unwrap();
+        // The DDL lock is held by [`Self::ddl_commit`], which is the only
+        // caller: the orphan sweep and the catalog write have to happen inside
+        // the same captured batch.
         if self.storage.catalog.get_table_by_name(name)?.is_none() {
             self.clear_orphan_rows(name)?;
         }
@@ -7047,6 +7125,39 @@ impl Engine {
         let _ = self.write_id_log(&appends_key(&tkey), &totals);
     }
 
+    /// The commit timestamp of every append, aligned with [`Self::append_totals`].
+    fn append_ts(&self, table: &str) -> Vec<u64> {
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey.clone()).or_default();
+        if entry.append_ts.is_none() {
+            entry.append_ts = Some(self.load_id_log(&append_ts_key(&tkey)));
+        }
+        entry.append_ts.clone().unwrap_or_default()
+    }
+
+    /// Stamps the newest append with the commit timestamp its transaction got.
+    ///
+    /// The row ids are reserved while the transaction is still being staged
+    /// (`reserve_rows`), so the entry exists - with no timestamp yet - by the
+    /// time the commit hands one out. A rolled-back transaction leaves the zero
+    /// in place, and the mirror's fallback then treats the batch as one create.
+    fn settle_append_ts(&self, table: &str, count: usize, ts: u64) {
+        let n = self.append_totals(table).len();
+        if count == 0 || n == 0 {
+            return;
+        }
+        let mut log = self.append_ts(table);
+        log.resize(n.saturating_sub(count), 0);
+        log.resize(n, ts);
+        let tkey = self.table_key(table);
+        {
+            let mut tables = self.tables.lock().unwrap();
+            tables.entry(tkey.clone()).or_default().append_ts = Some(log.clone());
+        }
+        let _ = self.write_id_log(&append_ts_key(&tkey), &log);
+    }
+
     /// Every row id deleted since the table was created.
     fn deleted_ids(&self, table: &str) -> Vec<u64> {
         let tkey = self.table_key(table);
@@ -7073,6 +7184,35 @@ impl Engine {
             tables.entry(tkey.clone()).or_default().deleted_ids = Some(log.clone());
         }
         let _ = self.write_id_log(&deletes_key(&tkey), &log);
+    }
+
+    /// The commit timestamp of every delete, aligned with [`Self::deleted_ids`].
+    fn delete_ts(&self, table: &str) -> Vec<u64> {
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey.clone()).or_default();
+        if entry.delete_ts.is_none() {
+            entry.delete_ts = Some(self.load_id_log(&delete_ts_key(&tkey)));
+        }
+        entry.delete_ts.clone().unwrap_or_default()
+    }
+
+    /// Stamps the last `count` deletes with the commit timestamp their
+    /// transaction got (`BlockVersion::Delete(row_id, commit_ts)`).
+    fn settle_delete_ts(&self, table: &str, count: usize, ts: u64) {
+        let n = self.deleted_ids(table).len();
+        if count == 0 || n == 0 {
+            return;
+        }
+        let mut log = self.delete_ts(table);
+        log.resize(n - count.min(n), 0);
+        log.resize(n, ts);
+        let tkey = self.table_key(table);
+        {
+            let mut tables = self.tables.lock().unwrap();
+            tables.entry(tkey.clone()).or_default().delete_ts = Some(log.clone());
+        }
+        let _ = self.write_id_log(&delete_ts_key(&tkey), &log);
     }
 
     fn reserve_rows(&self, table: &str, n: usize, new_segment: bool) -> Result<usize> {
@@ -7451,15 +7591,17 @@ impl Engine {
                 sparse_store_hints(columns),
             )
         };
-        let created = self.create_table_clearing_orphans(
-            name,
-            &names,
-            &defaults,
-            &not_nulls,
-            &types,
-            &comments,
-            &sparse_stores,
-        )?;
+        let created = self.ddl_commit(|| {
+            self.create_table_clearing_orphans(
+                name,
+                &names,
+                &defaults,
+                &not_nulls,
+                &types,
+                &comments,
+                &sparse_stores,
+            )
+        })?;
         let literals: Vec<Vec<Literal>> = rows
             .iter()
             .map(|row| {
@@ -7756,7 +7898,9 @@ impl Engine {
             t.put(row_key(table, base + k), encoded.as_bytes().to_vec());
             encoded_rows.push(encoded);
         }
-        self.txn.commit(t)?;
+        let ts = self.txn.commit(t)?;
+        // The block's `version` records the append's commit ts.
+        self.settle_append_ts(table, 1, ts);
         // With no index of any kind in memory there is nothing to maintain;
         // skipping the per-row hook avoids a catalog lookup + string render for
         // every inserted row (the reference's insert path has the same guard).
@@ -7802,7 +7946,13 @@ impl Engine {
     /// commits and records the tombstones' commit ts. Mirrors the reference's
     /// `ConflictCheckTest.conflict_check_delete`: the first committer wins and
     /// concurrent deleters get `kTxnConflict`.
-    fn commit_with_deletes(&self, table: &str, deletes: &[usize], mut txn: Txn) -> Result<u64> {
+    fn commit_with_deletes(
+        &self,
+        table: &str,
+        deletes: &[usize],
+        appended: usize,
+        mut txn: Txn,
+    ) -> Result<u64> {
         // See `insert_literals_inner`: a direct delete must invalidate the
         // cached `SELECT` results too.
         self.result_cache.lock().unwrap().clear();
@@ -7819,8 +7969,85 @@ impl Engine {
         }
         self.note_deletes(table, deletes);
         let ts = self.txn.commit(txn)?;
+        // An UPDATE stages its rewritten rows as an append in the same
+        // transaction (`reserve_rows` already logged the create), so the
+        // block's `version` has to record this ts for them as well
+        // (`BlockVersion::Append`).
+        if appended > 0 {
+            self.settle_append_ts(table, appended, ts);
+        }
+        // `BlockVersion::Delete(row_id, commit_ts)`: the slot carries the
+        // deleting transaction's commit timestamp.
+        self.settle_delete_ts(table, deletes.len(), ts);
         self.refresh_cpp_block_mirror(table)?;
         Ok(ts)
+    }
+
+    /// Whether committing `batch` would leave the catalog exactly as it is.
+    ///
+    /// The C++-layout rewrite is a full rewrite: every DDL re-emits every
+    /// record, so a statement that changed nothing still produces a batch.
+    /// Comparing each item with what the store already holds is what tells the
+    /// two apart.
+    fn batch_is_noop(&self, batch: &[(Vec<u8>, Option<Vec<u8>>)]) -> Result<bool> {
+        let store = self.storage.catalog.store().as_ref();
+        for (key, value) in batch {
+            let current = store.get(key)?;
+            let unchanged = match value {
+                Some(value) => current.as_deref() == Some(value.as_slice()),
+                None => current.is_none(),
+            };
+            if !unchanged {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// Runs a DDL as one write transaction, the way the reference does.
+    ///
+    /// Every statement in the reference gets a transaction
+    /// (`QueryContext::BeginTxn`) and the executor commits it once
+    /// (`QueryContext::CommitTxn`), so a DDL's catalog records carry its commit
+    /// timestamp (`KeyEncode::CatalogDbKey(db_name, commit_ts)`).
+    ///
+    /// A statement that staged nothing is a **read-only** transaction in the
+    /// reference (`NewTxn::Commit` -> `GetReadCommitTS` = `current_ts + 1`): it
+    /// writes no WAL record and moves neither clock. `DROP TABLE IF EXISTS` on
+    /// a name that does not exist is the common case, and spending a write
+    /// timestamp on it would shift every later one.
+    ///
+    /// The catalog's C++-layout writes are collected instead of applied
+    /// ([`Catalog::capture`]), stamped with the reserved commit timestamp
+    /// ([`Catalog::restamp`]) and committed together with the WAL entry, so the
+    /// key's ts and the entry's ts are the same value.
+    fn ddl_commit<T>(&self, f: impl FnOnce() -> Result<T>) -> Result<T> {
+        // One DDL at a time: a second capture would interleave two statements'
+        // layout rewrites, and only one capture slot exists.
+        let _ddl = self.ddl_lock.lock().unwrap();
+        let (out, mut batch) = self.storage.catalog.capture(f)?;
+        // A statement that changes nothing must not spend a timestamp. The
+        // reference commits such a transaction through `GetReadCommitTS` — an
+        // odd ts, no WAL entry — so `DROP TABLE IF EXISTS <missing>` leaves
+        // every later ts where it was. The C++-layout rewrite always emits the
+        // whole layout (the sweep deletes it, the rewrite writes it back), so
+        // "nothing changed" has to be decided by comparing the batch with the
+        // store: a put that would write the same bytes and a delete of a key
+        // that is already absent are both no-ops.
+        if batch.is_empty() || self.batch_is_noop(&batch)? {
+            return Ok(out);
+        }
+        let commit_ts = self.txn.reserve_commit_ts();
+        Catalog::restamp(&mut batch, commit_ts);
+        let mut txn = self.txn.begin();
+        for (key, value) in batch {
+            match value {
+                Some(value) => txn.put(key, value),
+                None => txn.delete(key),
+            }
+        }
+        self.txn.commit_at(txn, commit_ts)?;
+        Ok(out)
     }
 
     /// Runs one statement with the query registry open around it (C++
@@ -8002,15 +8229,17 @@ impl Engine {
                 let comments: Vec<Option<String>> =
                     columns.iter().map(|c| c.comment.clone()).collect();
                 let sparse_stores = sparse_store_hints(columns);
-                let t = self.create_table_clearing_orphans(
-                    name,
-                    &names,
-                    &defaults,
-                    &not_nulls,
-                    &types,
-                    &comments,
-                    &sparse_stores,
-                )?;
+                let t = self.ddl_commit(|| {
+                    self.create_table_clearing_orphans(
+                        name,
+                        &names,
+                        &defaults,
+                        &not_nulls,
+                        &types,
+                        &comments,
+                        &sparse_stores,
+                    )
+                })?;
                 Ok(QueryResult::CreatedTable {
                     id: t.id,
                     name: t.name,
@@ -8070,22 +8299,34 @@ impl Engine {
                     .get(&new_tkey)
                     .map(|e| e.secondary.indexes.keys().cloned().collect())
                     .unwrap_or_default();
-                for im in self.storage.catalog.list_indexes()? {
-                    if im.table == *table {
-                        let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
-                        self.storage.catalog.create_index_typed(
-                            &im.name,
-                            new_name,
-                            &im.column,
-                            &im.index_type,
-                            &im.options,
-                        )?;
+                // Keep the index ids: the layout writer keys an index record by
+                // its table id, and the reference keeps the id across a rename.
+                let keep: Vec<infinity_catalog::IndexMeta> = self.storage.catalog.list_indexes()?;
+                self.ddl_commit(|| {
+                    // Rename **first**: under the cpp_only backend the whole
+                    // index list is derived from the layout, so a rename
+                    // retires the old table's index records with it — dropping
+                    // and re-creating them before the rename would leave the
+                    // re-created records to be swept by the rename's rewrite.
+                    self.storage.catalog.rename_table(table, new_name)?;
+                    for im in &keep {
+                        if im.table == *table {
+                            let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
+                            self.storage.catalog.create_index_typed_with_id(
+                                &im.name,
+                                new_name,
+                                &im.column,
+                                &im.index_type,
+                                &im.options,
+                                im.id,
+                            )?;
+                        }
                     }
-                }
-                for column in &pairs {
-                    let _ = self.build_index(new_name, column);
-                }
-                self.storage.catalog.rename_table(table, new_name)?;
+                    for column in &pairs {
+                        let _ = self.build_index(new_name, column);
+                    }
+                    Ok(())
+                })?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -8144,16 +8385,19 @@ impl Engine {
                 // The rewrite changed the stored layout but not the ids.
                 self.invalidate_row_cache(table);
                 self.invalidate_block_mirror(table);
-                self.storage.catalog.drop_column(table, column)?;
-                if let Some(im) = self
-                    .storage
-                    .catalog
-                    .list_indexes()?
-                    .into_iter()
-                    .find(|i| i.table == *table && i.column == *column)
-                {
-                    let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
-                }
+                self.ddl_commit(|| {
+                    self.storage.catalog.drop_column(table, column)?;
+                    if let Some(im) = self
+                        .storage
+                        .catalog
+                        .list_indexes()?
+                        .into_iter()
+                        .find(|i| i.table == *table && i.column == *column)
+                    {
+                        let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
+                    }
+                    Ok(())
+                })?;
                 let tkey = self.table_key(table);
                 self.tables
                     .lock()
@@ -8210,15 +8454,17 @@ impl Engine {
                 let not_nulls: Vec<bool> = columns.iter().map(|c| c.not_null).collect();
                 let types: Vec<String> = columns.iter().map(|c| c.type_text.clone()).collect();
                 let sparse_stores = sparse_store_hints(columns);
-                self.storage.catalog.add_columns_typed_with_sparse_stores(
-                    table,
-                    &names,
-                    &defaults,
-                    &not_nulls,
-                    &types,
-                    &vec![None; names.len()],
-                    &sparse_stores,
-                )?;
+                self.ddl_commit(|| {
+                    self.storage.catalog.add_columns_typed_with_sparse_stores(
+                        table,
+                        &names,
+                        &defaults,
+                        &not_nulls,
+                        &types,
+                        &vec![None; names.len()],
+                        &sparse_stores,
+                    )
+                })?;
                 Ok(QueryResult::CreatedTable {
                     id: 0,
                     name: table.clone(),
@@ -8233,7 +8479,7 @@ impl Engine {
                 name,
                 if_not_exists,
             } => {
-                self.storage.catalog.create_database(name, *if_not_exists)?;
+                self.ddl_commit(|| self.storage.catalog.create_database(name, *if_not_exists))?;
                 Ok(QueryResult::CreatedDatabase { name: name.clone() })
             }
             // A collection is the legacy alias of a table: the reference's
@@ -8259,16 +8505,19 @@ impl Engine {
                         "dropping the current database is not allowed".into(),
                     ));
                 }
-                let existed = self.storage.catalog.drop_database(name, *if_exists)?;
-                if existed || *if_exists {
-                    // drop every table registered under this database
-                    let prefix = format!("{name}.");
-                    for t in self.storage.catalog.list_tables()? {
-                        if t.name.starts_with(&prefix) {
-                            self.drop_table_all(&t.name)?;
+                self.ddl_commit(|| {
+                    let existed = self.storage.catalog.drop_database(name, *if_exists)?;
+                    if existed || *if_exists {
+                        // drop every table registered under this database
+                        let prefix = format!("{name}.");
+                        for t in self.storage.catalog.list_tables()? {
+                            if t.name.starts_with(&prefix) {
+                                self.drop_table_all(&t.name)?;
+                            }
                         }
                     }
-                }
+                    Ok(existed)
+                })?;
                 Ok(QueryResult::DroppedDatabase { name: name.clone() })
             }
             Statement::Show { text } => {
@@ -8590,9 +8839,11 @@ impl Engine {
                 if duplicate && !*if_not_exists {
                     return Err(Error::Invalid(format!("index '{name}' already exists")));
                 }
-                self.storage
-                    .catalog
-                    .create_index_typed(name, table, column, index_type, opts)?;
+                self.ddl_commit(|| {
+                    self.storage
+                        .catalog
+                        .create_index_typed(name, table, column, index_type, opts)
+                })?;
                 // remember the analyzer so fulltext matching can tokenise compatibly
                 if let Some((_, a)) = opts.iter().find(|(k, _)| k == "ANALYZER") {
                     let a = a
@@ -8671,12 +8922,15 @@ impl Engine {
                 })
             }
             Statement::DropTable { name, if_exists } => {
-                let existed = self.drop_table_all(name)?;
+                // The reference rolls the transaction back on a failing DDL,
+                // and a rollback spends no timestamp: reject before the DDL
+                // transaction is opened.
+                if !*if_exists && self.storage.catalog.get_table_by_name(name)?.is_none() {
+                    return Err(Error::Invalid(format!("table '{name}' does not exist")));
+                }
+                let existed = self.ddl_commit(|| self.drop_table_all(name))?;
                 if existed {
                     self.drop_text_index_storage(name, None);
-                }
-                if !existed && !*if_exists {
-                    return Err(Error::Invalid(format!("table '{name}' does not exist")));
                 }
                 Ok(QueryResult::DroppedTable {
                     name: name.clone(),
@@ -8692,18 +8946,18 @@ impl Engine {
                     .into_iter()
                     .find(|im| im.name == *name)
                     .map(|im| (im.table, im.column, im.index_type));
+                if target.is_none() && !*if_exists {
+                    return Err(Error::Invalid(format!("index '{name}' does not exist")));
+                }
                 let was_fulltext = target
                     .as_ref()
                     .map(|(_, _, t)| t.eq_ignore_ascii_case("FULLTEXT"))
                     .unwrap_or(false);
-                let existed = self.storage.catalog.drop_index(name)?;
+                let existed = self.ddl_commit(|| self.storage.catalog.drop_index(name))?;
                 if existed {
                     if let Some((table, column, _)) = target.filter(|_| was_fulltext) {
                         self.drop_text_index_storage(&table, Some(&column));
                     }
-                }
-                if !existed && !*if_exists {
-                    return Err(Error::Invalid(format!("index '{name}' does not exist")));
                 }
                 Ok(QueryResult::DroppedIndex {
                     name: name.clone(),
@@ -8915,7 +9169,7 @@ impl Engine {
                 }
                 if !to_del.is_empty() {
                     let t = self.txn.begin();
-                    self.commit_with_deletes(table, &to_del, t)?;
+                    self.commit_with_deletes(table, &to_del, 0, t)?;
                     self.drop_text_index_rows(table, &to_del);
                     self.drop_vector_cache_rows(table, &to_del);
                 }
@@ -9032,7 +9286,7 @@ impl Engine {
                             .join("\t");
                         t.put(row_key(table, base + k), encoded.into_bytes());
                     }
-                    self.commit_with_deletes(table, &to_del, t)?;
+                    self.commit_with_deletes(table, &to_del, 1, t)?;
                     for (k, nr) in new_rows.iter().enumerate() {
                         let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
                         self.update_indexes_on_insert_text(table, base + k, &texts)?;
@@ -20408,20 +20662,20 @@ mod tests {
         let t1 = stale_delete(&e, table, seqs[0]);
         let t2 = stale_delete(&e, table, seqs[0]);
         let t3 = stale_delete(&e, table, seqs[0]);
-        e.commit_with_deletes(table, &[seqs[0]], t1).unwrap();
+        e.commit_with_deletes(table, &[seqs[0]], 0, t1).unwrap();
         assert!(matches!(
-            e.commit_with_deletes(table, &[seqs[0]], t2),
+            e.commit_with_deletes(table, &[seqs[0]], 0, t2),
             Err(Error::TxnConflict(_))
         ));
         assert!(matches!(
-            e.commit_with_deletes(table, &[seqs[0]], t3),
+            e.commit_with_deletes(table, &[seqs[0]], 0, t3),
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 6);
 
         // A transaction that starts after the winning commit is not stale.
         let t4 = stale_delete(&e, table, seqs[1]);
-        e.commit_with_deletes(table, &[seqs[1]], t4).unwrap();
+        e.commit_with_deletes(table, &[seqs[1]], 0, t4).unwrap();
         assert_eq!(e.row_count("dc").unwrap(), 5);
 
         // Overlapping delete sets: the later committer conflicts on the shared
@@ -20429,10 +20683,10 @@ mod tests {
         let mut a = stale_delete(&e, table, seqs[2]);
         a.delete(del_key(table, seqs[3]));
         let b = stale_delete(&e, table, seqs[2]);
-        e.commit_with_deletes(table, &[seqs[2], seqs[3]], a)
+        e.commit_with_deletes(table, &[seqs[2], seqs[3]], 0, a)
             .unwrap();
         assert!(matches!(
-            e.commit_with_deletes(table, &[seqs[2]], b),
+            e.commit_with_deletes(table, &[seqs[2]], 0, b),
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 3);

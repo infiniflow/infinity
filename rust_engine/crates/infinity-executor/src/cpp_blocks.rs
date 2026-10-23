@@ -19,12 +19,13 @@ use infinity_catalog::cpp_layout::{
 };
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
-/// The ts a deleted block slot carries in the mirror's `version`.
+/// The ts a deleted block slot carries when the delete's commit ts is unknown.
 ///
 /// `BlockVersion::CheckDelete` hides a slot whose ts is non-zero and not newer
-/// than the reader's, so any value in `[1, reader_ts]` works; the mirror has no
-/// per-delete commit order to stamp (the reference does, and the format test
-/// takes it out before comparing).
+/// than the reader's, so any value in `[1, reader_ts]` works. A settled delete
+/// carries its transaction's commit ts (`settle_delete_ts`); only a delete that
+/// was never stamped - one the previous process recorded but did not commit, or
+/// a row deleted before the ts log existed - falls back to this.
 const DELETED_MIRROR_TS: u64 = 1;
 
 /// Serialises mirror rewrites.
@@ -1674,16 +1675,24 @@ impl Engine {
         // tell block-resident rows from rows written after the checkpoint.
         let block_rows: Vec<usize> = rows.iter().map(|(seq, _)| *seq).collect();
         // `BlockVersion::Append` boundaries: one `create` per append, sized by
-        // how many of that append's rows land in the block.
+        // how many of that append's rows land in the block. Each carries the
+        // append transaction's commit ts, like the reference
+        // (`BlockVersion::Append(commit_ts, …)`, `new_txn_data_impl.cpp:957`).
         let totals = self.append_totals(&table);
-        // Deleted row id -> its position in the mirrored row order, so the
-        // version file can mark the block slot that holds it.
-        let deleted_at: std::collections::HashMap<usize, usize> = self
+        let append_ts = self.append_ts(&table);
+        // Deleted row id -> its position in the mirrored row order and the
+        // commit ts of the transaction that deleted it, so the version file
+        // can mark the block slot that holds it (`BlockVersion::Delete`).
+        let delete_ts = self.delete_ts(&table);
+        let deleted_at: std::collections::HashMap<usize, (usize, u64)> = self
             .deleted_ids(&table)
             .iter()
-            .filter_map(|id| {
+            .enumerate()
+            .filter_map(|(k, id)| {
                 let id = *id as usize;
-                block_rows.binary_search(&id).ok().map(|at| (id, at))
+                let at = block_rows.binary_search(&id).ok()?;
+                let ts = delete_ts.get(k).copied().unwrap_or(0);
+                Some((id, (at, if ts == 0 { DELETED_MIRROR_TS } else { ts })))
             })
             .collect();
         let db_id = self.database_id_of(&table);
@@ -1716,6 +1725,9 @@ impl Engine {
             global_pos += seg_rows.len();
 
             let mut blocks: Vec<CppBlock> = Vec::new();
+            // The ts the segment was created with: the commit ts of the append
+            // that opened it (`TableMeta::AddSegmentWithID(commit_ts, …)`).
+            let mut seg_create_ts = CPP_MIRROR_TS;
             // Drain the segment block by block so each block's values are freed
             // once it is encoded: holding the whole table's decoded rows while
             // the texts are rendered doubled the transient on a long import.
@@ -1733,21 +1745,21 @@ impl Engine {
                 // version batches are recorded in; the slot a deleted row
                 // occupies is inside its own segment's block.
                 let start = block_index * DEFAULT_BLOCK_CAPACITY;
-                let mut version = BlockVersionFile::new(
-                    &self.block_version_batches(&totals, seg_start + start, chunk.len()),
-                    DEFAULT_BLOCK_CAPACITY,
-                );
-                // The mirror is a full rewrite at one checkpoint, so its rows carry
-                // no per-append commit order: publishing them with ts 0 keeps them
-                // visible to a reader whose `begin_ts` is 1 (the C++
-                // `BlockVersion::GetRowCount` returns 0 when the first create entry
-                // is *newer* than `begin_ts`). A deleted slot takes the mirror ts
-                // the reader compares against.
                 let slot_base = seg_start + start;
-                for (&_id, &at) in deleted_at.iter() {
+                let batches =
+                    self.block_version_batches(&totals, &append_ts, slot_base, chunk.len());
+                let mut version = BlockVersionFile::new(&batches, DEFAULT_BLOCK_CAPACITY);
+                for (&_id, &(at, ts)) in deleted_at.iter() {
                     if (slot_base..slot_base + chunk.len()).contains(&at) {
-                        version.delete(at - slot_base, DELETED_MIRROR_TS);
+                        version.delete(at - slot_base, ts);
                     }
+                }
+                // The block's own record carries the ts of the append that
+                // opened it, which is exactly the first `create` of its version
+                // file (`SegmentMeta::AddBlockWithID(commit_ts, …)`).
+                let block_ts = batches.first().map(|(ts, _)| *ts).unwrap_or(CPP_MIRROR_TS);
+                if block_index == 0 {
+                    seg_create_ts = block_ts;
                 }
                 let id = BlockId {
                     db_id,
@@ -1798,14 +1810,14 @@ impl Engine {
                 }
                 blocks.push(CppBlock {
                     block_id: block_index as u16,
-                    commit_ts: CPP_MIRROR_TS,
+                    commit_ts: block_ts,
                 });
                 written += chunk.len();
                 block_index += 1;
             }
             segments.push(CppSegment {
                 segment_id,
-                create_ts: CPP_MIRROR_TS,
+                create_ts: seg_create_ts,
                 blocks,
             });
         }
@@ -1846,28 +1858,45 @@ impl Engine {
     /// The `BlockVersion::Append` batches for one block: one `(ts, rows)` per
     /// append, sized by how many of that append's rows the block holds.
     ///
-    /// `totals` is the cumulative row count after every append. It is a hint
-    /// for the mirror rather than committed state, so when it disagrees with
-    /// the rows actually mirrored (a table written before the log existed, or
-    /// an append the process lost) the block gets one create for all of them,
-    /// which is what the mirror always wrote.
+    /// `totals` is the cumulative row count after every append and `ts` the
+    /// commit ts of the transaction that made it; the two are aligned
+    /// (`settle_append_ts`). `totals` is a hint for the mirror rather than
+    /// committed state, so when it disagrees with the rows actually mirrored
+    /// (a table written before the log existed, or an append the process lost)
+    /// the block gets one create for all of them, which is what the mirror
+    /// always wrote.
     fn block_version_batches(
         &self,
         totals: &[u64],
+        ts: &[u64],
         block_start: usize,
         rows_in_block: usize,
     ) -> Vec<(u64, u32)> {
         let end = block_start + rows_in_block;
+        // An append the previous process lost, or one made before the ts log
+        // existed, has no commit ts of its own. The newest known ts is the
+        // closest stand-in: it keeps the create visible to a reader at the
+        // current ts, and puts it where the append order says it belongs.
+        let fallback = ts
+            .iter()
+            .rev()
+            .copied()
+            .find(|t| *t != 0)
+            .unwrap_or(CPP_MIRROR_TS);
         let mut batches: Vec<(u64, u32)> = Vec::new();
         let mut prev = 0u64;
-        for &total in totals {
+        for (i, &total) in totals.iter().enumerate() {
             if total <= prev {
                 continue;
             }
             let lo = prev.max(block_start as u64);
             let hi = total.min(end as u64);
             if hi > lo {
-                batches.push((CPP_MIRROR_TS, (hi - lo) as u32));
+                let batch_ts = match ts.get(i).copied().unwrap_or(0) {
+                    0 => fallback,
+                    t => t,
+                };
+                batches.push((batch_ts, (hi - lo) as u32));
             }
             prev = total;
             if total >= end as u64 {
@@ -1876,7 +1905,7 @@ impl Engine {
         }
         let sum: u64 = batches.iter().map(|(_, rows)| u64::from(*rows)).sum();
         if sum != rows_in_block as u64 {
-            return vec![(CPP_MIRROR_TS, rows_in_block as u32)];
+            return vec![(fallback, rows_in_block as u32)];
         }
         batches
     }

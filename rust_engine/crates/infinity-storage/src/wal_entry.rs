@@ -253,6 +253,13 @@ pub enum KvBatchKind {
     /// Any other record the committing layer cannot type (snapshot blobs,
     /// non-UTF-8 row values, …).
     Other = 2,
+    /// Keys to **remove** from the KV, not records to write. The keys carry a
+    /// placeholder value (the record they delete is gone, so there is nothing
+    /// to store); replay applies them as deletions. Kept apart from the two
+    /// kinds above because a batch that only deletes has no record to write,
+    /// and because a key can be deleted in the same transaction that writes
+    /// others.
+    Delete = 3,
 }
 
 impl KvBatchKind {
@@ -260,6 +267,7 @@ impl KvBatchKind {
         Some(match v {
             1 => Self::Catalog,
             2 => Self::Other,
+            3 => Self::Delete,
             _ => return None,
         })
     }

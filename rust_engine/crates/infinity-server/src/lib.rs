@@ -1317,6 +1317,35 @@ fn handle_connection(
                             &format!("DROP SNAPSHOT {};", sql_name(&snap)),
                             sid,
                         )
+                    } else if name == "DumpIndex" {
+                        // `DumpIndexRequest` is the one request whose session id
+                        // comes last: {1: db, 2: table, 3: index, 4: session_id}
+                        // (`thrift/infinity.thrift:685`).
+                        let (db, table, index_name) = (get(1), get(2), get(3));
+                        let full = if db.is_empty() {
+                            table
+                        } else {
+                            format!("{db}.{table}")
+                        };
+                        match engine.as_ref() {
+                            Some(eng) => match eng.dump_index_transaction(&full, &index_name) {
+                                Ok(()) => CommonResponse {
+                                    error_code: OK,
+                                    error_msg: "OK".into(),
+                                    session_id: sid,
+                                },
+                                Err(e) => CommonResponse {
+                                    error_code: e.status_code(),
+                                    error_msg: e.to_string(),
+                                    session_id: sid,
+                                },
+                            },
+                            None => CommonResponse {
+                                error_code: 1,
+                                error_msg: "no engine bound".into(),
+                                session_id: sid,
+                            },
+                        }
                     } else if name == "Optimize" {
                         // Merge the index chunks that earlier memory dumps left
                         // behind, as the reference's optimize does.

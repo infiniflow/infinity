@@ -30,12 +30,12 @@ patterns counted (see `test_the_reference_is_deterministic_where_the_test_assume
   and pure `double` arithmetic over a floating-point one (`LargeSigned<T>` is
   `double` for a floating `T`, `piecewise_linear_model.hpp:40`), with a
   well-defined guard key at the top of every level (`pgm_index.hpp:104-130`).
-* **Deterministic modulo a timestamp** — the block `version` file: the
-  reference records the commit ts of the append that filled the block, the port
-  records its own mirror ts. The layout must match; the ts must not be compared.
-  The values cannot agree: the reference spends a timestamp on the bootstrap,
-  the initial checkpoint and every DDL, while the port's DDL is not
-  transactional (`rust_engine/docs/FORMAT_EQUIVALENCE_TESTS.md` §6.6).
+* **Deterministic** — the block `version` file: its `create_ts` values are the
+  commit ts of the append that filled each block and its marked slots carry the
+  ts of the delete that emptied them. The two engines allocate the same
+  sequence for the same statements (bootstrap, initial checkpoint, every DDL,
+  every append, every delete — `rust_engine/docs/FORMAT_EQUIVALENCE_TESTS.md`
+  §6.6), so the ts, and with it the whole file, must match.
 * **Not byte comparable — compared by content** — the HNSW chunk's **graph**:
   the reference builds it with a `thread_local std::mt19937`
   (`hnsw_alg.cppm:107`), so which thread inserts which vector — and therefore
@@ -52,13 +52,17 @@ patterns counted (see `test_the_reference_is_deterministic_where_the_test_assume
 The test therefore asserts:
 1. every deterministic file is byte identical — including the sparse index
    chunk and every secondary index chunk;
-2. the `version` file is identical once its ts is normalized;
+2. the `version` file is byte identical: its `create_ts` values and its
+   deleted-slot ts are the commit ts of the appends and deletes that wrote
+   them, and the two engines allocate the same sequence (`_config` explains
+   the one scheduling-dependent dump the test switches off);
 3. the index chunk that carries a build-dependent model — the HNSW graph —
    still has identical **postings** (decoded), and the rest of the HNSW chunk
    (header, vectors, labels) is byte identical;
 4. the catalog's *logical* content (the key/value pairs the reference sees
-   through `SHOW CATALOG 'all'`) is identical, modulo the ts the reference
-   stamps on the records it wrote itself;
+   through `SHOW CATALOG 'all'`) is identical, keys included: only the value
+   of `idx_chunk|…|{chunk_id}` is normalized, because the port has no dump
+   transaction to name there;
 5. the indexes are **logically** equivalent: the reference reads each
    engine's directory and must answer the same queries the same way. This
    covers everything the byte comparison cannot see.
@@ -121,7 +125,7 @@ MINIO_ACCESS_KEY = os.environ.get("INFINITY_MINIO_ACCESS_KEY", "")
 MINIO_SECRET_KEY = os.environ.get("INFINITY_MINIO_SECRET_KEY", "")
 
 
-def _config(root, engine, pg_port):
+def _config(root, engine, pg_port, quota="1KB"):
     """A config for one engine, rooted at `root`.
 
     The two engines read the root differently: the reference takes
@@ -129,6 +133,17 @@ def _config(root, engine, pg_port):
     "use the object store" switch (it must stay empty), while the port
     derives its root from the *parent* of `persistence_dir`
     (`serve_from_config`, `crates/infinity-cli/src/main.rs:98`).
+
+    `quota` is `[buffer] memindex_memory_quota`. A small quota makes the
+    reference dump an index from a **worker thread** once the memory index
+    crosses it (`BGMemIndexTracer::IncreaseMemoryUsage`,
+    `src/storage/tracer/memindex_tracer.cppm:102`), and that dump is a write
+    transaction: its commit ts is allocated whenever the worker happens to run,
+    so it lands between whatever statements the client sent next. That is fine
+    for the tests that check chunk *content*, but a test that compares commit
+    timestamps has to pass a quota the memory index can never cross (`"2GB"`;
+    the reference's byte-size parser rejects `"0"` - "Invalid byte size: 0"), so
+    that the explicit `DumpIndex` calls are the only dumps.
     """
     persistence = "" if engine == "cpp" else f"{root}/persistence"
     return f"""
@@ -160,7 +175,7 @@ compact_interval = "0s"
 buffer_manager_size = "2GB"
 temp_dir = "{root}/tmp"
 result_cache = "off"
-memindex_memory_quota = "1KB"
+memindex_memory_quota = "{quota}"
 
 [wal]
 wal_dir = "{root}/wal"
@@ -238,7 +253,7 @@ def _seed(conn, row_count=ROWS):
     time.sleep(2)
 
 
-def _run_engine(engine, root, pg_port, row_count=ROWS, seed=None):
+def _run_engine(engine, root, pg_port, row_count=ROWS, seed=None, quota="1KB"):
     """Seed one engine's directory, retrying a boot that dies during init.
 
     The Thrift server accepts connections before storage finishes initialising,
@@ -250,7 +265,7 @@ def _run_engine(engine, root, pg_port, row_count=ROWS, seed=None):
     last = None
     for _ in range(2):
         try:
-            return _boot_and_seed(engine, root, pg_port, row_count, seed)
+            return _boot_and_seed(engine, root, pg_port, row_count, seed, quota)
         except AssertionError as err:
             last = err
             _wait_port_free()
@@ -258,33 +273,36 @@ def _run_engine(engine, root, pg_port, row_count=ROWS, seed=None):
     raise last
 
 
-def _boot_and_seed(engine, root, pg_port, row_count, seed):
+def _boot_and_seed(engine, root, pg_port, row_count, seed, quota):
     # The engines bind a fixed port without `SO_REUSEADDR`; a previous engine
     # (or anything else on the machine) still holding it makes this one abort
     # with "Could not bind: Address already in use".
     _wait_port_free()
     shutil.rmtree(root, ignore_errors=True)
-    _write_config(engine, root, pg_port)
+    _write_config(engine, root, pg_port, quota)
     _spawn_and_run(engine, root, seed or (lambda c: _seed(c, row_count)))
 
 
-def _write_config(engine, root, pg_port):
+def _write_config(engine, root, pg_port, quota="1KB"):
     for sub in ("log", "tmp"):
         os.makedirs(os.path.join(root, sub), exist_ok=True)
     with open(os.path.join(root, "engine.toml"), "w") as handle:
-        handle.write(_config(root, engine, pg_port))
+        handle.write(_config(root, engine, pg_port, quota))
 
 
-def _run_phases(engine, root, pg_port, phases):
+def _run_phases(engine, root, pg_port, phases, quota="1KB"):
     """Run each phase in its own engine process, over the same directory.
 
     A phase is just a callable taking the connection; whether it ends with
     `flush_data()` decides whether the rows it wrote reach the block files or
     only the WAL - which is what the crash test relies on.
+
+    `quota` is passed to `_config`; see there for why a ts-comparing test
+    disables the background dump.
     """
     _wait_port_free()
     shutil.rmtree(root, ignore_errors=True)
-    _write_config(engine, root, pg_port)
+    _write_config(engine, root, pg_port, quota)
     for seed in phases:
         _spawn_and_run(engine, root, seed)
     return root
@@ -739,10 +757,12 @@ def _compare_data_files(cpp, rust, index_kinds):
         return failures
     for name in sorted(cpp_blocks):
         if name.endswith("/version"):
-            # Same layout, different commit ts (the reference stamps the
-            # append's ts, the port its mirror ts).
-            if _normalize_version(cpp[name]) != _normalize_version(rust[name]):
-                failures.append(f"{name}: the version layout differs")
+            # The `create_ts` of every append and the ts of every delete are
+            # the transactions' own commit ts, and the two engines now allocate
+            # the same sequence for the same statements, so this file is
+            # compared like every other one.
+            if cpp[name] != rust[name]:
+                failures.append(f"{name}: the version file differs")
         else:
             # Block columns and the outline: laid out from the row values. A
             # `.col` file's NULL slots are filler (see `_mask_null_slots`).
@@ -839,15 +859,22 @@ def _mask_null_slots(blob):
     return bytes(out)
 
 
-def _normalize_version(blob):
-    """The block `version` file without its commit ts.
+def _version_without_ts(blob):
+    """The block `version` file with its commit ts masked out.
 
     Layout: `[u16 create_size]` then, per create, `[u64 create_ts][i64 rows]`,
-    then `[u16 capacity]` and one u64 per slot. The ts values differ between
-    the engines - the reference stamps each append's and each delete's commit
-    ts, the port its mirror ts - while *which* creates and *which* slots are
-    marked is derived from the rows. So every create ts becomes zero and every
-    non-zero delete ts becomes one.
+    then `[u16 capacity]` and one u64 per slot. Every create ts becomes zero
+    and every non-zero delete ts becomes one.
+
+    The compact test is the only caller, and it needs it because the two
+    engines do a different amount of work there: the port's `compact_table`
+    moves the rows into a new segment, while the reference's
+    `ManualCompactTask` asks `NewCompactionAlg` for candidates and finds a
+    single segment, so it opens no transaction at all
+    (`physical_compact_impl.cpp:36`, `compaction_process_impl.cpp`). The
+    port's tail rows are therefore written one transaction - two timestamps -
+    later. *Which* creates and *which* slots are marked still follows from the
+    rows, so that part stays compared.
     """
     out = bytearray(blob)
     pos = 0
@@ -903,7 +930,8 @@ compact_interval = "0s"
 buffer_manager_size = "2GB"
 temp_dir = "{root}/tmp"
 result_cache = "off"
-memindex_memory_quota = "1KB"
+# Opening a directory to read it must not start a background dump.
+memindex_memory_quota = "2GB"
 
 [wal]
 wal_dir = "{root}/wal"
@@ -1070,27 +1098,25 @@ def _index_answers(root, pg_port):
         _wait_port_free()
 
 
-def _normalize_catalog_key(key):
-    """The catalog key without the ts it ends with.
+def _normalize_catalog_value(key, value):
+    """The catalog value with the one ts the port cannot name taken out.
 
-    The reference stamps the commit ts of the transaction that created the
-    record into the key (`catalog|tbl|{db}|{name}|{ts}`,
-    `catalog|idx|{db}|{tbl}|{name}|{ts}`,
-    `tbl|col|{db}|{tbl}|{name}|{ts}`); the port writes its own mirror ts.
-    The ts is the only part that may differ - the key's *structure* is the
-    format, and it must match.
+    Every record whose value is a bare ts holds the commit ts of the write
+    that created it, and the two engines now agree on all of them —
+    `catalog|blk|…` (the append that opened the block), `catalog|seg|…` (the
+    append that opened the segment), `idx_seg|…` (the transaction that paired
+    the index with the segment) — because they allocate the same sequence for
+    the same statements (see `rust_engine/docs/FORMAT_EQUIVALENCE_TESTS.md`
+    §6.6).
+
+    The exception is `idx_chunk|…|{chunk_id}`: the reference stamps the
+    commit ts of the background transaction whose memory dump produced the
+    chunk. The port's mirror is a single rewrite at checkpoint time, not a
+    per-index dump chain, so it has no such transaction to name and writes 0.
     """
-    return re.sub(r"\|(\d+)$", "", key)
-
-
-def _normalize_catalog_value(value):
-    """The catalog value with a bare ts replaced by a placeholder.
-
-    A record whose value is only a ts (`catalog|blk|…`, `idx_seg|…`,
-    `idx_chunk|…`) holds the commit ts of the write that created it.
-    """
-    if re.fullmatch(r"\d+", value):
-        return "<ts>"
+    if key.startswith("idx_chunk|") and not key.endswith("|chunk_info"):
+        if re.fullmatch(r"\d+", value):
+            return "<ts>"
     return value
 
 
@@ -1138,7 +1164,14 @@ def _table_records(pairs, table_dir, table):
 
 
 def _normalize_catalog(pairs, zero_size_indexes=(), drop_chunk_info=False):
-    """The catalog's records, with the ts taken out of the keys and values.
+    """The catalog's records, keys compared verbatim.
+
+    The keys of the ts-stamped records (`catalog|tbl|{db}|{name}|{ts}`,
+    `catalog|idx|{db}|{tbl}|{name}|{ts}`, `tbl|col|{db}|{tbl}|{name}|{ts}`)
+    embed the commit ts of the transaction that wrote them, and the two
+    engines now produce the same ts for the same statements, so the key itself
+    is compared. Only the values `_normalize_catalog_value` names are taken
+    out.
 
     `index_size` is also taken out of the chunk records of the indexes in
     `zero_size_indexes`: the reference stores `GetSizeInBytes()` of the
@@ -1150,18 +1183,20 @@ def _normalize_catalog(pairs, zero_size_indexes=(), drop_chunk_info=False):
     (`HnswFileWorker::HnswFileWorker`, `hnsw_file_worker_impl.cpp:55`), so the
     port writes zero.
 
-    `drop_chunk_info` removes the `…|chunk_info` records instead: a chunk's
+    `drop_chunk_info` removes the `idx_chunk|…` records: a chunk's
     `base_row_id`/`row_count` are the *boundaries* the dump happened to land
     on, and those are a scheduling outcome (see
-    `test_the_chunk_boundaries_are_timing_dependent`). A test that wants them
-    checked must assert the tiling invariant itself rather than compare this
-    record to the reference's (`_assert_chunk_tiling`).
+    `test_the_chunk_boundaries_are_timing_dependent`). How *many* chunks a
+    segment ends up with follows from the same boundaries - the reference
+    dumps only the rows added since its last dump, the port rewrites the whole
+    segment - so the per-chunk ts records go with them. A test that wants the
+    chunks checked must assert the tiling invariant itself rather than compare
+    these records to the reference's (`_assert_chunk_tiling`).
     """
     out = {}
     for key, value in pairs.items():
-        key = _normalize_catalog_key(key)
-        value = _normalize_catalog_value(value)
-        if drop_chunk_info and key.endswith("|chunk_info"):
+        value = _normalize_catalog_value(key, value)
+        if drop_chunk_info and key.startswith("idx_chunk|"):
             continue
         if zero_size_indexes and key.endswith("|chunk_info"):
             parts = key.split("|")
@@ -1253,13 +1288,12 @@ def test_the_two_engines_write_the_same_bytes():
         failures
     )
 
-    # The catalog: the same logical records. The reference stamps the commit
-    # ts of the transaction that created a record into its key and, for some
-    # records, into its value; the port writes its own mirror ts. The ts is
-    # the only part that may differ, so it is taken out before comparing -
-    # the key's *structure* and the value's *content* are the format. The
-    # `index_size` of a graph-shaped chunk (HNSW, BMP) is taken out as well,
-    # for the reason given in `_normalize_catalog`.
+    # The catalog: the same records. The keys embed the commit ts of the
+    # transaction that created them and the bare-ts values are that ts too;
+    # the two engines now agree on all of them, so the keys are compared
+    # verbatim and only the values `_normalize_catalog_value` names are taken
+    # out. The `index_size` of a graph-shaped chunk (HNSW, BMP) is taken out
+    # as well, for the reason given in `_normalize_catalog`.
     #
     # The port writes the C++ key space only in its `rocksdb-store` build;
     # without it the reference opens an empty catalog and there is nothing to
@@ -1506,6 +1540,14 @@ def test_the_bytes_after_deletes_updates_and_a_restart():
     id. So the block holds 210 rows (100 + 100 appended + 10 rewritten) and
     the `version` file three creates (100/200/210) with 30 marked slots - 20
     from the DELETE and 10 from the UPDATE that replaced them.
+
+    `memindex_memory_quota = "2GB"`: the `version` file carries the commit ts
+    of every append and delete, and the reference's quota-driven dump is a
+    *background* write transaction whose ts is allocated whenever its worker
+    runs - measured between the append and the DELETE on one run and after the
+    UPDATE on another. A quota the memory index never crosses leaves the
+    explicit `DumpIndex` calls in the phases as the only dumps, so both engines
+    allocate the same ts sequence (`_config` has the details).
     """
     roots = {}
     for engine, port in (("cpp", 5432), ("rust", 5433)):
@@ -1514,6 +1556,7 @@ def test_the_bytes_after_deletes_updates_and_a_restart():
             os.path.join(ROOT, f"mut_{engine}"),
             port,
             [_phase_initial, _phase_mutate],
+            quota="2GB",
         )
 
     files = {engine: _files(root) for engine, root in roots.items()}
@@ -1532,10 +1575,11 @@ def test_the_bytes_after_deletes_updates_and_a_restart():
         failures
     )
 
-    # The catalog: the same records once the ts is taken out, including the
-    # delete bitmap. The chunk infos are left out of the comparison - a chunk's
-    # boundaries are a scheduling outcome, not the format - and the invariant
-    # they must satisfy is asserted instead: the chunks tile the rows.
+    # The catalog: the same records, ts-stamped keys included, and the delete
+    # bitmap. Only the `idx_chunk|…` records are left out - a chunk's
+    # boundaries (and therefore how many chunks a segment has) are a scheduling
+    # outcome, not the format - and the invariant they must satisfy is asserted
+    # instead: the chunks tile the rows.
     cpp_pairs = _table_records(
         _catalog_pairs(roots["cpp"], 5432), dirs["cpp"], MUTATE_TABLE
     )
@@ -1544,8 +1588,8 @@ def test_the_bytes_after_deletes_updates_and_a_restart():
     )
     _assert_chunk_tiling(cpp_pairs, {1, 2}, 210, "cpp")
     _assert_chunk_tiling(rust_pairs, {1, 2}, 210, "rust")
-    cpp_catalog = _normalize_catalog(cpp_pairs, {1}, drop_chunk_info=True)
-    rust_catalog = _normalize_catalog(rust_pairs, {1}, drop_chunk_info=True)
+    cpp_catalog = _normalize_catalog(cpp_pairs, drop_chunk_info=True)
+    rust_catalog = _normalize_catalog(rust_pairs, drop_chunk_info=True)
     assert set(cpp_catalog) == set(rust_catalog), (
         f"only in cpp: {sorted(set(cpp_catalog) - set(rust_catalog))}, "
         f"only in rust: {sorted(set(rust_catalog) - set(cpp_catalog))}"
@@ -1862,16 +1906,23 @@ def test_a_compacted_table_keeps_its_segments_apart():
     )
 
     # The tail block of the port's second segment holds the same 50 rows as the
-    # reference's second block, so its bytes must match (modulo the version ts).
+    # reference's second block, so its bytes must match. The `version` file is
+    # the one exception: the port compacted (one write transaction) where the
+    # reference had nothing to merge (none), so the tail rows' `create_ts` is
+    # two higher - `_version_without_ts` has the details and masks only the ts.
     # `_compare_data_files` keys off `…/version`, so both sides carry the same
     # synthetic block prefix.
     prefix = "seg_x/blk_x/"
     tail = {
-        prefix + name: blob
+        prefix + name: _version_without_ts(blob)
+        if name.split("/")[-1] == "version"
+        else blob
         for name, blob in _under(files["rust"], f"{dirs['rust']}/seg_2/blk_0").items()
     }
     cpp_tail = {
-        prefix + name: blob
+        prefix + name: _version_without_ts(blob)
+        if name.split("/")[-1] == "version"
+        else blob
         for name, blob in _under(files["cpp"], f"{dirs['cpp']}/seg_0/blk_1").items()
     }
     assert set(tail) == set(cpp_tail), (

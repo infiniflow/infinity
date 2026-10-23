@@ -34,11 +34,10 @@ pub struct CppTable {
 /// One block of a flushed segment, as the reference records it under
 /// `catalog|blk|{db_id}|{table_id}|{segment_id}|{block_id}`.
 ///
-/// `commit_ts` is the value of that record; the reference keeps a block when it
-/// is `<= begin_ts` (`GetTableSegmentBlocks`,
-/// `src/storage/catalog/kv_utility_impl.cpp:100`). A block mirror is one
-/// checkpoint of the whole table, so every block is published with
-/// [`CPP_MIRROR_TS`] and is visible to any reader.
+/// `commit_ts` is the value of that record — the ts of the append that opened
+/// the block (`SegmentMeta::AddBlockWithID`); the reference keeps a block when
+/// it is `<= begin_ts` (`GetTableSegmentBlocks`,
+/// `src/storage/catalog/kv_utility_impl.cpp:100`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CppBlock {
     pub block_id: u16,
@@ -86,13 +85,17 @@ pub struct CppIndexSegment {
     pub chunks: Vec<CppIndexChunk>,
 }
 
-/// The timestamp every record of a block mirror is published with.
+/// The timestamp a mirror record falls back to when it has no transaction of
+/// its own to name.
 ///
-/// The mirror is a full rewrite of the table at a checkpoint, not an append, so
-/// it has no per-block commit order. The reference hides a segment or block
-/// whose timestamp is greater than the reader's `begin_ts`
-/// (`GetTableSegments` / `GetTableSegmentBlocks`); 0 is visible to every reader,
-/// including one that starts from an empty WAL and therefore begins at ts 1.
+/// Every ts the port can attribute — a block's append, a segment's creation,
+/// an index's pairing with a segment, a catalog record — is now written with
+/// the transaction's real commit ts. What is left is `idx_chunk|…`'s value, the
+/// commit ts of the reference's per-index memory dump: the reference schedules
+/// those dumps on background workers, so the value is the schedule, not the
+/// data. 0 is visible to every reader (`GetTableSegments` /
+/// `GetTableSegmentBlocks` hide a ts greater than `begin_ts`, and even a reader
+/// that starts from an empty WAL begins at ts 1).
 pub const CPP_MIRROR_TS: TxnTimeStamp = 0;
 
 /// C++ `UNCOMMIT_TS` (`src/common/default_values.cppm:83`): the value a segment
@@ -659,7 +662,39 @@ impl Catalog {
         indexes: &[IndexMeta],
         segments: &[CppSegmentSet],
     ) -> Result<usize> {
+        self.write_cpp_layout_with_ts(store, store, dbs, tables, indexes, segments)
+    }
+
+    /// Like [`Self::write_cpp_layout_from`], but the timestamps a record keeps
+    /// are read from `ts_source` while the layout is written to `store`. The
+    /// batch writer records into an in-memory sink that holds no catalog, so it
+    /// has to name the real store the existing records live in.
+    #[allow(clippy::too_many_arguments)]
+    pub fn write_cpp_layout_with_ts(
+        &self,
+        store: &dyn MetaStore,
+        ts_source: &dyn MetaStore,
+        dbs: &[String],
+        tables: &[TableMeta],
+        indexes: &[IndexMeta],
+        segments: &[CppSegmentSet],
+    ) -> Result<usize> {
         let mut written = 0usize;
+        // Every catalog record is keyed by the commit timestamp of the
+        // transaction that created it (`KeyEncode::CatalogDbKey`). A record
+        // that already exists keeps its timestamp; a record this DDL creates
+        // gets the placeholder the caller replaces with the transaction's
+        // commit timestamp.
+        let ts_of = |prefix: &str| -> Result<Option<u64>> {
+            let mut newest = None;
+            for (k, _) in ts_source.scan_prefix(prefix.as_bytes())? {
+                let text = String::from_utf8_lossy(&k).to_string();
+                if let Some(ts) = text.rsplit('|').next().and_then(|t| t.parse::<u64>().ok()) {
+                    newest = Some(newest.map_or(ts, |n: u64| n.max(ts)));
+                }
+            }
+            Ok(newest)
+        };
 
         let next_table_id = tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
         // The reference hands out **1-based** database ids (`CreateDatabase`
@@ -669,7 +704,7 @@ impl Catalog {
             |name: &str| -> u64 { dbs.iter().position(|d| d == name).unwrap_or(0) as u64 + 1 };
 
         for (i, db) in dbs.iter().enumerate() {
-            let ts = i as u64 + 1;
+            let ts = ts_of(&format!("catalog|db|{db}|"))?.unwrap_or(crate::DDL_TS_SENTINEL);
             let db_str = (i as u64 + 1).to_string();
             store.put(key::catalog_db_key(db, ts).as_bytes(), db_str.as_bytes())?;
             store.put(
@@ -691,8 +726,9 @@ impl Catalog {
             let db_id = db_id_of(db_name);
             let db_str = db_id.to_string();
             let tbl_str = t.id.to_string();
-            let ts = t.id + 1; // monotonic per write
             let name = table_of(&t.name);
+            let ts =
+                ts_of(&format!("catalog|tbl|{db_str}|{name}|"))?.unwrap_or(crate::DDL_TS_SENTINEL);
 
             store.put(
                 key::catalog_table_key(&db_str, name, ts).as_bytes(),
@@ -797,7 +833,7 @@ impl Catalog {
         for im in indexes {
             let im_table = table_of(&im.table);
             let im_db = db_of(&im.table);
-            let Some((db_str, tbl_str, ts, cpp)) = resolved
+            let Some((db_str, tbl_str, _table_ts, cpp)) = resolved
                 .iter()
                 .find(|(_, _, _, c)| c.table_name == im_table && c.db_name == im_db)
             else {
@@ -818,7 +854,14 @@ impl Catalog {
                     .map_or(1, |p| p + 1) as u64
             };
             store.put(
-                key::catalog_index_key(db_str, tbl_str, &im.name, *ts).as_bytes(),
+                key::catalog_index_key(
+                    db_str,
+                    tbl_str,
+                    &im.name,
+                    ts_of(&format!("catalog|idx|{db_str}|{tbl_str}|{}|", im.name))?
+                        .unwrap_or(crate::DDL_TS_SENTINEL),
+                )
+                .as_bytes(),
                 index_id.to_string().as_bytes(),
             )?;
             store.put(
@@ -876,7 +919,16 @@ impl Catalog {
             key::NEXT_DATABASE_ID.as_bytes(),
             dbs.len().to_string().as_bytes(),
         )?;
-        written += 1;
+        // `meta|version` is what stops the reference from treating the catalog
+        // as pre-0.7.0 and running its JSON-index conversion on startup
+        // (`Storage::AdminToWriter`, `storage_impl.cpp:381`). The layout sweep
+        // deletes it with the rest of the key space, so it is written back here
+        // with every rewrite.
+        store.put(
+            key::META_VERSION.as_bytes(),
+            key::CATALOG_VERSION.as_bytes(),
+        )?;
+        written += 2;
         store.flush()?;
         Ok(written)
     }
@@ -896,8 +948,28 @@ impl Catalog {
         indexes: &[IndexMeta],
         segments: &[CppSegmentSet],
     ) -> Result<Vec<crate::BatchItem>> {
+        // The recorder is a sink: the timestamps the records keep have to be
+        // read from the catalog this layout is being derived from.
+        self.write_cpp_layout_batch_from(self.store.as_ref(), dbs, tables, indexes, segments)
+    }
+
+    /// Like [`Self::write_cpp_layout_batch`], but reading the timestamps the
+    /// records keep from `ts_source`.
+    ///
+    /// A DDL that is still in flight writes into a capture overlay instead of
+    /// the store, so the *existing* timestamps have to be read through the same
+    /// overlay: a record created by an earlier step of the same statement is
+    /// part of the layout this rewrite is derived from.
+    pub fn write_cpp_layout_batch_from(
+        &self,
+        ts_source: &dyn MetaStore,
+        dbs: &[String],
+        tables: &[TableMeta],
+        indexes: &[IndexMeta],
+        segments: &[CppSegmentSet],
+    ) -> Result<Vec<crate::BatchItem>> {
         let recorder = LayoutBatch::new();
-        self.write_cpp_layout_from(&recorder, dbs, tables, indexes, segments)?;
+        self.write_cpp_layout_with_ts(&recorder, ts_source, dbs, tables, indexes, segments)?;
         Ok(recorder.into_items())
     }
 
@@ -1165,21 +1237,20 @@ pub fn write_cpp_segments(store: &dyn MetaStore, set: &CppSegmentSet) -> Result<
             written += 1;
         }
     }
-    // `next_segment_id` is the next id to hand out; `unsealed_segment_id` is the
-    // segment the engine would still append to (`TableMeta::InitSet`,
-    // `table_meta_impl.cpp:274`; `unsealed_segment_id` is read by
-    // `NewTxn::AddSegment`).
-    let next = set
-        .segments
-        .iter()
-        .map(|s| s.segment_id + 1)
-        .max()
-        .unwrap_or(0);
-    let unsealed = set.segments.iter().map(|s| s.segment_id).max();
+    // The reference writes `next_segment_id` as "0" when the table is created
+    // and **never advances it** (`TableMeta::InitSet`,
+    // `table_meta_impl.cpp:274`): the id it hands out is derived from the
+    // segment map (`MetaTableObject::GetNextSegmentID`,
+    // `meta_tree_impl.cpp:657`). Writing the derived value here instead would
+    // leave a tag the reference itself never produces.
     store.put(
         key::catalog_table_tag_key(&set.db_id, &set.table_id, "next_segment_id").as_bytes(),
-        next.to_string().as_bytes(),
+        b"0",
     )?;
+    // `unsealed_segment_id` *is* maintained: it names the segment the engine is
+    // still appending to (`NewTxn::CommitBottomAppend`,
+    // `new_txn_data_impl.cpp:1854`).
+    let unsealed = set.segments.iter().map(|s| s.segment_id).max();
     if let Some(unsealed) = unsealed {
         store.put(
             key::catalog_table_tag_key(&set.db_id, &set.table_id, "unsealed_segment_id").as_bytes(),
@@ -1222,7 +1293,20 @@ pub fn write_cpp_index_segments(
             store.delete(seg_key.as_bytes())?;
             continue;
         }
-        store.put(seg_key.as_bytes(), CPP_MIRROR_TS.to_string().as_bytes())?;
+        // `idx_seg|…` holds the commit ts of the transaction that first paired
+        // this index with this segment (`TableIndexMeta::AddSegmentIndexID1`,
+        // `src/storage/catalog/meta/table_index_meta_impl.cpp:138`). That is
+        // either the append that opened the segment — which adds a segment
+        // entry for every index the table already has — or the `CREATE INDEX`
+        // when the segment already existed; whichever came later.
+        let index_ts = index_create_ts(store, &set.db_id, &set.table_id, index.index_id)?;
+        let segment_ts = segment_create_ts(store, &set.db_id, &set.table_id, index.segment_id)?;
+        let paired_ts = match (index_ts, segment_ts) {
+            (Some(a), Some(b)) => a.max(b),
+            (Some(a), None) | (None, Some(a)) => a,
+            (None, None) => CPP_MIRROR_TS,
+        };
+        store.put(seg_key.as_bytes(), paired_ts.to_string().as_bytes())?;
         written += 1;
         let next_chunk = index
             .chunks
@@ -1257,6 +1341,16 @@ pub fn write_cpp_index_segments(
             // instead of rebuilding, so a chunk it cannot decode would make
             // it answer with nothing. Every chunk the port mirrors is in the
             // reference's own byte layout, so all of them qualify.
+            //
+            // The value is the commit ts of the transaction whose memory
+            // dump produced the chunk (`SegmentIndexMeta::AddChunkIndexID1`,
+            // `segment_index_meta_impl.cpp:129`). The reference dumps each
+            // index in its own background transaction, so the values are the
+            // dump schedule (measured: four indexes at 22/24/26/28 and the
+            // full-text one at 32, after a checkpoint); the port's mirror is
+            // a single rewrite at checkpoint time and has no such
+            // transaction to name, so it writes 0 — like a reader started
+            // from an empty WAL, which sees every chunk either way.
             let id_key = key::catalog_index_chunk_key(
                 &set.db_id,
                 &set.table_id,
@@ -1291,6 +1385,41 @@ pub fn write_cpp_index_segments(
         }
     }
     Ok(written)
+}
+
+/// The commit ts of the transaction that created `index_id`
+/// (`catalog|idx|{db}|{table}|{name}|{ts}` → the index id).
+fn index_create_ts(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_id: &str,
+    index_id: u64,
+) -> Result<Option<u64>> {
+    let prefix = key::catalog_table_index_prefix(db_id, table_id);
+    let want = index_id.to_string();
+    for (k, v) in store.scan_prefix(prefix.as_bytes())? {
+        if v != want.as_bytes() {
+            continue;
+        }
+        let k = String::from_utf8_lossy(&k).to_string();
+        let ts = k.rsplit('|').next().and_then(|t| t.parse::<u64>().ok());
+        return Ok(ts);
+    }
+    Ok(None)
+}
+
+/// The value of `catalog|seg|{db}|{table}|{segment}` — the ts of the append
+/// that opened the segment.
+fn segment_create_ts(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_id: &str,
+    segment_id: u32,
+) -> Result<Option<u64>> {
+    let k = key::catalog_segment_key(db_id, table_id, segment_id);
+    Ok(store
+        .get(k.as_bytes())?
+        .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok()))
 }
 
 /// A JSON string literal (the chunk info is read with `simdjson`, so the base

@@ -418,11 +418,16 @@ fn rollback_counter_moves_exactly_once_per_rollback() {
     assert_eq!(number(&engine, "active_txn_count"), 0);
 
     // A commit is not a rollback, and the counter stays where it was.
+    // `total_commit_count` is measured as a delta: the startup and the DDL are
+    // write transactions too (the reference counts them), so the absolute value
+    // already moved before this commit — the assertion is that this one commit
+    // adds exactly one.
+    let commits_before = number(&engine, "total_commit_count");
     let mut txn = engine.begin_txn();
     txn.append("rb", vec![vec![Literal::Int(1)]]).unwrap();
     txn.commit().unwrap();
     assert_eq!(number(&engine, "total_rollback_count"), 1);
-    assert_eq!(number(&engine, "total_commit_count"), 1);
+    assert_eq!(number(&engine, "total_commit_count"), commits_before + 1);
 
     // Dropping an uncommitted transaction releases its slot without counting a
     // rollback (only an explicit rollback does).

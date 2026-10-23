@@ -109,6 +109,14 @@ impl Drop for Txn {
 /// Owns the WAL + KV pair and hands out transactions.
 pub struct TxnManager {
     store: Arc<dyn MetaStore>,
+    /// Where a transaction's **catalog** records land.
+    ///
+    /// The reference has one `kv_instance_` for the catalog and keeps rows in
+    /// block files; this engine keeps rows in a KV of its own, so a transaction
+    /// can span both. Its row commands (`Append`/`Delete`) apply to `store`,
+    /// everything else to this one - which is the catalog the DDL writes into.
+    /// Both are the same store in a build that keeps them together.
+    catalog_store: Arc<dyn MetaStore>,
     wal: Mutex<WalManager>,
     wal_path: PathBuf,
     /// `wal/wal.log`: the file the **reference** reads. It holds exactly one
@@ -192,7 +200,15 @@ impl TxnManager {
             }
         }
         let wal = WalManager::open(&wal_path)?;
+        // The reference replays the WAL, then reserves exactly one timestamp
+        // for the memory-index recovery before its startup checkpoint
+        // (`Storage::Init` -> `RecoverMemIndex` -> `BeginRecoveryTxn`, which
+        // sets `prepare_commit_ts_ = current_ts_ + 2` and leaves `current_ts_`
+        // alone). The reservation is permanent: the startup checkpoint takes
+        // `current + 4` and every later commit is offset by the same two.
+        let start_ts = max_ts.max(applied_ts);
         Ok(Self {
+            catalog_store: store.clone(),
             store,
             wal: Mutex::new(wal),
             wal_path,
@@ -202,8 +218,8 @@ impl TxnManager {
             // the KV store is the other source of the timestamp high-water mark.
             // The reference seeds both pointers from `start_ts`, the checkpoint
             // frame's commit ts (`NewTxnManager(..., start_ts)`).
-            current_ts: AtomicU64::new(max_ts.max(applied_ts)),
-            prepare_commit_ts: AtomicU64::new(max_ts.max(applied_ts)),
+            current_ts: AtomicU64::new(start_ts),
+            prepare_commit_ts: AtomicU64::new(start_ts + 2),
             max_applied: AtomicU64::new(applied_ts),
             last_appended: AtomicU64::new(max_ts),
             synced: AtomicU64::new(applied_ts),
@@ -213,6 +229,14 @@ impl TxnManager {
             active: Arc::new(Mutex::new(HashMap::new())),
             commit_lock: Mutex::new(()),
         })
+    }
+
+    /// Points the transaction manager at the store a directory keeps its
+    /// catalog records in (`<dir>/catalog` while rows live in
+    /// `<dir>/persistence`).
+    pub fn with_catalog_store(mut self, store: Arc<dyn MetaStore>) -> Self {
+        self.catalog_store = store;
+        self
     }
 
     pub fn begin(&self) -> Txn {
@@ -302,14 +326,40 @@ impl TxnManager {
         if read_only && txn.reads.keys.is_empty() && txn.reads.prefixes.is_empty() {
             return Err(Error::Txn("empty transaction".into()));
         }
-        let _commit = self.commit_lock.lock().unwrap();
         if read_only {
+            let _commit = self.commit_lock.lock().unwrap();
             return Ok(self.current_ts() + 1);
         }
         // `NewTxnManager::GetWriteCommitTS`: `prepare_commit_ts_ += 2`, taken
         // *before* the conflict check, so a rolled-back transaction still spends
         // its timestamp - the reference never hands the same value out twice.
-        let commit_ts = self.prepare_commit_ts.fetch_add(2, Ordering::SeqCst) + 2;
+        let commit_ts = self.reserve_commit_ts();
+        self.commit_at(txn, commit_ts)
+    }
+
+    /// Takes the next write commit timestamp without committing anything.
+    ///
+    /// A caller that has to stamp the bytes it is about to write with the
+    /// commit timestamp (the catalog keys of a DDL carry it, as the
+    /// reference's `KeyEncode::CatalogDbKey(db, commit_ts)` does) reserves the
+    /// value here and hands it back through [`Self::commit_at`]. The reference
+    /// has the same split: the transaction's store is filled before the
+    /// timestamp exists, and `GetWriteCommitTS` is what pins it.
+    pub fn reserve_commit_ts(&self) -> TxnTimeStamp {
+        self.prepare_commit_ts.fetch_add(2, Ordering::SeqCst) + 2
+    }
+
+    /// Commits a write transaction whose commit timestamp was already taken by
+    /// [`Self::reserve_commit_ts`].
+    ///
+    /// An empty transaction is valid here, unlike [`Self::commit`]: the
+    /// reference opens a transaction for every statement and commits it even
+    /// when the statement wrote nothing (`CREATE DATABASE … IF NOT EXISTS` on
+    /// an existing name stages no store but still takes a write commit ts,
+    /// `NewTxn::Commit` -> `GetWriteCommitTS`), so the timestamp is spent and
+    /// the log keeps the entry.
+    pub fn commit_at(&self, txn: Txn, commit_ts: TxnTimeStamp) -> Result<TxnTimeStamp> {
+        let _commit = self.commit_lock.lock().unwrap();
         {
             let seen = self.write_ts.lock().unwrap();
             if let Some(reason) = self.conflict(&txn, &seen) {
@@ -330,16 +380,24 @@ impl TxnManager {
             wal.append(&entry)?;
             self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
         }
-        let mut writes = txn.writes.clone();
+        let mut writes: Vec<(Vec<u8>, Option<Vec<u8>>)> = txn
+            .writes
+            .iter()
+            .cloned()
+            .map(|(k, v)| (k, Some(v)))
+            .collect();
         for key in &txn.deletes {
-            writes.push((key.clone(), b"1".to_vec()));
+            writes.push((key.clone(), None));
         }
         // The applied-timestamp marker rides along with the batch, so a replay
         // after a reopen never re-applies records that are already in the KV.
         let applied = self.max_applied.fetch_max(commit_ts, Ordering::SeqCst);
         let applied = applied.max(commit_ts);
-        writes.push((APPLIED_TS_KEY.to_vec(), applied.to_le_bytes().to_vec()));
-        self.store.atomic_write(&writes)?;
+        writes.push((
+            APPLIED_TS_KEY.to_vec(),
+            Some(applied.to_le_bytes().to_vec()),
+        ));
+        apply_split(self.store.as_ref(), self.catalog_store.as_ref(), writes)?;
         {
             let mut seen = self.write_ts.lock().unwrap();
             for (key, _) in &txn.writes {
@@ -451,14 +509,28 @@ impl TxnManager {
                             row_ranges,
                             block,
                             ..
-                        } => writes.extend(append_writes(db_name, table_name, row_ranges, block)?),
+                        } => writes.extend(
+                            append_writes(db_name, table_name, row_ranges, block)?
+                                .into_iter()
+                                .map(|(k, v)| (k, Some(v))),
+                        ),
                         WalCmd::Delete {
                             db_name,
                             table_name,
                             row_ids,
                             ..
-                        } => writes.extend(delete_writes(db_name, table_name, row_ids)),
-                        WalCmd::KvBatch { writes: batch, .. } => writes.extend(batch.clone()),
+                        } => writes.extend(
+                            delete_writes(db_name, table_name, row_ids)
+                                .into_iter()
+                                .map(|(k, v)| (k, Some(v))),
+                        ),
+                        WalCmd::KvBatch {
+                            kind: KvBatchKind::Delete,
+                            writes: batch,
+                        } => writes.extend(batch.iter().map(|(k, _)| (k.clone(), None))),
+                        WalCmd::KvBatch { writes: batch, .. } => {
+                            writes.extend(batch.iter().cloned().map(|(k, v)| (k, Some(v))))
+                        }
                         WalCmd::Checkpoint { .. } => {}
                         other => {
                             // The reference's log carries its catalog DDL
@@ -478,9 +550,9 @@ impl TxnManager {
                 }
                 writes.push((
                     APPLIED_TS_KEY.to_vec(),
-                    entry.commit_ts.to_le_bytes().to_vec(),
+                    Some(entry.commit_ts.to_le_bytes().to_vec()),
                 ));
-                self.store.atomic_write(&writes)?;
+                apply_split(self.store.as_ref(), self.catalog_store.as_ref(), writes)?;
                 self.max_applied
                     .fetch_max(entry.commit_ts, Ordering::SeqCst);
                 // `CommitReplayTxn`: a replayed entry moves both pointers to its
@@ -521,7 +593,11 @@ impl TxnManager {
         let floor = max_commit_ts
             .max(self.max_applied.load(Ordering::SeqCst))
             .max(self.last_appended.load(Ordering::SeqCst))
-            .max(self.current_ts.load(Ordering::SeqCst));
+            .max(self.current_ts.load(Ordering::SeqCst))
+            // The startup reservation already puts the clock at `current + 2`,
+            // and the reference's startup checkpoint is written at `current +
+            // 4` even when the directory holds nothing yet.
+            .max(self.prepare_commit_ts.load(Ordering::SeqCst));
         if floor == 0 {
             return Ok(());
         }
@@ -629,6 +705,47 @@ impl TxnManager {
 // ---------------------------------------------------------------------------
 
 /// Splits `row:{table}:{seq}` / `del:{table}:{seq}` into `(table, seq)`.
+/// Applies a transaction's writes to the two stores it can span.
+///
+/// A row command (`row:`/`del:`, the keys [`build_commands`] turns into
+/// `Append`/`Delete`) belongs to the row store; everything else is a catalog
+/// record and belongs to the catalog store - the same split the reference makes
+/// between its block files and `kv_instance_`. The replay marker
+/// (`meta:applied_ts`) also belongs to the row store, because it says how much
+/// of the row WAL is in it. Both halves are written as one atomic batch each,
+/// rows first: a crash between them replays the catalog records from the WAL
+/// into the catalog store, which is idempotent.
+fn apply_split(
+    store: &dyn MetaStore,
+    catalog_store: &dyn MetaStore,
+    writes: Vec<(Vec<u8>, Option<Vec<u8>>)>,
+) -> Result<()> {
+    let mut rows: Vec<(Vec<u8>, Option<Vec<u8>>)> = Vec::new();
+    let mut catalog: Vec<(Vec<u8>, Option<Vec<u8>>)> = Vec::new();
+    for (key, value) in writes {
+        let is_row = parse_row_key(&key, ROW_PREFIX).is_some()
+            || parse_row_key(&key, DEL_PREFIX).is_some()
+            || key == APPLIED_TS_KEY;
+        if is_row {
+            // A row tombstone is a **record** in the row store
+            // (`del:<table>:<seq>` => "1"), so a delete keeps its marker. A
+            // catalog delete is the absence of the key: the reference's
+            // `KVInstance::Delete` removes the record, and leaving a "1" behind
+            // would resurrect it as a record with that value.
+            rows.push((key, Some(value.unwrap_or_else(|| b"1".to_vec()))));
+        } else {
+            catalog.push((key, value));
+        }
+    }
+    if !rows.is_empty() {
+        store.atomic_batch(&rows)?;
+    }
+    if !catalog.is_empty() {
+        catalog_store.atomic_batch(&catalog)?;
+    }
+    Ok(())
+}
+
 fn parse_row_key<'a>(key: &'a [u8], prefix: &str) -> Option<(&'a str, u64)> {
     let s = std::str::from_utf8(key).ok()?;
     let rest = s.strip_prefix(prefix)?;
@@ -705,13 +822,18 @@ fn build_commands(writes: &[(Vec<u8>, Vec<u8>)], deletes: &[Vec<u8>]) -> Vec<Wal
         .collect();
 
     let mut del_groups: Vec<(String, Vec<u64>)> = Vec::new();
+    // Non-row deletes are catalog records that must disappear from the KV (the
+    // layout sweep drops a dropped table's keys, the counters and
+    // `meta|version`). They travel as their own `KvBatch` so replay removes the
+    // keys instead of writing the placeholder value.
+    let mut kv_deletes: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     for key in deletes {
         match parse_row_key(key, DEL_PREFIX) {
             Some((table, seq)) => match del_groups.last_mut() {
                 Some((name, ids)) if name == table => ids.push(seq),
                 _ => del_groups.push((table.to_string(), vec![seq])),
             },
-            None => kv.push((key.clone(), b"1".to_vec())),
+            None => kv_deletes.push((key.clone(), b"1".to_vec())),
         }
     }
     for (table, seqs) in del_groups {
@@ -729,6 +851,12 @@ fn build_commands(writes: &[(Vec<u8>, Vec<u8>)], deletes: &[Vec<u8>]) -> Vec<Wal
         cmds.push(WalCmd::KvBatch {
             kind: kv_kind,
             writes: kv,
+        });
+    }
+    if !kv_deletes.is_empty() {
+        cmds.push(WalCmd::KvBatch {
+            kind: KvBatchKind::Delete,
+            writes: kv_deletes,
         });
     }
     cmds

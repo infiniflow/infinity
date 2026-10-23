@@ -405,8 +405,11 @@ fn restart_rebuilds_the_conflict_state_from_the_wal() {
     }
     let m = manager(dir.path());
     let seen = m.write_ts.lock().unwrap();
-    assert_eq!(seen.get(&row("default_db.t", 0)), Some(&2));
-    assert_eq!(seen.get(&del_key("default_db.t", 7)), Some(&2));
+    // `TxnManager::open` spends the recovery transaction's timestamp first
+    // (`prepare_commit_ts_ = start_ts + 2`, the reference's
+    // `BeginRecoveryTxn`), so the first commit here is 4, not 2.
+    assert_eq!(seen.get(&row("default_db.t", 0)), Some(&4));
+    assert_eq!(seen.get(&del_key("default_db.t", 7)), Some(&4));
 }
 
 #[test]
@@ -422,8 +425,9 @@ fn checkpoint_ts_skips_already_applied_records() {
     }
     let store = Arc::new(FjallMetaStore::open(dir.path().join("kv2"), "default").unwrap());
     let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
-    // The three commits took timestamps 2, 4 and 6: replaying past the first
-    // one leaves the other two.
-    assert_eq!(m.recover(2).unwrap(), 2);
+    // The three commits took timestamps 4, 6 and 8 (`open` spends the
+    // recovery transaction's ts first): replaying past the first one leaves
+    // the other two.
+    assert_eq!(m.recover(4).unwrap(), 2);
     assert_eq!(store.scan_prefix(b"row:").unwrap().len(), 2);
 }

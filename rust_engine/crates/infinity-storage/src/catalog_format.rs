@@ -198,6 +198,16 @@ pub const NEXT_DATABASE_ID: &str = "next_database_id";
 pub const NEXT_TABLE_ID: &str = "next_table_id";
 /// `meta|version` — the catalog format version.
 pub const META_VERSION: &str = "meta|version";
+/// The value of [`META_VERSION`]: the `[general] version` of the config, which
+/// the reference writes once it has upgraded a catalog
+/// (`Storage::ConvertJsonIndexFormat`, `src/storage/storage_impl.cpp:1271`).
+///
+/// The reference reads it on every startup: a catalog **without** the key (or
+/// with a value that is not `x.y.z`) is taken as pre-0.7.0 and put through its
+/// JSON-index conversion, which on a port-written catalog aborts the startup
+/// (`Storage::AdminToWriter` → `WriterToAdmin`). The config's version is fixed:
+/// the reference refuses anything but this one (`Config::CheckConfig`).
+pub const CATALOG_VERSION: &str = "0.7.4";
 
 /// Drop tombstone for a table: `tbl|{db_name}|{tbl_name}|{ts}`.
 pub fn drop_table_marker(db_name: &str, table_name: &str, ts: u64) -> String {

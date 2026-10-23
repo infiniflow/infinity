@@ -10,12 +10,23 @@ pub mod meta_cache;
 /// C++-compatible value encoding for catalog records (spec §8.6).
 pub mod value_format;
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use infinity_common::{Error, Result};
 use infinity_storage::{FjallMetaStore, MetaStore};
 
 const COUNTER_KEY: &[u8] = b"__counter:table";
+
+/// Placeholder for "this record is created by the DDL in flight".
+///
+/// The C++ catalog keys carry the creating transaction's commit timestamp
+/// (`KeyEncode::CatalogDbKey(db_name, commit_ts)`), and that value only exists
+/// once the transaction commits. A DDL therefore stamps its new records with
+/// this sentinel and the caller replaces it with the reserved commit timestamp
+/// before the batch is written ([`Catalog::restamp`]). It cannot collide with a
+/// real timestamp: the clock is a `u64` that increments by two.
+pub const DDL_TS_SENTINEL: u64 = u64::MAX;
 
 /// The storage hint of a `SPARSE` column: `WITH (SORT)` / `WITH (SORTED)`.
 ///
@@ -351,6 +362,10 @@ pub struct Catalog {
     /// `tbl:`/`tblname:`/`db:`/`idx:` keys are then never written, so the store
     /// holds nothing but what a C++ engine can read.
     cpp_only: bool,
+    /// When a DDL captures its batch ([`Self::capture`]), newly created records
+    /// are stamped with [`DDL_TS_SENTINEL`] and the caller substitutes the
+    /// transaction's commit timestamp with [`Self::restamp`].
+    capture: Mutex<Option<Capture>>,
 }
 
 /// The C++ key-space prefixes this catalog owns. Sweeping them is how the
@@ -361,6 +376,68 @@ const CPP_KEY_PREFIXES: [&str; 5] = ["catalog|", "db|", "tbl|", "col|", "idx|"];
 /// One entry of a catalog commit: `Some(value)` writes the key, `None` deletes
 /// it (`MetaStore::atomic_batch`).
 pub type BatchItem = (Vec<u8>, Option<Vec<u8>>);
+
+/// A DDL's writes while they are still in flight.
+///
+/// `batch` is what the caller commits; `view` is the same writes as a
+/// read-through map, so a statement that performs **several** catalog
+/// mutations (`DROP TABLE` removes the table and then its index records,
+/// `DROP DATABASE` drops every table it holds) reads the state its own earlier
+/// step produced instead of the store's stale one. Without it the second step
+/// would rewrite the layout from the pre-step records and resurrect what the
+/// first step removed.
+#[derive(Default)]
+struct Capture {
+    batch: Vec<BatchItem>,
+    view: HashMap<Vec<u8>, Option<Vec<u8>>>,
+}
+
+/// The store as the DDL in flight sees it: the captured writes overlay the
+/// committed ones. Only reads go through here; a write inside a capture is
+/// already recorded by [`Catalog::rewrite_cpp`].
+struct Overlay<'a> {
+    inner: &'a dyn MetaStore,
+    view: &'a HashMap<Vec<u8>, Option<Vec<u8>>>,
+}
+
+impl MetaStore for Overlay<'_> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        match self.view.get(key) {
+            Some(value) => Ok(value.clone()),
+            None => self.inner.get(key),
+        }
+    }
+
+    fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+        self.inner.put(key, value)
+    }
+
+    fn delete(&self, key: &[u8]) -> Result<()> {
+        self.inner.delete(key)
+    }
+
+    fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        let mut rows: Vec<(Vec<u8>, Vec<u8>)> = self
+            .inner
+            .scan_prefix(prefix)?
+            .into_iter()
+            .filter(|(key, _)| !self.view.contains_key(key))
+            .collect();
+        for (key, value) in self.view {
+            if let (true, Some(value)) = (key.starts_with(prefix), value) {
+                rows.push((key.clone(), value.clone()));
+            }
+        }
+        // `MetaStore::scan_prefix` returns key order and the layout readers
+        // rely on it.
+        rows.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(rows)
+    }
+
+    fn flush(&self) -> Result<()> {
+        self.inner.flush()
+    }
+}
 
 /// Keeps only the last operation on each key of a batch.
 ///
@@ -386,6 +463,7 @@ impl Catalog {
             store,
             counter_lock: Mutex::new(()),
             cpp_only: false,
+            capture: Mutex::new(None),
         }
     }
 
@@ -396,6 +474,7 @@ impl Catalog {
             store,
             counter_lock: Mutex::new(()),
             cpp_only: true,
+            capture: Mutex::new(None),
         }
     }
 
@@ -424,7 +503,23 @@ impl Catalog {
     /// `catalog|db|{name}|{ts}` record, so the scan is authoritative.
     fn cpp_databases(&self) -> Result<Vec<String>> {
         let mut out = vec!["default_db".to_string()];
-        for (k, _) in self.store.scan_prefix(b"catalog|db|")? {
+        for name in self.cpp_database_records()? {
+            if !out.contains(&name) {
+                out.push(name);
+            }
+        }
+        Ok(out)
+    }
+
+    /// The databases that actually **have a record** in the C++ key space.
+    ///
+    /// `default_db` is created by the reference's startup transaction
+    /// (`Storage::CreateDefaultDB`, only when `system_start_ts == 0`), so it is
+    /// not implied: a directory that never ran that transaction has no record
+    /// for it, and `CREATE DATABASE` has to write one.
+    fn cpp_database_records(&self) -> Result<Vec<String>> {
+        let mut out: Vec<String> = Vec::new();
+        for (k, _) in self.with_view(|store| store.scan_prefix(b"catalog|db|"))? {
             let text = String::from_utf8_lossy(&k).to_string();
             if let Some(name) = text.split('|').nth(2) {
                 if !out.iter().any(|d| d == name) {
@@ -435,72 +530,86 @@ impl Catalog {
         Ok(out)
     }
 
+    /// Runs `f` against the store as the DDL in flight sees it: either the
+    /// store itself, or the store with the captured writes applied.
+    fn with_view<T>(&self, f: impl FnOnce(&dyn MetaStore) -> Result<T>) -> Result<T> {
+        let guard = self.capture.lock().unwrap();
+        match guard.as_ref() {
+            Some(capture) => f(&Overlay {
+                inner: self.store.as_ref(),
+                view: &capture.view,
+            }),
+            None => f(self.store.as_ref()),
+        }
+    }
+
     fn cpp_tables(&self) -> Result<Vec<TableMeta>> {
-        crate::cpp_layout::read_cpp_tables_as_meta(self.store.as_ref())
+        self.with_view(|store| crate::cpp_layout::read_cpp_tables_as_meta(store))
     }
 
     fn cpp_indexes(&self) -> Result<Vec<IndexMeta>> {
-        let tables = crate::cpp_layout::read_cpp_layout(self.store.as_ref())?;
-        let mut out = Vec::new();
-        for def in crate::cpp_layout::read_cpp_indexes(self.store.as_ref())? {
-            if let Some(meta) = crate::cpp_layout::index_meta_of(&def, &tables) {
-                out.push(meta);
+        self.with_view(|store| {
+            let tables = crate::cpp_layout::read_cpp_layout(store)?;
+            let mut out = Vec::new();
+            for def in crate::cpp_layout::read_cpp_indexes(store)? {
+                if let Some(meta) = crate::cpp_layout::index_meta_of(&def, &tables) {
+                    out.push(meta);
+                }
             }
-        }
-        // A record read back from the C++ key space carries the id the
-        // reference handed out; a record without one (a hand-written one) is
-        // numbered per table (1-based, as `CREATE INDEX` would) - skipping
-        // the ids the other records already hold, so the fallback cannot
-        // hand two indexes the same id.
-        let mut next: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
-        let mut taken: std::collections::HashMap<String, std::collections::HashSet<u64>> =
-            std::collections::HashMap::new();
-        for im in out.iter() {
-            if im.id > 0 {
-                taken.entry(im.table.clone()).or_default().insert(im.id);
+            // A record read back from the C++ key space carries the id the
+            // reference handed out; a record without one (a hand-written one)
+            // is numbered per table (1-based, as `CREATE INDEX` would) -
+            // skipping the ids the other records already hold, so the fallback
+            // cannot hand two indexes the same id.
+            let mut next: HashMap<String, u64> = HashMap::new();
+            let mut taken: HashMap<String, std::collections::HashSet<u64>> = HashMap::new();
+            for im in out.iter() {
+                if im.id > 0 {
+                    taken.entry(im.table.clone()).or_default().insert(im.id);
+                }
             }
-        }
-        for im in out.iter_mut() {
-            if im.id == 0 {
-                let used = taken.entry(im.table.clone()).or_default();
-                let n = next.entry(im.table.clone()).or_insert(0);
-                loop {
-                    *n += 1;
-                    if !used.contains(n) {
-                        break;
+            for im in out.iter_mut() {
+                if im.id == 0 {
+                    let used = taken.entry(im.table.clone()).or_default();
+                    let n = next.entry(im.table.clone()).or_insert(0);
+                    loop {
+                        *n += 1;
+                        if !used.contains(n) {
+                            break;
+                        }
+                    }
+                    im.id = *n;
+                    used.insert(*n);
+                }
+            }
+            // Name-only indexes — the engine does not materialise an expression
+            // target such as `c1 + 5`, so it has no C++ `IndexBase`; its name
+            // lives under a supplementary table tag (`write_cpp_layout_from`).
+            for t in &tables {
+                let tag = infinity_storage::catalog_format::catalog_table_tag_key(
+                    &t.db_id.to_string(),
+                    &t.table_id.to_string(),
+                    "rust_name_only_indexes",
+                );
+                let Some(bytes) = store.get(tag.as_bytes())? else {
+                    continue;
+                };
+                for name in String::from_utf8_lossy(&bytes).split(',') {
+                    let name = name.trim();
+                    if !name.is_empty() {
+                        out.push(IndexMeta {
+                            name: name.to_string(),
+                            table: format!("{}.{}", t.db_name, t.table_name),
+                            column: String::new(),
+                            index_type: String::new(),
+                            options: Vec::new(),
+                            id: 0,
+                        });
                     }
                 }
-                im.id = *n;
-                used.insert(*n);
             }
-        }
-        // Name-only indexes — the engine does not materialise an expression
-        // target such as `c1 + 5`, so it has no C++ `IndexBase`; its name lives
-        // under a supplementary table tag (`write_cpp_layout_from`).
-        for t in &tables {
-            let tag = infinity_storage::catalog_format::catalog_table_tag_key(
-                &t.db_id.to_string(),
-                &t.table_id.to_string(),
-                "rust_name_only_indexes",
-            );
-            let Some(bytes) = self.store.get(tag.as_bytes())? else {
-                continue;
-            };
-            for name in String::from_utf8_lossy(&bytes).split(',') {
-                let name = name.trim();
-                if !name.is_empty() {
-                    out.push(IndexMeta {
-                        name: name.to_string(),
-                        table: format!("{}.{}", t.db_name, t.table_name),
-                        column: String::new(),
-                        index_type: String::new(),
-                        options: Vec::new(),
-                        id: 0,
-                    });
-                }
-            }
-        }
-        Ok(out)
+            Ok(out)
+        })
     }
 
     /// Republished the whole C++ layout from `dbs`/`tables`/`indexes` after
@@ -522,9 +631,89 @@ impl Catalog {
         // them unchanged instead of leaving the C++ reader with a segmentless
         // table.
         let segments = crate::cpp_layout::read_cpp_segments(self.store.as_ref())?;
-        let mut batch = self.cpp_layout_sweep(self.store.as_ref())?;
-        batch.extend(self.write_cpp_layout_batch(dbs, tables, indexes, &segments)?);
-        self.store.atomic_batch(&last_op_per_key(batch))
+        // While a DDL is in flight the layout is computed from what that DDL
+        // has already written, not from the store: dropping a database rewrites
+        // the layout once per table it holds, and each rewrite must see the
+        // previous one.
+        let mut slot = self.capture.lock().unwrap();
+        let (sweep, layout) = match slot.as_ref() {
+            Some(capture) => {
+                let view = Overlay {
+                    inner: self.store.as_ref(),
+                    view: &capture.view,
+                };
+                (
+                    self.cpp_layout_sweep(&view)?,
+                    self.write_cpp_layout_batch_from(&view, dbs, tables, indexes, &segments)?,
+                )
+            }
+            None => (
+                self.cpp_layout_sweep(self.store.as_ref())?,
+                self.write_cpp_layout_batch(dbs, tables, indexes, &segments)?,
+            ),
+        };
+        let batch = last_op_per_key([sweep, layout].concat());
+        // A DDL under a transaction hands its writes to the caller
+        // (`Engine::ddl_commit`), which writes them together with the WAL record
+        // that carries the commit timestamp this layout is stamped with.
+        if let Some(capture) = slot.as_mut() {
+            for (key, value) in &batch {
+                capture.view.insert(key.clone(), value.clone());
+            }
+            capture.batch.extend(batch);
+            return Ok(());
+        }
+        drop(slot);
+        self.store.atomic_batch(&batch)
+    }
+
+    /// Runs `f` with this catalog's C++-layout writes collected instead of
+    /// applied, returning them so the caller can commit them through a
+    /// transaction.
+    ///
+    /// Reads inside `f` see the writes `f` already made ([`Self::with_view`]),
+    /// so a statement that mutates the catalog more than once sees its own
+    /// effects. Only one DDL runs at a time (`Engine::ddl_commit` holds the
+    /// lock), so a single slot is enough; a nested capture is a programming
+    /// error and is reported rather than silently nesting.
+    pub fn capture<T>(&self, f: impl FnOnce() -> Result<T>) -> Result<(T, Vec<BatchItem>)> {
+        {
+            let mut slot = self.capture.lock().unwrap();
+            if slot.is_some() {
+                return Err(Error::Catalog("nested catalog capture".into()));
+            }
+            *slot = Some(Capture::default());
+        }
+        let out = f();
+        let capture = self.capture.lock().unwrap().take().unwrap_or_default();
+        Ok((out?, last_op_per_key(capture.batch)))
+    }
+
+    /// Replaces the DDL sentinel in every **newly written** key with `ts`, the
+    /// commit timestamp the caller reserved for the transaction.
+    ///
+    /// Only the puts are re-stamped: a sentinel names a record this DDL creates.
+    /// A **delete** names a record that already exists, so its key carries that
+    /// record's *real* commit ts — the sweep that drops a stale layout deletes
+    /// such keys, and re-stamping one would aim it at a key that does not exist,
+    /// leaving the real record behind. (This is why a `DROP TABLE` after a
+    /// restore wrote sentinel-ts keys used to delete nothing.)
+    pub fn restamp(batch: &mut [BatchItem], ts: u64) {
+        let from = format!("|{DDL_TS_SENTINEL}");
+        let to = format!("|{ts}");
+        for (key, value) in batch.iter_mut() {
+            // Skip deletions: their key is the existing record's, already stamped.
+            if value.is_none() {
+                continue;
+            }
+            if let Ok(text) = std::str::from_utf8(key) {
+                if text.ends_with(&from) {
+                    let mut replaced = text[..text.len() - from.len()].to_string();
+                    replaced.push_str(&to);
+                    *key = replaced.into_bytes();
+                }
+            }
+        }
     }
 
     /// Republishes the whole C++ layout from the **current** native catalog,
@@ -954,14 +1143,21 @@ impl Catalog {
     pub fn create_database(&self, name: &str, if_not_exists: bool) -> Result<()> {
         if self.cpp_only {
             let mut dbs = self.cpp_databases()?;
-            if dbs.iter().any(|d| d == name) {
+            if self.cpp_database_records()?.iter().any(|d| d == name) {
                 return if if_not_exists {
                     Ok(())
                 } else {
                     Err(Error::Catalog(format!("database '{name}' already exists")))
                 };
             }
-            dbs.push(name.to_string());
+            // `cpp_databases()` already lists `default_db` (the reference
+            // implies it), so pushing it again would write the database twice
+            // and hand it two ids: the layout would then emit
+            // `db|1|next_table_id` *and* `db|2|next_table_id`, and
+            // `catalog|db|default_db|{ts}` would end up carrying the second id.
+            if !dbs.iter().any(|d| d == name) {
+                dbs.push(name.to_string());
+            }
             self.rewrite_cpp(&dbs, &self.cpp_tables()?, &self.cpp_indexes()?)?;
             return Ok(());
         }
@@ -977,13 +1173,26 @@ impl Catalog {
         Ok(())
     }
 
+    /// Whether `name` is **recorded** as a database, as opposed to being
+    /// implied by the C++ reader.
+    ///
+    /// `default_db` is created by the reference's startup transaction
+    /// (`Storage::CreateDefaultDB`), so an empty directory has no record for
+    /// it: startup has to write one, and `CREATE DATABASE` must not treat it as
+    /// already existing.
+    pub fn has_database_record(&self, name: &str) -> Result<bool> {
+        if self.cpp_only {
+            return Ok(self.cpp_database_records()?.iter().any(|d| d == name));
+        }
+        Ok(self.store.get(&db_key(name))?.is_some())
+    }
+
     /// Removes a database registration. `if_exists` tolerates a missing name.
     pub fn drop_database(&self, name: &str, if_exists: bool) -> Result<bool> {
         if self.cpp_only {
             let mut dbs = self.cpp_databases()?;
-            let before = dbs.len();
+            let existed = self.cpp_database_records()?.iter().any(|d| d == name);
             dbs.retain(|d| d != name);
-            let existed = dbs.len() != before;
             if !existed && !if_exists {
                 return Err(Error::Catalog(format!("database '{name}' does not exist")));
             }
@@ -1760,8 +1969,12 @@ mod tests {
 
         let back = crate::cpp_layout::read_cpp_segments(store.as_ref()).unwrap();
         assert_eq!(back, vec![set]);
-        // `next_segment_id` is the next id to hand out, `unsealed_segment_id`
-        // the segment the engine would still append to.
+        // `next_segment_id` is written as "0" and never advanced — the reference
+        // does the same at `TableMeta::InitSet` (`table_meta_impl.cpp:274`) and
+        // derives the id to hand out from the segment map
+        // (`MetaTableObject::GetNextSegmentID`, `meta_tree_impl.cpp:657`).
+        // `unsealed_segment_id` *is* maintained: it names the segment the engine
+        // would still append to.
         let tag = |name: &str| {
             store
                 .get(
@@ -1771,7 +1984,7 @@ mod tests {
                 .unwrap()
                 .map(|v| String::from_utf8_lossy(&v).to_string())
         };
-        assert_eq!(tag("next_segment_id").as_deref(), Some("1"));
+        assert_eq!(tag("next_segment_id").as_deref(), Some("0"));
         assert_eq!(tag("unsealed_segment_id").as_deref(), Some("0"));
 
         // Publishing again with fewer blocks must not leave the stale record.
