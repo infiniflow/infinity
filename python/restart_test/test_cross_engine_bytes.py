@@ -125,8 +125,8 @@ MINIO_ACCESS_KEY = os.environ.get("INFINITY_MINIO_ACCESS_KEY", "")
 MINIO_SECRET_KEY = os.environ.get("INFINITY_MINIO_SECRET_KEY", "")
 
 
-def _config(root, engine, pg_port, quota="1KB"):
-    """A config for one engine, rooted at `root`.
+def _config(root, engine, pg_port, quota="2GB"):
+    """A config for one engine, rooted at `root`, with every asynchronous task off.
 
     The two engines read the root differently: the reference takes
     `data_dir`/`catalog_dir`/`wal_dir` and uses `persistence_dir` only as a
@@ -134,16 +134,41 @@ def _config(root, engine, pg_port, quota="1KB"):
     derives its root from the *parent* of `persistence_dir`
     (`serve_from_config`, `crates/infinity-cli/src/main.rs:98`).
 
-    `quota` is `[buffer] memindex_memory_quota`. A small quota makes the
-    reference dump an index from a **worker thread** once the memory index
-    crosses it (`BGMemIndexTracer::IncreaseMemoryUsage`,
-    `src/storage/tracer/memindex_tracer.cppm:102`), and that dump is a write
-    transaction: its commit ts is allocated whenever the worker happens to run,
-    so it lands between whatever statements the client sent next. That is fine
-    for the tests that check chunk *content*, but a test that compares commit
-    timestamps has to pass a quota the memory index can never cross (`"2GB"`;
-    the reference's byte-size parser rejects `"0"` - "Invalid byte size: 0"), so
-    that the explicit `DumpIndex` calls are the only dumps.
+    **Determinism is the input of this test, so no background task may write
+    while the script runs.** Every interval the reference accepts is set to
+    "0s", which its parser turns into 0 and its triggers read as "disabled"
+    (`MIN_*_INTERVAL_SEC = 0`, "0 means disable the function",
+    `src/common/default_values.cppm:98-123`):
+
+    * `[storage] optimize_interval` - merges index chunks from a background
+      task (`OptimizeIndexProcessor`), which rewrites the very chunk files the
+      test compares;
+    * `[storage] cleanup_interval` - deletes the chunks a previous optimize
+      merged away;
+    * `[storage] compact_interval` - merges segments on its own schedule, so
+      the segment/block layout would depend on wall-clock time;
+    * `[wal] checkpoint_interval` - writes a checkpoint from the WAL thread,
+      which spends a commit ts and rewrites the C++ mirror (the reference's
+      default is 30 s, so without this a slow run would checkpoint mid-script).
+
+    A memory index has **two** dump triggers, and only one of them is
+    deterministic:
+
+    * **row capacity** - `[storage] mem_index_capacity` (default 65536 = 8
+      blocks). When a memory index holds that many rows it is dumped
+      (`new_txn_index_impl.cpp:1381`). The count is a property of the script, so
+      the trigger is reproducible and stays **on**;
+    * **memory usage** - `[buffer] memindex_memory_quota`. The tracer
+      (`BGMemIndexTracer::IncreaseMemoryUsage`,
+      `src/storage/tracer/memindex_tracer.cppm:102`) dumps from a **worker
+      thread** as soon as the memory index crosses the quota, and that dump is a
+      write transaction whose commit ts is allocated whenever the worker happens
+      to run - it lands between whatever statements the client sent next, so the
+      chunk boundaries *and* the ts sequence become a scheduling outcome. The
+      quota is therefore set beyond anything this test can allocate (`"2GB"`, the
+      buffer size; the reference's byte-size parser rejects `"0"` - "Invalid
+      byte size: 0"), which leaves the explicit `DumpIndex` calls and the
+      row-capacity trigger as the only dumps.
     """
     persistence = "" if engine == "cpp" else f"{root}/persistence"
     return f"""
@@ -167,9 +192,16 @@ log_level = "info"
 data_dir = "{root}/data"
 catalog_dir = "{root}/catalog"
 persistence_dir = "{persistence}"
+# Every background task is off: the mirror, the segment layout and the ts
+# sequence must not depend on when a worker thread happens to run.
 optimize_interval = "0s"
 cleanup_interval = "0s"
 compact_interval = "0s"
+# The *row-count* trigger stays on (the reference default, 8 blocks): it fires
+# when a memory index holds this many rows, which is a property of the script,
+# not of the clock (`new_txn_index_impl.cpp:1381`). Only the *memory-usage*
+# trigger (`BGMemIndexTracer`, a worker thread) is disabled, by the quota below.
+mem_index_capacity = 65536
 
 [buffer]
 buffer_manager_size = "2GB"
@@ -253,7 +285,7 @@ def _seed(conn, row_count=ROWS):
     time.sleep(2)
 
 
-def _run_engine(engine, root, pg_port, row_count=ROWS, seed=None, quota="1KB"):
+def _run_engine(engine, root, pg_port, row_count=ROWS, seed=None, quota="2GB"):
     """Seed one engine's directory, retrying a boot that dies during init.
 
     The Thrift server accepts connections before storage finishes initialising,
@@ -283,14 +315,14 @@ def _boot_and_seed(engine, root, pg_port, row_count, seed, quota):
     _spawn_and_run(engine, root, seed or (lambda c: _seed(c, row_count)))
 
 
-def _write_config(engine, root, pg_port, quota="1KB"):
+def _write_config(engine, root, pg_port, quota="2GB"):
     for sub in ("log", "tmp"):
         os.makedirs(os.path.join(root, sub), exist_ok=True)
     with open(os.path.join(root, "engine.toml"), "w") as handle:
         handle.write(_config(root, engine, pg_port, quota))
 
 
-def _run_phases(engine, root, pg_port, phases, quota="1KB"):
+def _run_phases(engine, root, pg_port, phases, quota="2GB"):
     """Run each phase in its own engine process, over the same directory.
 
     A phase is just a callable taking the connection; whether it ends with
@@ -922,9 +954,12 @@ log_level = "info"
 data_dir = "{root}/data"
 catalog_dir = "{root}/catalog"
 persistence_dir = ""
+# Every background task is off: the mirror, the segment layout and the ts
+# sequence must not depend on when a worker thread happens to run.
 optimize_interval = "0s"
 cleanup_interval = "0s"
 compact_interval = "0s"
+mem_index_capacity = 65536
 
 [buffer]
 buffer_manager_size = "2GB"
@@ -2020,7 +2055,10 @@ def test_the_chunk_boundaries_are_timing_dependent():
     """
     for engine, port in (("cpp", 5432), ("rust", 5433)):
         root = os.path.join(ROOT, f"gran_{engine}")
-        _run_engine(engine, root, port, seed=_seed_granularity)
+        # This is the one test that *wants* the worker-thread dump the rest of
+        # the gate switches off: it checks the tiling invariant of whatever
+        # boundaries the schedule produced, so the small quota stays.
+        _run_engine(engine, root, port, seed=_seed_granularity, quota="1KB")
         files = _files(root)
         table_dir = _own_table_dir(files, len(GRANULARITY_COLUMNS))
         assert table_dir, f"{engine} wrote no table"
