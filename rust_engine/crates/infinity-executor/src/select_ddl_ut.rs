@@ -133,103 +133,31 @@ fn insert_select_reports_arity_and_name_errors() {
     assert!(err.to_string().contains("table"), "{err}");
 }
 
+/// The reference has no `CREATE TABLE … AS SELECT`. Without a column list the
+/// statement reaches its binder and fails with `Status::NoColumnDefined`
+/// (3048); with one, the reference's grammar rejects the trailing `AS`, so the
+/// port refuses it at parse time instead of dropping the query.
 #[test]
-fn create_table_as_infers_names_and_types_and_copies_rows() {
+fn create_table_as_select_is_rejected_like_the_reference() {
     let (_d, e) = engine();
     seed_source(&e);
 
-    assert!(matches!(
-        result(&e, "CREATE TABLE copy AS SELECT a, b FROM src;"),
-        QueryResult::CreatedTable { .. }
-    ));
-    assert_eq!(
-        row_strings(&e, "SELECT * FROM copy ORDER BY a;"),
-        vec![
-            vec!["1".to_string(), "x".to_string()],
-            vec!["2".to_string(), "y".to_string()],
-            vec!["3".to_string(), "z".to_string()],
-        ]
-    );
-    let columns = select_rows(&e, "SHOW TABLE copy COLUMNS;");
-    assert_eq!(columns[0][0], "a");
-    assert_eq!(columns[0][1], "Integer");
-    assert_eq!(columns[1][0], "b");
-    assert_eq!(columns[1][1], "Varchar");
-}
-
-#[test]
-fn create_table_as_accepts_explicit_definitions_and_aliases() {
-    let (_d, e) = engine();
-    seed_source(&e);
-
-    result(
-        &e,
-        "CREATE TABLE typed (x DOUBLE, y VARCHAR) AS SELECT a, b FROM src;",
-    );
-    assert_eq!(
-        row_strings(&e, "SELECT * FROM typed ORDER BY x;"),
-        vec![
-            vec!["1.000000".to_string(), "x".to_string()],
-            vec!["2.000000".to_string(), "y".to_string()],
-            vec!["3.000000".to_string(), "z".to_string()],
-        ]
-    );
-    let columns = select_rows(&e, "SHOW TABLE typed COLUMNS;");
-    assert_eq!(columns[0][1], "Double");
-
-    result(
-        &e,
-        "CREATE TABLE named AS SELECT a AS id, b AS label FROM src;",
-    );
-    assert_eq!(
-        select_rows(&e, "SELECT * FROM named ORDER BY id;")[0],
-        vec!["1".to_string(), "x".to_string()]
-    );
-
-    // A SELECT without a FROM derives both names and types from the literals.
-    result(&e, "CREATE TABLE konst AS SELECT 1 AS one, 'x' AS letter;");
-    assert_eq!(
-        select_rows(&e, "SELECT * FROM konst;"),
-        vec![vec!["1".to_string(), "x".to_string()]]
-    );
-    assert_eq!(select_rows(&e, "SHOW TABLE konst COLUMNS;")[0][1], "BigInt");
-}
-
-#[test]
-fn create_table_as_keeps_declared_types_for_direct_columns_even_when_empty() {
-    let (_d, e) = engine();
-    e.execute("CREATE TABLE vecs (id INT, v EMBEDDING(FLOAT,2));")
-        .unwrap();
-    e.execute("INSERT INTO vecs VALUES (1, [0.1,0.2]);")
-        .unwrap();
-    result(&e, "CREATE TABLE vcopy AS SELECT * FROM vecs;");
-    let columns = select_rows(&e, "SHOW TABLE vcopy COLUMNS;");
-    assert_eq!(columns[0][1], "Integer");
-    assert_eq!(columns[1][1], "Embedding(float,2)");
-
-    // No rows still yields the source schema, not an all-VARCHAR guess.
-    e.execute("CREATE TABLE empty_src (a INT, v EMBEDDING(FLOAT,2));")
-        .unwrap();
-    result(&e, "CREATE TABLE empty_copy AS SELECT * FROM empty_src;");
-    let columns = select_rows(&e, "SHOW TABLE empty_copy COLUMNS;");
-    assert_eq!(columns[0][1], "Integer");
-    assert_eq!(columns[1][1], "Embedding(float,2)");
-}
-
-#[test]
-fn create_table_as_reports_definition_arity_mismatch() {
-    let (_d, e) = engine();
-    seed_source(&e);
     let err = e
-        .execute("CREATE TABLE bad (x INT) AS SELECT a, b FROM src;")
+        .execute("CREATE TABLE copy AS SELECT a, b FROM src;")
         .unwrap_err();
-    assert!(
-        err.to_string()
-            .contains("1 column definition(s) but SELECT returns 2 column(s)"),
-        "{err}"
+    assert_eq!(
+        err.to_string(),
+        "Try to define Table copy without any column."
     );
-    // A failed CTAS must not leave the table behind.
-    assert!(e.execute("SELECT * FROM bad;").is_err());
+    assert_eq!(err.status_code(), 3048);
+    // Nothing was created.
+    assert!(e.execute("SELECT * FROM copy;").is_err());
+
+    let err = e
+        .execute("CREATE TABLE typed (x DOUBLE, y VARCHAR) AS SELECT a, b FROM src;")
+        .unwrap_err();
+    assert!(err.to_string().contains("unexpected AS"), "{err}");
+    assert!(e.execute("SELECT * FROM typed;").is_err());
 }
 
 #[test]

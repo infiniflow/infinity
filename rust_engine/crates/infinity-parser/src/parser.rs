@@ -475,15 +475,13 @@ impl Parser {
                     self.expect(Token::LParen)?;
                     let columns = self.column_defs()?;
                     self.expect(Token::RParen)?;
-                    // `CREATE TABLE t (a INT) AS SELECT …`: the definitions
-                    // name/type the output columns instead of being inferred.
-                    if self.eat_kw("AS") {
-                        let query = self.statement()?;
-                        return Ok(Statement::CreateTableAs {
-                            name,
-                            columns,
-                            query: Box::new(query),
-                        });
+                    // `CREATE TABLE t (a INT) AS SELECT …` is a syntax error
+                    // in the reference ("unexpected AS, expecting end of
+                    // file"): its grammar has no `CREATE TABLE … AS` form, so
+                    // the port refuses it here rather than silently dropping
+                    // the `AS <query>` tail.
+                    if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("AS")) {
+                        return self.err("syntax error, unexpected AS, expecting end of file");
                     }
                     // tolerate a trailing `PROPERTIES (…)` / `WITH (…)` clause
                     while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
@@ -2927,6 +2925,20 @@ mod tests {
                 ],
             }
         );
+    }
+
+    /// The reference's grammar has no `CREATE TABLE … AS SELECT`, so the
+    /// definitions-after-name form is a syntax error there ("unexpected AS,
+    /// expecting end of file"); the port must not accept it and silently drop
+    /// the `AS <query>` tail.
+    #[test]
+    fn create_table_with_columns_does_not_take_an_as_query() {
+        let error = parse("CREATE TABLE t (a INT) AS SELECT 1;").unwrap_err();
+        assert!(error.to_string().contains("unexpected AS"), "{error}");
+        // The bare form still parses: the executor reports it the way the
+        // reference's binder does (`NoColumnDefined`).
+        let s = one("CREATE TABLE t AS SELECT 1;");
+        assert!(matches!(s, Statement::CreateTableAs { .. }));
     }
 
     #[test]

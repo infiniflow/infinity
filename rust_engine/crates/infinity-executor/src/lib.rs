@@ -2429,36 +2429,6 @@ fn literal_from_value(value: &Value, type_text: &str) -> Literal {
     }
 }
 
-/// The column type `CREATE TABLE … AS SELECT` assigns to an inferred column:
-/// integers become `BIGINT`, mixed integers/floats `DOUBLE`, booleans
-/// `BOOLEAN`, and anything textual (or an all-NULL column) `VARCHAR`.
-fn infer_column_type(values: impl Iterator<Item = Value>) -> String {
-    let mut saw_int = false;
-    let mut saw_float = false;
-    let mut saw_bool = false;
-    let mut saw_other = false;
-    for v in values {
-        match v {
-            Value::Int(_) => saw_int = true,
-            Value::Float(_) => saw_float = true,
-            Value::Bool(_) => saw_bool = true,
-            Value::Str(_) => saw_other = true,
-            Value::Null => {}
-        }
-    }
-    if saw_other || (saw_bool && (saw_int || saw_float)) {
-        "VARCHAR".to_string()
-    } else if saw_float {
-        "DOUBLE".to_string()
-    } else if saw_int {
-        "BIGINT".to_string()
-    } else if saw_bool {
-        "BOOLEAN".to_string()
-    } else {
-        "VARCHAR".to_string()
-    }
-}
-
 fn is_plain_identifier(s: &str) -> bool {
     let mut chars = s.chars();
     match chars.next() {
@@ -8318,174 +8288,6 @@ impl Engine {
         self.insert_literals(table, None, literals)
     }
 
-    /// The output types of a SELECT, used by `CREATE TABLE … AS SELECT`.
-    ///
-    /// A direct column (or `*`) keeps its declared type, so an empty result and
-    /// structured columns (vector/array/sparse/…) survive the copy. Expressions
-    /// and aggregates have no static type in this planner, so their type is
-    /// inferred from the produced values.
-    fn select_output_types(&self, stmt: &Statement, rows: &[Vec<Value>]) -> Vec<String> {
-        let Statement::Select {
-            items, from, join, ..
-        } = stmt
-        else {
-            return Vec::new();
-        };
-        let mut base: Option<(Vec<String>, Vec<String>)> = None;
-        if let Some(t) = from {
-            if !t.trim_start().to_ascii_uppercase().starts_with("SELECT ") {
-                if let (Ok(schema), Ok(mut types)) = (self.table_schema(t), self.column_types(t)) {
-                    let mut schema = schema;
-                    if let Some(j) = join {
-                        if let (Ok(js), Ok(jt)) =
-                            (self.table_schema(&j.table), self.column_types(&j.table))
-                        {
-                            schema.extend(js);
-                            types.extend(jt);
-                        }
-                    }
-                    base = Some((schema, types));
-                }
-            }
-        }
-        let inferred = |i: usize| infer_column_type(rows.iter().filter_map(|r| r.get(i).cloned()));
-        let width = rows.first().map(Vec::len).unwrap_or_else(|| {
-            items
-                .iter()
-                .map(|it| match it {
-                    SelectItem::Star => base.as_ref().map_or(0, |(schema, _)| schema.len()),
-                    _ => 1,
-                })
-                .sum()
-        });
-        let mut out = Vec::with_capacity(width);
-        for (i, item) in items.iter().enumerate() {
-            match item {
-                SelectItem::Star => {
-                    if let Some((_, types)) = &base {
-                        out.extend(types.iter().cloned());
-                    }
-                }
-                SelectItem::Column(c) => {
-                    let declared = base.as_ref().and_then(|(schema, types)| {
-                        schema
-                            .iter()
-                            .position(|s| s == c)
-                            .and_then(|p| types.get(p).cloned())
-                    });
-                    out.push(declared.unwrap_or_else(|| inferred(i)));
-                }
-                SelectItem::Literal(l) => out.push(match l {
-                    Literal::Int(_) => "BIGINT".to_string(),
-                    Literal::Float(_) => "DOUBLE".to_string(),
-                    _ => "VARCHAR".to_string(),
-                }),
-                _ => out.push(inferred(i)),
-            }
-        }
-        if out.len() == width {
-            out
-        } else {
-            (0..width).map(inferred).collect()
-        }
-    }
-
-    /// `CREATE TABLE t [(cols)] AS SELECT …`: derives the schema (explicit
-    /// definitions win; otherwise names and types are inferred from the
-    /// result), creates the table and appends the rows.
-    fn create_table_from_select(
-        &self,
-        name: &str,
-        columns: &[infinity_parser::ColumnDef],
-        query: &Statement,
-    ) -> Result<QueryResult> {
-        let query = self.expand_views(query.clone(), &[])?;
-        let (source_columns, rows) = self.run_select(&query)?;
-        let (names, types, defaults, not_nulls, comments, sparse_stores) = if columns.is_empty() {
-            let names: Vec<String> = source_columns
-                .iter()
-                .enumerate()
-                .map(|(i, c)| {
-                    if c.trim().is_empty() {
-                        format!("column_{}", i + 1)
-                    } else {
-                        c.clone()
-                    }
-                })
-                .collect();
-            let mut types = self.select_output_types(&query, &rows);
-            if types.len() != names.len() {
-                types = (0..names.len())
-                    .map(|i| infer_column_type(rows.iter().filter_map(|r| r.get(i).cloned())))
-                    .collect();
-            }
-            (
-                names,
-                types,
-                vec![None; source_columns.len()],
-                vec![false; source_columns.len()],
-                vec![None; source_columns.len()],
-                vec![None; source_columns.len()],
-            )
-        } else {
-            if columns.len() != source_columns.len() {
-                return Err(Error::Invalid(format!(
-                    "CREATE TABLE AS has {} column definition(s) but SELECT returns {} column(s)",
-                    columns.len(),
-                    source_columns.len()
-                )));
-            }
-            (
-                columns.iter().map(|c| c.name.clone()).collect(),
-                columns.iter().map(|c| c.type_text.clone()).collect(),
-                columns
-                    .iter()
-                    .map(|c| {
-                        c.default
-                            .as_ref()
-                            .map(|l| normalize_default(&c.type_text, &l.to_slt_string()))
-                    })
-                    .collect(),
-                columns.iter().map(|c| c.not_null).collect(),
-                columns.iter().map(|c| c.comment.clone()).collect(),
-                sparse_store_hints(columns),
-            )
-        };
-        let created = self.ddl_commit(|| {
-            self.create_table_clearing_orphans(
-                name,
-                &names,
-                &defaults,
-                &not_nulls,
-                &types,
-                &comments,
-                &sparse_stores,
-            )
-        })?;
-        let literals: Vec<Vec<Literal>> = rows
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .enumerate()
-                    .map(|(i, value)| {
-                        literal_from_value(value, types.get(i).map(String::as_str).unwrap_or(""))
-                    })
-                    .collect()
-            })
-            .collect();
-        match self.insert_literals(name, None, literals) {
-            Ok(_) => Ok(QueryResult::CreatedTable {
-                id: created.id,
-                name: created.name,
-            }),
-            Err(e) => {
-                // A failed insert must not leave a half-created table behind.
-                let _ = self.drop_table_all(name);
-                Err(e)
-            }
-        }
-    }
-
     /// `DESCRIBE <table>`: the same four columns as the reference's
     /// `SHOW TABLE … COLUMNS` (`name`, `type`, `default`, `comment`), in
     /// definition order.
@@ -10178,11 +9980,18 @@ impl Engine {
                 columns,
                 query,
             } => self.insert_from_select(table, columns.as_deref(), query),
-            Statement::CreateTableAs {
-                name,
-                columns,
-                query,
-            } => self.create_table_from_select(name, columns, query),
+            // The reference has no `CREATE TABLE … AS SELECT`: the statement
+            // reaches its binder as a table definition without columns and
+            // fails there (`Status::NoColumnDefined`,
+            // `query_context_impl.cpp:238`). Rejecting it with the same message
+            // keeps the two engines indistinguishable to a client.
+            Statement::CreateTableAs { name, .. } => {
+                // `CreateTableInfo::table_name_`, not the qualified name.
+                let table = name.rsplit('.').next().unwrap_or(name.as_str());
+                Err(Error::NoColumnDefined(format!(
+                    "Try to define Table {table} without any column."
+                )))
+            }
             Statement::CreateView {
                 name,
                 columns,
@@ -18017,6 +17826,11 @@ impl Engine {
         self.context
             .last_cleanup_ts
             .store(self.txn.current_ts(), std::sync::atomic::Ordering::Relaxed);
+        // `NewTxn::Cleanup` is a transaction: its commit writes one `CLEANUP`
+        // command carrying the begin ts (`CleanupTxnStore::ToWalEntry`), which
+        // the reference's replay ignores. Without it a directory that ran a
+        // cleanup has one frame less than the reference's.
+        self.txn.append_cleanup()?;
         cleaned
     }
 }
@@ -20332,6 +20146,28 @@ mod tests {
         // A predicate that spans both blocks still returns every row.
         let got = rows(&e, "SELECT id FROM pf WHERE id >= 8190 AND id < 8200;");
         assert_eq!(got.len(), 10, "{got:?}");
+    }
+
+    /// The reference has no `CREATE TABLE … AS SELECT`: without a column
+    /// definition the statement reaches its binder and fails with
+    /// `Status::NoColumnDefined` (3048), not with a table created from the
+    /// query's result.
+    #[test]
+    fn create_table_as_select_is_rejected_like_the_reference() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE cta_src (a INT);").unwrap();
+        e.execute("INSERT INTO cta_src VALUES (1);").unwrap();
+        let error = e
+            .execute("CREATE TABLE cta_dst AS SELECT * FROM cta_src;")
+            .expect_err("CTAS must be rejected");
+        assert_eq!(
+            error.to_string(),
+            "Try to define Table cta_dst without any column."
+        );
+        assert_eq!(error.status_code(), 3048);
+        // Nothing was created.
+        assert!(e.execute("SELECT * FROM cta_dst;").is_err());
     }
 
     /// The rows of a `SELECT`, as rendered strings.

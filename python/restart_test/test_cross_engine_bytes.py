@@ -2227,7 +2227,7 @@ def test_the_quantized_ivf_indexes_mirror_and_answer():
     for engine, port in (("cpp", 5432), ("rust", 5433)):
         answers = _answers(roots[engine], port, QUANT_TABLE, queries)
         assert answers["count"] == [220], f"{engine}: {answers['count']}"
-        for name in [n for n in ("sq", "pq") if n in answers]:
+        for name in ("sq", "pq"):
             ids = answers[name]
             assert len(ids) == 10, f"{engine} {name}: expected 10 ids, got {ids}"
             assert len(set(ids)) == len(ids), f"{engine} {name}: duplicate ids {ids}"
@@ -2266,14 +2266,9 @@ def test_the_quantized_ivf_indexes_survive_a_crash():
             .match_dense("sq", probe, "float", "l2", 10, {"nprobe": "16"})
             .to_result(),
         }
-        if reader == "rust":
-            # The port's product-quantized chunk is not reference-readable yet
-            # (`PQ_Code_StorageT::ExtractCodes` reads past the code area the
-            # reference derives from the chunk), so the PQ probe only runs when
-            # the port reads its own directory. See `GAPS.md` §4.
-            queries["pq"] = lambda t: t.output(["id"]).match_dense(
-                "pq", probe, "float", "l2", 10, {"nprobe": "16"}
-            ).to_result()
+        queries["pq"] = lambda t: t.output(["id"]).match_dense(
+            "pq", probe, "float", "l2", 10, {"nprobe": "16"}
+        ).to_result()
         answers = _answers(root, port, QUANT_TABLE, queries)
         # 200 flushed − 10 deleted + 30 appended.
         assert answers["count"] == [220], (

@@ -800,6 +800,36 @@ impl TxnManager {
         Ok(())
     }
 
+    /// C++ `NewTxn::Cleanup`: the cleanup is a transaction of its own
+    /// (`TransactionType::kCleanup`), so it spends a timestamp like any other
+    /// and leaves one `CLEANUP` command carrying its **begin** ts
+    /// (`CleanupTxnStore::ToWalEntry`). Replay ignores it; the frame exists so
+    /// a cleanup is visible in the log exactly as it is in the reference's.
+    pub fn append_cleanup(&self) -> Result<()> {
+        let _commit = self.commit_lock.lock().unwrap();
+        if self.current_ts.load(Ordering::SeqCst) == 0
+            && self.prepare_commit_ts.load(Ordering::SeqCst) == 0
+        {
+            return Ok(());
+        }
+        let begin_ts = self.current_ts.load(Ordering::SeqCst) + 1;
+        let commit_ts = self.prepare_commit_ts.fetch_add(2, Ordering::SeqCst) + 2;
+        let entry = WalEntry::new(
+            self.next_txn_id.fetch_add(1, Ordering::SeqCst) as i64,
+            commit_ts,
+            vec![WalCmd::Cleanup {
+                timestamp: begin_ts,
+            }],
+        );
+        {
+            let mut wal = self.wal.lock().unwrap();
+            wal.append(&entry)?;
+            wal.flush()?;
+        }
+        self.current_ts.store(commit_ts, Ordering::SeqCst);
+        Ok(())
+    }
+
     /// Rotates a full active log so a single file cannot grow without bound.
     ///
     /// The reference rotates when the WAL passes its size threshold and keeps

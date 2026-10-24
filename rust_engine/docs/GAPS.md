@@ -65,13 +65,13 @@
 | 快照（`CREATE … SNAPSHOT`） | 两种机制互不兼容，无跨引擎用例 |
 | binary-fuse 半区（`BOOLEAN`/`DECIMAL` 的 `bloom_filter`） | 重写版固定写「存在但未构建」 |
 | `IMPORT` 的 WAL 命令形态 | 参考写 `ImportV2`，重写版写等价的 `AppendV2` |
-| IVF 的 **product-quantization** chunk | 端口写出的 PQ 码本/码区布局与参考不同：参考读端口目录再跑 `MATCH VECTOR` 会在 `PQ_Code_StorageT::ExtractCodes` 里越界（段错误）。plain 与 scalar-quantization 的 chunk 参考能读；`test_the_quantized_ivf_indexes_survive_a_crash` 因此只在端口自读时探测 `pq` |
 
 ## 5 已登记的行为差异（性能/口径，不是待办）
 
 | 项 | 说明 | 出处 |
 |---|---|---|
 | 相关子查询的作用域边界 | 只支持引用**外层关系（FROM 侧）**的相关子查询：引用 JOIN 右侧表、引用派生表（parser 不保留派生表别名，标准 SQL 也要求限定）、或写在 `SEARCH` 的 `WHERE` filter 里时返回错误；不会静默按内层同名列求值（`substitute_outer_row` 只剥掉内层表自己的限定符） | `dependent.rs`、`substitute_outer_row` |
+| `CREATE TABLE … AS SELECT` | 不实现（参考也没有）：`CREATE TABLE t AS SELECT …` 返回参考的 `Status::NoColumnDefined`（`Try to define Table t without any column.`，3048）；带列定义的 `CREATE TABLE t (a INT) AS SELECT …` 在参考是解析错误（`unexpected AS, expecting end of file`），端口同样拒绝 |
 | 多词 / 短语 `MATCH` | 走「整行重新分词 + 逐行匹配」，结果与参考一致但不用索引（`filter_fulltext` 的索引过滤已构造真实 `Or`/`And` 树） | `CLASS_MAP.md`「有意的设计变更」 |
 | `standard-porter` | 用 Porter2（`rust_stemmers::English`），少数词干与参考的 `STEM_LANG_PORT` 不同；其余 17 种语言同族一致 | 同上 |
 | `SPARSE` 列的 `SHOW`/catalog 类型文本 | 存储字节一致，但渲染不同：C++ `Sparse(float,int8,0)`，Rust `Sparse(float,int32,8)`（元素类型一致） | `test_cross_engine_compat.py` 只比元素类型 |

@@ -39,6 +39,12 @@ pub enum Error {
     #[error("invalid argument: {0}")]
     Invalid(String),
 
+    /// C++ `Status::NoColumnDefined` (3048): a `CREATE TABLE` without a column
+    /// definition. The status keeps the bare message
+    /// ("Try to define Table {name} without any column."), so `Display` does too.
+    #[error("{0}")]
+    NoColumnDefined(String),
+
     /// C++ `Status::SyntaxError` (3013). The status keeps the bare message, so
     /// `Display` does too — a client that compares the text (the reference
     /// appends its own `@file:line`) sees only what the parser/binder wrote.
@@ -78,6 +84,8 @@ impl Error {
         match self {
             // 7012 PARSER_ERROR: data that does not parse for the column type.
             Error::Invalid(m) if m.starts_with("parser:") => 7012,
+            // 3048 NO_COLUMN_DEFINED.
+            Error::NoColumnDefined(_) => 3048,
             // 3050 EMPTY_SELECT_FIELDS.
             Error::Invalid(m) if m.starts_with("empty select fields") => 3050,
             // 3037 IMPORT_FILE_FORMAT_ERROR: a CSV/JSON cell does not fit the

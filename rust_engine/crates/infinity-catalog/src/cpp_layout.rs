@@ -490,6 +490,31 @@ fn table_of(table: &str) -> &str {
 /// Returns `None` for a `USING` kind the C++ has no index class for (or for a
 /// column that vanished); the caller then leaves no record rather than write a
 /// half-formed one.
+/// One field of a JSON object, for the nested `ivf_option` blob.
+fn json_field<'a>(parent: Option<&'a Json>, key: &str) -> Option<&'a Json> {
+    match parent? {
+        Json::Obj(fields) => fields.iter().find(|(k, _)| k == key).map(|(_, v)| v),
+        _ => None,
+    }
+}
+
+/// The name [`ivf_element_code`] reads back for a `plain_storage_data_type_`
+/// ordinal (`embedding_type.h:33`).
+fn ivf_element_name(code: i64) -> &'static str {
+    match code {
+        value_format::element::BIT => "bit",
+        value_format::element::INT8 => "int8",
+        value_format::element::INT16 => "int16",
+        value_format::element::INT32 => "int32",
+        value_format::element::INT64 => "int64",
+        value_format::element::FLOAT64 => "double",
+        value_format::element::UINT8 => "uint8",
+        value_format::element::FLOAT16 => "float16",
+        value_format::element::BFLOAT16 => "bfloat16",
+        _ => "float32",
+    }
+}
+
 /// `EmbeddingT::String2EmbeddingDataType` for the `plain_storage_data_type`
 /// option (`embedding_type.h:33`).
 fn ivf_element_code(text: &str) -> i64 {
@@ -1708,6 +1733,86 @@ pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<Ind
     if let Some(l) = opt("lsg_config") {
         options.push(("LSG_CONFIG".to_string(), l));
     }
+    // `IndexIVF::Serialize` writes one nested `ivf_option` object, and
+    // `index_def_for` reads it back as individual options. Expanding it here
+    // keeps a reloaded record byte-identical - and keeps the storage type:
+    // without it `ivf_storage_option` sees "plain", so reopening a directory
+    // rebuilt a quantized index with the plain chunk layout.
+    if let Some(option) = def
+        .extra
+        .iter()
+        .find(|(name, _)| name == "ivf_option")
+        .map(|(_, value)| value)
+    {
+        let field = json_field;
+        let number = |v: Option<&Json>| -> Option<String> {
+            v.map(|v| match v {
+                Json::Int(i) => i.to_string(),
+                Json::Float(f) => f.to_string(),
+                other => other.compact(),
+            })
+        };
+        let centroid = field(Some(option), "centroid_option_");
+        let storage = field(Some(option), "storage_option_");
+        if let Some(metric) = field(Some(option), "metric_").and_then(|v| match v {
+            Json::Int(i) => Some(*i),
+            _ => None,
+        }) {
+            options.push((
+                "METRIC".to_string(),
+                value_format::metric_name(metric).to_string(),
+            ));
+        }
+        if let Some(ratio) = number(field(centroid, "centroids_num_ratio_")) {
+            options.push(("CENTROIDS_NUM_RATIO".to_string(), ratio));
+        }
+        if let Some(v) = number(field(centroid, "min_points_per_centroid_")) {
+            options.push(("MIN_POINTS_PER_CENTROID".to_string(), v));
+        }
+        if let Some(v) = number(field(centroid, "max_points_per_centroid_")) {
+            options.push(("MAX_POINTS_PER_CENTROID".to_string(), v));
+        }
+        let storage_type = field(storage, "type_").and_then(|v| match v {
+            Json::Int(i) => Some(*i),
+            _ => None,
+        });
+        match storage_type {
+            Some(value_format::ivf_storage::SCALAR_QUANTIZATION) => {
+                options.push((
+                    "STORAGE_TYPE".to_string(),
+                    "scalar_quantization".to_string(),
+                ));
+                if let Some(v) = number(field(storage, "scalar_quantization_bits_")) {
+                    options.push(("SCALAR_QUANTIZATION_BITS".to_string(), v));
+                }
+            }
+            Some(value_format::ivf_storage::PRODUCT_QUANTIZATION) => {
+                options.push((
+                    "STORAGE_TYPE".to_string(),
+                    "product_quantization".to_string(),
+                ));
+                if let Some(v) = number(field(storage, "product_quantization_subspace_num_")) {
+                    options.push(("PRODUCT_QUANTIZATION_SUBSPACE_NUM".to_string(), v));
+                }
+                if let Some(v) = number(field(storage, "product_quantization_subspace_bits_")) {
+                    options.push(("PRODUCT_QUANTIZATION_SUBSPACE_BITS".to_string(), v));
+                }
+            }
+            _ => {
+                options.push(("STORAGE_TYPE".to_string(), "plain".to_string()));
+                if let Some(code) = field(storage, "plain_storage_data_type_").and_then(|v| match v
+                {
+                    Json::Int(i) => Some(*i),
+                    _ => None,
+                }) {
+                    options.push((
+                        "PLAIN_STORAGE_DATA_TYPE".to_string(),
+                        ivf_element_name(code).to_string(),
+                    ));
+                }
+            }
+        }
+    }
     Some(IndexMeta {
         name: def.base.index_name.clone(),
         table,
@@ -1772,6 +1877,58 @@ mod tests {
     use super::*;
     use infinity_storage::FjallMetaStore;
     use std::sync::Arc;
+
+    /// An IVF record has to survive a reload: `index_meta_of` expands the
+    /// nested `ivf_option` back into the options `index_def_for` reads, so a
+    /// reopened directory rewrites the same record - and, more to the point,
+    /// keeps `storage_type`, without which a quantized index was rebuilt with
+    /// the plain chunk layout.
+    #[test]
+    fn ivf_options_survive_a_reload() {
+        let table = CppTable {
+            db_name: "default_db".into(),
+            db_id: 1,
+            table_name: "t".into(),
+            table_id: 0,
+            columns: vec![ColumnDefValue::new(
+                data_type_of_text("EMBEDDING(FLOAT,4)").unwrap(),
+                0,
+                "v",
+            )],
+            next_column_id: 1,
+        };
+        for (storage_type, sq, pqn, pqb) in [
+            (value_format::ivf_storage::PLAIN, 0, 0, 0),
+            (value_format::ivf_storage::SCALAR_QUANTIZATION, 8, 0, 0),
+            (value_format::ivf_storage::PRODUCT_QUANTIZATION, 0, 2, 8),
+        ] {
+            let plain = if storage_type == value_format::ivf_storage::PLAIN {
+                value_format::element::FLOAT32
+            } else {
+                value_format::element::INVALID
+            };
+            let mut def = IndexDefValue::ivf(
+                "ivf",
+                "t",
+                "v",
+                value_format::metric::L2,
+                value_format::IvfCentroid::default(),
+                storage_type,
+                plain,
+                sq,
+                pqn,
+                pqb,
+            );
+            def.owner = Some(("1".into(), "0".into()));
+            let meta = index_meta_of(&def, std::slice::from_ref(&table)).expect("index meta");
+            let back = index_def_for(&meta, &table).expect("index def");
+            assert_eq!(
+                value_format::index_def_bytes(&back),
+                value_format::index_def_bytes(&def),
+                "storage_type {storage_type}"
+            );
+        }
+    }
 
     #[test]
     fn data_type_mapping_covers_the_common_shapes() {

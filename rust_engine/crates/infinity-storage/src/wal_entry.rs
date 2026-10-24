@@ -1589,6 +1589,7 @@ fn encode_cmd<S: Sink>(sink: &mut S, cmd: &WalCmd) {
             }
         }
         WalCmd::Checkpoint { max_commit_ts } => put_u64(sink, *max_commit_ts),
+        WalCmd::Cleanup { timestamp } => put_u64(sink, *timestamp),
         WalCmd::Compact {
             db_name,
             db_id,
@@ -1857,6 +1858,9 @@ fn decode_cmd(cursor: &mut Cursor<'_>, layout: DataBlockLayout) -> Option<WalCmd
                 row_ids,
             }
         }
+        WalCommandType::Cleanup => WalCmd::Cleanup {
+            timestamp: cursor.u64()?,
+        },
         WalCommandType::CheckpointV2 => WalCmd::Checkpoint {
             max_commit_ts: cursor.u64()?,
         },
