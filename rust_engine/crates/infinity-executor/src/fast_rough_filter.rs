@@ -235,6 +235,49 @@ fn less(variant: u8, a: &Bound, b: &Bound) -> bool {
     }
 }
 
+/// Reads one bound of `variant` from `bytes` at `at`.
+fn decode_bound(variant: u8, bytes: &[u8], at: &mut usize) -> Option<Bound> {
+    let take = |at: &mut usize, n: usize| -> Option<&[u8]> {
+        let out = bytes.get(*at..*at + n)?;
+        *at += n;
+        Some(out)
+    };
+    Some(match variant {
+        variant::TINY_INT => Bound::Integral(*take(at, 1)?.first()? as i8 as i64),
+        variant::SMALL_INT => {
+            Bound::Integral(i16::from_le_bytes(take(at, 2)?.try_into().ok()?) as i64)
+        }
+        variant::INTEGER => {
+            Bound::Integral(i32::from_le_bytes(take(at, 4)?.try_into().ok()?) as i64)
+        }
+        variant::BIG_INT => Bound::Integral(i64::from_le_bytes(take(at, 8)?.try_into().ok()?)),
+        variant::HUGE_INT => {
+            let upper = i64::from_le_bytes(take(at, 8)?.try_into().ok()?);
+            let lower = i64::from_le_bytes(take(at, 8)?.try_into().ok()?);
+            // The min/max half only ever stores a sign-extended i64 (see
+            // `encode`), so the lower half carries the value.
+            let _ = upper;
+            Bound::Integral(lower)
+        }
+        variant::DATE | variant::TIME => {
+            Bound::Day(i32::from_le_bytes(take(at, 4)?.try_into().ok()?))
+        }
+        variant::DATE_TIME | variant::TIMESTAMP => Bound::Stamp(
+            i32::from_le_bytes(take(at, 4)?.try_into().ok()?),
+            i32::from_le_bytes(take(at, 4)?.try_into().ok()?),
+        ),
+        variant::VARCHAR => {
+            let mut text = Text::lowest();
+            text.bytes.copy_from_slice(take(at, VARCHAR_STORED)?);
+            text.len = *take(at, 1)?.first()?;
+            Bound::Text(text)
+        }
+        variant::FLOAT => Bound::Real(f32::from_le_bytes(take(at, 4)?.try_into().ok()?) as f64),
+        variant::DOUBLE => Bound::Real(f64::from_le_bytes(take(at, 8)?.try_into().ok()?)),
+        _ => return None,
+    })
+}
+
 fn encode(variant: u8, bound: &Bound, out: &mut Vec<u8>) {
     match bound {
         Bound::Integral(v) => match variant {
@@ -387,6 +430,85 @@ impl Filters {
         }
     }
 
+    /// Parses a `seg|…|fast_rough_filter` / `blk|…|fast_rough_filter` record.
+    ///
+    /// Returns `None` for a record this reader does not understand (a different
+    /// layout), which the caller treats as "cannot prune".
+    pub fn decode(bytes: &[u8]) -> Option<Filters> {
+        let mut at = 0usize;
+        let take = |at: &mut usize, n: usize| -> Option<&[u8]> {
+            let out = bytes.get(*at..*at + n)?;
+            *at += n;
+            Some(out)
+        };
+        let total = u32::from_le_bytes(take(&mut at, 4)?.try_into().ok()?) as usize;
+        if total != bytes.len() {
+            return None;
+        }
+        take(&mut at, 8)?; // build_time
+                           // Both halves' size fields include themselves: `probabilistic` spans
+                           // `[size(4)][count(4)][2 * column_count]`.
+        let probabilistic = u32::from_le_bytes(take(&mut at, 4)?.try_into().ok()?) as usize;
+        let probabilistic_at = at - 4;
+        let columns = u32::from_le_bytes(take(&mut at, 4)?.try_into().ok()?) as usize;
+        let minmax_at = probabilistic_at + probabilistic;
+        at = minmax_at;
+        let minmax = u32::from_le_bytes(take(&mut at, 4)?.try_into().ok()?) as usize;
+        let minmax_columns = u32::from_le_bytes(take(&mut at, 4)?.try_into().ok()?) as usize;
+        if minmax_columns != columns || minmax_at + minmax > bytes.len() {
+            return None;
+        }
+        let mut out = Vec::with_capacity(columns);
+        for _ in 0..columns {
+            let variant = *take(&mut at, 1)?.first()?;
+            if variant == variant::MONOSTATE {
+                out.push(None);
+                continue;
+            }
+            let min = decode_bound(variant, bytes, &mut at)?;
+            let max = decode_bound(variant, bytes, &mut at)?;
+            out.push(Some((variant, min, max)));
+        }
+        Some(Filters {
+            columns: out,
+            types: columns,
+        })
+    }
+
+    /// Whether a row matching `cond` can exist in the block this filter
+    /// describes. Conservative: `true` whenever the answer is not provable.
+    ///
+    /// C++ `FastRoughFilter::MayContain` consults the bloom half for equality
+    /// and the min/max half for ranges; the bloom half is only built for a
+    /// column that declared `bloom_filter`, so equality falls back to min/max.
+    pub fn may_contain(&self, column: usize, op: PruneOp, value: &Value) -> bool {
+        let Some(Some((variant, min, max))) = self.columns.get(column) else {
+            return true;
+        };
+        let Some(value) = bound_of(*variant, value) else {
+            return true;
+        };
+        // An empty column keeps the sentinel pair (min > max); nothing is known.
+        if less(*variant, max, min) {
+            return true;
+        }
+        match op {
+            PruneOp::Eq => !less(*variant, &value, min) && !less(*variant, max, &value),
+            PruneOp::Lt => less(*variant, min, &value),
+            PruneOp::Le => less(*variant, min, &value) || !less(*variant, &value, min),
+            PruneOp::Gt => less(*variant, &value, max),
+            PruneOp::Ge => less(*variant, &value, max) || !less(*variant, max, &value),
+        }
+    }
+
+    /// Whether every `(column index, op, value)` can hold for some row of the
+    /// block.
+    pub fn may_contain_all(&self, conds: &[(usize, PruneOp, Value)]) -> bool {
+        conds
+            .iter()
+            .all(|(column, op, value)| self.may_contain(*column, *op, value))
+    }
+
     /// The record `seg|…|fast_rough_filter` / `blk|…|fast_rough_filter` holds.
     ///
     /// `build_time` is the segment's begin ts (the creating transaction's
@@ -424,6 +546,27 @@ impl Filters {
         out.extend_from_slice(&minmax);
         out
     }
+}
+
+/// One comparison the scan can test against a block's min/max before reading
+/// the block. Only conjunctions are pushed down; a disjunction is left to the
+/// filter operator.
+#[derive(Clone, Debug)]
+pub struct PruneCond {
+    /// The column's name (the record's columns follow the table schema).
+    pub column: String,
+    pub op: PruneOp,
+    pub value: Value,
+}
+
+/// The comparison operators a min/max prefilter can answer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PruneOp {
+    Eq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
 }
 
 /// [`Filters`] over one set of rows (the tests' entry point).
@@ -508,5 +651,42 @@ mod tests {
             vec![10, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, 0, 0, 0, 1, 0, 0, 0, 0]
         );
         assert_eq!(u64::from_le_bytes(record[4..12].try_into().unwrap()), 7);
+    }
+
+    /// A decoded block record answers the comparisons a scan pushes down, and
+    /// stays conservative where it cannot.
+    #[test]
+    fn a_decoded_record_refutes_only_what_it_can_prove() {
+        let types = schema();
+        let record = build(&types, &rows(4), 0);
+        let filters = Filters::decode(&record).expect("the record decodes");
+        let may =
+            |column: usize, op: PruneOp, value: Value| filters.may_contain(column, op, &value);
+        // `id` is 0..3.
+        assert!(may(0, PruneOp::Eq, Value::Int(3)));
+        assert!(!may(0, PruneOp::Eq, Value::Int(4)));
+        assert!(!may(0, PruneOp::Gt, Value::Int(3)));
+        assert!(may(0, PruneOp::Ge, Value::Int(3)));
+        assert!(!may(0, PruneOp::Lt, Value::Int(0)));
+        assert!(may(0, PruneOp::Le, Value::Int(0)));
+        // `title` is `title-0` … `title-3`.
+        assert!(may(1, PruneOp::Eq, Value::Str("title-2".into())));
+        assert!(!may(1, PruneOp::Eq, Value::Str("title-9".into())));
+        assert!(!may(1, PruneOp::Gt, Value::Str("title-9".into())));
+        // A column without a min/max half (`EMBEDDING`) answers "may match".
+        assert!(may(3, PruneOp::Eq, Value::Str("[0.0,0.1,0.2,0.3]".into())));
+        // A value the variant cannot represent stays conservative too.
+        assert!(may(0, PruneOp::Eq, Value::Str("not-a-number".into())));
+        // Two conditions are a conjunction.
+        assert!(!filters.may_contain_all(&[
+            (0, PruneOp::Eq, Value::Int(2)),
+            (0, PruneOp::Eq, Value::Int(9)),
+        ]));
+        assert!(filters.may_contain_all(&[
+            (0, PruneOp::Ge, Value::Int(1)),
+            (1, PruneOp::Lt, Value::Str("title-3".into())),
+        ]));
+        // A truncated record (a different layout) is refused, not misread.
+        assert!(Filters::decode(&record[..record.len() - 1]).is_none());
     }
 }

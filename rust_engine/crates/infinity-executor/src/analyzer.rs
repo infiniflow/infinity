@@ -708,32 +708,153 @@ const STANDARD_LANGUAGES: &[(&str, rust_stemmers::Algorithm)] = &[
     ("turkish", rust_stemmers::Algorithm::Turkish),
 ];
 
-/// The stemmer C++ selects for `standard-<suffix>`; unknown suffixes keep the
+/// The stemmer C++ selects for `standard-<language>`; unknown suffixes keep the
 /// English default, exactly like the reference's if-chain.
-fn standard_stemmer(name: &str) -> rust_stemmers::Algorithm {
-    let suffix = name.split_once('-').map(|(_, suffix)| suffix).unwrap_or("");
+fn standard_stemmer(language: &str) -> rust_stemmers::Algorithm {
     STANDARD_LANGUAGES
         .iter()
-        .find(|(language, _)| language.eq_ignore_ascii_case(suffix))
+        .find(|(name, _)| name.eq_ignore_ascii_case(language))
         .map(|(_, algorithm)| *algorithm)
         .unwrap_or(rust_stemmers::Algorithm::English)
 }
 
-/// Whether [`AnalyzerPool::get_analyzer`] can construct `name` (ignoring
-/// resource availability). DDL validation uses this so it never accepts a name
-/// the pool will later reject.
-pub fn is_constructible_analyzer_name(name: &str) -> bool {
-    let lower = name.to_ascii_lowercase();
-    let (family, suffix) = lower
-        .split_once('-')
-        .map_or((lower.as_str(), ""), |(family, suffix)| (family, suffix));
-    match family {
-        "rag" | "standard" | "chinese" | "ik" | "keyword" | "whitespace" | "rankfeatures"
-        | "japanese" | "korean" | "traditional" => true,
-        "ngram" => suffix.parse::<usize>().is_ok_and(|n| n > 0),
-        "sparsegram" => SparseGramAnalyzer::from_name(&lower).is_some(),
-        _ => false,
+/// The name grammar of C++ `AnalyzerPool::GetAnalyzer`.
+///
+/// The reference hashes the run of bytes before the first `-` (`Str2Int`) and
+/// switches on the hash, so the family match is **case sensitive**: `Chinese`
+/// and `RAG-fine` are `AnalyzerNotFound`. Each family then parses the rest of
+/// the name itself, and those parsers differ: `chinese`/`ik`/`traditional`
+/// accept only the exact suffix `-fine`, `standard` compares its `-<language>`
+/// case insensitively (`IEquals`), `keyword`/`whitespace` take everything after
+/// the first `-` as the delimiter set, `ngram` uses `strtol` (a numeric prefix
+/// is enough), and `sparsegram` validates its window (`ParseSparseGramAnalyzerName`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AnalyzerName<'a> {
+    Rag,
+    /// `standard` and its `-<language>` suffix (empty without a suffix).
+    Standard {
+        language: &'a str,
+    },
+    /// `strtol` of the suffix, truncated to the reference's `u32`.
+    NGram {
+        n: u32,
+    },
+    Chinese {
+        fine: bool,
+    },
+    Traditional {
+        fine: bool,
+    },
+    Ik {
+        fine: bool,
+    },
+    /// `keyword` / `whitespace`, optionally followed by `-<delimiters>`; the
+    /// delimiters are empty when the name has no suffix.
+    Whitespace {
+        delimiters: &'a str,
+    },
+    RankFeatures,
+    Japanese,
+    Korean,
+    SparseGram {
+        min_n: u32,
+        max_n: u32,
+        fold: bool,
+    },
+}
+
+/// C++ `strtol` restricted to the prefix it consumes: optional whitespace, an
+/// optional sign, then decimal digits. Saturation matches `LONG_MAX`/`LONG_MIN`
+/// (the reference stores the result in a `u32`, so an out-of-range value is
+/// truncated rather than rejected).
+fn strtol_prefix(text: &str) -> i64 {
+    let bytes = text.as_bytes();
+    let mut index = 0usize;
+    while index < bytes.len() && bytes[index].is_ascii_whitespace() {
+        index += 1;
     }
+    let negative = match bytes.get(index) {
+        Some(b'-') => {
+            index += 1;
+            true
+        }
+        Some(b'+') => {
+            index += 1;
+            false
+        }
+        _ => false,
+    };
+    let mut value: i64 = 0;
+    while let Some(byte) = bytes.get(index) {
+        if !byte.is_ascii_digit() {
+            break;
+        }
+        value = value
+            .saturating_mul(10)
+            .saturating_add(i64::from(byte - b'0'));
+        index += 1;
+    }
+    if negative {
+        -value
+    } else {
+        value
+    }
+}
+
+/// Parses `name` exactly like C++ `AnalyzerPool::GetAnalyzer` selects a family
+/// and interprets its suffix. Shared by the pool and by the DDL validation so
+/// the two cannot drift (the reference validates by constructing the analyzer).
+pub fn parse_analyzer_name(name: &str) -> Result<AnalyzerName<'_>, String> {
+    let split = name.split_once('-');
+    let (family, suffix_option) = match split {
+        Some((family, suffix)) => (family, Some(suffix)),
+        None => (name, None),
+    };
+    let suffix = suffix_option.unwrap_or("");
+    match family {
+        "rag" => Ok(AnalyzerName::Rag),
+        "standard" => Ok(AnalyzerName::Standard { language: suffix }),
+        // `strcmp(rest, "-fine")`: exact, so `chinese-FINE` stays coarse.
+        "chinese" => Ok(AnalyzerName::Chinese {
+            fine: suffix == "fine",
+        }),
+        "traditional" => Ok(AnalyzerName::Traditional {
+            fine: suffix == "fine",
+        }),
+        "ik" => Ok(AnalyzerName::Ik {
+            fine: suffix == "fine",
+        }),
+        "keyword" | "whitespace" => Ok(AnalyzerName::Whitespace { delimiters: suffix }),
+        "rankfeatures" => Ok(AnalyzerName::RankFeatures),
+        "japanese" => Ok(AnalyzerName::Japanese),
+        "korean" => Ok(AnalyzerName::Korean),
+        "ngram" => {
+            // No '-' at all is the reference's own error message; with one, a
+            // non-positive (after the `u32` truncation) value is rejected.
+            let Some(rest) = suffix_option else {
+                return Err(format!("NGRAM-number, but it is {name}."));
+            };
+            let n = strtol_prefix(rest) as u32;
+            if n == 0 {
+                return Err(format!("NGRAM-number, number > 0, but it is {name}."));
+            }
+            Ok(AnalyzerName::NGram { n })
+        }
+        "sparsegram" => {
+            let (min_n, max_n, fold) = SparseGramAnalyzer::from_name(name)
+                .map(|analyzer| (analyzer.min_n, analyzer.max_n, analyzer.fold))
+                .ok_or_else(|| format!("SPARSEGRAM[-min[-max]][-fold], but it is {name}."))?;
+            Ok(AnalyzerName::SparseGram { min_n, max_n, fold })
+        }
+        _ => Err(unsupported_analyzer_message(name)),
+    }
+}
+
+/// Whether [`AnalyzerPool::get_analyzer`] accepts `name` (ignoring resource
+/// availability). DDL validation uses this so it never accepts a name the pool
+/// will later reject.
+pub fn is_constructible_analyzer_name(name: &str) -> bool {
+    parse_analyzer_name(name).is_ok()
 }
 
 impl AnalyzerPool {
@@ -752,66 +873,57 @@ impl AnalyzerPool {
 
     /// C++: `AnalyzerPool::GetAnalyzer`.
     pub fn get_analyzer(&self, name: &str) -> Result<Analyzer, String> {
-        let lower = name.to_ascii_lowercase();
-        let (family, suffix) = lower
-            .split_once('-')
-            .map_or((lower.as_str(), ""), |(family, suffix)| (family, suffix));
-        match family {
-            "rag" => self.get_rag(name),
-            "standard" => {
+        match parse_analyzer_name(name)? {
+            AnalyzerName::Rag => self.get_rag(name),
+            AnalyzerName::Standard { language } => {
                 // C++: divide `@#$`, unite `/`, then InitStemmer(<language>).
                 let mut analyzer = StandardAnalyzer::new();
                 let mut config = TokenizeConfig::default();
                 config.add_divides("@#$");
                 config.add_unites("/");
                 analyzer.set_tokenizer_config(config);
-                analyzer.init_stemmer(standard_stemmer(&lower));
+                analyzer.init_stemmer(standard_stemmer(language));
                 Ok(Analyzer::Standard(Box::new(analyzer)))
             }
-            "ngram" => {
-                let n = suffix
-                    .parse::<usize>()
-                    .ok()
-                    .filter(|n| *n > 0)
-                    .ok_or_else(|| format!("NGRAM-number, number > 0, but it is {name}."))?;
-                Ok(Analyzer::NGram(NGramAnalyzer::new(n)))
-            }
-            "chinese" => {
+            AnalyzerName::NGram { n } => Ok(Analyzer::NGram(NGramAnalyzer::new(n as usize))),
+            AnalyzerName::Chinese { fine } => {
                 let mut analyzer = (*self.chinese_prototype()?).clone();
-                if suffix.eq_ignore_ascii_case("fine") {
+                if fine {
                     analyzer.set_cut_grain(CutGrain::Fine);
                 }
                 Ok(Analyzer::Chinese(analyzer))
             }
-            "ik" => {
+            AnalyzerName::Ik { fine } => {
                 let mut analyzer = (*self.ik_prototype()?).clone();
-                analyzer.set_fine_grained(suffix.eq_ignore_ascii_case("fine"));
+                analyzer.set_fine_grained(fine);
                 Ok(Analyzer::IK(analyzer))
             }
             // C++: `keyword` and `whitespace` both build a `WhitespaceAnalyzer`;
             // the first '-' introduces the delimiter set.
-            "keyword" | "whitespace" => {
-                let delimiters = name.split_once('-').map_or("", |(_, rest)| rest);
+            AnalyzerName::Whitespace { delimiters } => {
                 Ok(Analyzer::Whitespace(WhitespaceAnalyzer::new(delimiters)))
             }
-            "rankfeatures" => Ok(Analyzer::RankFeatures(RankFeaturesAnalyzer)),
-            "japanese" => Ok(Analyzer::Japanese((*self.japanese_prototype()?).clone())),
-            "korean" => Ok(Analyzer::Korean((*self.korean_prototype()?).clone())),
+            AnalyzerName::RankFeatures => Ok(Analyzer::RankFeatures(RankFeaturesAnalyzer)),
+            AnalyzerName::Japanese => Ok(Analyzer::Japanese((*self.japanese_prototype()?).clone())),
+            AnalyzerName::Korean => Ok(Analyzer::Korean((*self.korean_prototype()?).clone())),
             // C++: `traditional[-fine]` wires the suffix into `SetCutGrain`.
-            "traditional" => {
+            AnalyzerName::Traditional { fine } => {
                 let mut analyzer = TraditionalChineseAnalyzer::new(
                     self.opencc_prototype()?,
                     (*self.chinese_prototype()?).clone(),
                 );
-                if suffix.eq_ignore_ascii_case("fine") {
+                if fine {
                     analyzer.set_cut_grain(CutGrain::Fine);
                 }
                 Ok(Analyzer::Traditional(analyzer))
             }
-            "sparsegram" => SparseGramAnalyzer::from_name(&lower)
-                .map(Analyzer::SparseGram)
-                .ok_or_else(|| format!("SPARSEGRAM[-min[-max]][-fold], but it is {name}.")),
-            _ => Err(unsupported_analyzer_message(name)),
+            AnalyzerName::SparseGram { min_n, max_n, fold } => {
+                Ok(Analyzer::SparseGram(SparseGramAnalyzer {
+                    min_n,
+                    max_n,
+                    fold,
+                }))
+            }
         }
     }
 
@@ -5557,6 +5669,238 @@ mod analyzer_pool_tests {
         assert_eq!(slovak.tokenize("daňové"), "danove");
     }
 
+    /// C++ `AnalyzerPool::GetAnalyzer`, name by name: the family is matched
+    /// case sensitively (the reference hashes the bytes before the first `-`),
+    /// `chinese`/`ik`/`traditional` take only the exact `-fine`, `standard`
+    /// compares its language case insensitively, `keyword`/`whitespace` keep
+    /// the delimiter bytes verbatim, `ngram` follows `strtol` (a numeric prefix
+    /// is enough, the value is truncated to `u32`) and `sparsegram` validates
+    /// its window like `ParseSparseGramAnalyzerName`. Nothing here touches the
+    /// resource files: only the name grammar is asserted.
+    #[test]
+    fn analyzer_name_grammar_matches_the_reference() {
+        use AnalyzerName::*;
+        let accepted: &[(&str, AnalyzerName<'_>)] = &[
+            ("rag", Rag),
+            ("rag-fine", Rag),
+            ("rag-fine-czech", Rag),
+            ("rag-", Rag),
+            ("rag--", Rag),
+            ("standard", Standard { language: "" }),
+            ("standard-", Standard { language: "" }),
+            (
+                "standard-english",
+                Standard {
+                    language: "english",
+                },
+            ),
+            // `IEquals` is the one case-insensitive suffix comparison.
+            ("standard-PORTER", Standard { language: "PORTER" }),
+            (
+                "standard-english-x",
+                Standard {
+                    language: "english-x",
+                },
+            ),
+            ("chinese", Chinese { fine: false }),
+            ("chinese-fine", Chinese { fine: true }),
+            // `strcmp(rest, "-fine")`: `chinese-FINE` stays coarse.
+            ("chinese-FINE", Chinese { fine: false }),
+            ("chinese-fine-x", Chinese { fine: false }),
+            ("traditional", Traditional { fine: false }),
+            ("traditional-fine", Traditional { fine: true }),
+            ("ik", Ik { fine: false }),
+            ("ik-fine", Ik { fine: true }),
+            ("ik-FINE", Ik { fine: false }),
+            ("keyword", Whitespace { delimiters: "" }),
+            ("keyword-,", Whitespace { delimiters: "," }),
+            ("keyword-@#$-", Whitespace { delimiters: "@#$-" }),
+            ("whitespace", Whitespace { delimiters: "" }),
+            ("whitespace-", Whitespace { delimiters: "" }),
+            // Everything after the first '-' is the delimiter set, verbatim.
+            ("whitespace--x", Whitespace { delimiters: "-x" }),
+            ("whitespace-AB", Whitespace { delimiters: "AB" }),
+            ("rankfeatures", RankFeatures),
+            ("rankfeatures-x", RankFeatures),
+            ("japanese", Japanese),
+            ("japanese-fine", Japanese),
+            ("korean", Korean),
+            ("korean-anything", Korean),
+            // `strtol`: leading spaces, sign, and a trailing non-digit are fine.
+            ("ngram-3", NGram { n: 3 }),
+            ("ngram-3x", NGram { n: 3 }),
+            ("ngram- 3", NGram { n: 3 }),
+            ("ngram-+3", NGram { n: 3 }),
+            ("ngram-0003", NGram { n: 3 }),
+            ("ngram-3-12", NGram { n: 3 }),
+            // The reference stores `strtol`'s result in a `u32`, so a negative
+            // value wraps; it is accepted, not rejected.
+            ("ngram--1", NGram { n: u32::MAX }),
+            (
+                "sparsegram",
+                SparseGram {
+                    min_n: 3,
+                    max_n: 12,
+                    fold: false,
+                },
+            ),
+            (
+                "sparsegram-fold",
+                SparseGram {
+                    min_n: 3,
+                    max_n: 12,
+                    fold: true,
+                },
+            ),
+            (
+                "sparsegram-5",
+                SparseGram {
+                    min_n: 5,
+                    max_n: 12,
+                    fold: false,
+                },
+            ),
+            (
+                "sparsegram-3-7-fold",
+                SparseGram {
+                    min_n: 3,
+                    max_n: 7,
+                    fold: true,
+                },
+            ),
+            (
+                "sparsegram-fold-3-7",
+                SparseGram {
+                    min_n: 3,
+                    max_n: 7,
+                    fold: true,
+                },
+            ),
+            (
+                "sparsegram-3-fold-fold",
+                SparseGram {
+                    min_n: 3,
+                    max_n: 12,
+                    fold: true,
+                },
+            ),
+            (
+                "sparsegram-1024-1024",
+                SparseGram {
+                    min_n: 1024,
+                    max_n: 1024,
+                    fold: false,
+                },
+            ),
+        ];
+        for (name, expected) in accepted {
+            assert_eq!(parse_analyzer_name(name), Ok(expected.clone()), "{name}");
+            assert!(is_constructible_analyzer_name(name), "{name}");
+        }
+
+        let rejected = [
+            "",
+            "-rag",
+            // Case-sensitive family match.
+            "Chinese",
+            "RAG-fine",
+            "Standard",
+            "Sparsegram",
+            "english",
+            "traditionalchinese",
+            "bogus",
+            // `ngram` needs a '-' and a non-zero `strtol` result.
+            "ngram",
+            "ngram-",
+            "ngram--",
+            "ngram-0",
+            "ngram-x",
+            // `sparsegram`: empty segment, non-digit, third number, >1024, and
+            // `min == 0` / `max < min` are all syntax errors.
+            "sparsegram-0",
+            "sparsegram-20",
+            "sparsegram-1025",
+            "sparsegram--3",
+            "sparsegram-3-",
+            "sparsegram-3x",
+            "sparsegram-1-2-3",
+            "sparsegram-3-FOLD",
+        ];
+        for name in rejected {
+            assert!(
+                parse_analyzer_name(name).is_err(),
+                "{name} must be rejected"
+            );
+            assert!(!is_constructible_analyzer_name(name), "{name}");
+        }
+
+        // The two `ngram` failures are distinct in the reference.
+        assert_eq!(
+            parse_analyzer_name("ngram").unwrap_err(),
+            "NGRAM-number, but it is ngram."
+        );
+        assert_eq!(
+            parse_analyzer_name("ngram-0").unwrap_err(),
+            "NGRAM-number, number > 0, but it is ngram-0."
+        );
+        assert_eq!(
+            parse_analyzer_name("sparsegram-0").unwrap_err(),
+            "SPARSEGRAM[-min[-max]][-fold], but it is sparsegram-0."
+        );
+    }
+
+    /// The suffix has to reach the analyzer, not just the parser: `ngram-3x`
+    /// tokenises like `ngram-3`, the delimiter bytes keep their case, `fine` is
+    /// exact, and `sparsegram`'s window is the one the name asked for.
+    #[test]
+    fn analyzer_suffixes_reach_the_constructed_analyzers() {
+        if !resource_available() {
+            panic!(
+                "Resource directory {RESOURCE_DIR} not available; the analyzers cannot be loaded"
+            );
+        }
+        let terms = |name: &str, text: &str| -> Vec<String> {
+            AnalyzerPool::instance()
+                .get_analyzer(name)
+                .unwrap_or_else(|error| panic!("GetAnalyzer({name}) failed: {error}"))
+                .analyze(text)
+                .into_iter()
+                .map(|term| term.text)
+                .collect()
+        };
+
+        // `strtol` takes the numeric prefix, so both names build `NGramAnalyzer(3)`.
+        assert_eq!(terms("ngram-3x", "abcdef"), terms("ngram-3", "abcdef"));
+        assert_eq!(terms("ngram-3x", "abcdef"), ["abc", "bcd", "cde", "def"]);
+        // ... and a zero prefix is rejected instead of yielding no terms.
+        assert!(AnalyzerPool::instance().get_analyzer("ngram-0x").is_err());
+
+        // C++ `WhitespaceAnalyzer(delimiters)`: byte-exact, so `AB` is not `ab`.
+        assert_eq!(terms("whitespace-AB", "aAbB"), ["a", "b"]);
+        // A bare `keyword` keeps the whole value; with delimiters it splits.
+        assert_eq!(terms("keyword", "a,b"), ["a,b"]);
+        assert_eq!(terms("keyword-,", "a,b"), ["a", "b"]);
+
+        // `chinese-FINE` is coarse (`strcmp`), `chinese-fine` splits further.
+        let coarse = terms("chinese-FINE", GRAIN_PROBE);
+        let fine = terms("chinese-fine", GRAIN_PROBE);
+        assert_eq!(coarse, [GRAIN_PROBE]);
+        assert!(fine.len() > coarse.len(), "{fine:?}");
+
+        match AnalyzerPool::instance()
+            .get_analyzer("sparsegram-3-7-fold")
+            .expect("sparsegram-3-7-fold")
+        {
+            Analyzer::SparseGram(analyzer) => {
+                assert_eq!(
+                    (analyzer.min_n, analyzer.max_n, analyzer.fold),
+                    (3, 7, true)
+                );
+            }
+            other => panic!("expected a sparsegram analyzer, got {}", other.kind()),
+        }
+    }
+
     /// C++ `AnalyzerPool::GetAnalyzer`: every name family resolves to the
     /// analyzer the reference constructs, including the MeCab- and OpenCC-backed
     /// CJK families.
@@ -5577,15 +5921,18 @@ mod analyzer_pool_tests {
             ("standard-french", Some("standard")),
             ("standard-porter", Some("standard")),
             ("ngram-3", Some("ngram")),
+            ("ngram-3x", Some("ngram")),
             ("chinese", Some("chinese")),
             ("chinese-fine", Some("chinese")),
             ("ik", Some("ik")),
             ("ik-fine", Some("ik")),
             ("keyword", Some("whitespace")),
+            ("keyword-,", Some("whitespace")),
             ("whitespace", Some("whitespace")),
             ("whitespace-#@$", Some("whitespace")),
             ("rankfeatures", Some("rankfeatures")),
             ("sparsegram", Some("sparsegram")),
+            ("sparsegram-fold", Some("sparsegram")),
             ("sparsegram-3-12", Some("sparsegram")),
             ("sparsegram-3-12-fold", Some("sparsegram")),
             ("japanese", Some("japanese")),
@@ -5598,6 +5945,17 @@ mod analyzer_pool_tests {
             ("userdefined", None),
             ("ngram", None),
             ("bogus", None),
+            // The family match is case sensitive (`Str2Int` hashes the bytes).
+            ("Chinese", None),
+            ("RAG-fine", None),
+            ("Standard", None),
+            // Numeric suffixes the reference rejects.
+            ("ngram-0", None),
+            ("ngram-x", None),
+            ("sparsegram-0", None),
+            ("sparsegram-20", None),
+            ("sparsegram-1025", None),
+            ("sparsegram--3", None),
         ];
         for (name, expected) in cases {
             let constructible = is_constructible_analyzer_name(name);

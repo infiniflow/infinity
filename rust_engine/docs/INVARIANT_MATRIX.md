@@ -1,12 +1,10 @@
-# Gate G — C++ 内部不变量 → Rust 测试 对照清单
+# Gate G — C++ 内部不变量 → Rust 测试对照
 
-> 计划书 §6 Gate G 要求：**必须**产出一份「C++ 内部不变量 → Rust 测试」清单并纳入门槛，
-> 覆盖 ①配置校验/拒绝行为、②存储/事务不变量、③索引不变量；
-> **清单外的例外须显式登记并说明理由**，不得默认遗漏。
->
-> 本文件为 **v0.1**：Rust 侧只登记**已存在**的测试（名称与 `cargo test` 输出的完全一致），
-> 未覆盖项在「缺口」列写明状态。C++ 侧以计划书「附录 A：核心不变量」与 CI 的
-> `src/unit_test/main/config_ut.cpp:175` 为锚点。最后更新：2026-10-17（G1–G5 全部闭合；G4 受 pinned nightly MSRV 限制，未覆盖带 FFI/SIMD 的 crate）。
+计划书 §6 Gate G 要求：产出一份「C++ 内部不变量 → Rust 测试」清单并纳入门槛，覆盖
+①配置校验/拒绝行为、②存储/事务不变量、③索引不变量；**清单外的例外须显式登记并说明理由**。
+
+Rust 侧只登记**已存在**的测试，名称与 `cargo test` 输出一致；C++ 侧以计划书「附录 A：核心不变量」
+与 `src/unit_test/main/config_ut.cpp:175` 为锚点。还没被任何测试兜住的不变量见 §4。
 
 ## 1. 配置校验 / 拒绝行为
 
@@ -19,6 +17,7 @@
 | 空事务必须被拒绝 | `infinity-txn: empty_txn_rejected` | ✅ |
 | 重名表 / 重名列必须被拒绝 | `infinity-catalog: duplicate_name_is_rejected`；executor `defaults_and_alter_add_column`（重复列） | ✅ |
 | 张量维度/嵌套不合法必须报错 | executor：`TENSORARRAY` 三重嵌套与维度校验（`.slt` 的 `statement error` 记录） | ✅ |
+| 列类型不在参考白名单时必须拒绝（`Decimal`/`HugeInt`/`Interval`/`UUID`，含 `ARRAY` 元素） | executor `the_reference_column_type_whitelist_is_enforced`；RPC 侧 `tcp_create_table_round_trip_with_engine` | ✅ |
 
 ## 2. 存储 / 事务不变量
 
@@ -31,12 +30,13 @@
 | `commit_ts` 分配在任意交错下**唯一无缺口** | `infinity-txn: commit_ts_allocation_is_unique`（+ `--cfg loom` 的 `loom_model`） | ✅ |
 | 元数据 KV 原子批写「全有或全无」 | `infinity-storage: atomic_write_is_all_or_nothing` | ✅ |
 | 元数据跨重开**持久**，前缀扫描**有序** | `infinity-storage: survives_reopen_after_flush`、`scan_prefix_is_ordered`；catalog `survives_reopen_with_columns`；executor `persists_across_restart` | ✅ |
-| CRC-32/IEEE 与 C++ **逐字节一致** | `infinity-storage: standard_check_value`、`differs_on_one_bit` | ✅ |
+| CRC-32/IEEE 与 C++ **逐字节一致** | `infinity-storage: standard_check_value`、`differs_on_one_bit`；WAL 帧级：`test_the_wal_entries_match_byte_for_byte`（整帧，含 CRC） | ✅ |
 | 行墓碑（DELETE）对查询**不可见**，对聚合**不计入** | executor `delete_with_where_and_all` | ✅ |
 | `DROP TABLE` 后同名重建必须**空表** | executor（`DROP TABLE` 清理行/墓碑/索引；`test_simple_agg` 由 38→77 通过） | ✅ |
 | 快照/恢复（`CREATE/DROP/RESTORE TABLE SNAPSHOT`） | executor：快照序列化 + 恢复重建（`test/sql/snapshot/**` 10 文件全绿） | ✅ 基础 |
 | **检查点/compaction 后恢复**（WAL 截断后仍可恢复；恢复后的写入再次重启仍在） | `infinity-executor: restart_checkpoint`（①WAL 全截断后重启仍完整；②删掉已 compact 的 WAL 文件仍完整；③恢复后的新写入再重启不丢） | ✅ |
 | A1 三底座**彼此独立**且耐久性契约不同 | 代码结构（KV/WAL/块文件各自 crate 边界）；**跨底座宕机一致性**：`infinity-storage: crash_consistency`（5 用例，见 §4） | ✅ |
+| WAL 帧与参考逐字节相同（含 `txn_id` 序列） | `test_the_wal_entries_match_byte_for_byte`、`test_the_ddl_wal_commands_match_the_reference` | ✅ |
 
 ## 3. 索引不变量
 
@@ -45,19 +45,17 @@
 | 二级索引：插入后可查、范围扫描、**持久化后重建** | `infinity-index: insert_lookup`、`range_scan`、`persist_and_load`；executor `index_scan_matches_expected_and_survives_restart` | ✅ |
 | 向量索引：Flat 精确 top-1 | `infinity-index/vector: flat_exact_top1` | ✅ |
 | HNSW 能找到精确解，且**召回率**达标 | `infinity-index/vector: hnsw_finds_exact_vector`、`hnsw_recall_vs_flat` | ✅ |
-| 全文倒排：分词、单词查询、AND 查询与排序、top-k 截断 | `infinity-index/fulltext: tokenize_basic`、`single_term_lookup`、`and_query_and_ranking`、`top_k_limits`；**打分单调性**：`infinity-executor: fulltext_score`（见 §4 G5） | ✅ |
-| A3 逐索引**文件集合/发布/合并/清理**契约（向量 `.idx`、全文 `.dic/.pos/.spill/.len`） | `infinity-storage/tests/index_file_family.rs`（见 §4 G2） | ✅ |
+| 全文倒排：分词、单词查询、AND 查询与排序、top-k 截断 | `infinity-index/fulltext: tokenize_basic`、`single_term_lookup`、`and_query_and_ranking`、`top_k_limits`；**打分单调性**：`infinity-executor: fulltext_score` | ✅ |
+| A3 逐索引**文件集合/发布/合并/清理**契约（向量 `.idx`、全文 `.dic/.pos/.spill/.len`） | `infinity-storage/tests/index_file_family.rs` | ✅ |
 | `DROP INDEX` 后重建 | `infinity-executor: index_drop_recreate`（DROP 前后与重建后查询结果一致；重建后写入的新行可见） | ✅ |
 
-## 4. 显式登记的例外与缺口（Gate G 要求）
+## 4. 显式登记的例外
 
-| # | 缺口 | 理由 / 影响 |
+| # | 项 | 说明 |
 |---|---|---|
-| G1 | ~~**配置项的范围校验**（`config_ut.cpp` 类）~~ | **已闭合（2026-10-17）**：`SET CONFIG` 对已知键（`result_cache`/`cache_result_capacity`/`CHECKPOINT_INTERVAL`）做值域校验并**拒绝**越界/非法值（不静默钳制）；未知键保持容忍。回归测试：`infinity-executor/tests/config_validation.rs`（4 用例）。 |
-| G2 | ~~**索引文件族契约**（A3）~~ | **已闭合（2026-10-17）**：`infinity-storage/tests/index_file_family.rs`（4 用例）把 C++ 的索引路径/文件族契约固定下来——①路径形状 `db_{db}/tbl_{tbl}/idx_{index}/seg_{seg}`、向量族的 `chunk_{n}.idx`、块数据的 `db_{db}/tbl_{tbl}/seg_{seg}/blk_{blk}` 与 `{col}.col`/`col_{id}_out`/`version`；②全文族的后缀集 `.dic`/`.pos`/`.spill`（瞬时）/`.len` 与 `{index_dir}/{base_name}{suffix}` 拼法；③两类索引的**文件集合差异**（向量=单 `chunk_{n}.idx`；全文=`.dic`+`.pos`+`.len`）；④用真实编解码器把全文族的 `.dic`+`.pos`+`.len` 组成一个可回读的倒排索引（term→offset→TermMeta→postings）。此前该缺口的原因是磁盘格式未落地，现随 #68/#70/#71 完成而闭合。 |
-| G3 | ~~**跨底座宕机一致性**（KV+WAL+块文件同时崩溃）~~ | **已闭合（2026-10-17）**：`infinity-storage/tests/crash_consistency.rs` 把 PoC C 的边界场景落成回归测试 —— ①块写后崩溃→事务不可见；②WAL 落盘后崩溃→回放可见；③完整提交→无需回放即可见；④块文件丢失→由 WAL 载荷重建；⑤WAL 撕裂尾→回放在有效前缀处停止。 |
-| G4 | **`miri` / sanitizer** 覆盖 | **已闭合（2026-10-17，受工具链限制的范围内）**：`run_gate_d.sh` 现在跑三件事——①**miri**（`nightly-2025-04-04`）对纯 Rust 核心（`infinity-parser`/`infinity-expression`/`infinity-planner`，38 用例）；②**AddressSanitizer** 与 ③**ThreadSanitizer**（同 nightly，`RUSTFLAGS=-Zsanitizer=address|thread` + `-Zbuild-std`）对同三个 crate（各 38 用例，实测 `sanitizer=address: core crates clean` / `sanitizer=thread: core crates clean`）。**限制**：`infinity-storage`/`infinity-catalog`/`infinity-executor` 的依赖 MSRV 高于该 pinned nightly（1.88.0-nightly），故带 FFI/SIMD 的 crate 未纳入——如需覆盖需升级 pinned toolchain 到满足 MSRV 的 nightly。 |
-| G5 | ~~全文**打分**不变量~~ | **已闭合（2026-10-17）**：`infinity-executor/tests/fulltext_score.rs`（①更高 tf 不打低于低 tf；②等 tf 下更短文档不打低于更长文档；③不含查询词的行不出现）**加上新的一组精确口径单测**：`lib.rs::tests::analyzer_emits_word_and_stem_only_on_the_index_side`（索引侧发原词+词干、查询侧只发词干）、`standard_tokenizer_matches_the_cpp_byte_table`（`/` unite、`_`/`.`/`,` 切分）、`highlight_keeps_hit_sentences_and_marks_terms`。分值本身已与 C++ 逐位对齐；2026-10-19 修复后实测 Gate A 为 statement ok 1752/1752、statement error 129/129、query 1546/1546（174 个文件，100%）。 |
+| E1 | `miri` / sanitizer 的 crate 范围 | `run_gate_d.sh` 跑 miri、AddressSanitizer、ThreadSanitizer（`nightly-2025-04-04`），只覆盖纯 Rust 核心（`infinity-parser`/`infinity-expression`/`infinity-planner`，各 38 用例）。`infinity-storage`/`infinity-catalog`/`infinity-executor` 的依赖 MSRV 高于该 pinned nightly，带 FFI/SIMD 的 crate 未纳入；要覆盖需升级 pinned toolchain |
+| E2 | 索引文件族契约的测试形态 | `index_file_family.rs`（4 用例）固定：路径形状 `db_{db}/tbl_{tbl}/idx_{index}/seg_{seg}`、向量族 `chunk_{n}.idx`、块数据 `db_{db}/tbl_{tbl}/seg_{seg}/blk_{blk}` 与 `{col}.col`/`col_{id}_out`/`version`；全文族后缀 `.dic`/`.pos`/`.spill`（瞬时）/`.len`；并用真实编解码器把 `.dic`+`.pos`+`.len` 组成可回读的倒排索引 |
+| E3 | 全文精确分值 | 单调性（tf、长度、命中）由 `fulltext_score.rs` 与 §2 的精确口径单测兜住；与参考的逐值一致性由 Gate A（`.slt` 全量）和 `FORMAT_EQUIVALENCE_TESTS.md` §6.2 承担，不在本清单里重复 |
 
 ## 5. 使用方式
 
@@ -68,7 +66,5 @@ cd rust_engine && cargo test --workspace
 RUSTFLAGS="--cfg loom" cargo test -p infinity-txn --lib loom
 ```
 
-> 结论：Gate G 的**清单已产出且 G1–G5 全部闭合**——配置值域校验（G1）、索引文件族契约（G2）、
-> 跨底座崩溃回归（G3）、miri/ASan/TSan（G4，受 pinned nightly MSRV 限制的范围）、全文打分单调性（G5）
-> 均带回归测试。§5.1 的**精确分值与 C++/iresearch 对齐**仍是独立任务（Gate A 打分项）。
-> **2026-10-19**：G1–G5 只覆盖上表列出的窄范围；Gate A 的全量 SQL 一致性已单独重测为 1752/1752、129/129、1546/1546（174 文件，100%）。
+本清单的例外只有 §4 三条：E1 是工具链限制，E2/E3 说明了测试的形态与归属。§1–§3 的每一行都有对应的
+`cargo test` 用例，且都在 CI（`--workspace`）里跑。

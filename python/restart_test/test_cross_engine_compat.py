@@ -225,8 +225,7 @@ def _catalog_snapshot(conn):
         # Names and the scalar types compare exactly. The SPARSE column's type
         # text does not: both engines read the same stored bytes but render the
         # sparse DataType differently (C++ prints `Sparse(float,int8,0)`, Rust
-        # `Sparse(float,int32,8)`) - a divergence tracked in
-        # SIMPLIFICATION_AUDIT.md. The element type is compared, because that is
+        # `Sparse(float,int32,8)`), so only the element type is compared - it is
         # the part both engines agree on and the part the index is built from.
         "columns": [
             (name, ty if not ty.lower().startswith("sparse") else ty.split(",")[0])
@@ -481,3 +480,93 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
     assert after == before, f"{first} -> {second}: {after} != {before}"
     assert count == ROWS + 3, count
     assert sorted(fresh) == [ROWS, ROWS + 1, ROWS + 2], fresh
+
+
+# The `ANALYZER` name grammar (`AnalyzerPool::GetAnalyzer`) and the tokenisation
+# each suffix selects. The two engines are asked the same question on separate
+# data directories: which names a FULLTEXT index accepts, and which rows
+# `MATCH TEXT` returns for a fixed corpus. Every entry is reachable without the
+# analyzer dictionaries (`rag`/`chinese`/`ik` need `/usr/share/infinity/resource`
+# on both sides), so the matrix stays about the suffix grammar:
+#   * `ngram-<n>` follows `strtol` (a numeric prefix is enough) and a bare
+#     `ngram` / `ngram-0` is rejected;
+#   * `sparsegram` validates its window (empty segment, >1024, `min == 0`,
+#     `max < min` and a third number are all errors);
+#   * the family match is case sensitive;
+#   * `keyword-<chars>` / `whitespace-<chars>` split on exactly those bytes.
+ANALYZER_NAMES = [
+    "standard",
+    "standard-PORTER",
+    "ngram-3",
+    "ngram-3x",
+    "ngram-0",
+    "ngram",
+    "sparsegram-3-12",
+    "sparsegram-fold",
+    "sparsegram-0",
+    "sparsegram-100-5",
+    "sparsegram--3",
+    "keyword",
+    "keyword-,",
+    "whitespace",
+    "whitespace-#@$",
+    "Chinese",
+    "RAG-fine",
+]
+
+ANALYZER_ROWS = ["a,b", "a b", "a-b", "alpha,beta", "quick brown", "2023-01-01"]
+ANALYZER_QUERIES = ["a", "b", "alpha", "beta", "quick", "a,b", "2023-01-01"]
+
+
+def _analyzer_probe(conn):
+    """`{name: {"accepted": bool, "hits": {query: [ids]}}}` for one engine."""
+    db = conn.get_database("default_db")
+    out = {}
+    for i, name in enumerate(ANALYZER_NAMES):
+        table = f"an_{i}"
+        db.drop_table(table, ConflictType.Ignore)
+        t = db.create_table(
+            table,
+            {"id": {"type": "int"}, "doc": {"type": "varchar"}},
+            ConflictType.Error,
+        )
+        t.insert([{"id": j, "doc": text} for j, text in enumerate(ANALYZER_ROWS)])
+        try:
+            t.create_index(
+                f"idx_{i}",
+                index.IndexInfo("doc", index.IndexType.FullText, {"analyzer": name}),
+            )
+        except Exception:
+            # Both engines report an error code; only the *decision* is
+            # compared, the message text is engine-specific.
+            out[name] = {"accepted": False}
+            continue
+        hits = {}
+        for query in ANALYZER_QUERIES:
+            data, _, _ = t.output(["id"]).match_text("doc", query, 100).to_result()
+            hits[query] = sorted(int(v) for v in data.get("id", []))
+        out[name] = {"accepted": True, "hits": hits}
+    return out
+
+
+def test_analyzer_names_and_tokenisation_match():
+    """The `ANALYZER` suffix grammar is the same on both engines."""
+    for path in (CPP_BIN, RUST_BIN):
+        if not os.access(path, os.X_OK):
+            pytest.skip(f"{path} is not executable")
+
+    InfinityRunner(CPP_BIN, CONFIG).clear()
+    reference = _run(CPP_BIN, _analyzer_probe)
+    InfinityRunner(RUST_BIN, CONFIG).clear()
+    port = _run(RUST_BIN, _analyzer_probe)
+
+    accepted = {name: probe["accepted"] for name, probe in reference.items()}
+    assert accepted == {name: probe["accepted"] for name, probe in port.items()}, (
+        f"analyzer acceptance differs: {reference} vs {port}"
+    )
+    for name in ANALYZER_NAMES:
+        if not accepted[name]:
+            continue
+        assert reference[name]["hits"] == port[name]["hits"], (
+            f"{name}: {reference[name]['hits']} != {port[name]['hits']}"
+        )

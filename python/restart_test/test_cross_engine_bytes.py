@@ -88,6 +88,10 @@ from infinity import index
 
 CPP_BIN = os.environ.get("INFINITY_CPP_BIN", "cmake-build-reldeb/src/infinity")
 RUST_BIN = os.environ.get("INFINITY_RUST_BIN", "rust_engine/scripts/infinity_rust_shim.sh")
+# The Rust CLI binary itself. `RUST_BIN` is the harness shim, which only
+# forwards `--config=…` and otherwise forces `serve`, so a subcommand has to be
+# sent to the binary directly.
+RUST_CLI = os.environ.get("INFINITY_RUST_CLI", "rust_engine/target/release/infinity")
 URI = NetworkAddress("127.0.0.1", 23817)
 
 TABLE = "test_cross_engine_bytes"
@@ -1822,6 +1826,125 @@ def test_the_secondary_and_sparse_indexes_survive_deletes_updates_and_a_restart(
     )
 
 
+SPARSE_OPT_TABLE = "test_cross_engine_sparse_options"
+SPARSE_OPT_COLUMNS = {
+    "id": {"type": "int"},
+    "sp": {"type": "sparse,8,float,int"},
+}
+# `alpha`/`beta`/`tail`/`threshold` are the names the reference's binder admits
+# (`expression_binder_impl.cpp:1140`); each variant is `(name, opt_params, topn)`.
+SPARSE_OPT_QUERIES = [
+    ("default", None, 5),
+    ("beta_one_term", {"beta": "0.34"}, 5),
+    ("alpha_half", {"alpha": "0.5"}, 5),
+    ("tail_noop", {"tail": "F"}, 5),
+    ("threshold", {"threshold": "0.9"}, 5),
+    ("all_set", {"alpha": "0.7", "beta": "0.67", "threshold": "0.5"}, 3),
+]
+
+
+def _phase_sparse_options(conn, root):
+    """Insert a three-term sparse column, dump the BMP chunk, query variants."""
+    db = conn.get_database("default_db")
+    db.drop_table(SPARSE_OPT_TABLE, ConflictType.Ignore)
+    t = db.create_table(SPARSE_OPT_TABLE, SPARSE_OPT_COLUMNS, ConflictType.Error)
+    t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
+    rows = []
+    for i in range(40):
+        # `beta` keeps the two strongest query terms (0.9 and 0.5) and drops
+        # term 2 (0.1). Every even row gets a big term-2 bonus that dominates
+        # the 0.001 steps of term 1, so dropping it reorders the answer.
+        doc = {0: 1.0, 1: i * 0.001}
+        if i % 2 == 0:
+            doc[2] = 1.0
+        rows.append({"id": i, "sp": doc})
+    t.insert(rows)
+    conn.flush_data()
+    _dump_indexes(t, ["sp_idx"])
+    time.sleep(1)
+    answers = {}
+    for name, opts, topn in SPARSE_OPT_QUERIES:
+        data, _types, _extra = t.output(["id"]).match_sparse(
+            "sp", {0: 0.9, 1: 0.5, 2: 0.1}, "ip", topn, opts
+        ).to_result()
+        # A variant that filters everything out answers no columns at all.
+        answers[name] = (
+            {name: [str(v) for v in values] for name, values in data.items()}
+            if data
+            else {}
+        )
+    # `use_tail` is not one of the binder's names: both engines reject it.
+    try:
+        t.output(["id"]).match_sparse(
+            "sp", {0: 0.9, 1: 0.5, 2: 0.1}, "ip", 5, {"use_tail": "F"}
+        ).to_result()
+        answers["use_tail"] = "accepted"
+    except Exception as error:  # noqa: BLE001 - the code and text are the contract
+        # The reference appends its source location (`…@src/…:1143`).
+        answers["use_tail"] = [
+            getattr(error, "error_code", None),
+            str(error).split("@", 1)[0],
+        ]
+    with open(os.path.join(root, "sparse_options.json"), "w") as handle:
+        json.dump(answers, handle)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_sparse_search_options_change_the_answer_the_same_way():
+    """`alpha` / `beta` / `tail` / `threshold` on a dumped BMP chunk.
+
+    The options reach `BMPAlgBase::SearchKnn` in the reference: `beta` keeps
+    `ceil(nnz * beta)` of the strongest query terms, `alpha` scales the
+    early-stop bound, and `threshold` filters the results. The port used to pass
+    only `alpha` to its on-disk reader, so a `beta` query answered differently;
+    now both engines run the same variants over the same chunk and must return
+    the same ids. `tail` is one of the binder's names but never reaches
+    `BmpSearchOptions` in either engine, and `use_tail` is rejected by name.
+    """
+    roots = {}
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        root = os.path.join(ROOT, f"sparseopt_{engine}")
+        roots[engine] = _run_phases(
+            engine,
+            root,
+            port,
+            [lambda conn, r=root: _phase_sparse_options(conn, r)],
+        )
+
+    def load(root):
+        with open(os.path.join(root, "sparse_options.json")) as handle:
+            return json.load(handle)
+
+    cpp = load(roots["cpp"])
+    rust = load(roots["rust"])
+    assert cpp, "the reference answered nothing"
+    for name, _, _ in SPARSE_OPT_QUERIES:
+        assert cpp[name] == rust[name], (
+            f"`{name}` answered differently:\n  cpp:  {cpp[name]}\n  rust: {rust[name]}"
+        )
+    assert isinstance(cpp["use_tail"], list), (
+        f"the reference accepted `use_tail`: {cpp['use_tail']}"
+    )
+    assert isinstance(rust["use_tail"], list), (
+        f"the port accepted `use_tail`: {rust['use_tail']}"
+    )
+    assert cpp["use_tail"][0] == rust["use_tail"][0] == 3013, (
+        f"cpp: {cpp['use_tail']}, rust: {rust['use_tail']}"
+    )
+    for side in (cpp["use_tail"], rust["use_tail"]):
+        assert "Unsupported optional parameter: use_tail" in side[1], side
+    # The variants must not all collapse to the default, otherwise the gate
+    # would pass on a reader that ignores the options.
+    assert cpp["default"] != cpp["beta_one_term"], (
+        "beta did not change the reference's answer; pick a query that shows it"
+    )
+
+
 VEC_TABLE = "test_cross_engine_vector_mutations"
 VEC_COLUMNS = {
     "id": {"type": "int"},
@@ -2360,8 +2483,12 @@ def test_the_object_directory_is_shared_with_the_reference():
     object file - a scan (the block columns) and the secondary index chunk are
     both read this way.
 
-    This is the local stand-in for a bucket: the same records and the same
-    packed object are what `VirtualStore` uploads when `storage_type = minio`.
+    This is the **local** object layout, shared by both engines. The bucket
+    transport is **not** aligned (see `docs/FORMAT_EQUIVALENCE_TESTS.md` §6.5):
+    the reference uploads a packed object under a bare `obj_key` via
+    `VirtualStore::UploadObject`, while the port mirrors a path tree
+    (`data/`, `catalog/`, `persistence/`) as individual objects. The two do not
+    read each other's buckets.
     """
     expected = {}
     for writer, reader, port in (("rust", "cpp", 5432), ("cpp", "rust", 5433)):
@@ -2495,21 +2622,18 @@ def test_the_sparse_index_options_reach_the_chunk():
 
 
 # ---------------------------------------------------------------------------
-# The WAL: the entries both engines encode the same way, byte for byte.
+# The WAL: every entry the two engines write for the same statements.
 #
-# A frame is `[i32 size][i64 txn_id][u64 commit_ts][i32 cmd_count]` followed by
-# the commands; each command is `[u8 type]` and then type-specific fields. The
-# reference writes one command per statement (`Append` 24, `Delete` 25) and the
-# port writes the same encoding for them, so their payloads can be compared
-# byte for byte. DDL is excluded: the reference writes `CreateDatabase` /
-# `CreateTable` / `CreateIndex`, the port a `KvBatch` (the catalog keys the DDL
-# wrote), which is a different command, not a different encoding of the same one.
+# A frame is `[i32 size][u32 checksum][i64 txn_id][u64 commit_ts][i32
+# cmd_count]` followed by the commands and a copy of `size`; each command is
+# `[u8 type]` and then type-specific fields. The checksum and `txn_id` are
+# per-engine, so the gate compares the frame body (everything after the header,
+# which carries the commands and their encoding) at the same commit ts.
 # ---------------------------------------------------------------------------
 
 WAL_TABLE = "test_cross_engine_wal"
 WAL_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}}
-WAL_CMD_APPEND = 24
-WAL_CMD_DELETE = 25
+WAL_CHECKPOINT = 104
 
 
 def _phase_wal(conn):
@@ -2524,7 +2648,12 @@ def _phase_wal(conn):
 
 
 def _wal_frames(path):
-    """`(commit_ts, [command signatures])` for every frame in a WAL file."""
+    """`(commit_ts, body)` for every frame in a WAL file.
+
+    `body` is everything after the frame header (the command count and the
+    commands), the part both engines must agree on; the header's checksum and
+    `txn_id` are per-engine.
+    """
     blob = open(path, "rb").read()
     pos = 0
     out = []
@@ -2533,39 +2662,22 @@ def _wal_frames(path):
         if size <= 28 or pos + size > len(blob):
             break
         ts = struct.unpack_from("<Q", blob, pos + 16)[0]
-        count = struct.unpack_from("<i", blob, pos + 24)[0]
-        cmds = blob[pos + 28 : pos + size]
-        out.append((ts, _wal_commands(cmds, count)))
+        out.append((ts, blob[pos + 28 : pos + size]))
         pos += size
     return out
 
 
-def _wal_commands(blob, count):
-    """Decodes the commands of one frame; `None` when a layout is unknown.
-
-    Only `Append`/`Delete` are decoded: their signature is
-    `(type, db_name, db_id, table_name, table_id, rest)` where `rest` is every
-    byte after the `table_id` string: the four strings and the commit ts are
-    compared byte for byte, and the rest is compared as described below.
-    """
+def _wal_raw_frames(path):
+    """Every frame's bytes, header included."""
+    blob = open(path, "rb").read()
     pos = 0
     out = []
-    for _ in range(count):
-        if pos >= len(blob):
-            return None
-        kind = blob[pos]
-        pos += 1
-        if kind not in (WAL_CMD_APPEND, WAL_CMD_DELETE):
-            return None
-        fields = []
-        for _ in range(4):
-            if pos + 4 > len(blob):
-                return None
-            length = struct.unpack_from("<I", blob, pos)[0]
-            pos += 4
-            fields.append(blob[pos : pos + length])
-            pos += length
-        out.append((kind, fields[0], fields[1], fields[2], fields[3], blob[pos:]))
+    while pos + 28 <= len(blob):
+        size = struct.unpack_from("<i", blob, pos)[0]
+        if size <= 28 or pos + size > len(blob):
+            break
+        out.append(blob[pos : pos + size])
+        pos += size
     return out
 
 
@@ -2575,19 +2687,26 @@ def _wal_commands(blob, count):
 @pytest.mark.skipif(
     not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
 )
-def test_the_wal_entries_match_for_the_shared_commands():
-    """Append and delete entries are the same bytes; DDL is a different command.
+def test_the_wal_entries_match_byte_for_byte():
+    """Every frame is the same bytes, header included.
 
-    The WAL is not byte comparable as a whole (`txn_id` is per engine, and the
-    reference writes `CreateTable` where the port writes the catalog keys it
-    produced), but the row-carrying commands are: the port replays the
-    reference's `Append`/`Delete` entries and the reference replays the port's,
-    so their payloads have to be the same bytes.
+    The header carries `size`, the CRC32 of the frame and `txn_id`; the CRC
+    covers the others, so comparing whole frames compares the transaction id
+    sequence too. The reference takes an id per **statement** — read-only ones
+    included (`USE`, `SHOW TABLES`, `SELECT`) — and the port now spends them at
+    the same points: one at startup for the memory-index recovery, one for the
+    startup checkpoint, one for `create default_db`, then one per RPC/statement.
+
+    That covers the typed DDL commands (`CreateTableV2`, `CreateIndexV2`, …) as
+    well as `AppendV2` (a reference `DataBlock` of typed columns, not the port's
+    text block) and `DeleteV2`, and it covers the *order* of the commands inside
+    a frame — an UPDATE is one frame holding the delete and then the append, and
+    the reference writes them in that order.
 
     The gate runs with **no flush**, so neither file is truncated at a
-    checkpoint; it then compares, per entry, the commit ts and every byte of
-    the `Append`/`Delete` payload after the `db_id`/`table_id` strings (the only
-    fields the port leaves empty).
+    checkpoint. Both files are `wal/wal.log` and hold the same frames, the
+    startup `CheckpointV2` included: the port swaps the log at a checkpoint and
+    writes the frame into the fresh file, as `WalManager::SwapWalFile` does.
     """
     roots = {}
     for engine, port in (("cpp", 5432), ("rust", 5433)):
@@ -2595,69 +2714,138 @@ def test_the_wal_entries_match_for_the_shared_commands():
             engine, os.path.join(ROOT, f"wal_{engine}"), port, [_phase_wal]
         )
 
-    cpp = _wal_frames(os.path.join(roots["cpp"], "wal", "wal.log"))
-    rust = _wal_frames(os.path.join(roots["rust"], "wal", "wal.rust"))
+    cpp = _wal_raw_frames(os.path.join(roots["cpp"], "wal", "wal.log"))
+    rust = _wal_raw_frames(os.path.join(roots["rust"], "wal", "wal.log"))
 
-    def shared(frames):
-        out = []
-        for ts, cmds in frames:
-            if cmds is None:
-                continue
-            out.append((ts, cmds))
-        return out
+    assert cpp, "the reference wrote no entries"
+    assert len(cpp) == len(rust), f"{len(cpp)} frames vs {len(rust)}"
+    for i, (a, b) in enumerate(zip(cpp, rust)):
+        assert a == b, f"frame {i} differs:\n  cpp  {a.hex()}\n  rust {b.hex()}"
 
-    cpp_shared = shared(cpp)
-    rust_shared = shared(rust)
-    assert cpp_shared, "the reference wrote no Append/Delete entries"
-    assert len(cpp_shared) == len(rust_shared), (
-        f"{len(cpp_shared)} reference entries vs {len(rust_shared)} port entries"
-    )
-    for (cpp_ts, cpp_cmds), (rust_ts, rust_cmds) in zip(cpp_shared, rust_shared):
-        assert cpp_ts == rust_ts, f"commit ts {cpp_ts} != {rust_ts}"
-        assert len(cpp_cmds) == len(rust_cmds), (
-            f"ts {cpp_ts}: {len(cpp_cmds)} commands vs {len(rust_cmds)}"
+
+# ---------------------------------------------------------------------------
+# The append block's column encodings, one table per type.
+#
+# `test_the_wal_entries_match_byte_for_byte` compares the block of a table with
+# two columns. This gate walks the rest of the reference's column types: each
+# table has one column and one row, so a mismatch names the type.
+#
+# The NULL table comes **first**: a NULL row's fixed slot is whatever the
+# reference's column buffer held (the reference never writes it), so a fresh
+# process zeroes it. A NULL table placed after others would pick up bytes from
+# an earlier table's freed buffer and could not be compared.
+# ---------------------------------------------------------------------------
+
+WAL_TYPE_TABLES = [
+    ("c_null", {"type": "int32"}, None),
+    ("c_bool", {"type": "bool"}, True),
+    ("c_i8", {"type": "int8"}, 1),
+    ("c_i16", {"type": "int16"}, 2),
+    ("c_i32", {"type": "int32"}, 3),
+    ("c_i64", {"type": "int64"}, 4),
+    ("c_f32", {"type": "float32"}, 1.5),
+    ("c_f64", {"type": "float64"}, 2.5),
+    ("c_f16", {"type": "float16"}, 1.5),
+    ("c_bf16", {"type": "bfloat16"}, 2.5),
+    ("c_varchar", {"type": "varchar"}, "abc"),
+    ("c_date", {"type": "date"}, "2024-01-02"),
+    ("c_time", {"type": "time"}, "03:04:05"),
+    ("c_datetime", {"type": "datetime"}, "2024-01-02 03:04:05"),
+    ("c_ts", {"type": "timestamp"}, "2024-01-02 03:04:05"),
+    ("c_json", {"type": "json"}, '{"a":1}'),
+    ("c_vec", {"type": "vector,4,float"}, [1.0, 2.0, 3.0, 4.0]),
+    ("c_mvec", {"type": "multivector,2,float"}, [[1.0, 2.0], [3.0, 4.0]]),
+    ("c_tensor", {"type": "tensor,4,float"}, [1.0, 2.0, 3.0, 4.0]),
+    ("c_sparse", {"type": "sparse,8,float,int"}, {1: 0.5, 3: 0.25}),
+]
+
+
+def _phase_wal_types(conn):
+    db = conn.get_database("default_db")
+    for name, spec, value in WAL_TYPE_TABLES:
+        table = "waltype_" + name
+        db.drop_table(table, ConflictType.Ignore)
+        t = db.create_table(table, {name: spec}, ConflictType.Error)
+        t.insert([{name: value}])
+    time.sleep(1)
+
+
+def _append_blocks(wal_dir):
+    """The `DataBlock` bytes of every `AppendV2` frame, in replay order.
+
+    A restart seals the active log (`wal.log` -> `wal.log.<ts>`), so the frames
+    are spread over the sealed segments and the active file; the port writes the
+    same names the reference does.
+    """
+    sealed = sorted(
+        (
+            (int(name.rsplit(".", 1)[1]), os.path.join(wal_dir, name))
+            for name in os.listdir(wal_dir)
+            if name.startswith("wal.log.") and name.rsplit(".", 1)[1].isdigit()
         )
-        for (cpp_kind, cpp_db, cpp_dbid, cpp_tbl, cpp_tblid, cpp_rest), (
-            rust_kind,
-            rust_db,
-            rust_dbid,
-            rust_tbl,
-            rust_tblid,
-            rust_rest,
-        ) in zip(cpp_cmds, rust_cmds):
-            assert cpp_kind == rust_kind, f"ts {cpp_ts}: command type"
-            assert cpp_db == rust_db, f"ts {cpp_ts}: database {cpp_db!r}"
-            assert cpp_dbid == rust_dbid, f"ts {cpp_ts}: database id {cpp_dbid!r}"
-            assert cpp_tbl == rust_tbl, f"ts {cpp_ts}: table {cpp_tbl!r}"
-            assert cpp_tblid == rust_tblid, f"ts {cpp_ts}: table id {cpp_tblid!r}"
-            if cpp_kind == WAL_CMD_DELETE:
-                # The delete payload is `[u32 count][row id: u64]...` followed by
-                # one trailer word; the ids are compared, the trailer is a
-                # per-engine count (both engines accept each other's entry, so
-                # it is not part of the row data).
-                cpp_count = struct.unpack_from("<I", cpp_rest, 0)[0]
-                rust_count = struct.unpack_from("<I", rust_rest, 0)[0]
-                assert cpp_count == rust_count, (
-                    f"ts {cpp_ts} delete: {cpp_count} ids vs {rust_count}"
-                )
-                ids = cpp_count * 8
-                assert cpp_rest[4 : 4 + ids] == rust_rest[4 : 4 + ids], (
-                    f"ts {cpp_ts} delete: row ids differ"
-                )
-            else:
-                # The append payload starts with the block header
-                # (`block_num, block_id, first_row_id, row_count`); the row
-                # data after it uses the port's own encoding (see §5.2 of
-                # FORMAT_EQUIVALENCE_TESTS.md).
-                assert cpp_rest[:16] == rust_rest[:16], (
-                    f"ts {cpp_ts} append: block header differs "
-                    f"({cpp_rest[:16].hex()} vs {rust_rest[:16].hex()})"
-                )
-                cpp_rows = struct.unpack_from("<I", cpp_rest, 12)[0]
-                rust_rows = struct.unpack_from("<I", rust_rest, 12)[0]
-                assert cpp_rows == rust_rows, (
-                    f"ts {cpp_ts} append: {cpp_rows} rows vs {rust_rows}"
-                )
+    )
+    files = [path for _, path in sealed] + [os.path.join(wal_dir, "wal.log")]
+    out = []
+    for path in files:
+        if not os.path.exists(path):
+            continue
+        for _, body in _wal_frames(path):
+            if not body or body[0] != 24:
+                continue
+            pos = 1
+            for _ in range(4):
+                length = struct.unpack_from("<I", body, pos)[0]
+                pos += 4 + length
+            ranges = struct.unpack_from("<I", body, pos)[0]
+            pos += 4 + ranges * 16
+            out.append(body[pos : len(body) - 4])
+    return out
+
+
+def _phase_wal_types_rows(conn):
+    """After a restart: every table still has its one row (the WAL replayed)."""
+    db = conn.get_database("default_db")
+    for name, _, _ in WAL_TYPE_TABLES:
+        # `to_result` is `(column -> values, column definitions, row count)`.
+        values, _, _ = db.get_table("waltype_" + name).output([name]).to_result()
+        cells = values[name]
+        assert len(cells) == 1, f"{name}: {len(cells)} rows after replay"
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_append_block_matches_for_every_type():
+    """One row of every column type the port puts in a reference block.
+
+    Covers the bit-packed `Boolean`, the integer widths, `Float16`/`BFloat16`,
+    the four-byte `Date`/`Time`, the eight-byte `DateTime`/`Timestamp`, the
+    16-byte `Varchar`/`Json` slots with their heaps and the inline `Embedding`.
+    A `NULL` row exercises the roaring null bitmap, whose values are the
+    **non-NULL** rows of the whole 8192-row capacity.
+
+    A second phase reopens the port's directory: the block is decoded back into
+    rows, so the typed encoding must also be replayable.
+    """
+    roots = {}
+    for engine, port in (("cpp", 5432), ("rust", 5433)):
+        phases = [_phase_wal_types]
+        if engine == "rust":
+            phases.append(_phase_wal_types_rows)
+        roots[engine] = _run_phases(
+            engine, os.path.join(ROOT, f"waltype_{engine}"), port, phases
+        )
+
+    cpp = _append_blocks(os.path.join(roots["cpp"], "wal"))
+    rust = _append_blocks(os.path.join(roots["rust"], "wal"))
+    names = [name for name, _, _ in WAL_TYPE_TABLES]
+    assert len(cpp) == len(names), f"{len(cpp)} reference appends for {len(names)} tables"
+    assert len(rust) == len(names), f"{len(rust)} port appends for {len(names)} tables"
+    for name, a, b in zip(names, cpp, rust):
+        assert a == b, f"{name} block differs:\n  cpp  {a.hex()}\n  rust {b.hex()}"
 
 
 # ---------------------------------------------------------------------------
@@ -3233,12 +3421,15 @@ def test_the_port_round_trips_through_object_storage():
     one used to come back, so a directory restored from the bucket had block
     files that belonged to no table.
 
-    There is no cross-engine half to this: the reference's object mode uploads
-    its catalog (`meta/...`) but `VirtualStore::DownloadObject` has no caller
-    in `src/` - measured, a reference directory whose local files are wiped
-    starts with an empty catalog - and its object *keys* are packed blobs
-    addressed through `pm|object|<path>` records in the KV, not a path tree.
-    See `docs/FORMAT_EQUIVALENCE_TESTS.md` §5.2.7.
+    There is no cross-engine half to this, by decision: the port mirrors a
+    path tree (`data/`, `catalog/`, `persistence/`) into the bucket as
+    individual objects, while the reference uploads a packed object under a
+    bare `obj_key` via `VirtualStore::UploadObject` (its object keys are not
+    a path tree, and `VirtualStore::DownloadObject` has no caller in `src/` -
+    measured, a reference directory whose local files are wiped starts with an
+    empty catalog). Aligning the bucket transport is **not ported**; see
+    `docs/FORMAT_EQUIVALENCE_TESTS.md` §6.5. This test only covers the port's
+    own bucket round trip.
     """
     root = os.path.join(ROOT, "object_rust")
     # A bucket per run: a leftover from an earlier run would be restored into
@@ -3591,6 +3782,102 @@ BLOCK_SEG_ROWS = 20000
 BLOCK_SEG_BLOCKS = 3
 
 
+def _raw_catalog_hex(root):
+    """Every catalog value as `key -> hex`, read straight out of the store.
+
+    `SHOW CATALOG 'all'` returns a binary value through the Postgres text
+    protocol, which turns the `fast_rough_filter` records into an empty string
+    - that is why the gate could only assert that the record *exists*. The Rust
+    CLI's `dump-catalog` opens the same RocksDB catalog and prints the bytes as
+    hex, so the gate can compare them byte for byte.
+    """
+    out = subprocess.run(
+        [RUST_CLI, "dump-catalog", root],
+        capture_output=True,
+        text=True,
+    )
+    assert out.returncode == 0, (
+        f"dump-catalog failed on {root}: rc={out.returncode} {out.stderr.strip()}"
+    )
+    pairs = {}
+    for line in out.stdout.splitlines():
+        if "\t" not in line:
+            continue
+        key, hexvalue = line.split("\t", 1)
+        pairs[key] = hexvalue
+    return pairs
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_CLI, os.X_OK), reason=f"{RUST_CLI} is not executable"
+)
+def test_the_fast_rough_filters_match_byte_for_byte():
+    """The `fast_rough_filter` records are the same bytes, not just present.
+
+    `BuildFastRoughFilterTask::ExecuteOnNewSealedSegment`
+    (`new_txn_data_impl.cpp:1739`) writes one record per sealed segment
+    (`seg|…|fast_rough_filter`) and one per block (`blk|…|fast_rough_filter`).
+    They are binary, so `show catalog 'all'` renders them as an empty string and
+    the gate used to stop at "the key exists". This reads the bytes out of the
+    catalog store instead and compares them: three `IMPORT`s seal three
+    segments, so both levels are covered.
+    """
+    cpp_root = os.path.join(ROOT, "frf_cpp")
+    rust_root = os.path.join(ROOT, "frf_rust")
+    directory = tempfile.mkdtemp(prefix="frf-csv-")
+    try:
+        for name, start, count in zip(
+            ("a.csv", "b.csv", "c.csv"), SEG_STARTS, SEG_ROWS
+        ):
+            _seg_csv(os.path.join(directory, name), start, count)
+        phase = lambda conn: _seg_phase(conn, directory)  # noqa: E731
+        _run_engine("cpp", cpp_root, 5432, seed=phase)
+        _run_engine("rust", rust_root, 5433, seed=phase)
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+    cpp_hex = _raw_catalog_hex(cpp_root)
+    rust_hex = _raw_catalog_hex(rust_root)
+
+    def filters(pairs):
+        return {k: v for k, v in pairs.items() if "fast_rough_filter" in k}
+
+    cpp_filters = filters(cpp_hex)
+    rust_filters = filters(rust_hex)
+    assert cpp_filters, "the reference wrote no fast_rough_filter record"
+    assert rust_filters, "the port wrote no fast_rough_filter record"
+
+    # Both levels are present: one per sealed segment and one per block.
+    for label, pairs in (("cpp", cpp_filters), ("rust", rust_filters)):
+        assert any(k.startswith("seg|") for k in pairs), (
+            f"{label}: no segment-level fast_rough_filter {sorted(pairs)}"
+        )
+        assert any(k.startswith("blk|") for k in pairs), (
+            f"{label}: no block-level fast_rough_filter {sorted(pairs)}"
+        )
+        # A binary value: not an empty string once hex-encoded.
+        assert all(len(v) > 0 and len(v) % 2 == 0 for v in pairs.values()), (
+            f"{label}: a fast_rough_filter record is empty or malformed"
+        )
+
+    only_cpp = sorted(set(cpp_filters) - set(rust_filters))
+    only_rust = sorted(set(rust_filters) - set(cpp_filters))
+    changed = [
+        f"{key}:\n    cpp  {cpp_filters[key]}\n    rust {rust_filters[key]}"
+        for key in sorted(set(cpp_filters) & set(rust_filters))
+        if cpp_filters[key] != rust_filters[key]
+    ]
+    assert not (only_cpp or only_rust or changed), (
+        f"only in cpp: {only_cpp}\nonly in rust: {only_rust}\n" + "\n".join(changed)
+    )
+
+
 def _block_seg_phase(conn, directory):
     db = conn.get_database("default_db")
     db.drop_table(BLOCK_SEG_TABLE, ConflictType.Ignore)
@@ -3770,6 +4057,23 @@ def _merged_phase(conn, directory):
     time.sleep(2)
 
 
+def _cleanup_phase(conn):
+    """Trigger `Cleanup` over a directory that already compacted its sources.
+
+    Both engines expose the same Thrift `Cleanup` RPC (the reference at
+    `infinity_thrift_service_impl.cpp:1226`, the port at
+    `infinity-server/src/lib.rs:1156`), which runs the equivalent of
+    `NewTxn::Cleanup()` / `Engine::cleanup()`: it reclaims every segment marked
+    deprecated by a prior `Compact`, removing the source segment's data files,
+    its catalog records and its index chunks. This phase is the second process
+    over the same directory, so the engine reads the catalog the compaction
+    left behind.
+    """
+    conn.cleanup()
+    conn.flush_data()
+    time.sleep(2)
+
+
 @pytest.mark.skipif(
     not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
 )
@@ -3890,6 +4194,125 @@ def test_a_compacted_table_matches_and_keeps_its_sources():
     assert cpp_answers["fulltext_last"] == [MERGED_STARTS[3] + 20]
 
 
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_a_cleanup_reclaims_the_deprecated_sources():
+    """After `Cleanup` the deprecated source segments are gone from both engines.
+
+    The compact test stops before this step: it proves the four source segments
+    keep their files and `drop|seg|…` / `drop|idx_seg|…` marks, but a reader at
+    a later ts skips them, so the marks themselves are not compared. This test
+    runs `Cleanup` over the same directory (the compaction already happened, so
+    the second process sees the `drop|` marks) and compares what survives.
+
+    Both engines reclaim the same things: the source segments' data files
+    (`seg_0..3`), their catalog records (`catalog|seg|…`, `seg|…`, `blk|…`),
+    their index chunks (`idx_chunk|…` records + the `idx_*/seg_*` directories)
+    and the `drop|seg|…` / `drop|idx_seg|…` marks themselves. Only the merged
+    segment (id 4) remains, with its blocks, versions and index chunks - which
+    must still be byte identical after the cleanup, since cleanup does not touch
+    the live segment's files.
+    """
+    cpp_root = os.path.join(ROOT, "cleaned_cpp")
+    rust_root = os.path.join(ROOT, "cleaned_rust")
+    directory = tempfile.mkdtemp(prefix="cleaned-csv-")
+    try:
+        for name, start, count in zip(
+            ("a.csv", "b.csv", "c.csv", "d.csv"), MERGED_STARTS, MERGED_ROWS
+        ):
+            _seg_csv(os.path.join(directory, name), start, count)
+        phase = lambda conn: _merged_phase(conn, directory)  # noqa: E731
+        _run_engine("cpp", cpp_root, 5432, seed=phase)
+        _run_engine("rust", rust_root, 5433, seed=phase)
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+    _wait_for_segment_chunks(cpp_root, SEG_INDEXES, range(5))
+    _wait_for_segment_chunks(rust_root, SEG_INDEXES, range(5))
+
+    # Capture the pre-cleanup state for the byte comparison, then run cleanup
+    # over the same directory (second process). `_run_engine` wipes the root,
+    # so the cleanup phase is spawned directly on the existing directory.
+    cpp_pre = _files(cpp_root)
+    rust_pre = _files(rust_root)
+
+    _spawn_and_run("cpp", cpp_root, _cleanup_phase)
+    _spawn_and_run("rust", rust_root, _cleanup_phase)
+
+    # After cleanup: source segments 0-3 are gone, merged segment 4 remains.
+    cpp_files, rust_files = _files(cpp_root), _files(rust_root)
+    for label, files in (("cpp", cpp_files), ("rust", rust_files)):
+        segs = {
+            name.split("/seg_")[1].split("/")[0]
+            for name in files
+            if "/seg_" in name and "/blk_" in name
+        }
+        assert segs == {"4"}, f"{label}: surviving segments {sorted(segs)}"
+        for index_id in SEG_INDEXES:
+            got = _segment_dirs(files, index_id)
+            assert got == ["4"], (
+                f"{label} idx_{index_id}: surviving segments {got}"
+            )
+
+    # The merged segment's files are untouched by cleanup: byte identical to
+    # the pre-cleanup state.
+    cpp_dir = _own_table_dir(cpp_pre, SEG_COLUMNS)
+    rust_dir = _own_table_dir(rust_pre, SEG_COLUMNS)
+    assert cpp_dir is not None and rust_dir is not None
+    failures = _compare_data_files(
+        _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), SEG_INDEXES
+    )
+    assert not failures, "the merged segment's bytes changed after cleanup:\n  " + "\n  ".join(
+        failures
+    )
+
+    # The catalog's surviving records are the same: the source segments'
+    # records, the `drop|…` marks and their index chunks are all gone; the
+    # merged segment's records remain.
+    def surviving(root, pg_port, table_dir):
+        pairs = _normalize_catalog(
+            _table_records(_catalog_pairs(root, pg_port), table_dir, MERGED_TABLE),
+            zero_size_indexes=SEG_ZERO_SIZE,
+        )
+        # No `drop|` marks survive cleanup, and no source-segment records do.
+        assert not any(k.startswith("drop|") for k in pairs), (
+            f"drop marks survive cleanup: {sorted(k for k in pairs if k.startswith('drop|'))}"
+        )
+        return pairs
+
+    cpp_pairs = surviving(cpp_root, 5432, cpp_dir)
+    rust_pairs = surviving(rust_root, 5433, rust_dir)
+    only_cpp = sorted(set(cpp_pairs) - set(rust_pairs))
+    only_rust = sorted(set(rust_pairs) - set(cpp_pairs))
+    changed = [
+        f"{key}: {cpp_pairs[key]} != {rust_pairs[key]}"
+        for key in sorted(set(cpp_pairs) & set(rust_pairs))
+        if cpp_pairs[key] != rust_pairs[key]
+    ]
+    assert not (only_cpp or only_rust or changed), (
+        f"only in cpp: {only_cpp}\nonly in rust: {only_rust}\n" + "\n".join(changed)
+    )
+
+    # The surviving merged segment answers the same queries.
+    queries = {
+        "count": lambda t: t.output(["count(*)"]).to_result(),
+        "fulltext_second": lambda t: t.output(["id"])
+        .match_text("body", f"doc{MERGED_STARTS[1] + 50}", 20)
+        .to_result(),
+        "secondary": lambda t: t.output(["id"])
+        .filter(f"title = 'title-{MERGED_STARTS[2] + 10}'")
+        .to_result(),
+    }
+    cpp_answers = _answers(cpp_root, 5432, MERGED_TABLE, queries)
+    rust_answers = _answers(rust_root, 5433, MERGED_TABLE, queries)
+    assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
+    assert cpp_answers["count"] == [sum(MERGED_ROWS)]
+
+
 # ---------------------------------------------------------------------------
 # A table larger than one segment.
 #
@@ -3996,3 +4419,113 @@ def test_a_table_larger_than_a_segment_starts_a_second_one():
     assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
     assert cpp_answers["count"] == [HUGE_ROWS]
     assert cpp_answers["last"] == [HUGE_ROWS - 1]
+
+
+def _wal_command_payloads(path, kind):
+    """Every command payload of `kind`, in file order (header excluded).
+
+    The entry header carries a per-engine `txn_id`, so only the command
+    payload (after the 28-byte header) is compared. The trailing `i32` entry
+    size is dropped too; it follows the command bytes.
+    """
+    blob = open(path, "rb").read()
+    pos = 0
+    out = []
+    while pos + 28 <= len(blob):
+        size = struct.unpack_from("<i", blob, pos)[0]
+        if size <= 28 or pos + size > len(blob):
+            break
+        count = struct.unpack_from("<i", blob, pos + 24)[0]
+        cmds = blob[pos + 28 : pos + size - 4]
+        if count == 1 and cmds and cmds[0] == kind:
+            out.append(cmds)
+        pos += size
+    return out
+
+
+def _phase_ddl_wal(conn):
+    db = conn.get_database("default_db")
+    t = db.create_table(
+        "wal_ddl",
+        {
+            "id": {"type": "int"},
+            "name": {"type": "varchar"},
+            "body": {"type": "varchar"},
+            "v": {"type": "vector,4,float"},
+            "sp": {"type": "sparse,8,float,int"},
+        },
+        ConflictType.Error,
+    )
+    t.create_index("sec", index.IndexInfo("name", index.IndexType.Secondary))
+    t.create_index("ft", index.IndexInfo("body", index.IndexType.FullText))
+    t.create_index(
+        "hn",
+        index.IndexInfo("v", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}),
+    )
+    t.create_index("bm", index.IndexInfo("sp", index.IndexType.BMP))
+    t.add_columns({"extra": {"type": "varchar"}})
+    # Drop a column that existed at CREATE TABLE (its `tbl|col|` key carries the
+    # table ts, which both engines agree on). Dropping a column that was *added
+    # later* still differs: the reference keys its `column_keys` entry with the
+    # ADD ts while the port uses the table ts (a catalog-key gap, not WAL).
+    t.drop_columns("id")
+    t.drop_index("sec")
+    t.rename("wal_renamed")
+    db.drop_table("wal_renamed")
+    conn.create_database("wal_db", ConflictType.Error)
+    conn.drop_database("wal_db", ConflictType.Error)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_ddl_wal_commands_match_the_reference():
+    """The typed DDL WAL commands are the same bytes as the reference's.
+
+    Each command payload is compared on its own (so a failure names the
+    command), and the whole `wal.log` is then compared frame by frame — the
+    header's `txn_id` and CRC included. Covered:
+    CreateDatabase/CreateTable/CreateIndex (Secondary/FullText/HNSW/BMP)/
+    AddColumns/DropColumns/DropIndex/RenameTable/DropTable/DropDatabase. IVF is
+    excluded from the *payload* comparison: its `IndexIVFOption` is a POD
+    written by `memcpy` with uninitialized padding, so the reference itself is
+    not reproducible (measured across two runs).
+    """
+    cpp_root = os.path.join(ROOT, "ddlwal_cpp")
+    rust_root = os.path.join(ROOT, "ddlwal_rust")
+    _run_engine("cpp", cpp_root, 5432, seed=_phase_ddl_wal)
+    _run_engine("rust", rust_root, 5433, seed=_phase_ddl_wal)
+
+    cpp_wal = os.path.join(cpp_root, "wal", "wal.log")
+    rust_wal = os.path.join(rust_root, "wal", "wal.log")
+    for kind, name in [
+        (8, "CreateDatabaseV2"),
+        (10, "CreateTableV2"),
+        (13, "CreateIndexV2"),
+        (44, "AddColumnsV2"),
+        (45, "DropColumnsV2"),
+        (14, "DropIndexV2"),
+        (43, "RenameTableV2"),
+        (11, "DropTableV2"),
+        (9, "DropDatabaseV2"),
+    ]:
+        cpp_payloads = _wal_command_payloads(cpp_wal, kind)
+        rust_payloads = _wal_command_payloads(rust_wal, kind)
+        assert cpp_payloads, f"the reference wrote no {name}"
+        assert len(cpp_payloads) == len(rust_payloads), (
+            f"{name}: {len(cpp_payloads)} reference frames vs {len(rust_payloads)} port frames"
+        )
+        for i, (a, b) in enumerate(zip(cpp_payloads, rust_payloads)):
+            assert a == b, f"{name} #{i} differs:\n  cpp  {a.hex()}\n  rust {b.hex()}"
+
+    # Every frame — header (`txn_id`, CRC) included — is the same bytes.
+    cpp_frames = _wal_raw_frames(cpp_wal)
+    rust_frames = _wal_raw_frames(rust_wal)
+    assert len(cpp_frames) == len(rust_frames), (
+        f"{len(cpp_frames)} reference frames vs {len(rust_frames)} port frames"
+    )
+    for i, (a, b) in enumerate(zip(cpp_frames, rust_frames)):
+        assert a == b, f"frame {i} differs:\n  cpp  {a.hex()}\n  rust {b.hex()}"

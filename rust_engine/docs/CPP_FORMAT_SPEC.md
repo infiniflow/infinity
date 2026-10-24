@@ -101,7 +101,7 @@ score     += smooth_idf * smooth_tf * weight
 
 # 8. 已验证：目录/文件命名、段块元数据、块内列式编码（关闭 §6 的 1/2/3）
 
-> 本节由源码逐行核对产出（`file:line` 为证）。**重要更正**：C++ 树中已无 `src/storage/meta/entry/{block_entry,segment_entry}*`（仅剩 `data_access_state.cppm`），`SegmentEntry`/`BlockEntry` 类不存在；段/块元数据改为 **RocksDB KV + 每块的 `version` 文件**，实现位于 `src/storage/catalog/meta/*`。
+> 本节由源码逐行核对产出（`file:line` 为证）。C++ 树中没有 `src/storage/meta/entry/{block_entry,segment_entry}*`（仅剩 `data_access_state.cppm`），也没有 `SegmentEntry`/`BlockEntry` 类；段/块元数据是 **RocksDB KV + 每块的 `version` 文件**，实现在 `src/storage/catalog/meta/*`。
 
 ## 8.0 全局目录
 
@@ -272,7 +272,7 @@ slot 宽度（`logical_type.cpp:183-255` 的 `type_size[]`；`DataType::Size()` 
 
 outline 文件（`col_{id}_out`）：内容 = 各次 `Append` 的原始字节按序首尾相接（`var_buffer_impl.cpp:28-46,85-104`）；`Append` 返回的 `offset`（= 追加前累积大小）写入 slot 的 `file_offset_`；**文件无索引、无头**，寻址全靠 slot 字段。Sparse 的 outline 内容 = `indices`（`nnz * index_width`）紧跟 `data`（`nnz * data_width`）（`vector_buffer.cppm:161-184`；`sparse_info.h:55-65`）。
 
-> **更正（2026-10-17）：`TENSORARRAY` 的切分是*可推导*的，不是歧义。** 其 slot 与 `TENSOR` 同为 `TensorArrayT = {tensor_num:16; file_offset:48}`（`tensor_array_type.h:28-36`），而 `file_offset_` 指向 outline 里 `tensor_num` 个 **8 字节 `TensorT` 记录**（`SetTensorArray`：逐个 `SetTensor` 写各 tensor 数据并记下其 `{count:16; offset:48}`，再把这段 meta 数组 `AppendTensorArrayMeta` 到 `file_offset_`——`column_vector_impl.cpp:2792-2805`；`GetTensorArrayMeta` `:2784-2790` 反读）。因此每个 tensor 的长度与位置都能从 outline 读出，此前「slot 只记总数、切分歧义」的结论**已推翻**；实现只需在 outline 里多写一段 meta 数组。`EMBEDDING(BIT,d)` 亦已补齐（位打包 `ceil(d/8)` 字节，见 `embedding_size`）。
+> **`TENSORARRAY` 的切分可从 outline 推导。** 其 slot 与 `TENSOR` 同为 `TensorArrayT = {tensor_num:16; file_offset:48}`（`tensor_array_type.h:28-36`），`file_offset_` 指向 outline 里 `tensor_num` 个 **8 字节 `TensorT` 记录**（`SetTensorArray`：逐个 `SetTensor` 写各 tensor 数据并记下其 `{count:16; offset:48}`，再把这段 meta 数组 `AppendTensorArrayMeta` 到 `file_offset_`——`column_vector_impl.cpp:2792-2805`；`GetTensorArrayMeta` `:2784-2790` 反读）。每个 tensor 的长度与位置都从这段 meta 数组读出；写侧只需在 outline 里多写一段 meta。`EMBEDDING(BIT,d)` 按位打包 `ceil(d/8)` 字节（`embedding_size`）。
 
 ## 8.4 Byte-level 实现清单（Rust 照此读写）
 
@@ -480,7 +480,7 @@ u8[pos_list_len]
     - `{1,2,3,4,5}` → 1 word = `0300fa09`
     - `{1,1,1,2,3,5,8,13,21,34,55,89}` → 4 words = `01700016 81404030 28201a15 d12d0b00`
   - **复现配方**：`clang++-23 -std=c++23 -O2 -march=native -I<fastpfor>/headers -I<repo>/third_party/newpfor main.cpp <fastpfor>/src/{bitpacking,bitpackingaligned,bitpackingunaligned,simdbitpacking,simdunalignedbitpacking,horizontalbitpacking}.cpp <repo>/third_party/newpfor/{new_pfordelta_compressor,decompress_sse4}.cpp`，其中 `main.cpp` 用 `encodeArray`（u32）/ `Compress(...,true)`（u16）并打印字节。**注意**：FastPForLib 不在仓库内（由 C++ 构建拉取），故未随仓库提交生成器；上述字节已固定在本节。同理注意 `-O2` 与 `-march` 必须与目标一致（SIMD 路径按位宽分派，但字节输出与 -O 无关——已核）。
-- **Rust 侧状态（2026-10-17 更新）**：
+- **Rust 侧实现**：
   - **u32 块编解码已实现并逐位对齐 C++**（`infinity-storage::inverted_format::{encode_u32_block, decode_u32_block, POSTING_MINI_BLOCK}`）。**布局规律已定论**（无需移植 SSE 表）：`CompositeCodec<SIMDBinaryPacking, VariableByte>`；SIMD 部件写 `u32 simd_len`，随后每 16 个 128-值 mini-block 一组，先写 **4 个 u32 的位宽头**（每个 u32 内含 4 个位宽，**大端序**：`Bs[4g]<<24|Bs[4g+1]<<16|Bs[4g+2]<<8|Bs[4g+3]`），再写各 mini-block 的 `4*w` 个字。**mini-block 内部布局 = 按 32 位 SSE lane 的位流**：128 个值按 `index % 4` 分成 4 条 lane，lane L 的值（`i≡L mod 4`，按 `i/4` 排序）以 LSB-first 连续打包成 `w` 个字的位流，lane L 的第 k 个字落在输出字 `L + 4k`。剩余 `len%128` 个值走 **VariableByte**（7 位/字节、LSB 优先、**最高位在最后一字节置 1**，最后补 0 到 32 位边界）。已用 11 个 C++ 真值用例（位宽 1/2/3/7/8/16/17、纯 VB、SIMD+VB 混合）断言**编码逐位相同**且解码往返。
   - **u16 块（NewPForDelta）编解码均已实现并逐位对齐 C++**（`infinity-storage::inverted_format::{encode_u16_block, decode_u16_block}`），9 个真值用例全部通过（含 `increase`/`same` 特殊帧、常规帧、两块输入、以及 3 个带 S9 例外的帧）：
     - **header**：`isLastBlock:1 | exceptionIntRange:11 | frameBits:5 | firstExceptionPos:8 | dataNum:7`（`dataNum` 存 `块内值数-1`；`frameBits==31` 表示 32）。
@@ -489,7 +489,6 @@ u8[pos_list_len]
     - **`S9Decode`**：把例外值按位 OR 回 `dest`（`dest[cur] |= field << frameBits`），`cur` 从 `firstExceptionPos-1` 开始，字段 **MSB-first 且低位对齐**（`field_j = (val >> ((n-1-j)*b)) & mask`，`b=BIT_LENGTH[c%16]`、`n=CODE_NUM[c%16]`）；**值/间隔交替**，`c<16` 以值开头、`c>=16` 以间隔开头（`head` 跨字进位：本字以值结尾则 `head=16`）；`BIT_LENGTH={1,2,3,4,5,7,9,14,28}`、`CODE_NUM={28,14,9,7,5,4,3,2,1}`。**`S9Encode`** 是相应贪心编码（取第一个能容纳 `CODE_NUM[k]` 个值的位宽，`res |= k<<28`）。
     - **编码侧选择**（`SelectCompressBits`）：先判 `isAllSame`/`isIncrease`/`isDecrease`（`enableBlockOpt=true` 时启用）→ 特殊帧；否则在 `frameBits = FRAME_BIT_MAP[maxBits] .. 0` 上按「帧字节 + 例外字节」总大小取最小者（例外率上限 `len*10/100`，例外位宽→字节 2/3/4/8），`BASIC_MASK[i]=(1<<i)-1`。**至此全文倒排的全部落盘格式（`.dic`/FST、`.pos` 的 u32 与 u16 块）都可与 C++ 逐位互读互写。**
     - **C++ 真值（9 例，供逐位断言；`Compress(...,true)` 即 `enableBlockOpt=true`）**：`{1,2,3,4,5}`→`0300fa09`（递增特殊帧）；`{1,1,1,2,3,5,8,13,21,34,55,89}`→`017000168140403028201a15d12d0b00`；`{i%7}₁₂₈`→`013000fe88c61ad1…`；`{1000}₁₂₈`→`d107feff`（全等值特殊帧）；`{i*37%1000}₁₂₈`→`01a000fe0094a0c4…`；`{i%3}₁₃₀`→`002000fe2449…0120000202000000`（两块）；以及 3 个带 S9 例外的帧（`{i%8}` 挖 3 个尖峰 → `05300cfe…`；`{i%4}` 挖 1 个 → `032002fe…`；`{i%16}` 挖 20 个 → `01c000fea01f…`）。复现：`clang++ -std=c++23 -O2 -mssse3 -msse4.1 -I third_party/newpfor u16.cpp third_party/newpfor/{new_pfordelta_compressor,decompress_sse4}.cpp`（`decompress_sse4.cpp` 需 `-mssse3 -msse4.1`）。
-- **关于「布局不可推导」的更正（2026-10-17 晚）**：先用探针（`a[i]=i`，逐宽度）观察到 SIMD-BP128 按 32 位 SSE lane 交错、且宽度 2/4 恰等于朴素顺序，因而一度判定「必须逐宽度移植 SSE 表（≈2000 行）」。**随后按「lane = `index % 4`、lane 内 LSB-first 连续位流、lane L 的第 k 字落在字 `L+4k`」建模，一次通过全部 11 个真值用例**（含宽度 17），故该判定**已推翻**：布局是**可推导的**，Rust 实现只需上述规则（见上一条），无需移植任何 SSE 代码。
 
 ### 9.3.6 `.len`（列长 / BM25 统计）
 
@@ -568,7 +567,7 @@ u8[pos_list_len]
 
 **已冻结的子类字段与 `file_name` 规则**（Rust 侧 `infinity-catalog::value_format::{IndexDefValue, index_file_name}`）：
 
-- **`file_name` 生成规则**：`fmt::format("{}_{}", create_index_info->table_name_, *index_name)`（`src/planner/logical_planner_impl.cpp:859`），即 `{table}_{index}`（表名用**不带库名**的 `table_name_`）。此前的 VERIFY 已解除。
+- **`file_name` 生成规则**：`fmt::format("{}_{}", create_index_info->table_name_, *index_name)`（`src/planner/logical_planner_impl.cpp:859`），即 `{table}_{index}`（表名用**不带库名**的 `table_name_`）。
 - **HNSW**（`index_hnsw_impl.cpp:278-290`；默认值 `src/common/default_values.cppm:178-180`）：`build_type`（`HnswBuildTypeToString`：`plain`/`lsg`）、`ef_construction`（默认 200）、`encode_type`（`HnswEncodeTypeToString`：`plain`/`lvq`/`rabitq`）、`M`（默认 16）、`block_size`（默认 8192）、`metric_type`（`MetricTypeToString`：`cosine`/`ip`/`l2`/`Invalid`）。注意大写 `M` 在 nlohmann 的 `std::map` 里排在小写键**之前**。
 - **FULLTEXT**（`index_full_text_impl.cpp:114-119`；`Make` `:90-116`）：`analyzer`（缺省 `standard`）、`flag`（`OPTION_FLAG_ALL = 63`，`index_defines.cppm:13-32`）。
 - **SECONDARY**（`index_secondary_impl.cpp:117-124`；`Make`）：`cardinality`（`"low"`/`"high"`）、`is_json_index`（bool）。
@@ -586,13 +585,13 @@ u8[pos_list_len]
 - **`ConstantExpr::Serialize()`**（`src/parser/expr/constant_expr.cpp:452-530`）：`{"type": <int32 LiteralType>, "value": …}`（键序 `type` < `value`）。`LiteralType` 序号（`constant_expr.h`）：`kBoolean`0/`kDouble`1/`kString`2/`kInteger`3/`kNull`4/`kDate`5/`kTime`6/`kDateTime`7/`kTimestamp`8/`kIntegerArray`9/`kDoubleArray`10/`kSubArrayArray`11/`kInterval`12/`kLongSparseArray`13/`kDoubleSparseArray`14/`kEmptyArray`15/`kCurlyBracketsArray`16/`kJson`17。**`kNull` 与 `kEmptyArray` 不写 `value` 键**；`kDate`/`kTime`/`kDateTime`/`kTimestamp` 的 `value` 是**字符串**（`char* date_value_`）；`kString`/`kJson` 也是字符串（`char*`，不二次解析）；`kSubArrayArray`/`kCurlyBracketsArray` 的 `value` 是**逐元素递归 `Serialize()`** 的数组；`kLongSparseArray`/`kDoubleSparseArray` 的 `value` 是对象 `{indices:[i64…], data:[…]}`（dump 后键序 `data`<`indices`）。
 - **`SparseInfo::Serialize()`**（`src/parser/type/info/sparse_info.cpp:103-110`）：SPARSE 列的 `type_info` = `{"data_type": <EmbeddingDataType>, "index_type": <EmbeddingDataType>, "dimension": <int>, "sort": <int8 SparseStoreType>}`。`index_type` 由 `dimension` 推得（`GetIndexType` `:44-58`）：≤128→`int8`(2)、≤32768→`int16`(3)、≤2^31→`int32`(4)、否则 `int64`(5)；`sort` 默认 `kSort`(0)（`store_type_{SparseStoreType::kSort}` `sparse_info.h:107`）。普通 SPARSE 列的 `type_info` **不嵌在 `{"data_type":…}` 里**，而是直接是上面的对象（`data_type.cpp:471` 用 `SparseInfo::Deserialize(type_info_json.raw_json())`）。
 
-**已查证：自定义 MergeOperator 无语义影响**（此前列为待冻结项）。C++ 在 `kv_store_impl.cpp:308,333` 为 RocksDB 实例注册 `String2UInt64AddOperator`（`src/storage/common/rocksdb_merge_operator_impl.cpp:28-49`）：`Merge` 把已存在的值与操作数**各自按十进制字符串** `stoull` 后相加，再 `std::to_string` 写回（已存在值缺失时按 0）。**但全仓库没有任何 `->Merge(` 调用点**（仅 `Put/Get/Delete/GetIterator`），因此该算子从不产生 merge 记录，磁盘上永远是普通键值。结论：**读写互通不需要它**——Rust 侧不注册也不影响；只有当 C++ 将来开始 `Merge` 时才会出现。
+**自定义 MergeOperator 无语义影响。**C++ 在 `kv_store_impl.cpp:308,333` 为 RocksDB 实例注册 `String2UInt64AddOperator`（`src/storage/common/rocksdb_merge_operator_impl.cpp:28-49`）：`Merge` 把已存在的值与操作数**各自按十进制字符串** `stoull` 后相加，再 `std::to_string` 写回（已存在值缺失时按 0）。**但全仓库没有任何 `->Merge(` 调用点**（仅 `Put/Get/Delete/GetIterator`），因此该算子从不产生 merge 记录，磁盘上永远是普通键值。结论：**读写互通不需要它**——Rust 侧不注册也不影响；只有当 C++ 将来开始 `Merge` 时才会出现。
 
 **§8.6 全部冻结完毕**：catalog 的键（§8.2）、列值（`ColumnDef`/`DataType`）、索引值（`IndexBase` 全部十种类型）、默认值（`ConstantExpr`）、SPARSE `type_info`（`SparseInfo`）都已逐字段复刻并有 pin 测试；MergeOperator 经查证无语义影响。
 
-## 8.7 本轮新增冻结的事实（2026-10-17，均以源码行号为准）
+## 8.7 键空间与索引持久化的口径
 
-这些是在**把 C++ 键空间做成唯一 catalog**（§2.6.1 第 ④ 项）与补齐向量索引持久化/查询路径时，逐条实测出来、且此前文档未记的口径。
+把 C++ 键空间做成唯一 catalog（§2.6.1 第 ④ 项）以及向量索引持久化/查询路径依赖的口径，均以源码行号为准。
 
 ### 8.7.1 元素类型名：C++ 内部名 vs 引擎拼写
 
@@ -605,7 +604,7 @@ u8[pos_list_len]
 | BIT / UINT8 / INT8 / INT16 / INT32 / INT64 | `BIT`/`UINT8`/… | `bit`/`uint8`/`int8`/… |
 | FLOAT16 / BFLOAT16 | `FLOAT16`/`BFLOAT16` | `float16`/`bfloat16` |
 
-`data_type_of_text` 读侧先 `to_ascii_uppercase()` 再匹配，故小写拼写可安全回写。另：`element_code` 必须把 **`UNSIGNED TINYINT`** 归到 `UINT8`（此前误判为 `INT8`，`test_knn_hnsw_u8` 因此失败）。`LogicalType` 侧同理补上 **`HUGEINT`=5**（服务端线上 `logic_type=5` 会发 `HUGEINT`，缺它会让任何 `CREATE TABLE` 失败）。
+`data_type_of_text` 读侧先 `to_ascii_uppercase()` 再匹配，故小写拼写可安全回写。另：`element_code` 必须把 **`UNSIGNED TINYINT`** 归到 `UINT8`（归到 `INT8` 会让 `test_knn_hnsw_u8` 失败）。`LogicalType` 侧同理补上 **`HUGEINT`=5**（服务端线上 `logic_type=5` 会发 `HUGEINT`，缺它会让任何 `CREATE TABLE` 失败）。
 
 ### 8.7.2 函数索引的记录形态（`SECONDARYFUNCTIONAL`）
 
@@ -631,7 +630,7 @@ Rust 侧写出的近似记录把**引擎的表达式文本**放进 `func_col_par
 
 ### 8.7.5 `Varchar` 槽的不动点
 
-`Varchar` = 24 位长度 + union：**≤13 字节内联进槽**，更长的才进 outline（5 字节前缀 + 8 字节偏移）。读写两侧都必须遵守该不动点；此前的实现「总是走 outline、读侧对 >13 字节回占位符」会让长字符串镜像回读损坏。
+`Varchar` = 24 位长度 + union：**≤13 字节内联进槽**，更长的才进 outline（5 字节前缀 + 8 字节偏移）。读写两侧都必须遵守该不动点；写侧总是走 outline、或读侧对 >13 字节不读 slot，都会让长字符串镜像回读损坏。
 
 ### 8.7.6 向量索引镜像与 FUSION 组合（引擎侧实现的口径）
 

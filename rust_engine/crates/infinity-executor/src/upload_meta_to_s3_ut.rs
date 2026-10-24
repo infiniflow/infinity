@@ -9,6 +9,11 @@
 //! a real upload/list/download round trip through [`infinity_storage::s3`];
 //! when the environment is absent it prints how to enable it and returns
 //! without touching the network.
+//!
+//! Note: the port mirrors a **path tree** into the bucket, not the reference's
+//! packed-object/`obj_key` transport; the bucket layout is not aligned (see
+//! `docs/FORMAT_EQUIVALENCE_TESTS.md` §6.5). This test only covers the port's
+//! own round trip.
 
 use std::path::Path;
 

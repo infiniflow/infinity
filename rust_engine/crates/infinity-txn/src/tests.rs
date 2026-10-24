@@ -94,7 +94,7 @@ fn concurrent_commits_are_serialized_and_durable() {
     );
 
     // WAL has one record per commit, with unique commit timestamps
-    let recs = WalManager::read_all(dir.path().join("wal.rust")).unwrap();
+    let recs = WalManager::read_all(dir.path().join("wal.log")).unwrap();
     assert_eq!(recs.len(), (THREADS * PER) as usize);
     let ts: BTreeSet<u64> = recs.iter().map(|r| r.commit_ts).collect();
     assert_eq!(
@@ -107,7 +107,7 @@ fn concurrent_commits_are_serialized_and_durable() {
 #[test]
 fn truncated_wal_recovers_exactly_the_valid_prefix() {
     let dir = tempdir().unwrap();
-    let wal = dir.path().join("wal.rust");
+    let wal = dir.path().join("wal.log");
     {
         let store: Arc<dyn MetaStore> =
             Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
@@ -122,9 +122,9 @@ fn truncated_wal_recovers_exactly_the_valid_prefix() {
     // simulate a crash that truncates the WAL at many different offsets
     for cut in (0..full.len()).step_by(41) {
         let d2 = tempdir().unwrap();
-        // The engine's records live in `wal.rust`; `wal.log` is the reference's
-        // checkpoint file. The truncated prefix belongs to the former.
-        let wal2 = d2.path().join("wal.rust");
+        // Checkpoint frames and records share `wal.log`, so the truncated
+        // prefix is written to the same name the manager opens.
+        let wal2 = d2.path().join("wal.log");
         std::fs::write(&wal2, &full[..cut]).unwrap();
         let store: Arc<dyn MetaStore> =
             Arc::new(FjallMetaStore::open(d2.path().join("kv"), "default").unwrap());
@@ -193,7 +193,7 @@ fn append_is_a_typed_command_and_replays_the_same_rows() {
     }
 
     // The record is a typed Append with one coalesced row range.
-    let mut iter = WalEntryIterator::make(dir.path().join("wal.rust"), false).unwrap();
+    let mut iter = WalEntryIterator::make(dir.path().join("wal.log"), false).unwrap();
     let entry = iter.next().expect("one record");
     assert!(!iter.has_next());
     assert_eq!(entry.cmds.len(), 1);
@@ -208,11 +208,8 @@ fn append_is_a_typed_command_and_replays_the_same_rows() {
             assert_eq!(db_name, "default_db");
             assert_eq!(table_name, "t");
             assert_eq!(row_ranges, &[(WalRowId::new(0, 0), 5)]);
-            assert_eq!(block.row_count(), 5);
-            assert_eq!(
-                block.get_value(0, 3),
-                Some(BlockValue::Str("3\trow-3".to_string()))
-            );
+            assert_eq!(block.len(), 1);
+            assert_eq!(block[0].values.varchar(3).as_deref(), Some("3\trow-3"));
         }
         other => panic!("expected an Append command, got {other:?}"),
     }
@@ -239,7 +236,7 @@ fn delete_is_a_typed_command_and_replays_the_tombstones() {
         m.commit(t).unwrap();
         assert_eq!(store.scan_prefix(b"del:").unwrap().len(), 2);
     }
-    let mut iter = WalEntryIterator::make(dir.path().join("wal.rust"), false).unwrap();
+    let mut iter = WalEntryIterator::make(dir.path().join("wal.log"), false).unwrap();
     let entry = iter.next().expect("one record");
     match &entry.cmds[0] {
         WalCmd::Delete {
@@ -264,6 +261,32 @@ fn delete_is_a_typed_command_and_replays_the_tombstones() {
 
 /// Catalog records keep their exact value in a `KvBatch` and replay verbatim.
 #[test]
+fn typed_commands_replace_the_catalog_kv_batch() {
+    // A DDL that prepared typed WAL commands emits them instead of a `KvBatch`
+    // for the same catalog records (`build_commands`).
+    let dir = tempdir().unwrap();
+    {
+        let store: Arc<dyn MetaStore> =
+            Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
+        let m = TxnManager::open(dir.path().join("wal.log"), store).unwrap();
+        let mut t = m.begin();
+        t.put(b"tbl:0000000000000001".to_vec(), b"catalog-record".to_vec());
+        t.set_typed_commands(vec![WalCmd::Checkpoint { max_commit_ts: 7 }]);
+        m.commit(t).unwrap();
+    }
+    let mut iter = WalEntryIterator::make(dir.path().join("wal.log"), false).unwrap();
+    let entry = iter.next().expect("one record");
+    assert!(
+        matches!(
+            entry.cmds.as_slice(),
+            [WalCmd::Checkpoint { max_commit_ts: 7 }]
+        ),
+        "expected the typed command to replace the KvBatch, got {:?}",
+        entry.cmds
+    );
+}
+
+#[test]
 fn catalog_writes_are_carried_as_a_kv_batch() {
     let dir = tempdir().unwrap();
     let key = b"tbl:0000000000000001".to_vec();
@@ -276,7 +299,7 @@ fn catalog_writes_are_carried_as_a_kv_batch() {
         t.put(key.clone(), value.clone());
         m.commit(t).unwrap();
     }
-    let mut iter = WalEntryIterator::make(dir.path().join("wal.rust"), false).unwrap();
+    let mut iter = WalEntryIterator::make(dir.path().join("wal.log"), false).unwrap();
     let entry = iter.next().expect("one record");
     match &entry.cmds[0] {
         WalCmd::KvBatch { kind, writes } => {
@@ -309,7 +332,7 @@ fn rollback_frees_the_slot_and_the_next_txn_does_not_conflict() {
     assert_eq!(m.total_committed_txn_count(), 1);
 
     // Nothing reached the WAL: only the committed record is there.
-    let recs = WalManager::read_all(dir.path().join("wal.rust")).unwrap();
+    let recs = WalManager::read_all(dir.path().join("wal.log")).unwrap();
     assert_eq!(recs.len(), 1);
 }
 

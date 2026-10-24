@@ -35,7 +35,7 @@ cd rust_engine && cargo build --release -p infinity-cli --features rocksdb-store
 | 表数据（块镜像 `data/db_{id}/tbl_{id}/seg_{n}/blk_{m}/`） | ✅ 逐字节对齐参考布局（`cpp_format`），C++ 可读 |
 | catalog 的表/列/索引记录 | ✅ 键与值都对齐 `KeyEncode`/`DataType::Serialize`（`cpp_layout.rs`） |
 | 次级索引 chunk | ✅ 类型化键（`KeyKind::{U64,F32,F64,I32,I64}`），C++ 的 FLOAT/DOUBLE/DATE/TIME 块可读 |
-| WAL | ✅ `wal/wal.log` 是参考 framing 的 `kNewCheckpoint` 条目；本引擎自己的重做记录在 `wal/wal.rust` |
+| WAL | ✅ `wal/wal.log` 同时承载 checkpoint 帧与事务记录（checkpoint 时整文件改名成 `wal.log.<seal_ts>`，同 `WalManager::SwapWalFile`），帧体与参考逐字节相同 |
 | fjall 键空间本身 | ❌ 与 RocksDB 不同格式，只能 Rust 读 |
 | HNSW / 全文 / 二级索引的索引目录 | ✅ 各自有 chunk 镜像并登记 `catalog|idx_chunk|…|chunk_info` |
 
@@ -112,4 +112,4 @@ INFINITY_CPP_BIN=$PWD/../cmake-build-debug/src/infinity \
   ../.venv/bin/python -m pytest -q ../python/restart_test/test_cross_engine_compat.py
 ```
 
-相关文档：格式冻结细节见 [`CPP_FORMAT_SPEC.md`](CPP_FORMAT_SPEC.md)（其 §2/§7 是本 FAQ 的历史背景，部分描述已过时，以本文为准）；审计结论见 [`SIMPLIFICATION_AUDIT.md`](SIMPLIFICATION_AUDIT.md) 的 P0/P1 行。
+相关文档：格式细节见 [`CPP_FORMAT_SPEC.md`](CPP_FORMAT_SPEC.md)；未覆盖与未实现项见 [`GAPS.md`](GAPS.md)。

@@ -523,12 +523,17 @@ mod tests {
             )
             .unwrap();
         assert_eq!(bound.output_names, vec!["id".to_string()]);
+        // `bound_select_statement_impl.cpp:840-860` puts LIMIT below the final
+        // project; the binder normalizes to that shape.
         match bound.plan {
-            LogicalPlan::Limit { input, n } => {
-                assert_eq!(n, 10);
-                assert!(matches!(*input, LogicalPlan::Projection { .. }));
-            }
-            other => panic!("expected limit over projection, got {other:?}"),
+            LogicalPlan::Projection { input, .. } => match *input {
+                LogicalPlan::Limit { input, n } => {
+                    assert_eq!(n, 10);
+                    assert!(matches!(*input, LogicalPlan::Filter { .. }));
+                }
+                other => panic!("expected limit under the projection, got {other:?}"),
+            },
+            other => panic!("expected projection on top, got {other:?}"),
         }
     }
 
@@ -669,6 +674,11 @@ mod tests {
             LogicalPlan::Scan {
                 table: scanned,
                 columns,
+            }
+            | LogicalPlan::IndexScan {
+                table: scanned,
+                columns,
+                ..
             } => (scanned == table).then(|| columns.clone()),
             LogicalPlan::Join { left, right, .. } => {
                 scan_columns(left, table).or_else(|| scan_columns(right, table))

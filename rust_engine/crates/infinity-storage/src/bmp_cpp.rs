@@ -29,6 +29,8 @@ use memmap2::Mmap;
 use std::fs::File;
 use std::path::Path;
 
+use infinity_index::sparse::BmpSearchOptions;
+
 use crate::cpp_format::FormatError;
 
 /// Width of the sparse index element type (`EmbeddingDataType`).
@@ -300,6 +302,9 @@ pub struct BmpCppReader {
     widths: IdxWidth,
     /// Per term: `(block id, max score)`.
     ivt: Vec<Vec<(i32, f32)>>,
+    /// Per term: the `topk` the index was optimized for, and its k-th score.
+    kths: Vec<i32>,
+    kth_scores: Vec<f32>,
     /// Per block: `(term, [(offset, value)])`.
     blocks: Vec<BlockTerms>,
     doc_ids: Vec<u32>,
@@ -314,8 +319,8 @@ impl BmpCppReader {
         let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
         let mut cur = Cursor { buf: &map, at: 0 };
         let term_num = cur.u64_aligned()? as usize;
-        cur.skip_aligned(4, term_num * 4); // kths
-        cur.skip_aligned(4, term_num * 4); // kth scores
+        let kths = cur.i32s_aligned(term_num)?;
+        let kth_scores = cur.f32s_aligned(term_num)?;
         let prefix: Vec<u64> = cur.u64s_aligned(term_num + 1)?;
         let sum = *prefix.last().unwrap_or(&0) as usize;
         let block_ids = cur.i32s_aligned(sum)?;
@@ -357,23 +362,60 @@ impl BmpCppReader {
             block_size,
             widths: width,
             ivt,
+            kths,
+            kth_scores,
             blocks,
             doc_ids,
         })
+    }
+
+    /// `BlockPostingsBase::kth` (`bmp_ivt.cppm:272`): the stored k-th score
+    /// only applies when the query asks for the same `topk` the index was
+    /// optimized for, else 0.
+    fn kth(&self, topk: usize, term: usize) -> f32 {
+        if self.kths.get(term).copied() == Some(topk as i32) {
+            self.kth_scores.get(term).copied().unwrap_or(0.0)
+        } else {
+            0.0
+        }
     }
 
     pub fn doc_count(&self) -> usize {
         self.doc_ids.len()
     }
 
-    /// `BMPAlgBase::SearchKnn`: threshold from the k-th posting score, block
-    /// bounds, exact block scoring, and `alpha` early stop.
-    pub fn search(&self, query: &[(i32, f32)], topk: usize, alpha: f32) -> Vec<(usize, f32)> {
+    /// `BMPAlgBase::SearchKnn`: `beta` term selection, threshold from the k-th
+    /// posting score, block bounds, exact block scoring, and `alpha` early stop.
+    pub fn search(
+        &self,
+        query: &[(i32, f32)],
+        topk: usize,
+        options: BmpSearchOptions,
+    ) -> Vec<(usize, f32)> {
         let _ = self.widths;
         if topk == 0 || self.doc_ids.is_empty() {
             return Vec::new();
         }
         let topk = topk.min(self.doc_ids.len());
+        // `beta < 1` keeps only the strongest `ceil(nnz * beta)` query terms,
+        // then restores index order (`bmp_alg.cppm:67-80`).
+        let kept: Vec<(i32, f32)>;
+        let query = if options.beta < 1.0 {
+            let mut idx: Vec<usize> = (0..query.len()).collect();
+            let keep = ((query.len() as f32) * options.beta).ceil() as usize;
+            idx.sort_by(|a, b| {
+                query[*b]
+                    .1
+                    .partial_cmp(&query[*a].1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            idx.truncate(keep);
+            idx.sort_by_key(|i| query[*i].0);
+            kept = idx.iter().map(|i| query[*i]).collect();
+            &kept[..]
+        } else {
+            query
+        };
         let block_num = self.blocks.len();
         let mut bounds = vec![0.0f32; block_num];
         let mut threshold = 0.0f32;
@@ -386,14 +428,15 @@ impl BmpCppReader {
                     bounds[*block as usize] += q * max;
                 }
             }
-            // No k-th table is persisted here (the reference stores it from its
-            // `topk` build option); the largest term bound is the safe stand-in.
-            threshold = threshold.max(posting.iter().map(|(_, m)| *m * q).fold(0.0f32, f32::max));
+            // `BlockPostingsBase::kth`: `kth_score` only when the query's `topk`
+            // is the one the index was optimized for; otherwise 0 (a persisted
+            // index is not optimized, so this normally leaves `threshold` at 0).
+            threshold = threshold.max(q * self.kth(topk, term as usize));
         }
         let mut order: Vec<(f32, usize)> = bounds
             .iter()
             .enumerate()
-            .filter(|(_, b)| **b >= threshold * (1.0 - 1e-6))
+            .filter(|(_, b)| **b >= threshold)
             .map(|(i, b)| (*b, i))
             .collect();
         order.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
@@ -431,11 +474,15 @@ impl BmpCppReader {
             best.truncate(topk);
             if best.len() == topk {
                 let min = best.last().map(|x| x.1).unwrap_or(0.0);
-                if ub * alpha < min * (1.0 - 1e-6) {
+                if ub * options.alpha < min {
                     break;
                 }
             }
         }
+        // `use_tail` scores the not-yet-finalized tail (`GetScoresTail`). A
+        // built index has already turned its tail into the last block (the
+        // writer pads it to `block_size`), so there is nothing left to score.
+        let _ = options.use_tail;
         best
     }
 }
@@ -556,7 +603,7 @@ mod tests {
         assert_eq!(reader.doc_count(), 40);
         assert_eq!(reader.block_size, 16);
         let q = vec![(0i32, 1.0f32), (7, 1.0)];
-        let hits = reader.search(&q, 5, 1.0);
+        let hits = reader.search(&q, 5, BmpSearchOptions::default());
         assert!(!hits.is_empty());
         // Every hit must agree with a brute-force dot product.
         for (row, score) in &hits {
@@ -585,8 +632,60 @@ mod tests {
         let docs: Vec<SparseDoc> = vec![(0, vec![(3, 1.0)]), (1, vec![(3, 2.0)])];
         write_bmp_file(&path, 16, IdxWidth::I8, &docs, 8).unwrap();
         let reader = BmpCppReader::open(&path, IdxWidth::I8).unwrap();
-        let hits = reader.search(&[(3, 1.0)], 2, 1.0);
+        let hits = reader.search(&[(3, 1.0)], 2, BmpSearchOptions::default());
         assert_eq!(hits.len(), 2);
         assert_eq!(hits[0].0, 1);
+    }
+
+    /// `beta` keeps only `ceil(nnz * beta)` of the strongest query terms, so a
+    /// weak term stops contributing (`bmp_alg.cppm:67-80`).
+    #[test]
+    fn beta_keeps_the_strongest_query_terms() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_beta.bmp");
+        // Doc 0 matches the strong term, doc 1 the weak one.
+        let docs: Vec<SparseDoc> = vec![(0, vec![(1, 1.0)]), (1, vec![(2, 1.0)])];
+        write_bmp_file(&path, 16, IdxWidth::I32, &docs, 4).unwrap();
+        let reader = BmpCppReader::open(&path, IdxWidth::I32).unwrap();
+        let query = vec![(1i32, 10.0f32), (2, 1.0)];
+        let all = reader.search(&query, 2, BmpSearchOptions::default());
+        assert_eq!(all.iter().map(|(r, _)| *r).collect::<Vec<_>>(), vec![0, 1]);
+        assert!((all[0].1 - 10.0).abs() < 1e-6);
+        assert!((all[1].1 - 1.0).abs() < 1e-6);
+
+        let strong_only = BmpSearchOptions {
+            beta: 0.5,
+            ..BmpSearchOptions::default()
+        };
+        let hits = reader.search(&query, 2, strong_only);
+        assert_eq!(hits.len(), 2);
+        assert!((hits[0].1 - 10.0).abs() < 1e-6);
+        // The weak term no longer scores: doc 1 falls back to 0.
+        assert!((hits[1].1 - 0.0).abs() < 1e-6);
+    }
+
+    /// The block threshold is the posting's stored k-th score, which is 0 for
+    /// an index that was never optimized. A block whose bound is lower than
+    /// another block's single-term maximum must still be scored, or its rows
+    /// drop out of the top-k.
+    #[test]
+    fn the_kth_threshold_keeps_every_block() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_threshold.bmp");
+        // Block 0: doc 0 has term 1 -> 10.0. Block 1 starts at doc 16 and has
+        // term 2 -> 100.0 on doc 16.
+        let mut docs: Vec<SparseDoc> = (0..16).map(|i| (i, vec![(1, 10.0)])).collect();
+        docs.push((16, vec![(2, 100.0)]));
+        docs.extend((17..32).map(|i| (i, vec![(1, 1.0)])));
+        write_bmp_file(&path, 16, IdxWidth::I32, &docs, 4).unwrap();
+        let reader = BmpCppReader::open(&path, IdxWidth::I32).unwrap();
+        let hits = reader.search(&[(1, 1.0), (2, 1.0)], 2, BmpSearchOptions::default());
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].0, 16);
+        assert!((hits[0].1 - 100.0).abs() < 1e-6);
+        // The runner-up lives in the block whose bound (10.0) is below the
+        // other block's term maximum (100.0).
+        assert_eq!(hits[1].0, 0);
+        assert!((hits[1].1 - 10.0).abs() < 1e-6);
     }
 }

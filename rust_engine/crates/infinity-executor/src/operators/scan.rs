@@ -40,6 +40,9 @@ pub struct TableScan {
     /// The full-text column the candidate's index filter reads.
     pub fulltext_index_column: Option<String>,
     pub fulltext_substring: bool,
+    /// The predicate's comparisons, for the block prefilter: a block whose
+    /// `blk|…|fast_rough_filter` record refutes one of them is not read.
+    pub prune: Vec<crate::fast_rough_filter::PruneCond>,
 }
 
 impl TableScan {
@@ -53,6 +56,9 @@ impl TableScan {
         let needs_ids = self.candidate.is_some()
             && self.fulltext_index_column.is_some()
             && !self.fulltext_substring;
+        // Only a plain full scan of the node is cacheable: an override or an
+        // index filter answers a *predicate*, not the node's rows.
+        let cacheable = self.override_rows.is_none() && self.candidate.is_none();
         let (mut rows, row_ids) = match self.override_rows.take() {
             Some(rows) => (rows, None),
             None if needs_ids => {
@@ -60,7 +66,7 @@ impl TableScan {
                 let ids: Vec<usize> = pairs.iter().map(|(id, _)| *id).collect();
                 (pairs.into_iter().map(|(_, row)| row).collect(), Some(ids))
             }
-            None => (engine.fetch_rows(&self.table)?, None),
+            None => (engine.fetch_rows_pruned(&self.table, &self.prune)?, None),
         };
         // The index filter refers to the pre-`LazyLoad` scan layout, so it maps
         // back onto the unpruned row before the rows compact.
@@ -87,6 +93,9 @@ impl TableScan {
         }
         if let Some(full) = &self.source_columns {
             rows = crate::align_rows(rows, &self.columns, full);
+        }
+        if cacheable {
+            engine.cache_scan_rows(&self.table, &self.columns, &rows);
         }
         Ok(rows)
     }
@@ -291,6 +300,7 @@ mod tests {
             index_positions: None,
             fulltext_index_column: None,
             fulltext_substring: false,
+            prune: Vec::new(),
         };
         let mut source = PhysicalSource::new(&engine, SourceSpec::Table(Box::new(scan)), 8192);
         assert_eq!(
@@ -313,6 +323,7 @@ mod tests {
             index_positions: None,
             fulltext_index_column: None,
             fulltext_substring: false,
+            prune: Vec::new(),
         };
         let mut source = PhysicalSource::new(&engine, SourceSpec::Table(Box::new(scan)), 8192);
         source.set_unmatchable(true);
@@ -333,6 +344,7 @@ mod tests {
             index_positions: None,
             fulltext_index_column: None,
             fulltext_substring: false,
+            prune: Vec::new(),
         };
         let mut source = PhysicalSource::new(&engine, SourceSpec::Table(Box::new(scan)), 8192);
         assert_eq!(source.collect().unwrap(), vec![vec![Value::Int(42)]]);

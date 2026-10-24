@@ -126,6 +126,7 @@ mod gate_b_executor_ut;
 
 #[cfg(test)]
 mod upload_meta_to_s3_ut;
+mod wal_ddl;
 
 pub mod data_table;
 
@@ -1133,6 +1134,462 @@ fn normalize_default(type_text: &str, raw: &str) -> String {
 }
 
 /// Encodes a row for storage, reshaping tensor columns by their declared dim.
+/// Maps a declared type text to the port `LogicalType`, for the subset the
+/// Append block encoder can represent. `None` means "use the text fallback".
+fn port_logical_type(type_text: &str) -> Option<infinity_common::LogicalType> {
+    use infinity_common::LogicalType as LT;
+    let doc = infinity_catalog::cpp_layout::data_type_of_text(type_text)?;
+    let code = match infinity_expression::json::extract(&doc, ".data_type")? {
+        infinity_expression::json::Json::Int(v) => *v,
+        _ => return None,
+    };
+    Some(match code {
+        0 => LT::Boolean,
+        1 => LT::TinyInt,
+        2 => LT::SmallInt,
+        3 => LT::Integer,
+        4 => LT::BigInt,
+        6 => LT::Decimal,
+        7 => LT::Float,
+        8 => LT::Double,
+        9 => LT::Varchar,
+        10 => LT::Date,
+        11 => LT::Time,
+        12 => LT::DateTime,
+        13 => LT::Timestamp,
+        // The port's block model has no half-precision column: the declared
+        // type still reaches the WAL encoder, which packs the value to `f16`.
+        32 | 33 => LT::Float,
+        35 => LT::Json,
+        23 => {
+            let dim = match infinity_expression::json::extract(&doc, ".type_info.dimension")? {
+                infinity_expression::json::Json::Int(v) => *v as u32,
+                _ => 0,
+            };
+            LT::Embedding(dim)
+        }
+        _ => return None,
+    })
+}
+
+fn literal_to_block_value(
+    lit: &Literal,
+    lt: &infinity_common::LogicalType,
+) -> Option<infinity_storage::data_block::BlockValue> {
+    use infinity_common::LogicalType as LT;
+    use infinity_storage::data_block::BlockValue;
+    Some(match (lt, lit) {
+        (_, Literal::Null) => BlockValue::Null,
+        (LT::Boolean, Literal::Int(i)) => BlockValue::Bool(*i != 0),
+        (LT::Boolean, Literal::Str(s)) => BlockValue::Bool(match s.trim() {
+            "true" | "1" => true,
+            "false" | "0" => false,
+            _ => return None,
+        }),
+        (LT::TinyInt, Literal::Int(i)) => BlockValue::TinyInt(*i as i8),
+        (LT::SmallInt, Literal::Int(i)) => BlockValue::SmallInt(*i as i16),
+        (LT::Integer, Literal::Int(i)) => BlockValue::Int32(*i as i32),
+        // An integer column truncates a fractional value, as the reference's
+        // implicit cast does (`-6.3` -> `-6`).
+        (LT::TinyInt, Literal::Float(f)) => BlockValue::TinyInt(*f as i8),
+        (LT::SmallInt, Literal::Float(f)) => BlockValue::SmallInt(*f as i16),
+        (LT::Integer, Literal::Float(f)) => BlockValue::Int32(*f as i32),
+        (LT::BigInt, Literal::Int(i)) => BlockValue::Int(*i),
+        (LT::BigInt, Literal::Float(f)) => BlockValue::Int(*f as i64),
+        (LT::Float, Literal::Float(f)) => BlockValue::Float(*f as f32),
+        (LT::Float, Literal::Int(i)) => BlockValue::Float(*i as f32),
+        (LT::Double, Literal::Float(f)) => BlockValue::Double(*f),
+        (LT::Double, Literal::Int(i)) => BlockValue::Double(*i as f64),
+        (LT::Varchar, Literal::Str(s)) => BlockValue::Str(s.clone()),
+        (LT::Date, Literal::Str(s)) => BlockValue::parse_text(s, LT::Date)?,
+        (LT::Time, Literal::Str(s)) => BlockValue::parse_text(s, LT::Time)?,
+        (LT::DateTime, Literal::Str(s)) => BlockValue::parse_text(s, LT::DateTime)?,
+        (LT::Timestamp, Literal::Str(s)) => BlockValue::parse_text(s, LT::Timestamp)?,
+        (LT::Json, Literal::Str(s)) => BlockValue::parse_text(s, LT::Json)?,
+        (LT::Embedding(_), Literal::Vector(v)) => {
+            BlockValue::Embedding(v.iter().map(|x| *x as f32).collect())
+        }
+        (LT::Embedding(_), Literal::Array(items)) => BlockValue::Embedding(
+            items
+                .iter()
+                .map(|x| x.trim().parse::<f32>().ok())
+                .collect::<Option<Vec<_>>>()?,
+        ),
+        _ => return None,
+    })
+}
+
+/// Builds the reference's `DataBlock` columns from the insert's literals.
+///
+/// `None` means a column's value or type is outside what this path can
+/// represent exactly (a `DECIMAL`'s scale, a tensor, a sparse vector, …); the
+/// caller then keeps the text-column block, which replays but does not match
+/// the reference's bytes.
+fn typed_append_block(
+    rows: &[Vec<Literal>],
+    types: &[String],
+) -> Option<Vec<infinity_storage::wal::block::BlockColumn>> {
+    use infinity_storage::data_block::{Column, DataBlock};
+    use infinity_storage::wal::block::{self, BlockColumn};
+    use infinity_storage::wal::ddl_def::LogicalType as RefType;
+
+    let declared: Vec<_> = types
+        .iter()
+        .map(|t| crate::wal_ddl::data_type_of_text(t))
+        .collect::<Option<Vec<_>>>()?;
+    let direct = |i: usize| {
+        matches!(
+            declared[i].logical_type,
+            RefType::Tensor | RefType::TensorArray | RefType::MultiVector | RefType::Sparse
+        )
+    };
+    if declared.len() != types.len() {
+        return None;
+    }
+    for row in rows {
+        if row.len() != declared.len() {
+            return None;
+        }
+    }
+
+    // The port's `DataBlock` has no tensor or sparse column, so those are built
+    // straight into the reference form; everything else goes through it.
+    let port_indexes: Vec<usize> = (0..types.len()).filter(|i| !direct(*i)).collect();
+    let mut adapted: Vec<Option<BlockColumn>> = vec![None; types.len()];
+    if !port_indexes.is_empty() {
+        let mut columns = Vec::with_capacity(port_indexes.len());
+        let mut logical_types = Vec::with_capacity(port_indexes.len());
+        let mut port_types = Vec::with_capacity(port_indexes.len());
+        for &i in &port_indexes {
+            let lt = port_logical_type(&types[i])?;
+            columns.push(Column::new(lt.clone())?);
+            logical_types.push(lt);
+            port_types.push(declared[i].clone());
+        }
+        let mut block = DataBlock::new(columns, rows.len());
+        for row in rows {
+            for (slot, &i) in port_indexes.iter().enumerate() {
+                block
+                    .append_value(slot, literal_to_block_value(&row[i], &logical_types[slot])?)
+                    .ok()?;
+            }
+        }
+        block.finalize();
+        for (slot, column) in block::from_data_block_with(&block, Some(&port_types))?
+            .into_iter()
+            .enumerate()
+        {
+            adapted[port_indexes[slot]] = Some(column);
+        }
+    }
+    for i in 0..types.len() {
+        if !direct(i) {
+            continue;
+        }
+        let cells: Vec<&Literal> = rows.iter().map(|row| &row[i]).collect();
+        adapted[i] = Some(match declared[i].logical_type {
+            RefType::Sparse => sparse_column(&cells, &declared[i])?,
+            _ => tensor_column(&cells, &declared[i])?,
+        });
+    }
+    adapted.into_iter().collect()
+}
+
+/// `TENSOR` / `TENSORARRAY` / `MULTIVECTOR`: the value's numbers are laid out
+/// row-major in the heap and the slot counts how many `dim`-sized vectors it
+/// holds (`TensorType{embedding_num, file_offset}`).
+fn tensor_column(
+    cells: &[&Literal],
+    data_type: &infinity_storage::wal::ddl_def::DataType,
+) -> Option<infinity_storage::wal::block::BlockColumn> {
+    use infinity_storage::wal::block::{BlockColumn, ColumnValues};
+    let dim = match &data_type.type_info {
+        infinity_storage::wal::ddl_def::TypeInfo::Embedding { dimension, .. } => {
+            usize::try_from(*dimension).ok()?
+        }
+        _ => return None,
+    };
+    if dim == 0 {
+        return None;
+    }
+    let mut values = Vec::with_capacity(cells.len());
+    let mut nulls = Vec::new();
+    for (row, cell) in cells.iter().enumerate() {
+        if matches!(cell, Literal::Null) {
+            nulls.push(row as u32);
+            values.push(None);
+            continue;
+        }
+        let numbers = literal_numbers(cell)?;
+        if numbers.len() % dim != 0 {
+            return None;
+        }
+        let raw: Vec<u8> = numbers
+            .iter()
+            .flat_map(|x| (*x as f32).to_le_bytes())
+            .collect();
+        values.push(Some((u16::try_from(numbers.len() / dim).ok()?, raw)));
+    }
+    let mut column = BlockColumn::new(data_type.clone(), ColumnValues::tensors(&values));
+    column.nulls = nulls;
+    Some(column)
+}
+
+/// `SPARSE`: `(index, value)` pairs, sorted by index (the reference's default
+/// `kSort` store type), indices then values in the heap.
+fn sparse_column(
+    cells: &[&Literal],
+    data_type: &infinity_storage::wal::ddl_def::DataType,
+) -> Option<infinity_storage::wal::block::BlockColumn> {
+    use infinity_storage::wal::block::{BlockColumn, ColumnValues};
+    use infinity_storage::wal::ddl_def::TypeInfo;
+    let TypeInfo::Sparse {
+        data_type: value_type,
+        index_type,
+        ..
+    } = &data_type.type_info
+    else {
+        return None;
+    };
+    let index_width = infinity_storage::wal::block::element_width(*index_type)?;
+    let value_width = infinity_storage::wal::block::element_width(*value_type)?;
+    let mut values = Vec::with_capacity(cells.len());
+    let mut nulls = Vec::new();
+    for (row, cell) in cells.iter().enumerate() {
+        if matches!(cell, Literal::Null) {
+            nulls.push(row as u32);
+            values.push(None);
+            continue;
+        }
+        let mut pairs = literal_sparse_pairs(cell)?;
+        pairs.sort_by_key(|(index, _)| *index);
+        let mut indices = Vec::with_capacity(pairs.len() * index_width);
+        let mut raw = Vec::with_capacity(pairs.len() * value_width);
+        for (index, value) in &pairs {
+            pack_integer(&mut indices, *index as i64, *index_type)?;
+            pack_float(&mut raw, *value, *value_type)?;
+        }
+        values.push(Some((pairs.len() as i64, indices, raw)));
+    }
+    let mut column = BlockColumn::new(data_type.clone(), ColumnValues::sparses(&values));
+    column.nulls = nulls;
+    Some(column)
+}
+
+/// The numbers of a tensor literal, in declaration order.
+fn literal_numbers(lit: &Literal) -> Option<Vec<f64>> {
+    match lit {
+        Literal::Vector(v) => Some(v.clone()),
+        Literal::Int(i) => Some(vec![*i as f64]),
+        Literal::Float(f) => Some(vec![*f]),
+        Literal::Str(s) => parse_number_list(s),
+        Literal::Array(items) => {
+            let mut out = Vec::new();
+            for item in items {
+                out.extend(parse_number_list(item)?);
+            }
+            Some(out)
+        }
+        Literal::Null => None,
+    }
+}
+
+/// `"[1,2,3]"` (any nesting) -> its numbers in order.
+fn parse_number_list(text: &str) -> Option<Vec<f64>> {
+    let mut out = Vec::new();
+    for token in text.split(|c: char| c == '[' || c == ']' || c == ',') {
+        let token = token.trim();
+        if token.is_empty() {
+            continue;
+        }
+        out.push(token.parse::<f64>().ok()?);
+    }
+    Some(out)
+}
+
+/// `"[1:0.5,3:0.25]"` -> `(index, value)` pairs.
+fn literal_sparse_pairs(lit: &Literal) -> Option<Vec<(i64, f64)>> {
+    let items: Vec<String> = match lit {
+        Literal::Array(items) => items.clone(),
+        Literal::Str(s) => s
+            .trim()
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .split(',')
+            .map(|s| s.to_string())
+            .collect(),
+        _ => return None,
+    };
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let (index, value) = item.trim().split_once(':')?;
+        out.push((index.trim().parse().ok()?, value.trim().parse().ok()?));
+    }
+    Some(out)
+}
+
+fn pack_integer(
+    out: &mut Vec<u8>,
+    value: i64,
+    kind: infinity_storage::wal::ddl_def::EmbeddingDataType,
+) -> Option<()> {
+    use infinity_storage::wal::ddl_def::EmbeddingDataType as E;
+    match kind {
+        E::Int8 | E::UInt8 => out.push(value as u8),
+        E::Int16 => out.extend_from_slice(&(value as i16).to_le_bytes()),
+        E::Int32 => out.extend_from_slice(&(value as i32).to_le_bytes()),
+        E::Int64 => out.extend_from_slice(&value.to_le_bytes()),
+        _ => return None,
+    }
+    Some(())
+}
+
+fn pack_float(
+    out: &mut Vec<u8>,
+    value: f64,
+    kind: infinity_storage::wal::ddl_def::EmbeddingDataType,
+) -> Option<()> {
+    use infinity_storage::wal::ddl_def::EmbeddingDataType as E;
+    match kind {
+        E::Float => out.extend_from_slice(&(value as f32).to_le_bytes()),
+        E::Double => out.extend_from_slice(&value.to_le_bytes()),
+        E::Float16 => out.extend_from_slice(
+            &infinity_storage::cpp_format::f32_to_f16_bits(value as f32).to_le_bytes(),
+        ),
+        E::BFloat16 => {
+            out.extend_from_slice(&(((value as f32).to_bits() >> 16) as u16).to_le_bytes())
+        }
+        _ => return None,
+    }
+    Some(())
+}
+
+/// The reference's column-type whitelist, as its error message.
+///
+/// `VerifyColumnDataType` accepts `Boolean`, `TinyInt`, `SmallInt`, `Integer`,
+/// `BigInt`, `Float`, `Double`, `Float16`, `BFloat16`, `Varchar`, `Date`,
+/// `Time`, `Timestamp`, `Json`, `DateTime`, `Embedding` (with a dimension
+/// limit), `MultiVector`, `Tensor`, `TensorArray`, `Sparse` and `Array` of those.
+/// Everything else — notably `HugeInt`, `Decimal`, `Interval` and `UUID` — is
+/// rejected; `Array` recurses and reports the element's error too.
+fn unsupported_column_type(type_text: &str) -> Option<String> {
+    unsupported_column_display(type_text)
+        .map(|display| format!("Not supported data type: {display}"))
+}
+
+/// The `DataType::ToString()` of a rejected column type (`None` when accepted).
+fn unsupported_column_display(type_text: &str) -> Option<String> {
+    let up = type_text.trim().to_ascii_uppercase();
+    let base = up.split('(').next().unwrap_or("").trim();
+    match base {
+        "BOOL" | "BOOLEAN" | "TINYINT" | "INT8" | "SMALLINT" | "INT16" | "INT" | "INTEGER"
+        | "INT32" | "BIGINT" | "INT64" | "FLOAT" | "REAL" | "FLOAT32" | "DOUBLE" | "FLOAT64"
+        | "FLOAT16" | "BFLOAT16" | "VARCHAR" | "TEXT" | "STRING" | "DATE" | "TIME" | "DATETIME"
+        | "TIMESTAMP" | "JSON" | "EMBEDDING" | "VECTOR" | "TENSOR" | "TENSORARRAY"
+        | "MULTIVECTOR" | "SPARSE" => None,
+        "ARRAY" => {
+            // The element type is the inner text (`ARRAY(INT)`); the SDK's
+            // spelling is `array,int`.
+            let inner = match up.split_once('(') {
+                Some((_, rest)) => rest.trim_end_matches(')').to_string(),
+                None => up.split_once(',').map(|(_, rest)| rest.to_string())?,
+            };
+            let element = unsupported_column_display(&inner)?;
+            let message = format!("Not supported data type: {element}");
+            Some(format!(
+                "Array({element}), error in element type: {message}"
+            ))
+        }
+        // `Decimal(decimal(<precision>, <scale>))`: `DecimalInfo::ToString`
+        // spells the parameters lower-case with a space after the comma.
+        "DECIMAL" => match up.split_once('(') {
+            Some((_, rest)) => {
+                let inner = rest.trim_end_matches(')');
+                let mut parts = inner.split(',').map(|p| p.trim());
+                let precision: i64 = parts.next().unwrap_or("0").parse().unwrap_or(0);
+                let scale: i64 = parts.next().unwrap_or("0").parse().unwrap_or(0);
+                Some(format!("Decimal(decimal({precision}, {scale}))"))
+            }
+            None => Some("Decimal".to_string()),
+        },
+        "HUGEINT" | "INT128" => Some("HugeInt".to_string()),
+        "UUID" => Some("UUID".to_string()),
+        "INTERVAL" => Some("Interval".to_string()),
+        "TUPLE" => Some("Tuple".to_string()),
+        "POINT" => Some("Point".to_string()),
+        "LINE" => Some("Line".to_string()),
+        "LINESEG" | "LINE_SEGMENT" => Some("LineSegment".to_string()),
+        "BOX" => Some("Box".to_string()),
+        "CIRCLE" => Some("Circle".to_string()),
+        other => Some(other.to_string()),
+    }
+}
+
+/// Splits a table reference into the `(db_name, table_name)` pair the typed WAL
+/// commands carry. A bare name belongs to `default_db`.
+fn split_table_name(table: &str) -> (String, String) {
+    match table.rsplit_once('.') {
+        Some((db, name)) => (db.to_string(), name.to_string()),
+        None => ("default_db".to_string(), table.to_string()),
+    }
+}
+
+/// The comparisons a block prefilter can answer, out of a scan predicate.
+///
+/// Only conjunctions are pushed down (`a AND b`): a disjunction could be
+/// refuted per branch, but the filter operator keeps it, so leaving it out is
+/// both sound and simple. An operator the prefilter cannot answer (`NE`, `LIKE`,
+/// `IN`, …) makes its conjunct disappear — the scan then reads more blocks, not
+/// fewer rows.
+fn prune_conditions(pred: &Expr, columns: &[String]) -> Vec<crate::fast_rough_filter::PruneCond> {
+    use crate::fast_rough_filter::{PruneCond, PruneOp};
+    let mut out = Vec::new();
+    let mut stack = vec![pred];
+    while let Some(expr) = stack.pop() {
+        match expr {
+            Expr::And(a, b) => {
+                stack.push(a);
+                stack.push(b);
+            }
+            Expr::Cmp(left, op, right) => {
+                let (column, value, op) = match (&**left, &**right) {
+                    (Expr::Column(i), Expr::Literal(v)) => (*i, v, *op),
+                    (Expr::Literal(v), Expr::Column(i)) => (
+                        *i,
+                        v,
+                        match op {
+                            infinity_parser::CmpOp::Lt => infinity_parser::CmpOp::Gt,
+                            infinity_parser::CmpOp::Le => infinity_parser::CmpOp::Ge,
+                            infinity_parser::CmpOp::Gt => infinity_parser::CmpOp::Lt,
+                            infinity_parser::CmpOp::Ge => infinity_parser::CmpOp::Le,
+                            other => *other,
+                        },
+                    ),
+                    _ => continue,
+                };
+                let op = match op {
+                    infinity_parser::CmpOp::Eq => PruneOp::Eq,
+                    infinity_parser::CmpOp::Lt => PruneOp::Lt,
+                    infinity_parser::CmpOp::Le => PruneOp::Le,
+                    infinity_parser::CmpOp::Gt => PruneOp::Gt,
+                    infinity_parser::CmpOp::Ge => PruneOp::Ge,
+                    infinity_parser::CmpOp::Ne => continue,
+                };
+                let Some(name) = columns.get(column) else {
+                    continue;
+                };
+                out.push(PruneCond {
+                    column: name.clone(),
+                    op,
+                    value: value.clone(),
+                });
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
 fn encode_row(row: &[Literal], types: &[String]) -> String {
     row.iter()
         .enumerate()
@@ -2094,6 +2551,198 @@ fn boolean_expr(value: bool) -> ExprAst {
         CmpOp::Eq,
         Box::new(ExprAst::Literal(Literal::Int(if value { 1 } else { 0 }))),
     )
+}
+
+/// The SQL text of the first subquery inside a predicate.
+fn predicate_subquery_sql(pred: &Predicate) -> Option<&str> {
+    match pred {
+        Predicate::IsTrue(e) | Predicate::IsNull(e, _) => expr_subquery_sql(e),
+        Predicate::Cmp(a, _, b) => expr_subquery_sql(a).or_else(|| expr_subquery_sql(b)),
+        Predicate::Like(a, b, _, _) => expr_subquery_sql(a).or_else(|| expr_subquery_sql(b)),
+        Predicate::In(a, vals, _) => {
+            expr_subquery_sql(a).or_else(|| vals.iter().find_map(expr_subquery_sql))
+        }
+        Predicate::Bool(a, _, b) => predicate_subquery_sql(a).or_else(|| predicate_subquery_sql(b)),
+        Predicate::Not(a) => predicate_subquery_sql(a),
+    }
+}
+
+fn expr_subquery_sql(e: &ExprAst) -> Option<&str> {
+    match e {
+        ExprAst::Func { name, args } if name.eq_ignore_ascii_case("SUBQUERY") => {
+            subquery_sql_arg(args).ok()
+        }
+        ExprAst::Func { name, args } if name.eq_ignore_ascii_case("EXISTS") => {
+            exists_subquery_sql(args).ok()
+        }
+        ExprAst::Func { args, .. } => args.iter().find_map(expr_subquery_sql),
+        ExprAst::Binary(a, _, b)
+        | ExprAst::Cmp(a, _, b)
+        | ExprAst::And(a, b)
+        | ExprAst::Or(a, b) => expr_subquery_sql(a).or_else(|| expr_subquery_sql(b)),
+        ExprAst::Not(a) => expr_subquery_sql(a),
+        ExprAst::Column(_) | ExprAst::Literal(_) => None,
+    }
+}
+
+/// The conjuncts of an `a AND b AND …` predicate.
+fn flatten_and<'a>(pred: &'a Predicate, out: &mut Vec<&'a Predicate>) {
+    match pred {
+        Predicate::Bool(a, infinity_parser::BoolOp::And, b) => {
+            flatten_and(a, out);
+            flatten_and(b, out);
+        }
+        other => out.push(other),
+    }
+}
+
+fn combine_and(mut preds: Vec<Predicate>) -> Option<Predicate> {
+    let mut out = preds.pop()?;
+    while let Some(next) = preds.pop() {
+        out = Predicate::Bool(Box::new(next), infinity_parser::BoolOp::And, Box::new(out));
+    }
+    Some(out)
+}
+
+/// The SQL text of an outer value, as a literal the subquery can read back.
+fn outer_literal(value: &Value) -> String {
+    match value {
+        Value::Null => "NULL".to_string(),
+        Value::Int(i) => i.to_string(),
+        Value::Float(f) => {
+            // A float must stay a float: `-0` or `2` would re-parse as an int.
+            let text = format!("{f:?}");
+            if text.contains(['.', 'e', 'E']) {
+                text
+            } else {
+                format!("{text}.0")
+            }
+        }
+        Value::Bool(b) => b.to_string(),
+        Value::Str(s) => format!("'{}'", s.replace('\'', "''")),
+    }
+}
+
+/// Replaces the enclosing row's columns in a subquery's SQL with their values.
+///
+/// The replacement is textual because the parser keeps a nested query as SQL
+/// text. Only identifiers that name an outer column are touched, both bare
+/// (`x`) and qualified (`outer.x`), and single-quoted strings are skipped so a
+/// literal that happens to spell a column name survives.
+fn substitute_outer_row(
+    sql: &str,
+    columns: &[(String, usize)],
+    row: &[Value],
+    outer_table: &str,
+) -> String {
+    let sql = collapse_dots(sql);
+    // A single-table subquery's column may be qualified with its own table,
+    // which the binder resolves through the fully-qualified one; drop that
+    // qualifier. A join keeps them, since they disambiguate.
+    let strip_inner = !sql.to_ascii_uppercase().contains(" JOIN ");
+    let mut out = String::with_capacity(sql.len() + 16);
+    let chars: Vec<char> = sql.chars().collect();
+    let mut i = 0usize;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '\'' {
+            // Copy the quoted run verbatim.
+            out.push(c);
+            i += 1;
+            while i < chars.len() {
+                out.push(chars[i]);
+                if chars[i] == '\'' {
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+            continue;
+        }
+        if c.is_alphanumeric() || c == '_' || c == '.' {
+            let start = i;
+            while i < chars.len()
+                && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.')
+            {
+                i += 1;
+            }
+            let token: String = chars[start..i].iter().collect();
+            match outer_column_value(&token, columns, row, outer_table) {
+                Some(text) => out.push_str(&text),
+                None if strip_inner && token.matches('.').count() == 1 => {
+                    out.push_str(token.rsplit_once('.').map(|(_, c)| c).unwrap_or(&token))
+                }
+                None => out.push_str(&token),
+            }
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
+/// Closes the spaces a nested query's text may carry around a qualifier dot
+/// (`t . c` -> `t.c`) without touching a quoted string.
+fn collapse_dots(sql: &str) -> String {
+    let chars: Vec<char> = sql.chars().collect();
+    let mut out: Vec<char> = Vec::with_capacity(chars.len());
+    let mut i = 0usize;
+    while i < chars.len() {
+        if chars[i] == '\'' {
+            while i < chars.len() {
+                out.push(chars[i]);
+                if chars[i] == '\'' && out.len() > 1 && out[out.len() - 2] != '\\' {
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+            continue;
+        }
+        if chars[i] == '.' {
+            while out.last() == Some(&' ') {
+                out.pop();
+            }
+            out.push('.');
+            i += 1;
+            while i < chars.len() && chars[i] == ' ' {
+                i += 1;
+            }
+            continue;
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out.into_iter().collect()
+}
+
+fn outer_column_value(
+    token: &str,
+    columns: &[(String, usize)],
+    row: &[Value],
+    outer_table: &str,
+) -> Option<String> {
+    let bare = match token.rsplit_once('.') {
+        Some((qualifier, column)) => {
+            // The outer table is fully qualified (`db.table`) while the query
+            // may name it bare; either spelling identifies the same table.
+            let bare_table = outer_table.rsplit('.').next().unwrap_or(outer_table);
+            if !qualifier.eq_ignore_ascii_case(outer_table)
+                && !qualifier.eq_ignore_ascii_case(bare_table)
+            {
+                return None;
+            }
+            column
+        }
+        None => token,
+    };
+    // Only the columns the binder reported as correlated: a bare name that the
+    // inner table also has belongs to the inner query.
+    let (_, index) = columns
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(bare))?;
+    row.get(*index).map(outer_literal)
 }
 
 fn value_to_literal(value: Value) -> Literal {
@@ -3600,11 +4249,16 @@ fn sparse_doc_bytes(doc: &[(i32, f32)]) -> usize {
     doc.len() * 8
 }
 
-/// C++ `BMPUtil::ParseBmpSearchOptions`: the per-query `MATCH SPARSE` options
-/// `alpha` / `beta` / `use_tail`, from the legacy option string and the SQL
-/// `WITH (…)` clause (the latter wins, like `KnnScanOptions::parse`). An
-/// `alpha`/`beta` outside `[0, 1]` and a `use_tail` other than `T`/`F` are
-/// ignored, exactly like the reference's warnings do.
+/// C++ `BMPUtil::ParseBmpSearchOptions`: the per-query `MATCH SPARSE` options,
+/// from the option string and the SQL `WITH (…)` clause (the latter wins, like
+/// `KnnScanOptions::parse`). An `alpha`/`beta` outside `[0, 1]` is ignored,
+/// exactly like the reference's warnings do.
+///
+/// The reference only reads `alpha`, `beta`, `use_tail` and `use_lock` here,
+/// while its binder admits `alpha`, `beta`, `tail` and `threshold`: `tail` and
+/// `threshold` therefore never change `BmpSearchOptions` (`tail` is a dead name
+/// in the reference, `threshold` filters results elsewhere), and `use_tail` is
+/// rejected before it gets here.
 fn parse_bmp_search_options(
     with_opts: Option<&str>,
     params: &str,
@@ -3629,12 +4283,6 @@ fn parse_bmp_search_options(
             } else if key.trim().eq_ignore_ascii_case("beta") {
                 if let Some(beta) = unit(value) {
                     options.beta = beta;
-                }
-            } else if key.trim().eq_ignore_ascii_case("use_tail") {
-                match value.trim() {
-                    "T" => options.use_tail = true,
-                    "F" => options.use_tail = false,
-                    _ => {}
                 }
             }
         }
@@ -3760,8 +4408,9 @@ impl SparseIndex {
         for (segment, reader) in &self.sealed {
             // Ask for enough candidates that tombstoned rows cannot starve the
             // top-k; `search` clamps to the chunk's document count. The on-disk
-            // reader implements the `alpha` pruning of `BMPHandler::SearchKnn`.
-            for (row, score) in reader.search(query, k + dead.len(), options.alpha) {
+            // reader runs the same `BMPAlgBase::SearchKnn` (`alpha`, `beta`,
+            // `use_tail`) as the in-memory one.
+            for (row, score) in reader.search(query, k + dead.len(), options) {
                 let seq = (segment << 32) | u64::from(row as u32);
                 if !dead.contains(&seq) {
                     hits.push((seq, score));
@@ -4150,6 +4799,9 @@ pub struct Engine {
     context: Context,
     /// cached `SELECT` results keyed by the statement text
     result_cache: Mutex<HashMap<String, Vec<QueryResult>>>,
+    /// `ResultCacheManager`: plan-node results the optimizer's
+    /// `ResultCacheGetter` reads and the scan fills (`result_cache` config).
+    plan_cache: Arc<infinity_planner::result_cache::SharedCache>,
     /// the database new unqualified table names are resolved against
     current_db: Mutex<String>,
     /// Per-table write bookkeeping (C++ `TableEntry`), keyed by the
@@ -4516,6 +5168,7 @@ impl<'a> EngineTxn<'a> {
         // A commit changes visible rows; cached `SELECT` results must not
         // survive it (the SQL path clears the cache for mutating statements).
         self.engine.result_cache.lock().unwrap().clear();
+        self.engine.plan_cache.clear();
         let mut delete_counts: std::collections::BTreeMap<String, usize> = Default::default();
         for (table, _) in &self.deletes {
             *delete_counts.entry(table.clone()).or_default() += 1;
@@ -4885,6 +5538,7 @@ impl Engine {
             wal_enabled: options.wal_enabled,
             index_epoch: std::sync::atomic::AtomicU64::new(0),
             result_cache: Mutex::new(HashMap::new()),
+            plan_cache: Arc::new(infinity_planner::result_cache::SharedCache::new()),
             current_db: Mutex::new("default_db".to_string()),
             tables: Arc::new(Mutex::new(HashMap::new())),
             ddl_lock: Mutex::new(()),
@@ -4921,7 +5575,10 @@ impl Engine {
         // keys, so skipping them would shift every later timestamp by two.
         engine.txn.append_checkpoint(0)?;
         if !engine.storage.catalog.has_database_record("default_db")? {
-            engine.ddl_commit(|| engine.storage.catalog.create_database("default_db", false))?;
+            engine.ddl_commit_typed(
+                || engine.storage.catalog.create_database("default_db", false),
+                |batch| crate::wal_ddl::create_database_command_from_batch(batch, "default_db"),
+            )?;
         }
         // The reference stamps `db_id`/`table_id` into every row command; a
         // directory opened here has to name its tables the same way.
@@ -5001,10 +5658,12 @@ impl Engine {
     /// whether it reads the enclosing query.
     ///
     /// A correlated subquery becomes a dependent join in the reference
-    /// (`SubqueryUnnest::unnest_subqueries`); this executor evaluates
-    /// subqueries eagerly, so it reports one instead of planning a join it
-    /// cannot run. Anything the binder cannot represent falls through to the
-    /// eager path, which reports its own error.
+    /// (`SubqueryUnnest::unnest_subqueries`). This executor runs the shapes the
+    /// plan model can express — a WHERE conjunct is evaluated per outer row
+    /// (see [`Self::split_correlated_conjuncts`]) — and reports a correlation
+    /// found anywhere else (a projected subquery, HAVING, a join) instead of
+    /// folding it to one constant. Anything the binder cannot represent falls
+    /// through to the eager path, which reports its own error.
     fn bind_subquery(&self, stmt: &Statement, outer: &[String]) -> Result<()> {
         let Statement::Select {
             items,
@@ -5055,8 +5714,342 @@ impl Engine {
             &mut context,
         );
         Err(Error::Invalid(
-            "correlated subqueries are not supported".into(),
+            "correlated subqueries are only supported as a WHERE conjunct".into(),
         ))
+    }
+
+    /// Splits the WHERE conjuncts into the ones the planner can evaluate and
+    /// the ones that read the enclosing row.
+    ///
+    /// A correlated subquery is a dependent join in the reference
+    /// (`SubqueryUnnest`); this executor has no mark-join operator, so the
+    /// conjunct is evaluated per scan row by substituting the outer values into
+    /// the subquery and running it. The rest of the predicate keeps going
+    /// through the normal plan.
+    fn split_correlated_conjuncts(
+        &self,
+        stmt: &Statement,
+        outer_columns: &[String],
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+    ) -> Result<(Option<Statement>, Vec<(Predicate, Vec<(String, usize)>)>)> {
+        let Statement::Select {
+            where_pred: Some(pred),
+            ..
+        } = stmt
+        else {
+            return Ok((None, Vec::new()));
+        };
+        let mut conjuncts: Vec<&Predicate> = Vec::new();
+        flatten_and(pred, &mut conjuncts);
+        let mut kept: Vec<Predicate> = Vec::new();
+        let mut correlated: Vec<(Predicate, Vec<(String, usize)>)> = Vec::new();
+        for conjunct in conjuncts {
+            if !conjunct.contains_subquery() {
+                kept.push(conjunct.clone());
+                continue;
+            }
+            match self.correlated_subquery_columns(conjunct, outer_columns, ctes)? {
+                Some(columns) => correlated.push((conjunct.clone(), columns)),
+                None => kept.push(conjunct.clone()),
+            }
+        }
+        if correlated.is_empty() {
+            return Ok((None, Vec::new()));
+        }
+        let mut rewritten = stmt.clone();
+        if let Statement::Select { where_pred, .. } = &mut rewritten {
+            *where_pred = combine_and(kept);
+        }
+        Ok((Some(rewritten), correlated))
+    }
+
+    /// The outer columns a conjunct's subquery reads, as `(column name, outer
+    /// schema index)`; `None` when the subquery is not correlated.
+    fn correlated_subquery_columns(
+        &self,
+        pred: &Predicate,
+        outer_columns: &[String],
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+    ) -> Result<Option<Vec<(String, usize)>>> {
+        let Some(sql) = predicate_subquery_sql(pred) else {
+            return Ok(None);
+        };
+        let Ok(mut statements) = parse(sql) else {
+            return Ok(None);
+        };
+        let Some(Statement::Select {
+            items,
+            from,
+            where_pred,
+            ctes: local_ctes,
+            ..
+        }) = statements.pop()
+        else {
+            return Ok(None);
+        };
+        let Some(table) = from else {
+            return Ok(None);
+        };
+        // A CTE alias in FROM is not a base table: binding it against the
+        // catalog would read the shadowed table's schema and invent a
+        // correlation (`run_subquery` makes the same check).
+        if ctes.contains_key(&table.to_ascii_lowercase())
+            || local_ctes
+                .iter()
+                .any(|c| c.alias.eq_ignore_ascii_case(&table))
+        {
+            return Ok(None);
+        }
+        let Ok(columns) = self.table_schema(&self.table_key(&table)) else {
+            return Ok(None);
+        };
+        let bound = infinity_planner::binder::QueryBinder::new().bind_subquery(
+            infinity_planner::subquery::SubqueryType::Scalar,
+            Some(&table),
+            &columns,
+            &items,
+            where_pred.as_ref(),
+            outer_columns,
+        );
+        let Ok(bound) = bound else {
+            return Ok(None);
+        };
+        if bound.correlated_columns.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(
+            bound
+                .correlated_columns
+                .iter()
+                .filter_map(|c| {
+                    outer_columns
+                        .get(c.binding.column_idx)
+                        .map(|name| (name.clone(), c.binding.column_idx))
+                })
+                .collect(),
+        ))
+    }
+
+    /// Whether a correlated conjunct holds for one scan row.
+    fn correlated_conjunct_holds(
+        &self,
+        pred: &Predicate,
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        schema: &[String],
+        row: &[Value],
+        outer_table: &str,
+        columns: &[(String, usize)],
+    ) -> Result<bool> {
+        let resolved =
+            self.resolve_correlated_pred(pred, ctes, schema, row, outer_table, columns)?;
+        let expr = infinity_planner::predicate_expr(&resolved, schema)?;
+        Ok(expr.eval_predicate(row))
+    }
+
+    fn resolve_correlated_pred(
+        &self,
+        p: &Predicate,
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        schema: &[String],
+        row: &[Value],
+        outer_table: &str,
+        columns: &[(String, usize)],
+    ) -> Result<Predicate> {
+        Ok(match p {
+            Predicate::IsTrue(ExprAst::Func { name, args })
+                if name.eq_ignore_ascii_case("EXISTS") =>
+            {
+                let sql = exists_subquery_sql(args)?;
+                let sql = substitute_outer_row(sql, columns, row, outer_table);
+                Predicate::Cmp(
+                    ExprAst::Literal(Literal::Int(1)),
+                    CmpOp::Eq,
+                    ExprAst::Literal(Literal::Int(i64::from(self.subquery_exists(
+                        &sql,
+                        ctes,
+                        &[],
+                    )?))),
+                )
+            }
+            Predicate::Cmp(a, op, b) => Predicate::Cmp(
+                self.resolve_correlated_expr(a, ctes, schema, row, outer_table, columns)?,
+                *op,
+                self.resolve_correlated_expr(b, ctes, schema, row, outer_table, columns)?,
+            ),
+            Predicate::IsTrue(e) => Predicate::IsTrue(self.resolve_correlated_expr(
+                e,
+                ctes,
+                schema,
+                row,
+                outer_table,
+                columns,
+            )?),
+            Predicate::IsNull(e, neg) => Predicate::IsNull(
+                self.resolve_correlated_expr(e, ctes, schema, row, outer_table, columns)?,
+                *neg,
+            ),
+            Predicate::Like(a, pat, esc, neg) => Predicate::Like(
+                self.resolve_correlated_expr(a, ctes, schema, row, outer_table, columns)?,
+                self.resolve_correlated_expr(pat, ctes, schema, row, outer_table, columns)?,
+                *esc,
+                *neg,
+            ),
+            Predicate::In(a, vals, neg) => Predicate::In(
+                self.resolve_correlated_expr(a, ctes, schema, row, outer_table, columns)?,
+                vals.iter()
+                    .map(|v| {
+                        self.resolve_correlated_expr(v, ctes, schema, row, outer_table, columns)
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+                *neg,
+            ),
+            Predicate::Bool(a, op, b) => Predicate::Bool(
+                Box::new(self.resolve_correlated_pred(
+                    a,
+                    ctes,
+                    schema,
+                    row,
+                    outer_table,
+                    columns,
+                )?),
+                *op,
+                Box::new(self.resolve_correlated_pred(
+                    b,
+                    ctes,
+                    schema,
+                    row,
+                    outer_table,
+                    columns,
+                )?),
+            ),
+            Predicate::Not(a) => Predicate::Not(Box::new(self.resolve_correlated_pred(
+                a,
+                ctes,
+                schema,
+                row,
+                outer_table,
+                columns,
+            )?)),
+        })
+    }
+
+    fn resolve_correlated_expr(
+        &self,
+        e: &ExprAst,
+        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        schema: &[String],
+        row: &[Value],
+        outer_table: &str,
+        columns: &[(String, usize)],
+    ) -> Result<ExprAst> {
+        Ok(match e {
+            ExprAst::Func { name, args } if name.eq_ignore_ascii_case("SUBQUERY") => {
+                let sql = subquery_sql_arg(args)?;
+                let sql = substitute_outer_row(sql, columns, row, outer_table);
+                ExprAst::Literal(value_to_literal(self.scalar_subquery_value(
+                    &sql,
+                    ctes,
+                    &[],
+                )?))
+            }
+            ExprAst::Func { name, args } if name.eq_ignore_ascii_case("EXISTS") => {
+                let sql = exists_subquery_sql(args)?;
+                let sql = substitute_outer_row(sql, columns, row, outer_table);
+                boolean_expr(self.subquery_exists(&sql, ctes, &[])?)
+            }
+            ExprAst::Func { name, args } => ExprAst::Func {
+                name: name.clone(),
+                args: args
+                    .iter()
+                    .map(|a| {
+                        self.resolve_correlated_expr(a, ctes, schema, row, outer_table, columns)
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+            },
+            ExprAst::Binary(a, op, b) => ExprAst::Binary(
+                Box::new(self.resolve_correlated_expr(
+                    a,
+                    ctes,
+                    schema,
+                    row,
+                    outer_table,
+                    columns,
+                )?),
+                *op,
+                Box::new(self.resolve_correlated_expr(
+                    b,
+                    ctes,
+                    schema,
+                    row,
+                    outer_table,
+                    columns,
+                )?),
+            ),
+            ExprAst::Cmp(a, op, b) => ExprAst::Cmp(
+                Box::new(self.resolve_correlated_expr(
+                    a,
+                    ctes,
+                    schema,
+                    row,
+                    outer_table,
+                    columns,
+                )?),
+                *op,
+                Box::new(self.resolve_correlated_expr(
+                    b,
+                    ctes,
+                    schema,
+                    row,
+                    outer_table,
+                    columns,
+                )?),
+            ),
+            ExprAst::Not(a) => ExprAst::Not(Box::new(self.resolve_correlated_expr(
+                a,
+                ctes,
+                schema,
+                row,
+                outer_table,
+                columns,
+            )?)),
+            ExprAst::And(a, b) => ExprAst::And(
+                Box::new(self.resolve_correlated_expr(
+                    a,
+                    ctes,
+                    schema,
+                    row,
+                    outer_table,
+                    columns,
+                )?),
+                Box::new(self.resolve_correlated_expr(
+                    b,
+                    ctes,
+                    schema,
+                    row,
+                    outer_table,
+                    columns,
+                )?),
+            ),
+            ExprAst::Or(a, b) => ExprAst::Or(
+                Box::new(self.resolve_correlated_expr(
+                    a,
+                    ctes,
+                    schema,
+                    row,
+                    outer_table,
+                    columns,
+                )?),
+                Box::new(self.resolve_correlated_expr(
+                    b,
+                    ctes,
+                    schema,
+                    row,
+                    outer_table,
+                    columns,
+                )?),
+            ),
+            other => other.clone(),
+        })
     }
 
     /// A scalar subquery: the first row's first column, NULL for an empty
@@ -6595,6 +7588,10 @@ impl Engine {
     pub fn execute(&self, sql: &str) -> Result<Vec<QueryResult>> {
         let mut out = Vec::new();
         for s in parse(sql)? {
+            // `NewTxnManager::BeginTxnShared` runs once per statement, read-only
+            // ones included; the id lands in the WAL frame of a write. An RPC
+            // that already took one for its statement keeps it.
+            self.txn.ensure_statement_id();
             self.context
                 .query_count
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -6616,6 +7613,7 @@ impl Engine {
                     columns: vec![],
                     rows: vec![],
                 });
+                self.txn.end_statement();
                 continue;
             }
             let qualified = self.expand_views(self.qualify_tables(&s), &[])?;
@@ -6644,6 +7642,7 @@ impl Engine {
                 let key = format!("{qualified:?}");
                 if let Some(hit) = self.result_cache.lock().unwrap().get(&key).cloned() {
                     out.extend(hit);
+                    self.txn.end_statement();
                     continue;
                 }
                 let res = self.execute_stmt(&qualified, sql)?;
@@ -6659,11 +7658,13 @@ impl Engine {
                         .insert(key, vec![res.clone()]);
                 }
                 out.push(res);
+                self.txn.end_statement();
                 continue;
             }
             let mutating = invalidates_result_cache(&qualified);
             if mutating {
                 self.result_cache.lock().unwrap().clear();
+                self.plan_cache.clear();
             }
             out.push(self.execute_stmt(&qualified, sql)?);
             // Durability: a committed mutation must survive a crash, so both the
@@ -6676,6 +7677,7 @@ impl Engine {
                 }
                 self.storage.store.flush()?;
             }
+            self.txn.end_statement();
         }
         Ok(out)
     }
@@ -6996,6 +7998,14 @@ impl Engine {
         // The DDL lock is held by [`Self::ddl_commit`], which is the only
         // caller: the orphan sweep and the catalog write have to happen inside
         // the same captured batch.
+        // C++ `VerifyColumnDataType` (`logical_planner_impl.cpp:551`): the
+        // reference refuses these column types at DDL time, so a table holding
+        // them can never reach the WAL on either side.
+        for type_text in types {
+            if let Some(message) = unsupported_column_type(type_text) {
+                return Err(Error::Invalid(message));
+            }
+        }
         if self.storage.catalog.get_table_by_name(name)?.is_none() {
             self.clear_orphan_rows(name)?;
         }
@@ -7131,18 +8141,19 @@ impl Engine {
             let Some(analyzer) = entry.analyzers.get(column) else {
                 continue;
             };
-            if !analyzer.to_ascii_lowercase().starts_with("sparsegram") {
+            // Only a `sparsegram` index rewrites regex queries; the family match
+            // is the same case-sensitive one `AnalyzerPool::get_analyzer` uses.
+            let Ok(analyzer::AnalyzerName::SparseGram { min_n, max_n, fold }) =
+                analyzer::parse_analyzer_name(analyzer)
+            else {
                 continue;
-            }
+            };
             let index_name = entry
                 .analyzers_by_index
                 .iter()
                 .find(|(_, a)| *a == analyzer)
                 .map(|(name, _)| name.clone())
                 .unwrap_or_else(|| format!("{column}_ft_index"));
-            let (min_n, max_n, fold) =
-                infinity_expression::regex_literal::parse_sparsegram_analyzer(analyzer)
-                    .unwrap_or((3, 12, false));
             catalog = catalog.with_column(i, index_name, min_n, max_n, fold);
         }
         catalog
@@ -8090,6 +9101,7 @@ impl Engine {
         // that reach this primitive directly (Thrift insert, import) would
         // otherwise keep serving a stale `count(*)`.
         self.result_cache.lock().unwrap().clear();
+        self.plan_cache.clear();
         // A memory index that already exceeds its quota is dumped
         // before these rows join it.
         let _batch = self.batch_lock.lock().unwrap();
@@ -8114,6 +9126,18 @@ impl Engine {
             let encoded = self.encode_row_stored(table, row, &types)?;
             t.put(row_key(table, base + k), encoded.as_bytes().to_vec());
             encoded_rows.push(encoded);
+        }
+        // Emit the reference `WalCmdAppendV2` (real typed columns) when the
+        // table's types are covered; otherwise the transaction writes the
+        // text-column block through `build_commands`.
+        if let Some(block) = typed_append_block(&rows, &types) {
+            t.set_typed_commands(vec![self.append_command(
+                table,
+                &meta.id.to_string(),
+                base,
+                rows.len(),
+                block,
+            )]);
         }
         let ts = self.txn.commit(t)?;
         // The block's `version` records the append's commit ts.
@@ -8174,6 +9198,52 @@ impl Engine {
     /// commits and records the tombstones' commit ts. Mirrors the reference's
     /// `ConflictCheckTest.conflict_check_delete`: the first committer wins and
     /// concurrent deleters get `kTxnConflict`.
+    /// The reference `WalCmdAppendV2` for one contiguous run of rows.
+    ///
+    /// `block` must be a typed block (`typed_append_block`); the WAL encoder
+    /// then writes it in the reference's `DataBlock` layout.
+    fn append_command(
+        &self,
+        table: &str,
+        table_id: &str,
+        base: usize,
+        count: usize,
+        block: Vec<infinity_storage::wal::block::BlockColumn>,
+    ) -> infinity_storage::WalCmd {
+        let (db_name, table_name) = split_table_name(table);
+        infinity_storage::WalCmd::Append {
+            db_id: self.database_id(&db_name).to_string(),
+            db_name,
+            table_name,
+            table_id: table_id.to_string(),
+            row_ranges: vec![(
+                infinity_storage::wal_entry::WalRowId::from_u64(base as u64),
+                count as u64,
+            )],
+            block,
+        }
+    }
+
+    /// The reference `WalCmdDeleteV2` for a set of row sequences.
+    fn delete_command(
+        &self,
+        table: &str,
+        table_id: &str,
+        seqs: &[usize],
+    ) -> infinity_storage::WalCmd {
+        let (db_name, table_name) = split_table_name(table);
+        infinity_storage::WalCmd::Delete {
+            db_id: self.database_id(&db_name).to_string(),
+            db_name,
+            table_name,
+            table_id: table_id.to_string(),
+            row_ids: seqs
+                .iter()
+                .map(|s| infinity_storage::wal_entry::WalRowId::from_u64(*s as u64))
+                .collect(),
+        }
+    }
+
     fn commit_with_deletes(
         &self,
         table: &str,
@@ -8184,6 +9254,7 @@ impl Engine {
         // See `insert_literals_inner`: a direct delete must invalidate the
         // cached `SELECT` results too.
         self.result_cache.lock().unwrap().clear();
+        self.plan_cache.clear();
         self.invalidate_row_cache(table);
         self.note_live_rows(table, -(deletes.len() as isize));
         // The block mirror keeps its snapshot: deleted row ids are hidden by
@@ -8249,7 +9320,219 @@ impl Engine {
     /// ([`Catalog::capture`]), stamped with the reserved commit timestamp
     /// ([`Catalog::restamp`]) and committed together with the WAL entry, so the
     /// key's ts and the entry's ts are the same value.
+    /// Builds the reference's `WalCmdDropColumnsV2` from the column's catalog
+    /// record (`tbl|col|{db_id}|{table_id}|{name}|{ts}` → column id). Must be
+    /// called before the drop removes the record.
+    fn drop_columns_command(
+        &self,
+        table: &str,
+        column: &str,
+    ) -> Result<Option<infinity_storage::WalCmd>> {
+        let Some((db_id, table_id, table_key)) = self.table_ident(table)? else {
+            return Ok(None);
+        };
+        let bare = table.rsplit('.').next().unwrap_or(table).to_string();
+        let prefix = format!("tbl|col|{db_id}|{table_id}|{column}|");
+        for (k, v) in self
+            .storage
+            .catalog
+            .store()
+            .scan_prefix(prefix.as_bytes())?
+        {
+            let key = String::from_utf8_lossy(&k).into_owned();
+            let id = crate::wal_ddl::ColumnRecord::from_json(&String::from_utf8_lossy(&v))
+                .map(|r| r.id() as u32)
+                .unwrap_or(0);
+            return Ok(Some(infinity_storage::WalCmd::DropColumns {
+                db_name: "default_db".to_string(),
+                db_id,
+                table_name: bare,
+                table_id,
+                column_names: vec![column.to_string()],
+                column_ids: vec![id],
+                table_key,
+                column_keys: vec![key],
+            }));
+        }
+        Ok(None)
+    }
+
+    /// The `(db_id, table_id, table_key)` of a table from its catalog key.
+    fn table_ident(&self, table: &str) -> Result<Option<(String, String, String)>> {
+        let bare = table.rsplit('.').next().unwrap_or(table);
+        for (k, v) in self.storage.catalog.store().scan_prefix(b"catalog|tbl|")? {
+            let key = String::from_utf8_lossy(&k).into_owned();
+            let parts: Vec<&str> = key.split('|').collect();
+            if parts.len() >= 5 && parts[3] == bare {
+                return Ok(Some((
+                    parts[2].to_string(),
+                    String::from_utf8_lossy(&v).into_owned(),
+                    key,
+                )));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Builds the reference's `WalCmdRenameTableV2` from the table's catalog
+    /// key (before the rename rewrites it).
+    fn rename_table_command(
+        &self,
+        old: &str,
+        new: &str,
+    ) -> Result<Option<infinity_storage::WalCmd>> {
+        let bare_old = old.rsplit('.').next().unwrap_or(old);
+        let bare_new = new.rsplit('.').next().unwrap_or(new);
+        for (k, v) in self.storage.catalog.store().scan_prefix(b"catalog|tbl|")? {
+            let key = String::from_utf8_lossy(&k).into_owned();
+            let parts: Vec<&str> = key.split('|').collect();
+            if parts.len() >= 5 && parts[3] == bare_old {
+                return Ok(Some(infinity_storage::WalCmd::RenameTable {
+                    db_name: "default_db".to_string(),
+                    db_id: parts[2].to_string(),
+                    table_name: bare_old.to_string(),
+                    table_id: String::from_utf8_lossy(&v).into_owned(),
+                    new_table_name: bare_new.to_string(),
+                    old_table_key: key,
+                }));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Builds the reference's `WalCmdDropIndexV2` from the index's catalog
+    /// record (`catalog|idx|{db_id}|{table_id}|{index_name}|{ts}` → index id);
+    /// the table name is resolved by matching the table id.
+    fn drop_index_command(&self, index_name: &str) -> Result<Option<infinity_storage::WalCmd>> {
+        let mut found: Option<(String, String, u64, String, String)> = None;
+        for (k, v) in self.storage.catalog.store().scan_prefix(b"catalog|idx|")? {
+            let key = String::from_utf8_lossy(&k).into_owned();
+            let parts: Vec<&str> = key.split('|').collect();
+            // catalog|idx|{db_id}|{table_id}|{index_name}|{ts}
+            if parts.len() >= 6 && parts[4] == index_name {
+                found = Some((
+                    parts[2].to_string(),
+                    parts[3].to_string(),
+                    parts[5].parse::<u64>().unwrap_or(0),
+                    String::from_utf8_lossy(&v).into_owned(),
+                    key,
+                ));
+                break;
+            }
+        }
+        let Some((db_id, table_id, create_ts, index_id, index_key)) = found else {
+            return Ok(None);
+        };
+        let mut table_name = String::new();
+        for (k, v) in self.storage.catalog.store().scan_prefix(b"catalog|tbl|")? {
+            let key = String::from_utf8_lossy(&k).into_owned();
+            let parts: Vec<&str> = key.split('|').collect();
+            if parts.len() >= 5
+                && parts[2] == db_id
+                && String::from_utf8_lossy(&v).as_ref() == table_id.as_str()
+            {
+                table_name = parts[3].to_string();
+                break;
+            }
+        }
+        Ok(Some(infinity_storage::WalCmd::DropIndex {
+            db_name: "default_db".to_string(),
+            db_id,
+            table_name,
+            table_id,
+            index_name: index_name.to_string(),
+            index_id,
+            create_ts,
+            index_key,
+        }))
+    }
+
+    /// Builds the reference's `WalCmdDropDatabaseV2` from the database's
+    /// catalog key (`catalog|db|{name}|{ts}` → db id). Must be called before
+    /// the drop deletes the record.
+    fn drop_database_command(&self, db: &str) -> Result<Option<infinity_storage::WalCmd>> {
+        for (k, v) in self.storage.catalog.store().scan_prefix(b"catalog|db|")? {
+            let key = String::from_utf8_lossy(&k).into_owned();
+            let parts: Vec<&str> = key.split('|').collect();
+            if parts.len() >= 4 && parts[2] == db {
+                let create_ts = parts[3].parse::<u64>().unwrap_or(0);
+                let db_id = String::from_utf8_lossy(&v).into_owned();
+                return Ok(Some(infinity_storage::WalCmd::DropDatabase {
+                    db_name: db.to_string(),
+                    db_id,
+                    create_ts,
+                }));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Builds the reference's `WalCmdDropTableV2` for `table` from its catalog
+    /// key (`catalog|tbl|{db_id}|{name}|{ts}` → table id), or `None` if the
+    /// table has no layout record.
+    fn drop_table_command(&self, table: &str) -> Result<Option<infinity_storage::WalCmd>> {
+        let bare = table.rsplit('.').next().unwrap_or(table);
+        let db_name = if table.contains('.') {
+            table
+                .rsplit_once('.')
+                .map(|(d, _)| d.to_string())
+                .unwrap_or_else(|| "default_db".into())
+        } else {
+            "default_db".to_string()
+        };
+        for (k, v) in self.storage.catalog.store().scan_prefix(b"catalog|tbl|")? {
+            let key = String::from_utf8_lossy(&k).into_owned();
+            let parts: Vec<&str> = key.split('|').collect();
+            if parts.len() >= 5 && parts[3] == bare {
+                let db_id = parts[2].to_string();
+                let create_ts = parts[4].parse::<u64>().unwrap_or(0);
+                let table_id = String::from_utf8_lossy(&v).into_owned();
+                return Ok(Some(infinity_storage::WalCmd::DropTable {
+                    db_name,
+                    db_id,
+                    table_name: bare.to_string(),
+                    table_id,
+                    create_ts,
+                    table_key: key,
+                }));
+            }
+        }
+        Ok(None)
+    }
+
+    /// The table's own catalog key (`catalog|tbl|{db_id}|{name}|{ts}`), which
+    /// the reference carries as `table_key` in `CreateIndexV2`. Empty when the
+    /// table has no layout record yet.
+    fn table_catalog_key(&self, table: &str) -> Result<String> {
+        // `table` may be qualified (`default_db.wdldl`); the catalog key holds
+        // the bare name.
+        let bare = table.rsplit('.').next().unwrap_or(table);
+        for (k, _v) in self.storage.catalog.store().scan_prefix(b"catalog|tbl|")? {
+            let key = String::from_utf8_lossy(&k).into_owned();
+            let parts: Vec<&str> = key.split('|').collect();
+            if parts.len() >= 5 && parts[3] == bare {
+                return Ok(key);
+            }
+        }
+        Ok(String::new())
+    }
+
     fn ddl_commit<T>(&self, f: impl FnOnce() -> Result<T>) -> Result<T> {
+        self.ddl_commit_typed(f, |batch| {
+            crate::wal_ddl::create_table_command_from_batch(batch)
+        })
+    }
+
+    /// Like [`Self::ddl_commit`], but lets the caller turn the captured batch
+    /// into the reference's typed WAL command (`WalCmdCreateTableV2`,
+    /// `WalCmdCreateIndexV2`, …). The catalog writes are still applied to the
+    /// store by `commit_at`; replay deliberately skips typed DDL (the catalog
+    /// is durable at commit), so this only changes the WAL's bytes.
+    fn ddl_commit_typed<T>(
+        &self,
+        f: impl FnOnce() -> Result<T>,
+        typed_builder: impl FnOnce(&[(Vec<u8>, Option<Vec<u8>>)]) -> Option<infinity_storage::WalCmd>,
+    ) -> Result<T> {
         // One DDL at a time: a second capture would interleave two statements'
         // layout rewrites, and only one capture slot exists.
         let _ddl = self.ddl_lock.lock().unwrap();
@@ -8267,12 +9550,16 @@ impl Engine {
         }
         let commit_ts = self.txn.reserve_commit_ts();
         Catalog::restamp(&mut batch, commit_ts);
+        let typed = typed_builder(&batch);
         let mut txn = self.txn.begin();
         for (key, value) in batch {
             match value {
                 Some(value) => txn.put(key, value),
                 None => txn.delete(key),
             }
+        }
+        if let Some(cmd) = typed {
+            txn.set_typed_commands(vec![cmd]);
         }
         self.txn.commit_at(txn, commit_ts)?;
         Ok(out)
@@ -8530,31 +9817,35 @@ impl Engine {
                 // Keep the index ids: the layout writer keys an index record by
                 // its table id, and the reference keeps the id across a rename.
                 let keep: Vec<infinity_catalog::IndexMeta> = self.storage.catalog.list_indexes()?;
-                self.ddl_commit(|| {
-                    // Rename **first**: under the cpp_only backend the whole
-                    // index list is derived from the layout, so a rename
-                    // retires the old table's index records with it — dropping
-                    // and re-creating them before the rename would leave the
-                    // re-created records to be swept by the rename's rewrite.
-                    self.storage.catalog.rename_table(table, new_name)?;
-                    for im in &keep {
-                        if im.table == *table {
-                            let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
-                            self.storage.catalog.create_index_typed_with_id(
-                                &im.name,
-                                new_name,
-                                &im.column,
-                                &im.index_type,
-                                &im.options,
-                                im.id,
-                            )?;
+                let rename_cmd = self.rename_table_command(table, new_name)?;
+                self.ddl_commit_typed(
+                    || {
+                        // Rename **first**: under the cpp_only backend the whole
+                        // index list is derived from the layout, so a rename
+                        // retires the old table's index records with it — dropping
+                        // and re-creating them before the rename would leave the
+                        // re-created records to be swept by the rename's rewrite.
+                        self.storage.catalog.rename_table(table, new_name)?;
+                        for im in &keep {
+                            if im.table == *table {
+                                let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
+                                self.storage.catalog.create_index_typed_with_id(
+                                    &im.name,
+                                    new_name,
+                                    &im.column,
+                                    &im.index_type,
+                                    &im.options,
+                                    im.id,
+                                )?;
+                            }
                         }
-                    }
-                    for column in &pairs {
-                        let _ = self.build_index(new_name, column);
-                    }
-                    Ok(())
-                })?;
+                        for column in &pairs {
+                            let _ = self.build_index(new_name, column);
+                        }
+                        Ok(())
+                    },
+                    |_| rename_cmd,
+                )?;
                 if let Some(meta) = self.storage.catalog.get_table_by_name(new_name)? {
                     self.register_table_ids(&meta);
                 }
@@ -8616,19 +9907,23 @@ impl Engine {
                 // The rewrite changed the stored layout but not the ids.
                 self.invalidate_row_cache(table);
                 self.invalidate_block_mirror(table);
-                self.ddl_commit(|| {
-                    self.storage.catalog.drop_column(table, column)?;
-                    if let Some(im) = self
-                        .storage
-                        .catalog
-                        .list_indexes()?
-                        .into_iter()
-                        .find(|i| i.table == *table && i.column == *column)
-                    {
-                        let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
-                    }
-                    Ok(())
-                })?;
+                let dc_cmd = self.drop_columns_command(table, column)?;
+                self.ddl_commit_typed(
+                    || {
+                        self.storage.catalog.drop_column(table, column)?;
+                        if let Some(im) = self
+                            .storage
+                            .catalog
+                            .list_indexes()?
+                            .into_iter()
+                            .find(|i| i.table == *table && i.column == *column)
+                        {
+                            let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
+                        }
+                        Ok(())
+                    },
+                    |_| dc_cmd,
+                )?;
                 let tkey = self.table_key(table);
                 self.tables
                     .lock()
@@ -8685,17 +9980,31 @@ impl Engine {
                 let not_nulls: Vec<bool> = columns.iter().map(|c| c.not_null).collect();
                 let types: Vec<String> = columns.iter().map(|c| c.type_text.clone()).collect();
                 let sparse_stores = sparse_store_hints(columns);
-                self.ddl_commit(|| {
-                    self.storage.catalog.add_columns_typed_with_sparse_stores(
-                        table,
-                        &names,
-                        &defaults,
-                        &not_nulls,
-                        &types,
-                        &vec![None; names.len()],
-                        &sparse_stores,
-                    )
-                })?;
+                let bare = table.rsplit('.').next().unwrap_or(table).to_string();
+                let base_index = self.table_schema(table)?.len() as u32;
+                let ac_ident = self.table_ident(table)?;
+                let ac_names = names.clone();
+                self.ddl_commit_typed(
+                    || {
+                        self.storage.catalog.add_columns_typed_with_sparse_stores(
+                            table,
+                            &names,
+                            &defaults,
+                            &not_nulls,
+                            &types,
+                            &vec![None; names.len()],
+                            &sparse_stores,
+                        )
+                    },
+                    move |b| match &ac_ident {
+                        Some((db_id, table_id, table_key)) => {
+                            crate::wal_ddl::add_columns_command_from_batch(
+                                b, db_id, table_id, &bare, table_key, base_index, &ac_names,
+                            )
+                        }
+                        None => None,
+                    },
+                )?;
                 Ok(QueryResult::CreatedTable {
                     id: 0,
                     name: table.clone(),
@@ -8710,7 +10019,10 @@ impl Engine {
                 name,
                 if_not_exists,
             } => {
-                self.ddl_commit(|| self.storage.catalog.create_database(name, *if_not_exists))?;
+                self.ddl_commit_typed(
+                    || self.storage.catalog.create_database(name, *if_not_exists),
+                    |batch| crate::wal_ddl::create_database_command_from_batch(batch, name),
+                )?;
                 Ok(QueryResult::CreatedDatabase { name: name.clone() })
             }
             // A collection is the legacy alias of a table: the reference's
@@ -8736,19 +10048,23 @@ impl Engine {
                         "dropping the current database is not allowed".into(),
                     ));
                 }
-                self.ddl_commit(|| {
-                    let existed = self.storage.catalog.drop_database(name, *if_exists)?;
-                    if existed || *if_exists {
-                        // drop every table registered under this database
-                        let prefix = format!("{name}.");
-                        for t in self.storage.catalog.list_tables()? {
-                            if t.name.starts_with(&prefix) {
-                                self.drop_table_all(&t.name)?;
+                let drop_db_cmd = self.drop_database_command(name)?;
+                self.ddl_commit_typed(
+                    || {
+                        let existed = self.storage.catalog.drop_database(name, *if_exists)?;
+                        if existed || *if_exists {
+                            // drop every table registered under this database
+                            let prefix = format!("{name}.");
+                            for t in self.storage.catalog.list_tables()? {
+                                if t.name.starts_with(&prefix) {
+                                    self.drop_table_all(&t.name)?;
+                                }
                             }
                         }
-                    }
-                    Ok(existed)
-                })?;
+                        Ok(existed)
+                    },
+                    |_batch| drop_db_cmd,
+                )?;
                 Ok(QueryResult::DroppedDatabase { name: name.clone() })
             }
             Statement::Show { text } => {
@@ -9081,17 +10397,30 @@ impl Engine {
                 if duplicate && !*if_not_exists {
                     return Err(Error::Invalid(format!("index '{name}' already exists")));
                 }
-                self.ddl_commit(|| {
-                    self.storage
-                        .catalog
-                        .create_index_typed(name, table, column, index_type, opts)
-                })?;
+                // The command carries the bare table name; `table` is
+                // qualified (`default_db.wdldl`).
+                let table_name = table.rsplit('.').next().unwrap_or(table).to_string();
+                let table_key = self.table_catalog_key(table)?;
+                self.ddl_commit_typed(
+                    || {
+                        self.storage
+                            .catalog
+                            .create_index_typed(name, table, column, index_type, opts)
+                    },
+                    |batch| {
+                        crate::wal_ddl::create_index_command_from_batch(
+                            batch,
+                            &table_name,
+                            &table_key,
+                        )
+                    },
+                )?;
                 // remember the analyzer so fulltext matching can tokenise compatibly
                 if let Some((_, a)) = opts.iter().find(|(k, _)| k == "ANALYZER") {
-                    let a = a
-                        .trim()
-                        .trim_matches(|c| c == '\'' || c == '"')
-                        .to_ascii_lowercase();
+                    // C++ keeps `InitParameter::param_value_` verbatim: the
+                    // name is case sensitive and its suffix carries parameters
+                    // (`whitespace-<delims>`, `ngram-<n>`, `rag-fine-<lang>`).
+                    let a = a.trim().trim_matches(|c| c == '\'' || c == '"').to_string();
                     let key = self.table_key(table);
                     let mut tables = self.tables.lock().unwrap();
                     let entry = tables.entry(key).or_default();
@@ -9170,7 +10499,9 @@ impl Engine {
                 if !*if_exists && self.storage.catalog.get_table_by_name(name)?.is_none() {
                     return Err(Error::Invalid(format!("table '{name}' does not exist")));
                 }
-                let existed = self.ddl_commit(|| self.drop_table_all(name))?;
+                let drop_cmd = self.drop_table_command(name)?;
+                let existed =
+                    self.ddl_commit_typed(|| self.drop_table_all(name), |_batch| drop_cmd.clone())?;
                 if existed {
                     self.drop_text_index_storage(name, None);
                 }
@@ -9195,7 +10526,11 @@ impl Engine {
                     .as_ref()
                     .map(|(_, _, t)| t.eq_ignore_ascii_case("FULLTEXT"))
                     .unwrap_or(false);
-                let existed = self.ddl_commit(|| self.storage.catalog.drop_index(name))?;
+                let drop_idx_cmd = self.drop_index_command(name)?;
+                let existed = self.ddl_commit_typed(
+                    || self.storage.catalog.drop_index(name),
+                    |_batch| drop_idx_cmd,
+                )?;
                 if existed {
                     if let Some((table, column, _)) = target.filter(|_| was_fulltext) {
                         self.drop_text_index_storage(&table, Some(&column));
@@ -9250,6 +10585,7 @@ impl Engine {
                 // `SET CONFIG result_cache "clear"` empties the cache.
                 if key.eq_ignore_ascii_case("result_cache") && value.eq_ignore_ascii_case("clear") {
                     self.result_cache.lock().unwrap().clear();
+                    self.plan_cache.clear();
                 }
                 Ok(QueryResult::Rows {
                     columns: vec![],
@@ -9528,6 +10864,23 @@ impl Engine {
                             .join("\t");
                         t.put(row_key(table, base + k), encoded.into_bytes());
                     }
+                    // The reference emits one frame holding the delete and then
+                    // the append, both typed (`NewTxn::Update` -> `DeleteRows`
+                    // then `Append`). The port's `build_commands` would order
+                    // them the other way round and encode the rewritten rows as
+                    // text, so both commands are supplied here.
+                    if let Some((_, table_id, _)) = self.table_ident(table)? {
+                        let literals: Vec<Vec<Literal>> = new_rows
+                            .iter()
+                            .map(|r| r.iter().map(|v| value_to_literal(v.clone())).collect())
+                            .collect();
+                        if let Some(block) = typed_append_block(&literals, &types) {
+                            t.set_typed_commands(vec![
+                                self.delete_command(table, &table_id, &to_del),
+                                self.append_command(table, &table_id, base, literals.len(), block),
+                            ]);
+                        }
+                    }
                     self.commit_with_deletes(table, &to_del, 1, t)?;
                     for (k, nr) in new_rows.iter().enumerate() {
                         let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
@@ -9613,6 +10966,11 @@ impl Engine {
             },
             _ => Vec::new(),
         };
+        // A correlated conjunct cannot be constant-folded: it is evaluated per
+        // scan row below, and the rest of the predicate still goes to the plan.
+        let (correlated_stmt, correlated) =
+            self.split_correlated_conjuncts(stmt, &outer_columns, &cte_scope)?;
+        let stmt: &Statement = correlated_stmt.as_ref().unwrap_or(stmt);
         let resolved = self.resolve_stmt_subqueries(stmt, &cte_scope, &outer_columns)?;
         let stmt: &Statement = resolved.as_ref().unwrap_or(stmt);
         let Statement::Select {
@@ -10021,10 +11379,16 @@ impl Engine {
         let mut candidate = None;
         let mut unmatchable = false;
         let mut fulltext_substring = false;
+        let mut rough_filter_done = false;
+        // The scan's catalog, kept so the production optimizer can run the
+        // reference's `ApplyFastRoughFilter` rule against the real indexes
+        // instead of the empty one `FastRoughFilterRule::default()` carries.
+        let mut scan_catalog: Option<infinity_planner::index_scan::IndexCatalog> = None;
         let scan_source = plan_scan_of(&plan);
         if join.is_none() && override_rows.is_none() {
             if let (Some(t), Some((_, scan_columns))) = (from.as_ref(), scan_source.as_ref()) {
                 let catalog = self.index_catalog(t, scan_columns);
+                scan_catalog = Some(catalog.clone());
                 unmatchable =
                     infinity_planner::index_scan::ApplyFastRoughFilter::build(&plan, &catalog)
                         .iter()
@@ -10033,32 +11397,32 @@ impl Engine {
                                 == infinity_planner::index_scan::FastRoughFilterTag::AlwaysFalse
                         });
                 if !unmatchable {
-                    // The builder removes the predicate it answered from the
-                    // plan; keep a copy so the original predicate still runs as
-                    // the residual check over the index-selected rows.
-                    let residual = scan_predicate_of(&plan);
+                    // The reference's first two rules, in its order
+                    // (`optimizer_impl.cpp:40-41`): the rough filter, then the
+                    // index scan. The rule rewrites the plan into an
+                    // `IndexScan` node that owns the evaluator; the executor
+                    // reads it back from there.
                     let regex = self.regex_index_catalog(t, scan_columns);
-                    let indexed = infinity_planner::index_scan::IndexScanBuilder::build_with_regex(
-                        plan,
-                        &catalog,
-                        Some(&regex),
-                    )?;
-                    plan = indexed.plan;
-                    if let Some(pushed) = indexed.candidates.into_iter().next() {
-                        if let Some(residual) = residual {
-                            // The residual predicate addresses the scan's
-                            // output, so it belongs directly above the scan:
-                            // wrapping the root would re-bind its columns to the
-                            // projection's narrower schema.
-                            plan = add_filter_above_scan(plan, residual);
-                        }
+                    let mut index_optimizer = infinity_planner::optimize::Optimizer::new();
+                    index_optimizer.add_rule(Box::new(
+                        infinity_planner::optimize::FastRoughFilterRule::new(catalog.clone()),
+                    ));
+                    index_optimizer.add_rule(Box::new(
+                        infinity_planner::index_scan::IndexScanRule::new(
+                            catalog.clone(),
+                            Some(regex.clone()),
+                        ),
+                    ));
+                    plan = index_optimizer.optimize(plan)?;
+                    rough_filter_done = true;
+                    if let Some(pushed) = plan_index_candidate(&plan) {
                         // A sparse-gram index answers a literal run by
                         // substring; a term index answers by token.
                         fulltext_substring = fulltext_options(&pushed.index_filter)
                             .is_some_and(|opts| opts.to_ascii_lowercase().contains("index="))
                             && fulltext_column(&pushed.index_filter)
                                 .is_some_and(|i| regex.columns.contains_key(&i));
-                        candidate = Some(pushed);
+                        candidate = Some((*pushed).clone());
                     }
                 }
             }
@@ -10085,6 +11449,44 @@ impl Engine {
                 }
             }
         }
+        // A correlated subquery runs once per scan row with that row's values
+        // bound, the way a dependent join feeds the outer row into the inner
+        // side. The rows are filtered before the plan sees them, so projection,
+        // aggregation and ordering all work on the surviving rows.
+        if !correlated.is_empty() {
+            let (Some(table), None) = (from.as_ref(), join.as_ref()) else {
+                return Err(Error::Invalid(
+                    "correlated subqueries are only supported on a single table".into(),
+                ));
+            };
+            // `tables` already carries the enclosing relation's columns (a CTE
+            // or a derived table has no catalog entry), and a derived table's
+            // rows are the scan source from the start.
+            let schema = tables
+                .first()
+                .map(|(_, columns)| columns.clone())
+                .unwrap_or_default();
+            let rows = match override_rows.take() {
+                Some(rows) => rows,
+                None => self.fetch_rows(table)?,
+            };
+            let mut kept = Vec::with_capacity(rows.len());
+            for row in rows {
+                let mut holds = true;
+                for (conjunct, columns) in &correlated {
+                    if !self.correlated_conjunct_holds(
+                        conjunct, &cte_scope, &schema, &row, table, columns,
+                    )? {
+                        holds = false;
+                        break;
+                    }
+                }
+                if holds {
+                    kept.push(row);
+                }
+            }
+            override_rows = Some(kept);
+        }
         let source_columns = tables.first().map(|(_, columns)| columns.clone());
         let (columns, mut rows) = self.run_plan(
             plan,
@@ -10093,6 +11495,8 @@ impl Engine {
             candidate,
             unmatchable,
             fulltext_substring,
+            scan_catalog,
+            rough_filter_done,
         )?;
         if *distinct {
             let mut seen = std::collections::HashSet::new();
@@ -10122,6 +11526,8 @@ impl Engine {
         candidate: Option<infinity_planner::index_scan::IndexScanCandidate>,
         unmatchable: bool,
         fulltext_substring: bool,
+        catalog: Option<infinity_planner::index_scan::IndexCatalog>,
+        rough_filter_done: bool,
     ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
         // The index filter was built over the scan layout that still contains
         // the pushed-down columns; remember how those map onto the row before
@@ -10148,12 +11554,32 @@ impl Engine {
             .as_ref()
             .and_then(|candidate| fulltext_column(&candidate.index_filter))
             .and_then(|i| plan_scan_of(&plan).and_then(|(_, columns)| columns.get(i).cloned()));
-        // The production optimizer: the C++ rule order (fast-rough filter,
-        // column pruning, lazy load, binder remap) plus the legacy plan-only
-        // rewrites (limit push-down, filter-below-sort, constant folding).
-        let mut optimizer = infinity_planner::optimize::Optimizer::with_default_rules();
-        optimizer.add_rule(Box::new(infinity_planner::optimize::BuiltinRules));
+        // The production optimizer: the C++ rule order (`optimizer_impl.cpp`).
+        // The first two rules ran before the range lookup; the bound plan was
+        // already re-stacked by the binder (`optimize::normalize`).
+        // The first two rules ran before the index-scan range lookup (the
+        // candidate has to exist there), so this pass starts at the pruner.
+        let mut optimizer = match (catalog, rough_filter_done) {
+            (_, true) => infinity_planner::optimize::Optimizer::after_rough_filter(),
+            (Some(catalog), false) => {
+                infinity_planner::optimize::Optimizer::with_catalog(catalog, None)
+            }
+            (None, false) => infinity_planner::optimize::Optimizer::with_default_rules(),
+        };
         let plan = optimizer.optimize(plan)?;
+        // `ResultCacheGetter` is registered last in the reference's optimizer
+        // list, so it keys the *rewritten* nodes the scan actually produces.
+        let begin_ts = self.current_ts();
+        let cacheable = self.result_cache_active();
+        let plan = if cacheable {
+            infinity_planner::result_cache::ResultCacheGetter::rewrite(
+                plan,
+                self.plan_cache.as_ref(),
+                begin_ts,
+            )
+        } else {
+            plan
+        };
         #[cfg(test)]
         LAST_PLAN_DEBUG.with(|slot| *slot.borrow_mut() = Some(format!("{plan:?}")));
         // Lower the plan to the operator chain and build the fragment's source.
@@ -10168,6 +11594,11 @@ impl Engine {
                 crate::operators::scan::SourceSpec::Values { columns, rows }
             }
             crate::operators::lower::SourceKind::Table { table, columns } => {
+                // The block prefilter answers the predicate's range/equality
+                // comparisons: they are what a min/max record can refute.
+                let prune = scan_predicate_of(&plan)
+                    .map(|pred| prune_conditions(&pred, &columns))
+                    .unwrap_or_default();
                 crate::operators::scan::SourceSpec::Table(Box::new(
                     crate::operators::scan::TableScan {
                         table,
@@ -10178,6 +11609,7 @@ impl Engine {
                         index_positions,
                         fulltext_index_column,
                         fulltext_substring,
+                        prune,
                     },
                 ))
             }
@@ -10247,6 +11679,24 @@ impl Engine {
             .collect())
     }
 
+    /// [`Self::fetch_rows`] with block pruning: the scan hands over the    /// predicate's range/equality comparisons, and a block whose
+    /// `blk|…|fast_rough_filter` record proves none of them can hold is not
+    /// decoded at all. Falls back to the plain scan (which is always correct)
+    /// when the mirror is absent.
+    pub(crate) fn fetch_rows_pruned(
+        &self,
+        table: &str,
+        prune: &[crate::fast_rough_filter::PruneCond],
+    ) -> Result<Vec<Vec<Value>>> {
+        if prune.is_empty() {
+            return self.fetch_rows(table);
+        }
+        if let Some(rows) = self.try_cpp_rows_pruned(table, prune)? {
+            return Ok(rows.into_iter().map(|(_, r)| r).collect());
+        }
+        self.fetch_rows(table)
+    }
+
     /// Next storage sequence id for `table` (max existing + 1).
     fn next_row_seq(&self, table: &str) -> Result<usize> {
         let prefix = row_prefix(table);
@@ -10262,6 +11712,29 @@ impl Engine {
             }
         }
         Ok(max)
+    }
+
+    /// Fills `ResultCacheGetter`'s cache with one scan node's rows
+    /// (`ResultCacheSetter`): the key is the node shape plus the timestamp the
+    /// rows were read at, so a later query at the same timestamp can reuse
+    /// them. The write paths clear the cache.
+    pub(crate) fn cache_scan_rows(&self, table: &str, columns: &[String], rows: &[Vec<Value>]) {
+        if rows.is_empty() || !self.result_cache_active() {
+            return;
+        }
+        // A scan of this shape is what the getter keys on.
+        let node = infinity_planner::LogicalPlan::Scan {
+            table: table.to_string(),
+            columns: columns.to_vec(),
+        };
+        let key = infinity_planner::result_cache::cache_key(&node, self.current_ts());
+        self.plan_cache.put(
+            key,
+            infinity_planner::result_cache::CacheContent {
+                columns: columns.to_vec(),
+                rows: rows.to_vec(),
+            },
+        );
     }
 
     /// Non-deleted rows with their storage sequence ids (tombstones are skipped).
@@ -10417,6 +11890,16 @@ impl Engine {
     /// Returns `None` when the table has no block mirror or the mirror does not
     /// match its recorded row ids, so the caller falls back to the KV row store.
     fn try_cpp_rows(&self, table: &str) -> Result<Option<TableRows>> {
+        self.try_cpp_rows_pruned(table, &[])
+    }
+
+    /// [`Self::try_cpp_rows`] with block pruning: a block whose prefilter rules
+    /// out the predicate is never decoded.
+    fn try_cpp_rows_pruned(
+        &self,
+        table: &str,
+        prune: &[crate::fast_rough_filter::PruneCond],
+    ) -> Result<Option<TableRows>> {
         let table = if table.contains('.') {
             table.to_string()
         } else {
@@ -10438,17 +11921,23 @@ impl Engine {
             return Ok(None);
         }
         let wanted: Vec<usize> = (0..schema.len()).collect();
-        let Ok((_, rows)) = self.read_cpp_blocks_selected(table, &wanted) else {
+        let Ok((_, rows)) = self.read_cpp_blocks_pruned(table, &wanted, prune) else {
             return Ok(None);
         };
-        if rows.len() != snapshot.len() {
+        if prune.is_empty() && rows.len() != snapshot.len() {
             // The mirror was rewritten between the snapshot and the read.
             return Ok(None);
         }
         // Both the snapshot and the journal scan are in ascending row-id
         // order, so a linear merge finds each row's block cells without a
-        // per-scan hash table.
+        // per-scan hash table. A pruned read has holes where the skipped blocks
+        // were, so it looks the cells up by row id instead.
         let mut next = 0usize;
+        let mut by_seq: std::collections::HashMap<usize, Vec<String>> = if prune.is_empty() {
+            std::collections::HashMap::new()
+        } else {
+            rows.iter().cloned().collect()
+        };
         let prefix = row_prefix(table);
         let deleted = self.tombstone_set(table)?;
         let defaults = self.table_defaults(table).unwrap_or_default();
@@ -10466,18 +11955,24 @@ impl Engine {
             if deleted.contains(&(seq as u64)) {
                 continue;
             }
-            // Rows deleted after the checkpoint leave holes in the snapshot.
-            while next < snapshot.len() && snapshot[next] < seq {
-                next += 1;
-            }
-            if next < snapshot.len() && snapshot[next] == seq {
-                let cells = &rows[next];
+            if prune.is_empty() {
+                // Rows deleted after the checkpoint leave holes in the snapshot.
+                while next < snapshot.len() && snapshot[next] < seq {
+                    next += 1;
+                }
+                if next < snapshot.len() && snapshot[next] == seq {
+                    let cells = &rows[next].1;
+                    out.push((seq, cells.iter().map(|c| parse_value(c)).collect()));
+                    next += 1;
+                    continue;
+                }
+            } else if let Some(cells) = by_seq.remove(&seq) {
                 out.push((seq, cells.iter().map(|c| parse_value(c)).collect()));
-                next += 1;
-            } else {
-                // Written after the mirror snapshot: the journal holds it.
-                out.push((seq, self.parse_stored_row(table, &defaults, &v)?));
+                continue;
             }
+            // Written after the mirror snapshot (or inside a pruned block): the
+            // journal holds it.
+            out.push((seq, self.parse_stored_row(table, &defaults, &v)?));
         }
         Ok(Some(out))
     }
@@ -11710,6 +13205,21 @@ impl Engine {
         self.txn.current_ts()
     }
 
+    /// Takes the transaction id the reference's `BeginTxnShared` would take for
+    /// one statement.
+    ///
+    /// Every statement spends an id, read-only ones included (`SELECT`, `USE`,
+    /// `SHOW …`), and the WAL frame the statement writes carries it. The
+    /// session handshake (`Connect`/`Disconnect`) is not a statement.
+    pub fn begin_statement(&self) {
+        self.txn.ensure_statement_id();
+    }
+
+    /// Ends the statement scope opened by [`Self::begin_statement`].
+    pub fn end_statement(&self) {
+        self.txn.end_statement();
+    }
+
     /// C++ `NewTxnManager::PrepareCommitTS`: the high-water mark committers
     /// take from.
     pub fn prepare_commit_ts(&self) -> u64 {
@@ -12346,6 +13856,44 @@ impl Engine {
         self.compact_all_segments(table)
     }
 
+    /// C++ `CompactionProcessor::NewNotifyCompact`
+    /// (`compaction_process_impl.cpp:86`): walk every database and table and
+    /// merge the segments `NewCompactionAlg` selects. Returns how many tables
+    /// were compacted.
+    ///    /// The reference lists the tables in a read transaction and then compacts
+    /// each one in its own compact transaction; here the catalog read is the
+    /// listing and [`Self::compact_table`] opens the compaction.
+    pub fn notify_compact(&self) -> usize {
+        let databases = self.storage.catalog.list_databases().unwrap_or_default();
+        let tables = self.storage.catalog.list_tables().unwrap_or_default();
+        let mut compacted = 0;
+        for meta in tables {
+            // The catalog keys a table by the name it was created with: a
+            // qualified `db.t` when the DDL named the database, the bare name
+            // otherwise (then the session's current database is the one it
+            // lives in, as in `qualified_table`). Prefer the database whose
+            // lookup returns this very table.
+            let qualified = databases.iter().find_map(|db| {
+                let candidate = format!("{db}.{}", meta.name);
+                self.storage
+                    .catalog
+                    .get_table_by_name(&candidate)
+                    .ok()
+                    .flatten()
+                    .filter(|found| found.id == meta.id)
+                    .map(|_| candidate)
+            });
+            let target = qualified.unwrap_or_else(|| meta.name.clone());
+            if self.compaction_candidates(&target).is_empty() {
+                continue;
+            }
+            if self.compact_table(&target).is_ok() {
+                compacted += 1;
+            }
+        }
+        compacted
+    }
+
     /// `NewCompactionAlg` (`DBTCompactionAlg`): the segments a manual or
     /// periodic compaction would merge.
     ///
@@ -12549,6 +14097,7 @@ impl Engine {
         // a dead row id. Rebuild the declared indexes from the merged rows.
         self.rebuild_indexes()?;
         self.result_cache.lock().unwrap().clear();
+        self.plan_cache.clear();
         Ok(())
     }
 
@@ -12940,16 +14489,14 @@ impl Engine {
                 }
                 for (k, v) in opts {
                     if k == "ANALYZER" {
-                        let a = v
-                            .trim()
-                            .trim_matches(|c| c == '\'' || c == '"')
-                            .to_ascii_lowercase();
-                        // Accept exactly the families `AnalyzerPool::get_analyzer`
-                        // can construct; `japanese`, `korean` and `traditional`
-                        // are C++ families the port does not vendor (MeCab/OpenCC)
-                        // and are rejected here rather than at query time.
-                        if !analyzer::is_constructible_analyzer_name(&a) {
-                            return Err(Error::Invalid(analyzer::unsupported_analyzer_message(&a)));
+                        // C++ `IndexFullText::Make` hands the raw parameter to
+                        // `AnalyzerPool::GetAnalyzer` and fails on its status,
+                        // so the name is validated case sensitively and with
+                        // the same per-family suffix rules (including the
+                        // `strtol` prefix of `ngram-<n>`).
+                        let a = v.trim().trim_matches(|c| c == '\'' || c == '"');
+                        if !analyzer::is_constructible_analyzer_name(a) {
+                            return Err(Error::Invalid(analyzer::unsupported_analyzer_message(a)));
                         }
                     }
                 }
@@ -12960,18 +14507,21 @@ impl Engine {
     }
 
     /// The tokeniser delimiters implied by a column's full-text analyzer:
-    /// `keyword`/`whitespace` split on whitespace (`Some([])`), `whitespace-<chars>`
-    /// splits on the listed characters, and any other analyzer uses the standard
-    /// tokeniser (`None`).
+    /// `keyword`/`whitespace` split on whitespace (`Some([])`), their
+    /// `-<chars>` form splits on the listed characters, and any other analyzer
+    /// uses the standard tokeniser (`None`).
     fn index_delims(&self, table: &str, column: &str) -> Option<Vec<char>> {
         let key = self.table_key(table);
         let guard = self.tables.lock().unwrap();
-        let a = guard.get(&key)?.analyzers.get(column)?.to_ascii_lowercase();
-        if a == "keyword" || a == "whitespace" {
-            Some(Vec::new())
-        } else {
-            a.strip_prefix("whitespace")
-                .map(|rest| rest.trim_start_matches(['-', '_', ' ']).chars().collect())
+        let name = guard.get(&key)?.analyzers.get(column)?;
+        // C++ `WhitespaceAnalyzer`: the delimiter set is everything after the
+        // first '-' of a `keyword`/`whitespace` name, verbatim (so `-A` is the
+        // uppercase byte), and empty means "split on whitespace".
+        match analyzer::parse_analyzer_name(name) {
+            Ok(analyzer::AnalyzerName::Whitespace { delimiters }) => {
+                Some(delimiters.chars().collect())
+            }
+            _ => None,
         }
     }
 
@@ -12992,10 +14542,12 @@ impl Engine {
     fn index_analyzer(&self, table: &str, column: &str) -> Option<String> {
         let key = self.table_key(table);
         let guard = self.tables.lock().unwrap();
-        let analyzer = guard.get(&key)?.analyzers.get(column)?.to_ascii_lowercase();
-        match analyzer.split('-').next().unwrap_or("") {
-            "standard" | "keyword" | "whitespace" | "" => None,
-            _ => Some(analyzer),
+        let name = guard.get(&key)?.analyzers.get(column)?.clone();
+        match analyzer::parse_analyzer_name(&name) {
+            Ok(analyzer::AnalyzerName::Standard { .. })
+            | Ok(analyzer::AnalyzerName::Whitespace { .. })
+            | Err(_) => None,
+            Ok(_) => Some(name),
         }
     }
 
@@ -15078,39 +16630,85 @@ impl Engine {
                 String::new()
             }
         });
-        for part in params.split(';').filter(|p| !p.trim().is_empty()) {
-            let key = part
-                .split('=')
-                .next()
-                .unwrap_or("")
-                .trim()
-                .to_ascii_lowercase();
-            let known = matches!(
-                key.as_str(),
-                "topn"
-                    | "threshold"
-                    | "ef"
-                    | "ef_search"
-                    | "nprobe"
-                    | "io_limit"
-                    | "distance"
-                    | "similarity"
-                    | "alpha"
+        // `MATCH SPARSE` accepts exactly the names `ExpressionBinder::BuildSearchExpr`
+        // allows (`expression_binder_impl.cpp:1140-1146`): `alpha`, `beta`,
+        // `tail`, `threshold`. `index_name` / `ignore_index` are consumed by the
+        // service layer and `filter` is a separate field, so the port's string
+        // transport may carry them too. Note `tail` is accepted and **ignored**
+        // by the reference — `BMPUtil::ParseBmpSearchOptions` only reads
+        // `use_tail`, which never gets past the binder.
+        let sparse_known = |key: &str| {
+            matches!(
+                key,
+                // The reference's `opt_params` names.
+                "alpha"
                     | "beta"
-                    // `BMPUtil::ParseBmpSearchOptions`'s tail switch.
-                    | "use_tail"
-                    // index hints the SDK passes through; the planner picks the
-                    // index itself, so they are accepted and ignored.
+                    | "tail"
+                    | "threshold"
+                    // Consumed by its service layer / separate fields.
                     | "index_name"
                     | "ignore_index"
-                    | "index_type"
-                    // `MATCH TEXT`/`MATCH SPARSE` carry a per-search filter.
                     | "filter"
-            );
-            if !known {
-                return Err(Error::Invalid(format!(
-                    "invalid parameter: unknown option '{key}'"
-                )));
+                    // The port's SQL form may carry `topn` in the option bag
+                    // (`MATCH SPARSE (col, vec, 'ip', 'topn=5;alpha=0.5')`); the
+                    // reference takes it as the positional 4th argument.
+                    | "topn"
+            )
+        };
+        let sources: Vec<&str> = if is_sparse {
+            [Some(params.as_str()), with_opts]
+                .into_iter()
+                .flatten()
+                .collect()
+        } else {
+            vec![params.as_str()]
+        };
+        for source in sources {
+            for part in source.split(';').filter(|p| !p.trim().is_empty()) {
+                let key = part
+                    .split('=')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_ascii_lowercase();
+                if key.is_empty() {
+                    continue;
+                }
+                if is_sparse {
+                    if !sparse_known(&key) {
+                        return Err(Error::Syntax(format!(
+                            "Unsupported optional parameter: {key}"
+                        )));
+                    }
+                    continue;
+                }
+                let known = matches!(
+                    key.as_str(),
+                    "topn"
+                        | "threshold"
+                        | "ef"
+                        | "ef_search"
+                        | "nprobe"
+                        | "io_limit"
+                        | "distance"
+                        | "similarity"
+                        | "alpha"
+                        | "beta"
+                        // `BMPUtil::ParseBmpSearchOptions`'s tail switch.
+                        | "use_tail"
+                        // index hints the SDK passes through; the planner picks the
+                        // index itself, so they are accepted and ignored.
+                        | "index_name"
+                        | "ignore_index"
+                        | "index_type"
+                        // `MATCH TEXT`/`MATCH SPARSE` carry a per-search filter.
+                        | "filter"
+                );
+                if !known {
+                    return Err(Error::Invalid(format!(
+                        "invalid parameter: unknown option '{key}'"
+                    )));
+                }
             }
         }
         // `index_name=…` selects a specific index; naming one that does not
@@ -15486,7 +17084,7 @@ impl Engine {
                 let Ok(reader) = infinity_storage::bmp_cpp::BmpCppReader::open(&path, width) else {
                     continue;
                 };
-                for (row, score) in reader.search(&query_i32, topn.max(1), bmp_options.alpha) {
+                for (row, score) in reader.search(&query_i32, topn.max(1), bmp_options) {
                     let id = ((segment << 32) | row as u64) as usize;
                     let score = score as f64;
                     best.entry(id)
@@ -15708,7 +17306,7 @@ impl Engine {
         // Appending it before the truncation means the truncation can drop the
         // prefix while the entry itself survives, and the log is never empty.
         let _ = self.txn.append_checkpoint(applied);
-        let _ = self.txn.truncate_wal_up_to(applied);
+        let _ = self.txn.rotate_wal_if_large();
         // Dump the index memory tails first. The caller only logs a `flush`
         // error, so a failing block mirror (e.g. an unsupported column type)
         // must not leave the memory tails unbounded — that is what pushed the
@@ -15893,11 +17491,10 @@ impl Engine {
     /// Only the CLI calls this: [`Engine::open_with_options`] stays
     /// deterministic for tests and embedded callers.
     ///
-    /// `compact_interval` is accepted but does nothing: `NotifyCompactTask`
-    /// walks every database and table and compacts the segments
-    /// `NewCompactionAlg` selects (`compaction_process_impl.cpp:86-210`), and
-    /// neither the selection heuristic nor the per-table walk exists here yet
-    /// (TODO(item 1b)). Passing `Duration::ZERO` disables a trigger.
+    /// `compact_interval` drives [`Self::notify_compact`], the reference's
+    /// periodic compaction (`compaction_process_impl.cpp:86`): every database
+    /// and table is visited, and the segments `NewCompactionAlg` picks are
+    /// merged. `Duration::ZERO` disables a trigger.
     pub fn start_background_tasks(
         self: &Arc<Self>,
         cleanup_interval: std::time::Duration,
@@ -16731,7 +18328,9 @@ impl Engine {
         // one); truncating alone leaves an empty log, which it also rejects.
         let ts = self.txn.synced_ts();
         let _ = self.txn.append_checkpoint(ts);
-        let _ = self.txn.truncate_wal_up_to(ts);
+        // A checkpoint keeps its sealed segment; `Cleanup` reclaims it, as in
+        // `WalManager::Cleanup`.
+        let _ = self.txn.rotate_wal_if_large();
     }
 
     /// Runs the reference's optimize pass over the index mirrors: a mirror
@@ -16754,6 +18353,11 @@ impl Engine {
         // (`background_process_impl.cpp:109`); only `kAdmin` is rejected.
         self.ensure_cleanup_allowed()?;
         self.flush_storage()?;
+        // `WalManager::Cleanup`: the sealed `wal.log.<ts>` segments whose
+        // records the KV store holds are reclaimed here, not at a checkpoint.
+        if let Ok(applied) = self.txn.applied_ts() {
+            let _ = self.txn.drop_sealed_wal_up_to(applied);
+        }
         self.reclaim_deprecated_segments()?;
         let cleaned = self.cleanup_cpp_index_chunks();
         // `BGTaskProcessor` records the cleanup timestamp so the trigger can
@@ -17040,62 +18644,13 @@ fn value_as_f64(value: &Value) -> Option<f64> {
 /// Inserts `predicate` directly above the base scan of `plan`. The predicate
 /// is bound against the scan's output, so it cannot be wrapped around the root
 /// when the root re-projects.
-fn add_filter_above_scan(plan: LogicalPlan, predicate: Expr) -> LogicalPlan {
-    match plan {
-        LogicalPlan::Scan { .. } | LogicalPlan::Values { .. } => LogicalPlan::Filter {
-            input: Box::new(plan),
-            predicate,
-        },
-        LogicalPlan::Filter {
-            input,
-            predicate: existing,
-        } => LogicalPlan::Filter {
-            input: Box::new(add_filter_above_scan(*input, predicate)),
-            predicate: existing,
-        },
-        LogicalPlan::Projection {
-            input,
-            exprs,
-            names,
-        } => LogicalPlan::Projection {
-            input: Box::new(add_filter_above_scan(*input, predicate)),
-            exprs,
-            names,
-        },
-        LogicalPlan::Aggregate {
-            input,
-            group_keys,
-            group_names,
-            aggs,
-        } => LogicalPlan::Aggregate {
-            input: Box::new(add_filter_above_scan(*input, predicate)),
-            group_keys,
-            group_names,
-            aggs,
-        },
-        LogicalPlan::Sort { input, keys } => LogicalPlan::Sort {
-            input: Box::new(add_filter_above_scan(*input, predicate)),
-            keys,
-        },
-        LogicalPlan::Limit { input, n } => LogicalPlan::Limit {
-            input: Box::new(add_filter_above_scan(*input, predicate)),
-            n,
-        },
-        LogicalPlan::Offset { input, n } => LogicalPlan::Offset {
-            input: Box::new(add_filter_above_scan(*input, predicate)),
-            n,
-        },
-        other @ LogicalPlan::Join { .. } => LogicalPlan::Filter {
-            input: Box::new(other),
-            predicate,
-        },
-    }
-}
 
 /// The first base scan a (single-table) plan reads, with its pruned columns.
 fn plan_scan_of(plan: &LogicalPlan) -> Option<(String, Vec<String>)> {
     match plan {
-        LogicalPlan::Scan { table, columns } => Some((table.clone(), columns.clone())),
+        LogicalPlan::Scan { table, columns } | LogicalPlan::IndexScan { table, columns, .. } => {
+            Some((table.clone(), columns.clone()))
+        }
         LogicalPlan::Filter { input, .. }
         | LogicalPlan::Projection { input, .. }
         | LogicalPlan::Aggregate { input, .. }
@@ -17103,6 +18658,22 @@ fn plan_scan_of(plan: &LogicalPlan) -> Option<(String, Vec<String>)> {
         | LogicalPlan::Limit { input, .. }
         | LogicalPlan::Offset { input, .. } => plan_scan_of(input),
         LogicalPlan::Join { .. } | LogicalPlan::Values { .. } => None,
+    }
+}
+
+/// The index-scan node's candidate, when the plan has one.
+fn plan_index_candidate(
+    plan: &LogicalPlan,
+) -> Option<std::sync::Arc<infinity_planner::index_scan::IndexScanCandidate>> {
+    match plan {
+        LogicalPlan::IndexScan { candidate, .. } => Some(candidate.clone()),
+        LogicalPlan::Filter { input, .. }
+        | LogicalPlan::Projection { input, .. }
+        | LogicalPlan::Aggregate { input, .. }
+        | LogicalPlan::Sort { input, .. }
+        | LogicalPlan::Limit { input, .. }
+        | LogicalPlan::Offset { input, .. } => plan_index_candidate(input),
+        _ => None,
     }
 }
 
@@ -18675,11 +20246,9 @@ fn trigger_loop(
             }
             if !compact_interval.is_zero() && last_compact.elapsed() >= compact_interval {
                 last_compact = std::time::Instant::now();
-                // TODO(item 1b): `NotifyCompactTask` walks every database and
-                // table and compacts the segments `NewCompactionAlg` selects
-                // (`compaction_process_impl.cpp:86-210`); neither the walk nor
-                // the selection heuristic is ported, so the interval is wired
-                // but fires nothing.
+                // `CompactionProcessor::NewNotifyCompact`: every table, the
+                // segments `NewCompactionAlg` picks.
+                engine.notify_compact();
             }
             if !cleanup_interval.is_zero()
                 && last_cleanup.elapsed() >= cleanup_interval
@@ -18697,6 +20266,244 @@ fn trigger_loop(
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    /// A `NULL` slot and a vector column both reach the WAL as typed columns:
+    /// the first through the null bitmap, the second as inline element bytes.
+    #[test]
+    fn typed_append_accepts_null_and_embedding_rows() {
+        let cols = typed_append_block(&[vec![Literal::Null]], &["int32".to_string()])
+            .expect("a NULL int row is representable");
+        assert_eq!(cols.len(), 1);
+        assert_eq!(cols[0].nulls, vec![0]);
+
+        let cols = typed_append_block(
+            &[vec![Literal::Vector(vec![1.0, 2.0])]],
+            &["vector,2,float".to_string()],
+        )
+        .expect("a float vector row is representable");
+        assert_eq!(cols.len(), 1);
+        assert_eq!(
+            cols[0].data_type.logical_type,
+            infinity_storage::wal::ddl_def::LogicalType::Embedding
+        );
+    }
+
+    /// C++ `VerifyColumnDataType` (`logical_planner_impl.cpp:551`): the types
+    /// the reference refuses at DDL time, with the message it prints.
+    #[test]
+    fn the_reference_column_type_whitelist_is_enforced() {
+        for (text, expected) in [
+            (
+                "DECIMAL(10,2)",
+                "Not supported data type: Decimal(decimal(10, 2))",
+            ),
+            ("HUGEINT", "Not supported data type: HugeInt"),
+            ("UUID", "Not supported data type: UUID"),
+            ("INTERVAL", "Not supported data type: Interval"),
+            (
+                "ARRAY(DECIMAL(10,2))",
+                "Not supported data type: Array(Decimal(decimal(10, 2))), \
+                 error in element type: Not supported data type: Decimal(decimal(10, 2))",
+            ),
+        ] {
+            assert_eq!(unsupported_column_type(text).as_deref(), Some(expected));
+        }
+        // Everything the whitelist accepts, including an array of a scalar.
+        for text in [
+            "BOOLEAN",
+            "TINYINT",
+            "SMALLINT",
+            "INTEGER",
+            "BIGINT",
+            "FLOAT",
+            "DOUBLE",
+            "FLOAT16",
+            "BFLOAT16",
+            "VARCHAR",
+            "DATE",
+            "TIME",
+            "DATETIME",
+            "TIMESTAMP",
+            "JSON",
+            "EMBEDDING(FLOAT, 4)",
+            "VECTOR(4, FLOAT)",
+            "TENSOR(FLOAT, 4)",
+            "MULTIVECTOR(FLOAT, 2)",
+            "SPARSE(FLOAT, INT, 8)",
+            "ARRAY(INT)",
+        ] {
+            assert!(
+                unsupported_column_type(text).is_none(),
+                "{text} should be accepted"
+            );
+        }
+    }
+
+    /// A subquery that reads the enclosing row runs once per row: `EXISTS`,
+    /// `NOT EXISTS` and a scalar aggregate all see that row's values.
+    #[test]
+    fn a_correlated_subquery_is_evaluated_per_outer_row() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE cs_dept (id INTEGER, name VARCHAR)")
+            .unwrap();
+        e.execute("CREATE TABLE cs_emp (id INTEGER, dept_id INTEGER, salary INTEGER)")
+            .unwrap();
+        e.execute("INSERT INTO cs_dept VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
+            .unwrap();
+        e.execute("INSERT INTO cs_emp VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
+            .unwrap();
+        let names = |sql: &str| rows(&e, sql);
+        assert_eq!(
+            names("SELECT name FROM cs_dept WHERE EXISTS (SELECT 1 FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id);"),
+            vec![vec!["eng".to_string()], vec!["ops".to_string()]]
+        );
+        assert_eq!(
+            names("SELECT name FROM cs_dept WHERE NOT EXISTS (SELECT 1 FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id);"),
+            vec![vec!["idle".to_string()]]
+        );
+        assert_eq!(
+            names("SELECT name FROM cs_dept WHERE (SELECT COUNT(*) FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id) >= 2;"),
+            vec![vec!["eng".to_string()]]
+        );
+        // The rest of the predicate still runs alongside it.
+        assert_eq!(
+            names("SELECT name FROM cs_dept WHERE id >= 2 AND EXISTS (SELECT 1 FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id);"),
+            vec![vec!["ops".to_string()]]
+        );
+    }
+
+    /// A full-text index is built and queried with the analyzer it declared,
+    /// not with the standard one: an `ngram-3` index turns `quick` into
+    /// `qui`/`uic`/`ick`, so a literal `qui` is a token there and not in a
+    /// `standard` index.
+    #[test]
+    fn a_fulltext_index_uses_its_declared_analyzer() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        for (table, analyzer) in [("an_std", "standard"), ("an_gram", "ngram-3")] {
+            e.execute(&format!("CREATE TABLE {table} (id INTEGER, body VARCHAR)"))
+                .unwrap();
+            e.execute(&format!(
+                "CREATE INDEX {table}_idx ON {table} (body) USING FULLTEXT WITH (analyzer='{analyzer}')"
+            ))
+            .unwrap();
+            e.execute(&format!("INSERT INTO {table} VALUES (1, 'quick brown');"))
+                .unwrap();
+        }
+        e.flush().unwrap();
+        let hits = |table: &str| {
+            rows(
+                &e,
+                &format!("SELECT id FROM {table} SEARCH MATCH TEXT (body, 'qui', 10);"),
+            )
+        };
+        assert_eq!(hits("an_std"), Vec::<Vec<String>>::new());
+        assert_eq!(hits("an_gram"), vec![vec!["1".to_string()]]);
+        // The whole word still matches both.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM an_std SEARCH MATCH TEXT (body, 'quick', 10);"
+            ),
+            vec![vec!["1".to_string()]]
+        );
+    }
+
+    /// With `result_cache` on, a repeated scan is answered from the plan-node
+    /// cache (`ResultCacheGetter` + `ResultCacheSetter`), and a write drops it.
+    #[test]
+    fn the_plan_cache_answers_a_repeated_scan_and_a_write_drops_it() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE rc (id INTEGER, name VARCHAR)")
+            .unwrap();
+        for i in 0..5 {
+            e.execute(&format!("INSERT INTO rc VALUES ({i}, 'n{i}');"))
+                .unwrap();
+        }
+        assert_eq!(e.plan_cache.len(), 0);
+        // The cache is opt-in, as in the reference (`DEFAULT_RESULT_CACHE`).
+        let before = rows(&e, "SELECT id FROM rc WHERE id >= 2;");
+        assert_eq!(e.plan_cache.len(), 0);
+        e.execute("SET CONFIG result_cache ON").unwrap();
+        let first = rows(&e, "SELECT id FROM rc WHERE id >= 2;");
+        assert_eq!(first, before);
+        assert!(!e.plan_cache.is_empty(), "the scan did not fill the cache");
+        assert_eq!(rows(&e, "SELECT id FROM rc WHERE id >= 2;"), first);
+        // A write clears every entry: the answer could have changed.
+        e.execute("INSERT INTO rc VALUES (9, 'n9');").unwrap();
+        assert_eq!(e.plan_cache.len(), 0);
+        assert_eq!(
+            rows(&e, "SELECT id FROM rc WHERE id >= 2;").len(),
+            first.len() + 1
+        );
+    }
+
+    /// `CompactionProcessor::NewNotifyCompact`: the periodic trigger visits
+    /// every table and merges the four segments `NewCompactionAlg` picks.
+    #[test]
+    fn notify_compact_merges_the_segments_the_alg_picks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE nc (id INTEGER)").unwrap();
+        // Four imports of one block each: layer 0 holds four segments, which is
+        // exactly what `DBTCompactionAlg` merges.
+        for part in 0..4 {
+            let path = dir.path().join(format!("nc{part}.csv"));
+            let text: String = (0..8192)
+                .map(|i| format!("{}\n", part * 8192 + i))
+                .collect();
+            std::fs::write(&path, text).unwrap();
+            e.execute(&format!(
+                "COPY nc FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                path.display()
+            ))
+            .unwrap();
+        }
+        assert_eq!(e.segments("nc").len(), 4);
+        assert_eq!(e.row_count("nc").unwrap(), 4 * 8192);
+        assert_eq!(e.notify_compact(), 1);
+        assert_eq!(e.segments("nc").len(), 1, "{:?}", e.segments("nc"));
+        assert_eq!(e.row_count("nc").unwrap(), 4 * 8192);
+        // Nothing left to pick: a second pass is a no-op.
+        assert_eq!(e.notify_compact(), 0);
+        let rows = rows(&e, "SELECT id FROM nc WHERE id = 12345;");
+        assert_eq!(rows, vec![vec!["12345".to_string()]]);
+    }
+
+    /// A scan that carries a range predicate prunes whole blocks through their
+    /// `blk|…|fast_rough_filter` record: a block whose min/max refutes the
+    /// predicate is never decoded, and the rows the answer needs still come
+    /// back.
+    #[test]
+    fn the_block_prefilter_skips_blocks_that_cannot_match() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE pf (id INTEGER)").unwrap();
+        // `COPY` seals the segment, which is when the reference builds the
+        // block prefilters. Two blocks: ids 8192..8999 live in the second one,
+        // so `id < 10` can never match it.
+        let csv = dir.path().join("pf.csv");
+        let text: String = (0..9000).map(|i| format!("{i}\n")).collect();
+        std::fs::write(&csv, text).unwrap();
+        e.execute(&format!(
+            "COPY pf FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            csv.display()
+        ))
+        .unwrap();
+        e.flush().unwrap();
+        crate::cpp_blocks::PRUNED_BLOCKS.with(|n| n.set(0));
+        let got = rows(&e, "SELECT id FROM pf WHERE id < 10;");
+        assert_eq!(got.len(), 10, "{got:?}");
+        assert_eq!(got[0][0], "0");
+        assert_eq!(got[9][0], "9");
+        let pruned = crate::cpp_blocks::PRUNED_BLOCKS.with(|n| n.get());
+        assert!(pruned > 0, "no block was pruned (read {pruned})");
+        // A predicate that spans both blocks still returns every row.
+        let got = rows(&e, "SELECT id FROM pf WHERE id >= 8190 AND id < 8200;");
+        assert_eq!(got.len(), 10, "{got:?}");
+    }
 
     /// The rows of a `SELECT`, as rendered strings.
     fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
@@ -18733,6 +20540,8 @@ mod tests {
                 None,
                 false,
                 false,
+                None,
+                false,
             )
             .unwrap();
         assert_eq!(rows, vec![vec![Value::Int(1)]]);
@@ -18763,7 +20572,9 @@ mod tests {
             )],
             names: vec!["sum".to_string()],
         };
-        let (columns, rows) = e.run_plan(plan, None, None, None, false, false).unwrap();
+        let (columns, rows) = e
+            .run_plan(plan, None, None, None, false, false, None, false)
+            .unwrap();
         assert_eq!(columns, vec!["sum".to_string()]);
         assert_eq!(rows, vec![vec![Value::Int(3)], vec![Value::Int(7)]]);
         assert_eq!(crate::operators::operator_run_count(), before + 1);
@@ -18974,7 +20785,7 @@ mod tests {
     /// explicitly. Folding it once as a constant would silently answer
     /// `true`/`false` for every outer row, which is what the old path did.
     #[test]
-    fn a_correlated_subquery_is_rejected_instead_of_evaluated_as_a_constant() {
+    fn a_correlated_subquery_sees_each_outer_row() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.execute("CREATE TABLE cs (id INT, v INT);").unwrap();
@@ -18991,14 +20802,13 @@ mod tests {
             ),
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
-        // Correlated on the outer `cs.id`: no eager constant can be correct.
-        let err = e
-            .execute("SELECT id FROM cs WHERE EXISTS (SELECT id FROM cs2 WHERE cs2.id = cs.id);")
-            .unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("correlated subqueries are not supported"),
-            "{err}"
+        // Correlated on the outer `cs.id`: only row 2 has a `cs2` match.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM cs WHERE EXISTS (SELECT id FROM cs2 WHERE cs2.id = cs.id) ORDER BY id;"
+            ),
+            vec![vec!["2".to_string()]]
         );
     }
 
@@ -19034,16 +20844,14 @@ mod tests {
         e.execute("CREATE TABLE otc (id INT);").unwrap();
         e.execute("INSERT INTO otc VALUES (1);").unwrap();
         e.execute("CREATE TABLE otc2 (id INT);").unwrap();
-        let err = e
-            .execute(
+        // The CTE supplies the outer rows; `otc2` is empty, so nothing matches.
+        assert_eq!(
+            rows(
+                &e,
                 "WITH cs AS (SELECT id FROM otc) \
                  SELECT id FROM cs WHERE EXISTS (SELECT id FROM otc2 WHERE otc2.id = cs.id);",
-            )
-            .unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("correlated subqueries are not supported"),
-            "{err}"
+            ),
+            Vec::<Vec<String>>::new()
         );
     }
 
@@ -19070,7 +20878,7 @@ mod tests {
             .unwrap_err();
         assert!(
             err.to_string()
-                .contains("correlated subqueries are not supported"),
+                .contains("correlated subqueries are only supported"),
             "{err}"
         );
     }
@@ -21582,6 +23390,92 @@ mod tests {
         assert!(guard.merge(std::slice::from_ref(&run)).postings[&run].is_empty());
     }
 
+    /// The `keyword`/`whitespace` families take their delimiter set from the
+    /// name, and the name is kept byte for byte: `keyword-,` splits on the
+    /// comma while a bare `keyword` keeps the whole value, and `whitespace-AB`
+    /// must not be lowercased into splitting on `a`/`b`.
+    #[test]
+    fn a_keyword_fulltext_index_takes_its_delimiters_from_the_name() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE kw_t (doc VARCHAR);").unwrap();
+        e.execute("INSERT INTO kw_t VALUES ('a,b');").unwrap();
+        e.execute("CREATE INDEX kw_idx ON kw_t (doc) USING FULLTEXT WITH (analyzer='keyword-,');")
+            .unwrap();
+
+        assert_eq!(e.index_delims("kw_t", "doc"), Some(vec![',']));
+        let tokenizer = e.index_tokenizer("kw_t", "doc");
+        // `keyword-<chars>` is carried by the delimiters, not by a family
+        // analyzer, exactly as the reference's `WhitespaceAnalyzer` is.
+        assert!(tokenizer.analyzer.is_none());
+        let index = e.text_index_for("kw_t", "doc", tokenizer).unwrap();
+        let guard = index.read().unwrap();
+        for term in ["a", "b"] {
+            let term = term.to_string();
+            assert_eq!(
+                guard.merge(std::slice::from_ref(&term)).postings[&term].len(),
+                1,
+                "{term}"
+            );
+        }
+        let whole = "a,b".to_string();
+        assert!(guard.merge(std::slice::from_ref(&whole)).postings[&whole].is_empty());
+        drop(guard);
+
+        // The delimiter bytes are not lowercased on the way in.
+        e.execute("CREATE TABLE kw_case (doc VARCHAR);").unwrap();
+        e.execute(
+            "CREATE INDEX kwc ON kw_case (doc) USING FULLTEXT WITH (analyzer='whitespace-AB');",
+        )
+        .unwrap();
+        assert_eq!(e.index_delims("kw_case", "doc"), Some(vec!['A', 'B']));
+    }
+
+    /// DDL accepts exactly the names `AnalyzerPool::GetAnalyzer` constructs:
+    /// the family is case sensitive, `ngram` parses a numeric prefix, and
+    /// `sparsegram` validates its window.
+    #[test]
+    fn create_index_validates_the_analyzer_name_like_the_reference() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // One table per name: a column carries at most one full-text index.
+        for (i, name) in [
+            "Chinese",
+            "ngram-0",
+            "sparsegram--3",
+            "sparsegram-100-5",
+            "bogus",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let table = format!("an_bad_{i}");
+            e.execute(&format!("CREATE TABLE {table} (doc VARCHAR);"))
+                .unwrap();
+            let sql = format!(
+                "CREATE INDEX bad_{i} ON {table} (doc) USING FULLTEXT WITH (analyzer='{name}');"
+            );
+            assert!(e.execute(&sql).is_err(), "{name} must be rejected");
+        }
+        for (i, name) in [
+            "ngram-3x",
+            "sparsegram-fold",
+            "keyword-,",
+            "standard-PORTER",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let table = format!("an_ok_{i}");
+            e.execute(&format!("CREATE TABLE {table} (doc VARCHAR);"))
+                .unwrap();
+            let sql = format!(
+                "CREATE INDEX ok_{i} ON {table} (doc) USING FULLTEXT WITH (analyzer='{name}');"
+            );
+            assert!(e.execute(&sql).is_ok(), "{name} must be accepted");
+        }
+    }
+
     /// `alpha` is a real `BmpSearchOptions` field, not a hard-coded constant:
     /// `alpha=0` prunes at the first full block, so the higher-scoring tail is
     /// never scored. C++ `BMPUtil::ParseBmpSearchOptions` +
@@ -21628,17 +23522,48 @@ mod tests {
         // exact answer is never scored evidence that the option reached
         // `BmpAlg`/`BmpCppReader::search` instead of a hard-coded 0.9.
         assert_eq!(score("topn=1;alpha=0"), 1.0);
-        // `beta` and `use_tail` are parsed too; out-of-range values are ignored.
-        let options = parse_bmp_search_options(Some("alpha=0.5;beta=0.25"), "alpha=0.9;use_tail=F");
+        // `alpha`/`beta` are parsed; out-of-range values are ignored, and the
+        // binder's `tail` name does not touch `use_tail` (the reference's
+        // `ParseBmpSearchOptions` reads `use_tail`, which the binder rejects).
+        let options = parse_bmp_search_options(Some("alpha=0.5;beta=0.25"), "alpha=0.9;tail=F");
         assert_eq!(
             (options.alpha, options.beta, options.use_tail),
-            (0.5, 0.25, false)
+            (0.5, 0.25, true)
         );
-        let ignored = parse_bmp_search_options(None, "alpha=7;beta=-1;use_tail=X");
+        let ignored = parse_bmp_search_options(None, "alpha=7;beta=-1;tail=X");
         assert_eq!(
             (ignored.alpha, ignored.beta, ignored.use_tail),
             (1.0, 1.0, true)
         );
+    }
+
+    /// `MATCH SPARSE`'s option whitelist is the reference's
+    /// (`alpha`/`beta`/`tail`/`threshold`): anything else is a syntax error.
+    #[test]
+    fn sparse_rejects_unknown_options() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sp (id INTEGER, v SPARSE(FLOAT, 64))")
+            .unwrap();
+        e.execute("INSERT INTO sp VALUES (1, [10:1.0]);").unwrap();
+        let err = e
+            .execute("SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', 'use_tail=F')")
+            .unwrap_err();
+        let message = err.to_string();
+        assert!(
+            message.contains("Unsupported optional parameter: use_tail"),
+            "{message}"
+        );
+        // The reference's four names are accepted (`tail` is a no-op there).
+        for opts in ["alpha=0.5", "beta=0.5", "tail=F", "threshold=0.1"] {
+            assert!(
+                e.execute(&format!(
+                    "SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', '{opts}')"
+                ))
+                .is_ok(),
+                "{opts}"
+            );
+        }
     }
 
     /// A column declared `DEFAULT ''` keeps the empty string, not NULL.

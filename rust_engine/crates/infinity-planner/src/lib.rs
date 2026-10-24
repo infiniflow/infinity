@@ -30,7 +30,9 @@ use infinity_parser::{
 pub fn output_schema(plan: &LogicalPlan) -> Vec<String> {
     match plan {
         LogicalPlan::Values { columns, .. } => columns.clone(),
-        LogicalPlan::Scan { columns, .. } => columns.clone(),
+        LogicalPlan::Scan { columns, .. } | LogicalPlan::IndexScan { columns, .. } => {
+            columns.clone()
+        }
         LogicalPlan::Join {
             left,
             right,
@@ -61,7 +63,7 @@ pub fn output_schema(plan: &LogicalPlan) -> Vec<String> {
 pub fn output_width(plan: &LogicalPlan) -> usize {
     match plan {
         LogicalPlan::Values { columns, .. } => columns.len(),
-        LogicalPlan::Scan { columns, .. } => columns.len(),
+        LogicalPlan::Scan { columns, .. } | LogicalPlan::IndexScan { columns, .. } => columns.len(),
         LogicalPlan::Join {
             left_width, right, ..
         } => left_width + output_width(right),
@@ -88,6 +90,14 @@ pub enum LogicalPlan {
     Scan {
         table: String,
         columns: Vec<String>,
+    },
+    /// A scan answered by an index (`IndexScanBuilder`): the reference's
+    /// `LogicalIndexScan`. It owns the filter evaluator, and the residual
+    /// predicate (if any) sits in a `Filter` above it.
+    IndexScan {
+        table: String,
+        columns: Vec<String>,
+        candidate: std::sync::Arc<crate::index_scan::IndexScanCandidate>,
     },
     /// Cross product of two inputs, kept only where `left_key == right_key`.
     Join {
@@ -1138,6 +1148,9 @@ pub(crate) fn plan_select_bound(
             n,
         };
     }
+    // The reference's binder stacks `ORDER BY`/`LIMIT` below the final
+    // projection; this one builds them above, so re-stack before pruning.
+    let plan = crate::optimize::normalize(plan);
     // C++ runs `ColumnPruner` over the bound plan before execution: every
     // operator keeps only the columns some expression above it reads, and the
     // binding remap rewrites the surviving references. The root operator's

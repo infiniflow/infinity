@@ -66,6 +66,42 @@ impl ResultCache for CacheMap {
     }
 }
 
+/// A [`CacheMap`] behind a lock: the engine's `ResultCacheManager`, shared by
+/// the optimizer (which reads it) and the scan (which fills it).
+#[derive(Debug, Default)]
+pub struct SharedCache {
+    map: std::sync::Mutex<CacheMap>,
+}
+
+impl SharedCache {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn put(&self, key: CacheKey, content: CacheContent) {
+        self.map.lock().unwrap().insert(key, content);
+    }
+
+    /// Empties the cache (the reference frees the manager on every write).
+    pub fn clear(&self) {
+        self.map.lock().unwrap().clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.lock().unwrap().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl ResultCache for SharedCache {
+    fn get(&self, key: &CacheKey) -> Option<CacheContent> {
+        self.map.lock().unwrap().get(key)
+    }
+}
+
 fn node_key(plan: &LogicalPlan) -> String {
     match plan {
         LogicalPlan::Values { columns, rows } => {
@@ -73,7 +109,9 @@ fn node_key(plan: &LogicalPlan) -> String {
             // with the same schema still produce different results.
             format!("values[{}]{rows:?}", columns.join(","))
         }
-        LogicalPlan::Scan { table, columns } => format!("scan:{table}[{}]", columns.join(",")),
+        LogicalPlan::Scan { table, columns } | LogicalPlan::IndexScan { table, columns, .. } => {
+            format!("scan:{table}[{}]", columns.join(","))
+        }
         LogicalPlan::Join {
             left,
             right,
@@ -177,7 +215,9 @@ impl ResultCacheGetter {
 
 fn rewrite_children(plan: LogicalPlan, cache: &dyn ResultCache, begin_ts: u64) -> LogicalPlan {
     match plan {
-        LogicalPlan::Scan { .. } | LogicalPlan::Values { .. } => plan,
+        LogicalPlan::Scan { .. } | LogicalPlan::IndexScan { .. } | LogicalPlan::Values { .. } => {
+            plan
+        }
         LogicalPlan::Filter { input, predicate } => LogicalPlan::Filter {
             input: Box::new(ResultCacheGetter::rewrite(*input, cache, begin_ts)),
             predicate,

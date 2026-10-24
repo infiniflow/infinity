@@ -125,6 +125,8 @@ pub fn data_type_of_text(type_text: &str) -> Option<Json> {
 /// [`data_type_of_text`] with an explicit sparse storage hint.
 pub fn data_type_of_text_with_store(type_text: &str, store: Option<SparseStore>) -> Option<Json> {
     let up = type_text.trim().to_ascii_uppercase();
+    let up = expand_declaration(&up);
+    let up = up.as_str();
     let base = up.split('(').next().unwrap_or("").trim();
     let plain = |lt: i64| Some(data_type_json(lt, None));
     match base {
@@ -228,6 +230,26 @@ fn index_element_code(name: &str) -> Option<i64> {
         "INT64" | "BIGINT" => value_format::element::INT64,
         _ => return None,
     })
+}
+
+/// Rewrites the SDK's comma declaration into the parenthesised form the
+/// branches below parse: `VECTOR,4,FLOAT` → `VECTOR(FLOAT,4)`,
+/// `SPARSE,8,FLOAT,INT` → `SPARSE(FLOAT,INT,8)`.
+fn expand_declaration(up: &str) -> String {
+    if up.contains('(') || !up.contains(',') {
+        return up.to_string();
+    }
+    let parts: Vec<&str> = up.split(',').map(str::trim).collect();
+    match (parts[0], parts.len()) {
+        ("VECTOR" | "EMBEDDING" | "TENSOR" | "TENSORARRAY" | "MULTIVECTOR", 3..) => {
+            // `base,<dim>,<elem>`
+            format!("{}({},{})", parts[0], parts[2], parts[1])
+        }
+        ("SPARSE", 4..) => format!("SPARSE({},{},{})", parts[2], parts[3], parts[1]),
+        ("DECIMAL", 3..) => format!("DECIMAL({},{})", parts[1], parts[2]),
+        ("ARRAY", 2..) => format!("ARRAY({})", parts[1]),
+        _ => up.to_string(),
+    }
 }
 
 /// Element type name -> `EmbeddingDataType` ordinal.

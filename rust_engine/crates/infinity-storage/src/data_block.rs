@@ -656,6 +656,7 @@ impl Column {
             LogicalType::Interval => Column::Interval(ColumnVector::new()),
             LogicalType::Uuid => Column::Uuid(ColumnVector::new()),
             LogicalType::Array => Column::Array(ColumnVector::new()),
+            LogicalType::Embedding(_) => Column::Embedding(ColumnVector::new()),
             LogicalType::Mixed => Column::Mixed(ColumnVector::new()),
             LogicalType::Json => Column::Json(ColumnVector::new()),
             LogicalType::RowID => Column::RowId(ColumnVector::new()),

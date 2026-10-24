@@ -39,6 +39,12 @@ pub enum Error {
     #[error("invalid argument: {0}")]
     Invalid(String),
 
+    /// C++ `Status::SyntaxError` (3013). The status keeps the bare message, so
+    /// `Display` does too — a client that compares the text (the reference
+    /// appends its own `@file:line`) sees only what the parser/binder wrote.
+    #[error("{0}")]
+    Syntax(String),
+
     /// The reference's `Status::InvalidNodeRole` (8007): the operation needs a
     /// node role the storage is not in (e.g. a write on a non-writable node).
     /// `Status::InvalidNodeRole` keeps the bare message, so `Display` does too;
@@ -83,6 +89,9 @@ impl Error {
             Error::Invalid(m) if m.starts_with("fulltext index does not exist") => 3053,
             // 3049 NOT_SUPPORTED_TYPE_CONVERSION.
             Error::Invalid(m) if m.starts_with("not supported type conversion") => 3049,
+            // 3032 NOT_SUPPORTED: a column type the reference's
+            // `VerifyColumnDataType` refuses at DDL time.
+            Error::Invalid(m) if m.starts_with("Not supported data type") => 3032,
             // 3010 DATA_TYPE_MISMATCH / INVALID_KNN_DISTANCE_TYPE.
             Error::Invalid(m)
                 if m.starts_with("invalid distance type")
@@ -150,6 +159,8 @@ impl Error {
                 3076
             }
             Error::Invalid(_) => 3014,
+            // 3013 SYNTAX_ERROR.
+            Error::Syntax(_) => 3013,
             // 3016 DUPLICATE_DATABASE_NAME.
             Error::Catalog(m) if m.starts_with("database") && m.ends_with("already exists") => 3016,
             // 3021 DB_NOT_EXIST for the catalog's own "database ... does not

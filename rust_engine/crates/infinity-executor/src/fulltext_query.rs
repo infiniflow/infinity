@@ -21,7 +21,7 @@
 
 use std::collections::HashMap;
 
-use crate::analyzer::{Analyzer, AnalyzerPool};
+use crate::analyzer::{Analyzer, AnalyzerPool, WhitespaceAnalyzer};
 use crate::query_builder::{
     DocIterator, PhraseDocIterator, PhraseQueryNode, QueryNode, TermDocIterator, TermLookup,
     TermQueryNode,
@@ -211,12 +211,19 @@ impl SearchDriver {
         analyzer_name: &str,
         text: &str,
     ) -> Result<Vec<(String, u32)>, QueryParseError> {
-        match analyzer_name.split('-').next().unwrap_or("") {
-            "keyword" => Ok(vec![(text.to_string(), 0)]),
-            "whitespace" => Ok(text
-                .split_whitespace()
-                .enumerate()
-                .map(|(position, token)| (token.to_string(), position as u32))
+        let suffix = analyzer_name.split_once('-').map(|(_, suffix)| suffix);
+        match analyzer_name
+            .split_once('-')
+            .map_or(analyzer_name, |(f, _)| f)
+        {
+            // A bare `keyword` field keeps the whole value as one term; the
+            // `keyword-<delims>` form is a `WhitespaceAnalyzer` exactly like
+            // `whitespace-<delims>` (C++ compares the name against "keyword").
+            "keyword" if suffix.is_none() => Ok(vec![(text.to_string(), 0)]),
+            "keyword" | "whitespace" => Ok(WhitespaceAnalyzer::new(suffix.unwrap_or(""))
+                .analyze(text)
+                .into_iter()
+                .map(|term| (term.text, term.word_offset))
                 .collect()),
             "chinese" => {
                 // The reference's `chinese` analyzer is jieba-based; the Rust

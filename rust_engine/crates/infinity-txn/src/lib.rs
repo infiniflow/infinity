@@ -27,7 +27,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use infinity_common::{Error, Result, TxnTimeStamp};
-use infinity_storage::data_block::{BlockValue, Column, ColumnVector, DataBlock};
+use infinity_storage::data_block::{BlockValue, DataBlock};
 use infinity_storage::{
     KvBatchKind, MetaStore, WalCmd, WalEntry, WalEntryIterator, WalManager, WalRowId,
 };
@@ -47,6 +47,19 @@ pub struct TxnInfo {
     pub begin_ts: TxnTimeStamp,
 }
 
+thread_local! {
+    /// The id the current statement already took.
+    ///
+    /// `NewTxnManager::BeginTxnShared` runs once per statement — a `SELECT`,
+    /// `USE` or `SHOW` spends an id without writing a WAL record. The statement
+    /// entry point (`Engine::execute`, or a read-only RPC handler) calls
+    /// [`TxnManager::begin_statement`], which takes the id; a write path that
+    /// then calls [`TxnManager::begin`] reuses it instead of taking a second.
+    /// A statement that begins several writes (a `CREATE DATABASE` that
+    /// bootstraps `default_db` first) calls `begin_statement` again per write.
+    static PENDING_TXN_ID: std::cell::RefCell<Option<u64>> = const { std::cell::RefCell::new(None) };
+}
+
 /// Keys a transaction read, for the conflict check (`NewTxn`'s read set).
 #[derive(Default)]
 struct ReadSet {
@@ -64,6 +77,10 @@ pub struct Txn {
     /// Tombstones this transaction writes. They are validated against newer
     /// commits at commit time (`NewTxn::CommitTxn` conflict check).
     deletes: Vec<Vec<u8>>,
+    /// Typed WAL commands a DDL prepared for this transaction (e.g.
+    /// `WalCmdCreateTableV2`). When non-empty, commit emits these instead of a
+    /// `KvBatch` for the catalog records, so the WAL matches the reference.
+    typed_commands: Vec<WalCmd>,
     reads: ReadSet,
     /// The manager's active-transaction registry (C++ `txn_map_`). Dropping a
     /// transaction that was neither committed nor rolled back releases its
@@ -85,6 +102,12 @@ impl Txn {
     /// this one's lifetime invalidates the commit (C++ `NewTxn::GetStore`).
     pub fn read(&mut self, key: impl Into<Vec<u8>>) {
         self.reads.keys.push(key.into());
+    }
+    /// Sets the typed WAL commands to emit instead of a `KvBatch` for this
+    /// transaction's catalog records. The reference emits typed DDL commands
+    /// (`WalCmdCreateTableV2`, …); this channel lets a DDL supply them.
+    pub fn set_typed_commands(&mut self, cmds: Vec<WalCmd>) {
+        self.typed_commands = cmds;
     }
     /// Records a read of every key under `prefix` (C++ `NewTxn` range read).
     pub fn read_prefix(&mut self, prefix: impl Into<Vec<u8>>) {
@@ -124,12 +147,15 @@ pub struct TxnManager {
     /// resolves a table by id needs them, so an empty string is a real loss.
     table_ids: Mutex<HashMap<String, (String, String)>>,
     wal_path: PathBuf,
-    /// `wal/wal.log`: the file the **reference** reads. It holds exactly one
-    /// entry, the `kNewCheckpoint` command a checkpoint writes, because the
-    /// reference replays every record in that file and rejects one it cannot
-    /// decode. This engine's own redo records live in `wal.rust` instead (they
-    /// are applied at the checkpoint, so the reference has nothing to replay).
+    /// `wal/wal.log`: the **active** log the reference reads. It carries the
+    /// transaction records and, after a checkpoint, the `kNewCheckpoint` frame
+    /// the checkpoint wrote into the fresh file (the swap keeps the previous
+    /// records in `wal.log.<seal_ts>`). Same file as [`Self::wal_path`]; kept
+    /// apart for the two call sites' intent.
     checkpoint_path: PathBuf,
+    /// `WalManager::last_swap_wal_ts_`: the seal timestamp of the last swap, so
+    /// a checkpoint with nothing new does not rotate an empty log.
+    last_swap: AtomicU64,
     next_txn_id: AtomicU64,
     /// `NewTxnManager::current_ts_`: the timestamp of the last **completed**
     /// commit. A new transaction's `begin_ts` is `current_ts + 1`, so it sees
@@ -178,12 +204,13 @@ impl TxnManager {
     /// transaction's `begin_ts` is the WAL/KV high-water mark, so an older
     /// commit can never be "newer than begin_ts".
     pub fn open(wal_path: impl Into<PathBuf>, store: Arc<dyn MetaStore>) -> Result<Self> {
-        let checkpoint_path = wal_path.into();
-        // This engine's redo records go to `wal.rust` (plus `wal.rust.{ts}`
-        // segments); `wal.log` is reserved for the reference-framed checkpoint
-        // entry, so the reference never has to decode a record this engine
-        // wrote. Sealing still accepts `wal.log.{ts}` for older directories.
-        let wal_path = checkpoint_path.with_file_name("wal.rust");
+        // One file holds both the checkpoint frame and the transaction records,
+        // as the reference's `wal.log` does: `WalManager` swaps it to
+        // `wal.log.<seal_ts>` at a checkpoint and opens a fresh `wal.log`. A
+        // directory written by an older build of this engine also keeps its
+        // records in `wal.rust`; `segment_paths` still reads that.
+        let wal_path = wal_path.into();
+        let checkpoint_path = wal_path.clone();
         let recs = read_all_segments(&wal_path)?;
         let applied_ts = store
             .get(APPLIED_TS_KEY)?
@@ -212,13 +239,14 @@ impl TxnManager {
         // alone). The reservation is permanent: the startup checkpoint takes
         // `current + 4` and every later commit is offset by the same two.
         let start_ts = max_ts.max(applied_ts);
-        Ok(Self {
+        let manager = Self {
             catalog_store: store.clone(),
             store,
             table_ids: Mutex::new(HashMap::new()),
             wal: Mutex::new(wal),
             wal_path,
             checkpoint_path,
+            last_swap: AtomicU64::new(0),
             next_txn_id: AtomicU64::new(max_id + 1),
             // A checkpoint may have truncated the WAL, so the applied marker in
             // the KV store is the other source of the timestamp high-water mark.
@@ -234,7 +262,13 @@ impl TxnManager {
             write_ts: Mutex::new(write_ts),
             active: Arc::new(Mutex::new(HashMap::new())),
             commit_lock: Mutex::new(()),
-        })
+        };
+        // `Storage::Init` -> `RecoverMemIndex` -> `BeginRecoveryTxn`: the
+        // reference begins one transaction before its startup checkpoint, so it
+        // spends an id there on every open (id 1 on a fresh directory).
+        manager.begin_statement();
+        manager.end_statement();
+        Ok(manager)
     }
 
     /// Points the transaction manager at the store a directory keeps its
@@ -249,10 +283,55 @@ impl TxnManager {
         self.begin_with_text("")
     }
 
+    /// Takes the id the reference's `BeginTxnShared` takes for one statement.
+    ///
+    /// The next write on this thread reuses it; a read-only statement simply
+    /// leaves it unused, which is exactly what the reference does (its txn map
+    /// holds the read-only transaction until it is rolled back).
+    pub fn begin_statement(&self) -> u64 {
+        let id = self.next_txn_id.fetch_add(1, Ordering::SeqCst);
+        PENDING_TXN_ID.with(|pending| *pending.borrow_mut() = Some(id));
+        id
+    }
+
+    /// The current statement's id, taken if the caller has not taken one yet.
+    ///
+    /// An RPC that runs several statements (a `CREATE DATABASE` that then
+    /// `USE`s it) takes one id per statement, as `BeginTxnShared` does.
+    pub fn ensure_statement_id(&self) -> u64 {
+        PENDING_TXN_ID.with(|pending| {
+            let mut slot = pending.borrow_mut();
+            match *slot {
+                Some(id) => id,
+                None => {
+                    let id = self.next_txn_id.fetch_add(1, Ordering::SeqCst);
+                    *slot = Some(id);
+                    id
+                }
+            }
+        })
+    }
+
+    /// Ends the statement scope opened by [`Self::begin_statement`].
+    pub fn end_statement(&self) {
+        PENDING_TXN_ID.with(|pending| *pending.borrow_mut() = None);
+    }
+
+    /// The id the next statement will take (without taking it).
+    pub fn next_txn_id(&self) -> u64 {
+        self.next_txn_id.load(Ordering::Relaxed)
+    }
+
     /// C++: `NewTxnManager::BeginTxnShared` — registers the transaction in
     /// `txn_map_` so `SHOW TRANSACTIONS` and `active_txn_count` see it.
     pub fn begin_with_text(&self, txn_text: impl Into<String>) -> Txn {
-        let id = self.next_txn_id.fetch_add(1, Ordering::SeqCst);
+        // `NewTxnManager::BeginTxnShared` is called once per **statement**, so a
+        // read-only statement still spends an id (`SELECT`, `USE`, `SHOW …`).
+        // The statement's id is taken by `begin_statement` when one is pending;
+        // otherwise this call is its own statement.
+        let id = PENDING_TXN_ID
+            .with(|pending| pending.borrow_mut().take())
+            .unwrap_or_else(|| self.next_txn_id.fetch_add(1, Ordering::SeqCst));
         // `NewTxnManager::BeginTxnShared`: `begin_ts = current_ts_ + 1`. It is
         // one past the last completed commit, so it is *below* this
         // transaction's own commit timestamp (which is `current_ts_ + 2`) and
@@ -270,6 +349,7 @@ impl TxnManager {
             txn_text: info.txn_text,
             writes: Vec::new(),
             deletes: Vec::new(),
+            typed_commands: Vec::new(),
             reads: ReadSet::default(),
             active: self.active.clone(),
         }
@@ -390,7 +470,12 @@ impl TxnManager {
         let entry = WalEntry::new(
             txn.id as i64,
             commit_ts,
-            build_commands(&txn.writes, &txn.deletes, &self.table_ids.lock().unwrap()),
+            build_commands(
+                &txn.writes,
+                &txn.deletes,
+                &self.table_ids.lock().unwrap(),
+                &txn.typed_commands,
+            ),
         );
         {
             let mut wal = self.wal.lock().unwrap();
@@ -616,26 +701,39 @@ impl TxnManager {
         self.write_checkpoint_frame(max_commit_ts, max_commit_ts + 1)
     }
 
-    /// Writes the `wal.log` checkpoint frame (`commit_ts` = the frame's own
-    /// stamp, `max_commit_ts` = the newest transaction it covers) and fsyncs it.
+    /// Writes a `kNewCheckpoint` frame without rotating the log.
+    ///
+    /// Used by the dump-index path, which only needs the frame's ts to cover the
+    /// chunks it sealed. Appending (rather than creating the file) keeps the
+    /// records after the last real checkpoint intact.
     fn write_checkpoint_frame(
         &self,
         commit_ts: TxnTimeStamp,
         max_commit_ts: TxnTimeStamp,
     ) -> Result<()> {
         let entry = WalEntry::new(-1, commit_ts, vec![WalCmd::Checkpoint { max_commit_ts }]);
-        let mut buf = Vec::with_capacity(entry.size_in_bytes());
-        entry.write_adv(&mut buf);
-        if let Some(parent) = self.checkpoint_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+        let mut wal = self.wal.lock().unwrap();
+        wal.append(&entry)?;
+        wal.flush()
+    }
+
+    /// C++ `WalManager::SwapWalFile` (`wal_manager_impl.cpp:504`): seal the
+    /// active `wal.log` as `wal.log.<seal_ts>` and start an empty one.
+    ///
+    /// The reference swaps **before** writing the checkpoint frame, so the
+    /// frame is the first entry of the fresh log and everything the checkpoint
+    /// covers stays replayable in the sealed file. A log that holds nothing is
+    /// not rotated (the reference's `Exists` check leaves a fresh directory
+    /// without a sealed file).
+    fn swap_wal_file(&self, max_commit_ts: TxnTimeStamp) -> Result<()> {
+        let mut wal = self.wal.lock().unwrap();
+        if max_commit_ts <= self.last_swap.load(Ordering::SeqCst) {
+            return Ok(());
         }
-        use std::io::Write;
-        let mut file = std::fs::File::create(&self.checkpoint_path)
-            .map_err(|e| Error::io(&self.checkpoint_path, e))?;
-        file.write_all(&buf)
-            .map_err(|e| Error::io(&self.checkpoint_path, e))?;
-        file.sync_all()
-            .map_err(|e| Error::io(&self.checkpoint_path, e))?;
+        if wal.file_size()? > 0 {
+            wal.rotate(max_commit_ts)?;
+        }
+        self.last_swap.store(max_commit_ts, Ordering::SeqCst);
         Ok(())
     }
 
@@ -674,33 +772,27 @@ impl TxnManager {
         // ts is the even value one above it.
         let begin_ts = self.current_ts.load(Ordering::SeqCst) + 1;
         let commit_ts = self.prepare_commit_ts.fetch_add(2, Ordering::SeqCst) + 2;
+        // The reference swaps the file first (`kNewCheckpoint` commit path,
+        // `wal_manager_impl.cpp:288`), then writes the frame into the new
+        // `wal.log`; the records it covers stay in `wal.log.<seal_ts>`.
+        self.swap_wal_file(self.last_appended.load(Ordering::SeqCst))?;
         let entry = WalEntry::new(
-            -1,
+            // A checkpoint is an ordinary transaction in the reference
+            // (`BeginTxnShared` with `kNewCheckpoint`), so its frame carries a
+            // real id.
+            self.next_txn_id.fetch_add(1, Ordering::SeqCst) as i64,
             commit_ts,
             vec![WalCmd::Checkpoint {
                 max_commit_ts: begin_ts,
             }],
         );
-        let mut buf = Vec::with_capacity(entry.size_in_bytes());
-        entry.write_adv(&mut buf);
-        // `wal.log` is the reference's file: one checkpoint entry, nothing this
-        // engine would have to be understood for.
-        // The directory may not exist yet: tests open a bare path, and the
-        // first checkpoint is what creates the file.
-        if let Some(parent) = self.checkpoint_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
-        }
-        // Written and fsynced: this file is the only thing that tells the
-        // reference which checkpoint the directory holds, and it refuses to
-        // open a directory whose checkpoint entry a power loss took away.
         {
-            use std::io::Write;
-            let mut file = std::fs::File::create(&self.checkpoint_path)
-                .map_err(|e| Error::io(&self.checkpoint_path, e))?;
-            file.write_all(&buf)
-                .map_err(|e| Error::io(&self.checkpoint_path, e))?;
-            file.sync_all()
-                .map_err(|e| Error::io(&self.checkpoint_path, e))?;
+            let mut wal = self.wal.lock().unwrap();
+            wal.append(&entry)?;
+            // Written and fsynced: this file is the only thing that tells the
+            // reference which checkpoint the directory holds, and it refuses to
+            // open a directory whose checkpoint entry a power loss took away.
+            wal.flush()?;
         }
         // The checkpoint transaction is committed: its commit ts is the clock's
         // new position, exactly as `CommitBottom` leaves `current_ts_`.
@@ -708,24 +800,32 @@ impl TxnManager {
         Ok(())
     }
 
-    /// Drops the WAL prefix that the KV store already holds. The caller must
-    /// pass a timestamp whose records have been fsynced (`flush()` first), so a
-    /// crash can never lose a record that this call discards. `meta:applied_ts`
-    /// keeps recovery correct; this only bounds the log's size, as the
-    /// reference does at a checkpoint.
-    pub fn truncate_wal_up_to(&self, applied: TxnTimeStamp) -> Result<bool> {
+    /// Rotates a full active log so a single file cannot grow without bound.
+    ///
+    /// The reference rotates when the WAL passes its size threshold and keeps
+    /// every sealed segment until `Cleanup`; so does this engine (see
+    /// [`Self::drop_sealed_wal_up_to`]).
+    pub fn rotate_wal_if_large(&self) -> Result<()> {
+        const SEGMENT_BYTES: u64 = 64 * 1024 * 1024;
+        let mut wal = self.wal.lock().unwrap();
+        if wal.file_size()? >= SEGMENT_BYTES {
+            let seal = self.last_appended.load(Ordering::SeqCst);
+            wal.rotate(seal)?;
+            self.last_swap.store(seal, Ordering::SeqCst);
+        }
+        Ok(())
+    }
+
+    /// Drops the sealed segments whose records the KV store already holds.
+    ///
+    /// C++ `WalManager::Cleanup` (`wal_manager_impl.cpp`): a checkpoint keeps
+    /// its sealed file — the reference deletes `wal.log.<ts>` only at a
+    /// cleanup — so the deletion lives here rather than in the checkpoint path.
+    /// The caller must pass a timestamp whose records have been fsynced.
+    pub fn drop_sealed_wal_up_to(&self, applied: TxnTimeStamp) -> Result<bool> {
         let applied = applied.min(self.synced.load(Ordering::SeqCst));
         if applied == 0 {
             return Ok(false);
-        }
-        let mut wal = self.wal.lock().unwrap();
-        // Rotate a full active log (O(1)), then drop every sealed segment whose
-        // records are all applied. This keeps the log's footprint bounded
-        // without ever copying the remaining tail.
-        const SEGMENT_BYTES: u64 = 64 * 1024 * 1024;
-        if wal.file_size()? >= SEGMENT_BYTES {
-            let seal = self.last_appended.load(Ordering::SeqCst).max(applied);
-            wal.rotate(seal)?;
         }
         let mut dropped = false;
         for (path, seal_ts) in sealed_segments(&self.wal_path)? {
@@ -855,6 +955,7 @@ fn build_commands(
     writes: &[(Vec<u8>, Vec<u8>)],
     deletes: &[Vec<u8>],
     table_ids: &HashMap<String, (String, String)>,
+    typed: &[WalCmd],
 ) -> Vec<WalCmd> {
     struct AppendGroup {
         table: String,
@@ -864,8 +965,22 @@ fn build_commands(
     let mut groups: Vec<AppendGroup> = Vec::new();
     let mut kv: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     let mut kv_kind = KvBatchKind::Other;
+    let mut del_groups: Vec<(String, Vec<u64>)> = Vec::new();
 
     for (key, value) in writes {
+        // A tombstone **written** as `del:{table}:{seq} = "1"` (compaction
+        // renumbers rows and leaves one per moved row) says the same thing a
+        // `DeleteV2` does; the KV still receives the write, the WAL carries the
+        // reference command instead of a `KvBatch` the reference cannot read.
+        if value == b"1" {
+            if let Some((table, seq)) = parse_row_key(key, DEL_PREFIX) {
+                match del_groups.last_mut() {
+                    Some((name, ids)) if name == table => ids.push(seq),
+                    _ => del_groups.push((table.to_string(), vec![seq])),
+                }
+                continue;
+            }
+        }
         match (parse_row_key(key, ROW_PREFIX), std::str::from_utf8(value)) {
             (Some((table, seq)), Ok(text)) => match groups.last_mut() {
                 Some(group) if group.table == table => group.rows.push((seq, text.to_string())),
@@ -886,7 +1001,6 @@ fn build_commands(
         .map(|group| build_append(&group.table, &group.rows, table_ids))
         .collect();
 
-    let mut del_groups: Vec<(String, Vec<u64>)> = Vec::new();
     // Non-row deletes are catalog records that must disappear from the KV (the
     // layout sweep drops a dropped table's keys, the counters and
     // `meta|version`). They travel as their own `KvBatch` so replay removes the
@@ -916,6 +1030,14 @@ fn build_commands(
         });
     }
 
+    // A DDL that prepared typed commands emits them instead of the catalog
+    // `KvBatch`, matching the reference's `WalCmdCreateTableV2`/… .
+    if !typed.is_empty() {
+        // The caller supplied the typed commands for this transaction (a DDL's
+        // `WalCmdCreateTableV2`, an INSERT's reference `WalCmdAppendV2`); they
+        // replace the auto-derived ones rather than joining them.
+        return typed.to_vec();
+    }
     if !kv.is_empty() {
         cmds.push(WalCmd::KvBatch {
             kind: kv_kind,
@@ -948,13 +1070,17 @@ fn build_append(
     rows: &[(u64, String)],
     table_ids: &HashMap<String, (String, String)>,
 ) -> WalCmd {
-    let mut block = DataBlock::new(vec![Column::Str(ColumnVector::new())], rows.len());
-    for (_, text) in rows {
-        block
-            .append_value(0, BlockValue::Str(text.clone()))
-            .expect("block capacity matches the row count");
-    }
-    block.finalize();
+    let texts: Vec<&str> = rows.iter().map(|(_, text)| text.as_str()).collect();
+    let values = infinity_storage::wal::block::ColumnValues::varchars(
+        &texts.iter().map(|t| Some(*t)).collect::<Vec<_>>(),
+    );
+    let block = vec![infinity_storage::wal::block::BlockColumn::new(
+        infinity_storage::wal::ddl_def::DataType {
+            logical_type: infinity_storage::wal::ddl_def::LogicalType::Varchar,
+            type_info: infinity_storage::wal::ddl_def::TypeInfo::None,
+        },
+        values,
+    )];
     // Contiguous row ids are one range, as the reference writes them.
     let mut row_ranges: Vec<(WalRowId, u64)> = Vec::new();
     for (seq, _) in rows {
@@ -983,8 +1109,12 @@ fn append_writes(
     db_name: &str,
     table_name: &str,
     row_ranges: &[(WalRowId, u64)],
-    block: &DataBlock,
+    block: &[infinity_storage::wal::block::BlockColumn],
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    let block = infinity_storage::wal::block::to_data_block(block).ok_or_else(|| {
+        Error::Wal("append command carries a block this build cannot replay".into())
+    })?;
+    let block = &block;
     let table = join_table(db_name, table_name);
     let mut out = Vec::new();
     let mut row = 0usize;
@@ -1156,21 +1286,23 @@ fn sealed_segments(wal_path: &std::path::Path) -> Result<Vec<(PathBuf, TxnTimeSt
     Ok(out)
 }
 
-/// Every WAL file in replay order: the sealed segments (oldest first), the
-/// reference's active `wal.log`, then this engine's active `wal.rust`.
+/// Every WAL file in replay order: the sealed segments (oldest first), then the
+/// active log.
 ///
-/// A directory written by the reference has `wal.log`/`wal.log.{ts}` and no
-/// `wal.rust`; one written by this engine has the mirror image (plus a
-/// `wal.log` that only carries a checkpoint entry). Reading both means a
-/// directory either engine crashed on replays the records it did not flush.
+/// The reference names its files `wal.log` / `wal.log.{ts}`; this engine writes
+/// the same names. A directory written by an older build of this engine keeps
+/// its records in `wal.rust` (with a checkpoint-only `wal.log`), so both are
+/// read — a crash on either side then replays what it did not flush.
 fn segment_paths(wal_path: &std::path::Path) -> Result<Vec<PathBuf>> {
     let mut out: Vec<PathBuf> = sealed_segments(wal_path)?
         .into_iter()
         .map(|(path, _)| path)
         .collect();
-    let reference_log = wal_path.with_file_name("wal.log");
-    if reference_log.exists() {
-        out.push(reference_log);
+    // `wal.rust` is the older layout's entry file; the active `wal.log` is
+    // pushed below and must not be listed twice.
+    let legacy = wal_path.with_file_name("wal.rust");
+    if legacy != wal_path && legacy.exists() {
+        out.push(legacy);
     }
     out.push(wal_path.to_path_buf());
     Ok(out)

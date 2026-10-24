@@ -4,6 +4,8 @@
 
 - 总数：**1136**
 - 状态分布：`excluded` 15, `exempt` 20, `mapped` 1090, `partial` 4, `test` 7
+- 状态含义：`mapped` = Rust 有同职责的类型/函数（"承担方式"列给出落点）；`partial` = 类型存在但生产路径只走到一部分（原因写在列里）；`test` = C++ 测试夹具；`exempt` = 设计变更豁免的原语（`fst`/SIMD/压缩等）；`excluded` = 不移植（DiskANN/geo）。
+- 类级的 `partial` 汇总见 [`GAPS.md`](GAPS.md) §2；格式层面的缺口在 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §5。
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -479,29 +481,29 @@
 | 470 | `LogicalUpdate` | `src/planner/node/logical_update.cppm` | mapped | infinity_planner 
 | 471 | `LogicalViewScan` | `src/planner/node/logical_view_scan.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 472 | `Optimizer` | `src/planner/optimizer.cppm` | mapped | infinity_planner 
-| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
+| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
 | 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | partial | `ResultCacheGetterRule` 仅在 `Optimizer::with_result_cache` 注册并有单测；默认管线未启用（执行器使用语句级缓存），不计入生产接线 
-| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；`530b11691` 修复 residual 挂载位置，Gate A 回到 1546/1546 
-| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行，随后显式报 “correlated subqueries are not supported”）；正常查询不可达，属 error-path/test-only 
-| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行，随后显式报 “correlated subqueries are not supported”）；正常查询不可达，属 error-path/test-only 
-| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行，随后显式报 “correlated subqueries are not supported”）；正常查询不可达，属 error-path/test-only 
+| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
+| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行；执行器对 WHERE 里的相关合取项按外层行求值，其余位置报 “correlated subqueries are only supported as a WHERE conjunct”） 
+| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行；执行器对 WHERE 里的相关合取项按外层行求值，其余位置报 “correlated subqueries are only supported as a WHERE conjunct”） 
+| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行；执行器对 WHERE 里的相关合取项按外层行求值，其余位置报 “correlated subqueries are only supported as a WHERE conjunct”） 
 | 496 | `FragmentContext` | `src/scheduler/fragment_context.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
 | 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 

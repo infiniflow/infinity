@@ -1,6 +1,14 @@
-//! End-to-end checks for the S3 client against a local MinIO. Run with
-//! `INFINITY_MINIO_TEST=1 cargo test --test s3_minio`; without the variable the
-//! tests are no-ops so the default suite stays hermetic.
+//! End-to-end checks for the S3 client against a local S3 endpoint (MinIO or
+//! its maintained fork Silo). Run with `INFINITY_MINIO_TEST=1 cargo test
+//! --test s3_minio`; without the variable the tests are no-ops so the default
+//! suite stays hermetic.
+//!
+//! The client mirrors a **path tree** (`data/`, `catalog/`, `persistence/`)
+//! into the bucket as individual objects. The C++ reference instead uploads a
+//! packed object under a bare `obj_key` via `VirtualStore::UploadObject`;
+//! aligning that transport is **not ported** (see
+//! `docs/FORMAT_EQUIVALENCE_TESTS.md` §6.5). These tests only cover the
+//! port's own bucket round trip.
 
 use infinity_storage::s3::{restore_tree, sync_tree, S3Client, S3Config};
 

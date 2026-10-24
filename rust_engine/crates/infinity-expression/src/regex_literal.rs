@@ -524,26 +524,62 @@ pub fn has_any_sparse_gram(text: &str, min_n: u32, max_n: u32) -> bool {
 }
 
 /// Parse `sparsegram[-<min>[-<max>]][-fold]`.
+///
+/// C++: `ParseSparseGramAnalyzerName` (`common/utility/sparse_gram.h`). Every
+/// byte after the family must belong to a `-`-introduced segment; a segment is
+/// either `fold` or a decimal number no larger than 1024, at most two numbers
+/// are accepted, and the resulting window must satisfy `min != 0` and
+/// `max >= min` (defaults 3/12). An empty segment is a syntax error, the name
+/// is matched case sensitively, and a third number is rejected.
 pub fn parse_sparsegram_analyzer(name: &str) -> Option<(u32, u32, bool)> {
-    let name = name.trim().to_ascii_lowercase();
+    const MAX_N: u32 = 1024;
     let rest = name.strip_prefix("sparsegram")?;
-    let mut min_n = SPARSE_GRAM_DEFAULT_MIN;
-    let mut max_n = SPARSE_GRAM_DEFAULT_MAX;
+    let mut numbers = [0u32; 2];
+    let mut number_count = 0usize;
     let mut fold = false;
-    let mut numbers = 0usize;
-    for part in rest.split('-').filter(|p| !p.is_empty()) {
-        if part == "fold" {
-            fold = true;
-        } else if let Ok(value) = part.parse::<u32>() {
-            match numbers {
-                0 => min_n = value,
-                1 => max_n = value,
-                _ => return None,
+    let mut rest = rest;
+    while !rest.is_empty() {
+        rest = rest.strip_prefix('-')?;
+        let segment = match rest.find('-') {
+            Some(dash) => {
+                let segment = &rest[..dash];
+                rest = &rest[dash..];
+                segment
             }
-            numbers += 1;
-        } else {
+            None => std::mem::take(&mut rest),
+        };
+        if segment == "fold" {
+            fold = true;
+            continue;
+        }
+        if segment.is_empty() || number_count >= 2 {
             return None;
         }
+        let mut value = 0u32;
+        for byte in segment.bytes() {
+            if !byte.is_ascii_digit() {
+                return None;
+            }
+            value = value * 10 + u32::from(byte - b'0');
+            if value > MAX_N {
+                return None;
+            }
+        }
+        numbers[number_count] = value;
+        number_count += 1;
+    }
+    let min_n = if number_count >= 1 {
+        numbers[0]
+    } else {
+        SPARSE_GRAM_DEFAULT_MIN
+    };
+    let max_n = if number_count >= 2 {
+        numbers[1]
+    } else {
+        SPARSE_GRAM_DEFAULT_MAX
+    };
+    if min_n == 0 || max_n < min_n {
+        return None;
     }
     Some((min_n, max_n, fold))
 }
@@ -594,7 +630,44 @@ mod tests {
             parse_sparsegram_analyzer("sparsegram"),
             Some((3, 12, false))
         );
+        // `fold` is a segment of its own and may appear anywhere.
+        assert_eq!(
+            parse_sparsegram_analyzer("sparsegram-fold"),
+            Some((3, 12, true))
+        );
+        assert_eq!(
+            parse_sparsegram_analyzer("sparsegram-fold-5-8"),
+            Some((5, 8, true))
+        );
+        // One number only sets the floor; the ceiling keeps its default.
+        assert_eq!(
+            parse_sparsegram_analyzer("sparsegram-5"),
+            Some((5, 12, false))
+        );
+        // `ParseSparseGramAnalyzerName` bounds the window by 1024 inclusive.
+        assert_eq!(
+            parse_sparsegram_analyzer("sparsegram-1024-1024"),
+            Some((1024, 1024, false))
+        );
+
         assert_eq!(parse_sparsegram_analyzer("jieba"), None);
+        // A suffix segment must be `fold` or a decimal number: an empty
+        // segment, letters, a third number, >1024, and `min == 0` or
+        // `max < min` are all syntax errors.
+        for rejected in [
+            "sparsegram-0",
+            "sparsegram-20",
+            "sparsegram-1025",
+            "sparsegram--3",
+            "sparsegram-3-",
+            "sparsegram-3x",
+            "sparsegram-1-2-3",
+            "sparsegram-3-FOLD",
+            "sparsegram3",
+            "Sparsegram-3",
+        ] {
+            assert_eq!(parse_sparsegram_analyzer(rejected), None, "{rejected}");
+        }
     }
 
     #[test]

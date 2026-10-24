@@ -470,6 +470,16 @@ fn handle_connection(
         if std::env::var_os("INF_DEBUG_SQL").is_some() {
             eprintln!("[RPC] {name}");
         }
+        // `NewTxnManager::BeginTxnShared` runs once per statement, so every RPC
+        // but the session handshake spends a transaction id — a read-only one
+        // (`SELECT`, `SHOW …`, `GetDatabase`) included. The reference's WAL
+        // carries the id in its frame header, so the two engines only agree on
+        // that byte when both spend ids at the same points.
+        if !matches!(name.as_str(), "Connect" | "Disconnect") {
+            if let Some(eng) = engine.as_ref() {
+                eng.begin_statement();
+            }
+        }
         let handled: Result<()> = (|| {
             match name.as_str() {
                 "Connect" => {
@@ -1887,12 +1897,23 @@ fn handle_connection(
                             sql.push_str(&format!(" USING {}", req.index_type));
                         }
                         if !req.params.is_empty() {
-                            // Option values are quoted so a value with spaces
-                            // (`invalid compress type`) still parses.
+                            // C++ `Infinity::CreateIndex` lowercases every
+                            // `InitParameter` name *and* value before the
+                            // statement runs, so over Thrift `analyzer='Chinese'`
+                            // means `chinese` (the SQL path keeps the spelling
+                            // and stays case sensitive). The value is quoted so
+                            // one with spaces (`invalid compress type`) still
+                            // parses.
                             let opts = req
                                 .params
                                 .iter()
-                                .map(|(k, v)| format!("{k}='{}'", v.replace('\'', "''")))
+                                .map(|(k, v)| {
+                                    format!(
+                                        "{}='{}'",
+                                        k.to_lowercase(),
+                                        v.to_lowercase().replace('\'', "''")
+                                    )
+                                })
                                 .collect::<Vec<_>>()
                                 .join(",");
                             sql.push_str(&format!(" WITH ({opts})"));
@@ -1955,6 +1976,9 @@ fn handle_connection(
             }
             Ok(())
         })();
+        if let Some(eng) = engine.as_ref() {
+            eng.end_statement();
+        }
         if let Err(e) = handled {
             if std::env::var_os("INF_DEBUG_SQL").is_some() {
                 eprintln!("[RPC-ERR] {name}: {e}");
@@ -1997,6 +2021,11 @@ fn scalar_sql(logic_type: i32) -> String {
         3 => "INTEGER".into(),
         4 => "BIGINT".into(),
         5 => "HUGEINT".into(),
+        // `Decimal` and `Interval` are on the wire but not in the reference's
+        // column-type whitelist (`VerifyColumnDataType`); render their real
+        // names so the DDL layer rejects them instead of quietly creating a
+        // `VARCHAR` column.
+        6 => "DECIMAL".into(),
         7 => "FLOAT".into(),
         8 => "DOUBLE".into(),
         9 => "FLOAT16".into(),
@@ -2006,6 +2035,9 @@ fn scalar_sql(logic_type: i32) -> String {
         18 => "TIME".into(),
         19 => "DATETIME".into(),
         20 => "TIMESTAMP".into(),
+        // `Interval` (`LogicType::Interval`, ordinal 21) is rejected by the
+        // reference's column-type whitelist.
+        21 => "INTERVAL".into(),
         22 => "ARRAY(VARCHAR)".into(),
         23 => "JSON".into(),
         _ => "VARCHAR".into(),
@@ -7847,7 +7879,9 @@ mod tests {
                 name: "id".into(),
                 default: None,
                 not_null: false,
-                logic_type: 5,
+                // `LogicType::Integer`; `HugeInt` (5) is one of the types the
+                // reference's column whitelist rejects.
+                logic_type: 3,
                 physical: PhysicalWire::None,
                 comment: String::new(),
             }],
@@ -7857,6 +7891,13 @@ mod tests {
         assert_eq!(create_table(&addr, &req).unwrap().error_code, OK);
         // creating the same table again must fail: the engine kept the state
         assert_ne!(create_table(&addr, &req).unwrap().error_code, OK);
+
+        // The reference refuses `HugeInt` at DDL time; the RPC reports its
+        // `NOT_SUPPORTED` code instead of quietly creating a `VARCHAR`.
+        let mut huge = req.clone();
+        huge.table_name = "h".into();
+        huge.columns[0].logic_type = 5;
+        assert_eq!(create_table(&addr, &huge).unwrap().error_code, 3032);
     }
 
     /// Regression: every `read_*_args` must consume the *enclosing*

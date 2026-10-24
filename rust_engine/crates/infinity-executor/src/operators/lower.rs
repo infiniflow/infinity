@@ -130,7 +130,8 @@ pub fn lower(plan: &LogicalPlan) -> Result<Lowered> {
                 operators.push(Box::new(Sort::new(keys.clone())));
                 cursor = input;
             }
-            LogicalPlan::Scan { table, columns } => {
+            LogicalPlan::Scan { table, columns }
+            | LogicalPlan::IndexScan { table, columns, .. } => {
                 operators.reverse();
                 let names = names.unwrap_or_else(|| columns.clone());
                 return Ok(Lowered {
@@ -218,7 +219,9 @@ fn fuse_top(plan: &LogicalPlan) -> Option<FusedTop<'_>> {
 /// columns here, which is how the reference treats it too.
 fn leaf_scan(plan: &LogicalPlan) -> (String, Vec<String>) {
     match plan {
-        LogicalPlan::Scan { table, columns } => (table.clone(), columns.clone()),
+        LogicalPlan::Scan { table, columns } | LogicalPlan::IndexScan { table, columns, .. } => {
+            (table.clone(), columns.clone())
+        }
         _ => (String::new(), Vec::new()),
     }
 }

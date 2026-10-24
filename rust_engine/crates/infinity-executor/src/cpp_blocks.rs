@@ -14,6 +14,12 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+#[cfg(test)]
+thread_local! {
+    /// Blocks the prefilter skipped, so a test can prove the read happened.
+    pub static PRUNED_BLOCKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 use infinity_catalog::cpp_layout::{
     CppBlock, CppIndexChunk, CppIndexSegment, CppSegment, CppSegmentSet, CPP_MIRROR_TS, UNCOMMIT_TS,
 };
@@ -2508,7 +2514,7 @@ impl Engine {
     /// sequence ids.
     fn restore_cpp_blocks(&self, table: &str) -> Result<usize> {
         let table = self.qualified_table(table);
-        let Ok((_, rows)) = self.read_cpp_blocks_wanted(&table, None) else {
+        let Ok((_, rows)) = self.read_cpp_blocks_wanted(&table, None, &[]) else {
             return Ok(0);
         };
         let types = self.column_types(&table)?;
@@ -2572,7 +2578,7 @@ impl Engine {
     /// This never consults the KV store, so a successful read proves the mirror
     /// carries the table on its own.
     pub fn read_cpp_blocks(&self, table: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
-        let (columns, rows) = self.read_cpp_blocks_wanted(table, None)?;
+        let (columns, rows) = self.read_cpp_blocks_wanted(table, None, &[])?;
         Ok((columns, rows.into_iter().map(|(_, cells)| cells).collect()))
     }
 
@@ -2584,8 +2590,21 @@ impl Engine {
         table: &str,
         wanted: &[usize],
     ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
-        let (columns, rows) = self.read_cpp_blocks_wanted(table, Some(wanted))?;
+        let (columns, rows) = self.read_cpp_blocks_wanted(table, Some(wanted), &[])?;
         Ok((columns, rows.into_iter().map(|(_, cells)| cells).collect()))
+    }
+
+    /// [`Self::read_cpp_blocks_selected`] plus block pruning: a block whose
+    /// `blk|…|fast_rough_filter` record proves the predicate cannot match is
+    /// not read at all (C++ `FastRoughFilter::MayContain`, applied per block by
+    /// the scan).
+    pub fn read_cpp_blocks_pruned(
+        &self,
+        table: &str,
+        wanted: &[usize],
+        prune: &[crate::fast_rough_filter::PruneCond],
+    ) -> Result<(Vec<String>, Vec<(usize, Vec<String>)>)> {
+        self.read_cpp_blocks_wanted(table, Some(wanted), prune)
     }
 
     /// Number of rows the block mirror currently holds.
@@ -2711,6 +2730,7 @@ impl Engine {
         &self,
         table: &str,
         wanted: Option<&[usize]>,
+        prune: &[crate::fast_rough_filter::PruneCond],
     ) -> Result<(Vec<String>, Vec<(usize, Vec<String>)>)> {
         let table = self.qualified_table(table);
         let meta = self
@@ -2761,6 +2781,22 @@ impl Engine {
         if blocks.is_empty() {
             return Err(Error::NotFound(format!("no blocks for table '{table}'")));
         }
+        // Resolve the conditions once against the schema; a column the record
+        // does not cover (vector/sparse/tensor/bool) keeps its condition and
+        // `may_contain` answers `true` for it.
+        let resolved: Vec<(
+            usize,
+            crate::fast_rough_filter::PruneOp,
+            infinity_expression::Value,
+        )> = prune
+            .iter()
+            .filter_map(|cond| {
+                meta.columns
+                    .iter()
+                    .position(|c| c.eq_ignore_ascii_case(&cond.column))
+                    .map(|i| (i, cond.op, cond.value.clone()))
+            })
+            .collect();
         for (at, (segment_id, block_index)) in blocks.into_iter().enumerate() {
             let id = BlockId {
                 db_id,
@@ -2768,6 +2804,23 @@ impl Engine {
                 segment_id,
                 block_id: block_index,
             };
+            if !resolved.is_empty() {
+                // Skip a block the prefilter rules out without reading a single
+                // column file.
+                let key = format!(
+                    "blk|{}|{}|{}|{}|fast_rough_filter",
+                    db_id, meta.id, segment_id, block_index
+                );
+                if let Ok(Some(record)) = self.storage.catalog.store().get(key.as_bytes()) {
+                    if let Some(filters) = crate::fast_rough_filter::Filters::decode(&record) {
+                        if !filters.may_contain_all(&resolved) {
+                            #[cfg(test)]
+                            PRUNED_BLOCKS.with(|n| n.set(n.get() + 1));
+                            continue;
+                        }
+                    }
+                }
+            }
             match self.decode_block_cells(&table, &root, &meta, &types, id, wanted) {
                 Some(cells) => rows.extend(cells),
                 None if at == 0 => {

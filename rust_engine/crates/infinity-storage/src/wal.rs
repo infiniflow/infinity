@@ -36,6 +36,16 @@ use infinity_common::{Error, Result, TxnTimeStamp};
 
 use crate::wal_entry::{WalEntry, WAL_ENTRY_HEADER_LEN};
 
+/// Port of the reference's `storage/wal` subsystem, one module per source
+/// unit. `log_file` and `bottom_executor` are done; `wal_manager` and
+/// `wal_entry` follow.
+pub mod block;
+pub mod bottom_executor;
+pub mod ddl_def;
+pub mod index_def;
+pub mod log_file;
+pub mod wal_cmd;
+
 /// Append-only WAL writer for a single file.
 pub struct WalManager {
     path: PathBuf,

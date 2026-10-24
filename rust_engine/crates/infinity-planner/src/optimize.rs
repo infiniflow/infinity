@@ -199,20 +199,29 @@ impl Optimizer {
     }
 
     /// The C++ rule list (`optimizer_impl.cpp:40-46`) minus the two rules that
-    /// cannot be expressed as a plan-only rewrite:
-    ///
-    /// * `IndexScanBuilder` returns the candidates a runtime has to execute, so
-    ///   a rule that dropped the pushed predicate would lose rows; callers use
-    ///   [`crate::index_scan::IndexScanBuilder::build_with_regex`] directly
-    ///   (the executor does, as optimizer step 2).
-    /// * `ResultCacheGetter` needs a cache and timestamp, so it is registered by
-    ///   [`Self::with_result_cache`].
+    /// need runtime state: `IndexScanBuilder` is [`crate::index_scan::IndexScanRule`]
+    /// (the executor runs it with the rough filter, in the reference's order,
+    /// because the range scan needs the candidate before lowering) and
+    /// `ResultCacheGetter` is appended by [`Self::with_result_cache`].
     ///
     /// The default list is therefore fast-rough-filter, column pruning,
-    /// lazy-load and the binder remap.
+    /// lazy-load and the binder remap. Production uses [`Self::with_catalog`]
+    /// so the rough filter sees the real indexes, and
+    /// [`Self::after_rough_filter`] when the first two rules already ran.
     pub fn with_default_rules() -> Self {
         let mut optimizer = Self::new();
         optimizer.add_rule(Box::new(FastRoughFilterRule::default()));
+        optimizer.add_rule(Box::new(ColumnPruner));
+        optimizer.add_rule(Box::new(LazyLoad));
+        optimizer.add_rule(Box::new(ColumnRemapRule));
+        optimizer
+    }
+
+    /// The reference's list from `ColumnPruner` on: used when the caller has
+    /// already run `ApplyFastRoughFilter` and `IndexScanBuilder` (the executor
+    /// does, because the index candidate is needed before lowering).
+    pub fn after_rough_filter() -> Self {
+        let mut optimizer = Self::new();
         optimizer.add_rule(Box::new(ColumnPruner));
         optimizer.add_rule(Box::new(LazyLoad));
         optimizer.add_rule(Box::new(ColumnRemapRule));
@@ -258,28 +267,18 @@ impl Optimizer {
     }
 }
 
-/// `OptimizerRule` wrapper around the three built-in rewrites below.
-pub struct BuiltinRules;
-
-impl OptimizerRule for BuiltinRules {
-    fn name(&self) -> &'static str {
-        "Builtin Rules"
-    }
-
-    fn apply(&self, plan: LogicalPlan) -> Result<LogicalPlan> {
-        Ok(optimize(plan))
-    }
-}
-
-/// Optimizes `plan` bottom-up (the catalog-free half of the optimizer).
+/// Normalizes a freshly bound plan to the shape the reference's binder
+/// produces.
 ///
-/// Column pruning is part of [`Optimizer::with_default_rules`]; this function
-/// keeps the original three rewrites for callers that have not bound a
-/// catalog. [`crate::plan_select`] already returns a pruned plan.
-pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
+/// The reference builds `LIMIT`/`ORDER BY` **below** the final projection
+/// (`bound_select_statement_impl.cpp:840-860`) and puts `WHERE` below
+/// `ORDER BY`; this binder builds them above, so the tree is re-stacked here,
+/// before `ColumnPruner` sees it. It runs in the binder, not as an optimizer
+/// rule, so the optimizer's rule list is exactly `Optimizer::with_default_rules`.
+pub fn normalize(plan: LogicalPlan) -> LogicalPlan {
     match plan {
         LogicalPlan::Limit { input, n } => {
-            let input = optimize(*input);
+            let input = normalize(*input);
             match input {
                 LogicalPlan::Projection {
                     input,
@@ -297,13 +296,13 @@ pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
             }
         }
         LogicalPlan::Filter { input, predicate } => {
-            let input = optimize(*input);
+            let input = normalize(*input);
             if matches!(const_bool(&predicate), Some(true)) {
                 return input; // statically true -> drop the filter
             }
             match input {
                 LogicalPlan::Offset { input, n } => LogicalPlan::Offset {
-                    input: Box::new(optimize(*input)),
+                    input: Box::new(normalize(*input)),
                     n,
                 },
                 LogicalPlan::Sort { input, keys } => LogicalPlan::Sort {
@@ -321,7 +320,7 @@ pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
             exprs,
             names,
         } => LogicalPlan::Projection {
-            input: Box::new(optimize(*input)),
+            input: Box::new(normalize(*input)),
             exprs,
             names,
         },
@@ -331,17 +330,17 @@ pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
             group_names,
             aggs,
         } => LogicalPlan::Aggregate {
-            input: Box::new(optimize(*input)),
+            input: Box::new(normalize(*input)),
             group_keys,
             group_names,
             aggs,
         },
         LogicalPlan::Offset { input, n } => LogicalPlan::Offset {
-            input: Box::new(optimize(*input)),
+            input: Box::new(normalize(*input)),
             n,
         },
         LogicalPlan::Sort { input, keys } => LogicalPlan::Sort {
-            input: Box::new(optimize(*input)),
+            input: Box::new(normalize(*input)),
             keys,
         },
         LogicalPlan::Join {
@@ -351,8 +350,8 @@ pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
             right_key,
             left_width,
         } => LogicalPlan::Join {
-            left: Box::new(optimize(*left)),
-            right: Box::new(optimize(*right)),
+            left: Box::new(normalize(*left)),
+            right: Box::new(normalize(*right)),
             left_key,
             right_key,
             left_width,
@@ -405,7 +404,7 @@ mod tests {
             }),
             n: 5,
         };
-        let got = optimize(plan);
+        let got = normalize(plan);
         match got {
             LogicalPlan::Projection { input, .. } => {
                 assert!(matches!(*input, LogicalPlan::Limit { n: 5, .. }))
@@ -428,7 +427,7 @@ mod tests {
             }),
             predicate: pred,
         };
-        let got = optimize(plan);
+        let got = normalize(plan);
         match got {
             LogicalPlan::Sort { input, .. } => {
                 assert!(matches!(*input, LogicalPlan::Filter { .. }))
@@ -444,7 +443,7 @@ mod tests {
             CmpOp::Eq,
             Box::new(Expr::Literal(Value::Int(1))),
         );
-        let got = optimize(LogicalPlan::Filter {
+        let got = normalize(LogicalPlan::Filter {
             input: Box::new(scan()),
             predicate: pred,
         });
@@ -454,11 +453,11 @@ mod tests {
     #[test]
     fn optimizer_rule_trait_runs_in_order() {
         let mut optimizer = Optimizer::new();
-        optimizer.add_rule(Box::new(BuiltinRules));
+        optimizer.add_rule(Box::new(FastRoughFilterRule::default()));
         optimizer.add_rule(Box::new(crate::column::ColumnPruner));
         assert_eq!(
             optimizer.rule_names(),
-            vec!["Builtin Rules", "Column Pruner"]
+            vec!["Apply Fast Rough Filter", "Column Pruner"]
         );
         let plan = LogicalPlan::Limit {
             input: Box::new(LogicalPlan::Projection {
@@ -469,7 +468,7 @@ mod tests {
             n: 4,
         };
         let got = optimizer.optimize(plan).unwrap();
-        assert!(matches!(got, LogicalPlan::Projection { .. }));
+        assert!(matches!(got, LogicalPlan::Limit { .. }));
     }
 
     #[test]
@@ -492,8 +491,19 @@ mod tests {
             None,
         )
         .unwrap();
-        let optimized = optimize(plan);
+        let optimized = normalize(plan);
         assert!(matches!(optimized, LogicalPlan::Projection { .. }));
+    }
+
+    /// The production order: the executor runs the first two rules itself
+    /// (they need the storage catalog and the candidate is consumed before
+    /// lowering), then `run_plan` continues at `ColumnPruner`.
+    #[test]
+    fn production_order_matches_the_reference() {
+        assert_eq!(
+            Optimizer::after_rough_filter().rule_names(),
+            vec!["Column Pruner", "Lazy Load", "Column Remapper"]
+        );
     }
 
     /// The default rule list is the reference's order (`optimizer_impl.cpp`).
@@ -582,19 +592,22 @@ mod tests {
         let pruned = ColumnPruner::prune(indexed.plan).unwrap();
         match pruned {
             LogicalPlan::Projection { exprs, input, .. } => {
-                assert_eq!(exprs, vec![Expr::Column(0)]);
+                // The index scan is opaque to pruning (`ColumnPruner` does not
+                // visit its expression), so the projection keeps referring to
+                // the scan's own layout.
+                assert_eq!(exprs, vec![Expr::Column(1)]);
                 match *input {
                     LogicalPlan::Filter { input, predicate } => {
                         assert_eq!(
                             predicate,
                             Expr::Cmp(
-                                Box::new(Expr::Column(0)),
+                                Box::new(Expr::Column(1)),
                                 CmpOp::Gt,
                                 Box::new(Expr::Literal(Value::Int(1)))
                             )
                         );
                         assert!(
-                            matches!(*input, LogicalPlan::Scan { columns, .. } if columns == ["b"])
+                            matches!(*input, LogicalPlan::IndexScan { columns, .. } if columns == ["a", "b"])
                         );
                     }
                     other => panic!("expected the residual filter, got {other:?}"),

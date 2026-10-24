@@ -2,14 +2,12 @@
 
 `src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 48, `exempt` 13, `ported` 951。
 
-- `ported`：Rust 已逐条移植同等场景；少数以 native 组件等价替代 C++ 第三方（如 RocksDB 事务 KV → `txn_kv`、后台线程池 → `bg_task`），映射列直接指向替代实现，不声称字节级一致。
-- `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
-- `gate-a`：parser/planner/executor/function，当前由 Gate A 的 SQL 用例覆盖，单元断言待移植。
-- `integration`：catalog/txn/wal/io/bg_task，当前由 Gate C 的 restart/快照集成用例覆盖，单元断言待移植。
-- `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point/Line/Box/Path/Polygon/Circle`）相关用例——用户确认不移植这些类型。
-- `exempt`：SIMD/第三方夹具、整段或整块位于 `#if 0` 的用例（C++ 构建中不存在），以及已登记为设计变更的组件——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 事务型 KV、无 WAL 的 checkpoint 模式、后台任务线程池等（后三项已补齐实现，见 ported）。
-- `gap`：尚未移植。
+- `ported`：Rust 有同等场景的用例，映射列给出 `crate 模块::测试名`。少数以 native 组件等价替代 C++ 第三方（例如 RocksDB 事务 KV → `txn_kv`、后台线程池 → `bg_task`），映射列直接指向替代实现，不声称字节级一致。
+- `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point`/`Line`/`Box`/`Path`/`Polygon`/`Circle`）相关用例——这些类型不移植。
+- `exempt`：SIMD/第三方夹具、整段或整块位于 `#if 0` 的用例（C++ 构建中不存在），以及登记为设计变更的组件——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 事务型 KV、无 WAL 的 checkpoint 模式、后台任务线程池等（后三项的等价实现已在 `ported` 行给出）。
 - 带 `#[ignore]` 的 `ported` 行：C++ 的 `DISABLED_*` 用例，Rust 用 `#[ignore]` 表达，需 `cargo test -- --ignored` 显式运行。
+
+表里只有以上三种状态，没有 `partial`/`gap` 行；类层面的 `partial` 在 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)。
 
 | # | 文件 | Fixture | 用例 | 状态 |
 |---:|---|---|---|---|

@@ -46,7 +46,7 @@ fn open_txn(dir: &Path) -> infinity_common::Result<(TxnManager, Arc<dyn MetaStor
 
 fn usage() -> ! {
     eprintln!(
-        "usage: infinity <create-table|list-tables|put|get|recover|query|bench|serve|import-csv|conformance|smoke> <dir> [args...]
+        "usage: infinity <create-table|list-tables|put|get|dump-catalog|recover|query|bench|serve|import-csv|conformance|smoke> <dir> [args...]
        [--catalog-engine=fjall|rocksdb]  the substrate a fresh catalog is created on"
     );
     std::process::exit(2);
@@ -382,6 +382,37 @@ fn run(args: &[String]) -> infinity_common::Result<()> {
                     String::from_utf8_lossy(&k),
                     String::from_utf8_lossy(&v)
                 );
+            }
+            Ok(())
+        }
+        "dump-catalog" => {
+            // Raw `key<tab>hex` for every pair in the catalog store. The
+            // reference's `SHOW CATALOG 'all'` renders a binary value through
+            // the Postgres text protocol, which turns the `fast_rough_filter`
+            // records into an empty string; the byte gate needs the actual
+            // bytes, and this command is the one place that yields them.
+            // `Catalog::open` is fjall-only; the substrate has to be detected so
+            // the same command reads a catalogue the reference wrote (RocksDB)
+            // and one the port wrote (fjall).
+            let opened = infinity_storage::open_store(
+                &catalog_dir(&dir),
+                "catalog",
+                infinity_storage::metastore::StoreBackend::Fjall,
+            )?;
+            let filter = args.get(2).cloned();
+            for (k, v) in opened.store.scan_prefix(b"")? {
+                let key = String::from_utf8_lossy(&k);
+                if let Some(f) = &filter {
+                    if !key.contains(f.as_str()) {
+                        continue;
+                    }
+                }
+                let mut hex = String::with_capacity(v.len() * 2);
+                for b in &v {
+                    use std::fmt::Write;
+                    let _ = write!(hex, "{b:02x}");
+                }
+                println!("{key}\t{hex}");
             }
             Ok(())
         }

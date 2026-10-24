@@ -144,7 +144,7 @@ fn max_position(plan: &LogicalPlan) -> Option<usize> {
                     *max = Some(max.map_or(columns.len() - 1, |m| m.max(columns.len() - 1)));
                 }
             }
-            LogicalPlan::Scan { columns, .. } => {
+            LogicalPlan::Scan { columns, .. } | LogicalPlan::IndexScan { columns, .. } => {
                 if !columns.is_empty() {
                     *max = Some(max.map_or(columns.len() - 1, |m| m.max(columns.len() - 1)));
                 }
@@ -236,6 +236,13 @@ fn prune_node(
                 },
                 map,
             ))
+        }
+        // C++ `ColumnPruner`: `case LogicalNodeType::kIndexScan: // do not
+        // visit node expression`. The candidate's evaluator addresses columns
+        // by position, so narrowing the scan under it would mis-bind them.
+        plan @ LogicalPlan::IndexScan { .. } => {
+            let width = output_width(&plan);
+            Ok((plan, map_for(&(0..width).collect::<Vec<_>>(), width)))
         }
         LogicalPlan::Projection {
             input,
@@ -541,6 +548,7 @@ fn remap_plan(plan: LogicalPlan, map: &[Option<usize>]) -> Result<LogicalPlan> {
     Ok(match plan {
         LogicalPlan::Values { columns, rows } => LogicalPlan::Values { columns, rows },
         LogicalPlan::Scan { table, columns } => LogicalPlan::Scan { table, columns },
+        plan @ LogicalPlan::IndexScan { .. } => plan,
         LogicalPlan::Projection {
             input,
             exprs,
@@ -688,7 +696,7 @@ impl OptimizerRule for LazyLoad {
 
 fn collect_loads(plan: &LogicalPlan, required: &BTreeSet<usize>, out: &mut Vec<ScanLoad>) {
     match plan {
-        LogicalPlan::Scan { table, columns } => {
+        LogicalPlan::Scan { table, columns } | LogicalPlan::IndexScan { table, columns, .. } => {
             let column_indices: Vec<usize> = required
                 .iter()
                 .copied()

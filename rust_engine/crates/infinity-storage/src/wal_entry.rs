@@ -331,7 +331,7 @@ pub enum WalCmd {
         db_name: String,
         db_id: String,
         table_id: String,
-        table_def: WalTableDef,
+        table_def: crate::wal::ddl_def::TableDef,
     },
     DropTable {
         db_name: String,
@@ -347,7 +347,7 @@ pub enum WalCmd {
         table_name: String,
         table_id: String,
         index_id: String,
-        index_base: WalIndexBase,
+        index_base: crate::wal::index_def::IndexDef,
         segment_index_infos: Vec<WalSegmentIndexInfo>,
         table_key: String,
     },
@@ -374,7 +374,8 @@ pub enum WalCmd {
         table_name: String,
         table_id: String,
         row_ranges: Vec<(WalRowId, u64)>,
-        block: DataBlock,
+        /// The rows, in the reference's `DataBlock` form (`wal::block`).
+        block: Vec<crate::wal::block::BlockColumn>,
     },
     Delete {
         db_name: String,
@@ -422,7 +423,7 @@ pub enum WalCmd {
         table_name: String,
         table_id: String,
         column_idx_list: Vec<u32>,
-        column_defs: Vec<WalColumnDef>,
+        column_defs: Vec<crate::wal::ddl_def::ColumnDef>,
         table_key: String,
     },
     DropColumns {
@@ -978,6 +979,11 @@ impl<'a> Cursor<'a> {
     fn remaining(&self) -> usize {
         self.buf.len().saturating_sub(self.pos)
     }
+
+    /// The unconsumed tail of the buffer (for `ddl_def::Reader`).
+    fn remaining_slice(&self) -> &'a [u8] {
+        &self.buf[self.pos..]
+    }
 }
 
 fn logical_type_code(t: LogicalType) -> (u8, u32) {
@@ -1219,25 +1225,13 @@ fn empty_column(logical_type: LogicalType) -> Option<Column> {
     })
 }
 
-fn put_data_block<S: Sink>(sink: &mut S, block: &DataBlock) {
-    put_len(sink, block.column_count());
-    put_len(sink, block.row_count());
-    for (idx, column) in block.columns().iter().enumerate() {
-        let (code, dim) = logical_type_code(column.logical_type());
-        put_u8(sink, code);
-        if code == 19 {
-            put_u32(sink, dim);
-        }
-        for row in 0..block.row_count() {
-            match block.get_value(idx, row) {
-                Some(value) => {
-                    put_u8(sink, 1);
-                    put_block_value(sink, &value);
-                }
-                None => put_u8(sink, 0),
-            }
-        }
-    }
+/// A `wal.rust` (port layout) block as reference columns.
+///
+/// That layout is what earlier builds of this crate wrote: a typed port block.
+/// Its columns are turned back into the reference form so the command carries
+/// one representation, whichever file it was read from.
+fn port_block_columns(block: DataBlock) -> Option<Vec<crate::wal::block::BlockColumn>> {
+    crate::wal::block::from_data_block(&block)
 }
 
 /// How the `DataBlock` inside a `WalCmd::Append` is encoded.
@@ -1291,273 +1285,6 @@ fn read_data_block(cursor: &mut Cursor<'_>) -> Option<DataBlock> {
     }
     block.finalize();
     Some(block)
-}
-
-/// Reads a `DataBlock` in the layout the reference writes into its WAL.
-///
-/// Mirrors `DataBlock::ReadAdv`/`ColumnVector::ReadAdv`
-/// (`data_block_impl.cpp:363`, `column_vector_impl.cpp:2702`): the column count,
-/// then per column the `DataType`, the `ColumnVectorType`, `tail_index`, the
-/// slots, the var buffer (only for the types that own one) and the null bitmap.
-fn read_reference_data_block(cursor: &mut Cursor<'_>) -> Option<DataBlock> {
-    let column_count = cursor.len()?;
-    let mut columns = Vec::with_capacity(column_count);
-    let mut decoded = Vec::with_capacity(column_count);
-    for _ in 0..column_count {
-        let (logical_type, values) = read_reference_column(cursor)?;
-        columns.push(empty_column(logical_type)?);
-        decoded.push(values);
-    }
-    let row_count = decoded.first().map(Vec::len).unwrap_or(0);
-    if decoded.iter().any(|values| values.len() != row_count) {
-        return None;
-    }
-    let mut block = DataBlock::new(columns, row_count);
-    for (column, values) in decoded.into_iter().enumerate() {
-        for value in values {
-            block.append_value(column, value).ok()?;
-        }
-    }
-    block.finalize();
-    Some(block)
-}
-
-/// A C++ `DataType` (`parser/type/data_type.h`): the logical type plus the
-/// type info its `WriteAdv` appends (`data_type.cpp:320`).
-struct ReferenceType {
-    logical: LogicalType,
-    /// `EmbeddingDataType` of an embedding column (`embedding_type.h:33`).
-    element: i8,
-    dimension: usize,
-    /// `DecimalInfo::scale`, needed to render a `DecimalT`.
-    scale: u32,
-}
-
-/// C++ `LogicalType` (`logical_type.h:43`) — a different numbering from this
-/// crate's own column codes.
-const LO_EMBEDDING: i8 = 23;
-
-fn read_reference_type(cursor: &mut Cursor<'_>) -> Option<ReferenceType> {
-    let code = cursor.i8()?;
-    let mut ty = ReferenceType {
-        logical: LogicalType::Invalid,
-        element: -1,
-        dimension: 0,
-        scale: 0,
-    };
-    ty.logical = match code {
-        0 => LogicalType::Boolean,
-        1 => LogicalType::TinyInt,
-        2 => LogicalType::SmallInt,
-        3 => LogicalType::Integer,
-        4 => LogicalType::BigInt,
-        5 => LogicalType::HugeInt,
-        6 => LogicalType::Decimal,
-        7 => LogicalType::Float,
-        8 => LogicalType::Double,
-        9 => LogicalType::Varchar,
-        10 => LogicalType::Date,
-        11 => LogicalType::Time,
-        12 => LogicalType::DateTime,
-        13 => LogicalType::Timestamp,
-        14 => LogicalType::Interval,
-        15 => LogicalType::Array,
-        22 => LogicalType::Uuid,
-        LO_EMBEDDING => LogicalType::Embedding(0),
-        24 => LogicalType::RowID,
-        25 => LogicalType::Mixed,
-        34 => LogicalType::Json,
-        _ => return None,
-    };
-    match code {
-        6 => {
-            // `DecimalInfo`: precision then scale, both i64.
-            let _precision = cursor.i64()?;
-            ty.scale = cursor.i64()? as u32;
-        }
-        15 => {
-            // The element type is written inline; only its bytes matter here.
-            read_reference_type(cursor)?;
-        }
-        LO_EMBEDDING => {
-            ty.element = cursor.i8()?;
-            ty.dimension = cursor.i32()? as usize;
-            ty.logical = LogicalType::Embedding(ty.dimension as u32);
-        }
-        _ => {}
-    }
-    Some(ty)
-}
-
-/// `DataType::Size()` of one slot (`data_type.cpp:227`, `LogicalTypeWidth`).
-fn reference_slot_width(ty: &ReferenceType) -> Option<usize> {
-    Some(match ty.logical {
-        LogicalType::Boolean | LogicalType::TinyInt => 1,
-        LogicalType::SmallInt => 2,
-        LogicalType::Integer | LogicalType::Float => 4,
-        LogicalType::BigInt | LogicalType::Double => 8,
-        LogicalType::HugeInt | LogicalType::Decimal | LogicalType::Uuid => 16,
-        LogicalType::Varchar | LogicalType::Json => 16,
-        LogicalType::Date | LogicalType::Time => 4,
-        LogicalType::DateTime | LogicalType::Timestamp | LogicalType::Interval => 8,
-        LogicalType::Array => 8,
-        LogicalType::RowID => 8,
-        LogicalType::Embedding(_) => reference_embedding_width(ty.element, ty.dimension)?,
-        _ => return None,
-    })
-}
-
-/// `EmbeddingType::EmbeddingSize` (`embedding_type.h:129`) for the C++
-/// `EmbeddingDataType` numbering: 0 bit, 1 int8, 2 int16, 3 int32, 4 int64,
-/// 5 float, 6 double, 7 uint8, 8 float16, 9 bfloat16.
-fn reference_embedding_width(element: i8, dimension: usize) -> Option<usize> {
-    Some(match element {
-        0 => dimension.div_ceil(8),
-        1 | 7 => dimension,
-        2 | 8 | 9 => dimension * 2,
-        3 | 5 => dimension * 4,
-        4 | 6 => dimension * 8,
-        _ => return None,
-    })
-}
-
-/// The types whose `VectorBuffer::WriteAdv` emits a heap (`vector_buffer_impl.cpp:326`).
-fn reference_has_var_buffer(logical: LogicalType) -> bool {
-    matches!(
-        logical,
-        LogicalType::Array | LogicalType::Varchar | LogicalType::Json
-    )
-}
-
-fn read_reference_column(cursor: &mut Cursor<'_>) -> Option<(LogicalType, Vec<BlockValue>)> {
-    let ty = read_reference_type(cursor)?;
-    // C++ `ColumnVectorType`: 1 flat, 2 constant, 3 compact bit.
-    let vector_type = cursor.i8()?;
-    let tail = cursor.i32()?;
-    if tail < 0 || !matches!(vector_type, 1..=3) {
-        return None;
-    }
-    let tail = tail as usize;
-    let width = reference_slot_width(&ty)?;
-    let raw = if vector_type == 3 {
-        cursor.take(tail.div_ceil(8))?
-    } else {
-        cursor.take(tail.checked_mul(width)?)?
-    };
-    let outline: &[u8] = if reference_has_var_buffer(ty.logical) {
-        let heap_len = cursor.len()?;
-        cursor.take(heap_len)?
-    } else {
-        &[]
-    };
-    let valid = read_reference_nulls(cursor)?;
-
-    let mut values = Vec::with_capacity(tail);
-    for row in 0..tail {
-        if !valid.get(row).copied().unwrap_or(true) {
-            values.push(BlockValue::Null);
-            continue;
-        }
-        if vector_type == 3 {
-            let byte = raw.get(row / 8).copied().unwrap_or(0);
-            values.push(BlockValue::Bool(byte & (1 << (row % 8)) != 0));
-            continue;
-        }
-        // A constant vector stores one value for every row.
-        let at = if vector_type == 2 { 0 } else { row };
-        let slot = raw.get(at * width..at * width + width)?;
-        values.push(reference_value(&ty, slot, outline)?);
-    }
-    Some((ty.logical, values))
-}
-
-/// C++ `Bitmask::ReadAdv` (`roaring_bitmap.cppm:325`), which stores the bitmap
-/// of **valid** rows: `[count: u32][all_true: u8][size: i32][roaring bytes]`.
-fn read_reference_nulls(cursor: &mut Cursor<'_>) -> Option<Vec<bool>> {
-    let count = cursor.u32()? as usize;
-    let all_true = cursor.u8()? != 0;
-    let mut valid = vec![true; count];
-    if all_true {
-        return Some(valid);
-    }
-    let size = cursor.len()?;
-    let bytes = cursor.take(size)?;
-    let bitmap = roaring::RoaringBitmap::deserialize_from(bytes).ok()?;
-    for (row, bit) in valid.iter_mut().enumerate() {
-        *bit = bitmap.contains(row as u32);
-    }
-    Some(valid)
-}
-
-fn reference_value(ty: &ReferenceType, slot: &[u8], outline: &[u8]) -> Option<BlockValue> {
-    fn i32_at(slot: &[u8], at: usize) -> Option<i32> {
-        Some(i32::from_le_bytes(slot.get(at..at + 4)?.try_into().ok()?))
-    }
-    Some(match ty.logical {
-        LogicalType::Boolean => BlockValue::Bool(slot.first().copied()? != 0),
-        LogicalType::TinyInt => BlockValue::TinyInt(slot.first().copied()? as i8),
-        LogicalType::SmallInt => {
-            BlockValue::SmallInt(i16::from_le_bytes(slot.get(..2)?.try_into().ok()?))
-        }
-        LogicalType::Integer => BlockValue::Int32(i32_at(slot, 0)?),
-        LogicalType::BigInt => BlockValue::Int(i64::from_le_bytes(slot.get(..8)?.try_into().ok()?)),
-        LogicalType::HugeInt => {
-            BlockValue::HugeInt(i128::from_le_bytes(slot.get(..16)?.try_into().ok()?))
-        }
-        LogicalType::Decimal => BlockValue::Decimal(infinity_common::DecimalT::new(
-            i128::from_le_bytes(slot.get(..16)?.try_into().ok()?),
-            ty.scale,
-        )),
-        LogicalType::Float => {
-            BlockValue::Float(f32::from_le_bytes(slot.get(..4)?.try_into().ok()?))
-        }
-        LogicalType::Double => {
-            BlockValue::Double(f64::from_le_bytes(slot.get(..8)?.try_into().ok()?))
-        }
-        LogicalType::Varchar => BlockValue::Str(
-            String::from_utf8(crate::cpp_format::decode_varchar_slot(slot, outline)?).ok()?,
-        ),
-        LogicalType::Date => BlockValue::Date(infinity_common::DateT::new(i32_at(slot, 0)?)),
-        LogicalType::Time => BlockValue::Time(infinity_common::TimeT::new(i32_at(slot, 0)?)),
-        LogicalType::DateTime => BlockValue::DateTime(infinity_common::DateTimeT::new(
-            i32_at(slot, 0)?,
-            i32_at(slot, 4)?,
-        )),
-        LogicalType::Timestamp => BlockValue::Timestamp(infinity_common::TimestampT::new(
-            i32_at(slot, 0)?,
-            i32_at(slot, 4)?,
-        )),
-        LogicalType::Interval => {
-            BlockValue::Interval(infinity_common::IntervalT::new(i32_at(slot, 0)?))
-        }
-        LogicalType::Uuid => BlockValue::Uuid(slot.get(..16)?.try_into().ok()?),
-        // `RowID` is a union of `u64` with `{u32 segment_offset, u32 segment_id}`
-        // on little-endian (`row_id.h:36-47`).
-        LogicalType::RowID => BlockValue::RowId(crate::data_block::RowIdT::new(
-            u32::from_le_bytes(slot.get(4..8)?.try_into().ok()?),
-            u32::from_le_bytes(slot.get(..4)?.try_into().ok()?),
-        )),
-        // `JsonType` is `{u64 length, u64 offset}` into the var buffer
-        // (`json_type.h:23`), the same shape as `Varchar` with a wider offset.
-        LogicalType::Json => {
-            let len = u64::from_le_bytes(slot.get(..8)?.try_into().ok()?) as usize;
-            let offset = u64::from_le_bytes(slot.get(8..16)?.try_into().ok()?) as usize;
-            let text = std::str::from_utf8(outline.get(offset..offset.checked_add(len)?)?).ok()?;
-            BlockValue::Json(infinity_common::json::parse(text)?)
-        }
-        // `BlockValue::Embedding` is float-only; other element types have no
-        // representation in this crate's block model.
-        LogicalType::Embedding(dim) if ty.element == 5 => {
-            let mut vector = Vec::with_capacity(dim as usize);
-            for element in 0..dim as usize {
-                vector.push(f32::from_le_bytes(
-                    slot.get(element * 4..element * 4 + 4)?.try_into().ok()?,
-                ));
-            }
-            BlockValue::Embedding(vector)
-        }
-        _ => return None,
-    })
 }
 
 fn encode_segment_info<S: Sink>(sink: &mut S, info: &WalSegmentInfo) {
@@ -1681,75 +1408,38 @@ fn decode_column_def(cursor: &mut Cursor<'_>) -> Option<WalColumnDef> {
     })
 }
 
-fn encode_table_def<S: Sink>(sink: &mut S, def: &WalTableDef) {
-    put_str(sink, &def.db_name);
-    put_str(sink, &def.table_name);
-    put_str(sink, &def.table_id);
-    put_str(sink, &def.comment);
-    put_len(sink, def.columns.len());
-    for column in &def.columns {
-        encode_column_def(sink, column);
-    }
+fn encode_table_def<S: Sink>(sink: &mut S, def: &crate::wal::ddl_def::TableDef) {
+    // Reference `TableDef::WriteAdv` (see `wal::ddl_def`), marshalled through
+    // the WAL's `Sink`.
+    let mut buf = Vec::new();
+    def.write_adv(&mut buf);
+    sink.put(&buf);
 }
 
-fn decode_table_def(cursor: &mut Cursor<'_>) -> Option<WalTableDef> {
-    let db_name = cursor.string()?;
-    let table_name = cursor.string()?;
-    let table_id = cursor.string()?;
-    let comment = cursor.string()?;
-    let count = cursor.len()?;
-    let mut columns = Vec::with_capacity(count);
-    for _ in 0..count {
-        columns.push(decode_column_def(cursor)?);
-    }
-    Some(WalTableDef {
-        db_name,
-        table_name,
-        table_id,
-        comment,
-        columns,
-    })
+fn decode_table_def(cursor: &mut Cursor<'_>) -> Option<crate::wal::ddl_def::TableDef> {
+    use crate::wal::ddl_def::{Reader, TableDef};
+    let mut reader = Reader::new(cursor.remaining_slice());
+    let def = TableDef::read_adv(&mut reader).ok()?;
+    let used = reader.pos();
+    cursor.take(used)?;
+    Some(def)
 }
 
-fn encode_index_base<S: Sink>(sink: &mut S, base: &WalIndexBase) {
-    put_str(sink, &base.index_name);
-    put_str(sink, &base.comment);
-    put_str(sink, &base.index_id);
-    put_len(sink, base.column_names.len());
-    for name in &base.column_names {
-        put_str(sink, name);
-    }
-    put_str(sink, &base.index_type);
-    put_len(sink, base.params.len());
-    for (key, value) in &base.params {
-        put_str(sink, key);
-        put_str(sink, value);
-    }
+fn encode_index_base<S: Sink>(sink: &mut S, base: &crate::wal::index_def::IndexDef) {
+    // Reference `IndexBase::WriteAdv` (+ the subclass fields), via `index_def`.
+    let mut buf = Vec::new();
+    base.write_adv(&mut buf);
+    sink.put(&buf);
 }
 
-fn decode_index_base(cursor: &mut Cursor<'_>) -> Option<WalIndexBase> {
-    let index_name = cursor.string()?;
-    let comment = cursor.string()?;
-    let index_id = cursor.string()?;
-    let column_count = cursor.len()?;
-    let mut column_names = Vec::with_capacity(column_count);
-    for _ in 0..column_count {
-        column_names.push(cursor.string()?);
-    }
-    let index_type = cursor.string()?;
-    let param_count = cursor.len()?;
-    let mut params = Vec::with_capacity(param_count);
-    for _ in 0..param_count {
-        params.push((cursor.string()?, cursor.string()?));
-    }
-    Some(WalIndexBase {
-        index_name,
-        comment,
-        index_id,
-        column_names,
-        index_type,
-        params,
-    })
+fn decode_index_base(cursor: &mut Cursor<'_>) -> Option<crate::wal::index_def::IndexDef> {
+    use crate::wal::ddl_def::Reader;
+    use crate::wal::index_def::IndexDef;
+    let mut reader = Reader::new(cursor.remaining_slice());
+    let def = IndexDef::read_adv(&mut reader).ok()?;
+    let used = reader.pos();
+    cursor.take(used)?;
+    Some(def)
 }
 
 fn encode_cmd<S: Sink>(sink: &mut S, cmd: &WalCmd) {
@@ -1877,7 +1567,9 @@ fn encode_cmd<S: Sink>(sink: &mut S, cmd: &WalCmd) {
                 put_u32(sink, row_id.segment_id);
                 put_u64(sink, *count);
             }
-            put_data_block(sink, block);
+            // `DataBlock::WriteAdv`: the block is already in the reference's
+            // typed column layout.
+            sink.put(&crate::wal::block::encode_block(block));
         }
         WalCmd::Delete {
             db_name,
@@ -1991,7 +1683,9 @@ fn encode_cmd<S: Sink>(sink: &mut S, cmd: &WalCmd) {
             }
             put_len(sink, column_defs.len());
             for def in column_defs {
-                encode_column_def(sink, def);
+                let mut buf = Vec::new();
+                def.write_adv(&mut buf);
+                sink.put(&buf);
             }
             put_str(sink, table_key);
         }
@@ -2015,7 +1709,8 @@ fn encode_cmd<S: Sink>(sink: &mut S, cmd: &WalCmd) {
             }
             put_len(sink, column_ids.len());
             for id in column_ids {
-                put_u32(sink, *id);
+                // `column_ids_` is 8 bytes on the wire (u64), not u32.
+                put_u64(sink, *id as u64);
             }
             put_str(sink, table_key);
             put_len(sink, column_keys.len());
@@ -2132,8 +1827,13 @@ fn decode_cmd(cursor: &mut Cursor<'_>, layout: DataBlockLayout) -> Option<WalCmd
                 table_id,
                 row_ranges,
                 block: match layout {
-                    DataBlockLayout::Port => read_data_block(cursor)?,
-                    DataBlockLayout::Reference => read_reference_data_block(cursor)?,
+                    DataBlockLayout::Port => port_block_columns(read_data_block(cursor)?)?,
+                    DataBlockLayout::Reference => {
+                        let (columns, used) =
+                            crate::wal::block::decode_block(cursor.remaining_slice())?;
+                        cursor.take(used)?;
+                        columns
+                    }
                 },
             }
         }
@@ -2248,7 +1948,12 @@ fn decode_cmd(cursor: &mut Cursor<'_>, layout: DataBlockLayout) -> Option<WalCmd
             let def_count = cursor.len()?;
             let mut column_defs = Vec::with_capacity(def_count);
             for _ in 0..def_count {
-                column_defs.push(decode_column_def(cursor)?);
+                use crate::wal::ddl_def::{ColumnDef, Reader};
+                let mut reader = Reader::new(cursor.remaining_slice());
+                let def = ColumnDef::read_adv(&mut reader).ok()?;
+                let used = reader.pos();
+                cursor.take(used)?;
+                column_defs.push(def);
             }
             WalCmd::AddColumns {
                 db_name,
@@ -2273,7 +1978,7 @@ fn decode_cmd(cursor: &mut Cursor<'_>, layout: DataBlockLayout) -> Option<WalCmd
             let id_count = cursor.len()?;
             let mut column_ids = Vec::with_capacity(id_count);
             for _ in 0..id_count {
-                column_ids.push(cursor.u32()?);
+                column_ids.push(cursor.u64()? as u32);
             }
             let table_key = cursor.string()?;
             let key_count = cursor.len()?;
@@ -2339,33 +2044,48 @@ mod tests {
     const DEFAULT_VECTOR_SIZE: usize = 8192;
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:48` (`MockTableDesc2`).
-    fn mock_table_desc2() -> WalTableDef {
-        WalTableDef::new(
-            "default_db",
-            "tbl1",
-            "",
-            "",
-            vec![
-                WalColumnDef {
-                    column_id: 0,
-                    name: "tiny_int_col".to_string(),
-                    logical_type: LogicalType::TinyInt,
-                    constraints: vec![ConstraintType::Unique, ConstraintType::NotNull],
-                },
-                WalColumnDef {
-                    column_id: 1,
-                    name: "big_int_col".to_string(),
-                    logical_type: LogicalType::BigInt,
-                    constraints: vec![ConstraintType::PrimaryKey],
-                },
-                WalColumnDef {
-                    column_id: 2,
-                    name: "double_col".to_string(),
-                    logical_type: LogicalType::Double,
-                    constraints: vec![ConstraintType::NotNull],
-                },
+    fn mock_table_desc2() -> crate::wal::ddl_def::TableDef {
+        use crate::wal::ddl_def::{
+            ColumnDef, ConstantExpr, ConstraintType as RefConstraint, DataType,
+            LogicalType as RefLogical, TableDef, TypeInfo,
+        };
+        let col = |id, lt, name: &str, cons: Vec<RefConstraint>| ColumnDef {
+            id,
+            column_type: DataType {
+                logical_type: lt,
+                type_info: TypeInfo::None,
+            },
+            name: name.to_string(),
+            constraints: cons,
+            comment: String::new(),
+            default_expr: ConstantExpr::Null,
+            build_bloom_filter: false,
+        };
+        TableDef {
+            schema_name: "default_db".to_string(),
+            table_name: "tbl1".to_string(),
+            table_comment: String::new(),
+            columns: vec![
+                col(
+                    0,
+                    RefLogical::TinyInt,
+                    "tiny_int_col",
+                    vec![RefConstraint::Unique, RefConstraint::NotNull],
+                ),
+                col(
+                    1,
+                    RefLogical::BigInt,
+                    "big_int_col",
+                    vec![RefConstraint::PrimaryKey],
+                ),
+                col(
+                    2,
+                    RefLogical::Double,
+                    "double_col",
+                    vec![RefConstraint::NotNull],
+                ),
             ],
-        )
+        }
     }
 
     /// C++: `wal_entry_ut.cpp:83` (`MakeSegmentInfo`). Note the reference
@@ -2386,20 +2106,27 @@ mod tests {
         }
     }
 
-    fn mock_data_block(row_count: usize) -> DataBlock {
-        let mut block = DataBlock::new(
-            vec![
-                Column::Bool(ColumnVector::new()),
-                Column::TinyInt(ColumnVector::new()),
-            ],
-            row_count,
-        );
-        for i in 0..row_count {
-            block.append_value(0, BlockValue::Bool(i % 2 == 0)).unwrap();
-            block.append_value(1, BlockValue::TinyInt(i as i8)).unwrap();
-        }
-        block.finalize();
-        block
+    fn mock_block_columns(row_count: usize) -> Vec<crate::wal::block::BlockColumn> {
+        use crate::wal::block::{BlockColumn, ColumnValues};
+        use crate::wal::ddl_def::{DataType, LogicalType, TypeInfo};
+        let bools: Vec<bool> = (0..row_count).map(|i| i % 2 == 0).collect();
+        let tinies: Vec<i8> = (0..row_count).map(|i| i as i8).collect();
+        vec![
+            BlockColumn::new(
+                DataType {
+                    logical_type: LogicalType::Boolean,
+                    type_info: TypeInfo::None,
+                },
+                ColumnValues::Bools(bools),
+            ),
+            BlockColumn::new(
+                DataType {
+                    logical_type: LogicalType::TinyInt,
+                    type_info: TypeInfo::None,
+                },
+                ColumnValues::TinyInts(tinies),
+            ),
+        ]
     }
 
     fn data_entry(commit_ts: TxnTimeStamp) -> WalEntry {
@@ -2432,7 +2159,7 @@ mod tests {
                     table_name: "tbl1".to_string(),
                     table_id: "1".to_string(),
                     row_ranges: vec![(WalRowId::new(0, 0), 8192)],
-                    block: mock_data_block(row_count),
+                    block: mock_block_columns(row_count),
                 },
             ],
         )
@@ -2646,14 +2373,20 @@ mod tests {
                     table_name: "tbl1".to_string(),
                     table_id: "2".to_string(),
                     index_id: "3".to_string(),
-                    index_base: WalIndexBase::new(
-                        "idx1",
-                        "test comment",
-                        "idx1_tbl1",
-                        vec!["col1".to_string(), "col2".to_string()],
-                        "IVF",
-                        vec![("metric".to_string(), "ip".to_string())],
-                    ),
+                    index_base: {
+                        use crate::wal::index_def::{IndexBase, IndexDef, IndexType};
+                        IndexDef::Secondary {
+                            base: IndexBase {
+                                index_type: IndexType::Secondary,
+                                index_name: "idx1".to_string(),
+                                index_comment: "test comment".to_string(),
+                                file_name: "idx1_tbl1".to_string(),
+                                column_names: vec!["col1".to_string(), "col2".to_string()],
+                            },
+                            cardinality: 0,
+                            is_json: false,
+                        }
+                    },
                     segment_index_infos: Vec::new(),
                     table_key: "table_key".to_string(),
                 },
@@ -2673,7 +2406,7 @@ mod tests {
                     table_name: "tbl1".to_string(),
                     table_id: "2".to_string(),
                     row_ranges: vec![(WalRowId::new(0, 0), DEFAULT_VECTOR_SIZE as u64)],
-                    block: mock_data_block(DEFAULT_VECTOR_SIZE),
+                    block: mock_block_columns(DEFAULT_VECTOR_SIZE),
                 },
                 WalCmd::Delete {
                     db_name: "db1".to_string(),
@@ -2728,17 +2461,44 @@ mod tests {
                     table_id: "2".to_string(),
                     column_idx_list: vec![3, 4],
                     column_defs: vec![
-                        WalColumnDef {
-                            column_id: 3,
-                            name: "boolean_col".to_string(),
-                            logical_type: LogicalType::Boolean,
-                            constraints: Vec::new(),
+                        {
+                            use crate::wal::ddl_def::{
+                                ColumnDef as RCol, ConstantExpr as RConst, DataType as RType,
+                                LogicalType as RLogic, TypeInfo as RTI,
+                            };
+                            RCol {
+                                id: 3,
+                                column_type: RType {
+                                    logical_type: RLogic::Boolean,
+                                    type_info: RTI::None,
+                                },
+                                name: "boolean_col".to_string(),
+                                constraints: Vec::new(),
+                                comment: String::new(),
+                                default_expr: RConst::Null,
+                                build_bloom_filter: false,
+                            }
                         },
-                        WalColumnDef {
-                            column_id: 4,
-                            name: "embedding_col".to_string(),
-                            logical_type: LogicalType::Embedding(16),
-                            constraints: Vec::new(),
+                        {
+                            use crate::wal::ddl_def::{
+                                ColumnDef as RCol, ConstantExpr as RConst, DataType as RType,
+                                EmbeddingDataType as RElem, LogicalType as RLogic, TypeInfo as RTI,
+                            };
+                            RCol {
+                                id: 4,
+                                column_type: RType {
+                                    logical_type: RLogic::Embedding,
+                                    type_info: RTI::Embedding {
+                                        element_type: RElem::Float,
+                                        dimension: 16,
+                                    },
+                                },
+                                name: "embedding_col".to_string(),
+                                constraints: Vec::new(),
+                                comment: String::new(),
+                                default_expr: RConst::Null,
+                                build_bloom_filter: false,
+                            }
                         },
                     ],
                     table_key: "table_key".to_string(),

@@ -1,8 +1,8 @@
 # Rust 重写版的持久化格式：现状、与 C++ 参考的差异、测试覆盖
 
-> 判定口径与 [`CPP_FORMAT_SPEC.md`](CPP_FORMAT_SPEC.md) 一致：C++ 参考能打开重写版的目录、重写版能打开参考的目录，查询结果一致。本文在此之上记录更强的**字节**口径、当前的覆盖范围，以及重写版与参考仍然存在的差异。差异的成因分类见 [`SIMPLIFICATION_AUDIT.md`](SIMPLIFICATION_AUDIT.md)。
+> 判定口径与 [`CPP_FORMAT_SPEC.md`](CPP_FORMAT_SPEC.md) 一致：C++ 参考能打开重写版的目录、重写版能打开参考的目录，查询结果一致。本文在此之上记录更强的**字节**口径、当前的覆盖范围，以及重写版与参考仍然存在的差异。缺口汇总见 [`GAPS.md`](GAPS.md)。
 >
-> **现状**：同一输入下，重写版写出的块文件（`.col` / outline / `version`）、全文索引、次级索引（整数键与浮点键）、稀疏 BMP 索引与参考逐字节相同；HNSW、IVF 按内容比对；`catalog/`、`wal/` 与对象存储只保证互读。逐条差异见 §6。
+> **现状**：同一输入下，重写版写出的块文件（`.col` / outline / `version`）、全文索引、次级索引（整数键与浮点键）、稀疏 BMP 索引、`wal/wal.log`（整帧，含 `txn_id` 与 CRC）与参考逐字节相同；HNSW、IVF 按内容比对；`catalog/` 按键值比。**对象存储不移植**：重写版不采用参考的 `obj_key` 打包对象上传 + VirtualStore 设计，桶内仍用路径树传播（§6.5）。逐条差异见 §6，缺口汇总见 [`GAPS.md`](GAPS.md)。
 
 ---
 
@@ -55,6 +55,8 @@
 | `::test_a_multi_segment_table_matches_across_segments` | 两次 `IMPORT`（100 + 60 行，同一线程顺序导入）→ 两个段；七类索引（全文 / HNSW / IVF / 次级 varchar·float·int / 稀疏 BMP） | 每个索引在 `seg_0`、`seg_1` 各一套 chunk，chunk id 从 0 重新开始、`base_row_id` 以 `1 << 32` 起算；块、全文、次级、稀疏 chunk 逐字节相同，HNSW 头/向量/标签与 IVF `(offset, vector)` 按内容；catalog 键值相同的部分逐键比；参考读两边目录答案一致，跨段全文合并同时返回两个段的行 |
 | `::test_a_segment_with_many_blocks_keeps_one_chunk_per_index` | 一次 `IMPORT` 20000 行 → 一段 3 块 | 每个索引在该段只有**一个** chunk（`row_count` 20000、`base_row_id` 0）——`PopulateIndex` 按 `mem_index_capacity`/段末 dumps 一次，不是每块一个；块、全文、次级、稀疏逐字节相同；参考读两边答案一致 |
 | `::test_a_compacted_table_matches_and_keeps_its_sources` | 4 次 `IMPORT`（100+60+40+30）后 `COMPACT` | `NewCompactionAlg` 需要同层 4 个段才挑候选；合并段 id = 5、ts 是该压缩事务；四个源段保留文件与 catalog 记录、只多 `drop\|seg\|…` 与 `drop\|idx_seg\|…`，`(index, segment)` 配对记录被删（参考读目录时据此不看旧段）；新段每个索引一个 230 行 chunk |
+| `::test_a_cleanup_reclaims_the_deprecated_sources` | 同上，再在同一个目录上跑一次 `Cleanup`（第二个进程） | 两端都回收 `drop\|seg\|…` 标出的四个源段：数据文件、`catalog\|seg\|` / `seg\|` / `blk\|` 记录、索引 chunk 与 `idx_*/seg_*` 目录、以及 `drop\|…` 标记本身全部消失；只剩合并段 4，它的块 / version / chunk 与压缩后逐字节相同，`drop\|` 标记不再存在，查询仍答 230 行 |
+| `::test_the_fast_rough_filters_match_byte_for_byte` | 3 次 `IMPORT`（100+60+40）封存三个段 | `seg\|…\|fast_rough_filter` 与 `blk\|…\|fast_rough_filter` 各 3 条、每条 130 字节、十六进制逐字节相同（用重写版 CLI 的 `dump-catalog` 绕开 `show catalog` 把二进制渲染成空串的问题） |
 | `::test_a_table_larger_than_a_segment_starts_a_second_one`（`INFINITY_BYTES_HUGE=1`） | 一次 `IMPORT` 8,388,700 行、两列无索引 → 1024 块在 `seg_0`、92 行在 `seg_1` | 容量 8,388,608 行触发第二段（`TableCache::PrepareAppendNolock`），整条导入仍是一个事务；两引擎的块数（1024 + 1）、块字节、`version` 相同；两侧答案一致 |
 | `::test_the_object_directory_is_shared_with_the_reference` | 100 行 + 次级索引；两个引擎各写一次 `persistence_dir`（`storage_type = "local"`，即桶在本地的那份布局），写完删掉 `data/`，由另一个引擎读 | 对面的引擎按 `pm|object|` 解析打包对象后：行数 100、`id = 7` 命中、次级范围查询命中同一批 id；两个方向一致 |
 | `::test_the_port_round_trips_through_object_storage` | 200 行 + `storage_type="minio"` → 清空本地目录 → 读回 → 再写 50 行（在恢复出来的树上做 checkpoint）→ 再清空 → 读回 | 重写版从桶里恢复 `data/`+`catalog/`+`persistence/`，行数 200；第二次 checkpoint 后是 250（需要 `INFINITY_MINIO_URL`；每次跑用新桶，避免上一轮的桶污染） |
@@ -64,8 +66,10 @@
 | `::test_the_quantized_ivf_indexes_survive_a_crash` | 上一张表 + 30 行未 flush + 删除 10 行后 kill -9，双向交接 | 另一引擎 replay 后 220 行；SQ / PQ 各返回 10 个合法 id，且不含未 flush 阶段删除的 id |
 | `::test_the_indexes_survive_a_crash` | 100 行 flush + dump → 50 行未 flush + 删除 10 行后 kill -9，双向交接；6 个索引（次级 INT / DOUBLE、BMP、HNSW、IVF、全文） | 另一引擎 replay 后 140 行；次级等值仍命中已 flush 的行；稀疏 / HNSW / IVF / 全文各返回 5 个合法 id |
 | `::test_the_sparse_index_options_reach_the_chunk` | 300 行、300 个不同 term、列声明 `sparse,512,...`；同一列上两个 BMP 索引：`block_size = 4` 与默认（16） | 同一引擎里两个 chunk 必须**不同**（选项确实进了 chunk）；各自与另一引擎的同名 chunk 逐字节相同；chunk 盖住 300 行 |
-| `::test_the_wal_entries_match_for_the_shared_commands` | 建表 + 100 行 append + 20 行 delete + 10 行 update，**不** flush（WAL 不被 checkpoint 截断） | 每条 `Append` / `Delete` 的提交 ts、命令类型、库名/表名逐字节相同；`Delete` 的行 id 列表逐字节相同；`Append` 的块头（`block_num/block_id/first_row_id/row_count`）逐字节相同 |
+| `::test_the_append_block_matches_for_every_type` | 每个类型一张单列表，各插一行：NULL、bool、int8/16/32/64、float32/64、float16/bfloat16、varchar、date、time、datetime、timestamp、json、vector,4,float、multivector,2,float、tensor,4,float、sparse,8,float,int | 两块 `AppendV2` 的 `DataBlock` 逐字节相同：位压缩 bool、`{i32 date,i32 time}` 的日期时间、`{u64 len,u64 offset}`+BSON 的 json、行内 embedding、`{u16 count,u48 offset}`+元素 heap 的 tensor/multivector、`{i64 nnz,i64 offset}`+`indices++values` 的 sparse，以及 NULL 的 roaring 位图（值域 8192 行、位为**非 NULL** 行）；第二阶段重启端口，确认这些块都能 replay 回行 |
+| `::test_the_wal_entries_match_byte_for_byte` | 建表 + 100 行 append + 20 行 delete + 10 行 update，**不** flush（WAL 不被 checkpoint 截断） | `wal.log` **整帧**完全相同（header 的 `txn_id` 与 CRC 也一致），**含**参考在空目录上写的启动 `CheckpointV2(1)`：typed DDL 命令、`AppendV2` 的整块（参考 `DataBlock` 列式编码）、`DeleteV2` 的行 id，以及 UPDATE 帧内 delete→append 的命令顺序 |
 | `test_cross_engine_compat.py` | 200 行，4 类索引 | 双向交接：A 写 → B 读 → B 再写 |
+| `::test_analyzer_names_and_tokenisation_match` | 17 个 `ANALYZER` 名字（`ngram-3`/`ngram-3x`/`ngram-0`、`sparsegram-3-12`/`-fold`/`-0`/`-100-5`/`--3`、`keyword`/`keyword-,`、`whitespace`/`whitespace-#@$`、`Chinese`、`RAG-fine`…），各建一张表并插 6 行 | 两个引擎各自独立建目录：`CREATE INDEX` 的接受/拒绝**完全一致**，且每个被接受的名字上 7 条 `MATCH TEXT` 查询命中的行 id 相同（`keyword-,` 按逗号切、`whitespace-AB` 保留大写、`ngram-3x` 等价 `ngram-3`） |
 | `infinity-storage/tests/s3_minio.rs` | 本地临时目录 + 桶 | `tree_sync_and_restore`（往返 + 二次同步上传 0 个文件）、`same_size_edit_is_uploaded`（同长度改写必须重传）、`put_get_list_delete_roundtrip`；需要 `INFINITY_MINIO_TEST=1` |
 
 ## 4. 覆盖矩阵
@@ -85,10 +89,10 @@
 | 次级索引 chunk（浮点键） | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ 重放后查询 | ✅ float / double 键 | ◐ |
 | 稀疏 BMP chunk | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ 重放后查询 | ✅ block_size / 词表规模 | ◐ |
 | 删除位图（catalog 内） | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
-| WAL 记录 | ◐ 帧头+删除 id 逐字节 | ◐ | ◐ | ✅ | ✅ | ✅ 跨引擎 replay | — | ◐ |
+| WAL 记录 | ✅ 整份 `wal.log` 逐字节帧体 | ✅ | ◐ | ✅ | ✅ | ✅ 跨引擎 replay | — | ◐ |
 | Catalog KV | ◐ 逻辑 | ◐ | ◐ | ✅ | ✅ | ◐ | — | — |
 
-"对象存储"列的 `◐` 现在指**跨引擎对象目录**：任一引擎写出的 `pm|object|` + 打包对象，另一个引擎删掉 `data/` 后也能读出来（§3 的对象目录用例）。MinIO 传输层仍只有重写版自身往返，原因见 §6.5。
+"对象存储"列的 `◐` 指**跨引擎对象目录**（本地布局）：任一引擎写出的 `pm|object|` + 打包对象，另一个引擎删掉 `data/` 后也能读出来（§3 的对象目录用例）。桶传输层**不移植**参考的设计，跨引擎桶互读门禁不成立，原因见 §6.5。
 
 ## 5. 未纳入门禁的部分
 
@@ -96,8 +100,8 @@
 
 1. **HNSW 图区**。参考用 `thread_local` 随机数，图本身不是唯一确定的；重写版的图是确定的，但两端不可能相同。
 2. **IVF 训练**。参考的 k-means 采样走 `std::random_device`，质心与质心个数都不是行值的函数。
-3. **`catalog/` 与 `wal/`**。带 ts / LSN / session id。
-4. **MinIO 桶内布局**。对象布局（`pm|object|` + 打包对象）已经对齐并由 §3 的对象目录用例双向验证；桶只是这套布局的远端传输，见 §6.5。
+3. **`catalog/` 的字节**。带 ts / LSN / session id，参考自己两次跑也不同；逻辑内容按键比（§3）。`wal/` 的文件名、帧头与帧体都已经逐字节对齐（§6.2），门禁比的是整帧。
+4. **对象存储桶内布局**。重写版**不移植**参考的远程对象存储设计（`obj_key` 打包对象 + `pm|object|` 记录 + VirtualStore 上传、catalog 的 `meta/` 路径树同步），桶内仍按路径树传播 `data/`、`catalog/`、`persistence/`。这是**主动放弃对齐**，不是"有实测理由的不确定"，理由见 §6.5。本地对象目录布局（`pm|object|` + 打包对象）已对齐并由 §3 的对象目录用例双向验证，但它不涉及桶传输。
 
 前两项的结论是**不追求字节可比**，理由在 §6.4：要复刻 libstdc++ 的 `mt19937` + `uniform_int_distribution` + 线程插入顺序，等于把实现细节写进格式。
 
@@ -105,16 +109,14 @@
 
 1. **段的产生方式**：参考在 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）之前不会因为写满而开第二段；`COMPACT` 的候选由 `NewCompactionAlg` 按 DBT 挑（同层至少 `DBT_COMPACTION_M = 4` 个段），少于四个时不开事务。多段门禁因此走 `IMPORT`：它按 `ApplySegmentIDs` 自己分配并封存一个段（`new_txn_data_impl.cpp:241`）。
 2. **多段的规模**：`test_a_multi_segment_table_matches_across_segments` 是 3 段、每段一块一个 chunk；`test_a_segment_with_many_blocks_keeps_one_chunk_per_index` 是一段三块一个 chunk；`test_a_compacted_table_matches_and_keeps_its_sources` 是 4 段压成 1 段；`test_a_table_larger_than_a_segment_starts_a_second_one` 是 8,388,700 行按容量切出的两段（1024 + 1 块，无索引，需 `INFINITY_BYTES_HUGE=1`）。仍未覆盖：**带索引**的 8M 行表（索引 chunk 会按 `mem_index_capacity` 切，规模是分钟级）、以及三段以上的容量切分。
-3. **`fast_rough_filter` 的二进制值**：记录本身已经对齐（段级 `seg|…|fast_rough_filter` 与块级 `blk|…|fast_rough_filter`，`BuildFastRoughFilterTask::ExecuteOnNewSealedSegment`，`new_txn_data_impl.cpp:1739`），字节由 `fast_rough_filter.rs` 的单测钉住（用参考抓下来的 130 字节记录做 fixture）。门禁只能确认**记录存在**：`show catalog 'all'` 把二进制值渲染成空串，比不了内容。另有两处未覆盖——`CREATE TABLE … (c BOOLEAN/DECIMAL /* bloom_filter */)` 打开的 binary-fuse 半区（门禁的 schema 不用它，重写版固定写"存在但未构建"）、以及 `HUGEINT` 以上的极值比较。
+3. **`fast_rough_filter` 之外的二进制值**：段级 `seg|…|fast_rough_filter` 与块级 `blk|…|fast_rough_filter`（`BuildFastRoughFilterTask::ExecuteOnNewSealedSegment`，`new_txn_data_impl.cpp:1739`）已经**逐字节比**——`test_the_fast_rough_filters_match_byte_for_byte` 用重写版 CLI 的 `dump-catalog`（它按 `StoreBackend::detect` 打开目录，两边都是 RocksDB）把值读成十六进制再比，`show catalog 'all'` 把二进制渲染成空串的问题因此绕开；三次 `IMPORT` 封存三个段，两级记录各 3 条、每条 130 字节。仍未覆盖——`CREATE TABLE … (c BOOLEAN/DECIMAL /* bloom_filter */)` 打开的 binary-fuse 半区（门禁的 schema 不用它，重写版固定写"存在但未构建"）。`HUGEINT` **不是**缺口：参考自己就不支持该类型（`CREATE TABLE` 报 `Not supported data type: HugeInt`，`query_context_impl.cpp:238`），两端都无从写出可比对的字节。
 4. **压缩的候选集**：`compact_table` 判空用 DBT 规则（同层 ≥ 4 段才挑），但一旦有候选就合并**全部**存活段；参考只合并它挑中的那 4 个。段数 > 4 时两者的段划分因此不同（数据一致、段号不同）。4 段用例是两边一致的唯一点。
-5. **`Cleanup` 之后的目录**：重写版的 `reclaim_deprecated_segments` 直接删掉被压缩段的文件与 `catalog\|seg\|` / `blk\|` / `seg\|` / `idx_chunk\|` 记录、连 `drop\|` 标记一起删；参考的 `NewCatalog::CleanSegment` 还会写 `drop\|idx_chunk\|…` 之类"已删"标记。这一步没有逐记录比（门禁只覆盖到 `Cleanup` 之前）。
-6. **PLAID / EMVB / MULTIVECTOR 索引 chunk**：镜像里有写入代码（`write_cpp_plaid_index`、multivector chunk），但字节门禁只覆盖全文、HNSW、IVF（plain/SQ/PQ）、次级（int/float/double/date）、稀疏 BMP。PLAID 需要 sparse-vector 数据、EMVB/MULTIVECTOR 需要 embedding 列，目前只有重写版自身的单测。
-7. **快照（`CREATE TABLE/DATABASE/SYSTEM SNAPSHOT`）**：参考的快照是 `data/snapshot/…` 下的文件副本 + JSON 清单（`SnapshotInfo::RestoreSnapshotFiles`），重写版把它存成 KV 里的 `snap:` 记录。两种机制互不兼容，也没有任何跨引擎用例。
-8. **WAL 的 Append 行载荷**：帧头（提交 ts、命令数、命令类型、库名/表名）、`Delete` 的行 id 列表、`Append` 的块头都逐字节比（`test_the_wal_entries_match_for_the_shared_commands`）；`Append` 的行数据段与 `Delete` 的结尾计数字是重写版自己的编码——两个方向都能 replay（`test_a_crash_leaves_a_replayable_directory` 与 `test_the_indexes_survive_a_crash`），但字节不同。DDL 不在比对内：参考写 `CreateTable`/`CreateIndex`，重写版写 `KvBatch`（它落盘的 catalog 键），是不同的命令而非同一命令的不同编码。
+5. **PLAID / EMVB / MULTIVECTOR 索引 chunk**：镜像里有写入代码（`write_cpp_plaid_index`、multivector chunk），但字节门禁只覆盖全文、HNSW、IVF（plain/SQ/PQ）、次级（int/float/double/date）、稀疏 BMP。PLAID 需要 sparse-vector 数据、EMVB/MULTIVECTOR 需要 embedding 列，目前只有重写版自身的单测。
+6. **快照（`CREATE TABLE/DATABASE/SYSTEM SNAPSHOT`）**：参考的快照是 `data/snapshot/…` 下的文件副本 + JSON 清单（`SnapshotInfo::RestoreSnapshotFiles`），重写版把它存成 KV 里的 `snap:` 记录。两种机制互不兼容，也没有任何跨引擎用例。
 
 ### 5.3 流程
 
-1. **CI**：`.github/workflows/rust_engine.yml` 的 `cross_engine` job 在 builder 镜像里编参考、用 `--features rocksdb-store` 编重写版，并在 bwrap 下跑两个 pytest 文件。**对象存储不在 CI 里**：job 没有设 `INFINITY_MINIO_URL` / `INFINITY_MINIO_TEST`，所以 `test_the_port_round_trips_through_object_storage` 与 `s3_minio.rs` 在 CI 中都是 skip，需要手工跑（§7）。
+1. **CI**：`.github/workflows/rust_engine.yml` 的 `cross_engine` job 在 builder 镜像里编参考、用 `--features rocksdb-store` 编重写版，并在 bwrap 下跑两个 pytest 文件。**对象存储不在 CI 里**：重写版不移植参考的远程对象存储（§6.5），`test_the_port_round_trips_through_object_storage` 与 `s3_minio.rs` 只覆盖重写版自身的桶往返，需要手工跑（§7）。
 2. **重写版自身确定性**：由 `test_the_port_is_deterministic_too` 单独断言（3 次跑，`data/` 下每个文件都必须相同）。
 
 ## 6. 与 C++ 参考的差异
@@ -125,16 +127,15 @@
 |---|---|---|---|
 | HNSW 图区 | 确定（插入顺序即行序） | `thread_local std::mt19937`，节点层级取决于线程调度 | header / vectors / labels 字节比，图区与查询答案按内容比 |
 | IVF 质心 | 确定 | `std::random_device` 采样，质心个数也不固定 | chunk 按内容比 |
-| `catalog/`、`wal/` | RocksDB；redo 记录写 `wal/wal.rust`，replay 时同时读参考的 `wal/wal.log` | RocksDB；写 `wal/wal.log` | 只比逻辑内容与互读 |
 | 对象存储：写出的布局 | `persistence_format = "reference"` 时写 `pm\|object\|` 记录 + 打包对象（与参考同一套，128 MB 上限 / footer / stat） | `ObjCreate` 命名打包 blob，本地路径映射在 KV 的 `pm\|object\|<path>` | 对象目录用例双向比（§3） |
-| 对象存储：S3 传输 | 路径树 `data/`、`catalog/`、`persistence/` 逐文件上传 | 对象键即 `obj_key`，对象文件直接上传 | 只做重写版自身往返（无可用端点，§6.5） |
+| 对象存储：S3 传输 | 路径树 `data/`、`catalog/`、`persistence/` 逐文件上传 | 对象键即 `obj_key`，对象文件直接上传 | **不移植**该差异（§6.5）；只做重写版自身往返 |
 | 索引 chunk 的段目录 | 每个段一套 `idx_{id}/seg_{s}/`，chunk id 每段从 0 起 | 同左 | 多段用例逐文件比（§3） |
 | 块镜像的大小上限 | 没有：每张表都镜像，内存按块（一次 range scan 一个块） | 没有：写入即落块 | 8,388,700 行用例（§3） |
 | 索引 chunk 的粒度 | `IMPORT` 的段：全文按 `mem_index_capacity` 切、次级/稀疏整段一个；`INSERT` 的段：按块 | 同左 | 一段三块用例（§3） |
 | 压缩后的段布局 | 合并段 = 最大段号 + 1，块/版本/chunk 都带压缩事务的 ts；源段保留文件与记录，另写 `drop\|seg\|` 与 `drop\|idx_seg\|`、删 `(index, segment)` 配对；`Cleanup` 才回收 | 同左 | 4 段压缩用例（§3） |
-| `seg\|…\|fast_rough_filter` / `blk\|…` | 与参考同字节（`fast_rough_filter.rs`） | `IMPORT`/压缩时建 | 门禁只断言记录存在（`show catalog` 渲染二进制为空），字节由单测 fixture 钉住（§5.2.3） |
+| 压缩的 WAL 命令 | 一帧两条：`AppendV2`（新段的行，按新 row id）+ `DeleteV2`（被移动行的旧 id 墓碑） | 一帧一条 `CompactV2`（`SegmentInfo` + 废弃段 id），不搬行 | 参考能 replay 重写版这一帧（`test_a_compacted_table_matches_and_keeps_its_sources` 里参考读端口目录），但命令与载荷不同，不纳入逐字节门禁 |
+| `seg\|…\|fast_rough_filter` / `blk\|…` | 与参考同字节（`fast_rough_filter.rs`） | `IMPORT`/压缩时建 | 已逐字节比：`test_the_fast_rough_filters_match_byte_for_byte` 用 `dump-catalog` 读十六进制（`show catalog` 渲染二进制为空，走它只能断言记录存在）；字节另有 `fast_rough_filter.rs` 单测的 130 字节 fixture 钉住（§5.2.3） |
 | 段的产生时机 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切（与参考相同）；单段 `COMPACT` 不开事务 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切 | 见 §5.2 |
-| WAL 的 `Append` 行载荷 / DDL 命令 | 行数据按 `row_id` + 文本编码，DDL 写 `KvBatch`（catalog 键值） | 行数据按块内列编码，DDL 写 `CreateTable`/`CreateIndex` | 帧头、命令类型、库/表名、`Delete` 行 id 逐字节比；行载荷与 DDL 只保证双向 replay |
 | 不带 `rocksdb-store` feature 时 | catalog 落 fjall | 只认 RocksDB | 参考打开只剩 `system_tag`（`Database: default_db doesn't exist`）；门禁必须带 feature |
 
 ### 6.2 与参考逐字节一致的部分
@@ -144,7 +145,10 @@
 - 全文 `.dic/.pos/.len`、次级索引 chunk（整数键与浮点键，含 PGM 模型）、稀疏 BMP chunk；
 - 块的 NULL 位图，包括 `IMPORT` 写出的块的空位图覆盖规则：参考在一次导入里按**导入行数**建位图（最后一字节的尾位是 0），`INSERT` 写的块按字节填满（尾位是 1），两条规则都复刻（`ColumnBody::build_with`）；
 - JSON 列按 BSON 落盘（`{"data": <值>}` 外层、键排序、小整数 `int32`）；
-- 浮点列按精确值落盘，只有 SELECT 输出层按 6 位小数格式化。
+- 浮点列按精确值落盘，只有 SELECT 输出层按 6 位小数格式化；
+- WAL 的**整份 `wal/wal.log`**：活动日志同时承载 checkpoint 帧与事务帧，checkpoint 时按 `WalManager::SwapWalFile` 改名成 `wal.log.<seal_ts>` 再建新文件，文件名与参考一致。逐帧比较**整帧**（含 header 的 `size`、`txn_id` 和 CRC32——CRC 覆盖 `txn_id`，所以事务号序列也对齐了）：空目录上的启动 `CheckpointV2(1)`、`DeleteV2` 的行 id、11 类 typed DDL 命令、`AppendV2` 的 `DataBlock`（`[i32 ncols]` + 每列 `DataType + ColumnVectorType + tail + 定长区 + VectorBuffer + NullBitmap`），以及 UPDATE 帧内 delete→append 的命令顺序。列类型覆盖 `BOOLEAN`（位压缩）、各整数宽度、`FLOAT16`/`BFLOAT16`、`VARCHAR`、`DATE`/`TIME`/`DATETIME`/`TIMESTAMP`、`JSON`、`EMBEDDING`、`TENSOR`/`TENSORARRAY`/`MULTIVECTOR`、`SPARSE`；NULL 位图是 roaring，值域是整段 8192 行里**非 NULL** 的行。
+  **事务号**按参考的 `BeginTxnShared` 花：*每条语句*一个（只读的 `SELECT`/`USE`/`SHOW` 也算），启动时先花一个给内存索引恢复（`Storage::Init` → `RecoverMemIndex`）、启动 checkpoint 再花一个、`create default_db` 再花一个；服务端对除 `Connect`/`Disconnect` 之外的每个 RPC 记一条语句，`execute` 里每个语句复用该 id，一条 SQL 写多条语句时每条各花一个。帧头与帧体都一致，`txn_id` 逐一相同，CRC 也随之相同。
+  NULL 行的定长 slot 和 `VARCHAR` 的内联 padding 参考侧不写（未初始化内存：同一张 NULL 表放在 `time` 列之后 slot 是 `252b0000`、放在 `int32` 之后是 `03000000`，而 `VARCHAR` 内联串的 7 个尾字节实测出现过 `0x53`），重写版写 0。两者只在参考的缓冲区是干净的（新进程、该列第一次写）时才逐字节相同，门禁就是这样安排的：`test_the_append_block_matches_for_every_type` 把 NULL 表放在新进程的第一位，`test_the_wal_entries_match_byte_for_byte` 只做一次 append。
 
 ### 6.3 参考的非格式行为（决定门禁怎么写）
 
@@ -163,20 +167,31 @@
 
 要让两引擎产出同一个图，重写版必须逐位复刻 `std::mt19937`、`std::uniform_int_distribution` 的取模方式、以及**线程插入顺序**。随机数和线程调度都不是格式的一部分。
 
-### 6.5 对象存储：同一套对象布局
+### 6.5 对象存储：本地布局对齐，桶传输不移植
 
-参考的持久化层（`PersistenceManager`，`src/storage/persistence/persistence_manager_impl.cpp`）不把数据文件留在 `data/`，而是：
+**决定：不移植参考的远程对象存储功能。** 重写版的 S3 客户端（`infinity_storage::s3`）按路径树上传播 `data/`、`catalog/`、`persistence/`，**不**复刻参考的 `obj_key` 打包对象 + VirtualStore 上传设计。本地对象目录布局（`pm|object|` + 打包对象）仍与参考对齐，并由 §3 的对象目录用例双向验证；桶内布局则不追求与参考一致。
 
-- 把文件按 8 字节对齐拼进**对象**，或整个搬过去；对象文件的文件名就是 `obj_key`；
-- 在 catalog 里写 `pm|object|<相对 data_dir 的路径>` → `{"obj_key","part_offset","part_size"}`，空文件记 `KEY_EMPTY`；
-- 另写 `pm|object_stat|<obj_key>` → `{"deleted_ranges":[],"obj_size","parts"}`；
-- 对象目录就是 `persistence_dir`（本地模式），换成 `storage_type = "minio"` 时同一份布局在桶里（`VirtualStore` 只换传输）。
+参考的持久化层（`PersistenceManager`，`src/storage/persistence/persistence_manager_impl.cpp`）在本地模式下把数据文件按 8 字节对齐拼进**对象**，对象文件名就是 `obj_key`，并在 catalog 里写：
 
-重写版现在读写同一套布局：`[storage] persistence_format = "reference"`（参考会拒绝 `[storage]` 里的未知键，所以这个键只写进重写版的配置）让引擎在打开时按 `pm|object|` 把缺的 `data/` 文件从对象里取出来，并在每次 checkpoint 后把 `data/` 重新打包成一个对象、重写这些记录。`test_the_object_directory_is_shared_with_the_reference` 双向验证：任一引擎写出的对象目录，删掉 `data/` 后另一个引擎都能按对象答出同样的行与索引结果。
+- `pm|object|<相对 data_dir 的路径>` → `{"obj_key","part_offset","part_size"}`，空文件记 `KEY_EMPTY`；
+- `pm|object_stat|<obj_key>` → `{"deleted_ranges":[],"obj_size","parts"}`。
 
-剩下的差异只有传输层：重写版的 S3 客户端（`infinity_storage::s3`）仍按路径树上传播 `data/`、`catalog/`、`persistence/`，没有把打包对象与 `pm|object|` 记录发到桶里。要覆盖这一段需要一个可用的 S3 端点（用例需要 `INFINITY_MINIO_URL`），而 MinIO 开源版已归档、本机也没有可用的替代端点，所以这一列在门禁里仍是重写版自身的往返。
+对象目录就是 `persistence_dir`。换成 `storage_type = "minio"` 时，参考通过 `VirtualStore::UploadObject` 把**整个打包对象**按**裸 `obj_key`**（UUID，无路径前缀）上传到桶，删除时按 `obj_key` 删；catalog（RocksDB）另由 `KVStore` 的 `FlushListener`/`CompactListener` 以 `meta/`、`meta/sst/` 路径树同步到桶。这是两套独立的机制。
 
-参考的 compose 规则（128 MB 上限、独占对象、`parts > 1` 的 4 字节 footer、逐次 append 的统计记录、引用计数与 `deleted_ranges`）已由 `infinity_storage::persistence` 实现，逐条单测与参考写出的记录值对照；移植过程与剩余的纯形状重构见 [`PERSISTENCE_MANAGER_PORT_PLAN.md`](PERSISTENCE_MANAGER_PORT_PLAN.md)。
+重写版**只复刻了本地这一半**：`[storage] persistence_format = "reference"`（参考会拒绝 `[storage]` 里的未知键，所以这个键只写进重写版的配置）让引擎在打开时按 `pm|object|` 把缺的 `data/` 文件从对象里取出来，并在每次 checkpoint 后把 `data/` 重新打包。`test_the_object_directory_is_shared_with_the_reference` 双向验证：任一引擎写出的对象目录，删掉 `data/` 后另一个引擎都能按对象答出同样的行与索引结果。
+
+**桶传输层不移植**：重写版的 S3 客户端上传的是路径树（每文件一个对象，键为 `data/...` 等相对路径），不是参考的打包对象（裸 `obj_key` 一个对象）。因此：
+
+- 桶内布局与参考**不同**，跨引擎对象存储互读门禁不成立（参考不会用 `restore_tree` 读路径树，重写版也不会按 `obj_key` 下载）；
+- 参考的 compose 规则（128 MB 上限、独占对象、`parts > 1` 的 4 字节 footer、引用计数与 `deleted_ranges`）在**本地**已由 `infinity_storage::persistence` 实现并逐条单测与参考对照，但它们不进入桶；
+- 重写版自身的桶往返由 `test_the_port_round_trips_through_object_storage`（Python）与 `s3_minio.rs`（Rust）覆盖，需要一个 S3 端点（MinIO 平替 silo：`pgsty/silo`，默认 `minioadmin/minioadmin`，端口 9000，`silo server <data_dir>` 启动），CI 不跑。
+
+| 方面 | C++ 参考 | 重写版（现状） |
+|---|---|---|
+| 上传单元 | 打包对象（≤128MB，多文件，8 字节对齐，多 part 加 4 字节 footer） | 单个文件（路径树） |
+| S3 对象键 | 裸 `obj_key`（UUID） | 相对路径（`data/...`、`catalog/...`、`persistence/...`） |
+| catalog 上传 | RocksDB listener 同步到 `meta/`、`meta/sst/` | 作为路径树的一部分 |
+| 数据文件恢复 | 按 `pm|object|` 记录惰性下载 | 启动时 `restore_missing_files` 扫描 |
 
 ### 6.6 时间戳：两个引擎消耗同一条序列
 
@@ -207,7 +222,7 @@
          20=Append 22=checkpoint(flush) 24/26/28/30/32=DumpIndex
 ```
 
-（文件级读数会误导：重写版的 redo 记录在 `wal.rust`，`wal.log` 只保留最新一个 checkpoint 帧，后写的那帧由 `cover_with_checkpoint` 覆盖到最后一次 dump，所以 `wal.log` 里读到的是 32；参考会截断自己的 `wal.log`。逐值比较看的是两边实际消耗的提交 ts。）
+（文件级读数会误导：`wal.log` 里可能有多条 checkpoint 帧（`cover_with_checkpoint` 为 dump 的 chunk 追加的覆盖帧），参考也会在 checkpoint 时整文件换新；最新一条 checkpoint 记录的是它自己的覆盖范围，不是最后一个事务。逐值比较看的是两边实际消耗的提交 ts。）
 
 第二个进程接着写同一目录（append 100 / delete 20 / update 10 / flush / dump ×2）：
 

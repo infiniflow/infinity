@@ -2232,6 +2232,120 @@ pub struct IndexScanPlan {
     pub candidates: Vec<IndexScanCandidate>,
 }
 
+/// The predicate directly above a `Scan` node, if the plan has one.
+pub fn scan_predicate_of(plan: &LogicalPlan) -> Option<Expr> {
+    match plan {
+        LogicalPlan::Filter { input, predicate } => match &**input {
+            LogicalPlan::Scan { .. } => Some(predicate.clone()),
+            _ => scan_predicate_of(input),
+        },
+        LogicalPlan::Projection { input, .. }
+        | LogicalPlan::Aggregate { input, .. }
+        | LogicalPlan::Sort { input, .. }
+        | LogicalPlan::Limit { input, .. }
+        | LogicalPlan::Offset { input, .. } => scan_predicate_of(input),
+        _ => None,
+    }
+}
+
+/// Puts `predicate` directly above the scan, under any existing filter.
+///
+/// The index-scan builder removes the predicate it answered; the same
+/// predicate still has to run over the index-selected rows, and it addresses
+/// the scan's output columns, so wrapping the plan root would re-bind it.
+pub fn add_filter_above_scan(plan: LogicalPlan, predicate: Expr) -> LogicalPlan {
+    match plan {
+        LogicalPlan::Scan { .. } | LogicalPlan::IndexScan { .. } | LogicalPlan::Values { .. } => {
+            LogicalPlan::Filter {
+                input: Box::new(plan),
+                predicate,
+            }
+        }
+        LogicalPlan::Filter {
+            input,
+            predicate: existing,
+        } => LogicalPlan::Filter {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            predicate: existing,
+        },
+        LogicalPlan::Projection {
+            input,
+            exprs,
+            names,
+        } => LogicalPlan::Projection {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            exprs,
+            names,
+        },
+        LogicalPlan::Aggregate {
+            input,
+            group_keys,
+            group_names,
+            aggs,
+        } => LogicalPlan::Aggregate {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            group_keys,
+            group_names,
+            aggs,
+        },
+        LogicalPlan::Sort { input, keys } => LogicalPlan::Sort {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            keys,
+        },
+        LogicalPlan::Limit { input, n } => LogicalPlan::Limit {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            n,
+        },
+        LogicalPlan::Offset { input, n } => LogicalPlan::Offset {
+            input: Box::new(add_filter_above_scan(*input, predicate)),
+            n,
+        },
+        other @ LogicalPlan::Join { .. } => LogicalPlan::Filter {
+            input: Box::new(other),
+            predicate,
+        },
+    }
+}
+
+/// C++ `IndexScanBuilder` as an optimizer rule.
+///
+/// The reference replaces the plan's `LogicalTableScan` with a
+/// `LogicalIndexScan` that owns the filter evaluator. The rule does the same:
+/// the answered predicate is pushed into an [`LogicalPlan::IndexScan`] node and
+/// the residual (if any) stays in a `Filter` above it.
+pub struct IndexScanRule {
+    catalog: IndexCatalog,
+    regex: Option<RegexIndexCatalog>,
+}
+
+impl IndexScanRule {
+    pub fn new(catalog: IndexCatalog, regex: Option<RegexIndexCatalog>) -> Self {
+        Self { catalog, regex }
+    }
+}
+
+impl crate::optimize::OptimizerRule for IndexScanRule {
+    fn name(&self) -> &'static str {
+        "Index Scan Builder"
+    }
+
+    fn apply(&self, plan: LogicalPlan) -> infinity_common::Result<LogicalPlan> {
+        // The index scan is the candidate phase; the answered predicate still
+        // runs above it as the exact check. C++ folds the two into the node
+        // because its evaluator is exact per row; this one narrows candidates,
+        // so the residual keeps the answer exact.
+        let residual = scan_predicate_of(&plan);
+        let built = IndexScanBuilder::build_with_regex(plan, &self.catalog, self.regex.as_ref())?;
+        let mut plan = built.plan;
+        if !built.candidates.is_empty() {
+            if let Some(residual) = residual {
+                plan = add_filter_above_scan(plan, residual);
+            }
+        }
+        Ok(plan)
+    }
+}
+
 /// C++ `IndexScanBuilder`.
 ///
 /// C++ replaces the `LogicalTableScan` with a `LogicalIndexScan` node holding
@@ -2286,21 +2400,24 @@ fn rewrite(
                 // that have candidate index columns).
                 let answered = pushed.index_filter_evaluator.kind() != EvaluatorType::AllTrue;
                 if let Some(index_filter) = pushed.index_filter.as_ref().filter(|_| answered) {
-                    candidates.push(IndexScanCandidate {
+                    let candidate = std::sync::Arc::new(IndexScanCandidate {
                         table: table.clone(),
                         index_filter: index_filter.clone(),
                         leftover_filter: pushed.leftover_filter.clone(),
                         evaluator: pushed.index_filter_evaluator,
                     });
+                    candidates.push((*candidate).clone());
+                    let scan = LogicalPlan::IndexScan {
+                        table: table.clone(),
+                        columns: columns.clone(),
+                        candidate,
+                    };
                     return Ok(match pushed.leftover_filter {
                         Some(leftover) => LogicalPlan::Filter {
-                            input: Box::new(LogicalPlan::Scan {
-                                table: table.clone(),
-                                columns: columns.clone(),
-                            }),
+                            input: Box::new(scan),
                             predicate: leftover,
                         },
-                        None => input,
+                        None => scan,
                     });
                 }
             }
@@ -2777,7 +2894,7 @@ mod tests {
         assert_eq!(built.candidates[0].table, "t");
         assert_eq!(built.candidates[0].index_filter, predicate);
         assert_eq!(built.candidates[0].leftover_filter, None);
-        assert!(matches!(built.plan, LogicalPlan::Scan { .. }));
+        assert!(matches!(built.plan, LogicalPlan::IndexScan { .. }));
 
         // A non-indexed predicate keeps the filter and reports no candidate.
         let plan = LogicalPlan::Filter {
@@ -2787,6 +2904,56 @@ mod tests {
         let built = IndexScanBuilder::build(plan, &catalog()).unwrap();
         assert!(built.candidates.is_empty());
         assert!(matches!(built.plan, LogicalPlan::Filter { .. }));
+    }
+
+    /// `IndexScanRule` is the optimizer-rule form of the builder: it rewrites
+    /// the plan (the answered predicate is pushed down, the original stays as
+    /// the residual above the scan) and publishes the candidate for the
+    /// executor.
+    #[test]
+    fn the_index_scan_rule_writes_the_candidate_into_the_plan() {
+        let scan = LogicalPlan::Scan {
+            table: "t".into(),
+            columns: vec!["id".into(), "ok".into()],
+        };
+        let predicate = cmp(col(0), CmpOp::Ge, Expr::Literal(Value::Int(1)));
+        let plan = LogicalPlan::Filter {
+            input: Box::new(scan),
+            predicate: predicate.clone(),
+        };
+        let rule = IndexScanRule::new(catalog(), None);
+        let mut optimizer = crate::optimize::Optimizer::new();
+        optimizer.add_rule(Box::new(rule));
+        let out = optimizer.optimize(plan).unwrap();
+        // A fully answered predicate needs no residual `Filter`.
+        let LogicalPlan::IndexScan {
+            candidate,
+            table,
+            columns,
+        } = &out
+        else {
+            panic!("expected an index scan, got {out:?}");
+        };
+        assert_eq!(table, "t");
+        assert_eq!(columns, &vec!["id".to_string(), "ok".to_string()]);
+        assert_eq!(candidate.index_filter, predicate);
+        // A predicate nothing can answer leaves a plain scan.
+        let rule = IndexScanRule::new(catalog(), None);
+        let mut optimizer = crate::optimize::Optimizer::new();
+        optimizer.add_rule(Box::new(rule));
+        let plan = LogicalPlan::Filter {
+            input: Box::new(LogicalPlan::Scan {
+                table: "t".into(),
+                columns: vec!["id".into(), "ok".into()],
+            }),
+            predicate: Expr::IsNull(Box::new(col(1)), false),
+        };
+        let out = optimizer.optimize(plan).unwrap();
+        assert!(matches!(out, LogicalPlan::Filter { .. }));
+        let LogicalPlan::Filter { input, .. } = out else {
+            unreachable!()
+        };
+        assert!(matches!(*input, LogicalPlan::Scan { .. }));
     }
 
     struct RangeIndex {
