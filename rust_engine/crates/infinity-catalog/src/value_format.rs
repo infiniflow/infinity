@@ -575,6 +575,25 @@ pub mod ivf_storage {
     pub const PRODUCT_QUANTIZATION: i64 = 2;
 }
 
+/// `IndexIVFCentroidOption`'s values (`index_ivf.cppm:30-35`): the defaults are
+/// 1.0 / 32 / 256, and `Make` only overrides the ones the statement passed.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct IvfCentroid {
+    pub num_ratio: f64,
+    pub min_points: i64,
+    pub max_points: i64,
+}
+
+impl Default for IvfCentroid {
+    fn default() -> Self {
+        Self {
+            num_ratio: 1.0,
+            min_points: 32,
+            max_points: 256,
+        }
+    }
+}
+
 /// `BMPCompressType` ordinals (`bmp_util.cppm:28-32`).
 pub mod bmp_compress {
     pub const RAW: i64 = 0;
@@ -898,8 +917,9 @@ impl IndexDefValue {
         .with("is_json_index", Json::Bool(is_json_index))
     }
 
-    /// `IndexIVF::Serialize()` with **plain** storage and the C++ centroid
-    /// defaults (`index_ivf_impl.cpp:339-393`, `index_ivf.cppm:30-61`).
+    /// `IndexIVF::Serialize()` with **plain** storage, the C++ centroid
+    /// defaults and no quantization (`index_ivf_impl.cpp:339-393`,
+    /// `index_ivf.cppm:30-61`).
     pub fn ivf_plain(
         index_name: &str,
         table_name: &str,
@@ -907,10 +927,54 @@ impl IndexDefValue {
         metric: i64,
         plain_storage_data_type: i64,
     ) -> Self {
+        Self::ivf(
+            index_name,
+            table_name,
+            column,
+            metric,
+            IvfCentroid {
+                num_ratio: 1.0,
+                min_points: 32,
+                max_points: 256,
+            },
+            ivf_storage::PLAIN,
+            plain_storage_data_type,
+            0,
+            0,
+            0,
+        )
+    }
+
+    /// `IndexIVF::Serialize()` with every option spelled out. `IndexIVF::Make`
+    /// only fills the fields its `storage_type` uses: a quantized index keeps
+    /// `plain_storage_data_type_` at `kElemInvalid` (10), while the plain one
+    /// falls back to the column's element type (`CheckIndexIVFStorageOption`).
+    #[allow(clippy::too_many_arguments)]
+    pub fn ivf(
+        index_name: &str,
+        table_name: &str,
+        column: &str,
+        metric: i64,
+        centroid: IvfCentroid,
+        storage_type: i64,
+        plain_storage_data_type: i64,
+        scalar_quantization_bits: i64,
+        product_quantization_subspace_num: i64,
+        product_quantization_subspace_bits: i64,
+    ) -> Self {
         let centroid = obj(vec![
-            ("centroids_num_ratio_".to_string(), Json::Float(1.0)),
-            ("min_points_per_centroid_".to_string(), Json::Int(32)),
-            ("max_points_per_centroid_".to_string(), Json::Int(256)),
+            (
+                "centroids_num_ratio_".to_string(),
+                Json::Float(centroid.num_ratio),
+            ),
+            (
+                "min_points_per_centroid_".to_string(),
+                Json::Int(centroid.min_points),
+            ),
+            (
+                "max_points_per_centroid_".to_string(),
+                Json::Int(centroid.max_points),
+            ),
         ]);
         let storage = obj(vec![
             (
@@ -919,14 +983,17 @@ impl IndexDefValue {
             ),
             (
                 "product_quantization_subspace_bits_".to_string(),
-                Json::Int(0),
+                Json::Int(product_quantization_subspace_bits),
             ),
             (
                 "product_quantization_subspace_num_".to_string(),
-                Json::Int(0),
+                Json::Int(product_quantization_subspace_num),
             ),
-            ("scalar_quantization_bits_".to_string(), Json::Int(0)),
-            ("type_".to_string(), Json::Int(ivf_storage::PLAIN)),
+            (
+                "scalar_quantization_bits_".to_string(),
+                Json::Int(scalar_quantization_bits),
+            ),
+            ("type_".to_string(), Json::Int(storage_type)),
         ]);
         let option = obj(vec![
             ("metric_".to_string(), Json::Int(metric)),

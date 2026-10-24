@@ -501,9 +501,9 @@
 | 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
 | 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
 | 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行；执行器对 WHERE 里的相关合取项按外层行求值，其余位置报 “correlated subqueries are only supported as a WHERE conjunct”） 
-| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行；执行器对 WHERE 里的相关合取项按外层行求值，其余位置报 “correlated subqueries are only supported as a WHERE conjunct”） 
-| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | partial | 仅在相关子查询检测分支被调用（结果未执行；执行器对 WHERE 里的相关合取项按外层行求值，其余位置报 “correlated subqueries are only supported as a WHERE conjunct”） 
+| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | mapped | 计划侧保留并单测；执行侧由 `infinity-executor/src/dependent.rs` 按同一模型执行（相关列 = join key，内层按 distinct key 求值一次后拼回外层行）。参考自身没有执行算子（`JoinType::kMark` 只出现在 planner，`src/executor` 无对应实现，实测 C++ 直接 abort），因此这里的“mapped”指模型一致、执行由端口实现 
+| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | mapped | 同上：把 depth-1 列改写成可下推的列引用，端口对应“把嵌套查询改写成隐藏扫描列 `#_corr_n`” 
+| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | mapped | 同上：标量/IN/EXISTS 的 unnest 语义（mark 列 + 相关列 join）由 `dependent.rs` 执行；测试 `a_correlated_subquery_works_outside_the_where_clause`、`a_correlated_subquery_runs_once_per_distinct_key`、`a_correlated_subquery_reads_a_cte_or_joined_relation` 
 | 496 | `FragmentContext` | `src/scheduler/fragment_context.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
 | 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
@@ -716,7 +716,7 @@
 | 705 | `LSGConfig` | `src/storage/definition/index_hnsw.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 706 | `IndexIVF` | `src/storage/definition/index_ivf.cppm` | mapped | `infinity_index::ivf_def::IndexIvf::{make,validate_column}`，由 `Engine::validate_index` 调用 
 | 707 | `IndexIVFCentroidOption` | `src/storage/definition/index_ivf.cppm` | mapped | `infinity_index::ivf_def::CentroidOption`；质心数按 `min(sqrt(n)·ratio, n/min_points)` 在镜像时取 
-| 708 | `IndexIVFOption` | `src/storage/definition/index_ivf.cppm` | mapped | `infinity_index::ivf_def::IvfOption`；`CREATE INDEX ... USING IVF` 的参数即经它解析 
+| 708 | `IndexIVFOption` | `src/storage/definition/index_ivf.cppm` | mapped | `infinity_index::ivf_def::IvfOption`；`CREATE INDEX ... USING IVF` 的参数即经它解析。WAL 里它是 32 字节整块，参考把两段 padding 写成显式字段（`padding_after_metric_[3]`、`padding_after_storage_enums_[2]`），端口按同一布局写 0，见 `infinity-storage::wal::index_def::IndexDef::Ivf` 
 | 709 | `IndexIVFStorageOption` | `src/storage/definition/index_ivf.cppm` | mapped | `infinity_index::ivf_def::StorageOption`；镜像按 `storage_type` 写 plain/SQ/PQ，检索见 `ivf::{IvfIndex,IvfSqIndex,IvfPqIndex}` 
 | 710 | `IndexPLAID` | `src/storage/definition/index_plaid.cppm` | mapped | infinity_executor::data_table + infinity_storage::data_block 
 | 711 | `IndexSecondary` | `src/storage/definition/index_secondary.cppm` | mapped | infinity_executor::data_table + infinity_storage::data_block 

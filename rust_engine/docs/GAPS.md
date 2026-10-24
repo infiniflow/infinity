@@ -23,14 +23,15 @@
 
 ## 2 未实现 / 未接线
 
-| # | 缺口 | 现状 | 影响 | 证据 |
-|---|---|---|---|---|
-| 2.1 | 相关子查询在 WHERE 合取项之外 | WHERE 里的相关子查询已按外层行求值（`split_correlated_conjuncts` + 逐行替换外层值）；出现在投影列、HAVING、JOIN 条件里的相关子查询仍**显式拒绝** | 这类 SQL 报 `correlated subqueries are only supported as a WHERE conjunct` | `infinity-executor/src/lib.rs` `bind_subquery`；测试 `a_correlated_subquery_is_evaluated_per_outer_row` |
-| 2.2 | 相关子查询不是真正的 dependent/mark join | 逐行执行子查询（每行一次），不是参考的 `SubqueryUnnest` 计划形状 | 结果一致；大表上比参考慢（子查询按行数重复执行） | `SubqueryUnnest`/`DependentJoinFlattener`/`RewriteCorrelatedExpressions` 在 `CLASS_AUDIT.md` 仍记 `partial` |
+当前没有未实现的功能缺口。相关子查询的执行方式与门禁如下：
+
+- **相关子查询是 dependent join**（`infinity-executor/src/dependent.rs`）：`QueryBinder::bind_subquery` 的 `correlated_columns` 决定哪些嵌套查询读外层（参考的 `CorrelatedExpressionsDetector`），每个这样的嵌套查询被改写成隐藏扫描列 `#_corr_<n>`；外层关系物化后按 **distinct key** 求值内层（每个 key 一次，缓存复用），再把值拼回每一行。`WHERE`（`EXISTS`/`NOT EXISTS`/`IN`/`NOT IN`/标量比较）、投影（含投影表达式里的子查询）和 `HAVING` 都走普通列路径；`HAVING`/分组查询里要求相关列被 `GROUP BY` 决定，隐藏列随之进 `GROUP BY`（不改变分组）。外层关系可以是基表、CTE 或 JOIN 的 FROM 侧（隐藏列随左侧行进 join 源）。
+- **参考侧没有可对齐的行为**：C++ 对 `SELECT (SELECT …) FROM o` 在 `FragmentTask::OnExecute` 里 `std::terminate`/abort（实测整机崩溃），对 `WHERE EXISTS (…)` 回 `Unknown error`；`JoinType::kMark` 只有 planner 生成、`src/executor` 没有对应算子。所以这里按参考 planner 的模型（`SubqueryUnnest` → `DependentJoinFlattener` 的 mark join + 按相关列 join）执行，而不是复刻一次崩溃。
+- **测试**：`a_correlated_subquery_works_outside_the_where_clause`（投影/投影表达式/HAVING）、`a_correlated_subquery_runs_once_per_distinct_key`（4 行 2 个 key → 内层只执行 2 次，含 `IN`/`NOT IN`）、`a_correlated_subquery_reads_a_cte_or_joined_relation`（CTE 与 JOIN 左侧）、以及原有的 `a_correlated_subquery_is_evaluated_per_outer_row`、`a_correlated_subquery_sees_each_outer_row`。
 
 压缩与 `IMPORT` 的 WAL 命令形态（`CompactV2` / `ImportV2` vs `[AppendV2, DeleteV2]` / `AppendV2`）是已登记的行为差异，记在 `FORMAT_EQUIVALENCE_TESTS.md` §6.1，不在这里重复。
 
-`docs` 里先前记的另外五项已经收口，代码与门禁如下：
+其余各项的接线位置与门禁：
 
 - **`IndexScanBuilder` 是优化器规则**（`infinity-planner` 的 `IndexScanRule`）：规则重写计划（谓词下推 + 残余过滤）并把候选（含求值器）通过共享槽交给执行器；测试 `the_index_scan_rule_publishes_its_candidate_and_keeps_the_residual`。
 - **`ResultCacheGetter` 在生产管线里**：`result_cache` 配置打开时，`run_plan` 在优化之后跑 getter，扫描节点用 `cache_scan_rows` 填充 `SharedCache`，写路径清空；测试 `the_plan_cache_answers_a_repeated_scan_and_a_write_drops_it`。
@@ -45,10 +46,11 @@
 |---|---|---|
 | HNSW 图区 | `thread_local std::mt19937`，节点层级取决于线程调度；实测同一输入五次跑出五种图 | header/vectors/labels 字节比，图与查询答案按内容比（`FORMAT_EQUIVALENCE_TESTS.md` §6.4） |
 | IVF 质心 / 训练 | `std::random_device` 采样，质心个数也不固定 | chunk 按内容比 |
-| `IVF` 的 `IndexIVFOption` | POD `memcpy`，结构体含未初始化 padding；参考两次运行末段不同 | 不参与 DDL 命令的字节比对 |
 | `catalog/` 的字节 | 带 ts / LSN / session id，参考自己两次跑也不同 | 逻辑内容按键比 |
 | NULL 行定长 slot、`VARCHAR` 内联 padding | 参考不写这些字节（未初始化内存，实测随前一次分配变化） | 新进程、该列首次写时逐字节相同；门禁按此安排 |
 | 后台 dump 的 chunk 切分 | 配额驱动的队列 + 后台线程，切分是调度结果 | 关闭配额触发，只保留显式 `DumpIndex` 与行容量触发 |
+
+`IVF` 的 `IndexIVFOption` 原先在这里：它作为整块 POD 写进 `CreateIndexV2`，5 个 padding 字节未初始化，参考自己两次运行就不同。现在这两段 padding 在参考里是**明写的字段**（`IndexIVFOption::padding_after_metric_`、`IndexIVFStorageOption::padding_after_storage_enums_`，布局不变、`sizeof` 仍为 32），端口按同一布局写出 0，于是 IVF 的 DDL 命令与其它索引一样进 `test_the_ddl_wal_commands_match_the_reference` 的逐字节比对（plain 与 `scalar_quantization` 各一条）。
 
 ## 4 覆盖不到的输入空间
 
@@ -63,11 +65,13 @@
 | 快照（`CREATE … SNAPSHOT`） | 两种机制互不兼容，无跨引擎用例 |
 | binary-fuse 半区（`BOOLEAN`/`DECIMAL` 的 `bloom_filter`） | 重写版固定写「存在但未构建」 |
 | `IMPORT` 的 WAL 命令形态 | 参考写 `ImportV2`，重写版写等价的 `AppendV2` |
+| IVF 的 **product-quantization** chunk | 端口写出的 PQ 码本/码区布局与参考不同：参考读端口目录再跑 `MATCH VECTOR` 会在 `PQ_Code_StorageT::ExtractCodes` 里越界（段错误）。plain 与 scalar-quantization 的 chunk 参考能读；`test_the_quantized_ivf_indexes_survive_a_crash` 因此只在端口自读时探测 `pq` |
 
 ## 5 已登记的行为差异（性能/口径，不是待办）
 
 | 项 | 说明 | 出处 |
 |---|---|---|
+| 相关子查询的作用域边界 | 只支持引用**外层关系（FROM 侧）**的相关子查询：引用 JOIN 右侧表、引用派生表（parser 不保留派生表别名，标准 SQL 也要求限定）、或写在 `SEARCH` 的 `WHERE` filter 里时返回错误；不会静默按内层同名列求值（`substitute_outer_row` 只剥掉内层表自己的限定符） | `dependent.rs`、`substitute_outer_row` |
 | 多词 / 短语 `MATCH` | 走「整行重新分词 + 逐行匹配」，结果与参考一致但不用索引（`filter_fulltext` 的索引过滤已构造真实 `Or`/`And` 树） | `CLASS_MAP.md`「有意的设计变更」 |
 | `standard-porter` | 用 Porter2（`rust_stemmers::English`），少数词干与参考的 `STEM_LANG_PORT` 不同；其余 17 种语言同族一致 | 同上 |
 | `SPARSE` 列的 `SHOW`/catalog 类型文本 | 存储字节一致，但渲染不同：C++ `Sparse(float,int8,0)`，Rust `Sparse(float,int32,8)`（元素类型一致） | `test_cross_engine_compat.py` 只比元素类型 |

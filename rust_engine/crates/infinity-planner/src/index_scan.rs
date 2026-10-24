@@ -2925,14 +2925,24 @@ mod tests {
         let mut optimizer = crate::optimize::Optimizer::new();
         optimizer.add_rule(Box::new(rule));
         let out = optimizer.optimize(plan).unwrap();
-        // A fully answered predicate needs no residual `Filter`.
+        // The scan answers the predicate by narrowing candidates, so the
+        // predicate stays above it: the port's index evaluator refines a row
+        // set, it does not stand in for the comparison itself.
+        let LogicalPlan::Filter {
+            input,
+            predicate: residual,
+        } = &out
+        else {
+            panic!("expected a filter over an index scan, got {out:?}");
+        };
+        assert_eq!(residual, &predicate);
         let LogicalPlan::IndexScan {
             candidate,
             table,
             columns,
-        } = &out
+        } = input.as_ref()
         else {
-            panic!("expected an index scan, got {out:?}");
+            panic!("expected an index scan, got {input:?}");
         };
         assert_eq!(table, "t");
         assert_eq!(columns, &vec!["id".to_string(), "ok".to_string()]);

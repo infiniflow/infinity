@@ -255,6 +255,12 @@ pub(crate) fn put_i64(out: &mut Vec<u8>, v: i64) {
 pub(crate) fn put_u8(out: &mut Vec<u8>, v: u8) {
     out.push(v);
 }
+pub(crate) fn put_u32(out: &mut Vec<u8>, v: u32) {
+    out.extend_from_slice(&v.to_le_bytes());
+}
+pub(crate) fn put_f32(out: &mut Vec<u8>, v: f32) {
+    put_u32(out, v.to_bits());
+}
 pub(crate) fn put_str(out: &mut Vec<u8>, s: &str) {
     put_i32(out, s.len() as i32);
     out.extend_from_slice(s.as_bytes());
@@ -284,6 +290,13 @@ impl<'a> Reader<'a> {
     pub(crate) fn u8(&mut self) -> Result<u8> {
         let b = self.take(1)?;
         Ok(b[0])
+    }
+    pub(crate) fn u32(&mut self) -> Result<u32> {
+        let b = self.take(4)?;
+        Ok(u32::from_le_bytes(b.try_into().unwrap()))
+    }
+    pub(crate) fn f32(&mut self) -> Result<f32> {
+        Ok(f32::from_bits(self.u32()?))
     }
     pub(crate) fn string(&mut self) -> Result<String> {
         let n = self.i32()? as usize;

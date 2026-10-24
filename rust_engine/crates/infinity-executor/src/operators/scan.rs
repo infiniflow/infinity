@@ -112,6 +112,11 @@ pub struct JoinScan {
     pub left_key: usize,
     pub right_key: usize,
     pub left_width: usize,
+    /// The left rows the caller already materialised (a dependent join fills
+    /// its hidden columns before the join runs). In `source_columns` order.
+    pub left_rows: Option<Vec<Vec<Value>>>,
+    /// The layout `left_rows` is in when it is not `left_columns` itself.
+    pub left_source_columns: Option<Vec<String>>,
 }
 
 /// What the fragment's source produces.
@@ -174,11 +179,17 @@ impl<'a> PhysicalSource<'a> {
             SourceSpec::Values { rows, .. } => std::mem::take(rows),
             SourceSpec::Table(scan) => scan.rows(self.engine)?,
             SourceSpec::Join(join) => {
-                let lrows = crate::align_rows(
-                    self.engine.fetch_rows(&join.left)?,
-                    &join.left_columns,
-                    &self.engine.table_schema(&join.left)?,
-                );
+                let lrows = match join.left_rows.take() {
+                    Some(rows) => match join.left_source_columns.as_ref() {
+                        Some(source) => crate::align_rows(rows, &join.left_columns, source),
+                        None => rows,
+                    },
+                    None => crate::align_rows(
+                        self.engine.fetch_rows(&join.left)?,
+                        &join.left_columns,
+                        &self.engine.table_schema(&join.left)?,
+                    ),
+                };
                 let rrows = crate::align_rows(
                     self.engine.fetch_rows(&join.right)?,
                     &join.right_columns,

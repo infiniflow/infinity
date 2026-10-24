@@ -47,6 +47,7 @@ use crate::fulltext_query::SearchDriver;
 use crate::query_builder::QueryNode;
 
 mod deferred_catalog;
+mod dependent;
 mod explain;
 
 #[cfg(test)]
@@ -2553,82 +2554,6 @@ fn boolean_expr(value: bool) -> ExprAst {
     )
 }
 
-/// The SQL text of the first subquery inside a predicate.
-fn predicate_subquery_sql(pred: &Predicate) -> Option<&str> {
-    match pred {
-        Predicate::IsTrue(e) | Predicate::IsNull(e, _) => expr_subquery_sql(e),
-        Predicate::Cmp(a, _, b) => expr_subquery_sql(a).or_else(|| expr_subquery_sql(b)),
-        Predicate::Like(a, b, _, _) => expr_subquery_sql(a).or_else(|| expr_subquery_sql(b)),
-        Predicate::In(a, vals, _) => {
-            expr_subquery_sql(a).or_else(|| vals.iter().find_map(expr_subquery_sql))
-        }
-        Predicate::Bool(a, _, b) => predicate_subquery_sql(a).or_else(|| predicate_subquery_sql(b)),
-        Predicate::Not(a) => predicate_subquery_sql(a),
-    }
-}
-
-fn expr_subquery_sql(e: &ExprAst) -> Option<&str> {
-    match e {
-        ExprAst::Func { name, args } if name.eq_ignore_ascii_case("SUBQUERY") => {
-            subquery_sql_arg(args).ok()
-        }
-        ExprAst::Func { name, args } if name.eq_ignore_ascii_case("EXISTS") => {
-            exists_subquery_sql(args).ok()
-        }
-        ExprAst::Func { args, .. } => args.iter().find_map(expr_subquery_sql),
-        ExprAst::Binary(a, _, b)
-        | ExprAst::Cmp(a, _, b)
-        | ExprAst::And(a, b)
-        | ExprAst::Or(a, b) => expr_subquery_sql(a).or_else(|| expr_subquery_sql(b)),
-        ExprAst::Not(a) => expr_subquery_sql(a),
-        ExprAst::Column(_) | ExprAst::Literal(_) => None,
-    }
-}
-
-/// The conjuncts of an `a AND b AND …` predicate.
-fn flatten_and<'a>(pred: &'a Predicate, out: &mut Vec<&'a Predicate>) {
-    match pred {
-        Predicate::Bool(a, infinity_parser::BoolOp::And, b) => {
-            flatten_and(a, out);
-            flatten_and(b, out);
-        }
-        other => out.push(other),
-    }
-}
-
-fn combine_and(mut preds: Vec<Predicate>) -> Option<Predicate> {
-    let mut out = preds.pop()?;
-    while let Some(next) = preds.pop() {
-        out = Predicate::Bool(Box::new(next), infinity_parser::BoolOp::And, Box::new(out));
-    }
-    Some(out)
-}
-
-/// The SQL text of an outer value, as a literal the subquery can read back.
-fn outer_literal(value: &Value) -> String {
-    match value {
-        Value::Null => "NULL".to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => {
-            // A float must stay a float: `-0` or `2` would re-parse as an int.
-            let text = format!("{f:?}");
-            if text.contains(['.', 'e', 'E']) {
-                text
-            } else {
-                format!("{text}.0")
-            }
-        }
-        Value::Bool(b) => b.to_string(),
-        Value::Str(s) => format!("'{}'", s.replace('\'', "''")),
-    }
-}
-
-/// Replaces the enclosing row's columns in a subquery's SQL with their values.
-///
-/// The replacement is textual because the parser keeps a nested query as SQL
-/// text. Only identifiers that name an outer column are touched, both bare
-/// (`x`) and qualified (`outer.x`), and single-quoted strings are skipped so a
-/// literal that happens to spell a column name survives.
 fn substitute_outer_row(
     sql: &str,
     columns: &[(String, usize)],
@@ -2637,8 +2562,11 @@ fn substitute_outer_row(
 ) -> String {
     let sql = collapse_dots(sql);
     // A single-table subquery's column may be qualified with its own table,
-    // which the binder resolves through the fully-qualified one; drop that
-    // qualifier. A join keeps them, since they disambiguate.
+    // which the binder resolves through the fully-qualified one; drop *that*
+    // qualifier. A join keeps them, since they disambiguate. A qualifier that
+    // names neither the enclosing relation nor the inner table is left alone:
+    // dropping it would silently read the inner column instead.
+    let inner_table = inner_table_of(&sql);
     let strip_inner = !sql.to_ascii_uppercase().contains(" JOIN ");
     let mut out = String::with_capacity(sql.len() + 16);
     let chars: Vec<char> = sql.chars().collect();
@@ -2669,7 +2597,12 @@ fn substitute_outer_row(
             let token: String = chars[start..i].iter().collect();
             match outer_column_value(&token, columns, row, outer_table) {
                 Some(text) => out.push_str(&text),
-                None if strip_inner && token.matches('.').count() == 1 => {
+                None if strip_inner
+                    && token.matches('.').count() == 1
+                    && inner_table
+                        .as_deref()
+                        .is_some_and(|table| qualifier_matches(&token, table)) =>
+                {
                     out.push_str(token.rsplit_once('.').map(|(_, c)| c).unwrap_or(&token))
                 }
                 None => out.push_str(&token),
@@ -2680,6 +2613,51 @@ fn substitute_outer_row(
         i += 1;
     }
     out
+}
+
+fn outer_literal(value: &Value) -> String {
+    match value {
+        Value::Null => "NULL".to_string(),
+        Value::Int(i) => i.to_string(),
+        Value::Float(f) => {
+            // A float must stay a float: `-0` or `2` would re-parse as an int.
+            let text = format!("{f:?}");
+            if text.contains(['.', 'e', 'E']) {
+                text
+            } else {
+                format!("{text}.0")
+            }
+        }
+        Value::Bool(b) => b.to_string(),
+        Value::Str(s) => format!("'{}'", s.replace('\'', "''")),
+    }
+}
+
+/// The table a single-table subquery reads (the first `FROM <ident>`), for the
+/// qualifier comparison in [`substitute_outer_row`].
+fn inner_table_of(sql: &str) -> Option<String> {
+    let upper = sql.to_ascii_uppercase();
+    let at = upper.find("FROM ")? + "FROM ".len();
+    let rest = &sql[at..];
+    let end = rest
+        .find(|c: char| !(c.is_alphanumeric() || c == '_' || c == '.'))
+        .unwrap_or(rest.len());
+    let table = &rest[..end];
+    if table.is_empty() {
+        None
+    } else {
+        Some(table.to_string())
+    }
+}
+
+/// Whether `qualified` (`t.c`) is qualified with `table` (`t`, `db.t`, or
+/// `db . t` before `collapse_dots`).
+fn qualifier_matches(qualified: &str, table: &str) -> bool {
+    let Some((qualifier, _)) = qualified.rsplit_once('.') else {
+        return false;
+    };
+    qualifier.eq_ignore_ascii_case(table)
+        || qualifier.eq_ignore_ascii_case(table.rsplit('.').next().unwrap_or(table))
 }
 
 /// Closes the spaces a nested query's text may carry around a qualifier dot
@@ -5591,14 +5569,6 @@ impl Engine {
     /// Runs a derived-table subquery (`FROM (SELECT …)`), returning its columns
     /// and rows so the outer query can scan them.
     fn derived_table(&self, sql: &str) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
-        // C++ binds a derived table (and, with `LATERAL`, a correlated one)
-        // before it is executed. Binding first keeps a correlated derived
-        // table from silently resolving against the wrong scope.
-        if let Ok(statements) = parse(sql) {
-            for stmt in &statements {
-                self.bind_subquery(stmt, &[])?;
-            }
-        }
         for r in self.execute(sql)? {
             if let QueryResult::Rows { columns, rows } = r {
                 // `QueryResult` renders cells as text; the scan works on values.
@@ -5629,151 +5599,36 @@ impl Engine {
         if !matches!(stmt, Statement::Select { .. }) {
             return Err(Error::Invalid("subquery must be a SELECT".into()));
         }
-        // A CTE alias in FROM is resolved against `ctes`, not the catalog. A
-        // CTE may shadow a base table, and binding against that table's schema
-        // would reject a legitimate query.
-        let from_is_cte = match &stmt {
-            Statement::Select {
-                from: Some(table),
-                ctes: local_ctes,
-                ..
-            } => {
-                ctes.contains_key(&table.to_ascii_lowercase())
-                    || local_ctes
-                        .iter()
-                        .any(|c| c.alias.eq_ignore_ascii_case(table))
-            }
-            _ => false,
-        };
-        if !from_is_cte {
-            self.bind_subquery(&stmt, outer)?;
+        // A correlated subquery is executed by the dependent join
+        // (`dependent.rs`), which substitutes the outer values and caches the
+        // inner rows per key. Reaching this point with an outer reference left
+        // would silently resolve the name against the inner table instead, so
+        // it is an error rather than a wrong answer.
+        if self.correlated_sql_columns(sql, outer, ctes)?.is_some() {
+            return Err(Error::Invalid(
+                "correlated subquery is not supported here (only a single table's WHERE, HAVING or projection)".into(),
+            ));
         }
         let visible: Vec<String> = ctes.keys().cloned().collect();
         let stmt = self.expand_views(self.qualify_tables_in(&stmt, &visible), &visible)?;
         self.run_select_with_ctes(&stmt, ctes)
     }
 
-    /// C++ `QueryBinder::BindSubquery`: binds a subquery into the
-    /// depth-annotated `SubqueryPlan` and asks `CorrelatedExpressionsDetector`
-    /// whether it reads the enclosing query.
+    /// C++ `QueryBinder::BindSubquery` + `CorrelatedExpressionsDetector`: the
+    /// outer columns `sql` reads, as `(column name, outer schema index)`.
     ///
-    /// A correlated subquery becomes a dependent join in the reference
-    /// (`SubqueryUnnest::unnest_subqueries`). This executor runs the shapes the
-    /// plan model can express — a WHERE conjunct is evaluated per outer row
-    /// (see [`Self::split_correlated_conjuncts`]) — and reports a correlation
-    /// found anywhere else (a projected subquery, HAVING, a join) instead of
-    /// folding it to one constant. Anything the binder cannot represent falls
-    /// through to the eager path, which reports its own error.
-    fn bind_subquery(&self, stmt: &Statement, outer: &[String]) -> Result<()> {
-        let Statement::Select {
-            items,
-            from,
-            where_pred,
-            ..
-        } = stmt
-        else {
-            return Ok(());
-        };
-        let Some(table) = from.as_ref() else {
-            return Ok(());
-        };
-        // The catalog keys tables by `db.table`; an unqualified name in the
-        // subquery's FROM has to be resolved the same way. A name that still
-        // does not resolve (a CTE, say) is not a base-table subquery, so the
-        // binder check is skipped rather than failed.
-        let Ok(columns) = self.table_schema(&self.table_key(table)) else {
-            return Ok(());
-        };
-        let bound = infinity_planner::binder::QueryBinder::new().bind_subquery(
-            infinity_planner::subquery::SubqueryType::Scalar,
-            Some(table),
-            &columns,
-            items,
-            where_pred.as_ref(),
-            outer,
-        );
-        let bound = bound.map_err(|e| Error::Invalid(format!("failed to bind subquery: {e}")))?;
-        if bound.correlated_columns.is_empty() {
-            return Ok(());
-        }
-        // C++ flattens the correlated subquery into a dependent join here
-        // (`SubqueryUnnest::unnest_subqueries`, which runs
-        // `DependentJoinFlattener` and `RewriteCorrelatedExpressions`). The
-        // flattening still runs so the reference's planning work stays
-        // exercised, but the resulting mark join has no executor operator.
-        let mut root = infinity_planner::subquery::SubqueryPlan::Scan {
-            table: table.clone(),
-            columns: columns.clone(),
-            table_idx: 0,
-        };
-        let mut expression = infinity_planner::subquery::SubqueryExpr::Subquery(Box::new(bound));
-        let mut context = infinity_planner::subquery::BindContext::new();
-        let _ = infinity_planner::subquery::SubqueryUnnest::unnest_subqueries(
-            &mut expression,
-            &mut root,
-            &mut context,
-        );
-        Err(Error::Invalid(
-            "correlated subqueries are only supported as a WHERE conjunct".into(),
-        ))
-    }
-
-    /// Splits the WHERE conjuncts into the ones the planner can evaluate and
-    /// the ones that read the enclosing row.
-    ///
-    /// A correlated subquery is a dependent join in the reference
-    /// (`SubqueryUnnest`); this executor has no mark-join operator, so the
-    /// conjunct is evaluated per scan row by substituting the outer values into
-    /// the subquery and running it. The rest of the predicate keeps going
-    /// through the normal plan.
-    fn split_correlated_conjuncts(
+    /// `None` when the nested query is uncorrelated, or when it is not a
+    /// single-table base-table query (a CTE alias, a missing table, a shape the
+    /// binder cannot represent) — those stay on the constant-folding path.
+    fn correlated_sql_columns(
         &self,
-        stmt: &Statement,
-        outer_columns: &[String],
-        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
-    ) -> Result<(Option<Statement>, Vec<(Predicate, Vec<(String, usize)>)>)> {
-        let Statement::Select {
-            where_pred: Some(pred),
-            ..
-        } = stmt
-        else {
-            return Ok((None, Vec::new()));
-        };
-        let mut conjuncts: Vec<&Predicate> = Vec::new();
-        flatten_and(pred, &mut conjuncts);
-        let mut kept: Vec<Predicate> = Vec::new();
-        let mut correlated: Vec<(Predicate, Vec<(String, usize)>)> = Vec::new();
-        for conjunct in conjuncts {
-            if !conjunct.contains_subquery() {
-                kept.push(conjunct.clone());
-                continue;
-            }
-            match self.correlated_subquery_columns(conjunct, outer_columns, ctes)? {
-                Some(columns) => correlated.push((conjunct.clone(), columns)),
-                None => kept.push(conjunct.clone()),
-            }
-        }
-        if correlated.is_empty() {
-            return Ok((None, Vec::new()));
-        }
-        let mut rewritten = stmt.clone();
-        if let Statement::Select { where_pred, .. } = &mut rewritten {
-            *where_pred = combine_and(kept);
-        }
-        Ok((Some(rewritten), correlated))
-    }
-
-    /// The outer columns a conjunct's subquery reads, as `(column name, outer
-    /// schema index)`; `None` when the subquery is not correlated.
-    fn correlated_subquery_columns(
-        &self,
-        pred: &Predicate,
-        outer_columns: &[String],
+        sql: &str,
+        outer: &[String],
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
     ) -> Result<Option<Vec<(String, usize)>>> {
-        let Some(sql) = predicate_subquery_sql(pred) else {
+        if outer.is_empty() {
             return Ok(None);
-        };
+        }
         let Ok(mut statements) = parse(sql) else {
             return Ok(None);
         };
@@ -5792,7 +5647,7 @@ impl Engine {
         };
         // A CTE alias in FROM is not a base table: binding it against the
         // catalog would read the shadowed table's schema and invent a
-        // correlation (`run_subquery` makes the same check).
+        // correlation.
         if ctes.contains_key(&table.to_ascii_lowercase())
             || local_ctes
                 .iter()
@@ -5800,18 +5655,19 @@ impl Engine {
         {
             return Ok(None);
         }
+        // The catalog keys tables by `db.table`; an unqualified name in the
+        // subquery's FROM has to be resolved the same way.
         let Ok(columns) = self.table_schema(&self.table_key(&table)) else {
             return Ok(None);
         };
-        let bound = infinity_planner::binder::QueryBinder::new().bind_subquery(
+        let Ok(bound) = infinity_planner::binder::QueryBinder::new().bind_subquery(
             infinity_planner::subquery::SubqueryType::Scalar,
             Some(&table),
             &columns,
             &items,
             where_pred.as_ref(),
-            outer_columns,
-        );
-        let Ok(bound) = bound else {
+            outer,
+        ) else {
             return Ok(None);
         };
         if bound.correlated_columns.is_empty() {
@@ -5822,7 +5678,7 @@ impl Engine {
                 .correlated_columns
                 .iter()
                 .filter_map(|c| {
-                    outer_columns
+                    outer
                         .get(c.binding.column_idx)
                         .map(|name| (name.clone(), c.binding.column_idx))
                 })
@@ -5830,230 +5686,6 @@ impl Engine {
         ))
     }
 
-    /// Whether a correlated conjunct holds for one scan row.
-    fn correlated_conjunct_holds(
-        &self,
-        pred: &Predicate,
-        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
-        schema: &[String],
-        row: &[Value],
-        outer_table: &str,
-        columns: &[(String, usize)],
-    ) -> Result<bool> {
-        let resolved =
-            self.resolve_correlated_pred(pred, ctes, schema, row, outer_table, columns)?;
-        let expr = infinity_planner::predicate_expr(&resolved, schema)?;
-        Ok(expr.eval_predicate(row))
-    }
-
-    fn resolve_correlated_pred(
-        &self,
-        p: &Predicate,
-        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
-        schema: &[String],
-        row: &[Value],
-        outer_table: &str,
-        columns: &[(String, usize)],
-    ) -> Result<Predicate> {
-        Ok(match p {
-            Predicate::IsTrue(ExprAst::Func { name, args })
-                if name.eq_ignore_ascii_case("EXISTS") =>
-            {
-                let sql = exists_subquery_sql(args)?;
-                let sql = substitute_outer_row(sql, columns, row, outer_table);
-                Predicate::Cmp(
-                    ExprAst::Literal(Literal::Int(1)),
-                    CmpOp::Eq,
-                    ExprAst::Literal(Literal::Int(i64::from(self.subquery_exists(
-                        &sql,
-                        ctes,
-                        &[],
-                    )?))),
-                )
-            }
-            Predicate::Cmp(a, op, b) => Predicate::Cmp(
-                self.resolve_correlated_expr(a, ctes, schema, row, outer_table, columns)?,
-                *op,
-                self.resolve_correlated_expr(b, ctes, schema, row, outer_table, columns)?,
-            ),
-            Predicate::IsTrue(e) => Predicate::IsTrue(self.resolve_correlated_expr(
-                e,
-                ctes,
-                schema,
-                row,
-                outer_table,
-                columns,
-            )?),
-            Predicate::IsNull(e, neg) => Predicate::IsNull(
-                self.resolve_correlated_expr(e, ctes, schema, row, outer_table, columns)?,
-                *neg,
-            ),
-            Predicate::Like(a, pat, esc, neg) => Predicate::Like(
-                self.resolve_correlated_expr(a, ctes, schema, row, outer_table, columns)?,
-                self.resolve_correlated_expr(pat, ctes, schema, row, outer_table, columns)?,
-                *esc,
-                *neg,
-            ),
-            Predicate::In(a, vals, neg) => Predicate::In(
-                self.resolve_correlated_expr(a, ctes, schema, row, outer_table, columns)?,
-                vals.iter()
-                    .map(|v| {
-                        self.resolve_correlated_expr(v, ctes, schema, row, outer_table, columns)
-                    })
-                    .collect::<Result<Vec<_>>>()?,
-                *neg,
-            ),
-            Predicate::Bool(a, op, b) => Predicate::Bool(
-                Box::new(self.resolve_correlated_pred(
-                    a,
-                    ctes,
-                    schema,
-                    row,
-                    outer_table,
-                    columns,
-                )?),
-                *op,
-                Box::new(self.resolve_correlated_pred(
-                    b,
-                    ctes,
-                    schema,
-                    row,
-                    outer_table,
-                    columns,
-                )?),
-            ),
-            Predicate::Not(a) => Predicate::Not(Box::new(self.resolve_correlated_pred(
-                a,
-                ctes,
-                schema,
-                row,
-                outer_table,
-                columns,
-            )?)),
-        })
-    }
-
-    fn resolve_correlated_expr(
-        &self,
-        e: &ExprAst,
-        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
-        schema: &[String],
-        row: &[Value],
-        outer_table: &str,
-        columns: &[(String, usize)],
-    ) -> Result<ExprAst> {
-        Ok(match e {
-            ExprAst::Func { name, args } if name.eq_ignore_ascii_case("SUBQUERY") => {
-                let sql = subquery_sql_arg(args)?;
-                let sql = substitute_outer_row(sql, columns, row, outer_table);
-                ExprAst::Literal(value_to_literal(self.scalar_subquery_value(
-                    &sql,
-                    ctes,
-                    &[],
-                )?))
-            }
-            ExprAst::Func { name, args } if name.eq_ignore_ascii_case("EXISTS") => {
-                let sql = exists_subquery_sql(args)?;
-                let sql = substitute_outer_row(sql, columns, row, outer_table);
-                boolean_expr(self.subquery_exists(&sql, ctes, &[])?)
-            }
-            ExprAst::Func { name, args } => ExprAst::Func {
-                name: name.clone(),
-                args: args
-                    .iter()
-                    .map(|a| {
-                        self.resolve_correlated_expr(a, ctes, schema, row, outer_table, columns)
-                    })
-                    .collect::<Result<Vec<_>>>()?,
-            },
-            ExprAst::Binary(a, op, b) => ExprAst::Binary(
-                Box::new(self.resolve_correlated_expr(
-                    a,
-                    ctes,
-                    schema,
-                    row,
-                    outer_table,
-                    columns,
-                )?),
-                *op,
-                Box::new(self.resolve_correlated_expr(
-                    b,
-                    ctes,
-                    schema,
-                    row,
-                    outer_table,
-                    columns,
-                )?),
-            ),
-            ExprAst::Cmp(a, op, b) => ExprAst::Cmp(
-                Box::new(self.resolve_correlated_expr(
-                    a,
-                    ctes,
-                    schema,
-                    row,
-                    outer_table,
-                    columns,
-                )?),
-                *op,
-                Box::new(self.resolve_correlated_expr(
-                    b,
-                    ctes,
-                    schema,
-                    row,
-                    outer_table,
-                    columns,
-                )?),
-            ),
-            ExprAst::Not(a) => ExprAst::Not(Box::new(self.resolve_correlated_expr(
-                a,
-                ctes,
-                schema,
-                row,
-                outer_table,
-                columns,
-            )?)),
-            ExprAst::And(a, b) => ExprAst::And(
-                Box::new(self.resolve_correlated_expr(
-                    a,
-                    ctes,
-                    schema,
-                    row,
-                    outer_table,
-                    columns,
-                )?),
-                Box::new(self.resolve_correlated_expr(
-                    b,
-                    ctes,
-                    schema,
-                    row,
-                    outer_table,
-                    columns,
-                )?),
-            ),
-            ExprAst::Or(a, b) => ExprAst::Or(
-                Box::new(self.resolve_correlated_expr(
-                    a,
-                    ctes,
-                    schema,
-                    row,
-                    outer_table,
-                    columns,
-                )?),
-                Box::new(self.resolve_correlated_expr(
-                    b,
-                    ctes,
-                    schema,
-                    row,
-                    outer_table,
-                    columns,
-                )?),
-            ),
-            other => other.clone(),
-        })
-    }
-
-    /// A scalar subquery: the first row's first column, NULL for an empty
-    /// result. More than one row or column is an error, as in the reference.
     fn scalar_subquery_value(
         &self,
         sql: &str,
@@ -10949,30 +10581,6 @@ impl Engine {
                 cte_scope.insert(cte.alias.to_ascii_lowercase(), (columns, rows));
             }
         }
-        // Scalar/EXISTS subqueries are rewritten to constants before planning;
-        // the planner has no access to the storage engine. The enclosing
-        // query's columns are the scope a subquery may correlate with.
-        // The enclosing query's columns are the scope a subquery may correlate
-        // with. A CTE alias in FROM shadows any base table of the same name, so
-        // take its columns from the CTE scope instead of the catalog.
-        let outer_columns = match stmt {
-            Statement::Select {
-                from: Some(table), ..
-            } => match cte_scope.get(&table.to_ascii_lowercase()) {
-                Some((columns, _)) => columns.clone(),
-                None => self
-                    .table_schema(&self.table_key(table))
-                    .unwrap_or_default(),
-            },
-            _ => Vec::new(),
-        };
-        // A correlated conjunct cannot be constant-folded: it is evaluated per
-        // scan row below, and the rest of the predicate still goes to the plan.
-        let (correlated_stmt, correlated) =
-            self.split_correlated_conjuncts(stmt, &outer_columns, &cte_scope)?;
-        let stmt: &Statement = correlated_stmt.as_ref().unwrap_or(stmt);
-        let resolved = self.resolve_stmt_subqueries(stmt, &cte_scope, &outer_columns)?;
-        let stmt: &Statement = resolved.as_ref().unwrap_or(stmt);
         let Statement::Select {
             items,
             from,
@@ -11034,6 +10642,48 @@ impl Engine {
                 }
             }
         }
+        // `FROM (SELECT …)`: run the subquery first and scan its result. A
+        // `FROM <cte>` uses the rows materialised above the same way.
+        let derived: Option<(Vec<String>, Vec<Vec<Value>>)> = match from.as_ref() {
+            Some(f) if f.trim_start().to_ascii_uppercase().starts_with("SELECT ") => {
+                Some(self.derived_table(f.trim())?)
+            }
+            Some(f) => cte_scope.get(&f.to_ascii_lowercase()).cloned(),
+            None => None,
+        };
+        // Scalar/EXISTS subqueries are rewritten before planning: the planner
+        // has no access to the storage engine. The enclosing relation's columns
+        // are the scope a nested query may correlate with - a derived table's
+        // or a CTE's columns, else the base table's.
+        let outer_columns = match (&derived, from.as_ref()) {
+            (Some((columns, _)), _) => columns.clone(),
+            (None, Some(table)) => self
+                .table_schema(&self.table_key(table))
+                .unwrap_or_default(),
+            (None, None) => Vec::new(),
+        };
+        // A correlated subquery becomes a dependent join: every nested query
+        // that reads this relation's columns is rewritten into a hidden scan
+        // column, filled in below once the outer rows are materialised (see
+        // `dependent.rs`). Uncorrelated nested queries keep going through the
+        // constant folder.
+        let dependent = crate::dependent::plan(self, stmt, &outer_columns, &cte_scope)?;
+        let stmt: &Statement = dependent.as_ref().map(|d| &d.stmt).unwrap_or(stmt);
+        let resolved = self.resolve_stmt_subqueries(stmt, &cte_scope, &outer_columns)?;
+        let stmt: &Statement = resolved.as_ref().unwrap_or(stmt);
+        // The rewritten statement is the one that gets planned; its clauses
+        // shadow the parsed ones (only the nested queries changed).
+        let Statement::Select {
+            items,
+            where_pred,
+            group_by,
+            having,
+            order_by,
+            ..
+        } = stmt
+        else {
+            unreachable!("run_select checked the statement is a SELECT");
+        };
         // `SELECT … UNNEST(col) …`: expand an array/JSON column into one
         // row per element, then let the normal planner handle WHERE,
         // GROUP BY and aggregates over the expanded relation.
@@ -11123,18 +10773,15 @@ impl Engine {
         // `FROM (SELECT …)`: run the subquery first and scan its result.
         // Its columns become a synthetic table so names resolve. A `FROM <cte>`
         // uses the rows materialised above the same way.
-        let derived: Option<(Vec<String>, Vec<Vec<Value>>)> = match from.as_ref() {
-            Some(f) if f.trim_start().to_ascii_uppercase().starts_with("SELECT ") => {
-                Some(self.derived_table(f.trim())?)
-            }
-            Some(f) => cte_scope.get(&f.to_ascii_lowercase()).cloned(),
-            None => None,
-        };
         let from_derived: Option<String> = if derived.is_some() {
             Some("__derived".to_string())
         } else {
             from.clone()
         };
+        // The name a nested query uses for this relation: the CTE alias or the
+        // base table (the derived-table alias is not in the AST, so a derived
+        // table's columns are referenced unqualified).
+        let outer_table_name = from.clone().unwrap_or_default();
         let from = &from_derived;
         // A WHERE clause must be a predicate: `WHERE c1` on a
         // non-boolean column is rejected by the reference.
@@ -11207,7 +10854,11 @@ impl Engine {
         // C++ block mirror when that mirror is as fresh as the row
         // store (plan #87). `SELECT id, name` then avoids decoding the
         // wide columns (embeddings, text) altogether.
+        // The projection-only scan reads just the selected columns, so a row it
+        // returns has neither the dependent join's hidden columns nor the
+        // width the hidden-value pass expects.
         if override_rows.is_none()
+            && dependent.is_none()
             && join.is_none()
             && search.is_none()
             && where_pred.is_none()
@@ -11264,6 +10915,14 @@ impl Engine {
             .collect();
         if unnest_rows.is_some() {
             override_rows = unnest_rows;
+        }
+        // The dependent join's value columns belong to the scanned relation, so
+        // the statements rewritten by `dependent.rs` resolve them like any
+        // other column (the same way `#_row_id` and the search columns work).
+        if let Some(dep) = dependent.as_ref() {
+            if let Some(entry) = tables.first_mut() {
+                entry.1.extend(dep.column_names());
+            }
         }
         // C++ `QueryBinder::BindSelect` is the entry point that turns a parsed
         // `SELECT` into a bound plan; it owns the clause ordering.
@@ -11449,43 +11108,33 @@ impl Engine {
                 }
             }
         }
-        // A correlated subquery runs once per scan row with that row's values
-        // bound, the way a dependent join feeds the outer row into the inner
-        // side. The rows are filtered before the plan sees them, so projection,
-        // aggregation and ordering all work on the surviving rows.
-        if !correlated.is_empty() {
-            let (Some(table), None) = (from.as_ref(), join.as_ref()) else {
+        // The inner side of the dependent join runs once per distinct key over
+        // the materialised outer relation; each row then carries the result as
+        // an ordinary column, so `WHERE`, `HAVING`, `ORDER BY` and the
+        // projection see it through the regular path.
+        if let Some(dep) = dependent.as_ref() {
+            // With a join the hidden columns belong to the FROM side, which is
+            // what the join source consumes as its left input.
+            let Some(table) = from.as_ref() else {
                 return Err(Error::Invalid(
-                    "correlated subqueries are only supported on a single table".into(),
+                    "correlated subquery needs a source relation".into(),
                 ));
             };
             // `tables` already carries the enclosing relation's columns (a CTE
             // or a derived table has no catalog entry), and a derived table's
-            // rows are the scan source from the start.
-            let schema = tables
+            // rows are the scan source from the start. The dependent join's
+            // hidden names were appended last: the rows do not have them yet.
+            let mut schema = tables
                 .first()
                 .map(|(_, columns)| columns.clone())
                 .unwrap_or_default();
-            let rows = match override_rows.take() {
+            schema.truncate(schema.len().saturating_sub(dep.column_names().len()));
+            let mut rows = match override_rows.take() {
                 Some(rows) => rows,
                 None => self.fetch_rows(table)?,
             };
-            let mut kept = Vec::with_capacity(rows.len());
-            for row in rows {
-                let mut holds = true;
-                for (conjunct, columns) in &correlated {
-                    if !self.correlated_conjunct_holds(
-                        conjunct, &cte_scope, &schema, &row, table, columns,
-                    )? {
-                        holds = false;
-                        break;
-                    }
-                }
-                if holds {
-                    kept.push(row);
-                }
-            }
-            override_rows = Some(kept);
+            dep.apply(self, &cte_scope, &outer_table_name, &schema, &mut rows)?;
+            override_rows = Some(rows);
         }
         let source_columns = tables.first().map(|(_, columns)| columns.clone());
         let (columns, mut rows) = self.run_plan(
@@ -11632,6 +11281,8 @@ impl Engine {
                     left_key,
                     right_key,
                     left_width,
+                    left_rows: override_rows,
+                    left_source_columns: source_columns,
                 },
             )),
         };
@@ -20373,6 +20024,184 @@ mod tests {
         );
     }
 
+    #[test]
+    fn probe_exact() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE cj_o (id INT, a INT);").unwrap();
+        e.execute("CREATE TABLE cj_s (a INT, x INT);").unwrap();
+        e.execute("CREATE TABLE cj_t (x INT);").unwrap();
+        e.execute("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+            .unwrap();
+        e.execute("INSERT INTO cj_t VALUES (10);").unwrap();
+        for sql in [
+            "WITH c AS (SELECT * FROM cj_o) SELECT id, (SELECT COUNT(*) FROM cj_s WHERE cj_s.a = c.a) AS n FROM c ORDER BY id;",
+            "SELECT id FROM (SELECT * FROM cj_o) WHERE EXISTS (SELECT 1 FROM cj_s WHERE cj_s.a = a) ORDER BY id;",
+            "SELECT id FROM cj_o JOIN cj_s ON cj_s.a = cj_o.a WHERE EXISTS (SELECT 1 FROM cj_t WHERE cj_t.x = a) ORDER BY id;",
+        ] {
+            match e.execute(sql) {
+                Ok(r) => println!("PROBE ok {sql} => {r:?}"),
+                Err(err) => println!("PROBE err {sql} => {err}"),
+            }
+        }
+    }
+
+    /// The dependent join also works when the outer relation is a CTE or the
+    /// left side of a join: the hidden columns ride along with the rows the
+    /// source hands to the plan. (A derived table is not a correlatable scope:
+    /// the parser drops its alias, so a nested query cannot qualify it.)
+    #[test]
+    fn a_correlated_subquery_reads_a_cte_or_joined_relation() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE cj_o (id INT, a INT);").unwrap();
+        e.execute("CREATE TABLE cj_s (a INT, x INT);").unwrap();
+        e.execute("CREATE TABLE cj_t (x INT);").unwrap();
+        e.execute("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+            .unwrap();
+        e.execute("INSERT INTO cj_t VALUES (10);").unwrap();
+
+        // A CTE as the outer relation: `c.a` is substituted with the alias the
+        // statement used, not the internal one.
+        assert_eq!(
+            rows(
+                &e,
+                "WITH c AS (SELECT * FROM cj_o) \
+                 SELECT id, (SELECT COUNT(*) FROM cj_s WHERE cj_s.a = c.a) AS n FROM c ORDER BY id;"
+            ),
+            vec![
+                vec!["1".to_string(), "1".to_string()],
+                vec!["2".to_string(), "1".to_string()],
+            ]
+        );
+        // Joined relation: the correlated columns read the FROM side, whose
+        // rows the join takes from the dependent join's output.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM cj_o JOIN cj_s ON cj_s.a = cj_o.a \
+                 WHERE EXISTS (SELECT 1 FROM cj_t WHERE cj_t.x = a) ORDER BY id;"
+            ),
+            vec![vec!["1".to_string()]]
+        );
+    }
+
+    /// `GAPS.md` 2.2: the correlated side is a dependent join, not a per-row
+    /// re-execution. Four outer rows over two distinct keys run the inner query
+    /// twice, and the cached rows answer `IN`/`NOT IN` per row.
+    #[test]
+    fn a_correlated_subquery_runs_once_per_distinct_key() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ck (id INT, k INT);").unwrap();
+        e.execute("INSERT INTO ck VALUES (1, 10), (2, 10), (3, 20), (4, 20);")
+            .unwrap();
+        e.execute("CREATE TABLE cv (k INT, x INT);").unwrap();
+        e.execute("INSERT INTO cv VALUES (10, 1), (20, 2);")
+            .unwrap();
+
+        crate::dependent::INNER_RUNS.with(|runs| runs.set(0));
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id, (SELECT MAX(x) FROM cv WHERE cv.k = ck.k) AS m FROM ck ORDER BY id;"
+            ),
+            vec![
+                vec!["1".to_string(), "1".to_string()],
+                vec!["2".to_string(), "1".to_string()],
+                vec!["3".to_string(), "2".to_string()],
+                vec!["4".to_string(), "2".to_string()],
+            ]
+        );
+        assert_eq!(
+            crate::dependent::INNER_RUNS.with(|runs| runs.get()),
+            2,
+            "the inner side must run once per distinct key, not once per row"
+        );
+
+        // `IN` / `NOT IN` probe the cached rows with the row's own operand.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM ck WHERE k IN (SELECT k FROM cv WHERE cv.x >= ck.id) ORDER BY id;"
+            ),
+            vec![vec!["1".to_string()]]
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM ck WHERE k NOT IN (SELECT k FROM cv WHERE cv.x >= ck.id) ORDER BY id;"
+            ),
+            vec![
+                vec!["2".to_string()],
+                vec!["3".to_string()],
+                vec!["4".to_string()],
+            ]
+        );
+    }
+
+    /// `GAPS.md` 2.1: a correlated subquery is not limited to a `WHERE`
+    /// conjunct. The dependent join (`dependent.rs`) turns every nested query
+    /// that reads the outer row into a hidden column, so the projection, the
+    /// projection's surrounding expression and `HAVING` all evaluate it
+    /// through the ordinary column path.
+    #[test]
+    fn a_correlated_subquery_works_outside_the_where_clause() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE cs_dept2 (id INTEGER, name VARCHAR)")
+            .unwrap();
+        e.execute("CREATE TABLE cs_emp2 (id INTEGER, dept_id INTEGER, salary INTEGER)")
+            .unwrap();
+        e.execute("INSERT INTO cs_dept2 VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
+            .unwrap();
+        e.execute("INSERT INTO cs_emp2 VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
+            .unwrap();
+
+        // Projected scalar subquery, one value per outer row.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT name, (SELECT COUNT(*) FROM cs_emp2 WHERE cs_emp2.dept_id = cs_dept2.id) AS n \
+                 FROM cs_dept2 ORDER BY id;"
+            ),
+            vec![
+                vec!["eng".to_string(), "2".to_string()],
+                vec!["ops".to_string(), "1".to_string()],
+                vec!["idle".to_string(), "0".to_string()],
+            ]
+        );
+        // It composes with the rest of the item: the hidden column is an
+        // ordinary operand of the projected expression.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT (SELECT MAX(salary) FROM cs_emp2 WHERE cs_emp2.dept_id = cs_dept2.id) + 1 AS m \
+                 FROM cs_dept2 ORDER BY id;"
+            ),
+            vec![
+                vec!["201".to_string()],
+                vec!["51".to_string()],
+                vec!["null".to_string()],
+            ]
+        );
+        // `HAVING`: the correlated column depends only on the grouping key, so
+        // each group sees one value.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT dept_id FROM cs_emp2 GROUP BY dept_id \
+                 HAVING (SELECT COUNT(*) FROM cs_dept2 WHERE cs_dept2.id = cs_emp2.dept_id) > 0 \
+                 ORDER BY dept_id;"
+            ),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+    }
+
     /// A full-text index is built and queried with the analyzer it declared,
     /// not with the standard one: an `ngram-3` index turns `quick` into
     /// `qui`/`uic`/`ick`, so a literal `qui` is a token there and not in a
@@ -20878,7 +20707,7 @@ mod tests {
             .unwrap_err();
         assert!(
             err.to_string()
-                .contains("correlated subqueries are only supported"),
+                .contains("correlated subquery is not supported here"),
             "{err}"
         );
     }

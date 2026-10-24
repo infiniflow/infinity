@@ -207,12 +207,14 @@ pub fn create_table_command_from_batch(batch: &[(Vec<u8>, Option<Vec<u8>>)]) -> 
 /// Maps the port's `idx|{db}|{tbl}|{idx_id}|index_base` JSON to a full
 /// reference `IndexDef` (base + the per-type option fields the record carries).
 ///
-/// IVF/Plaid/EMVB/SMVE/DiskAnn are not produced: their option structs are PODs
-/// written by `memcpy` (padding-sensitive) and are not handled yet, so the
-/// caller falls back to the `KvBatch`.
+/// IVF's `IndexIVFOption` is a 32-byte POD copied as one blob; its five padding
+/// bytes are written as zero by both engines (`IndexIVF::WriteAdv` zeroes them),
+/// so the payload is comparable. EMVB/PLAID/SMVE write their handful of scalars
+/// field by field. DiskANN is not ported, so that kind falls back to the
+/// `KvBatch`.
 pub fn index_def_from_json(text: &str) -> Option<infinity_storage::wal::index_def::IndexDef> {
     use infinity_storage::wal::index_def::{
-        HnswBuildType, HnswEncodeType, IndexBase, IndexDef, IndexType, MetricType,
+        HnswBuildType, HnswEncodeType, IndexBase, IndexDef, IndexType, IvfStorageType, MetricType,
     };
     let doc = parse(text)?;
     let type_text = as_str(extract(&doc, ".index_type"))?;
@@ -221,6 +223,10 @@ pub fn index_def_from_json(text: &str) -> Option<infinity_storage::wal::index_de
         "FULLTEXT" => IndexType::FullText,
         "HNSW" => IndexType::Hnsw,
         "BMP" => IndexType::Bmp,
+        "IVF" => IndexType::Ivf,
+        "EMVB" => IndexType::Emvb,
+        "PLAID" => IndexType::Plaid,
+        "SMVE" => IndexType::Smve,
         _ => return None,
     };
     let column_names = match extract(&doc, ".column_names") {
@@ -258,6 +264,80 @@ pub fn index_def_from_json(text: &str) -> Option<infinity_storage::wal::index_de
             base,
             block_size: as_i64(extract(&doc, ".block_size")).unwrap_or(0) as u64,
             compress_type: as_i64(extract(&doc, ".compress_type")).unwrap_or(0) as i8,
+        },
+        IndexType::Emvb => IndexDef::Emvb {
+            base,
+            residual_pq_subspace_num: as_i64(extract(&doc, ".pq_subspace_num")).unwrap_or(0) as u32,
+            residual_pq_subspace_bits: as_i64(extract(&doc, ".pq_subspace_bits")).unwrap_or(0)
+                as u32,
+        },
+        IndexType::Plaid => IndexDef::Plaid {
+            base,
+            nbits: as_i64(extract(&doc, ".nbits")).unwrap_or(4) as u32,
+            n_centroids: as_i64(extract(&doc, ".n_centroids")).unwrap_or(0) as u32,
+            colbertsar_mode: matches!(extract(&doc, ".colbertsar_mode"), Some(Json::Bool(true))),
+        },
+        IndexType::Smve => IndexDef::Smve {
+            base,
+            width: as_i64(extract(&doc, ".width")).unwrap_or(2048) as u32,
+            topk: as_i64(extract(&doc, ".topk")).unwrap_or(8) as u32,
+        },
+        IndexType::Ivf => IndexDef::Ivf {
+            base,
+            metric_type: match as_i64(extract(&doc, ".ivf_option.metric_")).unwrap_or(3) {
+                0 => MetricType::Cosine,
+                1 => MetricType::InnerProduct,
+                2 => MetricType::L2,
+                _ => MetricType::Invalid,
+            },
+            centroids_num_ratio: match extract(
+                &doc,
+                ".ivf_option.centroid_option_.centroids_num_ratio_",
+            ) {
+                Some(Json::Float(v)) => *v as f32,
+                Some(Json::Int(v)) => *v as f32,
+                _ => 1.0,
+            },
+            min_points_per_centroid: as_i64(extract(
+                &doc,
+                ".ivf_option.centroid_option_.min_points_per_centroid_",
+            ))
+            .unwrap_or(32) as u32,
+            max_points_per_centroid: as_i64(extract(
+                &doc,
+                ".ivf_option.centroid_option_.max_points_per_centroid_",
+            ))
+            .unwrap_or(256) as u32,
+            storage_type: match as_i64(extract(&doc, ".ivf_option.storage_option_.type_"))
+                .unwrap_or(0)
+            {
+                1 => IvfStorageType::ScalarQuantization,
+                2 => IvfStorageType::ProductQuantization,
+                _ => IvfStorageType::Plain,
+            },
+            plain_storage_data_type:
+                infinity_storage::wal::ddl_def::EmbeddingDataType::from_discriminant(
+                    as_i64(extract(
+                        &doc,
+                        ".ivf_option.storage_option_.plain_storage_data_type_",
+                    ))
+                    .unwrap_or(10) as i8,
+                ),
+            scalar_quantization_bits: as_i64(extract(
+                &doc,
+                ".ivf_option.storage_option_.scalar_quantization_bits_",
+            ))
+            .unwrap_or(0) as u32,
+            product_quantization_subspace_num: as_i64(extract(
+                &doc,
+                ".ivf_option.storage_option_.product_quantization_subspace_num_",
+            ))
+            .unwrap_or(0) as u32,
+            product_quantization_subspace_bits: as_i64(extract(
+                &doc,
+                ".ivf_option.storage_option_.product_quantization_subspace_bits_",
+            ))
+            .unwrap_or(0) as u32,
         },
         IndexType::Hnsw => IndexDef::Hnsw {
             base,

@@ -490,6 +490,23 @@ fn table_of(table: &str) -> &str {
 /// Returns `None` for a `USING` kind the C++ has no index class for (or for a
 /// column that vanished); the caller then leaves no record rather than write a
 /// half-formed one.
+/// `EmbeddingT::String2EmbeddingDataType` for the `plain_storage_data_type`
+/// option (`embedding_type.h:33`).
+fn ivf_element_code(text: &str) -> i64 {
+    match text.trim().to_ascii_lowercase().as_str() {
+        "bit" => value_format::element::BIT,
+        "int8" | "i8" => value_format::element::INT8,
+        "int16" | "i16" => value_format::element::INT16,
+        "int32" | "i32" => value_format::element::INT32,
+        "int64" | "i64" => value_format::element::INT64,
+        "float16" | "f16" => value_format::element::FLOAT16,
+        "bfloat16" | "bf16" => value_format::element::BFLOAT16,
+        "double" | "float64" | "f64" => value_format::element::FLOAT64,
+        "uint8" | "u8" => value_format::element::UINT8,
+        _ => value_format::element::FLOAT32,
+    }
+}
+
 fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
     // A functional index (`CREATE INDEX … (sqrt(c1))`) names an *expression*, so
     // there is no such column; the `SECONDARY` arm below turns it into a
@@ -553,12 +570,58 @@ fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
             let col = col?;
             let elem = value_format::type_info_int(&col.column_type, "embedding_type")
                 .unwrap_or(value_format::element::FLOAT32);
-            Some(IndexDefValue::ivf_plain(
+            // `IndexIVF::Make` + `CheckIndexIVFStorageOption`: only the fields
+            // the storage type uses are filled, so a quantized index keeps the
+            // plain element type at `kElemInvalid` and an unset plain type
+            // follows the column (i8/u8 keep theirs, any float becomes f32).
+            let storage = opt_word("STORAGE_TYPE", "plain");
+            let (storage_type, plain, sq, pqn, pqb) =
+                if storage.eq_ignore_ascii_case("scalar_quantization") {
+                    (
+                        value_format::ivf_storage::SCALAR_QUANTIZATION,
+                        value_format::element::INVALID,
+                        opt_num("SCALAR_QUANTIZATION_BITS", 0),
+                        0,
+                        0,
+                    )
+                } else if storage.eq_ignore_ascii_case("product_quantization") {
+                    (
+                        value_format::ivf_storage::PRODUCT_QUANTIZATION,
+                        value_format::element::INVALID,
+                        0,
+                        opt_num("PRODUCT_QUANTIZATION_SUBSPACE_NUM", 0),
+                        opt_num("PRODUCT_QUANTIZATION_SUBSPACE_BITS", 0),
+                    )
+                } else {
+                    let plain = opt("PLAIN_STORAGE_DATA_TYPE")
+                        .map(|v| ivf_element_code(&v))
+                        .unwrap_or(match elem {
+                            value_format::element::INT8 | value_format::element::UINT8 => elem,
+                            value_format::element::FLOAT32
+                            | value_format::element::FLOAT64
+                            | value_format::element::FLOAT16
+                            | value_format::element::BFLOAT16 => value_format::element::FLOAT32,
+                            other => other,
+                        });
+                    (value_format::ivf_storage::PLAIN, plain, 0, 0, 0)
+                };
+            Some(IndexDefValue::ivf(
                 &im.name,
                 &table.table_name,
                 &im.column,
                 value_format::metric_code_of(&opt_word("METRIC", "l2")),
-                elem,
+                value_format::IvfCentroid {
+                    num_ratio: opt("CENTROIDS_NUM_RATIO")
+                        .and_then(|v| v.trim().parse::<f64>().ok())
+                        .unwrap_or(1.0),
+                    min_points: opt_num("MIN_POINTS_PER_CENTROID", 32),
+                    max_points: opt_num("MAX_POINTS_PER_CENTROID", 256),
+                },
+                storage_type,
+                plain,
+                sq,
+                pqn,
+                pqb,
             ))
         }
         "BMP" => Some(IndexDefValue::bmp(
