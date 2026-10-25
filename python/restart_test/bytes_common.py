@@ -598,7 +598,7 @@ def _check_index(cpp, rust, index_id, kind, failures):
         return
     for name in sorted(cpp_files_for_index):
         a, b = cpp_files_for_index[name], rust_files_for_index[name]
-        if kind in ("fulltext", "secondary-u64", "bmp"):
+        if kind in ("fulltext", "secondary-u64", "bmp", "smve"):
             # Deterministic: the layout is derived from the rows alone.
             if a != b:
                 failures.append(

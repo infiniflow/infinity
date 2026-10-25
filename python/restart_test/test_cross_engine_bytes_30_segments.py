@@ -1113,3 +1113,65 @@ def test_a_big_import_populates_every_index_kind():
     rust_answers = _answers(rust_root, 5433, BIG_TABLE, queries)
     assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
     assert cpp_answers["count"] == [BIG_ROWS]
+
+
+SMVE_TABLE = "test_cross_engine_smve"
+SMVE_ROWS = 500
+SMVE_COLUMNS = {"id": {"type": "int"}, "t": {"type": "tensor,4,float"}}
+
+
+def _smve_phase(conn):
+    db = conn.get_database("default_db")
+    db.drop_table(SMVE_TABLE, ConflictType.Ignore)
+    t = db.create_table(SMVE_TABLE, SMVE_COLUMNS, ConflictType.Error)
+    t.create_index("smve_t", index.IndexInfo("t", index.IndexType.SMVE))
+    rows = [
+        {"id": i, "t": [float(i % 7), float(i % 5), float(i % 3), 0.5]}
+        for i in range(SMVE_ROWS)
+    ]
+    for start in range(0, len(rows), 8192):
+        t.insert(rows[start : start + 8192])
+    conn.flush_data()
+    t.dump_index("smve_t")
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_smve_chunk_matches_byte_for_byte():
+    """`USING SMVE` on a `TENSOR(FLOAT,4)` column: one chunk of 500 documents.
+
+    The chunk is `u32 width/topk/embedding_dim/n_docs`, the `dim × width`
+    projection matrix and the BMP index over the sparse codes. The projection
+    is the reference's `mt19937(42)` sequence, so the whole file is comparable
+    byte for byte - including the compressed BMP section (`BMPCompressType::
+    kCompressed`, which is what `bmp_cpp::encode_bmp` writes).
+    """
+    cpp_root = os.path.join(ROOT, "smve_cpp")
+    rust_root = os.path.join(ROOT, "smve_rust")
+    _run_engine("cpp", cpp_root, 5432, seed=_smve_phase)
+    _run_engine("rust", rust_root, 5433, seed=_smve_phase)
+
+    cpp_files, rust_files = _files(cpp_root), _files(rust_root)
+    cpp_dir = _own_table_dir(cpp_files, len(SMVE_COLUMNS))
+    rust_dir = _own_table_dir(rust_files, len(SMVE_COLUMNS))
+    assert cpp_dir and rust_dir, f"{cpp_dir} / {rust_dir}"
+    failures = _compare_data_files(
+        _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), {1: "smve"}
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures[:20]
+    )
+
+    queries = {
+        "count": lambda t: t.output(["count(*)"]).to_result(),
+        "id": lambda t: t.output(["id"]).filter(f"id = {SMVE_ROWS - 1}").to_result(),
+    }
+    cpp_answers = _answers(cpp_root, 5432, SMVE_TABLE, queries)
+    rust_answers = _answers(rust_root, 5433, SMVE_TABLE, queries)
+    assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
+    assert cpp_answers["count"] == [SMVE_ROWS]

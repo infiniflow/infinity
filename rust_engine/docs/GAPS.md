@@ -45,7 +45,11 @@
 |---|---|
 | 项 | 为什么没覆盖 |
 |---|---|
-| PLAID / EMVB / SMVE chunk 字节 | 端口已按参考的时序写这三类的 `chunk_0.idx`（`CREATE INDEX` 建内存索引、INSERT 追加、flush dump），但**参考侧本身不完备**：`TENSOR(FLOAT,4)` 上 `USING SMVE` 的 chunk 实测 `term_num=2048`、IVT 条目 0、32 个块全部为空（`src/unit_test` 里没有 SMVE 用例），而端口把 500 篇文档编进了索引（68,368 B vs 140,392 B）。要逐字节比就得先确认参考什么时候会产出非空的 SMVE 索引 |
+| 项 | 为什么没覆盖 |
+|---|---|
+| PLAID / EMVB chunk 字节 | 两者的训练都含 `std::random_device`（PLAID 的 k-means 初始化、EMVB 的残差 PQ 训练），只能按内容比而不是逐字节；EMVB 另外要超过 `build_index_threshold_`（8192 个 embedding）才会建内存索引，小表上两引擎都不产 chunk |
+
+SMVE 已经闭口：`test_the_smve_chunk_matches_byte_for_byte`（500 行 `TENSOR(FLOAT,4)`）逐字节相同，前提是参考侧 `SMVEIndexInMem::BuildFromColumn` 把 `GetTensorRaw` 的第二个返回值当**token 数**而不是字节数（参考里原来除错了，chunk 因此是空的）。
 
 ## 5 已登记的行为差异（性能/口径，不是待办）
 
