@@ -192,6 +192,11 @@ pub struct TxnManager {
     active: Arc<Mutex<HashMap<u64, TxnInfo>>>,
     /// Serialises conflict validation + commit so the first committer wins.
     commit_lock: Mutex<()>,
+    /// C++ `NewTxnManager::bottom_txns_`: transactions whose bottom half has
+    /// been taken, keyed by commit ts. `true` when the bottom finished, so the
+    /// clock can only advance past the **smallest** unfinished ts.
+    bottom_txns: Mutex<std::collections::BTreeMap<TxnTimeStamp, bool>>,
+    bottom_cv: std::sync::Condvar,
 }
 
 impl TxnManager {
@@ -262,6 +267,8 @@ impl TxnManager {
             write_ts: Mutex::new(write_ts),
             active: Arc::new(Mutex::new(HashMap::new())),
             commit_lock: Mutex::new(()),
+            bottom_txns: Mutex::new(std::collections::BTreeMap::new()),
+            bottom_cv: std::sync::Condvar::new(),
         };
         // `Storage::Init` -> `RecoverMemIndex` -> `BeginRecoveryTxn`: the
         // reference begins one transaction before its startup checkpoint, so it
@@ -405,6 +412,46 @@ impl TxnManager {
     /// Commits: validate against newer transactions, append the typed command
     /// list to the WAL (serial), then apply the batch atomically to the KV.
     /// Returns the commit timestamp.
+    /// C++ `NewTxnManager::GetWriteCommitTS`: the transaction takes its place
+    /// in the bottom-half queue *before* it commits, so a later transaction
+    /// cannot publish its writes first.
+    pub fn register_bottom(&self, commit_ts: TxnTimeStamp) {
+        self.bottom_txns.lock().unwrap().insert(commit_ts, false);
+    }
+
+    /// C++ `NewTxnManager::CommitBottom`: mark this transaction's bottom done
+    /// and let the clock move past every finished transaction from the front.
+    /// Visibility therefore advances in commit-ts order even when the bottoms
+    /// themselves finished the other way round.
+    pub fn finish_bottom(&self, commit_ts: TxnTimeStamp) {
+        let mut bottom = self.bottom_txns.lock().unwrap();
+        if let Some(done) = bottom.get_mut(&commit_ts) {
+            *done = true;
+        }
+        while bottom.iter().next().map_or(false, |(_, done)| *done) {
+            let front = *bottom.keys().next().unwrap();
+            bottom.remove(&front);
+            self.current_ts.fetch_max(front, Ordering::SeqCst);
+        }
+        drop(bottom);
+        self.bottom_cv.notify_all();
+    }
+
+    /// Waits until `commit_ts` is visible (`current_ts` has reached it).
+    pub fn wait_visible(&self, commit_ts: TxnTimeStamp) {
+        let mut bottom = self.bottom_txns.lock().unwrap();
+        while self.current_ts.load(Ordering::SeqCst) < commit_ts {
+            bottom = self.bottom_cv.wait(bottom).unwrap();
+        }
+    }
+
+    /// [`Self::commit`] without publishing the commit; the caller calls
+    /// [`Self::finish_bottom`] when its bottom work is done.
+    pub fn commit_deferred(&self, txn: Txn) -> Result<TxnTimeStamp> {
+        let commit_ts = self.reserve_commit_ts();
+        self.commit_at_deferred(txn, commit_ts)
+    }
+
     pub fn commit(&self, txn: Txn) -> Result<TxnTimeStamp> {
         // C++ distinguishes a read-only transaction (no WAL record, commit ts
         // `current_ts + 1`, `GetReadCommitTS`) from an empty one.
@@ -456,6 +503,18 @@ impl TxnManager {
     }
 
     pub fn commit_at(&self, txn: Txn, commit_ts: TxnTimeStamp) -> Result<TxnTimeStamp> {
+        self.commit_at_deferred(txn, commit_ts).map(|ts| {
+            self.finish_bottom(ts);
+            ts
+        })
+    }
+
+    /// [`Self::commit_at`] without publishing the commit: the caller finishes
+    /// its own bottom work (in the executor: the index updates) and then calls
+    /// [`Self::finish_bottom`], so a transaction is visible only once its rows
+    /// *and* its index entries are in place.
+    pub fn commit_at_deferred(&self, txn: Txn, commit_ts: TxnTimeStamp) -> Result<TxnTimeStamp> {
+        self.register_bottom(commit_ts);
         let _commit = self.commit_lock.lock().unwrap();
         {
             let seen = self.write_ts.lock().unwrap();
@@ -463,7 +522,7 @@ impl TxnManager {
                 // The timestamp is spent; `CommitBottom` advances `current_ts_`
                 // past it in commit-ts order even when the transaction rolled
                 // back, so the clock keeps the same hole.
-                self.current_ts.fetch_max(commit_ts, Ordering::SeqCst);
+                self.finish_bottom(commit_ts);
                 return Err(Error::TxnConflict(reason));
             }
         }
@@ -512,7 +571,6 @@ impl TxnManager {
         // `CommitBottom` / `FinalizeTxn`: the clock moves only once the batch is
         // in the store, so a reader's `begin_ts` is `current_ts + 1` and never
         // sees a commit that is still being applied.
-        self.current_ts.store(commit_ts, Ordering::SeqCst);
         self.total_committed.fetch_add(1, Ordering::Relaxed);
         Ok(commit_ts)
     }

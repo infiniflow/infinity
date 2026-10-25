@@ -5241,6 +5241,9 @@ impl<'a> EngineTxn<'a> {
         // after the append must not publish it (`PhysicalInsert` checks the
         // same condition while executing the request).
         self.engine.ensure_writable()?;
+        // The commit ts of a deferred bottom half: the commit is published at
+        // the end, once rows, index entries and the block mirror are in place.
+        let mut deferred_ts: Option<u64> = None;
         let Some(txn) = self.txn.take() else {
             return Ok(());
         };
@@ -5293,7 +5296,12 @@ impl<'a> EngineTxn<'a> {
             self.engine.note_live_rows(table, -(*count as isize));
         }
         if !txn.is_empty() {
-            let ts = self.engine.txn.commit(txn)?;
+            // The bottom half: rows first, index entries after (both are
+            // inside `CommitBottom` in the reference). The commit becomes
+            // visible only once the index entries are in place, so a reader
+            // never sees rows their index does not know about yet.
+            let ts = self.engine.txn.commit_deferred(txn)?;
+            deferred_ts = Some(ts);
             // The block's `version` carries each append's and each delete's
             // commit ts (`BlockVersion::Append` / `Delete`).
             let mut append_counts: std::collections::BTreeMap<&str, usize> = Default::default();
@@ -5355,6 +5363,12 @@ impl<'a> EngineTxn<'a> {
         // The catalog is still current: perform the sealed writes now.
         for dump in &self.dumps {
             self.engine.dump_index(&dump.table, &dump.index)?;
+        }
+        // `NewTxnManager::CommitBottom`: publish. The clock advances in
+        // commit-ts order, so a transaction that took a smaller ts publishes
+        // first even if its bottom finished later.
+        if let Some(ts) = deferred_ts {
+            self.engine.txn.finish_bottom(ts);
         }
         Ok(())
     }

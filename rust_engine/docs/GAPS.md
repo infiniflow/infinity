@@ -30,7 +30,7 @@
 | 待办 | 参考的做法 | 端口现在 |
 |---|---|---|
 | 执行器的多 fragment 与 tasklet（D4） | `FragmentBuilder` 把计划切成并行流 / 串行 materialize / merge 若干 fragment，之间用交换队列；`FragmentContext::CreateTasks` 按 `min(cpu_count, first_operator->TaskletCount())` 建 tasklet，scan 的 tasklet 数就是块数（`fragment_context_impl.cpp:1215-1245`），`TaskletCount()` 默认 1、filter/project/limit 透传左侧、match/merge/projection 强制 1 | 不拆 fragment、没有 tasklet：`run_fragment` 在单线程里跑完整条算子链（`operators/mod.rs:342`）；`EXPLAIN FRAGMENT` 里的 `Fragment #N * M Task` 只是单测 fixture 的文本（`explain.rs:1805`）。结果一致，并行度不同 |
-| 事务下半部的执行者与可见顺序 | 每个事务在自己的线程里做 bottom（`NewTxn::CommitBottom` → `CommitBottomAppend`，单事务内对 append range 顺序循环，`new_txn_data_impl.cpp:1840`；索引 insert 也在这里，`AppendIndex`，`:1887`），manager 用 `bottom_txns_`（按 commit_ts 排序）从队首推进 `current_ts_` 并 `NotifyTopHalf`（`new_txn_manager_impl.cpp:410-455`）：**bottom 工作并发、可见性按 commit_ts 有序** | 冲突检测、WAL 追加、KV 批量写与 `max_applied` 全在同一把 `commit_lock` 里（`infinity-txn/src/lib.rs:458`），执行顺序 = 抢锁顺序，而 commit ts 在抢锁**之前**分配；索引更新在 `commit_at` 返回、锁释放之后由调用线程逐行做。并发客户端下可能出现 ts 大的事务先对读者可见，且同一张表的索引更新可以在锁外交错 |
+| 事务下半部的执行者与可见顺序 | 已按参考落地：事务在取到 ts 时就排进 `bottom_txns_`（按 commit_ts 排序），底部工作（行 → 索引 → 块镜像）做完才调 `finish_bottom`，时钟**从队首按 commit_ts 顺序**推进；冲突/回滚也走同一个屏障，ts 的空洞保留。仍待办的是把底部工作本身放到各事务自己的线程上（现在 WAL 追加与 KV 写还在 `commit_lock` 下串行） | `infinity-txn/src/lib.rs` 的 `register_bottom` / `finish_bottom`；`EngineTxn::commit` 在索引更新与块镜像之后才发布 |
 
 原先记在这一节里的接线项——相关子查询、压缩/`IMPORT` 的 WAL 帧、DDL 的 typed 命令、`COMPACT` 的候选集、`IndexScanBuilder`、`ResultCacheGetter`、`MATCH TEXT` 走倒排、`fast_rough_filter`、`compact_interval`、分析器家族、稀疏检索选项、快照——已经接线，记录在 [`CLASS_MAP.md`](CLASS_MAP.md)（类/方法级）与 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §6（格式与门禁级）。
 
