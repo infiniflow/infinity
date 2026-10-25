@@ -43,9 +43,8 @@ pub struct SnapshotBrief {
     /// The snapshot directory's ctime, `%Y-%m-%d %H:%M:%S`.
     pub create_time: String,
     /// The snapshot's ts (the metadata's `max_commit_ts`, the same number the
-    /// WAL command carries). The reference never fills this — the assignment
-    /// is commented out at `snapshot_brief_impl.cpp:94`, so its column prints
-    /// an uninitialized value — and the port fills it instead.
+    /// WAL command carries), which both engines now write and read back
+    /// (`SnapshotBrief::GetSnapshots`).
     pub commit_ts: u64,
     pub size: u64,
 }
