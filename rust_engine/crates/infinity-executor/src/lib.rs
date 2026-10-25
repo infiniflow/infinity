@@ -147,6 +147,9 @@ mod select_ddl_ut;
 mod snapshot_ut;
 
 #[cfg(test)]
+mod wal_shape_ut;
+
+#[cfg(test)]
 mod subquery_cte_ut;
 
 #[cfg(test)]
@@ -13039,6 +13042,10 @@ impl Engine {
             t.put(row_key(table, new), v);
             t.put(del_key(table, *old), b"1".to_vec());
         }
+        // `CompactTxnStore::ToWalEntry`: one `CompactV2` command carrying the
+        // merged segment and the deprecated ids, instead of the row moves
+        // (`new_txn_data_impl.cpp:753`).
+        t.set_typed_commands(vec![self.compact_command(table, next_seg, rows.len(), &sources)?]);
         let compact_ts = if !rows.is_empty() {
             self.txn.commit(t)?
         } else {
@@ -13158,6 +13165,107 @@ impl Engine {
         self.result_cache.lock().unwrap().clear();
         self.plan_cache.clear();
         Ok(())
+    }
+
+    /// `WalCmdCompactV2` for a merge of `sources` into `next_seg`
+    /// (`new_txn_data_impl.cpp:753-786`).
+    fn compact_command(
+        &self,
+        table: &str,
+        next_seg: u32,
+        rows: usize,
+        sources: &[u32],
+    ) -> Result<infinity_storage::WalCmd> {
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let (db_name, table_name) = split_table_name(table);
+        let mut indexes: Vec<(u64, String)> = self
+            .storage
+            .catalog
+            .list_indexes()?
+            .iter()
+            .filter(|im| im.table == table || im.table == self.qualified_table(table))
+            .map(|im| (im.id, im.name.clone()))
+            .collect();
+        indexes.sort();
+        Ok(infinity_storage::WalCmd::Compact {
+            db_name,
+            db_id: self.database_id_of(table).to_string(),
+            table_name,
+            table_id: meta.id.to_string(),
+            index_names: indexes.iter().map(|(_, name)| name.clone()).collect(),
+            index_ids: indexes.iter().map(|(id, _)| id.to_string()).collect(),
+            // `CompactTxnStore::ToWalEntry` reads `segment_infos_`, the copy
+            // taken *before* the per-block/per-segment counts were filled in
+            // (`new_txn_data_impl.cpp:758` vs `:766`), so the reference's
+            // command carries 0 there. Replay ignores them (it commits the
+            // segment and its block ids), so the port writes 0 too.
+            new_segment_infos: vec![self.wal_segment_info(
+                next_seg,
+                rows,
+                meta.columns.len(),
+                false,
+            )],
+            deprecated_segment_ids: sources.to_vec(),
+        })
+    }
+
+    /// `WalCmdImportV2` for the segment a `COPY` is writing
+    /// (`ImportTxnStore::ToWalEntry`, `base_txn_store_impl.cpp:378`): the
+    /// segment's info, never the rows.
+    fn import_command(&self, table: &str, segment: u32) -> Result<infinity_storage::WalCmd> {
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let (db_name, table_name) = split_table_name(table);
+        let rows = self.segment_rows(table, segment as usize);
+        Ok(infinity_storage::WalCmd::Import {
+            db_name,
+            db_id: self.database_id_of(table).to_string(),
+            table_name,
+            table_id: meta.id.to_string(),
+            segment_info: self.wal_segment_info(segment, rows, meta.columns.len(), true),
+        })
+    }
+
+    /// C++ `WalSegmentInfo` (`wal_entry_impl.cpp:135`): one block per
+    /// `DEFAULT_BLOCK_CAPACITY` rows, `outline_infos` = `(1, 0)` per column,
+    /// `row_capacity` = the segment's capacity.
+    fn wal_segment_info(
+        &self,
+        segment_id: u32,
+        rows: usize,
+        columns: usize,
+        row_counts: bool,
+    ) -> infinity_storage::wal_entry::WalSegmentInfo {
+        let block_capacity = infinity_storage::cpp_format::DEFAULT_BLOCK_CAPACITY;
+        let mut block_infos = Vec::new();
+        let mut block_id = 0u16;
+        let mut left = rows;
+        while left > 0 {
+            let in_block = left.min(block_capacity);
+            block_infos.push(infinity_storage::wal_entry::WalBlockInfo {
+                block_id,
+                row_count: if row_counts { in_block as u16 } else { 0 },
+                row_capacity: block_capacity as u16,
+                outline_infos: vec![(1u32, 0u64); columns],
+            });
+            left -= in_block;
+            block_id += 1;
+        }
+        infinity_storage::wal_entry::WalSegmentInfo {
+            segment_id,
+            column_count: columns as u64,
+            row_count: if row_counts { rows as u64 } else { 0 },
+            actual_row_count: 0,
+            row_capacity: Self::SEGMENT_ROW_CAPACITY as u64,
+            block_infos,
+        }
     }
 
     /// `Cleanup` reclaims the segments a compaction deprecated.
@@ -14769,6 +14877,7 @@ impl Engine {
                 let encoded = encode_row(row, &types);
                 t.put(row_key(table, base + k), encoded.into_bytes());
             }
+            t.set_typed_commands(vec![self.import_command(table, (base >> 32) as u32)?]);
             let ts = self.txn.commit(t)?;
             self.settle_append_ts(table, 1, ts);
             self.note_import_ts(table, (base >> 32) as u32, ts);
@@ -14861,6 +14970,9 @@ impl Engine {
                     let encoded = self.encode_row_stored(table, row, &types_for_scan)?;
                     t.put(row_key(table, base + k), encoded.into_bytes());
                 }
+                // `ImportTxnStore::ToWalEntry`: the frame names the segment,
+                // not the rows (they are in the blocks the import writes).
+                t.set_typed_commands(vec![self.import_command(table, (base >> 32) as u32)?]);
                 let ts = match statement_ts {
                     Some(ts) => self.txn.commit_at(t, ts)?,
                     None => {

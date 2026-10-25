@@ -29,7 +29,7 @@
 - **参考侧没有可对齐的行为**：C++ 对 `SELECT (SELECT …) FROM o` 在 `FragmentTask::OnExecute` 里 `std::terminate`/abort（实测整机崩溃），对 `WHERE EXISTS (…)` 回 `Unknown error`；`JoinType::kMark` 只有 planner 生成、`src/executor` 没有对应算子。所以这里按参考 planner 的模型（`SubqueryUnnest` → `DependentJoinFlattener` 的 mark join + 按相关列 join）执行，而不是复刻一次崩溃。
 - **测试**：`a_correlated_subquery_works_outside_the_where_clause`（投影/投影表达式/HAVING）、`a_correlated_subquery_runs_once_per_distinct_key`（4 行 2 个 key → 内层只执行 2 次，含 `IN`/`NOT IN`）、`a_correlated_subquery_reads_a_cte_or_joined_relation`（CTE 与 JOIN 左侧）、以及原有的 `a_correlated_subquery_is_evaluated_per_outer_row`、`a_correlated_subquery_sees_each_outer_row`。
 
-压缩与 `IMPORT` 的 WAL 命令形态（`CompactV2` / `ImportV2` vs `[AppendV2, DeleteV2]` / `AppendV2`）是已登记的行为差异，记在 `FORMAT_EQUIVALENCE_TESTS.md` §6.1，不在这里重复。
+压缩与 `IMPORT` 的 WAL 命令形态与参考一致：压缩是一帧一条 `CompactV2`（合并段 + 废弃段 id + 表的 index 名/id，不搬行），`IMPORT` 是一帧一条 `ImportV2`（新段信息），两条命令的载荷与参考逐字节相同（`wal_shape_ut` 用参考 `wal.log` 里取出的字节做 fixture）。行仍然写进 KV/块，只是不再出现在 WAL 里。仍未对齐的是参考在同一帧里追加的 `DumpIndexV2`，以及 >8192 行导入的帧数（见 §5）。
 
 其余各项的接线位置与门禁：
 
@@ -66,7 +66,6 @@
 | PLAID / EMVB / MULTIVECTOR chunk 字节 | 只有重写版自身单测 |
 | 快照（`CREATE … SNAPSHOT`）的 `table_indexes[].segment_indexes` | 端口按磁盘上的 chunk 文件名/大小写条目，`base_row_id`/`row_cnt` 没有可复用的账本；两侧表 id 也不同，所以只做结构比对，不做逐字节比对 |
 | binary-fuse 半区（`BOOLEAN`/`DECIMAL` 的 `bloom_filter`） | 重写版固定写「存在但未构建」 |
-| `IMPORT` 的 WAL 命令形态 | 参考写 `ImportV2`，重写版写等价的 `AppendV2` |
 
 ## 5 已登记的行为差异（性能/口径，不是待办）
 
@@ -77,6 +76,8 @@
 | `CREATE VIEW` / `DROP VIEW` | 不实现（参考也没有实现）：`PhysicalCreateView::Execute` 是空壳、DDL 分发没有这个分支，两侧都死在 `UnrecoverableException("Unknown DDL type")`（`query_context_impl.cpp:467`/`:489`），视图不会被登记，`FROM v` 随后报表不存在 |
 | `INSERT … SELECT` | 只支持 select list 全为常量：参考的 `PhysicalInsert` 把投影表达式交给 `ExpressionState::CreateState`，那里没有 `Column` 分支，任何列引用（含 `SELECT *`）都会死在该处（`expression_state_impl.cpp:68`）。端口报同一条 `Unknown expression type: Column. expression name: {col}`，常量情形与参考一样按源行数插入 |
 | `CREATE SNAPSHOT … ON TABLE <db>.<tbl>` | 参考的文法是 `IDENTIFIER`，带库名的写法是解析错误（`unexpected '.', expecting end of file`）；端口接受限定名（HTTP 层就按这个拼），无库名时用会话库 |
+| `IMPORT` / `COMPACT` 的 `DumpIndexV2` 伴随命令 | 参考在导入/压缩的**同一帧**里为每个 index（每个段）追加一条 `DumpIndexV2`——它在事务内就把 chunk 写出来。端口把 chunk 留到 checkpoint 时才落盘，所以导入/压缩的帧里没有这条命令 | `base_txn_store_impl.cpp:387`/`:402` |
+| `IMPORT` 的帧数 | 参考整条语句一个事务、一帧（每段一条 `ImportV2`）。端口按 8192 行一批提交（同一 commit ts），>8192 行的导入因此是多帧，每帧的 `ImportV2` 带该批之后的段状态 | `copy_from_inner`、`COPY_BATCH_ROWS` |
 | 多词 / 短语 `MATCH` | 走「整行重新分词 + 逐行匹配」，结果与参考一致但不用索引（`filter_fulltext` 的索引过滤已构造真实 `Or`/`And` 树） | `CLASS_MAP.md`「有意的设计变更」 |
 | `standard-porter` | 用 Porter2（`rust_stemmers::English`），少数词干与参考的 `STEM_LANG_PORT` 不同；其余 17 种语言同族一致 | 同上 |
 | `SPARSE` 列的 `SHOW`/catalog 类型文本 | 存储字节一致，但渲染不同：C++ `Sparse(float,int8,0)`，Rust `Sparse(float,int32,8)`（元素类型一致） | `test_cross_engine_compat.py` 只比元素类型 |

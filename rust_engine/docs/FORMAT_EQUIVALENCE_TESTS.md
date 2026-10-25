@@ -133,7 +133,7 @@
 | 块镜像的大小上限 | 没有：每张表都镜像，内存按块（一次 range scan 一个块） | 没有：写入即落块 | 8,388,700 行用例（§3） |
 | 索引 chunk 的粒度 | `IMPORT` 的段：全文按 `mem_index_capacity` 切、次级/稀疏整段一个；`INSERT` 的段：按块 | 同左 | 一段三块用例（§3） |
 | 压缩后的段布局 | 合并段 = 最大段号 + 1，块/版本/chunk 都带压缩事务的 ts；源段保留文件与记录，另写 `drop\|seg\|` 与 `drop\|idx_seg\|`、删 `(index, segment)` 配对；`Cleanup` 才回收 | 同左 | 4 段压缩用例（§3） |
-| 压缩的 WAL 命令 | 一帧两条：`AppendV2`（新段的行，按新 row id）+ `DeleteV2`（被移动行的旧 id 墓碑） | 一帧一条 `CompactV2`（`SegmentInfo` + 废弃段 id），不搬行 | 参考能 replay 重写版这一帧（`test_a_compacted_table_matches_and_keeps_its_sources` 里参考读端口目录），但命令与载荷不同，不纳入逐字节门禁 |
+| 压缩的 WAL 命令 | 一帧一条 `CompactV2`（`SegmentInfo` + 废弃段 id + index 名/id），不搬行 | 同左 | 载荷与参考逐字节相同（`wal_shape_ut::a_compaction_logs_one_compact_command` 以参考 `wal.log` 的字节为 fixture）。参考的 `DumpIndexV2` 伴随命令仍缺（§6 的「带索引」行） |
 | `seg\|…\|fast_rough_filter` / `blk\|…` | 与参考同字节（`fast_rough_filter.rs`） | `IMPORT`/压缩时建 | 已逐字节比：`test_the_fast_rough_filters_match_byte_for_byte` 用 `dump-catalog` 读十六进制（`show catalog` 渲染二进制为空，走它只能断言记录存在）；字节另有 `fast_rough_filter.rs` 单测的 130 字节 fixture 钉住（§5.2.3） |
 | 段的产生时机 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切（与参考相同）；单段 `COMPACT` 不开事务 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切 | 见 §5.2 |
 | 不带 `rocksdb-store` feature 时 | catalog 落 fjall | 只认 RocksDB | 参考打开只剩 `system_tag`（`Database: default_db doesn't exist`）；门禁必须带 feature |
