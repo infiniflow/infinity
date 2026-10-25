@@ -12619,6 +12619,11 @@ impl Engine {
 
     /// Rows committed per block while streaming a `COPY … FROM`.
     const COPY_BATCH_ROWS: usize = 8192;
+    /// Rows one `COPY` stages into its single transaction before it commits
+    /// early. The reference imports a whole statement in one transaction; the
+    /// bound only exists so a stress import (millions of rows) does not hold
+    /// every encoded row in memory at once.
+    const IMPORT_TXN_ROWS: usize = 1_048_576;
 
     /// Number of segments `table` has: at least one per write batch, and more
     /// when a single import exceeds the segment capacity.
@@ -13044,8 +13049,12 @@ impl Engine {
         }
         // `CompactTxnStore::ToWalEntry`: one `CompactV2` command carrying the
         // merged segment and the deprecated ids, instead of the row moves
-        // (`new_txn_data_impl.cpp:753`).
-        t.set_typed_commands(vec![self.compact_command(table, next_seg, rows.len(), &sources)?]);
+        // (`new_txn_data_impl.cpp:753`), followed by the compaction's own
+        // `DumpIndexV2` per index (`:502`; `CompactTxnStore` leaves the
+        // `table_key` empty, so the port does too).
+        let mut cmds = vec![self.compact_command(table, next_seg, rows.len(), &sources)?];
+        cmds.extend(self.dump_index_commands(table, next_seg, rows.len(), "")?);
+        t.set_typed_commands(cmds);
         let compact_ts = if !rows.is_empty() {
             self.txn.commit(t)?
         } else {
@@ -14800,6 +14809,129 @@ impl Engine {
         }
     }
 
+    /// `WalCmdDumpIndexV2` per index over `segment`: the chunk the dump that
+    /// runs inside the import/compaction transaction produced
+    /// (`ImportTxnStore::ToWalEntry`, `base_txn_store_impl.cpp:387`).
+    ///
+    /// The reference fills the chunk info from `ChunkIndexMetaInfo`, which only
+    /// a full-text dump populates (`base_name` = the chunk's `ft_<base>` and
+    /// `term_count`); the other kinds leave it empty. `index_size` is 0 in both.
+    /// `table_key` is the table's catalog key, and empty for a compaction
+    /// (`CompactTxnStore` never sets it).
+    fn dump_index_commands(
+        &self,
+        table: &str,
+        segment: u32,
+        rows: usize,
+        table_key: &str,
+    ) -> Result<Vec<infinity_storage::WalCmd>> {
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let mut indexes = self
+            .storage
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .filter(|im| im.table == table || im.table == self.qualified_table(table))
+            .collect::<Vec<_>>();
+        indexes.sort_by_key(|im| im.id);
+        let (db_name, table_name) = split_table_name(table);
+        let db_id = self.database_id_of(table).to_string();
+        let table_id = meta.id.to_string();
+        let base_row_id = ((segment as u64) << 32) as usize;
+        let mut out = Vec::with_capacity(indexes.len());
+        for im in indexes {
+            let fulltext = im.index_type.eq_ignore_ascii_case("FULLTEXT");
+            let (base_name, term_count) = if fulltext {
+                (
+                    format!("ft_{base_row_id:016x}"),
+                    self.text_term_count(table, &im.column),
+                )
+            } else {
+                (String::new(), 0)
+            };
+            out.push(infinity_storage::WalCmd::DumpIndex {
+                db_name: db_name.clone(),
+                db_id: db_id.clone(),
+                table_name: table_name.clone(),
+                table_id: table_id.clone(),
+                index_name: im.name.clone(),
+                index_id: im.id.to_string(),
+                segment_id: segment,
+                chunk_infos: vec![infinity_storage::wal_entry::WalChunkIndexInfo {
+                    chunk_id: 0,
+                    base_name,
+                    base_row_id: infinity_storage::wal_entry::WalRowId::new(segment, 0),
+                    row_count: rows as u32,
+                    term_count,
+                    index_size: 0,
+                    deprecate_ts: u64::MAX,
+                }],
+                deprecate_ids: Vec::new(),
+                table_key: table_key.to_string(),
+            });
+        }
+        Ok(out)
+    }
+
+    /// The postings the in-memory full-text segment of `column` holds — what
+    /// `ChunkIndexMetaInfo::term_count_` reports for a dump of it (it counts
+    /// `(term, row)` pairs, not distinct terms: 100 rows of `aaa bbb` is 200).
+    fn text_term_count(&self, table: &str, column: &str) -> u32 {
+        let key = self.table_key(table);
+        let shared = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.text.get(column).cloned());
+        let Some(shared) = shared else {
+            return 0;
+        };
+        let text = shared.read().unwrap();
+        // Spilled runs keep their postings on disk; their term dictionary is
+        // loaded with the reader, so `postings` covers the memory tail only.
+        text.mem
+            .postings
+            .values()
+            .map(|postings| postings.len())
+            .sum::<usize>() as u32
+    }
+
+    /// Commits one `COPY` transaction: `ImportV2` per segment it wrote
+    /// (`ImportTxnStore::ToWalEntry`, `base_txn_store_impl.cpp:378`), never the
+    /// rows, which are already in the blocks the import wrote.
+    fn commit_import_chunk(&self, table: &str, mut t: Txn, segments: &[u32]) -> Result<u64> {
+        let mut cmds = Vec::new();
+        for segment in segments {
+            cmds.push(self.import_command(table, *segment)?);
+        }
+        // The dump runs inside the import transaction, so its `DumpIndexV2`
+        // rides in the same frame (`ImportTxnStore::ToWalEntry:387`).
+        let table_key = self.table_catalog_key(table)?;
+        for segment in segments {
+            let rows = self.segment_rows(table, *segment as usize);
+            cmds.extend(self.dump_index_commands(table, *segment, rows, &table_key)?);
+        }
+        if !cmds.is_empty() {
+            t.set_typed_commands(cmds);
+        }
+        let ts = self.txn.commit(t)?;
+        // The block's `version` and, for a fresh segment, its `catalog|seg|`
+        // record carry this transaction's commit ts (`BlockVersion::Append`,
+        // `TableMeta::AddSegmentWithID`).
+        self.settle_append_ts(table, 1, ts);
+        for segment in segments {
+            self.note_import_ts(table, *segment, ts);
+        }
+        self.dump_hnsw_over_capacity(table);
+        self.dump_secondary_over_capacity(table);
+        Ok(ts)
+    }
+
     /// Loads a CSV file into `table` (`COPY t FROM …`). The path may be absolute
     /// or the Infinity fixture path `/var/infinity/test_data/…`, which is mapped
     /// onto `INFINITY_DATA_DIR` (default `test/data`) if present.
@@ -14912,11 +15044,12 @@ impl Engine {
         let mut reader = std::io::BufReader::new(file);
         let mut total = 0usize;
         let mut first_batch = true;
-        // The statement's single commit ts: `NewTxn::Import` commits once, so
-        // every batch after the first reuses it instead of spending another
-        // (`commit_at`). Otherwise the sequence would drift by the number of
-        // extra batches and every later transaction would be stamped wrong.
-        let mut statement_ts: Option<u64> = None;
+        // `NewTxn::Import` is one transaction for the whole statement, so the
+        // rows are staged into a single `Txn` and committed once
+        // (`IMPORT_TXN_ROWS` bounds the memory a stress import may hold).
+        let mut t = self.txn.begin();
+        let mut staged = 0usize;
+        let mut segments: Vec<u32> = Vec::new();
         loop {
             let mut batch: Vec<Vec<Literal>> = Vec::with_capacity(Self::COPY_BATCH_ROWS);
             let mut eof = false;
@@ -14965,40 +15098,37 @@ impl Engine {
                 let base = self.reserve_rows_from(table, batch.len(), first_batch, true)?;
                 first_batch = false;
                 self.note_index_insert(table, batch.len());
-                let mut t = self.txn.begin();
                 for (k, row) in batch.iter().enumerate() {
                     let encoded = self.encode_row_stored(table, row, &types_for_scan)?;
                     t.put(row_key(table, base + k), encoded.into_bytes());
                 }
-                // `ImportTxnStore::ToWalEntry`: the frame names the segment,
-                // not the rows (they are in the blocks the import writes).
-                t.set_typed_commands(vec![self.import_command(table, (base >> 32) as u32)?]);
-                let ts = match statement_ts {
-                    Some(ts) => self.txn.commit_at(t, ts)?,
-                    None => {
-                        let ts = self.txn.commit(t)?;
-                        statement_ts = Some(ts);
-                        ts
-                    }
-                };
-                // The block's `version` and, for a fresh segment, its
-                // `catalog|seg|` record carry this transaction's commit ts
-                // (`BlockVersion::Append`, `TableMeta::AddSegmentWithID`).
-                self.settle_append_ts(table, 1, ts);
-                self.note_import_ts(table, (base >> 32) as u32, ts);
+                let segment = (base >> 32) as u32;
+                if !segments.contains(&segment) {
+                    segments.push(segment);
+                }
                 for (k, row) in batch.iter().enumerate() {
                     self.update_indexes_on_insert(table, base + k, row)?;
                     let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
                     self.update_text_indexes(table, base + k, &texts);
                     self.update_vector_caches(table, base + k, &texts);
                 }
-                self.dump_hnsw_over_capacity(table);
-                self.dump_secondary_over_capacity(table);
                 total += batch.len();
+                staged += batch.len();
+                if staged >= Self::IMPORT_TXN_ROWS {
+                    self.commit_import_chunk(table, t, &segments)?;
+                    t = self.txn.begin();
+                    staged = 0;
+                    segments.clear();
+                }
             }
             if eof {
                 break;
             }
+        }
+        if staged > 0 {
+            self.commit_import_chunk(table, t, &segments)?;
+        } else {
+            drop(t);
         }
         Ok(QueryResult::Inserted { count: total })
     }
