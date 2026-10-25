@@ -2269,7 +2269,58 @@ impl Engine {
     /// projection matrix (the reference's `mt19937(42)` sequence, so the bytes
     /// match) and the BMP index (`BMPHandler::SaveToPtr`). EMVB:
     /// `EMVBIndex::SaveIndexInner`.
-    fn cpp_multivector_chunk(
+    /// The C++ chunk of the table's SMVE or EMVB index, **as it was dumped**:
+    /// the memory index is built when the index is created and fed by every
+    /// insert, and `flush()` dumps it into the segment files - the chunk is
+    /// that dump, not a rebuild from the rows.
+    fn cpp_multivector_chunk(&self, table: &str, column: &str, kind: &str) -> Option<Vec<u8>> {
+        let key = self.table_key(table);
+        let index = {
+            let tables = self.tables.lock().unwrap();
+            tables.get(&key)?.mv.get(column).cloned()?
+        };
+        let guard = index.read().ok()?;
+        if kind.eq_ignore_ascii_case("SMVE") {
+            let smve = guard.smve.as_ref()?;
+            let mut out = Vec::new();
+            for v in [
+                smve.width(),
+                smve.topk(),
+                smve.embedding_dim(),
+                smve.chunk_row_count(),
+            ] {
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+            for v in smve.projection() {
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+            let docs: Vec<infinity_storage::bmp_cpp::SparseDoc> = smve
+                .docs()
+                .iter()
+                .map(|(row, entries)| {
+                    (
+                        *row as u64,
+                        entries
+                            .iter()
+                            .map(|(term, value)| (*term as i32, *value))
+                            .collect(),
+                    )
+                })
+                .collect();
+            out.extend_from_slice(&infinity_storage::bmp_cpp::encode_bmp(
+                infinity_index::sparse::BMP_BLOCK_SIZE,
+                infinity_storage::bmp_cpp::IdxWidth::I32,
+                &docs,
+                smve.width() as usize,
+            ));
+            Some(out)
+        } else {
+            let emvb = guard.tail_emvb.lock().ok()?;
+            Some(emvb.as_ref()?.data.encode())
+        }
+    }
+
+    fn cpp_multivector_chunk_from_rows(
         &self,
         table: &str,
         column: &str,
@@ -2474,7 +2525,7 @@ impl Engine {
                     // `emvb_index_file_worker`): one `chunk_0.idx` per
                     // segment naming the whole segment.
                     let Some(bytes) =
-                        self.cpp_multivector_chunk(table, &im.column, &im.index_type, &im.options)
+                        self.cpp_multivector_chunk(table, &im.column, &im.index_type)
                     else {
                         continue;
                     };
@@ -2496,7 +2547,7 @@ impl Engine {
                     || im.index_type.eq_ignore_ascii_case("EMVB")
                 {
                     let Some(bytes) =
-                        self.cpp_multivector_chunk(table, &im.column, &im.index_type, &im.options)
+                        self.cpp_multivector_chunk(table, &im.column, &im.index_type)
                     else {
                         continue;
                     };

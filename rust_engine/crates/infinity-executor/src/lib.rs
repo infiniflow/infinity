@@ -4066,12 +4066,45 @@ impl MultiVectorIndex {
         }
     }
 
+    /// C++: `EMVBIndexInMem` over the memory tail (`build_index_threshold_`).
+    fn build_emvb_tail(&self) {
+        let tail_embeddings: usize = self.tail.values().map(Vec::len).sum();
+        if tail_embeddings < emvb_build_threshold() {
+            return;
+        }
+        let mut guard = self.tail_emvb.lock().unwrap();
+        if guard
+            .as_ref()
+            .map(|t| t.generation != self.tail_generation)
+            .unwrap_or(true)
+        {
+            let mut docs: Vec<(u32, &[Vec<f32>])> = Vec::with_capacity(self.tail.len());
+            let mut seqs = Vec::with_capacity(self.tail.len());
+            for (i, (seq, doc)) in self.tail.iter().enumerate() {
+                docs.push((i as u32, doc.as_slice()));
+                seqs.push(*seq);
+            }
+            let data = infinity_storage::emvb_segment::build_emvb(self.dims, 0, &docs);
+            *guard = Some(MvTailEmvb {
+                generation: self.tail_generation,
+                data,
+                seqs,
+            });
+        }
+    }
+
     /// Dumps the memory tail into per-segment files (one `ROW_ID` segment per
     /// file, the reference's chunk dump) and keeps their mmap readers.
     fn seal(&mut self) {
         if self.tail.is_empty() {
             return;
         }
+        // The reference's chunk is the memory index it dumps, so the two that
+        // live in memory (SMVE, and EMVB over the tail) have to be built from
+        // these documents **before** the tail is taken - the chunk writer
+        // serializes them, it does not rebuild from the rows.
+        self.build_smve();
+        self.build_emvb_tail();
         #[allow(clippy::type_complexity)]
         let mut by_segment: std::collections::BTreeMap<u64, Vec<(u64, Vec<Vec<f32>>)>> =
             Default::default();
