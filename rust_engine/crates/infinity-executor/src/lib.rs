@@ -14578,7 +14578,6 @@ impl Engine {
             .map(|(_, v)| minimum_should_match(v.trim(), units_total))
             .unwrap_or(1);
         let topn = parse_topn_param(params).unwrap_or(10);
-        let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
         // The index decides which documents can hold one of the group's terms;
         // only those rows are read and tokenised. This syntax has no negation
