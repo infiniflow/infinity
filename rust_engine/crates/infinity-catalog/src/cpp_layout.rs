@@ -820,12 +820,21 @@ impl Catalog {
         // The reference hands out **1-based** database ids (`CreateDatabase`
         // applies `next_database_id_ + 1`, and the block mirror names its
         // directory `db_{db_id}`), so the first database is 1, not 0.
-        let db_id_of =
-            |name: &str| -> u64 { dbs.iter().position(|d| d == name).unwrap_or(0) as u64 + 1 };
+        // The id the database was created with, as `CREATE DATABASE` recorded
+        // it; a database the caller only implied falls back to its position.
+        let db_id_of = |name: &str| -> u64 {
+            ts_source
+                .get(format!("db:{name}").as_bytes())
+                .ok()
+                .flatten()
+                .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+                .filter(|id| *id > 0)
+                .unwrap_or_else(|| dbs.iter().position(|d| d == name).unwrap_or(0) as u64 + 1)
+        };
 
-        for (i, db) in dbs.iter().enumerate() {
+        for db in dbs.iter() {
             let ts = ts_of(&format!("catalog|db|{db}|"))?.unwrap_or(crate::DDL_TS_SENTINEL);
-            let db_str = (i as u64 + 1).to_string();
+            let db_str = db_id_of(db).to_string();
             store.put(key::catalog_db_key(db, ts).as_bytes(), db_str.as_bytes())?;
             store.put(
                 key::catalog_db_tag_key(&db_str, "next_table_id").as_bytes(),
@@ -1035,9 +1044,18 @@ impl Catalog {
         // *table* id counter is a per-database tag (`db|{db_id}|next_table_id`,
         // written above), not a system tag - the reference has no top-level
         // `next_table_id`.
+        // The tag is the *last id handed out*, and the reference only ever
+        // raises it (`CreateDatabase` merges +1), so a drop must not lower it:
+        // the highest id the layout holds and the value already stored both
+        // count, and a rewrite keeps whichever is larger.
+        let highest_db_id = dbs.iter().map(|d| db_id_of(d)).max().unwrap_or(0);
+        let stored_next = ts_source
+            .get(key::NEXT_DATABASE_ID.as_bytes())?
+            .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+            .unwrap_or(0);
         store.put(
             key::NEXT_DATABASE_ID.as_bytes(),
-            dbs.len().to_string().as_bytes(),
+            highest_db_id.max(stored_next).max(dbs.len() as u64).to_string().as_bytes(),
         )?;
         // `meta|version` is what stops the reference from treating the catalog
         // as pre-0.7.0 and running its JSON-index conversion on startup

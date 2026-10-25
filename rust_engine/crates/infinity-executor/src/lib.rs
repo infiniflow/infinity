@@ -5892,6 +5892,13 @@ impl Engine {
     /// The C++ database id of `db`: its 1-based position in the catalog's
     /// listing (`default_db` first).
     pub fn database_id(&self, db: &str) -> u64 {
+        // The record carries the id `CREATE DATABASE` handed out
+        // (`next_database_id_ + 1`), which is what names `db_{id}`.
+        if let Ok(Some(id)) = self.storage.catalog.database_id_of_name(db) {
+            return id;
+        }
+        // A database implied but not recorded (`default_db` on a directory that
+        // predates its record) falls back to its position.
         self.storage
             .catalog
             .list_databases()
@@ -17308,16 +17315,16 @@ impl Engine {
     /// `PhysicalShow::ExecuteShowDatabases` (`physical_show_databases_impl.cpp`).
     fn show_databases(&self) -> Result<QueryResult> {
         let names = self.storage.catalog.list_databases()?;
-        let root = self.dir.join("data");
         let rows = names
             .iter()
-            .enumerate()
-            .map(|(i, name)| {
+            .map(|name| {
+                // `DatabaseInfo::db_entry_dir_` is the directory's name under
+                // the data root, not its path, and it carries the database's
+                // own id: `default_db` is created at startup, so it is `db_1`
+                // even though `db1` sorts before it.
                 vec![
                     name.clone(),
-                    root.join(format!("db_{}", i + 1))
-                        .to_string_lossy()
-                        .into_owned(),
+                    format!("db_{}", self.database_id(name)),
                     String::new(),
                 ]
             })
@@ -23911,16 +23918,14 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
 
-        // `ListDatabases` starts with `default_db` only.
+        // `ListDatabases` starts with `default_db` only, and its
+        // `db_entry_dir_` is the directory name the startup transaction gave
+        // it (`db_1`).
         assert_eq!(
             rows(&e, "SHOW DATABASES;"),
             vec![vec![
                 "default_db".to_string(),
-                dir.path()
-                    .join("data")
-                    .join("db_1")
-                    .to_string_lossy()
-                    .into_owned(),
+                "db_1".to_string(),
                 String::new()
             ]]
         );

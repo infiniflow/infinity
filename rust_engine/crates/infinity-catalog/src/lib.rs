@@ -233,6 +233,11 @@ fn db_key(name: &str) -> Vec<u8> {
 
 const INDEX_PREFIX: &[u8] = b"idx:";
 
+/// C++ `NEXT_DATABASE_ID` (`default_values.cppm:341`): the last database id
+/// handed out. It lives in the same KV as the reference's, so a directory the
+/// reference wrote continues its sequence.
+const NEXT_DATABASE_ID_KEY: &[u8] = b"next_database_id";
+
 /// Metadata of an index.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexMeta {
@@ -1142,8 +1147,47 @@ impl Catalog {
                 Err(Error::Catalog(format!("database '{name}' already exists")))
             };
         }
-        self.store.put(&key, b"1")?;
+        // The reference keeps a monotonic `next_database_id` tag
+        // (`NewCatalog::Init` starts it at 0, `CreateDatabase` merges +1), so
+        // an id is never reused and a dropped database does not hand its
+        // `db_{id}` directory to the next one. The record carries the id it
+        // was created with for the same reason: a position in the listing
+        // would renumber `default_db` the moment a name sorts before it.
+        let id = self.next_database_id()?;
+        self.store
+            .put(NEXT_DATABASE_ID_KEY, id.to_string().as_bytes())?;
+        self.store.put(&key, id.to_string().as_bytes())?;
         Ok(())
+    }
+
+    /// The id `CREATE DATABASE` hands out next: the stored counter + 1
+    /// (`IncrLatestID(db_id_str, NEXT_DATABASE_ID)`).
+    pub fn next_database_id(&self) -> Result<u64> {
+        Ok(self
+            .store
+            .get(NEXT_DATABASE_ID_KEY)?
+            .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+            .unwrap_or(0)
+            + 1)
+    }
+
+    /// Every recorded database with its id, in name order.
+    pub fn database_ids(&self) -> Result<Vec<(String, u64)>> {
+        let mut out = Vec::new();
+        for (k, v) in self.store.scan_prefix(b"db:")? {
+            let name = String::from_utf8_lossy(&k[3..]).to_string();
+            let id = String::from_utf8_lossy(&v).parse::<u64>().unwrap_or(0);
+            out.push((name, id));
+        }
+        Ok(out)
+    }
+
+    /// The id of `name`; `None` when the database has no record.
+    pub fn database_id_of_name(&self, name: &str) -> Result<Option<u64>> {
+        Ok(self
+            .store
+            .get(&db_key(name))?
+            .map(|v| String::from_utf8_lossy(&v).parse::<u64>().unwrap_or(0)))
     }
 
     /// Whether `name` is **recorded** as a database, as opposed to being
@@ -1200,10 +1244,17 @@ impl Catalog {
         if self.cpp_only {
             return self.cpp_databases();
         }
-        let mut out = vec!["default_db".to_string()];
+        // The records are the list; `default_db` is created at startup like any
+        // other database (`Storage::Init`), so it is usually one of them. A
+        // directory that predates that record still reports it once.
+        let mut out = Vec::new();
         for (k, _) in self.store.scan_prefix(b"db:")? {
             out.push(String::from_utf8_lossy(&k[3..]).to_string());
         }
+        if !out.iter().any(|d| d == "default_db") {
+            out.push("default_db".to_string());
+        }
+        out.sort();
         Ok(out)
     }
 
