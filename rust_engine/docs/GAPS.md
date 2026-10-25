@@ -43,7 +43,7 @@
 
 | 项 | 为什么没覆盖 |
 |---|---|
-| PLAID / EMVB / MULTIVECTOR chunk 字节 | 重写版已有编码器（PLAID 的 `write_cpp_plaid_index`、EMVB 的 `encode_emvb`、SMVE 的投影矩阵已与参考逐位相同），但还没有把三者的 chunk 发布进 C++ 镜像并与参考对比的用例 |
+| PLAID / EMVB / MULTIVECTOR chunk 字节 | PLAID 的 `chunk_0.idx`、EMVB 的 `encode_emvb`、SMVE 的投影矩阵都已与参考同源，但 SMVE chunk 的 BMP 段仍对不上：参考用 `BMPCompressType::kCompressed`（`BMPHandler::Make(..., BMP_BLOCK_SIZE, kCompressed)`），`bmp_cpp::encode_bmp` 只有未压缩布局（实测 BMP 段 107,608 B vs 参考 35,584 B，固定区 32,784 B 两边一致）。另外 `plaid_centroids.bin`（参考 317 B）未写，`CREATE INDEX … USING EMVB` 缺 `pq_subspace_num` 时参考报 3061、端口接受 |
 
 ## 5 已登记的行为差异（性能/口径，不是待办）
 
