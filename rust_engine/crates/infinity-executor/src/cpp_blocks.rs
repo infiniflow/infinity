@@ -5719,8 +5719,54 @@ mod tests {
         );
     }
 
-    /// The watermark a dump resumes from: chunks are additive until a merged
-    /// newest chunk covers them.
+    /// A checkpoint rewrites the whole C++ layout from its own read-back
+    /// (`Catalog::rewrite_cpp_layout`), so every record it does not carry
+    /// through is lost. `first_delete_ts` is such a record: the delete writes
+    /// it, the read-back has to hand it back, or the next checkpoint tells
+    /// every reader that nobody ever deleted a row.
+    #[test]
+    fn a_checkpoint_keeps_the_segments_first_delete_ts() {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE t (id INT, v FLOAT);").unwrap();
+            e.execute("INSERT INTO t VALUES (1, 1.0), (2, 2.0), (3, 3.0);")
+                .unwrap();
+            e.write_cpp_blocks("t").unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("INSERT INTO t VALUES (4, 4.0);").unwrap();
+        e.execute("DELETE FROM t WHERE id = 1;").unwrap();
+        let delete_ts = e
+            .delete_ts("t")
+            .into_iter()
+            .find(|ts| *ts != 0)
+            .expect("the delete was stamped");
+        let tag = |e: &Engine| {
+            e.storage
+                .catalog
+                .store()
+                .get(b"seg|1|0|0|first_delete_ts")
+                .unwrap()
+                .map(|v| String::from_utf8_lossy(&v).to_string())
+        };
+        assert_eq!(tag(&e).as_deref(), Some(delete_ts.to_string().as_str()));
+        // The checkpoint sweeps the layout and writes it back; a DDL captures
+        // it the same way.
+        e.flush().unwrap();
+        assert_eq!(
+            tag(&e).as_deref(),
+            Some(delete_ts.to_string().as_str()),
+            "a checkpoint must not claim the segment has no deletes"
+        );
+        e.execute("CREATE INDEX ix ON t (id);").unwrap();
+        assert_eq!(
+            tag(&e).as_deref(),
+            Some(delete_ts.to_string().as_str()),
+            "a DDL must not claim the segment has no deletes"
+        );
+    }
+
     #[test]
     fn plaid_coverage_counts_a_merged_newest_chunk_once() {
         assert_eq!(plaid_coverage(&[(200, 600)]), (200, 600));

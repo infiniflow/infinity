@@ -1297,6 +1297,19 @@ pub fn read_cpp_segments(store: &dyn MetaStore) -> Result<Vec<CppSegmentSet>> {
             continue;
         };
         let create_ts = String::from_utf8_lossy(&v).parse().unwrap_or(0);
+        // `first_delete_ts` is a record of its own, not something the segment
+        // key implies: the deleting transaction writes it
+        // (`SegmentMeta::CommitFirstDeleteTS`) and it has to survive a rewrite
+        // that only re-emits the layout - a checkpoint rewrites every record
+        // from this read-back, so defaulting it to "nobody deleted" would
+        // resurrect the deleted rows for every reader below the delete's ts.
+        let first_delete_ts = store
+            .get(
+                key::catalog_segment_tag_key(&db_id, &table_id, segment_id, "first_delete_ts")
+                    .as_bytes(),
+            )?
+            .and_then(|v| String::from_utf8_lossy(&v).parse().ok())
+            .unwrap_or(UNCOMMIT_TS);
         let mut blocks = Vec::new();
         for (bk, _) in store
             .scan_prefix(key::catalog_block_prefix(&db_id, &table_id, segment_id).as_bytes())?
@@ -1334,7 +1347,7 @@ pub fn read_cpp_segments(store: &dyn MetaStore) -> Result<Vec<CppSegmentSet>> {
         set.segments.push(CppSegment {
             segment_id,
             create_ts,
-            first_delete_ts: UNCOMMIT_TS,
+            first_delete_ts,
             blocks,
         });
     }
