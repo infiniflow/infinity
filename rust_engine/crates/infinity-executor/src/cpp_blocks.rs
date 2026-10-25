@@ -2262,6 +2262,104 @@ impl Engine {
         Ok(())
     }
 
+    /// The C++ chunk of a SMVE or EMVB index, built from the table's rows the
+    /// way the reference's memory dump builds it.
+    ///
+    /// SMVE: `u32 width, topk, embedding_dim, n_docs`, the `dim × width`
+    /// projection matrix (the reference's `mt19937(42)` sequence, so the bytes
+    /// match) and the BMP index (`BMPHandler::SaveToPtr`). EMVB:
+    /// `EMVBIndex::SaveIndexInner`.
+    fn cpp_multivector_chunk(
+        &self,
+        table: &str,
+        column: &str,
+        kind: &str,
+        options: &[(String, String)],
+    ) -> Option<Vec<u8>> {
+        let schema = self.table_schema(table).ok()?;
+        let ci = schema.iter().position(|c| c == column)?;
+        let declared = self.column_types(table).ok()?.get(ci)?.clone();
+        let dims = crate::type_dim(&declared)?;
+        if dims == 0 {
+            return None;
+        }
+        let rows = self.fetch_rows_with_ids_projected_all(table, ci).ok()?;
+        let mut docs: Vec<(u64, Vec<Vec<f32>>)> = Vec::new();
+        for (seq, cells) in rows {
+            let Some(infinity_expression::Value::Str(text)) = cells.get(ci) else {
+                continue;
+            };
+            if let Some(doc) = crate::parse_multivector_doc(text, dims) {
+                docs.push((seq as u64 & 0xffff_ffff, doc));
+            }
+        }
+        if docs.is_empty() {
+            return None;
+        }
+        if kind.eq_ignore_ascii_case("SMVE") {
+            let mut width = 2048u32;
+            let mut topk = 8u32;
+            for (key, value) in options {
+                if key.eq_ignore_ascii_case("width") {
+                    if let Ok(v) = value.trim().parse() {
+                        width = v;
+                    }
+                } else if key.eq_ignore_ascii_case("topk") {
+                    if let Ok(v) = value.trim().parse() {
+                        topk = v;
+                    }
+                }
+            }
+            let numbered: Vec<(u32, Vec<Vec<f32>>)> = docs
+                .iter()
+                .enumerate()
+                .map(|(i, (_, doc))| (i as u32, doc.clone()))
+                .collect();
+            let mut index = infinity_index::smve::SmveIndex::new(width, topk, dims as u32);
+            index.build_from_column(&numbered).ok()?;
+            let mut out = Vec::new();
+            for v in [width, topk, dims as u32, numbered.len() as u32] {
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+            for v in index.projection() {
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+            let sparse_docs: Vec<infinity_storage::bmp_cpp::SparseDoc> = index
+                .docs()
+                .iter()
+                .map(|(row, entries)| {
+                    (
+                        *row as u64,
+                        entries
+                            .iter()
+                            .map(|(term, value)| (*term as i32, *value))
+                            .collect(),
+                    )
+                })
+                .collect();
+            let term_num = sparse_docs
+                .iter()
+                .flat_map(|(_, entries)| entries.iter().map(|(term, _)| *term as usize + 1))
+                .max()
+                .unwrap_or(0);
+            out.extend_from_slice(&infinity_storage::bmp_cpp::encode_bmp(
+                infinity_index::sparse::BMP_BLOCK_SIZE,
+                infinity_storage::bmp_cpp::IdxWidth::I32,
+                &sparse_docs,
+                term_num,
+            ));
+            Some(out)
+        } else {
+            let refs: Vec<(u32, &[Vec<f32>])> = docs
+                .iter()
+                .enumerate()
+                .map(|(i, (_, doc))| (i as u32, doc.as_slice()))
+                .collect();
+            let data = infinity_storage::emvb_segment::build_emvb(dims, 0, &refs);
+            Some(data.encode())
+        }
+    }
+
     fn publish_cpp_index_chunks(&self, table: &str, table_id: u64) -> Result<()> {
         let db_id = self.database_id_of(table);
         let root = self
@@ -2368,6 +2466,54 @@ impl Engine {
                     // Written in place by `write_cpp_fulltext_index`; its files are
                     // named after the chunk's base name, not `chunk_N.idx`.
                     publish_fulltext_chunks(&seg_dir)
+                } else if im.index_type.eq_ignore_ascii_case("SMVE")
+                    || im.index_type.eq_ignore_ascii_case("EMVB")
+                {
+                    // These two write their chunk through their own file
+                    // worker in the reference (`smve_index_file_worker`,
+                    // `emvb_index_file_worker`): one `chunk_0.idx` per
+                    // segment naming the whole segment.
+                    let Some(bytes) =
+                        self.cpp_multivector_chunk(table, &im.column, &im.index_type, &im.options)
+                    else {
+                        continue;
+                    };
+                    if std::fs::create_dir_all(&seg_dir).is_err()
+                        || std::fs::write(seg_dir.join("chunk_0.idx"), &bytes).is_err()
+                    {
+                        continue;
+                    }
+                    vec![CppIndexChunk {
+                        chunk_id: 0,
+                        base_name: String::new(),
+                        base_row_id: u64::from(*segment) << 32,
+                        row_count: *seg_rows,
+                        term_count: 0,
+                        index_size: bytes.len() as u64,
+                        commit_ts: 0,
+                    }]
+                } else if im.index_type.eq_ignore_ascii_case("SMVE")
+                    || im.index_type.eq_ignore_ascii_case("EMVB")
+                {
+                    let Some(bytes) =
+                        self.cpp_multivector_chunk(table, &im.column, &im.index_type, &im.options)
+                    else {
+                        continue;
+                    };
+                    if std::fs::create_dir_all(&seg_dir).is_err()
+                        || std::fs::write(seg_dir.join("chunk_0.idx"), &bytes).is_err()
+                    {
+                        continue;
+                    }
+                    vec![CppIndexChunk {
+                        chunk_id: 0,
+                        base_name: String::new(),
+                        base_row_id: u64::from(*segment) << 32,
+                        row_count: *seg_rows,
+                        term_count: 0,
+                        index_size: bytes.len() as u64,
+                        commit_ts: 0,
+                    }]
                 } else {
                     publish_chunk_files(
                         &seg_dir,

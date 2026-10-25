@@ -4026,6 +4026,18 @@ impl MultiVectorIndex {
         self.plaid_seqs = seqs;
     }
 
+    /// Whether this index was built knowing about `kind` (`PLAID` / `SMVE`).
+    /// `EMVB` has no config of its own and is always known.
+    fn knows_kind(&self, kind: &str) -> bool {
+        if kind.eq_ignore_ascii_case("PLAID") {
+            self.plaid_config.is_some()
+        } else if kind.eq_ignore_ascii_case("SMVE") {
+            self.smve_config.is_some()
+        } else {
+            true
+        }
+    }
+
     /// C++: `SMVEIndexInMem::BuildFromColumn` over the buffered documents.
     fn build_smve(&mut self) {
         if std::env::var_os("INFINITY_DEBUG_PLAN").is_some() {
@@ -9986,6 +9998,13 @@ impl Engine {
                         .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
                         .and_then(|ty| type_dim(&ty));
                     if let Some(dims) = dims {
+                        // The memory index is built once, with the configs the
+                        // catalog had at that moment; a second index on the same
+                        // column (`USING SMVE` after `USING PLAID`) would
+                        // silently reuse it. The reference keeps one object per
+                        // index, so rebuild when the cached one does not know
+                        // this kind.
+                        self.forget_multivector_index(table, column, index_type);
                         let _ = self.multivector_index_for(table, column, dims);
                     }
                 }
@@ -12269,6 +12288,28 @@ impl Engine {
 
     /// Keeps existing multi-vector indexes in step with an inserted/rewritten
     /// row. Called from the shared DML hook so every write path is covered.
+    /// Drops the cached memory index of `(table, column)` when it was built
+    /// before `kind` existed, so the caller rebuilds it with that config.
+    fn forget_multivector_index(&self, table: &str, column: &str, kind: &str) {
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&tkey) else {
+            return;
+        };
+        let rebuild = entry
+            .mv
+            .get(column)
+            .map(|idx| {
+                !idx.read()
+                    .map(|g| g.knows_kind(kind))
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+        if rebuild {
+            entry.mv.remove(column);
+        }
+    }
+
     fn update_multivector_indexes(&self, table: &str, seq: usize, cells: &[String]) {
         let tkey = self.table_key(table);
         let indexes: Vec<(String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = self
@@ -12779,15 +12820,6 @@ impl Engine {
 
     /// Rows committed per block while streaming a `COPY … FROM`.
     const COPY_BATCH_ROWS: usize = 8192;
-    /// Rows one `COPY` stages into its single transaction before it commits
-    /// early. The reference imports a whole statement in one transaction, so
-    /// splitting is a divergence: every extra commit spends a ts and moves
-    /// `version`'s `create_ts` away from the reference's (measured: 8.39M rows
-    /// with an index, 16 batches, ts 28 against 12). The bound now sits above
-    /// the segment capacity so a capacity split still imports in one
-    /// transaction; it only exists so a stress import that several engines
-    /// would split anyway does not hold every encoded row at once.
-    const IMPORT_TXN_ROWS: usize = 33_554_432;
 
     /// Number of segments `table` has: at least one per write batch, and more
     /// when a single import exceeds the segment capacity.
@@ -15358,13 +15390,6 @@ impl Engine {
                     self.update_vector_caches(table, base + k, &texts);
                 }
                 total += batch.len();
-                staged += batch.len();
-                if staged >= Self::IMPORT_TXN_ROWS {
-                    self.commit_import_chunk(table, t, &segments)?;
-                    t = self.txn.begin();
-                    staged = 0;
-                    segments.clear();
-                }
             }
             if eof {
                 break;
