@@ -6,7 +6,7 @@
 
 | 维度 | 状态 | 验证 |
 |---|---|---|
-| 磁盘格式（`data/`、`catalog/`、`wal/`） | 块列、`version`、索引 chunk、catalog 键值、WAL 帧（**含 `txn_id` 与 CRC**）与参考逐字节相同 | `python/restart_test/test_cross_engine_bytes.py` |
+| 磁盘格式（`data/`、`catalog/`、`wal/`） | 块列、`version`、索引 chunk、catalog 键值、WAL 帧（**含 `txn_id` 与 CRC**）与参考逐字节相同 | `python/restart_test/test_cross_engine_bytes_*.py`（按层分文件，见 `FORMAT_EQUIVALENCE_TESTS.md` §3） |
 | WAL | `wal.log` 的文件名、checkpoint 换文件、帧头、帧体全部一致；两引擎可互相 replay | 同上 + `test_cross_engine_compat.py` |
 | SQL 行为 | `.slt` 全量一致（Gate A）；SDK/协议（Gate B）、重启/恢复（Gate C）由对应脚本驱动 | `rust_engine/scripts/run_gate_{a,b,c}.sh` |
 | 已知缺口 | 见 [`GAPS.md`](GAPS.md) | — |
@@ -32,7 +32,7 @@
 ```bash
 cd rust_engine && cargo build --release -p infinity-cli
 cd ..
-.venv/bin/python -m pytest python/restart_test/test_cross_engine_bytes.py \
+.venv/bin/python -m pytest python/restart_test/test_cross_engine_bytes_*.py \
                               python/restart_test/test_cross_engine_compat.py -q
 ```
 

@@ -97,7 +97,7 @@ jobs:
           work=$(mktemp -d)
           bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "$work" /var/infinity \
                 --unshare-pid --proc /proc -- \
-                .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_bytes.py -rx
+                .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_bytes_*.py -rx
           work=$(mktemp -d)
           bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "$work" /var/infinity \
                 --unshare-pid --proc /proc -- \

@@ -68,7 +68,7 @@ if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
     ( cd "$root" && INFINITY_SERVER_BIN="$root/rust_engine/target/release/infinity" \
         INFINITY_CPP_BIN="${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" \
         "$py" -m pytest -q python/restart_test/test_cross_engine_compat.py \
-        python/restart_test/test_cross_engine_bytes.py \
+        python/restart_test/test_cross_engine_bytes_*.py \
         --infinity_path="$shim" ) || status=1
   else
     echo "FAIL: could not build the port binary the cross-engine leg needs"

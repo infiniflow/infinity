@@ -39,9 +39,27 @@
 
 下表就是门禁的全部入口，每条都必须通过。
 
+用例按**分层**组织——每层的"对照物"是一个粒度：一个文件/一条记录、一张表的目录、
+段的划分、WAL 的一帧……失败时的第一句话就能指出问题在哪一层。层与文件一一对应，
+可以单独跑一层（`pytest python/restart_test/test_cross_engine_bytes_30_segments.py`）：
+
+| 文件 | 层 | 对照物 |
+|---|---|---|
+| `test_cross_engine_bytes_00_premises.py` | 前提 | 每个引擎自己是否确定（不比较两个引擎） |
+| `test_cross_engine_bytes_10_encoding.py` | L0 编码原语 | 一个文件、一条记录 |
+| `test_cross_engine_bytes_20_table.py` | L1 单表 | 一张表的目录 + catalog 逻辑内容 |
+| `test_cross_engine_bytes_30_segments.py` | L2 段演化 | 段号、块归属、压缩与 cleanup |
+| `test_cross_engine_bytes_40_wal.py` | L3 WAL | 帧（载荷、`txn_id`、CRC） |
+| `test_cross_engine_bytes_50_mutations.py` | L4 变更与恢复 | 一轮写入历史之后的结果 |
+| `test_cross_engine_bytes_60_storage.py` | L5 外部存储 | 对象目录与 S3 |
+| `test_cross_engine_compat.py` | L6 交接语义 | 另一引擎读回、答案一致（自己的 harness） |
+
+共享的 harness（配置模板、引擎启动、文件遍历、各文件类的比较器、catalog/SELECT
+读取）在 `python/restart_test/bytes_common.py`，它本身没有用例。
+
 | 测试 | 数据集 | 断言 |
 |---|---|---|
-| `test_cross_engine_bytes.py::test_the_two_engines_write_the_same_bytes` | 200 行 → 1 块，5 类索引 | 块文件逐字节相同；每个索引按其类别比对（全文/次级/稀疏整文件，HNSW 头+向量+标签）；目录逻辑记录相同；索引答案相同 |
+| `test_cross_engine_bytes_20_table.py::test_the_two_engines_write_the_same_bytes` | 200 行 → 1 块，5 类索引 | 块文件逐字节相同；每个索引按其类别比对（全文/次级/稀疏整文件，HNSW 头+向量+标签）；目录逻辑记录相同；索引答案相同 |
 | `::test_the_blocks_match_across_many_blocks` | 20000 行、无索引 → 3 块（8192/8192/3616） | 每块每列的 `.col`、outline、每块 `version` 逐字节相同 |
 | `::test_the_chunk_boundaries_are_timing_dependent` | 100 行 + 100 行两次 flush（一个块） | chunk 覆盖行区间无空洞、无重叠、总数 200；**不**断言固定的 chunk 数 |
 | `::test_the_columns_match_for_every_type` | 16 类列 × 200 行，含 NULL 与极值 | 每个 `.col` 与 outline 逐字节相同（NULL 槽按位图屏蔽） |
@@ -251,13 +269,13 @@ cd rust_engine && cargo build --release -p infinity-cli
 work=$(mktemp -d)
 bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "$work" /var/infinity \
       --unshare-pid --proc /proc -- \
-      .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_bytes.py
+      .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_bytes_*.py
 
 # 对象存储往返（需要一个可用的 S3/MinIO 端点，桶名不能带下划线）
 INFINITY_MINIO_URL=127.0.0.1:9000 \
 INFINITY_MINIO_ACCESS_KEY=... INFINITY_MINIO_SECRET_KEY=... \
 bwrap ... -- .venv/bin/python -m pytest -q \
-      python/restart_test/test_cross_engine_bytes.py::test_the_port_round_trips_through_object_storage
+      python/restart_test/test_cross_engine_bytes_60_storage.py::test_the_port_round_trips_through_object_storage
 
 # 互读
 bwrap ... -- .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_compat.py \
