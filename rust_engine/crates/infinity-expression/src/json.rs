@@ -9,6 +9,11 @@ pub enum Json {
     Null,
     Bool(bool),
     Int(i64),
+    /// An unsigned integer that does not fit `i64`. JSON has one number type,
+    /// so this only exists to keep a `u64` sentinel (a segment's
+    /// `first_delete_ts = 18446744073709551615`) printing exactly as
+    /// `nlohmann::json` prints it.
+    Uint(u64),
     Float(f64),
     Str(String),
     Arr(Vec<Json>),
@@ -22,6 +27,7 @@ impl Json {
             Json::Null => "null".to_string(),
             Json::Bool(b) => b.to_string(),
             Json::Int(i) => i.to_string(),
+            Json::Uint(u) => u.to_string(),
             Json::Float(f) => fmt_json_float(*f),
             Json::Str(s) => format!("\"{}\"", escape(s)),
             Json::Arr(items) => {
@@ -219,6 +225,9 @@ impl Parser {
         if !text.contains(['.', 'e', 'E']) {
             if let Ok(i) = text.parse::<i64>() {
                 return Some(Json::Int(i));
+            }
+            if let Ok(u) = text.parse::<u64>() {
+                return Some(Json::Uint(u));
             }
         }
         text.parse::<f64>().ok().map(Json::Float)

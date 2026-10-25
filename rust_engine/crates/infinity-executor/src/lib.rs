@@ -24,8 +24,6 @@ use infinity_catalog::{Catalog, SparseStore as CatalogSparseStore};
 use infinity_common::{Error, Result};
 use infinity_expression::{Expr, Value};
 use infinity_index::{Index, SecondaryIndex};
-use infinity_parser::lexer::{tokenize, Token};
-use infinity_parser::parser::render_tokens_as_sql;
 use infinity_parser::{
     parse, AggFunc, CmpOp, ColumnDef, ExprAst, JoinClause, Literal, MatchClause, Predicate,
     SearchClause, SelectItem, SparseStore as ParserSparseStore, Statement,
@@ -128,6 +126,7 @@ mod gate_b_executor_ut;
 #[cfg(test)]
 mod upload_meta_to_s3_ut;
 mod wal_ddl;
+mod snapshot;
 
 pub mod data_table;
 
@@ -143,6 +142,9 @@ mod query_match_ut;
 
 #[cfg(test)]
 mod select_ddl_ut;
+
+#[cfg(test)]
+mod snapshot_ut;
 
 #[cfg(test)]
 mod subquery_cte_ut;
@@ -321,9 +323,6 @@ fn append_copy_key(table: &str) -> Vec<u8> {
 fn del_prefix(table: &str) -> Vec<u8> {
     format!("del:{table}:").into_bytes()
 }
-fn snap_key(name: &str) -> Vec<u8> {
-    format!("snap:{name}").into_bytes()
-}
 /// `rank_features` contribution: `cell` is a JSON array of
 /// `{"<tag>": <number>}` objects, and each listed tag adds `number * weight`.
 /// A missing tag contributes nothing.
@@ -379,12 +378,6 @@ fn match_is_min_heap(m: &MatchClause) -> bool {
         true
     }
 }
-/// Record / field separators used inside a snapshot blob.
-const SNAP_REC: char = '\u{1d}';
-const SNAP_FLD: char = '\u{1c}';
-/// Separates the per-table blobs of a database snapshot.
-const DB_SNAP_SEP: char = '\u{1b}';
-
 /// The declared dimension of a `TENSOR(FLOAT,d)` / `EMBEDDING(FLOAT,d)` column.
 fn type_dim(type_text: &str) -> Option<usize> {
     let t = type_text.to_ascii_uppercase();
@@ -1962,6 +1955,67 @@ fn uses_row_id(items: &[SelectItem]) -> bool {
     })
 }
 
+/// The name the reference prints for a column: the last identifier of a
+/// qualified reference (`t.a` → `a`), without quoting.
+fn bare_column_name(name: &str) -> String {
+    let name = name.rsplit('.').next().unwrap_or(name).trim();
+    name.trim_matches('"').trim_matches('`').to_string()
+}
+
+/// The first column an expression reads, if any.
+fn expr_column(e: &ExprAst) -> Option<String> {
+    match e {
+        ExprAst::Column(c) => Some(bare_column_name(c)),
+        ExprAst::Func { args, .. } => args.iter().find_map(expr_column),
+        ExprAst::Binary(a, _, b) | ExprAst::Cmp(a, _, b) | ExprAst::And(a, b) | ExprAst::Or(a, b) => {
+            expr_column(a).or_else(|| expr_column(b))
+        }
+        ExprAst::Not(a) => expr_column(a),
+        ExprAst::Literal(_) => None,
+    }
+}
+
+/// The first column an `INSERT … SELECT`'s select list reads, if any.
+///
+/// `SELECT *` counts: the binder expands it to the source's columns, whose
+/// names `expanded` carries in order.
+fn insert_select_column(query: &Statement, expanded: &[String]) -> Option<String> {
+    let Statement::Select { items, .. } = query else {
+        return None;
+    };
+    for item in items {
+        match item {
+            SelectItem::Star => {
+                return Some(expanded.first().cloned().unwrap_or_else(|| "*".to_string()))
+            }
+            SelectItem::Column(name) => return Some(bare_column_name(name)),
+            SelectItem::Expr(e) => {
+                if let Some(column) = expr_column(e) {
+                    return Some(column);
+                }
+            }
+            SelectItem::Func { args, .. } => {
+                if let Some(column) = args.iter().find_map(expr_column) {
+                    return Some(column);
+                }
+            }
+            SelectItem::Aggregate(agg) => {
+                for expr in agg.arg_exprs.iter().flatten() {
+                    if let Some(column) = expr_column(expr) {
+                        return Some(column);
+                    }
+                }
+                // `COUNT(*)` reads no column; any other plain argument does.
+                if let Some(name) = agg.args.first().filter(|a| a.trim() != "*") {
+                    return Some(bare_column_name(name));
+                }
+            }
+            SelectItem::Literal(_) => {}
+        }
+    }
+    None
+}
+
 thread_local! {
     /// Set while a table is created from the SDK's physical type, where a
     /// sparse dimension of 0 is legal.
@@ -2427,72 +2481,6 @@ fn literal_from_value(value: &Value, type_text: &str) -> Literal {
         Value::Str(s) => Literal::Str(s.clone()),
         Value::Null => Literal::Null,
     }
-}
-
-fn is_plain_identifier(s: &str) -> bool {
-    let mut chars = s.chars();
-    match chars.next() {
-        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
-        _ => return false,
-    }
-    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
-/// Qualifies every unqualified table reference using `resolve(name)`, which
-/// returns the database the table actually lives in. Views created from a
-/// non-default database may reference tables in another database, so the
-/// caller resolves each name against the catalog instead of blindly using the
-/// current session database. The walk handles `FROM`/`JOIN` positions
-/// (including comma-separated FROM lists and subqueries).
-fn qualify_sql_tables_with(sql: &str, resolve: &dyn Fn(&str) -> String) -> Result<String> {
-    let mut toks = tokenize(sql)?;
-    let mut depth = 0i32;
-    let mut in_from = false;
-    let mut expect_table = false;
-    for i in 0..toks.len() {
-        match toks[i].clone() {
-            Token::LParen => {
-                depth += 1;
-                expect_table = false;
-            }
-            Token::RParen => depth -= 1,
-            Token::Comma if in_from && depth == 0 => expect_table = true,
-            Token::Ident(k) => {
-                let up = k.to_ascii_uppercase();
-                if expect_table {
-                    expect_table = false;
-                    let already_qualified =
-                        matches!(toks.get(i + 1), Some(Token::Op(op)) if op == ".");
-                    if !already_qualified && !k.contains('.') {
-                        let lower = k.to_ascii_lowercase();
-                        let target = resolve(&lower);
-                        toks[i] = Token::Ident(format!("{target}.{lower}"));
-                    }
-                    continue;
-                }
-                if up == "FROM" || up == "JOIN" {
-                    in_from = true;
-                    expect_table = true;
-                } else if depth == 0
-                    && matches!(
-                        up.as_str(),
-                        "WHERE"
-                            | "GROUP"
-                            | "HAVING"
-                            | "ORDER"
-                            | "LIMIT"
-                            | "OFFSET"
-                            | "SEARCH"
-                            | "UNION"
-                    )
-                {
-                    in_from = false;
-                }
-            }
-            _ => {}
-        }
-    }
-    Ok(render_tokens_as_sql(&toks))
 }
 
 /// The SQL text carried by a parser-produced `SUBQUERY` pseudo-function.
@@ -4733,6 +4721,8 @@ pub struct Engine {
     txn: TxnManager,
     /// the engine's data directory (root of the C++-format block mirror)
     dir: PathBuf,
+    /// C++ `Config::SnapshotDir()`: one directory per snapshot name.
+    snapshot_dir: PathBuf,
     /// The persistence layer (`PersistenceManager`), when this engine publishes
     /// its data files through `pm|object|` instead of leaving `data/` private
     /// (`EngineOptions::object_dir`).
@@ -5328,6 +5318,9 @@ pub struct EngineOptions {
     /// at every checkpoint it republishes `data/` as one object. `None` keeps
     /// the plain directory the other gates use.
     pub object_dir: Option<std::path::PathBuf>,
+    /// C++ `[storage] snapshot_dir`. `None` puts snapshots under the data
+    /// root, which is what an engine opened on a temporary directory wants.
+    pub snapshot_dir: Option<std::path::PathBuf>,
 }
 
 impl Default for EngineOptions {
@@ -5337,6 +5330,7 @@ impl Default for EngineOptions {
             exchange_capacity: 4,
             catalog_backend: None,
             object_dir: None,
+            snapshot_dir: None,
         }
     }
 }
@@ -5370,6 +5364,9 @@ impl Engine {
 
     pub fn open_with_options(dir: impl AsRef<Path>, options: EngineOptions) -> Result<Self> {
         let dir: PathBuf = dir.as_ref().to_path_buf();
+        // `Config::SnapshotDir()`: snapshots live next to the data root unless
+        // the caller names a directory (the CLI always does).
+        let dir_for = dir.clone();
         // The catalog lives at `<dir>/catalog`, the path the C++ engine uses for
         // its catalog RocksDB. Under `rocksdb-store` the C++ key space is the
         // **only** catalog (the native fjall key space is not written), so a
@@ -5482,6 +5479,10 @@ impl Engine {
                 last_cleanup_ts: std::sync::atomic::AtomicU64::new(0),
             },
             dir,
+            snapshot_dir: options
+                .snapshot_dir
+                .clone()
+                .unwrap_or_else(|| dir_for.clone().join("snapshot")),
             persistence,
             wal_enabled: options.wal_enabled,
             index_epoch: std::sync::atomic::AtomicU64::new(0),
@@ -5580,7 +5581,7 @@ impl Engine {
             ));
         }
         let visible: Vec<String> = ctes.keys().cloned().collect();
-        let stmt = self.expand_views(self.qualify_tables_in(&stmt, &visible), &visible)?;
+        let stmt = self.qualify_tables_in(&stmt, &visible);
         self.run_select_with_ctes(&stmt, ctes)
     }
 
@@ -7218,7 +7219,7 @@ impl Engine {
                 self.txn.end_statement();
                 continue;
             }
-            let qualified = self.expand_views(self.qualify_tables(&s), &[])?;
+            let qualified = self.qualify_tables(&s);
             // Storage mode gate, before the statement can touch the engine.
             // Every write operator checks the mode in the reference, and this
             // covers INSERT/INSERT SELECT/DELETE/UPDATE, the DDL and snapshot
@@ -7381,41 +7382,6 @@ impl Engine {
             _ => {}
         }
         s
-    }
-
-    /// Replaces `FROM <view>` with the view's stored query. The derived-table
-    /// path then executes that query. Views are expanded once per statement;
-    /// nested views are expanded when the derived query itself is executed.
-    /// A CTE alias shadows a view of the same name, whether it is declared by
-    /// this statement or bound by an enclosing `WITH` (`inherited`).
-    fn expand_views(&self, mut stmt: Statement, inherited: &[String]) -> Result<Statement> {
-        if let Statement::Select {
-            from, join, ctes, ..
-        } = &mut stmt
-        {
-            let cte_names: Vec<String> =
-                ctes.iter().map(|c| c.alias.to_ascii_lowercase()).collect();
-            let is_cte = |name: &str| {
-                let name = name.to_ascii_lowercase();
-                cte_names.contains(&name) || inherited.iter().any(|i| i.eq_ignore_ascii_case(&name))
-            };
-            if let Some(t) = from.as_mut() {
-                if !t.trim_start().to_ascii_uppercase().starts_with("SELECT ") && !is_cte(t) {
-                    if let Some(v) = self.storage.catalog.get_view_by_name(t)? {
-                        *t = v.query;
-                    }
-                }
-            }
-            if let Some(j) = join.as_mut() {
-                if !is_cte(&j.table) && self.storage.catalog.get_view_by_name(&j.table)?.is_some() {
-                    return Err(Error::Invalid(format!(
-                        "view '{}' is not supported in a JOIN",
-                        j.table
-                    )));
-                }
-            }
-        }
-        Ok(stmt)
     }
 
     /// True when at least one index (secondary / fulltext / vector / sparse /
@@ -8243,8 +8209,20 @@ impl Engine {
             .catalog
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        let query = self.expand_views(query.clone(), &[])?;
+        let query = query.clone();
         let (source_columns, rows) = self.run_select(&query)?;
+        // The reference only ever got as far as constants: `PhysicalInsert`
+        // sends each projected expression through
+        // `ExpressionState::CreateState`, which has no case for a column
+        // reference, so an `INSERT … SELECT` that reads one dies in
+        // `UnrecoverableException` (`expression_state_impl.cpp:68`) — after
+        // the binder, so a bad column name still reports its bind error.
+        // The port refuses the same queries instead of answering them.
+        if let Some(column) = insert_select_column(&query, &source_columns) {
+            return Err(Error::Unrecoverable(format!(
+                "Unknown expression type: Column. expression name: {column}"
+            )));
+        }
         let target_indices: Vec<usize> = match columns {
             Some(cols) => {
                 let mut indices = Vec::with_capacity(cols.len());
@@ -8320,109 +8298,6 @@ impl Engine {
                 "comment".to_string(),
             ],
             rows,
-        })
-    }
-
-    /// `CREATE VIEW v [(cols)] AS SELECT …`: validates the query, resolves the
-    /// output column names (applying an explicit alias list) and registers the
-    /// view's fully-qualified SQL in the catalog.
-    fn create_view(&self, name: &str, aliases: &[String], query_sql: &str) -> Result<QueryResult> {
-        let db = self.db();
-        // `CREATE VIEW v AS (SELECT …)` parses to the same SELECT statement;
-        // store the query without the redundant outer parentheses so the
-        // derived-table path recognises it by its `SELECT` prefix.
-        let mut raw = query_sql.trim();
-        if raw.starts_with('(') && raw.ends_with(')') {
-            raw = raw[1..raw.len() - 1].trim();
-        }
-        // Resolve each unqualified table to the database it really lives in:
-        // a view created in `db1` may legitimately select from a table in
-        // `default_db`. The current database wins; otherwise a unique match
-        // across the catalog decides, and an unknown name keeps the current
-        // database so the normal "table not found" error is produced.
-        let databases = self.storage.catalog.list_databases()?;
-        let resolve = |table: &str| -> String {
-            let in_db = |d: &str| {
-                self.storage
-                    .catalog
-                    .get_table_by_name(&format!("{d}.{table}"))
-                    .ok()
-                    .flatten()
-                    .is_some()
-            };
-            if in_db(&db) {
-                return db.clone();
-            }
-            let mut found: Option<&String> = None;
-            for d in &databases {
-                if in_db(d) {
-                    if found.is_some() {
-                        return db.clone();
-                    }
-                    found = Some(d);
-                }
-            }
-            found.cloned().unwrap_or_else(|| db.clone())
-        };
-        let mut sql = qualify_sql_tables_with(raw, &resolve)?;
-        // Validate against the qualified text: `query` still carries the
-        // unqualified names, which would resolve against the session database.
-        let parsed = infinity_parser::parse(&sql)?
-            .into_iter()
-            .next()
-            .ok_or_else(|| Error::Invalid("empty view query".to_string()))?;
-        let qualified = self.expand_views(parsed, &[])?;
-        let (source_columns, _) = self.run_select(&qualified)?;
-        let view_columns = if aliases.is_empty() {
-            source_columns
-        } else {
-            if aliases.len() != source_columns.len() {
-                return Err(Error::Invalid(format!(
-                    "CREATE VIEW has {} column name(s) but SELECT returns {} column(s)",
-                    aliases.len(),
-                    source_columns.len()
-                )));
-            }
-            let mut seen = std::collections::HashSet::new();
-            for alias in aliases {
-                if !seen.insert(alias.to_ascii_lowercase()) {
-                    return Err(Error::Invalid(format!(
-                        "duplicate view column name '{alias}'"
-                    )));
-                }
-            }
-            for (src, alias) in source_columns.iter().zip(aliases) {
-                if !is_plain_identifier(src) || !is_plain_identifier(alias) {
-                    return Err(Error::Invalid(format!(
-                        "cannot rename view column '{src}' to '{alias}'"
-                    )));
-                }
-            }
-            let projection: Vec<String> = source_columns
-                .iter()
-                .zip(aliases)
-                .map(|(src, alias)| format!("{src} AS {alias}"))
-                .collect();
-            sql = format!("SELECT {} FROM ({sql})", projection.join(", "));
-            aliases.to_vec()
-        };
-        self.storage
-            .catalog
-            .create_view(name, &view_columns, &sql)?;
-        Ok(QueryResult::Rows {
-            columns: vec![],
-            rows: vec![],
-        })
-    }
-
-    fn drop_view(&self, name: &str, if_exists: bool) -> Result<QueryResult> {
-        let existed = self.storage.catalog.drop_view(name)?;
-        if !existed && !if_exists {
-            return Err(Error::Invalid(format!("view '{name}' does not exist")));
-        }
-        Ok(QueryResult::Rows {
-            columns: vec![],
-            rows: vec![],
         })
     }
 
@@ -9512,25 +9387,54 @@ impl Engine {
                         };
                         self.show_tables(db)
                     }
-                    // `SHOW SNAPSHOTS` lists every snapshot; `SHOW SNAPSHOT
-                    // <name>` describes one (the reference's
-                    // `physical_show_snapshot_impl.cpp`).
+                    // `SHOW SNAPSHOTS` lists every snapshot directory
+                    // (`physical_show_list_snapshots_impl.cpp`): name, scope,
+                    // creation time, commit ts and size.
                     Some("snapshots") => Ok(QueryResult::Rows {
-                        columns: vec!["snapshot".to_string()],
+                        columns: vec![
+                            "name".to_string(),
+                            "scope".to_string(),
+                            "time".to_string(),
+                            "commit".to_string(),
+                            "size".to_string(),
+                        ],
                         rows: self
-                            .snapshot_names()?
+                            .snapshot_briefs()?
                             .into_iter()
-                            .map(|n| vec![n])
+                            .map(|b| {
+                                vec![
+                                    b.name,
+                                    b.scope,
+                                    b.create_time,
+                                    b.commit_ts.to_string(),
+                                    crate::snapshot::SnapshotBrief::format_size(b.size),
+                                ]
+                            })
                             .collect(),
                     }),
+                    // `SHOW SNAPSHOT <name>` describes one
+                    // (`physical_show_snapshot_impl.cpp`).
                     Some("snapshot") => {
                         let name = words.next().unwrap_or_default();
-                        if !self.snapshot_names()?.iter().any(|n| n == name) {
-                            return Err(Error::NotFound(format!("snapshot '{name}'")));
-                        }
+                        let brief = self
+                            .snapshot_briefs()?
+                            .into_iter()
+                            .find(|b| b.name == name)
+                            .ok_or_else(|| {
+                                Error::Unknown(format!("can't find snapshot: {name}"))
+                            })?;
                         Ok(QueryResult::Rows {
-                            columns: vec!["snapshot".to_string()],
-                            rows: vec![vec![name.to_string()]],
+                            columns: vec!["name".to_string(), "value".to_string()],
+                            rows: vec![
+                                vec!["snapshot_name".to_string(), brief.name],
+                                vec!["snapshot_scope".to_string(), brief.scope],
+                                vec!["create_time".to_string(), brief.create_time],
+                                vec!["commit_timestamp".to_string(), brief.commit_ts.to_string()],
+                                vec![
+                                    "snapshot_size".to_string(),
+                                    crate::snapshot::SnapshotBrief::format_size(brief.size),
+                                ],
+                            ],
                         })
                     }
                     _ => Ok(QueryResult::Rows {
@@ -9992,13 +9896,16 @@ impl Engine {
                     "Try to define Table {table} without any column."
                 )))
             }
-            Statement::CreateView {
-                name,
-                columns,
-                query_sql,
-                ..
-            } => self.create_view(name, columns, query_sql),
-            Statement::DropView { name, if_exists } => self.drop_view(name, *if_exists),
+            // The reference has no view implementation: `PhysicalCreateView` is
+            // an empty stub and the DDL dispatch does not know the statement,
+            // so both statements die in
+            // `UnrecoverableException("Unknown DDL type")`
+            // (`query_context_impl.cpp:467` for CREATE, `:489` for DROP). Just
+            // as with CTAS, the port reports the same failure instead of
+            // keeping a mechanism the reference does not have.
+            Statement::CreateView { .. } | Statement::DropView { .. } => {
+                Err(Error::Unrecoverable("Unknown DDL type".to_string()))
+            }
             Statement::Describe { table } => self.describe_table(table),
             Statement::Utility { .. } => Ok(QueryResult::Rows {
                 columns: vec![],
@@ -10130,10 +10037,7 @@ impl Engine {
                 })
             }
             Statement::DropSnapshot { name } => {
-                if self.storage.store.get(&snap_key(name))?.is_none() {
-                    return Err(Error::NotFound(format!("snapshot '{name}'")));
-                }
-                self.storage.store.delete(&snap_key(name))?;
+                self.drop_snapshot(name)?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -10371,10 +10275,7 @@ impl Engine {
                 // Only the bindings that precede this CTE are visible inside
                 // it, plus anything inherited from an enclosing query.
                 let visible: Vec<String> = cte_scope.keys().cloned().collect();
-                let query = self.expand_views(
-                    self.qualify_tables_in(cte.query.as_ref(), &visible),
-                    &visible,
-                )?;
+                let query = self.qualify_tables_in(cte.query.as_ref(), &visible);
                 let (mut columns, rows) = self.run_select_with_ctes(&query, &cte_scope)?;
                 if !cte.columns.is_empty() {
                     if cte.columns.len() != columns.len() {
@@ -11017,7 +10918,7 @@ impl Engine {
         // already re-stacked by the binder (`optimize::normalize`).
         // The first two rules ran before the index-scan range lookup (the
         // candidate has to exist there), so this pass starts at the pruner.
-        let mut optimizer = match (catalog, rough_filter_done) {
+        let optimizer = match (catalog, rough_filter_done) {
             (_, true) => infinity_planner::optimize::Optimizer::after_rough_filter(),
             (Some(catalog), false) => {
                 infinity_planner::optimize::Optimizer::with_catalog(catalog, None)
@@ -12686,15 +12587,6 @@ impl Engine {
         self.txn.prepare_commit_ts()
     }
 
-    pub fn snapshot_names(&self) -> Result<Vec<String>> {
-        let mut out = Vec::new();
-        for (k, _) in self.storage.store.scan_prefix(b"snap:")? {
-            out.push(String::from_utf8_lossy(&k[5..]).to_string());
-        }
-        out.sort();
-        Ok(out)
-    }
-
     /// Records the comment given to `CREATE INDEX` (the SDK reads it back from
     /// `SHOW INDEX`).
     pub fn set_index_comment(&self, table: &str, index: &str, comment: &str) {
@@ -12972,299 +12864,6 @@ impl Engine {
         self.context.buffer.lock().unwrap().used_bytes()
     }
 
-    /// Encodes one table (schema, indexes, rows) into the snapshot blob format
-    /// written by `CREATE SNAPSHOT … ON TABLE` and by database snapshots.
-    fn snapshot_table_blob(&self, table: &str) -> Result<String> {
-        let meta = self
-            .storage
-            .catalog
-            .get_table_by_name(table)?
-            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        let rows = self.fetch_rows_with_ids(table)?;
-        let mut out = String::new();
-        out.push_str(&meta.name);
-        out.push(SNAP_REC);
-        out.push_str(&meta.columns.join(&SNAP_FLD.to_string()));
-        out.push(SNAP_REC);
-        let defs: Vec<String> = meta
-            .defaults
-            .iter()
-            .map(|d| match d {
-                Some(v) => format!("1{v}"),
-                None => "0".to_string(),
-            })
-            .collect();
-        out.push_str(&defs.join(&SNAP_FLD.to_string()));
-        out.push(SNAP_REC);
-        let nns: Vec<String> = meta
-            .not_nulls
-            .iter()
-            .map(|b| if *b { "1" } else { "0" }.to_string())
-            .collect();
-        out.push_str(&nns.join(&SNAP_FLD.to_string()));
-        out.push(SNAP_REC);
-        // A sparse storage hint travels as a `WITH (SORTED)` suffix on the type
-        // text, so old snapshots (which have no suffix) still decode.
-        let types: Vec<String> = meta
-            .types
-            .iter()
-            .enumerate()
-            .map(
-                |(i, t)| match meta.sparse_stores.get(i).copied().flatten() {
-                    Some(CatalogSparseStore::Sorted) => format!("{t} WITH (SORTED)"),
-                    _ => t.clone(),
-                },
-            )
-            .collect();
-        out.push_str(&types.join(&SNAP_FLD.to_string()));
-        out.push(SNAP_REC);
-        // The snapshot carries the table's indexes: name, column, type and the
-        // `WITH (…)` options, so a restore recreates the same index kinds.
-        let idxs: Vec<String> = self
-            .storage
-            .catalog
-            .list_indexes()?
-            .into_iter()
-            .filter(|im| im.table == *table)
-            .map(|im| {
-                let opts = im
-                    .options
-                    .iter()
-                    .map(|(k, v)| format!("{k}={v}"))
-                    .collect::<Vec<_>>()
-                    .join(",");
-                format!(
-                    "{}{SNAP_FLD}{}{SNAP_FLD}{}{SNAP_FLD}{}",
-                    im.name, im.column, im.index_type, opts
-                )
-            })
-            .collect();
-        // Indexes use their own separator: SNAP_REC also terminates the block,
-        // so encoding them with SNAP_REC would make the decoder treat the 2nd..
-        // index as a data row.
-        out.push_str(&idxs.join("\n"));
-        out.push(SNAP_REC);
-        for (_, row) in &rows {
-            out.push_str(
-                &row.iter()
-                    .map(|v| v.to_slt_string())
-                    .collect::<Vec<_>>()
-                    .join(&SNAP_FLD.to_string()),
-            );
-            out.push(SNAP_REC);
-        }
-        Ok(out)
-    }
-
-    /// Recreates a table from a blob written by [`Self::snapshot_table_blob`],
-    /// replacing any current incarnation of it.
-    fn restore_table_blob(&self, text: &str) -> Result<()> {
-        let mut recs = text.split(SNAP_REC);
-        let table = recs.next().unwrap_or_default().to_string();
-        let columns: Vec<String> = recs
-            .next()
-            .unwrap_or_default()
-            .split(SNAP_FLD)
-            .map(|s| s.to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        let defaults: Vec<Option<String>> = recs
-            .next()
-            .unwrap_or_default()
-            .split(SNAP_FLD)
-            .map(|s| s.strip_prefix('1').map(|v| v.to_string()))
-            .collect();
-        let not_nulls: Vec<bool> = recs
-            .next()
-            .unwrap_or_default()
-            .split(SNAP_FLD)
-            .map(|s| s == "1")
-            .collect();
-        let types: Vec<String> = recs
-            .next()
-            .unwrap_or_default()
-            .split(SNAP_FLD)
-            .map(|s| s.to_string())
-            .collect();
-        // name FLD column [FLD type [FLD options]]
-        #[allow(clippy::type_complexity)]
-        let indexes: Vec<(String, String, String, Vec<(String, String)>)> = recs
-            .next()
-            .unwrap_or_default()
-            .split('\n')
-            .filter(|s| !s.is_empty())
-            .map(|s| {
-                let mut f = s.split(SNAP_FLD);
-                let name = f.next().unwrap_or_default().to_string();
-                let column = f.next().unwrap_or_default().to_string();
-                let ty = f.next().unwrap_or_default().to_string();
-                let opts = f
-                    .next()
-                    .unwrap_or_default()
-                    .split(',')
-                    .filter(|p| !p.is_empty())
-                    .filter_map(|p| p.split_once('='))
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
-                    .collect();
-                (name, column, ty, opts)
-            })
-            .collect();
-        let rows: Vec<String> = recs.map(|s| s.to_string()).collect();
-        // replace any current incarnation of the table
-        if self.storage.catalog.get_table_by_name(&table)?.is_some() {
-            self.storage.catalog.drop_table(&table)?;
-            for (k, _) in self.storage.store.scan_prefix(&row_prefix(&table))? {
-                self.storage.store.delete(&k)?;
-            }
-            for (k, _) in self.storage.store.scan_prefix(&del_prefix(&table))? {
-                self.storage.store.delete(&k)?;
-            }
-        }
-        self.storage.catalog.create_table_typed(
-            &table,
-            &columns,
-            &defaults,
-            &not_nulls,
-            &types,
-            &vec![None; columns.len()],
-        )?;
-        for (i, r) in rows.iter().enumerate() {
-            if !r.is_empty() {
-                // the snapshot blob separates cells with SNAP_FLD; the row
-                // store uses tabs
-                let encoded = r.split(SNAP_FLD).collect::<Vec<_>>().join("\t");
-                self.storage
-                    .store
-                    .put(&row_key(&table, i), &encoded.into_bytes())?;
-            }
-        }
-        // re-create the snapshot's indexes
-        for (name, column, ty, opts) in indexes {
-            self.storage
-                .catalog
-                .create_index_typed(&name, &table, &column, &ty, &opts)?;
-            if self.table_schema(&table)?.iter().any(|c| c == &column) {
-                self.build_index(&table, &column)?;
-            }
-        }
-        Ok(())
-    }
-
-    /// `CREATE TABLE SNAPSHOT`: writes `table`'s committed schema, indexes and
-    /// rows under `name`. A caller inside an [`EngineTxn`] sees only committed
-    /// state, because staged rows/tombstones are not in the KV store yet.
-    pub fn create_table_snapshot(&self, db: &str, table: &str, name: &str) -> Result<()> {
-        let table = if table.contains('.') {
-            table.to_ascii_lowercase()
-        } else {
-            format!("{}.{}", db.to_ascii_lowercase(), table.to_ascii_lowercase())
-        };
-        let blob = self.snapshot_table_blob(&table)?;
-        self.storage.store.put(&snap_key(name), blob.as_bytes())?;
-        Ok(())
-    }
-
-    /// `CREATE DATABASE SNAPSHOT <name> FOR <db>`: every table of `db` (with
-    /// its schema and indexes) is written into one snapshot record.
-    pub fn create_database_snapshot(&self, name: &str, db: &str) -> Result<()> {
-        let prefix = format!("{db}.");
-        let mut out = String::new();
-        for meta in self
-            .storage
-            .catalog
-            .list_tables()?
-            .into_iter()
-            .filter(|m| m.name.starts_with(&prefix))
-        {
-            if !out.is_empty() {
-                out.push(DB_SNAP_SEP);
-            }
-            out.push_str(&self.snapshot_table_blob(&meta.name)?);
-        }
-        self.storage.store.put(&snap_key(name), out.as_bytes())?;
-        Ok(())
-    }
-
-    /// `CREATE SYSTEM SNAPSHOT <name>`: every table of every database.
-    pub fn create_system_snapshot(&self, name: &str) -> Result<()> {
-        let mut out = String::new();
-        for meta in self.storage.catalog.list_tables()? {
-            if !out.is_empty() {
-                out.push(DB_SNAP_SEP);
-            }
-            out.push_str(&self.snapshot_table_blob(&meta.name)?);
-        }
-        self.storage.store.put(&snap_key(name), out.as_bytes())?;
-        Ok(())
-    }
-
-    /// Restores one table from a `CREATE SNAPSHOT … ON TABLE` snapshot.
-    ///
-    /// Restoring into an existing table is refused, as in
-    /// `NewTxn::RestoreTableSnapshot` (`DROP TABLE` first).
-    pub fn restore_table_snapshot(&self, name: &str) -> Result<()> {
-        let _ddl = self.ddl_lock.lock().unwrap();
-        let data = self
-            .storage
-            .store
-            .get(&snap_key(name))?
-            .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
-        let blob = String::from_utf8_lossy(&data).into_owned();
-        let table = blob.split(SNAP_REC).next().unwrap_or_default().to_string();
-        if !table.is_empty() && self.storage.catalog.get_table_by_name(&table)?.is_some() {
-            return Err(Error::Invalid(format!("table '{table}' already exists")));
-        }
-        self.restore_table_blob(&blob)
-    }
-
-    /// Restores every table of a database or system snapshot.
-    ///
-    /// The snapshot records its tables as `<db>.<table>`. Restoring into an
-    /// existing database is refused, as in `NewTxn::RestoreDatabaseSnapshot`.
-    fn restore_snapshot_tables(&self, name: &str) -> Result<()> {
-        let _ddl = self.ddl_lock.lock().unwrap();
-        let data = self
-            .storage
-            .store
-            .get(&snap_key(name))?
-            .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
-        let text = String::from_utf8_lossy(&data).to_string();
-        let blobs: Vec<&str> = text.split(DB_SNAP_SEP).filter(|s| !s.is_empty()).collect();
-        let mut databases: Vec<String> = Vec::new();
-        for blob in &blobs {
-            let table = blob.split(SNAP_REC).next().unwrap_or_default();
-            if let Some((db, _)) = table.split_once('.') {
-                if !databases.iter().any(|d| d == db) {
-                    databases.push(db.to_string());
-                }
-            }
-        }
-        let existing = self.storage.catalog.list_databases()?;
-        for db in &databases {
-            if existing.iter().any(|d| d == db) {
-                return Err(Error::Invalid(format!("database '{db}' already exists")));
-            }
-        }
-        // The snapshot's databases may have been dropped since it was taken.
-        for db in &databases {
-            self.storage.catalog.create_database(db, false)?;
-        }
-        for blob in blobs {
-            self.restore_table_blob(blob)?;
-        }
-        Ok(())
-    }
-
-    /// Restores every table of a database snapshot.
-    pub fn restore_database_snapshot(&self, name: &str) -> Result<()> {
-        self.restore_snapshot_tables(name)
-    }
-
-    /// Restores every table of a system snapshot.
-    pub fn restore_system_snapshot(&self, name: &str) -> Result<()> {
-        self.restore_snapshot_tables(name)
-    }
-
     /// Begins a table restore that is only applied by
     /// [`PendingRestore::commit`].
     pub fn begin_restore_table_snapshot(&self, name: &str) -> Result<PendingRestore<'_>> {
@@ -13284,8 +12883,8 @@ impl Engine {
     }
 
     fn begin_restore(&self, scope: RestoreScope, name: &str) -> Result<PendingRestore<'_>> {
-        if self.storage.store.get(&snap_key(name))?.is_none() {
-            return Err(Error::NotFound(format!("snapshot '{name}'")));
+        if !self.snapshot_names()?.iter().any(|n| n == name) {
+            return Err(Error::NotFound(format!("Snapshot: {name} not found")));
         }
         Ok(PendingRestore {
             engine: self,
@@ -20573,21 +20172,20 @@ mod tests {
         );
     }
 
-    /// A CTE alias bound by an enclosing `WITH` shadows a view of the same
-    /// name inside a subquery, just as it does in the outer statement. The CTE
-    /// exposes `wid`; the view of the same name exposes `id`.
+    /// A CTE alias bound by an enclosing `WITH` shadows a base table of the
+    /// same name inside a subquery, just as it does in the outer statement.
+    /// The CTE exposes `wid`; the base table of the same name exposes `id`.
     #[test]
-    fn an_inherited_cte_alias_is_not_expanded_as_a_view() {
+    fn an_inherited_cte_alias_shadows_the_base_table() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE iv (id INT);").unwrap();
-        e.execute("INSERT INTO iv VALUES (1);").unwrap();
-        e.execute("CREATE VIEW ivw AS SELECT id FROM iv;").unwrap();
+        e.execute("CREATE TABLE ivb (id INT);").unwrap();
+        e.execute("INSERT INTO ivb VALUES (1);").unwrap();
         assert_eq!(
             rows(
                 &e,
-                "WITH ivw AS (SELECT id AS wid FROM iv) \
-                 SELECT id FROM iv WHERE EXISTS (SELECT wid FROM ivw);"
+                "WITH ivw AS (SELECT id AS wid FROM ivb) \
+                 SELECT id FROM ivb WHERE EXISTS (SELECT wid FROM ivw);"
             ),
             vec![vec!["1".to_string()]]
         );

@@ -439,6 +439,55 @@ pub enum WalCmd {
     Cleanup {
         timestamp: TxnTimeStamp,
     },
+    /// C++ `WalCmdCreateTableSnapshot` (`wal_entry.cppm:744`).
+    CreateTableSnapshot {
+        db_name: String,
+        table_name: String,
+        snapshot_name: String,
+        /// The reference stores the creating transaction's **begin** ts
+        /// (`CreateTableSnapshotTxnStore::max_commit_ts_`).
+        max_commit_ts: TxnTimeStamp,
+    },
+    /// C++ `WalCmdCreateDBSnapshot` (`wal_entry.cppm:765`).
+    CreateDbSnapshot {
+        db_name: String,
+        snapshot_name: String,
+        max_commit_ts: TxnTimeStamp,
+    },
+    /// C++ `WalCmdCreateSystemSnapshot` (`wal_entry.cppm:784`).
+    CreateSystemSnapshot {
+        snapshot_name: String,
+        max_commit_ts: TxnTimeStamp,
+    },
+    /// C++ `WalCmdRestoreTableSnapshot` (`wal_entry.cppm:802`).
+    ///
+    /// `index_cmds` are `WalCmdCreateIndexV2`s, each written as a whole command
+    /// (its own type byte included), so replay can rebuild the indexes.
+    RestoreTableSnapshot {
+        db_name: String,
+        db_id: String,
+        table_name: String,
+        table_id: String,
+        snapshot_name: String,
+        table_def: crate::wal::ddl_def::TableDef,
+        segment_infos: Vec<WalSegmentInfo>,
+        index_cmds: Vec<WalCmd>,
+        /// Data files restored into the data directory, relative to it.
+        files: Vec<String>,
+    },
+    /// C++ `WalCmdRestoreDatabaseSnapshot` (`wal_entry.cppm:836`).
+    RestoreDatabaseSnapshot {
+        db_name: String,
+        db_id: String,
+        db_comment: String,
+        snapshot_name: String,
+        table_cmds: Vec<WalCmd>,
+    },
+    /// C++ `WalCmdRestoreSystemSnapshot` (`wal_entry.cppm:863`).
+    RestoreSystemSnapshot {
+        snapshot_name: String,
+        db_cmds: Vec<WalCmd>,
+    },
     /// Rust-engine extension: an exact KV write batch that could not be
     /// expressed as one of the typed commands above. Replay applies the writes
     /// atomically, so nothing is silently dropped.
@@ -467,6 +516,12 @@ impl WalCmd {
             WalCmd::AddColumns { .. } => WalCommandType::AddColumnsV2,
             WalCmd::DropColumns { .. } => WalCommandType::DropColumnsV2,
             WalCmd::Cleanup { .. } => WalCommandType::Cleanup,
+            WalCmd::CreateTableSnapshot { .. } => WalCommandType::CreateTableSnapshot,
+            WalCmd::CreateDbSnapshot { .. } => WalCommandType::CreateDbSnapshot,
+            WalCmd::CreateSystemSnapshot { .. } => WalCommandType::CreateSystemSnapshot,
+            WalCmd::RestoreTableSnapshot { .. } => WalCommandType::RestoreTableSnapshot,
+            WalCmd::RestoreDatabaseSnapshot { .. } => WalCommandType::RestoreDatabaseSnapshot,
+            WalCmd::RestoreSystemSnapshot { .. } => WalCommandType::RestoreSystemSnapshot,
             WalCmd::KvBatch { .. } => WalCommandType::KvBatch,
         }
     }
@@ -1589,7 +1644,6 @@ fn encode_cmd<S: Sink>(sink: &mut S, cmd: &WalCmd) {
             }
         }
         WalCmd::Checkpoint { max_commit_ts } => put_u64(sink, *max_commit_ts),
-        WalCmd::Cleanup { timestamp } => put_u64(sink, *timestamp),
         WalCmd::Compact {
             db_name,
             db_id,
@@ -1720,6 +1774,92 @@ fn encode_cmd<S: Sink>(sink: &mut S, cmd: &WalCmd) {
             }
         }
         WalCmd::Cleanup { timestamp } => put_u64(sink, *timestamp),
+        WalCmd::CreateTableSnapshot {
+            db_name,
+            table_name,
+            snapshot_name,
+            max_commit_ts,
+        } => {
+            put_str(sink, db_name);
+            put_str(sink, table_name);
+            put_str(sink, snapshot_name);
+            put_u64(sink, *max_commit_ts);
+        }
+        WalCmd::CreateDbSnapshot {
+            db_name,
+            snapshot_name,
+            max_commit_ts,
+        } => {
+            put_str(sink, db_name);
+            put_str(sink, snapshot_name);
+            put_u64(sink, *max_commit_ts);
+        }
+        WalCmd::CreateSystemSnapshot {
+            snapshot_name,
+            max_commit_ts,
+        } => {
+            put_str(sink, snapshot_name);
+            put_u64(sink, *max_commit_ts);
+        }
+        WalCmd::RestoreTableSnapshot {
+            db_name,
+            db_id,
+            table_name,
+            table_id,
+            snapshot_name,
+            table_def,
+            segment_infos,
+            index_cmds,
+            files,
+        } => {
+            put_str(sink, db_name);
+            put_str(sink, db_id);
+            put_str(sink, table_name);
+            put_str(sink, table_id);
+            put_str(sink, snapshot_name);
+            let mut buf = Vec::new();
+            table_def.write_adv(&mut buf);
+            sink.put(&buf);
+            put_len(sink, segment_infos.len());
+            for info in segment_infos {
+                encode_segment_info(sink, info);
+            }
+            put_len(sink, index_cmds.len());
+            for cmd in index_cmds {
+                // Each index command carries its own type byte.
+                encode_cmd(sink, cmd);
+            }
+            put_len(sink, files.len());
+            for file in files {
+                put_str(sink, file);
+            }
+        }
+        WalCmd::RestoreDatabaseSnapshot {
+            db_name,
+            db_id,
+            db_comment,
+            snapshot_name,
+            table_cmds,
+        } => {
+            put_str(sink, db_name);
+            put_str(sink, db_id);
+            put_str(sink, db_comment);
+            put_str(sink, snapshot_name);
+            put_len(sink, table_cmds.len());
+            for cmd in table_cmds {
+                encode_cmd(sink, cmd);
+            }
+        }
+        WalCmd::RestoreSystemSnapshot {
+            snapshot_name,
+            db_cmds,
+        } => {
+            put_str(sink, snapshot_name);
+            put_len(sink, db_cmds.len());
+            for cmd in db_cmds {
+                encode_cmd(sink, cmd);
+            }
+        }
         WalCmd::KvBatch { kind, writes } => {
             put_u8(sink, *kind as u8);
             put_len(sink, writes.len());
@@ -1858,9 +1998,6 @@ fn decode_cmd(cursor: &mut Cursor<'_>, layout: DataBlockLayout) -> Option<WalCmd
                 row_ids,
             }
         }
-        WalCommandType::Cleanup => WalCmd::Cleanup {
-            timestamp: cursor.u64()?,
-        },
         WalCommandType::CheckpointV2 => WalCmd::Checkpoint {
             max_commit_ts: cursor.u64()?,
         },
@@ -2004,6 +2141,91 @@ fn decode_cmd(cursor: &mut Cursor<'_>, layout: DataBlockLayout) -> Option<WalCmd
         WalCommandType::Cleanup => WalCmd::Cleanup {
             timestamp: cursor.u64()?,
         },
+        WalCommandType::CreateTableSnapshot => WalCmd::CreateTableSnapshot {
+            db_name: cursor.string()?,
+            table_name: cursor.string()?,
+            snapshot_name: cursor.string()?,
+            max_commit_ts: cursor.u64()?,
+        },
+        WalCommandType::CreateDbSnapshot => WalCmd::CreateDbSnapshot {
+            db_name: cursor.string()?,
+            snapshot_name: cursor.string()?,
+            max_commit_ts: cursor.u64()?,
+        },
+        WalCommandType::CreateSystemSnapshot => WalCmd::CreateSystemSnapshot {
+            snapshot_name: cursor.string()?,
+            max_commit_ts: cursor.u64()?,
+        },
+        WalCommandType::RestoreTableSnapshot => {
+            let db_name = cursor.string()?;
+            let db_id = cursor.string()?;
+            let table_name = cursor.string()?;
+            let table_id = cursor.string()?;
+            let snapshot_name = cursor.string()?;
+            let table_def = {
+                use crate::wal::ddl_def::Reader;
+                let mut reader = Reader::new(cursor.remaining_slice());
+                let def = crate::wal::ddl_def::TableDef::read_adv(&mut reader).ok()?;
+                cursor.take(reader.pos())?;
+                def
+            };
+            let segment_count = cursor.len()?;
+            let mut segment_infos = Vec::with_capacity(segment_count);
+            for _ in 0..segment_count {
+                segment_infos.push(decode_segment_info(cursor)?);
+            }
+            let index_count = cursor.len()?;
+            let mut index_cmds = Vec::with_capacity(index_count);
+            for _ in 0..index_count {
+                index_cmds.push(decode_cmd(cursor, layout)?);
+            }
+            let file_count = cursor.len()?;
+            let mut files = Vec::with_capacity(file_count);
+            for _ in 0..file_count {
+                files.push(cursor.string()?);
+            }
+            WalCmd::RestoreTableSnapshot {
+                db_name,
+                db_id,
+                table_name,
+                table_id,
+                snapshot_name,
+                table_def,
+                segment_infos,
+                index_cmds,
+                files,
+            }
+        }
+        WalCommandType::RestoreDatabaseSnapshot => {
+            let db_name = cursor.string()?;
+            let db_id = cursor.string()?;
+            let db_comment = cursor.string()?;
+            let snapshot_name = cursor.string()?;
+            let table_count = cursor.len()?;
+            let mut table_cmds = Vec::with_capacity(table_count);
+            for _ in 0..table_count {
+                table_cmds.push(decode_cmd(cursor, layout)?);
+            }
+            WalCmd::RestoreDatabaseSnapshot {
+                db_name,
+                db_id,
+                db_comment,
+                snapshot_name,
+                table_cmds,
+            }
+        }
+        WalCommandType::RestoreSystemSnapshot => {
+            let snapshot_name = cursor.string()?;
+            let db_count = cursor.len()?;
+            let mut db_cmds = Vec::with_capacity(db_count);
+            for _ in 0..db_count {
+                db_cmds.push(decode_cmd(cursor, layout)?);
+            }
+            WalCmd::RestoreSystemSnapshot {
+                snapshot_name,
+                db_cmds,
+            }
+        }
         WalCommandType::KvBatch => {
             let kind = KvBatchKind::from_u8(cursor.u8()?)?;
             let count = cursor.len()?;
@@ -2524,6 +2746,84 @@ mod tests {
                         (b"idx:2".to_vec(), Vec::new()),
                     ],
                 },
+                WalCmd::CreateTableSnapshot {
+                    db_name: "db1".to_string(),
+                    table_name: "tbl1".to_string(),
+                    snapshot_name: "snap1".to_string(),
+                    max_commit_ts: 7,
+                },
+                WalCmd::CreateDbSnapshot {
+                    db_name: "db1".to_string(),
+                    snapshot_name: "snap2".to_string(),
+                    max_commit_ts: 9,
+                },
+                WalCmd::CreateSystemSnapshot {
+                    snapshot_name: "snap3".to_string(),
+                    max_commit_ts: 11,
+                },
+                WalCmd::RestoreTableSnapshot {
+                    db_name: "db1".to_string(),
+                    db_id: "1".to_string(),
+                    table_name: "tbl1".to_string(),
+                    table_id: "2".to_string(),
+                    snapshot_name: "snap1".to_string(),
+                    table_def: mock_table_desc2(),
+                    segment_infos: vec![make_segment_info(100, 8, 2)],
+                    index_cmds: vec![WalCmd::CreateIndex {
+                        db_name: "db1".to_string(),
+                        db_id: "1".to_string(),
+                        table_name: "tbl1".to_string(),
+                        table_id: "2".to_string(),
+                        index_id: "3".to_string(),
+                        index_base: {
+                            use crate::wal::index_def::{IndexBase, IndexDef, IndexType};
+                            IndexDef::Secondary {
+                                base: IndexBase {
+                                    index_type: IndexType::Secondary,
+                                    index_name: "idx1".to_string(),
+                                    index_comment: String::new(),
+                                    file_name: "idx1_tbl1".to_string(),
+                                    column_names: vec!["col1".to_string()],
+                                },
+                                cardinality: 0,
+                                is_json: false,
+                            }
+                        },
+                        segment_index_infos: Vec::new(),
+                        table_key: "table_key".to_string(),
+                    }],
+                    files: vec![
+                        "db_1/tbl_2/seg_0/blk_0/0.col".to_string(),
+                        "db_1/tbl_2/seg_0/blk_0/version".to_string(),
+                    ],
+                },
+                WalCmd::RestoreDatabaseSnapshot {
+                    db_name: "db1".to_string(),
+                    db_id: "1".to_string(),
+                    db_comment: String::new(),
+                    snapshot_name: "snap2".to_string(),
+                    table_cmds: vec![WalCmd::RestoreTableSnapshot {
+                        db_name: "db1".to_string(),
+                        db_id: "1".to_string(),
+                        table_name: "tbl1".to_string(),
+                        table_id: "2".to_string(),
+                        snapshot_name: "snap2".to_string(),
+                        table_def: mock_table_desc2(),
+                        segment_infos: Vec::new(),
+                        index_cmds: Vec::new(),
+                        files: vec!["db_1/tbl_2/seg_0/blk_0/0.col".to_string()],
+                    }],
+                },
+                WalCmd::RestoreSystemSnapshot {
+                    snapshot_name: "snap3".to_string(),
+                    db_cmds: vec![WalCmd::RestoreDatabaseSnapshot {
+                        db_name: "db1".to_string(),
+                        db_id: "1".to_string(),
+                        db_comment: "c".to_string(),
+                        snapshot_name: "snap3".to_string(),
+                        table_cmds: Vec::new(),
+                    }],
+                },
             ],
         );
 
@@ -2535,6 +2835,64 @@ mod tests {
         let (decoded, consumed) = WalEntry::read_adv(&buf).expect("decode entry");
         assert_eq!(decoded, entry);
         assert_eq!(consumed, expected);
+    }
+
+    /// `WalCmdCreateTableSnapshot::WriteAdv` (`wal_entry_impl.cpp:1289`),
+    /// `WalCmdCreateDBSnapshot::WriteAdv` (`:1297`) and
+    /// `WalCmdCreateSystemSnapshot::WriteAdv` (`:1304`): the type byte, then
+    /// each string as `[i32 length][bytes]`, then the `max_commit_ts` as a
+    /// little-endian `u64`.
+    #[test]
+    fn create_snapshot_commands_write_the_reference_layout() {
+        fn string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as i32).to_le_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+
+        let mut buf = Vec::new();
+        encode_cmd(
+            &mut buf,
+            &WalCmd::CreateTableSnapshot {
+                db_name: "default_db".to_string(),
+                table_name: "snap_t".to_string(),
+                snapshot_name: "s1".to_string(),
+                max_commit_ts: 21,
+            },
+        );
+        let mut want = vec![110u8];
+        string(&mut want, "default_db");
+        string(&mut want, "snap_t");
+        string(&mut want, "s1");
+        want.extend_from_slice(&21u64.to_le_bytes());
+        assert_eq!(buf, want);
+
+        let mut buf = Vec::new();
+        encode_cmd(
+            &mut buf,
+            &WalCmd::CreateDbSnapshot {
+                db_name: "default_db".to_string(),
+                snapshot_name: "s2".to_string(),
+                max_commit_ts: 23,
+            },
+        );
+        let mut want = vec![111u8];
+        string(&mut want, "default_db");
+        string(&mut want, "s2");
+        want.extend_from_slice(&23u64.to_le_bytes());
+        assert_eq!(buf, want);
+
+        let mut buf = Vec::new();
+        encode_cmd(
+            &mut buf,
+            &WalCmd::CreateSystemSnapshot {
+                snapshot_name: "s3".to_string(),
+                max_commit_ts: 25,
+            },
+        );
+        let mut want = vec![112u8];
+        string(&mut want, "s3");
+        want.extend_from_slice(&25u64.to_le_bytes());
+        assert_eq!(buf, want);
     }
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:339`

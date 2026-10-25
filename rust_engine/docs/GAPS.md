@@ -39,6 +39,7 @@
 - **`compact_interval` 会触发压缩**：`notify_compact` 遍历库/表并调用 `compact_table`（`NewCompactionAlg` 的 DBT 选段）；测试 `notify_compact_merges_the_segments_the_alg_picks`。
 - **全文分析器家族已接线**：`index_analyzer` → `AnalyzerPool`，建索引与查询用同一个分析器；测试 `a_fulltext_index_uses_its_declared_analyzer`（`ngram-3` 的 `qui` 命中、`standard` 不命中）。名称语法由 `parse_analyzer_name` 一处解析，DDL 校验与 `get_analyzer` 共用：族名大小写敏感、`chinese`/`ik`/`traditional` 只认精确 `-fine`、`keyword`/`whitespace` 的分隔符逐字节（`keyword-,` 按逗号切，索引侧同样生效）、`ngram` 走 `strtol`（`ngram-3x` 等于 `ngram-3`）、`sparsegram` 校验窗口（空段/非数字/第三个数字/>1024/`min==0`/`max<min` 均拒绝）；单测 `analyzer_name_grammar_matches_the_reference`、`analyzer_suffixes_reach_the_constructed_analyzers`、`a_keyword_fulltext_index_takes_its_delimiters_from_the_name`、`create_index_validates_the_analyzer_name_like_the_reference`，跨引擎门禁 `test_analyzer_names_and_tokenisation_match`。
 - **稀疏检索选项**：`alpha`/`beta`/`threshold` 生效（`BmpSearchOptions` 传到磁盘 reader，含 `beta` 截断与 k-th 阈值），`use_tail` 像参考一样被 binder 拒绝、`tail` 被接受但不生效；门禁 `test_the_sparse_search_options_change_the_answer_the_same_way`。
+- **快照按参考的目录布局与 WAL 命令实现**（`infinity-executor/src/snapshot.rs`）：`<snapshot_dir>/<name>/<name>.json` + 数据文件副本，`CREATE` 写 110/111/112、`RESTORE` 写 113/114/115（`WalCmd::CreateTableSnapshot` 等六个 typed 命令，replay 与参考一样跳过 create），`SHOW SNAPSHOTS`/`SHOW SNAPSHOT` 读目录（`SnapshotBrief`），`DROP SNAPSHOT` 先 rename 成 `deleted_<name>` 再删；建快照前先跑一次块镜像（参考的 `CheckpointforSnapshot`）。测试 `snapshot_ut::*`（元数据 JSON 逐字节、嵌套、删除、恢复行、报错文案）与 `wal_entry::tests::create_snapshot_commands_write_the_reference_layout`。
 
 ## 3 不可逐字节比对（参考侧不确定）
 
@@ -62,7 +63,7 @@
 | 三段以上的容量切分 | 只测两段 |
 | `COMPACT` 候选集 > 4 段 | 参考只合并 DBT 挑中的 4 个，重写版合并全部存活段 |
 | PLAID / EMVB / MULTIVECTOR chunk 字节 | 只有重写版自身单测 |
-| 快照（`CREATE … SNAPSHOT`） | 两种机制互不兼容，无跨引擎用例 |
+| 快照（`CREATE … SNAPSHOT`）的 `table_indexes[].segment_indexes` | 端口按磁盘上的 chunk 文件名/大小写条目，`base_row_id`/`row_cnt` 没有可复用的账本；两侧表 id 也不同，所以只做结构比对，不做逐字节比对 |
 | binary-fuse 半区（`BOOLEAN`/`DECIMAL` 的 `bloom_filter`） | 重写版固定写「存在但未构建」 |
 | `IMPORT` 的 WAL 命令形态 | 参考写 `ImportV2`，重写版写等价的 `AppendV2` |
 
@@ -72,6 +73,11 @@
 |---|---|---|
 | 相关子查询的作用域边界 | 只支持引用**外层关系（FROM 侧）**的相关子查询：引用 JOIN 右侧表、引用派生表（parser 不保留派生表别名，标准 SQL 也要求限定）、或写在 `SEARCH` 的 `WHERE` filter 里时返回错误；不会静默按内层同名列求值（`substitute_outer_row` 只剥掉内层表自己的限定符） | `dependent.rs`、`substitute_outer_row` |
 | `CREATE TABLE … AS SELECT` | 不实现（参考也没有）：`CREATE TABLE t AS SELECT …` 返回参考的 `Status::NoColumnDefined`（`Try to define Table t without any column.`，3048）；带列定义的 `CREATE TABLE t (a INT) AS SELECT …` 在参考是解析错误（`unexpected AS, expecting end of file`），端口同样拒绝 |
+| `CREATE VIEW` / `DROP VIEW` | 不实现（参考也没有实现）：`PhysicalCreateView::Execute` 是空壳、DDL 分发没有这个分支，两侧都死在 `UnrecoverableException("Unknown DDL type")`（`query_context_impl.cpp:467`/`:489`），视图不会被登记，`FROM v` 随后报表不存在 |
+| `INSERT … SELECT` | 只支持 select list 全为常量：参考的 `PhysicalInsert` 把投影表达式交给 `ExpressionState::CreateState`，那里没有 `Column` 分支，任何列引用（含 `SELECT *`）都会死在该处（`expression_state_impl.cpp:68`）。端口报同一条 `Unknown expression type: Column. expression name: {col}`，常量情形与参考一样按源行数插入 |
+| 快照的行内容 | 参考把行放在被复制的 `.col` 里；端口的行在 `row:` 日志里（块镜像只在 checkpoint 时重写），所以每个表在快照目录里多写一个 `db_{db}_tbl_{tbl}.rows`，恢复时从它重建行日志。其余（目录布局、`<name>.json`、文件副本的相对路径、`deleted_<name>` 的删除方式）与参考一致 |
+| `CREATE SNAPSHOT … ON TABLE <db>.<tbl>` | 参考的文法是 `IDENTIFIER`，带库名的写法是解析错误（`unexpected '.', expecting end of file`）；端口接受限定名（HTTP 层就按这个拼），无库名时用会话库 |
+| `SHOW SNAPSHOTS` 的 `commit` 列 / `SHOW SNAPSHOT` 的 `commit_timestamp` | 参考从不给 `SnapshotBrief::commit_ts_` 赋值（`snapshot_brief_impl.cpp:94` 那句被注释掉），打印的是默认构造对象里的残值（实测同一进程两次取值不同）；端口固定写 `0` |
 | 多词 / 短语 `MATCH` | 走「整行重新分词 + 逐行匹配」，结果与参考一致但不用索引（`filter_fulltext` 的索引过滤已构造真实 `Or`/`And` 树） | `CLASS_MAP.md`「有意的设计变更」 |
 | `standard-porter` | 用 Porter2（`rust_stemmers::English`），少数词干与参考的 `STEM_LANG_PORT` 不同；其余 17 种语言同族一致 | 同上 |
 | `SPARSE` 列的 `SHOW`/catalog 类型文本 | 存储字节一致，但渲染不同：C++ `Sparse(float,int8,0)`，Rust `Sparse(float,int32,8)`（元素类型一致） | `test_cross_engine_compat.py` 只比元素类型 |

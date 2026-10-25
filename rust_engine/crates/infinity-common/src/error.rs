@@ -58,6 +58,22 @@ pub enum Error {
     #[error("{0}")]
     InvalidNodeRole(String),
 
+    /// C++ `Status::SnapshotAlreadyExists` (3100). The status keeps the bare
+    /// message ("Snapshot: {name} already exists"), so `Display` does too.
+    #[error("{0}")]
+    SnapshotAlreadyExists(String),
+
+    /// C++ `Status::NotFound` (3088) as the snapshot paths use it: the status
+    /// carries the bare text (`Snapshot: {name} not found`).
+    #[error("{0}")]
+    SnapshotNotFound(String),
+
+    /// C++ `Status::Unknown` (3091), which renders as `Unknown {detail}` — the
+    /// wording `SHOW SNAPSHOT <missing>` produces
+    /// (`physical_show_snapshot_impl.cpp:39`).
+    #[error("Unknown {0}")]
+    Unknown(String),
+
     /// C++: `UnrecoverableException` (`src/common/utility/exception.cppm`).
     /// Its `what()` is the bare message.
     #[error("{0}")]
@@ -189,6 +205,12 @@ impl Error {
             }
             // 4002 TXN_CONFLICT.
             Error::TxnConflict(_) => 4002,
+            // 3100 SNAPSHOT_ALREADY_EXISTS.
+            Error::SnapshotAlreadyExists(_) => 3100,
+            // 3088 NOT_FOUND.
+            Error::SnapshotNotFound(_) => 3088,
+            // 3091 UNKNOWN.
+            Error::Unknown(_) => 3091,
             // 8007 INVALID_NODE_ROLE (`ErrorCode::kInvalidNodeRole`,
             // `src/common/status.cppm:213`).
             Error::InvalidNodeRole(_) => 8007,

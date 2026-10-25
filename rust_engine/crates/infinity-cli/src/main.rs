@@ -173,9 +173,16 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     } else {
         None
     };
+    // `[storage] snapshot_dir`: one directory per snapshot name
+    // (`Config::SnapshotDir()`).
+    let snapshot_dir = toml_value(&text, "snapshot_dir")
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from);
     let options = infinity_executor::EngineOptions {
         catalog_backend: backend,
         object_dir,
+        snapshot_dir,
         ..Default::default()
     };
     let engine = Arc::new(Engine::open_with_options(&root, options)?);
