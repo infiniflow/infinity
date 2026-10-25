@@ -157,34 +157,52 @@ pub fn data_type_of_text(text: &str) -> Option<DataType> {
 /// The catalog writes are still applied to the store by `commit_at`; replay
 /// deliberately skips typed DDL (the catalog is durable at commit), so this
 /// only changes the WAL's bytes.
-pub fn create_table_command_from_batch(batch: &[(Vec<u8>, Option<Vec<u8>>)]) -> Option<WalCmd> {
-    // (db_id, table_id, name)
-    let mut table: Option<(String, String, String)> = None;
-    let mut cols: Vec<(i64, ColumnRecord)> = Vec::new();
-    let mut has_index = false;
+/// `table_name` is the table the statement created: the batch holds the whole
+/// C++ layout (the DDL mirrors it, `Catalog::capture`), so "the last table
+/// record" is not the new one as soon as the catalog has more than one.
+pub fn create_table_command_from_batch(
+    batch: &[(Vec<u8>, Option<Vec<u8>>)],
+    table_name: &str,
+) -> Option<WalCmd> {
+    // catalog|tbl|{db_id}|{name}|{ts}; the table id is the value.
+    let prefix = "catalog|tbl|";
+    let mut hit: Option<(String, String)> = None;
     for (k, v) in batch {
         let Ok(key) = std::str::from_utf8(k) else {
             continue;
         };
-        if let Some(rest) = key.strip_prefix("catalog|tbl|") {
-            // catalog|tbl|{db_id}|{name}|{ts}; the table id is the value.
-            let parts: Vec<&str> = rest.split('|').collect();
-            if parts.len() >= 2 {
-                let table_id = v
-                    .as_ref()
-                    .map(|b| String::from_utf8_lossy(b).into_owned())
-                    .unwrap_or_default();
-                table = Some((parts[0].to_string(), table_id, parts[1].to_string()));
-            }
-        } else if key.starts_with("catalog|idx|") {
-            has_index = true;
-        } else if let Some(_rest) = key.strip_prefix("tbl|col|") {
-            // tbl|col|{db}|{tbl}|{name}|{ts}
-            if let Some(Some(val)) = v.as_ref().map(Some) {
-                if let Ok(text) = std::str::from_utf8(val) {
-                    if let Some(rec) = ColumnRecord::from_json(text) {
-                        cols.push((rec.id(), rec));
-                    }
+        let Some(rest) = key.strip_prefix(prefix) else {
+            continue;
+        };
+        let parts: Vec<&str> = rest.split('|').collect();
+        if parts.len() < 3 || parts[1] != table_name {
+            continue;
+        }
+        let Some(value) = v.as_ref() else { continue };
+        hit = Some((
+            parts[0].to_string(),
+            String::from_utf8_lossy(value).into_owned(),
+        ));
+    }
+    let (db_id, table_id) = hit?;
+    let mut cols: Vec<(i64, ColumnRecord)> = Vec::new();
+    let has_index = batch.iter().any(|(k, v)| {
+        v.is_some()
+            && std::str::from_utf8(k)
+                .map(|key| key.starts_with(&format!("catalog|idx|{db_id}|{table_id}|")))
+                .unwrap_or(false)
+    });
+    for (k, v) in batch {
+        let Ok(key) = std::str::from_utf8(k) else {
+            continue;
+        };
+        if !key.starts_with(&format!("tbl|col|{db_id}|{table_id}|")) {
+            continue;
+        }
+        if let Some(value) = v.as_ref() {
+            if let Ok(text) = std::str::from_utf8(value) {
+                if let Some(rec) = ColumnRecord::from_json(text) {
+                    cols.push((rec.id(), rec));
                 }
             }
         }
@@ -192,7 +210,7 @@ pub fn create_table_command_from_batch(batch: &[(Vec<u8>, Option<Vec<u8>>)]) -> 
     if has_index || cols.is_empty() {
         return None;
     }
-    let (db_id, table_id, table_name) = table?;
+    let table_name = table_name.to_string();
     cols.sort_by_key(|(id, _)| *id);
     let ordered: Vec<ColumnRecord> = cols.into_iter().map(|(_, r)| r).collect();
     let td = table_def_from_columns("default_db", &table_name, &ordered);
@@ -374,48 +392,55 @@ pub fn index_def_from_json(text: &str) -> Option<infinity_storage::wal::index_de
 ///
 /// `table_name` and `table_key` are not in the batch; the caller supplies them
 /// (the reference's `table_key` is the table's own `catalog|tbl|…` key).
+/// `index_name` is the index the statement created: the batch carries the whole
+/// C++ layout, so the last `catalog|idx|` record is any index, not this one.
 pub fn create_index_command_from_batch(
     batch: &[(Vec<u8>, Option<Vec<u8>>)],
     table_name: &str,
     table_key: &str,
+    index_name: &str,
 ) -> Option<WalCmd> {
     use infinity_storage::wal::index_def::IndexDef;
     if table_key.is_empty() {
         return None;
     }
-    let mut db_id = String::new();
-    let mut table_id = String::new();
-    let mut index_id = String::new();
-    let mut has_index = false;
+    // catalog|idx|{db_id}|{table_id}|{index_name}|{ts}; the index id is the value.
+    let mut ids: Option<(String, String, String)> = None;
+    for (k, v) in batch {
+        let Ok(key) = std::str::from_utf8(k) else {
+            continue;
+        };
+        let Some(rest) = key.strip_prefix("catalog|idx|") else {
+            continue;
+        };
+        let parts: Vec<&str> = rest.split('|').collect();
+        if parts.len() < 4 || parts[2] != index_name {
+            continue;
+        }
+        let Some(value) = v.as_ref() else { continue };
+        ids = Some((
+            parts[0].to_string(),
+            parts[1].to_string(),
+            String::from_utf8_lossy(value).into_owned(),
+        ));
+    }
+    let (db_id, table_id, index_id) = ids?;
+    let tag = format!("idx|{db_id}|{table_id}|{index_id}|index_base");
     let mut index_base: Option<IndexDef> = None;
     for (k, v) in batch {
         let Ok(key) = std::str::from_utf8(k) else {
             continue;
         };
-        if let Some(rest) = key.strip_prefix("catalog|idx|") {
-            // catalog|idx|{db_id}|{table_id}|{index_name}|{ts}
-            let parts: Vec<&str> = rest.split('|').collect();
-            if parts.len() >= 3 {
-                db_id = parts[0].to_string();
-                table_id = parts[1].to_string();
-                index_id = v
-                    .as_ref()
-                    .map(|b| String::from_utf8_lossy(b).into_owned())
-                    .unwrap_or_default();
-                has_index = true;
-            }
-        } else if key.ends_with("|index_base") {
-            if let Some(Some(val)) = v.as_ref().map(Some) {
-                if let Ok(text) = std::str::from_utf8(val) {
-                    if let Some(def) = index_def_from_json(text) {
-                        index_base = Some(def);
-                    }
+        if key != tag {
+            continue;
+        }
+        if let Some(value) = v.as_ref() {
+            if let Ok(text) = std::str::from_utf8(value) {
+                if let Some(def) = index_def_from_json(text) {
+                    index_base = Some(def);
                 }
             }
         }
-    }
-    if !has_index {
-        return None;
     }
     let index_base = index_base?;
     Some(WalCmd::CreateIndex {

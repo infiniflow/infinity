@@ -9229,7 +9229,8 @@ impl Engine {
                     // (`TableDef::WriteAdv` -> `ColumnDef::WriteAdv`), not into
                     // the catalog, whose `ColumnDef::ToJson` omits it.
                     |batch| {
-                        let cmd = crate::wal_ddl::create_table_command_from_batch(batch)?;
+                        let bare = name.rsplit('.').next().unwrap_or(name);
+                        let cmd = crate::wal_ddl::create_table_command_from_batch(batch, bare)?;
                         match cmd {
                             infinity_storage::WalCmd::CreateTable {
                                 db_name,
@@ -9938,6 +9939,7 @@ impl Engine {
                             batch,
                             &table_name,
                             &table_key,
+                            name,
                         )
                     },
                 )?;

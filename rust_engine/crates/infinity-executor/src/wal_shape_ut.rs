@@ -387,3 +387,63 @@ fn a_create_table_logs_the_bloom_flag() {
         vec![true, false]
     );
 }
+
+/// A DDL frame names the target **the statement created**, not whatever else
+/// the batch holds. The batch carries the whole C++ layout (the DDL mirrors it
+/// inside `Catalog::capture`), so "the last table/index record" stops being the
+/// new one as soon as the catalog has more than one - which is how a second
+/// `CREATE INDEX` used to be logged as a copy of the first.
+#[test]
+fn a_ddl_frame_names_the_target_the_statement_created() {
+    use infinity_storage::wal::index_def::IndexDef;
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    e.execute("CREATE TABLE t1 (a INT, b VARCHAR);").unwrap();
+    e.execute("CREATE TABLE t2 (id INT);").unwrap();
+    e.execute("CREATE INDEX i1 ON t1 (a);").unwrap();
+    e.execute("CREATE INDEX i2 ON t2 (id);").unwrap();
+
+    let mut tables: Vec<(String, Vec<String>)> = Vec::new();
+    let mut indexes: Vec<(String, String)> = Vec::new();
+    for entry in wal_entries(dir.path()) {
+        for cmd in &entry.cmds {
+            match cmd {
+                WalCmd::CreateTable { table_def, .. } => tables.push((
+                    table_def.table_name.clone(),
+                    table_def
+                        .columns
+                        .iter()
+                        .map(|c| c.name.clone())
+                        .collect::<Vec<_>>(),
+                )),
+                WalCmd::CreateIndex {
+                    table_name,
+                    index_base,
+                    ..
+                } => {
+                    let IndexDef::Secondary { base, .. } = index_base else {
+                        panic!("expected a secondary index, got {index_base:?}");
+                    };
+                    indexes.push((table_name.clone(), base.index_name.clone()));
+                }
+                _ => {}
+            }
+        }
+    }
+    assert_eq!(
+        tables,
+        vec![
+            ("t1".to_string(), vec!["a".to_string(), "b".to_string()]),
+            ("t2".to_string(), vec!["id".to_string()]),
+        ],
+        "each table frame carries its own columns"
+    );
+    assert_eq!(
+        indexes,
+        vec![
+            ("t1".to_string(), "i1".to_string()),
+            ("t2".to_string(), "i2".to_string()),
+        ],
+        "each index frame carries its own name"
+    );
+}
