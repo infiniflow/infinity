@@ -12,7 +12,6 @@ members = [
     "crates/infinity-executor",
     "crates/infinity-server",
     "crates/infinity-cli",
-    "crates/infinity-catalog-convert",
 ]
 
 [workspace.package]
@@ -33,7 +32,6 @@ infinity-planner = { path = "crates/infinity-planner" }
 infinity-index = { path = "crates/infinity-index" }
 infinity-executor = { path = "crates/infinity-executor" }
 infinity-server = { path = "crates/infinity-server" }
-fjall = "3"
 lz4_flex = "0.13"
 hmac = "0.12"
 sha2 = "0.10"

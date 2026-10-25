@@ -35,8 +35,7 @@
 ## 2. 已验证：Catalog / Meta KV = RocksDB + 自定义 MergeOperator
 
 - 实现文件：`src/storage/catalog/kv_store.cppm`、`src/storage/catalog/kv_store_impl.cpp`；合并算子：`src/storage/common/rocksdb_merge_operator.cppm` / `_impl.cpp`。
-- 结论：Rust 侧**必须改用 `rust-rocksdb`**（计划 §4.2 已列为「保留磁盘兼容」的回退方案），当前 `fjall`（纯 Rust LSM）与 C++ 目录**互不可读**。
-- **现状更新**：`rust-rocksdb` 后端已落地，feature 为 `rocksdb-store`（`infinity-storage/src/metastore_rocks.rs`）；开了它，catalog 直接用 C++ 的键空间（`Catalog::with_store_cpp_only`），目录可被参考打开，由 `python/restart_test/test_cross_engine_compat.py` 双向验证。后端选择、磁盘兼容矩阵与 fsync 屏障见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md)——本文 §2/§7 的"尚未接入"描述已过时，以 FAQ 为准。
+- 结论：Rust 侧用的是 `rust-rocksdb`（`infinity-storage/src/metastore_rocks.rs`）——与参考同一底座，目录可被参考打开，由 `python/restart_test/test_cross_engine_compat.py` 双向验证。磁盘兼容矩阵与 fsync 屏障见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md)。
 - 迁移前需冻结（见 §6）：RocksDB `Options`/`ColumnFamily` 集合、比较器、`MergeOperator` 的 `Merge`/`FullMergeV2` 语义、以及键前缀命名空间。
 
 ## 3. 已验证：全文倒排索引的组成模块（待逐文件冻结细节）
@@ -89,8 +88,8 @@ score     += smooth_idf * smooth_tf * weight
 
 | 子系统 | 现状 | 差距 |
 |---|---|---|
-| 表数据 | 行文本 `row:<table>:<seq>` 存于 fjall | **字节级布局已实现**（`infinity-storage::cpp_format`：数据文件框架 / `version` 文件 / `[data_region][null_bitmap]` 列体 / outline / 块目录读写，含逐字节单测）；**尚未接入执行器的读写路径** |
-| Catalog/Meta | fjall | 非 RocksDB，键空间不同（§2） |
+| 表数据 | 行文本 `row:<table>:<seq>` 存于 RocksDB | **字节级布局已实现**（`infinity-storage::cpp_format`：数据文件框架 / `version` 文件 / `[data_region][null_bitmap]` 列体 / outline / 块目录读写，含逐字节单测）；**尚未接入执行器的读写路径** |
+| Catalog/Meta | RocksDB（与参考同一底座） | 键空间兼容（§2） |
 | 向量索引 | 仅内存，`open` 时重建 | 未持久化，无 §6-4 的文件 |
 | 全文索引 | 内存匹配 + 自研 BM25 | 未落盘，无 §6-5 的文件 |
 | 二级索引 | 内存 BTree | 无 PGM 文件 |

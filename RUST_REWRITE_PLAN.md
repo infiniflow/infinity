@@ -18,7 +18,7 @@
 三条技术主线：
 
 1. **并发**：以 **Tokio 多线程运行时** 替代「固定线程池 + 逐核绑核 + 私有阻塞队列」的 `TaskScheduler`，采用「async 编排 + CPU 计算下沉 Rayon」两层模型（§4.4）。
-2. **KV 存储**：RocksDB 在 Infinity 中只承担**元数据**（catalog / 计数器 / 对象清单 / rough filter / drop 墓碑），不承载行数据与索引。定义 `MetaStore` trait，默认纯 Rust `fjall`，并提供 `rust-rocksdb` 实现以兼容 C++ catalog（§4.2）。
+2. **KV 存储**：RocksDB 在 Infinity 中只承担**元数据**（catalog / 计数器 / 对象清单 / rough filter / drop 墓碑），不承载行数据与索引。定义 `MetaStore` trait，唯一实现是 `rust-rocksdb`（与 C++ catalog 同一底座，§4.2）。
 3. **验收**：以现有测试资产为准 —— **173 个 SQL Logic Test**、**Python PySDK 308 个有效 `def test_`**、**Go SDK 375 用例**，外加持久化 / 并发 / 性能关卡（§8）。测试经网络连接真实服务，因此 **Thrift 线协议必须保持兼容**（`TBinaryProtocol` + `client_version == 37`）。
 
 迁移策略：**结构对齐的类级移植（structure-preserving port）**——以 C++ 类/public 方法为骨架逐类/逐方法移植（已批准的设计变更除外），C++ 单元测试随对应类一并移植，conformance testing 只作为验收而非设计来源（§4.1 D1）。新旧二进制并存，C++ 为 oracle；测试通过不等于移植完成，以 `CLASS_MAP.md` 的未闭合项为准。
@@ -93,7 +93,7 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 
 | 底座 | 内容 | C++ 位置 | Rust 对应 |
 |---|---|---|---|
-| **RocksDB（事务 KV）** | Catalog/元数据、ID 计数器、对象清单、rough filter、drop 墓碑 | `storage/catalog/kv_store*`、`meta/*` | `MetaStore` trait（`fjall` / `MetaStoreRocks`） |
+| **RocksDB（事务 KV）** | Catalog/元数据、ID 计数器、对象清单、rough filter、drop 墓碑 | `storage/catalog/kv_store*`、`meta/*` | `MetaStore` trait（`RocksMetaStore`） |
 | **自研 WAL** | 已提交 DDL/DML 的 redo log（CRC32 分帧） | `storage/wal/*` | `infinity-storage::wal`（格式全量移植） |
 | **自研块文件** | 列数据、MVCC `version`、索引 chunk | `storage/buffer/*`、`meta/*_impl.cpp` | `cpp_format` / `BufferManager` |
 
@@ -185,7 +185,7 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 | 全文倒排 | 自研 FST + `format/` + posting/block-max | `inverted_format` + `fulltext_segment`（`.dic/.pos/.len/.row`） | ✅ 字节兼容 |
 | 向量列存储 | 列/段文件 | `cpp_format` + `cpp_blocks`（真实块目录，可脱离 KV 读回） | ✅ 字节兼容（位张量与变长嵌套数组除外，按设计报错） |
 | 向量索引 | `chunk_<id>.idx` | `knn_format`（HNSW 图区、IVF plain/SQ/PQ） | ✅ 编解码字节兼容；HNSW 与 IVF（含 SQ/PQ）均已用于检索 |
-| Catalog KV | RocksDB + C++ 键空间 | `metastore_rocks` + `catalog_format` + `value_format` + `cpp_layout` | ✅ `rocksdb-store` 下双向可读；默认构建仍为 fjall |
+| Catalog KV | RocksDB + C++ 键空间 | `metastore_rocks` + `catalog_format` + `value_format` + `cpp_layout` | ✅ 双向可读（RocksDB 是唯一底座） |
 | 稀疏 | BMP `ivt+fwd+doc_ids` | `bmp_cpp` | ✅ 字节兼容 + 检索 |
 | 多向量 | EMVB `SaveIndexInner` + OPQ | `emvb_segment` + `multivector_segment` | ✅ 写入与码字持久化；查询侧仍用原始 token 精确重排 |
 | 次级索引 | PGM / 低基数 Roaring | `secondary_segment` + `secondary_lowcard` | ✅ 字节兼容 |
@@ -266,17 +266,17 @@ RocksDB 只存元数据，负载为「低容量 + 事务 + 快照 + 计数器」
 
 | 方案 | 结论 |
 |---|---|
-| **`rust-rocksdb`** | **保留磁盘兼容的实现**；`rocksdb-store` feature 下作为 catalog / 持久化基底 |
-| **`fjall`** | **默认实现**（纯 Rust LSM；原子批写、快照读、前缀扫描、flush） |
+| **`rust-rocksdb`** | **唯一的 KV 底座**：catalog / 持久化，与参考同一套字节 |
+
 | `redb` | 备选 |
 | `sled` | 不用（长期 beta） |
 
 **决策**：
 
 - 定义 `MetaStore` trait（`get/put/delete/atomic_write/scan_prefix/flush`），键一律用 `catalog_format` 的 C++ 拼写。
-- 默认 `fjall`；`rocksdb-store` feature 切到 `MetaStoreRocks`，此时 `<dir>/catalog` 就是 C++ 引擎可打开的 RocksDB。
-- **C++ 键空间是唯一 catalog（`rocksdb-store`）**：`Catalog::with_store_cpp_only` 只读写 C++ 键（DDL 后整体重写、drop 走删除），引擎层已切换；默认构建仍为 fjall 原生 catalog（C++ 不可读）。
-- `fjall` 无内置 backup/restore → 版本化备份由 Infinity 自建（对应 R4）。
+- `<dir>/catalog` 就是 C++ 引擎可打开的 RocksDB（唯一底座）。
+- **C++ 布局与原生键空间同库**：每个 DDL 写原生记录，checkpoint 时把 C++ 布局写全，参考可直接打开该目录。
+- 版本化备份由 Infinity 自建（对应 R4）。
 - **构建坑（记录）**：`librocksdb-sys` 自带版本用本机 GCC 16 编不过；系统 RocksDB 头文件与 crate FFI 不匹配。最终用 **clang 编译 crate 自带版本**，在 `rust_engine/.cargo/config.toml` 的 `[env]` 设 `CC/CXX`。
 
 ### 4.3 D3 — 列式数据模型
@@ -356,7 +356,7 @@ rust_engine/crates/
 
 | C++ 依赖 | Rust 方案 | 备注 |
 |---|---|---|
-| `rocksdb` | `rust-rocksdb` / `fjall` | §4.2 |
+| `rocksdb` | `rust-rocksdb` | §4.2 |
 | `thrift` | Apache `thrift` crate | 保 `TBinaryProtocol` |
 | `oatpp` | `axum` + `hyper` + `tower` | 保持路由/JSON |
 | `nlohmann-json` | `serde_json` | |
@@ -415,7 +415,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 | crate | 内容 | 状态 |
 |---|---|---|
 | `infinity-common` | 基础类型 / 错误 / 配置 | ✅ |
-| `infinity-storage` | WAL（CRC-32/IEEE 分帧、撕裂尾容忍、checkpoint 截断、分段轮转）、MVCC、`MetaStore`（fjall + rocksdb）、C++ 格式编解码 | ✅ M1 |
+| `infinity-storage` | WAL（CRC-32/IEEE 分帧、撕裂尾容忍、checkpoint 截断、分段轮转）、MVCC、`MetaStore`（RocksDB）、C++ 格式编解码 | ✅ M1 |
 | `infinity-catalog` | 表/列/索引元数据、C++ 键与值编码、`cpp_layout` 双向 | ✅ |
 | `infinity-txn` | `WriteWAL(串行) → KV 原子写`、幂等回放、loom 模型 | ✅ |
 | `infinity-parser` | 手写 lexer + 递归下降：DDL/DML/DQL、`SEARCH MATCH`（VECTOR/SPARSE/TENSOR/TEXT + FUSION）、`COPY`/`SHOW`/`EXPLAIN`/快照 | ✅ M2 |
@@ -631,7 +631,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 | PoC | 状态 | 结果 | 影响 |
 |---|---|---|---|
 | **A. Tokio 有界队列无死锁** | ✅ 5/5 | 容量=1 下顺序消费**死锁**（如期捕获）；按边并发可前进；早停/错误/取消通过 | 验证 §4.4 与 R12 |
-| **B. fjall KV 四门槛** | ✅（1 gap） | 原子批写 ✓、快照可重复读 ✓、原子计数器 RMW ✓；**无内置 backup/restore** | 备份自建（R4） |
+
 | **C. 跨底座宕机一致性** | ✅ 5/5 | 块写入后 / WAL 后 / 全提交 / checkpoint+tail / WAL 撕裂：未落 WAL 不算提交，回放幂等，撕裂尾忽略 | 验证附录 A.1/A.4 |
 | **D. Thrift golden** | ✅ 双向 | Rust vs 仓库 Python codec（0.24.0）：`CommonResponse` 32 字节逐字节相等；双向编解码；`ColumnField` 双向 MATCH | 验证 D6 |
 | **E. `.slt` 可消费** | ✅ | 173 文件、1535 statement ok、104 statement error、1270 query、0 结构错误 | 验证 Gate A 资产 |

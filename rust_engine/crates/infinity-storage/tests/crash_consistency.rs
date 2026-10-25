@@ -1,4 +1,4 @@
-//! Cross-substrate crash-consistency regression (plan §6 Gate G / INVARIANT_MATRIX G3).
+//! Crash-consistency regression (plan §6 Gate G / INVARIANT_MATRIX G3).
 //!
 //! Models Infinity's three persistence substrates on one commit path — block
 //! files, the WAL (redo log) and the metadata KV — and injects a crash at each
@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use infinity_storage::{FjallMetaStore, KvBatchKind, MetaStore, WalCmd, WalEntry, WalManager};
+use infinity_storage::{KvBatchKind, MetaStore, RocksMetaStore, WalCmd, WalEntry, WalManager};
 
 /// Where the simulated process died.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,7 +59,7 @@ fn entry(txn_id: u64, block_id: u64, data: &[u8]) -> WalEntry {
 
 /// Runs the commit protocol for one transaction, stopping at the requested
 /// boundary to simulate a crash (later durable writes never happen).
-fn commit_until(dir: &Path, kv: &FjallMetaStore, txn_id: u64, data: &[u8], stop: Stop) {
+fn commit_until(dir: &Path, kv: &RocksMetaStore, txn_id: u64, data: &[u8], stop: Stop) {
     let block_id = txn_id;
     fs::create_dir_all(dir.join("blocks")).unwrap();
     fs::write(block_path(dir, block_id), data).unwrap();
@@ -82,7 +82,7 @@ fn commit_until(dir: &Path, kv: &FjallMetaStore, txn_id: u64, data: &[u8], stop:
 
 /// Recovery: replay the WAL past the KV checkpoint, rebuilding any missing
 /// block file, and record the replayed transactions back into the KV.
-fn recover(dir: &Path, kv: &FjallMetaStore) -> Vec<u64> {
+fn recover(dir: &Path, kv: &RocksMetaStore) -> Vec<u64> {
     let checkpoint = kv
         .get(checkpoint_key())
         .unwrap()
@@ -116,12 +116,12 @@ fn kvs_put_missing_block(dir: &Path, block_id: u64, data: &[u8]) {
 
 /// A transaction is visible once the KV records it (either at commit time or
 /// via WAL replay).
-fn visible(kv: &FjallMetaStore, txn_id: u64) -> bool {
+fn visible(kv: &RocksMetaStore, txn_id: u64) -> bool {
     kv.get(&txn_key(txn_id)).unwrap().is_some()
 }
 
-fn open_kv(dir: &Path) -> FjallMetaStore {
-    FjallMetaStore::open(dir.join("kv"), "default").unwrap()
+fn open_kv(dir: &Path) -> RocksMetaStore {
+    RocksMetaStore::open(dir.join("kv")).unwrap()
 }
 
 #[test]

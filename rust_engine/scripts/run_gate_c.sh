@@ -61,19 +61,17 @@ fi
 #     byte-level check, where the two engines write the same data and their
 #     files are compared byte for byte.
 if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
-  # The reference reads the *C++-layout* catalog (`catalog| db| tbl| col| idx|`
-  # in RocksDB). That backend only exists behind the `rocksdb-store` feature;
-  # without it the engine opens a fjall catalog, starts on an empty schema and
-  # no handover can pass. Build the feature-enabled binary for this leg only,
-  # so the rest of Gate C keeps exercising the default backend.
-  if cargo build -q --release -p infinity-cli --features rocksdb-store; then
+  # Both engines keep their catalog in the same RocksDB key space
+  # (`catalog| db| tbl| col| idx|`), so the binary Gate C runs above already
+  # reads and writes what the reference does.
+  if cargo build -q --release -p infinity-cli; then
     ( cd "$root" && INFINITY_SERVER_BIN="$root/rust_engine/target/release/infinity" \
         INFINITY_CPP_BIN="${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" \
         "$py" -m pytest -q python/restart_test/test_cross_engine_compat.py \
         python/restart_test/test_cross_engine_bytes.py \
         --infinity_path="$shim" ) || status=1
   else
-    echo "FAIL: could not build the rocksdb-store binary the cross-engine leg needs"
+    echo "FAIL: could not build the port binary the cross-engine leg needs"
     status=1
   fi
 else

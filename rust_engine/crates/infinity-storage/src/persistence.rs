@@ -1158,7 +1158,7 @@ mod tests {
         fs::create_dir_all(data_dir.join("db_1/tbl_0/seg_0/blk_0")).unwrap();
         let catalog = tmp.path().join("catalog");
         fs::create_dir_all(&catalog).unwrap();
-        let store = Arc::new(crate::FjallMetaStore::open(&catalog, "catalog").unwrap());
+        let store = Arc::new(crate::RocksMetaStore::open(&catalog).unwrap());
 
         let file = data_dir.join("db_1/tbl_0/seg_0/blk_0/version");
         fs::write(&file, b"payload").unwrap();

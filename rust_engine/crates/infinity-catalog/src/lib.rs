@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use infinity_common::{Error, Result};
-use infinity_storage::{FjallMetaStore, MetaStore};
+use infinity_storage::{MetaStore, RocksMetaStore};
 
 const COUNTER_KEY: &[u8] = b"__counter:table";
 
@@ -443,14 +443,14 @@ impl Catalog {
     }
 
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let store = FjallMetaStore::open(path, "catalog")?;
+        let store = RocksMetaStore::open(path)?;
         Ok(Self::with_store(Arc::new(store)))
     }
 
     /// Like [`Self::open`] but with the C++ key space as the sole catalog
     /// (plan §2.6.1 item ④).
     pub fn open_cpp_only(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let store = FjallMetaStore::open(path, "catalog")?;
+        let store = RocksMetaStore::open(path)?;
         Ok(Self::with_store_cpp_only(Arc::new(store)))
     }
 
@@ -1370,7 +1370,7 @@ mod tests {
     fn cpp_only_catalog_writes_only_the_cpp_key_space() {
         let dir = tempdir().unwrap();
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path(), "catalog").unwrap());
+            Arc::new(RocksMetaStore::open(dir.path()).unwrap());
         let c = Catalog::with_store_cpp_only(store.clone());
         assert!(c.is_cpp_only());
         c.create_database("db2", false).unwrap();
@@ -1516,7 +1516,7 @@ mod tests {
     fn legacy_table_record_decodes_without_a_sparse_hint() {
         let dir = tempdir().unwrap();
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path(), "catalog").unwrap());
+            Arc::new(RocksMetaStore::open(dir.path()).unwrap());
         // A record written before the hint field existed: six columns, no
         // trailing sparse hint.
         let legacy = "t\u{1e}id\u{1f}\u{1f}0\u{1f}INTEGER\u{1f}\u{1f}0";
@@ -1530,7 +1530,7 @@ mod tests {
     fn cpp_only_catalog_keeps_the_sparse_hint() {
         let dir = tempdir().unwrap();
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path(), "catalog").unwrap());
+            Arc::new(RocksMetaStore::open(dir.path()).unwrap());
         {
             let c = Catalog::with_store_cpp_only(store.clone());
             c.create_table_typed_with_sparse_stores(
@@ -1640,7 +1640,7 @@ mod tests {
     }
 
     fn counting_catalog(dir: &std::path::Path, cpp_only: bool) -> (Catalog, Arc<Counts>) {
-        let inner: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(dir, "catalog").unwrap());
+        let inner: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir).unwrap());
         let counts = Arc::new(Counts::default());
         let store: Arc<dyn MetaStore> = Arc::new(CountingStore {
             inner,
@@ -1841,7 +1841,7 @@ mod tests {
             .collect();
 
         let direct: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dst.path(), "catalog").unwrap());
+            Arc::new(RocksMetaStore::open(dst.path()).unwrap());
         // The direct writer preserves the segment layer already in the store, so
         // publish it first and the two paths see the same input.
         for set in &segments {

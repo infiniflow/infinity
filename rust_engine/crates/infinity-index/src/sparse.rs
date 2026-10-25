@@ -978,14 +978,14 @@ mod bmp_reference_suite {
             write_bmp_file(&path, block_size, IdxWidth::I32, &docs, cols).unwrap();
             let reader = BmpCppReader::open(&path, IdxWidth::I32).unwrap();
             assert_eq!(reader.doc_count(), rows);
-            assert!(reader.search(&[], 0, 1.0).is_empty());
+            assert!(reader.search(&[], 0, Default::default()).is_empty());
 
             let mut hit = 0;
             let mut total = 0;
             for (q, gt) in queries.iter().zip(&gt) {
                 let mem_hits = index.search_knn(q, 10, options);
                 let query: Vec<(i32, f32)> = q.iter().map(|(t, v)| (*t as i32, *v)).collect();
-                let disk_hits = reader.search(&query, 10, 1.0);
+                let disk_hits = reader.search(&query, 10, Default::default());
                 assert_eq!(disk_hits.len(), mem_hits.len());
                 for (mem, disk) in mem_hits.iter().zip(&disk_hits) {
                     assert_eq!(mem.0, disk.0, "doc id differs across the round trip");

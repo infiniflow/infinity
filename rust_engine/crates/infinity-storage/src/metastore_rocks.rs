@@ -6,8 +6,8 @@
 //! those keys. This module provides the substrate, so pointing the engine at a
 //! directory the C++ engine wrote (or handing it one) uses the same bytes.
 //!
-//! Gated behind the `rocksdb-store` feature because it pulls in the C++
-//! `librocksdb`; the default build stays pure Rust.
+//! This is the only substrate: the catalog and the row store both live in a
+//! RocksDB, the same one the reference writes.
 
 use std::path::Path;
 use std::sync::Mutex;

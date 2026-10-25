@@ -116,7 +116,7 @@
 
 ### 5.3 流程
 
-1. **CI**：`.github/workflows/rust_engine.yml` 的 `cross_engine` job 在 builder 镜像里编参考、用 `--features rocksdb-store` 编重写版，并在 bwrap 下跑两个 pytest 文件。**对象存储不在 CI 里**：重写版不移植参考的远程对象存储（§6.5），`test_the_port_round_trips_through_object_storage` 与 `s3_minio.rs` 只覆盖重写版自身的桶往返，需要手工跑（§7）。
+1. **CI**：`.github/workflows/rust_engine.yml` 的 `cross_engine` job 在 builder 镜像里编参考、编重写版（`cargo build --release -p infinity-cli`），并在 bwrap 下跑两个 pytest 文件。**对象存储不在 CI 里**：重写版不移植参考的远程对象存储（§6.5），`test_the_port_round_trips_through_object_storage` 与 `s3_minio.rs` 只覆盖重写版自身的桶往返，需要手工跑（§7）。
 2. **重写版自身确定性**：由 `test_the_port_is_deterministic_too` 单独断言（3 次跑，`data/` 下每个文件都必须相同）。
 
 ## 6. 与 C++ 参考的差异
@@ -136,7 +136,6 @@
 | 压缩 / 导入的 WAL 命令 | 一帧一条 `CompactV2` / `ImportV2`（不搬行），带索引的表在同一帧追加每个 index 的 `DumpIndexV2` | 同左 | 载荷与参考逐字节相同（`wal_shape_ut` 以参考 `wal.log` 的字节为 fixture）；`DumpIndexV2` 的字段由 `an_indexed_{import,compaction}_logs_the_dump_in_the_same_frame` 钉住 |
 | `seg\|…\|fast_rough_filter` / `blk\|…` | 与参考同字节（`fast_rough_filter.rs`） | `IMPORT`/压缩时建 | 已逐字节比：`test_the_fast_rough_filters_match_byte_for_byte` 用 `dump-catalog` 读十六进制（`show catalog` 渲染二进制为空，走它只能断言记录存在）；字节另有 `fast_rough_filter.rs` 单测的 130 字节 fixture 钉住（§5.2.3） |
 | 段的产生时机 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切（与参考相同）；单段 `COMPACT` 不开事务 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切 | 见 §5.2 |
-| 不带 `rocksdb-store` feature 时 | catalog 落 fjall | 只认 RocksDB | 参考打开只剩 `system_tag`（`Database: default_db doesn't exist`）；门禁必须带 feature |
 
 ### 6.2 与参考逐字节一致的部分
 
@@ -246,7 +245,7 @@
 ```bash
 # 参考（容器内）与重写版
 docker exec infinity_builder cmake --build /infinity/cmake-build-reldeb --target infinity
-cd rust_engine && cargo build --release -p infinity-cli --features rocksdb-store
+cd rust_engine && cargo build --release -p infinity-cli
 
 # 字节 / 全类型 / 多块 / 写序列 / 索引矩阵 / 崩溃 / 多段（需要可写的 /var/infinity）
 work=$(mktemp -d)
@@ -275,7 +274,7 @@ cd rust_engine && INFINITY_MINIO_TEST=1 INFINITY_MINIO_ENDPOINT=127.0.0.1:9000 \
 | 变量 | 默认 | 作用 |
 |---|---|---|
 | `INFINITY_CPP_BIN` | `cmake-build-reldeb/src/infinity` | 参考二进制 |
-| `INFINITY_RUST_BIN` | `rust_engine/scripts/infinity_rust_shim.sh` | 重写版入口（shim 跑 `rust_engine/target/release/infinity`，编它必须带 `--features rocksdb-store`） |
+| `INFINITY_RUST_BIN` | `rust_engine/scripts/infinity_rust_shim.sh` | 重写版入口（shim 跑 `rust_engine/target/release/infinity`） |
 | `INFINITY_BYTES_ROOT` | `/var/infinity/bytes` | 两引擎的数据根 |
 | `INFINITY_BYTES_ROWS` | `200` | 字节测试的数据集行数 |
 | `INFINITY_BYTES_BLOCK_ROWS` | `20000` | 多块测试的行数（>8192 才是多块） |

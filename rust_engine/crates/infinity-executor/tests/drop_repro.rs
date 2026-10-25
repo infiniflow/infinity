@@ -1,16 +1,11 @@
-use infinity_executor::Engine;
+//! A table restored from a snapshot can be dropped again: `DROP TABLE` has to
+//! remove the restored catalog entry (and its rows), not only the original one.
+//!
+//! The two drops exercise different paths — the first removes a table the
+//! engine created, the second one the restore just recreated — and the restore
+//! must not leave a second incarnation behind for the second drop to miss.
 
-fn dump(e: &Engine, where_: &str) {
-    println!("--- store after {where_} ---");
-    let store = e.storage.catalog.store();
-    for (k, v) in store.scan_prefix(b"").unwrap() {
-        let k = String::from_utf8_lossy(&k).to_string();
-        if k.contains("tb1") || k.starts_with("tbl:") || k.starts_with("name:") {
-            println!("{k} => {:?}", String::from_utf8_lossy(&v));
-        }
-    }
-    println!("--- tables: {:?}", e.execute("SHOW TABLES;"));
-}
+use infinity_executor::Engine;
 
 #[test]
 fn drop_after_restore() {
@@ -26,10 +21,8 @@ fn drop_after_restore() {
         "drop left the table behind (1)"
     );
     e.execute("RESTORE TABLE SNAPSHOT s1;").unwrap();
-    dump(&e, "restore");
-    let r = e.execute("DROP TABLE tb1;");
-    println!("second drop: {r:?}");
-    dump(&e, "second drop");
+    assert!(e.table_exists("default_db.tb1"), "restore did not recreate it");
+    e.execute("DROP TABLE tb1;").unwrap();
     assert!(
         !e.table_exists("default_db.tb1"),
         "drop left the table behind (2)"

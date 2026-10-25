@@ -81,9 +81,9 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_MAKE_PROGRAM=/usr/local/bin/ninja \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -S /infinity -B /infinity/cmake-build-reldeb
           docker exec infinity_builder cmake --build /infinity/cmake-build-reldeb --target infinity -j 8
-      - name: Port (C++-compatible catalog)
+      - name: Port
         working-directory: rust_engine
-        run: cargo build --release -p infinity-cli --features rocksdb-store
+        run: cargo build --release -p infinity-cli
       - name: Python SDK
         run: |
           python3 -m venv .venv

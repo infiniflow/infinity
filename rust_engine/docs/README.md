@@ -23,14 +23,14 @@
 | [`TEST_AUDIT.md`](TEST_AUDIT.md) | 参考 `src/unit_test/**` 每个 `TEST/TEST_F/TEST_P` 一行的台账（`ported`/`excluded`/`exempt`） | 查某个 C++ 单测在 Rust 里对应哪条 |
 | [`INVARIANT_MATRIX.md`](INVARIANT_MATRIX.md) | Gate G：C++ 内部不变量 → Rust 回归测试的对照 | 想知道某条不变量由谁兜住 |
 | [`CALL_PROBE_AUDIT.md`](CALL_PROBE_AUDIT.md) | 用 uprobe 探针回答"某个函数在参考里到底被调用没有"的方法、已测事实与未覆盖项 | 怀疑某个实现是死代码时 |
-| [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) | catalog 底座（fjall ↔ RocksDB）与跨引擎互操作的常见问题 | 换底座、或参考打不开目录时 |
+| [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) | catalog 底座（RocksDB）与跨引擎互操作的常见问题 | 参考打不开目录、或想确认 fsync 点时 |
 
 ## 怎么验证
 
-格式门禁（需要参考二进制 `cmake-build-reldeb/src/infinity`；重写版必须带 `--features rocksdb-store`）：
+格式门禁（需要参考二进制 `cmake-build-reldeb/src/infinity`）：
 
 ```bash
-cd rust_engine && cargo build --release -p infinity-cli --features rocksdb-store
+cd rust_engine && cargo build --release -p infinity-cli
 cd ..
 .venv/bin/python -m pytest python/restart_test/test_cross_engine_bytes.py \
                               python/restart_test/test_cross_engine_compat.py -q
@@ -39,7 +39,7 @@ cd ..
 单元测试：
 
 ```bash
-cd rust_engine && cargo test --release --features rocksdb-store --workspace --lib
+cd rust_engine && cargo test --release --workspace --lib
 ```
 
 `scripts/run_gate_{a,b,c,d,e}.sh` 分别对应 SQL、SDK/协议、持久化、并发、性能关卡。

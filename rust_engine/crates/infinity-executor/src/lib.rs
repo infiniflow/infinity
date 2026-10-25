@@ -5285,19 +5285,6 @@ fn is_blob_type(t: &str) -> bool {
     is_embedding_type(t) || is_tensor_type(t) || is_sparse_type(t)
 }
 
-/// The substrate a fresh data directory is created on.
-///
-/// It follows the **engine's** feature, not the store crate's: the converter
-/// needs the RocksDB substrate while the engine may stay on fjall, and the
-/// engine's catalogue semantics (the C++ key space or the native one) follow
-/// from it.
-#[cfg(feature = "rocksdb-store")]
-pub const DEFAULT_CATALOG_BACKEND: infinity_storage::metastore::StoreBackend =
-    infinity_storage::metastore::StoreBackend::RocksDb;
-/// The substrate a fresh data directory is created on.
-#[cfg(not(feature = "rocksdb-store"))]
-pub const DEFAULT_CATALOG_BACKEND: infinity_storage::metastore::StoreBackend =
-    infinity_storage::metastore::StoreBackend::Fjall;
 
 /// Open options (the reference's `InfinityContext` configuration relevant to
 /// durability).
@@ -5309,11 +5296,6 @@ pub struct EngineOptions {
     pub wal_enabled: bool,
     /// Tokio exchange capacity per pipeline edge.
     pub exchange_capacity: usize,
-    /// The substrate a *fresh* catalog is created on.
-    ///
-    /// `None` (the default) lets the build decide. An existing directory is
-    /// always opened on the substrate it holds, whatever this says.
-    pub catalog_backend: Option<infinity_storage::metastore::StoreBackend>,
     /// The reference's object directory (`pm|object|` + one file per object).
     ///
     /// `Some` makes the engine speak that layout: at open it materialises any
@@ -5331,7 +5313,6 @@ impl Default for EngineOptions {
         Self {
             wal_enabled: true,
             exchange_capacity: 4,
-            catalog_backend: None,
             object_dir: None,
             snapshot_dir: None,
         }
@@ -5370,25 +5351,11 @@ impl Engine {
         // `Config::SnapshotDir()`: snapshots live next to the data root unless
         // the caller names a directory (the CLI always does).
         let dir_for = dir.clone();
-        // The catalog lives at `<dir>/catalog`, the path the C++ engine uses for
-        // its catalog RocksDB. Under `rocksdb-store` the C++ key space is the
-        // **only** catalog (the native fjall key space is not written), so a
-        // C++ engine can open this directory's catalog; otherwise the catalog
-        // is a native fjall store.
+        // The catalog lives at `<dir>/catalog`, the path and the substrate the
+        // C++ engine uses for its catalog RocksDB, so a C++ engine can open the
+        // directory the port wrote.
         let catalog_dir = dir.join("catalog");
-        // The substrate is a property of the directory, not of the build: a
-        // directory the reference wrote holds a RocksDB, a directory this port
-        // wrote holds a fjall store, and a fresh directory gets the build's
-        // default. One binary therefore opens both, and the build only decides
-        // what a *new* directory is made of.
-        let opened_catalog = infinity_storage::open_store(
-            &catalog_dir,
-            "catalog",
-            options.catalog_backend.unwrap_or(DEFAULT_CATALOG_BACKEND),
-        )?;
-        let catalog_on_rocks =
-            opened_catalog.backend == infinity_storage::metastore::StoreBackend::RocksDb;
-        let catalog_store: Arc<dyn MetaStore> = opened_catalog.store;
+        let catalog_store: Arc<dyn MetaStore> = infinity_storage::open_store(&catalog_dir)?;
         // A no-WAL open first undoes whatever the previous process wrote after
         // its last checkpoint, then wraps the store so this process's writes
         // are journaled too. Doing the rollback in both modes is defensive: a
@@ -5402,15 +5369,10 @@ impl Engine {
                 &catalog_dir,
             ))
         };
-        let catalog = {
-            if catalog_on_rocks {
-                // The C++ key space *is* the catalog in a RocksDB directory:
-                // the reference wrote it and expects to read it back.
-                Catalog::with_store_cpp_only(catalog_store)
-            } else {
-                Catalog::with_store(catalog_store)
-            }
-        };
+        // The native catalog and the C++ key space live in the same RocksDB:
+        // every DDL writes the native records and the reference's layout, and a
+        // checkpoint mirrors the layout so the reference can open the directory.
+        let catalog = Catalog::with_store(catalog_store);
         // The reference keeps its data files in objects and describes them in
         // `pm|object|`; open the `data/` tree before anything reads a block.
         let persistence = match options.object_dir.as_ref() {
@@ -5426,14 +5388,8 @@ impl Engine {
             }
             None => None,
         };
-        // The row/meta store: RocksDB when the `rocksdb-store` feature is on
-        // (the substrate the C++ engine's catalog uses), fjall otherwise.
-        let store: Arc<dyn MetaStore> = infinity_storage::open_store(
-            &dir.join("persistence"),
-            "default",
-            options.catalog_backend.unwrap_or(DEFAULT_CATALOG_BACKEND),
-        )?
-        .store;
+        // The row/meta store, on the same substrate as the catalog.
+        let store: Arc<dyn MetaStore> = infinity_storage::open_store(&dir.join("persistence"))?;
         let wal_dir = dir.join("wal");
         std::fs::create_dir_all(&wal_dir).map_err(|e| Error::Io {
             path: wal_dir.clone(),
@@ -20601,14 +20557,7 @@ mod tests {
     /// A store opened exactly the way `Engine::open` opens its catalog, so a
     /// test can plant or inspect the C++ key space at `<dir>/catalog`.
     fn open_catalog_store(dir: &std::path::Path) -> std::sync::Arc<dyn MetaStore> {
-        #[cfg(feature = "rocksdb-store")]
-        {
-            std::sync::Arc::new(infinity_storage::RocksMetaStore::open(dir).unwrap())
-        }
-        #[cfg(not(feature = "rocksdb-store"))]
-        {
-            std::sync::Arc::new(infinity_storage::FjallMetaStore::open(dir, "catalog").unwrap())
-        }
+        std::sync::Arc::new(infinity_storage::RocksMetaStore::open(dir).unwrap())
     }
 
     #[test]
@@ -20833,7 +20782,7 @@ mod tests {
             other => panic!("{other:?}"),
         }
         e.flush().unwrap();
-        drop(e); // release the fjall lock before reopening
+        drop(e); // release the RocksDB lock before reopening
                  // reopen: the index is rebuilt from catalog metadata and still scans
         let e2 = Engine::open(dir.path()).unwrap();
         match &e2.execute("SELECT id FROM t WHERE name = 'b';").unwrap()[0] {
@@ -21953,31 +21902,6 @@ mod tests {
         .is_empty());
     }
 
-    /// Under `rocksdb-store` the catalog is the C++ key space only: no native
-    /// `tbl:`/`db:`/`idx:` record may be written (plan #69).
-    #[cfg(feature = "rocksdb-store")]
-    #[test]
-    fn cpp_only_catalog_writes_no_native_keys() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (a INT, b VARCHAR);").unwrap();
-        e.execute("CREATE INDEX t_a ON t (a);").unwrap();
-        e.execute("INSERT INTO t VALUES (1, 'x');").unwrap();
-        let store = e.catalog().store();
-        for prefix in ["tbl:", "tblname:", "db:", "idx:"] {
-            assert!(
-                store.scan_prefix(prefix.as_bytes()).unwrap().is_empty(),
-                "native key prefix {prefix} survived"
-            );
-        }
-        assert!(!store.scan_prefix(b"catalog|tbl|").unwrap().is_empty());
-        assert!(!store.scan_prefix(b"catalog|idx|").unwrap().is_empty());
-        // The same directory reopens with the schema restored.
-        e.flush().unwrap();
-        drop(e);
-        let e = Engine::open(dir.path()).unwrap();
-        assert_eq!(rows(&e, "SELECT a FROM t;"), vec![vec!["1".to_string()]]);
-    }
 
     /// WAND now covers filters, `minimum_should_match`, `delta_term` and
     /// `similarity=boolean`; each must agree with the reference semantics.

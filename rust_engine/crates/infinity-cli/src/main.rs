@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use infinity_catalog::Catalog;
 use infinity_executor::{Engine, QueryResult};
-use infinity_storage::{FjallMetaStore, MetaStore};
+use infinity_storage::{MetaStore, RocksMetaStore};
 use infinity_txn::TxnManager;
 
 fn catalog_dir(dir: &Path) -> PathBuf {
@@ -35,7 +35,7 @@ fn open_catalog(dir: &Path) -> infinity_common::Result<Catalog> {
 }
 
 fn open_txn(dir: &Path) -> infinity_common::Result<(TxnManager, Arc<dyn MetaStore>)> {
-    let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(kv_dir(dir), "default")?);
+    let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(kv_dir(dir))?);
     std::fs::create_dir_all(dir.join("wal")).map_err(|e| infinity_common::Error::Io {
         path: dir.join("wal"),
         source: e,
@@ -47,7 +47,7 @@ fn open_txn(dir: &Path) -> infinity_common::Result<(TxnManager, Arc<dyn MetaStor
 fn usage() -> ! {
     eprintln!(
         "usage: infinity <create-table|list-tables|put|get|dump-catalog|recover|query|bench|serve|import-csv|conformance|smoke> <dir> [args...]
-       [--catalog-engine=fjall|rocksdb]  the substrate a fresh catalog is created on"
+"
     );
     std::process::exit(2);
 }
@@ -63,32 +63,6 @@ fn toml_value(text: &str, key: &str) -> Option<String> {
 
 /// `infinity --config=<file>` — the C++ server's invocation, used by
 /// `python/restart_test`. The data root is the parent of `persistence_dir`.
-/// The catalog substrate named on the command line
-/// (`--catalog-engine=fjall|rocksdb`).
-///
-/// It decides what a *fresh* data directory is created on; an existing
-/// directory is always opened on the substrate it holds. Naming it makes it
-/// easy to produce a directory the reference can read (rocksdb) or one the
-/// port keeps to itself (fjall).
-fn catalog_backend_flag(
-    args: &[String],
-) -> infinity_common::Result<Option<infinity_storage::metastore::StoreBackend>> {
-    let mut backend = None;
-    for arg in args {
-        let Some(value) = arg.strip_prefix("--catalog-engine=") else {
-            continue;
-        };
-        backend = Some(
-            infinity_storage::metastore::StoreBackend::parse(value).ok_or_else(|| {
-                infinity_common::Error::Invalid(format!(
-                    "unknown catalog engine '{value}' (expected fjall or rocksdb)"
-                ))
-            })?,
-        );
-    }
-    Ok(backend)
-}
-
 fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     let text = std::fs::read_to_string(path).map_err(|e| infinity_common::Error::Io {
         path: PathBuf::from(path),
@@ -153,13 +127,6 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
             }
         }
     }
-    // `[storage] catalog_engine = "rocksdb" | "fjall"`: the substrate a fresh
-    // catalog is created on. The command line wins over the file.
-    let mut backend = toml_value(&text, "catalog_engine")
-        .and_then(|v| infinity_storage::metastore::StoreBackend::parse(&v));
-    if let Some(flag) = catalog_backend_flag(&std::env::args().collect::<Vec<_>>())? {
-        backend = Some(flag);
-    }
     // `[storage] persistence_format = "reference"`: publish the data files the
     // way the reference's `PersistenceManager` does (`pm|object|` records plus
     // one packed object under `persistence_dir`), and materialise them again on
@@ -180,7 +147,6 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
         .filter(|v| !v.is_empty())
         .map(std::path::PathBuf::from);
     let options = infinity_executor::EngineOptions {
-        catalog_backend: backend,
         object_dir,
         snapshot_dir,
         ..Default::default()
@@ -398,16 +364,9 @@ fn run(args: &[String]) -> infinity_common::Result<()> {
             // the Postgres text protocol, which turns the `fast_rough_filter`
             // records into an empty string; the byte gate needs the actual
             // bytes, and this command is the one place that yields them.
-            // `Catalog::open` is fjall-only; the substrate has to be detected so
-            // the same command reads a catalogue the reference wrote (RocksDB)
-            // and one the port wrote (fjall).
-            let opened = infinity_storage::open_store(
-                &catalog_dir(&dir),
-                "catalog",
-                infinity_storage::metastore::StoreBackend::Fjall,
-            )?;
+            let store = infinity_storage::open_store(&catalog_dir(&dir))?;
             let filter = args.get(2).cloned();
-            for (k, v) in opened.store.scan_prefix(b"")? {
+            for (k, v) in store.scan_prefix(b"")? {
                 let key = String::from_utf8_lossy(&k);
                 if let Some(f) = &filter {
                     if !key.contains(f.as_str()) {
@@ -438,10 +397,7 @@ fn run(args: &[String]) -> infinity_common::Result<()> {
                 .get(2)
                 .cloned()
                 .unwrap_or_else(|| "0.0.0.0:23817".into());
-            let options = infinity_executor::EngineOptions {
-                catalog_backend: catalog_backend_flag(args)?,
-                ..Default::default()
-            };
+            let options = infinity_executor::EngineOptions::default();
             let engine =
                 std::sync::Arc::new(infinity_executor::Engine::open_with_options(&dir, options)?);
             let server = infinity_server::Server::bind_with_engine(&addr, engine)?;
@@ -603,7 +559,7 @@ fn run_smoke(dir: &Path) -> infinity_common::Result<()> {
     println!("[smoke] tables after restart: {tables:?}");
 
     let fresh: Arc<dyn MetaStore> =
-        Arc::new(FjallMetaStore::open(dir.join("kv_recovered"), "default")?);
+        Arc::new(RocksMetaStore::open(dir.join("kv_recovered"))?);
     let m = TxnManager::open(wal_path(dir), fresh.clone())?;
     let n = m.recover(0)?;
     println!("[smoke] replayed {n} WAL record(s) into fresh store");

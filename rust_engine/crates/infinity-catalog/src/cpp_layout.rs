@@ -1875,7 +1875,7 @@ pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use infinity_storage::FjallMetaStore;
+    use infinity_storage::RocksMetaStore;
     use std::sync::Arc;
 
     /// An IVF record has to survive a reload: `index_meta_of` expands the
@@ -1988,7 +1988,7 @@ mod tests {
         .unwrap();
 
         let out = tempfile::tempdir().unwrap();
-        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(out.path(), "cpp").unwrap());
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(out.path()).unwrap());
         cat.write_cpp_layout(store.as_ref()).unwrap();
 
         let tables = read_cpp_layout(store.as_ref()).unwrap();
@@ -2039,7 +2039,7 @@ mod tests {
             .unwrap();
 
         let out = tempfile::tempdir().unwrap();
-        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(out.path(), "cpp").unwrap());
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(out.path()).unwrap());
         cat.write_cpp_layout(store.as_ref()).unwrap();
 
         let defs = read_cpp_indexes(store.as_ref()).unwrap();
@@ -2077,7 +2077,7 @@ mod tests {
 
         // Write into a *separate* store so the engine's own catalog is untouched.
         let out = tempfile::tempdir().unwrap();
-        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(out.path(), "cpp").unwrap());
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(out.path()).unwrap());
         let written = cat.write_cpp_layout(store.as_ref()).unwrap();
         assert!(written >= 4, "wrote {written} records");
 
@@ -2170,7 +2170,7 @@ mod tests {
         .unwrap();
 
         let cpp = tempfile::tempdir().unwrap();
-        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(cpp.path(), "cpp").unwrap());
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(cpp.path()).unwrap());
         cat.write_cpp_layout(store.as_ref()).unwrap();
 
         // A fresh, empty native catalog imports it.
@@ -2237,7 +2237,7 @@ mod tests {
         )
         .unwrap();
         let out = tempfile::tempdir().unwrap();
-        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(out.path(), "cpp").unwrap());
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(out.path()).unwrap());
         let err = cat.write_cpp_layout(store.as_ref()).unwrap_err();
         assert!(err.to_string().contains("does not cover"), "{err}");
     }
@@ -2277,7 +2277,7 @@ mod tests {
         .unwrap();
 
         let out = tempfile::tempdir().unwrap();
-        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(out.path(), "cpp").unwrap());
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(out.path()).unwrap());
         cat.write_cpp_layout(store.as_ref()).unwrap();
 
         // The `next_index_id` tag counts both indexes.

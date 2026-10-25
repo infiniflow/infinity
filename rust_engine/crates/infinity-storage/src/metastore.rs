@@ -1,49 +1,13 @@
-//! The `MetaStore` trait and its pure-Rust `fjall` implementation (plan §3 D2).
+//! The `MetaStore` trait — the KV surface the catalog and the row store sit on.
 //!
-//! Backs catalog/meta, ID counters, object manifests and tombstones — the subset
-//! of RocksDB usage that Infinity relies on. `rust-rocksdb` can later provide an
-//! alternative impl behind the same trait.
+//! The one implementation is RocksDB ([`crate::metastore_rocks::RocksMetaStore`]),
+//! the substrate the C++ engine uses, so a directory either engine wrote reads
+//! back byte-for-byte. The trait keeps that decision out of the callers.
+//!
+//! It backs catalog/meta, ID counters, row records and tombstones — the subset
+//! of RocksDB usage that Infinity relies on.
 
-use std::path::Path;
-use std::sync::Mutex;
-
-use fjall::{Database, Keyspace, KeyspaceCreateOptions, PersistMode};
 use infinity_common::{Error, Result};
-
-fn fe(e: fjall::Error) -> Error {
-    Error::Storage(e.to_string())
-}
-
-/// Stored values larger than this are LZ4-compressed before they reach the
-/// LSM tree. Table rows are tab-separated text with thousands of floats, which
-/// compresses 3-4x; the codec is transparent to every caller.
-const COMPRESS_MIN: usize = 512;
-/// A compressed value starts with this pair; all legacy values are UTF-8 text,
-/// so they never collide with it.
-const LZ4_MAGIC: [u8; 2] = [0xC1, 0x4C];
-
-fn encode_value(value: &[u8]) -> Vec<u8> {
-    if value.len() < COMPRESS_MIN {
-        return value.to_vec();
-    }
-    let packed = lz4_flex::compress_prepend_size(value);
-    if packed.len() + LZ4_MAGIC.len() >= value.len() {
-        return value.to_vec();
-    }
-    let mut out = Vec::with_capacity(LZ4_MAGIC.len() + packed.len());
-    out.extend_from_slice(&LZ4_MAGIC);
-    out.extend_from_slice(&packed);
-    out
-}
-
-fn decode_value(value: &[u8]) -> Vec<u8> {
-    if value.len() > LZ4_MAGIC.len() && value[0] == LZ4_MAGIC[0] && value[1] == LZ4_MAGIC[1] {
-        if let Ok(raw) = lz4_flex::decompress_size_prepended(&value[LZ4_MAGIC.len()..]) {
-            return raw;
-        }
-    }
-    value.to_vec()
-}
 
 /// A transactional key-value store for metadata.
 ///
@@ -61,9 +25,6 @@ pub trait MetaStore: Send + Sync {
     /// This is the single primitive a DDL uses: a catalog mutation that
     /// removes N old entries and adds M new ones commits once, so a crash or
     /// an error can never leave half a DDL behind.
-    ///
-    /// The default applies the operations one by one; an implementation that
-    /// can batch (the LSM and RocksDB backends) must override it.
     fn atomic_batch(&self, items: &[(Vec<u8>, Option<Vec<u8>>)]) -> Result<()> {
         for (key, value) in items {
             match value {
@@ -100,8 +61,7 @@ pub trait MetaStore: Send + Sync {
     /// The block mirror reads one block's rows at a time instead of loading a
     /// whole table: the reference streams its rows through the buffer manager
     /// (`NewTxn::Import` -> `AppendInBlock`), so a table of any size is
-    /// mirrored with O(block) memory. A backend that cannot bound the scan
-    /// falls back to the prefix walk below.
+    /// mirrored with O(block) memory.
     fn scan_range(&self, start: &[u8], end: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
         Ok(self
             .scan_prefix(start)?
@@ -137,208 +97,16 @@ pub(crate) fn merge_delta(current: Option<&[u8]>, delta: u64) -> Result<u64> {
         .ok_or_else(|| Error::Storage("String2UInt64AddOperator overflow".into()))
 }
 
-/// The substrate a store directory holds.
-///
-/// The two substrates are told apart by what they leave on disk: fjall writes
-/// a `keyspaces/` directory and `<id>.jnl` journals, RocksDB writes `CURRENT`
-/// and a `MANIFEST-*`. The engine looks at the directory it was pointed at and
-/// picks the matching substrate, so one binary can open a directory either
-/// engine wrote.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StoreBackend {
-    Fjall,
-    RocksDb,
-}
-
-impl StoreBackend {
-    /// Detects the substrate of an existing store directory.
-    ///
-    /// `None` when the directory does not exist or carries no marker (an empty
-    /// directory, or one only holding leftovers).
-    ///
-    /// RocksDB is looked for first: it is the substrate the reference uses, so
-    /// a directory that holds one is opened as a RocksDB, and fjall is the
-    /// fallback for a directory that does not.
-    pub fn detect(path: &Path) -> Option<Self> {
-        if !path.is_dir() {
-            return None;
-        }
-        let has_manifest = std::fs::read_dir(path)
-            .ok()?
-            .flatten()
-            .any(|e| e.file_name().to_string_lossy().starts_with("MANIFEST-"));
-        if has_manifest || path.join("CURRENT").is_file() {
-            return Some(StoreBackend::RocksDb);
-        }
-        if path.join("keyspaces").is_dir() {
-            return Some(StoreBackend::Fjall);
-        }
-        None
-    }
-
-    pub fn name(self) -> &'static str {
-        match self {
-            StoreBackend::Fjall => "fjall",
-            StoreBackend::RocksDb => "rocksdb",
-        }
-    }
-
-    /// Parses the name of a substrate (`fjall`, `rocksdb`).
-    pub fn parse(text: &str) -> Option<Self> {
-        match text.trim().to_ascii_lowercase().as_str() {
-            "fjall" => Some(StoreBackend::Fjall),
-            "rocksdb" | "rocks" => Some(StoreBackend::RocksDb),
-            _ => None,
-        }
-    }
-}
-
-/// `fjall`-backed `MetaStore`.
-pub struct FjallMetaStore {
-    db: Database,
-    ks: Keyspace,
-    /// Serialises the read-modify-write of [`MetaStore::merge`], so two
-    /// concurrent merges of one counter cannot lose an increment.
-    merge_lock: Mutex<()>,
-}
-
-impl FjallMetaStore {
-    /// Opens (creating if needed) a metastore under `path` in keyspace `name`.
-    pub fn open(path: impl AsRef<Path>, name: &str) -> Result<Self> {
-        let db = Database::builder(path.as_ref()).open().map_err(fe)?;
-        let ks = db
-            .keyspace(name, KeyspaceCreateOptions::default)
-            .map_err(fe)?;
-        Ok(Self {
-            db,
-            ks,
-            merge_lock: Mutex::new(()),
-        })
-    }
-}
-
-impl MetaStore for FjallMetaStore {
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.ks.get(key).map_err(fe)?.map(|v| decode_value(&v)))
-    }
-
-    fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
-        self.ks.insert(key, encode_value(value)).map_err(fe)
-    }
-
-    fn delete(&self, key: &[u8]) -> Result<()> {
-        self.ks.remove(key).map_err(fe)
-    }
-
-    fn atomic_batch(&self, items: &[(Vec<u8>, Option<Vec<u8>>)]) -> Result<()> {
-        if items.is_empty() {
-            return Ok(());
-        }
-        let mut batch = self.db.batch();
-        for (key, value) in items {
-            match value {
-                Some(value) => {
-                    let stored = encode_value(value);
-                    batch.insert(&self.ks, key.as_slice(), stored.as_slice());
-                }
-                None => batch.remove(&self.ks, key.as_slice()),
-            }
-        }
-        batch.commit().map_err(fe)
-    }
-
-    fn merge(&self, key: &[u8], delta: u64) -> Result<u64> {
-        let _guard = self.merge_lock.lock().unwrap();
-        let merged = merge_delta(self.get(key)?.as_deref(), delta)?;
-        self.put(key, merged.to_string().as_bytes())?;
-        Ok(merged)
-    }
-
-    fn count_prefix(&self, prefix: &[u8]) -> Result<usize> {
-        let mut n = 0usize;
-        for kv in self.ks.prefix(prefix) {
-            kv.into_inner().map_err(fe)?;
-            n += 1;
-        }
-        Ok(n)
-    }
-
-    fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        let mut out = Vec::new();
-        for kv in self.ks.prefix(prefix) {
-            let (k, v) = kv.into_inner().map_err(fe)?;
-            out.push((k.to_vec(), decode_value(&v)));
-        }
-        Ok(out)
-    }
-
-    fn scan_range(&self, start: &[u8], end: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        let mut out = Vec::new();
-        for kv in self.ks.range(start.to_vec()..end.to_vec()) {
-            let (k, v) = kv.into_inner().map_err(fe)?;
-            out.push((k.to_vec(), decode_value(&v)));
-        }
-        Ok(out)
-    }
-
-    fn flush(&self) -> Result<()> {
-        self.db.persist(PersistMode::SyncAll).map_err(fe)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::metastore_rocks::RocksMetaStore;
+    use crate::MetaStore;
     use tempfile::tempdir;
 
-    fn open() -> (tempfile::TempDir, FjallMetaStore) {
+    fn open() -> (tempfile::TempDir, RocksMetaStore) {
         let dir = tempdir().unwrap();
-        let s = FjallMetaStore::open(dir.path(), "catalog").unwrap();
+        let s = RocksMetaStore::open(dir.path()).unwrap();
         (dir, s)
-    }
-
-    #[test]
-    fn the_substrate_of_a_directory_is_detected() {
-        let dir = tempdir().unwrap();
-        // Nothing there yet: no substrate to detect.
-        assert_eq!(StoreBackend::detect(&dir.path().join("catalog")), None);
-
-        // A fjall store: a `keyspaces` directory.
-        let fjall = dir.path().join("fjall");
-        FjallMetaStore::open(&fjall, "catalog").unwrap();
-        assert_eq!(StoreBackend::detect(&fjall), Some(StoreBackend::Fjall));
-
-        // A RocksDB store: `CURRENT` and a `MANIFEST-*`.
-        let rocks = dir.path().join("rocks");
-        std::fs::create_dir_all(&rocks).unwrap();
-        std::fs::write(rocks.join("CURRENT"), b"MANIFEST-000001\n").unwrap();
-        std::fs::write(rocks.join("MANIFEST-000001"), b"").unwrap();
-        assert_eq!(StoreBackend::detect(&rocks), Some(StoreBackend::RocksDb));
-
-        // RocksDB is looked for first: a directory that carries both markers
-        // is read as a RocksDB, because that is what the reference writes.
-        let both = dir.path().join("both");
-        std::fs::create_dir_all(both.join("keyspaces")).unwrap();
-        std::fs::write(both.join("CURRENT"), b"MANIFEST-000001\n").unwrap();
-        assert_eq!(StoreBackend::detect(&both), Some(StoreBackend::RocksDb));
-    }
-
-    #[test]
-    fn compressed_values_roundtrip() {
-        let (_d, s) = open();
-        // A row-shaped value: thousands of repeated float fields.
-        let mut text = String::new();
-        for i in 0..4000 {
-            text.push_str(&format!("{:.6},", (i % 97) as f64 * 0.25));
-        }
-        s.put(b"row", text.as_bytes()).unwrap();
-        assert_eq!(s.get(b"row").unwrap().unwrap(), text.as_bytes());
-        s.atomic_write(&[(b"row2".to_vec(), text.as_bytes().to_vec())])
-            .unwrap();
-        assert_eq!(s.get(b"row2").unwrap().unwrap(), text.as_bytes());
-        let scan = s.scan_prefix(b"row").unwrap();
-        assert_eq!(scan.len(), 2);
-        assert_eq!(scan[0].1, text.as_bytes());
     }
 
     #[test]
@@ -444,11 +212,11 @@ mod tests {
     fn survives_reopen_after_flush() {
         let dir = tempdir().unwrap();
         {
-            let s = FjallMetaStore::open(dir.path(), "catalog").unwrap();
+            let s = RocksMetaStore::open(dir.path()).unwrap();
             s.put(b"persist", b"yes").unwrap();
             s.flush().unwrap();
         }
-        let s = FjallMetaStore::open(dir.path(), "catalog").unwrap();
+        let s = RocksMetaStore::open(dir.path()).unwrap();
         assert_eq!(s.get(b"persist").unwrap(), Some(b"yes".to_vec()));
     }
 }

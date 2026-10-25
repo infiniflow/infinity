@@ -201,12 +201,12 @@ pub(crate) fn rollback_pending(inner: &dyn MetaStore, catalog_dir: &Path) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use infinity_storage::FjallMetaStore;
+    use infinity_storage::RocksMetaStore;
     use tempfile::tempdir;
 
-    fn open() -> (tempfile::TempDir, Arc<FjallMetaStore>) {
+    fn open() -> (tempfile::TempDir, Arc<RocksMetaStore>) {
         let dir = tempdir().unwrap();
-        let store = Arc::new(FjallMetaStore::open(dir.path(), "catalog").unwrap());
+        let store = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
         (dir, store)
     }
 

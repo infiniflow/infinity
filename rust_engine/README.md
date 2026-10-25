@@ -9,7 +9,7 @@ remains the reference oracle.
 | crate | role | status |
 |---|---|---|
 | `infinity-common` | base types, errors | ✅ initial |
-| `infinity-storage` | WAL + MVCC + `MetaStore`(fjall) | ✅ M1 kernel |
+| `infinity-storage` | WAL + MVCC + `MetaStore`(RocksDB) | ✅ M1 kernel |
 | `infinity-catalog` | metadata over `MetaStore` | ✅ minimal |
 | `infinity-txn` | commit pipeline (WAL → KV) + recovery + concurrent-commit & crash-injection tests + **loom** model | ✅ minimal |
 | `infinity-parser` | hand-written lexer + recursive-descent SQL (`CREATE/DROP/INSERT` (**multi-row**)/`SELECT` w/ `WHERE`/`JOIN…ON`/`GROUP BY`/`ORDER BY`/`LIMIT`, projection, aggregates) | ✅ M2 |
@@ -25,7 +25,7 @@ remains the reference oracle.
 - **WAL** — CRC-32/IEEE framed append log (`magic|size|checksum|txn_id|commit_ts|payload`)
   with torn-tail and checksum tolerance, `replay_since`, and checkpoint truncation.
 - **MVCC** — timestamp-array `BlockVersion` (`created`/`deleted`), update = delete + append.
-- **MetaStore** — trait + pure-Rust `fjall` impl (atomic batch, snapshot reads, prefix scan, flush).
+- **MetaStore** — trait + RocksDB impl (atomic batch, prefix scan, flush); the substrate the reference uses.
 - **Catalog** — tables with persisted monotonic ids + name index.
 - **Txn** — `WriteWAL(serial) → KV atomic write`, idempotent WAL replay on recovery.
 

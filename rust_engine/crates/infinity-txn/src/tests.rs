@@ -1,11 +1,11 @@
 //! Tests for the commit pipeline, the typed WAL and the transaction manager.
 
 use super::*;
-use infinity_storage::FjallMetaStore;
+use infinity_storage::RocksMetaStore;
 use tempfile::tempdir;
 
 fn manager(dir: &std::path::Path) -> TxnManager {
-    let store = Arc::new(FjallMetaStore::open(dir.join("kv"), "default").unwrap());
+    let store = Arc::new(RocksMetaStore::open(dir.join("kv")).unwrap());
     TxnManager::open(dir.join("wal.log"), store).unwrap()
 }
 
@@ -18,7 +18,7 @@ fn commit_applies_to_kv() {
     let dir = tempdir().unwrap();
     {
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
+            Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
         let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
         let mut t = m.begin();
         t.put(b"a".to_vec(), b"1".to_vec());
@@ -46,7 +46,7 @@ fn recovery_replays_wal_after_reopen() {
         }
     }
     // fresh manager + fresh store: KV empty, WAL has 3 -> recover
-    let store = Arc::new(FjallMetaStore::open(dir.path().join("kv2"), "default").unwrap());
+    let store = Arc::new(RocksMetaStore::open(dir.path().join("kv2")).unwrap());
     let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
     assert_eq!(m.recover(0).unwrap(), 3);
     assert_eq!(store.get(b"k0").unwrap(), Some(b"v0".to_vec()));
@@ -63,7 +63,7 @@ fn concurrent_commits_are_serialized_and_durable() {
     const PER: u64 = 25;
     {
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
+            Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
         let mgr = Arc::new(TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap());
         let handles: Vec<_> = (0..THREADS)
             .map(|t| {
@@ -87,7 +87,7 @@ fn concurrent_commits_are_serialized_and_durable() {
     }
     // all rows are durable in KV
     let store: Arc<dyn MetaStore> =
-        Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
+        Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
     assert_eq!(
         store.scan_prefix(b"k").unwrap().len(),
         (THREADS * PER) as usize
@@ -110,7 +110,7 @@ fn truncated_wal_recovers_exactly_the_valid_prefix() {
     let wal = dir.path().join("wal.log");
     {
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
+            Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
         let m = TxnManager::open(&wal, store).unwrap();
         for i in 0..10u64 {
             let mut t = m.begin();
@@ -127,7 +127,7 @@ fn truncated_wal_recovers_exactly_the_valid_prefix() {
         let wal2 = d2.path().join("wal.log");
         std::fs::write(&wal2, &full[..cut]).unwrap();
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(d2.path().join("kv"), "default").unwrap());
+            Arc::new(RocksMetaStore::open(d2.path().join("kv")).unwrap());
         let m = TxnManager::open(d2.path().join("wal.log"), store.clone()).unwrap();
         m.recover(0).unwrap(); // must not panic
         let expected = WalManager::read_all(&wal2).unwrap().len();
@@ -182,7 +182,7 @@ fn append_is_a_typed_command_and_replays_the_same_rows() {
         .collect();
     {
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
+            Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
         let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
         let mut t = m.begin();
         for (key, value) in &expected {
@@ -215,7 +215,7 @@ fn append_is_a_typed_command_and_replays_the_same_rows() {
     }
 
     // Recovery into an empty KV reproduces the rows byte for byte.
-    let store = Arc::new(FjallMetaStore::open(dir.path().join("kv2"), "default").unwrap());
+    let store = Arc::new(RocksMetaStore::open(dir.path().join("kv2")).unwrap());
     let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
     m.recover(0).unwrap();
     assert_eq!(store.scan_prefix(b"row:").unwrap(), expected);
@@ -228,7 +228,7 @@ fn delete_is_a_typed_command_and_replays_the_tombstones() {
     let table = "default_db.t";
     {
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
+            Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
         let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
         let mut t = m.begin();
         t.delete(del_key(table, 3));
@@ -252,7 +252,7 @@ fn delete_is_a_typed_command_and_replays_the_tombstones() {
         other => panic!("expected a Delete command, got {other:?}"),
     }
 
-    let store = Arc::new(FjallMetaStore::open(dir.path().join("kv2"), "default").unwrap());
+    let store = Arc::new(RocksMetaStore::open(dir.path().join("kv2")).unwrap());
     let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
     m.recover(0).unwrap();
     assert_eq!(store.get(&del_key(table, 3)).unwrap(), Some(b"1".to_vec()));
@@ -267,7 +267,7 @@ fn typed_commands_replace_the_catalog_kv_batch() {
     let dir = tempdir().unwrap();
     {
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
+            Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
         let m = TxnManager::open(dir.path().join("wal.log"), store).unwrap();
         let mut t = m.begin();
         t.put(b"tbl:0000000000000001".to_vec(), b"catalog-record".to_vec());
@@ -293,7 +293,7 @@ fn catalog_writes_are_carried_as_a_kv_batch() {
     let value = b"catalog-record".to_vec();
     {
         let store: Arc<dyn MetaStore> =
-            Arc::new(FjallMetaStore::open(dir.path().join("kv"), "default").unwrap());
+            Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
         let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
         let mut t = m.begin();
         t.put(key.clone(), value.clone());
@@ -308,7 +308,7 @@ fn catalog_writes_are_carried_as_a_kv_batch() {
         }
         other => panic!("expected a KvBatch command, got {other:?}"),
     }
-    let store = Arc::new(FjallMetaStore::open(dir.path().join("kv2"), "default").unwrap());
+    let store = Arc::new(RocksMetaStore::open(dir.path().join("kv2")).unwrap());
     let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
     m.recover(0).unwrap();
     assert_eq!(store.get(&key).unwrap(), Some(value));
@@ -446,7 +446,7 @@ fn checkpoint_ts_skips_already_applied_records() {
             m.commit(t).unwrap();
         }
     }
-    let store = Arc::new(FjallMetaStore::open(dir.path().join("kv2"), "default").unwrap());
+    let store = Arc::new(RocksMetaStore::open(dir.path().join("kv2")).unwrap());
     let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
     // The three commits took timestamps 4, 6 and 8 (`open` spends the
     // recovery transaction's ts first): replaying past the first one leaves

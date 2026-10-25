@@ -1,30 +1,22 @@
-# Catalog 后端 FAQ：fjall ↔ RocksDB、磁盘兼容与 fsync
+# Catalog 后端 FAQ：RocksDB、磁盘兼容与 fsync
 
-这份文档回答三个反复出现的问题：**Rust 侧现在用哪个 catalog 后端**、**它和参考实现的目录能不能互相读**、**在哪些点上真的做了 fsync**。
+这份文档回答三个反复出现的问题：**Rust 侧用哪个 catalog 后端**、**它和参考实现的目录能不能互相读**、**在哪些点上真的做了 fsync**。
 
-实现位置：`crates/infinity-storage/src/metastore.rs`（fjall）、`crates/infinity-storage/src/metastore_rocks.rs`（RocksDB）、`crates/infinity-catalog/src/cpp_layout.rs`（C++ 键空间/值编码）、`crates/infinity-storage/src/wal.rs`（重做日志）。
+实现位置：`crates/infinity-storage/src/metastore.rs`（`MetaStore` trait）、`crates/infinity-storage/src/metastore_rocks.rs`（RocksDB，唯一实现）、`crates/infinity-catalog/src/cpp_layout.rs`（C++ 键空间/值编码）、`crates/infinity-storage/src/wal.rs`（重做日志）。
 
 ---
 
-## 1. 两个后端，什么时候用哪个
+## 1. 只有一个后端：RocksDB
 
-| | fjall（默认） | RocksDB（`--features rocksdb-store`） |
-|---|---|---|
-| 代码 | `FjallMetaStore`（纯 Rust LSM） | `RocksMetaStore`（rust-rocksdb 0.22） |
-| catalog 目录 | `<dir>/catalog`（fjall 键空间 `catalog`） | `<dir>/catalog`（**C++ 的键空间**：`catalog| db| tbl| col| idx| seg| blk|`） |
-| 行/元数据目录 | `<dir>/persistence`（fjall 键空间 `default`） | `<dir>/persistence`（RocksDB） |
-| 目录可被 C++ 打开 | ❌ | ✅ |
-| Catalog 语义 | `Catalog::with_store`（原生键空间 + 镜像） | `Catalog::with_store_cpp_only`（**只有** C++ 键空间，不写原生键空间） |
+| | |
+|---|---|
+| 代码 | `RocksMetaStore`（rust-rocksdb 0.25） |
+| catalog 目录 | `<dir>/catalog`（RocksDB；`catalog\| db\| tbl\| col\| idx\| seg\| blk\|` 与原生键空间同库） |
+| 行/元数据目录 | `<dir>/persistence`（RocksDB） |
+| 目录可被 C++ 打开 | ✅ 同一个底座、同一套键 |
+| Catalog 语义 | `Catalog::with_store`（原生键空间 + C++ 布局镜像；checkpoint 时把布局写全） |
 
-选择点在 `Engine::open_with_options`（`crates/infinity-executor/src/lib.rs:4534` 起）：开了 feature 就用 RocksDB 且 catalog 走 C++ 键空间，否则用 fjall 原生键空间。
-
-**结论**：要与参考实现互读目录，必须开 feature：
-
-```bash
-cd rust_engine && cargo build --release -p infinity-cli --features rocksdb-store
-```
-
-不开 feature 时，Rust 写的目录里根本没有 C++ 的键，C++ 打开只会看到一个空 schema——这会被误判成「格式不兼容」。
+没有 feature、没有探测器、没有离线转换工具：底座就是参考用的那个，所以同一个二进制打开两边写的目录都是同一段代码。
 
 ---
 
@@ -36,32 +28,9 @@ cd rust_engine && cargo build --release -p infinity-cli --features rocksdb-store
 | catalog 的表/列/索引记录 | ✅ 键与值都对齐 `KeyEncode`/`DataType::Serialize`（`cpp_layout.rs`） |
 | 次级索引 chunk | ✅ 类型化键（`KeyKind::{U64,F32,F64,I32,I64}`），C++ 的 FLOAT/DOUBLE/DATE/TIME 块可读 |
 | WAL | ✅ `wal/wal.log` 同时承载 checkpoint 帧与事务记录（checkpoint 时整文件改名成 `wal.log.<seal_ts>`，同 `WalManager::SwapWalFile`），帧体与参考逐字节相同 |
-| fjall 键空间本身 | ❌ 与 RocksDB 不同格式，只能 Rust 读 |
-| HNSW / 全文 / 二级索引的索引目录 | ✅ 各自有 chunk 镜像并登记 `catalog|idx_chunk|…|chunk_info` |
+| HNSW / 全文 / 二级索引的索引目录 | ✅ 各自有 chunk 镜像并登记 `catalog\|idx_chunk\|…\|chunk_info` |
 
-跨引擎门禁：`python/restart_test/test_cross_engine_compat.py`（C++ 写 → Rust 读，反之亦然，核对 catalog/数据/每个索引）。`rust_engine/scripts/run_gate_c.sh` 的跨引擎腿会自动构建带 feature 的二进制。
-
----
-
-## 2b. 探测、开关与转换
-
-**探测（自动）**：引擎打开一个目录时按目录内容选底座——先找 RocksDB 的标记（`CURRENT` / `MANIFEST-*`），没有再找 fjall 的（`keyspaces/`）。所以同一个二进制既能打开参考写的目录，也能打开本引擎写的目录；底座是**数据的属性**，不再是**构建的属性**。找不到标记（全新目录）时用构建的默认值。
-
-**开关（显式）**：`--catalog-engine=fjall|rocksdb`（或配置文件里的 `[storage] catalog_engine`）决定**新建**目录用哪种底座：
-
-```bash
-infinity serve /var/infinity --catalog-engine=rocksdb   # 写出的目录参考能直接打开
-infinity serve /var/infinity --catalog-engine=fjall     # 纯 Rust 存储
-```
-已存在的目录忽略这个开关：它按自己持有的底座打开。
-
-**转换（离线）**：`infinity-catalog-convert` 在两种底座之间搬一个数据目录的 store：
-
-```bash
-infinity-catalog-convert --dir <data-dir> --from fjall --to rocksdb   # 交给参考
-infinity-catalog-convert --dir <data-dir> --from rocksdb --to fjall   # 给纯 Rust 引擎读
-```
-复制走 `MetaStore` trait 而不是文件：fjall 对大 value 做了 LZ4 压缩，文件级拷贝会把压缩字节带进 RocksDB，参考读到的是垃圾。转换器是**唯一**依赖 RocksDB 底座的 crate，所以引擎可以只留在 fjall，跨引擎互操作变成一个显式的、可测试的步骤。目标 store 在源旁边建好再换入，失败时原目录不动；源 store 在换目录**之前**关闭——否则还没关的 store 会把 `CURRENT`/`MANIFEST` 刷进新目录，让探测选错底座。
+跨引擎门禁：`python/restart_test/test_cross_engine_compat.py`（C++ 写 → Rust 读，反之亦然，核对 catalog/数据/每个索引）。`rust_engine/scripts/run_gate_c.sh` 的跨引擎腿直接用它构建出来的 `infinity` 二进制。
 
 ## 3. fsync 在哪些点上
 
@@ -73,7 +42,6 @@ infinity-catalog-convert --dir <data-dir> --from rocksdb --to fjall   # 给纯 R
 | `WalManager::flush` | `file.sync_all()` | checkpoint / shutdown / FLUSH 的屏障 |
 | `WalManager::rotate` | 先 `sync_all()` 再 rename | 封存日志段前 |
 | `WalManager::truncate_all` | `set_len(0)` + `sync_all()` | 日志被清空时 |
-| `FjallMetaStore::flush` | `db.persist(PersistMode::SyncAll)` | **fjall 唯一的 fsync 点**，整个库落盘 |
 | `RocksMetaStore::flush` | `db.flush()` + `db.flush_wal(true)` | `flush` 只把 memtable 写成 SST，**只有 `flush_wal(true)` 才让日志真正落盘**；两者都做才是持久化屏障 |
 | checkpoint 条目 `wal/wal.log` | 写完 `sync_all()` | 这个文件是参考判断「目录有没有 checkpoint」的唯一依据，掉电丢了参考就会拒绝打开目录 |
 | `MetaStore::put` / `delete` / `atomic_batch` | 不 fsync | 由上面的 `flush()` 统一兜底 |
@@ -86,14 +54,14 @@ infinity-catalog-convert --dir <data-dir> --from rocksdb --to fjall   # 给纯 R
 
 ## 4. 常见坑
 
-1. **跨引擎测试必须带 feature 构建**，否则 Rust 起在空 catalog 上，症状是「两边都读不到数据」，与格式无关。
+1. **同一个目录只能有一个进程打开**：RocksDB 在目录里加锁，上一个引擎没退干净再开就会 `lock hold by current process`。测试前 `pkill -x infinity`。
 2. **不要留下 0 字节的 `wal/wal.log`**：参考把空日志当成坏条目（`Found unexpected bad wal entry`），删除它又会变成 `WAL replay: No checkpoint found in wal`。正确做法是写入一条合法的 checkpoint 条目。
 3. **参考必须能在 WAL 里找到 checkpoint**：任何有数据的目录都要有 `kNewCheckpoint` 条目，`max_checkpoint_ts` 从它来。
 4. **变长列必须写 `col_{id}_out`**：`ColumnMeta::FilePaths` 会为 kVarBuffer 类型列出这个 outline 文件，缺失即 abort 整个块读取。
 5. **BMP 倒排表按列声明的 bound 定尺寸**（不是去重 term 数）：参考读该文件时段与段之间没有长度字段，term 数少一个就整体错位。
-6. **端口 23817**：参考不设 `SO_REUSEADDR`，上一个引擎没退干净就会 `Address already in use`；测试前 `pkill -x infinity`。另外，SDK 关闭连接后**服务端**会进 `TIME_WAIT`（Linux 60s），这期间参考绑不上 23817——所以端口等待要超过 60s。
+6. **端口 23817**：参考不设 `SO_REUSEADDR`，上一个引擎没退干净就会 `Address already in use`；另外 SDK 关闭连接后**服务端**会进 `TIME_WAIT`（Linux 60s），这期间参考绑不上 23817——所以端口等待要超过 60s。
 7. **索引数量会影响参考自己**：一张有 6 个索引的表让参考在自己的 index-dump 任务里 abort（"Dump index ... Aborted"，正在把全文索引的 FST 并进字典）。只有 2 个索引、其中一个是 DATE 次级索引时正常，所以触发条件更像是索引个数而不是类型；这条还没查清，跨引擎测试因此不给 DATE 列建次级索引。
-7. **数据目录必须落磁盘**，不能用 tmpfs（Gate C 的导入用例会把 tmpfs 撑爆并报 ENOSPC）。
+8. **数据目录必须落磁盘**，不能用 tmpfs（Gate C 的导入用例会把 tmpfs 撑爆并报 ENOSPC）。
 
 ---
 
@@ -107,7 +75,7 @@ cargo test -p infinity-txn --lib            # WAL / 恢复
 cargo test -p infinity-storage --test crash_consistency
 
 # 双引擎交接（C++ ↔ Rust），两个方向都要过
-cd rust_engine && cargo build --release -p infinity-cli --features rocksdb-store
+cd rust_engine && cargo build --release -p infinity-cli
 INFINITY_CPP_BIN=$PWD/../cmake-build-debug/src/infinity \
   ../.venv/bin/python -m pytest -q ../python/restart_test/test_cross_engine_compat.py
 ```

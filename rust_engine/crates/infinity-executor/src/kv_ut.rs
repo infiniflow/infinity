@@ -13,7 +13,7 @@
 //! - `kv_utility` `test1` — catalog key spelling and the timestamp suffix.
 
 use infinity_storage::catalog_format::{catalog_db_key, catalog_table_key, get_timestamp_from_key};
-use infinity_storage::{FjallMetaStore, MetaStore};
+use infinity_storage::{MetaStore, RocksMetaStore};
 use tempfile::tempdir;
 
 /// C++: `kv_store_ut.cpp:446` (`kv_store6`).
@@ -24,7 +24,7 @@ use tempfile::tempdir;
 #[test]
 fn kv_store6_prefix_iteration_and_flush() {
     let dir = tempdir().unwrap();
-    let store = FjallMetaStore::open(dir.path(), "default").unwrap();
+    let store = RocksMetaStore::open(dir.path()).unwrap();
 
     let pairs = [
         ("key1", "value1"),

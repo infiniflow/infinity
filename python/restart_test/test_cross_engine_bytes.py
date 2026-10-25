@@ -980,9 +980,9 @@ def _catalog_pairs(root, pg_port):
     compares both engines' text as it stands.
 
     The reference is started on the directory to read it, so the port's
-    catalog must be in the C++ key space - which is what the port's
-    `rocksdb-store` build writes. Without it the reference opens an empty
-    catalog and the comparison is meaningless, so the caller skips it.
+    catalog must be in the C++ key space - which is the only catalog the port
+    keeps. Without it the reference opens an empty catalog and the comparison
+    is meaningless, so the caller skips it.
     """
     _wait_port_free()
     config = os.path.join(root, "reader.toml")
@@ -1314,9 +1314,9 @@ def test_the_two_engines_write_the_same_bytes():
     # `index_size` of a graph-shaped chunk (HNSW, BMP) is taken out
     # as well, for the reason given in `_normalize_catalog`.
     #
-    # The port writes the C++ key space only in its `rocksdb-store` build;
-    # without it the reference opens an empty catalog and there is nothing to
-    # compare, so the check is skipped rather than failed.
+    # The port keeps the C++ key space as its only catalog; an empty one means
+    # the directory holds no schema, so the check is skipped rather than
+    # failed.
     zero_size_indexes = {
         index_id
         for index_id, kind in INDEX_KINDS.items()
@@ -1333,7 +1333,7 @@ def test_the_two_engines_write_the_same_bytes():
     if not rust_catalog:
         pytest.skip(
             "the port's catalog is not in the C++ key space; "
-            "build it with `--features rocksdb-store`"
+            "the port must be built on RocksDB (the only substrate)"
         )
     assert set(cpp_catalog) == set(rust_catalog), (
         f"only in cpp: {sorted(set(cpp_catalog) - set(rust_catalog))}, "
@@ -3707,7 +3707,7 @@ def test_a_multi_segment_table_matches_across_segments():
     if not rust_pairs:
         pytest.skip(
             "the port's catalog is not in the C++ key space; "
-            "build it with `--features rocksdb-store`"
+            "the port must be built on RocksDB (the only substrate)"
         )
     only_cpp = sorted(set(cpp_pairs) - set(rust_pairs))
     only_rust = sorted(set(rust_pairs) - set(cpp_pairs))
