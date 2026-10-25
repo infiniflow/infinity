@@ -43,9 +43,7 @@
 
 | 项 | 为什么没覆盖 |
 |---|---|
-| 带索引的 8M 行表 | 只测了无索引的容量切分；带索引按 `mem_index_capacity` 切 chunk，分钟级 |
-| 三段以上的容量切分 | 只测两段 |
-| PLAID / EMVB / MULTIVECTOR chunk 字节 | 只有重写版自身单测 |
+| PLAID / EMVB / MULTIVECTOR chunk 字节 | 重写版已有编码器（PLAID 的 `write_cpp_plaid_index`、EMVB 的 `encode_emvb`、SMVE 的投影矩阵已与参考逐位相同），但还没有把三者的 chunk 发布进 C++ 镜像并与参考对比的用例 |
 
 ## 5 已登记的行为差异（性能/口径，不是待办）
 

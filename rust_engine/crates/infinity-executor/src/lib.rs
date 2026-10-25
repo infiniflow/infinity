@@ -12780,10 +12780,14 @@ impl Engine {
     /// Rows committed per block while streaming a `COPY … FROM`.
     const COPY_BATCH_ROWS: usize = 8192;
     /// Rows one `COPY` stages into its single transaction before it commits
-    /// early. The reference imports a whole statement in one transaction; the
-    /// bound only exists so a stress import (millions of rows) does not hold
-    /// every encoded row in memory at once.
-    const IMPORT_TXN_ROWS: usize = 1_048_576;
+    /// early. The reference imports a whole statement in one transaction, so
+    /// splitting is a divergence: every extra commit spends a ts and moves
+    /// `version`'s `create_ts` away from the reference's (measured: 8.39M rows
+    /// with an index, 16 batches, ts 28 against 12). The bound now sits above
+    /// the segment capacity so a capacity split still imports in one
+    /// transaction; it only exists so a stress import that several engines
+    /// would split anyway does not hold every encoded row at once.
+    const IMPORT_TXN_ROWS: usize = 33_554_432;
 
     /// Number of segments `table` has: at least one per write batch, and more
     /// when a single import exceeds the segment capacity.
