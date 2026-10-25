@@ -43,7 +43,9 @@
 
 | 项 | 为什么没覆盖 |
 |---|---|
-| PLAID / EMVB / MULTIVECTOR chunk 字节 | PLAID 的 `chunk_0.idx`、EMVB 的 `encode_emvb`、SMVE 的投影矩阵都已与参考同源，但 SMVE chunk 的 BMP 段仍对不上：参考用 `BMPCompressType::kCompressed`（`BMPHandler::Make(..., BMP_BLOCK_SIZE, kCompressed)`），`bmp_cpp::encode_bmp` 只有未压缩布局（实测 BMP 段 107,608 B vs 参考 35,584 B，固定区 32,784 B 两边一致）。另外 `plaid_centroids.bin`（参考 317 B）未写，`CREATE INDEX … USING EMVB` 缺 `pq_subspace_num` 时参考报 3061、端口接受 |
+| 项 | 为什么没覆盖 |
+|---|---|
+| PLAID / EMVB / SMVE chunk 字节 | 端口已按参考的时序写这三类的 `chunk_0.idx`（`CREATE INDEX` 建内存索引、INSERT 追加、flush dump），但**参考侧本身不完备**：`TENSOR(FLOAT,4)` 上 `USING SMVE` 的 chunk 实测 `term_num=2048`、IVT 条目 0、32 个块全部为空（`src/unit_test` 里没有 SMVE 用例），而端口把 500 篇文档编进了索引（68,368 B vs 140,392 B）。要逐字节比就得先确认参考什么时候会产出非空的 SMVE 索引 |
 
 ## 5 已登记的行为差异（性能/口径，不是待办）
 
