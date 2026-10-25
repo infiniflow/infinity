@@ -1,5 +1,7 @@
 # C++ 单元测试覆盖审计
 
+> **子目标 S4 · 用例级覆盖不漏**｜纲领见 [`PORTING.md`](PORTING.md) §5
+
 `src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 48, `exempt` 13, `ported` 951。
 
 - `ported`：Rust 有同等场景的用例，映射列给出 `crate 模块::测试名`。少数以 native 组件等价替代 C++ 第三方（例如 RocksDB 事务 KV → `txn_kv`、后台线程池 → `bg_task`），映射列直接指向替代实现，不声称字节级一致。

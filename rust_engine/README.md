@@ -2,7 +2,8 @@
 
 The Rust re-implementation of the Infinity engine, per [`../RUST_REWRITE_PLAN.md`](../RUST_REWRITE_PLAN.md).
 This is a **clean-room rewrite** built milestone by milestone; the C++ engine
-remains the reference oracle.
+remains the reference oracle. Goals, methodology and the current gap list are in
+[`docs/PORTING.md`](docs/PORTING.md).
 
 ## Layout (§4.1)
 

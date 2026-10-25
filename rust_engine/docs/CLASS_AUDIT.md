@@ -1,5 +1,7 @@
 # C++ 类级覆盖审计（逐名）
 
+> **子目标 S3 · 类级覆盖不漏**｜纲领见 [`PORTING.md`](PORTING.md) §5
+
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担于 cast）；geo 用例的排除见 `TEST_AUDIT.md`，DiskANN 15 类在本表 `excluded`。
 
 - 总数：**1136**

@@ -1,5 +1,7 @@
 # 现状缺口清单
 
+> **子目标 S8 · 缺口收口**｜纲领见 [`PORTING.md`](PORTING.md) §5
+
 本文件是**唯一**的缺口汇总：哪些地方与参考不同、为什么、影响是什么。分四类：
 
 - **§1 有意不移植**：已经决定不做，不是待办；
@@ -8,7 +10,7 @@
 - **§4 覆盖不到的输入空间**：机制有了，门禁还没跑到那个规模/形态。
 
 格式层面的逐文件细节在 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §5；逐类/逐用例的映射状态在
-[`CLASS_AUDIT.md`](CLASS_AUDIT.md)（`partial` / `gap` 行）与 [`TEST_AUDIT.md`](TEST_AUDIT.md)（`gap` 行）。
+[`CLASS_AUDIT.md`](CLASS_AUDIT.md)（`partial` 行）与 [`TEST_AUDIT.md`](TEST_AUDIT.md)（`excluded` 行，对应本文 §1 的不移植决定）。
 **已接受的设计变更**（不是待办）登记在 [`CLASS_MAP.md`](CLASS_MAP.md)「有意的设计变更」，本文不重复。
 
 ---
