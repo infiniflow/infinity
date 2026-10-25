@@ -123,10 +123,10 @@ mod table_ut;
 #[cfg(test)]
 mod gate_b_executor_ut;
 
+mod snapshot;
 #[cfg(test)]
 mod upload_meta_to_s3_ut;
 mod wal_ddl;
-mod snapshot;
 
 pub mod data_table;
 
@@ -1259,7 +1259,7 @@ fn typed_append_block(
         let mut port_types = Vec::with_capacity(port_indexes.len());
         for &i in &port_indexes {
             let lt = port_logical_type(&types[i])?;
-            columns.push(Column::new(lt.clone())?);
+            columns.push(Column::new(lt)?);
             logical_types.push(lt);
             port_types.push(declared[i].clone());
         }
@@ -1363,7 +1363,7 @@ fn sparse_column(
         let mut indices = Vec::with_capacity(pairs.len() * index_width);
         let mut raw = Vec::with_capacity(pairs.len() * value_width);
         for (index, value) in &pairs {
-            pack_integer(&mut indices, *index as i64, *index_type)?;
+            pack_integer(&mut indices, *index, *index_type)?;
             pack_float(&mut raw, *value, *value_type)?;
         }
         values.push(Some((pairs.len() as i64, indices, raw)));
@@ -1394,7 +1394,7 @@ fn literal_numbers(lit: &Literal) -> Option<Vec<f64>> {
 /// `"[1,2,3]"` (any nesting) -> its numbers in order.
 fn parse_number_list(text: &str) -> Option<Vec<f64>> {
     let mut out = Vec::new();
-    for token in text.split(|c: char| c == '[' || c == ']' || c == ',') {
+    for token in text.split(['[', ']', ',']) {
         let token = token.trim();
         if token.is_empty() {
             continue;
@@ -1970,9 +1970,10 @@ fn expr_column(e: &ExprAst) -> Option<String> {
     match e {
         ExprAst::Column(c) => Some(bare_column_name(c)),
         ExprAst::Func { args, .. } => args.iter().find_map(expr_column),
-        ExprAst::Binary(a, _, b) | ExprAst::Cmp(a, _, b) | ExprAst::And(a, b) | ExprAst::Or(a, b) => {
-            expr_column(a).or_else(|| expr_column(b))
-        }
+        ExprAst::Binary(a, _, b)
+        | ExprAst::Cmp(a, _, b)
+        | ExprAst::And(a, b)
+        | ExprAst::Or(a, b) => expr_column(a).or_else(|| expr_column(b)),
         ExprAst::Not(a) => expr_column(a),
         ExprAst::Literal(_) => None,
     }
@@ -2280,6 +2281,81 @@ fn sparse_store_hints(columns: &[ColumnDef]) -> Vec<Option<CatalogSparseStore>> 
             })
         })
         .collect()
+}
+
+/// C++ `DataType::SupportBloomFilter()` (`data_type.h:149`): the types
+/// `CREATE TABLE … WITH (bloom_filter_columns = …)` accepts. `DECIMAL` and
+/// `HUGEINT` are on the reference's list but its DDL rejects both column types,
+/// so they cannot be reached.
+fn supports_bloom_filter(type_text: &str) -> bool {
+    let t = type_text.trim().to_ascii_uppercase();
+    let head = t.split(['(', ',']).next().unwrap_or("").trim();
+    matches!(
+        head,
+        "BOOLEAN"
+            | "TINYINT"
+            | "SMALLINT"
+            | "INTEGER"
+            | "INT"
+            | "BIGINT"
+            | "HUGEINT"
+            | "DECIMAL"
+            | "VARCHAR"
+            | "DATE"
+            | "TIME"
+            | "DATETIME"
+            | "TIMESTAMP"
+    )
+}
+
+/// The per-column `build_bloom_filter_` flags from `CREATE TABLE … WITH
+/// (bloom_filter_columns = 'c1, c2')` (`logical_planner_impl.cpp:690`).
+///
+/// The reference splits the value on `,`, trims spaces (only spaces), resolves
+/// each name to a column id, sorts and dedupes the ids, and refuses a type that
+/// cannot carry a bloom filter. A repeated property name is a syntax error and
+/// unknown names are ignored.
+fn bloom_filter_flags(
+    opts: &[(String, String)],
+    names: &[String],
+    types: &[String],
+    table: &str,
+) -> Result<Vec<bool>> {
+    let mut flags = vec![false; names.len()];
+    let mut seen: std::collections::HashSet<&str> = Default::default();
+    for (key, value) in opts {
+        if !seen.insert(key.as_str()) {
+            return Err(Error::Invalid(format!(
+                "Duplicate table property param name: {key}"
+            )));
+        }
+        if !key.eq_ignore_ascii_case("BLOOM_FILTER_COLUMNS") {
+            continue;
+        }
+        let mut ids: Vec<usize> = Vec::new();
+        for raw in value.split(',') {
+            let name = raw.trim_matches(' ');
+            let Some(id) = names.iter().position(|n| n == name) else {
+                return Err(Error::Invalid(format!(
+                    "Column {name} not found in table {table}"
+                )));
+            };
+            ids.push(id);
+        }
+        ids.sort_unstable();
+        ids.dedup();
+        for id in ids {
+            if !supports_bloom_filter(&types[id]) {
+                return Err(Error::Invalid(format!(
+                    "Bloom filter can't be created for {} type column {}",
+                    describe_type(&types[id]),
+                    names[id]
+                )));
+            }
+            flags[id] = true;
+        }
+    }
+    Ok(flags)
 }
 
 /// Width of a sparse column's index element (`SPARSE(FLOAT, INT8)` etc.).
@@ -5285,7 +5361,6 @@ fn is_blob_type(t: &str) -> bool {
     is_embedding_type(t) || is_tensor_type(t) || is_sparse_type(t)
 }
 
-
 /// Open options (the reference's `InfinityContext` configuration relevant to
 /// durability).
 #[derive(Debug, Clone)]
@@ -7803,6 +7878,63 @@ impl Engine {
         let _ = self.write_id_log(&append_copy_key(&tkey), &kinds);
     }
 
+    /// Rewrites the append log after a compaction merged `sources` into a new
+    /// segment of `new_rows` rows.
+    ///
+    /// The log is cumulative over the table's rows in segment-id order, which
+    /// is the order the mirror lays segments out in. A compaction removes the
+    /// merged segments' rows and appends the new segment's, so every boundary
+    /// after a removed segment shifts down by the rows removed before it, the
+    /// boundaries *inside* a removed segment disappear, and the new segment's
+    /// single append goes last. A merge of every segment therefore leaves one
+    /// entry, and a partial merge keeps the untouched segments' `version`
+    /// batches exactly as they were.
+    ///
+    /// Returns `(totals, ts, copy)` in the shape the three logs are stored in.
+    fn rebase_appends(
+        &self,
+        table: &str,
+        layout: &[(u32, u64)],
+        sources: &std::collections::HashSet<u32>,
+        new_rows: u64,
+        new_ts: u64,
+    ) -> (Vec<u64>, Vec<u64>, Vec<u64>) {
+        let old_totals = self.append_totals(table);
+        let old_ts = self.append_ts(table);
+        let old_copy = self.append_copy(table);
+        let mut out = (Vec::new(), Vec::new(), Vec::new());
+        // Walk the old boundaries next to the layout that produced them, so a
+        // boundary is dropped exactly when its segment was merged away.
+        let mut segment_start = 0u64;
+        let mut removed = 0u64;
+        let mut i = 0usize;
+        for (segment, rows) in layout {
+            let segment_end = segment_start + rows;
+            let merged = sources.contains(segment);
+            while i < old_totals.len() && old_totals[i] <= segment_end {
+                let total = old_totals[i];
+                if !merged && total > segment_start {
+                    let shifted = total - removed;
+                    if out.0.last().is_none_or(|last| *last < shifted) {
+                        out.0.push(shifted);
+                        out.1.push(old_ts.get(i).copied().unwrap_or(0));
+                        out.2.push(old_copy.get(i).copied().unwrap_or(0));
+                    }
+                }
+                i += 1;
+            }
+            if merged {
+                removed += rows;
+            }
+            segment_start = segment_end;
+        }
+        let base = out.0.last().copied().unwrap_or(0);
+        out.0.push(base + new_rows);
+        out.1.push(new_ts);
+        out.2.push(1);
+        out
+    }
+
     /// Per-append provenance, aligned with [`Self::append_totals`].
     fn append_copy(&self, table: &str) -> Vec<u64> {
         let tkey = self.table_key(table);
@@ -8608,11 +8740,13 @@ impl Engine {
         };
         let bare = table.rsplit('.').next().unwrap_or(table).to_string();
         let prefix = format!("tbl|col|{db_id}|{table_id}|{column}|");
-        for (k, v) in self
+        if let Some((k, v)) = self
             .storage
             .catalog
             .store()
             .scan_prefix(prefix.as_bytes())?
+            .into_iter()
+            .next()
         {
             let key = String::from_utf8_lossy(&k).into_owned();
             let id = crate::wal_ddl::ColumnRecord::from_json(&String::from_utf8_lossy(&v))
@@ -8792,14 +8926,7 @@ impl Engine {
         Ok(String::new())
     }
 
-    fn ddl_commit<T>(&self, f: impl FnOnce() -> Result<T>) -> Result<T> {
-        self.ddl_commit_typed(f, |batch| {
-            crate::wal_ddl::create_table_command_from_batch(batch)
-        })
-    }
-
-    /// Like [`Self::ddl_commit`], but lets the caller turn the captured batch
-    /// into the reference's typed WAL command (`WalCmdCreateTableV2`,
+    /// Turns the captured batch into the reference's typed WAL command (`WalCmdCreateTableV2`,
     /// `WalCmdCreateIndexV2`, …). The catalog writes are still applied to the
     /// store by `commit_at`; replay deliberately skips typed DDL (the catalog
     /// is durable at commit), so this only changes the WAL's bytes.
@@ -8934,7 +9061,11 @@ impl Engine {
 
     fn execute_stmt_inner(&self, stmt: &Statement) -> Result<QueryResult> {
         match stmt {
-            Statement::CreateTable { name, columns } => {
+            Statement::CreateTable {
+                name,
+                columns,
+                opts,
+            } => {
                 // A sparse column written as `SPARSE(elem, dim)` may declare 0
                 // (an unknown bound); a negative one is invalid.
                 for c in columns {
@@ -9019,17 +9150,55 @@ impl Engine {
                 let comments: Vec<Option<String>> =
                     columns.iter().map(|c| c.comment.clone()).collect();
                 let sparse_stores = sparse_store_hints(columns);
-                let t = self.ddl_commit(|| {
-                    self.create_table_clearing_orphans(
-                        name,
-                        &names,
-                        &defaults,
-                        &not_nulls,
-                        &types,
-                        &comments,
-                        &sparse_stores,
-                    )
-                })?;
+                // `WITH (bloom_filter_columns = '…')`: which columns ask for a
+                // binary-fuse prefilter (`logical_planner_impl.cpp:690`).
+                // The reference's message names the table without its schema
+                // (`*table_def_ptr->table_name()`).
+                let bloom = bloom_filter_flags(
+                    opts,
+                    &names,
+                    &types,
+                    name.rsplit('.').next().unwrap_or(name),
+                )?;
+                let t = self.ddl_commit_typed(
+                    || {
+                        self.create_table_clearing_orphans(
+                            name,
+                            &names,
+                            &defaults,
+                            &not_nulls,
+                            &types,
+                            &comments,
+                            &sparse_stores,
+                        )
+                    },
+                    // The reference puts the flag into the WAL command itself
+                    // (`TableDef::WriteAdv` -> `ColumnDef::WriteAdv`), not into
+                    // the catalog, whose `ColumnDef::ToJson` omits it.
+                    |batch| {
+                        let cmd = crate::wal_ddl::create_table_command_from_batch(batch)?;
+                        match cmd {
+                            infinity_storage::WalCmd::CreateTable {
+                                db_name,
+                                db_id,
+                                table_id,
+                                mut table_def,
+                            } => {
+                                for (i, column) in table_def.columns.iter_mut().enumerate() {
+                                    column.build_bloom_filter =
+                                        bloom.get(i).copied().unwrap_or(false);
+                                }
+                                Some(infinity_storage::WalCmd::CreateTable {
+                                    db_name,
+                                    db_id,
+                                    table_id,
+                                    table_def,
+                                })
+                            }
+                            other => Some(other),
+                        }
+                    },
+                )?;
                 Ok(QueryResult::CreatedTable {
                     id: t.id,
                     name: t.name,
@@ -9620,7 +9789,7 @@ impl Engine {
                         Statement::Delete { table, where_pred } if logical => Some(
                             crate::explain::explain_logical_delete(table, where_pred.as_ref()),
                         ),
-                        Statement::CreateTable { name, columns } => {
+                        Statement::CreateTable { name, columns, .. } => {
                             let (db, tbl) = match name.split_once('.') {
                                 Some((d, t)) => (d.to_string(), t.to_string()),
                                 None => ("default_db".to_string(), name.clone()),
@@ -12864,10 +13033,10 @@ impl Engine {
         })
     }
 
-    /// Merges every segment of `table` into one new segment: the live rows are
-    /// re-keyed contiguously from the new segment's base row id, tombstones are
-    /// dropped and the write-batch counter is reset, so `SHOW SEGMENTS` reports
-    /// a single segment.
+    /// Merges the segments `NewCompactionAlg` picks into one new segment: their
+    /// live rows are re-keyed contiguously from the new segment's base row id,
+    /// their tombstones are dropped, and every other segment is left exactly as
+    /// it was.
     ///
     /// The reference (`NewTxn::Compact`) writes the merged rows into a fresh
     /// segment whose id is one past the highest existing segment id; the source
@@ -12880,10 +13049,11 @@ impl Engine {
         // picks nothing the reference opens **no** transaction and leaves the
         // directory untouched; merging anyway would move every row and spend a
         // timestamp it never spends.
-        if self.compaction_candidates(table).is_empty() {
+        let candidates = self.compaction_candidates(table);
+        if candidates.is_empty() {
             return Ok(());
         }
-        self.compact_all_segments(table)
+        self.compact_segments(table, &candidates)
     }
 
     /// C++ `CompactionProcessor::NewNotifyCompact`
@@ -12977,20 +13147,47 @@ impl Engine {
     /// it merges unconditionally — even a single segment, which the manual and
     /// periodic tasks would never choose.
     pub fn compact_all_segments(&self, table: &str) -> Result<()> {
+        let all = self.segment_ids(table);
+        self.compact_segments(table, &all)
+    }
+
+    /// `NewTxn::Compact(db, table, segment_ids)`: merge exactly `sources` into
+    /// one new segment and leave every other segment alone.
+    ///
+    /// The reference passes the ids `NewCompactionAlg` picked - at most
+    /// `DBT_COMPACTION_M` (4) of them - so a table with more than four live
+    /// segments keeps the rest: only the four become deprecated and the merged
+    /// segment takes the next id after **every** segment, not after the picked
+    /// ones (`SystemCache::ApplySegmentIDs`).
+    fn compact_segments(&self, table: &str, sources: &[u32]) -> Result<()> {
         // Compaction rewrites segments, so both the manual and the periodic
         // task require `kWritable` (`compaction_process_impl.cpp:270-295`).
         self.ensure_writable()?;
         self.invalidate_row_cache(table);
-        // Rows are re-keyed below; the mirror's row-id snapshot stops matching
-        // the moment the first row moves.
+        // Compaction moves rows between segments without changing how many are
+        // live, so the counter survives even though the mirror's row-id
+        // snapshot does not (it stops matching the moment the first row moves).
+        let live_rows = self.live_row_count(table)?;
         self.invalidate_block_mirror(table);
-        let rows = self.fetch_rows_with_ids(table)?;
-        // The segments this compaction consumes: the reference keeps their
-        // files and catalog records and only marks them deprecated.
-        let sources = self.segment_ids(table);
-        // `SegmentMeta` ids are never reused: the merged segment takes the next
-        // id after every segment this table has ever used.
-        let next_seg = sources.iter().copied().max().map_or(0, |id| id + 1);
+        let sources: std::collections::HashSet<u32> = sources.iter().copied().collect();
+        let mut source_ids: Vec<u32> = sources.iter().copied().collect();
+        source_ids.sort_unstable();
+        // The layout the row ids were allocated in, before anything moves:
+        // `next_seg` counts from every segment, and the append log is rebased
+        // against it.
+        let layout = self.segment_row_counts(table);
+        let next_seg = layout
+            .iter()
+            .map(|(id, _)| *id)
+            .max()
+            .map_or(0, |id| id + 1); // Only the picked segments' rows move. A row id carries its segment in
+                                     // the high 32 bits, so the journal is filtered rather than re-scanned
+                                     // per segment.
+        let rows: Vec<(usize, Vec<Value>)> = self
+            .fetch_rows_with_ids(table)?
+            .into_iter()
+            .filter(|(seq, _)| sources.contains(&((seq >> 32) as u32)))
+            .collect();
         // The new segment starts at its own row-id base (`segment_id << 32`).
         let base = (next_seg as usize) << 32;
         // Renumber through the transaction so WAL replay reproduces the
@@ -13015,7 +13212,7 @@ impl Engine {
         // (`new_txn_data_impl.cpp:753`), followed by the compaction's own
         // `DumpIndexV2` per index (`:502`; `CompactTxnStore` leaves the
         // `table_key` empty, so the port does too).
-        let mut cmds = vec![self.compact_command(table, next_seg, rows.len(), &sources)?];
+        let mut cmds = vec![self.compact_command(table, next_seg, rows.len(), &source_ids)?];
         cmds.extend(self.dump_index_commands(table, next_seg, rows.len(), "")?);
         t.set_typed_commands(cmds);
         let compact_ts = if !rows.is_empty() {
@@ -13025,21 +13222,34 @@ impl Engine {
         };
         // Drop every source position that no compacted row reuses. The
         // destination positions are exactly `[base, base + rows.len())`; every
-        // other key is an old copy (including rows deleted before the
-        // compaction that therefore never appear in `rows`) and must go, or a
-        // later scan would see it again.
+        // other key inside a merged segment is an old copy (including rows
+        // deleted before the compaction that therefore never appear in `rows`)
+        // and must go, or a later scan would see it again. Rows of segments
+        // that were not merged stay where they are.
         let dests: std::collections::HashSet<usize> = (0..rows.len()).map(|i| base + i).collect();
         for (k, _) in self.storage.store.scan_prefix(&row_prefix(table))? {
             let seq = std::str::from_utf8(&k)
                 .ok()
                 .and_then(|s| s.rsplit(':').next())
                 .and_then(|s| s.parse::<usize>().ok());
-            if seq.is_none_or(|seq| !dests.contains(&seq)) {
-                self.storage.store.delete(&k)?;
+            match seq {
+                Some(seq) if !sources.contains(&((seq >> 32) as u32)) || dests.contains(&seq) => {}
+                _ => {
+                    self.storage.store.delete(&k)?;
+                }
             }
         }
         for (k, _) in self.storage.store.scan_prefix(&del_prefix(table))? {
-            self.storage.store.delete(&k)?;
+            let seq = std::str::from_utf8(&k)
+                .ok()
+                .and_then(|s| s.rsplit(':').next())
+                .and_then(|s| s.parse::<usize>().ok());
+            match seq {
+                Some(seq) if !sources.contains(&((seq >> 32) as u32)) => {}
+                _ => {
+                    self.storage.store.delete(&k)?;
+                }
+            }
         }
         let key = self.table_key(table);
         {
@@ -13047,9 +13257,10 @@ impl Engine {
             let entry = tables.entry(key).or_default();
             entry.row_counter = Some((next_seg, rows.len() as u32, true));
             entry.write_batches = 1;
-            // The merged rows all live in the new segment; the source segment
-            // metas are garbage collected with the old row keys.
-            entry.segments.clear();
+            // The merged rows all live in the new segment; their source segment
+            // metas are garbage collected with the old row keys, while the
+            // segments this compaction did not pick keep theirs.
+            entry.segments.retain(|id, _| !sources.contains(id));
             if !rows.is_empty() {
                 entry.segments.insert(
                     next_seg,
@@ -13075,27 +13286,31 @@ impl Engine {
             entry.ivf_mem.clear();
             entry.block_index = None;
             entry.cpp_block_rows = None;
-            entry.live_rows = Some(rows.len());
+            entry.live_rows = Some(live_rows);
         }
         // The merged rows are one append of the compaction transaction: the
         // reference writes every block of the new segment with that commit ts
-        // as its single `create`, so the mirror's append log restarts here
-        // instead of carrying the source segments' appends.
+        // as its single `create`. The append log keeps the boundaries of the
+        // segments this compaction did not pick - the mirror lays them out in
+        // segment-id order and reads their block `version` files from the same
+        // log - and drops the merged segments' own boundaries.
         if !rows.is_empty() {
+            let totals =
+                self.rebase_appends(table, &layout, &sources, rows.len() as u64, compact_ts);
             let tkey = self.table_key(table);
             {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(tkey.clone()).or_default();
-                entry.append_totals = Some(vec![rows.len() as u64]);
-                entry.append_ts = Some(vec![compact_ts]);
+                entry.append_totals = Some(totals.0.clone());
+                entry.append_ts = Some(totals.1.clone());
                 // A merge writes the new segment's blocks from the merged rows
                 // in one go, like an import: the null bitmap covers exactly
                 // those rows (tail bits of the last byte stay clear).
-                entry.append_copy = Some(vec![1]);
+                entry.append_copy = Some(totals.2.clone());
             }
-            let _ = self.write_id_log(&appends_key(&tkey), &[rows.len() as u64]);
-            let _ = self.write_id_log(&append_ts_key(&tkey), &[compact_ts]);
-            let _ = self.write_id_log(&append_copy_key(&tkey), &[1]);
+            let _ = self.write_id_log(&appends_key(&tkey), &totals.0);
+            let _ = self.write_id_log(&append_ts_key(&tkey), &totals.1);
+            let _ = self.write_id_log(&append_copy_key(&tkey), &totals.2);
             // `PopulateIndex` runs inside the compaction transaction too, so the
             // new segment's chunks carry its ts and cover the whole segment.
             self.note_import_ts(table, next_seg, compact_ts);
@@ -13104,7 +13319,7 @@ impl Engine {
         // `drop|seg|…` / `drop|idx_seg|…` at the compaction's ts: the source
         // segments stay on disk until `Cleanup`, and a reader at a later ts
         // ignores them because of these records.
-        if !sources.is_empty() {
+        if !source_ids.is_empty() {
             let db_id = self.database_id_of(table);
             let table_id = self
                 .storage
@@ -13127,7 +13342,7 @@ impl Engine {
                     segments: Vec::new(),
                 },
                 &index_ids,
-                &sources,
+                &source_ids,
                 compact_ts,
             )?;
         }
@@ -19952,6 +20167,86 @@ mod tests {
         assert_eq!(got.len(), 10, "{got:?}");
     }
 
+    /// `CREATE TABLE … PROPERTIES (bloom_filter_columns = '…')` is accepted and
+    /// validated, but the flag never reaches the segment: the reference's
+    /// `ColumnDef::ToJson` omits `build_bloom_filter_` (`column_def.cpp:229`),
+    /// and the transaction that seals a segment reads its column defs back from
+    /// that record, so `BuildOnlyBloomFilter` never runs. Measured on the
+    /// reference: a `BOOLEAN` column declared with the property still
+    /// serializes `1, 0` in `seg|…|fast_rough_filter`.
+    #[test]
+    fn a_bloom_filter_column_is_accepted_but_never_built() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute(
+            "CREATE TABLE bf (b BOOLEAN, i INTEGER) PROPERTIES (bloom_filter_columns = ' b ');",
+        )
+        .unwrap();
+
+        // One `COPY` seals a segment, which is when the filter is built.
+        let csv = dir.path().join("bf.csv");
+        let text: String = (0..100)
+            .map(|i| format!("{},{i}\n", if i % 2 == 0 { "true" } else { "false" }))
+            .collect();
+        std::fs::write(&csv, text).unwrap();
+        e.execute(&format!(
+            "COPY bf FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            csv.display()
+        ))
+        .unwrap();
+        e.flush().unwrap();
+        let record = {
+            let mut found = None;
+            for (k, v) in e.storage.catalog.store().scan_prefix(b"seg|1|").unwrap() {
+                if String::from_utf8_lossy(&k).ends_with("|fast_rough_filter") {
+                    found = Some(v);
+                }
+            }
+            found.expect("the segment filter")
+        };
+        // `[u32 total][u64 build_time][u32 probabilistic_size][u32 columns]`
+        // then per column `[u8 exists][u8 built]`.
+        assert_eq!(u32::from_le_bytes(record[12..16].try_into().unwrap()), 12);
+        assert_eq!(u32::from_le_bytes(record[16..20].try_into().unwrap()), 2);
+        assert_eq!(
+            &record[20..24],
+            &[1, 0, 1, 0],
+            "both filter objects exist, nothing was built into either"
+        );
+
+        // DDL errors, as the reference's planner reports them.
+        let error = e
+            .execute("CREATE TABLE bf2 (x FLOAT) PROPERTIES (bloom_filter_columns = 'x');")
+            .expect_err("FLOAT has no bloom filter");
+        assert!(
+            error
+                .to_string()
+                .contains("Bloom filter can't be created for Float type column x"),
+            "{error}"
+        );
+        assert_eq!(error.status_code(), 3013);
+        let error = e
+            .execute("CREATE TABLE bf3 (b BOOLEAN) PROPERTIES (bloom_filter_columns = 'nope');")
+            .expect_err("unknown column");
+        assert!(
+            error
+                .to_string()
+                .contains("Column nope not found in table bf3"),
+            "{error}"
+        );
+        let error = e
+            .execute(
+                "CREATE TABLE bf4 (b BOOLEAN, c BOOLEAN) PROPERTIES (bloom_filter_columns = 'b', bloom_filter_columns = 'c');",
+            )
+            .expect_err("duplicate property");
+        assert!(
+            error
+                .to_string()
+                .contains("Duplicate table property param name: BLOOM_FILTER_COLUMNS"),
+            "{error}"
+        );
+    }
+
     /// The reference has no `CREATE TABLE … AS SELECT`: without a column
     /// definition the statement reaches its binder and fails with
     /// `Status::NoColumnDefined` (3048), not with a table created from the
@@ -21908,7 +22203,6 @@ mod tests {
         )
         .is_empty());
     }
-
 
     /// WAND now covers filters, `minimum_should_match`, `delta_term` and
     /// `similarity=boolean`; each must agree with the reference semantics.

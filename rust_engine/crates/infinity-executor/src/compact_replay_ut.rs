@@ -294,6 +294,82 @@ fn compaction_needs_four_segments_in_one_layer() {
     );
 }
 
+/// `DBTCompactionAlg` merges the **first four** segments of the lowest layer
+/// that holds `DBT_COMPACTION_M` (4) of them, not every live segment: with six
+/// segments the remaining two stay where they are, and the merged segment takes
+/// the id after *every* segment (6), not after the four that were merged.
+#[test]
+fn a_compaction_of_more_than_four_segments_keeps_the_rest() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    create_table(&e);
+    for value in 0..6 {
+        e.import_literals("db1.tb1", None, const_block(value, "abc"))
+            .unwrap();
+    }
+    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2, 3, 4, 5]);
+    // The mirror is what a compaction leaves behind on disk, so write it first.
+    e.flush().unwrap();
+
+    e.compact_table("db1.tb1").unwrap();
+    assert_eq!(
+        e.segment_ids("db1.tb1"),
+        vec![4, 5, 6],
+        "the four candidates merge into 6, the other two keep their ids"
+    );
+    assert_eq!(h::count(&e, "db1.tb1"), 6 * 8192);
+    // Every imported value survives exactly once, in whichever segment holds
+    // it now: the merged four moved, the untouched two did not.
+    for value in 0..6 {
+        assert_eq!(
+            h::rows(
+                &e,
+                &format!("SELECT count(*) FROM db1.tb1 WHERE col1 = {value};")
+            ),
+            vec![vec!["8192".to_string()]],
+            "value {value}"
+        );
+    }
+    // The layout the reference leaves for the same six imports (measured: the
+    // merged segment holds the four source blocks, the two it did not pick keep
+    // their single block each, and the four deprecated segments keep their
+    // files until `Cleanup`).
+    e.flush().unwrap();
+    let table_dir = {
+        let mut found = None;
+        for db in std::fs::read_dir(dir.path().join("data"))
+            .unwrap()
+            .flatten()
+        {
+            for tbl in std::fs::read_dir(db.path()).unwrap().flatten() {
+                found = Some(tbl.path());
+            }
+        }
+        found.expect("the table directory")
+    };
+    let blocks = |segment: u32| -> usize {
+        let dir = table_dir.join(format!("seg_{segment}"));
+        let mut count = 0;
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                if entry.file_name().to_string_lossy().starts_with("blk_") {
+                    count += 1;
+                }
+            }
+        }
+        count
+    };
+    assert_eq!(blocks(0), 1, "a deprecated segment keeps its block");
+    assert_eq!(blocks(3), 1);
+    assert_eq!(blocks(4), 1, "an untouched segment keeps its block");
+    assert_eq!(blocks(5), 1);
+    assert_eq!(blocks(6), 4, "the merged segment holds the four sources");
+
+    // Three segments left, so a second COMPACT picks nothing.
+    e.compact_table("db1.tb1").unwrap();
+    assert_eq!(e.segment_ids("db1.tb1"), vec![4, 5, 6]);
+}
+
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:1448`
 /// (`TestTxnCompact.compact_and_compact`): a second merge is a no-op.
 #[test]

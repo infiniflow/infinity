@@ -394,6 +394,10 @@ pub enum Statement {
     CreateTable {
         name: String,
         columns: Vec<ColumnDef>,
+        /// `WITH (k = v, …)` table properties, keys upper-cased. The reference
+        /// reads `bloom_filter_columns` from here (`logical_planner_impl.cpp:690`)
+        /// and ignores the rest.
+        opts: Vec<(String, String)>,
     },
     CreateDatabase {
         name: String,

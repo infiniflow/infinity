@@ -342,3 +342,48 @@ fn an_indexed_compaction_logs_the_dump_in_the_same_frame() {
     assert_eq!(chunk_infos[0].row_count, 230);
     assert_eq!(chunk_infos[0].deprecate_ts, u64::MAX);
 }
+
+/// `CREATE TABLE … WITH (bloom_filter_columns = '…')` puts the flag into the
+/// `CreateTableV2` command's column defs (`TableDef::WriteAdv` ->
+/// `ColumnDef::WriteAdv`), which is the only place the reference records it:
+/// `ColumnDef::ToJson` omits it, so the catalog's `tbl|col|…` record does not
+/// carry it and a reader of that key space sees every flag as false.
+#[test]
+fn a_create_table_logs_the_bloom_flag() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    e.execute("CREATE TABLE bf (b BOOLEAN, i INT) WITH (bloom_filter_columns = 'b');")
+        .unwrap();
+    // The WAL writer buffers a frame until a checkpoint flushes it.
+    e.flush().unwrap();
+    for entry in wal_entries(dir.path()) {
+        eprintln!(
+            "ENTRY {} ts={} cmds={:?}",
+            entry.txn_id,
+            entry.commit_ts,
+            entry
+                .cmds
+                .iter()
+                .map(|c| format!("{:?}", c.command_type()))
+                .collect::<Vec<_>>()
+        );
+    }
+    let table_def = wal_entries(dir.path())
+        .iter()
+        .flat_map(|entry| entry.cmds.iter())
+        .find_map(|cmd| match cmd {
+            WalCmd::CreateTable { table_def, .. } if table_def.table_name == "bf" => {
+                Some(table_def.clone())
+            }
+            _ => None,
+        })
+        .expect("the CREATE TABLE frame");
+    assert_eq!(
+        table_def
+            .columns
+            .iter()
+            .map(|c| c.build_bloom_filter)
+            .collect::<Vec<_>>(),
+        vec![true, false]
+    );
+}

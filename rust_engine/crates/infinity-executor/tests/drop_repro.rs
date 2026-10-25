@@ -21,7 +21,10 @@ fn drop_after_restore() {
         "drop left the table behind (1)"
     );
     e.execute("RESTORE TABLE SNAPSHOT s1;").unwrap();
-    assert!(e.table_exists("default_db.tb1"), "restore did not recreate it");
+    assert!(
+        e.table_exists("default_db.tb1"),
+        "restore did not recreate it"
+    );
     e.execute("DROP TABLE tb1;").unwrap();
     assert!(
         !e.table_exists("default_db.tb1"),

@@ -69,6 +69,43 @@ impl Parser {
             self.err(&format!("expected keyword {kw}"))
         }
     }
+    /// `(k = v, …)`: a property list as `WITH (…)` / `PROPERTIES (…)` spells
+    /// it. Keys are upper-cased; a bare flag (`HEADER`) has an empty value.
+    fn option_list(&mut self) -> Result<Vec<(String, String)>> {
+        let mut opts = Vec::new();
+        if self.peek() != &Token::LParen {
+            return Ok(opts);
+        }
+        self.advance();
+        while !matches!(self.peek(), Token::RParen | Token::Eof) {
+            let key = match self.advance() {
+                Token::Ident(k) | Token::Str(k) => k,
+                _ => continue,
+            };
+            if self.peek() == &Token::Op("=".into()) {
+                self.advance();
+            }
+            let value = match self.peek() {
+                Token::RParen | Token::Comma => String::new(),
+                _ => match self.advance() {
+                    Token::Ident(v) => v,
+                    Token::Int(i) => i.to_string(),
+                    Token::Float(f) => f.to_string(),
+                    Token::Str(v) => v,
+                    _ => String::new(),
+                },
+            };
+            opts.push((key.to_ascii_uppercase(), value));
+            if self.peek() == &Token::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        self.expect(Token::RParen)?;
+        Ok(opts)
+    }
+
     fn expect_ident(&mut self) -> Result<String> {
         match self.advance() {
             Token::Ident(mut s) => {
@@ -483,8 +520,17 @@ impl Parser {
                     if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("AS")) {
                         return self.err("syntax error, unexpected AS, expecting end of file");
                     }
-                    // tolerate a trailing `PROPERTIES (…)` / `WITH (…)` clause
+                    // `WITH (k = v, …)`: the reference reads the table's
+                    // properties from here (`bloom_filter_columns`). Anything
+                    // else trailing the column list is tolerated and dropped,
+                    // as the reference's grammar allows a bare `PROPERTIES`
+                    // list it does not interpret either.
+                    let mut opts: Vec<(String, String)> = Vec::new();
                     while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+                        if self.eat_kw("WITH") || self.eat_kw("PROPERTIES") {
+                            opts.extend(self.option_list()?);
+                            continue;
+                        }
                         if self.peek() == &Token::LParen {
                             let mut depth = 0i32;
                             loop {
@@ -504,7 +550,11 @@ impl Parser {
                             self.advance();
                         }
                     }
-                    Ok(Statement::CreateTable { name, columns })
+                    Ok(Statement::CreateTable {
+                        name,
+                        columns,
+                        opts,
+                    })
                 }
             }
             "DROP" => {
@@ -2894,6 +2944,7 @@ mod tests {
             s,
             Statement::CreateTable {
                 name: "t".into(),
+                opts: vec![],
                 columns: vec![
                     ColumnDef {
                         name: "id".into(),
@@ -3662,6 +3713,7 @@ mod tests {
             one("CREATE TABLE t (a INT, b TENSOR(FLOAT,16), c EMBEDDING(FLOAT, 4))"),
             Statement::CreateTable {
                 name: "t".into(),
+                opts: vec![],
                 columns: vec![
                     ColumnDef {
                         name: "a".into(),

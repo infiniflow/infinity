@@ -170,6 +170,16 @@ impl Error {
             {
                 3013
             }
+            // 3013 SYNTAX_ERROR: `CREATE TABLE … WITH (bloom_filter_columns =
+            // …)` (`logical_planner_impl.cpp:690`) - an unknown column, a type
+            // without `SupportBloomFilter()`, or the property twice.
+            Error::Invalid(m)
+                if m.starts_with("Bloom filter can't be created for")
+                    || m.starts_with("Duplicate table property param name")
+                    || (m.starts_with("Column ") && m.contains(" not found in table ")) =>
+            {
+                3013
+            }
             // 3076 INVALID_COMMAND: `SET VARIABLE` on an unknown name, a
             // read-only variable, or a value of the wrong type. The reference's
             // `PhysicalCommand` reports `Status::InvalidCommand`

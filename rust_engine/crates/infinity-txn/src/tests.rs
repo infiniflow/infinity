@@ -86,8 +86,7 @@ fn concurrent_commits_are_serialized_and_durable() {
         mgr.flush().unwrap();
     }
     // all rows are durable in KV
-    let store: Arc<dyn MetaStore> =
-        Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
+    let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
     assert_eq!(
         store.scan_prefix(b"k").unwrap().len(),
         (THREADS * PER) as usize

@@ -31,7 +31,8 @@ fn columns(e: &Engine, sql: &str) -> Vec<String> {
 #[test]
 fn a_table_snapshot_writes_the_reference_metadata() {
     let (dir, e) = engine();
-    e.execute("CREATE TABLE snap_t (a INT, b VARCHAR);").unwrap();
+    e.execute("CREATE TABLE snap_t (a INT, b VARCHAR);")
+        .unwrap();
     e.execute("INSERT INTO snap_t VALUES (1, 'x'), (2, 'y');")
         .unwrap();
     e.execute("CREATE SNAPSHOT s1 ON TABLE snap_t;").unwrap();
@@ -108,6 +109,131 @@ fn a_table_snapshot_writes_the_reference_metadata() {
     assert_eq!(rows[0], vec!["snapshot_name", "s1"]);
     assert_eq!(rows[1], vec!["snapshot_scope", "Table"]);
     assert_eq!(rows[3], vec!["commit_timestamp".to_string(), commit]);
+}
+
+/// `table_indexes[].segment_indexes` is read from the catalog's
+/// `idx_chunk|…|chunk_info` records, which is where the reference keeps a
+/// chunk's row range and index size (`ChunkIndexMeta::MapMetaToSnapShotInfo`,
+/// `chunk_index_meta_impl.cpp:810`). Deriving them from the file names used to
+/// force `base_row_id`/`row_cnt` to 0 and the segment id to 0.
+#[test]
+fn a_table_snapshot_records_the_index_chunks_the_catalog_holds() {
+    let (_d, e) = engine();
+    e.execute("CREATE TABLE snap_i (a INT, b VARCHAR);")
+        .unwrap();
+    let block: Vec<Vec<infinity_parser::Literal>> = (0..8192)
+        .map(|_| {
+            vec![
+                infinity_parser::Literal::Int(1),
+                infinity_parser::Literal::Str("x".into()),
+            ]
+        })
+        .collect();
+    e.execute("CREATE INDEX idx_a ON snap_i (a);").unwrap();
+    e.import_literals("default_db.snap_i", None, block).unwrap();
+    e.dump_index("default_db.snap_i", "idx_a").unwrap();
+    // The mirror publishes the `idx_chunk|…` records the snapshot reads (the
+    // reference writes them inside the dump transaction; the port's mirror
+    // writes them at checkpoint time).
+    e.flush().unwrap();
+    e.execute("CREATE SNAPSHOT s1 ON TABLE snap_i;").unwrap();
+
+    let text = std::fs::read_to_string(e.snapshot_dir().join("s1").join("s1.json")).unwrap();
+    let json = infinity_expression::json::parse(&text).unwrap();
+    let field = |object: &infinity_expression::json::Json, name: &str| {
+        let infinity_expression::json::Json::Obj(entries) = object else {
+            panic!("expected an object, got {object:?}");
+        };
+        entries
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.clone())
+            .unwrap_or_else(|| panic!("{name} is missing in {object:?}"))
+    };
+    let infinity_expression::json::Json::Arr(indexes) = field(&json, "table_indexes") else {
+        panic!("table_indexes must be an array");
+    };
+    assert_eq!(indexes.len(), 1);
+    let index = &indexes[0];
+    assert!(matches!(
+        field(index, "index_dir"),
+        infinity_expression::json::Json::Str(ref s)
+            if s.starts_with("db_1/tbl_") && s.ends_with("/idx_1")
+    ));
+
+    let infinity_expression::json::Json::Arr(segment_indexes) = field(index, "segment_indexes")
+    else {
+        panic!("segment_indexes must be an array");
+    };
+    assert_eq!(segment_indexes.len(), 1);
+    let segment = &segment_indexes[0];
+    assert_eq!(
+        field(segment, "segment_id"),
+        infinity_expression::json::Json::Int(0)
+    );
+    let infinity_expression::json::Json::Arr(chunks) = field(segment, "chunk_indexes") else {
+        panic!("chunk_indexes must be an array");
+    };
+    assert_eq!(chunks.len(), 1);
+    let chunk = &chunks[0];
+    // `chunk_{id}.idx`, the row range the chunk covers and its on-disk size;
+    // a secondary chunk has no `base_name` and no `full_text_files`.
+    assert_eq!(
+        field(chunk, "index_filename"),
+        infinity_expression::json::Json::Str("chunk_0.idx".into())
+    );
+    assert_eq!(
+        field(chunk, "base_name"),
+        infinity_expression::json::Json::Str(String::new())
+    );
+    assert_eq!(
+        field(chunk, "base_row_id"),
+        infinity_expression::json::Json::Str("0".into())
+    );
+    let record_row_count = 8192;
+    assert_eq!(
+        field(chunk, "row_cnt"),
+        infinity_expression::json::Json::Int(record_row_count)
+    );
+    // `SecondaryIndexInMem::GetChunkIndexMetaInfo` records 0 for a secondary
+    // chunk; the types whose memory index reports its own footprint (HNSW,
+    // BMP) are not covered here.
+    assert_eq!(
+        field(chunk, "index_size"),
+        infinity_expression::json::Json::Int(0)
+    );
+    assert!(
+        !matches!(chunk, infinity_expression::json::Json::Obj(entries)
+            if entries.iter().any(|(k, _)| k == "full_text_files")),
+        "only a full-text chunk lists its files"
+    );
+
+    // The whole `table_indexes` entry, as the reference wrote it for the same
+    // table (`CREATE TABLE si (a INT, b VARCHAR)` + `CREATE INDEX idx_a ON si
+    // (a)` + one 100-row `COPY`): only the table id and the row count differ.
+    assert_eq!(
+        field(&json, "table_indexes").compact(),
+        format!(
+            concat!(
+                "[{{\"index_base\":{{\"cardinality\":\"high\",",
+                "\"column_names\":[\"a\"],\"file_name\":\"snap_i_idx_a\",",
+                "\"index_comment\":\"\",\"index_name\":\"idx_a\",",
+                "\"index_type\":\"SECONDARY\",\"is_json_index\":false}},",
+                "\"index_dir\":\"{}\",\"index_id_str\":\"1\",",
+                "\"segment_indexes\":[{{\"chunk_indexes\":[{{\"base_name\":\"\",",
+                "\"base_row_id\":\"0\",\"chunk_id\":0,",
+                "\"index_filename\":\"chunk_0.idx\",\"index_size\":0,",
+                "\"row_cnt\":{}}}],\"segment_id\":0}}]}}]"
+            ),
+            // `index_dir` is `db_1/tbl_{table}/idx_1`; the assertion above
+            // already pinned its shape, so take it from the record.
+            match field(index, "index_dir") {
+                infinity_expression::json::Json::Str(s) => s.clone(),
+                other => panic!("index_dir must be a string, got {other:?}"),
+            },
+            record_row_count
+        )
+    );
 }
 
 /// Database and system snapshots use the same directory, with the

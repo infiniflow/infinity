@@ -12,10 +12,20 @@
 //! ```
 //!
 //! The probabilistic (binary-fuse) half is only built for a column whose
-//! `ColumnDef::build_bloom_filter_` was set by DDL (`CREATE TABLE … (c INT
-//! /* bloom_filter */)`, `logical_planner_impl.cpp:716`); every other column
-//! serializes as `1, 0` — the filter object exists, nothing was built into it.
-//! The min/max half is built for every column whose type supports it.
+//! `ColumnDef::build_bloom_filter_` is set, and in the reference that never
+//! happens: `CREATE TABLE … PROPERTIES (bloom_filter_columns = '…')` sets the
+//! flag on the in-memory `ColumnDef` (`logical_planner_impl.cpp:690`) but
+//! `ColumnDef::ToJson` (`column_def.cpp:229`) does not record it, so the
+//! transaction that seals a segment - which reads the column defs back from
+//! `tbl|col|…` - sees `false` and `BuildOnlyBloomFilter` never runs. Measured on
+//! the reference: a `BOOLEAN` column declared with the property still
+//! serializes `1, 0` (100 rows, `seg|1|1|0|fast_rough_filter`, twice over two
+//! imports). Every column therefore serializes as `1, 0` — the filter object
+//! exists, nothing is built into it — and the min/max half is built for every
+//! column whose type supports it.
+//!
+//! The flag does survive in the WAL's `CreateTableV2`
+//! (`ColumnDef::WriteAdv`), which is where the port writes it too.
 //!
 //! `build_time` is the segment's **begin** ts, i.e. the commit ts of the
 //! transaction that created it minus one (`segment_meta->begin_ts()`).
@@ -527,8 +537,9 @@ impl Filters {
         }
         let column_count = self.types as u32;
         // Every column gets a filter object (the vector is sized to the column
-        // count); `built = 0` because only a column declared with the
-        // bloom-filter option is ever built, and no gate's schema uses it.
+        // count); `built = 0` because the reference never builds one (see the
+        // module comment: the DDL flag does not survive into the sealing
+        // transaction).
         let probabilistic_size = 8 + 2 * column_count as usize;
         let minmax_size = 8 + minmax.len();
         let total = 12 + probabilistic_size + minmax_size;

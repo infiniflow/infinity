@@ -250,7 +250,7 @@ pub fn index_def_from_json(text: &str) -> Option<infinity_storage::wal::index_de
     Some(match index_type {
         IndexType::Secondary => IndexDef::Secondary {
             base,
-            cardinality: as_i64(extract(&doc, ".cardinality").or_else(|| None))
+            cardinality: as_i64(extract(&doc, ".cardinality").or(None))
                 .map(|v| v as u8)
                 .unwrap_or(0),
             is_json: matches!(extract(&doc, ".is_json_index"), Some(Json::Bool(true))),

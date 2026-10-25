@@ -558,8 +558,7 @@ fn run_smoke(dir: &Path) -> infinity_common::Result<()> {
     let tables = c.list_tables()?;
     println!("[smoke] tables after restart: {tables:?}");
 
-    let fresh: Arc<dyn MetaStore> =
-        Arc::new(RocksMetaStore::open(dir.join("kv_recovered"))?);
+    let fresh: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.join("kv_recovered"))?);
     let m = TxnManager::open(wal_path(dir), fresh.clone())?;
     let n = m.recover(0)?;
     println!("[smoke] replayed {n} WAL record(s) into fresh store");

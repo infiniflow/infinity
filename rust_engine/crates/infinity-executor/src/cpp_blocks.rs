@@ -285,7 +285,7 @@ fn publish_secondary_chunks(
             base_name: String::new(),
             // `RowID` of the block's first row: the segment in the high bits,
             // the in-segment offset in the low ones.
-            base_row_id: (u64::from(segment) << 32) | block * DEFAULT_BLOCK_CAPACITY as u64,
+            base_row_id: (u64::from(segment) << 32) | (block * DEFAULT_BLOCK_CAPACITY as u64),
             row_count: entries.len() as u64,
             term_count: 0,
             index_size: 0,
@@ -349,7 +349,7 @@ fn publish_bmp_chunks(
         chunks.push(CppIndexChunk {
             chunk_id: block as u32,
             base_name: String::new(),
-            base_row_id: (u64::from(segment) << 32) | block * DEFAULT_BLOCK_CAPACITY as u64,
+            base_row_id: (u64::from(segment) << 32) | (block * DEFAULT_BLOCK_CAPACITY as u64),
             row_count: docs.len() as u64,
             term_count: 0,
             index_size: 0,
@@ -1311,7 +1311,7 @@ pub fn encode_fulltext_chunk(
         .collect();
     for (_, docs) in &terms {
         let mut doc_encoder =
-            infinity_storage::inverted_format::doc_list::DocListEncoder::new(doc_option.clone());
+            infinity_storage::inverted_format::doc_list::DocListEncoder::new(doc_option);
         let mut pos_encoder =
             infinity_storage::inverted_format::position_list::PositionListEncoder::new(
                 OPTION_FLAG_ALL,
@@ -2332,7 +2332,9 @@ impl Engine {
                 // the import's chunk layout (one per capacity for full-text, one
                 // for the whole segment for secondary and sparse).
                 let imported = self.imported_extent(table, *segment, *seg_rows).is_some();
-                let chunks = if im.index_type.eq_ignore_ascii_case("SECONDARY") {
+                // A plain `CREATE INDEX` leaves the type empty, which is the
+                // secondary default everywhere else (`is_secondary_kind`).
+                let chunks = if crate::is_secondary_kind(&im.index_type) {
                     let dir = self.dir.join("secondary").join(&private);
                     // The chunk's key width comes from the column's declared type,
                     // exactly as the reader derives it (`SecondarySegmentReader::

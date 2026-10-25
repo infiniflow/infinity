@@ -85,7 +85,8 @@ fn insert_select_of_constants_inserts_one_row_per_source_row() {
     );
     // A constant list over a source still yields one row per source row.
     assert_eq!(
-        e.execute("INSERT INTO dst SELECT 8, 'w' FROM src;").unwrap(),
+        e.execute("INSERT INTO dst SELECT 8, 'w' FROM src;")
+            .unwrap(),
         vec![QueryResult::Inserted { count: 3 }]
     );
     assert_eq!(
@@ -121,9 +122,7 @@ fn insert_select_reports_arity_and_name_errors() {
         "{err}"
     );
 
-    let err = e
-        .execute("INSERT INTO missing SELECT 1, 'x';")
-        .unwrap_err();
+    let err = e.execute("INSERT INTO missing SELECT 1, 'x';").unwrap_err();
     assert!(err.to_string().contains("table"), "{err}");
 
     // The binder runs before the evaluator, so an unknown column keeps its
@@ -213,4 +212,3 @@ fn views_are_rejected_like_the_reference() {
     // A table of that name is still creatable: the view never occupied it.
     e.execute("CREATE TABLE v (a INT);").unwrap();
 }
-

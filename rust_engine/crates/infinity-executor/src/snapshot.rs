@@ -18,8 +18,8 @@
 use std::path::{Path, PathBuf};
 
 use infinity_catalog::value_format;
-use infinity_expression::json::Json;
 use infinity_common::{Error, Result, TxnTimeStamp};
+use infinity_expression::json::Json;
 use infinity_storage::block_index::BlockIndex;
 use infinity_storage::wal::ddl_def::{ColumnDef, ConstantExpr, TableDef};
 use infinity_storage::wal_entry::WalCmd;
@@ -217,8 +217,13 @@ impl Engine {
             if !meta_db.eq_ignore_ascii_case(db) {
                 continue;
             }
-            table_snapshots
-                .push(self.write_table_snapshot(&dir, name, db_id, &meta, snapshot_ts)?);
+            table_snapshots.push(self.write_table_snapshot(
+                &dir,
+                name,
+                db_id,
+                &meta,
+                snapshot_ts,
+            )?);
         }
         let json = Json::Obj(vec![
             ("database_name".into(), Json::Str(db.to_string())),
@@ -259,8 +264,13 @@ impl Engine {
                 if !meta_db.eq_ignore_ascii_case(db) {
                     continue;
                 }
-                table_snapshots
-                    .push(self.write_table_snapshot(&dir, name, db_id, &meta, snapshot_ts)?);
+                table_snapshots.push(self.write_table_snapshot(
+                    &dir,
+                    name,
+                    db_id,
+                    &meta,
+                    snapshot_ts,
+                )?);
             }
             db_snapshots.push(Json::Obj(vec![
                 ("database_name".into(), Json::Str(db.clone())),
@@ -318,14 +328,14 @@ impl Engine {
         let table = json_table(&json, name)?;
         let files = self.restore_table(table)?;
         let db_id: u64 = json_str(&json, "db_id_str").parse().unwrap_or(0);
-        let table_id: u64 = json_str(&table, "table_id_str").parse().unwrap_or(0);
+        let table_id: u64 = json_str(table, "table_id_str").parse().unwrap_or(0);
         self.log_snapshot(WalCmd::RestoreTableSnapshot {
             db_name: json_str(&json, "database_name"),
             db_id: db_id.to_string(),
-            table_name: json_str(&table, "table_name"),
+            table_name: json_str(table, "table_name"),
             table_id: table_id.to_string(),
             snapshot_name: name.to_string(),
-            table_def: table_def_of(&table),
+            table_def: table_def_of(table),
             segment_infos: Vec::new(),
             index_cmds: Vec::new(),
             files,
@@ -475,57 +485,91 @@ impl Engine {
         }
         let segments = self.segment_json(db_id, meta.id, &meta.ids)?;
         let mut indexes = Vec::new();
-        if let Ok(defs) = infinity_catalog::cpp_layout::read_cpp_indexes(
-            self.storage.catalog.store().as_ref(),
-        ) {
+        if let Ok(defs) =
+            infinity_catalog::cpp_layout::read_cpp_indexes(self.storage.catalog.store().as_ref())
+        {
             for def in defs {
-                let Some(index_id) = def.index_id else { continue };
+                let Some(index_id) = def.index_id else {
+                    continue;
+                };
                 let owner = def.owner.clone().unwrap_or_default();
                 if !owner.1.eq_ignore_ascii_case(&meta.id.to_string()) {
                     continue;
                 }
-                let root = self.blocks_root();
-                let chunk_files = self
-                    .index_files(&meta.name, &def.base.index_name)
-                    .into_iter()
-                    .filter_map(|p| file_relative(&root, &p))
-                    .collect::<Vec<_>>();
-                let mut chunk_indexes = Vec::new();
-                for (i, file) in chunk_files.iter().enumerate() {
-                    let size = self
-                        .blocks_root()
-                        .join(file)
-                        .metadata()
-                        .map(|m| m.len() as i64)
-                        .unwrap_or(0);
-                    let name = file.rsplit('/').next().unwrap_or(file);
-                    chunk_indexes.push(Json::Obj(vec![
-                        ("base_name".into(), Json::Str(name.to_string())),
-                        ("base_row_id".into(), Json::Str("0".to_string())),
-                        ("chunk_id".into(), Json::Int(i as i64)),
-                        ("index_filename".into(), Json::Str(name.to_string())),
-                        ("index_size".into(), Json::Int(size)),
-                        ("row_cnt".into(), Json::Int(0)),
-                    ]));
+                let index_dir = format!("db_{db_id}/tbl_{}/idx_{index_id}", meta.id);
+                // `TableIndexMeta::MapMetaToSnapShotInfo` reads the segment
+                // layer from the catalog, not from the files: `chunk_info`
+                // carries the row range and the index size, and the segment
+                // and chunk ids are the catalog's own. The mirror writes those
+                // records, so both engines serialize the same values.
+                let chunk_layers = infinity_catalog::cpp_layout::read_cpp_index_chunks(
+                    self.storage.catalog.store().as_ref(),
+                    &db_id.to_string(),
+                    &meta.id.to_string(),
+                    &index_id.to_string(),
+                )?;
+                let fulltext = def.base.index_type.eq_ignore_ascii_case("FULLTEXT");
+                let mut segment_indexes = Vec::new();
+                for (segment_id, chunks) in chunk_layers {
+                    let mut chunk_indexes = Vec::new();
+                    for (chunk_id, info) in chunks {
+                        let mut entries = vec![
+                            ("base_name".into(), Json::Str(info.base_name.clone())),
+                            (
+                                "base_row_id".into(),
+                                Json::Str(info.base_row_id.to_string()),
+                            ),
+                            ("chunk_id".into(), Json::Int(chunk_id as i64)),
+                            // `ChunkIndexMetaInfo::IndexFileName` names the
+                            // index file after the chunk id for every type; a
+                            // full-text chunk additionally lists its three
+                            // files.
+                            (
+                                "index_filename".into(),
+                                Json::Str(format!("chunk_{chunk_id}.idx")),
+                            ),
+                            ("index_size".into(), Json::Int(info.index_size as i64)),
+                            ("row_cnt".into(), Json::Int(info.row_count as i64)),
+                        ];
+                        if fulltext {
+                            let base = format!("{index_dir}/seg_{segment_id}/{}", info.base_name);
+                            entries.push((
+                                "full_text_files".into(),
+                                Json::Arr(vec![
+                                    Json::Str(format!("{base}.pos")),
+                                    Json::Str(format!("{base}.dic")),
+                                    Json::Str(format!("{base}.len")),
+                                ]),
+                            ));
+                        }
+                        chunk_indexes.push(Json::Obj(entries));
+                    }
+                    // `SegmentIndexSnapshotInfo::Serialize` only emits the key
+                    // when the segment has chunks.
+                    let mut segment = Vec::new();
+                    if !chunk_indexes.is_empty() {
+                        segment.push(("chunk_indexes".into(), Json::Arr(chunk_indexes)));
+                    }
+                    segment.push(("segment_id".into(), Json::Int(segment_id as i64)));
+                    segment_indexes.push(Json::Obj(segment));
                 }
-                indexes.push(Json::Obj(vec![
-                    ("index_base".into(), value_format::index_base_json(&def.base)),
-                    (
-                        "index_dir".into(),
-                        Json::Str(format!("db_{db_id}/tbl_{}/idx_{index_id}", meta.id)),
-                    ),
+                // `TableIndexSnapshotInfo` stores `index_base_->Serialize()`,
+                // i.e. the base fields **plus** the subtype's own
+                // (`cardinality`/`is_json_index` for a secondary index), which
+                // is the same record the catalog holds under
+                // `idx|…|index_base`.
+                let mut index = vec![
+                    ("index_base".into(), value_format::index_def_json(&def)),
+                    ("index_dir".into(), Json::Str(index_dir)),
                     ("index_id_str".into(), Json::Str(index_id.to_string())),
-                    (
-                        "segment_indexes".into(),
-                        Json::Arr(vec![Json::Obj(vec![
-                            ("chunk_indexes".into(), Json::Arr(chunk_indexes)),
-                            ("segment_id".into(), Json::Int(0)),
-                        ])]),
-                    ),
-                ]));
+                ];
+                if !segment_indexes.is_empty() {
+                    index.push(("segment_indexes".into(), Json::Arr(segment_indexes)));
+                }
+                indexes.push(Json::Obj(index));
             }
         }
-        Ok(Json::Obj(vec![
+        let mut entries = vec![
             ("column_definition".into(), Json::Arr(column_definition)),
             ("create_ts".into(), Json::Int(0)),
             ("database_name".into(), Json::Str(db_name.to_string())),
@@ -535,9 +579,17 @@ impl Engine {
             // uninitialized value in `SHOW SNAPSHOTS`; the port records the
             // snapshot's own ts here, which is what the column means.
             ("max_commit_ts".into(), Json::Int(snapshot_ts as i64)),
-            ("next_column_id".into(), Json::Int(
-                meta.ids.iter().copied().max().map(|v| v as i64 + 1).unwrap_or(0),
-            )),
+            (
+                "next_column_id".into(),
+                Json::Int(
+                    meta.ids
+                        .iter()
+                        .copied()
+                        .max()
+                        .map(|v| v as i64 + 1)
+                        .unwrap_or(0),
+                ),
+            ),
             ("next_segment_id".into(), Json::Int(0)),
             ("row_count".into(), Json::Int(0)),
             ("segments".into(), Json::Arr(segments)),
@@ -549,7 +601,14 @@ impl Engine {
             ("txn_id".into(), Json::Int(0)),
             ("unsealed_id".into(), Json::Int(0)),
             ("version".into(), Json::Int(1)),
-        ]))
+        ];
+        // `CreateSnapshotMetadataJSON` appends `table_indexes` inside the loop
+        // over the table's index snapshots, so the key is absent on a table
+        // without indexes.
+        if !indexes.is_empty() {
+            entries.push(("table_indexes".into(), Json::Arr(indexes)));
+        }
+        Ok(Json::Obj(entries))
     }
 
     /// `SegmentSnapshotInfo::Serialize` per segment of the table: the blocks
@@ -571,19 +630,22 @@ impl Engine {
             let mut row_count = 0i64;
             for block in &blocks {
                 row_count += block.row_count as i64;
-                let dir = format!("db_{db_id}/tbl_{table_id}/seg_{segment_id}/blk_{}", block.id.block_id);
+                let dir = format!(
+                    "db_{db_id}/tbl_{table_id}/seg_{segment_id}/blk_{}",
+                    block.id.block_id
+                );
                 let mut columns = Vec::new();
                 for column_id in column_ids {
                     let mut entries = vec![
                         ("column_id".into(), Json::Int(*column_id as i64)),
-                        ("filepath".into(), Json::Str(format!("{dir}/{column_id}.col"))),
+                        (
+                            "filepath".into(),
+                            Json::Str(format!("{dir}/{column_id}.col")),
+                        ),
                     ];
                     let outline = format!("{dir}/col_{column_id}_out");
                     if self.blocks_root().join(&outline).exists() {
-                        entries.push((
-                            "outlines".into(),
-                            Json::Arr(vec![Json::Str(outline)]),
-                        ));
+                        entries.push(("outlines".into(), Json::Arr(vec![Json::Str(outline)])));
                     }
                     columns.push(Json::Obj(entries));
                 }
@@ -724,7 +786,9 @@ impl Engine {
     /// Copies everything the table owns in the data directory
     /// (`db_{db}/tbl_{table}/…`) into the snapshot directory.
     fn copy_table_files(&self, db_id: u64, table_id: u64, dir: &Path) -> Result<()> {
-        let src = self.blocks_root().join(format!("db_{db_id}/tbl_{table_id}"));
+        let src = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{table_id}"));
         copy_dir(&src, &dir.join(format!("db_{db_id}/tbl_{table_id}")))
     }
 
@@ -770,7 +834,10 @@ fn table_def_of(table: &Json) -> TableDef {
     let mut columns = Vec::new();
     for column in json_arr(table, "column_definition") {
         let default = json_get(&column, "default");
-        let literal = default.as_ref().and_then(|d| json_get(d, "type")).map(json_int);
+        let literal = default
+            .as_ref()
+            .and_then(|d| json_get(d, "type"))
+            .map(json_int);
         let value = default.and_then(|d| json_get(d, "value").cloned());
         let default_expr = match literal {
             Some(0) => ConstantExpr::Boolean(matches!(value, Some(Json::Bool(true)))),
@@ -813,17 +880,6 @@ fn split_qualified(name: &str) -> (String, String) {
         Some((db, table)) => (db.to_string(), table.to_string()),
         None => (String::new(), name.to_string()),
     }
-}
-
-/// `path` relative to `root`, with `/` separators (the form the snapshot
-/// metadata records).
-fn file_relative(root: &Path, path: &Path) -> Option<String> {
-    let rel = path.strip_prefix(root).ok()?;
-    let out: Vec<String> = rel
-        .components()
-        .map(|c| c.as_os_str().to_string_lossy().to_string())
-        .collect();
-    Some(out.join("/"))
 }
 
 /// The reference's path rewrite: the `db_*` / `tbl_*` ids of the snapshot are
@@ -876,6 +932,18 @@ fn snapshot_files(json: &Json) -> Vec<String> {
     for index in json_arr(json, "table_indexes") {
         for segment_index in json_arr(&index, "segment_indexes") {
             for chunk in json_arr(&segment_index, "chunk_indexes") {
+                // `TableSnapshotInfo::GetIndexFiles`: a full-text chunk lists
+                // its three files itself, every other type holds one file named
+                // after the chunk id under `idx_{id}/seg_{s}/`.
+                let full_text = json_arr(&chunk, "full_text_files");
+                if !full_text.is_empty() {
+                    for file in full_text {
+                        if let Json::Str(s) = file {
+                            out.push(s);
+                        }
+                    }
+                    continue;
+                }
                 let name = json_str(&chunk, "index_filename");
                 if name.is_empty() {
                     continue;
@@ -898,7 +966,11 @@ fn schema_of(table: &Json) -> Result<(Vec<String>, Vec<Option<String>>, Vec<bool
     for column in json_arr(table, "column_definition") {
         columns.push(json_str(&column, "column_name"));
         defaults.push(default_text(&column));
-        not_nulls.push(json_arr(&column, "constraints").iter().any(|c| json_int(c) == 2));
+        not_nulls.push(
+            json_arr(&column, "constraints")
+                .iter()
+                .any(|c| json_int(c) == 2),
+        );
         types.push(type_text(&column)?);
     }
     Ok((columns, defaults, not_nulls, types))
@@ -909,7 +981,7 @@ fn type_text(column: &Json) -> Result<String> {
     let Some(kind) = json_get(column, "column_type").and_then(|t| json_get(t, "data_type")) else {
         return Err(Error::Invalid("snapshot column has no type".to_string()));
     };
-    let code = json_int(&kind);
+    let code = json_int(kind);
     let info = json_get(column, "column_type").and_then(|t| json_get(t, "type_info"));
     let text = match code {
         0 => "BOOLEAN",
@@ -930,19 +1002,21 @@ fn type_text(column: &Json) -> Result<String> {
         33 => "BFLOAT16",
         35 => "JSON",
         6 => {
-            let p = info.as_ref().and_then(|i| json_get(i, "precision")).map(|v| json_int(&v));
-            let s = info.as_ref().and_then(|i| json_get(i, "scale")).map(|v| json_int(&v));
-            return Ok(format!(
-                "DECIMAL({},{})",
-                p.unwrap_or(18),
-                s.unwrap_or(3)
-            ));
+            let p = info
+                .as_ref()
+                .and_then(|i| json_get(i, "precision"))
+                .map(json_int);
+            let s = info
+                .as_ref()
+                .and_then(|i| json_get(i, "scale"))
+                .map(json_int);
+            return Ok(format!("DECIMAL({},{})", p.unwrap_or(18), s.unwrap_or(3)));
         }
         15 => {
             let inner = info
                 .as_ref()
                 .and_then(|i| json_get(i, "element_type"))
-                .map(|v| json_int(&v));
+                .map(json_int);
             return Ok(format!("ARRAY({})", scalar_text(inner.unwrap_or(3))));
         }
         23 | 28 | 29 | 34 => {
@@ -955,12 +1029,12 @@ fn type_text(column: &Json) -> Result<String> {
             let elem = info
                 .as_ref()
                 .and_then(|i| json_get(i, "embedding_type"))
-                .map(|v| json_int(&v))
+                .map(json_int)
                 .unwrap_or(5);
             let dim = info
                 .as_ref()
                 .and_then(|i| json_get(i, "dimension"))
-                .map(|v| json_int(&v))
+                .map(json_int)
                 .unwrap_or(0);
             return Ok(format!("{kind}({},{dim})", element_text(elem)));
         }
@@ -968,12 +1042,12 @@ fn type_text(column: &Json) -> Result<String> {
             let elem = info
                 .as_ref()
                 .and_then(|i| json_get(i, "embedding_type"))
-                .map(|v| json_int(&v))
+                .map(json_int)
                 .unwrap_or(5);
             let dim = info
                 .as_ref()
                 .and_then(|i| json_get(i, "dimension"))
-                .map(|v| json_int(&v))
+                .map(json_int)
                 .unwrap_or(0);
             return Ok(format!("SPARSE({},{dim})", element_text(elem)));
         }
@@ -1054,7 +1128,7 @@ fn default_json(default: Option<&Option<String>>) -> Json {
 /// The inverse of [`default_json`]: the default's `.slt` text.
 fn default_text(column: &Json) -> Option<String> {
     let default = json_get(column, "default")?;
-    match json_get(&default, "value") {
+    match json_get(default, "value") {
         Some(Json::Int(v)) => Some(v.to_string()),
         Some(Json::Float(v)) => Some(format!("{v}")),
         Some(Json::Str(v)) => Some(format!("'{v}'")),
@@ -1145,13 +1219,13 @@ fn format_time(secs: i64) -> String {
     let (days, secs_of_day) = (secs.div_euclid(86400), secs.rem_euclid(86400));
     let z = days + 719468;
     let era = if z >= 0 { z } else { z - 146096 } / 146097;
-    let doe = (z - era * 146097) as i64;
+    let doe = z - era * 146097;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
     let y = yoe + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
-    let d = (doy - (153 * mp + 2) / 5 + 1) as i64;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 } as i64;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
     format!(
         "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",

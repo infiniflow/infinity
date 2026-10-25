@@ -1055,7 +1055,11 @@ impl Catalog {
             .unwrap_or(0);
         store.put(
             key::NEXT_DATABASE_ID.as_bytes(),
-            highest_db_id.max(stored_next).max(dbs.len() as u64).to_string().as_bytes(),
+            highest_db_id
+                .max(stored_next)
+                .max(dbs.len() as u64)
+                .to_string()
+                .as_bytes(),
         )?;
         // `meta|version` is what stops the reference from treating the catalog
         // as pre-0.7.0 and running its JSON-index conversion on startup
@@ -1616,6 +1620,120 @@ pub fn write_cpp_index_segments(
         }
     }
     Ok(written)
+}
+
+/// One `idx_chunk|…|chunk_info` record, i.e. `ChunkIndexMetaInfo`
+/// (`src/storage/catalog/meta/chunk_index_meta_impl.cpp:59`).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CppChunkInfo {
+    /// Full-text chunks name their files after it (`ft_{base_row_id:016x}`);
+    /// every other index type leaves it empty.
+    pub base_name: String,
+    /// `RowID` of the chunk's first row (`segment_id << 32 | offset`).
+    pub base_row_id: u64,
+    /// Data rows the chunk covers.
+    pub row_count: u64,
+    /// `(term, row)` postings; only full-text chunks fill it.
+    pub term_count: u64,
+    /// Bytes the index occupies on disk.
+    pub index_size: u64,
+}
+
+impl CppChunkInfo {
+    /// Parses the record's JSON (keys sorted, as `nlohmann::json::dump`
+    /// writes them).
+    pub fn parse(text: &[u8]) -> Option<CppChunkInfo> {
+        let json = infinity_expression::json::parse(std::str::from_utf8(text).ok()?)?;
+        let infinity_expression::json::Json::Obj(entries) = json else {
+            return None;
+        };
+        let mut out = CppChunkInfo::default();
+        for (key, value) in entries {
+            let uint = |v: &infinity_expression::json::Json| -> u64 {
+                match v {
+                    infinity_expression::json::Json::Int(i) => *i as u64,
+                    infinity_expression::json::Json::Uint(u) => *u,
+                    infinity_expression::json::Json::Str(s) => s.parse().unwrap_or(0),
+                    _ => 0,
+                }
+            };
+            match key.as_str() {
+                "base_name" => {
+                    if let infinity_expression::json::Json::Str(s) = &value {
+                        out.base_name = s.clone();
+                    }
+                }
+                "base_row_id" => out.base_row_id = uint(&value),
+                "row_count" => out.row_count = uint(&value),
+                "term_count" => out.term_count = uint(&value),
+                "index_size" => out.index_size = uint(&value),
+                _ => {}
+            }
+        }
+        Some(out)
+    }
+}
+
+/// One segment of an index with its chunks: `(segment id, [(chunk id,
+/// chunk info)])`.
+pub type CppSegmentIndex = (u32, Vec<(u64, CppChunkInfo)>);
+
+/// `TableIndexMeta::MapMetaToSnapShotInfo`'s segment layer
+/// (`table_index_meta_impl.cpp:294`): the segments this index has chunk records
+/// for — `GetTableIndexSegments`, numerically sorted — each with its chunks in
+/// chunk-id order (`SegmentIndexMeta::LoadChunkIDs1`).
+pub fn read_cpp_index_chunks(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_id: &str,
+    index_id: &str,
+) -> Result<Vec<CppSegmentIndex>> {
+    let mut segment_ids: Vec<u32> = Vec::new();
+    let prefix = format!("idx_seg|{db_id}|{table_id}|{index_id}|");
+    for (key, _) in store.scan_prefix(prefix.as_bytes())? {
+        let text = String::from_utf8_lossy(&key).to_string();
+        if let Some(suffix) = text.strip_prefix(&prefix) {
+            if let Ok(id) = suffix.parse::<u32>() {
+                segment_ids.push(id);
+            }
+        }
+    }
+    segment_ids.sort_unstable();
+    let mut out = Vec::new();
+    for segment_id in segment_ids {
+        let mut chunk_ids: Vec<u64> = Vec::new();
+        for (key, _) in store.scan_prefix(
+            key::catalog_index_chunk_prefix(db_id, table_id, index_id, segment_id).as_bytes(),
+        )? {
+            let text = String::from_utf8_lossy(&key).to_string();
+            let prefix = key::catalog_index_chunk_prefix(db_id, table_id, index_id, segment_id);
+            if let Some(suffix) = text.strip_prefix(&prefix) {
+                if let Ok(id) = suffix.parse::<u64>() {
+                    chunk_ids.push(id);
+                }
+            }
+        }
+        chunk_ids.sort_unstable();
+        let mut chunks = Vec::new();
+        for chunk_id in chunk_ids {
+            let record = key::catalog_index_chunk_tag_key(
+                db_id,
+                table_id,
+                index_id,
+                segment_id,
+                chunk_id,
+                "chunk_info",
+            );
+            let info = store
+                .get(record.as_bytes())?
+                .as_deref()
+                .and_then(CppChunkInfo::parse)
+                .unwrap_or_default();
+            chunks.push((chunk_id, info));
+        }
+        out.push((segment_id, chunks));
+    }
+    Ok(out)
 }
 
 /// The commit ts of the transaction that created `index_id`

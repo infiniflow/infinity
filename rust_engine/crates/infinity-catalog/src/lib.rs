@@ -649,6 +649,21 @@ impl Catalog {
             *slot = Some(Capture::default());
         }
         let out = f();
+        // A native catalog's `f` wrote the catalog's own key space; the C++
+        // layout it describes is what the typed WAL command is derived from
+        // (`create_table_command_from_batch` and friends read `catalog|tbl|`,
+        // `tbl|col|` and `catalog|idx|`), so mirror it inside this capture.
+        // C++-only mode already rewrote it inside `f`; a checkpoint mirrors it
+        // too, which is what covers a directory no DDL touched.
+        if out.is_ok() && !self.cpp_only {
+            // Best effort, like the checkpoint's: a column type the C++ encoding
+            // does not cover yet leaves the previous layout in place rather than
+            // failing the DDL (the next checkpoint reports it).
+            let _ = self
+                .list_databases()
+                .and_then(|dbs| Ok((dbs, self.list_tables()?, self.list_indexes()?)))
+                .and_then(|(dbs, tables, indexes)| self.rewrite_cpp(&dbs, &tables, &indexes));
+        }
         let capture = self.capture.lock().unwrap().take().unwrap_or_default();
         Ok((out?, last_op_per_key(capture.batch)))
     }
@@ -860,6 +875,11 @@ impl Catalog {
         comments: &[Option<String>],
         sparse_stores: &[Option<SparseStore>],
     ) -> Result<TableMeta> {
+        // The `CREATE TABLE … PROPERTIES (bloom_filter_columns = …)` flag is
+        // **not** recorded here: the reference's `ColumnDef::ToJson` omits
+        // `build_bloom_filter_`, so the catalog it writes reads back as
+        // all-false. The flag survives only in the WAL's `CreateTableV2`.
+
         if self.get_table_by_name(name)?.is_some() {
             return Err(Error::Catalog(format!("table '{name}' already exists")));
         }
@@ -1420,8 +1440,7 @@ mod tests {
     #[test]
     fn cpp_only_catalog_writes_only_the_cpp_key_space() {
         let dir = tempdir().unwrap();
-        let store: Arc<dyn MetaStore> =
-            Arc::new(RocksMetaStore::open(dir.path()).unwrap());
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
         let c = Catalog::with_store_cpp_only(store.clone());
         assert!(c.is_cpp_only());
         c.create_database("db2", false).unwrap();
@@ -1566,8 +1585,7 @@ mod tests {
     #[test]
     fn legacy_table_record_decodes_without_a_sparse_hint() {
         let dir = tempdir().unwrap();
-        let store: Arc<dyn MetaStore> =
-            Arc::new(RocksMetaStore::open(dir.path()).unwrap());
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
         // A record written before the hint field existed: six columns, no
         // trailing sparse hint.
         let legacy = "t\u{1e}id\u{1f}\u{1f}0\u{1f}INTEGER\u{1f}\u{1f}0";
@@ -1580,8 +1598,7 @@ mod tests {
     #[test]
     fn cpp_only_catalog_keeps_the_sparse_hint() {
         let dir = tempdir().unwrap();
-        let store: Arc<dyn MetaStore> =
-            Arc::new(RocksMetaStore::open(dir.path()).unwrap());
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
         {
             let c = Catalog::with_store_cpp_only(store.clone());
             c.create_table_typed_with_sparse_stores(
@@ -1891,8 +1908,7 @@ mod tests {
             .map(|(k, v)| (k, v.expect("the layout writer only writes")))
             .collect();
 
-        let direct: Arc<dyn MetaStore> =
-            Arc::new(RocksMetaStore::open(dst.path()).unwrap());
+        let direct: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dst.path()).unwrap());
         // The direct writer preserves the segment layer already in the store, so
         // publish it first and the two paths see the same input.
         for set in &segments {
