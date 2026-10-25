@@ -17,28 +17,107 @@ pub struct SmveResult {
     pub values: Vec<f32>,
 }
 
+/// `std::mt19937` (the reference seeds it with 42).
+///
+/// The generator itself is standard; what matters is that the reference's
+/// sequence is reproduced bit for bit, because the projection matrix is part
+/// of the on-disk chunk.
+struct Mt19937 {
+    state: [u32; 624],
+    at: usize,
+}
+
+impl Mt19937 {
+    fn new(seed: u32) -> Self {
+        let mut state = [0u32; 624];
+        state[0] = seed;
+        for i in 1..624 {
+            state[i] = 1_812_433_253u32
+                .wrapping_mul(state[i - 1] ^ (state[i - 1] >> 30))
+                .wrapping_add(i as u32);
+        }
+        Self { state, at: 624 }
+    }
+
+    fn twist(&mut self) {
+        for i in 0..624 {
+            let y = (self.state[i] & 0x8000_0000) | (self.state[(i + 1) % 624] & 0x7fff_ffff);
+            let mut next = self.state[(i + 397) % 624] ^ (y >> 1);
+            if y & 1 != 0 {
+                next ^= 0x9908_b0df;
+            }
+            self.state[i] = next;
+        }
+        self.at = 0;
+    }
+
+    fn next_u32(&mut self) -> u32 {
+        if self.at >= 624 {
+            self.twist();
+        }
+        let mut y = self.state[self.at];
+        self.at += 1;
+        y ^= y >> 11;
+        y ^= (y << 7) & 0x9d2c_5680;
+        y ^= (y << 15) & 0xefc6_0000;
+        y ^= y >> 18;
+        y
+    }
+}
+
+/// `std::generate_canonical<float, 24>` over [`Mt19937`]: with a 32-bit
+/// generator and 24 mantissa bits libstdc++ takes one draw and scales it by
+/// `2^-32` in `float` arithmetic.
+fn canonical(rng: &mut Mt19937) -> f32 {
+    (rng.next_u32() as f32) / 4_294_967_296.0f32
+}
+
+/// `std::normal_distribution<float>(0, 1)`: the polar (Marsaglia) method, with
+/// the second value cached, as libstdc++ implements it.
+struct Normal {
+    rng: Mt19937,
+    saved: Option<f32>,
+}
+
+impl Normal {
+    fn new(seed: u32) -> Self {
+        Self {
+            rng: Mt19937::new(seed),
+            saved: None,
+        }
+    }
+
+    fn next(&mut self) -> f32 {
+        if let Some(v) = self.saved.take() {
+            return v;
+        }
+        loop {
+            let x = 2.0f32 * canonical(&mut self.rng) - 1.0f32;
+            let y = 2.0f32 * canonical(&mut self.rng) - 1.0f32;
+            let r2 = x * x + y * y;
+            if r2 > 1.0 || r2 == 0.0 {
+                continue;
+            }
+            let mult = (-2.0 * r2.ln() / r2).sqrt();
+            self.saved = Some(x * mult);
+            return y * mult;
+        }
+    }
+}
+
 /// C++: `GenerateProjectionMatrix`.
 ///
-/// `dim × width` row-major, each column normalized to unit length. The
-/// reference seeds `std::mt19937` with 42; the deterministic xorshift here
-/// plays the same role (the matrix only has to be reproducible within a build
-/// and shared by writes and queries, which it is).
+/// `dim × width`, each column normalized to unit length, drawn from
+/// `std::mt19937(42)` through `std::normal_distribution<float>` — the same
+/// sequence and the same `float` arithmetic, because the matrix is written
+/// into the index chunk.
 pub fn generate_projection_matrix(dim: usize, width: usize) -> Vec<f32> {
-    let mut state = 42u64;
+    let mut normal = Normal::new(42);
     let mut mat = vec![0f32; width * dim];
     for j in 0..width {
         let mut sum_sq = 0.0f32;
         for i in 0..dim {
-            // Box-Muller on two xorshift draws.
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            let u = (((state >> 11) as f64) / ((1u64 << 53) as f64)).max(1e-12);
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            let v = ((state >> 11) as f64) / ((1u64 << 53) as f64);
-            let val = ((-2.0 * u.ln()).sqrt() * (2.0 * std::f64::consts::PI * v).cos()) as f32;
+            let val = normal.next();
             mat[j * dim + i] = val;
             sum_sq += val * val;
         }
@@ -123,6 +202,9 @@ pub struct SmveIndex {
     embedding_dim: u32,
     projection_matrix: Vec<f32>,
     bmp: BmpAlg,
+    /// The sparse code of each document, in insertion order: the BMP writer
+    /// needs the documents, and the chunk carries them.
+    docs: Vec<(u32, Vec<(u32, f32)>)>,
     /// Row id of each BMP document id.
     labels: Vec<u32>,
     built: bool,
@@ -137,6 +219,7 @@ impl SmveIndex {
             embedding_dim,
             projection_matrix: generate_projection_matrix(embedding_dim as usize, width as usize),
             bmp: BmpAlg::new(crate::sparse::BMP_BLOCK_SIZE),
+            docs: Vec::new(),
             labels: Vec::new(),
             built: false,
         }
@@ -185,6 +268,7 @@ impl SmveIndex {
             .filter(|(_, v)| *v != 0.0)
             .collect();
         self.bmp.add_doc(&entries);
+        self.docs.push((row_id, entries));
         self.labels.push(row_id);
         self.bmp.build();
         self.built = true;
@@ -254,6 +338,16 @@ impl SmveIndex {
             + self.width as usize * self.embedding_dim as usize * 4
             + self.labels.len() * 4
             + self.bmp.len() * 16
+    }
+
+    /// The `dim × width` projection matrix (the reference's own sequence).
+    pub fn projection(&self) -> &[f32] {
+        &self.projection_matrix
+    }
+
+    /// Each document's sparse code, in insertion order: `(row id, [(term, value)])`.
+    pub fn docs(&self) -> &[(u32, Vec<(u32, f32)>)] {
+        &self.docs
     }
 
     /// C++: `SMVEIndexInMem::GetChunkIndexMetaInfo` (row count part).
@@ -331,5 +425,28 @@ mod tests {
         let (_, ids) = index.search(&query, 3, 4, Some(&allowed));
         assert_eq!(ids, vec![5]);
         assert!(index.size_in_bytes() > 0);
+    }
+
+    /// The projection matrix is written into the chunk, so it has to be the
+    /// reference's sequence: `std::mt19937(42)` through
+    /// `std::normal_distribution<float>` (polar method, second value cached),
+    /// with the same `float` arithmetic. Expected values taken from the
+    /// reference's own `chunk_0.idx` for a `TENSOR(FLOAT,4)` column.
+    #[test]
+    fn the_projection_matrix_matches_the_reference_sequence() {
+        let matrix = generate_projection_matrix(4, 2048);
+        let expected = [
+            0.701173961f32,
+            -0.296649039,
+            0.499022365,
+            0.413921654,
+            0.618849814,
+            0.630404711,
+            -0.0728976876,
+            -0.462926388,
+        ];
+        for (i, want) in expected.iter().enumerate() {
+            assert_eq!(matrix[i], *want, "element {i}");
+        }
     }
 }

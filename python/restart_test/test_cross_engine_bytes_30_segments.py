@@ -5,8 +5,8 @@
 `test_a_compacted_table_matches_and_keeps_its_sources` /
 `test_a_cleanup_reclaims_the_deprecated_sources`（4 段压成 1 段再回收）、
 `test_a_compaction_with_one_segment_is_a_no_op`、
-`test_a_table_larger_than_a_segment_starts_a_second_one`（838 万行按容量切段，
-需要 `INFINITY_BYTES_HUGE=1`），以及
+`test_a_table_larger_than_a_segment_starts_a_second_one`（三段容量切分 + 全文索引
+按 `mem_index_capacity` 切 chunk，需要 `INFINITY_BYTES_HUGE=1`），以及
 `test_the_chunk_boundaries_are_timing_dependent`（证明 chunk 边界是调度结果，
 不能当字节门禁）。
 
@@ -870,15 +870,21 @@ def test_a_cleanup_reclaims_the_deprecated_sources():
 
 HUGE_TABLE = "test_cross_engine_huge"
 HUGE_SEGMENT_CAPACITY = 8192 * 1024
-HUGE_ROWS = HUGE_SEGMENT_CAPACITY + 92
+# `DEFAULT_SEGMENT_CAPACITY` is 8,388,608 rows, so three segments need two
+# full ones plus a tail. The reference cannot be asked for a smaller capacity,
+# hence the opt-in gate; two is the smallest split worth checking and three is
+# what tells a capacity split apart from an import that just started a second
+# segment.
+HUGE_SEGMENTS = int(os.environ.get("INFINITY_BYTES_HUGE_SEGMENTS", "3"))
+HUGE_ROWS = (HUGE_SEGMENTS - 1) * HUGE_SEGMENT_CAPACITY + 92
 HUGE_ENABLED = os.environ.get("INFINITY_BYTES_HUGE", "") not in ("", "0")
 
 
 def _huge_csv(path, rows):
-    """`id, score` per row, written in one pass."""
+    """`id, title` per row, written in one pass."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", buffering=1 << 20) as handle:
-        handle.writelines(f"{i},{i % 1000}\n" for i in range(rows))
+        handle.writelines(f"{i},doc-{i}\n" for i in range(rows))
 
 
 def _huge_phase(conn, directory):
@@ -886,11 +892,17 @@ def _huge_phase(conn, directory):
     db.drop_table(HUGE_TABLE, ConflictType.Ignore)
     t = db.create_table(
         HUGE_TABLE,
-        {"id": {"type": "int"}, "score": {"type": "int"}},
+        {"id": {"type": "int"}, "title": {"type": "varchar"}},
         ConflictType.Error,
     )
+    # An index on the huge table: the import populates it inside the import
+    # transaction and the memory index dumps one chunk per `mem_index_capacity`
+    # (65536) rows, per segment — which is the layout the two engines have to
+    # agree on at 8M rows, not just at 200.
+    t.create_index("ft", index.IndexInfo("title", index.IndexType.FullText))
     t.import_data(os.path.join(directory, "huge.csv"))
     conn.flush_data()
+    t.dump_index("ft")
     time.sleep(2)
 
 
@@ -904,11 +916,18 @@ def _huge_phase(conn, directory):
     not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
 )
 def test_a_table_larger_than_a_segment_starts_a_second_one():
-    """8,388,700 rows in one `IMPORT`: 1024 blocks in `seg_0`, 92 rows in `seg_1`.
+    """`(HUGE_SEGMENTS - 1) * 8,388,608 + 92` rows in one `IMPORT`.
 
-    Both engines seal `seg_0` at `DEFAULT_SEGMENT_CAPACITY` and open `seg_1` for
-    the tail, all inside the import transaction: one commit ts, one `create`
-    per block, and the same block ids in each segment (0…1023, then 0).
+    Both engines seal a segment at `DEFAULT_SEGMENT_CAPACITY` and open the next
+    one inside the same import transaction: one commit ts, one `create` per
+    block, and the same block ids in each segment (0…1023, then 0). With the
+    default of three segments the tail case and the repeated split are both
+    exercised (`seg_0` and `seg_1` full, `seg_2` holding 92 rows).
+
+    The table carries a full-text index, so the import also has to populate it
+    and the dump has to cut one chunk per `mem_index_capacity` (65536) rows per
+    segment — 128 chunks for each full segment, one for the tail. That is the
+    layout the two engines have to agree on at 8M rows, not just at 200.
     """
     cpp_root = os.path.join(ROOT, "huge_cpp")
     rust_root = os.path.join(ROOT, "huge_rust")
@@ -921,6 +940,15 @@ def test_a_table_larger_than_a_segment_starts_a_second_one():
     finally:
         shutil.rmtree(directory, ignore_errors=True)
 
+    full = HUGE_SEGMENTS - 1
+    tail = HUGE_SEGMENT_CAPACITY * full
+    tail_rows = HUGE_ROWS - tail
+    expected_blocks = {f"seg_{i}": 1024 for i in range(full)}
+    expected_blocks[f"seg_{full}"] = 1
+    # `mem_index_capacity` = 65536 rows per chunk within a segment.
+    expected_chunks = {f"seg_{i}": 128 for i in range(full)}
+    expected_chunks[f"seg_{full}"] = 1
+
     cpp_files, rust_files = _files(cpp_root), _files(rust_root)
     for label, files in (("cpp", cpp_files), ("rust", rust_files)):
         blocks = [
@@ -928,23 +956,27 @@ def test_a_table_larger_than_a_segment_starts_a_second_one():
             for name in files
             if "/seg_" in name and "/blk_" in name and name.endswith("/version")
         ]
-        segments = sorted({"seg_0", "seg_1"} & {parts[2] for parts in blocks})
-        assert segments == ["seg_0", "seg_1"], f"{label}: segments {segments}"
+        segments = sorted(set(expected_blocks) & {parts[2] for parts in blocks})
+        assert segments == sorted(expected_blocks), f"{label}: segments {segments}"
         per_segment = {
             segment: sum(1 for parts in blocks if parts[2] == segment)
             for segment in segments
         }
-        assert per_segment == {"seg_0": 1024, "seg_1": 1}, (
+        assert per_segment == expected_blocks, (
             f"{label}: blocks per segment {per_segment}"
         )
+        # A full-text chunk is one `.dic` under `db_{db}/tbl_{tbl}/idx_{id}/seg_{s}/`.
+        chunks = {}
+        for name in files:
+            parts = name.split("/")
+            if len(parts) >= 5 and parts[2].startswith("idx_") and name.endswith(".dic"):
+                chunks[parts[3]] = chunks.get(parts[3], 0) + 1
+        assert chunks == expected_chunks, f"{label}: chunks per segment {chunks}"
 
-    # Only the last block of each segment needs comparing in full: the other
-    # 1024 are the same 8192-row shape, and the comparison below walks them all
-    # through the masked `.col` compare anyway.
     cpp_dir = _own_table_dir(cpp_files, 2)
     rust_dir = _own_table_dir(rust_files, 2)
     failures = _compare_data_files(
-        _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), {}
+        _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), {1: "fulltext"}
     )
     assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
         failures[:20]
