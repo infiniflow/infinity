@@ -231,8 +231,8 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 - **除上述清单外**，若确需合并、拆分或替换某个 C++ 类/方法，应先登记为**新的设计变更**（动机、影响范围、与 C++ 的对应关系），再实现；不允许默默简化。
 - 不得把多个 C++ 类合并成一个「上帝对象」或一组自由函数；不得以全表扫描代替索引迭代器、以单个内存 map 代替「segment + memindex」两形态、以行式 `Value` 代替列式 `ColumnVector` 而不登记。
 - **C++ 单元测试随类移植**：`src/unit_test` 中针对某个 C++ 类的测试，若 Rust 已有对应类/方法，则该测试必须一并移植（同等场景与断言）并纳入 `cargo test`；依赖 C++ 内部表示、FFI 或尚未移植方法的用例，在 `CLASS_MAP.md` 的「未移植单测」表登记，**不得以 Gate A 通过替代**。
-- 对照表维护在 `rust_engine/docs/CLASS_MAP.md`：每个 Rust `pub fn` 的文档注释写 `C++: path:line`；「有意的设计变更」「尚未一一对应」「未移植单测」三张表必须与代码同步。
-- 验收：`CLASS_MAP.md` 中「尚未一一对应」的条目即移植未完成项；Gate A 全绿**不代表**移植完成。
+- 对照表维护在 `rust_engine/docs/CLASS_MAP.md`：每个 Rust `pub fn` 的文档注释写 `C++: path:line`；§2 的逐名清单、「有意的设计变更」「未移植单测」必须与代码同步。
+- 验收：`CLASS_MAP.md` §2 里不是 `mapped` 的行、§4 未登记的设计差异即移植未完成项；Gate A 全绿**不代表**移植完成。
 
 ---
 
@@ -255,7 +255,7 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 2. **逐类移植**：以一个 C++ 类及其被其他类依赖的方法为最小移植单元；不把多个类合并成简化实现。
 3. **单测随类**：已有对应 Rust 类的 C++ 单元测试必须移植（§3.6），不能移植的登记「未移植单测」。
 4. **设计变更白名单**：调度器、FST、SIMD/压缩/`mmap` 等（§3.6）；新增变更须显式批准并登记。
-5. **conformance 是验收，不是设计来源**：Gate A/B 通过不表示移植完成；`CLASS_MAP.md` 的「尚未一一对应」「未移植单测」未闭合即未完成。
+5. **conformance 是验收，不是设计来源**：Gate A/B 通过不表示移植完成；`CLASS_MAP.md` 的 `partial` 行与「未移植单测」未闭合即未完成。
 6. **新旧二进制并存**：C++ 作为 oracle 与差分基准；按垂直切片交付，但切片内部按类移植，不按「能过测试的最小实现」切。
 
 线协议（Thrift/HTTP）保持兼容，现有 SDK 测试无需修改即可作为验收门槛。
@@ -397,7 +397,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 | **M0 一致性基础设施** | workspace；CI；Thrift codegen；conformance harness（冻结清单）；**`CLASS_MAP.md` 初版 + C++ 单测清单**；trait 定稿；跨底座宕机契约；索引状态矩阵；确定性规则；四类原型 | 握手成功；`SELECT 1`；harness 能对 C++ 跑全量并产出基线；**计划移植的类、public 方法、单测都已在 CLASS_MAP 登记**；规则定稿；原型给出人月区间 |
 | **M1 存储内核** | `MetaStore` + WAL + BufferManager + BlockStore + MVCC + catalog（按 C++ 类逐个移植） | 存储层单测；**对应 C++ 单测已移植**；重启/宕机恢复测试 |
 | **M2 查询内核** | lexer/parser/expr/planner/optimizer/physical/executor | 无索引 ddl/dml/dql 子集全绿；`EXPLAIN` 可产出；**对应类的 C++ 单测已移植** |
-| **M3 索引** | 二级 → HNSW → 全文 → 稀疏 → IVF → 多向量（DiskANN 视状态矩阵）；每项按 C++ 类边界移植 | `test/sql/dql/**`、`ddl/index`、`snapshot` 全绿；**CLASS_MAP 中 M3 范围「尚未一一对应 / 未移植单测」清零** |
+| **M3 索引** | 二级 → HNSW → 全文 → 稀疏 → IVF → 多向量（DiskANN 视状态矩阵）；每项按 C++ 类边界移植 | `test/sql/dql/**`、`ddl/index`、`snapshot` 全绿；**CLASS_MAP 中 M3 范围「`partial` 行 / 未移植单测」清零** |
 | **M4 网络与 SDK** | Thrift 全量 RPC；HTTP 路由 | `python/test_pysdk` + `go/tests` 全绿（未修改 SDK）；HTTP 模式全绿 |
 | **M5 并发/持久化/性能** | 压测、崩溃恢复、loom/miri/sanitizer、性能调优 | `parallel_test`；Gate E 达标；集群视范围 |
 | **M6 发布与迁移** | `infinity-import`（校验/回滚）、打包、灰度 | 发布候选；迁移演练通过 |

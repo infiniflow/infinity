@@ -63,11 +63,10 @@
 
 ### 2.4 台账驱动：不让"看起来实现了"蒙混
 
-- `CLASS_AUDIT.md`：参考每个 `export class/struct` 一行，`mapped` / `partial` / `test` / `exempt` / `excluded`。
+- `CLASS_MAP.md`：参考每个 `export class/struct` 一行（`mapped` / `partial` / `test` / `exempt` / `excluded`），以及关键类的方法级对应与登记过的设计变更。
 - `TEST_AUDIT.md`：参考每个 `TEST/TEST_F/TEST_P` 一行，`ported` / `excluded` / `exempt`。
-- `CLASS_MAP.md`：关键类与方法的一一对应，以及登记过的设计变更。
 
-`partial` 不是"差不多"，是"生产路径只走到一部分"，必须写清缺哪一段。三份台账是"覆盖"的唯一口径：没有行的功能不算覆盖，没有对应测试的类不算移植。
+`partial` 不是"差不多"，是"生产路径只走到一部分"，必须写清缺哪一段。两份台账是"覆盖"的唯一口径：没有行的功能不算覆盖，没有对应测试的类不算移植。
 
 ### 2.5 门禁分层，修一个差异沉一条测试
 
@@ -117,14 +116,13 @@
 |---|---|---|---|---|
 | S1 | 冻结磁盘格式 | [`CPP_FORMAT_SPEC.md`](CPP_FORMAT_SPEC.md) | 数据文件、`version`、列体、outline、倒排三件套、次级/稀疏索引、WAL、catalog 键的字节级规格，逐条带 `文件:行` | 要动格式，或想知道某段字节为什么长这样 |
 | S2 | 做到逐字节等价 | [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) | 三层口径的边界、门禁的分层与覆盖矩阵、格式层面的例外及原因、复现步骤 | 跑/改/新增格式门禁 |
-| S3 | 类级覆盖不漏 | [`CLASS_AUDIT.md`](CLASS_AUDIT.md) | 参考每个 `export class/struct` 的映射状态；`partial` 说明缺哪一段 | 查某个类有没有对应 |
+| S3 | 类级覆盖与方法对应 | [`CLASS_MAP.md`](CLASS_MAP.md) | 参考每个 `export class/struct` 的状态与 Rust 落点；关键类的方法级对应；有意的设计变更；已/未移植的单测 | 查某个类有没有对应、某个差异是不是故意的 |
 | S4 | 用例级覆盖不漏 | [`TEST_AUDIT.md`](TEST_AUDIT.md) | 参考每个 `TEST/TEST_F/TEST_P` 在 Rust 的落点，或排除理由 | 查某个 C++ 单测对应哪条 |
-| S5 | 结构与设计变更可追溯 | [`CLASS_MAP.md`](CLASS_MAP.md) | 类/方法的一一对应；「有意的设计变更」「尚未一一对应」「未移植单测」三张表 | 想知道某个 C++ 类型在 Rust 里是谁、某个差异是否故意 |
-| S6 | 内部不变量有测试兜住 | [`INVARIANT_MATRIX.md`](INVARIANT_MATRIX.md) | C++ 不变量 → Rust 回归测试的对照；Gate G 的三组（配置、存储/事务、索引） | 想知道某条不变量由谁兜住 |
-| S7 | catalog 底座与互操作 | [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) | 唯一后端（RocksDB）、与参考目录互读的条件、fsync 点 | 参考打不开目录、或想确认落盘点 |
-| S8 | 缺口收口 | [`GAPS.md`](GAPS.md) | 唯一缺口总表：有意不移植 / 未实现 / 不可字节比 / 覆盖不到 | 想知道"还差什么" |
+| S5 | 内部不变量有测试兜住 | [`INVARIANT_MATRIX.md`](INVARIANT_MATRIX.md) | C++ 不变量 → Rust 回归测试的对照；Gate G 的三组（配置、存储/事务、索引） | 想知道某条不变量由谁兜住 |
+| S6 | catalog 底座与互操作 | [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) | 唯一后端（RocksDB）、与参考目录互读的条件、fsync 点 | 参考打不开目录、或想确认落盘点 |
+| S7 | 缺口收口 | [`GAPS.md`](GAPS.md) | 唯一缺口总表：有意不移植 / 未实现 / 不可字节比 / 覆盖不到 | 想知道"还差什么" |
 
-子目标之间的依赖：S1 是 S2 的输入；S2 的例外决定 S8 §3；S3/S4/S5 是"覆盖"的口径，S6 是"不变量"的口径；S7 是跨引擎互操作的前提（两引擎共用同一个 catalog 键空间）。
+子目标之间的依赖：S1 是 S2 的输入；S2 的例外决定 S7 §3；S3/S4 是"覆盖"的口径，S5 是"不变量"的口径；S6 是跨引擎互操作的前提（两引擎共用同一个 catalog 键空间）。
 
 ---
 

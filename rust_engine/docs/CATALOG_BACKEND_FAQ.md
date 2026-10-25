@@ -1,6 +1,6 @@
 # Catalog 后端 FAQ：RocksDB、磁盘兼容与 fsync
 
-> **子目标 S7 · catalog 底座与互操作**｜纲领见 [`PORTING.md`](PORTING.md) §5
+> **子目标 S6 · catalog 底座与互操作**｜纲领见 [`PORTING.md`](PORTING.md) §5
 
 这份文档回答三个反复出现的问题：**Rust 侧用哪个 catalog 后端**、**它和参考实现的目录能不能互相读**、**在哪些点上真的做了 fsync**。
 

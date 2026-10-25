@@ -9,7 +9,7 @@
 - `exempt`：SIMD/第三方夹具、整段或整块位于 `#if 0` 的用例（C++ 构建中不存在），以及登记为设计变更的组件——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 事务型 KV、无 WAL 的 checkpoint 模式、后台任务线程池等（后三项的等价实现已在 `ported` 行给出）。
 - 带 `#[ignore]` 的 `ported` 行：C++ 的 `DISABLED_*` 用例，Rust 用 `#[ignore]` 表达，需 `cargo test -- --ignored` 显式运行。
 
-表里只有以上三种状态，没有 `partial`/`gap` 行；类层面的 `partial` 在 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)。
+表里只有以上三种状态，没有 `partial`/`gap` 行；类层面的状态与 `partial` 在 [`CLASS_MAP.md`](CLASS_MAP.md) §2。
 
 | # | 文件 | Fixture | 用例 | 状态 |
 |---:|---|---|---|---|
