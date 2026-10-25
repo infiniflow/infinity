@@ -12820,6 +12820,14 @@ impl Engine {
 
     /// Rows committed per block while streaming a `COPY … FROM`.
     const COPY_BATCH_ROWS: usize = 8192;
+    /// Rows one `COPY` stages into its single transaction before it commits
+    /// early. The reference imports a whole statement in one transaction; the
+    /// bound exists because the port's index chunks are produced by commits
+    /// (the rows only reach the memory index at that point), so a single
+    /// 8M-row transaction leaves the full-text index with no chunk at all.
+    /// Dropping the bound therefore needs the reference's in-transaction
+    /// `PopulateIndex` dump first.
+    const IMPORT_TXN_ROWS: usize = 33_554_432;
 
     /// Number of segments `table` has: at least one per write batch, and more
     /// when a single import exceeds the segment capacity.
@@ -15390,6 +15398,13 @@ impl Engine {
                     self.update_vector_caches(table, base + k, &texts);
                 }
                 total += batch.len();
+                staged += batch.len();
+                if staged >= Self::IMPORT_TXN_ROWS {
+                    self.commit_import_chunk(table, t, &segments)?;
+                    t = self.txn.begin();
+                    staged = 0;
+                    segments.clear();
+                }
             }
             if eof {
                 break;
