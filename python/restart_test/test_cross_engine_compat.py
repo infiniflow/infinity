@@ -222,15 +222,11 @@ def _catalog_snapshot(conn):
         "tables": sorted(db.list_tables().table_names),
         "column_count": meta.column_count,
         "segment_count": meta.segment_count,
-        # Names and the scalar types compare exactly. The SPARSE column's type
-        # text does not: both engines read the same stored bytes but render the
-        # sparse DataType differently (C++ prints `Sparse(float,int8,0)`, Rust
-        # `Sparse(float,int32,8)`), so only the element type is compared - it is
-        # the part both engines agree on and the part the index is built from.
-        "columns": [
-            (name, ty if not ty.lower().startswith("sparse") else ty.split(",")[0])
-            for name, ty in zip(cols["name"], cols["type"])
-        ],
+        # Names and types compare exactly, SPARSE included: both engines print
+        # `Sparse(<elem>,<index>,<dimension>)` from the same catalog record
+        # (`DataType::ToString()`), so the index width and the bound are part of
+        # the comparison too.
+        "columns": list(zip(cols["name"], cols["type"])),
     }
 
 
@@ -419,7 +415,9 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
         "Varchar",
         "Varchar",
         "Embedding(float,4)",
-        "Sparse(float",
+        # The SDK's `sparse,8,float,int`: the engine renders the element, the
+        # index width and the bound, all three from the catalog record.
+        "Sparse(float,int32,8)",
         "Float",
         "BigInt",
         "Double",

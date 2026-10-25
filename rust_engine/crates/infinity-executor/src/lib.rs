@@ -23196,6 +23196,48 @@ mod tests {
         assert!(validate_tensor_dimension("VARCHAR", "'no tensor'").is_ok());
     }
 
+    /// `SHOW TABLE … COLUMNS` prints what the reference's
+    /// `DataType::ToString()` prints: `Sparse(<elem>,<index>,<dimension>)` with
+    /// the element and index names of `EmbeddingDataType` and the dimension the
+    /// column was declared with. The index width follows the bound for the
+    /// two-part spelling and the declaration for the three-part one. Measured
+    /// on the reference: `SPARSE(FLOAT,8)` → `Sparse(float,int8,8)`,
+    /// `SPARSE(FLOAT,30000)` → `Sparse(float,int16,30000)`, and the SDK's
+    /// `sparse,8,float,int` (which the server renders as
+    /// `SPARSE(float,int32,8)`) → `Sparse(float,int32,8)`.
+    #[test]
+    fn a_sparse_column_renders_like_the_reference() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute(
+            "CREATE TABLE sp_render (id INT, a SPARSE(FLOAT, 8), \
+             b SPARSE(FLOAT, INT32, 8), c SPARSE(FLOAT, 30000));",
+        )
+        .unwrap();
+        let got = rows(&e, "SHOW TABLE sp_render COLUMNS;");
+        assert_eq!(got[1][1], "Sparse(float,int8,8)");
+        assert_eq!(got[2][1], "Sparse(float,int32,8)");
+        assert_eq!(got[3][1], "Sparse(float,int16,30000)");
+
+        // An unknown bound is the SDK's `sparse,0,…` spelling; the reference
+        // prints the same text for it.
+        crate::with_zero_dimension_sparse(|| {
+            e.execute("CREATE TABLE sp_zero (id INT, s SPARSE(FLOAT, 0));")
+        })
+        .unwrap();
+        let got = rows(&e, "SHOW TABLE sp_zero COLUMNS;");
+        assert_eq!(got[1][1], "Sparse(float,int8,0)");
+
+        // The rendering survives a restart, which reads the type back from the
+        // catalog record (`type_text_of`).
+        e.flush().unwrap();
+        let e = crate::new_catalog_ut::reopen(e, dir.path());
+        let got = rows(&e, "SHOW TABLE sp_render COLUMNS;");
+        assert_eq!(got[1][1], "Sparse(float,int8,8)");
+        assert_eq!(got[2][1], "Sparse(float,int32,8)");
+        assert_eq!(got[3][1], "Sparse(float,int16,30000)");
+    }
+
     #[test]
     fn describe_type_names() {
         assert_eq!(describe_type("INT"), "Integer");

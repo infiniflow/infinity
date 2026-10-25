@@ -369,13 +369,24 @@ pub fn type_text_of(column_type: &infinity_expression::json::Json) -> Option<Str
                 // `data_type` field is the element.
                 _ => ("SPARSE", "data_type"),
             };
-            let elem = value_format::type_info_int(column_type, elem_key)?;
-            let dim = value_format::type_info_int(column_type, "dimension")?;
+            let elem = match value_format::type_info_int(column_type, elem_key) {
+                Some(code) => code,
+                // A SPARSE element that the record does not name reads as
+                // `kElemBit` (0) through `SparseInfo::Deserialize`.
+                None if code == value_format::logical::SPARSE => 0,
+                None => return None,
+            };
+            // `SparseInfo::Deserialize` casts `doc["dimension"].get<size_t>()`
+            // straight through, so a record that does not carry the field
+            // yields 0 rather than failing - the same for the index width
+            // (`kElemBit` = 0). A SPARSE column from an older writer therefore
+            // still renders (`Sparse(bit,bit,0)`), as the reference prints it.
+            let dim = value_format::type_info_int(column_type, "dimension").unwrap_or(0);
             // A SPARSE record also stores the index width, which is *not* a
             // function of the bound (`sparse,8,float,int` is an int32 index
             // over a bound of 8), so keep it in the text.
             let text = if code == value_format::logical::SPARSE {
-                let index = value_format::type_info_int(column_type, "index_type")?;
+                let index = value_format::type_info_int(column_type, "index_type").unwrap_or(0);
                 format!(
                     "{base}({},{},{})",
                     element_name(elem)?,
@@ -2274,6 +2285,33 @@ mod tests {
             assert_eq!(type_text_of(&j).unwrap(), canonical, "{text}");
             let j2 = data_type_of_text(canonical).unwrap();
             assert_eq!(type_text_of(&j2).unwrap(), canonical, "{canonical}");
+        }
+    }
+
+    /// A SPARSE record always carries `data_type`, `index_type` and
+    /// `dimension`; a record from another writer may not. `SparseInfo::
+    /// Deserialize` casts each missing field straight to its enum, i.e. 0
+    /// (`kElemBit` / dimension 0), so the text keeps a value instead of
+    /// collapsing to the empty string (`SHOW COLUMNS` would print `Invalid`).
+    #[test]
+    fn a_sparse_record_without_its_optional_fields_still_renders() {
+        for (json, text) in [
+            (
+                r#"{"data_type":30,"type_info":{"data_type":5,"dimension":8,"index_type":3,"sort":0}}"#,
+                "SPARSE(float,int32,8)",
+            ),
+            (
+                r#"{"data_type":30,"type_info":{"data_type":5,"dimension":8}}"#,
+                "SPARSE(float,bit,8)",
+            ),
+            (
+                r#"{"data_type":30,"type_info":{"data_type":5,"index_type":1}}"#,
+                "SPARSE(float,int8,0)",
+            ),
+            (r#"{"data_type":30,"type_info":{}}"#, "SPARSE(bit,bit,0)"),
+        ] {
+            let j = infinity_expression::json::parse(json).unwrap();
+            assert_eq!(type_text_of(&j).unwrap(), text, "{json}");
         }
     }
 
