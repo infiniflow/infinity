@@ -154,7 +154,7 @@
 | 索引 chunk 的粒度 | `IMPORT` 的段：全文按 `mem_index_capacity` 切、次级/稀疏整段一个；`INSERT` 的段：按块 | 同左 | 一段三块用例（§3） |
 | 压缩后的段布局 | 合并段 = 最大段号 + 1，块/版本/chunk 都带压缩事务的 ts；源段保留文件与记录，另写 `drop\|seg\|` 与 `drop\|idx_seg\|`、删 `(index, segment)` 配对；`Cleanup` 才回收 | 同左 | 4 段压缩用例（§3） |
 | 压缩 / 导入的 WAL 命令 | 一帧一条 `CompactV2` / `ImportV2`（不搬行），带索引的表在同一帧追加每个 index 的 `DumpIndexV2`（`chunk_id` 0、`base_row_id` 段基址、`row_count` 段行数、`deprecate_ts` u64::MAX；全文的 `base_name` 是 `ft_<base>`、`term_count` 是 `(term, row)` posting 数）；导入帧的 `table_key` 是表的 catalog 键，压缩帧为空 | 同左 | 载荷与参考逐字节相同（`wal_shape_ut` 以参考 `wal.log` 的字节为 fixture）；`DumpIndexV2` 的字段由 `an_indexed_{import,compaction}_logs_the_dump_in_the_same_frame` 钉住 |
-| `COPY` 的帧划分 | 一条 `COPY` 是一个事务、一帧（解析按 8192 行一批，写入同一个 `Txn`）；只有超过 `IMPORT_TXN_ROWS`（1,048,576 行）的压测导入才分批提交，那是内存上限而不是格式选择 | 同左 | 导入用例的 `ImportV2` 帧与参考相同（§3） |
+| `COPY` 的帧划分 | 一条 `COPY` 是一个事务、一帧（解析按 8192 行一批，写入同一个 `Txn`，末尾提交一次；16,777,308 行也一样） | 同左 | 导入用例的 `ImportV2` 帧与参考相同（§3）；8.39M/16.7M 两个规模逐字节比（§5.2） |
 | DDL 帧的来源 | DDL 事务自己捕获的 batch：`Catalog::capture` 在语句执行后重写一次 C++ 布局并把改写记进 batch，`CreateTableV2` / `CreateIndexV2` / … 由它派生 | 同左（原生写与布局在同一 commit） | `test_the_ddl_wal_commands_match_the_reference` |
 | `seg\|…\|fast_rough_filter` / `blk\|…` | 与参考同字节（`fast_rough_filter.rs`） | `IMPORT`/压缩时建 | 已逐字节比：`test_the_fast_rough_filters_match_byte_for_byte` 用 `dump-catalog` 读十六进制（`show catalog` 渲染二进制为空，走它只能断言记录存在）；字节另有 `fast_rough_filter.rs` 单测的 130 字节 fixture 钉住（§5.2.3） |
 | 段的产生时机 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切（与参考相同）；单段 `COMPACT` 不开事务 | 按 `DEFAULT_SEGMENT_CAPACITY = 8,388,608` 行切 | 见 §5.2 |

@@ -15322,8 +15322,8 @@ impl Engine {
         let mut total = 0usize;
         let mut first_batch = true;
         // `NewTxn::Import` is one transaction for the whole statement, so the
-        // rows are staged into a single `Txn` and committed once
-        // (`IMPORT_TXN_ROWS` bounds the memory a stress import may hold).
+        // rows are staged into a single `Txn` and committed once - at the end,
+        // for every size (the commit below keys on `staged`).
         let mut t = self.txn.begin();
         let mut staged = 0usize;
         let mut segments: Vec<u32> = Vec::new();
