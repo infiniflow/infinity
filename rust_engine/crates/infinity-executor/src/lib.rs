@@ -12820,16 +12820,6 @@ impl Engine {
 
     /// Rows committed per block while streaming a `COPY … FROM`.
     const COPY_BATCH_ROWS: usize = 8192;
-    /// Rows one `COPY` stages into its single transaction before it commits
-    /// early.
-    ///
-    /// The reference imports a whole statement in one transaction. One
-    /// transaction works for an 8,388,700-row import with an index (measured:
-    /// byte identical), but **not** past the segment capacity: at 16,777,308
-    /// rows the single transaction leaves the full-text index with no chunk at
-    /// all (`rust: chunks per segment {}`), so the bound stays until the whole
-    /// import is known to survive one transaction.
-    const IMPORT_TXN_ROWS: usize = 33_554_432;
 
     /// Number of segments `table` has: at least one per write batch, and more
     /// when a single import exceeds the segment capacity.
@@ -15401,12 +15391,6 @@ impl Engine {
                 }
                 total += batch.len();
                 staged += batch.len();
-                if staged >= Self::IMPORT_TXN_ROWS {
-                    self.commit_import_chunk(table, t, &segments)?;
-                    t = self.txn.begin();
-                    staged = 0;
-                    segments.clear();
-                }
             }
             if eof {
                 break;
