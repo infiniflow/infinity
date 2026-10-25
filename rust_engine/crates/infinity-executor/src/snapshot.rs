@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 
 use infinity_catalog::value_format;
 use infinity_expression::json::Json;
-use infinity_common::{Error, Result};
+use infinity_common::{Error, Result, TxnTimeStamp};
 use infinity_storage::block_index::BlockIndex;
 use infinity_storage::wal::ddl_def::{ColumnDef, ConstantExpr, TableDef};
 use infinity_storage::wal_entry::WalCmd;
@@ -42,9 +42,10 @@ pub struct SnapshotBrief {
     pub scope: String,
     /// The snapshot directory's ctime, `%Y-%m-%d %H:%M:%S`.
     pub create_time: String,
-    /// The reference never sets `SnapshotBrief::commit_ts_` (the assignment is
-    /// commented out at `snapshot_brief_impl.cpp:94`), so it prints whatever
-    /// the default-constructed member holds. The port prints 0.
+    /// The snapshot's ts (the metadata's `max_commit_ts`, the same number the
+    /// WAL command carries). The reference never fills this — the assignment
+    /// is commented out at `snapshot_brief_impl.cpp:94`, so its column prints
+    /// an uninitialized value — and the port fills it instead.
     pub commit_ts: u64,
     pub size: u64,
 }
@@ -116,7 +117,7 @@ impl Engine {
                 name: name.to_string(),
                 scope: scope.to_string(),
                 create_time: created,
-                commit_ts: 0,
+                commit_ts: snapshot_commit_ts(&json),
                 size: dir_size(&path),
             });
         }
@@ -191,15 +192,17 @@ impl Engine {
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
         let db_id = self.database_id(&db_name);
+        // The snapshot's ts is fixed before anything is written, so the
+        // metadata and the WAL command carry the same number.
+        let snapshot_ts = self.begin_ts();
         let dir = self.prepare_snapshot_dir(name)?;
-        let json = self.write_table_snapshot(&dir, name, db_id, &meta)?;
+        let json = self.write_table_snapshot(&dir, name, db_id, &meta, snapshot_ts)?;
         self.write_snapshot_json(&dir, name, &json)?;
-        let begin_ts = self.begin_ts();
         self.log_snapshot(WalCmd::CreateTableSnapshot {
             db_name,
             table_name,
             snapshot_name: name.to_string(),
-            max_commit_ts: begin_ts,
+            max_commit_ts: snapshot_ts,
         })
     }
 
@@ -207,6 +210,7 @@ impl Engine {
     /// one `DATABASE`-scoped metadata JSON, logged as `CREATE_DB_SNAPSHOT`.
     pub fn create_database_snapshot(&self, name: &str, db: &str) -> Result<()> {
         let db_id = self.database_id(db);
+        let snapshot_ts = self.begin_ts();
         let dir = self.prepare_snapshot_dir(name)?;
         let mut table_snapshots = Vec::new();
         for meta in self.storage.catalog.list_tables()? {
@@ -214,7 +218,8 @@ impl Engine {
             if !meta_db.eq_ignore_ascii_case(db) {
                 continue;
             }
-            table_snapshots.push(self.write_table_snapshot(&dir, name, db_id, &meta)?);
+            table_snapshots
+                .push(self.write_table_snapshot(&dir, name, db_id, &meta, snapshot_ts)?);
         }
         let json = Json::Obj(vec![
             ("database_name".into(), Json::Str(db.to_string())),
@@ -230,11 +235,10 @@ impl Engine {
             ("version".into(), Json::Int(1)),
         ]);
         self.write_snapshot_json(&dir, name, &json)?;
-        let begin_ts = self.begin_ts();
         self.log_snapshot(WalCmd::CreateDbSnapshot {
             db_name: db.to_string(),
             snapshot_name: name.to_string(),
-            max_commit_ts: begin_ts,
+            max_commit_ts: snapshot_ts,
         })
     }
 
@@ -243,6 +247,7 @@ impl Engine {
     pub fn create_system_snapshot(&self, name: &str) -> Result<()> {
         let databases = self.storage.catalog.list_databases()?;
         let mut db_snapshots = Vec::new();
+        let snapshot_ts = self.begin_ts();
         // The whole snapshot has to be refused before anything is written when
         // the name is taken, so the directory is created first.
         let dir = self.prepare_snapshot_dir(name)?;
@@ -254,7 +259,8 @@ impl Engine {
                 if !meta_db.eq_ignore_ascii_case(db) {
                     continue;
                 }
-                table_snapshots.push(self.write_table_snapshot(&dir, name, db_id, &meta)?);
+                table_snapshots
+                    .push(self.write_table_snapshot(&dir, name, db_id, &meta, snapshot_ts)?);
             }
             db_snapshots.push(Json::Obj(vec![
                 ("database_name".into(), Json::Str(db.clone())),
@@ -277,10 +283,9 @@ impl Engine {
             ("version".into(), Json::Int(1)),
         ]);
         self.write_snapshot_json(&dir, name, &json)?;
-        let begin_ts = self.begin_ts();
         self.log_snapshot(WalCmd::CreateSystemSnapshot {
             snapshot_name: name.to_string(),
-            max_commit_ts: begin_ts,
+            max_commit_ts: snapshot_ts,
         })
     }
 
@@ -309,7 +314,7 @@ impl Engine {
     pub fn restore_table_snapshot(&self, name: &str) -> Result<()> {
         let json = self.read_snapshot_json(name)?;
         let table = json_table(&json, name)?;
-        let files = self.restore_table(name, table)?;
+        let files = self.restore_table(table)?;
         let db_id: u64 = json_str(&json, "db_id_str").parse().unwrap_or(0);
         let table_id: u64 = json_str(&table, "table_id_str").parse().unwrap_or(0);
         self.log_snapshot(WalCmd::RestoreTableSnapshot {
@@ -333,7 +338,7 @@ impl Engine {
         let db_id = json_str(&json, "db_id_str");
         let mut table_cmds = Vec::new();
         for table in json_arr(&json, "table_snapshots") {
-            let files = self.restore_table(name, &table)?;
+            let files = self.restore_table(&table)?;
             let table_id = json_str(&table, "table_id_str");
             table_cmds.push(WalCmd::RestoreTableSnapshot {
                 db_name: db_name.clone(),
@@ -366,7 +371,7 @@ impl Engine {
             let db_id = json_str(&db, "db_id_str");
             let mut table_cmds = Vec::new();
             for table in json_arr(&db, "table_snapshots") {
-                let files = self.restore_table(name, &table)?;
+                let files = self.restore_table(&table)?;
                 let table_id = json_str(&table, "table_id_str");
                 table_cmds.push(WalCmd::RestoreTableSnapshot {
                     db_name: db_name.clone(),
@@ -398,86 +403,28 @@ impl Engine {
     // metadata
     // ------------------------------------------------------------------
 
-    /// Writes one table's part of a snapshot: its files, its metadata JSON and
-    /// its row journal. Returns the metadata so a database/system snapshot can
-    /// nest it.
+    /// Writes one table's part of a snapshot: its files and its metadata.
+    /// Returns the metadata so a database/system snapshot can nest it.
+    ///
+    /// The files are the whole payload — the rows ride in the block columns,
+    /// exactly as in the reference, so nothing else is written.
     fn write_table_snapshot(
         &self,
         dir: &Path,
         name: &str,
         db_id: u64,
         meta: &infinity_catalog::TableMeta,
+        snapshot_ts: TxnTimeStamp,
     ) -> Result<Json> {
         // The reference snapshots through a checkpoint
         // (`NewTxn::CheckpointforSnapshot`), so the table's blocks exist by the
-        // time the files are copied and `segments` describes them.
+        // time the files are copied: `segments` describes them and the copies
+        // carry the rows.
         let _ = self.write_cpp_blocks(&meta.name);
         let (db_name, _) = split_qualified(&meta.name);
-        let json = self.table_snapshot_json(&db_name, db_id, meta, name)?;
+        let json = self.table_snapshot_json(&db_name, db_id, meta, name, snapshot_ts)?;
         self.copy_table_files(db_id, meta.id, dir)?;
-        self.write_snapshot_rows(dir, db_id, meta.id, &meta.name)?;
         Ok(json)
-    }
-
-    /// The row journal, which the reference keeps inside the block files it
-    /// copies. The port's rows live in `row:{table}:{seq}` at snapshot time,
-    /// because the block mirror is only rewritten at a checkpoint, so they are
-    /// written next to the metadata as `<name>/<table>.rows`.
-    fn write_snapshot_rows(
-        &self,
-        dir: &Path,
-        db_id: u64,
-        table_id: u64,
-        table: &str,
-    ) -> Result<()> {
-        let rows = self.committed_row_text(table)?;
-        let path = dir.join(rows_file(db_id, table_id));
-        let mut text = String::new();
-        for row in &rows {
-            text.push_str(row);
-            text.push('\n');
-        }
-        std::fs::write(&path, text).map_err(|e| Error::io(&path, e))
-    }
-
-    /// The table's live rows, as the text the row journal stores them in. A
-    /// tombstoned row is skipped, so the snapshot holds committed state only.
-    fn committed_row_text(&self, table: &str) -> Result<Vec<String>> {
-        let key = self.table_key(table);
-        let deleted: std::collections::HashSet<Vec<u8>> = self
-            .storage
-            .store
-            .scan_prefix(&crate::del_prefix(&key))?
-            .into_iter()
-            .map(|(k, _)| k)
-            .collect();
-        let mut rows: Vec<(usize, String)> = Vec::new();
-        let prefix = crate::row_prefix(&key);
-        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
-            let seq = String::from_utf8_lossy(&k[prefix.len()..])
-                .trim_start_matches('0')
-                .parse::<usize>()
-                .unwrap_or(0);
-            if deleted.contains(&crate::del_key(&key, seq)) {
-                continue;
-            }
-            rows.push((seq, String::from_utf8_lossy(&v).to_string()));
-        }
-        rows.sort_by_key(|(seq, _)| *seq);
-        Ok(rows.into_iter().map(|(_, text)| text).collect())
-    }
-
-    /// [`write_snapshot_rows`] read back, as the row text of each row.
-    fn read_snapshot_rows(&self, name: &str, db_id: &str, table_id: &str) -> Vec<Vec<String>> {
-        let file = rows_file(db_id.parse().unwrap_or(0), table_id.parse().unwrap_or(0));
-        let path = self.snapshot_dir().join(name).join(file);
-        let Ok(text) = std::fs::read_to_string(&path) else {
-            return Vec::new();
-        };
-        text.lines()
-            .filter(|l| !l.is_empty())
-            .map(|l| l.split('\t').map(str::to_string).collect())
-            .collect()
     }
 
     /// `TableSnapshotInfo::CreateSnapshotMetadataJSON`
@@ -489,6 +436,7 @@ impl Engine {
         db_id: u64,
         meta: &infinity_catalog::TableMeta,
         snapshot_name: &str,
+        snapshot_ts: TxnTimeStamp,
     ) -> Result<Json> {
         let table_name = meta.name.rsplit('.').next().unwrap_or(&meta.name);
         let mut column_definition = Vec::new();
@@ -580,7 +528,11 @@ impl Engine {
             ("create_ts".into(), Json::Int(0)),
             ("database_name".into(), Json::Str(db_name.to_string())),
             ("db_id_str".into(), Json::Str(db_id.to_string())),
-            ("max_commit_ts".into(), Json::Int(0)),
+            // The reference leaves this 0 (the assignment in
+            // `MapMetaToSnapShotInfo` is commented out) and then prints an
+            // uninitialized value in `SHOW SNAPSHOTS`; the port records the
+            // snapshot's own ts here, which is what the column means.
+            ("max_commit_ts".into(), Json::Int(snapshot_ts as i64)),
             ("next_column_id".into(), Json::Int(
                 meta.ids.iter().copied().max().map(|v| v as i64 + 1).unwrap_or(0),
             )),
@@ -656,7 +608,7 @@ impl Engine {
     /// Recreates one table from its snapshot metadata and copies its files back
     /// into the data directory under the new table id, returning the files the
     /// restore wrote (`WalCmdRestoreTableSnapshot::files_`).
-    fn restore_table(&self, snapshot: &str, table: &Json) -> Result<Vec<String>> {
+    fn restore_table(&self, table: &Json) -> Result<Vec<String>> {
         // Serialize against a create of the same name (and against the orphan
         // sweep), as `NewTxn::RestoreTableSnapshot` does through the catalog.
         let _ddl = self.ddl_lock.lock().unwrap();
@@ -690,16 +642,9 @@ impl Engine {
         // The copied block files carry the rows, but the port reads a table
         // through its row journal, so decode them back into it. The reference
         // serves the restored table straight from the files it copied.
-        let rows = self.read_snapshot_rows(
-            snapshot,
-            &json_str(table, "db_id_str"),
-            &json_str(table, "table_id_str"),
-        );
-        for (seq, row) in rows.iter().enumerate() {
-            self.storage
-                .store
-                .put(&crate::row_key(&name, seq), row.join("\t").as_bytes())?;
-        }
+        // The rows ride in the copied block columns; the journal is rebuilt
+        // from them (the same path a restart takes, `restore_cpp_blocks`).
+        self.restore_cpp_blocks(&name)?;
         // The index declarations come back too; the chunks are rebuilt, which
         // is what the reference does when a snapshot's index files are missing.
         for index in json_arr(table, "table_indexes") {
@@ -737,6 +682,7 @@ impl Engine {
         let mut out = Vec::new();
         for file in snapshot_files(snapshot) {
             let src = root.join(&file);
+
             if !src.exists() {
                 continue;
             }
@@ -859,13 +805,6 @@ fn table_def_of(table: &Json) -> TableDef {
     }
 }
 
-/// The name of a table's row journal inside a snapshot directory. A database
-/// or system snapshot holds one per table, so it cannot be named after the
-/// snapshot alone.
-fn rows_file(db_id: u64, table_id: u64) -> String {
-    format!("db_{db_id}_tbl_{table_id}.rows")
-}
-
 /// `"db.tbl"` -> `("db", "tbl")`.
 fn split_qualified(name: &str) -> (String, String) {
     match name.rsplit_once('.') {
@@ -922,6 +861,13 @@ fn snapshot_files(json: &Json) -> Vec<String> {
                         out.push(s);
                     }
                 }
+            }
+            // `TableSnapshotInfo::GetFiles` adds every block's `version` file
+            // (`snapshot_info_impl.cpp:296`); the JSON names it only through
+            // `block_dir`.
+            let block_dir = json_str(&block, "block_dir");
+            if !block_dir.is_empty() {
+                out.push(format!("{block_dir}/version"));
             }
         }
     }
@@ -1182,6 +1128,24 @@ fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// The ts a snapshot was taken at.
+///
+/// A table record carries it as `max_commit_ts`. A database or system record
+/// has no field of its own, so the newest table inside it decides — every
+/// table of one snapshot is written under the same ts.
+fn snapshot_commit_ts(json: &Json) -> u64 {
+    if let Some(ts) = json_get(json, "max_commit_ts") {
+        return json_int(ts).max(0) as u64;
+    }
+    let mut newest = 0;
+    for key in ["table_snapshots", "database_snapshots"] {
+        for nested in json_arr(json, key) {
+            newest = newest.max(snapshot_commit_ts(&nested));
+        }
+    }
+    newest
 }
 
 /// `%Y-%m-%d %H:%M:%S` in local time (C++ `std::strftime` with

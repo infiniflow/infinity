@@ -49,9 +49,24 @@ fn a_table_snapshot_writes_the_reference_metadata() {
         .expect("table")
         .id
         .to_string();
+    // `SHOW SNAPSHOTS` reports the ts the metadata carries, so read it first
+    // and pin the JSON to it (the reference never fills this field and prints
+    // an uninitialized value instead).
+    let shown = result(&e, "SHOW SNAPSHOTS;");
+    let commit = shown[0][3].clone();
+    assert_ne!(commit, "0", "the snapshot's ts must be a real value");
+    assert!(
+        !e.snapshot_dir().join("s1").join("s1.rows").exists()
+            && std::fs::read_dir(e.snapshot_dir().join("s1"))
+                .unwrap()
+                .flatten()
+                .all(|f| !f.file_name().to_string_lossy().ends_with(".rows")),
+        "the snapshot must not carry a row payload beside the metadata"
+    );
+
     // The reference's layout for the same table: keys sorted, `segments`
-    // describing the block the checkpoint-before-snapshot produced, and the
-    // `u64::MAX` sentinel printed in full.
+    // describing the block the checkpoint-before-snapshot produced, the
+    // snapshot's own ts, and the `u64::MAX` sentinel printed in full.
     let expected = format!(
         concat!(
             "{{\"column_definition\":[",
@@ -60,7 +75,7 @@ fn a_table_snapshot_writes_the_reference_metadata() {
             "{{\"column_id\":1,\"column_name\":\"b\",",
             "\"column_type\":{{\"data_type\":9}},\"default\":{{\"type\":4}}}}],",
             "\"create_ts\":0,\"database_name\":\"default_db\",\"db_id_str\":\"1\",",
-            "\"max_commit_ts\":0,\"next_column_id\":2,\"next_segment_id\":0,",
+            "\"max_commit_ts\":{1},\"next_column_id\":2,\"next_segment_id\":0,",
             "\"row_count\":0,\"segments\":[{{\"actual_row_count\":0,\"blocks\":[",
             "{{\"block_dir\":\"db_1/tbl_{0}/seg_0/blk_0\",\"block_id\":0,\"columns\":[",
             "{{\"column_id\":0,\"filepath\":\"db_1/tbl_{0}/seg_0/blk_0/0.col\"}},",
@@ -72,7 +87,7 @@ fn a_table_snapshot_writes_the_reference_metadata() {
             "\"snapshot_scope\":0,\"table_comment\":\"\",\"table_id_str\":\"{0}\",",
             "\"table_name\":\"snap_t\",\"txn_id\":0,\"unsealed_id\":0,\"version\":1}}"
         ),
-        table_id
+        table_id, commit
     );
     assert_eq!(text, expected);
 
@@ -85,17 +100,18 @@ fn a_table_snapshot_writes_the_reference_metadata() {
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0][0], "s1");
     assert_eq!(rows[0][1], "Table");
-    assert_eq!(rows[0][3], "0");
+    assert_eq!(rows[0][3], commit);
 
-    // `SHOW SNAPSHOT <name>` describes it (`physical_show_snapshot_impl`).
+    // `SHOW SNAPSHOT <name>` describes it (`physical_show_snapshot_impl`) and
+    // reports the same ts.
     let rows = result(&e, "SHOW SNAPSHOT s1;");
     assert_eq!(rows[0], vec!["snapshot_name", "s1"]);
     assert_eq!(rows[1], vec!["snapshot_scope", "Table"]);
-    assert_eq!(rows[3][0], "commit_timestamp");
+    assert_eq!(rows[3], vec!["commit_timestamp".to_string(), commit]);
 }
 
 /// Database and system snapshots use the same directory, with the
-/// `snapshot_scope` of their metadata and one rows file per table.
+/// `snapshot_scope` of their metadata and one ts for the whole snapshot.
 #[test]
 fn database_and_system_snapshots_nest_their_tables() {
     let (_d, e) = engine();

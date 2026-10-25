@@ -2512,7 +2512,7 @@ impl Engine {
 
     /// Writes the mirror's rows that the KV store is missing, under their own
     /// sequence ids.
-    fn restore_cpp_blocks(&self, table: &str) -> Result<usize> {
+    pub(crate) fn restore_cpp_blocks(&self, table: &str) -> Result<usize> {
         let table = self.qualified_table(table);
         let Ok((_, rows)) = self.read_cpp_blocks_wanted(&table, None, &[]) else {
             return Ok(0);
