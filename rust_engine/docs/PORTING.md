@@ -53,6 +53,8 @@
 
 改过参考必须重编参考二进制，两个引擎的比较才有意义；改动本身在 `GAPS.md` 登记（§3 的 `IndexIVFOption` 一条就是先例）——它正是"这一项现在能逐字节比"的依据。
 
+**测试用例也不能自己引入不确定性**：多客户端并行、后台线程（checkpoint、compact、optimize、cleanup、配额驱动的 memindex dump）都会把写入落在调度决定的时刻上——事务序列、chunk 边界、段布局随之变成"跑几次就几种结果"。所以门禁用单客户端串行，把能关的周期设成 0、把配额设到内存索引达不到的值，让每个事务都由脚本决定（`python/restart_test/bytes_common.py` 的 `_config`）；并发本身要覆盖的功能由 Gate D 单独承担，不进字节门禁。
+
 只有不确定性真的不可消除时才降到内容比较：HNSW 的 `thread_local` 随机图、IVF 质心的 `random_device` 采样、依赖线程调度的后台 chunk 切分。这些在 `GAPS.md` §3 登记原因与门禁的处理方式。
 
 ### 2.3 先冻结格式，再写实现
