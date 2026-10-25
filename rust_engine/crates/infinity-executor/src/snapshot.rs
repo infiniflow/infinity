@@ -229,6 +229,7 @@ impl Engine {
                 "db_next_table_id_str".into(),
                 Json::Str(self.next_table_id_str(db)),
             ),
+            ("max_commit_ts".into(), Json::Int(snapshot_ts as i64)),
             ("snapshot_name".into(), Json::Str(name.to_string())),
             ("snapshot_scope".into(), Json::Int(SCOPE_DATABASE)),
             ("table_snapshots".into(), Json::Arr(table_snapshots)),
@@ -270,6 +271,7 @@ impl Engine {
                     "db_next_table_id_str".into(),
                     Json::Str(self.next_table_id_str(db)),
                 ),
+                ("max_commit_ts".into(), Json::Int(snapshot_ts as i64)),
                 ("snapshot_name".into(), Json::Str(name.to_string())),
                 ("snapshot_scope".into(), Json::Int(SCOPE_DATABASE)),
                 ("table_snapshots".into(), Json::Arr(table_snapshots)),
@@ -278,6 +280,7 @@ impl Engine {
         }
         let json = Json::Obj(vec![
             ("database_snapshots".into(), Json::Arr(db_snapshots)),
+            ("max_commit_ts".into(), Json::Int(snapshot_ts as i64)),
             ("snapshot_name".into(), Json::Str(name.to_string())),
             ("snapshot_scope".into(), Json::Int(SCOPE_SYSTEM)),
             ("version".into(), Json::Int(1)),
@@ -1130,22 +1133,10 @@ fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-/// The ts a snapshot was taken at.
-///
-/// A table record carries it as `max_commit_ts`. A database or system record
-/// has no field of its own, so the newest table inside it decides — every
-/// table of one snapshot is written under the same ts.
+/// The ts a snapshot was taken at: every scope writes it as `max_commit_ts`
+/// (`TableSnapshotInfo`/`DatabaseSnapshotInfo`/`SystemSnapshotInfo`).
 fn snapshot_commit_ts(json: &Json) -> u64 {
-    if let Some(ts) = json_get(json, "max_commit_ts") {
-        return json_int(ts).max(0) as u64;
-    }
-    let mut newest = 0;
-    for key in ["table_snapshots", "database_snapshots"] {
-        for nested in json_arr(json, key) {
-            newest = newest.max(snapshot_commit_ts(&nested));
-        }
-    }
-    newest
+    json_int_of(json, "max_commit_ts").max(0) as u64
 }
 
 /// `%Y-%m-%d %H:%M:%S` in local time (C++ `std::strftime` with

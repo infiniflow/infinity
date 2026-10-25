@@ -132,11 +132,47 @@ fn database_and_system_snapshots_nest_their_tables() {
     assert!(sys_json.contains("\"snapshot_scope\":2"), "{sys_json}");
     assert!(sys_json.contains("\"database_snapshots\":[{"), "{sys_json}");
 
-    let scopes: Vec<String> = result(&e, "SHOW SNAPSHOTS;")
-        .into_iter()
-        .map(|r| r[1].clone())
-        .collect();
+    // Every record of one snapshot carries the same ts, and `SHOW SNAPSHOTS`
+    // reports it for all three scopes.
+    let shown = result(&e, "SHOW SNAPSHOTS;");
+    let scopes: Vec<String> = shown.iter().map(|r| r[1].clone()).collect();
     assert_eq!(scopes, vec!["Database", "System"]);
+    let ts = [json_ts(&db_json), json_ts(&sys_json)];
+    assert_eq!(ts[0], shown[0][3].parse::<u64>().unwrap());
+    assert_eq!(ts[1], shown[1][3].parse::<u64>().unwrap());
+    assert!(ts.iter().all(|t| *t > 0));
+    // The nested records use the same number as the record that holds them.
+    for nested in nested_ts(&db_json) {
+        assert_eq!(nested, ts[0]);
+    }
+    for nested in nested_ts(&sys_json) {
+        assert_eq!(nested, ts[1]);
+    }
+}
+
+/// The `max_commit_ts` a snapshot record carries.
+fn json_ts(text: &str) -> u64 {
+    let key = "\"max_commit_ts\":";
+    let start = text.find(key).expect("max_commit_ts") + key.len();
+    let rest = &text[start..];
+    let end = rest
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(rest.len());
+    rest[..end].parse().expect("ts")
+}
+
+/// Every nested record's `max_commit_ts`.
+fn nested_ts(text: &str) -> Vec<u64> {
+    text.match_indices("\"max_commit_ts\":")
+        .skip(1)
+        .map(|(i, _)| {
+            let rest = &text[i + "\"max_commit_ts\":".len()..];
+            let end = rest
+                .find(|c: char| !c.is_ascii_digit())
+                .unwrap_or(rest.len());
+            rest[..end].parse().expect("ts")
+        })
+        .collect()
 }
 
 /// `TableSnapshotInfo` + `Snapshot::DropSnapshot`: the directory disappears,
