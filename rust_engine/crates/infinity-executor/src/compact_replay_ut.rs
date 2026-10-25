@@ -370,6 +370,31 @@ fn a_compaction_of_more_than_four_segments_keeps_the_rest() {
     assert_eq!(e.segment_ids("db1.tb1"), vec![4, 5, 6]);
 }
 
+/// The segment an `INSERT` is still appending to is **unsealed**, and
+/// `CompactionProcessor` removes it from the candidate list before asking
+/// `NewCompactionAlg` (`compaction_process_impl.cpp:176`), so three imports plus
+/// one insert are three candidates, not four.
+#[test]
+fn an_unsealed_segment_is_not_a_compaction_candidate() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    create_table(&e);
+    for _ in 0..3 {
+        e.import_literals("db1.tb1", None, const_block(1, "abc"))
+            .unwrap();
+    }
+    // An `INSERT` after a `COPY` opens a new segment and leaves it unsealed.
+    e.insert_literals("db1.tb1", None, const_block(2, "abc"))
+        .unwrap();
+    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2, 3]);
+    e.compact_table("db1.tb1").unwrap();
+    assert_eq!(
+        e.segment_ids("db1.tb1"),
+        vec![0, 1, 2, 3],
+        "the open segment does not count towards the four"
+    );
+}
+
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:1448`
 /// (`TestTxnCompact.compact_and_compact`): a second merge is a no-op.
 #[test]

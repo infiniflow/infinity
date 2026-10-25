@@ -13109,8 +13109,24 @@ impl Engine {
     fn compaction_candidates(&self, table: &str) -> Vec<u32> {
         const M: usize = 4;
         const S: u64 = infinity_storage::cpp_format::DEFAULT_BLOCK_CAPACITY as u64;
+        // `CompactionProcessor` drops the table's **unsealed** segment from the
+        // candidate list before asking the algorithm
+        // (`compaction_process_impl.cpp:176`): the reference only seals a
+        // segment when a `COPY` writes it or it reaches the capacity, so the
+        // segment an `INSERT` is still appending to must not be merged.
+        let unsealed = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&self.table_key(table))
+            .and_then(|e| e.row_counter)
+            .filter(|(_, _, sealed)| !*sealed)
+            .map(|(segment, _, _)| segment);
         let mut layers: std::collections::BTreeMap<i32, Vec<(u32, u64)>> = Default::default();
         for (segment, rows) in self.segment_row_counts(table) {
+            if Some(segment) == unsealed {
+                continue;
+            }
             // `DBTConfig::CalculateLayer`: `log(row_cnt / s_) / log(c)` with
             // **integer** division inside the log, truncated to `int` and
             // floored at 0 (`-inf` for a segment smaller than one block casts

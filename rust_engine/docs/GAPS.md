@@ -34,7 +34,7 @@
 - 带索引的表在同一帧里再追加每个 index 的 `DumpIndexV2`（`chunk_id` 0、`base_row_id` 段基址、`row_count` 段行数、`deprecate_ts` u64::MAX；全文索引的 `base_name` 是 `ft_<base>`、`term_count` 是 `(term, row)` posting 数，其余索引留空）；导入帧的 `table_key` 是表的 catalog 键，压缩帧为空（`CompactTxnStore` 不设它）。
 - 一条 `COPY` 是一个事务、一帧（解析仍按 8192 行一批，写入同一个 `Txn`）；只有超过 `IMPORT_TXN_ROWS`（1,048,576 行）的压测导入才会分批提交，那是内存上限而不是格式选择。
 - DDL 的 typed 命令在**每次** DDL 上都会写出：原生 catalog 的写和参考的 C++ 布局在同一个 commit 里落盘（`Catalog::capture` 在 `f` 之后重写一次布局，把改写记进捕获的 batch），`WalCmdCreateTableV2`/`CreateIndexV2`/… 就是从那个 batch 派生出来的。在这之前布局只在 checkpoint 时镜像，DDL 事务的 batch 是空的，typed DDL 帧整类丢失（`test_the_ddl_wal_commands_match_the_reference` 会看到 0 帧）。
-- 压缩只合并 `NewCompactionAlg` 挑中的段，其余段原地不动：`COMPACT` 走 `Engine::compact_table`，候选由 DBT 规则给出（同层最少 4 段、取该层前 4 个、行数之和不超过段容量），合并后的段号仍是「全部段的最大号 + 1」，被合并的段进 `drop|seg|` 等 `Cleanup`。实测参考对 6 个段说 `Compact segments 0,1,2,3 into new segment`，端口同样留下 `{4,5,6}`，`seg_6` 含 4 个块、`seg_4`/`seg_5` 各 1 个块，`seg_0…3` 的文件保留（测试 `a_compaction_of_more_than_four_segments_keeps_the_rest`）。
+- 压缩只合并 `NewCompactionAlg` 挑中的段，其余段原地不动：`COMPACT` 走 `Engine::compact_table`，候选由 DBT 规则给出（先剔除未封段的段——`INSERT` 还在追加的那个；同层最少 4 段、取该层前 4 个、行数之和不超过段容量），合并后的段号仍是「全部段的最大号 + 1」，被合并的段进 `drop|seg|` 等 `Cleanup`。实测参考对 6 个段说 `Compact segments 0,1,2,3 into new segment`，端口同样留下 `{4,5,6}`，`seg_6` 含 4 个块、`seg_4`/`seg_5` 各 1 个块，`seg_0…3` 的文件保留（测试 `a_compaction_of_more_than_four_segments_keeps_the_rest`）。
 
 其余各项的接线位置与门禁：
 
