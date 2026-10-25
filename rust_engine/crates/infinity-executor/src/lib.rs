@@ -1091,6 +1091,13 @@ fn reshape_tensor(s: &str, dim: usize) -> String {
     format!("[{}]", groups.join(","))
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Rows whose text a `MATCH` path tokenised, so a test can prove the
+    /// column form reads the inverted index instead of the rows.
+    pub static MATCH_ROWS_TOKENIZED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Recognises a bare `filter_text(…)`/`filter_fulltext(…)` predicate that needs
 /// the full-text index to answer, returning what it asked for.
 fn fulltext_index_call(p: &Predicate) -> Option<(String, String, String)> {
@@ -3636,6 +3643,52 @@ impl TextIndex {
             postings,
             doc_len,
         }
+    }
+
+    /// `term -> doc -> positions` for `terms`, from the same postings
+    /// [`Self::merge`] walks.
+    ///
+    /// A phrase query needs the token offsets of every term it names, which the
+    /// `(doc, tf)` postings do not carry; the unsealed tail keeps them inline
+    /// and every sealed segment serves them from its `.pos` half
+    /// (`SegmentIndexReader::positions`). A re-indexed row's sealed copy is
+    /// stale and is dropped, exactly as [`Self::merge`] does.
+    fn merge_positions(&self, terms: &[String]) -> HashMap<String, HashMap<u64, Vec<u32>>> {
+        let mut out: HashMap<String, HashMap<u64, Vec<u32>>> = HashMap::new();
+        for term in terms {
+            let mut per_doc: HashMap<u64, Vec<u32>> = HashMap::new();
+            // Newest first: the memory tail, then the spilled runs, then the
+            // sealed segments. The first copy of a row wins.
+            if let Some(list) = self.mem.postings.get(term) {
+                for (row, _, positions) in list {
+                    per_doc.entry(*row).or_insert_with(|| positions.clone());
+                }
+            }
+            for run in self.mem.runs.iter().rev() {
+                let Ok(Some(list)) = run.reader.positions(term) else {
+                    continue;
+                };
+                for (row, positions) in list {
+                    if !self.mem.run_entry_is_current(run.id, row) {
+                        continue;
+                    }
+                    per_doc.entry(row).or_insert(positions);
+                }
+            }
+            for segment in &self.reader.segments {
+                let Ok(Some(list)) = segment.reader.positions(term) else {
+                    continue;
+                };
+                for (row, positions) in list {
+                    if self.overridden.contains(&row) {
+                        continue;
+                    }
+                    per_doc.entry(row).or_insert(positions);
+                }
+            }
+            out.insert(term.clone(), per_doc);
+        }
+        out
     }
 }
 
@@ -12620,33 +12673,6 @@ impl Engine {
         Ok(rows)
     }
 
-    /// Rows for `ids`, parsing only the `cols` columns (others are `Null`).
-    fn fetch_rows_cols(
-        &self,
-        table: &str,
-        ids: &[usize],
-        cols: &[usize],
-    ) -> Result<Vec<(usize, Vec<Value>)>> {
-        let mut out = Vec::with_capacity(ids.len());
-        for &seq in ids {
-            if self.storage.store.get(&del_key(table, seq))?.is_some() {
-                continue;
-            }
-            let Some(v) = self.storage.store.get(&row_key(table, seq))? else {
-                continue;
-            };
-            let text = String::from_utf8_lossy(&v);
-            let mut cells = vec![Value::Null; text.split('\t').count()];
-            for &c in cols {
-                if let Some(cell) = text.split('\t').nth(c) {
-                    cells[c] = self.decode_cell(table, cell)?;
-                }
-            }
-            out.push((seq, cells));
-        }
-        Ok(out)
-    }
-
     /// Rows matched by an equality on an indexed column, or the whole table
     /// when no such index applies. Point deletes/updates over a big table must
     /// not materialise every row.
@@ -14008,17 +14034,6 @@ impl Engine {
                 "parser: incomplete boolean expression in the full-text query".into(),
             ));
         }
-        // field boosts from `col^w` / `col@index^w`
-        let field_boosts: Vec<f64> = m
-            .column
-            .split(',')
-            .map(|c| {
-                c.split('^')
-                    .nth(1)
-                    .and_then(|v| v.trim().parse::<f64>().ok())
-                    .unwrap_or(1.0)
-            })
-            .collect();
         let cols: Vec<usize> = match_columns(&m.column)
             .iter()
             .filter_map(|c| schema.iter().position(|s| s == c))
@@ -14258,233 +14273,175 @@ impl Engine {
                 }
             }
         }
-        // BM25 (k1 = 1.2, b = 0.75) over the whole table; a document's length is
-        // the number of indexed terms, and `similarity=boolean` scores one point
-        // per matching term weighted by the field/term boosts.
-        // Deleted rows still contribute to the index statistics (they are only
-        // filtered from the result), so gather every stored row first.
-        let prefix = row_prefix(table);
-        let defaults = self.table_defaults(table).unwrap_or_default();
-        // When no filter, rank-feature or boolean mode is involved the inverted
-        // indexes decide the row set and supply the corpus statistics
-        // (doc count, average field length, df). A query whose terms cover most
-        // of the table is cheaper to scan than to gather.
-        #[allow(clippy::type_complexity)]
-        let index_view: Option<(Vec<usize>, Vec<(usize, f64, HashMap<String, usize>)>)> = (|| {
-            if boolean
-                || !rank_features.is_empty()
-                || in_filter.is_some()
-                || opt_filter.is_some()
-                || pred.is_some()
-            {
-                return None;
+        // Everything below runs off the inverted index. The postings give the
+        // candidate documents, each document's term frequency per field, the
+        // corpus statistics (`n_docs`, average field length, df) and - through
+        // the position lists - the phrase frequencies, so a multi-word or
+        // phrase query never re-tokenises a row. A row is read only when the
+        // query needs a value from it: a filter, or `rank_features`.
+        let query_terms: Vec<String> = {
+            let mut out: Vec<String> = Vec::new();
+            for (_, unit, _) in &units {
+                for term in unit {
+                    if !out.contains(term) {
+                        out.push(term.clone());
+                    }
+                }
             }
-            let mut set: std::collections::HashSet<usize> = Default::default();
-            let mut stats: Vec<(usize, f64, HashMap<String, usize>)> = Vec::new();
-            for (ci, _, d) in &field_specs {
-                let name = schema.get(*ci)?.clone();
-                let index = self.text_index_for(table, &name, d.clone()).ok()?;
-                let guard = index.read().ok()?;
-                let merged = guard.merge(&terms);
-                let n = merged.n_docs;
-                let sum = merged.total_len as usize;
-                let avg = if n == 0 {
+            out
+        };
+        let mut field_postings: Vec<HashMap<String, HashMap<u64, (u32, Vec<u32>)>>> = Vec::new();
+        let mut field_lens: Vec<HashMap<u64, u32>> = Vec::new();
+        let mut field_stats: Vec<(usize, f64)> = Vec::new();
+        let mut dfs: Vec<HashMap<String, usize>> = Vec::new();
+        let mut candidates: std::collections::BTreeSet<u64> = Default::default();
+        for (ci, _, d) in &field_specs {
+            let name = schema[*ci].clone();
+            let index = self.text_index_for(table, &name, d.clone())?;
+            let guard = index.read().unwrap();
+            let merged = guard.merge(&query_terms);
+            let positions = guard.merge_positions(&query_terms);
+            let n = merged.n_docs;
+            let avg = if n == 0 {
+                1.0
+            } else {
+                let a = merged.total_len as f64 / n as f64;
+                if a <= 0.0 {
                     1.0
                 } else {
-                    let a = sum as f64 / n as f64;
-                    if a <= 0.0 {
-                        1.0
-                    } else {
-                        a
-                    }
-                };
-                let mut df: HashMap<String, usize> = HashMap::new();
-                for t in &terms {
-                    if let Some(list) = merged.postings.get(t) {
-                        df.insert(t.clone(), list.len());
-                        for (doc, _) in list {
-                            set.insert(*doc as usize);
-                        }
-                    }
+                    a
                 }
-                stats.push((n, avg, df));
-            }
-            let total = stats.first().map(|st| st.0).unwrap_or(0);
-            if total == 0 || set.len() * 2 > total {
-                return None;
-            }
-            Some((set.into_iter().collect(), stats))
-        })(
-        );
-        let _ = &prefix;
-        // Per document we keep only what scoring needs: the tokenised fields,
-        // whether it is live and passes the filters, and the pre-computed
-        // rank-features / boolean contributions. Keeping the full row here made
-        // a query over 250k wide rows cost gigabytes, and several concurrent
-        // readers exhausted the server's memory.
-        #[allow(clippy::type_complexity)]
-        let mut docs: Vec<(usize, Vec<Vec<(String, u32)>>, bool, bool, f64, usize, f64)> =
-            Vec::new();
-        let scanned: Vec<(usize, Vec<Value>)> = match &index_view {
-            Some((ids, _)) => self.fetch_rows_cols(table, ids, &cols)?,
-            None => self.fetch_rows_including_deleted(table)?,
-        };
-        for (seq, mut row) in scanned {
-            // Rows loaded before a column was added (or from a narrower COPY)
-            // take the column's default value, not NULL.
-            while row.len() < defaults.len() {
-                let i = row.len();
-                row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
-                    Some(d) => Value::from_literal(&default_literal(d)),
-                    None => Value::Null,
-                });
-            }
-            let live = self.storage.store.get(&del_key(table, seq))?.is_none();
-            let filters_hold = in_filter
-                .as_ref()
-                .map(|p| p.eval_predicate(&row))
-                .unwrap_or(true)
-                && opt_filter
-                    .as_ref()
-                    .map(|p| p.eval_predicate(&row))
-                    .unwrap_or(true)
-                && pred.map(|p| p.eval_predicate(&row)).unwrap_or(true);
-            // `rank_features=<col>^<tag>^<weight>` adds `value * weight`.
-            let rank_bonus: f64 = rank_features
-                .iter()
-                .map(|(ci, tags)| {
-                    let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
-                    rank_features_bonus(&cell, tags)
-                })
-                .sum();
-            // `similarity=boolean` scores fields independently; compute it here
-            // while the row is still in hand.
-            let (mut bhits, mut bscore) = (0usize, 0.0f64);
-            if boolean {
-                for (ci, boost, d) in &field_specs {
-                    let text = match row.get(*ci) {
-                        Some(Value::Str(s)) => s.clone(),
-                        Some(other) => other.to_slt_string(),
-                        None => String::new(),
-                    };
-                    let ftoks = tokenize_index_text(&text, d);
-                    let fset: std::collections::HashSet<&str> =
-                        ftoks.iter().map(|x| x.as_str()).collect();
-                    let kw = d.keyword();
-                    let matched = terms.iter().filter(|t| fset.contains(t.as_str())).count();
-                    if matched > 0 {
-                        bhits += matched;
-                        bscore += boost * if kw { 1.0 } else { matched as f64 };
-                    }
+            };
+            let mut per_term: HashMap<String, HashMap<u64, (u32, Vec<u32>)>> = HashMap::new();
+            let mut df: HashMap<String, usize> = HashMap::new();
+            for term in &query_terms {
+                let list = merged.postings.get(term).cloned().unwrap_or_default();
+                let pos = positions.get(term).cloned().unwrap_or_default();
+                let mut per_doc: HashMap<u64, (u32, Vec<u32>)> = HashMap::with_capacity(list.len());
+                for (doc, tf) in list {
+                    candidates.insert(doc);
+                    let at = pos.get(&doc).cloned().unwrap_or_default();
+                    per_doc.insert(doc, (tf, at));
                 }
+                df.insert(term.clone(), per_doc.len());
+                per_term.insert(term.clone(), per_doc);
             }
-            // Tokenise every matched column on its own: BM25 keeps per-field
-            // statistics and a `doctitle,body^5` query sums them.
-            let fields: Vec<Vec<(String, u32)>> = cols
-                .iter()
-                .map(|&i| {
-                    let text = match row.get(i) {
-                        Some(Value::Str(s)) => s.clone(),
-                        Some(other) => other.to_slt_string(),
-                        None => String::new(),
-                    };
-                    tokenize_index_positions(&text, &tokenizer)
-                })
-                .collect();
-            docs.push((seq, fields, live, filters_hold, rank_bonus, bhits, bscore));
+            field_postings.push(per_term);
+            field_lens.push(merged.doc_len);
+            field_stats.push((n, avg));
+            dfs.push(df);
         }
-        let n_docs = match &index_view {
-            Some((_, stats)) => stats.first().map(|st| st.0).unwrap_or(1),
-            None => docs.len(),
-        }
-        .max(1);
-        // Document frequency per (field, term). Computing it inside `idf_of`
-        // made scoring O(rows^2); one pass here turns it into a lookup.
-        let dfs: Vec<HashMap<String, usize>> = if let Some((_, stats)) = &index_view {
-            stats.iter().map(|st| st.2.clone()).collect()
-        } else {
-            (0..cols.len())
-                .map(|f| {
-                    let mut m: HashMap<String, usize> = HashMap::new();
-                    for (_, fields, ..) in &docs {
-                        // A term counts once per document, however often it occurs.
-                        let mut seen: std::collections::HashSet<&str> =
-                            std::collections::HashSet::new();
-                        for (t, _) in &fields[f] {
-                            if seen.insert(t.as_str()) {
-                                *m.entry(t.clone()).or_insert(0) += 1;
-                            }
-                        }
-                    }
-                    m
-                })
-                .collect()
-        };
-        // One BM25 corpus per column (Lucene keeps statistics per field).
-        let avg_lens: Vec<f64> = if let Some((_, stats)) = &index_view {
-            stats.iter().map(|st| st.1).collect()
-        } else {
-            (0..cols.len())
-                .map(|f| {
-                    let sum: f64 = docs.iter().map(|d| d.1[f].len() as f64).sum();
-                    let a = sum / docs.len().max(1) as f64;
-                    if a <= 0.0 {
-                        1.0
-                    } else {
-                        a
-                    }
-                })
-                .collect()
-        };
+        let n_docs = field_stats.first().map(|(n, _)| *n).unwrap_or(1).max(1);
+        let avg_lens: Vec<f64> = field_stats.iter().map(|(_, a)| *a).collect();
         // A `keyword`/`whitespace` field scores constantly: one field-boost
         // point per matching document (not per query term).
         let keyword_field = tokenizer.keyword();
+        // Deleted rows keep contributing to the corpus statistics (as the
+        // reference's segments do until compaction) but never rank.
+        let mut dead = self.tombstone_set(table)?;
+        // Filters and rank features need values from the row; only the
+        // candidates can score, so only they are read.
+        let needs_values = pred.is_some()
+            || in_filter.is_some()
+            || opt_filter.is_some()
+            || !rank_features.is_empty();
+        let mut values: HashMap<u64, Vec<Value>> = HashMap::new();
+        if needs_values {
+            let ids: Vec<u64> = candidates.iter().copied().collect();
+            let defaults = self.table_defaults(table).unwrap_or_default();
+            for (seq, mut row) in self.fetch_some_rows_with_ids(table, &ids)? {
+                while row.len() < defaults.len() {
+                    let i = row.len();
+                    row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
+                        Some(d) => Value::from_literal(&default_literal(d)),
+                        None => Value::Null,
+                    });
+                }
+                let ok = pred
+                    .as_ref()
+                    .map(|p| p.eval_predicate(&row))
+                    .unwrap_or(true)
+                    && in_filter
+                        .as_ref()
+                        .map(|p| p.eval_predicate(&row))
+                        .unwrap_or(true)
+                    && opt_filter
+                        .as_ref()
+                        .map(|p| p.eval_predicate(&row))
+                        .unwrap_or(true);
+                if !ok {
+                    dead.insert(seq as u64);
+                }
+                values.insert(seq as u64, row);
+            }
+        }
         let mut scored: Vec<(usize, f64)> = Vec::new();
-        for (seq, fields, live, filters_hold, rank_bonus, bool_hits, bool_score) in &docs {
-            // Filters and the live check were evaluated while the row was in
-            // hand; a row that fails either never reaches the ranking.
-            if !live || !filters_hold {
+        for doc in candidates {
+            if dead.contains(&doc) {
                 continue;
             }
-            // `similarity=boolean` scores each field independently: a
-            // `keyword`/`whitespace` field contributes its boost once when any
-            // query term is present, a standard field contributes one boost per
-            // matching term.
+            // `rank_features=<col>^<tag>^<weight>` adds `value * weight`.
+            let rank_bonus: f64 = match values.get(&doc) {
+                Some(row) if !rank_features.is_empty() => rank_features
+                    .iter()
+                    .map(|(ci, tags)| {
+                        let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
+                        rank_features_bonus(&cell, tags)
+                    })
+                    .sum(),
+                _ => 0.0,
+            };
+            // `similarity=boolean` scores each field on its own: a
+            // `keyword`/`whitespace` field contributes its boost once, a
+            // standard field one boost per matching term.
             if boolean {
-                let bscore = bool_score + rank_bonus;
-                if *bool_hits >= min_should
-                    && *bool_hits > 0
+                let (mut bhits, mut bscore) = (0usize, 0.0f64);
+                for (f, (_, boost, d)) in field_specs.iter().enumerate() {
+                    let postings = &field_postings[f];
+                    let matched = query_terms
+                        .iter()
+                        .filter(|t| {
+                            postings
+                                .get(*t)
+                                .map(|m| m.contains_key(&doc))
+                                .unwrap_or(false)
+                        })
+                        .count();
+                    if matched > 0 {
+                        bhits += matched;
+                        bscore += boost * if d.keyword() { 1.0 } else { matched as f64 };
+                    }
+                }
+                let bscore = bscore + rank_bonus;
+                if bhits >= min_should
+                    && bhits > 0
                     && threshold.map(|t| bscore >= t).unwrap_or(true)
                 {
-                    scored.push((*seq, bscore));
+                    scored.push((doc as usize, bscore));
                 }
                 continue;
             }
             let mut score = 0.0f64;
             // Units matched in *any* field, for `minimum_should_match`.
             let mut unit_hits = vec![false; units.len()];
-            for (f, toks) in fields.iter().enumerate() {
-                if toks.is_empty() {
-                    continue;
-                }
-                let boost = field_boosts.get(f).copied().unwrap_or(1.0);
-                let len = toks.len() as f64;
+            for (f, (_, boost, _)) in field_specs.iter().enumerate() {
+                let postings = &field_postings[f];
+                let len = field_lens[f].get(&doc).copied().unwrap_or(0) as f64;
                 let avg_len = avg_lens[f];
-                let mut counts: HashMap<&str, usize> = HashMap::new();
-                // `(term, position)` pairs, for phrase matching.
-                let mut at: HashMap<u32, Vec<&str>> = HashMap::new();
-                for (t, pos) in toks {
-                    *counts.entry(t.as_str()).or_insert(0) += 1;
-                    at.entry(*pos).or_default().push(t.as_str());
-                }
                 let idf_of = |term: &str| -> f64 {
                     let df = dfs[f].get(term).copied().unwrap_or(0).max(1) as f64;
                     (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln()
                 };
+                let tf_of = |term: &str| -> Option<u32> {
+                    postings
+                        .get(term)
+                        .and_then(|m| m.get(&doc))
+                        .map(|(tf, _)| *tf)
+                };
                 if keyword_field {
                     let mut any = false;
                     for (ui, (_, unit, _)) in units.iter().enumerate() {
-                        if unit.iter().any(|t| counts.contains_key(t.as_str())) {
+                        if unit.iter().any(|t| tf_of(t).is_some()) {
                             unit_hits[ui] = true;
                             any = true;
                         }
@@ -14499,7 +14456,18 @@ impl Engine {
                     if (*phrase || require_all) && unit.len() > 1 {
                         // A phrase scores like one term whose `tf` is the phrase
                         // frequency and whose `idf` is the sum over its terms
-                        // (Lucene `PhraseWeight`).
+                        // (Lucene `PhraseWeight`); the frequency comes from the
+                        // index's position lists, not from the row's text.
+                        let mut at: HashMap<u32, Vec<&str>> = HashMap::new();
+                        for term in unit {
+                            if let Some((_, positions)) =
+                                postings.get(term).and_then(|m| m.get(&doc))
+                            {
+                                for p in positions {
+                                    at.entry(*p).or_default().push(term.as_str());
+                                }
+                            }
+                        }
                         let freq = phrase_freq(&at, unit);
                         if freq == 0 {
                             continue;
@@ -14512,12 +14480,10 @@ impl Engine {
                         continue;
                     }
                     for term in unit {
-                        let tf = match counts.get(term.as_str()) {
-                            Some(c) => *c as f64,
-                            None => continue,
-                        };
+                        let Some(tf) = tf_of(term) else { continue };
                         unit_hits[ui] = true;
                         let idf = idf_of(term);
+                        let tf = tf as f64;
                         let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
                         score += idf * (norm + delta_term) * boost * uboost;
                     }
@@ -14536,7 +14502,7 @@ impl Engine {
             };
             score += rank_bonus;
             if hits >= min_should && hits > 0 && threshold.map(|t| score >= t).unwrap_or(true) {
-                scored.push((*seq, score));
+                scored.push((doc as usize, score));
             }
         }
         scored.sort_by(|a, b| {
@@ -14614,11 +14580,36 @@ impl Engine {
         let topn = parse_topn_param(params).unwrap_or(10);
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
+        // The index decides which documents can hold one of the group's terms;
+        // only those rows are read and tokenised. This syntax has no negation
+        // (`parse_field_query` keeps a `-term` as a literal term), so the union
+        // of the leaves' postings cannot drop a matching document.
+        let mut candidates: std::collections::BTreeSet<u64> = Default::default();
+        for (_, terms) in groups {
+            for (name, text) in terms {
+                let Some((field_name, _, d)) =
+                    fields.iter().find(|(n, _, _)| n == name || name.is_empty())
+                else {
+                    continue;
+                };
+                let toks = tokenize_index_text(text, d);
+                if toks.is_empty() {
+                    continue;
+                }
+                let index = self.text_index_for(table, field_name, d.clone())?;
+                let guard = index.read().unwrap();
+                let merged = guard.merge(&toks);
+                for list in merged.postings.values() {
+                    candidates.extend(list.iter().map(|(doc, _)| *doc));
+                }
+            }
+        }
         let mut scored: Vec<(usize, f64)> = Vec::new();
-        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
-            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
-                .parse()
-                .unwrap_or(0);
+        for seq in candidates {
+            let seq = seq as usize;
+            let Some(v) = self.storage.store.get(&row_key(table, seq))? else {
+                continue;
+            };
             let mut row = self.parse_stored_row(table, &defaults, &v)?;
             while row.len() < defaults.len() {
                 let i = row.len();
@@ -14635,6 +14626,8 @@ impl Engine {
                     continue;
                 }
             }
+            #[cfg(test)]
+            MATCH_ROWS_TOKENIZED.with(|n| n.set(n.get() + 1));
             let tokens: Vec<std::collections::HashSet<String>> = fields
                 .iter()
                 .map(|(_, ci, d)| {
@@ -14769,16 +14762,81 @@ impl Engine {
             .collect();
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
-        // `(seq, live, passes the filter, per-field (term, position) pairs)`,
-        // over every stored row: deleted rows keep contributing to the corpus
-        // statistics, exactly as the index does until compaction.
+        // Corpus statistics come from the inverted index and the index also
+        // says which documents can possibly match, so only those are tokenised.
+        // A tree that negates (`NOT doc:x` selects documents without a term)
+        // constrains nothing and keeps the full scan.
+        let leaves = query_leaf_terms(&tree);
+        let mut candidates: Option<std::collections::BTreeSet<u64>> = None;
+        let mut n_docs = 0usize;
+        for field in fields.iter_mut() {
+            let terms: Vec<String> = leaves
+                .as_ref()
+                .map(|leaves| {
+                    leaves
+                        .iter()
+                        .filter(|(column, _)| column == &field.name)
+                        .map(|(_, term)| term.clone())
+                        .collect()
+                })
+                .unwrap_or_default();
+            let index = self.text_index_for(table, &field.name, field.tokenizer.clone())?;
+            let guard = index.read().unwrap();
+            let merged = guard.merge(&terms);
+            n_docs = n_docs.max(merged.n_docs);
+            field.avg_len = if merged.n_docs == 0 {
+                1.0
+            } else {
+                let avg = merged.total_len as f64 / merged.n_docs as f64;
+                if avg <= 0.0 {
+                    1.0
+                } else {
+                    avg
+                }
+            };
+            for term in &terms {
+                field.df.insert(
+                    term.clone(),
+                    merged.postings.get(term).map(Vec::len).unwrap_or(0),
+                );
+            }
+            if leaves.is_some() {
+                let set = candidates.get_or_insert_with(Default::default);
+                for list in merged.postings.values() {
+                    set.extend(list.iter().map(|(doc, _)| *doc));
+                }
+            }
+        }
+        let n_docs = n_docs.max(1);
+        // `(seq, live, passes the filter, per-field (term, position) pairs)`.
+        // Deleted rows still reach the index (its statistics count them), but
+        // they never rank.
         #[allow(clippy::type_complexity)]
         let mut docs: Vec<(usize, bool, bool, Vec<Vec<(String, u32)>>)> = Vec::new();
-        let mut len_sums = vec![0u64; fields.len()];
-        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
-            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
-                .parse()
-                .unwrap_or(0);
+        let scan: Vec<(usize, Vec<u8>)> = match &candidates {
+            Some(ids) => {
+                let mut out = Vec::with_capacity(ids.len());
+                for id in ids {
+                    if let Some(value) = self.storage.store.get(&row_key(table, *id as usize))? {
+                        out.push((*id as usize, value));
+                    }
+                }
+                out
+            }
+            None => self
+                .storage
+                .store
+                .scan_prefix(&prefix)?
+                .into_iter()
+                .filter_map(|(key, value)| {
+                    let seq = String::from_utf8_lossy(&key[prefix.len()..])
+                        .parse::<usize>()
+                        .ok()?;
+                    Some((seq, value))
+                })
+                .collect(),
+        };
+        for (seq, v) in scan {
             let mut row = self.parse_stored_row(table, &defaults, &v)?;
             while row.len() < defaults.len() {
                 let i = row.len();
@@ -14789,6 +14847,8 @@ impl Engine {
             }
             let live = self.storage.store.get(&del_key(table, seq))?.is_none();
             let passes = pred.map(|p| p.eval_predicate(&row)).unwrap_or(true);
+            #[cfg(test)]
+            MATCH_ROWS_TOKENIZED.with(|n| n.set(n.get() + 1));
             let tokens: Vec<Vec<(String, u32)>> = fields
                 .iter()
                 .map(|field| {
@@ -14800,21 +14860,7 @@ impl Engine {
                     tokenize_index_positions(&text, &field.tokenizer)
                 })
                 .collect();
-            for (fi, field_tokens) in tokens.iter().enumerate() {
-                len_sums[fi] += field_tokens.len() as u64;
-                let mut seen: std::collections::HashSet<&str> = Default::default();
-                for (term, _) in field_tokens {
-                    if seen.insert(term.as_str()) {
-                        *fields[fi].df.entry(term.clone()).or_insert(0) += 1;
-                    }
-                }
-            }
             docs.push((seq, live, passes, tokens));
-        }
-        let n_docs = docs.len().max(1);
-        for (fi, field) in fields.iter_mut().enumerate() {
-            let avg = len_sums[fi] as f64 / docs.len().max(1) as f64;
-            field.avg_len = if avg <= 0.0 { 1.0 } else { avg };
         }
         let bm25_param = |name: &str| -> f64 {
             params
@@ -19314,6 +19360,34 @@ fn collect_query_columns(node: &QueryNode, out: &mut Vec<String>) {
     }
 }
 
+/// The tree's `(column, term)` leaves, or `None` when it negates.
+///
+/// A `NOT doc:x` clause matches the documents that do **not** hold `x`, so the
+/// union of the leaves' postings would drop exactly the documents it selects;
+/// such a query keeps the full scan.
+fn query_leaf_terms(tree: &QueryNode) -> Option<Vec<(String, String)>> {
+    fn walk(node: &QueryNode, out: &mut Vec<(String, String)>) -> bool {
+        match node {
+            QueryNode::Term(term) => {
+                out.push((term.column.clone(), term.term.clone()));
+                true
+            }
+            QueryNode::Phrase(phrase) => {
+                for term in &phrase.terms {
+                    out.push((phrase.column.clone(), term.clone()));
+                }
+                true
+            }
+            QueryNode::And(children) | QueryNode::Or(children) => {
+                children.iter().all(|child| walk(child, out))
+            }
+            QueryNode::Not(_) | QueryNode::AndNot(_) => false,
+        }
+    }
+    let mut out = Vec::new();
+    walk(tree, &mut out).then_some(out)
+}
+
 /// Number of leaf terms in the tree, the denominator of
 /// `minimum_should_match` when it is given as a percentage.
 fn query_term_count(node: &QueryNode) -> usize {
@@ -22292,6 +22366,135 @@ mod tests {
         assert_eq!(got.len(), 1);
         let value: f64 = got[0][0].parse().unwrap();
         assert!((value - expected).abs() < 1e-4, "{value} vs {expected}");
+    }
+
+    /// A phrase, a multi-token clause under `operator=and`, and a boolean
+    /// similarity query answer from the index's postings and position lists: no
+    /// row is re-tokenised (`MATCH_ROWS_TOKENIZED` stays 0), which is what the
+    /// row-scan path used to do for every query it could not answer from the
+    /// postings alone.
+    #[test]
+    fn a_phrase_match_answers_from_the_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE fp (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute(
+            "INSERT INTO fp VALUES (1,'alpha beta'),(2,'alpha gamma'),\
+             (3,'beta gamma'),(4,'alpha beta gamma'),(5,'beta alpha'),(6,'gamma');",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX fp_i ON fp(body) USING FULLTEXT;")
+            .unwrap();
+
+        MATCH_ROWS_TOKENIZED.with(|n| n.set(0));
+        // A quoted phrase is one unit of two tokens: only adjacent occurrences
+        // in that order match, and the positions come from the index.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM fp SEARCH MATCH TEXT (body,'\"alpha beta\"','topn=10');"
+            ),
+            vec![vec!["1".to_string()], vec!["4".to_string()]]
+        );
+        // `operator=and` is an AND of the bare terms, not a phrase: `beta
+        // alpha` matches too, and the order is score-then-id.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM fp SEARCH MATCH TEXT \
+                 (body,'alpha beta','topn=10;operator=and');"
+            ),
+            vec![
+                vec!["1".to_string()],
+                vec!["5".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+        // Mixed units: a bare term OR a phrase, with a filter that needs the
+        // row value but no tokenisation. Documents 1, 2, 3 and 4 match; the
+        // filter drops the rest.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM fp SEARCH MATCH TEXT \
+                 (body,'gamma \"alpha beta\"','topn=10;filter=id < 5');"
+            )
+            .len(),
+            4
+        );
+        // `similarity=boolean` scores per field from the postings too; it
+        // counts matched *terms* (not phrase units), so every document with
+        // `alpha` or `beta` is returned.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM fp SEARCH MATCH TEXT \
+                 (body,'\"alpha beta\"','topn=10;similarity=boolean');"
+            ),
+            vec![
+                vec!["1".to_string()],
+                vec!["4".to_string()],
+                vec!["5".to_string()],
+                vec!["2".to_string()],
+                vec!["3".to_string()]
+            ]
+        );
+        assert_eq!(
+            MATCH_ROWS_TOKENIZED.with(|n| n.get()),
+            0,
+            "the column form must answer from the index"
+        );
+    }
+
+    /// The field-group form (`MATCH TEXT ('', '(doc:…)')`) also starts from the
+    /// index: only the documents that hold one of the query terms are
+    /// tokenised, in both scoring modes.
+    #[test]
+    fn a_field_group_match_tokenises_only_the_candidates() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE fg2 (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute(
+            "INSERT INTO fg2 VALUES (1,'alpha beta'),(2,'gamma'),(3,'delta'),\
+             (4,'alpha gamma'),(5,'epsilon'),(6,'zeta');",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX fg2_i ON fg2(body) USING FULLTEXT;")
+            .unwrap();
+
+        MATCH_ROWS_TOKENIZED.with(|n| n.set(0));
+        let hits = rows(
+            &e,
+            "SELECT id FROM fg2 SEARCH MATCH TEXT ('','(body:alpha)^1 (body:gamma)^1', 10);",
+        );
+        // `4` holds both terms, then the shorter `gamma` document outranks
+        // `alpha beta`.
+        assert_eq!(
+            hits,
+            vec![
+                vec!["4".to_string()],
+                vec!["2".to_string()],
+                vec!["1".to_string()]
+            ]
+        );
+        assert_eq!(
+            MATCH_ROWS_TOKENIZED.with(|n| n.get()),
+            3,
+            "three documents hold a query term"
+        );
+
+        // `similarity=boolean` takes the other field-query path; it starts from
+        // the same candidate set.
+        MATCH_ROWS_TOKENIZED.with(|n| n.set(0));
+        let hits = rows(
+            &e,
+            "SELECT id FROM fg2 SEARCH MATCH TEXT \
+             ('','(body:alpha)^1 (body:gamma)^1', 'similarity=boolean');",
+        );
+        assert_eq!(hits.len(), 3, "{hits:?}");
+        assert_eq!(MATCH_ROWS_TOKENIZED.with(|n| n.get()), 3);
     }
 
     /// IVF chunks written by the mirror are loaded and probed for candidates.
