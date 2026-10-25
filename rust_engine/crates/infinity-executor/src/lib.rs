@@ -22389,13 +22389,22 @@ mod tests {
 
         MATCH_ROWS_TOKENIZED.with(|n| n.set(0));
         // A quoted phrase is one unit of two tokens: only adjacent occurrences
-        // in that order match, and the positions come from the index.
+        // in that order match, and the positions come from the index. The score
+        // is `PhraseWeight`: the phrase frequency is the tf and the idf is the
+        // sum over the phrase's terms. n=6, avg_len=2, df(alpha)=df(beta)=4
+        // (documents 1, 2, 4 and 5 hold `alpha`; 1, 3, 4 and 5 hold `beta`)
+        // → idf sum = 2 * ln(1+2.5/4.5) = 0.883666; doc 1 has len 2 → norm
+        // 1.0, doc 4 has len 3 → norm 2.2/2.65.
         assert_eq!(
             rows(
                 &e,
-                "SELECT id FROM fp SEARCH MATCH TEXT (body,'\"alpha beta\"','topn=10');"
+                "SELECT id, ROUND(SCORE(),4) FROM fp SEARCH MATCH TEXT \
+                 (body,'\"alpha beta\"','topn=10');"
             ),
-            vec![vec!["1".to_string()], vec!["4".to_string()]]
+            vec![
+                vec!["1".to_string(), "0.883700".to_string()],
+                vec!["4".to_string(), "0.733600".to_string()]
+            ]
         );
         // `operator=and` is an AND of the bare terms, not a phrase: `beta
         // alpha` matches too, and the order is score-then-id.
