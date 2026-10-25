@@ -4,6 +4,7 @@
 `test_a_segment_with_many_blocks_keeps_one_chunk_per_index`（1 段 3 块）、
 `test_a_compacted_table_matches_and_keeps_its_sources` /
 `test_a_cleanup_reclaims_the_deprecated_sources`（4 段压成 1 段再回收）、
+`test_a_big_import_populates_every_index_kind`（15 万行一次 COPY、四种索引）、
 `test_a_compaction_with_one_segment_is_a_no_op`、
 `test_a_table_larger_than_a_segment_starts_a_second_one`（三段容量切分 + 全文索引
 按 `mem_index_capacity` 切 chunk，需要 `INFINITY_BYTES_HUGE=1`），以及
@@ -471,7 +472,10 @@ def _block_seg_phase(conn, directory):
     t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
     t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
     t.create_index("id_sec", index.IndexInfo("id", index.IndexType.Secondary))
-    t.import_data(os.path.join(directory, "big.csv"))
+    # JSONL: a CSV cell cannot carry the vector's commas (neither engine
+    # honours quotes while splitting), and the same file has to describe the
+    # sparse column too.
+    t.import_data(os.path.join(directory, "big.jsonl"), {"file_type": "jsonl"})
     conn.flush_data()
     time.sleep(2)
 
@@ -992,3 +996,120 @@ def test_a_table_larger_than_a_segment_starts_a_second_one():
     assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
     assert cpp_answers["count"] == [HUGE_ROWS]
     assert cpp_answers["last"] == [HUGE_ROWS - 1]
+
+
+BIG_TABLE = "test_cross_engine_big_import"
+# Past one `mem_index_capacity` (65536) twice: the import is a single
+# transaction, and every index still has to split its chunks at the capacity -
+# which is the part that used to depend on the commit batches.
+BIG_ROWS = 150_000
+BIG_COLUMNS = {
+    "id": {"type": "int"},
+    "title": {"type": "varchar"},
+    "vec": {"type": "vector,4,float"},
+    "score": {"type": "int"},
+    "sp": {"type": "sparse,8,float,int"},
+}
+
+
+def _big_csv(path, rows):
+    """Tab-separated, the encoding `tools/generate_wiki_embedding_plus.py` uses.
+
+    A vector or sparse cell carries commas of its own, so the tab is what tells
+    the columns apart; the sparse value is the bracketed `[term:value, ...]`
+    form, not `term:value` pairs.
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", buffering=1 << 20) as handle:
+        for i in range(rows):
+            vec = f"[{i % 7 / 7.0},0.25,0.5,0.75]"
+            sp = f"[0:{i % 5 + 1},1:0.5]"
+            handle.writelines(
+                f"{i}\tdoc-{i % 1000}\t{vec}\t{i}\t{sp}\n"
+            )
+
+
+def _big_phase(conn, directory):
+    db = conn.get_database("default_db")
+    db.drop_table(BIG_TABLE, ConflictType.Ignore)
+    t = db.create_table(BIG_TABLE, BIG_COLUMNS, ConflictType.Error)
+    t.create_index("ft", index.IndexInfo("title", index.IndexType.FullText))
+    t.create_index(
+        "vec_idx",
+        index.IndexInfo(
+            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+        ),
+    )
+    t.create_index("score_sec", index.IndexInfo("score", index.IndexType.Secondary))
+    t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
+    t.import_data(
+        os.path.join(directory, "big.csv"), {"file_type": "csv", "delimiter": "\t"}
+    )
+    conn.flush_data()
+    for name in ("ft", "vec_idx", "score_sec", "sp_idx"):
+        t.dump_index(name)
+    time.sleep(2)
+
+
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_a_big_import_populates_every_index_kind():
+    """150,000 rows in **one** `COPY` (one transaction), four index kinds.
+
+    The full-text chunks are cut per `mem_index_capacity` (65536) and the
+    secondary chunk is one per segment - neither may depend on the import being
+    committed in batches. Chunk counts are compared between the engines rather
+    than hard coded, then the chunks byte for byte.
+
+    The vector and sparse cells use the tab-separated form the repository's own
+    fixture uses (`[a, b, c, d]` and `[term:value, ...]`).
+    """
+    cpp_root = os.path.join(ROOT, "big_cpp")
+    rust_root = os.path.join(ROOT, "big_rust")
+    directory = tempfile.mkdtemp(prefix="big-csv-")
+    try:
+        _big_csv(os.path.join(directory, "big.csv"), BIG_ROWS)
+        phase = lambda conn: _big_phase(conn, directory)
+        _run_engine("cpp", cpp_root, 5432, seed=phase)
+        _run_engine("rust", rust_root, 5433, seed=phase)
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+    cpp_files, rust_files = _files(cpp_root), _files(rust_root)
+    counts = {}
+    for label, files in (("cpp", cpp_files), ("rust", rust_files)):
+        seen = {}
+        for name in files:
+            parts = name.split("/")
+            if len(parts) >= 5 and parts[2].startswith("idx_") and name.endswith(".dic"):
+                seen[(parts[2], parts[3])] = seen.get((parts[2], parts[3]), 0) + 1
+        counts[label] = seen
+        assert seen, f"{label}: no full-text chunks"
+    assert counts["cpp"] == counts["rust"], f"{counts['cpp']} != {counts['rust']}"
+    # 150,000 rows = 65536 + 65536 + 18928 -> three chunks in `seg_0`.
+    assert set(counts["cpp"].values()) == {3}, counts["cpp"]
+
+    cpp_dir = _own_table_dir(cpp_files, len(BIG_COLUMNS))
+    rust_dir = _own_table_dir(rust_files, len(BIG_COLUMNS))
+    failures = _compare_data_files(
+        _under(cpp_files, cpp_dir),
+        _under(rust_files, rust_dir),
+        {1: "fulltext", 2: "hnsw", 3: "secondary-u64", 4: "bmp"},
+    )
+    assert not failures, "the two engines wrote different bytes:\n  " + "\n  ".join(
+        failures[:20]
+    )
+
+    queries = {
+        "count": lambda t: t.output(["count(*)"]).to_result(),
+        "secondary": lambda t: t.output(["id"]).filter("score = 149999").to_result(),
+        "fulltext": lambda t: t.output(["id"]).match_text("title", "doc-7", 3).to_result(),
+    }
+    cpp_answers = _answers(cpp_root, 5432, BIG_TABLE, queries)
+    rust_answers = _answers(rust_root, 5433, BIG_TABLE, queries)
+    assert cpp_answers == rust_answers, f"{cpp_answers} != {rust_answers}"
+    assert cpp_answers["count"] == [BIG_ROWS]
