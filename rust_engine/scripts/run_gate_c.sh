@@ -29,6 +29,7 @@ if [[ -d "$root/python/restart_test" ]]; then
   # cwd is the repository root: the suites address fixtures as
   # `test/data/...`, so running from `python/` silently imports nothing.
   run=( "$py" -m pytest -q python/restart_test --infinity_path="$shim" )
+  work=""
   if command -v bwrap >/dev/null 2>&1; then
     data="${INFINITY_GATE_C_DATA:-$(mktemp -d)}"
     mkdir -p "$data/tmp"
@@ -65,11 +66,24 @@ if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
   # (`catalog| db| tbl| col| idx|`), so the binary Gate C runs above already
   # reads and writes what the reference does.
   if cargo build -q --release -p infinity-cli; then
+    cross=( "$py" -m pytest -q python/restart_test/test_cross_engine_compat.py \
+            python/restart_test/test_cross_engine_bytes_*.py \
+            --infinity_path="$shim" )
+    if command -v bwrap >/dev/null 2>&1; then
+      # The same sandbox the restart suites get: these tests root both engines
+      # at `/var/infinity/bytes` and start the reference again to read the
+      # result back, so an unprivileged run needs that directory writable and
+      # on disk. Reuse the directory leg 2 created when there is one.
+      cross_work="${work:-}"
+      [[ -n "$cross_work" ]] || cross_work="$(mktemp -d)"
+      mkdir -p "$cross_work"
+      cross=( bwrap --dev-bind / / --tmpfs /var --dir /var/infinity \
+              --bind "$cross_work" /var/infinity \
+              --unshare-pid --proc /proc -- "${cross[@]}" )
+    fi
     ( cd "$root" && INFINITY_SERVER_BIN="$root/rust_engine/target/release/infinity" \
         INFINITY_CPP_BIN="${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" \
-        "$py" -m pytest -q python/restart_test/test_cross_engine_compat.py \
-        python/restart_test/test_cross_engine_bytes_*.py \
-        --infinity_path="$shim" ) || status=1
+        "${cross[@]}" ) || status=1
   else
     echo "FAIL: could not build the port binary the cross-engine leg needs"
     status=1
