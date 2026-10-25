@@ -25,7 +25,14 @@
 
 ## 2 未实现 / 未接线
 
-当前没有未实现的功能缺口。原先记在这一节里的接线项——相关子查询、压缩/`IMPORT` 的 WAL 帧、DDL 的 typed 命令、`COMPACT` 的候选集、`IndexScanBuilder`、`ResultCacheGetter`、`MATCH TEXT` 走倒排、`fast_rough_filter`、`compact_interval`、分析器家族、稀疏检索选项、快照——现在各自记录在 [`CLASS_MAP.md`](CLASS_MAP.md)（类/方法级）与 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §6（格式与门禁级），本文不再重复。
+**现在有两项（都是并发对齐的待办）**：
+
+| 待办 | 参考的做法 | 端口现在 |
+|---|---|---|
+| 执行器的多 fragment 与 tasklet（D4） | `FragmentBuilder` 把计划切成并行流 / 串行 materialize / merge 若干 fragment，之间用交换队列；`FragmentContext::CreateTasks` 按 `min(cpu_count, first_operator->TaskletCount())` 建 tasklet，scan 的 tasklet 数就是块数（`fragment_context_impl.cpp:1215-1245`），`TaskletCount()` 默认 1、filter/project/limit 透传左侧、match/merge/projection 强制 1 | 不拆 fragment、没有 tasklet：`run_fragment` 在单线程里跑完整条算子链（`operators/mod.rs:342`）；`EXPLAIN FRAGMENT` 里的 `Fragment #N * M Task` 只是单测 fixture 的文本（`explain.rs:1805`）。结果一致，并行度不同 |
+| 事务下半部的执行者与可见顺序 | 每个事务在自己的线程里做 bottom（`NewTxn::CommitBottom` → `CommitBottomAppend`，单事务内对 append range 顺序循环，`new_txn_data_impl.cpp:1840`；索引 insert 也在这里，`AppendIndex`，`:1887`），manager 用 `bottom_txns_`（按 commit_ts 排序）从队首推进 `current_ts_` 并 `NotifyTopHalf`（`new_txn_manager_impl.cpp:410-455`）：**bottom 工作并发、可见性按 commit_ts 有序** | 冲突检测、WAL 追加、KV 批量写与 `max_applied` 全在同一把 `commit_lock` 里（`infinity-txn/src/lib.rs:458`），执行顺序 = 抢锁顺序，而 commit ts 在抢锁**之前**分配；索引更新在 `commit_at` 返回、锁释放之后由调用线程逐行做。并发客户端下可能出现 ts 大的事务先对读者可见，且同一张表的索引更新可以在锁外交错 |
+
+原先记在这一节里的接线项——相关子查询、压缩/`IMPORT` 的 WAL 帧、DDL 的 typed 命令、`COMPACT` 的候选集、`IndexScanBuilder`、`ResultCacheGetter`、`MATCH TEXT` 走倒排、`fast_rough_filter`、`compact_interval`、分析器家族、稀疏检索选项、快照——已经接线，记录在 [`CLASS_MAP.md`](CLASS_MAP.md)（类/方法级）与 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §6（格式与门禁级）。
 
 ## 3 不可逐字节比对（参考侧不确定）
 
@@ -57,6 +64,4 @@ SMVE 已经闭口：`test_the_smve_chunk_matches_byte_for_byte`（500 行 `TENSO
 | `INSERT … SELECT` | 只支持 select list 全为常量：参考的 `PhysicalInsert` 把投影表达式交给 `ExpressionState::CreateState`，那里没有 `Column` 分支，任何列引用（含 `SELECT *`）都会死在该处（`expression_state_impl.cpp:68`）。端口报同一条 `Unknown expression type: Column. expression name: {col}`，常量情形与参考一样按源行数插入 | `select_ddl_ut::insert_select_is_refused_when_the_select_list_reads_a_column` |
 | `CREATE SNAPSHOT … ON TABLE <db>.<tbl>` | 参考的文法是 `IDENTIFIER`，带库名的写法是解析错误（`unexpected '.', expecting end of file`）；端口接受限定名（HTTP 层就按这个拼），无库名时用会话库 | `infinity-parser` 的 `CREATE SNAPSHOT` 分支（`parser.rs:362`） |
 | `standard-porter` | 用 Porter2（`rust_stemmers::English`），少数词干与参考的 `STEM_LANG_PORT` 不同；其余 17 种语言同族一致 | `CLASS_MAP.md`「有意的设计变更」 |
-| 执行器的并行度（D4） | 端口不拆 fragment、没有 tasklet：`run_fragment` 在单线程里跑完整条算子链（`operators/mod.rs:342`），`EXPLAIN FRAGMENT` 里的 `Fragment #N * M Task` 是单测 fixture 的文本（`explain.rs:1805`）。参考的 `FragmentContext::CreateTasks` 按 `min(cpu_count, first_operator->TaskletCount())` 建 tasklet、scan 的 tasklet 是块数（`fragment_context_impl.cpp:1215-1245`），fragment 之间用交换队列；`PhysicalOperator::TaskletCount()` 默认 1，filter/project/limit 透传左侧、match/merge/projection 强制 1。**影响**：结果一致，扫描/连接的并行度不同 | `CLASS_MAP.md`「有意的设计变更」、`operators/mod.rs:342` |
-| 事务下半部的执行者与可见顺序 | 端口把冲突检测、WAL 追加、KV 批量写与 `max_applied` 全放在 `commit_at` 的同一把 `commit_lock` 里（`infinity-txn/src/lib.rs:458`），执行顺序 = 抢锁顺序，而 commit ts 在抢锁**之前**分配；索引更新在 `commit_at` 返回、锁释放之后由调用线程逐行做。参考是每个事务在自己的线程里做 bottom（`NewTxn::CommitBottom` → `CommitBottomAppend`，单事务内对 append range 顺序循环，`new_txn_data_impl.cpp:1840`），manager 用 `bottom_txns_`（按 commit_ts 排序）从队首推进 `current_ts_` 并 `NotifyTopHalf`（`new_txn_manager_impl.cpp:410-455`），所以**可见性**按 commit_ts 有序、bottom 工作本身并发。索引 insert 属于 bottom 工作（`AppendIndex` 在 `CommitBottomAppend` 里，`new_txn_data_impl.cpp:1887`），不是上半部。**影响**：并发客户端下端口可能出现 ts 大的事务先对读者可见，且同一张表的索引更新可以在锁外交错 | `infinity-txn/src/lib.rs:458`、`new_txn_manager_impl.cpp:410` |
 

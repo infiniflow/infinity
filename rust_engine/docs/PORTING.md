@@ -100,7 +100,7 @@
 | 类别 | 现在有什么 | 是否待办 |
 |---|---|---|
 | §1 有意不移植 | 对象存储 `obj_key` 打包、DiskANN、geo 类型 | 否，是决定 |
-| §2 未实现 / 未接线 | **当前为空**：相关子查询、压缩/IMPORT 的 WAL 帧、`IndexScanBuilder`、`ResultCacheGetter`、`MATCH` 走索引、`fast_rough_filter`、分析器家族、稀疏检索选项、快照均已接线并有门禁 | — |
+| §2 未实现 / 未接线 | **两项并发待办**：执行器的多 fragment / tasklet（D4）、事务下半部的执行者与按 commit_ts 推进可见性；其余接线项（相关子查询、压缩/IMPORT 的 WAL 帧、`IndexScanBuilder`、`ResultCacheGetter`、`MATCH` 走索引、`fast_rough_filter`、分析器家族、稀疏检索选项、快照）已接线并有门禁 | 是，待办 |
 | §3 不可逐字节比对 | HNSW 图区、IVF 质心、`catalog/` 字节、NULL slot 与内联 padding、后台 dump 的 chunk 切分 | 否，参考自身不确定 |
 | §4 覆盖不到的输入空间 | 带索引的 8M 行表、三段以上的容量切分、PLAID/EMVB/MULTIVECTOR chunk 字节 | 是，但代价高 |
 
