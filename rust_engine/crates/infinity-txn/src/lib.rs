@@ -77,6 +77,11 @@ pub struct Txn {
     /// Tombstones this transaction writes. They are validated against newer
     /// commits at commit time (`NewTxn::CommitTxn` conflict check).
     deletes: Vec<Vec<u8>>,
+    /// The subset of `deletes` the caller applies itself in the bottom half
+    /// (`DeleteInBlock`). They stay in `deletes` so the WAL entry keeps the
+    /// reference's `DeleteV2` command, but the commit batch leaves them out so
+    /// the row stays visible until the commit publishes.
+    deferred_deletes: Vec<Vec<u8>>,
     /// Typed WAL commands a DDL prepared for this transaction (e.g.
     /// `WalCmdCreateTableV2`). When non-empty, commit emits these instead of a
     /// `KvBatch` for the catalog records, so the WAL matches the reference.
@@ -97,6 +102,15 @@ impl Txn {
     /// `kTxnConflict`.
     pub fn delete(&mut self, key: impl Into<Vec<u8>>) {
         self.deletes.push(key.into());
+    }
+    /// Records a tombstone whose KV write the caller performs after the commit
+    /// batch (the bottom half). The WAL entry still lists it, so the command
+    /// stream matches the reference, which writes the tombstone in
+    /// `DeleteInBlock` too.
+    pub fn delete_deferred(&mut self, key: impl Into<Vec<u8>>) {
+        let key = key.into();
+        self.deferred_deletes.push(key.clone());
+        self.deletes.push(key);
     }
     /// Records a read of `key`, so a commit by a transaction that overlaps
     /// this one's lifetime invalidates the commit (C++ `NewTxn::GetStore`).
@@ -129,6 +143,62 @@ impl Drop for Txn {
     }
 }
 
+type WalJob = Box<dyn FnOnce(&mut WalManager) + Send>;
+
+/// The dedicated WAL writer thread.
+///
+/// The reference does not write frames on the committing thread: it hands the
+/// entry to `new_wait_flush_` and a single thread appends it (`NewFlush`,
+/// `wal_manager_impl.cpp:89`), which is what keeps the file in commit order
+/// without every committer serialising on the file itself. `WalWriter` owns the
+/// active log on such a thread; each call is one job and waits for its reply,
+/// so the order the caller emits is the order on disk.
+struct WalWriter {
+    jobs: std::sync::mpsc::Sender<WalJob>,
+}
+
+impl WalWriter {
+    fn start(wal: WalManager) -> Self {
+        let (jobs, queue) = std::sync::mpsc::channel::<WalJob>();
+        std::thread::Builder::new()
+            .name("wal-writer".to_string())
+            .spawn(move || {
+                let mut wal = wal;
+                while let Ok(job) = queue.recv() {
+                    job(&mut wal);
+                }
+            })
+            .expect("spawn the WAL writer");
+        Self { jobs }
+    }
+
+    /// Runs one operation on the writer and waits for it to finish.
+    fn run<T, F>(&self, f: F) -> Result<T>
+    where
+        T: Send + 'static,
+        F: FnOnce(&mut WalManager) -> Result<T> + Send + 'static,
+    {
+        let (reply, answer) = std::sync::mpsc::channel();
+        self.jobs
+            .send(Box::new(move |wal| {
+                let _ = reply.send(f(wal));
+            }))
+            .map_err(|_| Error::Wal("the WAL writer stopped".into()))?;
+        answer
+            .recv()
+            .map_err(|_| Error::Wal("the WAL writer stopped".into()))?
+    }
+
+    fn append(&self, entry: &WalEntry) -> Result<()> {
+        let entry = entry.clone();
+        self.run(move |wal| wal.append(&entry).map(|_| ()))
+    }
+
+    fn flush(&self) -> Result<()> {
+        self.run(|wal| wal.flush())
+    }
+}
+
 /// Owns the WAL + KV pair and hands out transactions.
 pub struct TxnManager {
     store: Arc<dyn MetaStore>,
@@ -140,7 +210,7 @@ pub struct TxnManager {
     /// everything else to this one - which is the catalog the DDL writes into.
     /// Both are the same store in a build that keeps them together.
     catalog_store: Arc<dyn MetaStore>,
-    wal: Mutex<WalManager>,
+    wal: WalWriter,
     /// The catalog ids of the tables this engine knows (`db.tbl` →
     /// `(db_id, table_id)`). The reference stamps them into every `Append` /
     /// `Delete` command (`WalCmdAppend::db_id_` / `table_id_`); a reader that
@@ -248,7 +318,7 @@ impl TxnManager {
             catalog_store: store.clone(),
             store,
             table_ids: Mutex::new(HashMap::new()),
-            wal: Mutex::new(wal),
+            wal: WalWriter::start(wal),
             wal_path,
             checkpoint_path,
             last_swap: AtomicU64::new(0),
@@ -356,6 +426,7 @@ impl TxnManager {
             txn_text: info.txn_text,
             writes: Vec::new(),
             deletes: Vec::new(),
+            deferred_deletes: Vec::new(),
             typed_commands: Vec::new(),
             reads: ReadSet::default(),
             active: self.active.clone(),
@@ -536,11 +607,8 @@ impl TxnManager {
                 &txn.typed_commands,
             ),
         );
-        {
-            let mut wal = self.wal.lock().unwrap();
-            wal.append(&entry)?;
-            self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
-        }
+        self.wal.append(&entry)?;
+        self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
         let mut writes: Vec<(Vec<u8>, Option<Vec<u8>>)> = txn
             .writes
             .iter()
@@ -548,6 +616,13 @@ impl TxnManager {
             .map(|(k, v)| (k, Some(v)))
             .collect();
         for key in &txn.deletes {
+            // A tombstone is applied by the caller's bottom half
+            // (`DeleteInBlock`), not by this batch: the row must stay visible
+            // until the commit publishes. It still rides in `deletes` so the
+            // entry lists the `DeleteV2` command the reference writes.
+            if txn.deferred_deletes.contains(key) {
+                continue;
+            }
             writes.push((key.clone(), None));
         }
         // The applied-timestamp marker rides along with the batch, so a replay
@@ -770,9 +845,12 @@ impl TxnManager {
         max_commit_ts: TxnTimeStamp,
     ) -> Result<()> {
         let entry = WalEntry::new(-1, commit_ts, vec![WalCmd::Checkpoint { max_commit_ts }]);
-        let mut wal = self.wal.lock().unwrap();
-        wal.append(&entry)?;
-        wal.flush()
+        // Appending and flushing as one job keeps the frame and its fsync
+        // together on the writer.
+        self.wal.run(move |wal| {
+            wal.append(&entry)?;
+            wal.flush()
+        })
     }
 
     /// C++ `WalManager::SwapWalFile` (`wal_manager_impl.cpp:504`): seal the
@@ -784,13 +862,15 @@ impl TxnManager {
     /// not rotated (the reference's `Exists` check leaves a fresh directory
     /// without a sealed file).
     fn swap_wal_file(&self, max_commit_ts: TxnTimeStamp) -> Result<()> {
-        let mut wal = self.wal.lock().unwrap();
         if max_commit_ts <= self.last_swap.load(Ordering::SeqCst) {
             return Ok(());
         }
-        if wal.file_size()? > 0 {
-            wal.rotate(max_commit_ts)?;
-        }
+        self.wal.run(move |wal| {
+            if wal.file_size()? > 0 {
+                wal.rotate(max_commit_ts)?;
+            }
+            Ok(())
+        })?;
         self.last_swap.store(max_commit_ts, Ordering::SeqCst);
         Ok(())
     }
@@ -844,14 +924,13 @@ impl TxnManager {
                 max_commit_ts: begin_ts,
             }],
         );
-        {
-            let mut wal = self.wal.lock().unwrap();
+        // Written and fsynced: this file is the only thing that tells the
+        // reference which checkpoint the directory holds, and it refuses to
+        // open a directory whose checkpoint entry a power loss took away.
+        self.wal.run(move |wal| {
             wal.append(&entry)?;
-            // Written and fsynced: this file is the only thing that tells the
-            // reference which checkpoint the directory holds, and it refuses to
-            // open a directory whose checkpoint entry a power loss took away.
-            wal.flush()?;
-        }
+            wal.flush()
+        })?;
         // The checkpoint transaction is committed: its commit ts is the clock's
         // new position, exactly as `CommitBottom` leaves `current_ts_`.
         self.current_ts.store(commit_ts, Ordering::SeqCst);
@@ -879,11 +958,10 @@ impl TxnManager {
                 timestamp: begin_ts,
             }],
         );
-        {
-            let mut wal = self.wal.lock().unwrap();
+        self.wal.run(move |wal| {
             wal.append(&entry)?;
-            wal.flush()?;
-        }
+            wal.flush()
+        })?;
         self.current_ts.store(commit_ts, Ordering::SeqCst);
         Ok(())
     }
@@ -895,10 +973,15 @@ impl TxnManager {
     /// [`Self::drop_sealed_wal_up_to`]).
     pub fn rotate_wal_if_large(&self) -> Result<()> {
         const SEGMENT_BYTES: u64 = 64 * 1024 * 1024;
-        let mut wal = self.wal.lock().unwrap();
-        if wal.file_size()? >= SEGMENT_BYTES {
-            let seal = self.last_appended.load(Ordering::SeqCst);
-            wal.rotate(seal)?;
+        let seal = self.last_appended.load(Ordering::SeqCst);
+        let rotated = self.wal.run(move |wal| {
+            if wal.file_size()? >= SEGMENT_BYTES {
+                wal.rotate(seal)?;
+                return Ok(true);
+            }
+            Ok(false)
+        })?;
+        if rotated {
             self.last_swap.store(seal, Ordering::SeqCst);
         }
         Ok(())
@@ -926,7 +1009,7 @@ impl TxnManager {
     }
 
     pub fn flush(&self) -> Result<()> {
-        self.wal.lock().unwrap().flush()?;
+        self.wal.flush()?;
         self.store.flush()?;
         // Everything the KV holds is now durable, so the log up to this point
         // can be dropped by the next checkpoint. The checkpoint entry itself is

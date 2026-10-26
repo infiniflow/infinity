@@ -9276,8 +9276,13 @@ impl Engine {
         // the slots (`BlockVersion::Delete`) once the commit is durable: the
         // reference hides a deleted row through the block's `version` file, so
         // a directory whose version was not refreshed would show it again.
-        // The tombstones are written by the bottom half (see below): a delete
-        // must not hide a row before its commit is published.
+        for seq in deletes {
+            txn.delete_deferred(del_key(table, *seq));
+        }
+        // The tombstone keys stay in the transaction so the WAL entry carries
+        // the `DeleteV2` command, but `commit_deferred` leaves them out of the
+        // KV batch: they are written by the bottom half (see below), so a
+        // delete does not hide a row before its commit is published.
         self.note_deletes(table, deletes);
         let ts = self.txn.commit_deferred(txn)?;
         let _visible = BottomGuard::new(&self.txn, ts);
