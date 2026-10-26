@@ -4950,6 +4950,8 @@ pub struct Engine {
     /// instead of the committing thread. `None` keeps the inline path, which is
     /// what an engine without a thread pool (most tests) uses.
     bottom_executor: Mutex<Option<Arc<infinity_storage::wal::bottom_executor::BottomExecutor<BottomWork>>>>,
+    /// The full-text inverted-index appender (`MemIndexAppender`).
+    mem_index_appender: Mutex<Option<Arc<MemIndexAppender>>>,
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
@@ -5223,6 +5225,65 @@ fn run_bottom(
         engine.txn.finish_bottom(ts);
     }
     Ok(())
+}
+
+/// Jobs the appender thread has run, for tests.
+#[cfg(test)]
+static TEXT_APPENDS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Jobs the appender thread has run, for tests.
+#[cfg(test)]
+fn text_append_count() -> usize {
+    TEXT_APPENDS.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// `MemIndexAppender` (`bg_task/mem_index_appender_impl.cpp:58`): one
+/// background thread that takes the inverted-index inserts of a commit off the
+/// committing path. The reference submits an `AppendMemIndexTask` per block
+/// (`new_txn_index_impl.cpp:891-894`) and `PostCommit` acquires its semaphore
+/// before the transaction completes; [`Engine::run_text_append`] is that
+/// submit-and-wait.
+struct MemIndexAppender {
+    tx: std::sync::Mutex<std::sync::mpsc::Sender<Box<dyn FnOnce() + Send>>>,
+    handle: std::sync::Mutex<Option<std::thread::JoinHandle<()>>>,
+}
+
+impl MemIndexAppender {
+    fn start() -> Self {
+        let (tx, rx) = std::sync::mpsc::channel::<Box<dyn FnOnce() + Send>>();
+        let handle = std::thread::Builder::new()
+            .name("infinity-mem-index-appender".to_string())
+            .spawn(move || {
+                while let Ok(work) = rx.recv() {
+                    #[cfg(test)]
+                    TEXT_APPENDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    work();
+                }
+            })
+            .expect("failed to spawn the mem index appender");
+        Self {
+            tx: std::sync::Mutex::new(tx),
+            handle: std::sync::Mutex::new(Some(handle)),
+        }
+    }
+
+    fn submit(&self, work: Box<dyn FnOnce() + Send>) -> bool {
+        self.tx.lock().unwrap().send(work).is_ok()
+    }
+}
+
+impl Drop for MemIndexAppender {
+    fn drop(&mut self) {
+        // Closing the sender (dropping it) ends the worker's loop.
+        let (dead_tx, _) = std::sync::mpsc::channel();
+        {
+            let mut tx = self.tx.lock().unwrap();
+            *tx = dead_tx;
+        }
+        if let Some(handle) = self.handle.lock().unwrap().take() {
+            let _ = handle.join();
+        }
+    }
 }
 
 #[derive(Default)]
@@ -5797,6 +5858,7 @@ impl Engine {
             batch_lock: Mutex::new(()),
             bottom_gates: Mutex::new(HashMap::new()),
             bottom_executor: Mutex::new(None),
+            mem_index_appender: Mutex::new(None),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
             vector_cache: Mutex::new(HashMap::new()),
             cpu_sample: Mutex::new(None),
@@ -7825,6 +7887,46 @@ impl Engine {
         task.wait()
     }
 
+    /// Attaches the full-text appender (`Storage::mem_index_appender`).
+    pub fn attach_mem_index_appender(self: &Arc<Self>, appender: Arc<MemIndexAppender>) {
+        *self.self_weak.lock().unwrap() = Arc::downgrade(self);
+        *self.mem_index_appender.lock().unwrap() = Some(appender);
+    }
+
+    fn mem_index_appender(&self) -> Option<Arc<MemIndexAppender>> {
+        self.mem_index_appender.lock().unwrap().clone()
+    }
+
+    /// `MemoryIndexer::AsyncInsertTop` + `MemIndexAppender::Submit` followed by
+    /// `PostCommit`'s semaphore wait: the inverted-index work runs on the
+    /// appender thread and this call returns once it is done.
+    fn run_text_append<F>(&self, work: F)
+    where
+        F: FnOnce(&Engine) + Send + 'static,
+    {
+        let (Some(engine), Some(appender)) = (self.engine_handle(), self.mem_index_appender()) else {
+            work(self);
+            return;
+        };
+        let (done_tx, done_rx) = std::sync::mpsc::sync_channel::<()>(1);
+        // `submit` only fails when the worker is gone; the job is dropped then,
+        // so run it here instead of losing it.
+        let pending = std::sync::Arc::new(std::sync::Mutex::new(Some(work)));
+        let job = std::sync::Arc::clone(&pending);
+        let submitted = appender.submit(Box::new(move || {
+            let work = job.lock().unwrap().take();
+            if let Some(work) = work {
+                work(&engine);
+            }
+            let _ = done_tx.send(());
+        }));
+        if submitted {
+            let _ = done_rx.recv();
+        } else if let Some(work) = pending.lock().unwrap().take() {
+            work(self);
+        }
+    }
+
     /// The gate a transaction's bottom half holds for `table`.
     ///
     /// `BottomExecutor` gives the reference the same shape with a thread pool
@@ -8919,9 +9021,22 @@ impl Engine {
                 for (k, row) in bottom_rows.iter().enumerate() {
                     engine.update_indexes_on_insert(&bottom_table, base + k, row)?;
                     let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-                    engine.update_text_indexes(&bottom_table, base + k, &texts);
                     engine.update_vector_caches(&bottom_table, base + k, &texts);
                 }
+                // The inverted-index inserts are the appender's job
+                // (`AppendMemIndexTask`); this waits for them, as
+                // `PostCommit` waits on the insert semaphores.
+                let text_table = bottom_table.clone();
+                let text_rows: Vec<(usize, Vec<String>)> = bottom_rows
+                    .iter()
+                    .enumerate()
+                    .map(|(k, row)| (base + k, row.iter().map(|v| v.to_slt_string()).collect()))
+                    .collect();
+                engine.run_text_append(move |engine| {
+                    for (seq, texts) in &text_rows {
+                        engine.update_text_indexes(&text_table, *seq, texts);
+                    }
+                });
                 // C++ `AppendMemIndex`: a segment that reached
                 // `mem_index_capacity` rows is dumped right after the batch.
                 engine.dump_hnsw_over_capacity(&bottom_table);
@@ -17389,6 +17504,9 @@ impl Engine {
         let mut bottom_executor = infinity_storage::wal::bottom_executor::BottomExecutor::new();
         bottom_executor.start(workers);
         self.attach_bottom_executor(Arc::new(bottom_executor));
+        // `Storage::Start` also starts the memory-index appender
+        // (`storage_impl.cpp` / `mem_index_appender_impl.cpp:52`).
+        self.attach_mem_index_appender(Arc::new(MemIndexAppender::start()));
         let engine = Arc::downgrade(self);
         let spawned = std::thread::Builder::new()
             .name("infinity-trigger".to_string())
@@ -20887,6 +21005,31 @@ mod tests {
         );
         e.flush().unwrap();
         assert!(dir.path().join("data").exists());
+    }
+
+    /// With an appender attached, a full-text INSERT does its inverted-index
+    /// work on the appender thread and waits for it: the index answers right
+    /// after the statement returns.
+    #[test]
+    fn a_fulltext_insert_runs_on_the_mem_index_appender() {
+        let dir = tempdir().unwrap();
+        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        e.attach_mem_index_appender(Arc::new(MemIndexAppender::start()));
+        e.execute("CREATE TABLE ft (id INT, body VARCHAR);").unwrap();
+        e.execute("CREATE INDEX ft_body ON ft (body) WITH (analyzer = 'standard');")
+            .unwrap();
+
+        let before = text_append_count();
+        e.execute("INSERT INTO ft VALUES (1, 'hello world'), (2, 'goodbye world');")
+            .unwrap();
+        assert_eq!(text_append_count(), before + 1, "the inversion ran on the appender");
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT count(*) FROM ft WHERE filter_fulltext('body', 'hello');"
+            ),
+            vec![vec!["1".to_string()]]
+        );
     }
 
     /// Splitting the row-wise prefix into tasklets must not cost the early stop
