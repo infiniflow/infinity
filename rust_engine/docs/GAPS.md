@@ -25,7 +25,11 @@
 
 ## 2 未实现 / 未接线
 
-**当前为空。** 原先记在这里的两项——执行器的多 fragment/tasklet 与交换队列、事务下半部的
+| 待办 | 参考的做法 | 端口现在 |
+|---|---|---|
+| 语句路径的"行与索引一起可见" | 下半部（`CommitBottom`：行 → 索引 → 块镜像）跑完才 `SetTxnCommitted`，`PostCommit` 再等全文追加的 sema（`new_txn_impl.cpp:2138-2141`、`4624-4660`）；读者要么看到行和索引，要么都看不到 | `EngineTxn` 那条路径已延后发布（`commit_deferred` → 索引 → `finish_bottom`）。`INSERT`/`DELETE`/`IMPORT`/`dump` 走 `TxnManager::commit`，在**调用时就推进 `current_ts`**，行/索引/块镜像随后才补——并发读者在这段窗口里能看到行、但索引项还没建（索引扫描与全表扫描可给出不同结果）。字节不受影响 |
+
+**其余接线项当前为空。** 原先记在这里的两项——执行器的多 fragment/tasklet 与交换队列、事务下半部的
 `BottomExecutor` 与 `MemIndexAppender` 追加队列——已经按参考落地，逐条记录在
 [`CLASS_MAP.md`](CLASS_MAP.md)（类/方法级）与 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §6（门禁级）。
 
@@ -66,5 +70,12 @@ SMVE 已经闭口：`test_the_smve_chunk_matches_byte_for_byte`（500 行 `TENSO
 | `CREATE VIEW` / `DROP VIEW` | 不实现（参考也没有实现）：`PhysicalCreateView::Execute` 是空壳、DDL 分发没有这个分支，两侧都死在 `UnrecoverableException("Unknown DDL type")`（`query_context_impl.cpp:467`/`:489`），视图不会被登记，`FROM v` 随后报表不存在 | `select_ddl_ut::views_are_rejected_like_the_reference` |
 | `INSERT … SELECT` | 只支持 select list 全为常量：参考的 `PhysicalInsert` 把投影表达式交给 `ExpressionState::CreateState`，那里没有 `Column` 分支，任何列引用（含 `SELECT *`）都会死在该处（`expression_state_impl.cpp:68`）。端口报同一条 `Unknown expression type: Column. expression name: {col}`，常量情形与参考一样按源行数插入 | `select_ddl_ut::insert_select_is_refused_when_the_select_list_reads_a_column` |
 | `CREATE SNAPSHOT … ON TABLE <db>.<tbl>` | 参考的文法是 `IDENTIFIER`，带库名的写法是解析错误（`unexpected '.', expecting end of file`）；端口接受限定名（HTTP 层就按这个拼），无库名时用会话库 | `infinity-parser` 的 `CREATE SNAPSHOT` 分支（`parser.rs:362`） |
+| 并行结构：无常驻调度器 | 参考的 `TaskScheduler` 有 `hardware_concurrency()` 个常驻 worker + 每 worker 一个任务队列，fragment 之间用队列流水；端口每个 fragment 用 `std::thread::scope` 起 `min(cpu, TaskletCount)` 个 tasklet，merge 任务串行消费有界通道 | `PARALLEL_MAP.md` §1、§4 |
+| 并行结构：无 `TxnAllocator` 线程 | 参考用单线程分配器发出行号/段号；端口在事务内直接分配 | `PARALLEL_MAP.md` §1 |
+| 并行结构：没有块级锁 | 参考每块一把 `BlockLock`（`shared_mutex`），不同表可同时写；端口写批次在 `batch_lock` 下落块镜像、checkpoint 在 `flush_lock` 下整表重写，表元数据共用 `tables` 一把互斥——并行度低于参考，字节与结果不受影响 | `PARALLEL_MAP.md` §3 |
+| 并行结构：无独立 WAL 写线程 | 参考由 `new_wait_flush_` + `NewFlush` 线程按提交顺序写帧；端口在 `commit_lock` 下直接 `wal.append`（顺序相同，线程不同） | `PARALLEL_MAP.md` §1 |
+| 并行结构：周期触发分成三段 | 参考一个 `PeriodicTriggerThread` 跑 checkpoint/compact/optimize/cleanup 四个触发器；端口 `trigger_loop` 跑后三个，checkpoint 与 flush 各一个 CLI 线程 | `PARALLEL_MAP.md` §1 |
+| 并行结构：队列无上限 | 参考的 `BlockingQueue` 有 1024 的上限，满了 `Enqueue` 阻塞；端口的下半部池、后台任务处理器与索引追加队列都是无界 `VecDeque`/`channel`，压力下会一直涨内存而不施加反压 | `PARALLEL_MAP.md` §4 |
+| 并行结构：交换队列容量 | 参考的 `LocalQueue` 容量由实现决定；端口每 tasklet 一条有界通道，容量固定 2 个 chunk | `PARALLEL_MAP.md` §4 |
 | `standard-porter` | 用 Porter2（`rust_stemmers::English`），少数词干与参考的 `STEM_LANG_PORT` 不同；其余 17 种语言同族一致 | `CLASS_MAP.md`「有意的设计变更」 |
 
