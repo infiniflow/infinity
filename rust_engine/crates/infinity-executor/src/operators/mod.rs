@@ -205,7 +205,11 @@ impl Default for OperatorContext {
 }
 
 /// A push-based physical operator (`PhysicalOperator::Execute`).
-pub trait PhysicalOperator {
+///
+/// `Send` is what lets the fragment run one tasklet per thread: a tasklet owns
+/// its own copy of the chain (see [`PhysicalOperator::fork`]), so the operators
+/// themselves never have to be `Sync`.
+pub trait PhysicalOperator: Send {
     fn operator_type(&self) -> PhysicalOperatorType;
 
     /// `PhysicalOperator::GetName`.
@@ -222,8 +226,24 @@ pub trait PhysicalOperator {
     }
 
     /// `PhysicalOperator::TaskletCount`: the number of tasks to split into.
+    ///
+    /// The chain is a flat list in execution order, so the port cannot ask the
+    /// operator below (the reference's `left_->TaskletCount()`); [`tasklet_count`]
+    /// resolves the same rule over the whole chain instead. Only the operators
+    /// whose count is `1` regardless of their input implement this.
     fn tasklet_count(&self) -> usize {
         1
+    }
+
+    /// A copy of this operator for another tasklet, or `None` when it cannot be
+    /// split (it keeps state in itself, as `Limit` does with its counter).
+    fn fork(&self) -> Option<Box<dyn PhysicalOperator>> {
+        None
+    }
+
+    /// Width of the rows this operator emits, given its input's width.
+    fn output_width(&self, input: usize) -> usize {
+        input
     }
 
     /// `PhysicalOperator::Execute`. Returns whether the operator did real work;
@@ -238,6 +258,11 @@ pub trait PhysicalOperator {
 
 /// Pulls the next batch from the relation below the operator chain.
 pub trait ChunkSource {
+    /// Width of the rows the source emits, before any projection.
+    fn width(&self) -> usize {
+        0
+    }
+
     /// Fills `state.data_blocks` with the next batch. Once the relation is
     /// exhausted the call sets `state.complete` (the batch handed out together
     /// with `complete` is still consumed by the chain).
@@ -288,6 +313,10 @@ impl RowsSource {
 }
 
 impl ChunkSource for RowsSource {
+    fn width(&self) -> usize {
+        self.width
+    }
+
     fn next(&mut self, state: &mut SourceState) -> Result<()> {
         state.data_blocks = Vec::new();
         let mut chunk = DataChunk::with_capacity(self.width, self.batch);
@@ -338,6 +367,42 @@ pub fn execute_task(
     Ok(progressed)
 }
 
+/// The fragment's tasklet count (`FragmentContext::CreateTasks`).
+///
+/// The reference asks the operator nearest the root for `TaskletCount()`; the
+/// port's chain is a flat list, so the same rule is resolved bottom-up here:
+/// a scan reports its block count, `Filter`/`Projection`/`Limit`/`Top`/`Sort`
+/// pass their input's count through (`left_->TaskletCount()`), and every other
+/// operator keeps the default of 1.
+pub fn tasklet_count(operators: &[Box<dyn PhysicalOperator>], source_tasklets: usize) -> usize {
+    let mut count = source_tasklets;
+    for operator in operators {
+        count = match operator.operator_type() {
+            PhysicalOperatorType::Filter
+            | PhysicalOperatorType::Projection
+            | PhysicalOperatorType::Limit
+            | PhysicalOperatorType::Top
+            | PhysicalOperatorType::Sort => count,
+            _ => operator.tasklet_count(),
+        };
+    }
+    count
+}
+
+/// The tasklets a relation of `rows` rows supports: `PhysicalScanBase::
+/// TaskletCount` is the scan's block count, and a block holds
+/// `DEFAULT_VECTOR_SIZE` rows.
+pub fn block_tasklets(rows: usize) -> usize {
+    rows.div_ceil(crate::chunk::DEFAULT_VECTOR_SIZE).max(1)
+}
+
+/// `min(cpu_count, TaskletCount())`, as `CreateTasks` caps the parallel width.
+fn cpu_count() -> usize {
+    std::thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(1)
+}
+
 /// Runs a fragment until its head completes (`FragmentTask` driven to the end).
 pub fn run_fragment(
     operators: &[Box<dyn PhysicalOperator>],
@@ -359,11 +424,107 @@ pub fn run_fragment(
     Ok(())
 }
 
+/// Runs the chain once over `source` and returns the head's output.
+fn run_serial(
+    mut operators: Vec<Box<dyn PhysicalOperator>>,
+    names: Vec<String>,
+    source: &mut dyn ChunkSource,
+) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+    for operator in &mut operators {
+        operator.init()?;
+    }
+    let mut ctx = OperatorContext::default();
+    let mut states = OperatorStates::new(&operators);
+    run_fragment(&operators, &mut ctx, &mut states, source)?;
+    // Nothing consumes the head's output, so it is still in its own state.
+    let head = operators.len() - 1;
+    let rows = std::mem::take(&mut states.state_mut(head).data_blocks)
+        .into_iter()
+        .flat_map(DataChunk::into_rows)
+        .collect();
+    Ok((names, rows))
+}
+
+/// Runs `tasks` tasklets over disjoint contiguous ranges of `rows` and joins
+/// their output in tasklet order, which is the row order of the serial run.
+///
+/// This is the fragment-with-exchange shape of the reference: each tasklet
+/// owns a copy of the chain ([`PhysicalOperator::fork`]) and its own half of the
+/// relation, and the results are concatenated in tasklet order.
+fn run_tasklets(
+    operators: &[Box<dyn PhysicalOperator>],
+    names: Vec<String>,
+    rows: Vec<Vec<Value>>,
+    width: usize,
+    tasks: usize,
+) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+    let per_task = rows.len().div_ceil(tasks);
+    let mut ranges: Vec<Vec<Vec<Value>>> = Vec::with_capacity(tasks);
+    let mut rest = rows;
+    for _ in 0..tasks {
+        if rest.is_empty() {
+            ranges.push(Vec::new());
+        } else {
+            let tail = rest.split_off(per_task.min(rest.len()));
+            ranges.push(rest);
+            rest = tail;
+        }
+    }
+    // Every tasklet runs its own copy of the chain, so none of the operators
+    // has to be `Sync`.
+    let chains: Vec<Vec<Box<dyn PhysicalOperator>>> = (0..tasks)
+        .map(|_| {
+            operators
+                .iter()
+                .map(|operator| {
+                    operator.fork().ok_or_else(|| {
+                        Error::Invalid(format!(
+                            "operator {} cannot be split into tasklets",
+                            operator.name()
+                        ))
+                    })
+                })
+                .collect::<Result<Vec<_>>>()
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let batch = crate::chunk::DEFAULT_VECTOR_SIZE;
+    let results: Vec<Result<(Vec<String>, Vec<Vec<Value>>)>> = std::thread::scope(|scope| {
+        let handles: Vec<_> = chains
+            .into_iter()
+            .zip(ranges)
+            .map(|(chain, rows)| {
+                scope.spawn(move || {
+                    let mut source = RowsSource::new(rows, width, batch);
+                    run_serial(chain, Vec::new(), &mut source)
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|handle| {
+                handle
+                    .join()
+                    .unwrap_or_else(|_| Err(Error::Invalid("tasklet panicked".into())))
+            })
+            .collect()
+    });
+    let mut joined: Vec<Vec<Value>> = Vec::new();
+    for result in results {
+        joined.extend(result?.1);
+    }
+    Ok((names, joined))
+}
+
 /// Runs a lowered chain over a fragment source and returns the result in the
 /// `run_plan` shape.
 ///
 /// The source hands rows out chunk by chunk, so an operator that completes
-/// early (LIMIT) stops the scan cursor too.
+/// early (LIMIT) stops the scan cursor too. A chain made only of row-local
+/// operators is split into `min(cpu_count, TaskletCount())` tasklets; a chain
+/// with a merge point (LIMIT/SORT/AGGREGATE) runs its row-local prefix in
+/// tasklets and the merge part serially over the concatenated output, which is
+/// the fragment-with-exchange split of `FragmentBuilder` with a single merge
+/// task.
 pub fn run_operators(
     mut operators: Vec<Box<dyn PhysicalOperator>>,
     names: Vec<String>,
@@ -380,19 +541,47 @@ pub fn run_operators(
         // A plan with no operator above the scan: the source is the result.
         return Ok((names, source.collect()?));
     }
-    for operator in &mut operators {
-        operator.init()?;
+    // `PhysicalOperatorType` has no exchange operator: the first operator that
+    // needs the whole relation is where the parallel fragment ends.
+    let split = operators
+        .iter()
+        .position(|operator| {
+            !matches!(
+                operator.operator_type(),
+                PhysicalOperatorType::Filter | PhysicalOperatorType::Projection
+            )
+        })
+        .unwrap_or(operators.len());
+    if split == 0 {
+        // The merge point sits right on the scan (LIMIT pushed below the
+        // projection, ORDER BY without a filter): nothing to split.
+        return run_serial(operators, names, source);
     }
-    let mut ctx = OperatorContext::default();
-    let mut states = OperatorStates::new(&operators);
-    run_fragment(&operators, &mut ctx, &mut states, source)?;
-    // Nothing consumes the head's output, so it is still in its own state.
-    let head = operators.len() - 1;
-    let rows = std::mem::take(&mut states.state_mut(head).data_blocks)
-        .into_iter()
-        .flat_map(DataChunk::into_rows)
-        .collect();
-    Ok((names, rows))
+    let source_width = source.width();
+    let prefix_width = operators[..split]
+        .iter()
+        .fold(source_width, |width, operator| {
+            operator.output_width(width)
+        });
+    // No operator in the prefix can finish early, so reading the relation up
+    // front is what the serial run would do anyway.
+    let rows = source.collect()?;
+    let tasks = tasklet_count(&operators, block_tasklets(rows.len())).min(cpu_count());
+    let merge = operators.split_off(split);
+    let mut prefix = operators;
+    let rows = if tasks > 1 {
+        run_tasklets(&prefix, Vec::new(), rows, source_width, tasks)?.1
+    } else {
+        // One tasklet: the prefix still runs, just serially.
+        let mut source = RowsSource::new(rows, source_width, crate::chunk::DEFAULT_VECTOR_SIZE);
+        run_serial(std::mem::take(&mut prefix), Vec::new(), &mut source)?.1
+    };
+    if merge.is_empty() {
+        return Ok((names, rows));
+    }
+    // The merge fragment: one task over the tasklets' concatenated output.
+    let mut source = RowsSource::new(rows, prefix_width, crate::chunk::DEFAULT_VECTOR_SIZE);
+    run_serial(merge, names, &mut source)
 }
 
 #[cfg(test)]
@@ -448,9 +637,112 @@ mod tests {
             .collect()
     }
 
+    /// `PhysicalOperator::TaskletCount` per operator, resolved over the chain:
+    /// the row-wise operators pass the scan's block count through, a blocking
+    /// one drops to a single tasklet.
     #[test]
-    fn a_chain_forwards_every_row_in_chunks() {
+    fn tasklet_count_follows_the_operator_rules() {
+        use super::aggregate::Aggregate;
+        use super::filter::Filter;
+        use super::limit::Limit;
+        use super::project::Projection;
+        use super::sort::Sort;
+
+        let row_wise: Vec<Box<dyn PhysicalOperator>> = vec![
+            Box::new(Filter::new(infinity_expression::Expr::Literal(
+                Value::Bool(true),
+            ))),
+            Box::new(Projection::new(Vec::new(), Vec::new())),
+            Box::new(Limit::new(0, 5)),
+            Box::new(Sort::new(Vec::new())),
+        ];
+        assert_eq!(tasklet_count(&row_wise, 12), 12);
+        let aggregate: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(Aggregate::new(
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        ))];
+        assert_eq!(tasklet_count(&aggregate, 12), 1);
+    }
+
+    /// Tasklets read disjoint contiguous ranges and their output is joined in
+    /// tasklet order, so the rows come back exactly as the serial run returns
+    /// them.
+    #[test]
+    fn tasklets_join_their_output_in_tasklet_order() {
+        use super::filter::Filter;
+        use super::project::Projection;
+
         let operators: Vec<Box<dyn PhysicalOperator>> = vec![
+            Box::new(Filter::new(infinity_expression::Expr::Cmp(
+                Box::new(infinity_expression::Expr::Column(0)),
+                infinity_parser::CmpOp::Gt,
+                Box::new(infinity_expression::Expr::Literal(Value::Int(10))),
+            ))),
+            Box::new(Projection::new(
+                vec![infinity_expression::Expr::Column(0)],
+                vec!["a".into()],
+            )),
+        ];
+        let input = rows(41);
+        let mut serial_source = RowsSource::new(input.clone(), 1, 4);
+        let chains: Vec<Box<dyn PhysicalOperator>> =
+            operators.iter().map(|op| op.fork().unwrap()).collect();
+        let expected = run_serial(chains, Vec::new(), &mut serial_source).unwrap().1;
+        assert_eq!(expected.len(), 30);
+        // Tasklet counts that divide the rows evenly and ones that do not, down
+        // to one row per tasklet.
+        for tasks in [2, 3, 5, 41] {
+            let (_, out) = run_tasklets(&operators, Vec::new(), input.clone(), 1, tasks).unwrap();
+            assert_eq!(out, expected, "tasks = {tasks}");
+        }
+    }
+
+    /// The entry point takes the same split: a row-wise chain over more than one
+    /// block runs in tasklets, and a LIMIT above it still sees the rows in
+    /// order.
+    #[test]
+    fn run_operators_splits_a_row_wise_chain_and_limits_after_the_merge() {
+        use super::filter::Filter;
+        use super::limit::Limit;
+        use super::project::Projection;
+
+        let chain = || -> Vec<Box<dyn PhysicalOperator>> {
+            vec![
+                Box::new(Filter::new(infinity_expression::Expr::Cmp(
+                    Box::new(infinity_expression::Expr::Column(0)),
+                    infinity_parser::CmpOp::Gt,
+                    Box::new(infinity_expression::Expr::Literal(Value::Int(100))),
+                ))),
+                Box::new(Projection::new(
+                    vec![infinity_expression::Expr::Column(0)],
+                    vec!["a".into()],
+                )),
+            ]
+        };
+        // 20_000 rows is more than two blocks, so a two-cpu machine already
+        // runs two tasklets.
+        let input = rows(20_000);
+        let mut source = RowsSource::new(input.clone(), 1, crate::chunk::DEFAULT_VECTOR_SIZE);
+        let (names, out) = run_operators(chain(), vec!["a".into()], &mut source).unwrap();
+        assert_eq!(names, vec!["a".to_string()]);
+        assert_eq!(out.len(), 20_000 - 101);
+        assert_eq!(out[0], vec![Value::Int(101)]);
+        assert_eq!(out[out.len() - 1], vec![Value::Int(19_999)]);
+
+        // LIMIT is the merge point: the filter runs in tasklets, the limit takes
+        // the first rows of their concatenation.
+        let mut operators = chain();
+        operators.push(Box::new(Limit::new(0, 10)));
+        let mut source = RowsSource::new(input, 1, crate::chunk::DEFAULT_VECTOR_SIZE);
+        let (_, out) = run_operators(operators, vec!["a".into()], &mut source).unwrap();
+        assert_eq!(out.len(), 10);
+        assert_eq!(out[0], vec![Value::Int(101)]);
+        assert_eq!(out[9], vec![Value::Int(110)]);
+    }
+
+    #[test]
+    fn a_chain_forwards_every_row_in_chunks() {        let operators: Vec<Box<dyn PhysicalOperator>> = vec![
             Box::new(Forward {
                 kind: PhysicalOperatorType::Filter,
             }),

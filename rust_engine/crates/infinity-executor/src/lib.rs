@@ -20593,6 +20593,27 @@ mod tests {
 
     /// GROUP BY and global aggregates run through the aggregate operator, keep
     /// first-seen group order, and still produce one row over an empty relation.
+    /// Splitting the row-wise prefix into tasklets must not cost the early stop
+    /// of `LIMIT`: the limit is the merge point, and the scan below it still
+    /// stops once its budget is spent (`physical_limit_impl.cpp:209`).
+    #[test]
+    fn a_limit_over_a_big_table_still_stops_early() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE lim (a INT);").unwrap();
+        let input: Vec<Vec<Literal>> = (0..100_000).map(|i| vec![Literal::Int(i)]).collect();
+        e.insert_literals("default_db.lim", None, input).unwrap();
+
+        let before = crate::operators::project::projected_rows();
+        let out = rows(&e, "SELECT a + 1 FROM lim LIMIT 3;");
+        assert_eq!(out, vec![vec!["1".to_string()], vec!["2".to_string()], vec!["3".to_string()]]);
+        let projected = crate::operators::project::projected_rows() - before;
+        assert!(
+            projected <= crate::chunk::DEFAULT_VECTOR_SIZE,
+            "projected {projected} rows"
+        );
+    }
+
     #[test]
     fn run_plan_executes_a_group_by_through_the_operator_model() {
         let dir = tempdir().unwrap();

@@ -38,6 +38,11 @@ impl PhysicalOperator for Filter {
         PhysicalOperatorType::Filter
     }
 
+    /// Row-local and stateless, so a tasklet can run its own copy.
+    fn fork(&self) -> Option<Box<dyn PhysicalOperator>> {
+        Some(Box::new(self.clone()))
+    }
+
     fn output_names(&self) -> Vec<String> {
         // A filter does not rename anything; the names come from the operator
         // below (C++ delegates `GetOutputNames` to `left_`).

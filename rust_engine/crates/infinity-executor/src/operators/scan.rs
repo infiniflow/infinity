@@ -212,6 +212,10 @@ impl<'a> PhysicalSource<'a> {
 }
 
 impl ChunkSource for PhysicalSource<'_> {
+    fn width(&self) -> usize {
+        self.columns.len()
+    }
+
     fn next(&mut self, state: &mut SourceState) -> Result<()> {
         state.data_blocks = Vec::new();
         if self.rows.is_none() {

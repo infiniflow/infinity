@@ -66,6 +66,15 @@ impl PhysicalOperator for Projection {
         PhysicalOperatorType::Projection
     }
 
+    /// Row-local and stateless, so a tasklet can run its own copy.
+    fn fork(&self) -> Option<Box<dyn PhysicalOperator>> {
+        Some(Box::new(self.clone()))
+    }
+
+    fn output_width(&self, _input: usize) -> usize {
+        self.exprs.len()
+    }
+
     fn output_names(&self) -> Vec<String> {
         self.names.clone()
     }
