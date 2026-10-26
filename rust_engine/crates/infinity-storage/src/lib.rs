@@ -8,10 +8,11 @@
 //! Invariants preserved from C++ (see plan 附录 A): the substrates are separate;
 //! MVCC is timestamp-array based (not KV snapshots); WAL writes are serialized.
 
-// Maps sealed on-disk indexes. `mmap` is the one operation that needs `unsafe`
-// (the mapping outlives the `File`); it is isolated in
-// [`fulltext_segment::SegmentIndexReader::open`], which documents why the region
-// cannot change while mapped.
+// `#![deny(unsafe_code)]` with per-site `#[allow(unsafe_code)]`: the only
+// `unsafe` here is `mmap` (mapping an index segment is far cheaper than reading
+// it into the heap - see PORTING.md §2.8) and two narrow FFI calls
+// (`malloc_trim`, `posix_fadvise`) that keep RSS and the page cache bounded
+// during large imports. Every site documents why no safe API can express it.
 #![deny(unsafe_code)]
 
 /// Releases free heap pages back to the OS (glibc). A no-op on other targets.

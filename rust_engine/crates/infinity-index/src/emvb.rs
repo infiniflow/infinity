@@ -942,6 +942,64 @@ mod tests {
         assert_eq!(got[0].0, 0);
     }
 
+    /// `ip_table` rotates the query into the PQ space before the residual
+    /// inner products (`OPQ::matrix_R_`), while the coarse-centroid scores stay
+    /// unrotated. The fixture makes that exact: the residual codeword is
+    /// `(0, 0.5)` in the rotated space and `R` turns `(1, 0)` into `(0, 1)`, so
+    /// the residual term is `0.5` when the query is rotated and `0` when it is
+    /// not.
+    #[test]
+    fn opq_rotation_is_applied_to_the_residual_table() {
+        // dims = 2, one subspace with two codewords.
+        let centroids = vec![1.0f32, 0.0, 0.0, 1.0];
+        let codebook = vec![0.0f32, 0.0, 0.0, 0.5];
+        let codes = vec![1u8];
+        let assignments = vec![0u32];
+        let doc_lens = vec![1u32];
+        let doc_segment_offsets = vec![0u32];
+        let centroids_to_docid = vec![vec![0u32], vec![]];
+        // `mul_row` applies `R^T` (out[col] = sum_row x[row] * R[row][col]),
+        // so this quarter turn maps (1,0) to (0,1).
+        let rotation: &'static [f32] = &[0.0, 1.0, -1.0, 0.0];
+        let view = |rotation: Option<&'static [f32]>| EmvbView {
+            dims: 2,
+            subspace_num: 1,
+            sub_dim: 2,
+            k: 2,
+            centroids: &centroids,
+            codebook: &codebook,
+            codes: &codes,
+            assignments: &assignments,
+            doc_lens: &doc_lens,
+            doc_segment_offsets: &doc_segment_offsets,
+            centroids_to_docid: &centroids_to_docid,
+            rotation,
+        };
+        let query = vec![vec![1.0f32, 0.0]];
+        let options = EmvbSearchOptions {
+            centroid_nprobe: 2,
+            threshold_first: -1.0,
+            n_doc_to_score: 10,
+            out_second_stage: 10,
+            threshold_final: -1.0,
+        };
+        let rotated = view(Some(rotation)).search(&query, 1, options);
+        assert_eq!(rotated.len(), 1);
+        // centroid score 1.0 + residual (0,1)·(0,0.5) = 1.5
+        assert!(
+            (rotated[0].1 - 1.5).abs() < 1e-6,
+            "score with the rotation = {}",
+            rotated[0].1
+        );
+        let unrotated = view(None).search(&query, 1, options);
+        // The same codes read with an unrotated query give a residual of 0.
+        assert!(
+            (unrotated[0].1 - 1.0).abs() < 1e-6,
+            "score without the rotation = {}",
+            unrotated[0].1
+        );
+    }
+
     /// C++: `EMVBTest.test_fakepq` (`test_emvb_ut.cpp`). A zero PQ distance
     /// table (`FakePQ`) reduces the final stage to the coarse-centroid MaxSim,
     /// so the ten documents of centroid 3 tie at `32 * 1.0` and come back in
