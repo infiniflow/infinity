@@ -453,3 +453,106 @@ fn checkpoint_ts_skips_already_applied_records() {
     assert_eq!(m.recover(4).unwrap(), 2);
     assert_eq!(store.scan_prefix(b"row:").unwrap().len(), 2);
 }
+
+/// `WalManager::Flush` swaps the file inside its own loop when it reaches a
+/// checkpoint entry (`wal_manager_impl.cpp:288-294`), so the swap and the frame
+/// are one step on the writer thread. As two jobs a commit could be written
+/// into the fresh log before the frame, which would leave a row frame ahead of
+/// the checkpoint the directory is opened by.
+#[test]
+fn a_checkpoint_frame_starts_its_fresh_log() {
+    let dir = tempdir().unwrap();
+    let store: Arc<dyn MetaStore> =
+        Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
+    let wal = dir.path().join("wal.log");
+    let m = Arc::new(TxnManager::open(&wal, store).unwrap());
+
+    let commits = {
+        let m = Arc::clone(&m);
+        std::thread::spawn(move || {
+            for i in 0..200u64 {
+                let mut t = m.begin();
+                t.put(format!("k{i}").into_bytes(), b"v".to_vec());
+                m.commit(t).unwrap();
+            }
+        })
+    };
+    let checkpoints = {
+        let m = Arc::clone(&m);
+        std::thread::spawn(move || {
+            for _ in 0..100 {
+                let seal = m.last_appended.load(Ordering::SeqCst);
+                let _ = m.append_checkpoint(seal);
+            }
+        })
+    };
+    commits.join().unwrap();
+    checkpoints.join().unwrap();
+    let seal = m.last_appended.load(Ordering::SeqCst);
+    m.append_checkpoint(seal).unwrap();
+
+    let is_checkpoint = |entry: &WalEntry| {
+        entry
+            .cmds
+            .iter()
+            .any(|cmd| matches!(cmd, WalCmd::Checkpoint { .. }))
+    };
+    let mut files = vec![wal.clone()];
+    for (path, _) in sealed_segments(&wal).unwrap() {
+        files.push(path);
+    }
+    let mut checked = 0;
+    for path in files {
+        let entries = WalManager::read_all(&path).unwrap();
+        if entries.iter().any(is_checkpoint) {
+            checked += 1;
+            assert!(
+                is_checkpoint(&entries[0]),
+                "{}: a row frame was written before the checkpoint",
+                path.display()
+            );
+        }
+    }
+    assert!(checked > 1, "the run must have rotated more than once");
+}
+
+/// The checkpoint is **one** job on the writer. `WalManager::Flush` swaps the
+/// file inside its own loop when it reaches a checkpoint entry
+/// (`wal_manager_impl.cpp:288-294`); as two jobs there is a window in which a
+/// commit is appended to the fresh log before the frame, and the directory's
+/// first frame stops being the checkpoint.
+#[test]
+fn a_checkpoint_is_one_job_on_the_writer() {
+    let dir = tempdir().unwrap();
+    let m = manager(dir.path());
+    let mut t = m.begin();
+    t.put(b"a".to_vec(), b"1".to_vec());
+    m.commit(t).unwrap();
+
+    let before = m.wal.ran.load(Ordering::SeqCst);
+    m.append_checkpoint(m.last_appended.load(Ordering::SeqCst))
+        .unwrap();
+    assert_eq!(
+        m.wal.ran.load(Ordering::SeqCst) - before,
+        1,
+        "the swap and the checkpoint frame must be one job"
+    );
+}
+
+/// The reply carries the job's error, so a failing rotate/append reaches the
+/// caller instead of being swallowed by the writer thread.
+#[test]
+fn a_writer_job_error_reaches_the_caller() {
+    let dir = tempdir().unwrap();
+    let m = manager(dir.path());
+    let error = m
+        .wal
+        .run(|_| -> Result<()> { Err(Error::Wal("rotate failed".into())) })
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("rotate failed"),
+        "unexpected error: {error}"
+    );
+    // And the writer is still usable afterwards.
+    m.flush().unwrap();
+}

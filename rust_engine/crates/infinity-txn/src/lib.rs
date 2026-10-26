@@ -154,22 +154,51 @@ type WalJob = Box<dyn FnOnce(&mut WalManager) + Send>;
 /// active log on such a thread; each call is one job and waits for its reply,
 /// so the order the caller emits is the order on disk.
 struct WalWriter {
-    jobs: std::sync::mpsc::Sender<WalJob>,
+    /// `None` once the writer is being shut down, which closes the queue.
+    jobs: Option<std::sync::mpsc::Sender<WalJob>>,
+    thread: Option<std::thread::JoinHandle<()>>,
+    /// How many jobs the thread has run. A checkpoint has to be exactly one
+    /// (swap + frame + fsync), so a test can pin that.
+    #[cfg(test)]
+    ran: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl Drop for WalWriter {
+    /// Closes the queue and joins the thread, so the active `wal.log` is closed
+    /// on this thread's schedule and not whenever the OS gets round to dropping
+    /// it - a reopen of the same directory must not race the close.
+    fn drop(&mut self) {
+        self.jobs.take();
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
 }
 
 impl WalWriter {
     fn start(wal: WalManager) -> Self {
         let (jobs, queue) = std::sync::mpsc::channel::<WalJob>();
-        std::thread::Builder::new()
+        #[cfg(test)]
+        let ran = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        #[cfg(test)]
+        let counter = Arc::clone(&ran);
+        let thread = std::thread::Builder::new()
             .name("wal-writer".to_string())
             .spawn(move || {
                 let mut wal = wal;
                 while let Ok(job) = queue.recv() {
+                    #[cfg(test)]
+                    counter.fetch_add(1, Ordering::SeqCst);
                     job(&mut wal);
                 }
             })
             .expect("spawn the WAL writer");
-        Self { jobs }
+        Self {
+            jobs: Some(jobs),
+            thread: Some(thread),
+            #[cfg(test)]
+            ran,
+        }
     }
 
     /// Runs one operation on the writer and waits for it to finish.
@@ -180,6 +209,8 @@ impl WalWriter {
     {
         let (reply, answer) = std::sync::mpsc::channel();
         self.jobs
+            .as_ref()
+            .ok_or_else(|| Error::Wal("the WAL writer is shut down".into()))?
             .send(Box::new(move |wal| {
                 let _ = reply.send(f(wal));
             }))
@@ -853,28 +884,6 @@ impl TxnManager {
         })
     }
 
-    /// C++ `WalManager::SwapWalFile` (`wal_manager_impl.cpp:504`): seal the
-    /// active `wal.log` as `wal.log.<seal_ts>` and start an empty one.
-    ///
-    /// The reference swaps **before** writing the checkpoint frame, so the
-    /// frame is the first entry of the fresh log and everything the checkpoint
-    /// covers stays replayable in the sealed file. A log that holds nothing is
-    /// not rotated (the reference's `Exists` check leaves a fresh directory
-    /// without a sealed file).
-    fn swap_wal_file(&self, max_commit_ts: TxnTimeStamp) -> Result<()> {
-        if max_commit_ts <= self.last_swap.load(Ordering::SeqCst) {
-            return Ok(());
-        }
-        self.wal.run(move |wal| {
-            if wal.file_size()? > 0 {
-                wal.rotate(max_commit_ts)?;
-            }
-            Ok(())
-        })?;
-        self.last_swap.store(max_commit_ts, Ordering::SeqCst);
-        Ok(())
-    }
-
     /// C++ `NewCheckpoint`: append the checkpoint entry the reference keeps.
     ///
     /// `GetReplayEntries` derives `last_commit_ts`/`max_checkpoint_ts` from the
@@ -913,7 +922,8 @@ impl TxnManager {
         // The reference swaps the file first (`kNewCheckpoint` commit path,
         // `wal_manager_impl.cpp:288`), then writes the frame into the new
         // `wal.log`; the records it covers stay in `wal.log.<seal_ts>`.
-        self.swap_wal_file(self.last_appended.load(Ordering::SeqCst))?;
+        let seal = self.last_appended.load(Ordering::SeqCst);
+        let rotate = seal > self.last_swap.load(Ordering::SeqCst);
         let entry = WalEntry::new(
             // A checkpoint is an ordinary transaction in the reference
             // (`BeginTxnShared` with `kNewCheckpoint`), so its frame carries a
@@ -924,13 +934,23 @@ impl TxnManager {
                 max_commit_ts: begin_ts,
             }],
         );
-        // Written and fsynced: this file is the only thing that tells the
-        // reference which checkpoint the directory holds, and it refuses to
-        // open a directory whose checkpoint entry a power loss took away.
+        // One job for the whole step, the way `WalManager::Flush` swaps inside
+        // its loop when it reaches the checkpoint entry
+        // (`wal_manager_impl.cpp:288-294`): swapping and appending as two jobs
+        // let a commit land in the fresh log before the frame, which put a row
+        // frame ahead of the checkpoint. Written and fsynced: this file is the
+        // only thing that tells the reference which checkpoint the directory
+        // holds, and it refuses to open one whose entry a power loss took away.
         self.wal.run(move |wal| {
+            if rotate && wal.file_size()? > 0 {
+                wal.rotate(seal)?;
+            }
             wal.append(&entry)?;
             wal.flush()
         })?;
+        if rotate {
+            self.last_swap.store(seal, Ordering::SeqCst);
+        }
         // The checkpoint transaction is committed: its commit ts is the clock's
         // new position, exactly as `CommitBottom` leaves `current_ts_`.
         self.current_ts.store(commit_ts, Ordering::SeqCst);
