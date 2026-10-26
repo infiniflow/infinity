@@ -4959,11 +4959,17 @@ pub struct Engine {
     /// Weak self handle handed to background tasks (avoids a cycle through
     /// `bg_processor`).
     self_weak: Mutex<std::sync::Weak<Engine>>,
-    /// Serializes a write batch against a background index dump. The
-    /// reference's `DumpMemIndex` transaction retries while an append holds
-    /// the segment, so it always dumps whole batches; holding this lock for
-    /// the batch gives the same chunk boundaries deterministically.
-    batch_lock: Mutex<()>,
+    /// One gate per table, held for a whole write batch.
+    ///
+    /// The reference's `DumpMemIndex` transaction retries while an append holds
+    /// the segment, so it always dumps whole batches; holding the table's gate
+    /// for the batch gives the same chunk boundaries deterministically. It is
+    /// per table, not one lock for the engine: two appends to different tables
+    /// hold different gates and overlap, which is the granularity the
+    /// reference's per-block `BlockLock` gives for writes that do not touch the
+    /// same block (`storage/block/block_lock`). A dump holds every gate, in key
+    /// order, so it sees whole batches.
+    batch_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     /// One gate per table: a transaction's bottom half (rows → index entries →
     /// block mirror) runs under its table's gate, so two transactions of the
     /// same table do their bottom work one after the other while transactions
@@ -5985,7 +5991,7 @@ impl Engine {
             ddl_lock: Mutex::new(()),
             bg_processor: Mutex::new(None),
             self_weak: Mutex::new(std::sync::Weak::new()),
-            batch_lock: Mutex::new(()),
+            batch_locks: Mutex::new(HashMap::new()),
             bottom_gates: Mutex::new(HashMap::new()),
             bottom_executor: Mutex::new(None),
             mem_index_appender: Mutex::new(None),
@@ -8815,6 +8821,21 @@ impl Engine {
         Ok(base)
     }
 
+    /// The write gate of `table` (see [`Self::batch_locks`]).
+    fn batch_gate(&self, table: &str) -> Arc<Mutex<()>> {
+        let key = self.table_key(table);
+        let mut gates = self.batch_locks.lock().unwrap();
+        Arc::clone(gates.entry(key).or_default())
+    }
+
+    /// Every table's write gate, in key order so two dumps cannot deadlock.
+    fn all_batch_gates(&self) -> Vec<Arc<Mutex<()>>> {
+        let gates = self.batch_locks.lock().unwrap();
+        let mut keys: Vec<&String> = gates.keys().collect();
+        keys.sort();
+        keys.into_iter().map(|k| Arc::clone(&gates[k])).collect()
+    }
+
     /// Records a write batch (`COPY`/`INSERT`) against `table`.
     fn bump_writes(&self, table: &str) {
         let key = self.table_key(table);
@@ -9163,7 +9184,8 @@ impl Engine {
         self.plan_cache.clear();
         // A memory index that already exceeds its quota is dumped
         // before these rows join it.
-        let _batch = self.batch_lock.lock().unwrap();
+        let gate = self.batch_gate(table);
+        let _batch = gate.lock().unwrap();
         self.note_index_insert(table, rows.len());
         // A scalar table's first batch in this process starts an empty decoded
         // row cache; the batch is appended after the commit.
@@ -20548,7 +20570,8 @@ impl BgTask for DumpMemIndexTask {
             // A dump sees a whole write batch, never the rows of a batch that
             // is still being indexed (the reference's dump transaction
             // conflicts with the append and retries).
-            let _batch = engine.batch_lock.lock().unwrap();
+            let gates = engine.all_batch_gates();
+            let _batch: Vec<_> = gates.iter().map(|gate| gate.lock().unwrap()).collect();
             engine.dump_all_memory_indexes();
         }
         self.pending.store(0, std::sync::atomic::Ordering::Relaxed);
@@ -21448,6 +21471,26 @@ mod tests {
         );
         let ids = rows(&e, "SELECT a FROM alloc_t;");
         assert_eq!(ids.len(), 7);
+    }
+
+    /// The write gate is per table: a batch on one table does not block a batch
+    /// on another, which is the parallelism the reference's per-block
+    /// `BlockLock` gives (`batch_locks`).
+    #[test]
+    fn write_gates_are_per_table() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        let a = e.batch_gate("db1.t1");
+        let b = e.batch_gate("db1.t2");
+        assert!(!Arc::ptr_eq(&a, &b), "different tables need different gates");
+        assert!(
+            Arc::ptr_eq(&a, &e.batch_gate("db1.t1")),
+            "the same table keeps one gate"
+        );
+        let held = a.lock().unwrap();
+        // The other table is still writable while this one's batch runs.
+        assert!(b.try_lock().is_ok());
+        drop(held);
     }
 
     /// `EXPLAIN FRAGMENT` prints the fragment envelope the reference prints:
