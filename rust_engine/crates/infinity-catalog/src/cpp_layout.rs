@@ -167,8 +167,17 @@ pub fn data_type_of_text_with_store(type_text: &str, store: Option<SparseStore>)
             };
             let inner = up.split_once('(')?.1.trim_end_matches(')');
             let mut parts = inner.split(',');
-            let elem = parts.next()?.trim().to_string();
-            let dim: i64 = parts.next()?.trim().parse().ok()?;
+            let first = parts.next()?.trim().to_string();
+            // `EMBEDDING(2)` is the port's own shorthand (the reference insists
+            // on `EMBEDDING(FLOAT, 2)`): one numeric component means "float of
+            // that dimension".
+            let (elem, dim) = match parts.next() {
+                Some(dim) => (first, dim.trim().parse::<i64>().ok()?),
+                None => (
+                    "FLOAT".to_string(),
+                    first.parse::<i64>().ok()?,
+                ),
+            };
             Some(data_type_json(
                 lt,
                 Some(embedding_type_info(element_code(&elem)?, dim)),
@@ -1993,6 +2002,29 @@ pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<Ind
 
 /// Rebuilds `TableMeta`s from a C++-layout catalog (for comparison with the
 /// engine's own view).
+/// The storage kind of a sparse column, read from the C++ type object
+/// (`SparseInfo::Serialize`: `{"data_type":…,"dimension":…,"index_type":…,"sort":0|1}`).
+fn sparse_store_of(column_type: &Json) -> Option<SparseStore> {
+    let Json::Obj(fields) = column_type else {
+        return None;
+    };
+    let sparse = fields.iter().find(|(k, _)| k == "sparse_type")?.1.clone();
+    let Json::Obj(sparse) = sparse else {
+        return None;
+    };
+    let sort = sparse.iter().find(|(k, _)| k == "sort")?.1.clone();
+    let sort = match sort {
+        Json::Int(v) => v,
+        Json::Uint(v) => v as i64,
+        _ => return None,
+    };
+    Some(if sort == 1 {
+        SparseStore::Sorted
+    } else {
+        SparseStore::Sort
+    })
+}
+
 pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> {
     let mut out = Vec::new();
     for t in read_cpp_layout(store)? {
@@ -2004,6 +2036,11 @@ pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> 
             .map(|c| {
                 let text = type_text_of(&c.column_type).unwrap_or_default();
                 let (bare, store) = split_sparse_store_suffix(&text);
+                // The C++ record renders a sparse type as
+                // `SPARSE(<elem>,<index>,<bound>)`, so the `WITH (SORTED)`
+                // suffix is not there to read back; the store kind lives in the
+                // type object's `sort` field.
+                let store = store.or_else(|| sparse_store_of(&c.column_type));
                 (bare.to_string(), store)
             })
             .collect();

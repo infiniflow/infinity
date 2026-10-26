@@ -131,7 +131,24 @@
 
 参考版同一份数据是 2.14 s。也就是说 83% 的 import 时间花在"把浮点转成字符串"，而这个开销完全来自"行存"这个实现选择，不是引擎/并发/IO。
 
-**对齐方向（未实现）**：让列式块成为存储本体——import 直接把 fvecs 的二进制编成块列，扫描/索引/删除读块，`row:` 键退场。WAL 侧已经有 `AppendV2` 的 typed `DataBlock` 编码可以直接复用。
+**对齐方向（进行中）**：让列式块成为存储本体——import 直接把 fvecs 的二进制编成块列，扫描/索引/删除读块，`row:` 键退场。WAL 侧已经有 `AppendV2` 的 typed `DataBlock` 编码可以直接复用。
+
+#### KV 里到底多了什么（实测，同一 workload：建表 + 3 行 + 删 1 行）
+
+两边 `catalog/` 的键集对比（`infinity dump-catalog`，参考版先 `FLUSH CATALOG` 再 dump）：
+
+| | 键 |
+|---|---|
+| 共有（14 个） | `catalog\|db\|default_db\|6`、`catalog\|tbl\|1\|t\|8`、`catalog\|seg\|1\|0\|0`、`catalog\|blk\|1\|0\|0\|0`、`db\|1\|next_table_id`、`meta\|version`、`next_database_id`、`seg\|1\|0\|0\|first_delete_ts`、`tbl\|1\|0\|next_column_id`、`next_index_id`、`next_segment_id`、`unsealed_segment_id`、`tbl\|col\|1\|0\|id\|8`、`tbl\|col\|1\|0\|v\|8` |
+| 端口多出（4 个） | `__counter:table`、`db:default_db`、`tbl:0000000000000000`、`tblname:default_db.t` |
+
+另外 `<dir>/persistence/` 整个是一个**行存储 RocksDB**（`row:`、`del:`、applied-ts 标记），参考版没有这个目录的数据——它的行只在 `data/` 的块文件里。
+
+`Catalog` 已经有 `with_store_cpp_only` 模式（只写 `catalog|`/`db|`/`tbl|`/`col|`/`idx|`），切过去后上面 4 个键消失、键集与参考版**逐键相同**（已实测）。但 `cpp_only` 还暴露出三处必须一起修的地方：
+
+1. `EMBEDDING(<dim>)` 简写映射（已修）。
+2. 稀疏列从 C++ 记录读回时丢失 `sort` 提示（已修），且类型文本会变成 `SPARSE(float,int16,30000)`——SQL 层要接受这种形式。
+3. `DROP TABLE`/`DROP DATABASE` 在 `cpp_only` 下不清理段/块/索引 chunk 记录，`cleanup` 也不删已删表的块目录（`import_then_drop_database`、`cleanup_internal_ut` 三处红）。这两处没修，所以 `cpp_only` 暂未开启。
 
 
 | 维度 | 状态 | 验证 |
