@@ -15,6 +15,7 @@ infinity-expression.workspace = true
 infinity-planner.workspace = true
 infinity-index.workspace = true
 lz4_flex.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

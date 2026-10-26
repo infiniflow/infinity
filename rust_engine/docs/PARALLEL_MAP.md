@@ -92,14 +92,14 @@
 
 ### 1.6 执行期 tasklet
 
-**做什么**——让一条查询的扫描并行（`fragment_context_impl.cpp:1215-1245`）：`FragmentBuilder` 把计划切成 fragment；每个 fragment 按 `min(cpu_count, first_operator->TaskletCount())` 建 tasklet，每个 tasklet 扫自己的块区间并跑行内算子；需要全局视野的算子（TOP/AGGREGATE/MERGE LIMIT）在下一级 fragment 里归并交换队列来的行。
+**做什么**——把 fragment 的行区间切成 `min(cpu, TaskletCount())` 份，每份一个 tasklet 跑自己的算子链拷贝，输出经有界交换队列按 tasklet 序汇给 sink（merge 任务）；阻塞算子（LIMIT/SORT/AGGREGATE）在 sink 侧串行。
 
 | | |
 |---|---|
-| 参考 | `TaskScheduler` 的 `hardware_concurrency()` 个常驻 worker，各带 `FragmentTaskBlockQueue`（`task_scheduler_impl.cpp:61-81`），fragment 之间以队列流水 |
-| 端口 | 无常驻调度器：`run_tasklets` 每个 fragment 用 `std::thread::scope` 起 `min(cpu, TaskletCount)` 个 tasklet，merge 任务按 tasklet 序从有界通道取；`TaskletCount` 规则与参考一致 |
-| 状态 | `different`（`GAPS.md` §5：无常驻调度器；宽度与规则对齐） |
-| 证据 | `run_operators_splits_a_row_wise_chain_and_limits_after_the_merge`、`the_merge_task_reads_the_tasklets_through_the_exchange_queue`、`test/sql/explain`（fragment 类型是外部口径） |
+| 参考 | 常驻 `TaskScheduler`：`hardware_concurrency()`（受 `CPULimit` 限制）个 worker 线程，每个一条任务队列，`ScheduleTask` 交给负载最小的 worker（`task_scheduler_impl.cpp:60-140`）；tasklet 与 sink 都是 `FragmentTask` |
+| 端口 | tokio 多线程 runtime（`scheduler.rs`，`worker_threads = available_parallelism()`），进程级只建一次；tasklet 是 `spawn_blocking` 作业（CPU 密集且会阻塞在有界交换队列上，tokio 的阻塞池会按需扩展到 worker 数以上，sink 不会排在阻塞的 tasklet 后面），sink 同样提交到池上并 `block_on` 等它，语句线程的等待方式与参考一致 |
+| 状态 | `aligned` |
+| 证据 | `jobs_run_on_the_pool`、`the_pool_is_resident`、`concurrent_jobs_all_finish`；`test/sql` 1555/1560 查询（结果顺序与串行一致）、`20_table`（5）、`50_mutations`（8）、`40_wal`（3） |
 
 ### 1.7 行号 / 段号分配
 

@@ -582,21 +582,26 @@ fn run_tasklets(
         })
         .collect::<Result<Vec<_>>>()?;
     let batch = crate::chunk::DEFAULT_VECTOR_SIZE;
-    std::thread::scope(|scope| {
-        let mut receivers = Vec::with_capacity(tasks);
-        for (chain, range) in chains.into_iter().zip(ranges) {
-            let (tx, rx) = std::sync::mpsc::sync_channel(EXCHANGE_CAPACITY);
-            receivers.push(rx);
-            scope.spawn(move || {
-                let mut source = RowsSource::new(range, source_width, batch);
-                if let Err(error) = run_forward(chain, &mut source, tx.clone()) {
-                    // The merge task picks the error up from the queue, so a
-                    // failing tasklet fails the statement instead of looking
-                    // like a short result.
-                    let _ = tx.send(Err(error.to_string()));
-                }
-            });
-        }
+    // The tasklets go to the resident pool (`TaskScheduler::ScheduleFragment`),
+    // not to threads of their own, so fragments from different statements share
+    // the same workers.
+    let mut receivers = Vec::with_capacity(tasks);
+    for (chain, range) in chains.into_iter().zip(ranges) {
+        let (tx, rx) = std::sync::mpsc::sync_channel(EXCHANGE_CAPACITY);
+        receivers.push(rx);
+        crate::scheduler::scheduler().submit(Box::new(move || {
+            let mut source = RowsSource::new(range, source_width, batch);
+            if let Err(error) = run_forward(chain, &mut source, tx.clone()) {
+                // The merge task picks the error up from the queue, so a
+                // failing tasklet fails the statement instead of looking like a
+                // short result.
+                let _ = tx.send(Err(error.to_string()));
+            }
+        }));
+    }
+    // The sink is the fragment's last task (`FragmentContext::Tasks`), so it
+    // runs on the pool too and the caller waits for it.
+    crate::scheduler::scheduler().run(move || -> Result<(Vec<String>, Vec<Vec<Value>>)> {
         let mut source = ExchangeSource::new(receivers, prefix_width);
         if merge.is_empty() {
             return Ok((names, source.collect()?));

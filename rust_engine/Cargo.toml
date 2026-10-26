@@ -22,6 +22,7 @@ repository = "https://github.com/infiniflow/infinity"
 
 [workspace.dependencies]
 rust-stemmers = "1.2"
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
 infinity-common = { path = "crates/infinity-common" }
 infinity-storage = { path = "crates/infinity-storage" }
 infinity-catalog = { path = "crates/infinity-catalog" }

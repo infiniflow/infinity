@@ -304,6 +304,7 @@ dependencies = [
  "lz4_flex",
  "rust-stemmers",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -943,6 +944,15 @@ dependencies = [
  "log",
  "ordered-float",
  "threadpool",
+]
+
+[[package]]
+name = "tokio"
+version = "1.53.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
+dependencies = [
+ "pin-project-lite",
 ]
 
 [[package]]
