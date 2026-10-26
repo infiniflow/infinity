@@ -10,6 +10,7 @@
 |---|---|
 | `aligned` | 线程归属、等待点、分片与尺寸与参考一致，可观察行为相同 |
 | `different` | 结构有意不同，已在 [`GAPS.md`](GAPS.md) 或 [`CLASS_MAP.md`](CLASS_MAP.md)「有意的设计变更」登记，写清差异与影响 |
+| `partial` | 机制已有，但只覆盖一部分路径——行内写清还缺哪一段 |
 | `n/a` | 参考有该结构、端口不需要（或反之），不影响等价 |
 
 ## 1 线程、队列与池
@@ -117,7 +118,7 @@
 |---|---|---|---|---|---|
 | 上半部等自己的下半部 | 提交线程把 txn 交给池后睡在 `commit_cv_`，被 `NotifyTopHalf` 唤醒才 `PostCommit`/`SetTxnCommitted` | `new_txn_impl.cpp:2138-2141` | `commit_deferred` → 底部工作 → `finish_bottom`；`run_commit_bottom` 用 condvar 等 worker | `aligned` | `infinity-txn` 单测、`a_commit_runs_its_bottom_half_on_the_bottom_executor` |
 | 按 commit_ts 顺序发布 | `bottom_txns_` 按 ts 排序，队首完成即推进 `current_ts_`；先做完的后序 txn 不越位 | `new_txn_manager_impl.cpp:410-457` | `register_bottom`/`finish_bottom` 屏障（冲突也走同一屏障，ts 空洞保留） | `aligned` | `infinity-txn` 的发布顺序用例 |
-| 行与索引一起可见 | 行落在块文件里、由下半部的 `AppendInBlock` 写，`SetTxnCommitted` 之后才可读 | `new_txn_impl.cpp:2138-2141`、`4624-4660` | 行是 KV 里的 `row:` 键，在 `TxnManager::commit_deferred` 那一批里就落盘（读路径按 key 存在与否判可见，不查时钟），索引在随后的下半部补；`EngineTxn` 已用 `commit_deferred` → 索引 → `finish_bottom` 延后**时钟**，但行可见性不由时钟决定 | `different` | `GAPS.md` §2：要真正对齐得把 `row:` 写的时机挪到下半部（或给读路径加 `append_ts ≤ current_ts` 过滤） |
+| 行与索引一起可见 | 行落在块文件里、由下半部的 `AppendInBlock` 写，`SetTxnCommitted` 之后才可读 | `new_txn_impl.cpp:2138-2141`、`4624-4660` | `INSERT` 的行已挪进下半部（`row:` 写在下半部第一步，之后才是索引与块镜像）；**删除仍是 `del:` 墓碑写在提交批次里**，删除会在发布前生效 | `partial` | `GAPS.md` §2；`20_table` 字节门禁不受影响 |
 | dump 任务完成 | `StopProcessorTask::Wait()` 等已入队任务跑完 | `background_process_impl.cpp:46-53` | `BGTaskProcessor::drain()` | `aligned` | `bg_task_ut` |
 | 只读事务 | `GetReadCommitTS`：不写 WAL、不占写 ts | `new_txn_impl.cpp:2051-2059` | `TxnManager::commit` 的 read-only 分支 | `aligned` | `txn_ut` |
 
