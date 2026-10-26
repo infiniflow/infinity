@@ -4637,6 +4637,22 @@ impl Engine {
                 path: path.clone(),
                 source: e,
             })?;
+            // `SegmentIndexMeta::SavePlaidGlobalCentroids`: the trained
+            // centroids and their quantizer live in a sidecar next to the
+            // chunk, and a reference reader needs it to open the segment.
+            if let Some(index) = self
+                .read_cpp_plaid_chunks(&table, index_name)
+                .ok()
+                .and_then(|chunks| chunks.into_iter().next())
+            {
+                let centroids_path = mirror.dir.join("plaid_centroids.bin");
+                std::fs::write(&centroids_path, index.save_plaid_centroids()).map_err(|e| {
+                    Error::Io {
+                        path: centroids_path.clone(),
+                        source: e,
+                    }
+                })?;
+            }
             return Ok(count);
         }
         // The mirrored rows are the concatenation of the chunks, so a new dump

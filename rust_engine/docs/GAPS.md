@@ -39,6 +39,7 @@
 |---|---|---|
 | HNSW 图区 | `thread_local std::mt19937`，节点层级取决于线程调度；实测同一输入五次跑出五种图 | header/vectors/labels 字节比，图与查询答案按内容比（`FORMAT_EQUIVALENCE_TESTS.md` §6.4） |
 | IVF 质心 / 训练 | `std::random_device` 采样，质心个数也不固定 | chunk 按内容比 |
+| PLAID 的 chunk / `plaid_centroids.bin` | k-means 初始化与量化器训练都用 `random_device`，同一输入两次跑出的 centroid 与 bucket 权重都不同 | 按内容比：文件集、chunk 头部的文档数、侧文件的头部（dims/nbits/centroid 数/has_quantizer）与按布局算出的长度（`test_the_plaid_chunk_matches_by_content`） |
 | `catalog/` 的字节 | 带 ts / LSN / session id，参考自己两次跑也不同 | 逻辑内容按键比 |
 | NULL 行定长 slot、`VARCHAR` 内联 padding | 参考不写这些字节（未初始化内存，实测随前一次分配变化） | 新进程、该列首次写时逐字节相同；门禁按此安排 |
 | 后台 dump 的 chunk 切分 | 配额驱动的队列 + 后台线程，切分是调度结果 | 关闭配额触发，只保留显式 `DumpIndex` 与行容量触发 |
@@ -49,7 +50,8 @@
 
 | 项                     | 为什么没覆盖                                                                                                                                                     |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PLAID 的 `plaid_centroids.bin` 侧文件 | 参考在 dump 时除了 chunk 还写 `idx_<id>/seg_<s>/plaid_centroids.bin`（`SegmentIndexMeta::SavePlaidGlobalCentroids`）：`[u32 dims][u32 nbits][u32 n_centroids][bool has_quantizer]` + centroids（`n×dims` f32）+ `-0.5*||c||` 表（`n` f32）+ `PlaidQuantizer::Save`。**端口不写这个文件**，所以参考读不了端口写的 PLAID 段（端口自己读 chunk 不需要它）。训练仍是 `random_device` 初始化，即便补上也只能按内容比；`test_the_plaid_chunk_matches_by_content` 已按内容比写好并标成 strict `xfail`，补完会立刻报"unexpected pass" |
+
+PLAID 也已经闭口：`test_the_plaid_chunk_matches_by_content`（2000 行 `TENSOR(FLOAT,4)`、`nbits=4`/`n_centroids=16`）比文件集（chunk + `plaid_centroids.bin`）、chunk 头部的文档数、以及侧文件的头部与长度；端口现在按参考的 `SegmentIndexMeta::SavePlaidGlobalCentroids` 写这个侧文件（`[u32 dims][u32 nbits][u32 n_centroids][bool has_quantizer]` + centroids + `-0.5·‖c‖²` + `PlaidQuantizer::Save`），否则参考读不了端口写的 PLAID 段。
 
 EMVB 已经闭口：`test_the_emvb_chunk_matches_by_content`（8300 行 `TENSOR(FLOAT,2)`、`pq_subspace_num=2`/`bits=8`）比的是输入决定的结构——chunk 大小、头部的 dims/subspace/bits/centroid 数、以及 `doc_lens`/`doc_segment_offsets`/`doc_offsets` 三张表；centroids、codes、OPQ 旋转是随机训练的结果，不比。对齐过程中修掉两处：`build_emvb` 的 centroid 数改成参考的 `min(sqrt(n), n/32)` 向上取 8 的倍数（原来用 `clamp(n/8, 8, 256)`，8300 行时是 256 而不是 96），以及 `pq_subspace_num`/`pq_subspace_bits` 之前没从索引定义传进 PQ（恒为 1/8）。
 

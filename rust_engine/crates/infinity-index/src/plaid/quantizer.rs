@@ -33,6 +33,24 @@ pub struct PlaidQuantizer {
 
 impl PlaidQuantizer {
     /// C++: `PlaidQuantizer::PlaidQuantizer`.
+    /// C++ `PlaidQuantizer::Save`: `[u32 nbits][u32 embedding_dim]
+    /// [f32 avg_residual][u32 n_cutoffs][f32 cutoffs…][u32 n_buckets]
+    /// [f32 weights…]`.
+    pub fn save(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.nbits.to_le_bytes());
+        out.extend_from_slice(&self.embedding_dim.to_le_bytes());
+        out.extend_from_slice(&self.avg_residual.to_le_bytes());
+        let n_cutoffs = self.n_buckets.saturating_sub(1);
+        out.extend_from_slice(&n_cutoffs.to_le_bytes());
+        for value in self.bucket_cutoffs.iter().take(n_cutoffs as usize) {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+        out.extend_from_slice(&self.n_buckets.to_le_bytes());
+        for value in &self.bucket_weights {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+
     pub fn new(nbits: u32, embedding_dim: u32) -> Result<Self> {
         if nbits != 2 && nbits != 4 {
             return Err(Error::Invalid(

@@ -182,13 +182,6 @@ def _plaid_files(root):
     return _under(files, table_dir)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "the port does not write the reference's plaid_centroids.bin sidecar "
-        "next to the chunk; see GAPS.md §4"
-    ),
-)
 @pytest.mark.skipif(
     not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
 )
@@ -222,6 +215,15 @@ def test_the_plaid_chunk_matches_by_content():
             b = struct.unpack_from("<I", rust[name], 20)[0]
             assert a == b == PLAID_ROWS, f"{name}: {a} vs {b} documents"
         elif name.endswith("centroids.bin"):
-            assert len(cpp[name]) == len(rust[name]), (
-                f"{name}: {len(cpp[name])} vs {len(rust[name])} bytes"
-            )
+            a, b = cpp[name], rust[name]
+            assert len(a) == len(b), f"{name}: {len(a)} vs {len(b)} bytes"
+            # `[u32 dims][u32 nbits][u32 n_centroids][bool has_quantizer]`, the
+            # centroids, their norms and `PlaidQuantizer::Save` (nbits, dims,
+            # avg_residual, the cutoffs, the bucket count and the weights).
+            dims, nbits, n_centroids = struct.unpack_from("<3I", a, 0)
+            assert struct.unpack_from("<3I", b, 0) == (dims, nbits, n_centroids)
+            assert a[12] == b[12] == 1, "both carry a quantizer"
+            buckets = 1 << nbits
+            quantizer = 20 + 4 * ((buckets - 1) + buckets)
+            expected = 13 + n_centroids * dims * 4 + n_centroids * 4 + quantizer
+            assert len(a) == expected, f"{name}: {len(a)} != {expected} bytes"

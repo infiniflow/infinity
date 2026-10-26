@@ -174,6 +174,31 @@ impl PlaidIndex {
     pub fn is_mmap(&self) -> bool {
         false
     }
+    /// `SegmentIndexMeta::SavePlaidGlobalCentroids`: the
+    /// `plaid_centroids.bin` sidecar of a dumped segment.
+    ///
+    /// `[u32 embedding_dim][u32 nbits][u32 n_centroids][bool has_quantizer]`,
+    /// then the centroids (`n × embedding_dim` f32), their `-0.5·‖c‖²` table
+    /// (`n` f32) and, when present, `PlaidQuantizer::Save`.
+    pub fn save_plaid_centroids(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&self.embedding_dimension.to_le_bytes());
+        out.extend_from_slice(&self.nbits.to_le_bytes());
+        out.extend_from_slice(&self.n_centroids.to_le_bytes());
+        // C++ `bool`, one byte.
+        out.push(u8::from(self.quantizer.is_some()));
+        for value in self.centroids_data() {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in self.centroid_norms_neg_half() {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+        if let Some(quantizer) = &self.quantizer {
+            quantizer.save(&mut out);
+        }
+        out
+    }
+
     pub fn centroids_data(&self) -> &[f32] {
         match &self.global_centroids {
             Some(g) => g.centroids_data(),
