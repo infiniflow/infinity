@@ -4945,6 +4945,11 @@ pub struct Engine {
     /// `crc32(table_id) % n` queues give the reference
     /// (`bottom_executor_impl.cpp:32-78`).
     bottom_gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
+    /// The reference's `BottomExecutor` (`Storage`'s `bottom_executor_`): when
+    /// one is attached, a transaction's bottom half runs on its sharded worker
+    /// instead of the committing thread. `None` keeps the inline path, which is
+    /// what an engine without a thread pool (most tests) uses.
+    bottom_executor: Mutex<Option<Arc<infinity_storage::wal::bottom_executor::BottomExecutor<PendingBottom>>>>,
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
@@ -5220,6 +5225,82 @@ fn run_bottom(
     Ok(())
 }
 
+/// One transaction's bottom half, handed to a [`BottomExecutor`] worker.
+///
+/// `BottomExecutor` routes by `crc32(table_id) % executor_size`
+/// (`bottom_executor_impl.cpp:73`) and calls `commit_bottom` on the worker;
+/// `commit` waits on [`Self::wait`], which is the reference's `commit_cv_`
+/// wait in `NewTxn::Commit` (`new_txn_impl.cpp:2138`).
+/// Bottom halves the attached `BottomExecutor` has run, so a test can prove a
+/// commit really went through the pool instead of the inline path.
+#[cfg(test)]
+static BOTTOM_RUNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+struct PendingBottom {
+    /// Owned handle: the worker outlives the committing borrow.
+    engine: Arc<Engine>,
+    /// `crc32(table_id)` routing key.
+    table_id: String,
+    /// Per-table gates, locked on the worker so the bottom halves of one table
+    /// still take their turn in commit order.
+    gates: Vec<Arc<std::sync::Mutex<()>>>,
+    appends: Vec<StagedAppend>,
+    deletes: Vec<(String, usize)>,
+    dumps: Vec<StagedDump>,
+    txn: std::sync::Mutex<Option<Txn>>,
+    state: std::sync::Mutex<BottomState>,
+    done: std::sync::Condvar,
+}
+
+#[derive(Default)]
+struct BottomState {
+    finished: bool,
+    result: Option<Result<()>>,
+}
+
+impl PendingBottom {
+    fn wait(&self) -> Result<()> {
+        let mut state = self.state.lock().unwrap();
+        while !state.finished {
+            state = self.done.wait(state).unwrap();
+        }
+        match state.result.take() {
+            Some(result) => result,
+            None => Ok(()),
+        }
+    }
+}
+
+impl infinity_storage::wal::bottom_executor::BottomTask for PendingBottom {
+    fn table_id(&self) -> &str {
+        &self.table_id
+    }
+
+    fn is_committing(&self) -> bool {
+        true
+    }
+
+    fn commit_bottom(&self) {
+        #[cfg(test)]
+        BOTTOM_RUNS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let txn = self.txn.lock().unwrap().take();
+        let result = match txn {
+            Some(txn) => {
+                let _guards: Vec<std::sync::MutexGuard<'_, ()>> =
+                    self.gates.iter().map(|gate| gate.lock().unwrap()).collect();
+                run_bottom(&self.engine, &self.appends, &self.deletes, &self.dumps, txn)
+            }
+            // The worker is only supposed to see a transaction once.
+            None => Ok(()),
+        };
+        let mut state = self.state.lock().unwrap();
+        state.result = Some(result);
+        state.finished = true;
+        drop(state);
+        self.done.notify_all();
+    }
+}
+
 impl<'a> EngineTxn<'a> {
     /// C++ `NewTxn::BeginTS`: the read timestamp this transaction sees.
     pub fn begin_ts(&self) -> u64 {
@@ -5419,9 +5500,38 @@ impl<'a> EngineTxn<'a> {
             .iter()
             .map(|table| self.engine.bottom_gate(table))
             .collect();
+        let appends = std::mem::take(&mut self.appends);
+        let deletes = std::mem::take(&mut self.deletes);
+        let dumps = std::mem::take(&mut self.dumps);
+        // The reference submits the transaction to the `BottomExecutor` and
+        // waits for the worker to call `CommitBottom`; without a pool (or
+        // without an owned engine handle for a `'static` job) the bottom half
+        // runs here.
+        if let (Some(engine), Some(executor)) = (self.handle.clone(), self.engine.bottom_executor())
+        {
+            let table_id = appends
+                .first()
+                .map(|(table, ..)| table.clone())
+                .or_else(|| deletes.first().map(|(table, _)| table.clone()))
+                .or_else(|| dumps.first().map(|dump| dump.table.clone()))
+                .unwrap_or_default();
+            let task = std::sync::Arc::new(PendingBottom {
+                engine,
+                table_id,
+                gates,
+                appends,
+                deletes,
+                dumps,
+                txn: std::sync::Mutex::new(Some(txn)),
+                state: std::sync::Mutex::new(BottomState::default()),
+                done: std::sync::Condvar::new(),
+            });
+            executor.submit(task.clone());
+            return task.wait();
+        }
         let _gates: Vec<std::sync::MutexGuard<'_, ()>> =
             gates.iter().map(|gate| gate.lock().unwrap()).collect();
-        run_bottom(self.engine, &self.appends, &self.deletes, &self.dumps, txn)
+        run_bottom(self.engine, &appends, &deletes, &dumps, txn)
     }
 
     /// `NewTxn::Rollback`: discards every staged write and counts the rollback
@@ -5692,6 +5802,7 @@ impl Engine {
             self_weak: Mutex::new(std::sync::Weak::new()),
             batch_lock: Mutex::new(()),
             bottom_gates: Mutex::new(HashMap::new()),
+            bottom_executor: Mutex::new(None),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
             vector_cache: Mutex::new(HashMap::new()),
             cpu_sample: Mutex::new(None),
@@ -7665,6 +7776,25 @@ impl Engine {
     /// then fall back to running the work on their own thread.
     pub fn engine_handle(&self) -> Option<Arc<Engine>> {
         self.self_weak.lock().unwrap().upgrade()
+    }
+
+    /// Attaches the `BottomExecutor` the reference keeps in `Storage`
+    /// (`wal_manager_impl.cpp:92`): commits then run their bottom half on a
+    /// worker, sharded by table id.
+    pub fn attach_bottom_executor(
+        self: &Arc<Self>,
+        executor: Arc<infinity_storage::wal::bottom_executor::BottomExecutor<PendingBottom>>,
+    ) {
+        // The queued job owns an `Arc<Engine>`, so the engine has to know its
+        // own handle (`EngineTxn::handle` upgrades this).
+        *self.self_weak.lock().unwrap() = Arc::downgrade(self);
+        *self.bottom_executor.lock().unwrap() = Some(executor);
+    }
+
+    fn bottom_executor(
+        &self,
+    ) -> Option<Arc<infinity_storage::wal::bottom_executor::BottomExecutor<PendingBottom>>> {
+        self.bottom_executor.lock().unwrap().clone()
     }
 
     /// The gate a transaction's bottom half holds for `table`.
@@ -17195,6 +17325,16 @@ impl Engine {
         let processor = Arc::new(BGTaskProcessor::new(1));
         processor.start();
         self.attach_bg_task_processor(processor);
+        // `WalManager::Start` starts the bottom executor next to the WAL
+        // thread (`wal_manager_impl.cpp:92-93`) with
+        // `max(2, hardware_concurrency() / 2)` workers (`config_impl.cpp:562`).
+        let workers = std::thread::available_parallelism()
+            .map(|count| count.get() / 2)
+            .unwrap_or(1)
+            .max(2);
+        let mut bottom_executor = infinity_storage::wal::bottom_executor::BottomExecutor::new();
+        bottom_executor.start(workers);
+        self.attach_bottom_executor(Arc::new(bottom_executor));
         let engine = Arc::downgrade(self);
         let spawned = std::thread::Builder::new()
             .name("infinity-trigger".to_string())
@@ -20665,6 +20805,49 @@ mod tests {
 
     /// GROUP BY and global aggregates run through the aggregate operator, keep
     /// first-seen group order, and still produce one row over an empty relation.
+    /// A commit with a `BottomExecutor` attached runs its bottom half on the
+    /// worker and waits for it: rows, index entries and the block mirror are in
+    /// place before `commit` returns, exactly as on the inline path.
+    #[test]
+    fn a_commit_runs_its_bottom_half_on_the_bottom_executor() {
+        let dir = tempdir().unwrap();
+        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        let mut executor = infinity_storage::wal::bottom_executor::BottomExecutor::new();
+        executor.start(2);
+        e.attach_bottom_executor(Arc::new(executor));
+        e.execute("CREATE TABLE be (a INT, b VARCHAR);").unwrap();
+        e.execute("CREATE INDEX be_b ON be (b);").unwrap();
+
+        let before = BOTTOM_RUNS.load(std::sync::atomic::Ordering::SeqCst);
+        let mut txn = e.begin_txn();
+        txn.append(
+            "default_db.be",
+            vec![
+                vec![Literal::Int(1), Literal::Str("x".into())],
+                vec![Literal::Int(2), Literal::Str("y".into())],
+            ],
+        )
+        .unwrap();
+        txn.commit().unwrap();
+
+        assert_eq!(
+            BOTTOM_RUNS.load(std::sync::atomic::Ordering::SeqCst),
+            before + 1,
+            "the bottom half ran on a worker"
+        );
+        // The worker's writes are visible: rows, the index entry and the counts.
+        assert_eq!(
+            rows(&e, "SELECT a FROM be WHERE b = 'y';"),
+            vec![vec!["2".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM be;"),
+            vec![vec!["2".to_string()]]
+        );
+        e.flush().unwrap();
+        assert!(dir.path().join("data").exists());
+    }
+
     /// Splitting the row-wise prefix into tasklets must not cost the early stop
     /// of `LIMIT`: the limit is the merge point, and the scan below it still
     /// stops once its budget is spent (`physical_limit_impl.cpp:209`).
