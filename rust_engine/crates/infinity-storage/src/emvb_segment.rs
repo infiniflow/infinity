@@ -360,14 +360,35 @@ impl EmvbData {
 
 /// Builds the EMVB arrays for one segment (`EMVBIndex::Train` + `AddOneDocEmbeddings`).
 pub fn build_emvb(dims: usize, start_segment_offset: u32, docs: &[(u32, &[Vec<f32>])]) -> EmvbData {
+    // The reference has no defaults (`CREATE INDEX … USING EMVB` must name
+    // both), so the inference below only serves callers without an index
+    // definition.
+    let subspace_num = if dims.is_multiple_of(8) { 8 } else { 1 };
+    build_emvb_with(dims, start_segment_offset, docs, subspace_num, 8)
+}
+
+/// Like [`build_emvb`] but with the index's `pq_subspace_num` /
+/// `pq_subspace_bits`.
+pub fn build_emvb_with(
+    dims: usize,
+    start_segment_offset: u32,
+    docs: &[(u32, &[Vec<f32>])],
+    subspace_num: usize,
+    subspace_bits: u32,
+) -> EmvbData {
     let tokens: Vec<&[f32]> = docs
         .iter()
         .flat_map(|(_, t)| t.iter().map(|v| v.as_slice()))
         .collect();
+    // `EMVBIndex::BuildEMVBIndex`: `min(sqrt(n), n / 32)` rounded **up** to a
+    // multiple of 8 (`emvb_index_impl.cpp:152-157`).
     let n_centroids = {
-        // The reference requires a multiple of 8.
-        let raw = (tokens.len() / 8).clamp(8, 256);
-        (raw / 8) * 8
+        let sqrt = (tokens.len() as f64).sqrt() as usize;
+        let before_8 = sqrt.min(tokens.len() / 32);
+        // The reference rejects a training set this small
+        // (`ExpectLeastTrainingDataNum`), so the floor only keeps the port's
+        // own small-data tests working.
+        ((before_8 + 7) & !7).max(8)
     };
     let centroids = coarse_centroids(dims, &tokens, n_centroids);
     let mut centroid_norms = Vec::with_capacity(n_centroids);
@@ -409,12 +430,17 @@ pub fn build_emvb(dims: usize, start_segment_offset: u32, docs: &[(u32, &[Vec<f3
                 .collect(),
         );
     }
-    let subspace_num = if dims.is_multiple_of(8) { 8 } else { 1 };
     // `EMVBIndex::Train` ends with `product_quantizer_->Train(residuals, n, 20)`,
     // i.e. `OPQ::Train` with 20 iterations.
     let residual_refs: Vec<&[f32]> = residuals.iter().map(|v| v.as_slice()).collect();
-    let rotation = OpqRotation::train(dims, subspace_num, 1usize << 8, &residual_refs, 20);
-    let pq = train_residual_pq(dims, subspace_num, 8, &residuals, &rotation);
+    let rotation = OpqRotation::train(
+        dims,
+        subspace_num,
+        1usize << subspace_bits.min(16),
+        &residual_refs,
+        20,
+    );
+    let pq = train_residual_pq(dims, subspace_num, subspace_bits, &residuals, &rotation);
 
     // The codebook layout is `subspace_num * k * sub_dim`.
     let sub_dim = dims.div_ceil(pq.subspace_num);

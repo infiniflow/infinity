@@ -3797,6 +3797,9 @@ struct MultiVectorIndex {
     plaid_seqs: Vec<u64>,
     /// SMVE options when the column carries a `USING SMVE` index.
     smve_config: Option<SmveConfig>,
+    /// The index's `pq_subspace_num` / `pq_subspace_bits`, which decide how the
+    /// residual PQ splits the embedding.
+    emvb_config: Option<EmvbConfig>,
     /// The reference's `SMVEIndexInMem` (a BMP over SMVE sparse codes).
     smve: Option<infinity_index::smve::SmveIndex>,
     /// Row id of each SMVE document id.
@@ -3811,8 +3814,15 @@ struct PlaidConfig {
     colbertsar: bool,
 }
 
+/// `CREATE INDEX … USING EMVB WITH (pq_subspace_num=…, pq_subspace_bits=…)`.
+#[derive(Debug, Clone, Copy)]
+struct EmvbConfig {
+    subspace_num: usize,
+    subspace_bits: u32,
+}
+
 /// `CREATE INDEX … USING SMVE WITH (width=…, topk=…)`.
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy)]
 struct SmveConfig {
     width: u32,
     topk: u32,
@@ -3872,6 +3882,7 @@ impl MultiVectorIndex {
         dims: usize,
         plaid_config: Option<PlaidConfig>,
         smve_config: Option<SmveConfig>,
+        emvb_config: Option<EmvbConfig>,
     ) -> Self {
         let next_chunk = std::fs::read_dir(&dir)
             .map(|d| {
@@ -3893,6 +3904,7 @@ impl MultiVectorIndex {
             plaid: None,
             plaid_seqs: Vec::new(),
             smve_config,
+            emvb_config,
             smve: None,
             smve_seqs: Vec::new(),
         }
@@ -4084,7 +4096,19 @@ impl MultiVectorIndex {
                 docs.push((i as u32, doc.as_slice()));
                 seqs.push(*seq);
             }
-            let data = infinity_storage::emvb_segment::build_emvb(self.dims, 0, &docs);
+            let (subspace_num, subspace_bits) = match self.emvb_config {
+                Some(cfg) => (cfg.subspace_num, cfg.subspace_bits),
+                // No `USING EMVB` definition: keep the inference `build_emvb`
+                // makes for a bare call.
+                None => (if self.dims.is_multiple_of(8) { 8 } else { 1 }, 8),
+            };
+            let data = infinity_storage::emvb_segment::build_emvb_with(
+                self.dims,
+                0,
+                &docs,
+                subspace_num,
+                subspace_bits,
+            );
             *guard = Some(MvTailEmvb {
                 generation: self.tail_generation,
                 data,
@@ -12663,6 +12687,7 @@ impl Engine {
             dims,
             self.mv_plaid_config(table, column),
             self.mv_smve_config(table, column),
+            self.mv_emvb_config(table, column),
         );
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
             let text = match cells.get(ci) {
@@ -12743,6 +12768,39 @@ impl Engine {
                         || im.index_type.eq_ignore_ascii_case("SMVE")
                         || im.index_type.eq_ignore_ascii_case("EMVB"))
             })
+    }
+
+    /// `CREATE INDEX … USING EMVB WITH (pq_subspace_num=…, pq_subspace_bits=…)`
+    /// on `table.column`.
+    fn mv_emvb_config(&self, table: &str, column: &str) -> Option<EmvbConfig> {
+        let short = table.rsplit('.').next().unwrap_or(table);
+        let im = self
+            .storage
+            .catalog
+            .list_indexes()
+            .ok()?
+            .into_iter()
+            .find(|im| {
+                im.index_type.eq_ignore_ascii_case("EMVB")
+                    && im.column == column
+                    && (im.table == table || im.table == short)
+            })?;
+        let mut cfg = EmvbConfig {
+            subspace_num: 1,
+            subspace_bits: 8,
+        };
+        for (key, value) in &im.options {
+            if key.eq_ignore_ascii_case("pq_subspace_num") {
+                if let Ok(v) = value.trim().parse() {
+                    cfg.subspace_num = v;
+                }
+            } else if key.eq_ignore_ascii_case("pq_subspace_bits") {
+                if let Ok(v) = value.trim().parse() {
+                    cfg.subspace_bits = v;
+                }
+            }
+        }
+        Some(cfg)
     }
 
     /// `CREATE INDEX … USING SMVE WITH (width=…, topk=…)` on `table.column`.
@@ -14395,6 +14453,48 @@ impl Engine {
                     return Err(Error::Invalid(format!(
                         "{index_type} index requires a vector column, got '{ty}'"
                     )));
+                }
+                if index_type.eq_ignore_ascii_case("EMVB") {
+                    // `IndexEMVB::ValidateColumnDataType` + `GetEMVBOPQ`:
+                    // tensor-of-float only, both PQ options required, and the
+                    // subspace count has to divide the dimension
+                    // (`index_emvb_impl.cpp:36-53`, `product_quantizer_impl.cpp:447`).
+                    if !ty.starts_with("TENSOR") || tensor_elem_type(&ty) != ElemType::Float32 {
+                        return Err(Error::Invalid(format!(
+                            "Attempt to create index on column: {column}, data type: {ty}."
+                        )));
+                    }
+                    let dims = crate::cpp_blocks::tensor_shape(&ty)
+                        .map(|(_, dim, _)| dim)
+                        .unwrap_or(0);
+                    let mut subspaces = 1usize;
+                    let mut bits = 8u32;
+                    for (k, v) in opts {
+                        if k.eq_ignore_ascii_case("pq_subspace_num") {
+                            subspaces = v.trim().parse().unwrap_or(0);
+                            if !matches!(subspaces, 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128) {
+                                return Err(Error::Invalid(
+                                    "Invalid index parameter type: pq_subspace_num".into(),
+                                ));
+                            }
+                        } else if k.eq_ignore_ascii_case("pq_subspace_bits") {
+                            bits = v.trim().parse().unwrap_or(0);
+                            if bits != 8 && bits != 16 {
+                                return Err(Error::Invalid(
+                                    "Invalid index parameter type: pq_subspace_bits".into(),
+                                ));
+                            }
+                        } else {
+                            return Err(Error::Invalid(format!(
+                                "Invalid index parameter type: {k}"
+                            )));
+                        }
+                    }
+                    if dims != 0 && dims % subspaces != 0 {
+                        return Err(Error::Invalid(format!(
+                            "embedding dimension {dims} is not a multiple of subspace number {subspaces}"
+                        )));
+                    }
                 }
                 if index_type.eq_ignore_ascii_case("IVF") {
                     // C++ `IndexIVF::Make`: `metric` is mandatory and the
@@ -21139,6 +21239,31 @@ mod tests {
         );
     }
 
+    /// `CREATE INDEX … USING EMVB`: the reference takes a tensor-of-float
+    /// column only, both PQ options, a subspace count that divides the
+    /// dimension and bits of 8 or 16 (`IndexEMVB::Make`, `GetEMVBOPQ`).
+    #[test]
+    fn emvb_index_options_are_validated_like_the_reference() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE em (id INT, v TENSOR(FLOAT,2), m MULTIVECTOR(FLOAT,2));")
+            .unwrap();
+        for sql in [
+            // a multi-vector column is not a tensor column
+            "CREATE INDEX a ON em (m) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
+            // 4 does not divide 2
+            "CREATE INDEX b ON em (v) USING EMVB WITH (pq_subspace_num = 4, pq_subspace_bits = 8);",
+            // bits must be 8 or 16
+            "CREATE INDEX c ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 4);",
+            // unknown option
+            "CREATE INDEX d ON em (v) USING EMVB WITH (nbits = 4);",
+        ] {
+            assert!(e.execute(sql).is_err(), "{sql} should be rejected");
+        }
+        e.execute("CREATE INDEX ok_i ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
+            .unwrap();
+    }
+
     /// `EXPLAIN FRAGMENT` prints the fragment envelope the reference prints:
     /// title, sink, every operator (the root gets an arrow), then the source.
     #[test]
@@ -22925,14 +23050,17 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         // Any positive budget is exceeded by the first row's tails.
         e.set_memindex_quota(1);
-        e.execute("CREATE TABLE q (id INT, m MULTIVECTOR(FLOAT,2), s SPARSE(FLOAT,10), c INT);")
+        // EMVB is a tensor-column index in the reference
+        // (`IndexEMVB::ValidateColumnDataType`), so the multi-vector form here
+        // is a `TENSOR(FLOAT,2)`.
+        e.execute("CREATE TABLE q (id INT, m TENSOR(FLOAT,2), s SPARSE(FLOAT,10), c INT);")
             .unwrap();
         e.execute("CREATE INDEX qi ON q (c);").unwrap();
         e.execute("CREATE INDEX qm ON q (m) USING EMVB;").unwrap();
         e.execute("CREATE INDEX qs ON q (s) USING BMP;").unwrap();
         e.execute(
-            "INSERT INTO q VALUES (1, [[1.0,0.0]], [0:1.0, 1:2.0], 7), \
-             (2, [[0.0,1.0]], [1:3.0], 7);",
+            "INSERT INTO q VALUES (1, [1.0,0.0], [0:1.0, 1:2.0], 7), \
+             (2, [0.0,1.0], [1:3.0], 7);",
         )
         .unwrap();
 
@@ -23401,13 +23529,16 @@ mod tests {
     fn multivector_prefilter_uses_the_persisted_residual_codes() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mvp (id INT, v MULTIVECTOR(FLOAT,2));")
+        e.execute("CREATE TABLE mvp (id INT, v TENSOR(FLOAT,2));")
             .unwrap();
-        e.execute("CREATE INDEX mvp_i ON mvp (v) USING EMVB;")
-            .unwrap();
+        e.execute(
+            "CREATE INDEX mvp_i ON mvp (v) USING EMVB \
+             WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
+        )
+        .unwrap();
         let mut sql = String::from("INSERT INTO mvp VALUES ");
         for i in 0..300 {
-            sql.push_str(&format!("({i}, [[{i}.0, 0.0]])"));
+            sql.push_str(&format!("({i}, [{i}.0, 0.0])"));
             if i < 299 {
                 sql.push(',');
             }

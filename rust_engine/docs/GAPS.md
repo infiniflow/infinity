@@ -25,14 +25,13 @@
 
 ## 2 未实现 / 未接线
 
-**现在有两项（都是并发对齐的待办）**：
+**当前为空。** 原先记在这里的两项——执行器的多 fragment/tasklet 与交换队列、事务下半部的
+`BottomExecutor` 与 `MemIndexAppender` 追加队列——已经按参考落地，逐条记录在
+[`CLASS_MAP.md`](CLASS_MAP.md)（类/方法级）与 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §6（门禁级）。
 
-| 待办 | 参考的做法 | 端口现在 |
-|---|---|---|
-| 执行器的多 fragment 与 tasklet（D4） | `FragmentBuilder` 把计划切成并行流 / 串行 materialize / merge 若干 fragment，之间用交换队列；`FragmentContext::CreateTasks` 按 `min(cpu_count, first_operator->TaskletCount())` 建 tasklet，scan 的 tasklet 数就是块数（`fragment_context_impl.cpp:1215-1245`），`TaskletCount()` 默认 1、filter/project/limit/top/sort 透传左侧、其余为 1（`physical_operator_impl.cpp:47` 起）；达到 merge 点时在 `physical_planner` 里换成 merge 算子（`physical_planner_impl.cpp:790/841`） | 已落地：`tasklet_count` / `block_tasklets` 按同一套规则解析整条链（`operators/mod.rs`）；行内算子（filter/project）按 `min(cpu_count, 块数)` 切 tasklet，各用链副本（`PhysicalOperator::fork`）跑连续行区间，输出经**有界交换队列**（每 tasklet 一条通道，容量 2 个 chunk）按 tasklet 序交给 merge 任务，merge 任务边收边算、收够即停（LIMIT 会连带停掉上游 tasklet）；tasklet 的报错也走通道上抛。`EXPLAIN FRAGMENT` 现在对非 SEARCH 计划也出 fragment 文本：`fragment_text` 在物理计划前加 `FRAGMENT (1, <ParallelStream|SerialMaterialize>)` 与 `-> SINK (n) Result`，后接原有算子与源（`ExplainFragment::Explain` 的形状）；SEARCH 路径仍由 `explain_search::fragment_lines` 逐 fragment 渲染。与参考逐字比过（同一批语句跑 C++ 与端口）：类型按 `FragmentBuilder` 判定（scan → ParallelStream，其上有 TOP/AGGREGATE → ParallelMaterialize），sink/source 的 id 取参考的分配（最后一个算子 +3 / +4）；`test/sql/explain/explain_fragment.slt` 用参考输出作期望。多 fragment 只出现在 SEARCH（`LocalQueue`），由 `explain_search::fragment_lines` 逐 fragment 渲染 |
-| 事务下半部的执行者与可见顺序 | 一个事务的下半部只由**一个** worker 跑完：`SendToWAL` 把 txn 交给 `BottomExecutor`，按 `crc32(table_id) % n` 分进 `max(2, hardware_concurrency()/2)` 条队列（`bottom_executor_impl.cpp:32-78`、`config_impl.cpp:562-567`），同表严格有序、只有跨表才并行；`CommitBottom` 内部按 WAL 命令 → 块对齐区间 → 列 → 索引逐个串行（`new_txn_impl.cpp:4578-4601`、`new_txn_data_impl.cpp:1840-1907`），上半部在 `commit_cv_` 上等它（`new_txn_impl.cpp:2138-2139`）。下半部里唯一的池是全文内存索引的追加：非实时 `MemIndexAppender::Submit`（`new_txn_index_impl.cpp:891-894`），实时走 `AsyncInsert` 的信号量，`PostCommit` 全部 `acquire` 完才 `SetCompletion` | 可见顺序已按参考落地（`register_bottom` / `finish_bottom`，时钟从队首按 commit_ts 推进，冲突也走同一屏障）。下半部本身同样是在一个线程上跑完行 → 索引 → 块镜像，与参考"每事务一个线程串行"同形；差别只在跨表——参考按表分片各跑各的，端口所有表共用 `Engine::tables` 一把锁（`update_indexes_on_insert_text`），且全文追加在发布前同步做完、没走池。已按参考落地：`BottomExecutor`（`infinity-storage` 的移植）挂在 `Engine` 上，`start_background_tasks` 按 `max(2, hardware_concurrency()/2)` 启动；`Engine::run_commit_bottom` 把每个语句的下半部（INSERT / DELETE·UPDATE / IMPORT / DumpMemIndex / `EngineTxn::commit`）包成 `BottomWork` 按 `crc32(table_id)` 分片投递，调用方等 condvar——即 `SendToWAL → Submit → CommitBottom` + `commit_cv_`；worker 内取该表 gate，同表按提交序、异表并行。无池或引擎不在 `Arc` 里时走内联。追加队列也已接上：`MemIndexAppender` 单线程队列在 `start_background_tasks` 启动，`Engine::run_text_append` 把插入路径的**全部索引维护**（二级/全文/向量缓存与容量触发的 dump）作为一个批次投递过去并等它完成（对应 `AppendIndex` 逐个 `AppendMemIndex` + `Submit`，以及 `PostCommit` 的信号量等待），下半部不再自己遍历批次。 |
-
-原先记在这一节里的接线项——相关子查询、压缩/`IMPORT` 的 WAL 帧、DDL 的 typed 命令、`COMPACT` 的候选集、`IndexScanBuilder`、`ResultCacheGetter`、`MATCH TEXT` 走倒排、`fast_rough_filter`、`compact_interval`、分析器家族、稀疏检索选项、快照——已经接线，记录在 [`CLASS_MAP.md`](CLASS_MAP.md)（类/方法级）与 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §6（格式与门禁级）。
+原先记在这一节里的接线项——相关子查询、压缩/`IMPORT` 的 WAL 帧、DDL 的 typed 命令、`COMPACT` 的候选集、
+`IndexScanBuilder`、`ResultCacheGetter`、`MATCH TEXT` 走倒排、`fast_rough_filter`、`compact_interval`、
+分析器家族、稀疏检索选项、快照——同样已经接线，记录位置同上。
 
 ## 3 不可逐字节比对（参考侧不确定）
 
@@ -50,7 +49,9 @@
 
 | 项                     | 为什么没覆盖                                                                                                                                                     |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PLAID / EMVB chunk 字节 | 两者的训练都含 `std::random_device`（PLAID 的 k-means 初始化、EMVB 的残差 PQ 训练），只能按内容比而不是逐字节；EMVB 另外要超过 `build_index_threshold_`（8192 个 embedding）才会建内存索引，小表上两引擎都不产 chunk |
+| PLAID chunk 字节 | `USING PLAID` 的 k-means 初始化同样是 `std::random_device`，只能按内容比；门禁还没写（EMVB 已闭口，见下） |
+
+EMVB 已经闭口：`test_the_emvb_chunk_matches_by_content`（8300 行 `TENSOR(FLOAT,2)`、`pq_subspace_num=2`/`bits=8`）比的是输入决定的结构——chunk 大小、头部的 dims/subspace/bits/centroid 数、以及 `doc_lens`/`doc_segment_offsets`/`doc_offsets` 三张表；centroids、codes、OPQ 旋转是随机训练的结果，不比。对齐过程中修掉两处：`build_emvb` 的 centroid 数改成参考的 `min(sqrt(n), n/32)` 向上取 8 的倍数（原来用 `clamp(n/8, 8, 256)`，8300 行时是 256 而不是 96），以及 `pq_subspace_num`/`pq_subspace_bits` 之前没从索引定义传进 PQ（恒为 1/8）。
 
 SMVE 已经闭口：`test_the_smve_chunk_matches_byte_for_byte`（500 行 `TENSOR(FLOAT,4)`）逐字节相同，前提是参考侧 `SMVEIndexInMem::BuildFromColumn` 把 `GetTensorRaw` 的第二个返回值当**token 数**而不是字节数（参考里原来除错了，chunk 因此是空的）。
 

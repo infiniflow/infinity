@@ -19,14 +19,20 @@ fn the_memory_tail_is_searched_through_the_in_memory_emvb_index() {
     std::env::set_var("INFINITY_EMVB_BUILD_THRESHOLD", "1");
     let dir = tempfile::tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE mvp (id INT, v MULTIVECTOR(FLOAT,2));")
+    // EMVB is a tensor-column index in the reference
+    // (`IndexEMVB::ValidateColumnDataType` rejects a multi-vector column), so
+    // the multi-vector grouping is expressed with `TENSOR(FLOAT,2)` rows.
+    e.execute("CREATE TABLE mvp (id INT, v TENSOR(FLOAT,2));")
         .unwrap();
-    e.execute("CREATE INDEX mvp_i ON mvp (v) USING EMVB;")
-        .unwrap();
+    e.execute(
+        "CREATE INDEX mvp_i ON mvp (v) USING EMVB \
+         WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
+    )
+    .unwrap();
     // Written after the index was built, so these rows sit in the memory tail.
     for i in 0..8 {
         e.execute(&format!(
-            "INSERT INTO mvp VALUES ({i}, [[{i}.0, 0.0], [0.0, 1.0]]);"
+            "INSERT INTO mvp VALUES ({i}, [{i}.0, 0.0]);"
         ))
         .unwrap();
     }
