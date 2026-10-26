@@ -93,7 +93,7 @@
 2. 与参考比对并行结构的外部口径——`EXPLAIN FRAGMENT` 的 fragment 类型与 sink/source、`EXPLAIN` 里的 merge 算子（`test/sql/explain`，期望值取自参考二进制）；
 3. 并发下的可观察顺序单独写用例（commit-ts 顺序发布、同表下半部按提交顺序）。
 
-字节门禁仍保持单客户端串行（§2.2），并发本身的覆盖归 Gate D。
+字节门禁仍保持单客户端串行（§2.2），并发本身的覆盖归 Gate D。逐结构的状态、落点与证据见 [`PARALLEL_MAP.md`](PARALLEL_MAP.md)。
 
 ---
 

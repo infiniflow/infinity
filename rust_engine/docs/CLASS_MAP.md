@@ -37,7 +37,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `planner/*` | 117 | `node` 52 → `Statement`/计划结构；`optimizer` 17 → 规则函数；其余为绑定/解析中间结构 |
 | `function/*` | 64 | `cast` 29 + `table` 17 + 其余 → Rust 的 cast/builtin 函数与 `AggFunc` 枚举 |
 | `common/*` | 58 | `analyzer` 39 → `tokenize_*` analyzer 函数；其余为工具结构 |
-| `main/*` + `network/*` + `scheduler/*` + `admin` + `metrics` + `unit_test` | 39 + 23 + 10 + 1 + 1 + 7 | 查询选项 → 解析结构；peer/cluster → `infinity_server::peer` + `ring_buffer`；调度器按 D4 由 Tokio 取代；admin → 语句分发；metrics → 服务端计数；`unit_test` 为 C++ 测试夹具 |
+| `main/*` + `network/*` + `scheduler/*` + `admin` + `metrics` + `unit_test` | 39 + 23 + 10 + 1 + 1 + 7 | 查询选项 → 解析结构；peer/cluster → `infinity_server::peer` + `ring_buffer`；调度器按 D4 由 `run_tasklets` 的 tasklet 承担（线程与队列的对应见 `PARALLEL_MAP.md`）；admin → 语句分发；metrics → 服务端计数；`unit_test` 为 C++ 测试夹具 |
 | `expression/*` | 12 | 标量表达式求值函数（`infinity-expression`） |
 
 > 判定口径：C++ 中承载**行为**且被其他类调用的类（HNSW/IVF/EMVB/PLAID/SMVE、全文段、事务、Buffer、BlockIndex、PDataBlock 等）在本表中逐类对应；纯数据载体、模板特化、迭代器和生成类型按上表合并，理由与归属均已登记。新增 C++ 行为类时仍须先登记再移植。
