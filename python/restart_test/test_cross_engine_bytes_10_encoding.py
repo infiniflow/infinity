@@ -335,3 +335,63 @@ def test_the_fast_rough_filters_match_byte_for_byte():
     assert not (only_cpp or only_rust or changed), (
         f"only in cpp: {only_cpp}\nonly in rust: {only_rust}\n" + "\n".join(changed)
     )
+
+
+def _phase_catalog_keys(conn):
+    """The smallest workload that touches every catalog record family."""
+    db = conn.get_database("default_db")
+    db.drop_table("kb", ConflictType.Ignore)
+    t = db.create_table(
+        "kb",
+        {"id": {"type": "int"}, "v": {"type": "vector,4,float"}},
+        ConflictType.Error,
+    )
+    t.insert(
+        [
+            {"id": 1, "v": [0.1, 0.2, 0.3, 0.4]},
+            {"id": 2, "v": [0.5, 0.6, 0.7, 0.8]},
+            {"id": 3, "v": [0.9, 1.0, 1.1, 1.2]},
+        ]
+    )
+    t.delete("id = 2")
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "the port's catalog still holds four keys the reference does not "
+        "(`__counter:table`, `db:<name>`, `tbl:<id>`, `tblname:<db>.<tbl>`) and "
+        "a separate row store under persistence/; see PORTING.md §3.1"
+    ),
+)
+@pytest.mark.skipif(
+    not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
+)
+@pytest.mark.skipif(
+    not os.access(RUST_BIN, os.X_OK), reason=f"{RUST_BIN} is not executable"
+)
+def test_the_catalog_key_set_and_values_match_exactly():
+    """The catalog holds **exactly** the reference's keys, with equal values.
+
+    Not "the records we know about match" - the whole key space. A key the port
+    writes and the reference does not (its own bookkeeping) is as much a
+    divergence as a value that differs, because a directory must be readable by
+    either engine and hold nothing the reference would not have written.
+    """
+    cpp_root = os.path.join(ROOT, "catalog_keys_cpp")
+    rust_root = os.path.join(ROOT, "catalog_keys_rust")
+    _run_engine("cpp", cpp_root, 5432, seed=_phase_catalog_keys)
+    _run_engine("rust", rust_root, 5433, seed=_phase_catalog_keys)
+
+    cpp = _raw_catalog_hex(cpp_root)
+    rust = _raw_catalog_hex(rust_root)
+
+    only_cpp = sorted(set(cpp) - set(rust))
+    only_rust = sorted(set(rust) - set(cpp))
+    assert not only_rust, f"keys the port writes and the reference does not: {only_rust}"
+    assert not only_cpp, f"keys the reference writes and the port does not: {only_cpp}"
+
+    differing = sorted(k for k in cpp if cpp[k] != rust[k])
+    assert not differing, "same key, different value: " + ", ".join(
+        f"{k} ({cpp[k]} vs {rust[k]})" for k in differing[:5]
+    )

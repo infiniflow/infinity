@@ -148,7 +148,10 @@
 
 1. `EMBEDDING(<dim>)` 简写映射（已修）。
 2. 稀疏列从 C++ 记录读回时丢失 `sort` 提示（已修），且类型文本会变成 `SPARSE(float,int16,30000)`——SQL 层要接受这种形式。
-3. `DROP TABLE`/`DROP DATABASE` 在 `cpp_only` 下不清理段/块/索引 chunk 记录，`cleanup` 也不删已删表的块目录（`import_then_drop_database`、`cleanup_internal_ut` 三处红）。这两处没修，所以 `cpp_only` 暂未开启。
+3. **drop 只做标记，回收交给 cleanup**（与参考版一致：`NewTxn::Compact` 写 `drop|seg|…`，cleanup 事务真正删记录与文件）。端口现在在 drop 时直接改写布局、不写标记，所以 cleanup 看不到被删表的段；`cleanup_internal_ut` 两处红。正确做法：`cpp_only` 的 `drop_table`/`drop_database` 给该表每个段写 `drop|seg|{db}/{tbl}/{seg}`，布局里不再重发这些段记录，`reclaim_deprecated_segments` 增加一趟"标记存在但表已不存在"的回收（删 `catalog|seg|`/`catalog|blk|`/`seg|`/`blk|`/`idx_chunk|` + 表目录）。另需在 drop 时清掉 `Engine.tables` 里该表的内存条目（`segment_ids` 从那里读，否则 `import_then_drop_database` 仍能看到已删表的段）。
+4. 每库的 `next_table_id` 必须是**单调**的（`TableMeta::next_table_id_`）：原实现按存活表的最大 id 重算，drop 掉最新表后计数器回退，新表复用 id 与块目录——已修（取 store 旧值与存活最大值中的较大者）。
+
+这三处没修完，所以 `cpp_only` 暂未开启。对应的门禁已经写好：`test_the_catalog_key_set_and_values_match_exactly`（`test_cross_engine_bytes_10_encoding.py`）断言两侧 **key 集合完全相同且同 key 的 value 相同**，现在是 strict `xfail`，`cpp_only` 打开后会立刻变成 unexpected pass。
 
 
 | 维度 | 状态 | 验证 |

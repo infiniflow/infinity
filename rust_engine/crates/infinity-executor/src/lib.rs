@@ -14349,6 +14349,33 @@ impl Engine {
                 );
             }
         }
+        // Directories of tables that no longer exist at all: `DROP TABLE` /
+        // `DROP DATABASE` removes the catalog records, so the loop above never
+        // hears about their segments and the files would stay behind for ever.
+        // Walking the block root is what makes cleanup complete, the way the
+        // reference's cleanup removes whatever the catalog does not reference.
+        let live: std::collections::HashSet<(String, String)> = self
+            .storage
+            .catalog
+            .list_tables()?
+            .iter()
+            .map(|m| (self.database_id_of(&m.name).to_string(), m.id.to_string()))
+            .collect();
+        let root = self.blocks_root();
+        if let Ok(dbs) = std::fs::read_dir(&root) {
+            for db in dbs.flatten() {
+                let db_name = db.file_name().to_string_lossy().to_string();
+                let Some(db_id) = db_name.strip_prefix("db_") else { continue };
+                let Ok(tables) = std::fs::read_dir(db.path()) else { continue };
+                for tbl in tables.flatten() {
+                    let tbl_name = tbl.file_name().to_string_lossy().to_string();
+                    let Some(table_id) = tbl_name.strip_prefix("tbl_") else { continue };
+                    if !live.contains(&(db_id.to_string(), table_id.to_string())) {
+                        let _ = std::fs::remove_dir_all(tbl.path());
+                    }
+                }
+            }
+        }
         Ok(())
     }
 

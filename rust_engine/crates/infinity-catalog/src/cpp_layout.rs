@@ -836,7 +836,6 @@ impl Catalog {
             Ok(newest)
         };
 
-        let next_table_id = tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
         // The reference hands out **1-based** database ids (`CreateDatabase`
         // applies `next_database_id_ + 1`, and the block mirror names its
         // directory `db_{db_id}`), so the first database is 1, not 0.
@@ -855,6 +854,22 @@ impl Catalog {
         for db in dbs.iter() {
             let ts = ts_of(&format!("catalog|db|{db}|"))?.unwrap_or(crate::DDL_TS_SENTINEL);
             let db_str = db_id_of(db).to_string();
+            // The counter is **per database** and monotonic
+            // (`TableMeta::next_table_id_`): a `DROP TABLE` must not rewind it,
+            // or the next table reuses the dropped table's id and its block
+            // directory. Keep the larger of what the store already had and what
+            // the surviving tables imply.
+            let previous: u64 = store
+                .get(key::catalog_db_tag_key(&db_str, "next_table_id").as_bytes())?
+                .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+                .unwrap_or(0);
+            let surviving = tables
+                .iter()
+                .filter(|t| db_of(&t.name) == *db)
+                .map(|t| t.id)
+                .max()
+                .map_or(0, |id| id + 1);
+            let next_table_id = previous.max(surviving).max(1);
             store.put(key::catalog_db_key(db, ts).as_bytes(), db_str.as_bytes())?;
             store.put(
                 key::catalog_db_tag_key(&db_str, "next_table_id").as_bytes(),
