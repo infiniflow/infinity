@@ -6693,21 +6693,31 @@ impl Engine {
         self.txn.commit_at(self.txn.begin(), ts)?;
         // Remember the ts: the `idx_chunk|…|{chunk_id}` record names the
         // transaction whose dump sealed the chunk, and it is this one.
-        let tkey = self.table_key(table);
-        self.storage
-            .store
-            .put(&dump_ts_key(&tkey, index), &ts.to_le_bytes())?;
-        // The chunk record the reference writes in this transaction
-        // (`AddChunkIndexID1`): the chunks already published for the index now
-        // belong to `ts`.
-        self.stamp_cpp_chunk_ts(&tkey, index, ts)?;
-        // A reader hides a chunk stamped above its `begin_ts`, which it takes
-        // from the newest checkpoint frame - the dump's ts must be covered.
-        self.txn.cover_with_checkpoint(ts)?;
-        if is_secondary_kind(&version.index.index_type) {
-            self.dump_index(table, index)?;
-        }
-        Ok(())
+        // `CommitBottom` of the dump transaction, on the table's worker: the
+        // ts record, the chunk stamps, the checkpoint cover and the sealed
+        // chunk write.
+        let bottom_table = self.table_key(table);
+        let shard_key = bottom_table.clone();
+        let index_name = index.to_string();
+        let secondary = is_secondary_kind(&version.index.index_type);
+        self.run_commit_bottom(&shard_key, move |engine| {
+            engine.storage.store.put(
+                &dump_ts_key(&bottom_table, &index_name),
+                &ts.to_le_bytes(),
+            )?;
+            // The chunk record the reference writes in this transaction
+            // (`AddChunkIndexID1`): the chunks already published for the index
+            // now belong to `ts`.
+            engine.stamp_cpp_chunk_ts(&bottom_table, &index_name, ts)?;
+            // A reader hides a chunk stamped above its `begin_ts`, which it
+            // takes from the newest checkpoint frame - the dump's ts must be
+            // covered.
+            engine.txn.cover_with_checkpoint(ts)?;
+            if secondary {
+                engine.dump_index(&bottom_table, &index_name)?;
+            }
+            Ok(())
+        })
     }
 
     /// Applies one `DumpMemIndex`: seals the target index's memory tail.
