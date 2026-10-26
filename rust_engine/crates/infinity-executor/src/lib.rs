@@ -5602,6 +5602,53 @@ impl<'a> EngineTxn<'a> {
     }
 }
 
+/// `ExplainFragment::Explain` for a plan that is not a `SEARCH`: the root
+/// fragment's title, its sink, then the operators and the source the physical
+/// plan already lists (`explain_select` and friends), which is the order the
+/// reference prints them in (`explain_fragment_impl.cpp:37-67`).
+///
+/// The fragment type follows `FragmentBuilder`: a table scan is a
+/// `ParallelStream`, a plan without one is a `SerialMaterialize`. The sink and
+/// source carry the next free node id, as the reference gives them ids of
+/// their own while it builds the fragment.
+fn fragment_text(lines: Vec<String>) -> Vec<String> {
+    // A `SEARCH` plan already comes back rendered per fragment
+    // (`explain_search::fragment_lines`).
+    if lines
+        .first()
+        .map(|line| line.starts_with("FRAGMENT"))
+        .unwrap_or(false)
+    {
+        return lines;
+    }
+    let parallel = lines
+        .iter()
+        .any(|line| line.to_ascii_uppercase().contains("SCAN"));
+    let fragment_type = if parallel {
+        "ParallelStream"
+    } else {
+        "SerialMaterialize"
+    };
+    // Node ids in these renderings are the planner's; the sink is one more than
+    // the largest the plan used.
+    let mut next_id = 0u64;
+    for line in &lines {
+        if let Some(start) = line.find('(') {
+            if let Some(end) = line[start..].find(')') {
+                if let Ok(id) = line[start + 1..start + end].parse::<u64>() {
+                    next_id = next_id.max(id + 1);
+                }
+            }
+        }
+    }
+    let mut out = Vec::with_capacity(lines.len() + 3);
+    out.push(format!("FRAGMENT (1, {fragment_type})"));
+    out.push(format!("-> SINK ({next_id}) Result"));
+    out.extend(lines);
+    out.push(String::new());
+    out
+}
+
 /// Deregisters a statement from the query registry when it returns, and records
 /// its duration in the profile history while `profile` is on.
 ///
@@ -10296,10 +10343,15 @@ impl Engine {
                     }
                 };
                 match text {
-                    Some(lines) => Ok(QueryResult::Rows {
-                        columns: vec![],
-                        rows: lines.into_iter().map(|l| vec![l]).collect(),
-                    }),
+                    Some(mut lines) => {
+                        if matches!(kind, infinity_parser::ExplainKind::Fragment) {
+                            lines = fragment_text(lines);
+                        }
+                        Ok(QueryResult::Rows {
+                            columns: vec![],
+                            rows: lines.into_iter().map(|l| vec![l]).collect(),
+                        })
+                    }
                     None => {
                         if let Statement::Select { from: Some(t), .. } = inner.as_ref() {
                             self.table_schema(t)?;
@@ -21039,6 +21091,24 @@ mod tests {
             ),
             vec![vec!["1".to_string()]]
         );
+    }
+
+    /// `EXPLAIN FRAGMENT` on a plain plan prints the fragment envelope around
+    /// the physical plan: title, sink, then the operators and the source
+    /// (`ExplainFragment::Explain`), not just the physical text again.
+    #[test]
+    fn explain_fragment_wraps_a_plain_plan() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ef (a INT, b INT);").unwrap();
+
+        let physical = rows(&e, "EXPLAIN PHYSICAL SELECT a FROM ef WHERE b = 1;");
+        let fragment = rows(&e, "EXPLAIN FRAGMENT SELECT a FROM ef WHERE b = 1;");
+        assert_eq!(fragment[0], vec!["FRAGMENT (1, ParallelStream)".to_string()]);
+        assert!(fragment[1][0].starts_with("-> SINK ("), "{:?}", fragment[1]);
+        // The plan itself follows the envelope, unchanged.
+        assert_eq!(&fragment[2..fragment.len() - 1], physical.as_slice());
+        assert_eq!(fragment.last().unwrap()[0], "");
     }
 
     /// Splitting the row-wise prefix into tasklets must not cost the early stop
