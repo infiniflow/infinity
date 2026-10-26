@@ -4938,6 +4938,13 @@ pub struct Engine {
     /// the segment, so it always dumps whole batches; holding this lock for
     /// the batch gives the same chunk boundaries deterministically.
     batch_lock: Mutex<()>,
+    /// One gate per table: a transaction's bottom half (rows → index entries →
+    /// block mirror) runs under its table's gate, so two transactions of the
+    /// same table do their bottom work one after the other while transactions
+    /// of different tables overlap - the order `BottomExecutor`'s
+    /// `crc32(table_id) % n` queues give the reference
+    /// (`bottom_executor_impl.cpp:32-78`).
+    bottom_gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
@@ -5295,6 +5302,29 @@ impl<'a> EngineTxn<'a> {
             self.engine.invalidate_row_cache(table);
             self.engine.note_live_rows(table, -(*count as isize));
         }
+        // Same-table bottom halves take their turn in commit order; different
+        // tables do not block each other (`BottomExecutor`'s sharded queues).
+        // Acquiring before the timestamp keeps the turn order equal to the
+        // commit order the barrier publishes in.
+        let mut gate_keys: Vec<String> = self
+            .appends
+            .iter()
+            .map(|(table, ..)| self.engine.table_key(table))
+            .chain(
+                self.deletes
+                    .iter()
+                    .map(|(table, _)| self.engine.table_key(table)),
+            )
+            .chain(self.dumps.iter().map(|dump| self.engine.table_key(&dump.table)))
+            .collect();
+        gate_keys.sort();
+        gate_keys.dedup();
+        let gates: Vec<std::sync::Arc<std::sync::Mutex<()>>> = gate_keys
+            .iter()
+            .map(|table| self.engine.bottom_gate(table))
+            .collect();
+        let _gates: Vec<std::sync::MutexGuard<'_, ()>> =
+            gates.iter().map(|gate| gate.lock().unwrap()).collect();
         if !txn.is_empty() {
             // The bottom half: rows first, index entries after (both are
             // inside `CommitBottom` in the reference). The commit becomes
@@ -5640,6 +5670,7 @@ impl Engine {
             bg_processor: Mutex::new(None),
             self_weak: Mutex::new(std::sync::Weak::new()),
             batch_lock: Mutex::new(()),
+            bottom_gates: Mutex::new(HashMap::new()),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
             vector_cache: Mutex::new(HashMap::new()),
             cpu_sample: Mutex::new(None),
@@ -7607,6 +7638,17 @@ impl Engine {
 
     /// Drops the decoded-row cache; every mutation that rewrites or removes
     /// rows calls it before the next scan.
+    /// The gate a transaction's bottom half holds for `table`.
+    ///
+    /// `BottomExecutor` gives the reference the same shape with a thread pool
+    /// sharded by table id: two transactions of one table take their bottom
+    /// turn in order, transactions of different tables overlap.
+    fn bottom_gate(&self, table: &str) -> Arc<Mutex<()>> {
+        let key = self.table_key(table);
+        let mut gates = self.bottom_gates.lock().unwrap();
+        Arc::clone(gates.entry(key).or_default())
+    }
+
     fn invalidate_row_cache(&self, table: &str) {
         let key = self.table_key(table);
         if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
