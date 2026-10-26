@@ -4949,7 +4949,7 @@ pub struct Engine {
     /// one is attached, a transaction's bottom half runs on its sharded worker
     /// instead of the committing thread. `None` keeps the inline path, which is
     /// what an engine without a thread pool (most tests) uses.
-    bottom_executor: Mutex<Option<Arc<infinity_storage::wal::bottom_executor::BottomExecutor<PendingBottom>>>>,
+    bottom_executor: Mutex<Option<Arc<infinity_storage::wal::bottom_executor::BottomExecutor<BottomWork>>>>,
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
@@ -5225,40 +5225,26 @@ fn run_bottom(
     Ok(())
 }
 
-/// One transaction's bottom half, handed to a [`BottomExecutor`] worker.
-///
-/// `BottomExecutor` routes by `crc32(table_id) % executor_size`
-/// (`bottom_executor_impl.cpp:73`) and calls `commit_bottom` on the worker;
-/// `commit` waits on [`Self::wait`], which is the reference's `commit_cv_`
-/// wait in `NewTxn::Commit` (`new_txn_impl.cpp:2138`).
-/// Bottom halves the attached `BottomExecutor` has run, so a test can prove a
-/// commit really went through the pool instead of the inline path.
-#[cfg(test)]
-static BOTTOM_RUNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-
-struct PendingBottom {
-    /// Owned handle: the worker outlives the committing borrow.
-    engine: Arc<Engine>,
-    /// `crc32(table_id)` routing key.
-    table_id: String,
-    /// Per-table gates, locked on the worker so the bottom halves of one table
-    /// still take their turn in commit order.
-    gates: Vec<Arc<std::sync::Mutex<()>>>,
-    appends: Vec<StagedAppend>,
-    deletes: Vec<(String, usize)>,
-    dumps: Vec<StagedDump>,
-    txn: std::sync::Mutex<Option<Txn>>,
-    state: std::sync::Mutex<BottomState>,
-    done: std::sync::Condvar,
-}
-
 #[derive(Default)]
 struct BottomState {
     finished: bool,
     result: Option<Result<()>>,
 }
 
-impl PendingBottom {
+/// The post-commit work of one statement, handed to a [`BottomExecutor`]
+/// worker (`NewTxnManager::CommitBottom` for a single-table statement).
+struct BottomWork {
+    engine: Arc<Engine>,
+    table_id: String,
+    /// The tables' gates, locked on the worker: bottom halves of one table take
+    /// their turn in submission (= commit) order.
+    gates: Vec<Arc<std::sync::Mutex<()>>>,
+    work: std::sync::Mutex<Option<Box<dyn FnOnce(&Engine) -> Result<()> + Send>>>,
+    state: std::sync::Mutex<BottomState>,
+    done: std::sync::Condvar,
+}
+
+impl BottomWork {
     fn wait(&self) -> Result<()> {
         let mut state = self.state.lock().unwrap();
         while !state.finished {
@@ -5271,7 +5257,7 @@ impl PendingBottom {
     }
 }
 
-impl infinity_storage::wal::bottom_executor::BottomTask for PendingBottom {
+impl infinity_storage::wal::bottom_executor::BottomTask for BottomWork {
     fn table_id(&self) -> &str {
         &self.table_id
     }
@@ -5282,15 +5268,14 @@ impl infinity_storage::wal::bottom_executor::BottomTask for PendingBottom {
 
     fn commit_bottom(&self) {
         #[cfg(test)]
-        BOTTOM_RUNS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let txn = self.txn.lock().unwrap().take();
-        let result = match txn {
-            Some(txn) => {
-                let _guards: Vec<std::sync::MutexGuard<'_, ()>> =
+        BOTTOM_WORKS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let work = self.work.lock().unwrap().take();
+        let result = match work {
+            Some(work) => {
+                let _turn: Vec<std::sync::MutexGuard<'_, ()>> =
                     self.gates.iter().map(|gate| gate.lock().unwrap()).collect();
-                run_bottom(&self.engine, &self.appends, &self.deletes, &self.dumps, txn)
+                work(&self.engine)
             }
-            // The worker is only supposed to see a transaction once.
             None => Ok(()),
         };
         let mut state = self.state.lock().unwrap();
@@ -5299,6 +5284,16 @@ impl infinity_storage::wal::bottom_executor::BottomTask for PendingBottom {
         drop(state);
         self.done.notify_all();
     }
+}
+
+/// Statements whose bottom half ran on the pool, for tests.
+#[cfg(test)]
+static BOTTOM_WORKS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Statements whose bottom half ran on the pool, for tests.
+#[cfg(test)]
+fn bottom_work_count() -> usize {
+    BOTTOM_WORKS.load(std::sync::atomic::Ordering::SeqCst)
 }
 
 impl<'a> EngineTxn<'a> {
@@ -5515,14 +5510,13 @@ impl<'a> EngineTxn<'a> {
                 .or_else(|| deletes.first().map(|(table, _)| table.clone()))
                 .or_else(|| dumps.first().map(|dump| dump.table.clone()))
                 .unwrap_or_default();
-            let task = std::sync::Arc::new(PendingBottom {
+            let task = std::sync::Arc::new(BottomWork {
                 engine,
                 table_id,
                 gates,
-                appends,
-                deletes,
-                dumps,
-                txn: std::sync::Mutex::new(Some(txn)),
+                work: std::sync::Mutex::new(Some(Box::new(move |engine: &Engine| {
+                    run_bottom(engine, &appends, &deletes, &dumps, txn)
+                }))),
                 state: std::sync::Mutex::new(BottomState::default()),
                 done: std::sync::Condvar::new(),
             });
@@ -7783,7 +7777,7 @@ impl Engine {
     /// worker, sharded by table id.
     pub fn attach_bottom_executor(
         self: &Arc<Self>,
-        executor: Arc<infinity_storage::wal::bottom_executor::BottomExecutor<PendingBottom>>,
+        executor: Arc<infinity_storage::wal::bottom_executor::BottomExecutor<BottomWork>>,
     ) {
         // The queued job owns an `Arc<Engine>`, so the engine has to know its
         // own handle (`EngineTxn::handle` upgrades this).
@@ -7793,8 +7787,32 @@ impl Engine {
 
     fn bottom_executor(
         &self,
-    ) -> Option<Arc<infinity_storage::wal::bottom_executor::BottomExecutor<PendingBottom>>> {
+    ) -> Option<Arc<infinity_storage::wal::bottom_executor::BottomExecutor<BottomWork>>> {
         self.bottom_executor.lock().unwrap().clone()
+    }
+
+    /// Runs one statement's post-commit work the way `NewTxnManager::
+    /// CommitBottom` does: on the `BottomExecutor` worker that owns `table`,
+    /// the caller waiting for it, or inline when no pool is attached.
+    fn run_commit_bottom<F>(&self, table: &str, work: F) -> Result<()>
+    where
+        F: FnOnce(&Engine) -> Result<()> + Send + 'static,
+    {
+        let (Some(engine), Some(executor)) = (self.engine_handle(), self.bottom_executor()) else {
+            let gate = self.bottom_gate(table);
+            let _turn = gate.lock().unwrap();
+            return work(self);
+        };
+        let task = Arc::new(BottomWork {
+            engine,
+            table_id: self.table_key(table),
+            gates: vec![self.bottom_gate(table)],
+            work: std::sync::Mutex::new(Some(Box::new(work))),
+            state: std::sync::Mutex::new(BottomState::default()),
+            done: std::sync::Condvar::new(),
+        });
+        executor.submit(task.clone());
+        task.wait()
     }
 
     /// The gate a transaction's bottom half holds for `table`.
@@ -8861,43 +8879,55 @@ impl Engine {
             )]);
         }
         let ts = self.txn.commit(t)?;
-        // The block's `version` records the append's commit ts.
-        self.settle_append_ts(table, 1, ts);
-        if new_segment {
-            // An import seals the segment it writes, so it also has an extent
-            // (and, with it, the sealed-segment prefilter).
-            let segment = (base >> 32) as u32;
-            self.note_import_ts(table, segment, ts);
-            self.note_import_rows(
-                table,
-                segment,
-                (base as u64 & 0xffff_ffff) + rows.len() as u64,
-            );
-        }
-        // With no index of any kind in memory there is nothing to maintain;
-        // skipping the per-row hook avoids a catalog lookup + string render for
-        // every inserted row (the reference's insert path has the same guard).
-        if self.any_in_memory_index() || self.has_index_declaration(table) {
-            for (k, row) in rows.iter().enumerate() {
-                self.update_indexes_on_insert(table, base + k, row)?;
-                let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-                self.update_text_indexes(table, base + k, &texts);
-                self.update_vector_caches(table, base + k, &texts);
+        // The bottom half: the block's `version` ts, the import extent, the
+        // index entries and the block mirror. On a pooled engine this runs on
+        // the table's `BottomExecutor` worker and the statement waits, as
+        // `CommitBottomAppend` does.
+        let bottom_table = table.to_string();
+        let shard_key = bottom_table.clone();
+        let row_count = rows.len();
+        let bottom_rows = rows;
+        let bottom_encoded = encoded_rows;
+        self.run_commit_bottom(&shard_key, move |engine| {
+            engine.settle_append_ts(&bottom_table, 1, ts);
+            if new_segment {
+                // An import seals the segment it writes, so it also has an
+                // extent (and, with it, the sealed-segment prefilter).
+                let segment = (base >> 32) as u32;
+                engine.note_import_ts(&bottom_table, segment, ts);
+                engine.note_import_rows(
+                    &bottom_table,
+                    segment,
+                    (base as u64 & 0xffff_ffff) + bottom_rows.len() as u64,
+                );
             }
-            // C++ `AppendMemIndex`: a segment that reached
-            // `mem_index_capacity` rows is dumped right after the batch.
-            self.dump_hnsw_over_capacity(table);
-            self.dump_secondary_over_capacity(table);
-        }
-        self.bump_writes(table);
-        self.note_live_rows(table, rows.len() as isize);
-        self.append_row_cache(table, base, &encoded_rows);
-        // The reference writes a block's files while the append commits
-        // (`AppendInBlock`), so a directory it leaves behind is always
-        // readable. Mirror the same way: a table that already has a C++ block
-        // directory gets its new rows at commit, not at the next `flush`, so a
-        // crash right after the insert cannot leave a stale block behind.
-        self.refresh_cpp_block_mirror(table)?;
+            // With no index of any kind in memory there is nothing to maintain;
+            // skipping the per-row hook avoids a catalog lookup + string render
+            // for every inserted row (the reference's insert path has the same
+            // guard).
+            if engine.any_in_memory_index() || engine.has_index_declaration(&bottom_table) {
+                for (k, row) in bottom_rows.iter().enumerate() {
+                    engine.update_indexes_on_insert(&bottom_table, base + k, row)?;
+                    let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
+                    engine.update_text_indexes(&bottom_table, base + k, &texts);
+                    engine.update_vector_caches(&bottom_table, base + k, &texts);
+                }
+                // C++ `AppendMemIndex`: a segment that reached
+                // `mem_index_capacity` rows is dumped right after the batch.
+                engine.dump_hnsw_over_capacity(&bottom_table);
+                engine.dump_secondary_over_capacity(&bottom_table);
+            }
+            engine.bump_writes(&bottom_table);
+            engine.note_live_rows(&bottom_table, bottom_rows.len() as isize);
+            engine.append_row_cache(&bottom_table, base, &bottom_encoded);
+            // The reference writes a block's files while the append commits
+            // (`AppendInBlock`), so a directory it leaves behind is always
+            // readable. Mirror the same way: a table that already has a C++
+            // block directory gets its new rows at commit, not at the next
+            // `flush`, so a crash right after the insert cannot leave a stale
+            // block behind.
+            engine.refresh_cpp_block_mirror(&bottom_table)
+        })?;
         // Give the allocator's per-batch scratch back to the OS. Trimming on
         // every batch walks the whole heap; once every few batches is enough
         // to keep RSS flat and avoids adding milliseconds to each commit.
@@ -8912,7 +8942,7 @@ impl Engine {
                 .store(0, std::sync::atomic::Ordering::Relaxed);
             infinity_storage::trim_allocator();
         }
-        Ok(QueryResult::Inserted { count: rows.len() })
+        Ok(QueryResult::Inserted { count: row_count })
     }
 
     /// Validates a delete set against the transaction's begin timestamp, then
@@ -20805,11 +20835,11 @@ mod tests {
 
     /// GROUP BY and global aggregates run through the aggregate operator, keep
     /// first-seen group order, and still produce one row over an empty relation.
-    /// A commit with a `BottomExecutor` attached runs its bottom half on the
-    /// worker and waits for it: rows, index entries and the block mirror are in
-    /// place before `commit` returns, exactly as on the inline path.
+    /// An `INSERT` on a pooled engine runs its bottom half on the table's
+    /// worker and waits for it: the rows, the index entries and the block
+    /// mirror are in place when the statement returns.
     #[test]
-    fn a_commit_runs_its_bottom_half_on_the_bottom_executor() {
+    fn an_insert_runs_its_bottom_half_on_the_bottom_executor() {
         let dir = tempdir().unwrap();
         let e = Arc::new(Engine::open(dir.path()).unwrap());
         let mut executor = infinity_storage::wal::bottom_executor::BottomExecutor::new();
@@ -20818,23 +20848,10 @@ mod tests {
         e.execute("CREATE TABLE be (a INT, b VARCHAR);").unwrap();
         e.execute("CREATE INDEX be_b ON be (b);").unwrap();
 
-        let before = BOTTOM_RUNS.load(std::sync::atomic::Ordering::SeqCst);
-        let mut txn = e.begin_txn();
-        txn.append(
-            "default_db.be",
-            vec![
-                vec![Literal::Int(1), Literal::Str("x".into())],
-                vec![Literal::Int(2), Literal::Str("y".into())],
-            ],
-        )
-        .unwrap();
-        txn.commit().unwrap();
-
-        assert_eq!(
-            BOTTOM_RUNS.load(std::sync::atomic::Ordering::SeqCst),
-            before + 1,
-            "the bottom half ran on a worker"
-        );
+        let before = bottom_work_count();
+        e.execute("INSERT INTO be VALUES (1, 'x'), (2, 'y');")
+            .unwrap();
+        assert_eq!(bottom_work_count(), before + 1, "the insert went through the pool");
         // The worker's writes are visible: rows, the index entry and the counts.
         assert_eq!(
             rows(&e, "SELECT a FROM be WHERE b = 'y';"),
