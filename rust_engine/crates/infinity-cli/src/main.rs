@@ -234,6 +234,71 @@ fn trim_allocator() {
 #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
 fn trim_allocator() {}
 
+/// `SELECT ROW_ID() FROM <table> SEARCH MATCH VECTOR (...)` — the statement
+/// `knn_query_benchmark` issues (`topn_ = topk`, `ef` as an option).
+fn knn_sql(table: &str, query: &[f32], topk: usize, ef: u64) -> String {
+    let vec = query
+        .iter()
+        .map(|x| format!("{x:.6}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "SELECT ROW_ID() FROM {table} SEARCH MATCH VECTOR (col1, [{vec}], 'float', 'l2', {topk}) WITH (ef = {ef});"
+    )
+}
+
+/// Reads an `fvecs` file: per record a `i32` dimension then that many `f32`.
+fn read_fvecs(path: &str) -> infinity_common::Result<Vec<Vec<f32>>> {
+    let bytes = std::fs::read(path).map_err(|e| infinity_common::Error::Io {
+        path: PathBuf::from(path),
+        source: e,
+    })?;
+    let mut out = Vec::new();
+    let mut at = 0usize;
+    while at + 4 <= bytes.len() {
+        let dim = i32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
+        at += 4;
+        if at + 4 * dim > bytes.len() {
+            break;
+        }
+        let mut row = Vec::with_capacity(dim);
+        for i in 0..dim {
+            row.push(f32::from_le_bytes(
+                bytes[at + 4 * i..at + 4 * i + 4].try_into().unwrap(),
+            ));
+        }
+        at += 4 * dim;
+        out.push(row);
+    }
+    Ok(out)
+}
+
+/// Reads an `ivecs` file (the SIFT ground truth): `i32` dimension then `i32`s.
+fn read_ivecs(path: &str) -> infinity_common::Result<Vec<Vec<i32>>> {
+    let bytes = std::fs::read(path).map_err(|e| infinity_common::Error::Io {
+        path: PathBuf::from(path),
+        source: e,
+    })?;
+    let mut out = Vec::new();
+    let mut at = 0usize;
+    while at + 4 <= bytes.len() {
+        let dim = i32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
+        at += 4;
+        if at + 4 * dim > bytes.len() {
+            break;
+        }
+        let mut row = Vec::with_capacity(dim);
+        for i in 0..dim {
+            row.push(i32::from_le_bytes(
+                bytes[at + 4 * i..at + 4 * i + 4].try_into().unwrap(),
+            ));
+        }
+        at += 4 * dim;
+        out.push(row);
+    }
+    Ok(out)
+}
+
 /// Parses a duration like `1s`, `500ms`, `1.5s` or `0s` into whole seconds.
 fn parse_interval_secs(text: &str) -> u64 {
     let t = text.trim();
@@ -377,7 +442,11 @@ fn run(args: &[String]) -> infinity_common::Result<()> {
             for r in e.execute(&sql)? {
                 print_result(&r);
             }
+            let t_flush = Instant::now();
             e.flush()?;
+            if std::env::var_os("INFINITY_PROFILE_IMPORT").is_some() {
+                eprintln!("flush profile: {:?}", t_flush.elapsed());
+            }
             Ok(())
         }
         "serve" => {
@@ -429,6 +498,76 @@ fn run(args: &[String]) -> infinity_common::Result<()> {
             // `tools/ci_tools/check_benchmark_result.py` (Gate E).
             println!("Total cost : {:.6} s", ins.as_secs_f64());
             println!("Total cost : {:.6} s", sel.as_secs_f64());
+            Ok(())
+        }
+        // `infinity knn-bench <dir> <query.fvecs> <groundtruth.ivecs> <ef> [topk]`:
+        // the query half of the CI benchmark (`knn_query_benchmark`), run in
+        // process so the numbers are the engine's and not the wire's.
+        "knn-bench" => {
+            let query_path = args
+                .get(2)
+                .cloned()
+                .unwrap_or_else(|| "sift_query.fvecs".into());
+            let truth_path = args.get(3).cloned().unwrap_or_default();
+            let ef: u64 = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(200);
+            let topk: usize = args.get(5).and_then(|s| s.parse().ok()).unwrap_or(100);
+            let table = "sift";
+            let queries = read_fvecs(&query_path)?;
+            let truth = if truth_path.is_empty() {
+                Vec::new()
+            } else {
+                read_ivecs(&truth_path)?
+            };
+            let e = Engine::open(&dir)?;
+            // `knn_query_benchmark` runs two warm-up loops before it times.
+            let mut warm = queries.iter().take(5);
+            while let Some(q) = warm.next() {
+                let _ = e.execute(&knn_sql(table, q, topk, ef))?;
+            }
+            let mut latencies = Vec::with_capacity(queries.len());
+            let mut hits = 0usize;
+            let mut total = 0usize;
+            for (qi, q) in queries.iter().enumerate() {
+                let t0 = Instant::now();
+                let out = e.execute(&knn_sql(table, q, topk, ef))?;
+                latencies.push(t0.elapsed().as_secs_f64());
+                if let Some(want) = truth.get(qi) {
+                    let mut got: Vec<u64> = Vec::new();
+                    if let Some(QueryResult::Rows { rows, .. }) = out.first() {
+                        for row in rows {
+                            if let Some(v) = row.first() {
+                                if let Ok(id) = v.parse::<u64>() {
+                                    got.push(id);
+                                }
+                            }
+                        }
+                    }
+                    let want: std::collections::HashSet<u64> =
+                        want.iter().map(|id| *id as u64).collect();
+                    hits += got.iter().filter(|id| want.contains(id)).count();
+                    total += want.len();
+                }
+            }
+            let mut sorted = latencies.clone();
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let sum: f64 = latencies.iter().sum();
+            let recall = if total > 0 {
+                hits as f64 / total as f64
+            } else {
+                0.0
+            };
+            println!(
+                "knn-bench: {} queries, topk {topk}, ef {ef}",
+                queries.len()
+            );
+            println!("Total cost : {sum:.6} s");
+            println!("qps: {:.2}", queries.len() as f64 / sum);
+            println!("lat p50: {:.3} ms", sorted[sorted.len() / 2] * 1000.0);
+            println!(
+                "lat p95: {:.3} ms",
+                sorted[(sorted.len() as f64 * 0.95) as usize] * 1000.0
+            );
+            println!("recall@{topk}: {recall:.4}");
             Ok(())
         }
         "import-csv" => {

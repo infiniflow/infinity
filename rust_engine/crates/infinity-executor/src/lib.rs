@@ -16022,10 +16022,12 @@ impl Engine {
         let resolved = resolve_data_path(path);
         // Read raw bytes: `FORMAT FVECS` is binary, everything else is text.
         // Missing fixtures stay a statement-level success with no rows.
+        let t_read0 = std::time::Instant::now();
         let bytes_in = match std::fs::read(&resolved) {
             Ok(b) => b,
             Err(_) => return Ok(QueryResult::Inserted { count: 0 }),
         };
+        let t_read = t_read0.elapsed();
         // `FORMAT FVECS` is a binary vector file: `i32 dim` then `dim` f32s per
         // record. It can only target a table whose single column is the vector.
         if opts
@@ -16039,6 +16041,8 @@ impl Engine {
                     types.len()
                 )));
             }
+            let profile = std::env::var_os("INFINITY_PROFILE_IMPORT").is_some();
+            let t0 = std::time::Instant::now();
             let mut rows: Vec<Vec<Literal>> = Vec::new();
             let bytes = bytes_in.as_slice();
             let mut pos = 0usize;
@@ -16065,6 +16069,8 @@ impl Engine {
                     "import: malformed fvecs file (trailing bytes)".into(),
                 ));
             }
+            let t_parse = t0.elapsed();
+            let t1 = std::time::Instant::now();
             let base = self.reserve_rows_from(table, rows.len(), true, true)?;
             self.note_index_insert(table, rows.len());
             let mut t = self.txn.begin();
@@ -16073,10 +16079,27 @@ impl Engine {
                 t.put(row_key(table, base + k), encoded.into_bytes());
             }
             t.set_typed_commands(vec![self.import_command(table, (base >> 32) as u32)?]);
+            let t_encode = t1.elapsed();
+            let t2 = std::time::Instant::now();
             let ts = self.txn.commit_deferred(t)?;
+            let t_commit = t2.elapsed();
+            let t3 = std::time::Instant::now();
             let _visible = BottomGuard::new(&self.txn, ts);
             self.settle_append_ts(table, 1, ts);
             self.note_import_ts(table, (base >> 32) as u32, ts);
+            drop(_visible);
+            let t_bottom = t3.elapsed();
+            if profile {
+                eprintln!(
+                    "import profile: rows={} read={:?} parse={:?} encode={:?} commit={:?} bottom={:?}",
+                    rows.len(),
+                    t_read,
+                    t_parse,
+                    t_encode,
+                    t_commit,
+                    t_bottom
+                );
+            }
             return Ok(QueryResult::Inserted { count: rows.len() });
         }
         let delim = opts
