@@ -6,6 +6,8 @@
 //!   * `INFINITY_BIND`    — Thrift listen address (default `0.0.0.0:23817`)
 //!   * `INFINITY_HTTP_BIND` — HTTP listen address (default `0.0.0.0:23820`)
 
+#![forbid(unsafe_code)]
+
 use std::sync::Arc;
 
 use infinity_executor::Engine;
