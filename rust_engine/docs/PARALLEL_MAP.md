@@ -75,9 +75,9 @@
 | | |
 |---|---|
 | 参考 | **一个** `PeriodicTriggerThread` 管四个触发器 |
-| 端口 | `trigger_loop` 只跑 cleanup/compact/optimize（`start_background_tasks`）；checkpoint 与 flush 由 CLI 两个线程按 `checkpoint_interval` 驱动 |
-| 状态 | `different`（`GAPS.md` §5） |
-| 证据 | `compact_replay_ut`、`cleanup_ut` |
+| 端口 | 同：`trigger_loop` 一个线程跑四个触发器（checkpoint 到点做 `checkpoint_wal` + `flush`；`start_background_tasks(checkpoint, cleanup, compact, optimize)`）。CLI 另有一个只做 `trim_allocator` 的线程（`malloc_trim` 只能在 CLI 调，不参与调度） |
+| 状态 | `aligned` |
+| 证据 | `bg_task_ut`、`compact_replay_ut`、`cleanup_ut` |
 
 ### 1.5 WAL 写入与轮换
 

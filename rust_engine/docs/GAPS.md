@@ -74,7 +74,6 @@ SMVE 已经闭口：`test_the_smve_chunk_matches_byte_for_byte`（500 行 `TENSO
 | 并行结构：无 `TxnAllocator` 线程 | 参考用单线程分配器发出行号/段号；端口在事务内直接分配 | `PARALLEL_MAP.md` §1 |
 | 并行结构：没有块级锁 | 参考每块一把 `BlockLock`（`shared_mutex`），不同表可同时写；端口写批次在 `batch_lock` 下落块镜像、checkpoint 在 `flush_lock` 下整表重写，表元数据共用 `tables` 一把互斥——并行度低于参考，字节与结果不受影响 | `PARALLEL_MAP.md` §3 |
 | 并行结构：无独立 WAL 写线程 | 参考由 `new_wait_flush_` + `NewFlush` 线程按提交顺序写帧；端口在 `commit_lock` 下直接 `wal.append`（顺序相同，线程不同） | `PARALLEL_MAP.md` §1 |
-| 并行结构：周期触发分成三段 | 参考一个 `PeriodicTriggerThread` 跑 checkpoint/compact/optimize/cleanup 四个触发器；端口 `trigger_loop` 跑后三个，checkpoint 与 flush 各一个 CLI 线程 | `PARALLEL_MAP.md` §1 |
 | 并行结构：交换队列容量 | 参考的 `LocalQueue` 容量由实现决定；端口每 tasklet 一条有界通道，容量固定 2 个 chunk | `PARALLEL_MAP.md` §4 |
 | `standard-porter` | 用 Porter2（`rust_stemmers::English`），少数词干与参考的 `STEM_LANG_PORT` 不同；其余 17 种语言同族一致 | `CLASS_MAP.md`「有意的设计变更」 |
 
