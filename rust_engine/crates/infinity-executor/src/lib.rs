@@ -5111,6 +5111,13 @@ struct StagedDump {
 /// from a rolled-back append).
 pub struct EngineTxn<'a> {
     engine: &'a Engine,
+    /// The same engine, when it lives in an `Arc` (`Engine::open` records a
+    /// `Weak` of itself): the bottom half can then be handed to a worker
+    /// thread with an owned handle instead of a borrow, as the reference's
+    /// `BottomExecutor` does. `None` for an engine built outside an `Arc`, and
+    /// the bottom half runs on the caller's thread.
+    #[allow(dead_code)] // read once the bottom half is dispatched to a worker
+    handle: Option<Arc<Engine>>,
     txn: Option<Txn>,
     /// `(table, first row id, encoded rows, literal rows)` per append.
     appends: Vec<StagedAppend>,
@@ -7638,6 +7645,14 @@ impl Engine {
 
     /// Drops the decoded-row cache; every mutation that rewrites or removes
     /// rows calls it before the next scan.
+    /// The engine as an owned handle, when it lives in an `Arc`.
+    ///
+    /// `Weak::upgrade` fails for an engine created without an `Arc`; callers
+    /// then fall back to running the work on their own thread.
+    pub fn engine_handle(&self) -> Option<Arc<Engine>> {
+        self.self_weak.lock().unwrap().upgrade()
+    }
+
     /// The gate a transaction's bottom half holds for `table`.
     ///
     /// `BottomExecutor` gives the reference the same shape with a thread pool
@@ -8439,6 +8454,7 @@ impl Engine {
     pub fn begin_txn(&self) -> EngineTxn<'_> {
         EngineTxn {
             engine: self,
+            handle: self.engine_handle(),
             txn: Some(self.txn.begin()),
             appends: Vec::new(),
             deletes: Vec::new(),
