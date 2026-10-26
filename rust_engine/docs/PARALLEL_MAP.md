@@ -85,10 +85,10 @@
 
 | | |
 |---|---|
-| 参考 | 独立写线程 `new_flush_thread_`（`wal_manager_impl.cpp:89`、`NewFlush`） |
-| 端口 | 无独立写线程：`TxnManager::commit_at_deferred` 在 `commit_lock` 下直接 `wal.append`（顺序与参考相同）；轮换由 CLI 的 `checkpoint_wal` 线程调 `rotate_wal_if_large` |
-| 状态 | `different`（`GAPS.md` §5） |
-| 证据 | `test_cross_engine_bytes_40_wal.py`（帧与文件名逐字节相同） |
+| 参考 | 独立写线程 `new_flush_thread_`（`wal_manager_impl.cpp:89`、`NewFlush`），条目从 `new_wait_flush_` 取 |
+| 端口 | `WalWriter`：名为 `wal-writer` 的线程独占 `WalManager`，`append`/`flush`/`file_size`/`rotate` 各是一个作业，调用方入队后等回执；`swap_wal_file` 与 `rotate_wal_if_large` 把"看大小 + 轮换"合成一个作业 |
+| 状态 | `aligned` |
+| 证据 | `test_cross_engine_bytes_40_wal.py`（整份 `wal.log` 逐帧相同，3 passed）、`50_mutations`（8 passed）、`cargo test -p infinity-txn`（18） |
 
 ### 1.6 执行期 tasklet
 
