@@ -112,6 +112,28 @@
 
 ## 3 当前状态
 
+### 3.1 存储形态：行存为主，列式块是镜像
+
+这是当前实现与参考版**最大的结构性差异**，也是性能差距的根源：
+
+- **行的权威副本在 KV**：每条记录是 RocksDB 里一个 `row:<db>.<tbl>:<row_id>` 键，值是文本（向量是 `"[0.1,0.2,…]"`）。这条设计来自最早的原型（`71c5d044b`，PoC 阶段），当时看中的是"rowid → 行"一次查找、MVCC/索引/回放都简单。
+- **`data/` 下的列式块是事后补的镜像**：任务是"mirror every table into the C++ block layout"（`a3684524a`）。`write_cpp_blocks` 每次提交/checkpoint 都把整表重写一遍，所以目录与参考版逐字节一致、参考版能直接读——但它是**派生输出**，不是存储本体。
+
+代价（SIFT 1M × 128 维 `COPY ... FORMAT fvecs`，`INFINITY_PROFILE_IMPORT=1`）：
+
+| 阶段 | 耗时 | 说明 |
+|---|---|---|
+| 读 493 MB fvecs | 0.18 s | — |
+| **f32 → 十进制文本** | **10.88 s** | 128M 次 `format!`，参考版不存在这一步（它写列式二进制） |
+| 编码存储行 | 0.53 s | 又一次文本拼接/解析 |
+| 提交（WAL + 1M KV 写） | 1.60 s | — |
+| 关闭 flush | 4.49 s | 500 MB 文本落 RocksDB |
+
+参考版同一份数据是 2.14 s。也就是说 83% 的 import 时间花在"把浮点转成字符串"，而这个开销完全来自"行存"这个实现选择，不是引擎/并发/IO。
+
+**对齐方向（未实现）**：让列式块成为存储本体——import 直接把 fvecs 的二进制编成块列，扫描/索引/删除读块，`row:` 键退场。WAL 侧已经有 `AppendV2` 的 typed `DataBlock` 编码可以直接复用。
+
+
 | 维度 | 状态 | 验证 |
 |---|---|---|
 | 磁盘格式（`data/`、`catalog/`、`wal/`） | 块列、`version`、索引 chunk、catalog 键值、WAL 帧（含 `txn_id` 与 CRC）与参考逐字节相同 | `python/restart_test/test_cross_engine_bytes_*.py`（按层分文件，见 `FORMAT_EQUIVALENCE_TESTS.md` §3） |
