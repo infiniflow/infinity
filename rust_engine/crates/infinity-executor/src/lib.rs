@@ -5621,31 +5621,50 @@ fn fragment_text(lines: Vec<String>) -> Vec<String> {
     {
         return lines;
     }
-    let parallel = lines
+    // `FragmentBuilder`: a table scan is a parallel stream, a blocking operator
+    // above it turns the fragment into a parallel materialize, and a plan with
+    // no scan at all (VALUES, a bare projection) materialises serially.
+    let has_scan = lines
         .iter()
         .any(|line| line.to_ascii_uppercase().contains("SCAN"));
-    let fragment_type = if parallel {
-        "ParallelStream"
-    } else {
-        "SerialMaterialize"
+    let blocking = lines.iter().any(|line| {
+        let line = line.trim_start();
+        line.starts_with("-> TOP") || line.starts_with("-> AGGREGATE") || line.starts_with("-> SORT")
+    });
+    let fragment_type = match (has_scan, blocking) {
+        (false, _) => "SerialMaterialize",
+        (true, true) => "ParallelMaterialize",
+        (true, false) => "ParallelStream",
     };
-    // Node ids in these renderings are the planner's; the sink is one more than
-    // the largest the plan used.
-    let mut next_id = 0u64;
+    // Node ids in these renderings are the planner's. `FragmentBuilder` takes
+    // the sink three ids past the last operator and the source one past the
+    // sink (`test/sql/explain` pins the same offsets: ops up to 4, sink 7,
+    // source 8).
+    let mut last_id = 0u64;
     for line in &lines {
         if let Some(start) = line.find('(') {
             if let Some(end) = line[start..].find(')') {
                 if let Ok(id) = line[start + 1..start + end].parse::<u64>() {
-                    next_id = next_id.max(id + 1);
+                    last_id = last_id.max(id);
                 }
             }
         }
     }
+    let sink = last_id + 3;
+    let source = sink + 1;
     let mut out = Vec::with_capacity(lines.len() + 3);
     out.push(format!("FRAGMENT (1, {fragment_type})"));
-    out.push(format!("-> SINK ({next_id}) Result"));
-    out.extend(lines);
-    out.push(String::new());
+    out.push(format!("-> SINK ({sink}) Result"));
+    for (i, line) in lines.into_iter().enumerate() {
+        // The physical rendering indents its root operator; in a fragment every
+        // operator hangs off the sink, so the root gets an arrow too.
+        if i == 0 && line.starts_with(' ') && !line.starts_with("->") {
+            out.push(format!("->{}", line));
+        } else {
+            out.push(line);
+        }
+    }
+    out.push(format!("-> SOURCE ({source}) Table"));
     out
 }
 
@@ -10225,6 +10244,32 @@ impl Engine {
                         } if join.is_none()
                             && search.is_none()
                             && crate::explain::has_aggregate(items)
+                            && !group_by.is_empty()
+                            // A `DISTINCT` aggregate keeps the two stacked
+                            // aggregates (`MERGE HASH AGGREGATE` over `HASH
+                            // AGGREGATE`), which `explain_distinct_agg` prints.
+                            && !crate::explain::has_distinct_aggregate(items) =>
+                        {
+                            Some(crate::explain::explain_group_agg(
+                                &crate::explain::HashAggPlan {
+                                    items,
+                                    table: t,
+                                    group_by,
+                                    order_by,
+                                },
+                            ))
+                        }
+                        Statement::Select {
+                            items,
+                            from: Some(t),
+                            join,
+                            group_by,
+                            order_by,
+                            search,
+                            ..
+                        } if join.is_none()
+                            && search.is_none()
+                            && crate::explain::has_aggregate(items)
                             && crate::explain::aggregates_renderable(items) =>
                         {
                             Some(crate::explain::explain_hash_agg(
@@ -10316,6 +10361,7 @@ impl Engine {
                                     distinct: *distinct,
                                     schema,
                                     logical,
+                                    limit: *limit,
                                 })
                             }))
                         }
@@ -21093,9 +21139,8 @@ mod tests {
         );
     }
 
-    /// `EXPLAIN FRAGMENT` on a plain plan prints the fragment envelope around
-    /// the physical plan: title, sink, then the operators and the source
-    /// (`ExplainFragment::Explain`), not just the physical text again.
+    /// `EXPLAIN FRAGMENT` prints the fragment envelope the reference prints:
+    /// title, sink, every operator (the root gets an arrow), then the source.
     #[test]
     fn explain_fragment_wraps_a_plain_plan() {
         let dir = tempdir().unwrap();
@@ -21106,9 +21151,34 @@ mod tests {
         let fragment = rows(&e, "EXPLAIN FRAGMENT SELECT a FROM ef WHERE b = 1;");
         assert_eq!(fragment[0], vec!["FRAGMENT (1, ParallelStream)".to_string()]);
         assert!(fragment[1][0].starts_with("-> SINK ("), "{:?}", fragment[1]);
-        // The plan itself follows the envelope, unchanged.
-        assert_eq!(&fragment[2..fragment.len() - 1], physical.as_slice());
-        assert_eq!(fragment.last().unwrap()[0], "");
+        // The plan follows the envelope: the root operator gains an arrow, the
+        // rest is the physical text.
+        assert_eq!(fragment[2][0], format!("->{}", physical[0][0]));
+        assert_eq!(&fragment[3..fragment.len() - 1], &physical[1..]);
+        assert!(fragment.last().unwrap()[0].starts_with("-> SOURCE ("));
+    }
+
+    /// A blocking operator turns the fragment into a parallel materialize, as
+    /// `FragmentBuilder` does for `TOP`/`AGGREGATE`.
+    #[test]
+    fn explain_fragment_type_follows_the_blocking_operator() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE eft (a INT, b INT);").unwrap();
+        for (sql, want) in [
+            ("EXPLAIN FRAGMENT SELECT a FROM eft;", "ParallelStream"),
+            (
+                "EXPLAIN FRAGMENT SELECT a FROM eft ORDER BY a LIMIT 3;",
+                "ParallelMaterialize",
+            ),
+            (
+                "EXPLAIN FRAGMENT SELECT count(*) FROM eft;",
+                "ParallelMaterialize",
+            ),
+        ] {
+            let out = rows(&e, sql);
+            assert_eq!(out[0], vec![format!("FRAGMENT (1, {want})")], "{sql}");
+        }
     }
 
     /// Splitting the row-wise prefix into tasklets must not cost the early stop

@@ -40,6 +40,8 @@ pub struct SelectPlan<'a> {
     pub schema: &'a [String],
     /// `EXPLAIN LOGICAL`: enables the logical-plan arithmetic cast rule.
     pub logical: bool,
+    /// `LIMIT n`: `ORDER BY … LIMIT n` is planned as a physical `TOP`.
+    pub limit: Option<u64>,
 }
 
 /// The node header line: `PROJECT (3)` at the root, `   -> SORT (4)` below it.
@@ -287,6 +289,14 @@ pub(crate) fn render_pred_m(p: &Predicate, ids: &HashMap<String, usize>, logical
 }
 
 /// True when any select item is an aggregate (those plans are not handled here).
+/// True when some aggregate is `DISTINCT`: those keep the stacked
+/// `MERGE HASH AGGREGATE` plan.
+pub fn has_distinct_aggregate(items: &[SelectItem]) -> bool {
+    items
+        .iter()
+        .any(|it| matches!(it, SelectItem::Aggregate(a) if a.distinct))
+}
+
 pub fn has_aggregate(items: &[SelectItem]) -> bool {
     items
         .iter()
@@ -497,6 +507,138 @@ pub struct HashAggPlan<'a> {
     pub table: &'a str,
     pub group_by: &'a [ExprAst],
     pub order_by: &'a [OrderKey],
+}
+
+/// The physical `EXPLAIN` text for `SELECT <keys>, <aggs> FROM t GROUP BY keys
+/// [ORDER BY …]`: one `AGGREGATE` node, optionally under a `SORT`
+/// (`test/sql/explain` pins the ids: `AGGREGATE (3)`, `SORT (4)`,
+/// `PROJECT (5)`).
+pub fn explain_group_agg(p: &HashAggPlan) -> Vec<String> {
+    let alias = p.table.split('.').next_back().unwrap_or(p.table);
+    let db = p
+        .table
+        .split_once('.')
+        .map(|(d, _)| d)
+        .unwrap_or("default_db");
+    let keys: Vec<String> = p
+        .group_by
+        .iter()
+        .filter_map(|e| match e {
+            ExprAst::Column(c) => Some(c.clone()),
+            _ => None,
+        })
+        .collect();
+    // Ids follow the reference: group keys first, then the projected columns,
+    // then the synthetic `__rowid` the aggregate counts.
+    let mut ids: HashMap<String, usize> = HashMap::new();
+    for c in &keys {
+        if !ids.contains_key(c) {
+            ids.insert(c.clone(), ids.len());
+        }
+    }
+    for it in p.items {
+        if let SelectItem::Column(c) = it {
+            if !ids.contains_key(c) {
+                ids.insert(c.clone(), ids.len());
+            }
+        }
+    }
+    if !ids.contains_key("__rowid") {
+        ids.insert("__rowid".to_string(), ids.len());
+    }
+    let anno = |c: &str| match ids.get(c) {
+        Some(i) => format!("{c} (#{i})"),
+        None => c.to_string(),
+    };
+    let rowid = anno("__rowid");
+
+    let has_sort = !p.order_by.is_empty();
+    let project_id = if has_sort { 5 } else { 4 };
+    let mut lines = Vec::new();
+    lines.push(header(0, "PROJECT", project_id));
+    lines.push(attr(0, "table index: #4"));
+    let exprs: Vec<String> = p
+        .items
+        .iter()
+        .filter_map(|it| match it {
+            SelectItem::Column(c) => Some(anno(c)),
+            SelectItem::Aggregate(a) if a.args.is_empty() => {
+                let id = ids.get("__rowid").copied().unwrap_or(0);
+                Some(format!("count(star) (#{id})"))
+            }
+            SelectItem::Aggregate(a) => {
+                let id = ids.get(&a.args[0]).copied().unwrap_or(0);
+                if a.distinct {
+                    Some(format!("{}(DISTINCT {}) (#{id})", a.func.as_str(), a.args[0]))
+                } else {
+                    Some(format!("{}({}) (#{id})", a.func.as_str(), a.args[0]))
+                }
+            }
+            _ => None,
+        })
+        .collect();
+    lines.push(attr(0, &format!("expressions: [{}]", exprs.join(", "))));
+
+    // The aggregate list as `AGGREGATE` prints it.
+    let agg_txt: Vec<String> = p
+        .items
+        .iter()
+        .filter_map(|it| match it {
+            SelectItem::Aggregate(a) => {
+                let arg = if a.args.is_empty() {
+                    rowid.clone()
+                } else {
+                    anno(&a.args[0])
+                };
+                Some(format!("{}({})", func_label(a.func), arg))
+            }
+            _ => None,
+        })
+        .collect();
+
+    if has_sort {
+        lines.push(header(1, "SORT", 4));
+        let skeys: Vec<String> = p
+            .order_by
+            .iter()
+            .map(|k| format!("{} {}", anno(&k.column), if k.asc { "ASC" } else { "DESC" }))
+            .collect();
+        lines.push(attr(1, &format!("expressions: [{}]", skeys.join(", "))));
+        let mut out = keys.clone();
+        for it in p.items {
+            if let SelectItem::Aggregate(a) = it {
+                let arg = if a.args.is_empty() {
+                    "__rowid".to_string()
+                } else {
+                    a.args[0].clone()
+                };
+                out.push(format!("{}({})", func_label(a.func), arg));
+            }
+        }
+        lines.push(attr(1, &format!("output columns: [{}]", out.join(", "))));
+    }
+
+    let agg_d = if has_sort { 2 } else { 1 };
+    lines.push(header(agg_d, "AGGREGATE", 3));
+    lines.push(attr(agg_d, "aggregate table index: #3"));
+    lines.push(attr(agg_d, &format!("aggregate: [{}]", agg_txt.join(", "))));
+    if !keys.is_empty() {
+        lines.push(attr(agg_d, "group by table index: #2"));
+        let kt: Vec<String> = keys.iter().map(|k| anno(k)).collect();
+        lines.push(attr(agg_d, &format!("group by: [{}]", kt.join(", "))));
+    }
+
+    let scan_d = if has_sort { 3 } else { 2 };
+    lines.push(header(scan_d, "TABLE SCAN", 2));
+    lines.push(attr(scan_d, &format!("table name: {alias}({db}.{alias})")));
+    lines.push(attr(scan_d, "table index: #1"));
+    let mut scan_out = keys.clone();
+    add_col(&mut scan_out, "__rowid");
+    lines.push(attr(
+        scan_d,
+        &format!("output_columns: [{}]", scan_out.join(", ")),
+    ));
+    lines
 }
 
 pub fn explain_hash_agg(p: &HashAggPlan) -> Vec<String> {
@@ -731,7 +873,9 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
         ops.push("AGGREGATE");
     }
     if has_sort {
-        ops.push("SORT");
+        // `ORDER BY … LIMIT n` is planned as a physical `TOP`, which also
+        // carries the limit budget.
+        ops.push(if p.limit.is_some() { "TOP" } else { "SORT" });
     }
     ops.push("PROJECT");
     let node_id = |i: usize| 2 + i as u64;
@@ -772,7 +916,8 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
         let d = depth_of(i);
         lines.push(header(d, op, node_id(i)));
         match *op {
-            "SORT" => {
+            "SORT" | "TOP" => {
+                let top = *op == "TOP";
                 let keys: Vec<String> = p
                     .order_by
                     .iter()
@@ -795,7 +940,11 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
                         format!("{col} {}", if k.asc { "ASC" } else { "DESC" })
                     })
                     .collect();
-                lines.push(attr(d, &format!("expressions: [{}]", keys.join(", "))));
+                let label = if top { "sort expressions" } else { "expressions" };
+                lines.push(attr(d, &format!("{label}: [{}]", keys.join(", "))));
+                if top {
+                    lines.push(attr(d, &format!("limit: {}", p.limit.unwrap_or(0))));
+                }
                 let mut out = scan_out.clone();
                 for c in &sort_cols {
                     add_col(&mut out, c);
@@ -1567,7 +1716,8 @@ pub fn explain_count_star(table: &str, where_pred: Option<&Predicate>, multi: bo
         lines.push(header(1, "Merge aggregate", 7));
         lines.push(attr(1, "output columns: [COUNT(__rowid)]"));
     }
-    lines.push(header(1, "AGGREGATE", 4));
+    // `AGGREGATE` is the node below the projection, so its id is one less.
+    lines.push(header(1, "AGGREGATE", project_id - 1));
     lines.push(attr(1, "aggregate table index: #3"));
     lines.push(attr(
         1,
