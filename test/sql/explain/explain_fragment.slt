@@ -1,0 +1,231 @@
+# name: test/sql/explain/explain_fragment.slt
+# description: EXPLAIN FRAGMENT / physical plans, pinned to the reference output
+# group: [explain]
+
+statement ok
+CREATE TABLE t (a INT, b VARCHAR, c INT);
+
+statement ok
+INSERT INTO t VALUES (1,'x',10),(2,'y',20),(3,'x',30);
+
+query I
+explain SELECT * FROM t;
+----
+PROJECT (3)
+ - table index: #4
+ - expressions: [a (#0), b (#1), c (#2)]
+-> TABLE SCAN (2)
+   - table name: t(default_db.t)
+   - table index: #1
+   - output_columns: [a, b, c, __rowid]
+
+query I
+explain SELECT a FROM t WHERE b = 'x';
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [a (#1)]
+-> FILTER (3)
+   - filter: b (#0) = x
+   - output columns: [b, __rowid]
+  -> TABLE SCAN (2)
+     - table name: t(default_db.t)
+     - table index: #1
+     - output_columns: [b, __rowid]
+
+query I
+explain SELECT a FROM t ORDER BY a;
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [a (#0)]
+-> SORT (3)
+   - expressions: [a (#0) ASC]
+   - output columns: [a, __rowid]
+  -> TABLE SCAN (2)
+     - table name: t(default_db.t)
+     - table index: #1
+     - output_columns: [a, __rowid]
+
+query I
+explain SELECT a FROM t ORDER BY a LIMIT 3;
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [a (#0)]
+-> TOP (3)
+   - sort expressions: [a (#0) ASC]
+   - limit: 3
+   - output columns: [a, __rowid]
+  -> TABLE SCAN (2)
+     - table name: t(default_db.t)
+     - table index: #1
+     - output_columns: [a, __rowid]
+
+query I
+explain SELECT count(*) FROM t;
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [count(star) (#0)]
+-> AGGREGATE (3)
+   - aggregate table index: #3
+   - aggregate: [COUNT(__rowid (#0))]
+  -> TABLE SCAN (2)
+     - table name: t(default_db.t)
+     - table index: #1
+     - output_columns: [__rowid]
+
+query I
+explain SELECT count(*) FROM t WHERE a > 1;
+----
+PROJECT (5)
+ - table index: #4
+ - expressions: [count(star) (#0)]
+-> AGGREGATE (4)
+   - aggregate table index: #3
+   - aggregate: [COUNT(__rowid (#1))]
+  -> FILTER (3)
+     - filter: CAST(a (#0) AS BigInt) > 1
+     - output columns: [a, __rowid]
+    -> TABLE SCAN (2)
+       - table name: t(default_db.t)
+       - table index: #1
+       - output_columns: [a, __rowid]
+
+query I
+explain SELECT b, count(*) FROM t GROUP BY b;
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [b (#0), count(star) (#1)]
+-> AGGREGATE (3)
+   - aggregate table index: #3
+   - aggregate: [COUNT(__rowid (#1))]
+   - group by table index: #2
+   - group by: [b (#0)]
+  -> TABLE SCAN (2)
+     - table name: t(default_db.t)
+     - table index: #1
+     - output_columns: [b, __rowid]
+
+query I
+explain SELECT DISTINCT b FROM t;
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [b (#0)]
+-> AGGREGATE (3)
+   - aggregate table index: #5
+   - aggregate: []
+   - group by table index: #5
+   - group by: [b (#0)]
+  -> TABLE SCAN (2)
+     - table name: t(default_db.t)
+     - table index: #1
+     - output_columns: [b, __rowid]
+
+query I
+explain fragment SELECT * FROM t;
+----
+FRAGMENT (1, ParallelStream)
+-> SINK (6) Result
+-> PROJECT (3)
+   - table index: #4
+   - expressions: [a (#0), b (#1), c (#2)]
+-> TABLE SCAN (2)
+   - table name: t(default_db.t)
+   - table index: #1
+   - output_columns: [a, b, c, __rowid]
+-> SOURCE (7) Table
+
+query I
+explain fragment SELECT a FROM t WHERE b = 'x';
+----
+FRAGMENT (1, ParallelStream)
+-> SINK (7) Result
+-> PROJECT (4)
+   - table index: #4
+   - expressions: [a (#1)]
+-> FILTER (3)
+   - filter: b (#0) = x
+   - output columns: [b, __rowid]
+-> TABLE SCAN (2)
+   - table name: t(default_db.t)
+   - table index: #1
+   - output_columns: [b, __rowid]
+-> SOURCE (8) Table
+
+query I
+explain fragment SELECT a FROM t ORDER BY a LIMIT 3;
+----
+FRAGMENT (1, ParallelMaterialize)
+-> SINK (7) Result
+-> PROJECT (4)
+   - table index: #4
+   - expressions: [a (#0)]
+-> TOP (3)
+   - sort expressions: [a (#0) ASC]
+   - limit: 3
+   - output columns: [a, __rowid]
+-> TABLE SCAN (2)
+   - table name: t(default_db.t)
+   - table index: #1
+   - output_columns: [a, __rowid]
+-> SOURCE (8) Table
+
+query I
+explain fragment SELECT count(*) FROM t;
+----
+FRAGMENT (1, ParallelMaterialize)
+-> SINK (7) Result
+-> PROJECT (4)
+   - table index: #4
+   - expressions: [count(star) (#0)]
+-> AGGREGATE (3)
+   - aggregate table index: #3
+   - aggregate: [COUNT(__rowid (#0))]
+-> TABLE SCAN (2)
+   - table name: t(default_db.t)
+   - table index: #1
+   - output_columns: [__rowid]
+-> SOURCE (8) Table
+
+query I
+explain fragment SELECT b, count(*) FROM t GROUP BY b;
+----
+FRAGMENT (1, ParallelMaterialize)
+-> SINK (7) Result
+-> PROJECT (4)
+   - table index: #4
+   - expressions: [b (#0), count(star) (#1)]
+-> AGGREGATE (3)
+   - aggregate table index: #3
+   - aggregate: [COUNT(__rowid (#1))]
+   - group by table index: #2
+   - group by: [b (#0)]
+-> TABLE SCAN (2)
+   - table name: t(default_db.t)
+   - table index: #1
+   - output_columns: [b, __rowid]
+-> SOURCE (8) Table
+
+query I
+explain fragment SELECT DISTINCT b FROM t;
+----
+FRAGMENT (1, ParallelMaterialize)
+-> SINK (7) Result
+-> PROJECT (4)
+   - table index: #4
+   - expressions: [b (#0)]
+-> AGGREGATE (3)
+   - aggregate table index: #5
+   - aggregate: []
+   - group by table index: #5
+   - group by: [b (#0)]
+-> TABLE SCAN (2)
+   - table name: t(default_db.t)
+   - table index: #1
+   - output_columns: [b, __rowid]
+-> SOURCE (8) Table
+
