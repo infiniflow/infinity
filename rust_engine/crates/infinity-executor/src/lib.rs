@@ -17735,6 +17735,7 @@ impl Engine {
     /// merged. `Duration::ZERO` disables a trigger.
     pub fn start_background_tasks(
         self: &Arc<Self>,
+        checkpoint_interval: std::time::Duration,
         cleanup_interval: std::time::Duration,
         compact_interval: std::time::Duration,
         optimize_interval: std::time::Duration,
@@ -17761,6 +17762,7 @@ impl Engine {
             .spawn(move || {
                 trigger_loop(
                     engine,
+                    checkpoint_interval,
                     cleanup_interval,
                     compact_interval,
                     optimize_interval,
@@ -20511,11 +20513,13 @@ impl BgTask for OptimizeTask {
 /// engine alive through a strong handle.
 fn trigger_loop(
     engine: std::sync::Weak<Engine>,
+    checkpoint_interval: std::time::Duration,
     cleanup_interval: std::time::Duration,
     compact_interval: std::time::Duration,
     optimize_interval: std::time::Duration,
 ) {
     const TICK: std::time::Duration = std::time::Duration::from_secs(1);
+    let mut last_checkpoint = std::time::Instant::now();
     let mut last_cleanup = std::time::Instant::now();
     let mut last_compact = std::time::Instant::now();
     let mut last_optimize = std::time::Instant::now();
@@ -20524,6 +20528,14 @@ fn trigger_loop(
             let Some(engine) = engine.upgrade() else {
                 return;
             };
+            // `PeriodicTriggerThread::Run`: the checkpoint trigger lives on the
+            // same 1s tick as the other three; a checkpoint rotates the WAL and
+            // folds the memory blocks into the block mirror.
+            if !checkpoint_interval.is_zero() && last_checkpoint.elapsed() >= checkpoint_interval {
+                last_checkpoint = std::time::Instant::now();
+                engine.checkpoint_wal();
+                let _ = engine.flush();
+            }
             if !optimize_interval.is_zero() && last_optimize.elapsed() >= optimize_interval {
                 last_optimize = std::time::Instant::now();
                 engine.submit_optimize_indexes();

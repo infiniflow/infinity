@@ -183,28 +183,16 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     // is what dumps the memory blocks into the on-disk C++ layout.
     let secs = parse_interval_secs(&toml_value(&text, "checkpoint_interval").unwrap_or_default());
     if secs > 0 {
-        // The WAL rotates on its own tick: a full checkpoint (which rewrites
-        // the C++-format mirror) can take minutes on a large table, and must not
-        // leave the log growing the whole time.
-        let weak = Arc::downgrade(&engine);
-        std::thread::spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_secs(secs.min(1)));
-            match weak.upgrade() {
-                Some(e) => e.checkpoint_wal(),
-                None => break,
-            }
-        });
+        // The checkpoint itself (WAL rotation + block flush) runs on the
+        // engine's periodic trigger thread, next to cleanup/compact/optimize
+        // (`PeriodicTriggerThread`); only the page release below stays here,
+        // because `trim_allocator` is CLI-only (`infinity-executor` forbids
+        // unsafe code).
         let weak = Arc::downgrade(&engine);
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(secs));
             match weak.upgrade() {
-                Some(e) => {
-                    let _ = e.flush();
-                    // A dump frees large transient buffers (row batches, index
-                    // tails, a rebuilt HNSW graph); return those pages to the OS
-                    // so RSS tracks live data on long imports (Gate C).
-                    trim_allocator();
-                }
+                Some(_) => trim_allocator(),
                 None => break,
             }
         });
@@ -221,6 +209,7 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     let compact = parse_interval_secs(&toml_value(&text, "compact_interval").unwrap_or_default());
     let optimize = parse_interval_secs(&toml_value(&text, "optimize_interval").unwrap_or_default());
     engine.start_background_tasks(
+        std::time::Duration::from_secs(secs),
         std::time::Duration::from_secs(cleanup),
         std::time::Duration::from_secs(compact),
         std::time::Duration::from_secs(optimize),

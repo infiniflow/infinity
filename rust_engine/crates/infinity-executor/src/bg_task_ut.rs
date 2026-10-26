@@ -136,6 +136,7 @@ fn start_background_tasks_sets_processor() {
         std::time::Duration::ZERO,
         std::time::Duration::ZERO,
         std::time::Duration::ZERO,
+        std::time::Duration::ZERO,
     );
     assert!(engine.submit_optimize_indexes(), "no processor attached");
     engine.drain_background_tasks();
