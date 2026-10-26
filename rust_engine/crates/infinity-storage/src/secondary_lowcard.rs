@@ -26,8 +26,6 @@
 //! first, so the portable image is CRoaring's post-run-optimisation encoding;
 //! the writer below reproduces that byte for byte.
 
-use memmap2::Mmap;
-use std::fs::File;
 use std::path::Path;
 
 use crate::cpp_format::FormatError;
@@ -324,17 +322,13 @@ pub fn write_lowcard_segment(path: &Path, entries: &[(u64, Vec<u32>)]) -> Result
 
 /// A low-cardinality chunk mapped read-only, keyed by the ordered key.
 pub struct LowCardReader {
-    map: Mmap,
+    map: Vec<u8>,
     count: usize,
 }
 
 impl LowCardReader {
-    #[allow(unsafe_code)]
     pub fn open(path: &Path) -> Result<Self, FormatError> {
-        let file =
-            File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
-        // SAFETY: read-only mapping of an immutable chunk file.
-        let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
+        let map = crate::cpp_format::read_index_file(path)?;
         if map.len() < 4 {
             return Err(FormatError::Truncated {
                 need: 4,

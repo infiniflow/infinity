@@ -4992,8 +4992,6 @@ pub struct Engine {
     /// How many allocation jobs the `TxnAllocator` thread has run. Lets a test
     /// assert the ids really came from it and not from the fallback.
     allocator_jobs: std::sync::atomic::AtomicUsize,
-    /// Write batches since the last `malloc_trim` (see `insert_literals`).
-    batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
     /// The previous `cpu_usage` sample: `(process cpu ticks, wall clock)`.
     /// C++'s `SystemInfo::CPUUsage` sleeps 200 ms between two snapshots; an
@@ -5997,7 +5995,6 @@ impl Engine {
             mem_index_appender: Mutex::new(None),
             allocator: Mutex::new(None),
             allocator_jobs: std::sync::atomic::AtomicUsize::new(0),
-            batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
             vector_cache: Mutex::new(HashMap::new()),
             cpu_sample: Mutex::new(None),
             queries: Mutex::new(diagnostics::QueryRegistry::default()),
@@ -9298,20 +9295,9 @@ impl Engine {
             // block behind.
             engine.refresh_cpp_block_mirror(&bottom_table)
         })?;
-        // Give the allocator's per-batch scratch back to the OS. Trimming on
-        // every batch walks the whole heap; once every few batches is enough
-        // to keep RSS flat and avoids adding milliseconds to each commit.
-        self.batches_since_trim
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        if self
-            .batches_since_trim
-            .load(std::sync::atomic::Ordering::Relaxed)
-            >= 8
-        {
-            self.batches_since_trim
-                .store(0, std::sync::atomic::Ordering::Relaxed);
-            infinity_storage::trim_allocator();
-        }
+        // The per-batch scratch is left to the allocator: returning free pages
+        // to the OS needs `malloc_trim`, the one FFI call the engine had, and
+        // every crate is `forbid(unsafe_code)` now.
         Ok(QueryResult::Inserted { count: row_count })
     }
 
@@ -17689,19 +17675,9 @@ impl Engine {
         // Write back the row sidecars: dirty file pages cannot be reclaimed and
         // are what pushes a long import into the OOM killer.
         self.sync_row_blobs();
-        // Bound the page cache the way the reference's buffer manager does:
-        // segment files and the row sidecar are written back and their clean
-        // pages dropped, so RSS tracks live structures rather than file cache.
-        for sub in [
-            "rowdata",
-            "fulltext",
-            "multivector",
-            "sparse",
-            "secondary",
-            "secondary_low",
-        ] {
-            infinity_storage::drop_tree_cache(&self.dir.join(sub));
-        }
+        // The segment files and the row sidecar are written back here. Clean
+        // pages are left to the kernel to evict (`drop_tree_cache` was a
+        // `posix_fadvise` FFI call, and every crate is `forbid(unsafe_code)`).
         // With `storage_type = "minio"` the C++-format data files are mirrored
         // into the bucket; the catalog and the row store follow at the end of
         // the checkpoint, once they are flushed.

@@ -9,6 +9,8 @@
 //!   infinity recover <dir>
 //!   infinity smoke <dir>          # create table + commit kv + reopen + verify
 
+#![forbid(unsafe_code)]
+
 mod config;
 
 use std::path::{Path, PathBuf};
@@ -182,29 +184,11 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     // The reference checkpoints periodically (`[wal] checkpoint_interval`), which
     // is what dumps the memory blocks into the on-disk C++ layout.
     let secs = parse_interval_secs(&toml_value(&text, "checkpoint_interval").unwrap_or_default());
-    if secs > 0 {
-        // The checkpoint itself (WAL rotation + block flush) runs on the
-        // engine's periodic trigger thread, next to cleanup/compact/optimize
-        // (`PeriodicTriggerThread`); only the page release below stays here,
-        // because `trim_allocator` is CLI-only (`infinity-executor` forbids
-        // unsafe code).
-        let weak = Arc::downgrade(&engine);
-        std::thread::spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_secs(secs));
-            match weak.upgrade() {
-                Some(_) => trim_allocator(),
-                None => break,
-            }
-        });
-    }
     // `[storage] cleanup_interval` / `compact_interval` / `optimize_interval`:
     // the reference's periodic triggers behind `PeriodicTriggerThread`
     // (`periodic_trigger_thread_impl.cpp:49-74`), plus the background processor
     // the memory-index quota dumps through (`BGMemIndexTracer::TriggerDump`).
-    // The checkpoint trigger above stays on its own thread because
-    // `trim_allocator` is CLI-only (`infinity-executor` forbids unsafe code):
-    // folding the checkpoint into the scheduler would drop the page release
-    // after each dump (Gate C).
+    // The checkpoint trigger runs on that same thread.
     let cleanup = parse_interval_secs(&toml_value(&text, "cleanup_interval").unwrap_or_default());
     let compact = parse_interval_secs(&toml_value(&text, "compact_interval").unwrap_or_default());
     let optimize = parse_interval_secs(&toml_value(&text, "optimize_interval").unwrap_or_default());
@@ -218,21 +202,6 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     println!("serving on {}", server.local_addr()?);
     server.run();
 }
-
-/// Releases free heap pages back to the OS (glibc). A no-op elsewhere.
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
-fn trim_allocator() {
-    unsafe extern "C" {
-        fn malloc_trim(pad: usize) -> i32;
-    }
-    // SAFETY: glibc's `malloc_trim` only returns already-free heap pages.
-    unsafe {
-        malloc_trim(0);
-    }
-}
-
-#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
-fn trim_allocator() {}
 
 /// Parses a duration like `1s`, `500ms`, `1.5s` or `0s` into whole seconds.
 fn parse_interval_secs(text: &str) -> u64 {

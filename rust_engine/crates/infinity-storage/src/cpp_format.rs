@@ -41,6 +41,19 @@ pub enum FormatError {
     Io(String),
 }
 
+/// Reads a sealed index file into memory.
+///
+/// The readers need the whole file (they binary-search fixed-width records over
+/// it). Every crate is `forbid(unsafe_code)`, and `memmap2`'s `map` is `unsafe`
+/// because the mapping can outlive the `File`, so the bytes are read into a
+/// `Vec` instead. A sealed segment never changes after it is written, so the
+/// copy is equivalent to a read-only mapping for every reader - at the cost of
+/// keeping the bytes in the heap rather than in the reclaimable page cache.
+pub fn read_index_file(path: &std::path::Path) -> Result<Vec<u8>, FormatError> {
+    std::fs::read(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
+}
+
+
 impl std::fmt::Display for FormatError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
