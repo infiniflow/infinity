@@ -25,9 +25,7 @@
 
 ## 2 未实现 / 未接线
 
-| 待办 | 参考的做法 | 端口现在 |
-|---|---|---|
-| 语句路径的"行与索引一起可见" | 下半部（`CommitBottom`：行 → 索引 → 块镜像）跑完才 `SetTxnCommitted`，`PostCommit` 再等全文追加的 sema（`new_txn_impl.cpp:2138-2141`、`4624-4660`）；读者要么看到行和索引，要么都看不到 | `EngineTxn` 那条路径已延后发布（`commit_deferred` → 索引 → `finish_bottom`）。`INSERT` 的行已经挪进下半部（先写 `row:`，再写索引与块镜像）；**`DELETE` 的 `del:` 墓碑仍写在提交批次里**，删除在发布前就生效；`IMPORT`/`dump` 的下半部同样排在提交之后。要完全对齐，删除墓碑也要挪进下半部（`Store` 的删除路径待接）。字节不受影响 |
+**当前为空。**
 
 **其余接线项当前为空。** 原先记在这里的两项——执行器的多 fragment/tasklet 与交换队列、事务下半部的
 `BottomExecutor` 与 `MemIndexAppender` 追加队列——已经按参考落地，逐条记录在

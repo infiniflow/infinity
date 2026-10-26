@@ -9276,9 +9276,8 @@ impl Engine {
         // the slots (`BlockVersion::Delete`) once the commit is durable: the
         // reference hides a deleted row through the block's `version` file, so
         // a directory whose version was not refreshed would show it again.
-        for seq in deletes {
-            txn.delete(del_key(table, *seq));
-        }
+        // The tombstones are written by the bottom half (see below): a delete
+        // must not hide a row before its commit is published.
         self.note_deletes(table, deletes);
         let ts = self.txn.commit_deferred(txn)?;
         let _visible = BottomGuard::new(&self.txn, ts);
@@ -9287,7 +9286,16 @@ impl Engine {
         let bottom_table = table.to_string();
         let shard_key = bottom_table.clone();
         let delete_count = deletes.len();
+        let bottom_deletes = deletes.to_vec();
         self.run_commit_bottom(&shard_key, move |engine| {
+            // `DeleteInBlock`: the tombstone keys land in the bottom half, so a
+            // reader keeps seeing the row until the commit publishes.
+            for seq in &bottom_deletes {
+                engine
+                    .storage
+                    .store
+                    .put(&del_key(&bottom_table, *seq), b"1")?;
+            }
             // An UPDATE stages its rewritten rows as an append in the same
             // transaction (`reserve_rows` already logged the create), so the
             // block's `version` has to record this ts for them as well

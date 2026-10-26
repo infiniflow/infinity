@@ -118,7 +118,7 @@
 |---|---|---|---|---|---|
 | 上半部等自己的下半部 | 提交线程把 txn 交给池后睡在 `commit_cv_`，被 `NotifyTopHalf` 唤醒才 `PostCommit`/`SetTxnCommitted` | `new_txn_impl.cpp:2138-2141` | `commit_deferred` → 底部工作 → `finish_bottom`；`run_commit_bottom` 用 condvar 等 worker | `aligned` | `infinity-txn` 单测、`a_commit_runs_its_bottom_half_on_the_bottom_executor` |
 | 按 commit_ts 顺序发布 | `bottom_txns_` 按 ts 排序，队首完成即推进 `current_ts_`；先做完的后序 txn 不越位 | `new_txn_manager_impl.cpp:410-457` | `register_bottom`/`finish_bottom` 屏障（冲突也走同一屏障，ts 空洞保留） | `aligned` | `infinity-txn` 的发布顺序用例 |
-| 行与索引一起可见 | 行落在块文件里、由下半部的 `AppendInBlock` 写，`SetTxnCommitted` 之后才可读 | `new_txn_impl.cpp:2138-2141`、`4624-4660` | `INSERT` 的行已挪进下半部（`row:` 写在下半部第一步，之后才是索引与块镜像）；**删除仍是 `del:` 墓碑写在提交批次里**，删除会在发布前生效 | `partial` | `GAPS.md` §2；`20_table` 字节门禁不受影响 |
+| 行与索引一起可见 | 行落在块文件里、由下半部的 `AppendInBlock` 写，`SetTxnCommitted` 之后才可读；删除的墓碑在 `DeleteInBlock`，也在下半部 | `new_txn_impl.cpp:2138-2141`、`4624-4660` | 同：`INSERT` 的 `row:` 与 `DELETE` 的 `del:` 都写在下半部（行 → 墓碑 → 索引 → 块镜像），发布由 `BottomGuard` 在最后触发 | `aligned` | 679 单测、`20_table`（5）与 `50_mutations`（8）字节门禁 |
 | dump 任务完成 | `StopProcessorTask::Wait()` 等已入队任务跑完 | `background_process_impl.cpp:46-53` | `BGTaskProcessor::drain()` | `aligned` | `bg_task_ut` |
 | 只读事务 | `GetReadCommitTS`：不写 WAL、不占写 ts | `new_txn_impl.cpp:2051-2059` | `TxnManager::commit` 的 read-only 分支 | `aligned` | `txn_ut` |
 
