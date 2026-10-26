@@ -5128,6 +5128,98 @@ pub struct EngineTxn<'a> {
     dumps: Vec<StagedDump>,
 }
 
+/// `NewTxn::CommitBottom` / `NewTxnManager::CommitBottom`: the bottom half of a
+/// write commit on its own, so it can run on a worker thread (the reference's
+/// `BottomExecutor`) instead of the committing one.
+///
+/// Rows go in first, index entries after, then the block mirror; the commit is
+/// published only once all of it is in place, so a reader never sees rows its
+/// index does not know about yet.
+fn run_bottom(
+    engine: &Engine,
+    appends: &[StagedAppend],
+    deletes: &[(String, usize)],
+    dumps: &[StagedDump],
+    txn: Txn,
+) -> Result<()> {
+    let mut deferred_ts: Option<u64> = None;
+    if !txn.is_empty() {
+        // The bottom half: rows first, index entries after (both are
+        // inside `CommitBottom` in the reference). The commit becomes
+        // visible only once the index entries are in place, so a reader
+        // never sees rows their index does not know about yet.
+        let ts = engine.txn.commit_deferred(txn)?;
+        deferred_ts = Some(ts);
+        // The block's `version` carries each append's and each delete's
+        // commit ts (`BlockVersion::Append` / `Delete`).
+        let mut append_counts: std::collections::BTreeMap<&str, usize> = Default::default();
+        for (table, ..) in appends {
+            *append_counts.entry(table.as_str()).or_default() += 1;
+        }
+        for (table, count) in append_counts {
+            engine.settle_append_ts(table, count, ts);
+        }
+        let mut delete_counts: std::collections::BTreeMap<&str, usize> = Default::default();
+        for (table, _) in deletes {
+            *delete_counts.entry(table.as_str()).or_default() += 1;
+        }
+        for (table, count) in delete_counts {
+            engine.settle_delete_ts(table, count, ts);
+        }
+    } else if !dumps.is_empty() {
+        // A dump is a write transaction of its own in the reference:
+        // `DumpIndexProcessor::DoDump` opens one with
+        // `BeginTxnShared(…, kDumpMemIndex)` and commits it, so it spends
+        // a commit ts whether or not the index had a tail to seal (the
+        // WAL keeps the `DumpIndex` entry). Spending it here is what keeps
+        // every later statement's ts where the reference has it.
+        let ts = engine.txn.reserve_commit_ts();
+        engine.txn.commit_at(txn, ts)?;
+    }
+    for (table, base, encoded, rows) in appends {
+        if engine.any_in_memory_index() || engine.has_index_declaration(table) {
+            for (k, row) in rows.iter().enumerate() {
+                engine.update_indexes_on_insert(table, base + k, row)?;
+                let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
+                engine.update_text_indexes(table, base + k, &texts);
+                engine.update_vector_caches(table, base + k, &texts);
+            }
+            engine.dump_hnsw_over_capacity(table);
+            engine.dump_secondary_over_capacity(table);
+        }
+        engine.bump_writes(table);
+        engine.note_live_rows(table, rows.len() as isize);
+        engine.append_row_cache(table, *base, encoded);
+    }
+    for (table, seq) in deletes {
+        engine.drop_text_index_rows(table, &[*seq]);
+        engine.drop_vector_cache_rows(table, &[*seq]);
+    }
+    // Keep the C++ block mirror current at commit, as the reference does
+    // (`AppendInBlock`), so a crash never leaves a block the catalog
+    // mentions without its files - the reference refuses to open such a
+    // directory.
+    let touched: std::collections::BTreeSet<&str> = appends
+        .iter()
+        .map(|(table, ..)| table.as_str())
+        .chain(deletes.iter().map(|(table, _)| table.as_str()))
+        .collect();
+    for table in touched {
+        engine.refresh_cpp_block_mirror(table)?;
+    }
+    // The catalog is still current: perform the sealed writes now.
+    for dump in dumps {
+        engine.dump_index(&dump.table, &dump.index)?;
+    }
+    // `NewTxnManager::CommitBottom`: publish. The clock advances in
+    // commit-ts order, so a transaction that took a smaller ts publishes
+    // first even if its bottom finished later.
+    if let Some(ts) = deferred_ts {
+        engine.txn.finish_bottom(ts);
+    }
+    Ok(())
+}
+
 impl<'a> EngineTxn<'a> {
     /// C++ `NewTxn::BeginTS`: the read timestamp this transaction sees.
     pub fn begin_ts(&self) -> u64 {
@@ -5255,9 +5347,6 @@ impl<'a> EngineTxn<'a> {
         // after the append must not publish it (`PhysicalInsert` checks the
         // same condition while executing the request).
         self.engine.ensure_writable()?;
-        // The commit ts of a deferred bottom half: the commit is published at
-        // the end, once rows, index entries and the block mirror are in place.
-        let mut deferred_ts: Option<u64> = None;
         let Some(txn) = self.txn.take() else {
             return Ok(());
         };
@@ -5332,82 +5421,7 @@ impl<'a> EngineTxn<'a> {
             .collect();
         let _gates: Vec<std::sync::MutexGuard<'_, ()>> =
             gates.iter().map(|gate| gate.lock().unwrap()).collect();
-        if !txn.is_empty() {
-            // The bottom half: rows first, index entries after (both are
-            // inside `CommitBottom` in the reference). The commit becomes
-            // visible only once the index entries are in place, so a reader
-            // never sees rows their index does not know about yet.
-            let ts = self.engine.txn.commit_deferred(txn)?;
-            deferred_ts = Some(ts);
-            // The block's `version` carries each append's and each delete's
-            // commit ts (`BlockVersion::Append` / `Delete`).
-            let mut append_counts: std::collections::BTreeMap<&str, usize> = Default::default();
-            for (table, ..) in &self.appends {
-                *append_counts.entry(table.as_str()).or_default() += 1;
-            }
-            for (table, count) in append_counts {
-                self.engine.settle_append_ts(table, count, ts);
-            }
-            let mut delete_counts: std::collections::BTreeMap<&str, usize> = Default::default();
-            for (table, _) in &self.deletes {
-                *delete_counts.entry(table.as_str()).or_default() += 1;
-            }
-            for (table, count) in delete_counts {
-                self.engine.settle_delete_ts(table, count, ts);
-            }
-        } else if !self.dumps.is_empty() {
-            // A dump is a write transaction of its own in the reference:
-            // `DumpIndexProcessor::DoDump` opens one with
-            // `BeginTxnShared(…, kDumpMemIndex)` and commits it, so it spends
-            // a commit ts whether or not the index had a tail to seal (the
-            // WAL keeps the `DumpIndex` entry). Spending it here is what keeps
-            // every later statement's ts where the reference has it.
-            let ts = self.engine.txn.reserve_commit_ts();
-            self.engine.txn.commit_at(txn, ts)?;
-        }
-        for (table, base, encoded, rows) in &self.appends {
-            if self.engine.any_in_memory_index() || self.engine.has_index_declaration(table) {
-                for (k, row) in rows.iter().enumerate() {
-                    self.engine.update_indexes_on_insert(table, base + k, row)?;
-                    let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-                    self.engine.update_text_indexes(table, base + k, &texts);
-                    self.engine.update_vector_caches(table, base + k, &texts);
-                }
-                self.engine.dump_hnsw_over_capacity(table);
-                self.engine.dump_secondary_over_capacity(table);
-            }
-            self.engine.bump_writes(table);
-            self.engine.note_live_rows(table, rows.len() as isize);
-            self.engine.append_row_cache(table, *base, encoded);
-        }
-        for (table, seq) in &self.deletes {
-            self.engine.drop_text_index_rows(table, &[*seq]);
-            self.engine.drop_vector_cache_rows(table, &[*seq]);
-        }
-        // Keep the C++ block mirror current at commit, as the reference does
-        // (`AppendInBlock`), so a crash never leaves a block the catalog
-        // mentions without its files - the reference refuses to open such a
-        // directory.
-        let touched: std::collections::BTreeSet<&str> = self
-            .appends
-            .iter()
-            .map(|(table, ..)| table.as_str())
-            .chain(self.deletes.iter().map(|(table, _)| table.as_str()))
-            .collect();
-        for table in touched {
-            self.engine.refresh_cpp_block_mirror(table)?;
-        }
-        // The catalog is still current: perform the sealed writes now.
-        for dump in &self.dumps {
-            self.engine.dump_index(&dump.table, &dump.index)?;
-        }
-        // `NewTxnManager::CommitBottom`: publish. The clock advances in
-        // commit-ts order, so a transaction that took a smaller ts publishes
-        // first even if its bottom finished later.
-        if let Some(ts) = deferred_ts {
-            self.engine.txn.finish_bottom(ts);
-        }
-        Ok(())
+        run_bottom(self.engine, &self.appends, &self.deletes, &self.dumps, txn)
     }
 
     /// `NewTxn::Rollback`: discards every staged write and counts the rollback
