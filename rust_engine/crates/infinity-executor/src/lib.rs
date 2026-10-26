@@ -9096,10 +9096,13 @@ impl Engine {
         // one transaction -> one WAL record + one KV batch (batched durability)
         let mut t = self.txn.begin();
         let mut encoded_rows: Vec<String> = Vec::with_capacity(rows.len());
-        for (k, row) in rows.iter().enumerate() {
-            let encoded = self.encode_row_stored(table, row, &types)?;
-            t.put(row_key(table, base + k), encoded.as_bytes().to_vec());
-            encoded_rows.push(encoded);
+        for row in rows.iter() {
+            // The rows are written by the bottom half, not by this batch: the
+            // reference writes them in `AppendInBlock` and only then publishes,
+            // so a reader never sees a row whose index entry is still missing.
+            // Replay rebuilds the same keys from the WAL block
+            // (`append_writes`).
+            encoded_rows.push(self.encode_row_stored(table, row, &types)?);
         }
         // Emit the reference `WalCmdAppendV2` (real typed columns) when the
         // table's types are covered; otherwise the transaction writes the
@@ -9127,6 +9130,14 @@ impl Engine {
         let bottom_rows = rows;
         let bottom_encoded = encoded_rows;
         self.run_commit_bottom(&shard_key, move |engine| {
+            // `AppendInBlock`: the rows land before the index entries and the
+            // block mirror, and the commit publishes after all of it.
+            for (k, encoded) in bottom_encoded.iter().enumerate() {
+                engine
+                    .storage
+                    .store
+                    .put(&row_key(&bottom_table, base + k), encoded.as_bytes())?;
+            }
             engine.settle_append_ts(&bottom_table, 1, ts);
             if new_segment {
                 // An import seals the segment it writes, so it also has an
