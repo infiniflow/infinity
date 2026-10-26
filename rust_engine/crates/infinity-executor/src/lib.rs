@@ -7900,30 +7900,39 @@ impl Engine {
     /// `MemoryIndexer::AsyncInsertTop` + `MemIndexAppender::Submit` followed by
     /// `PostCommit`'s semaphore wait: the inverted-index work runs on the
     /// appender thread and this call returns once it is done.
-    fn run_text_append<F>(&self, work: F)
+    fn run_text_append<F>(&self, work: F) -> Result<()>
     where
-        F: FnOnce(&Engine) + Send + 'static,
+        F: FnOnce(&Engine) -> Result<()> + Send + 'static,
     {
         let (Some(engine), Some(appender)) = (self.engine_handle(), self.mem_index_appender()) else {
-            work(self);
-            return;
+            return work(self);
         };
-        let (done_tx, done_rx) = std::sync::mpsc::sync_channel::<()>(1);
+        type Job = Box<dyn FnOnce(&Engine) -> Result<()> + Send>;
+        let (done_tx, done_rx) = std::sync::mpsc::sync_channel::<std::result::Result<(), String>>(1);
         // `submit` only fails when the worker is gone; the job is dropped then,
         // so run it here instead of losing it.
-        let pending = std::sync::Arc::new(std::sync::Mutex::new(Some(work)));
+        let pending: std::sync::Arc<std::sync::Mutex<Option<Job>>> =
+            std::sync::Arc::new(std::sync::Mutex::new(Some(Box::new(work))));
         let job = std::sync::Arc::clone(&pending);
         let submitted = appender.submit(Box::new(move || {
             let work = job.lock().unwrap().take();
-            if let Some(work) = work {
-                work(&engine);
-            }
-            let _ = done_tx.send(());
+            let result = match work {
+                Some(work) => work(&engine),
+                None => Ok(()),
+            };
+            let _ = done_tx.send(result.map_err(|error| error.to_string()));
         }));
         if submitted {
-            let _ = done_rx.recv();
-        } else if let Some(work) = pending.lock().unwrap().take() {
-            work(self);
+            return match done_rx.recv() {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(message)) => Err(Error::Invalid(message)),
+                Err(_) => Ok(()),
+            };
+        }
+        let work = pending.lock().unwrap().take();
+        match work {
+            Some(work) => work(self),
+            None => Ok(()),
         }
     }
 
@@ -9018,29 +9027,29 @@ impl Engine {
             // for every inserted row (the reference's insert path has the same
             // guard).
             if engine.any_in_memory_index() || engine.has_index_declaration(&bottom_table) {
-                for (k, row) in bottom_rows.iter().enumerate() {
-                    engine.update_indexes_on_insert(&bottom_table, base + k, row)?;
-                    let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-                    engine.update_vector_caches(&bottom_table, base + k, &texts);
-                }
-                // The inverted-index inserts are the appender's job
-                // (`AppendMemIndexTask`); this waits for them, as
-                // `PostCommit` waits on the insert semaphores.
-                let text_table = bottom_table.clone();
-                let text_rows: Vec<(usize, Vec<String>)> = bottom_rows
+                // Every index kind is maintained by the appender thread, the
+                // way `AppendIndex` hands each index meta to its own
+                // `AppendMemIndex`: the bottom half only waits for it
+                // (`PostCommit`'s semaphores), it does not walk the batch
+                // itself.
+                let index_table = bottom_table.clone();
+                let index_rows: Vec<(usize, Vec<String>)> = bottom_rows
                     .iter()
                     .enumerate()
                     .map(|(k, row)| (base + k, row.iter().map(|v| v.to_slt_string()).collect()))
                     .collect();
                 engine.run_text_append(move |engine| {
-                    for (seq, texts) in &text_rows {
-                        engine.update_text_indexes(&text_table, *seq, texts);
+                    for (seq, texts) in &index_rows {
+                        engine.update_indexes_on_insert_text(&index_table, *seq, texts)?;
+                        engine.update_text_indexes(&index_table, *seq, texts);
+                        engine.update_vector_caches(&index_table, *seq, texts);
                     }
-                });
-                // C++ `AppendMemIndex`: a segment that reached
-                // `mem_index_capacity` rows is dumped right after the batch.
-                engine.dump_hnsw_over_capacity(&bottom_table);
-                engine.dump_secondary_over_capacity(&bottom_table);
+                    // C++ `AppendMemIndex`: a segment that reached
+                    // `mem_index_capacity` rows is dumped right after the batch.
+                    engine.dump_hnsw_over_capacity(&index_table);
+                    engine.dump_secondary_over_capacity(&index_table);
+                    Ok(())
+                })?;
             }
             engine.bump_writes(&bottom_table);
             engine.note_live_rows(&bottom_table, bottom_rows.len() as isize);
