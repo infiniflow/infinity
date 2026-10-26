@@ -31,6 +31,11 @@ struct Shared {
     ready: Condvar,
 }
 
+/// C++ `DEFAULT_BLOCKING_QUEUE_SIZE` (`default_values.cppm`): `submit` waits
+/// while the queue holds this many tasks, so a producer cannot outrun the
+/// worker.
+const QUEUE_CAPACITY: usize = 1024;
+
 /// A background task processor (`BGTaskProcessor`).
 pub struct BGTaskProcessor {
     workers: usize,
@@ -78,6 +83,10 @@ impl BGTaskProcessor {
     /// the process and stops new work from being proposed.
     pub fn submit(&self, task: Box<dyn BgTask>) -> bool {
         let mut state = self.shared.state.lock().unwrap();
+        while state.queue.len() >= QUEUE_CAPACITY && !state.shutdown {
+            // The worker notifies when it takes work off the queue.
+            state = self.shared.ready.wait(state).unwrap();
+        }
         if state.shutdown {
             return false;
         }
@@ -165,6 +174,8 @@ fn worker(shared: Arc<Shared>) {
             continue;
         };
         state.running += 1;
+        // Wake any producer waiting for room.
+        shared.ready.notify_all();
         drop(state);
 
         // A panicking task must not take the worker down with it: the thread

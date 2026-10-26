@@ -16,6 +16,9 @@ use std::thread::JoinHandle;
 
 use crate::crc::crc32_ieee;
 
+/// C++ `DEFAULT_BLOCKING_QUEUE_SIZE` (`default_values.cppm`).
+const DEFAULT_QUEUE_CAPACITY: usize = 1024;
+
 /// What a worker needs from a transaction (`bottom_executor_impl.cpp:49-52`).
 pub trait BottomTask: Send + Sync + 'static {
     /// `NewTxn::GetTableIdStr` — the routing key.
@@ -35,6 +38,9 @@ struct QueueInner<T> {
 struct BlockingQueue<T> {
     inner: Mutex<QueueInner<T>>,
     cv: Condvar,
+    /// C++ `DEFAULT_BLOCKING_QUEUE_SIZE`: `Enqueue` waits while the queue holds
+    /// this many items, so a producer cannot outrun the worker.
+    capacity: usize,
 }
 
 impl<T> BlockingQueue<T> {
@@ -44,11 +50,15 @@ impl<T> BlockingQueue<T> {
                 items: VecDeque::new(),
             }),
             cv: Condvar::new(),
+            capacity: DEFAULT_QUEUE_CAPACITY,
         }
     }
 
     fn enqueue(&self, item: Option<Arc<T>>) {
         let mut inner = self.inner.lock().unwrap();
+        while inner.items.len() >= self.capacity {
+            inner = self.cv.wait(inner).unwrap();
+        }
         inner.items.push_back(item);
         self.cv.notify_all();
     }
@@ -61,6 +71,8 @@ impl<T> BlockingQueue<T> {
             inner = self.cv.wait(inner).unwrap();
         }
         out.extend(inner.items.drain(..));
+        drop(inner);
+        self.cv.notify_all();
     }
 }
 

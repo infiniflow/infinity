@@ -39,6 +39,7 @@ thread_local! {
 }
 use infinity_storage::secondary_segment::{Key, KeyKind};
 use infinity_storage::MetaStore;
+use infinity_common::TxnTimeStamp;
 use infinity_txn::{Txn, TxnManager};
 
 use crate::fulltext_query::SearchDriver;
@@ -5166,6 +5167,30 @@ pub struct EngineTxn<'a> {
 /// Rows go in first, index entries after, then the block mirror; the commit is
 /// published only once all of it is in place, so a reader never sees rows its
 /// index does not know about yet.
+/// Publishes a deferred commit when it goes out of scope.
+///
+/// The bottom half of a commit is what makes the rows, their index entries and
+/// the block mirror visible; the reference publishes only after all of it
+/// (`SetTxnCommitted`). Holding this guard across that work - rather than
+/// calling `finish_bottom` on the success path - keeps the barrier from
+/// stalling when the work fails half way.
+struct BottomGuard<'a> {
+    manager: &'a TxnManager,
+    ts: TxnTimeStamp,
+}
+
+impl<'a> BottomGuard<'a> {
+    fn new(manager: &'a TxnManager, ts: TxnTimeStamp) -> Self {
+        Self { manager, ts }
+    }
+}
+
+impl Drop for BottomGuard<'_> {
+    fn drop(&mut self) {
+        self.manager.finish_bottom(self.ts);
+    }
+}
+
 fn run_bottom(
     engine: &Engine,
     appends: &[StagedAppend],
@@ -5173,14 +5198,14 @@ fn run_bottom(
     dumps: &[StagedDump],
     txn: Txn,
 ) -> Result<()> {
-    let mut deferred_ts: Option<u64> = None;
+    let mut visible: Option<BottomGuard<'_>> = None;
     if !txn.is_empty() {
         // The bottom half: rows first, index entries after (both are
         // inside `CommitBottom` in the reference). The commit becomes
         // visible only once the index entries are in place, so a reader
         // never sees rows their index does not know about yet.
         let ts = engine.txn.commit_deferred(txn)?;
-        deferred_ts = Some(ts);
+        visible = Some(BottomGuard::new(&engine.txn, ts));
         // The block's `version` carries each append's and each delete's
         // commit ts (`BlockVersion::Append` / `Delete`).
         let mut append_counts: std::collections::BTreeMap<&str, usize> = Default::default();
@@ -5242,12 +5267,9 @@ fn run_bottom(
     for dump in dumps {
         engine.dump_index(&dump.table, &dump.index)?;
     }
-    // `NewTxnManager::CommitBottom`: publish. The clock advances in
-    // commit-ts order, so a transaction that took a smaller ts publishes
-    // first even if its bottom finished later.
-    if let Some(ts) = deferred_ts {
-        engine.txn.finish_bottom(ts);
-    }
+    // `NewTxnManager::CommitBottom`: publishing happens when `visible` drops,
+    // on the error path too, so the clock never waits on a half-done bottom.
+    drop(visible);
     Ok(())
 }
 
@@ -5268,13 +5290,15 @@ fn text_append_count() -> usize {
 /// before the transaction completes; [`Engine::run_text_append`] is that
 /// submit-and-wait.
 struct MemIndexAppender {
-    tx: std::sync::Mutex<std::sync::mpsc::Sender<Box<dyn FnOnce() + Send>>>,
+    tx: std::sync::Mutex<std::sync::mpsc::SyncSender<Box<dyn FnOnce() + Send>>>,
     handle: std::sync::Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
 impl MemIndexAppender {
     fn start() -> Self {
-        let (tx, rx) = std::sync::mpsc::channel::<Box<dyn FnOnce() + Send>>();
+        // C++ `DEFAULT_BLOCKING_QUEUE_SIZE`: a bounded queue, so the appender
+        // applies back-pressure instead of growing without limit.
+        let (tx, rx) = std::sync::mpsc::sync_channel::<Box<dyn FnOnce() + Send>>(1024);
         let handle = std::thread::Builder::new()
             .name("infinity-mem-index-appender".to_string())
             .spawn(move || {
@@ -5299,7 +5323,7 @@ impl MemIndexAppender {
 impl Drop for MemIndexAppender {
     fn drop(&mut self) {
         // Closing the sender (dropping it) ends the worker's loop.
-        let (dead_tx, _) = std::sync::mpsc::channel();
+        let (dead_tx, _) = std::sync::mpsc::sync_channel(1);
         {
             let mut tx = self.tx.lock().unwrap();
             *tx = dead_tx;
@@ -9089,7 +9113,10 @@ impl Engine {
                 block,
             )]);
         }
-        let ts = self.txn.commit(t)?;
+        // Deferred publish: the commit becomes visible when the bottom half
+        // below is done (the guard publishes, on the error path too).
+        let ts = self.txn.commit_deferred(t)?;
+        let _visible = BottomGuard::new(&self.txn, ts);
         // The bottom half: the block's `version` ts, the import extent, the
         // index entries and the block mirror. On a pooled engine this runs on
         // the table's `BottomExecutor` worker and the statement waits, as
@@ -9242,7 +9269,8 @@ impl Engine {
             txn.delete(del_key(table, *seq));
         }
         self.note_deletes(table, deletes);
-        let ts = self.txn.commit(txn)?;
+        let ts = self.txn.commit_deferred(txn)?;
+        let _visible = BottomGuard::new(&self.txn, ts);
         // `CommitBottomDelete` on the table's worker: the block's `version`
         // records the delete ts (and an UPDATE's rewritten rows' append ts).
         let bottom_table = table.to_string();
@@ -15814,7 +15842,8 @@ impl Engine {
         if !cmds.is_empty() {
             t.set_typed_commands(cmds);
         }
-        let ts = self.txn.commit(t)?;
+        let ts = self.txn.commit_deferred(t)?;
+        let _visible = BottomGuard::new(&self.txn, ts);
         // `CommitBottomAppend` for the imported segments on the table's worker.
         let bottom_table = table.to_string();
         let shard_key = bottom_table.clone();
@@ -15912,7 +15941,8 @@ impl Engine {
                 t.put(row_key(table, base + k), encoded.into_bytes());
             }
             t.set_typed_commands(vec![self.import_command(table, (base >> 32) as u32)?]);
-            let ts = self.txn.commit(t)?;
+            let ts = self.txn.commit_deferred(t)?;
+            let _visible = BottomGuard::new(&self.txn, ts);
             self.settle_append_ts(table, 1, ts);
             self.note_import_ts(table, (base >> 32) as u32, ts);
             return Ok(QueryResult::Inserted { count: rows.len() });

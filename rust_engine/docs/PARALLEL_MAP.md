@@ -117,7 +117,7 @@
 |---|---|---|---|---|---|
 | 上半部等自己的下半部 | 提交线程把 txn 交给池后睡在 `commit_cv_`，被 `NotifyTopHalf` 唤醒才 `PostCommit`/`SetTxnCommitted` | `new_txn_impl.cpp:2138-2141` | `commit_deferred` → 底部工作 → `finish_bottom`；`run_commit_bottom` 用 condvar 等 worker | `aligned` | `infinity-txn` 单测、`a_commit_runs_its_bottom_half_on_the_bottom_executor` |
 | 按 commit_ts 顺序发布 | `bottom_txns_` 按 ts 排序，队首完成即推进 `current_ts_`；先做完的后序 txn 不越位 | `new_txn_manager_impl.cpp:410-457` | `register_bottom`/`finish_bottom` 屏障（冲突也走同一屏障，ts 空洞保留） | `aligned` | `infinity-txn` 的发布顺序用例 |
-| 行与索引一起可见 | 下半部（行 → 索引）与 `PostCommit` 的 sema 都完成才 `SetTxnCommitted` | `new_txn_impl.cpp:2138-2141`、`4624-4660` | `EngineTxn` 路径已延后发布；`INSERT`/`DELETE`/`IMPORT`/`dump` 在 `TxnManager::commit` 时就推进 `current_ts`，索引在其后补 | `different` | `GAPS.md` §2（唯一待办） |
+| 行与索引一起可见 | 行落在块文件里、由下半部的 `AppendInBlock` 写，`SetTxnCommitted` 之后才可读 | `new_txn_impl.cpp:2138-2141`、`4624-4660` | 行是 KV 里的 `row:` 键，在 `TxnManager::commit_deferred` 那一批里就落盘（读路径按 key 存在与否判可见，不查时钟），索引在随后的下半部补；`EngineTxn` 已用 `commit_deferred` → 索引 → `finish_bottom` 延后**时钟**，但行可见性不由时钟决定 | `different` | `GAPS.md` §2：要真正对齐得把 `row:` 写的时机挪到下半部（或给读路径加 `append_ts ≤ current_ts` 过滤） |
 | dump 任务完成 | `StopProcessorTask::Wait()` 等已入队任务跑完 | `background_process_impl.cpp:46-53` | `BGTaskProcessor::drain()` | `aligned` | `bg_task_ut` |
 | 只读事务 | `GetReadCommitTS`：不写 WAL、不占写 ts | `new_txn_impl.cpp:2051-2059` | `TxnManager::commit` 的 read-only 分支 | `aligned` | `txn_ut` |
 
@@ -138,7 +138,7 @@
 |---|---|---|---|
 | 池大小 | `max(2, hardware_concurrency()/2)`，上限 cpu | 同 | `aligned` |
 | 下半部路由键 | `crc32(table_id) % n` | 同（`BottomExecutor::submit`） | `aligned` |
-| 队列是否有界 | `BlockingQueue` 上限 `DEFAULT_BLOCKING_QUEUE_SIZE = 1024`，满则 `Enqueue` 阻塞（`blocking_queue.cppm:29-99`） | 下半部池、后台处理器、追加队列都是无界 `VecDeque`/`mpsc::channel` | `different`（`GAPS.md` §5） |
+| 队列是否有界 | `BlockingQueue` 上限 `DEFAULT_BLOCKING_QUEUE_SIZE = 1024`，满则 `Enqueue` 阻塞（`blocking_queue.cppm:29-99`） | 同：下半部池的 `BlockingQueue`、`BGTaskProcessor` 的队列、追加队列（`sync_channel`）都是 1024 上限，满了生产者在 condvar 上等 | `aligned` | `bg_task_ut`、`test_cross_engine_bytes_20_table.py`（单客户端不会触发反压，行为不变） |
 | tasklet 宽度 | `min(cpu_count, TaskletCount())`（`fragment_context_impl.cpp:1218`） | 同（`tasklet_count`/`block_tasklets`，`operators/mod.rs`） | `aligned` |
 | `TaskletCount` 规则 | 默认 1；filter/project/limit/top/sort 透传；扫描 = 块数（`physical_operator_impl.cpp:47` 起、`physical_scan_base_impl.cpp:86`） | 同（链上解析） | `aligned` |
 | 交换队列容量 | `LocalQueue` 容量由实现决定 | 每 tasklet 一条有界通道，容量 2 个 chunk | `different`（`GAPS.md` §5） |
