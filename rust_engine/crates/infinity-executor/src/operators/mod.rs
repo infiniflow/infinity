@@ -445,17 +445,111 @@ fn run_serial(
     Ok((names, rows))
 }
 
-/// Runs `tasks` tasklets over disjoint contiguous ranges of `rows` and joins
-/// their output in tasklet order, which is the row order of the serial run.
+/// Capacity of one tasklet's exchange queue, in chunks.
 ///
-/// This is the fragment-with-exchange shape of the reference: each tasklet
-/// owns a copy of the chain ([`PhysicalOperator::fork`]) and its own half of the
-/// relation, and the results are concatenated in tasklet order.
+/// The reference's exchange queues are bounded the same way: a tasklet blocks
+/// once the fragment above it falls behind, so a merge task sees rows while the
+/// tasklets are still scanning.
+const EXCHANGE_CAPACITY: usize = 2;
+
+/// The exchange queue of one parallel fragment: one channel per tasklet,
+/// drained in tasklet order (`FragmentContext::Tasks` hands the merge task the
+/// tasklet sources in that order).
+struct ExchangeSource {
+    receivers: std::vec::IntoIter<std::sync::mpsc::Receiver<std::result::Result<DataChunk, String>>>,
+    current: Option<std::sync::mpsc::Receiver<std::result::Result<DataChunk, String>>>,
+    width: usize,
+    started: bool,
+}
+
+impl ExchangeSource {
+    fn new(receivers: Vec<std::sync::mpsc::Receiver<std::result::Result<DataChunk, String>>>, width: usize) -> Self {
+        Self {
+            receivers: receivers.into_iter(),
+            current: None,
+            width,
+            started: false,
+        }
+    }
+}
+
+impl ChunkSource for ExchangeSource {
+    fn width(&self) -> usize {
+        self.width
+    }
+
+    fn next(&mut self, state: &mut SourceState) -> Result<()> {
+        state.data_blocks = Vec::new();
+        loop {
+            if self.current.is_none() {
+                self.current = self.receivers.next();
+            }
+            let Some(receiver) = self.current.as_ref() else {
+                // Every tasklet is done. A fragment that never produced a chunk
+                // still has to run once, as an empty source does.
+                if !self.started {
+                    state.empty_source = true;
+                    self.started = true;
+                }
+                state.complete = true;
+                return Ok(());
+            };
+            match receiver.recv() {
+                Ok(Ok(chunk)) => {
+                    self.started = true;
+                    state.data_blocks.push(chunk);
+                    return Ok(());
+                }
+                Ok(Err(message)) => return Err(Error::Invalid(message)),
+                // This tasklet is finished; continue with the next one.
+                Err(_) => self.current = None,
+            }
+        }
+    }
+}
+
+/// Drives one tasklet's chain and forwards its head's chunks to the exchange.
+fn run_forward(
+    mut operators: Vec<Box<dyn PhysicalOperator>>,
+    source: &mut dyn ChunkSource,
+    tx: std::sync::mpsc::SyncSender<std::result::Result<DataChunk, String>>,
+) -> Result<()> {
+    for operator in &mut operators {
+        operator.init()?;
+    }
+    let mut ctx = OperatorContext::default();
+    let mut states = OperatorStates::new(&operators);
+    let head = operators.len() - 1;
+    while !states.is_complete() {
+        source.next(&mut states.source)?;
+        let progressed = execute_task(&operators, &mut ctx, &mut states)?;
+        for chunk in std::mem::take(&mut states.state_mut(head).data_blocks) {
+            // A closed queue means the fragment above has what it needs
+            // (`LIMIT` reached): the tasklet can stop.
+            if tx.send(Ok(chunk)).is_err() {
+                return Ok(());
+            }
+        }
+        if states.source.complete && !progressed && !states.is_complete() {
+            return Err(Error::Invalid(
+                "fragment made no progress after the source was exhausted".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Runs `tasks` tasklets over disjoint contiguous ranges of `rows`, each with
+/// its own copy of the chain, and feeds their output through the exchange to
+/// `merge` — which runs as one task, in tasklet order, so the rows come out
+/// exactly as the serial run returns them.
 fn run_tasklets(
     operators: &[Box<dyn PhysicalOperator>],
+    merge: Vec<Box<dyn PhysicalOperator>>,
     names: Vec<String>,
     rows: Vec<Vec<Value>>,
-    width: usize,
+    source_width: usize,
+    prefix_width: usize,
     tasks: usize,
 ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
     let per_task = rows.len().div_ceil(tasks);
@@ -488,31 +582,27 @@ fn run_tasklets(
         })
         .collect::<Result<Vec<_>>>()?;
     let batch = crate::chunk::DEFAULT_VECTOR_SIZE;
-    let results: Vec<Result<(Vec<String>, Vec<Vec<Value>>)>> = std::thread::scope(|scope| {
-        let handles: Vec<_> = chains
-            .into_iter()
-            .zip(ranges)
-            .map(|(chain, rows)| {
-                scope.spawn(move || {
-                    let mut source = RowsSource::new(rows, width, batch);
-                    run_serial(chain, Vec::new(), &mut source)
-                })
-            })
-            .collect();
-        handles
-            .into_iter()
-            .map(|handle| {
-                handle
-                    .join()
-                    .unwrap_or_else(|_| Err(Error::Invalid("tasklet panicked".into())))
-            })
-            .collect()
-    });
-    let mut joined: Vec<Vec<Value>> = Vec::new();
-    for result in results {
-        joined.extend(result?.1);
-    }
-    Ok((names, joined))
+    std::thread::scope(|scope| {
+        let mut receivers = Vec::with_capacity(tasks);
+        for (chain, range) in chains.into_iter().zip(ranges) {
+            let (tx, rx) = std::sync::mpsc::sync_channel(EXCHANGE_CAPACITY);
+            receivers.push(rx);
+            scope.spawn(move || {
+                let mut source = RowsSource::new(range, source_width, batch);
+                if let Err(error) = run_forward(chain, &mut source, tx.clone()) {
+                    // The merge task picks the error up from the queue, so a
+                    // failing tasklet fails the statement instead of looking
+                    // like a short result.
+                    let _ = tx.send(Err(error.to_string()));
+                }
+            });
+        }
+        let mut source = ExchangeSource::new(receivers, prefix_width);
+        if merge.is_empty() {
+            return Ok((names, source.collect()?));
+        }
+        run_serial(merge, names, &mut source)
+    })
 }
 
 /// Runs a lowered chain over a fragment source and returns the result in the
@@ -569,17 +659,26 @@ pub fn run_operators(
     let tasks = tasklet_count(&operators, block_tasklets(rows.len())).min(cpu_count());
     let merge = operators.split_off(split);
     let mut prefix = operators;
-    let rows = if tasks > 1 {
-        run_tasklets(&prefix, Vec::new(), rows, source_width, tasks)?.1
-    } else {
-        // One tasklet: the prefix still runs, just serially.
+    if tasks > 1 {
+        return run_tasklets(
+            &prefix,
+            merge,
+            names,
+            rows,
+            source_width,
+            prefix_width,
+            tasks,
+        );
+    }
+    // One tasklet: the prefix still runs, just serially.
+    let rows = {
         let mut source = RowsSource::new(rows, source_width, crate::chunk::DEFAULT_VECTOR_SIZE);
         run_serial(std::mem::take(&mut prefix), Vec::new(), &mut source)?.1
     };
     if merge.is_empty() {
         return Ok((names, rows));
     }
-    // The merge fragment: one task over the tasklets' concatenated output.
+    // The merge fragment: one task over the tasklets' output.
     let mut source = RowsSource::new(rows, prefix_width, crate::chunk::DEFAULT_VECTOR_SIZE);
     run_serial(merge, names, &mut source)
 }
@@ -693,9 +792,89 @@ mod tests {
         // Tasklet counts that divide the rows evenly and ones that do not, down
         // to one row per tasklet.
         for tasks in [2, 3, 5, 41] {
-            let (_, out) = run_tasklets(&operators, Vec::new(), input.clone(), 1, tasks).unwrap();
+            let (_, out) = run_tasklets(
+                &operators,
+                Vec::new(),
+                Vec::new(),
+                input.clone(),
+                1,
+                1,
+                tasks,
+            )
+            .unwrap();
             assert_eq!(out, expected, "tasks = {tasks}");
         }
+    }
+
+    /// The merge task pulls through the exchange queue, tasklet by tasklet, and
+    /// stops the tasklets once it has what it needs: a `LIMIT` above the split
+    /// returns at once instead of waiting for every tasklet to finish.
+    #[test]
+    fn the_merge_task_reads_the_tasklets_through_the_exchange_queue() {
+        use super::filter::Filter;
+        use super::limit::Limit;
+        use super::project::Projection;
+
+        let operators: Vec<Box<dyn PhysicalOperator>> = vec![
+            Box::new(Filter::new(infinity_expression::Expr::Cmp(
+                Box::new(infinity_expression::Expr::Column(0)),
+                infinity_parser::CmpOp::Gt,
+                Box::new(infinity_expression::Expr::Literal(Value::Int(100))),
+            ))),
+            Box::new(Projection::new(
+                vec![infinity_expression::Expr::Column(0)],
+                vec!["a".into()],
+            )),
+        ];
+        let merge: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(Limit::new(0, 10))];
+        let (_, out) = run_tasklets(
+            &operators,
+            merge,
+            vec!["a".into()],
+            rows(20_000),
+            1,
+            1,
+            4,
+        )
+        .unwrap();
+        assert_eq!(out.len(), 10);
+        assert_eq!(out[0], vec![Value::Int(101)]);
+        assert_eq!(out[9], vec![Value::Int(110)]);
+    }
+
+    /// A tasklet's failure travels through the exchange instead of ending the
+    /// statement with a short result.
+    #[test]
+    fn a_tasklet_error_fails_the_statement() {
+        /// Forwarding operator that fails on its first pass.
+        struct Boom;
+
+        impl PhysicalOperator for Boom {
+            fn operator_type(&self) -> PhysicalOperatorType {
+                PhysicalOperatorType::Filter
+            }
+
+            fn output_names(&self) -> Vec<String> {
+                Vec::new()
+            }
+
+            fn fork(&self) -> Option<Box<dyn PhysicalOperator>> {
+                Some(Box::new(Boom))
+            }
+
+            fn execute(
+                &self,
+                _ctx: &mut OperatorContext,
+                _states: &mut OperatorStates,
+                _id: usize,
+            ) -> Result<bool> {
+                Err(Error::Invalid("boom".into()))
+            }
+        }
+
+        let operators: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(Boom)];
+        let result = run_tasklets(&operators, Vec::new(), Vec::new(), rows(8), 1, 1, 2);
+        assert!(result.is_err(), "{result:?}");
     }
 
     /// The entry point takes the same split: a row-wise chain over more than one
