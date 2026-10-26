@@ -4977,6 +4977,14 @@ pub struct Engine {
     bottom_executor: Mutex<Option<Arc<infinity_storage::wal::bottom_executor::BottomExecutor<BottomWork>>>>,
     /// The full-text inverted-index appender (`MemIndexAppender`).
     mem_index_appender: Mutex<Option<Arc<MemIndexAppender>>>,
+    /// `Storage::txn_allocator_` (`txn_allocator_impl.cpp:56`): one thread
+    /// hands out every append's row ids, so they are contiguous in submission
+    /// order. Started lazily; an engine without a stable `Arc` handle (most
+    /// tests) allocates inline.
+    allocator: Mutex<Option<Arc<Allocator>>>,
+    /// How many allocation jobs the `TxnAllocator` thread has run. Lets a test
+    /// assert the ids really came from it and not from the fallback.
+    allocator_jobs: std::sync::atomic::AtomicUsize,
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
@@ -5836,6 +5844,13 @@ impl Default for EngineOptions {
     }
 }
 
+type AllocJob = Box<dyn FnOnce(&Engine) -> () + Send>;
+
+/// `TxnAllocator`: the single thread that hands out row ids.
+struct Allocator {
+    jobs: std::sync::mpsc::Sender<AllocJob>,
+}
+
 impl Engine {
     pub fn open(dir: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_options(dir, EngineOptions::default())
@@ -5973,6 +5988,8 @@ impl Engine {
             bottom_gates: Mutex::new(HashMap::new()),
             bottom_executor: Mutex::new(None),
             mem_index_appender: Mutex::new(None),
+            allocator: Mutex::new(None),
+            allocator_jobs: std::sync::atomic::AtomicUsize::new(0),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
             vector_cache: Mutex::new(HashMap::new()),
             cpu_sample: Mutex::new(None),
@@ -7958,6 +7975,12 @@ impl Engine {
         self.self_weak.lock().unwrap().upgrade()
     }
 
+    /// Records the engine's own handle so it can be handed to worker threads
+    /// (`BottomExecutor`, `MemIndexAppender`, `TxnAllocator`).
+    pub fn install_engine_handle(self: &Arc<Self>) {
+        *self.self_weak.lock().unwrap() = Arc::downgrade(self);
+    }
+
     /// Attaches the `BottomExecutor` the reference keeps in `Storage`
     /// (`wal_manager_impl.cpp:92`): commits then run their bottom half on a
     /// worker, sharded by table id.
@@ -7967,7 +7990,7 @@ impl Engine {
     ) {
         // The queued job owns an `Arc<Engine>`, so the engine has to know its
         // own handle (`EngineTxn::handle` upgrades this).
-        *self.self_weak.lock().unwrap() = Arc::downgrade(self);
+        self.install_engine_handle();
         *self.bottom_executor.lock().unwrap() = Some(executor);
     }
 
@@ -8001,9 +8024,45 @@ impl Engine {
         task.wait()
     }
 
+    /// Starts `TxnAllocator` on first use and returns its queue.
+    ///
+    /// Like the reference, the allocator is a **thread**, not a lock: an append
+    /// submits its table and row count and waits for the base id, so ids stay
+    /// contiguous in submission order even when several transactions allocate
+    /// at once. An engine that is not held in an `Arc` cannot be handed to the
+    /// thread, so it falls back to allocating inline (the same fallback the
+    /// bottom half uses).
+    fn allocator(&self) -> Option<Arc<Allocator>> {
+        if let Some(allocator) = self.allocator.lock().unwrap().clone() {
+            return Some(allocator);
+        }
+        let engine = self.engine_handle()?;
+        let (jobs, queue) = std::sync::mpsc::channel::<AllocJob>();
+        let weak = Arc::downgrade(&engine);
+        std::thread::Builder::new()
+            .name("txn-allocator".to_string())
+            .spawn(move || {
+                while let Ok(job) = queue.recv() {
+                    match weak.upgrade() {
+                        Some(engine) => {
+                            engine
+                                .allocator_jobs
+                                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                            job(&engine);
+                        }
+                        None => break,
+                    }
+                }
+            })
+            .ok()?;
+        let allocator = Arc::new(Allocator { jobs });
+        *self.allocator.lock().unwrap() = Some(allocator.clone());
+        Some(allocator)
+    }
+
     /// Attaches the full-text appender (`Storage::mem_index_appender`).
     pub fn attach_mem_index_appender(self: &Arc<Self>, appender: Arc<MemIndexAppender>) {
-        *self.self_weak.lock().unwrap() = Arc::downgrade(self);
+        self.install_engine_handle();
         *self.mem_index_appender.lock().unwrap() = Some(appender);
     }
 
@@ -8677,6 +8736,31 @@ impl Engine {
     /// `copy` is true for `COPY`/`IMPORT` (which may also continue a segment
     /// it already opened, so it is not the same question as `new_segment`).
     fn reserve_rows_from(
+        &self,
+        table: &str,
+        n: usize,
+        new_segment: bool,
+        copy: bool,
+    ) -> Result<usize> {
+        let Some(allocator) = self.allocator() else {
+            return self.reserve_rows_inline(table, n, new_segment, copy);
+        };
+        let (reply, answer) = std::sync::mpsc::channel();
+        let table = table.to_string();
+        allocator
+            .jobs
+            .send(Box::new(move |engine| {
+                let _ = reply.send(engine.reserve_rows_inline(&table, n, new_segment, copy));
+            }))
+            .map_err(|_| Error::Txn("the row allocator stopped".into()))?;
+        answer
+            .recv()
+            .map_err(|_| Error::Txn("the row allocator stopped".into()))?
+    }
+
+    /// The allocation itself, run on the allocator thread (`TxnAllocator::
+    /// Process` -> `AllocateRowID`).
+    fn reserve_rows_inline(
         &self,
         table: &str,
         n: usize,
@@ -21328,6 +21412,41 @@ mod tests {
         }
         e.execute("CREATE INDEX ok_i ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
             .unwrap();
+    }
+
+    /// `Storage::txn_allocator_`: every append's row ids come from one thread
+    /// (`TxnAllocator::Process` -> `AllocateRowID`), which is what keeps them
+    /// contiguous when several transactions allocate at the same time.
+    #[test]
+    fn row_ids_are_allocated_on_the_allocator_thread() {
+        let dir = tempdir().unwrap();
+        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        e.install_engine_handle();
+        e.execute("CREATE TABLE alloc_t (a INT);").unwrap();
+        let before = e.allocator_jobs.load(std::sync::atomic::Ordering::SeqCst);
+        e.execute("INSERT INTO alloc_t VALUES (1), (2), (3);")
+            .unwrap();
+        assert!(
+            e.allocator_jobs.load(std::sync::atomic::Ordering::SeqCst) > before,
+            "the ids must come from the allocator thread, not the inline fallback"
+        );
+        // Two concurrent appends still get disjoint, contiguous ranges.
+        let mut handles = Vec::new();
+        for _ in 0..4 {
+            let e = Arc::clone(&e);
+            handles.push(std::thread::spawn(move || {
+                e.execute("INSERT INTO alloc_t VALUES (9);").unwrap();
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM alloc_t;"),
+            vec![vec!["7".to_string()]]
+        );
+        let ids = rows(&e, "SELECT a FROM alloc_t;");
+        assert_eq!(ids.len(), 7);
     }
 
     /// `EXPLAIN FRAGMENT` prints the fragment envelope the reference prints:

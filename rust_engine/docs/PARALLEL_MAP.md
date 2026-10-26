@@ -101,16 +101,16 @@
 | 状态 | `different`（`GAPS.md` §5：无常驻调度器；宽度与规则对齐） |
 | 证据 | `run_operators_splits_a_row_wise_chain_and_limits_after_the_merge`、`the_merge_task_reads_the_tasklets_through_the_exchange_queue`、`test/sql/explain`（fragment 类型是外部口径） |
 
-### 1.7 事务/行号分配
+### 1.7 行号 / 段号分配
 
-**做什么**——为 append/import/dump/create-index 这类需要新 id 的事务发号（段号、块号、行号），保证同一时刻只有一个分配者、id 连续无洞（`txn_allocator_impl.cpp:56-110`，线程在 :37 起）。
+**做什么**——每个 append 在写行之前先取一段连续的 ROW_ID（`segment_id << 32 | offset`，段满 8,388,608 行换段；`COPY` 封段、后续 `INSERT` 开新段）。参考把它放在 `TxnAllocator` 线程上：`Submit` 入队，`Process` 逐条取出，按事务类型调 `AllocateRowID`，再把结果回填给提交线程——单线程顺序发号，所以并发 append 拿到的区间不重叠、也不留洞。
 
 | | |
 |---|---|
-| 参考 | 单线程 `TxnAllocator`，事务在自己的线程里等分配结果 |
-| 端口 | 无独立线程：行号在事务内直接分配（`EngineTxn::append` / `insert_literals_inner`） |
-| 状态 | `different`（`GAPS.md` §5） |
-| 证据 | `wal_shape_ut`（事务号序列与参考相同）、字节门禁里的块/段号 |
+| 参考 | `TxnAllocator::Process` 单线程消费 `task_queue_`（`txn_allocator_impl.cpp:56-110`，线程在 :37 起） |
+| 端口 | `Allocator`：名为 `txn-allocator` 的线程消费作业，`reserve_rows_from` 入队 `reserve_rows_inline` 并等回执；引擎不在 `Arc` 里时（多数单测）退回内联执行 |
+| 状态 | `aligned` |
+| 证据 | `row_ids_are_allocated_on_the_allocator_thread`（断言 `allocator_jobs` 增长，且 4 个并发 INSERT 后行数与 id 数正确）、`test_cross_engine_bytes_20_table.py`（行 id 与块布局逐字节）、`40_wal`/`50_mutations` |
 
 ## 2 等待点与可见性
 
