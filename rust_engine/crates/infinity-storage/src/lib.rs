@@ -8,10 +8,64 @@
 //! Invariants preserved from C++ (see plan 附录 A): the substrates are separate;
 //! MVCC is timestamp-array based (not KV snapshots); WAL writes are serialized.
 
-// Every crate of the rewrite is `forbid(unsafe_code)`: sealed indexes are read
-// into memory ([`cpp_format::read_index_file`]) instead of being mapped, which
-// keeps the byte-level equivalence and drops the last `unsafe` block.
-#![forbid(unsafe_code)]
+// Maps sealed on-disk indexes. `mmap` is the one operation that needs `unsafe`
+// (the mapping outlives the `File`); it is isolated in
+// [`fulltext_segment::SegmentIndexReader::open`], which documents why the region
+// cannot change while mapped.
+#![deny(unsafe_code)]
+
+/// Releases free heap pages back to the OS (glibc). A no-op on other targets.
+/// Long imports allocate per-batch buffers; without this the allocator retains
+/// them and RSS looks like a leak (Gate C).
+#[allow(unsafe_code)]
+pub fn trim_allocator() {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        unsafe extern "C" {
+            fn malloc_trim(pad: usize) -> i32;
+        }
+        // SAFETY: glibc's `malloc_trim` only returns already-free heap pages.
+        unsafe {
+            malloc_trim(0);
+        }
+    }
+}
+
+/// Drops clean page cache for one file after writing it back. Long imports
+/// write gigabytes of segment/sidecar files; without this the cache grows
+/// until the OOM killer fires (the reference bounds it with its buffer manager).
+#[allow(unsafe_code)]
+pub fn drop_file_cache(path: &std::path::Path) {
+    use std::os::unix::io::AsRawFd;
+    let Ok(file) = std::fs::File::open(path) else {
+        return;
+    };
+    let _ = file.sync_data();
+    // SAFETY: `posix_fadvise` only advises the kernel about this fd's cache.
+    unsafe {
+        posix_fadvise(file.as_raw_fd(), 0, 0, 4 /* POSIX_FADV_DONTNEED */);
+    }
+}
+
+#[allow(unsafe_code)]
+unsafe extern "C" {
+    fn posix_fadvise(fd: i32, offset: i64, len: i64, advice: i32) -> i32;
+}
+
+/// Recursively drops page cache under `root` (best effort).
+pub fn drop_tree_cache(root: &std::path::Path) {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            drop_tree_cache(&path);
+        } else {
+            drop_file_cache(&path);
+        }
+    }
+}
 
 pub mod binary_fuse_filter;
 pub mod block_index;

@@ -18,6 +18,8 @@
 //! The term index is sorted by term so a lookup is a binary search; block data
 //! is read on demand, so a query touches only the postings of its terms.
 
+use memmap2::Mmap;
+use std::fs::File;
 use std::path::Path;
 
 const MAGIC: &[u8; 8] = b"IBMP\x01\0\0\0";
@@ -102,7 +104,7 @@ pub fn write_bmp_segment(
 
 /// A segment file mapped read-only.
 pub struct BmpSegmentReader {
-    map: Vec<u8>,
+    map: Mmap,
     block_size: usize,
     doc_count: usize,
     term_count: usize,
@@ -111,8 +113,13 @@ pub struct BmpSegmentReader {
 }
 
 impl BmpSegmentReader {
+    #[allow(unsafe_code)]
     pub fn open(path: &Path) -> Result<Self, FormatError> {
-        let map = crate::cpp_format::read_index_file(path)?;
+        let file =
+            File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
+        // SAFETY: the file is read-only and never modified while mapped; a new
+        // version is written under a different name.
+        let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
         if map.len() < HEADER_LEN || &map[..8] != MAGIC {
             return Err(FormatError::BadMagic(0));
         }

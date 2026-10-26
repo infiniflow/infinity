@@ -44,7 +44,9 @@
 //! §9.3.5).
 
 use std::collections::BTreeMap;
-use std::fs;
+use std::fs::{self, File};
+
+use memmap2::Mmap;
 
 use crate::cpp_format::FormatError;
 use crate::inverted_format::position_list::{
@@ -183,9 +185,9 @@ pub fn write_segment_index(
 /// demand: the mapping shares the page cache, so a query does not keep the
 /// table's postings in the process heap.
 pub struct SegmentIndexReader {
-    dic: Vec<u8>,
-    pos: Vec<u8>,
-    len: Vec<u8>,
+    dic: Mmap,
+    pos: Mmap,
+    len: Mmap,
     /// Row id per dense document ordinal.
     rows: Vec<u64>,
     flags: TermMetaFlags,
@@ -195,17 +197,23 @@ impl SegmentIndexReader {
     /// Opens `{dir}/{base_name}.{dic,pos,len}`. Fails if any file is missing;
     /// an empty segment (`len` file of zero bytes) is allowed.
     ///
-    /// The segment is immutable once sealed (rebuilds write a new base name
-    /// instead of overwriting), so reading its bytes into memory is equivalent
-    /// to mapping them.
+    /// The mapping is the only `unsafe` operation in this crate: a segment is
+    /// immutable once sealed, so the mapped region cannot change underneath the
+    /// reader (rebuilds write a new base name instead of overwriting).
+    #[allow(unsafe_code)]
     pub fn open(
         dir: &str,
         base_name: &str,
         _base_row_id: u64,
         flags: TermMetaFlags,
     ) -> Result<Self, FormatError> {
-        let map = |suffix: &str| -> Result<Vec<u8>, FormatError> {
-            crate::cpp_format::read_index_file(std::path::Path::new(&fulltext_chunk_file(dir, base_name, suffix)))
+        let map = |suffix: &str| -> Result<Mmap, FormatError> {
+            let path = fulltext_chunk_file(dir, base_name, suffix);
+            let file = File::open(&path).map_err(|e| FormatError::Io(e.to_string()))?;
+            // SAFETY: the file is read-only for the lifetime of the mapping and
+            // does not change while it is mapped (a segment is immutable once
+            // sealed).
+            unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))
         };
         let rows_map = map(FULLTEXT_ROW_SUFFIX)?;
         let rows: Vec<u64> = rows_map

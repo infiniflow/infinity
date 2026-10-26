@@ -63,8 +63,6 @@ SMVE 已经闭口：`test_the_smve_chunk_matches_byte_for_byte`（500 行 `TENSO
 
 | 项 | 说明 | 出处 |
 |---|---|---|
-| 封存索引段读入堆而非 mmap | 全部 crate 都是 `#![forbid(unsafe_code)]`，`memmap2` 的 `map` 是 `unsafe`（映射可能比 `File` 活得久），所以 `cpp_format::read_index_file` 用 `std::fs::read` 把段读进 `Vec<u8>`。段一旦封存就不再变化，读到的字节与只读映射完全相同；差别只在内存形态：字节留在堆（RSS）而不是可回收的 page cache | `cpp_format::read_index_file`、`20_table`/`50_mutations`/`40_wal` 门禁 |
-| 不再 `malloc_trim` / `posix_fadvise` | 两者都只能通过 FFI（`unsafe`）调用：前者把空闲堆页还给 OS（Gate C 的 RSS 观测），后者丢 clean page cache（长导入的 OOM 边界）。放弃它们后 RSS 会更高、page cache 交给内核回收；结果与字节不受影响 | 同上 |
 | 相关子查询的作用域边界 | 只支持引用**外层关系（FROM 侧）**的相关子查询：引用 JOIN 右侧表、引用派生表（parser 不保留派生表别名，标准 SQL 也要求限定）、或写在 `SEARCH` 的 `WHERE` filter 里时返回错误；不会静默按内层同名列求值（`substitute_outer_row` 只剥掉内层表自己的限定符） | `dependent.rs`、`substitute_outer_row` |
 | `CREATE TABLE … AS SELECT` | 不实现（参考也没有）：`CREATE TABLE t AS SELECT …` 返回参考的 `Status::NoColumnDefined`（`Try to define Table t without any column.`，3048）；带列定义的 `CREATE TABLE t (a INT) AS SELECT …` 在参考是解析错误（`unexpected AS, expecting end of file`），端口同样拒绝 | `select_ddl_ut::create_table_as_select_is_rejected_like_the_reference` |
 | `CREATE VIEW` / `DROP VIEW` | 不实现（参考也没有实现）：`PhysicalCreateView::Execute` 是空壳、DDL 分发没有这个分支，两侧都死在 `UnrecoverableException("Unknown DDL type")`（`query_context_impl.cpp:467`/`:489`），视图不会被登记，`FROM v` 随后报表不存在 | `select_ddl_ut::views_are_rejected_like_the_reference` |
