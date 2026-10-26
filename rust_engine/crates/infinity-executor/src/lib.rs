@@ -9019,17 +9019,24 @@ impl Engine {
         }
         self.note_deletes(table, deletes);
         let ts = self.txn.commit(txn)?;
-        // An UPDATE stages its rewritten rows as an append in the same
-        // transaction (`reserve_rows` already logged the create), so the
-        // block's `version` has to record this ts for them as well
-        // (`BlockVersion::Append`).
-        if appended > 0 {
-            self.settle_append_ts(table, appended, ts);
-        }
-        // `BlockVersion::Delete(row_id, commit_ts)`: the slot carries the
-        // deleting transaction's commit timestamp.
-        self.settle_delete_ts(table, deletes.len(), ts);
-        self.refresh_cpp_block_mirror(table)?;
+        // `CommitBottomDelete` on the table's worker: the block's `version`
+        // records the delete ts (and an UPDATE's rewritten rows' append ts).
+        let bottom_table = table.to_string();
+        let shard_key = bottom_table.clone();
+        let delete_count = deletes.len();
+        self.run_commit_bottom(&shard_key, move |engine| {
+            // An UPDATE stages its rewritten rows as an append in the same
+            // transaction (`reserve_rows` already logged the create), so the
+            // block's `version` has to record this ts for them as well
+            // (`BlockVersion::Append`).
+            if appended > 0 {
+                engine.settle_append_ts(&bottom_table, appended, ts);
+            }
+            // `BlockVersion::Delete(row_id, commit_ts)`: the slot carries the
+            // deleting transaction's commit timestamp.
+            engine.settle_delete_ts(&bottom_table, delete_count, ts);
+            engine.refresh_cpp_block_mirror(&bottom_table)
+        })?;
         Ok(ts)
     }
 
@@ -15476,15 +15483,22 @@ impl Engine {
             t.set_typed_commands(cmds);
         }
         let ts = self.txn.commit(t)?;
-        // The block's `version` and, for a fresh segment, its `catalog|seg|`
-        // record carry this transaction's commit ts (`BlockVersion::Append`,
-        // `TableMeta::AddSegmentWithID`).
-        self.settle_append_ts(table, 1, ts);
-        for segment in segments {
-            self.note_import_ts(table, *segment, ts);
-        }
-        self.dump_hnsw_over_capacity(table);
-        self.dump_secondary_over_capacity(table);
+        // `CommitBottomAppend` for the imported segments on the table's worker.
+        let bottom_table = table.to_string();
+        let shard_key = bottom_table.clone();
+        let bottom_segments = segments.to_vec();
+        self.run_commit_bottom(&shard_key, move |engine| {
+            // The block's `version` and, for a fresh segment, its `catalog|seg|`
+            // record carry this transaction's commit ts (`BlockVersion::Append`,
+            // `TableMeta::AddSegmentWithID`).
+            engine.settle_append_ts(&bottom_table, 1, ts);
+            for segment in &bottom_segments {
+                engine.note_import_ts(&bottom_table, *segment, ts);
+            }
+            engine.dump_hnsw_over_capacity(&bottom_table);
+            engine.dump_secondary_over_capacity(&bottom_table);
+            Ok(())
+        })?;
         Ok(ts)
     }
 
