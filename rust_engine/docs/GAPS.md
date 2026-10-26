@@ -49,7 +49,7 @@
 
 | 项                     | 为什么没覆盖                                                                                                                                                     |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PLAID chunk 字节 | `USING PLAID` 的 k-means 初始化同样是 `std::random_device`，只能按内容比；门禁还没写（EMVB 已闭口，见下） |
+| PLAID 的 `plaid_centroids.bin` 侧文件 | 参考在 dump 时除了 chunk 还写 `idx_<id>/seg_<s>/plaid_centroids.bin`（`SegmentIndexMeta::SavePlaidGlobalCentroids`）：`[u32 dims][u32 nbits][u32 n_centroids][bool has_quantizer]` + centroids（`n×dims` f32）+ `-0.5*||c||` 表（`n` f32）+ `PlaidQuantizer::Save`。**端口不写这个文件**，所以参考读不了端口写的 PLAID 段（端口自己读 chunk 不需要它）。训练仍是 `random_device` 初始化，即便补上也只能按内容比；`test_the_plaid_chunk_matches_by_content` 已按内容比写好并标成 strict `xfail`，补完会立刻报"unexpected pass" |
 
 EMVB 已经闭口：`test_the_emvb_chunk_matches_by_content`（8300 行 `TENSOR(FLOAT,2)`、`pq_subspace_num=2`/`bits=8`）比的是输入决定的结构——chunk 大小、头部的 dims/subspace/bits/centroid 数、以及 `doc_lens`/`doc_segment_offsets`/`doc_offsets` 三张表；centroids、codes、OPQ 旋转是随机训练的结果，不比。对齐过程中修掉两处：`build_emvb` 的 centroid 数改成参考的 `min(sqrt(n), n/32)` 向上取 8 的倍数（原来用 `clamp(n/8, 8, 256)`，8300 行时是 256 而不是 96），以及 `pq_subspace_num`/`pq_subspace_bits` 之前没从索引定义传进 PQ（恒为 1/8）。
 
