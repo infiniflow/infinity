@@ -142,7 +142,7 @@
 | 队列是否有界 | `BlockingQueue` 上限 `DEFAULT_BLOCKING_QUEUE_SIZE = 1024`，满则 `Enqueue` 阻塞（`blocking_queue.cppm:29-99`） | 同：下半部池的 `BlockingQueue`、`BGTaskProcessor` 的队列、追加队列（`sync_channel`）都是 1024 上限，满了生产者在 condvar 上等 | `aligned` | `bg_task_ut`、`test_cross_engine_bytes_20_table.py`（单客户端不会触发反压，行为不变） |
 | tasklet 宽度 | `min(cpu_count, TaskletCount())`（`fragment_context_impl.cpp:1218`） | 同（`tasklet_count`/`block_tasklets`，`operators/mod.rs`） | `aligned` |
 | `TaskletCount` 规则 | 默认 1；filter/project/limit/top/sort 透传；扫描 = 块数（`physical_operator_impl.cpp:47` 起、`physical_scan_base_impl.cpp:86`） | 同（链上解析） | `aligned` |
-| 交换队列容量 | `LocalQueue` 容量由实现决定 | 每 tasklet 一条有界通道，容量 2 个 chunk | `different`（`GAPS.md` §5） |
+| 交换队列容量 | `QueueSourceState::source_queue_` 是 `BlockingQueue`，`DEFAULT_BLOCKING_QUEUE_SIZE` = 1024 个槽，一槽一个 `DataBlock` | 同：每 tasklet 一条 `sync_channel`，容量 1024 个 chunk（chunk 由语句已经物化的行切出，队列不会额外放大内存） | `aligned` | `run_tasklets` 相关单测、`test/sql` 1555/1560 |
 | 无池回退 | 参考没有（池总是存在） | 引擎不在 `Arc` 里或池未挂载时内联执行（`run_commit_bottom`、`run_text_append` 的 `else` 分支） | `n/a` |
 
 ## 5 怎么验证

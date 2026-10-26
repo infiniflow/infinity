@@ -447,10 +447,14 @@ fn run_serial(
 
 /// Capacity of one tasklet's exchange queue, in chunks.
 ///
-/// The reference's exchange queues are bounded the same way: a tasklet blocks
-/// once the fragment above it falls behind, so a merge task sees rows while the
-/// tasklets are still scanning.
-const EXCHANGE_CAPACITY: usize = 2;
+/// The reference's [`QueueSourceState::source_queue_`] is a `BlockingQueue`
+/// with `DEFAULT_BLOCKING_QUEUE_SIZE` (1024) slots, and a slot holds one
+/// `DataBlock`; the same here, so a tasklet blocks only once the sink is more
+/// than 1024 chunks behind. The chunks are built from rows the statement has
+/// already materialised, so the queue cannot grow the relation's footprint.
+///
+/// [`QueueSourceState::source_queue_`]: ../../infinity_executor/index.html
+const EXCHANGE_CAPACITY: usize = 1024;
 
 /// The exchange queue of one parallel fragment: one channel per tasklet,
 /// drained in tasklet order (`FragmentContext::Tasks` hands the merge task the
