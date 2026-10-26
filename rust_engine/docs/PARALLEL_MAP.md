@@ -2,64 +2,151 @@
 
 > 口径见 [`PORTING.md`](PORTING.md) §2.7（在哪跑 / 谁等谁 / 锁的层次 / 池尺寸与回退）
 
+每个结构先写**它做什么**（工作的步骤与落到哪），再给参考与端口的落点、状态与证据——只看"有没有对应类"看不出并行结构是否走样。
+
 状态取值：
 
 | 状态 | 含义 |
 |---|---|
-| `aligned` | 线程归属、等待点、分片与尺寸与参考一致，行为可观察部分相同 |
+| `aligned` | 线程归属、等待点、分片与尺寸与参考一致，可观察行为相同 |
 | `different` | 结构有意不同，已在 [`GAPS.md`](GAPS.md) 或 [`CLASS_MAP.md`](CLASS_MAP.md)「有意的设计变更」登记，写清差异与影响 |
-| `n/a` | 参考有该结构，端口不需要（或反之），不影响等价 |
-
-行内「参考」列给 `文件:行号`，「端口」列给落点，「证据」列给能复现该结论的用例。字节门禁不覆盖并行结构（[`PORTING.md`](PORTING.md) §2.2/§2.7），证据因此分三类：池计数器单测、`EXPLAIN` 类外部口径、并发可见性用例。
+| `n/a` | 参考有该结构、端口不需要（或反之），不影响等价 |
 
 ## 1 线程、队列与池
 
-| 结构 | 参考 | 端口 | 状态 | 证据 |
-|---|---|---|---|---|
-| 事务下半部池 | `BottomExecutor`：`max(2, hardware_concurrency()/2)` 条队列，`crc32(table_id) % n` 路由，worker 里跑 `CommitBottom()`（`bottom_executor_impl.cpp:32-78`、`config_impl.cpp:562-567`） | `infinity_storage::wal::bottom_executor::BottomExecutor`（同一个移植）+ `Engine::run_commit_bottom`；`start_background_tasks` 起池（`lib.rs`） | `aligned` | `an_insert_runs_its_bottom_half_on_the_bottom_executor`（`BOTTOM_WORKS` 计数 + 返回即可查询） |
-| 索引追加队列 | `MemIndexAppender`：**单线程**，非实时全文走 `Submit`（`mem_index_appender_impl.cpp:58`、`new_txn_index_impl.cpp:891-894`） | `MemIndexAppender`（单 worker + channel）+ `Engine::run_text_append`；插入路径的二级/全文/向量缓存整体交给它 | `aligned` | `a_fulltext_insert_runs_on_the_mem_index_appender`（`TEXT_APPENDS` 计数 + `filter_fulltext` 立刻命中） |
-| 后台任务处理器 | `BGTaskProcessor`：**每个实例一个线程**，`DequeueBulk` + `StopProcessorTask`（`background_process_impl.cpp:41-53`）；配额触发的 `DumpMemIndexTask` 走它 | `BGTaskProcessor`（`bg_task.rs:35`，`start_background_tasks` 里 `new(1)`），`DumpMemIndexTask`/`CleanupTask` 经它 | `aligned` | `bg_task_ut`（配额触发、`drain()` 语义） |
-| 周期触发 | **一个** `PeriodicTriggerThread`，1s tick 里跑 checkpoint/compact/optimize/cleanup 四个触发器（`periodic_trigger_thread_impl.cpp:49-74`） | `trigger_loop` 只跑 cleanup/compact/optimize（`start_background_tasks`），checkpoint 与 flush 另由 CLI 的两个线程按 `checkpoint_interval` 驱动 | `different` | `compact_replay_ut`、`cleanup_ut`；差异登记在 `GAPS.md` §5 |
-| WAL 写入与轮换 | 独立的 WAL 写线程消费 `new_wait_flush_`（`wal_manager_impl.cpp:89`、`NewFlush`），`SwapWalFile` 在 checkpoint 事务里换文件 | 没有独立写线程：`TxnManager::commit_at_deferred` 在 `commit_lock` 下直接 `wal.append`；轮换由 CLI 的 `checkpoint_wal` 线程调 `rotate_wal_if_large` | `different` | `test_cross_engine_bytes_40_wal.py`（帧与文件名逐字节相同）；线程差异登记在 `GAPS.md` §5 |
-| 执行期调度 | `TaskScheduler`：`hardware_concurrency()` 个常驻 worker，各带 `FragmentTaskBlockQueue`（`task_scheduler_impl.cpp:61-81`），fragment 之间用队列流水 | 无常驻调度器：`run_tasklets` 每个 fragment 用 `std::thread::scope` 起 `min(cpu, TaskletCount)` 个 tasklet，merge 任务按 tasklet 序从有界通道取 | `different`（`GAPS.md` §5） | `run_operators_splits_a_row_wise_chain_and_limits_after_the_merge`、`the_merge_task_reads_the_tasklets_through_the_exchange_queue` |
-| 事务/行号分配 | `TxnAllocator` 单线程（`txn_allocator_impl.cpp:37`） | 无独立线程：行号在事务内直接分配 | `different`（`GAPS.md` §5） | `wal_shape_ut`（事务号序列与参考相同） |
+### 1.1 事务下半部（`BottomExecutor` + `CommitBottom`）
+
+**做什么**——一次提交的落地工作，按事务的 WAL 命令逐条执行（`NewTxn::CommitBottom`，`new_txn_impl.cpp:4570-4609`）：
+
+1. `APPEND_V2` → `CommitBottomAppend`（`new_txn_data_impl.cpp:1788-1909`）：
+   - 把 `row_ranges_` 按块容量切成块对齐区间；
+   - 每个区间按需建段/块元数据（`AddNewSegmentWithID` / `AddNewBlockWithID`）；
+   - `AppendInBlock`：逐列 `AppendWith` 写列文件与 NULL 位图，再 `version.Append(commit_ts, 行尾)`；
+   - 每个索引 `AppendIndex`：读回该区间 → `AppendMemIndex`（次级/全文/多向量；非实时全文转交给 `MemIndexAppender`）；
+   - 段写满时 `DelUnsealedSegmentID`、建 `fast_rough_filter`、给每个索引提交 `DumpMemIndexTask`。
+2. `DELETE_V2` → `CommitBottomDelete`：只提交段级 `first_delete_ts`（墓碑与 `version` 的删除槽在上半部 `PrepareCommitDelete`/`DeleteInBlock` 已写）。
+3. 其它命令没有底部工作。
+4. `keys_wait_for_commit_` 的 kv 键写上 commit ts，再 `txn_mgr_->CommitBottom(this)`：推进 `current_ts_` 并唤醒在 `commit_cv_` 上等的上半部。
+
+| | |
+|---|---|
+| 参考 | 池：`max(2, hardware_concurrency()/2)` 条队列、`crc32(table_id) % n` 路由（`bottom_executor_impl.cpp:32-78`、`config_impl.cpp:562-567`）；每事务由**一个** worker 跑完上面全部步骤 |
+| 端口 | `infinity_storage::wal::bottom_executor::BottomExecutor` + `Engine::run_commit_bottom`（`BottomWork`：own `Arc<Engine>`、staged appends/deletes/dumps、每表 gate，跑 `run_bottom` 后 condvar 回传）；`start_background_tasks` 起池 |
+| 状态 | `aligned` |
+| 证据 | `an_insert_runs_its_bottom_half_on_the_bottom_executor`（`BOTTOM_WORKS` 计数 + 返回即可查）、字节门禁 `20_table`/`50_mutations` |
+
+### 1.2 索引追加（`MemIndexAppender`）
+
+**做什么**——把一次提交里的倒排写入搬离提交线程（`mem_index_appender_impl.cpp:70-135`，`Process()` 在 :70）：
+
+1. `DequeueBulk` 取出一批 `AppendMemIndexTask`；
+2. 按 `MemoryIndexer` 分组，同一个全文索引的多个块合成一个 `AppendMemIndexBatch`；
+3. `AsyncInsertBottom`：把列向量倒排进该段的内存索引器（分词、位置、行号）；
+4. 批末 `WaitForCompletion` + `CommitSync`；
+5. 逐个 task `Complete()`，释放上半部在 `PostCommit` 里等的 sema。
+
+| | |
+|---|---|
+| 参考 | **单线程**队列（`mem_index_appender_impl.cpp:58`），提交点 `new_txn_index_impl.cpp:891-894`，等待点 `new_txn_impl.cpp:4624-4660` |
+| 端口 | `MemIndexAppender`（单 worker + channel）+ `Engine::run_text_append`：插入路径的二级/全文/向量缓存整体投递，等 job 完成（失败上抛） |
+| 状态 | `aligned` |
+| 证据 | `a_fulltext_insert_runs_on_the_mem_index_appender`（`TEXT_APPENDS` 计数 + 立刻可检索）、`a_tasklet_error_fails_the_statement` |
+
+### 1.3 后台任务处理器（`BGTaskProcessor` / `DumpIndexProcessor`）
+
+**做什么**——执行"不挂在某个语句上"的任务（`background_process_impl.cpp:41-53`、`dump_index_process_impl.cpp:143-160`）：
+
+1. 单线程 `DequeueBulk`；
+2. 按 `BGTaskType` 分发：`kDumpMemIndex` → `DoDump` 打开一个 `kDumpMemIndex` 事务、`DumpMemIndex(...)`、提交（冲突则回滚重试）；`kCleanup` → 删除弃用段文件；其余同类；
+3. `StopProcessorTask` 是同步点：已入队的任务全部跑完才退出。
+
+| | |
+|---|---|
+| 参考 | `BGTaskProcessor` 每实例一个线程；dump 有自己的 `DumpIndexProcessor`（也是单线程），配额触发的 `DumpMemIndexTask` 走它们 |
+| 端口 | `BGTaskProcessor`（`bg_task.rs:35`，`start_background_tasks` 里 `new(1)`）+ `DumpMemIndexTask`/`CleanupTask`（`submit_task`）；`drain()` 对应停止同步点 |
+| 状态 | `aligned` |
+| 证据 | `bg_task_ut`（配额触发、`drain()` 语义）、`dump_mem_index_ut` |
+
+### 1.4 周期触发
+
+**做什么**——按 `[storage]` 的间隔周期性发起后台工作（`periodic_trigger_thread_impl.cpp:49-74`）：每 1s 醒一次，逐个检查 checkpoint / compact / optimize / cleanup 触发器是否到期，到期就 `Trigger()`（分别发起 checkpoint 事务、`CompactTask`、`OptimizeIndexTask`、`CleanupTask`）。
+
+| | |
+|---|---|
+| 参考 | **一个** `PeriodicTriggerThread` 管四个触发器 |
+| 端口 | `trigger_loop` 只跑 cleanup/compact/optimize（`start_background_tasks`）；checkpoint 与 flush 由 CLI 两个线程按 `checkpoint_interval` 驱动 |
+| 状态 | `different`（`GAPS.md` §5） |
+| 证据 | `compact_replay_ut`、`cleanup_ut` |
+
+### 1.5 WAL 写入与轮换
+
+**做什么**——把已取到 commit ts 的事务按提交顺序写进 `wal.log`：写线程消费 `new_wait_flush_`，把每个事务的 `wal_entry_` 追加成帧（帧头含 size/txn_id/CRC）；checkpoint 事务再 `SwapWalFile`，把当前文件改名成 `wal.log.<seal_ts>` 并建新文件。
+
+| | |
+|---|---|
+| 参考 | 独立写线程 `new_flush_thread_`（`wal_manager_impl.cpp:89`、`NewFlush`） |
+| 端口 | 无独立写线程：`TxnManager::commit_at_deferred` 在 `commit_lock` 下直接 `wal.append`（顺序与参考相同）；轮换由 CLI 的 `checkpoint_wal` 线程调 `rotate_wal_if_large` |
+| 状态 | `different`（`GAPS.md` §5） |
+| 证据 | `test_cross_engine_bytes_40_wal.py`（帧与文件名逐字节相同） |
+
+### 1.6 执行期 tasklet
+
+**做什么**——让一条查询的扫描并行（`fragment_context_impl.cpp:1215-1245`）：`FragmentBuilder` 把计划切成 fragment；每个 fragment 按 `min(cpu_count, first_operator->TaskletCount())` 建 tasklet，每个 tasklet 扫自己的块区间并跑行内算子；需要全局视野的算子（TOP/AGGREGATE/MERGE LIMIT）在下一级 fragment 里归并交换队列来的行。
+
+| | |
+|---|---|
+| 参考 | `TaskScheduler` 的 `hardware_concurrency()` 个常驻 worker，各带 `FragmentTaskBlockQueue`（`task_scheduler_impl.cpp:61-81`），fragment 之间以队列流水 |
+| 端口 | 无常驻调度器：`run_tasklets` 每个 fragment 用 `std::thread::scope` 起 `min(cpu, TaskletCount)` 个 tasklet，merge 任务按 tasklet 序从有界通道取；`TaskletCount` 规则与参考一致 |
+| 状态 | `different`（`GAPS.md` §5：无常驻调度器；宽度与规则对齐） |
+| 证据 | `run_operators_splits_a_row_wise_chain_and_limits_after_the_merge`、`the_merge_task_reads_the_tasklets_through_the_exchange_queue`、`test/sql/explain`（fragment 类型是外部口径） |
+
+### 1.7 事务/行号分配
+
+**做什么**——为 append/import/dump/create-index 这类需要新 id 的事务发号（段号、块号、行号），保证同一时刻只有一个分配者、id 连续无洞（`txn_allocator_impl.cpp:56-110`，线程在 :37 起）。
+
+| | |
+|---|---|
+| 参考 | 单线程 `TxnAllocator`，事务在自己的线程里等分配结果 |
+| 端口 | 无独立线程：行号在事务内直接分配（`EngineTxn::append` / `insert_literals_inner`） |
+| 状态 | `different`（`GAPS.md` §5） |
+| 证据 | `wal_shape_ut`（事务号序列与参考相同）、字节门禁里的块/段号 |
 
 ## 2 等待点与可见性
 
-| 语义 | 参考 | 端口 | 状态 | 证据 |
-|---|---|---|---|---|
-| 上半部等自己的下半部 | `Commit` 在 `commit_cv_` 上等 worker 跑完 `CommitBottom`（`new_txn_impl.cpp:2138-2139`） | `commit_deferred` 取 ts、底部工作结束后 `finish_bottom`；`run_commit_bottom` 用 condvar 等 worker | `aligned` | `infinity-txn` 单测、`a_commit_runs_...` |
-| 按 commit_ts 顺序发布 | `bottom_txns_` 按 ts 排序，队首逐个推进 `current_ts_`（`new_txn_manager_impl.cpp:410-457`） | `register_bottom`/`finish_bottom` 屏障，时钟从队首推进，冲突也走同一屏障 | `aligned` | `infinity-txn` 的发布顺序用例 |
-| 行与索引一起可见 | 下半部（行 → 索引）跑完才 `SetTxnCommitted`，`PostCommit` 再等全文追加的 sema（`new_txn_impl.cpp:2138-2141`、`4624-4660`） | `EngineTxn` 路径已延后发布（`commit_deferred` → 索引 → `finish_bottom`）；**语句路径**在 `TxnManager::commit` 时就推进 `current_ts`，行/索引/块镜像在其后补 | `different` | `a_commit_runs_its_bottom_half_on_the_bottom_executor` 只覆盖 `EngineTxn`；语句路径的窗口登记在 `GAPS.md` §2 |
-| dump 任务完成 | `StopProcessorTask::Wait()`（`background_process_impl.cpp:46-53`） | `BGTaskProcessor::drain()` | `aligned` | `bg_task_ut` |
-| 只读事务不占写 ts | `GetReadCommitTS`（`new_txn_impl.cpp:2051-2059`） | `TxnManager::commit` 的 read-only 分支 | `aligned` | `txn_ut` |
+| 等待点 | 参考做的事 | 参考 | 端口 | 状态 | 证据 |
+|---|---|---|---|---|---|
+| 上半部等自己的下半部 | 提交线程把 txn 交给池后睡在 `commit_cv_`，被 `NotifyTopHalf` 唤醒才 `PostCommit`/`SetTxnCommitted` | `new_txn_impl.cpp:2138-2141` | `commit_deferred` → 底部工作 → `finish_bottom`；`run_commit_bottom` 用 condvar 等 worker | `aligned` | `infinity-txn` 单测、`a_commit_runs_its_bottom_half_on_the_bottom_executor` |
+| 按 commit_ts 顺序发布 | `bottom_txns_` 按 ts 排序，队首完成即推进 `current_ts_`；先做完的后序 txn 不越位 | `new_txn_manager_impl.cpp:410-457` | `register_bottom`/`finish_bottom` 屏障（冲突也走同一屏障，ts 空洞保留） | `aligned` | `infinity-txn` 的发布顺序用例 |
+| 行与索引一起可见 | 下半部（行 → 索引）与 `PostCommit` 的 sema 都完成才 `SetTxnCommitted` | `new_txn_impl.cpp:2138-2141`、`4624-4660` | `EngineTxn` 路径已延后发布；`INSERT`/`DELETE`/`IMPORT`/`dump` 在 `TxnManager::commit` 时就推进 `current_ts`，索引在其后补 | `different` | `GAPS.md` §2（唯一待办） |
+| dump 任务完成 | `StopProcessorTask::Wait()` 等已入队任务跑完 | `background_process_impl.cpp:46-53` | `BGTaskProcessor::drain()` | `aligned` | `bg_task_ut` |
+| 只读事务 | `GetReadCommitTS`：不写 WAL、不占写 ts | `new_txn_impl.cpp:2051-2059` | `TxnManager::commit` 的 read-only 分支 | `aligned` | `txn_ut` |
 
 ## 3 锁
 
-| 锁 | 参考 | 端口 | 状态 | 证据 |
-|---|---|---|---|---|
-| 同表下半部顺序 | 由 `BottomExecutor` 分片保证（同表落同一 worker） | `bottom_gates`：`Engine::bottom_gate(table)`，worker 内取该表 gate | `aligned` | `b624fd4a2` 的提交说明与单测 |
-| 块级写锁 | 每块一把 `shared_mutex`（`BlockLock`，`new_txn_data_impl.cpp:930-958`），两表可同时写 | 无块级锁：写批次在 `batch_lock` 下落块镜像，checkpoint 在 `flush_lock` 下整表重写；表元数据共用 `tables` 一把互斥 | `different`（`GAPS.md` §5，性能差异，字节不受影响） | `test_cross_engine_bytes_00_premises.py`（同一目录两引擎先后可读） |
-| 表元数据 | 参考 `new_catalog` 的元数据缓存按条目加锁 | `tables: Arc<Mutex<HashMap<..>>>` 一把全局锁 | `different`（`GAPS.md` §5，性能差异） | 同上 |
-| DDL 串行 | catalog 的 DDL 由目录锁串行 | `ddl_lock` | `aligned` | `test/sql/ddl` |
-| WAL / checkpoint | 参考写 WAL 与 checkpoint 互斥 | `flush_lock` | `aligned` | `test_cross_engine_bytes_40_wal.py` |
-| 批量写 vs 后台 dump | `DumpMemIndex` 事务与 append 争用段 | `batch_lock` | `aligned` | `dump_mem_index_ut` |
+| 锁 | 参考保的是什么 | 参考 | 端口 | 状态 | 证据 |
+|---|---|---|---|---|---|
+| 块级写锁 | 每块一把 `shared_mutex`，列文件写入 + `version.Append` 在同一临界区，不同表可同时写 | `new_txn_data_impl.cpp:930-958` | 无块级锁：写批次在 `batch_lock` 下落块镜像，checkpoint 在 `flush_lock` 下整表重写；表元数据共用 `tables` 一把互斥 | `different`（`GAPS.md` §5，性能差异） | `test_cross_engine_bytes_00_premises.py` |
+| 表元数据 | 元数据缓存按条目加锁，读多写少 | `new_catalog` 的 meta 缓存锁 | `tables: Arc<Mutex<HashMap<..>>>` 一把全局锁 | `different`（`GAPS.md` §5，性能差异） | 同上 |
+| 同表下半部顺序 | 同表事务落同一个 worker，天然串行；跨表并行 | `BottomExecutor::Submit` | `bottom_gates`：`Engine::bottom_gate(table)`，worker 内取该表 gate | `aligned` | 提交 `b624fd4a2` 的单测 |
+| DDL 串行 | DDL 事务串行，避免两次布局重写交错 | catalog 的 DDL 锁 | `ddl_lock` | `aligned` | `test/sql/ddl` |
+| WAL / checkpoint | 写 WAL 与整表 checkpoint 互斥 | `WalManager` 的 flush/checkpoint 串行 | `flush_lock` | `aligned` | `test_cross_engine_bytes_40_wal.py` |
+| 批量写 vs 后台 dump | dump 事务与 append 争用段，靠重试而不是全局锁 | `DumpIndexProcessor::DoDump` 的重试 | `batch_lock`（写批次与 `DumpMemIndexTask` 互斥） | `aligned` | `dump_mem_index_ut` |
 
 ## 4 分片、尺寸与回退
 
-| 项 | 参考 | 端口 | 状态 |
+| 项 | 参考的取值 | 端口 | 状态 |
 |---|---|---|---|
-| 池大小 | `max(2, hardware_concurrency()/2)` | 同（`start_background_tasks`） | `aligned` |
+| 池大小 | `max(2, hardware_concurrency()/2)`，上限 cpu | 同 | `aligned` |
 | 下半部路由键 | `crc32(table_id) % n` | 同（`BottomExecutor::submit`） | `aligned` |
-| 队列是否有界 | `BlockingQueue` 有上限：`DEFAULT_BLOCKING_QUEUE_SIZE = 1024`，`Enqueue` 在满时阻塞（`blocking_queue.cppm:29-99`、`default_values.cppm`） | 下半部池（`VecDeque`）、后台任务处理器（`VecDeque`）、追加队列（`mpsc::channel`）都是无界 | `different`（`GAPS.md` §5） |
-| tasklet 宽度 | `min(cpu_count, first_operator->TaskletCount())`（`fragment_context_impl.cpp:1218`） | 同（`tasklet_count`/`block_tasklets`，`operators/mod.rs`） | `aligned` |
+| 队列是否有界 | `BlockingQueue` 上限 `DEFAULT_BLOCKING_QUEUE_SIZE = 1024`，满则 `Enqueue` 阻塞（`blocking_queue.cppm:29-99`） | 下半部池、后台处理器、追加队列都是无界 `VecDeque`/`mpsc::channel` | `different`（`GAPS.md` §5） |
+| tasklet 宽度 | `min(cpu_count, TaskletCount())`（`fragment_context_impl.cpp:1218`） | 同（`tasklet_count`/`block_tasklets`，`operators/mod.rs`） | `aligned` |
 | `TaskletCount` 规则 | 默认 1；filter/project/limit/top/sort 透传；扫描 = 块数（`physical_operator_impl.cpp:47` 起、`physical_scan_base_impl.cpp:86`） | 同（链上解析） | `aligned` |
-| 交换队列容量 | `LocalQueue` 的阻塞队列容量由实现决定 | 每 tasklet 一条有界通道，容量 2 个 chunk | `different`（`GAPS.md` §5） |
+| 交换队列容量 | `LocalQueue` 容量由实现决定 | 每 tasklet 一条有界通道，容量 2 个 chunk | `different`（`GAPS.md` §5） |
 | 无池回退 | 参考没有（池总是存在） | 引擎不在 `Arc` 里或池未挂载时内联执行（`run_commit_bottom`、`run_text_append` 的 `else` 分支） | `n/a` |
 
 ## 5 怎么验证
 
-1. **池计数器**：`BOTTOM_WORKS`（`an_insert_runs_its_bottom_half_on_the_bottom_executor`）、`TEXT_APPENDS`（`a_fulltext_insert_runs_on_the_mem_index_appender`）、`bg_task_ut` 的 `drain()` 断言——证明工作真的换了线程，而不是文档里写了一句。
+1. **池计数器**：`BOTTOM_WORKS`、`TEXT_APPENDS`、`bg_task_ut` 的 `drain()` 断言——证明工作真的换了线程，而不是文档里写了一句。
 2. **外部口径**：`test/sql/explain/explain_fragment.slt` 钉住 `FRAGMENT (1, <type>)` 与 sink/source，类型由计划里有无阻塞算子决定（`ParallelStream` / `ParallelMaterialize` / `SerialMaterialize`）；`EXPLAIN` 的 merge 算子（`TOP`/`AGGREGATE`）与参考一致。
-3. **可见性单测**：commit-ts 顺序发布、同表下半部顺序、索引写完才返回——都在 `infinity-txn` 与执行器单测里。
+3. **可见性单测**：commit-ts 顺序发布、同表下半部顺序、索引写完才返回——都在 `infinity-txn` 与执行器单测里；语句路径的窗口是 `GAPS.md` §2 的待办。
 4. **并发门禁**：Gate D（`run_gate_d.sh`）覆盖并发本身；字节门禁保持单客户端串行（`PORTING.md` §2.2）。
