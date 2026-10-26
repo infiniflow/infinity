@@ -13,6 +13,8 @@
 | `partial` | 机制已有，但只覆盖一部分路径——行内写清还缺哪一段 |
 | `n/a` | 参考有该结构、端口不需要（或反之），不影响等价 |
 
+并发一律建在 tokio 上（`infinity-executor::scheduler`）：常驻池是一个多线程 runtime，tasklet 是它的 `spawn_blocking` 作业，行号分配器是它的常驻阻塞消费者。唯一保留的命名线程是 `infinity-txn` 的 WAL 写线程——那个 crate 没有 scheduler，且它独占 `wal.log` 句柄直到进程结束。
+
 ## 1 线程、队列与池
 
 ### 1.1 事务下半部（`BottomExecutor` + `CommitBottom`）

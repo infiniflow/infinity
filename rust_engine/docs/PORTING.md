@@ -93,6 +93,10 @@
 2. 与参考比对并行结构的外部口径——`EXPLAIN FRAGMENT` 的 fragment 类型与 sink/source、`EXPLAIN` 里的 merge 算子（`test/sql/explain`，期望值取自参考二进制）；
 3. 并发下的可观察顺序单独写用例（commit-ts 顺序发布、同表下半部按提交顺序）。
 
+**实现选择：并发一律走 tokio，不再手写线程池。** 参考的 `TaskScheduler` 是常驻 worker 池，端口用 tokio 多线程 runtime 承担（`infinity-executor::scheduler`）：tasklet 是 `spawn_blocking` 作业（CPU 密集且阻塞在有界交换队列上），sink 任务提交到同一个池并 `block_on` 等待；行号分配器作为常驻阻塞消费者跑在同一个池上。这样"池多大、谁来调度、任务怎么排队"由框架决定，和参考的 `TaskScheduler` 一一对应，也避免每个 fragment 起线程。
+
+只有两类例外保留命名线程，因为它们持有的是进程级阻塞资源、且所在 crate 没有 scheduler：`infinity-txn` 里的 WAL 写线程（独占 `wal.log` 句柄）。判断标准是"这个循环会不会阻塞在 I/O 或队列上、是否活到进程结束"——会，就用 tokio 的阻塞池或专用线程；能 await 的，用 async 任务。
+
 字节门禁仍保持单客户端串行（§2.2），并发本身的覆盖归 Gate D。逐结构的状态、落点与证据见 [`PARALLEL_MAP.md`](PARALLEL_MAP.md)。
 
 ---

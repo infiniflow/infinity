@@ -43,6 +43,13 @@ impl TaskScheduler {
         self.runtime.spawn_blocking(job);
     }
 
+    /// A long-lived blocking consumer (the row allocator). It holds its queue
+    /// for the life of the process, so it gets one of tokio's blocking threads
+    /// instead of a `std::thread` of its own.
+    pub fn spawn_worker(&self, job: Job) {
+        self.runtime.spawn_blocking(job);
+    }
+
     /// Schedules the fragment's sink task and waits for it, the way the
     /// statement thread waits for the fragment in the reference.
     pub fn run<F, T>(&self, job: F) -> T

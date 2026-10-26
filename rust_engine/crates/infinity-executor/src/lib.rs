@@ -8046,22 +8046,23 @@ impl Engine {
         let engine = self.engine_handle()?;
         let (jobs, queue) = std::sync::mpsc::channel::<AllocJob>();
         let weak = Arc::downgrade(&engine);
-        std::thread::Builder::new()
-            .name("txn-allocator".to_string())
-            .spawn(move || {
-                while let Ok(job) = queue.recv() {
-                    match weak.upgrade() {
-                        Some(engine) => {
-                            engine
-                                .allocator_jobs
-                                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                            job(&engine);
-                        }
-                        None => break,
+        // The consumer lives as long as the engine, so it takes one of the
+        // task scheduler's blocking threads rather than creating a thread of
+        // its own (`TxnAllocator::Start` starts its processor thread; here the
+        // pool already has them).
+        crate::scheduler::scheduler().spawn_worker(Box::new(move || {
+            while let Ok(job) = queue.recv() {
+                match weak.upgrade() {
+                    Some(engine) => {
+                        engine
+                            .allocator_jobs
+                            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        job(&engine);
                     }
+                    None => break,
                 }
-            })
-            .ok()?;
+            }
+        }));
         let allocator = Arc::new(Allocator { jobs });
         *self.allocator.lock().unwrap() = Some(allocator.clone());
         Some(allocator)
