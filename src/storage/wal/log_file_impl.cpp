@@ -63,9 +63,12 @@ std::pair<std::optional<TempWalFileInfo>, std::vector<WalFileInfo>> WalFile::Par
                 continue;
             }
             TxnTimeStamp checkpoint_ts;
-            try {
-                checkpoint_ts = std::stoll(filename.substr(dot_pos + 1));
-            } catch (...) {
+            const std::string suffix = filename.substr(dot_pos + 1);
+            // Use from_chars instead of stoll: stoll silently accepts a numeric prefix
+            // (e.g. "120junk" -> 120), which would let a malformed/corrupted filename be
+            // treated as a valid, and now deletable, wal file with a wrong timestamp.
+            auto [ptr, ec] = std::from_chars(suffix.data(), suffix.data() + suffix.size(), checkpoint_ts);
+            if (ec != std::errc{} || ptr != suffix.data() + suffix.size()) {
                 LOG_WARN(fmt::format("Wal file {} has wrong file name", entry->path().string()));
                 continue;
             }
@@ -90,20 +93,20 @@ std::string WalFile::WalFilename(TxnTimeStamp max_commit_ts) { return fmt::forma
 
 std::string WalFile::TempWalFilename() { return std::string(WAL_FILE_TEMP_FILE); }
 
-// /**
-//  * @brief Gc the old wal files.
-//  * Only delete the wal.log.* files. the wal.log file is current wal file.
-//  * Check if the wal.log.* files are too old.
-//  * if * is less than the max_commit_ts, we will delete it.
-//  */
-// void WalFile::RecycleWalFile(TxnTimeStamp max_commit_ts, const std::string &wal_dir) {
-//     auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
-//     for (const auto &wal_info : wal_infos) {
-//         if (wal_info.max_commit_ts_ <= max_commit_ts) {
-//             LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
-//             VirtualStore::DeleteFile(wal_info.path_);
-//         }
-//     }
-// }
+/**
+ * @brief Gc the old wal files.
+ * Only delete the wal.log.* files. the wal.log file is current wal file.
+ * Check if the wal.log.* files are too old.
+ * if * is less than the max_commit_ts, we will delete it.
+ */
+void WalFile::RecycleWalFile(TxnTimeStamp max_commit_ts, const std::string &wal_dir) {
+    auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
+    for (const auto &wal_info : wal_infos) {
+        if (wal_info.max_commit_ts_ <= max_commit_ts) {
+            LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
+            VirtualStore::DeleteFile(wal_info.path_);
+        }
+    }
+}
 
 } // namespace infinity
