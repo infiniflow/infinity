@@ -638,6 +638,16 @@ private:
 public:
     Status RecoverMemIndex(TableIndexMeta &table_index_meta);
 
+    // Pure range computation (exposed for unit tests). Given the row ranges already covered by
+    // committed chunks ([begin, end) pairs, in any order) and the block layout of the segment,
+    // returns every row range that still has to be rebuilt. Blocks that are fully covered do not
+    // stop the scan; uncovered blocks and uncovered tails contribute ranges.
+    static std::vector<std::pair<RowID, u64>> ComputeMemIndexGapRanges(SegmentID segment_id,
+                                                                       const std::vector<std::pair<SegmentOffset, SegmentOffset>> &covered_ranges,
+                                                                       const std::vector<BlockID> &block_ids,
+                                                                       const std::vector<size_t> &block_row_cnts,
+                                                                       size_t block_capacity);
+
     Status GetFullTextIndexReader(const std::string &db_name, const std::string &table_name, std::shared_ptr<IndexReader> &index_reader);
 
 private:

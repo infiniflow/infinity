@@ -263,9 +263,12 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for minio and run unit test
@@ -355,9 +358,12 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run sqllogictest
@@ -490,9 +496,12 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run pysdk test
@@ -584,9 +593,12 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run Go tests
@@ -669,9 +681,12 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run http test
@@ -752,9 +767,12 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run pysdk test

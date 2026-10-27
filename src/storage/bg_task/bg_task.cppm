@@ -31,6 +31,7 @@ struct MemIndex;
 struct ColumnVector;
 class BaseMemIndex;
 class EMVBIndexInMem;
+class MemoryIndexer;
 class NewTxn;
 
 export struct BGTask {
@@ -194,6 +195,12 @@ public:
 
 public:
     std::shared_ptr<MemIndex> mem_index_{};
+    // The inverted index this task was prepared against. It is bound at submit time (in
+    // NewTxn::AppendMemIndex, right after AsyncInsertTop), because seq_inserted_/doc_count_
+    // are computed on that very indexer. Resolving it again at dequeue time (from mem_index_)
+    // can yield a different -- or already dumped/cleared -- indexer, which silently drops the
+    // rows. Holding a shared_ptr also keeps the indexer alive while the appender uses it.
+    std::shared_ptr<MemoryIndexer> memory_indexer_{};
     std::shared_ptr<ColumnVector> input_column_{};
     BlockOffset offset_{};
     BlockOffset row_cnt_{};

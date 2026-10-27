@@ -48,6 +48,8 @@ import :data_block;
 import :table_def;
 import :index_full_text;
 import :status;
+import :bg_task;
+import :mem_index;
 
 import data_type;
 import internal_types;
@@ -256,6 +258,118 @@ TEST_P(MemoryIndexerTest, SpillLoadTest) {
             ASSERT_EQ(tf, expected.tfs[j]);
         }
     }
+}
+
+// Regression test for the "rows silently missing from the fulltext index" bug:
+//  - one failed inversion must not stall the sorted ring (a missing sequence number used to
+//    block every later Put(), so the index silently stopped being updated), and
+//  - the failed task must be re-inverted with its original doc ids, otherwise the dumped chunk
+//    claims the row while containing none of its postings (permanently invisible).
+// The retry happens in MarkInvertFailed, while the ring still misses this sequence number and no
+// later doc can have been committed: doc lists are delta encoded, so appending the postings
+// after the placeholder had been released would write a smaller doc id behind a larger one.
+TEST_P(MemoryIndexerTest, InvertFailureRetriedOnDump) {
+    auto indexer = std::make_unique<MemoryIndexer>(GetFullDataDir(), "invert_failure", RowID(0U, 0U), flag_, "standard");
+    std::shared_ptr<ColumnVector> column_vector = MakeColumnVector(wiki_paragraphs_);
+    ASSERT_EQ(wiki_paragraphs_.size(), size_t(5));
+
+    std::shared_ptr<MemIndex> no_mem_index;
+    auto submit = [&](u32 row_offset, u32 row_cnt) {
+        auto task = std::make_shared<AppendMemIndexTask>(no_mem_index, column_vector, row_offset, row_cnt);
+        indexer->AsyncInsertTop(task.get());
+        return task;
+    };
+    auto commit_task = [&](const std::shared_ptr<AppendMemIndexTask> &task) {
+        AppendMemIndexBatch batch;
+        batch.InsertTask(task.get());
+        indexer->AsyncInsertBottom(column_vector, task->offset_, task->row_cnt_, task->seq_inserted_, task->doc_count_, &batch);
+        batch.WaitForCompletion();
+        indexer->CommitSync();
+    };
+
+    // Rows 0-1 are inverted normally.
+    commit_task(submit(0, 2));
+
+    // Row 2 fails to invert. This is what the catch blocks of Insert/AsyncInsert/AsyncInsertBottom
+    // now do instead of dropping the sequence number on the floor.
+    auto failed_task = submit(2, 1);
+    ASSERT_EQ(failed_task->doc_count_, 2u);
+    indexer->MarkInvertFailed(failed_task->seq_inserted_, column_vector, failed_task->offset_, failed_task->row_cnt_, failed_task->doc_count_);
+    // The retry succeeds right away, before the placeholder is queued, so nothing is left for the
+    // dump-time fallback (which would append row 2 behind rows 3-4 and break doc order).
+    EXPECT_FALSE(indexer->HasFailedInvertTasks());
+
+    // Rows 3-4 come after the hole and must still reach the posting table. Bounded wait: with a
+    // poisoned ring this has to fail the test instead of hanging it.
+    commit_task(submit(3, 2));
+    for (int i = 0; i < 200 && indexer->GetInflightTasks() > 0; ++i) {
+        indexer->CommitSync(50);
+    }
+    EXPECT_EQ(indexer->GetInflightTasks(), size_t(0));
+
+    {
+        auto reader = std::make_shared<InMemIndexSegmentReader>(SegmentID(0), indexer.get());
+        SegmentPosting seg_posting;
+        // "morphological" only occurs in row 2, which was re-inverted in place.
+        ASSERT_TRUE(reader->GetSegmentPosting("morphological", seg_posting));
+        // "recognize" only occurs in row 3, which is after the failed sequence number.
+        SegmentPosting after_hole_posting;
+        ASSERT_TRUE(reader->GetSegmentPosting("recognize", after_hole_posting));
+        std::shared_ptr<std::vector<SegmentPosting>> seg_postings = std::make_shared<std::vector<SegmentPosting>>();
+        seg_postings->push_back(after_hole_posting);
+        auto posting_iter = std::make_unique<PostingIterator>(flag_);
+        u32 state_pool_size = 0;
+        posting_iter->Init(seg_postings, state_pool_size);
+        EXPECT_EQ(posting_iter->SeekDoc(RowID(0U, 3U)), RowID(0U, 3U));
+    }
+
+    // Dump() must re-invert the failed row before writing the chunk.
+    indexer->Dump(false, /*spill=*/true);
+    EXPECT_FALSE(indexer->HasFailedInvertTasks());
+
+    auto reader = std::make_shared<InMemIndexSegmentReader>(SegmentID(0), indexer.get());
+    SegmentPosting seg_posting;
+    ASSERT_TRUE(reader->GetSegmentPosting("morphological", seg_posting));
+    std::shared_ptr<std::vector<SegmentPosting>> seg_postings = std::make_shared<std::vector<SegmentPosting>>();
+    seg_postings->push_back(seg_posting);
+    auto posting_iter = std::make_unique<PostingIterator>(flag_);
+    u32 state_pool_size = 0;
+    posting_iter->Init(seg_postings, state_pool_size);
+    // The row is restored at its original doc id, not appended at the end.
+    EXPECT_EQ(posting_iter->SeekDoc(RowID(0U, 2U)), RowID(0U, 2U));
+}
+
+// Regression test for the appender race: an AppendMemIndexTask carries the doc-id range that was
+// computed on one specific MemoryIndexer. If a mem-index dump pops and clears that indexer
+// between submit and dequeue, re-resolving it from MemIndex (as the appender used to do) either
+// hits a null pointer or writes the rows into a different/already dumped indexer. The task must
+// therefore own the indexer it was prepared against.
+TEST_P(MemoryIndexerTest, AppendTaskKeepsIndexerWhenMemIndexIsCleared) {
+    auto indexer = std::make_shared<MemoryIndexer>(GetFullDataDir(), "appender_bind", RowID(0U, 0U), flag_, "standard");
+    auto mem_index = std::make_shared<MemIndex>();
+    mem_index->SetFulltextIndex(indexer);
+
+    std::shared_ptr<ColumnVector> column_vector = MakeColumnVector(wiki_paragraphs_);
+    auto task = std::make_shared<AppendMemIndexTask>(mem_index, column_vector, 0, 1);
+    indexer->AsyncInsertTop(task.get());
+    // What NewTxn::AppendMemIndex does right after AsyncInsertTop.
+    task->memory_indexer_ = indexer;
+
+    // A concurrent dump pops the mem index and clears its indexer reference.
+    mem_index->ClearMemIndex();
+    ASSERT_EQ(mem_index->GetFulltextIndex(), nullptr);
+
+    // The task is still self-contained and keeps the indexer alive.
+    ASSERT_NE(task->memory_indexer_, nullptr);
+    AppendMemIndexBatch batch;
+    batch.InsertTask(task.get());
+    task->memory_indexer_->AsyncInsertBottom(task->input_column_, task->offset_, task->row_cnt_, task->seq_inserted_, task->doc_count_, &batch);
+    batch.WaitForCompletion();
+    task->memory_indexer_->CommitSync();
+
+    auto reader = std::make_shared<InMemIndexSegmentReader>(SegmentID(0), indexer.get());
+    SegmentPosting seg_posting;
+    EXPECT_TRUE(reader->GetSegmentPosting("finite", seg_posting));
 }
 
 TEST_P(MemoryIndexerTest, DISABLED_SLOW_SeekPosition) {
