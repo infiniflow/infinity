@@ -34,20 +34,35 @@
 
 ### 2.1 事务冲突检查 / 回滚
 
-参考的冲突检查是**按事务类型成对判定**（`NewTxn::CheckConflictTxnStore` 的二十多个重载），端口只有"KV 键相等 / 键前缀"两条规则；回滚一侧端口没有 RocksDB 事务可回滚，但也没有参考那套逐类型的清理。
+参考的冲突检查是**按事务类型成对判定**（`NewTxn::CheckConflictTxnStore` 的二十多个重载）。端口移植了同一套矩阵：
+`infinity-txn/src/conflict.rs` 的 `TxnOp`（= 参考 `BaseTxnStore::type_` 加上规则要读的字段）与 `conflict_between`，
+每个写语句在提交前用 `Txn::set_op` 声明自己的类型（INSERT/INSERT…SELECT/Thrift Insert → `Append`，COPY 与
+`import_literals` → `Import`，UPDATE → `Update{row_ids, segments}`，DELETE → `Delete{row_ids}`，COMPACT → `Compact`，
+DUMP → `DumpMemIndex`，DDL 各自一种，快照 → `Snapshot`）。
+
+判定是**有方向的**，与参考相同：只有后提交的一方跑检查、只有它自己的重载生效（所以 `Append` 看得到 `DropColumn`
+（4005），`DropColumn` 自己却没有重载，反过来的顺序不冲突）。候选集是 `TxnManager::candidates`（参考的
+`check_txn_map_`）：取号时登记、提交后标 finished、最老活跃 `begin_ts` 以下裁掉。
+
+行级判定不再借用 `del:` 键：DELETE/UPDATE 把行 id 放进 `TxnOp`，按交集比较（对应参考的 `row_ids_`），
+键集比较只留给没有分类的语句（`TxnOp::Other`）。`del:` 键只剩两块用途，都与冲突无关：块格式表达不了的列类型
+仍用它隐藏行（读路径），以及未分类语句的兜底检查。
 
 | 项 | 参考口径 | 端口现状 | 影响 | 依据 |
 |---|---|---|---|---|
-| DML 不进冲突写集 | Append/Import 与 CreateIndex / DropIndex / AddColumn / DropColumn / DropTable / RenameTable 是**表级**冲突（后两类 `retry=false`） | INSERT / INSERT…SELECT / UPDATE / IMPORT 的行走 `typed_commands`，`Txn.writes` 为空，`conflict` 没有可比键 | 并发 DDL 与写入之间没有冲突检查；单进程 SQL 路径靠 `batch_gate` + 提交串行掩盖，多会话会读到半改的布局 | `new_txn_impl.cpp:3347-3424`、`:3426-3495`；`infinity-txn/src/lib.rs:518-560`；`infinity-executor/src/lib.rs:9748`、`:10085`、`:17089` |
-| 无类型化规则矩阵 | Update-vs-Update **表级**、Update-vs-DumpMemIndex **段级**、Compact 与 Delete/Update/Create·DropIndex/Add·DropColumn 冲突、Dump-vs-Dump 直接 `UnrecoverableError` | 只有键相等/前缀：Update 只有行级；Compact 事务只有 typed 命令，**与谁都冲突不了**；两次并发的 dump 互不检测 | 并发 UPDATE 不同行在参考报 4002、端口都成功（结果不坏，口径不同）；COMPACT 与写入、dump 与 update 的互斥缺失 | `new_txn_impl.cpp:4313-4341`、`:3666-3760`、`:4095-4098`；`infinity-txn/src/lib.rs:518-560` |
-| 无 4005、无整句重试 | `retry_query=false` 的冲突返回 4005；QueryContext 对 4002 **无限重跑整条语句** | 只有 4002；`Engine::execute` 每条语句跑一遍 | 冲突时客户端拿到错误而参考会自动重跑；"不可重试"的冲突类型（对象被 drop/rename、列被改）无法表达 | `query_context_impl.cpp:113-119`、`status.cppm:156-159`；`infinity-common/src/error.rs:31`、`:217` |
-| 缺 `kv_commit_ts` 与候选窗口 | 冲突可见性按 **KV 真正提交的时刻**判，边界相等用 `last_kv_commit_ts` / `last_commit_ts` 两个冻结值消歧；候选集来自 `check_txn_map_`，按最老 begin_ts 裁剪 | 按"键最后一次写入的 ts > begin_ts"判；`write_ts` 永不裁剪 | 对端口自己的"提交即可见"模型等价，但边界语义不同；`write_ts` 随写入键数无界增长 | `new_txn_manager_impl.cpp:776-825`、`:669-694`；`infinity-txn/src/lib.rs:290`、`:380-385` |
 | 读没有语句级快照 | 每条语句一个 `begin_ts` + RocksDB 快照，语句内看不到之后的提交 | 普通 SELECT 直接读最新已发布状态（读路径没有 ts 参数） | 一条 SELECT 执行期间别的语句提交的行会出现在结果里；跨语句不受影响（端口没有跨语句事务） | `new_txn_manager_impl.cpp:113`、`kv_store_impl.cpp:429-438`；`infinity-executor/src/lib.rs:14321-14332` |
-| IMPORT/COPY 提交失败不回撤 | `PostRollback` 回滚 KV 事务、删 import 的临时/段目录、`ClearData` | 行在 `commit_at` **之前**就 `publish_rows`/`publish_encoded_rows` 进 buffer，并写 `appends:`/`append_ts:` 侧车；失败后都不撤 | 失败语句留下"幽灵行"：进程内 `row_count` 仍计入，但 checkpoint 按已提交 ts 裁剪不会写它们；只有 WAL/落盘失败能触发 | `new_txn_impl.cpp:4688-4745`；`infinity-executor/src/lib.rs:17102`、`:17489`、`cpp_blocks.rs:3366` |
-| 提交批次不是原子的 | KV 是 RocksDB 事务，行批与目录批同生共死 | `apply_split` 先写行的批（里面带着 `APPLIED_TS_KEY`）、再写目录批；目录批失败/崩溃后 applied 标记已前进 | 崩溃可能丢一批目录记录（DDL），而重放按 applied 标记跳过它们 | `new_txn_impl.cpp:473`；`infinity-txn/src/lib.rs:782-786`、`:1232-1261` |
+| 没有 `kv_commit_ts` | 冲突可见性按 KV 真正提交的时刻判，边界相等用 `last_kv_commit_ts` / `last_commit_ts` 消歧 | 端口的 KV 批就在提交里落（`apply_split`），`commit_ts` 即"KV 提交时刻"，那两个冻结值没有对应物 | 参考里"KV 提交与 commit_ts 不同步"的边界分支在端口不存在；候选可见性用 `finished && commit_ts < begin_ts` 表达同一件事 | `new_txn_manager_impl.cpp:776-825`；`infinity-txn/src/lib.rs:722-760` |
+| `write_ts` 不裁剪 | `check_txn_map_` 随最老 begin_ts 弹出 | 候选表已按同一规则裁剪；`write_ts`（未分类语句的键集兜底）仍只增不减 | 只有 `TxnOp::Other` 的语句会往里写，量很小；长期运行仍是无界增长 | `new_txn_manager_impl.cpp:669-694`；`infinity-txn/src/lib.rs:314` |
+| Optimize 不是事务 | `NewTxn::OptimizeIndex` 是写事务（占 ts、参与矩阵：Optimize-vs-Optimize 恒冲突、vs Append/Update 表级、vs Compact 段级） | 端口 `optimize_indexes` 只 bump `index_epoch` 并重写 chunk，不取 ts、不进候选表 | 并发的两次 optimize、optimize 与写入之间没有冲突保护（结果是内容级重建，不产生行错位） | `new_txn_impl.cpp:3949-4087`；`infinity-executor/src/lib.rs:20028-20037` |
+| Cleanup / Checkpoint 不进候选表 | 两者都是事务，`Cleanup` 与快照冲突 | `append_cleanup` / `append_checkpoint` 各自写帧并花 ts，但不经过 `commit_at`，因此不登记候选 | 快照与 cleanup 并发时没有 4002 | `new_txn_impl.cpp:4410-4466`、`:4536-4558`；`infinity-txn/src/lib.rs:1072-1136` |
 
 已经对齐的部分：begin_ts 取 `current_ts + 1` 且不推进时钟、冲突发生在写 WAL 之前、冲突不写 WAL、
-回滚不回退行号/段号、冲突也推进可见时钟、Delete-vs-Delete 与 Delete-vs-Update 是行级。
+回滚不回退行号/段号、冲突也推进可见时钟、各类规则的表级/行级/段级粒度（见 `conflict.rs` 的单测）、
+`retry_query` 的两档错误（4002 重试 / 4005 直返）、`QueryContext::QueryStatement` 的整句重试、
+IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）、`APPLIED_TS_KEY` 最后写。
+
+测试：`infinity-txn` 的 `conflict::tests::*`（矩阵逐条）、`conflict_check_ut::conflict_check_delete`
+（C++ `conflict_check_ut.cpp` 的移植）、`request_ut::conflict_*`（C++ `conflict_request_ut.cpp` 的十个用例）。
 
 **其余接线项当前为空。** 原先记在这里的接线项——多 fragment/tasklet 与交换队列、`BottomExecutor` 与
 `MemIndexAppender`、相关子查询、压缩/`IMPORT` 的 WAL 帧、DDL 的 typed 命令、`COMPACT` 的候选集、

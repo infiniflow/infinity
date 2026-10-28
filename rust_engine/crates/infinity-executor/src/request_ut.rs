@@ -450,6 +450,43 @@ fn conflict_drop_column_compact() {
     e.execute("SELECT * FROM t1;").unwrap();
 }
 
+/// C++: `src/unit_test/storage/new_request/conflict_request_ut.cpp:693`
+/// (`drop_column_create_index`): dropping the indexed column while the index is
+/// being built leaves at least one of the two committed, and the table stays
+/// readable either way.
+#[test]
+fn conflict_drop_column_create_index() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    let barrier = Barrier::new(2);
+    let mut drop_ok = false;
+    let mut index_ok = false;
+
+    std::thread::scope(|s| {
+        s.spawn(|| {
+            e.execute("CREATE TABLE t1(c1 INT, c2 VARCHAR);").unwrap();
+            e.execute("INSERT INTO t1 VALUES (1, 'abc'), (2, 'def');")
+                .unwrap();
+            barrier.wait();
+            drop_ok = e.execute("ALTER TABLE t1 DROP COLUMN (c1);").is_ok();
+        });
+        s.spawn(|| {
+            barrier.wait();
+            index_ok = e.execute("CREATE INDEX idx1 ON t1 (c1);").is_ok();
+        });
+    });
+
+    assert!(
+        drop_ok || index_ok,
+        "at least one of DROP COLUMN / CREATE INDEX must commit"
+    );
+    // The reference reads the table back after either outcome; the schema it
+    // ends with is the one that committed.
+    e.execute("SELECT * FROM t1;").unwrap();
+    if index_ok && !drop_ok {
+        assert_eq!(count(&e, "t1"), 2);
+    }
+}
 /// C++: `src/unit_test/storage/new_request/conflict_request_ut.cpp:769`
 /// (`delete_append`): a delete and an append racing both commit.
 #[test]

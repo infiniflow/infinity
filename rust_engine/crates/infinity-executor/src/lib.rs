@@ -40,7 +40,7 @@ thread_local! {
 use infinity_storage::secondary_segment::{Key, KeyKind};
 use infinity_storage::MetaStore;
 use infinity_common::TxnTimeStamp;
-use infinity_txn::{Txn, TxnManager};
+use infinity_txn::{Txn, TxnManager, TxnOp};
 
 use crate::fulltext_query::SearchDriver;
 use crate::query_builder::QueryNode;
@@ -4873,6 +4873,10 @@ struct RowCache {
 }
 
 const ROW_CACHE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
+/// How many times a statement re-runs after a retryable conflict
+/// (`QueryContext::QueryStatement` loops without a bound; this only stops a
+/// statement that conflicts with itself).
+const RETRY_LIMIT: usize = 1000;
 
 /// Decoded rows paired with their row ids (the executor's scan unit).
 type TableRows = Vec<(usize, Vec<Value>)>;
@@ -5596,6 +5600,12 @@ impl<'a> EngineTxn<'a> {
             }
         }
         let n = rows.len();
+        if let Some(txn) = self.txn.as_mut() {
+            // `NewTxn::Append`: the store type the conflict matrix reads.
+            txn.set_op(TxnOp::Append {
+                table: table.to_string(),
+            });
+        }
         self.appends.push(StagedAppend {
             table: table.to_string(),
             base,
@@ -5999,9 +6009,10 @@ struct Allocator {
 struct ImportCursor {
     segment: u32,
     offset: u32,
-    /// The append-log records this statement has created, stamped with its
-    /// commit ts as one group (`BlockVersion::Append` per block).
-    records: Vec<usize>,
+    /// Rows per batch, in stream order. The append records they become are
+    /// written **inside the commit** (`PrepareCommitImport` records each block
+    /// in the transaction), so a statement that never commits leaves none.
+    batches: Vec<usize>,
 }
 
 /// Which append records a bottom half has to stamp with its commit ts.
@@ -6201,6 +6212,9 @@ impl Engine {
         engine.txn.append_checkpoint(0)?;
         if !engine.storage.catalog.has_database_record("default_db")? {
             engine.ddl_commit_typed(
+                TxnOp::CreateDatabase {
+                    db: "default_db".to_string(),
+                },
                 || engine.storage.catalog.create_database("default_db", false),
                 |batch| crate::wal_ddl::create_database_command_from_batch(batch, "default_db"),
             )?;
@@ -7064,7 +7078,16 @@ impl Engine {
         let version = self.dump_version(table, index)?;
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
-        self.txn.commit_at(self.txn.begin(), ts)?;
+        let mut dump_txn = self.txn.begin();
+        // `NewTxn::DumpMemIndex`: two dumps never run together (the reference
+        // calls it unrecoverable), and an update on the same segment conflicts
+        // with it.
+        dump_txn.set_op(TxnOp::DumpMemIndex {
+            table: table.to_string(),
+            index: index.to_string(),
+            segments: self.segment_ids(table),
+        });
+        self.txn.commit_at(dump_txn, ts)?;
         // Remember the ts: the `idx_chunk|…|{chunk_id}` record names the
         // transaction whose dump sealed the chunk, and it is this one.
         // `CommitBottom` of the dump transaction, on the table's worker: the
@@ -7908,7 +7931,7 @@ impl Engine {
                     self.txn.end_statement();
                     continue;
                 }
-                let res = self.execute_stmt(&qualified, sql)?;
+                let res = self.execute_stmt_retrying(&qualified, sql)?;
                 // Only small results are worth caching: retaining (and later
                 // cloning on a hit) a whole-table `SELECT *` keeps hundreds of
                 // megabytes to gigabytes alive.
@@ -7929,7 +7952,7 @@ impl Engine {
                 self.result_cache.lock().unwrap().clear();
                 self.plan_cache.clear();
             }
-            out.push(self.execute_stmt(&qualified, sql)?);
+            out.push(self.execute_stmt_retrying(&qualified, sql)?);
             // Durability: a committed mutation must survive a crash, so both the
             // catalog and the row/meta KV are fsynced before acknowledging.
             if mutating {
@@ -9227,7 +9250,11 @@ impl Engine {
         // A `COPY` that arrives in several batches is still **one** statement
         // (the reference's `Import` writes every block in one transaction), so
         // only its first batch opens a segment; the rest continue it.
-        let opens_segment = new_segment && off > 0;
+        // `off > 0` is the "this segment already holds rows" test; a segment
+        // that was *claimed* but not filled yet (an import that opened it and
+        // has not written its first batch) is already taken as well, or a second
+        // `COPY` would reuse its ids.
+        let opens_segment = new_segment && (off > 0 || entry.segments.contains_key(&seg));
         let after_sealed_segment = !copy && sealed;
         if opens_segment || after_sealed_segment {
             seg += 1;
@@ -9262,16 +9289,16 @@ impl Engine {
     /// The import's first batch: opens a segment of the statement's own and
     /// hands back its cursor (`TableMeta::GetSegmentIDs1` -> `ApplySegmentIDs`
     /// in the reference, which is what keeps another writer out of it).
-    fn begin_import(&self, table: &str, n: usize) -> Result<(RowRange, ImportCursor)> {
-        let range = self.reserve_rows_from(table, n, true, true, None)?;
-        Ok((
-            range,
-            ImportCursor {
-                segment: (range.base >> 32) as u32,
-                offset: ((range.base & 0xffff_ffff) + n) as u32,
-                records: vec![range.append],
-            },
-        ))
+    fn begin_import(&self, table: &str) -> Result<ImportCursor> {
+        // `ApplySegmentIDs`: the statement claims a fresh segment and owns every
+        // offset in it. No append record is written yet - the whole import is
+        // one transaction, and its records are only created when it commits.
+        let range = self.reserve_rows_from(table, 0, true, true, None)?;
+        Ok(ImportCursor {
+            segment: (range.base >> 32) as u32,
+            offset: 0,
+            batches: Vec::new(),
+        })
     }
 
     /// The import's next batch: continues **its own** segment.
@@ -9324,15 +9351,17 @@ impl Engine {
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
         }
-        let append = self.note_append(table, n, true, None);
-        let mut records = cursor.records.clone();
-        records.push(append);
+        let mut batches = cursor.batches.clone();
+        batches.push(n);
         (
-            RowRange { base, append },
+            RowRange {
+                base,
+                append: usize::MAX,
+            },
             ImportCursor {
                 segment: cursor.segment,
                 offset,
-                records,
+                batches,
             },
         )
     }
@@ -9715,7 +9744,18 @@ impl Engine {
             }
         }
         // one transaction -> one WAL record + one KV batch (batched durability)
-        let t = self.txn.begin();
+        let mut t = self.txn.begin();
+        // `NewTxn::Append` / `NewTxn::Import`: the conflict matrix compares the
+        // store types, so an append meets a schema or index change on the table.
+        t.set_op(if new_segment {
+            TxnOp::Import {
+                table: table.to_string(),
+            }
+        } else {
+            TxnOp::Append {
+                table: table.to_string(),
+            }
+        });
         let mut encoded_rows: Vec<String> = Vec::with_capacity(rows.len());
         for row in rows.iter() {
             // The rows are written by the bottom half, not by this batch: the
@@ -9990,6 +10030,12 @@ impl Engine {
         for seq in deletes {
             txn.delete_deferred(del_key(table, *seq));
         }
+        // `NewTxn::Delete`: row level against other deletes and updates, table
+        // level against a compaction.
+        txn.set_op(TxnOp::Delete {
+            table: table.to_string(),
+            rows: deletes.iter().map(|seq| *seq as u64).collect(),
+        });
         let ts = self.txn.commit_deferred(txn)?;
         let _visible = BottomGuard::new(&self.txn, ts);
         // `CommitBottomDelete` on the table's worker: the block's `version`
@@ -10076,6 +10122,16 @@ impl Engine {
         for seq in deletes {
             txn.delete_deferred(del_key(table, *seq));
         }
+        // `NewTxn::Update`: table level against another update, row level
+        // against a delete, segment level against a memory-index dump.
+        let mut segments: Vec<u32> = deletes.iter().map(|seq| (*seq >> 32) as u32).collect();
+        segments.sort_unstable();
+        segments.dedup();
+        txn.set_op(TxnOp::Update {
+            table: table.to_string(),
+            rows: deletes.iter().map(|seq| *seq as u64).collect(),
+            segments,
+        });
         // `GetWriteCommitTS` -> `SubmitForAllocation`: the ids are taken in
         // commit-ts order, so a checkpoint always sees a dense prefix.
         let turn = self.txn.begin_write();
@@ -10342,6 +10398,7 @@ impl Engine {
     /// is durable at commit), so this only changes the WAL's bytes.
     fn ddl_commit_typed<T>(
         &self,
+        op: TxnOp,
         f: impl FnOnce() -> Result<T>,
         typed_builder: impl FnOnce(&[(Vec<u8>, Option<Vec<u8>>)]) -> Option<infinity_storage::WalCmd>,
     ) -> Result<T> {
@@ -10365,6 +10422,10 @@ impl Engine {
         Catalog::restamp(&mut batch, commit_ts);
         let typed = typed_builder(&batch);
         let mut txn = self.txn.begin();
+        // The reference's store type: the conflict matrix reads it, so a DDL
+        // meets the appends/updates/compactions that overlap with it
+        // (`NewTxn::CheckConflictTxnStore`).
+        txn.set_op(op);
         for (key, value) in batch {
             match value {
                 Some(value) => txn.put(key, value),
@@ -10376,6 +10437,44 @@ impl Engine {
         }
         self.txn.commit_at(txn, commit_ts)?;
         Ok(out)
+    }
+
+    /// `QueryContext::QueryStatement`: a **retryable** conflict re-runs the
+    /// whole statement against a fresh transaction
+    /// (`query_context_impl.cpp:114-121`), and a non-retryable one goes back to
+    /// the client (4005).
+    ///
+    /// The reference retries without a bound (the conflicting transaction
+    /// finishes and the retry sees it, so the loop converges). The bound here
+    /// only keeps a statement that conflicts with itself from spinning: the
+    /// retry is given up after a thousand turns, and a turn that saw no commit
+    /// at all yields the CPU first.
+    fn execute_stmt_retrying(&self, stmt: &Statement, sql: &str) -> Result<QueryResult> {
+        for _ in 0..RETRY_LIMIT {
+            let before = self.txn.current_ts();
+            match self.execute_stmt(stmt, sql) {
+                Err(Error::TxnConflict(_reason)) => {
+                    // `QueryStatementInternal` begins a new transaction for the
+                    // retry, so the statement spends another txn id.
+                    self.txn.end_statement();
+                    self.txn.ensure_statement_id();
+                    // The conflicting transaction may still be committing (its
+                    // commit ts is taken, its entry not yet written): give it
+                    // the CPU instead of binning the statement.
+                    if self.txn.current_ts() == before {
+                        std::thread::yield_now();
+                    }
+                    continue;
+                }
+                Err(Error::TxnConflictNoRetry(reason)) => {
+                    return Err(Error::TxnConflictNoRetry(reason))
+                }
+                other => return other,
+            }
+        }
+        Err(Error::TxnConflict(format!(
+            "the statement kept conflicting for {RETRY_LIMIT} attempts"
+        )))
     }
 
     /// Runs one statement with the query registry open around it (C++
@@ -10572,6 +10671,10 @@ impl Engine {
                     name.rsplit('.').next().unwrap_or(name),
                 )?;
                 let t = self.ddl_commit_typed(
+                    TxnOp::CreateTable {
+                        db: split_table_name(name).0,
+                        table: name.clone(),
+                    },
                     || {
                         self.create_table_clearing_orphans(
                             name,
@@ -10686,6 +10789,11 @@ impl Engine {
                 let keep: Vec<infinity_catalog::IndexMeta> = self.storage.catalog.list_indexes()?;
                 let rename_cmd = self.rename_table_command(table, new_name)?;
                 self.ddl_commit_typed(
+                    TxnOp::RenameTable {
+                        db: split_table_name(table).0,
+                        old: table.to_string(),
+                        new: new_name.to_string(),
+                    },
                     || {
                         // Rename **first**: under the cpp_only backend the whole
                         // index list is derived from the layout, so a rename
@@ -10780,6 +10888,10 @@ impl Engine {
                 self.invalidate_block_mirror(table);
                 let dc_cmd = self.drop_columns_command(table, column)?;
                 self.ddl_commit_typed(
+                    TxnOp::DropColumn {
+                        table: table.to_string(),
+                        columns: vec![column.to_string()],
+                    },
                     || {
                         self.storage.catalog.drop_column(table, column)?;
                         if let Some(im) = self
@@ -10871,6 +10983,9 @@ impl Engine {
                 // rewrite that dropped its tombstones would renumber its rows.
                 let before_columns = self.fetch_rows_including_deleted(table)?;
                 self.ddl_commit_typed(
+                    TxnOp::AddColumn {
+                        table: table.to_string(),
+                    },
                     || {
                         self.storage.catalog.add_columns_typed_with_sparse_stores(
                             table,
@@ -10927,6 +11042,7 @@ impl Engine {
                 if_not_exists,
             } => {
                 self.ddl_commit_typed(
+                    TxnOp::CreateDatabase { db: name.clone() },
                     || self.storage.catalog.create_database(name, *if_not_exists),
                     |batch| crate::wal_ddl::create_database_command_from_batch(batch, name),
                 )?;
@@ -10968,6 +11084,7 @@ impl Engine {
                     .map(|t| t.name)
                     .collect();
                 self.ddl_commit_typed(
+                    TxnOp::DropDatabase { db: name.clone() },
                     || {
                         let existed = self.storage.catalog.drop_database(name, *if_exists)?;
                         if existed || *if_exists {
@@ -11386,6 +11503,11 @@ impl Engine {
                 let table_name = table.rsplit('.').next().unwrap_or(table).to_string();
                 let table_key = self.table_catalog_key(table)?;
                 self.ddl_commit_typed(
+                    TxnOp::CreateIndex {
+                        table: table.clone(),
+                        index: name.clone(),
+                        columns: vec![column.clone()],
+                    },
                     || {
                         self.storage
                             .catalog
@@ -11492,8 +11614,14 @@ impl Engine {
                     return Err(Error::Invalid(format!("table '{name}' does not exist")));
                 }
                 let drop_cmd = self.drop_table_command(name)?;
-                let existed =
-                    self.ddl_commit_typed(|| self.drop_table_all(name), |_batch| drop_cmd.clone())?;
+                let existed = self.ddl_commit_typed(
+                    TxnOp::DropTable {
+                        db: split_table_name(name).0,
+                        table: name.clone(),
+                    },
+                    || self.drop_table_all(name),
+                    |_batch| drop_cmd.clone(),
+                )?;
                 if existed {
                     self.drop_text_index_storage(name, None);
                 }
@@ -11520,6 +11648,13 @@ impl Engine {
                     .unwrap_or(false);
                 let drop_idx_cmd = self.drop_index_command(name)?;
                 let existed = self.ddl_commit_typed(
+                    TxnOp::DropIndex {
+                        table: target
+                            .as_ref()
+                            .map(|(table, _, _)| table.clone())
+                            .unwrap_or_default(),
+                        index: name.clone(),
+                    },
                     || self.storage.catalog.drop_index(name),
                     |_batch| drop_idx_cmd,
                 )?;
@@ -14923,6 +15058,11 @@ impl Engine {
         // compacted state: a row moved from `old` to its destination also
         // leaves a tombstone for `old`, otherwise replay would resurrect it.
         let mut t = self.txn.begin();
+        // `NewTxn::Compact`: exclusive per table against writes and index DDL.
+        t.set_op(TxnOp::Compact {
+            table: table.to_string(),
+            segments: source_ids.clone(),
+        });
         // `CompactTxnStore::ToWalEntry`: one `CompactV2` command carrying the
         // merged segment and the deprecated ids, instead of the row moves
         // (`new_txn_data_impl.cpp:753`), followed by the compaction's own
@@ -17072,7 +17212,7 @@ impl Engine {
         mut t: Txn,
         segments: &[u32],
         encoded_rows: &[(usize, String)],
-        append_records: &[usize],
+        batches: &[usize],
     ) -> Result<u64> {
         let mut cmds = Vec::new();
         for segment in segments {
@@ -17088,25 +17228,29 @@ impl Engine {
         if !cmds.is_empty() {
             t.set_typed_commands(cmds);
         }
-        // `PrepareCommitImport` writes the blocks *before* the transaction
-        // commits, so the log's `ImportV2` frame does not have to carry the
-        // rows: a crash between the two leaves them on disk. The timestamp is
-        // reserved first because every block's `version` has to carry it.
+        t.set_op(TxnOp::Import {
+            table: table.to_string(),
+        });
+        // `PrepareCommitImport` -> `CommitBottomAppend`: the blocks and the
+        // `create` boundaries they carry belong to the transaction, so they are
+        // written **after** it commits - a statement that loses its commit
+        // leaves no rows, no extent and no `version` boundary behind (the
+        // reference deletes the segment directory in `PostRollback`).
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
+        let ts = self.txn.commit_at_deferred(t, ts)?;
+        let _visible = BottomGuard::new(&self.txn, ts);
         // Every block the import wrote carries this transaction's ts: the
         // reference's `CommitBottomAppend` appends each block's row count to the
         // block's `version` inside the import transaction, so all of them share
         // it, not just the last one.
-        for record in append_records {
-            self.settle_append_at(table, *record, ts);
+        for rows in batches {
+            self.note_append(table, *rows, true, Some(ts));
         }
         for segment in segments {
             self.note_import_ts(table, *segment, ts);
         }
         self.publish_encoded_rows(table, encoded_rows)?;
-        let ts = self.txn.commit_at(t, ts)?;
-        let _visible = BottomGuard::new(&self.txn, ts);
         // `CommitBottomAppend` for the imported segments on the table's worker.
         let bottom_table = table.to_string();
         let shard_key = bottom_table.clone();
@@ -17194,24 +17338,32 @@ impl Engine {
             }
             let t_parse = t0.elapsed();
             let t1 = std::time::Instant::now();
-            let range = self.reserve_rows_from(table, rows.len(), true, true, None)?;
+            // `ApplySegmentIDs`: a segment of the statement's own, with no
+            // append record yet - the records are written when it commits.
+            let opened = self.begin_import(table)?;
+            let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened)?;
             let base = range.base;
             self.note_index_insert(table, rows.len());
             let mut t = self.txn.begin();
+            t.set_op(TxnOp::Import {
+                table: table.to_string(),
+            });
             t.set_typed_commands(vec![self.import_command(table, (base >> 32) as u32)?]);
             let t_encode = t1.elapsed();
             let t2 = std::time::Instant::now();
-            // Blocks first, then the log (`PrepareCommitImport`), so replay of
-            // the row-less `ImportV2` frame never has to rebuild them.
+            // `PrepareCommitImport` -> `CommitBottomAppend`: the block and the
+            // `create` boundary belong to the transaction, so they are written
+            // once it commits - a statement that loses its commit leaves
+            // neither behind.
             let turn = self.txn.reserve_commit_ts();
-        let ts = turn.ts();
-            self.settle_append_at(table, range.append, ts);
-            self.note_import_ts(table, (base >> 32) as u32, ts);
-            self.publish_rows(table, base, &rows)?;
-            let ts = self.txn.commit_at(t, ts)?;
+            let ts = turn.ts();
+            let ts = self.txn.commit_at_deferred(t, ts)?;
             let t_commit = t2.elapsed();
             let t3 = std::time::Instant::now();
             let _visible = BottomGuard::new(&self.txn, ts);
+            self.note_append(table, rows.len(), true, Some(ts));
+            self.note_import_ts(table, (base >> 32) as u32, ts);
+            self.publish_rows(table, base, &rows)?;
             drop(_visible);
             let t_bottom = t3.elapsed();
             if profile {
@@ -17259,7 +17411,6 @@ impl Engine {
         // shared counter belongs to whoever allocated last, so reading it again
         // per batch would start this file's next block after an `INSERT`'s rows.
         let mut cursor: Option<ImportCursor> = None;
-        let mut append_records: Vec<usize> = Vec::new();
         // `NewTxn::Import` is one transaction for the whole statement, so the
         // rows are staged into a single `Txn` and committed once - at the end,
         // for every size (the commit below keys on `staged`).
@@ -17318,18 +17469,13 @@ impl Engine {
                 // shared counter belongs to whoever allocated last, and an
                 // `INSERT` during a long `COPY` moves it on.
                 let (range, next_cursor) = match cursor.take() {
-                    Some(cursor) => {
-                        let (range, next) =
-                            self.reserve_import_rows(table, batch.len(), cursor)?;
-                        (range, next)
-                    }
+                    Some(cursor) => self.reserve_import_rows(table, batch.len(), cursor)?,
                     None => {
-                        let (range, next) = self.begin_import(table, batch.len())?;
-                        (range, next)
+                        let opened = self.begin_import(table)?;
+                        self.reserve_import_rows(table, batch.len(), opened)?
                     }
                 };
                 let base = range.base;
-                append_records.push(range.append);
                 cursor = Some(next_cursor);
                 self.note_index_insert(table, batch.len());
                 for (k, row) in batch.iter().enumerate() {
@@ -17356,7 +17502,8 @@ impl Engine {
             }
         }
         if staged > 0 {
-            self.commit_import_chunk(table, t, &segments, &encoded_rows, &append_records)?;
+            let batches = cursor.map(|cursor| cursor.batches).unwrap_or_default();
+            self.commit_import_chunk(table, t, &segments, &encoded_rows, &batches)?;
         } else {
             drop(t);
         }
@@ -17477,18 +17624,23 @@ impl Engine {
         if rows.is_empty() {
             return Ok(QueryResult::Inserted { count: 0 });
         }
-        let range = self.reserve_rows_from(table, rows.len(), true, true, None)?;
+        let opened = self.begin_import(table)?;
+        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened)?;
         let base = range.base;
         self.note_index_insert(table, rows.len());
-        let t = self.txn.begin();
+        let mut t = self.txn.begin();
+        t.set_op(TxnOp::Import {
+            table: table.to_string(),
+        });
         // `PrepareCommitImport` seals the segment and writes its rows into the
-        // block before the log entry exists, so the frame carries no rows.
+        // block as part of the transaction, after it commits.
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
-        self.settle_append_at(table, range.append, ts);
-        self.note_import_ts(table, (base >> 32) as u32, ts);
+        let _ts = self.txn.commit_at_deferred(t, ts)?;
+        let _visible = BottomGuard::new(&self.txn, _ts);
+        self.note_append(table, rows.len(), true, Some(_ts));
+        self.note_import_ts(table, (base >> 32) as u32, _ts);
         self.publish_rows(table, base, &rows)?;
-        let _ts = self.txn.commit_at(t, ts)?;
         for (k, row) in rows.iter().enumerate() {
             self.update_indexes_on_insert(table, base + k, row)?;
             let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();

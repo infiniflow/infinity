@@ -2059,9 +2059,12 @@ impl Engine {
                 if !contiguous {
                     return Err(Error::Invalid(format!(
                         "table '{table}': block {segment_id}.{block_index} holds {} of the {} rows \
-                         committed at ts {checkpoint_ts}",
+                         committed at ts {checkpoint_ts} (ids {}..{}, window {first_id}..{})",
                         chunk.len(),
-                        end - start
+                        end - start,
+                        chunk.first().map(|(seq, _)| *seq).unwrap_or(0),
+                        chunk.last().map(|(seq, _)| *seq).unwrap_or(0),
+                        first_id + (end - start)
                     )));
                 }
                 block_rows.extend(

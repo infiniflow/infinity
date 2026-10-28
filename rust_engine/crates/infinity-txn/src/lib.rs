@@ -17,8 +17,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod conflict;
 pub mod state;
 
+pub use conflict::{conflict_between, Conflict, RowKey, TxnOp};
 pub use state::{transaction_type_to_str, txn_state_to_str, TransactionType, TxnState};
 
 use std::collections::HashMap;
@@ -87,6 +89,11 @@ pub struct Txn {
     /// `KvBatch` for the catalog records, so the WAL matches the reference.
     typed_commands: Vec<WalCmd>,
     reads: ReadSet,
+    /// What the transaction does, in the reference's terms (`NewTxn`'s
+    /// `BaseTxnStore::type_` plus the fields its conflict rules read). The
+    /// executor sets it before committing; [`TxnOp::Other`] keeps the key-set
+    /// check for statements the matrix has no rule for.
+    op: TxnOp,
     /// The manager's active-transaction registry (C++ `txn_map_`). Dropping a
     /// transaction that was neither committed nor rolled back releases its
     /// slot, as `~NewTxn` calls `RollBackTxn` in the reference.
@@ -126,6 +133,15 @@ impl Txn {
     /// Records a read of every key under `prefix` (C++ `NewTxn` range read).
     pub fn read_prefix(&mut self, prefix: impl Into<Vec<u8>>) {
         self.reads.prefixes.push(prefix.into());
+    }
+    /// Declares what this transaction does (`NewTxn`'s store type). The
+    /// conflict check turns into the reference's per-type matrix instead of the
+    /// key-set comparison as soon as it is set.
+    pub fn set_op(&mut self, op: TxnOp) {
+        self.op = op;
+    }
+    pub fn op(&self) -> &TxnOp {
+        &self.op
     }
     pub fn len(&self) -> usize {
         self.writes.len() + self.deletes.len()
@@ -291,6 +307,11 @@ pub struct TxnManager {
     /// C++ `NewTxnManager::txn_map_`: the live transactions, in begin order for
     /// `SHOW TRANSACTIONS`.
     active: Arc<Mutex<HashMap<u64, TxnInfo>>>,
+    /// C++ `NewTxnManager::check_txn_map_`: every write transaction that took a
+    /// commit ts, keyed by that ts, with the store type its conflict rules
+    /// read. An entry is pruned once no live transaction can still conflict
+    /// with it (`commit_ts < oldest begin_ts`).
+    candidates: Mutex<std::collections::BTreeMap<TxnTimeStamp, Candidate>>,
     /// Serialises the checkpoint/cleanup writers, which do not take a commit
     /// ts turn of their own.
     commit_lock: Mutex<()>,
@@ -307,6 +328,14 @@ pub struct TxnManager {
     /// clock can only advance past the **smallest** unfinished ts.
     bottom_txns: Mutex<std::collections::BTreeMap<TxnTimeStamp, bool>>,
     bottom_cv: std::sync::Condvar,
+}
+
+/// One entry of `NewTxnManager::check_txn_map_`: what a transaction that took a
+/// commit ts does, and whether it has finished.
+struct Candidate {
+    txn_id: u64,
+    op: TxnOp,
+    finished: bool,
 }
 
 /// One write transaction's place in commit-ts order (`NewTxnManager::
@@ -349,6 +378,7 @@ struct CommitRelease<'a> {
 impl Drop for CommitRelease<'_> {
     fn drop(&mut self) {
         if !self.committed.get() {
+            self.manager.finish_candidate(self.ts, false);
             self.manager.finish_bottom(self.ts);
         }
         self.manager.turn_done(self.ts);
@@ -422,6 +452,7 @@ impl TxnManager {
             total_rolled_back: AtomicU64::new(0),
             write_ts: Mutex::new(write_ts),
             active: Arc::new(Mutex::new(HashMap::new())),
+            candidates: Mutex::new(std::collections::BTreeMap::new()),
             commit_lock: Mutex::new(()),
             turns: Mutex::new(std::collections::BTreeSet::new()),
             turn_cv: std::sync::Condvar::new(),
@@ -517,14 +548,63 @@ impl TxnManager {
             deferred_deletes: Vec::new(),
             typed_commands: Vec::new(),
             reads: ReadSet::default(),
+            op: TxnOp::Other,
             active: self.active.clone(),
         }
     }
 
-    /// C++: `NewTxnManager::CheckConflict1` — `true` when some transaction
-    /// committed after `txn.begin_ts` touched a key or key range the
-    /// transaction read or wrote.
-    fn conflict(&self, txn: &Txn, seen: &HashMap<Vec<u8>, TxnTimeStamp>) -> Option<String> {
+    /// C++ `NewTxnManager::CheckConflict1`: the reference's matrix against every
+    /// transaction that took an earlier commit ts, falling back to the key-set
+    /// comparison for a statement the executor did not classify
+    /// ([`TxnOp::Other`]).
+    fn conflict(
+        &self,
+        txn: &Txn,
+        seen: &HashMap<Vec<u8>, TxnTimeStamp>,
+    ) -> Option<(Conflict, String)> {
+        if let Some(conflict) = self.matrix_conflict(txn) {
+            return Some(conflict);
+        }
+        if txn.op != TxnOp::Other {
+            // A classified statement is judged by its store type alone: the
+            // reference has no row-level `del:` key to compare, and its rules
+            // already cover what the key check would have found.
+            return None;
+        }
+        self.key_conflict(txn, seen)
+            .map(|reason| (Conflict::Retry, reason))
+    }
+
+    /// The reference's `CheckConflictTxnStore` over the candidate map.
+    ///
+    /// A candidate is any transaction that took a commit ts this one's snapshot
+    /// could not have seen: still in flight, or finished at or above
+    /// `begin_ts`.
+    fn matrix_conflict(&self, txn: &Txn) -> Option<(Conflict, String)> {
+        let candidates = self.candidates.lock().unwrap();
+        for (ts, candidate) in candidates.iter() {
+            if candidate.txn_id == txn.id {
+                continue;
+            }
+            if candidate.finished && *ts < txn.begin_ts {
+                continue;
+            }
+            if let Some(conflict) = conflict_between(&txn.op, &candidate.op) {
+                return Some((
+                    conflict,
+                    format!(
+                        "transaction {} (commit ts {}) conflicts with {:?}",
+                        candidate.txn_id, ts, candidate.op
+                    ),
+                ));
+            }
+        }
+        None
+    }
+
+    /// The key-set check: a key this transaction wrote, deleted or read was
+    /// touched after it began.
+    fn key_conflict(&self, txn: &Txn, seen: &HashMap<Vec<u8>, TxnTimeStamp>) -> Option<String> {
         let newer = |key: &[u8]| seen.get(key).is_some_and(|ts| *ts > txn.begin_ts);
         for (key, _) in &txn.writes {
             if newer(key) {
@@ -566,6 +646,44 @@ impl TxnManager {
             }
         }
         None
+    }
+
+    /// `GetWriteCommitTS` -> `check_txn_map_.emplace`: the transaction becomes a
+    /// conflict candidate for everything that is still running.
+    fn note_candidate(&self, txn: &Txn, commit_ts: TxnTimeStamp) {
+        let oldest = self
+            .active
+            .lock()
+            .unwrap()
+            .values()
+            .map(|info| info.begin_ts)
+            .min()
+            .unwrap_or(TxnTimeStamp::MAX);
+        let mut candidates = self.candidates.lock().unwrap();
+        // A transaction that committed before the oldest live transaction began
+        // can no longer conflict with anything (`CleanupTxnBottomNolock`,
+        // `new_txn_manager_impl.cpp:669-694`).
+        candidates.retain(|ts, _| *ts >= oldest);
+        candidates.insert(
+            commit_ts,
+            Candidate {
+                txn_id: txn.id,
+                op: txn.op.clone(),
+                finished: false,
+            },
+        );
+    }
+
+    /// A committed transaction stays a candidate (older snapshots still have to
+    /// see it); a rolled-back one never happened.
+    fn finish_candidate(&self, commit_ts: TxnTimeStamp, committed: bool) {
+        let mut candidates = self.candidates.lock().unwrap();
+        match candidates.get_mut(&commit_ts) {
+            Some(candidate) if committed => candidate.finished = true,
+            _ => {
+                candidates.remove(&commit_ts);
+            }
+        }
     }
 
     /// Commits: validate against newer transactions, append the typed command
@@ -756,15 +874,20 @@ impl TxnManager {
             committed: &committed,
         };
         self.register_bottom(commit_ts);
+        self.note_candidate(&txn, commit_ts);
         {
             let seen = self.write_ts.lock().unwrap();
-            if let Some(reason) = self.conflict(&txn, &seen) {
+            if let Some((kind, reason)) = self.conflict(&txn, &seen) {
                 // The timestamp is spent; `CommitBottom` advances `current_ts_`
                 // past it in commit-ts order even when the transaction rolled
                 // back, so the clock keeps the same hole.
                 drop(seen);
+                self.finish_candidate(commit_ts, false);
                 self.finish_bottom(commit_ts);
-                return Err(Error::TxnConflict(reason));
+                return Err(match kind {
+                    Conflict::Retry => Error::TxnConflict(reason),
+                    Conflict::NoRetry => Error::TxnConflictNoRetry(reason),
+                });
             }
         }
         before_wal(&mut txn)?;
@@ -818,6 +941,7 @@ impl TxnManager {
         // in the store, so a reader's `begin_ts` is `current_ts + 1` and never
         // sees a commit that is still being applied.
         self.total_committed.fetch_add(1, Ordering::Relaxed);
+        self.finish_candidate(commit_ts, true);
         committed.set(true);
         Ok(commit_ts)
     }
@@ -1258,10 +1382,18 @@ fn apply_split(
 ) -> Result<()> {
     let mut rows: Vec<(Vec<u8>, Option<Vec<u8>>)> = Vec::new();
     let mut catalog: Vec<(Vec<u8>, Option<Vec<u8>>)> = Vec::new();
+    // The applied marker goes **last**: it is what tells a replay which records
+    // the KV already holds, so it may only move once both halves are in. Written
+    // with the rows, a crash between the two batches would leave the catalog
+    // records out while the marker skipped them on the next open.
+    let mut applied: Option<(Vec<u8>, Option<Vec<u8>>)> = None;
     for (key, value) in writes {
+        if key == APPLIED_TS_KEY {
+            applied = Some((key, value));
+            continue;
+        }
         let is_row = parse_row_key(&key, ROW_PREFIX).is_some()
-            || parse_row_key(&key, DEL_PREFIX).is_some()
-            || key == APPLIED_TS_KEY;
+            || parse_row_key(&key, DEL_PREFIX).is_some();
         if is_row {
             // A row tombstone is a **record** in the row store
             // (`del:<table>:<seq>` => "1"), so a delete keeps its marker. A
@@ -1278,6 +1410,9 @@ fn apply_split(
     }
     if !catalog.is_empty() {
         catalog_store.atomic_batch(&catalog)?;
+    }
+    if let Some(entry) = applied {
+        store.atomic_batch(std::slice::from_ref(&entry))?;
     }
     Ok(())
 }

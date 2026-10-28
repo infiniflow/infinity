@@ -817,6 +817,10 @@ impl Engine {
         let turn = self.txn.reserve_commit_ts();
         let commit_ts = turn.ts();
         let mut txn = self.txn.begin();
+        // A snapshot transaction is typed like every other one: two snapshots
+        // of the same name conflict, a snapshot and a cleanup conflict
+        // (`new_txn_impl.cpp:4377-4534`).
+        txn.set_op(snapshot_op(&cmd));
         txn.set_typed_commands(vec![cmd]);
         self.txn.commit_at(txn, commit_ts)?;
         Ok(())
@@ -827,6 +831,21 @@ impl Engine {
     fn begin_ts(&self) -> u64 {
         self.txn.current_ts() + 1
     }
+}
+
+/// The conflict-matrix type of a snapshot command (`CreateTableSnapshotTxnStore`
+/// and friends in the reference).
+fn snapshot_op(cmd: &WalCmd) -> infinity_txn::TxnOp {
+    let name = match cmd {
+        WalCmd::CreateTableSnapshot { snapshot_name, .. }
+        | WalCmd::CreateDbSnapshot { snapshot_name, .. }
+        | WalCmd::CreateSystemSnapshot { snapshot_name, .. }
+        | WalCmd::RestoreTableSnapshot { snapshot_name, .. }
+        | WalCmd::RestoreDatabaseSnapshot { snapshot_name, .. }
+        | WalCmd::RestoreSystemSnapshot { snapshot_name, .. } => snapshot_name.clone(),
+        _ => return infinity_txn::TxnOp::Other,
+    };
+    infinity_txn::TxnOp::Snapshot { name }
 }
 
 /// The `WalCmdRestoreTableSnapshot` payload's `TableDef`, built from the

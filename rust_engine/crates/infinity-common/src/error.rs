@@ -33,6 +33,12 @@ pub enum Error {
     #[error("transaction conflict: {0}")]
     TxnConflict(String),
 
+    /// The reference's `kTxnConflictNoRetry` (4005): the object the statement
+    /// targets was dropped or reshaped, so re-running it would fail the same
+    /// way (`retry_query=false` in `NewTxn::CheckConflictTxnStore`).
+    #[error("transaction conflict, not retryable: {0}")]
+    TxnConflictNoRetry(String),
+
     #[error("not found: {0}")]
     NotFound(String),
 
@@ -215,6 +221,10 @@ impl Error {
             }
             // 4002 TXN_CONFLICT.
             Error::TxnConflict(_) => 4002,
+            // 4005 TXN_CONFLICT_NO_RETRY (`ErrorCode::kTxnConflictNoRetry`,
+            // `src/common/status.cppm:159`): re-running the statement cannot
+            // succeed.
+            Error::TxnConflictNoRetry(_) => 4005,
             // 3100 SNAPSHOT_ALREADY_EXISTS.
             Error::SnapshotAlreadyExists(_) => 3100,
             // 3088 NOT_FOUND.
