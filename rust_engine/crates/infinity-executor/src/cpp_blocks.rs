@@ -3305,6 +3305,34 @@ impl Engine {
 
     /// The rows a block's `version` makes visible: its created rows minus the
     /// slots marked deleted (`BlockVersion::GetRowCount`).
+    /// How many rows of `version` exist at `read_ts` (`cumulative_row_count` of
+    /// the newest `create` the reader can see).
+    fn created_at(version: &BlockVersionFile, read_ts: u64) -> usize {
+        version
+            .created
+            .iter()
+            .filter(|c| c.create_ts <= read_ts)
+            .last()
+            .map(|c| c.cumulative_row_count.max(0) as usize)
+            .unwrap_or(0)
+    }
+
+    /// Whether slot `slot` of the block is visible at `read_ts`.
+    fn slot_visible(
+        version: &BlockVersionFile,
+        slot: usize,
+        created_at: usize,
+        read_ts: u64,
+    ) -> bool {
+        if slot >= created_at {
+            return false;
+        }
+        match version.deleted.get(slot).copied().unwrap_or(0) {
+            0 => true,
+            deleted => deleted > read_ts,
+        }
+    }
+
     fn visible_rows_of(version: &BlockVersionFile) -> usize {
         let created = version
             .created
@@ -3367,39 +3395,43 @@ impl Engine {
     /// A count never has to be refused: the files say how many rows they hold,
     /// and the journal says what changed above them (see [`Engine::row_count`]).
     pub(crate) fn block_visible_row_count(&self, table: &str) -> usize {
-        let deleted: std::collections::HashSet<u64> =
-            self.deleted_ids(table).into_iter().collect();
+        // The count answers the same question the scan does, so it is taken at
+        // the same timestamp - including which deletes have happened.
+        let read_ts = crate::read_ts();
+        let deleted = self.tombstone_set_at(table, read_ts).unwrap_or_default();
         let pending = self.pending_rows_of(table);
         let mut rows = 0usize;
         for id in self.visible_block_ids(table) {
             let Some(version) = self.read_block_version(id) else {
                 continue;
             };
-            rows += Self::visible_rows_of(&version);
-            // A delete the checkpoint has not written yet is in the table's
-            // delete log and not in the block's `version`; a delete it has
-            // written is in both, and counting it twice would under-report.
-            let created = version
-                .created
-                .last()
-                .map(|c| c.cumulative_row_count.max(0) as usize)
-                .unwrap_or(0);
+            let created = Self::created_at(&version, read_ts);
+            let mut live = 0usize;
             for slot in 0..created {
-                if version.deleted.get(slot).copied().unwrap_or(0) != 0 {
+                if !Self::slot_visible(&version, slot, created, read_ts) {
                     continue;
                 }
+                live += 1;
+                // A delete the checkpoint has not written yet is in the table's
+                // delete log and not in the block's `version`; a delete it has
+                // written is in both, and counting it twice would under-report.
                 let seq = ((id.segment_id as u64) << 32)
                     | (u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64 + slot as u64);
                 if deleted.contains(&seq) {
-                    rows = rows.saturating_sub(1);
+                    live = live.saturating_sub(1);
                 }
             }
+            rows += live;
         }
         // Rows a commit appended since the last checkpoint live in the append
         // buffer, not in a file yet.
+        let view = self.append_view(table, read_ts);
         rows + pending
             .iter()
-            .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
+            .filter(|(seq, _)| {
+                !deleted.contains(&(*seq as u64))
+                    && view.as_ref().map_or(true, |view| view.covers(*seq, read_ts))
+            })
             .count()
     }
 
@@ -3658,6 +3690,20 @@ impl Engine {
         Some(out)
     }
 
+    /// The append log as a reader needs it: one snapshot of the records, the
+    /// stamps and the segment bases, taken **once** per scan (a per-row lookup
+    /// would allocate three vectors per row).
+    fn append_view(&self, table: &str, read_ts: u64) -> Option<AppendView> {
+        if read_ts == u64::MAX {
+            return None;
+        }
+        Some(AppendView {
+            totals: self.append_totals(table),
+            stamps: self.append_ts(table),
+            bases: self.segment_row_counts(table),
+        })
+    }
+
     /// The rows the commits since the last checkpoint appended, by row id
     /// (the reference's `BufferObject` for the blocks they land in).
     pub(crate) fn pending_rows_of(&self, table: &str) -> Vec<(usize, Vec<Value>)> {
@@ -3695,6 +3741,7 @@ impl Engine {
             .collect::<Result<_>>()?;
         let db_id = self.database_id_of(&table);
         let root = self.blocks_root();
+        let read_ts = crate::read_ts();
 
         let mut rows: Vec<(usize, Vec<String>)> = Vec::new();
         // The mirror is segmented (`seg_{id}/blk_{n}`), and a row's id carries
@@ -3766,13 +3813,17 @@ impl Engine {
                     // the block), so the scan drops it here - the same slots
                     // `cpp_visible_row_count` subtracts, which is what keeps
                     // the two numbers equal.
+                    //
+                    // The verdict is taken at the statement's `begin_ts`
+                    // (`BlockVersion::GetRowCount(begin_ts)`): a slot created
+                    // after it does not exist yet, and one deleted after it is
+                    // still there.
+                    let created_at = Self::created_at(&version, read_ts);
                     rows.extend(
                         cells
                             .into_iter()
                             .enumerate()
-                            .filter(|(slot, _)| {
-                                version.deleted.get(*slot).copied().unwrap_or(0) == 0
-                            })
+                            .filter(|(slot, _)| Self::slot_visible(&version, *slot, created_at, read_ts))
                             .map(|(_, row)| row),
                     );
                 }
@@ -3789,10 +3840,18 @@ impl Engine {
         if !pending.is_empty() {
             let have: std::collections::HashSet<usize> =
                 rows.iter().map(|(seq, _)| *seq).collect();
-            let deleted = self.deleted_ids(&table);
+            // One snapshot of the append log and the deletes for the whole
+            // buffer, not one per row.
+            let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
+            let view = self.append_view(&table, read_ts);
             for (seq, values) in pending {
-                if have.contains(&seq) || deleted.contains(&(seq as u64)) {
+                if have.contains(&seq) || dead.contains(&(seq as u64)) {
                     continue;
+                }
+                if let Some(view) = &view {
+                    if !view.covers(seq, read_ts) {
+                        continue;
+                    }
                 }
                 let cells: Vec<String> = values
                     .iter()
@@ -5791,6 +5850,43 @@ fn encode_hnsw_chunk_from(index: &HnswIndex, labels: &[u32]) -> (usize, Vec<u8>)
 /// compaction - which reads every row of its source segments and writes them
 /// into one new segment - one pass over the blocks instead of one table scan
 /// per moved row.
+/// A snapshot of one table's append log, for a reader pinned to a timestamp.
+pub(crate) struct AppendView {
+    totals: Vec<u64>,
+    stamps: Vec<u64>,
+    bases: Vec<(u32, u64)>,
+}
+
+impl AppendView {
+    /// Whether the append that produced `seq` had committed by `read_ts`.
+    ///
+    /// The records are cumulative and in row-id order, so the record that covers
+    /// the row is the first total past its ordinal. A record with no stamp is
+    /// one a replay rebuilt (or one written before the log kept stamps): it
+    /// counts as committed, because hiding rows whose append ts was never
+    /// recorded would lose them on every reopen.
+    pub(crate) fn covers(&self, seq: usize, read_ts: u64) -> bool {
+        if self.totals.is_empty() {
+            return true;
+        }
+        let segment = (seq >> 32) as u32;
+        let mut ordinal = seq;
+        let mut seen = 0usize;
+        for (id, rows) in &self.bases {
+            if *id == segment {
+                ordinal = seen + (seq & 0xffff_ffff);
+                break;
+            }
+            seen += *rows as usize;
+        }
+        let index = self.totals.partition_point(|total| (*total as usize) <= ordinal);
+        match self.stamps.get(index).copied().unwrap_or(0) {
+            0 => true,
+            stamp => stamp <= read_ts,
+        }
+    }
+}
+
 pub(crate) struct BlockCursor<'a> {
     engine: &'a Engine,
     /// Fully-qualified table name (`db.table`), the form the row keys use.

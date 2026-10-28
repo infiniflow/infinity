@@ -4873,6 +4873,36 @@ struct RowCache {
 }
 
 const ROW_CACHE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
+
+thread_local! {
+    /// The timestamp the current statement reads at (`NewTxn::BeginTS`,
+    /// `current_ts + 1` at its start). Reads on the statement's thread hide
+    /// rows created after it and keep rows deleted after it; every other thread
+    /// - the bottom halves, the background tasks, a caller that reads directly -
+    /// runs with `u64::MAX` and sees the latest state.
+    static READ_TS: std::cell::Cell<u64> = const { std::cell::Cell::new(u64::MAX) };
+}
+
+/// The timestamp the current statement reads at (`u64::MAX` outside one).
+pub(crate) fn read_ts() -> u64 {
+    READ_TS.with(|cell| cell.get())
+}
+
+/// Sets [`READ_TS`] for a statement and restores the previous value on drop.
+struct ReadTsGuard(u64);
+
+impl ReadTsGuard {
+    fn enter(ts: u64) -> Self {
+        let previous = READ_TS.with(|cell| cell.replace(ts));
+        Self(previous)
+    }
+}
+
+impl Drop for ReadTsGuard {
+    fn drop(&mut self) {
+        READ_TS.with(|cell| cell.set(self.0));
+    }
+}
 /// How many times a statement re-runs after a retryable conflict
 /// (`QueryContext::QueryStatement` loops without a bound; this only stops a
 /// statement that conflicts with itself).
@@ -8801,20 +8831,21 @@ impl Engine {
         totals.push(next);
         let index = totals.len() - 1;
         let tkey = self.table_key(table);
-        // Read before the entry is locked: the loader takes the same lock.
-        let mut settled = ts.map(|ts| {
+        // Read before the entry is locked: the loader takes the same lock. The
+        // timestamp log stays **aligned** with the totals: a record that has no
+        // stamp yet keeps a zero, so a later settle writes its own slot instead
+        // of padding the ones before it.
+        let settled = {
             let mut log = self.append_ts(table);
             log.resize(index, 0);
-            log.push(ts);
+            log.push(ts.unwrap_or(0));
             log
-        });
+        };
         {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey.clone()).or_default();
             entry.append_totals = Some(totals.clone());
-            if let Some(log) = settled.take() {
-                entry.append_ts = Some(log);
-            }
+            entry.append_ts = Some(settled.clone());
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
         }
@@ -8823,9 +8854,7 @@ impl Engine {
         // before the rows do, the mirror clips every total to the rows it
         // actually has and falls back to one create when they disagree.
         let _ = self.write_id_log(&appends_key(&tkey), &totals);
-        if let Some(log) = &settled {
-            let _ = self.write_id_log(&append_ts_key(&tkey), log);
-        }
+        let _ = self.write_id_log(&append_ts_key(&tkey), &settled);
         let mut kinds = self.append_copy(table);
         kinds.resize(totals.len(), 0);
         if let Some(last) = kinds.last_mut() {
@@ -10481,6 +10510,10 @@ impl Engine {
     /// error path, because the guard deregisters on drop.
     fn execute_stmt(&self, stmt: &Statement, sql: &str) -> Result<QueryResult> {
         let _query = self.begin_query(stmt, sql);
+        // `NewTxnManager::BeginTxnShared`: a statement reads the state as of the
+        // clock when it started, so a commit that lands while it runs is not
+        // half-visible (`NewTxn::BeginTS`, `new_txn_manager_impl.cpp:113`).
+        let _read = ReadTsGuard::enter(self.txn.current_ts() + 1);
         let mut res = self.execute_stmt_inner(stmt)?;
         if let Statement::Select {
             highlight,
@@ -12938,20 +12971,26 @@ impl Engine {
                 entry.and_then(|e| e.live_rows),
             )
         };
-        if let Some((rows, bytes)) = cached {
-            // The cache is authoritative only while it covers every live row.
-            if live == Some(rows.len()) {
-                return Ok(rows);
-            }
-            let mut tables = self.tables.lock().unwrap();
-            if let Some(entry) = tables.get_mut(&key) {
-                if entry.row_cache.as_ref().map(|c| c.bytes) == Some(bytes) {
-                    entry.row_cache = None;
+        // The cache holds the latest state; a reader pinned to a timestamp has
+        // to see the rows as of then, so it goes to the table itself.
+        if crate::read_ts() == u64::MAX {
+            if let Some((rows, bytes)) = cached {
+                // The cache is authoritative only while it covers every live row.
+                if live == Some(rows.len()) {
+                    return Ok(rows);
+                }
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(entry) = tables.get_mut(&key) {
+                    if entry.row_cache.as_ref().map(|c| c.bytes) == Some(bytes) {
+                        entry.row_cache = None;
+                    }
                 }
             }
         }
         let rows = self.row_set_from(table)?;
-        self.cache_row_set(table, key, &rows);
+        if crate::read_ts() == u64::MAX {
+            self.cache_row_set(table, key, &rows);
+        }
         Ok(rows)
     }
 
@@ -12971,7 +13010,7 @@ impl Engine {
         let defaults = self.table_defaults(table).unwrap_or_default();
         // Collect tombstones with one prefix scan: a point lookup per row
         // would add O(rows) KV round trips to every full scan.
-        let deleted = self.tombstone_set(table)?;
+        let deleted = self.tombstone_set_at(table, crate::read_ts())?;
         let mut rows = Vec::new();
         for (k, v) in self.storage.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
@@ -13159,7 +13198,7 @@ impl Engine {
         // The block rows are the answer for everything the files hold, pruned
         // or not. A pruned read simply has fewer of them (the blocks the
         // prefilter ruled out are not decoded).
-        let hidden = self.tombstone_set(table)?;
+        let hidden = self.tombstone_set_at(table, crate::read_ts())?;
         let mut out: Vec<(usize, Vec<Value>)> = rows
             .into_iter()
             .map(|(seq, cells)| (seq, cells.iter().map(|c| parse_value(c)).collect()))
@@ -13210,12 +13249,16 @@ impl Engine {
         // A decoded row cache answers a projection faster than decoding the
         // block mirror; leave the scan to it.
         let key = self.table_key(table);
-        let cached = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&key)
-            .and_then(|e| e.row_cache.as_ref().map(|c| c.rows.len()));
+        let cached = if crate::read_ts() == u64::MAX {
+            self.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .and_then(|e| e.row_cache.as_ref().map(|c| c.rows.len()))
+        } else {
+            // A pinned reader cannot take the cache: it holds the latest state.
+            None
+        };
         if let Some(len) = cached {
             if len == self.live_row_count(table)? {
                 return Ok(None);
@@ -14308,6 +14351,30 @@ impl Engine {
         // log (`note_deleted_ids`, `DeleteInBlock`); the block's `version`
         // carries it after the flush.
         dead.extend(self.deleted_ids(table));
+        Ok(dead)
+    }
+
+    /// [`Self::tombstone_set`] as of `read_ts`: a delete that committed after
+    /// it has not happened yet for this reader.
+    fn tombstone_set_at(
+        &self,
+        table: &str,
+        read_ts: u64,
+    ) -> Result<std::collections::HashSet<u64>> {
+        if read_ts == u64::MAX {
+            return self.tombstone_set(table);
+        }
+        let ids = self.deleted_ids(table);
+        let ts = self.delete_ts(table);
+        let mut dead: std::collections::HashSet<u64> = Default::default();
+        for (at, id) in ids.iter().enumerate() {
+            let deleted = ts.get(at).copied().unwrap_or(0);
+            // An unsettled entry is a delete the commit already accepted but
+            // has not stamped; it counts, exactly as `tombstone_set` does.
+            if deleted == 0 || deleted <= read_ts {
+                dead.insert(*id);
+            }
+        }
         Ok(dead)
     }
 
@@ -26914,6 +26981,39 @@ mod tests {
         e.reserve_rows("sg", 4, false).unwrap();
         e.reserve_rows("sg", 4, false).unwrap();
         assert_eq!(e.segments("sg"), vec![(0, 2), (1, 3), (2, 8)]);
+    }
+
+    /// `NewTxn::BeginTS`: a reader pinned to a timestamp does not see a row
+    /// committed after it, and does see one deleted after it.
+    #[test]
+    fn a_read_at_an_older_ts_hides_later_commits() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE rts (id INT);").unwrap();
+        e.execute("INSERT INTO rts VALUES (1);").unwrap();
+        let pin = e.current_ts();
+        e.execute("INSERT INTO rts VALUES (2);").unwrap();
+
+        // Outside a statement the reader is at `u64::MAX`: both rows.
+        assert_eq!(e.block_visible_row_count("default_db.rts"), 2);
+        assert_eq!(e.fetch_rows("default_db.rts").unwrap().len(), 2);
+
+        {
+            let _pinned = ReadTsGuard::enter(pin);
+            assert_eq!(e.block_visible_row_count("default_db.rts"), 1);
+            let seen = e.fetch_rows("default_db.rts").unwrap();
+            assert_eq!(seen.len(), 1, "the second insert committed after `pin`");
+        }
+
+        // A delete after the pin is invisible to the pinned reader.
+        let deleted_pin = e.current_ts();
+        e.execute("DELETE FROM rts WHERE id = 1;").unwrap();
+        assert_eq!(e.block_visible_row_count("default_db.rts"), 1);
+        {
+            let _pinned = ReadTsGuard::enter(deleted_pin);
+            assert_eq!(e.block_visible_row_count("default_db.rts"), 2);
+            assert_eq!(e.fetch_rows("default_db.rts").unwrap().len(), 2);
+        }
     }
 
     /// Four writers, checkpoints in the middle of the stream, then a restart:

@@ -34,34 +34,46 @@
 
 ### 2.1 事务冲突检查 / 回滚
 
+**本节没有待办项。** 下面是这一层现在的口径，以及两处"结构不同但语义等价"的地方。
+
 参考的冲突检查是**按事务类型成对判定**（`NewTxn::CheckConflictTxnStore` 的二十多个重载）。端口移植了同一套矩阵：
 `infinity-txn/src/conflict.rs` 的 `TxnOp`（= 参考 `BaseTxnStore::type_` 加上规则要读的字段）与 `conflict_between`，
 每个写语句在提交前用 `Txn::set_op` 声明自己的类型（INSERT/INSERT…SELECT/Thrift Insert → `Append`，COPY 与
 `import_literals` → `Import`，UPDATE → `Update{row_ids, segments}`，DELETE → `Delete{row_ids}`，COMPACT → `Compact`，
-DUMP → `DumpMemIndex`，OPTIMIZE → `OptimizeIndex`（每个真正要合并的索引一个事务），DDL 各自一种，快照 → `Snapshot`，
-checkpoint / cleanup → 由 `TxnManager` 自己登记）。
+DUMP → `DumpMemIndex`，OPTIMIZE → `OptimizeIndex`，DDL 各自一种，快照 → `Snapshot`，checkpoint / cleanup → 由
+`TxnManager` 自己登记）。
 
 判定是**有方向的**，与参考相同：只有后提交的一方跑检查、只有它自己的重载生效（所以 `Append` 看得到 `DropColumn`
 （4005），`DropColumn` 自己却没有重载，反过来的顺序不冲突）。候选集 `TxnManager::candidates` 是参考的
 `check_txn_map_`：取号时登记、提交后记 `kv_commit_ts`、失败/回滚摘除、最老活跃 `begin_ts` 以下裁剪；键日志
-（未分类语句的兜底）同一把尺子裁剪。端口把 KV 批放在提交里落（`apply_split`），所以 `kv_commit_ts` 与 `commit_ts`
-同值——参考里两者可能不同的那套边界消歧在端口没有对应分支。
+（未分类语句的兜底）同一把尺子裁剪。
 
 **行级判定不再有 `del:` 键**：DELETE/UPDATE 把行 id 放进 `TxnOp`，按交集比较（参考的 `row_ids_`）；块的 `version`
 是唯一的墓碑记录，端口不再往 KV 写任何 `del:` 记录（`cpp_blocks::tests::the_blocks_are_the_row_set_not_just_the_values`
 断言 `row:` 与 `del:` 前缀都为空）。键集比较只留给没有分类的语句。
 
-| 项 | 参考口径 | 端口现状 | 影响 | 依据 |
-|---|---|---|---|---|
-| 读没有语句级快照 | 每条语句一个 `begin_ts` + RocksDB 快照，语句内看不到之后的提交 | 普通 SELECT 直接读最新已发布状态（读路径没有 ts 参数） | 一条 SELECT 执行期间别的语句提交的行会出现在结果里；冲突判定仍按 `begin_ts`，所以只影响"读到什么"，不影响"能不能提交" | `new_txn_manager_impl.cpp:113`、`kv_store_impl.cpp:429-438`；`infinity-executor/src/lib.rs:14321-14332` |
+**读按语句的 `begin_ts`**：`execute_stmt` 进入时把本线程的读时间戳设成 `current_ts + 1`（`NewTxn::BeginTS`），
+块的解码按 `version` 的 `create_ts` 与 `deleted` 裁剪（`created_at` / `slot_visible`），缓冲区里的行按它所属的
+append 记录的时间戳裁剪（`AppendView::covers`），删除日志按删除的 commit ts 裁剪（`tombstone_set_at`），
+`row_count` 用同一把尺子；行缓存（解码结果与行集缓存）在 pin 住时绕过。语句之外——checkpoint、回放、后台任务、
+直接调用读接口——仍是"最新"。
+
+两处语义等价而不是逐字复刻：
+
+- **`kv_commit_ts` 与 `commit_ts` 同值**：端口把 KV 批放在提交里落（`apply_split`），所以参考里"KV 提交与 commit_ts
+  不同步"的边界分支（`last_kv_commit_ts` / `last_commit_ts` 消歧）在端口没有对应情形，候选的可见性用
+  `kv_commit_ts < begin_ts` 表达同一件事。
+- **OPTIMIZE 只为真正要合并的索引开事务**：参考的 `NewTxn::OptimizeIndex` 每个索引一个事务（即使没东西可合），
+  端口只在确实要合并 chunk 时开，空转的那一拍不花 ts。冲突保护一致（两次合并、合并与写入/更新互斥）。
 
 已经对齐的部分：begin_ts 取 `current_ts + 1` 且不推进时钟、冲突发生在写 WAL 之前、冲突不写 WAL、
 回滚不回退行号/段号、冲突也推进可见时钟、各类规则的表级/行级/段级粒度（见 `conflict.rs` 的单测）、
 `retry_query` 的两档错误（4002 重试 / 4005 直返）、`QueryContext::QueryStatement` 的整句重试、
 IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）、`APPLIED_TS_KEY` 最后写。
 
-测试：`infinity-txn` 的 `conflict::tests::*`（矩阵逐条）、`conflict_check_ut::conflict_check_delete`
-（C++ `conflict_check_ut.cpp`）、`request_ut::conflict_*`（C++ `conflict_request_ut.cpp` 的十个用例）。
+测试：`infinity-txn` 的 `conflict::tests::*`（矩阵逐条）、`tests::a_read_at_an_older_ts_hides_later_commits`
+（读按 begin_ts）、`conflict_check_ut::conflict_check_delete`（C++ `conflict_check_ut.cpp`）、
+`request_ut::conflict_*`（C++ `conflict_request_ut.cpp` 的十个用例）。
 事务这一层的 C++ 用例到端口映射见 [`TEST_AUDIT.md`](TEST_AUDIT.md)：`storage/txn/*` 15 个、
 `new_catalog/new_txn_mgr_ut` 2 个（另 2 个 `DISABLED_SLOW_` 在端口是 `#[ignore]`）、
 `cleanup_rollback_txn` 1 个，全部有对应用例。
