@@ -25,6 +25,7 @@ use infinity_catalog::cpp_layout::{
 };
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
+use infinity_txn::{OptimizeEntry, TxnOp};
 /// The ts a deleted block slot carries when the delete's commit ts is unknown.
 ///
 /// `BlockVersion::CheckDelete` hides a slot whose ts is non-zero and not newer
@@ -4022,18 +4023,24 @@ impl Engine {
     /// memory-index dump.
     pub fn write_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<usize> {
         self.write_cpp_hnsw_chunk(table, index_name, false, false)
+            .map(|written| written.0)
     }
 
     /// Appends a fresh chunk, as the reference's memory-index dump does. Rows
     /// added since the previous dump end up in the new chunk.
     pub fn dump_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<usize> {
         self.write_cpp_hnsw_chunk(table, index_name, true, false)
+            .map(|written| written.0)
     }
 
     /// The optimize merge: rebuilds the graph over every live row and appends
     /// it as the newest chunk, which then supersedes the incremental ones.
-    pub fn merge_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<usize> {
+    ///
+    /// Returns the segments it wrote a chunk for - the entries an optimize
+    /// transaction records (`OptimizeIndexTxnStore::entries_`).
+    pub fn merge_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<Vec<u32>> {
         self.write_cpp_hnsw_chunk(table, index_name, false, true)
+            .map(|written| written.1)
     }
 
     fn write_cpp_hnsw_chunk(
@@ -4042,7 +4049,7 @@ impl Engine {
         index_name: &str,
         new_chunk: bool,
         force_append: bool,
-    ) -> Result<usize> {
+    ) -> Result<(usize, Vec<u32>)> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -4102,13 +4109,13 @@ impl Engine {
             else {
                 // Nothing buffered since the last dump: a checkpoint has
                 // nothing to write and must not rebuild the whole graph.
-                return Ok(0);
+                return Ok((0, Vec::new()));
             };
             let Ok(mem) = mem.lock() else {
-                return Ok(0);
+                return Ok((0, Vec::new()));
             };
             if mem.is_empty() {
-                return Ok(0);
+                return Ok((0, Vec::new()));
             }
             let labels: Vec<u32> = mem.rows().iter().map(|s| *s as u32).collect();
             Some(encode_hnsw_chunk_from(mem.index(), &labels))
@@ -4118,6 +4125,7 @@ impl Engine {
         let db_id = self.database_id_of(&table);
         let options = self.hnsw_options(&table, index_name);
         let mut written = 0usize;
+        let mut written_segments: Vec<u32> = Vec::new();
         for (segment, rows) in &segments {
             let dir = self.blocks_root().join(format!(
                 "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
@@ -4158,8 +4166,25 @@ impl Engine {
                 source: e,
             })?;
             written += count;
+            written_segments.push(*segment);
         }
-        Ok(written)
+        Ok((written, written_segments))
+    }
+
+    /// Whether `column` is a `MULTIVECTOR`, whose mirror has no single-vector
+    /// graph in this build.
+    fn multivector_column(&self, table: &str, column: &str) -> bool {
+        let Ok(meta) = self.storage.catalog.get_table_by_name(&self.qualified_table(table)) else {
+            return false;
+        };
+        let Some(meta) = meta else {
+            return false;
+        };
+        meta.columns
+            .iter()
+            .position(|c| c == column)
+            .and_then(|i| meta.types.get(i))
+            .is_some_and(|t| t.trim().to_ascii_uppercase().starts_with("MULTIVECTOR"))
     }
 
     /// Optimizes every vector mirror: HNSW chunks are merged when the newest
@@ -4168,15 +4193,54 @@ impl Engine {
     /// reference's `OptimizeIndexInner` `kPLAID` case) as soon as a second
     /// chunk exists. A mirror that is already merged is left untouched, so
     /// repeated optimize ticks are no-ops.
+    ///
+    /// `OptimizationProcessor::NewNotifyOptimize`: **one** transaction for the
+    /// whole pass, opened before the pass looks at any index and committed even
+    /// when it merged nothing (`OptimizeAllIndexes` -> `CommitTxn`; an empty
+    /// `OptimizeIndexTxnStore` still spends its commit ts and writes an entry
+    /// without commands). The store records one entry per index segment the
+    /// pass rewrote, so two merges never run together and a merge meets the
+    /// appends and updates on its table. A failed pass is rolled back; a lost
+    /// conflict is logged and left alone, which is what the processor does.
     pub fn optimize_cpp_index_chunks(&self) -> Result<()> {
+        let turn = self.txn.reserve_commit_ts();
+        let ts = turn.ts();
+        let mut txn = self.txn.begin();
+        let mut entries: Vec<OptimizeEntry> = Vec::new();
+        let outcome = self.merge_optimizable_indexes(&mut entries);
+        txn.set_op(TxnOp::OptimizeIndex { entries });
+        match outcome {
+            Ok(()) => match self.txn.commit_at(txn, ts) {
+                Ok(_) | Err(Error::TxnConflict(_)) | Err(Error::TxnConflictNoRetry(_)) => Ok(()),
+                Err(error) => Err(error),
+            },
+            Err(error) => {
+                self.txn.rollback(txn)?;
+                Err(error)
+            }
+        }
+    }
+
+    /// The merge half of an optimize pass, recording what it rewrote.
+    fn merge_optimizable_indexes(&self, entries: &mut Vec<OptimizeEntry>) -> Result<()> {
         for im in self.storage.catalog.list_indexes()? {
             if im.index_type.eq_ignore_ascii_case("PLAID") {
-                if self.begin_optimize_txn(&im)? {
-                    let _ = self.merge_cpp_plaid_index(&im.table, &im.name);
+                if let Some(segment) = self.merge_cpp_plaid_index(&im.table, &im.name)? {
+                    entries.push(OptimizeEntry {
+                        table: self.qualified_table(&im.table),
+                        index: im.name.clone(),
+                        segment,
+                    });
                 }
                 continue;
             }
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
+                continue;
+            }
+            // A MULTIVECTOR column has no single-vector graph in this build, so
+            // its mirror has nothing to merge (`write_cpp_hnsw_chunk` refuses
+            // it); skipping it keeps one such index from failing the pass.
+            if self.multivector_column(&im.table, &im.column) {
                 continue;
             }
             let Ok(rows) = self.row_count(&im.table) else {
@@ -4227,39 +4291,15 @@ impl Engine {
             if rebuild_bytes > 1024 * 1024 * 1024 {
                 continue;
             }
-            if self.begin_optimize_txn(&im)? {
-                let _ = self.merge_cpp_hnsw_index(&im.table, &im.name);
+            for segment in self.merge_cpp_hnsw_index(&im.table, &im.name)? {
+                entries.push(OptimizeEntry {
+                    table: self.qualified_table(&im.table),
+                    index: im.name.clone(),
+                    segment,
+                });
             }
         }
         Ok(())
-    }
-
-    /// `NewTxn::OptimizeIndex`: a write transaction of its own, opened only
-    /// when the index really is going to be merged (a tick with nothing to do
-    /// must not spend a timestamp).
-    ///
-    /// The reference's store has no command to log (`WalCommandType` has no
-    /// `OPTIMIZE_INDEX_V2`), so the entry is empty; what the transaction buys is
-    /// its place in the conflict matrix - two merges of one index never run
-    /// together, and a merge meets the appends and updates on its table.
-    fn begin_optimize_txn(&self, im: &infinity_catalog::IndexMeta) -> Result<bool> {
-        let segments: Vec<u32> = self.segment_ids(&im.table);
-        let turn = self.txn.reserve_commit_ts();
-        let ts = turn.ts();
-        let mut txn = self.txn.begin();
-        txn.set_op(infinity_txn::TxnOp::OptimizeIndex {
-            table: self.qualified_table(&im.table),
-            index: im.name.clone(),
-            segments,
-        });
-        match self.txn.commit_at(txn, ts) {
-            Ok(_) => Ok(true),
-            // A concurrent merge (or a drop that took the index away) is a
-            // conflict; this tick simply leaves the chunks alone.
-            Err(infinity_common::Error::TxnConflict(_))
-            | Err(infinity_common::Error::TxnConflictNoRetry(_)) => Ok(false),
-            Err(error) => Err(error),
-        }
     }
 
     /// Drops `idx_{id}/seg_{s}` directories whose segment no longer exists.
@@ -5560,14 +5600,13 @@ impl Engine {
     /// the mirror has no meta, so the files themselves are the record) —
     /// [`Self::cleanup_cpp_index_chunks`] keeps the same rule as a safety net
     /// for a removal that failed. Returns the merged document count.
-    pub fn merge_cpp_plaid_index(&self, table: &str, index_name: &str) -> Result<usize> {
+    /// Returns the segment whose chunks were folded into one, or `None` when
+    /// there was nothing to merge - the entry an optimize transaction records.
+    pub fn merge_cpp_plaid_index(&self, table: &str, index_name: &str) -> Result<Option<u32>> {
         let mirror = self.cpp_plaid_mirror(table, index_name)?;
         let chunks = self.read_plaid_chunks(table, index_name)?;
         if chunks.len() < 2 {
-            return Ok(chunks
-                .first()
-                .map(|c| c.index.doc_num() as usize)
-                .unwrap_or(0));
+            return Ok(None);
         }
         let next = chunks.last().map(|c| c.id + 1).unwrap_or(0);
         let paths: Vec<PathBuf> = chunks.iter().map(|c| c.path.clone()).collect();
@@ -5581,7 +5620,7 @@ impl Engine {
         for old in paths {
             let _ = std::fs::remove_file(old);
         }
-        Ok(merged.doc_num() as usize)
+        Ok(Some(0))
     }
 
     /// Writes `table`'s PLAID index as `idx_{id}/seg_0/chunk_{n}.idx`, appending

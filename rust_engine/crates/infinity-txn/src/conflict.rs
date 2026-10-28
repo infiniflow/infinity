@@ -51,10 +51,11 @@ pub enum TxnOp {
         table: String,
         segments: Vec<u32>,
     },
+    /// `OptimizeIndexTxnStore`: one merge pass, one entry per index segment it
+    /// rewrote (`entries_`); `db_names_` / `table_names_in_db_` fall out of the
+    /// entries, so they are not stored twice.
     OptimizeIndex {
-        table: String,
-        index: String,
-        segments: Vec<u32>,
+        entries: Vec<OptimizeEntry>,
     },
     DumpMemIndex {
         table: String,
@@ -115,7 +116,6 @@ impl TxnOp {
             | Self::Delete { table, .. }
             | Self::Update { table, .. }
             | Self::Compact { table, .. }
-            | Self::OptimizeIndex { table, .. }
             | Self::DumpMemIndex { table, .. }
             | Self::CreateIndex { table, .. }
             | Self::DropIndex { table, .. }
@@ -129,21 +129,46 @@ impl TxnOp {
         }
     }
 
-    fn table_eq(&self, other: &str) -> bool {
-        self.table().is_some_and(|table| table == other)
-    }
-
-    fn same_table(&self, other: &Self) -> bool {
-        match (self.table(), other.table()) {
-            (Some(a), Some(b)) => a == b,
-            _ => false,
+    /// Every table the operation touches. All of them but an optimize pass
+    /// touch one.
+    fn tables(&self) -> Vec<&str> {
+        match self {
+            Self::OptimizeIndex { entries } => {
+                let mut tables: Vec<&str> =
+                    entries.iter().map(|entry| entry.table.as_str()).collect();
+                tables.sort_unstable();
+                tables.dedup();
+                tables
+            }
+            _ => self.table().into_iter().collect(),
         }
     }
 
-    fn in_db(&self, db: &str) -> bool {
-        self.table()
-            .is_some_and(|table| table.split('.').next() == Some(db))
+    /// Whether the operation touches `table`.
+    fn covers_table(&self, table: &str) -> bool {
+        self.tables().iter().any(|mine| *mine == table)
     }
+
+    fn same_table(&self, other: &Self) -> bool {
+        self.tables()
+            .iter()
+            .any(|mine| other.covers_table(mine))
+    }
+
+    fn in_db(&self, db: &str) -> bool {
+        self.tables()
+            .iter()
+            .any(|table| table.split('.').next() == Some(db))
+    }
+}
+
+/// One `OptimizeIndexStoreEntry`: the index segment a merge pass rewrote.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OptimizeEntry {
+    /// `db.table`.
+    pub table: String,
+    pub index: String,
+    pub segment: u32,
 }
 
 /// Whether the pair conflicts, and whether the statement can be retried.
@@ -254,7 +279,7 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             _ => None,
         },
         // `new_txn_impl.cpp:3666-3767`.
-        TxnOp::Compact { segments, .. } => match previous {
+        TxnOp::Compact { table, segments } => match previous {
             TxnOp::Compact { .. } if this.same_table(previous) => Some(NoRetry),
             TxnOp::CreateIndex { .. }
             | TxnOp::DropIndex { .. }
@@ -266,9 +291,12 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             {
                 Some(Retry)
             }
-            TxnOp::OptimizeIndex {
-                segments: theirs, ..
-            } if this.same_table(previous) => segments_intersect(segments, theirs).then_some(NoRetry),
+            // `new_txn_impl.cpp:3722-3734`: the pair matches on the optimize
+            // entry's own segment, and re-running cannot help.
+            TxnOp::OptimizeIndex { entries } => entries
+                .iter()
+                .any(|entry| entry.table == *table && segments.contains(&entry.segment))
+                .then_some(NoRetry),
             TxnOp::DropTable { .. } if this.same_table(previous) => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
             TxnOp::Snapshot { table: Some(t), .. } if Some(t.as_str()) == this.table() => {
@@ -285,20 +313,43 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
             _ => None,
         },
-        // `new_txn_impl.cpp:3949-4087`.
-        TxnOp::OptimizeIndex { index, segments, .. } => match previous {
+        // `new_txn_impl.cpp:3949-4087`: the pass knows every index segment it
+        // rewrote, so each rule matches on the entry that names the object.
+        TxnOp::OptimizeIndex { entries } => match previous {
+            // "Even if a previous optimize transaction has committed, it may
+            // still be in the conflict detection list if there are older
+            // uncommitted transactions. The next optimize will detect this
+            // conflict." - unconditional.
             TxnOp::OptimizeIndex { .. } => Some(Retry),
             TxnOp::Append { .. } | TxnOp::Update { .. } if this.same_table(previous) => Some(Retry),
             TxnOp::Compact {
-                segments: theirs, ..
-            } if this.same_table(previous) => segments_intersect(segments, theirs).then_some(Retry),
-            TxnOp::DumpMemIndex { index: i, .. } if i == index => Some(Retry),
-            TxnOp::DropIndex { index: i, .. } if i == index => Some(NoRetry),
-            TxnOp::DropTable { .. } if this.same_table(previous) => Some(NoRetry),
-            TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { table: Some(t), .. } if Some(t.as_str()) == this.table() => {
-                Some(Retry)
+                table,
+                segments: theirs,
+            } => entries
+                .iter()
+                .any(|entry| entry.table == *table && theirs.contains(&entry.segment))
+                .then_some(Retry),
+            TxnOp::DumpMemIndex { table, index, .. } => entries
+                .iter()
+                .any(|entry| entry.table == *table && entry.index == *index)
+                .then_some(Retry),
+            TxnOp::DropIndex { table, index } => {
+                // "If there are multiple databases or multiple tables involved
+                // in index optimization, the optimization is processed for all
+                // indexes" - it then conflicts with any drop.
+                if this.tables().len() > 1
+                    || entries
+                        .iter()
+                        .any(|entry| entry.table == *table && entry.index == *index)
+                {
+                    Some(NoRetry)
+                } else {
+                    None
+                }
             }
+            TxnOp::DropTable { table, .. } if this.covers_table(table) => Some(NoRetry),
+            TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
+            TxnOp::Snapshot { table: Some(t), .. } if this.covers_table(t) => Some(Retry),
             _ => None,
         },
         // `new_txn_impl.cpp:3769-3857`.
@@ -543,6 +594,77 @@ mod tests {
             segments: vec![0],
         };
         assert_eq!(conflict_between(&dump, &dump), Some(Conflict::NoRetry));
+    }
+
+    /// `new_txn_impl.cpp:3949-4087`: an optimize pass records one entry per
+    /// index segment it rewrote, and each rule matches on the entry that names
+    /// the object.
+    #[test]
+    fn an_optimize_pass_conflicts_per_entry() {
+        let pass = |entries: &[(&str, &str, u32)]| TxnOp::OptimizeIndex {
+            entries: entries
+                .iter()
+                .map(|(table, index, segment)| OptimizeEntry {
+                    table: (*table).into(),
+                    index: (*index).into(),
+                    segment: *segment,
+                })
+                .collect(),
+        };
+        let two = pass(&[("db.t", "i1", 0), ("db.t", "i2", 1)]);
+
+        // Two passes never run together, whatever they touch.
+        assert_eq!(
+            conflict_between(&two, &pass(&[("db.u", "i", 0)])),
+            Some(Conflict::Retry)
+        );
+        // A table the pass touched is a table-level conflict; another is not.
+        assert_eq!(conflict_between(&two, &append("db.t")), Some(Conflict::Retry));
+        assert_eq!(conflict_between(&two, &append("db.u")), None);
+
+        // A compaction only meets the entry's own segment.
+        let compact = |segments: &[u32]| TxnOp::Compact {
+            table: "db.t".into(),
+            segments: segments.to_vec(),
+        };
+        assert_eq!(
+            conflict_between(&two, &compact(&[1])),
+            Some(Conflict::Retry)
+        );
+        assert_eq!(conflict_between(&two, &compact(&[7])), None);
+        assert_eq!(
+            conflict_between(&compact(&[0]), &two),
+            Some(Conflict::NoRetry),
+            "the compaction side matches on the same entry"
+        );
+        assert_eq!(conflict_between(&compact(&[9]), &two), None);
+
+        // A dump meets the entry that names its index.
+        let dump = |index: &str| TxnOp::DumpMemIndex {
+            table: "db.t".into(),
+            index: index.into(),
+            segments: vec![0],
+        };
+        assert_eq!(conflict_between(&two, &dump("i2")), Some(Conflict::Retry));
+        assert_eq!(conflict_between(&two, &dump("i9")), None);
+
+        // A drop of one index conflicts only when the pass touched it - unless
+        // the pass spans more than one table, where the reference processes
+        // every index and therefore conflicts with any drop.
+        let drop_index = |index: &str| TxnOp::DropIndex {
+            table: "db.t".into(),
+            index: index.into(),
+        };
+        assert_eq!(
+            conflict_between(&two, &drop_index("i1")),
+            Some(Conflict::NoRetry)
+        );
+        assert_eq!(conflict_between(&two, &drop_index("i9")), None);
+        let wide = pass(&[("db.t", "i1", 0), ("db.u", "i2", 0)]);
+        assert_eq!(
+            conflict_between(&wide, &drop_index("i9")),
+            Some(Conflict::NoRetry)
+        );
     }
 
     /// `new_txn_impl.cpp:3909-3947`: dropping a table conflicts with another

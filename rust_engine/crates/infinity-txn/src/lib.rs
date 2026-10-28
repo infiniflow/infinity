@@ -20,7 +20,7 @@
 pub mod conflict;
 pub mod state;
 
-pub use conflict::{conflict_between, Conflict, RowKey, TxnOp};
+pub use conflict::{conflict_between, Conflict, OptimizeEntry, RowKey, TxnOp};
 pub use state::{transaction_type_to_str, txn_state_to_str, TransactionType, TxnState};
 
 use std::collections::HashMap;
@@ -94,6 +94,13 @@ pub struct Txn {
     /// executor sets it before committing; [`TxnOp::Other`] keeps the key-set
     /// check for statements the matrix has no rule for.
     op: TxnOp,
+    /// `TxnContext::last_kv_commit_ts_` / `last_commit_ts_`: the manager's pair
+    /// when this transaction began. The conflict check needs them to tell a
+    /// transaction that committed *before* this snapshot from one that only
+    /// finished its KV batch at the same timestamp
+    /// (`NewTxnManager::GetCheckCandidateTxns`).
+    last_system_kv_commit_ts: TxnTimeStamp,
+    last_system_commit_ts: TxnTimeStamp,
     /// The manager's active-transaction registry (C++ `txn_map_`). Dropping a
     /// transaction that was neither committed nor rolled back releases its
     /// slot, as `~NewTxn` calls `RollBackTxn` in the reference.
@@ -307,6 +314,13 @@ pub struct TxnManager {
     /// C++ `NewTxnManager::txn_map_`: the live transactions, in begin order for
     /// `SHOW TRANSACTIONS`.
     active: Arc<Mutex<HashMap<u64, TxnInfo>>>,
+    /// C++ `NewTxnManager::last_kv_commit_ts_` / `last_commit_ts_`: the pair a
+    /// transaction freezes at begin ([`Txn::last_system_kv_commit_ts`]). The KV
+    /// timestamp runs one step ahead of the commit ts because the batch is
+    /// applied after the commit that produced it, which is the gap the conflict
+    /// check has to resolve. Both move together, as they do under the
+    /// reference's `locker_`.
+    kv_clock: Mutex<(TxnTimeStamp, TxnTimeStamp)>,
     /// C++ `NewTxnManager::check_txn_map_`: every write transaction that took a
     /// commit ts, keyed by that ts, with the store type its conflict rules
     /// read. An entry is pruned once no live transaction can still conflict
@@ -334,13 +348,15 @@ pub struct TxnManager {
 /// commit ts does, and whether it has finished.
 struct Candidate {
     txn_id: u64,
+    begin_ts: TxnTimeStamp,
     op: TxnOp,
     /// `TxnContext::kv_commit_ts_`: when the transaction's KV batch became
-    /// visible to new snapshots, or `None` while it is still in flight
-    /// (the reference's `UNCOMMIT_TS`). The port applies the batch inside the
-    /// commit, so a finished transaction's value is its commit ts.
-    kv_commit_ts: Option<TxnTimeStamp>,
+    /// visible to new snapshots, or [`UNCOMMIT_TS`] while it is still in flight.
+    kv_commit_ts: TxnTimeStamp,
 }
+
+/// C++ `UNCOMMIT_TS` (`default_values.cppm:83`): "not yet".
+const UNCOMMIT_TS: TxnTimeStamp = TxnTimeStamp::MAX;
 
 /// One write transaction's place in commit-ts order (`NewTxnManager::
 /// GetWriteCommitTS` -> `wait_conflict_ck_`).
@@ -456,6 +472,7 @@ impl TxnManager {
             total_rolled_back: AtomicU64::new(0),
             write_ts: Mutex::new(write_ts),
             active: Arc::new(Mutex::new(HashMap::new())),
+            kv_clock: Mutex::new((0, 0)),
             candidates: Mutex::new(std::collections::BTreeMap::new()),
             commit_lock: Mutex::new(()),
             turns: Mutex::new(std::collections::BTreeSet::new()),
@@ -537,6 +554,9 @@ impl TxnManager {
         // transaction's own commit timestamp (which is `current_ts_ + 2`) and
         // above every commit that finished before it began.
         let begin_ts = self.current_ts.load(Ordering::SeqCst) + 1;
+        // `BeginTxnShared` hands the transaction the manager's
+        // `last_kv_commit_ts_` / `last_commit_ts_` as they are right now.
+        let (last_system_kv_commit_ts, last_system_commit_ts) = *self.kv_clock.lock().unwrap();
         let info = TxnInfo {
             txn_id: id,
             txn_text: txn_text.into(),
@@ -553,6 +573,8 @@ impl TxnManager {
             typed_commands: Vec::new(),
             reads: ReadSet::default(),
             op: TxnOp::Other,
+            last_system_kv_commit_ts,
+            last_system_commit_ts,
             active: self.active.clone(),
         }
     }
@@ -564,9 +586,10 @@ impl TxnManager {
     fn conflict(
         &self,
         txn: &Txn,
+        commit_ts: TxnTimeStamp,
         seen: &HashMap<Vec<u8>, TxnTimeStamp>,
     ) -> Option<(Conflict, String)> {
-        if let Some(conflict) = self.matrix_conflict(txn) {
+        if let Some(conflict) = self.matrix_conflict(txn, commit_ts) {
             return Some(conflict);
         }
         if txn.op != TxnOp::Other {
@@ -581,22 +604,49 @@ impl TxnManager {
 
     /// The reference's `CheckConflictTxnStore` over the candidate map.
     ///
-    /// A candidate is any transaction that took a commit ts this one's snapshot
-    /// could not have seen: still in flight, or finished at or above
-    /// `begin_ts`.
-    fn matrix_conflict(&self, txn: &Txn) -> Option<(Conflict, String)> {
+    /// `NewTxnManager::GetCheckCandidateTxns` decides which transactions are
+    /// candidates, and the test is on the **KV** commit timestamp, not on the
+    /// commit ts: the batch a transaction writes becomes visible a step after
+    /// the commit that produced it, so a snapshot can be newer than a commit and
+    /// still older than its batch. Three cases at the boundary equal to
+    /// `begin_ts`, resolved with the pair the transaction froze at begin
+    /// (`last_system_kv_commit_ts` / `last_system_commit_ts`):
+    ///
+    /// - `other_kv < last_kv`: the batch was already there before this
+    ///   transaction began - no conflict;
+    /// - `other_kv == last_kv`: the pair is the same one this transaction saw,
+    ///   so the order is decided by the commit ts - a commit at or below the
+    ///   frozen one happened first and does not conflict;
+    /// - `other_kv > last_kv`: the batch appeared after this transaction began -
+    ///   conflict.
+    fn matrix_conflict(
+        &self,
+        txn: &Txn,
+        commit_ts: TxnTimeStamp,
+    ) -> Option<(Conflict, String)> {
         let candidates = self.candidates.lock().unwrap();
         for (ts, candidate) in candidates.iter() {
             if candidate.txn_id == txn.id {
                 continue;
             }
-            // `NewTxnManager::GetCheckCandidateTxns`: a transaction whose KV
-            // batch is already visible to this snapshot cannot conflict.
-            if candidate
-                .kv_commit_ts
-                .is_some_and(|kv_ts| kv_ts < txn.begin_ts)
-            {
+            if candidate.kv_commit_ts < txn.begin_ts {
+                // Committed (and visible) before this transaction began.
                 continue;
+            }
+            if candidate.kv_commit_ts == txn.begin_ts {
+                if candidate.kv_commit_ts < txn.last_system_kv_commit_ts {
+                    continue;
+                }
+                if candidate.kv_commit_ts == txn.last_system_kv_commit_ts
+                    && *ts <= txn.last_system_commit_ts
+                {
+                    continue;
+                }
+            }
+            // A candidate that began after this transaction committed keeps the
+            // ones behind it out too: they began even later.
+            if candidate.begin_ts > commit_ts {
+                break;
             }
             if let Some(conflict) = conflict_between(&txn.op, &candidate.op) {
                 return Some((
@@ -675,16 +725,19 @@ impl TxnManager {
             .unwrap()
             .retain(|_, ts| *ts >= oldest);
         let mut candidates = self.candidates.lock().unwrap();
-        // A transaction that committed before the oldest live transaction began
-        // can no longer conflict with anything (`CleanupTxnBottomNolock`,
-        // `new_txn_manager_impl.cpp:669-694`).
-        candidates.retain(|ts, _| *ts >= oldest);
+        // A transaction whose KV batch is visible before the oldest live
+        // transaction began can no longer conflict with anything
+        // (`CleanupTxnBottomNolock` compares `KVCommitTS()` against the oldest
+        // `begin_ts`, `new_txn_manager_impl.cpp:687`).
+        candidates.retain(|_, candidate| candidate.kv_commit_ts >= oldest);
         candidates.insert(
             commit_ts,
             Candidate {
                 txn_id: txn.id,
+                begin_ts: txn.begin_ts,
                 op: txn.op.clone(),
-                kv_commit_ts: None,
+                // `TxnContext::kv_commit_ts_` starts at `UNCOMMIT_TS`.
+                kv_commit_ts: UNCOMMIT_TS,
             },
         );
     }
@@ -704,15 +757,16 @@ impl TxnManager {
             .min()
             .unwrap_or(TxnTimeStamp::MAX);
         let mut candidates = self.candidates.lock().unwrap();
-        candidates.retain(|ts, _| *ts >= oldest);
+        candidates.retain(|_, candidate| candidate.kv_commit_ts >= oldest);
         candidates.insert(
             commit_ts,
             Candidate {
                 // The manager's own transactions have no id of their own in
                 // `txn_map_`; `u64::MAX` can never equal a live transaction's.
                 txn_id: u64::MAX,
+                begin_ts: commit_ts - 1,
                 op,
-                kv_commit_ts: Some(commit_ts),
+                kv_commit_ts: self.note_kv_commit(commit_ts),
             },
         );
     }
@@ -722,11 +776,24 @@ impl TxnManager {
     fn finish_candidate(&self, commit_ts: TxnTimeStamp, committed: bool) {
         let mut candidates = self.candidates.lock().unwrap();
         match candidates.get_mut(&commit_ts) {
-            Some(candidate) if committed => candidate.kv_commit_ts = Some(commit_ts),
+            Some(candidate) if committed => candidate.kv_commit_ts = self.note_kv_commit(commit_ts),
             _ => {
                 candidates.remove(&commit_ts);
             }
         }
+    }
+
+    /// `NewTxnManager::CommitKVInstance`: the transaction's batch is now
+    /// visible, so the manager's `(last_kv_commit_ts_, last_commit_ts_)` pair
+    /// moves to it.
+    ///
+    /// The reference reads `current_ts_ + 1` here, i.e. one past the commit the
+    /// batch belongs to; the port applies the batch inside the commit itself,
+    /// so the same value is `commit_ts + 1`.
+    fn note_kv_commit(&self, commit_ts: TxnTimeStamp) -> TxnTimeStamp {
+        let kv_commit_ts = commit_ts + 1;
+        *self.kv_clock.lock().unwrap() = (kv_commit_ts, commit_ts);
+        kv_commit_ts
     }
 
     /// Commits: validate against newer transactions, append the typed command
@@ -920,7 +987,7 @@ impl TxnManager {
         self.note_candidate(&txn, commit_ts);
         {
             let seen = self.write_ts.lock().unwrap();
-            if let Some((kind, reason)) = self.conflict(&txn, &seen) {
+            if let Some((kind, reason)) = self.conflict(&txn, commit_ts, &seen) {
                 // The timestamp is spent; `CommitBottom` advances `current_ts_`
                 // past it in commit-ts order even when the transaction rolled
                 // back, so the clock keeps the same hole.

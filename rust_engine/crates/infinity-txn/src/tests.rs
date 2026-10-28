@@ -364,6 +364,52 @@ fn overlapping_write_ranges_conflict() {
     assert!(matches!(m.commit(t2), Err(Error::TxnConflict(_))));
 }
 
+/// `NewTxnManager::GetCheckCandidateTxns`: the candidate test is on the KV
+/// commit timestamp, not on the commit ts, and the pair the transaction froze
+/// at begin (`last_kv_commit_ts` / `last_commit_ts`) decides the boundary.
+#[test]
+fn a_snapshot_that_saw_a_commit_does_not_conflict_with_it() {
+    let dir = tempdir().unwrap();
+    let m = manager(dir.path());
+    let update = |rows: Vec<u64>| TxnOp::Update {
+        table: "default_db.t".into(),
+        rows,
+        segments: vec![0],
+    };
+
+    // A commits an update of row 1. Its KV batch becomes visible one step
+    // after the commit (`CommitKVInstance`), which is what the manager records.
+    let mut a = m.begin();
+    a.set_op(update(vec![1]));
+    a.put(row("default_db.t", 1), b"a".to_vec());
+    let a_ts = m.commit(a).unwrap();
+    assert_eq!(*m.kv_clock.lock().unwrap(), (a_ts + 1, a_ts));
+
+    // B begins after it: its `begin_ts` lands exactly on A's KV commit ts
+    // (case 2 of the reference). Update-vs-update is table level, so the only
+    // thing that can keep B out of a conflict is A being visible to it.
+    let mut b = m.begin();
+    assert_eq!(b.begin_ts, a_ts + 1, "begin_ts == A's kv commit ts");
+    assert_eq!(
+        (b.last_system_kv_commit_ts, b.last_system_commit_ts),
+        (a_ts + 1, a_ts)
+    );
+    b.set_op(update(vec![2]));
+    b.put(row("default_db.t", 2), b"b".to_vec());
+    m.commit(b).expect("A is visible to B, so the pair does not conflict");
+
+    // C began before A committed: same rule, but A's batch is newer than C's
+    // snapshot, so C is rejected.
+    let mut c = m.begin();
+    let mut d = m.begin();
+    d.set_op(update(vec![3]));
+    d.put(row("default_db.t", 3), b"d".to_vec());
+    m.commit(d).unwrap();
+    c.set_op(update(vec![4]));
+    c.put(row("default_db.t", 4), b"c".to_vec());
+    assert!(matches!(m.commit(c), Err(Error::TxnConflict(_))));
+}
+
 #[test]
 fn read_sets_and_ranges_conflict() {
     let dir = tempdir().unwrap();

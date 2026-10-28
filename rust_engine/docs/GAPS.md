@@ -27,26 +27,36 @@
 
 | 项 | 现状 | 影响 | 依据 |
 |---|---|---|---|
-| ~~行以列式块为存储本体（方案 C）~~ **已完成** | 提交零 block 文件 I/O：行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件只由 checkpoint（`flush_cpp_blocks` → `write_cpp_blocks`）写；`row:`/`del:` 停写（只有块格式表达不了的列类型回落 KV）。读全部把 buffer 盖在块上：整表/剪枝/列投影/点取/含墓碑/计数/`row_is_present`。回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧 | `persistence/` 不再有 `row:`/`del:` 子树（只剩侧车文件） | executor 698 passed / 29 ignored；catalog 54、storage 463、txn 21 全绿 |
+| ~~行以列式块为存储本体（方案 C）~~ **已完成** | 提交零 block 文件 I/O：行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件只由 checkpoint（`flush_cpp_blocks` → `write_cpp_blocks`）写；`row:`/`del:` 停写（块格式表达不了的列类型另留文本行副本；`del:` 一律不写，块的 `version` 是唯一墓碑）。读全部把 buffer 盖在块上：整表/剪枝/列投影/点取/含墓碑/计数/`row_is_present`。回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧 | `persistence/` 不再有 `row:`/`del:` 子树（只剩侧车文件） | executor 700 passed / 29 ignored；catalog 54、storage 463、txn 30 全绿 |
 | ~~`Cleanup` 之后 Rust 侧丢了 HNSW 的合并段 chunk（门禁 30）~~ **已修** | `prune_dead_segment_index_dirs` 曾用 `segment_ids()`（分配器，重开目录后为空）当"活段"，把每个 `idx_*/seg_4` 都删掉；改用 `visible_block_ids()`（块索引，跨重启有效） | 门禁 30：8 passed / 1 skipped | `cpp_blocks.rs::prune_dead_segment_index_dirs` |
 | ~~门禁 40：SDK 单列读多值表拿不到行~~ **已修** | ①列投影在"本进程没写过镜像"（重开目录）时因缺快照直接放弃，现在块文件就是行集、快照只做并发守卫；②多值/张量表的 WAL 帧用本 build 的 `DataBlock` 还原不了行，checkpoint 没跑过就会丢——这类表额外保留一份文本行（`needs_text_rows`），块仍是权威 | 门禁 40：3 passed | `lib.rs::try_cpp_projection`、`needs_text_rows`；回归用例 `tests::a_multivector_table_round_trips_through_its_blocks` |
-| ~~并发插入偶发丢行（`tests::concurrent_inserts_and_vector_searches_do_not_deadlock`）~~ **已修** | 根因是**分配与提交的次序**，不是 checkpoint 的写法：端口在执行期就发号（`reserve_rows`），参考在提交期发号且按 commit_ts 排序（`GetWriteCommitTS` 登记 → `SubmitForAllocation` 只从最小的 ts 放行 → `TxnAllocator::Process` → `PrepareAppend`）。执行期的号序和提交序不一致时，buffer 里会出现"高号已到、低号未到"，checkpoint 把块首当窗口起点就写歪（打点：`want=4 got=4 missing=[4,5] extra=2`）。现在：提交按 commit_ts 串行（`TxnManager::begin_write` / `commit_at_deferred_with`，对应 `wait_conflict_ck_`），行号在冲突检查之后、写 WAL 之前分配，`note_append` 当场带上 commit ts；checkpoint 的上界是 `current_ts`（已完成的 commit_ts），段的窗口按 `append_totals`+`append_ts` 裁到 `ts <= 上界`，块内 id 必须是窗口的稠密前缀（不再是"跳过带空洞的块"） | 全量 executor 698 passed / 29 ignored、txn 21、catalog 54、storage 463；字节门禁 00–60 全绿（新增 `tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`cpp_blocks::tests::a_checkpoint_writes_only_the_committed_prefix`） | `infinity-txn::TxnManager::begin_write`、`lib.rs::committed_rows`、`cpp_blocks.rs::write_cpp_blocks_mode`；参考 `new_txn_manager_impl.cpp:207-220`、`840-881`、`new_txn_impl.cpp:1763-1764` |
+| ~~并发插入偶发丢行（`tests::concurrent_inserts_and_vector_searches_do_not_deadlock`）~~ **已修** | 根因是**分配与提交的次序**，不是 checkpoint 的写法：端口在执行期就发号（`reserve_rows`），参考在提交期发号且按 commit_ts 排序（`GetWriteCommitTS` 登记 → `SubmitForAllocation` 只从最小的 ts 放行 → `TxnAllocator::Process` → `PrepareAppend`）。执行期的号序和提交序不一致时，buffer 里会出现"高号已到、低号未到"，checkpoint 把块首当窗口起点就写歪（打点：`want=4 got=4 missing=[4,5] extra=2`）。现在：提交按 commit_ts 串行（`TxnManager::begin_write` / `commit_at_deferred_with`，对应 `wait_conflict_ck_`），行号在冲突检查之后、写 WAL 之前分配，`note_append` 当场带上 commit ts；checkpoint 的上界是 `current_ts`（已完成的 commit_ts），段的窗口按 `append_totals`+`append_ts` 裁到 `ts <= 上界`，块内 id 必须是窗口的稠密前缀（不再是"跳过带空洞的块"） | 全量 executor 700 passed / 29 ignored、txn 30、catalog 54、storage 463；字节门禁 00–60 全绿（新增 `tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`cpp_blocks::tests::a_checkpoint_writes_only_the_committed_prefix`） | `infinity-txn::TxnManager::begin_write`、`lib.rs::committed_rows`、`cpp_blocks.rs::write_cpp_blocks_mode`；参考 `new_txn_manager_impl.cpp:207-220`、`840-881`、`new_txn_impl.cpp:1763-1764` |
 
 ### 2.1 事务冲突检查 / 回滚
 
-**本节没有待办项。** 下面是这一层现在的口径，以及两处"结构不同但语义等价"的地方。
+**本节没有待办项。** 下面是这一层现在的口径。
 
 参考的冲突检查是**按事务类型成对判定**（`NewTxn::CheckConflictTxnStore` 的二十多个重载）。端口移植了同一套矩阵：
 `infinity-txn/src/conflict.rs` 的 `TxnOp`（= 参考 `BaseTxnStore::type_` 加上规则要读的字段）与 `conflict_between`，
 每个写语句在提交前用 `Txn::set_op` 声明自己的类型（INSERT/INSERT…SELECT/Thrift Insert → `Append`，COPY 与
 `import_literals` → `Import`，UPDATE → `Update{row_ids, segments}`，DELETE → `Delete{row_ids}`，COMPACT → `Compact`，
-DUMP → `DumpMemIndex`，OPTIMIZE → `OptimizeIndex`，DDL 各自一种，快照 → `Snapshot`，checkpoint / cleanup → 由
-`TxnManager` 自己登记）。
+DUMP → `DumpMemIndex`，OPTIMIZE → `OptimizeIndex{entries}`（一次 optimize 一个事务，逐索引段记录），DDL 各自一种，
+快照 → `Snapshot`，checkpoint / cleanup → 由 `TxnManager` 自己登记）。
 
 判定是**有方向的**，与参考相同：只有后提交的一方跑检查、只有它自己的重载生效（所以 `Append` 看得到 `DropColumn`
-（4005），`DropColumn` 自己却没有重载，反过来的顺序不冲突）。候选集 `TxnManager::candidates` 是参考的
-`check_txn_map_`：取号时登记、提交后记 `kv_commit_ts`、失败/回滚摘除、最老活跃 `begin_ts` 以下裁剪；键日志
-（未分类语句的兜底）同一把尺子裁剪。
+（4005），`DropColumn` 自己却没有重载，反过来的顺序不冲突）。
+
+候选集 `TxnManager::candidates` 是参考的 `check_txn_map_`，可见性判据也按参考的两个时间戳：每条事务在 `begin`
+时冻结管理器的 `(last_kv_commit_ts, last_commit_ts)` 对（`NewTxnManager::BeginTxnShared` 把它交给 `NewTxn`），
+候选条目带自己的 `kv_commit_ts`（未提交 = `UNCOMMIT_TS`），`GetCheckCandidateTxns` 的判定逐条照搬：
+
+- `other_kv_commit_ts < begin_ts` → 已在本事务快照之前可见，跳过；
+- 相等时用冻结的那对消歧：`< last_kv` 跳过；`== last_kv` 且 `other_commit_ts <= last_commit` 跳过；否则冲突；
+- `other_begin_ts > this_commit_ts` → 后面的候选只会更晚，跳出。
+
+端口把 KV 批放在提交里落（`apply_split`），所以 `kv_commit_ts = commit_ts + 1`——参考在 `CommitKVInstance` 里读
+`current_ts_ + 1`，端口读同一个位置的唯一可能值。候选按 `kv_commit_ts < 最老活跃 begin_ts` 裁剪
+（`CleanupTxnBottomNolock`），键日志（未分类语句的兜底）同一把尺子。
 
 **行级判定不再有 `del:` 键**：DELETE/UPDATE 把行 id 放进 `TxnOp`，按交集比较（参考的 `row_ids_`）；块的 `version`
 是唯一的墓碑记录，端口不再往 KV 写任何 `del:` 记录（`cpp_blocks::tests::the_blocks_are_the_row_set_not_just_the_values`
@@ -58,21 +68,20 @@ append 记录的时间戳裁剪（`AppendView::covers`），删除日志按删�
 `row_count` 用同一把尺子；行缓存（解码结果与行集缓存）在 pin 住时绕过。语句之外——checkpoint、回放、后台任务、
 直接调用读接口——仍是"最新"。
 
-两处语义等价而不是逐字复刻：
-
-- **`kv_commit_ts` 与 `commit_ts` 同值**：端口把 KV 批放在提交里落（`apply_split`），所以参考里"KV 提交与 commit_ts
-  不同步"的边界分支（`last_kv_commit_ts` / `last_commit_ts` 消歧）在端口没有对应情形，候选的可见性用
-  `kv_commit_ts < begin_ts` 表达同一件事。
-- **OPTIMIZE 只为真正要合并的索引开事务**：参考的 `NewTxn::OptimizeIndex` 每个索引一个事务（即使没东西可合），
-  端口只在确实要合并 chunk 时开，空转的那一拍不花 ts。冲突保护一致（两次合并、合并与写入/更新互斥）。
+**OPTIMIZE 的事务范围**：`OptimizationProcessor::NewNotifyOptimize` 一次触发开**一个**事务（`OptimizeAllIndexes`
+把每个索引段的结果塞进同一个 `OptimizeIndexTxnStore::entries_`），即使什么都没合也照常提交（空 store 也花 commit ts、
+WAL 里留一条无命令的帧）。端口相同：`optimize_cpp_index_chunks` 先取号开事务，再扫索引，`TxnOp::OptimizeIndex`
+逐（表, 索引, 段）记录它真正重写过的条目，成功提交、失败回滚、冲突记为日志后放弃；条目字段决定每条规则（表级对
+Append/Update/快照，段级对 Compact，索引级对 DumpMemIndex/DropIndex，跨表时对任何 DropIndex 都冲突）。
 
 已经对齐的部分：begin_ts 取 `current_ts + 1` 且不推进时钟、冲突发生在写 WAL 之前、冲突不写 WAL、
 回滚不回退行号/段号、冲突也推进可见时钟、各类规则的表级/行级/段级粒度（见 `conflict.rs` 的单测）、
 `retry_query` 的两档错误（4002 重试 / 4005 直返）、`QueryContext::QueryStatement` 的整句重试、
 IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）、`APPLIED_TS_KEY` 最后写。
 
-测试：`infinity-txn` 的 `conflict::tests::*`（矩阵逐条）、`tests::a_read_at_an_older_ts_hides_later_commits`
-（读按 begin_ts）、`conflict_check_ut::conflict_check_delete`（C++ `conflict_check_ut.cpp`）、
+测试：`infinity-txn` 的 `conflict::tests::*`（矩阵逐条，含 `an_optimize_pass_conflicts_per_entry`）、
+`tests::a_read_at_an_older_ts_hides_later_commits`（读按 begin_ts）、
+`tests::a_snapshot_that_saw_a_commit_does_not_conflict_with_it`（KV 提交时间戳的三段判据）、`conflict_check_ut::conflict_check_delete`（C++ `conflict_check_ut.cpp`）、
 `request_ut::conflict_*`（C++ `conflict_request_ut.cpp` 的十个用例）。
 事务这一层的 C++ 用例到端口映射见 [`TEST_AUDIT.md`](TEST_AUDIT.md)：`storage/txn/*` 15 个、
 `new_catalog/new_txn_mgr_ut` 2 个（另 2 个 `DISABLED_SLOW_` 在端口是 `#[ignore]`）、
@@ -111,5 +120,6 @@ IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）
 | `CREATE VIEW` / `DROP VIEW` | 不实现（参考也没有实现）：`PhysicalCreateView::Execute` 是空壳、DDL 分发没有这个分支，两侧都死在 `UnrecoverableException("Unknown DDL type")`（`query_context_impl.cpp:467`/`:489`），视图不会被登记，`FROM v` 随后报表不存在 | `select_ddl_ut::views_are_rejected_like_the_reference` |
 | `INSERT … SELECT` | 只支持 select list 全为常量：参考的 `PhysicalInsert` 把投影表达式交给 `ExpressionState::CreateState`，那里没有 `Column` 分支，任何列引用（含 `SELECT *`）都会死在该处（`expression_state_impl.cpp:68`）。端口报同一条 `Unknown expression type: Column. expression name: {col}`，常量情形与参考一样按源行数插入 | `select_ddl_ut::insert_select_is_refused_when_the_select_list_reads_a_column` |
 | `CREATE SNAPSHOT … ON TABLE <db>.<tbl>` | 参考的文法是 `IDENTIFIER`，带库名的写法是解析错误（`unexpected '.', expecting end of file`）；端口接受限定名（HTTP 层就按这个拼），无库名时用会话库 | `infinity-parser` 的 `CREATE SNAPSHOT` 分支（`parser.rs:362`） |
+| OPTIMIZE 的 WAL 帧内容 | 参考的 `OptimizeIndexTxnStore::ToWalEntry` 每个条目写一条 `WalCmdDumpIndexV2`（`dump_cause_ = kOptimizeIndex`），带合并后 chunk 的 `chunk_id`/`row_cnt` 与被弃用的旧 chunk id；端口的合并是"再写一个覆盖全表的 chunk"（`write_cpp_hnsw_chunk(force_append)`，旧 chunk 保留、查询时合并），没有"弃用旧 chunk"这层，所以它的事务只记录条目、不写命令（重放不影响任何文件）。冲突范围与提交时机与参考一致，帧内容不同 | `cpp_blocks.rs::optimize_cpp_index_chunks`、`merge_cpp_hnsw_index` |
 | `standard-porter` | 用 Porter2（`rust_stemmers::English`），少数词干与参考的 `STEM_LANG_PORT` 不同；其余 17 种语言同族一致 | `CLASS_MAP.md`「有意的设计变更」 |
 
