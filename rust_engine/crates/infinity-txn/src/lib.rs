@@ -337,12 +337,21 @@ impl Drop for WriteTurn<'_> {
     }
 }
 
-/// Releases a place in commit-ts order on every exit path of a commit.
-struct TurnRelease<'a>(&'a TxnManager, TxnTimeStamp);
+/// Releases a place in commit-ts order on every exit path of a commit, and -
+/// when the commit did not go through - lets the visibility clock move past the
+/// spent timestamp, as `RemoveMapElementForRollbackNoLock` does.
+struct CommitRelease<'a> {
+    manager: &'a TxnManager,
+    ts: TxnTimeStamp,
+    committed: &'a std::cell::Cell<bool>,
+}
 
-impl Drop for TurnRelease<'_> {
+impl Drop for CommitRelease<'_> {
     fn drop(&mut self) {
-        self.0.turn_done(self.1);
+        if !self.committed.get() {
+            self.manager.finish_bottom(self.ts);
+        }
+        self.manager.turn_done(self.ts);
     }
 }
 
@@ -730,10 +739,22 @@ impl TxnManager {
         // may write its entry, so the log (and everything the entry decides:
         // row ids, block slots) follows commit order.
         self.turn_wait(commit_ts);
+        // The checkpoint reads `last_appended` to decide whether it has to
+        // rotate, so appending the entry and publishing the new high-water mark
+        // must be one step with respect to it (`WalManager::Flush` does both in
+        // its own loop, `wal_manager_impl.cpp:288-294`). Taken **after** the
+        // turn: a checkpoint never waits for a commit's turn.
+        let _commit = self.commit_lock.lock().unwrap();
         // Every exit path below (conflict, allocation failure, WAL error) hands
-        // the place back, so one failed statement cannot stall the commits that
-        // come after it.
-        let _turn = TurnRelease(self, commit_ts);
+        // the place back **and** lets the clock move past it, so one failed
+        // statement cannot stall the commits after it - the reference's
+        // `RemoveMapElementForRollbackNoLock` (`new_txn_manager_impl.cpp:888`).
+        let committed = std::cell::Cell::new(false);
+        let _release = CommitRelease {
+            manager: self,
+            ts: commit_ts,
+            committed: &committed,
+        };
         self.register_bottom(commit_ts);
         {
             let seen = self.write_ts.lock().unwrap();
@@ -797,6 +818,7 @@ impl TxnManager {
         // in the store, so a reader's `begin_ts` is `current_ts + 1` and never
         // sees a commit that is still being applied.
         self.total_committed.fetch_add(1, Ordering::Relaxed);
+        committed.set(true);
         Ok(commit_ts)
     }
 
