@@ -69,10 +69,15 @@ append 记录的时间戳裁剪（`AppendView::covers`），删除日志按删�
 直接调用读接口——仍是"最新"。
 
 **OPTIMIZE 的事务范围**：`OptimizationProcessor::NewNotifyOptimize` 一次触发开**一个**事务（`OptimizeAllIndexes`
-把每个索引段的结果塞进同一个 `OptimizeIndexTxnStore::entries_`），即使什么都没合也照常提交（空 store 也花 commit ts、
-WAL 里留一条无命令的帧）。端口相同：`optimize_cpp_index_chunks` 先取号开事务，再扫索引，`TxnOp::OptimizeIndex`
+把每个索引段的结果塞进同一个 `OptimizeIndexTxnStore::entries_`），即使什么都没合也照常提交（空 store 也花 commit ts；
+WAL 帧里是逐条目的 `DumpIndexV2`，没有条目时就是一条无命令的帧）。端口相同：`optimize_cpp_index_chunks` 先取号开事务，再扫索引，`TxnOp::OptimizeIndex`
 逐（表, 索引, 段）记录它真正重写过的条目，成功提交、失败回滚、冲突记为日志后放弃；条目字段决定每条规则（表级对
 Append/Update/快照，段级对 Compact，索引级对 DumpMemIndex/DropIndex，跨表时对任何 DropIndex 都冲突）。
+
+条目同时是 WAL 与弃用的载体：`OptimizeEntry` 带 `new_chunk_infos_`（合并后 chunk 的 `chunk_id`/`base_row_id`/`row_cnt`）
+与 `deprecate_chunks_`，提交时按 `OptimizeIndexTxnStore::ToWalEntry` 每条写一条 `WalCmdDumpIndexV2`（参考的
+`dump_cause_` 不进帧），提交成功后按 `RemoveChunkIDs(deprecate_ids)` 把旧 chunk 从段里去掉——端口段的 chunk 列表就是目录，
+所以这一步是删文件（时机差异见 §5）。测试：`tests::optimize_logs_one_dump_command_per_entry`。
 
 已经对齐的部分：begin_ts 取 `current_ts + 1` 且不推进时钟、冲突发生在写 WAL 之前、冲突不写 WAL、
 回滚不回退行号/段号、冲突也推进可见时钟、各类规则的表级/行级/段级粒度（见 `conflict.rs` 的单测）、
@@ -120,6 +125,6 @@ IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）
 | `CREATE VIEW` / `DROP VIEW` | 不实现（参考也没有实现）：`PhysicalCreateView::Execute` 是空壳、DDL 分发没有这个分支，两侧都死在 `UnrecoverableException("Unknown DDL type")`（`query_context_impl.cpp:467`/`:489`），视图不会被登记，`FROM v` 随后报表不存在 | `select_ddl_ut::views_are_rejected_like_the_reference` |
 | `INSERT … SELECT` | 只支持 select list 全为常量：参考的 `PhysicalInsert` 把投影表达式交给 `ExpressionState::CreateState`，那里没有 `Column` 分支，任何列引用（含 `SELECT *`）都会死在该处（`expression_state_impl.cpp:68`）。端口报同一条 `Unknown expression type: Column. expression name: {col}`，常量情形与参考一样按源行数插入 | `select_ddl_ut::insert_select_is_refused_when_the_select_list_reads_a_column` |
 | `CREATE SNAPSHOT … ON TABLE <db>.<tbl>` | 参考的文法是 `IDENTIFIER`，带库名的写法是解析错误（`unexpected '.', expecting end of file`）；端口接受限定名（HTTP 层就按这个拼），无库名时用会话库 | `infinity-parser` 的 `CREATE SNAPSHOT` 分支（`parser.rs:362`） |
-| OPTIMIZE 的 WAL 帧内容 | 参考的 `OptimizeIndexTxnStore::ToWalEntry` 每个条目写一条 `WalCmdDumpIndexV2`（`dump_cause_ = kOptimizeIndex`），带合并后 chunk 的 `chunk_id`/`row_cnt` 与被弃用的旧 chunk id；端口的合并是"再写一个覆盖全表的 chunk"（`write_cpp_hnsw_chunk(force_append)`，旧 chunk 保留、查询时合并），没有"弃用旧 chunk"这层，所以它的事务只记录条目、不写命令（重放不影响任何文件）。冲突范围与提交时机与参考一致，帧内容不同 | `cpp_blocks.rs::optimize_cpp_index_chunks`、`merge_cpp_hnsw_index` |
+| OPTIMIZE 弃用 chunk 的时机 | 参考提交时只把旧 chunk 从段的 chunk 列表里移出（`RemoveChunkIDs(deprecate_ids)`），字节由之后一次 cleanup 删；端口没有 chunk 级 catalog，段的 chunk 列表**就是目录**，所以"移出列表"只能是"删文件"，两件事合并在 optimize 提交之后那一刻完成。提交后的可读集合与参考相同（只有合并后的 chunk），差别仅在旧文件消失得早一步；崩溃在提交与删除之间时，cleanup 的"最新 chunk 覆盖全表"规则补删 | `cpp_blocks.rs::optimize_cpp_index_chunks`、`cleanup_cpp_index_chunks` |
 | `standard-porter` | 用 Porter2（`rust_stemmers::English`），少数词干与参考的 `STEM_LANG_PORT` 不同；其余 17 种语言同族一致 | `CLASS_MAP.md`「有意的设计变更」 |
 

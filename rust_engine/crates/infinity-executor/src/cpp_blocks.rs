@@ -25,7 +25,20 @@ use infinity_catalog::cpp_layout::{
 };
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
+use infinity_storage::WalCmd;
 use infinity_txn::{OptimizeEntry, TxnOp};
+/// One chunk a merge wrote, and the chunks of its segment it supersedes -
+/// the data of one `OptimizeIndexStoreEntry` (`new_chunk_infos_` /
+/// `deprecate_chunks_`).
+pub(crate) struct ChunkRewrite {
+    /// The directory the chunks live in (`idx_{id}/seg_{s}`).
+    pub dir: PathBuf,
+    pub segment: u32,
+    pub chunk_id: u32,
+    pub row_count: u32,
+    pub deprecate_ids: Vec<u32>,
+}
+
 /// The ts a deleted block slot carries when the delete's commit ts is unknown.
 ///
 /// `BlockVersion::CheckDelete` hides a slot whose ts is non-zero and not newer
@@ -4038,7 +4051,7 @@ impl Engine {
     ///
     /// Returns the segments it wrote a chunk for - the entries an optimize
     /// transaction records (`OptimizeIndexTxnStore::entries_`).
-    pub fn merge_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<Vec<u32>> {
+    pub fn merge_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<Vec<ChunkRewrite>> {
         self.write_cpp_hnsw_chunk(table, index_name, false, true)
             .map(|written| written.1)
     }
@@ -4049,7 +4062,7 @@ impl Engine {
         index_name: &str,
         new_chunk: bool,
         force_append: bool,
-    ) -> Result<(usize, Vec<u32>)> {
+    ) -> Result<(usize, Vec<ChunkRewrite>)> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -4125,7 +4138,7 @@ impl Engine {
         let db_id = self.database_id_of(&table);
         let options = self.hnsw_options(&table, index_name);
         let mut written = 0usize;
-        let mut written_segments: Vec<u32> = Vec::new();
+        let mut rewrites: Vec<ChunkRewrite> = Vec::new();
         for (segment, rows) in &segments {
             let dir = self.blocks_root().join(format!(
                 "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
@@ -4161,20 +4174,39 @@ impl Engine {
                 "chunk_{}.idx",
                 chunks.last().map(|(id, _)| id + 1).unwrap_or(0)
             );
+            let chunk_id: u32 = chunks
+                .last()
+                .map(|(id, _)| id + 1)
+                .unwrap_or(0)
+                .try_into()
+                .unwrap_or(u32::MAX);
             std::fs::write(dir.join(name), &chunk).map_err(|e| Error::Io {
                 path: dir.clone(),
                 source: e,
             })?;
             written += count;
-            written_segments.push(*segment);
+            // The chunks this one supersedes: the reference's
+            // `deprecate_chunks_`, which its optimize transaction removes from
+            // the segment's chunk list.
+            rewrites.push(ChunkRewrite {
+                dir: dir.clone(),
+                segment: *segment,
+                chunk_id,
+                row_count: count as u32,
+                deprecate_ids: chunks.iter().map(|(id, _)| *id as u32).collect(),
+            });
         }
-        Ok((written, written_segments))
+        Ok((written, rewrites))
     }
 
     /// Whether `column` is a `MULTIVECTOR`, whose mirror has no single-vector
     /// graph in this build.
     fn multivector_column(&self, table: &str, column: &str) -> bool {
-        let Ok(meta) = self.storage.catalog.get_table_by_name(&self.qualified_table(table)) else {
+        let Ok(meta) = self
+            .storage
+            .catalog
+            .get_table_by_name(&self.qualified_table(table))
+        else {
             return false;
         };
         let Some(meta) = meta else {
@@ -4207,11 +4239,40 @@ impl Engine {
         let ts = turn.ts();
         let mut txn = self.txn.begin();
         let mut entries: Vec<OptimizeEntry> = Vec::new();
-        let outcome = self.merge_optimizable_indexes(&mut entries);
+        let mut rewrites: Vec<ChunkRewrite> = Vec::new();
+        let outcome = self.merge_optimizable_indexes(&mut entries, &mut rewrites);
+        // `OptimizeIndexTxnStore::ToWalEntry`: one `WalCmdDumpIndexV2` per
+        // entry, carrying the merged chunk and the chunks it supersedes. The
+        // reference's `dump_cause_` is not part of the frame. A failed pass never
+        // gets here with its entries: it is rolled back.
+        let commands = match &outcome {
+            Ok(()) => self.optimize_index_commands(&entries)?,
+            Err(_) => Vec::new(),
+        };
         txn.set_op(TxnOp::OptimizeIndex { entries });
+        if !commands.is_empty() {
+            txn.set_typed_commands(commands);
+        }
         match outcome {
             Ok(()) => match self.txn.commit_at(txn, ts) {
-                Ok(_) | Err(Error::TxnConflict(_)) | Err(Error::TxnConflictNoRetry(_)) => Ok(()),
+                Ok(_) => {
+                    // `RemoveChunkIDs(deprecate_ids)`: the merged chunk is what
+                    // the segment holds from now on, so the ones it replaced stop
+                    // being read. The port's chunk list *is* the directory, so
+                    // "removed from the list" is "removed from the directory"; the
+                    // reference reclaims the same bytes in cleanup, one step later.
+                    for rewrite in &rewrites {
+                        for id in &rewrite.deprecate_ids {
+                            let path = rewrite.dir.join(format!("chunk_{id}.idx"));
+                            let _ = std::fs::remove_file(path);
+                        }
+                    }
+                    Ok(())
+                }
+                // A concurrent merge (or a drop that took the index away) is a
+                // conflict; `NewNotifyOptimize` logs it and leaves the chunks as
+                // they are.
+                Err(Error::TxnConflict(_)) | Err(Error::TxnConflictNoRetry(_)) => Ok(()),
                 Err(error) => Err(error),
             },
             Err(error) => {
@@ -4221,16 +4282,42 @@ impl Engine {
         }
     }
 
+    /// `OptimizeIndexTxnStore::ToWalEntry`: the command per entry.
+    fn optimize_index_commands(&self, entries: &[OptimizeEntry]) -> Result<Vec<WalCmd>> {
+        let mut out = Vec::with_capacity(entries.len());
+        for entry in entries {
+            let table = entry.table.as_str();
+            let Some(meta) = self.storage.catalog.get_table_by_name(table)? else {
+                continue;
+            };
+            let (db_name, table_name) = crate::split_table_name(table);
+            out.push(WalCmd::DumpIndex {
+                db_name,
+                db_id: self.database_id_of(table).to_string(),
+                table_name,
+                table_id: meta.id.to_string(),
+                index_name: entry.index.clone(),
+                index_id: self.cpp_index_position(table, &entry.index)?.to_string(),
+                segment_id: entry.segment,
+                chunk_infos: entry.chunk_infos.clone(),
+                deprecate_ids: entry.deprecate_ids.clone(),
+                table_key: self.table_key(table),
+            });
+        }
+        Ok(out)
+    }
+
     /// The merge half of an optimize pass, recording what it rewrote.
-    fn merge_optimizable_indexes(&self, entries: &mut Vec<OptimizeEntry>) -> Result<()> {
+    fn merge_optimizable_indexes(
+        &self,
+        entries: &mut Vec<OptimizeEntry>,
+        rewrites: &mut Vec<ChunkRewrite>,
+    ) -> Result<()> {
         for im in self.storage.catalog.list_indexes()? {
             if im.index_type.eq_ignore_ascii_case("PLAID") {
-                if let Some(segment) = self.merge_cpp_plaid_index(&im.table, &im.name)? {
-                    entries.push(OptimizeEntry {
-                        table: self.qualified_table(&im.table),
-                        index: im.name.clone(),
-                        segment,
-                    });
+                if let Some(rewrite) = self.merge_cpp_plaid_index(&im.table, &im.name)? {
+                    entries.push(self.optimize_entry(&im.table, &im.name, &rewrite));
+                    rewrites.push(rewrite);
                 }
                 continue;
             }
@@ -4291,15 +4378,38 @@ impl Engine {
             if rebuild_bytes > 1024 * 1024 * 1024 {
                 continue;
             }
-            for segment in self.merge_cpp_hnsw_index(&im.table, &im.name)? {
-                entries.push(OptimizeEntry {
-                    table: self.qualified_table(&im.table),
-                    index: im.name.clone(),
-                    segment,
-                });
+            for rewrite in self.merge_cpp_hnsw_index(&im.table, &im.name)? {
+                entries.push(self.optimize_entry(&im.table, &im.name, &rewrite));
+                rewrites.push(rewrite);
             }
         }
         Ok(())
+    }
+
+    /// The `OptimizeIndexStoreEntry` for one rewritten chunk: the reference's
+    /// `new_chunk_infos_` (one entry, from `ChunkIndexMetaInfo`) and
+    /// `deprecate_chunks_`.
+    fn optimize_entry(
+        &self,
+        table: &str,
+        index_name: &str,
+        rewrite: &ChunkRewrite,
+    ) -> OptimizeEntry {
+        OptimizeEntry {
+            table: self.qualified_table(table),
+            index: index_name.to_string(),
+            segment: rewrite.segment,
+            chunk_infos: vec![infinity_storage::wal_entry::WalChunkIndexInfo {
+                chunk_id: rewrite.chunk_id,
+                base_name: String::new(),
+                base_row_id: infinity_storage::wal_entry::WalRowId::new(rewrite.segment, 0),
+                row_count: rewrite.row_count,
+                term_count: 0,
+                index_size: 0,
+                deprecate_ts: u64::MAX,
+            }],
+            deprecate_ids: rewrite.deprecate_ids.clone(),
+        }
     }
 
     /// Drops `idx_{id}/seg_{s}` directories whose segment no longer exists.
@@ -4415,7 +4525,10 @@ impl Engine {
                 .map(|c| c.header.cur_vec_num as usize)
                 .unwrap_or(0);
             // The newest chunk covers the table only when it is a merged
-            // chunk; incremental dumps cover just their own rows.
+            // chunk; incremental dumps cover just their own rows. A committed
+            // optimize already dropped the chunks it superseded (the entry's
+            // `deprecate_ids`), so this is the fallback for a crash between that
+            // commit and the deletion.
             if covered < rows {
                 continue;
             }
@@ -5600,9 +5713,13 @@ impl Engine {
     /// the mirror has no meta, so the files themselves are the record) —
     /// [`Self::cleanup_cpp_index_chunks`] keeps the same rule as a safety net
     /// for a removal that failed. Returns the merged document count.
-    /// Returns the segment whose chunks were folded into one, or `None` when
+    /// Returns the chunk it folded the segment's chunks into, or `None` when
     /// there was nothing to merge - the entry an optimize transaction records.
-    pub fn merge_cpp_plaid_index(&self, table: &str, index_name: &str) -> Result<Option<u32>> {
+    pub fn merge_cpp_plaid_index(
+        &self,
+        table: &str,
+        index_name: &str,
+    ) -> Result<Option<ChunkRewrite>> {
         let mirror = self.cpp_plaid_mirror(table, index_name)?;
         let chunks = self.read_plaid_chunks(table, index_name)?;
         if chunks.len() < 2 {
@@ -5610,6 +5727,7 @@ impl Engine {
         }
         let next = chunks.last().map(|c| c.id + 1).unwrap_or(0);
         let paths: Vec<PathBuf> = chunks.iter().map(|c| c.path.clone()).collect();
+        let deprecate_ids: Vec<u32> = chunks.iter().map(|c| c.id as u32).collect();
         let indexes: Vec<PlaidIndex> = chunks.into_iter().map(|c| c.index).collect();
         let merged = Self::merge_plaid_chunk_indexes(&indexes)?;
         let path = mirror.dir.join(format!("chunk_{next}.idx"));
@@ -5620,7 +5738,13 @@ impl Engine {
         for old in paths {
             let _ = std::fs::remove_file(old);
         }
-        Ok(Some(0))
+        Ok(Some(ChunkRewrite {
+            dir: mirror.dir,
+            segment: 0,
+            chunk_id: next as u32,
+            row_count: merged.doc_num() as u32,
+            deprecate_ids,
+        }))
     }
 
     /// Writes `table`'s PLAID index as `idx_{id}/seg_0/chunk_{n}.idx`, appending

@@ -26812,6 +26812,64 @@ mod tests {
         assert_eq!(merged[0].labels.len(), 4);
     }
 
+    /// `OptimizeIndexTxnStore::ToWalEntry` and `RemoveChunkIDs`: the optimize
+    /// transaction logs one `DumpIndexV2` per entry - the chunk it wrote and the
+    /// chunks it replaced - and those chunks stop being read when it commits.
+    #[test]
+    fn optimize_logs_one_dump_command_per_entry() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ot (id INT, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        e.execute("CREATE INDEX ot_i ON ot (v) USING HNSW WITH (metric = l2, encode = plain);")
+            .unwrap();
+        e.execute("INSERT INTO ot VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
+            .unwrap();
+        e.flush().unwrap();
+        e.execute("INSERT INTO ot VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
+            .unwrap();
+        e.flush().unwrap();
+        assert_eq!(e.hnsw_chunk_ids("ot", "ot_i"), vec![0, 1]);
+
+        e.optimize_indexes().unwrap();
+
+        // `RemoveChunkIDs(deprecate_ids)` is part of the transaction, so the
+        // merged chunk is the only one a reader sees before cleanup runs.
+        assert_eq!(e.hnsw_chunk_ids("ot", "ot_i"), vec![2]);
+        let chunks = e.load_vector_indexes("ot", "ot_i");
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].labels.len(), 4);
+
+        // The entry reached the log: one command, naming chunk 2 as the new one
+        // and 0/1 as the ones it supersedes.
+        let wal = dir.path().join("wal").join("wal.log");
+        let records = infinity_storage::WalManager::read_all(&wal).unwrap();
+        let merged = records
+            .iter()
+            .flat_map(|entry| entry.cmds.iter())
+            .filter_map(|cmd| match cmd {
+                infinity_storage::WalCmd::DumpIndex {
+                    index_name,
+                    segment_id,
+                    chunk_infos,
+                    deprecate_ids,
+                    ..
+                } if index_name == "ot_i" && deprecate_ids == &[0, 1] => {
+                    Some((*segment_id, chunk_infos.clone(), deprecate_ids.clone()))
+                }
+                _ => None,
+            })
+            .next()
+            .expect("the optimize transaction logs the merged chunk");
+        assert_eq!(merged.0, 0);
+        assert_eq!(merged.2, vec![0, 1]);
+        assert_eq!(merged.1.len(), 1);
+        assert_eq!(merged.1[0].chunk_id, 2);
+        assert_eq!(merged.1[0].row_count, 4);
+        assert_eq!(merged.1[0].base_row_id, infinity_storage::wal_entry::WalRowId::new(0, 0));
+        assert_eq!(merged.1[0].deprecate_ts, u64::MAX);
+    }
+
     /// C++ `OptimizeKnnTest.test_hnsw_optimize` (`test_optimize_ut.cpp`):
     /// three memory-index dumps (chunks 0..2) over 24 appended rows; optimize
     /// appends one merged chunk (id 3) covering every live row, cleanup keeps

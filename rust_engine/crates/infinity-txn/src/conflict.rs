@@ -23,6 +23,8 @@
 //! equivalent of "the type plus the fields its rules read", and
 //! [`conflict_between`] is the matrix itself.
 
+use infinity_storage::wal_entry::WalChunkIndexInfo;
+
 /// A row id in the reference's shape: `segment << 32 | offset`.
 pub type RowKey = u64;
 
@@ -150,9 +152,7 @@ impl TxnOp {
     }
 
     fn same_table(&self, other: &Self) -> bool {
-        self.tables()
-            .iter()
-            .any(|mine| other.covers_table(mine))
+        self.tables().iter().any(|mine| other.covers_table(mine))
     }
 
     fn in_db(&self, db: &str) -> bool {
@@ -169,6 +169,13 @@ pub struct OptimizeEntry {
     pub table: String,
     pub index: String,
     pub segment: u32,
+    /// `new_chunk_infos_`: the chunk the pass wrote for this segment, in the
+    /// shape the WAL command carries.
+    pub chunk_infos: Vec<WalChunkIndexInfo>,
+    /// `deprecate_chunks_`: the chunks of the segment the merged one supersedes
+    /// (the reference's `RemoveChunkIDs(deprecate_ids)` at optimize, reclaimed
+    /// by cleanup).
+    pub deprecate_ids: Vec<u32>,
 }
 
 /// Whether the pair conflicts, and whether the statement can be retried.
@@ -608,6 +615,8 @@ mod tests {
                     table: (*table).into(),
                     index: (*index).into(),
                     segment: *segment,
+                    chunk_infos: Vec::new(),
+                    deprecate_ids: Vec::new(),
                 })
                 .collect(),
         };
