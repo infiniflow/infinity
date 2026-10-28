@@ -814,7 +814,8 @@ impl Engine {
     /// transaction writes no KV pair, so the commit takes its timestamp the
     /// way a DDL statement does (`commit_at`, not `commit`).
     fn log_snapshot(&self, cmd: WalCmd) -> Result<()> {
-        let commit_ts = self.txn.reserve_commit_ts();
+        let turn = self.txn.reserve_commit_ts();
+        let commit_ts = turn.ts();
         let mut txn = self.txn.begin();
         txn.set_typed_commands(vec![cmd]);
         self.txn.commit_at(txn, commit_ts)?;

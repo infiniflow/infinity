@@ -1710,7 +1710,17 @@ impl Engine {
     ///
     /// Rows are chunked `DEFAULT_BLOCK_CAPACITY` (8192) per block, as C++ does.
     pub fn write_cpp_blocks(&self, table: &str) -> Result<usize> {
-        self.write_cpp_blocks_mode(table, &[], true)
+        self.write_cpp_blocks_bounded(table, self.checkpoint_ts())
+    }
+
+    /// [`Self::write_cpp_blocks`] with the checkpoint's upper bound spelled out.
+    ///
+    /// The reference's checkpoint writes the rows of the transactions that had
+    /// finished at its `begin_ts` (`NewTxn::Checkpoint` -> `GetRowCnt1` ->
+    /// `BlockVersion::GetRowCount(begin_ts)`), so a row id handed out by a
+    /// transaction still in flight stays out of the files.
+    pub fn write_cpp_blocks_bounded(&self, table: &str, checkpoint_ts: u64) -> Result<usize> {
+        self.write_cpp_blocks_mode(table, &[], true, checkpoint_ts)
     }
 
     /// [`Self::write_cpp_blocks`] with the rows a commit is publishing.
@@ -1724,7 +1734,9 @@ impl Engine {
         table: &str,
         extra: &[(usize, Vec<Value>)],
     ) -> Result<usize> {
-        self.write_cpp_blocks_mode(table, extra, extra.is_empty())
+        // An explicit rewrite carries the rows the caller wants written (a
+        // column change re-encodes every cell), so nothing is clipped.
+        self.write_cpp_blocks_mode(table, extra, extra.is_empty(), u64::MAX)
     }
 
     /// `full` rewrites every block; otherwise only the blocks this commit
@@ -1736,6 +1748,7 @@ impl Engine {
         table: &str,
         extra: &[(usize, Vec<Value>)],
         full: bool,
+        checkpoint_ts: u64,
     ) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
@@ -1786,7 +1799,9 @@ impl Engine {
 
         // Deleted row id -> the commit ts of the transaction that deleted it,
         // so the version file marks the block slot that holds it
-        // (`BlockVersion::Delete`).
+        // (`BlockVersion::Delete`). A delete that commits after the checkpoint's
+        // bound is not part of this write: the row is still visible at that ts
+        // (`BlockVersion::save_to_file` drops the same entries).
         let delete_ts = self.delete_ts(&table);
         let deleted_at: std::collections::HashMap<usize, u64> = self
             .deleted_ids(&table)
@@ -1796,6 +1811,7 @@ impl Engine {
                 let ts = delete_ts.get(k).copied().unwrap_or(0);
                 (*id as usize, if ts == 0 { DELETED_MIRROR_TS } else { ts })
             })
+            .filter(|(_, ts)| checkpoint_ts == u64::MAX || *ts <= checkpoint_ts)
             .collect();
         let db_id = self.database_id_of(&table);
         let root = self.blocks_root();
@@ -1901,6 +1917,26 @@ impl Engine {
             counts = by_segment.into_iter().collect();
         }
         counts.sort_unstable();
+        // `NewTxn::Checkpoint` writes the rows of the transactions that had
+        // finished by `checkpoint_ts`: a block holds the rows whose append was
+        // stamped at or before it (`GetRowCnt1` -> `GetRowCount(begin_ts)`).
+        // The allocator's per-segment count also covers ids handed out to a
+        // transaction that has not committed yet, and those rows are in no
+        // block, so the extent is clipped here. Because ids are allocated in
+        // commit-ts order, the committed records are a prefix of the row ids.
+        if checkpoint_ts != u64::MAX {
+            let committed = self.committed_rows(&table, checkpoint_ts);
+            let mut seen = 0usize;
+            let mut clipped: Vec<(u32, u64)> = Vec::with_capacity(counts.len());
+            for (segment_id, rows) in counts {
+                let take = committed.saturating_sub(seen).min(rows as usize);
+                seen += rows as usize;
+                if take > 0 {
+                    clipped.push((segment_id, take as u64));
+                }
+            }
+            counts = clipped;
+        }
         for (segment_id, seg_rows_total) in counts {
             let seg_start = global_pos;
             global_pos += seg_rows_total as usize;
@@ -2009,17 +2045,24 @@ impl Engine {
                     extra,
                 )?;
                 // A block is addressed by slot: row *n* of block *b* is id
-                // `segment << 32 | b * capacity + n`. A chunk with a hole in its
-                // id run would shift every row after the hole onto the wrong
-                // slot, so such a block is left alone - the rows stay in the
-                // append buffer for the next checkpoint.
+                // `segment << 32 | b * capacity + n`. The window is the
+                // committed prefix, and ids are handed out in commit-ts order
+                // (`SubmitForAllocation`), so the chunk must tile it exactly;
+                // anything else means the row buffer lost a row, which must not
+                // be written to disk as a shifted block.
                 let first_id = ((segment_id as usize) << 32) | start;
-                let contiguous = chunk
-                    .iter()
-                    .enumerate()
-                    .all(|(slot, (seq, _))| *seq == first_id + slot);
+                let contiguous = chunk.len() == end - start
+                    && chunk
+                        .iter()
+                        .enumerate()
+                        .all(|(slot, (seq, _))| *seq == first_id + slot);
                 if !contiguous {
-                    continue;
+                    return Err(Error::Invalid(format!(
+                        "table '{table}': block {segment_id}.{block_index} holds {} of the {} rows \
+                         committed at ts {checkpoint_ts}",
+                        chunk.len(),
+                        end - start
+                    )));
                 }
                 block_rows.extend(
                     chunk
@@ -2449,10 +2492,10 @@ impl Engine {
     /// directory readable by the C++ engine. Tables whose columns are not yet
     /// packable (array/tensor/sparse/embedding) are skipped rather than
     /// mis-encoded.
-    pub fn flush_cpp_blocks(&self) -> Result<()> {
+    pub fn flush_cpp_blocks(&self, checkpoint_ts: u64) -> Result<()> {
         for meta in self.storage.catalog.list_tables()? {
             if meta.types.iter().all(|t| column_type_of(t).is_some()) {
-                self.write_cpp_blocks(&meta.name)?;
+                self.write_cpp_blocks_bounded(&meta.name, checkpoint_ts)?;
                 // The mirror now covers every row; the IVF memory segment is
                 // redundant and would double-count candidates.
                 let key = self.table_key(&meta.name);
@@ -3082,7 +3125,7 @@ impl Engine {
                 }
             }
             // One `create` per append transaction, stamped with its commit ts.
-            self.note_append(&table, batch.len(), false);
+            self.note_append(&table, batch.len(), false, None);
             self.settle_append_ts(&table, 1, append.commit_ts);
             if !rows.contains_key(&table) {
                 order.push(table.clone());
@@ -6305,6 +6348,43 @@ mod tests {
     /// journal gone the scan and the row count still answer in full. This is
     /// plan C's read path - a `row:` key is never consulted once the mirror is
     /// written and nothing has touched the table since.
+    /// A checkpoint writes the rows of the transactions that had finished, at
+    /// the bound `NewTxn::Checkpoint` uses (`current_ts`).
+    ///
+    /// An id handed out to an append whose commit has not landed is not part of
+    /// any block yet, so the files stay a dense prefix and the next checkpoint
+    /// picks the row up - instead of the old "skip a block with a hole", which
+    /// dropped the rows after the hole on the floor.
+    #[test]
+    fn a_checkpoint_writes_only_the_committed_prefix() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE cp (id INT);").unwrap();
+        e.execute("INSERT INTO cp VALUES (1), (2);").unwrap();
+        e.flush().unwrap();
+        assert_eq!(e.block_row_count("default_db.cp", 0, 0), Some(2));
+
+        // A row range reserved without a commit ts: what a transaction that is
+        // still committing looks like from the checkpoint's side.
+        let range = e.reserve_rows("default_db.cp", 2, false).unwrap();
+        assert_eq!(range.base, 2);
+        e.flush().unwrap();
+        assert_eq!(
+            e.block_row_count("default_db.cp", 0, 0),
+            Some(2),
+            "the uncommitted ids must not be counted as rows"
+        );
+        assert_eq!(e.row_count("default_db.cp").unwrap(), 2);
+
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(e.row_count("default_db.cp").unwrap(), 2);
+        assert_eq!(
+            row_strings(&e, "SELECT id FROM cp ORDER BY id;"),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+    }
+
     #[test]
     fn the_blocks_are_the_row_set_not_just_the_values() {
         let dir = tempdir().unwrap();

@@ -291,13 +291,59 @@ pub struct TxnManager {
     /// C++ `NewTxnManager::txn_map_`: the live transactions, in begin order for
     /// `SHOW TRANSACTIONS`.
     active: Arc<Mutex<HashMap<u64, TxnInfo>>>,
-    /// Serialises conflict validation + commit so the first committer wins.
+    /// Serialises the checkpoint/cleanup writers, which do not take a commit
+    /// ts turn of their own.
     commit_lock: Mutex<()>,
+    /// C++ `NewTxnManager::wait_conflict_ck_` / `allocator_map_`: every write
+    /// transaction that has taken a commit ts, keyed by that ts. Only the
+    /// **smallest** one may run its commit, so the WAL entry, the row-id
+    /// allocation and the block the append lands in all follow commit-ts order -
+    /// which is what keeps a block's row ids a dense prefix (the reference's
+    /// `TxnAllocator` hands ranges out in the same order).
+    turns: Mutex<std::collections::BTreeSet<TxnTimeStamp>>,
+    turn_cv: std::sync::Condvar,
     /// C++ `NewTxnManager::bottom_txns_`: transactions whose bottom half has
     /// been taken, keyed by commit ts. `true` when the bottom finished, so the
     /// clock can only advance past the **smallest** unfinished ts.
     bottom_txns: Mutex<std::collections::BTreeMap<TxnTimeStamp, bool>>,
     bottom_cv: std::sync::Condvar,
+}
+
+/// One write transaction's place in commit-ts order (`NewTxnManager::
+/// GetWriteCommitTS` -> `wait_conflict_ck_`).
+///
+/// Dropping it gives the place back, so a statement that fails between taking
+/// the timestamp and committing cannot pin every transaction behind it (the
+/// reference's `RemoveMapElementForRollbackNoLock`).
+pub struct WriteTurn<'a> {
+    manager: &'a TxnManager,
+    ts: TxnTimeStamp,
+}
+
+impl WriteTurn<'_> {
+    pub fn ts(&self) -> TxnTimeStamp {
+        self.ts
+    }
+
+    /// Blocks until this transaction is the smallest unfinished commit ts.
+    pub fn wait(&self) {
+        self.manager.turn_wait(self.ts);
+    }
+}
+
+impl Drop for WriteTurn<'_> {
+    fn drop(&mut self) {
+        self.manager.turn_done(self.ts);
+    }
+}
+
+/// Releases a place in commit-ts order on every exit path of a commit.
+struct TurnRelease<'a>(&'a TxnManager, TxnTimeStamp);
+
+impl Drop for TurnRelease<'_> {
+    fn drop(&mut self) {
+        self.0.turn_done(self.1);
+    }
 }
 
 impl TxnManager {
@@ -368,6 +414,8 @@ impl TxnManager {
             write_ts: Mutex::new(write_ts),
             active: Arc::new(Mutex::new(HashMap::new())),
             commit_lock: Mutex::new(()),
+            turns: Mutex::new(std::collections::BTreeSet::new()),
+            turn_cv: std::sync::Condvar::new(),
             bottom_txns: Mutex::new(std::collections::BTreeMap::new()),
             bottom_cv: std::sync::Condvar::new(),
         };
@@ -550,7 +598,8 @@ impl TxnManager {
     /// [`Self::commit`] without publishing the commit; the caller calls
     /// [`Self::finish_bottom`] when its bottom work is done.
     pub fn commit_deferred(&self, txn: Txn) -> Result<TxnTimeStamp> {
-        let commit_ts = self.reserve_commit_ts();
+        let turn = self.reserve_commit_ts();
+        let commit_ts = turn.ts();
         self.commit_at_deferred(txn, commit_ts)
     }
 
@@ -568,7 +617,8 @@ impl TxnManager {
         // `NewTxnManager::GetWriteCommitTS`: `prepare_commit_ts_ += 2`, taken
         // *before* the conflict check, so a rolled-back transaction still spends
         // its timestamp - the reference never hands the same value out twice.
-        let commit_ts = self.reserve_commit_ts();
+        let turn = self.reserve_commit_ts();
+        let commit_ts = turn.ts();
         self.commit_at(txn, commit_ts)
     }
 
@@ -577,11 +627,51 @@ impl TxnManager {
     /// A caller that has to stamp the bytes it is about to write with the
     /// commit timestamp (the catalog keys of a DDL carry it, as the
     /// reference's `KeyEncode::CatalogDbKey(db, commit_ts)` does) reserves the
-    /// value here and hands it back through [`Self::commit_at`]. The reference
-    /// has the same split: the transaction's store is filled before the
-    /// timestamp exists, and `GetWriteCommitTS` is what pins it.
-    pub fn reserve_commit_ts(&self) -> TxnTimeStamp {
-        self.prepare_commit_ts.fetch_add(2, Ordering::SeqCst) + 2
+    /// value here and hands the value back through [`Self::commit_at`]. The
+    /// reference has the same split: the transaction's store is filled before
+    /// the timestamp exists, and `GetWriteCommitTS` is what pins it.
+    ///
+    /// The returned [`WriteTurn`] is the transaction's place in commit-ts
+    /// order; holding it until the commit (or dropping it, if the statement
+    /// fails first) is what keeps every later commit behind this one.
+    pub fn reserve_commit_ts(&self) -> WriteTurn<'_> {
+        let ts = self.prepare_commit_ts.fetch_add(2, Ordering::SeqCst) + 2;
+        self.turns.lock().unwrap().insert(ts);
+        WriteTurn { manager: self, ts }
+    }
+
+    /// C++ `NewTxnManager::GetWriteCommitTS`: takes the next commit ts **and**
+    /// takes the transaction's place in the commit-ts order.
+    ///
+    /// Every statement that appends rows does this first and runs its commit
+    /// (conflict check, row-id allocation, WAL entry) through
+    /// [`Self::commit_at_deferred_with`]. Because the place is taken before the
+    /// range is allocated (`SubmitForAllocation` in the reference), the ids a
+    /// checkpoint sees form a dense prefix of the block. Same thing as
+    /// [`Self::reserve_commit_ts`]; the name says why the append path takes it.
+    pub fn begin_write(&self) -> WriteTurn<'_> {
+        self.reserve_commit_ts()
+    }
+
+    /// Waits until every smaller commit ts has committed (or gone away).
+    fn turn_wait(&self, commit_ts: TxnTimeStamp) {
+        let mut turns = self.turns.lock().unwrap();
+        // A ts taken through [`Self::reserve_commit_ts`] joins here, so it is
+        // still serialised against the transactions that registered early.
+        turns.insert(commit_ts);
+        while turns.first().copied() != Some(commit_ts) {
+            turns = self.turn_cv.wait(turns).unwrap();
+        }
+    }
+
+    /// Lets the next commit ts run. Idempotent: the turn is released by the
+    /// commit itself and again by [`WriteTurn`]'s `Drop`.
+    fn turn_done(&self, commit_ts: TxnTimeStamp) {
+        let mut turns = self.turns.lock().unwrap();
+        if turns.remove(&commit_ts) {
+            drop(turns);
+            self.turn_cv.notify_all();
+        }
     }
 
     /// Commits a write transaction whose commit timestamp was already taken by
@@ -616,18 +706,47 @@ impl TxnManager {
     /// [`Self::finish_bottom`], so a transaction is visible only once its rows
     /// *and* its index entries are in place.
     pub fn commit_at_deferred(&self, txn: Txn, commit_ts: TxnTimeStamp) -> Result<TxnTimeStamp> {
+        self.commit_at_deferred_with(txn, commit_ts, |_| Ok(()))
+    }
+
+    /// [`Self::commit_at_deferred`] with a step that runs **after** the conflict
+    /// check and **before** the WAL entry is built.
+    ///
+    /// That is where the reference allocates the append's row range
+    /// (`SubmitForAllocation` sits between the conflict check and `SendToWAL`,
+    /// `new_txn_manager_impl.cpp:207-314`): the range is part of the log entry,
+    /// and a transaction that lost the conflict never spends one. `before_wal`
+    /// gets the transaction so it can fill in the command it is about to log.
+    pub fn commit_at_deferred_with<F>(
+        &self,
+        mut txn: Txn,
+        commit_ts: TxnTimeStamp,
+        before_wal: F,
+    ) -> Result<TxnTimeStamp>
+    where
+        F: FnOnce(&mut Txn) -> Result<()>,
+    {
+        // `GetWriteCommitTS` -> `wait_conflict_ck_`: only the smallest commit ts
+        // may write its entry, so the log (and everything the entry decides:
+        // row ids, block slots) follows commit order.
+        self.turn_wait(commit_ts);
+        // Every exit path below (conflict, allocation failure, WAL error) hands
+        // the place back, so one failed statement cannot stall the commits that
+        // come after it.
+        let _turn = TurnRelease(self, commit_ts);
         self.register_bottom(commit_ts);
-        let _commit = self.commit_lock.lock().unwrap();
         {
             let seen = self.write_ts.lock().unwrap();
             if let Some(reason) = self.conflict(&txn, &seen) {
                 // The timestamp is spent; `CommitBottom` advances `current_ts_`
                 // past it in commit-ts order even when the transaction rolled
                 // back, so the clock keeps the same hole.
+                drop(seen);
                 self.finish_bottom(commit_ts);
                 return Err(Error::TxnConflict(reason));
             }
         }
+        before_wal(&mut txn)?;
         let entry = WalEntry::new(
             txn.id as i64,
             commit_ts,

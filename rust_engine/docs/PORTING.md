@@ -130,6 +130,20 @@ drop 的数据库。
 因为块解码与 WAL 块解码都还原不了这些列，否则快速重启（checkpoint 没跑过）会丢行；这类表的计数与读
 仍以块为准。
 
+**行号在提交序里发，checkpoint 只写已完成的**：两条一起才保证块内 id 是稠密前缀（块按 slot 寻址，
+行 *n* 的 id 是 `segment << 32 | block * 8192 + n`，中间缺一行就会把后面的行写错位）。
+
+- `TxnManager::begin_write` 一次做完参考 `GetWriteCommitTS` 的事：取号、登记进按 ts 的闸门；`commit_at_deferred_with`
+  等到自己是最小的 ts 才做冲突检查、发号、写 WAL。发号因此与 commit_ts 同序（参考 `allocator_map_` →
+  `TxnAllocator` → `PrepareAppend`），并且发号发生在冲突检查之后，输掉冲突的事务不花号段。
+- append 记录在发号时带上本事务的 commit ts（`note_append(..., ts)`），所以"已结算的、`ts <= 上界`的
+  记录"恰好是已完成的那些；COPY 在下半部分按记录下标结算（`settle_append_at`），不依赖"最后几条"。
+- checkpoint 的上界是 `current_ts`（最后一次下半部完成），块的窗口按 `committed_rows` 裁到该上界；
+  版本文件的 `create`/`delete` 同界裁剪，未提交的行留在缓冲区等下一次。参考的对应口径是
+  `NewTxn::Checkpoint` 取 `begin_ts`、块行数取 `GetRowCount(begin_ts)`。
+- 发号后未能提交（WAL/落盘失败）会留下永久空洞——参考同样如此（这类失败在参考里是 `UnrecoverableError`）；
+  端口在这种情况下让 checkpoint 报错，而不是把后一行写到前一个 slot 上。
+
 **append/delete 历史从文件重建**：`restore_cpp_blocks` 用每个块的 `version`（`created` 的
 `(ts, 累计行数)`、`deleted` 槽）重建 `appends:`/`append_ts:`/`append_copy:`/`deletes:`/
 `delete_ts:`/`import_rows:`/`import_ts:`，因此这些日志不再需要落盘；`recover_cpp_blocks`
