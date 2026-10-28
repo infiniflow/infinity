@@ -5366,10 +5366,11 @@ fn run_bottom(
     for append in appends {
         let table = append.table.as_str();
         if engine.any_in_memory_index() || engine.has_index_declaration(table) {
+            let schema = engine.table_schema(table).unwrap_or_default();
             for (k, row) in append.rows.iter().enumerate() {
-                engine.update_indexes_on_insert(table, append.base + k, row)?;
+                engine.update_indexes_on_insert(table, append.base + k, row, &schema)?;
                 let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-                engine.update_text_indexes(table, append.base + k, &texts);
+                engine.update_text_indexes(table, append.base + k, &texts, &schema);
                 engine.update_vector_caches(table, append.base + k, &texts);
             }
             engine.dump_hnsw_over_capacity(table);
@@ -7540,7 +7541,12 @@ impl Engine {
         };
         let schema = self.table_schema(table).unwrap_or_default();
         let col = schema.iter().position(|c| c == column);
-        let mut out: Vec<u64> = Vec::new();
+        // Candidate ids from the sealed chunks and the memory tail. The
+        // liveness/`want` re-check runs afterwards, over one pass of row
+        // texts: asking for a row inside these loops built a block cursor and
+        // decoded its block per id, which made a lookup over half a table
+        // quadratic.
+        let mut candidates: Vec<u64> = Vec::new();
         let mut seen: std::collections::HashSet<u64> = Default::default();
         // Sealed chunks are authoritative for the rows they cover; the memory
         // map only holds the tail written since the last dump.
@@ -7555,8 +7561,8 @@ impl Engine {
                 for (base, reader) in segments {
                     for off in reader.lookup(ordered) {
                         let id = base | u64::from(off);
-                        if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
-                            out.push(id);
+                        if seen.insert(id) {
+                            candidates.push(id);
                         }
                     }
                 }
@@ -7575,8 +7581,8 @@ impl Engine {
                     };
                     for off in reader.lookup(key) {
                         let id = base | u64::from(off);
-                        if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
-                            out.push(id);
+                        if seen.insert(id) {
+                            candidates.push(id);
                         }
                     }
                 }
@@ -7595,8 +7601,8 @@ impl Engine {
                     for (base, reader) in segments {
                         for off in reader.lookup(bit) {
                             let id = base | u64::from(off);
-                            if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
-                                out.push(id);
+                            if seen.insert(id) {
+                                candidates.push(id);
                             }
                         }
                     }
@@ -7642,8 +7648,8 @@ impl Engine {
                         };
                         for off in reader.lookup(key) {
                             let id = base | u64::from(off);
-                            if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
-                                out.push(id);
+                            if seen.insert(id) {
+                                candidates.push(id);
                             }
                         }
                     }
@@ -7652,7 +7658,29 @@ impl Engine {
         }
         // The tail: rows inserted after the last dump.
         for id in tail {
-            if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
+            if seen.insert(id) {
+                candidates.push(id);
+            }
+        }
+        let float_col = col.is_some_and(|ci| {
+            self.column_types(table)
+                .ok()
+                .and_then(|types| types.get(ci).cloned())
+                .is_some_and(|ty| is_float_type(&ty))
+        });
+        let texts: std::collections::HashMap<u64, Vec<u8>> = self
+            .row_texts(table, &candidates)
+            .map(|texts| {
+                texts
+                    .into_iter()
+                    .map(|(seq, text)| (seq as u64, text))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut out: Vec<u64> = Vec::with_capacity(candidates.len());
+        for id in candidates {
+            let Some(raw) = texts.get(&id) else { continue };
+            if self.stored_row_matches(raw, col, &want, float_col) {
                 out.push(id);
             }
         }
@@ -7798,25 +7826,40 @@ impl Engine {
             }
             (reg.disk.get(column).cloned(), tail)
         };
-        let mut out: Vec<u64> = Vec::new();
+        let mut candidates: Vec<u64> = Vec::new();
         let mut seen: std::collections::HashSet<u64> = Default::default();
         if let Some(segments) = &disk {
             for (base, reader) in segments {
                 for (start, end) in &keys {
                     for off in reader.range(*start, *end) {
                         let id = base | u64::from(off);
-                        if self.live_row_in_range(table, id, col, ranges, kind, &column_type)
-                            && seen.insert(id)
-                        {
-                            out.push(id);
+                        if seen.insert(id) {
+                            candidates.push(id);
                         }
                     }
                 }
             }
         }
         for id in tail {
-            if self.live_row_in_range(table, id, col, ranges, kind, &column_type) && seen.insert(id)
-            {
+            if seen.insert(id) {
+                candidates.push(id);
+            }
+        }
+        // One pass over the rows, as in `index_lookup`: a range probe over a
+        // large table cannot afford a block cursor per candidate.
+        let texts: std::collections::HashMap<u64, Vec<u8>> = self
+            .row_texts(table, &candidates)
+            .map(|texts| {
+                texts
+                    .into_iter()
+                    .map(|(seq, text)| (seq as u64, text))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut out: Vec<u64> = Vec::with_capacity(candidates.len());
+        for id in candidates {
+            let Some(raw) = texts.get(&id) else { continue };
+            if Self::stored_row_in_range(raw, col, ranges, kind, &column_type) {
                 out.push(id);
             }
         }
@@ -7824,59 +7867,55 @@ impl Engine {
         Some(out)
     }
 
-    /// A chunk or tail entry is a hit only when the row is live and still holds
-    /// the probed value (UPDATE re-appends, DROP COLUMN re-keys).
-    fn live_row_matches(&self, table: &str, id: u64, col: Option<usize>, want: &str) -> bool {
-        let Some(raw) = self.row_text(table, id).ok().flatten() else {
-            return false;
+    /// Does the row's stored text still hold `want` in `col`? A chunk or tail
+    /// entry is only a hit when the row is live and still holds the probed
+    /// value (UPDATE re-appends, DROP COLUMN re-keys). The row is
+    /// already known to be live (`row_texts` dropped the dead ones), so this
+    /// is pure text work.
+    fn stored_row_matches(
+        &self,
+        raw: &[u8],
+        col: Option<usize>,
+        want: &str,
+        float_col: bool,
+    ) -> bool {
+        let Some(ci) = col else {
+            return true;
         };
-        match col {
-            Some(ci) => match String::from_utf8_lossy(&raw)
-                .split('\t')
-                .nth(ci)
-                .map(str::trim)
-            {
-                Some(cell) if cell == want => true,
-                // A float cell keeps the shortest text that round-trips (the
-                // reference stores the typed value), while `want` is the
-                // `.slt` six-decimal form, so values off that grid differ as
-                // text; compare them numerically instead.
-                Some(cell) => {
-                    let is_float = self
-                        .column_types(table)
-                        .ok()
-                        .and_then(|types| types.get(ci).map(|ty| is_float_type(ty)))
-                        .unwrap_or(false);
-                    is_float
-                        && matches!(
-                            (cell.parse::<f64>(), want.parse::<f64>()),
-                            (Ok(a), Ok(b)) if a == b
-                        )
-                }
-                None => false,
-            },
-            None => true,
+        match String::from_utf8_lossy(raw)
+            .split('\t')
+            .nth(ci)
+            .map(str::trim)
+        {
+            Some(cell) if cell == want => true,
+            // A float cell keeps the shortest text that round-trips (the
+            // reference stores the typed value), while `want` is the `.slt`
+            // six-decimal form, so values off that grid differ as text;
+            // compare them numerically instead.
+            Some(cell) => {
+                float_col
+                    && matches!(
+                        (cell.parse::<f64>(), want.parse::<f64>()),
+                        (Ok(a), Ok(b)) if a == b
+                    )
+            }
+            None => false,
         }
     }
 
-    /// `live_row_matches` for a range probe: the row is live and the column's
-    /// current value falls in one of `ranges`. UPDATE re-appends and DROP
+    /// `stored_row_matches` for a range probe: the column's current value in a
+    /// live row falls in one of `ranges`. UPDATE re-appends and DROP
     /// COLUMN re-keys, so a chunk or tail entry alone is not authoritative.
     /// `kind` (and the declared type it came from) selects how the stored cell
     /// is read: the ordered integer, a float, or a date/time text.
-    fn live_row_in_range(
-        &self,
-        table: &str,
-        id: u64,
+    fn stored_row_in_range(
+        raw: &[u8],
         col: usize,
         ranges: &[(Value, Value)],
         kind: KeyKind,
         declared: &str,
     ) -> bool {
-        let Some(raw) = self.row_text(table, id).ok().flatten() else {
-            return false;
-        };
-        let field = String::from_utf8_lossy(&raw)
+        let field = String::from_utf8_lossy(raw)
             .split('\t')
             .nth(col)
             .map(str::trim)
@@ -9885,9 +9924,10 @@ impl Engine {
                     .map(|(k, row)| (base + k, row.iter().map(|v| v.to_slt_string()).collect()))
                     .collect();
                 engine.run_text_append(move |engine| {
+                    let schema = engine.table_schema(&index_table).unwrap_or_default();
                     for (seq, texts) in &index_rows {
-                        engine.update_indexes_on_insert_text(&index_table, *seq, texts)?;
-                        engine.update_text_indexes(&index_table, *seq, texts);
+                        engine.update_indexes_on_insert_text(&index_table, *seq, texts, &schema)?;
+                        engine.update_text_indexes(&index_table, *seq, texts, &schema);
                         engine.update_vector_caches(&index_table, *seq, texts);
                     }
                     // C++ `AppendMemIndex`: a segment that reached
@@ -12087,10 +12127,11 @@ impl Engine {
                             Ok(())
                         },
                     )?;
+                    let schema = self.table_schema(table).unwrap_or_default();
                     for (k, nr) in new_rows.iter().enumerate() {
                         let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
-                        self.update_indexes_on_insert_text(table, base + k, &texts)?;
-                        self.update_text_indexes(table, base + k, &texts);
+                        self.update_indexes_on_insert_text(table, base + k, &texts, &schema)?;
+                        self.update_text_indexes(table, base + k, &texts, &schema);
                         self.update_vector_caches(table, base + k, &texts);
                     }
                     self.drop_text_index_rows(table, &to_del);
@@ -12866,19 +12907,31 @@ impl Engine {
     }
 
     /// Maintains declared indexes on insert.
-    fn update_indexes_on_insert(&self, table: &str, seq: usize, values: &[Literal]) -> Result<()> {
+    fn update_indexes_on_insert(
+        &self,
+        table: &str,
+        seq: usize,
+        values: &[Literal],
+        schema: &[String],
+    ) -> Result<()> {
         let texts: Vec<String> = values.iter().map(|v| v.to_slt_string()).collect();
-        self.update_indexes_on_insert_text(table, seq, &texts)
+        self.update_indexes_on_insert_text(table, seq, &texts, schema)
     }
 
-    /// Same, for rows already rendered in their stored text form (UPDATE).
+    /// Same, for rows already rendered in their stored text form.
+    /// Feeds one row into every secondary index on `table`.
+    ///
+    /// The schema comes from the caller: it is a full catalog read (the C++
+    /// key space has no name index, so `get_table_by_name` walks the table
+    /// records), and paying it per row is what once made an indexed insert an
+    /// order of magnitude slower than a plain one.
     fn update_indexes_on_insert_text(
         &self,
         table: &str,
         seq: usize,
         values: &[String],
+        schema: &[String],
     ) -> Result<()> {
-        let schema = self.table_schema(table)?;
         let tkey = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey).or_default();
@@ -13476,10 +13529,6 @@ impl Engine {
     }
 
     /// [`Self::row_texts`] for one row id.
-    fn row_text(&self, table: &str, id: u64) -> Result<Option<Vec<u8>>> {
-        Ok(self.row_texts(table, &[id])?.into_iter().next().map(|(_, text)| text))
-    }
-
     fn row_texts(&self, table: &str, ids: &[u64]) -> Result<Vec<(usize, Vec<u8>)>> {
         let mut out = Vec::with_capacity(ids.len());
         if let Ok(mut cursor) = self.block_cursor(table) {
@@ -13637,17 +13686,34 @@ impl Engine {
     /// the rows written since the last dump. The sealed (on-disk) graph lives in
     /// `vector_indexes`.
     fn note_hnsw_insert(&self, table: &str, seq: u64, cells: &[String]) {
+        let key = self.table_key(table);
+        // `table_schema` is a full catalog read, so it must not be paid per
+        // row: probe the index set once per table, and once there is nothing
+        // in `hnsw_mem` the hook has nothing to do.
+        let probing = {
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(key.clone()).or_default();
+            if entry.hnsw_mem.is_empty() && !entry.hnsw_probed {
+                entry.hnsw_probed = true;
+                true
+            } else {
+                !entry.hnsw_mem.is_empty()
+            }
+        };
+        if !probing {
+            return;
+        }
         let Ok(schema) = self.table_schema(table) else {
             return;
         };
-        let key = self.table_key(table);
         // The table lock is only held to reach the per-segment mutexes; the
         // graph updates run under each segment's own lock.
         let segments: Vec<(String, Arc<Mutex<hnsw_mem::HnswIndexInMem>>)> = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(key).or_default();
-            if entry.hnsw_mem.is_empty() && !entry.hnsw_probed {
-                entry.hnsw_probed = true;
+            if entry.hnsw_mem.is_empty() && entry.hnsw_probed {
+                // The probe above marked the table as examined; a table with
+                // no HNSW index leaves `hnsw_mem` empty forever.
                 let Ok(indexes) = self.storage.catalog.list_indexes() else {
                     return;
                 };
@@ -14387,7 +14453,7 @@ impl Engine {
     }
 
     /// Keeps existing inverted indexes in step with an inserted/rewritten row.
-    fn update_text_indexes(&self, table: &str, seq: usize, cells: &[String]) {
+    fn update_text_indexes(&self, table: &str, seq: usize, cells: &[String], schema: &[String]) {
         // The multi-vector and sparse indexes share this DML hook: it is the one
         // place every write path (SQL INSERT/UPDATE, COPY, Thrift insert) goes
         // through.
@@ -14402,12 +14468,6 @@ impl Engine {
             .get(&tkey)
             .map(|e| e.text.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
             .unwrap_or_default();
-        if indexes.is_empty() {
-            return;
-        }
-        let Ok(schema) = self.table_schema(table) else {
-            return;
-        };
         for (column, shared) in indexes {
             let column = &column;
             let Some(ci) = schema.iter().position(|c| c == column) else {
@@ -17582,10 +17642,11 @@ impl Engine {
                 if !segments.contains(&segment) {
                     segments.push(segment);
                 }
+                let schema = self.table_schema(table).unwrap_or_default();
                 for (k, row) in batch.iter().enumerate() {
-                    self.update_indexes_on_insert(table, base + k, row)?;
+                    self.update_indexes_on_insert(table, base + k, row, &schema)?;
                     let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-                    self.update_text_indexes(table, base + k, &texts);
+                    self.update_text_indexes(table, base + k, &texts, &schema);
                     self.update_vector_caches(table, base + k, &texts);
                 }
                 total += batch.len();
@@ -17735,10 +17796,11 @@ impl Engine {
         self.note_append(table, rows.len(), true, Some(_ts));
         self.note_import_ts(table, (base >> 32) as u32, _ts);
         self.publish_rows(table, base, &rows)?;
+        let schema = self.table_schema(table).unwrap_or_default();
         for (k, row) in rows.iter().enumerate() {
-            self.update_indexes_on_insert(table, base + k, row)?;
+            self.update_indexes_on_insert(table, base + k, row, &schema)?;
             let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-            self.update_text_indexes(table, base + k, &texts);
+            self.update_text_indexes(table, base + k, &texts, &schema);
             self.update_vector_caches(table, base + k, &texts);
         }
         self.dump_hnsw_over_capacity(table);
