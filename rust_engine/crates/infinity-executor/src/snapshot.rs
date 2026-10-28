@@ -836,16 +836,29 @@ impl Engine {
 /// The conflict-matrix type of a snapshot command (`CreateTableSnapshotTxnStore`
 /// and friends in the reference).
 fn snapshot_op(cmd: &WalCmd) -> infinity_txn::TxnOp {
-    let name = match cmd {
-        WalCmd::CreateTableSnapshot { snapshot_name, .. }
-        | WalCmd::CreateDbSnapshot { snapshot_name, .. }
+    let (name, table) = match cmd {
+        WalCmd::CreateTableSnapshot {
+            db_name,
+            table_name,
+            snapshot_name,
+            ..
+        }
+        | WalCmd::RestoreTableSnapshot {
+            db_name,
+            table_name,
+            snapshot_name,
+            ..
+        } => (
+            snapshot_name.clone(),
+            Some(format!("{db_name}.{table_name}")),
+        ),
+        WalCmd::CreateDbSnapshot { snapshot_name, .. }
         | WalCmd::CreateSystemSnapshot { snapshot_name, .. }
-        | WalCmd::RestoreTableSnapshot { snapshot_name, .. }
         | WalCmd::RestoreDatabaseSnapshot { snapshot_name, .. }
-        | WalCmd::RestoreSystemSnapshot { snapshot_name, .. } => snapshot_name.clone(),
+        | WalCmd::RestoreSystemSnapshot { snapshot_name, .. } => (snapshot_name.clone(), None),
         _ => return infinity_txn::TxnOp::Other,
     };
-    infinity_txn::TxnOp::Snapshot { name }
+    infinity_txn::TxnOp::Snapshot { name, table }
 }
 
 /// The `WalCmdRestoreTableSnapshot` payload's `TableDef`, built from the

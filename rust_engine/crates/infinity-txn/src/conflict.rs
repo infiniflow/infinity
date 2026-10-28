@@ -98,6 +98,9 @@ pub enum TxnOp {
     },
     Snapshot {
         name: String,
+        /// The table a table snapshot covers (`CreateTableSnapshotTxnStore`),
+        /// which is what the appends and updates on it conflict with.
+        table: Option<String>,
     },
     Cleanup,
     Checkpoint,
@@ -190,7 +193,7 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             TxnOp::DropTable { table: t, .. } if t == table => Some(NoRetry),
             TxnOp::RenameTable { old, .. } if old == table => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { name } if name == table => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if t == table => Some(Retry),
             _ => None,
         },
         // `new_txn_impl.cpp:3426-3495`: the same, without the rename rule.
@@ -203,7 +206,7 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             }
             TxnOp::DropTable { table: t, .. } if t == table => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { name } if name == table => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if t == table => Some(Retry),
             _ => None,
         },
         // `new_txn_impl.cpp:4135-4203`: row level against other deletes and
@@ -218,7 +221,9 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             }
             TxnOp::DropTable { .. } if this.same_table(previous) => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { name } if Some(name.as_str()) == this.table() => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if Some(t.as_str()) == this.table() => {
+                Some(Retry)
+            }
             _ => None,
         },
         // `new_txn_impl.cpp:4269-4375`: delete-vs-update is row level,
@@ -243,7 +248,9 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             }
             TxnOp::DropTable { .. } if this.same_table(previous) => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { name } if Some(name.as_str()) == this.table() => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if Some(t.as_str()) == this.table() => {
+                Some(Retry)
+            }
             _ => None,
         },
         // `new_txn_impl.cpp:3666-3767`.
@@ -264,7 +271,9 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             } if this.same_table(previous) => segments_intersect(segments, theirs).then_some(NoRetry),
             TxnOp::DropTable { .. } if this.same_table(previous) => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { name } if Some(name.as_str()) == this.table() => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if Some(t.as_str()) == this.table() => {
+                Some(Retry)
+            }
             _ => None,
         },
         // `new_txn_impl.cpp:4089-4133`: the reference treats two dumps as
@@ -287,7 +296,9 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             TxnOp::DropIndex { index: i, .. } if i == index => Some(NoRetry),
             TxnOp::DropTable { .. } if this.same_table(previous) => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { name } if Some(name.as_str()) == this.table() => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if Some(t.as_str()) == this.table() => {
+                Some(Retry)
+            }
             _ => None,
         },
         // `new_txn_impl.cpp:3769-3857`.
@@ -316,7 +327,7 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
                 .then_some(NoRetry),
             TxnOp::DropTable { .. } if this.same_table(previous) => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { name } if name == table => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if t == table => Some(Retry),
             _ => None,
         },
         // `new_txn_impl.cpp:3859-3907`.
@@ -324,7 +335,9 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             TxnOp::DropIndex { index: i, .. } if i == index => Some(NoRetry),
             TxnOp::DropTable { .. } if this.same_table(previous) => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { name } if Some(name.as_str()) == this.table() => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if Some(t.as_str()) == this.table() => {
+                Some(Retry)
+            }
             _ => None,
         },
         // `new_txn_impl.cpp:3909-3947`.
@@ -334,7 +347,9 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             {
                 Some(NoRetry)
             }
-            TxnOp::Snapshot { name } if Some(name.as_str()) == this.table() => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if Some(t.as_str()) == this.table() => {
+                Some(Retry)
+            }
             _ => None,
         },
         // `new_txn_impl.cpp:4205-4267`.
@@ -343,14 +358,16 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             TxnOp::RenameTable { old: o, .. } if o == old => Some(NoRetry),
             TxnOp::DropTable { .. } if this.same_table(previous) => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { name } if name == old || name == new => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if t == old || t == new => Some(Retry),
             _ => None,
         },
         // `new_txn_impl.cpp:3215-3243`.
         TxnOp::CreateTable { .. } => match previous {
             TxnOp::RenameTable { new: n, .. } if Some(n.as_str()) == this.table() => Some(NoRetry),
             TxnOp::DropDatabase { db } if this.in_db(db) => Some(NoRetry),
-            TxnOp::Snapshot { name } if Some(name.as_str()) == this.table() => Some(Retry),
+            TxnOp::Snapshot { table: Some(t), .. } if Some(t.as_str()) == this.table() => {
+                Some(Retry)
+            }
             _ => None,
         },
         // `new_txn_impl.cpp:3160-3186`.
@@ -360,8 +377,8 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
             _ => None,
         },
         // `new_txn_impl.cpp:4377-4534`.
-        TxnOp::Snapshot { name } => match previous {
-            TxnOp::Snapshot { name: n } if n == name => Some(NoRetry),
+        TxnOp::Snapshot { name, .. } => match previous {
+            TxnOp::Snapshot { name: n, .. } if n == name => Some(NoRetry),
             TxnOp::Cleanup => Some(Retry),
             _ => None,
         },

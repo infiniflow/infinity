@@ -15,6 +15,7 @@
 //! another transaction must contain only committed state.
 
 use crate::{Engine, QueryResult};
+use infinity_common::Error;
 use infinity_parser::Literal;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Barrier;
@@ -650,10 +651,14 @@ fn table_snapshot_create_snapshot_insert_data() {
     // The append is still staged: a scan and the snapshot see 100,000 rows.
     assert_eq!(count(&e, "default_db.tb1"), 100_000);
 
-    // The reference commits the snapshot transaction before the append.
+    // The reference commits the snapshot transaction before the append, and an
+    // append that reaches its commit after a snapshot of the same table is a
+    // retryable conflict (`CheckConflictTxnStore`: `kAppend` vs
+    // `kCreateTableSnapshot`, `new_txn_impl.cpp:3406-3413`) - the snapshot the
+    // client asked for must not gain the rows that were in flight.
     txn2.commit().unwrap();
-    txn1.commit().unwrap();
-    assert_eq!(count(&e, "default_db.tb1"), 100_900);
+    assert!(matches!(txn1.commit(), Err(Error::TxnConflict(_))));
+    assert_eq!(count(&e, "default_db.tb1"), 100_000);
 
     e.execute("DROP TABLE tb1;").unwrap();
     e.execute("RESTORE TABLE SNAPSHOT test_insert;").unwrap();
