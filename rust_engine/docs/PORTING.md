@@ -112,12 +112,82 @@
 
 ## 3 当前状态
 
-### 3.1 存储形态：行存为主，列式块是镜像
+### 3.1 存储形态：catalog 已是参考的键空间，行仍在 KV
 
-这是当前实现与参考版**最大的结构性差异**，也是性能差距的根源：
+**catalog 只写参考版的键**。`Catalog` 以 `with_store_cpp_only` 打开，`catalog/` 里只有
+`catalog|…`、`db|…`、`tbl|…`、`col|…`、`idx|…`、`seg|…`、`blk|…`、`idx_seg|…`、
+`idx_chunk|…`、`drop|…` 以及 `next_database_id` / `meta|version`。
 
-- **行的权威副本在 KV**：每条记录是 RocksDB 里一个 `row:<db>.<tbl>:<row_id>` 键，值是文本（向量是 `"[0.1,0.2,…]"`）。这条设计来自最早的原型（`71c5d044b`，PoC 阶段），当时看中的是"rowid → 行"一次查找、MVCC/索引/回放都简单。
-- **`data/` 下的列式块是事后补的镜像**：任务是"mirror every table into the C++ block layout"（`a3684524a`）。`write_cpp_blocks` 每次提交/checkpoint 都把整表重写一遍，所以目录与参考版逐字节一致、参考版能直接读——但它是**派生输出**，不是存储本体。
+门禁 `test_the_catalog_key_set_and_values_match_exactly`
+（`test_cross_engine_bytes_10_encoding.py`）是这条的口径：同一 workload 下两侧 **key 集合完全
+相同，且同 key 的 value 逐字节相同**——不是"我们认识的记录对得上"，而是整个键空间，任何一侧
+多出的键都算差异。workload 覆盖：活表（3 行 + 删 1 行，含段层与块镜像）、被 drop 的表、被
+drop 的数据库。
+
+**行只在 `data/` 的块文件里**：提交把行交给块的 append 缓冲区（`TableEntry::pending_rows`，即参考的
+`BufferObject`），checkpoint 才写文件；`persistence/` 里只剩 append/delete 历史与侧车文件，
+不再有 `row:`/`del:` 键。唯一例外是块格式表达不了的列类型（多值/张量/稀疏）：那类表额外留一份文本行，
+因为块解码与 WAL 块解码都还原不了这些列，否则快速重启（checkpoint 没跑过）会丢行；这类表的计数与读
+仍以块为准。
+
+**append/delete 历史从文件重建**：`restore_cpp_blocks` 用每个块的 `version`（`created` 的
+`(ts, 累计行数)`、`deleted` 槽）重建 `appends:`/`append_ts:`/`append_copy:`/`deletes:`/
+`delete_ts:`/`import_rows:`/`import_ts:`，因此这些日志不再需要落盘；`recover_cpp_blocks`
+同时返回文件里最新的 ts，作为 WAL 重放的起点（等价于参考的 checkpoint 记录）。
+门禁：`cpp_blocks::tests::rehydration_*` 三个测试（普通表 / 带删行 / 压缩段）断言"丢掉行侧
+键、重开、再写一遍"后 `data/` 下每个文件逐字节不变。
+
+**读路径已经是块**。扫描按 `visible_block_ids`（块索引 − `drop|seg|` 标出的段）逐块解码，
+`version` 的 `created`/`deleted` 决定哪些槽可见；`row_count` 与 `cpp_visible_row_count` 用同一份
+`version`，`count(*)` 与整表扫描不会分叉。压缩不再物化行表：`BlockCursor` 用行号直接定位那一个块
+（`segment << 32 | block * capacity + slot`），一块一解码、O(1) 内存。`dirty:` 是**持久化**的
+"块落后于日志"标记（append/delete/压缩/删列置位，checkpoint 且期间没有新写入才清除），所以崩溃
+重放后读侧仍然知道该看块还是该合并日志。门禁：
+`cpp_blocks::tests::the_blocks_are_the_row_set_not_just_the_values`（丢掉 `row:` 后扫描/计数仍完整，
+含重开）、`a_compaction_reads_the_rows_out_of_the_blocks`（无日志也能压缩）、
+`a_crash_after_an_append_keeps_the_row` / `a_crash_after_a_delete_keeps_the_row_hidden`。
+
+读侧没有"只认日志"的路径了：整表/剪枝/投影/点取/含墓碑五种读法都先问块，日志只补 checkpoint 之上
+的那一段；`row_count` 数的是块 `version` 里可见的槽（不信任增量计数器——UPDATE 重写行会重新分配 id，
+计数器会漏）。行 id 分配（`next_row_seq`）与段布局（`block_segment_row_counts`）也能从块读回。
+
+**写路径按提交期原语落到块上**。一次 append 提交只写本批次行落入的那几个块，并给每个块的 `version`
+追加一条 `create`（`BlockVersion::Append(commit_ts, block_offset + rows)`，参考
+`NewTxn::AppendInBlock`）；一次 delete 只重写持有被删槽的块，把 `deleted_[slot]` 标成该事务的提交 ts
+（`DeleteInBlock`）。其余块一个字节都不动——它们已经是参考留下的那份，重编码只会让 NULL 位图按
+"最终行集"重算（实测一次 100 行的 COPY 写了 `0x0f` 的窗口，整表重写后变 `0xff`）。段层
+（`catalog|seg|`、`catalog|blk|`、`blk|…|fast_rough_filter`）随同这一次写入增量发布，未触及的块保留
+原记录里的 ts 与预过滤。唯一的例外是**被这次写入封段**的段：参考的 `ExecuteOnNewSealedSegment` 要给
+段里每个块建预过滤，这条路径会重写整段。门禁
+`cpp_blocks::tests::a_commit_writes_only_the_block_it_appends_to`：两次 `INSERT` 后第一块的
+`version` 逐字节不变、第二块多一条 `create`，随后一次 `DELETE` 只给第二块加墓碑。
+
+UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交给 buffer 或整表重写），没有哪条路径再从
+`row:` 取行。唯一要守住的是块的寻址方式：块按 **slot** 寻址（行 *n* 的 id 是
+`segment << 32 | block * 8192 + n`），所以写入前要校验 `chunk` 的 id 是否从块首连续——带空洞的块宁可
+这次不写（行留在 buffer 等下次 checkpoint），也不能紧凑写，否则空洞之后的行会整体挪位。
+
+所以"一个目录里的键与参考完全一致"现在对 `catalog/`、`data/` 与 `wal/` 三者都成立；`persistence/`
+里剩下的每一样（append/delete 历史、行侧车）都是参考版放在同一位置的东西。
+
+**drop 是标记，物理回收在 cleanup**。`DROP DATABASE` / `DROP TABLE` / `DROP INDEX` 只写
+`drop|db|{name}/{create_ts}/{db_id}`、`drop|tbl|{db}/{name}/{create_ts}/{table_id}`、
+`drop|idx|{db}/{table}/{name}/{create_ts}/{index_id}`，值是该事务的 commit ts；被弃用的记录、
+段层与文件**原地保留**，名字的可见性靠标记判断（先取同名记录里 ts 最新的那条，再看它的标记）。
+回收是 `Engine::cleanup` 里的 `reclaim_dropped_entities`：删标记、删它弃用的记录与目录，与参考
+版的 `NewTxn::PrepareCommitDrop{DB,Table}` → `NewTxn::Cleanup` → `NewCatalog::CleanDB` /
+`CleanTable` 一一对应。因此：
+
+- 标记的时间戳在 **value** 里（`KeyEncode::DropTableKey(…) -> to_string(commit_ts)`），
+  `Catalog::restamp` 对 `drop|` 开头的键改的是 value，不是 key；
+- 布局重写（`rewrite_cpp`）必须**跳过**被标记弃用的记录，否则 `DROP TABLE t; CREATE TABLE t`
+  会把旧记录提前抹掉，得到一个参考版不会有的键集（`dropped_record_prefixes`）；
+- 表 id 是**按库**计数的，`db_{id}/tbl_{id}` 与 `catalog|seg|{db}|{tbl}|` 都以两个 id 定位，
+  所以段层必须按 `(db_id, table_id)` 配对，不能只看表 id（两个库可以有同 id 的表）；
+- 索引 id 也是单调的（`TableMeta::GetNextIndexID` 的 `next_index_id` 标签）：`DROP INDEX` 留下
+  记录，按"存活索引的最大 id + 1"发号会让新建的索引拿到被 drop 的那个 id，从而继承它的键与
+  标记。
+
 
 代价（SIFT 1M × 128 维 `COPY ... FORMAT fvecs`，`INFINITY_PROFILE_IMPORT=1`）：
 
@@ -129,29 +199,8 @@
 | 提交（WAL + 1M KV 写） | 1.60 s | — |
 | 关闭 flush | 4.49 s | 500 MB 文本落 RocksDB |
 
-参考版同一份数据是 2.14 s。也就是说 83% 的 import 时间花在"把浮点转成字符串"，而这个开销完全来自"行存"这个实现选择，不是引擎/并发/IO。
-
-**对齐方向（进行中）**：让列式块成为存储本体——import 直接把 fvecs 的二进制编成块列，扫描/索引/删除读块，`row:` 键退场。WAL 侧已经有 `AppendV2` 的 typed `DataBlock` 编码可以直接复用。
-
-#### KV 里到底多了什么（实测，同一 workload：建表 + 3 行 + 删 1 行）
-
-两边 `catalog/` 的键集对比（`infinity dump-catalog`，参考版先 `FLUSH CATALOG` 再 dump）：
-
-| | 键 |
-|---|---|
-| 共有（14 个） | `catalog\|db\|default_db\|6`、`catalog\|tbl\|1\|t\|8`、`catalog\|seg\|1\|0\|0`、`catalog\|blk\|1\|0\|0\|0`、`db\|1\|next_table_id`、`meta\|version`、`next_database_id`、`seg\|1\|0\|0\|first_delete_ts`、`tbl\|1\|0\|next_column_id`、`next_index_id`、`next_segment_id`、`unsealed_segment_id`、`tbl\|col\|1\|0\|id\|8`、`tbl\|col\|1\|0\|v\|8` |
-| 端口多出（4 个） | `__counter:table`、`db:default_db`、`tbl:0000000000000000`、`tblname:default_db.t` |
-
-另外 `<dir>/persistence/` 整个是一个**行存储 RocksDB**（`row:`、`del:`、applied-ts 标记），参考版没有这个目录的数据——它的行只在 `data/` 的块文件里。
-
-`Catalog` 已经有 `with_store_cpp_only` 模式（只写 `catalog|`/`db|`/`tbl|`/`col|`/`idx|`），切过去后上面 4 个键消失、键集与参考版**逐键相同**（已实测）。但 `cpp_only` 还暴露出三处必须一起修的地方：
-
-1. `EMBEDDING(<dim>)` 简写映射（已修）。
-2. 稀疏列从 C++ 记录读回时丢失 `sort` 提示（已修），且类型文本会变成 `SPARSE(float,int16,30000)`——SQL 层要接受这种形式。
-3. **drop 只做标记，回收交给 cleanup**（与参考版一致：`NewTxn::Compact` 写 `drop|seg|…`，cleanup 事务真正删记录与文件）。端口现在在 drop 时直接改写布局、不写标记，所以 cleanup 看不到被删表的段；`cleanup_internal_ut` 两处红。正确做法：`cpp_only` 的 `drop_table`/`drop_database` 给该表每个段写 `drop|seg|{db}/{tbl}/{seg}`，布局里不再重发这些段记录，`reclaim_deprecated_segments` 增加一趟"标记存在但表已不存在"的回收（删 `catalog|seg|`/`catalog|blk|`/`seg|`/`blk|`/`idx_chunk|` + 表目录）。另需在 drop 时清掉 `Engine.tables` 里该表的内存条目（`segment_ids` 从那里读，否则 `import_then_drop_database` 仍能看到已删表的段）。
-4. 每库的 `next_table_id` 必须是**单调**的（`TableMeta::next_table_id_`）：原实现按存活表的最大 id 重算，drop 掉最新表后计数器回退，新表复用 id 与块目录——已修（取 store 旧值与存活最大值中的较大者）。
-
-这三处没修完，所以 `cpp_only` 暂未开启。对应的门禁已经写好：`test_the_catalog_key_set_and_values_match_exactly`（`test_cross_engine_bytes_10_encoding.py`）断言两侧 **key 集合完全相同且同 key 的 value 相同**，现在是 strict `xfail`，`cpp_only` 打开后会立刻变成 unexpected pass。
+参考版同一份数据是 2.14 s。83% 的 import 时间花在"把浮点转成字符串"，这个开销来自行值的文本
+编码（不是存储位置），是下一步优化的对象。
 
 
 | 维度 | 状态 | 验证 |
@@ -173,7 +222,7 @@
 |---|---|---|
 | §1 有意不移植 | 对象存储 `obj_key` 打包、DiskANN、geo 类型 | 否，是决定 |
 | §2 未实现 / 未接线 | **两项并发待办**：执行器的多 fragment / tasklet（D4）、事务下半部的执行者与按 commit_ts 推进可见性；其余接线项（相关子查询、压缩/IMPORT 的 WAL 帧、`IndexScanBuilder`、`ResultCacheGetter`、`MATCH` 走索引、`fast_rough_filter`、分析器家族、稀疏检索选项、快照）已接线并有门禁 | 是，待办 |
-| §3 不可逐字节比对 | HNSW 图区、IVF 质心、`catalog/` 字节、NULL slot 与内联 padding、后台 dump 的 chunk 切分 | 否，参考自身不确定 |
+| §3 不可逐字节比对 | HNSW 图区、IVF 质心、`catalog/` 的 RocksDB 文件字节（键与值已逐键比对）、NULL slot 与内联 padding、后台 dump 的 chunk 切分 | 否，参考自身不确定 |
 | §4 覆盖不到的输入空间 | 带索引的 8M 行表、三段以上的容量切分、PLAID/EMVB/MULTIVECTOR chunk 字节 | 是，但代价高 |
 
 已登记的性能/口径差异（相关子查询的作用域边界、`CREATE TABLE … AS SELECT`、视图、`INSERT … SELECT`、`standard-porter` 的词干）在 `GAPS.md` §5，不是待办。

@@ -50,7 +50,8 @@ use infinity_storage::cpp_format::{
 };
 use infinity_storage::knn_format;
 
-use crate::{del_key, parse_value, row_key, Engine};
+use crate::{append_copy_key, append_ts_key, appends_key, del_key, delete_ts_key, deletes_key,
+    import_rows_key, import_ts_key, parse_value, row_key, Engine};
 use infinity_parser::Literal;
 
 /// `(row id, vector)` pairs read back from a vector index mirror.
@@ -1653,6 +1654,7 @@ impl Engine {
         block_index: u16,
         start: u64,
         end: u64,
+        extra: &[(usize, Vec<Value>)],
     ) -> Result<Vec<(usize, Vec<Value>)>> {
         let first = ((segment_id as usize) << 32) | start as usize;
         let last = ((segment_id as usize) << 32) | end as usize;
@@ -1670,16 +1672,35 @@ impl Engine {
             block_id: block_index,
         };
         let root = self.blocks_root();
-        let held = self
-            .decode_block_cells(table, &root, meta, types, id, None)
-            .unwrap_or_default();
+        // A rewrite (a column change) replaces every cell, so the files must
+        // not win for the ids it carries.
+        let rewriting = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&self.table_key(table))
+            .map(|e| e.rewrite_rows)
+            .unwrap_or(false);
+        let held = if rewriting {
+            Vec::new()
+        } else {
+            self.decode_block_cells(table, &root, meta, types, id, None)
+                .unwrap_or_default()
+        };
         let mut out = Vec::with_capacity(held.len().max(journal.len()));
         for (seq, cells) in held {
             journal.remove(&seq);
             out.push((seq, cells.iter().map(|cell| parse_value(cell)).collect()));
         }
-        // Rows the block does not hold yet (appended since the last mirror).
+        // Rows the block does not hold yet: what a replay put in the journal,
+        // and what this commit is publishing (`AppendInBlock`).
         out.extend(journal);
+        let held_ids: std::collections::HashSet<usize> = out.iter().map(|(seq, _)| *seq).collect();
+        for (seq, values) in extra {
+            if *seq >= first && *seq < last && !held_ids.contains(seq) {
+                out.push((*seq, values.clone()));
+            }
+        }
         out.sort_unstable_by_key(|(seq, _)| *seq);
         Ok(out)
     }
@@ -1689,9 +1710,33 @@ impl Engine {
     ///
     /// Rows are chunked `DEFAULT_BLOCK_CAPACITY` (8192) per block, as C++ does.
     pub fn write_cpp_blocks(&self, table: &str) -> Result<usize> {
-        let _serialised = MIRROR_WRITE_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.write_cpp_blocks_mode(table, &[], true)
+    }
+
+    /// [`Self::write_cpp_blocks`] with the rows a commit is publishing.
+    ///
+    /// `extra` is `(row id, values)` for the rows of the transaction that just
+    /// committed: the reference's `AppendInBlock` writes them into the block as
+    /// part of the commit. With no rows to publish this is a whole-table
+    /// rewrite (a checkpoint, a restore).
+    pub(crate) fn write_cpp_blocks_extra(
+        &self,
+        table: &str,
+        extra: &[(usize, Vec<Value>)],
+    ) -> Result<usize> {
+        self.write_cpp_blocks_mode(table, extra, extra.is_empty())
+    }
+
+    /// `full` rewrites every block; otherwise only the blocks this commit
+    /// touched - the ones `extra`'s row ids land in and the ones that hold a
+    /// slot the table's delete log marks (`AppendInBlock` / `DeleteInBlock`,
+    /// `new_txn_data_impl.cpp:923` / `:1919`).
+    fn write_cpp_blocks_mode(
+        &self,
+        table: &str,
+        extra: &[(usize, Vec<Value>)],
+        full: bool,
+    ) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -1738,8 +1783,7 @@ impl Engine {
         // how many of that append's rows land in the block. Each carries the
         // append transaction's commit ts, like the reference
         // (`BlockVersion::Append(commit_ts, …)`, `new_txn_data_impl.cpp:957`).
-        let totals = self.append_totals(&table);
-        let append_ts = self.append_ts(&table);
+
         // Deleted row id -> the commit ts of the transaction that deleted it,
         // so the version file marks the block slot that holds it
         // (`BlockVersion::Delete`).
@@ -1756,12 +1800,77 @@ impl Engine {
         let db_id = self.database_id_of(&table);
         let root = self.blocks_root();
         let tkey = self.table_key(&table);
+        // Everything the commits since the last checkpoint appended is in the
+        // table's append buffer; this write is the checkpoint, so it takes them
+        // all. `extra` carries the rows of a rewrite (a column change, a
+        // replay, a compaction) that no commit buffered.
+        // A checkpoint writes every block, so nothing is "untouched".
+        let touched: std::collections::HashSet<(u32, u16)> = std::collections::HashSet::new();
+        let layout_total: u64 = self
+            .segment_row_counts(&table)
+            .iter()
+            .map(|(_, rows)| *rows)
+            .sum();
+        // Nothing moved since the files were written: they are already the
+        // newest copy, and re-encoding them would size the NULL bitmap from the
+        // final row set instead of the append window the file was written with.
+        let dirty = {
+            let tables = self.tables.lock().unwrap();
+            tables.get(&tkey).map(|e| e.mirror_dirty).unwrap_or(false)
+        };
+        if !dirty
+            && self
+                .block_index_for(&table)
+                .map(|index| !index.lock().unwrap().is_empty())
+                .unwrap_or(false)
         {
+            return Ok(layout_total as usize);
+        }
+        // The write counter as it stands before any row is read: a commit that
+        // lands while the mirror is being written bumps it, and the flag is only
+        // cleared when nothing did (otherwise the new rows would look covered).
+        //
+        // `mirrored` is how many rows the files held after the last write. A
+        // commit can only be *incremental* when that is known (a directory
+        // opened afresh has no count until the first rewrite) and the table's
+        // row set is the previous one plus this batch - otherwise another
+        // transaction reserved ids that are not on disk yet, and the read side
+        // has to keep merging the journal.
+        let epoch = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey.clone()).or_default();
             entry.block_index = None;
             entry.cpp_block_rows = None;
+            entry.mirror_epoch
+        };
+        // A checkpoint writes the whole table: the block files are the durable
+        // copy and there is no in-place append to them any more.
+        let partial = false;
+        let _ = full;
+        // The mirror's file writes are serialised; the table lock is **not**
+        // held across them (a commit takes the bottom gate before this, and the
+        // checkpoint takes the table lock on its own, so holding both here in
+        // the other order deadlocks the two threads).
+        let _serialised = MIRROR_WRITE_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // Taken under the lock: a checkpoint that queued behind this one must
+        // not see a stale snapshot of the append buffer, or its own rows would
+        // be dropped from the files by the write that lands last.
+        let buffered = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .map(|e| e.pending_rows.clone())
+                .unwrap_or_default()
+        };
+        let mut merged: Vec<(usize, Vec<Value>)> = extra.to_vec();
+        if !buffered.is_empty() {
+            let have: std::collections::HashSet<usize> =
+                merged.iter().map(|(seq, _)| *seq).collect();
+            merged.extend(buffered.into_iter().filter(|(seq, _)| !have.contains(seq)));
         }
+        let extra: &[(usize, Vec<Value>)] = &merged;
         let mut written = 0usize;
         // A row id carries its segment in the high 32 bits (`segment_id << 32 |
         // in-segment offset`). The reference writes one `seg_{id}/` directory
@@ -1770,7 +1879,27 @@ impl Engine {
         // enough to know every block's id window without reading the table.
         let mut segments: Vec<CppSegment> = Vec::new();
         let mut global_pos = 0usize;
+        // The append log and the segment map move under other commits: read
+        // them under the write lock, or a checkpoint that queued behind another
+        // one records `create` boundaries that stop short of the rows it wrote.
+        let totals = self.append_totals(&table);
+        let append_ts = self.append_ts(&table);
         let mut counts = self.segment_row_counts(&table);
+        if counts.is_empty() && !merged.is_empty() {
+            // The allocator's per-segment map is per-process; a table the
+            // catalog just re-registered (a DDL, a rename) has none. The rows
+            // the commit buffered still say how far each segment goes.
+            let mut by_segment: std::collections::BTreeMap<u32, u64> = Default::default();
+            for (seq, _) in &merged {
+                let segment = (*seq >> 32) as u32;
+                let offset = (*seq as u64 & 0xffff_ffff) + 1;
+                by_segment
+                    .entry(segment)
+                    .and_modify(|e| *e = (*e).max(offset))
+                    .or_insert(offset);
+            }
+            counts = by_segment.into_iter().collect();
+        }
         counts.sort_unstable();
         for (segment_id, seg_rows_total) in counts {
             let seg_start = global_pos;
@@ -1785,33 +1914,91 @@ impl Engine {
             // (`PrepareCommitImport` -> `ExecuteOnNewSealedSegment`), an
             // `INSERT` only seals one that reaches `DEFAULT_SEGMENT_CAPACITY`
             // (`CommitBottomAppend`), and an unsealed segment has no filter at
-            // all. A rewrite can leave fewer blocks than the previous one, so
-            // start clean either way.
+            // all. A whole-table rewrite can leave fewer blocks than the
+            // previous one, so it starts clean; a commit only rebuilds the tags
+            // of the block it wrote.
+            let block_count = (seg_rows_total as usize).div_ceil(DEFAULT_BLOCK_CAPACITY);
+            let sealed = self
+                .imported_extent(&table, segment_id, seg_rows_total)
+                .is_some()
+                || seg_rows_total as usize == Self::SEGMENT_ROW_CAPACITY;
+            // A segment that is sealed by *this* write needs the prefilter of
+            // every one of its blocks (`ExecuteOnNewSealedSegment` walks the
+            // whole segment), so that write falls back to rewriting the
+            // segment.
+            let last_block = block_count.saturating_sub(1) as u16;
+            let seg_partial =
+                partial && !(sealed && touched.contains(&(segment_id, last_block)));
             for (k, _) in self
                 .storage
                 .catalog
                 .store()
                 .scan_prefix(format!("blk|{}|{}|{}|", db_id, meta.id, segment_id).as_bytes())?
             {
+                if seg_partial {
+                    let block_id = String::from_utf8_lossy(&k)
+                        .split('|')
+                        .nth(5)
+                        .and_then(|s| s.parse::<u16>().ok());
+                    if block_id.is_some_and(|b| {
+                        (b as usize) < block_count && !touched.contains(&(segment_id, b))
+                    }) {
+                        continue;
+                    }
+                }
                 self.storage.catalog.store().delete(&k)?;
             }
-            let sealed = self
-                .imported_extent(&table, segment_id, seg_rows_total)
-                .is_some()
-                || seg_rows_total as usize == Self::SEGMENT_ROW_CAPACITY;
             let mut seg_filters = crate::fast_rough_filter::Filters::new(&meta.types);
             // Drain the segment block by block so each block's values are freed
             // once it is encoded: holding the whole table's decoded rows while
             // the texts are rendered doubled the transient on a long import.
-            let block_count = (seg_rows_total as usize).div_ceil(DEFAULT_BLOCK_CAPACITY);
             for block_index in 0..block_count {
+                if seg_partial && !touched.contains(&(segment_id, block_index as u16)) {
+                    // Untouched: its files and its `version` already say
+                    // everything this commit would write, so only its catalog
+                    // record is republished, with the ts it already carries.
+                    let ts = self
+                        .storage
+                        .catalog
+                        .store()
+                        .get(
+                            infinity_storage::catalog_format::catalog_block_key(
+                                &db_id.to_string(),
+                                &meta.id.to_string(),
+                                segment_id,
+                                block_index as u16,
+                            )
+                            .as_bytes(),
+                        )?
+                        .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+                        .unwrap_or(CPP_MIRROR_TS);
+                    if block_index == 0 {
+                        seg_create_ts = ts;
+                    }
+                    blocks.push(CppBlock {
+                        block_id: block_index as u16,
+                        commit_ts: ts,
+                    });
+                    continue;
+                }
                 // `block_start` stays in the table-wide append order the
                 // version batches are recorded in; the slot a deleted row
                 // occupies is inside its own segment's block.
                 let start = block_index * DEFAULT_BLOCK_CAPACITY;
                 let end = (start + DEFAULT_BLOCK_CAPACITY).min(seg_rows_total as usize);
                 let slot_base = seg_start + start;
-                let chunk = self.mirror_block_rows(
+                // Drop the buffer manager's copy of this block **before** the
+                // rows are merged: a cached decode of an older (shorter) file
+                // would make the merge miss the rows the file holds, and the
+                // rewrite would drop them.
+                let early_id = BlockId {
+                    db_id,
+                    table_id: meta.id,
+                    segment_id,
+                    block_id: block_index as u16,
+                };
+                self.context.buffer.lock().unwrap().invalidate(&early_id);
+                let mut chunk = self.mirror_block_rows(
                     &table,
                     &meta,
                     &types,
@@ -1819,8 +2006,27 @@ impl Engine {
                     block_index as u16,
                     start as u64,
                     end as u64,
+                    extra,
                 )?;
-                block_rows.extend(chunk.iter().map(|(seq, _)| *seq));
+                // A block is addressed by slot: row *n* of block *b* is id
+                // `segment << 32 | b * capacity + n`. A chunk with a hole in its
+                // id run would shift every row after the hole onto the wrong
+                // slot, so such a block is left alone - the rows stay in the
+                // append buffer for the next checkpoint.
+                let first_id = ((segment_id as usize) << 32) | start;
+                let contiguous = chunk
+                    .iter()
+                    .enumerate()
+                    .all(|(slot, (seq, _))| *seq == first_id + slot);
+                if !contiguous {
+                    continue;
+                }
+                block_rows.extend(
+                    chunk
+                        .iter()
+                        .map(|(seq, _)| *seq)
+                        .filter(|seq| !deleted_at.contains_key(seq)),
+                );
                 let texts: Vec<Vec<String>> = chunk
                     .iter()
                     .map(|(_, row): &(usize, Vec<Value>)| {
@@ -1927,17 +2133,17 @@ impl Engine {
                     block_id: block_index as u16,
                     commit_ts: block_ts,
                 });
-                written += chunk.len();
+                    written += chunk.len();
             }
             // `first_delete_ts` is the commit ts of the first delete that
             // touched this segment (`SegmentMeta::CommitFirstDeleteTS`): a
             // reader whose `begin_ts` is below it skips the block's delete
             // flags, so leaving it at UNCOMMIT_TS resurrects deleted rows.
-            let touched = self
+            let segment_deleted = self
                 .deleted_ids(&table)
                 .iter()
                 .any(|id| (*id >> 32) as u32 == segment_id);
-            let first_delete_ts = if touched {
+            let first_delete_ts = if segment_deleted {
                 self.delete_ts(&table)
                     .into_iter()
                     .filter(|ts| *ts != 0)
@@ -1946,7 +2152,7 @@ impl Engine {
             } else {
                 UNCOMMIT_TS
             };
-            if sealed && seg_create_ts != CPP_MIRROR_TS {
+            if !seg_partial && sealed && seg_create_ts != CPP_MIRROR_TS {
                 let _ = self.storage.catalog.store().put(
                     format!("seg|{}|{}|{}|fast_rough_filter", db_id, meta.id, segment_id)
                         .as_bytes(),
@@ -1997,10 +2203,42 @@ impl Engine {
             segments,
         })?;
         // The mirror has new block files; the table's block map must rescan.
+        // Release the write lock before touching the table entry: the files are
+        // on disk, and taking `tables` under `MIRROR_WRITE_LOCK` is what
+        // inverts against the checkpoint's `tables` → mirror order.
+        drop(_serialised);
         let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey).or_default();
+        let entry = tables.entry(tkey.clone()).or_default();
         entry.block_index = None;
+        // A whole-table rewrite rebuilt the row set from scratch; a commit only
+        // wrote the blocks it touched, so its row set is the previous one with
+        // this batch's rows added and its deletes removed.
+        let written_ids: std::collections::HashSet<usize> = block_rows.iter().copied().collect();
         entry.cpp_block_rows = Some(std::sync::Arc::new(block_rows));
+        // What the files hold now: the row set this write walked.
+        entry.mirror_rows = Some(written as u64);
+        // The mark retires only when this write took **every** row it was
+        // handed: a row outside the segment windows it walked (`counts` and the
+        // append buffer disagreeing) is still only in memory, and a commit that
+        // landed mid-flush is in the buffer too - the next read merges it.
+        // Drop exactly the rows this write put in a block - `block_rows` is that
+        // set, and a row the segment windows did not reach is not in it, so it
+        // stays buffered for the next checkpoint. Clearing by the *input* set
+        // would drop a row whose window was short; clearing the whole buffer
+        // would drop the rows a concurrent commit added meanwhile.
+        entry
+            .pending_rows
+            .retain(|(seq, _)| !written_ids.contains(seq));
+        // The mark retires only when nothing is left to write and no commit
+        // landed while this one ran.
+        let covered = entry.mirror_epoch == epoch && entry.pending_rows.is_empty();
+        entry.mirror_dirty = !covered;
+        drop(tables);
+        if covered {
+            // The blocks now cover everything the journal holds, so a restart
+            // may read them without it - the mark is what a reader consults.
+            self.clear_mirror_dirty(&tkey);
+        }
         Ok(written)
     }
 
@@ -2138,21 +2376,70 @@ impl Engine {
     /// [`Self::write_cpp_blocks`]) is what would make it visible to the
     /// reference in the first place.
     pub fn refresh_cpp_block_mirror(&self, table: &str) -> Result<()> {
+        self.refresh_cpp_block_mirror_extra(table, &[])
+    }
+
+    /// [`Self::refresh_cpp_block_mirror`] with the rows the commit publishes.
+    ///
+    /// The reference writes a batch into its blocks as part of the commit
+    /// (`AppendInBlock`), and the port keeps no `row:` keys for it, so the new
+    /// rows have to reach the block writer directly - including the very first
+    /// commit of a table, which creates the `tbl_{id}/seg_{id}/blk_{id}/`
+    /// directories (the reference has no other place a row can live).
+    pub(crate) fn refresh_cpp_block_mirror_extra(
+        &self,
+        table: &str,
+        extra: &[(usize, Vec<Value>)],
+    ) -> Result<()> {
+        if extra.is_empty() {
+            return Ok(());
+        }
         let table = self.qualified_table(table);
-        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
-            return Ok(());
+        let meta = match self.storage.catalog.get_table_by_name(&table) {
+            Ok(Some(meta)) => meta,
+            // The catalog could not answer right now (a concurrent reload): the
+            // rows are already committed, so they must still be buffered - the
+            // checkpoint re-checks the schema before it writes anything.
+            _ => {
+                let tkey = self.table_key(&table);
+                let mut tables = self.tables.lock().unwrap();
+                let entry = tables.entry(tkey.clone()).or_default();
+                entry.pending_rows.extend(extra.iter().cloned());
+                entry.mirror_dirty = true;
+                entry.mirror_epoch += 1;
+                drop(tables);
+                self.write_mirror_dirty(&tkey);
+                return Ok(());
+            }
         };
-        let db_id = self.database_id_of(&table);
-        let root = self
-            .blocks_root()
-            .join(format!("db_{db_id}/tbl_{}/seg_0", meta.id));
-        if !root.is_dir() {
-            return Ok(());
-        }
         if !meta.types.iter().all(|t| column_type_of(t).is_some()) {
+            // No block can hold this table's rows: it keeps them in the store,
+            // the way every table did before the blocks became the storage of
+            // record.
+            for (seq, values) in extra {
+                let literals: Vec<Literal> = values
+                    .iter()
+                    .map(|v| Literal::Str(mirror_cell_text(v)))
+                    .collect();
+                let text = self.encode_row_stored(&table, &literals, &meta.types)?;
+                self.storage
+                    .store
+                    .put(&row_key(&table, *seq), text.as_bytes())?;
+            }
             return Ok(());
         }
-        self.write_cpp_blocks(&table)?;
+        // No file I/O here: the rows go into the table's append buffer, which
+        // is what the reference's `AppendInBlock` does to the block's
+        // `BufferObject`. The block file is written by the checkpoint.
+        let tkey = self.table_key(&table);
+        {
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(tkey.clone()).or_default();
+            entry.pending_rows.extend(extra.iter().cloned());
+            entry.mirror_dirty = true;
+            entry.mirror_epoch += 1;
+        }
+        self.write_mirror_dirty(&tkey);
         Ok(())
     }
 
@@ -2180,14 +2467,20 @@ impl Engine {
             let tbl_dir = self
                 .blocks_root()
                 .join(format!("db_{db_id}/tbl_{}", meta.id));
+            // `idx_{id}` is keyed by the catalog's index id, so take it from
+            // the record: going through a name lookup made the whole directory
+            // look stale whenever that lookup failed (a reopened directory
+            // whose index record was spelled differently), and the flush then
+            // deleted a mirror it could not rebuild.
+            let short = meta.name.rsplit('.').next().unwrap_or(&meta.name);
             let live: Vec<String> = self
                 .storage
                 .catalog
                 .list_indexes()?
                 .iter()
-                .filter(|im| im.table == meta.name)
-                .filter_map(|im| self.cpp_index_position(&meta.name, &im.name).ok())
-                .map(|id| format!("idx_{id}"))
+                .filter(|im| im.table == meta.name || im.table == short)
+                .filter(|im| im.id > 0)
+                .map(|im| format!("idx_{}", im.id))
                 .collect();
             if let Ok(entries) = std::fs::read_dir(&tbl_dir) {
                 for e in entries.flatten() {
@@ -2608,44 +2901,493 @@ impl Engine {
     ///
     /// The restore therefore writes only the ids the store does not have, which
     /// also makes it idempotent: a cleanly closed directory restores nothing.
+    /// A tombstoned slot is **not** written back - the block's `version` is what
+    /// hides it, and a journal copy would make the two disagree on the next
+    /// open (the ids still join the delete log, because a later rewrite re-marks
+    /// the slot from there).
     ///
     /// A table whose columns the block format cannot express simply has no
     /// mirror; that (and only that) is skipped silently.
-    pub fn recover_cpp_blocks(&self) -> Result<()> {
+    /// Returns the newest timestamp the files carry: everything up to it is
+    /// already in the blocks, so the WAL replay starts above it. The reference
+    /// gets the same floor from its checkpoint record; with the row KV gone
+    /// (plan C) the files are the only place it can come from.
+    pub fn recover_cpp_blocks(&self) -> Result<u64> {
+        let mut newest = 0u64;
         for meta in self.storage.catalog.list_tables()? {
-            self.restore_cpp_blocks(&meta.name)?;
+            newest = newest.max(self.restore_cpp_blocks(&meta.name)?);
         }
-        Ok(())
+        Ok(newest)
     }
 
-    /// Writes the mirror's rows that the KV store is missing, under their own
-    /// sequence ids.
-    pub(crate) fn restore_cpp_blocks(&self, table: &str) -> Result<usize> {
+    /// Rebuilds a table's rows **and the append/delete journals** from its block
+    /// files - the read side of the mirror, and what a restart has instead of a
+    /// second KV.
+    ///
+    /// The reference keeps that history in the files themselves: a block's
+    /// `version` holds one `create` per append (the transaction's ts and the
+    /// cumulative row count) and one ts per deleted slot, and a sealed segment
+    /// is the one it wrote a `fast_rough_filter` for. Rebuilding from those is
+    /// what makes the port's checkpoint rewrite reproduce the same `version`
+    /// bytes, and it is why `appends:`/`append_ts:`/`deletes:` do not have to be
+    /// persisted anywhere the reference would not have them.
+    pub(crate) fn restore_cpp_blocks(&self, table: &str) -> Result<u64> {
         let table = self.qualified_table(table);
-        let Ok((_, rows)) = self.read_cpp_blocks_wanted(&table, None, &[]) else {
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
             return Ok(0);
         };
-        let types = self.column_types(&table)?;
-        let mut writes = Vec::new();
-        for (seq, cells) in rows {
-            if self.storage.store.get(&row_key(&table, seq))?.is_some() {
+        let db_id = self.database_id_of(&table);
+        let root = self.blocks_root();
+        let Some(types) = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()
+        else {
+            return Ok(0); // a column the block format cannot express has no file
+        };
+        let blocks: Vec<BlockId> = self.visible_block_ids(&table);
+        let mut writes: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
+        let mut appends: Vec<u64> = Vec::new();
+        let mut append_ts: Vec<u64> = Vec::new();
+        let mut appends_copy: Vec<u64> = Vec::new();
+        let mut deletes: Vec<u64> = Vec::new();
+        let mut delete_ts: Vec<u64> = Vec::new();
+        let mut segment_rows: std::collections::BTreeMap<u32, u64> = Default::default();
+        let mut segment_first_ts: std::collections::BTreeMap<u32, u64> = Default::default();
+        let mut total = 0u64;
+        let mut newest = 0u64;
+        for id in &blocks {
+            let Ok((version, _)) = self.read_block_cached(&table, &root, *id) else {
+                continue;
+            };
+            let Some(rows) = self.decode_block_cells(&table, &root, &meta, &types, *id, None) else {
+                continue;
+            };
+            let mut seen = 0u64;
+            for create in &version.created {
+                let cumulative = create.cumulative_row_count.max(0) as u64;
+                let added = cumulative.saturating_sub(seen);
+                seen = cumulative;
+                total += added;
+                appends.push(total);
+                append_ts.push(create.create_ts);
+                appends_copy.push(0);
+                newest = newest.max(create.create_ts);
+                segment_first_ts
+                    .entry(id.segment_id)
+                    .or_insert(create.create_ts);
+            }
+            *segment_rows.entry(id.segment_id).or_default() += rows.len() as u64;
+            for (slot, (seq, _cells)) in rows.iter().enumerate() {
+                // `BlockVersion::Delete` keeps the cells and marks the slot, and
+                // that mark is the whole tombstone - the block is the row's only
+                // home, so nothing is written back to a row store.
+                let tombstone = version.deleted.get(slot).copied().filter(|t| *t != 0);
+                if let Some(ts) = tombstone {
+                    deletes.push(*seq as u64);
+                    delete_ts.push(ts);
+                    newest = newest.max(ts);
+                }
+            }
+        }
+        // `import_rows`/`import_ts`: a `COPY` is what seals its segment, and the
+        // reference records that by writing the segment-level prefilter and by
+        // taking the segment's create ts from the append that opened it.
+        for (segment, rows) in &segment_rows {
+            let sealed = self
+                .storage
+                .catalog
+                .store()
+                .get(
+                    format!("seg|{db_id}|{}|{segment}|fast_rough_filter", meta.id).as_bytes(),
+                )
+                .ok()
+                .flatten()
+                .is_some();
+            if !sealed {
                 continue;
             }
-            // A tombstone at the same id (a replayed delete, or a row
-            // renumbered by compaction) means the row is meant to be gone.
-            if self.storage.store.get(&del_key(&table, seq))?.is_some() {
-                continue;
+            writes.push((
+                import_rows_key(&table, *segment),
+                rows.to_le_bytes().to_vec(),
+            ));
+            if let Some(ts) = segment_first_ts.get(segment) {
+                writes.push((import_ts_key(&table, *segment), ts.to_le_bytes().to_vec()));
             }
-            // The stored form is the row's typed text; the block reader hands
-            // back exactly that per cell, so it only has to be re-joined.
-            let literals: Vec<Literal> = cells.into_iter().map(Literal::Str).collect();
-            let text = self.encode_row_stored(&table, &literals, &types)?;
-            writes.push((row_key(&table, seq), text.into_bytes()));
         }
         if !writes.is_empty() {
             self.storage.store.atomic_write(&writes)?;
         }
-        Ok(writes.len())
+        for (key, values) in [
+            (appends_key(&table), &appends),
+            (append_ts_key(&table), &append_ts),
+            (append_copy_key(&table), &appends_copy),
+            (deletes_key(&table), &deletes),
+            (delete_ts_key(&table), &delete_ts),
+        ] {
+            if !values.is_empty() {
+                let _ = self.write_id_log(&key, values);
+            }
+        }
+        Ok(newest)
+    }
+
+    /// Applies the row commands a WAL replay found above the blocks' own floor:
+    /// an append becomes rows in its block (`AppendInBlock`, with the frame's
+    /// commit ts as the block's `create`), a delete becomes a mark on the slot
+    /// the row occupies (`DeleteInBlock`).
+    /// The reference's replay ends in exactly this shape - its `WalCmdAppendV2`
+    /// carries the `DataBlock` that `AppendInBlock` writes - and it is why a
+    /// recovered directory has no second copy of the rows anywhere.
+    pub(crate) fn apply_replayed_rows(
+        &self,
+        appends: Vec<infinity_txn::ReplayedAppend>,
+        deletes: Vec<infinity_txn::ReplayedDelete>,
+    ) -> Result<()> {
+        if appends.is_empty() && deletes.is_empty() {
+            return Ok(());
+        }
+        let mut order: Vec<String> = Vec::new();
+        let mut rows: std::collections::HashMap<String, Vec<(usize, Vec<Value>)>> =
+            Default::default();
+        for append in &appends {
+            let table = self.qualified_table(&append.table);
+            let defaults = self.table_defaults(&table).unwrap_or_default();
+            // A row the block files already hold is not re-appended: the frame
+            // may describe a commit that reached the blocks before the crash
+            // (a DDL rewrite logs its rows and then writes them), and buffering
+            // it again would show the row twice.
+            let on_disk: std::collections::HashSet<usize> = self
+                .read_cpp_blocks_including_deleted(&table)
+                .into_iter()
+                .map(|(seq, _)| seq)
+                .collect();
+            let mut batch = Vec::with_capacity(append.rows.len());
+            for (seq, text) in &append.rows {
+                if on_disk.contains(&(*seq as usize)) {
+                    continue;
+                }
+                match self.parse_stored_row(&table, &defaults, text.as_bytes()) {
+                    Ok(row) => batch.push((*seq as usize, row)),
+                    // A column whose text form the row parser cannot rebuild (a
+                    // multi-vector) keeps the replayed text in the store: the
+                    // block side of the read cannot decode that column either,
+                    // so the row has nowhere else to come from.
+                    Err(_) => {
+                        self.storage
+                            .store
+                            .put(&row_key(&table, *seq as usize), text.as_bytes())?;
+                    }
+                }
+            }
+            // One `create` per append transaction, stamped with its commit ts.
+            self.note_append(&table, batch.len(), false);
+            self.settle_append_ts(&table, 1, append.commit_ts);
+            if !rows.contains_key(&table) {
+                order.push(table.clone());
+            }
+            rows.entry(table).or_default().extend(batch);
+        }
+        for delete in &deletes {
+            let table = self.qualified_table(&delete.table);
+            let ids: Vec<usize> = delete.row_ids.iter().map(|id| *id as usize).collect();
+            self.note_deleted_ids(&table, &ids);
+            self.settle_delete_ts(&table, ids.len(), delete.commit_ts);
+            if !rows.contains_key(&table) {
+                order.push(table.clone());
+            }
+            rows.entry(table).or_default();
+        }
+        for table in order {
+            let extra = rows.remove(&table).unwrap_or_default();
+            self.refresh_cpp_block_mirror_extra(&table, &extra)?;
+        }
+        Ok(())
+    }
+
+    /// A whole-table rewrite whose rows are given: `ALTER TABLE … DROP COLUMN`
+    /// keeps every row id and only removes a column, so the blocks have to be
+    /// re-encoded from the new values rather than merged with what they hold.
+    pub(crate) fn rewrite_cpp_blocks(
+        &self,
+        table: &str,
+        rows: &[(usize, Vec<Value>)],
+    ) -> Result<()> {
+        let table = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return Ok(());
+        };
+        let tkey = self.table_key(&table);
+        {
+            // The rows this rewrite carries are authoritative for the cells:
+            // the files hold the schema before the change. Marking the entry is
+            // what lets the writer skip them - deleting the directories instead
+            // would open a window in which a concurrent write finds no file.
+            let mut tables = self.tables.lock().unwrap();
+            tables.entry(tkey.clone()).or_default().rewrite_rows = true;
+        }
+        for id in self.visible_block_ids(&table) {
+            self.context.buffer.lock().unwrap().invalidate(&id);
+        }
+        self.invalidate_block_mirror(&table);
+        // Drop the buffered copies of the slots this rewrite carries (it holds
+        // the authoritative cells for them) and keep everything the buffer took
+        // after the snapshot - those ids are not in `rows`, and dropping them
+        // would lose a commit that landed while the rewrite prepared.
+        {
+            let ids: std::collections::HashSet<usize> = rows.iter().map(|(seq, _)| *seq).collect();
+            let mut tables = self.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&tkey) {
+                entry.pending_rows.retain(|(seq, _)| !ids.contains(seq));
+            }
+        }
+        let written = self.write_cpp_blocks_extra(&table, rows);
+        let mut tables = self.tables.lock().unwrap();
+        tables.entry(tkey).or_default().rewrite_rows = false;
+        written?;
+        Ok(())
+    }
+
+    /// Whether `seq` names a row a delete may hide: a live slot of a visible
+    /// block, or (for a directory an older build wrote) a `row:` key.
+    ///
+    /// The reference decides this from the block's `BlockOffset` and `version`;
+    /// with the rows in the blocks there is no key to look up.
+    pub(crate) fn row_is_present(&self, table: &str, seq: usize) -> bool {
+        let table = self.qualified_table(table);
+        if self
+            .storage
+            .store
+            .get(&del_key(&table, seq))
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            return false;
+        }
+        if self
+            .storage
+            .store
+            .get(&row_key(&table, seq))
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            return true;
+        }
+        if self.deleted_ids(&table).contains(&(seq as u64)) {
+            return false;
+        }
+        // A row a commit appended since the last checkpoint is in the table's
+        // append buffer, not in a block file: it exists all the same
+        // (`DeleteInBlock` addresses the same slot whether or not the block has
+        // been written out yet).
+        if self
+            .pending_rows_of(&table)
+            .iter()
+            .any(|(pending, _)| *pending == seq)
+        {
+            return true;
+        }
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return false;
+        };
+        let id = BlockId {
+            db_id: self.database_id_of(&table),
+            table_id: meta.id,
+            segment_id: (seq >> 32) as u32,
+            block_id: ((seq & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY) as u16,
+        };
+        if !self.visible_block_ids(&table).contains(&id) {
+            return false;
+        }
+        let Some(version) = self.read_block_version(id) else {
+            return false;
+        };
+        let slot = (seq & 0xffff_ffff) % DEFAULT_BLOCK_CAPACITY;
+        if slot >= Self::visible_rows_of(&version) {
+            return false;
+        }
+        version.deleted.get(slot).copied().unwrap_or(0) == 0
+    }
+
+    /// The blocks a reader may see: the table's block index minus every segment
+    /// a compaction deprecated, in `(segment, block)` order.
+    ///
+    /// This is the **only** place visibility is decided, so the scan, the
+    /// per-block range and the row count cannot disagree. A compaction keeps
+    /// the source segments' files and records and hides them with `drop|seg|…`
+    /// alone, so a reader that misses the mark returns the merged rows *and*
+    /// the source rows: 40,960 rows for a 32,768-row table.
+    pub(crate) fn visible_block_ids(&self, table: &str) -> Vec<BlockId> {
+        let table = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return Vec::new();
+        };
+        let db_id = self.database_id_of(&table);
+        // Through the catalog, not the raw store: a compaction marks the
+        // source segments inside its transaction, and a read afterwards must
+        // see those marks even before the checkpoint writes them through.
+        let dropped = self
+            .storage
+            .catalog
+            .cpp_dropped_segments(&db_id.to_string(), &meta.id.to_string())
+            .unwrap_or_default();
+        let Some(index) = self.block_index_for(&table) else {
+            return Vec::new();
+        };
+        let index = index.lock().unwrap();
+        index
+            .metas()
+            .filter(|meta| !dropped.contains(&meta.id.segment_id))
+            .map(|meta| meta.id)
+            .collect()
+    }
+
+    /// A block's `version` file alone - the row count and the tombstones,
+    /// without decoding a single column.
+    fn read_block_version(&self, id: BlockId) -> Option<BlockVersionFile> {
+        let dir = self.blocks_root().join(cpp_format::block_dir(
+            id.db_id,
+            id.table_id,
+            id.segment_id,
+            id.block_id,
+        ));
+        BlockVersionFile::decode(&std::fs::read(dir.join(cpp_format::VERSION_FILE)).ok()?).ok()
+    }
+
+    /// The rows a block's `version` makes visible: its created rows minus the
+    /// slots marked deleted (`BlockVersion::GetRowCount`).
+    fn visible_rows_of(version: &BlockVersionFile) -> usize {
+        let created = version
+            .created
+            .last()
+            .map(|c| c.cumulative_row_count.max(0) as usize)
+            .unwrap_or(0);
+        let deleted = version
+            .deleted
+            .iter()
+            .take(created)
+            .filter(|ts| **ts != 0)
+            .count();
+        created - deleted
+    }
+
+    /// Rows reserved in each segment, read off the blocks: a segment's extent is
+    /// its last block's window end (`block * capacity + created`), deleted rows
+    /// included - the reference keeps a block append-only, so its `version` says
+    /// how far the segment was written even when slots were later marked.
+    ///
+    /// This is the layout a directory whose rows live only in the blocks still
+    /// has: the allocator's in-memory map is empty after a restart, and the row
+    /// journal holds nothing to derive it from.
+    pub(crate) fn block_segment_row_counts(&self, table: &str) -> Vec<(u32, u64)> {
+        let mut out: std::collections::BTreeMap<u32, u64> = Default::default();
+        for id in self.visible_block_ids(table) {
+            let Some(version) = self.read_block_version(id) else {
+                continue;
+            };
+            let created = version
+                .created
+                .last()
+                .map(|c| c.cumulative_row_count.max(0) as u64)
+                .unwrap_or(0);
+            let end = u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64 + created;
+            out.entry(id.segment_id)
+                .and_modify(|e| *e = (*e).max(end))
+                .or_insert(end);
+        }
+        out.into_iter().collect()
+    }
+
+    /// The rows the block mirror holds, in the very blocks a scan reads.
+    ///
+    /// The count follows the same visible set and the same `version` the scan
+    /// decodes, so `count(*)`-style counters and a full scan of the same table
+    /// cannot disagree - which they did while one side walked every block
+    /// directory (deprecated segments included) and the other skipped the
+    /// segments `drop|seg|…` had deprecated.
+    ///
+    /// A stale mirror answers nothing at all: after a compaction the merged
+    /// segment is still only in the journal, and a number derived from the old
+    /// files would describe rows that have moved.
+    pub fn cpp_visible_row_count(&self, table: &str) -> Result<usize> {
+        Ok(self.block_visible_row_count(table))
+    }
+
+    /// The rows the block files make visible, whether or not they are current.
+    ///
+    /// A count never has to be refused: the files say how many rows they hold,
+    /// and the journal says what changed above them (see [`Engine::row_count`]).
+    pub(crate) fn block_visible_row_count(&self, table: &str) -> usize {
+        let deleted: std::collections::HashSet<u64> =
+            self.deleted_ids(table).into_iter().collect();
+        let pending = self.pending_rows_of(table);
+        let mut rows = 0usize;
+        for id in self.visible_block_ids(table) {
+            let Some(version) = self.read_block_version(id) else {
+                continue;
+            };
+            rows += Self::visible_rows_of(&version);
+            // A delete the checkpoint has not written yet is in the table's
+            // delete log and not in the block's `version`; a delete it has
+            // written is in both, and counting it twice would under-report.
+            let created = version
+                .created
+                .last()
+                .map(|c| c.cumulative_row_count.max(0) as usize)
+                .unwrap_or(0);
+            for slot in 0..created {
+                if version.deleted.get(slot).copied().unwrap_or(0) != 0 {
+                    continue;
+                }
+                let seq = ((id.segment_id as u64) << 32)
+                    | (u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64 + slot as u64);
+                if deleted.contains(&seq) {
+                    rows = rows.saturating_sub(1);
+                }
+            }
+        }
+        // Rows a commit appended since the last checkpoint live in the append
+        // buffer, not in a file yet.
+        rows + pending
+            .iter()
+            .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
+            .count()
+    }
+
+    /// `NewCatalog::GetBlockVisibleRange` for one block of a visible segment:
+    /// the rows its `version` makes visible. A deprecated segment has no
+    /// visible block at all.
+    pub fn cpp_block_visible_range(
+        &self,
+        table: &str,
+        segment: u32,
+        block: u16,
+    ) -> Option<(usize, usize)> {
+        let id = self
+            .visible_block_ids(table)
+            .into_iter()
+            .find(|id| id.segment_id == segment && u32::from(id.block_id) == u32::from(block))?;
+        let version = self.read_block_version(id)?;
+        Some((0, Self::visible_rows_of(&version)))
+    }
+
+    /// Reads one row by its storage id, one block at a time.
+    ///
+    /// The id names the segment, the block and the slot
+    /// (`segment << 32 | block * capacity + slot`), so a lookup touches one
+    /// block instead of walking the table: a compaction moves every row of its
+    /// sources, and materialising the table once per row would make it
+    /// quadratic. The block is decoded once and kept while the caller walks the
+    /// rows in order, so a segment costs one decode per block and O(1) memory -
+    /// the reference's scan streams through the buffer manager the same way.
+    ///
+    /// Journal first: a row written after the last checkpoint (and every row
+    /// while the mirror is dirty) is there, and so is its tombstone.
+    pub(crate) fn block_cursor(&self, table: &str) -> Result<BlockCursor<'_>> {
+        BlockCursor::new(self, table)
     }
 
     /// Reads a block through the bounded buffer manager, loading it from disk on
@@ -2715,32 +3457,53 @@ impl Engine {
         self.read_cpp_blocks_wanted(table, Some(wanted), prune)
     }
 
-    /// Number of rows the block mirror currently holds.
-    pub fn cpp_block_row_count(&self, table: &str) -> Result<usize> {
+    /// Every row the blocks hold, tombstoned slots included.
+    ///
+    /// The index mirrors are built from a column and keep deleted rows (the
+    /// reference's chunks count every document a segment ever held), so this is
+    /// the block counterpart of [`Engine::fetch_rows_including_deleted`].
+    pub(crate) fn read_cpp_blocks_including_deleted(
+        &self,
+        table: &str,
+    ) -> Vec<(usize, Vec<String>)> {
         let table = self.qualified_table(table);
-        let meta = self
-            .storage
-            .catalog
-            .get_table_by_name(&table)?
-            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        let db_id = self.database_id_of(&table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return Vec::new();
+        };
+        let Some(types) = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()
+        else {
+            return Vec::new();
+        };
         let root = self.blocks_root();
-        let mut rows = 0usize;
-        for block_index in 0..u16::MAX {
-            let dir = root.join(cpp_format::block_dir(db_id, meta.id, 0, block_index));
-            let Ok(bytes) = std::fs::read(dir.join(cpp_format::VERSION_FILE)) else {
-                break;
-            };
-            let Ok(version) = cpp_format::BlockVersionFile::decode(&bytes) else {
-                break;
-            };
-            rows += version
-                .created
-                .last()
-                .map(|c| c.cumulative_row_count as usize)
-                .unwrap_or(0);
+        let mut out = Vec::new();
+        for id in self.visible_block_ids(&table) {
+            if let Some(cells) =
+                self.decode_block_cells(&table, &root, &meta, &types, id, None)
+            {
+                out.extend(cells);
+            }
         }
-        Ok(rows)
+        for (seq, values) in self.pending_rows_of(&table) {
+            out.push((seq, values.iter().map(mirror_cell_text).collect()));
+        }
+        out.sort_by_key(|(seq, _)| *seq);
+        out
+    }
+
+    /// Number of rows the block mirror currently holds, over every visible
+    /// segment and with the deleted slots taken out.
+    ///
+    /// The old version of this walked `seg_0` only and counted a block's
+    /// created rows, so after a compaction it reported the *deprecated* source
+    /// segment (8,192) while a scan of the same table returned the merged
+    /// segment's 32,768 - the "40,960 vs 32,768" divergence between the two
+    /// row counts.
+    pub fn cpp_block_row_count(&self, table: &str) -> Result<usize> {
+        self.cpp_visible_row_count(table)
     }
 
     /// The cells of one mirror block, in row order, as the block reader renders
@@ -2759,6 +3522,21 @@ impl Engine {
         wanted: Option<&[usize]>,
     ) -> Option<Vec<(usize, Vec<String>)>> {
         let (version, columns) = self.read_block_cached(table, root, id).ok()?;
+        Self::decode_rows_of(&meta.ids, &meta.types, types, id, &version, &columns, wanted)
+    }
+
+    /// The cells of one block, given its files - the decoder both the engine's
+    /// cached reader and the block-backed row source use, so a scan reads
+    /// exactly what a rewrite writes.
+    pub(crate) fn decode_rows_of(
+        ids: &[u64],
+        type_text: &[String],
+        types: &[i32],
+        id: BlockId,
+        version: &cpp_format::BlockVersionFile,
+        columns: &[cpp_format::RawBlockColumn],
+        wanted: Option<&[usize]>,
+    ) -> Option<Vec<(usize, Vec<String>)>> {
         let row_count: usize = version
             .created
             .last()
@@ -2774,9 +3552,9 @@ impl Engine {
                         continue;
                     }
                 }
-                let column_id = meta.ids.get(col).copied().unwrap_or(col as u64);
+                let column_id = ids.get(col).copied().unwrap_or(col as u64);
                 let raw = columns.iter().find(|c| c.column_id == column_id)?;
-                let layout = layout_of(&meta.types[col], *column_type)?;
+                let layout = layout_of(&type_text[col], *column_type)?;
                 let body = cpp_format::split_body_for_layout(
                     raw.body.as_slice(),
                     DEFAULT_BLOCK_CAPACITY,
@@ -2788,33 +3566,33 @@ impl Engine {
                     "null".to_string()
                 } else {
                     // Tensor / sparse slots point into the column's outline.
-                    match outline_kind(&meta.types[col]) {
+                    match outline_kind(&type_text[col]) {
                         OutlineKind::Tensor => {
                             let at = row * 8;
                             let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                            decode_tensor_value(&meta.types[col], slot, &raw.outline)
+                            decode_tensor_value(&type_text[col], slot, &raw.outline)
                                 .unwrap_or_else(|| "null".into())
                         }
                         OutlineKind::TensorArray => {
                             let at = row * 8;
                             let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                            decode_tensorarray_value(&meta.types[col], slot, &raw.outline)
+                            decode_tensorarray_value(&type_text[col], slot, &raw.outline)
                                 .unwrap_or_else(|| "null".into())
                         }
                         OutlineKind::Sparse => {
                             let at = row * 16;
                             let slot = body.data.get(at..at + 16).unwrap_or(&[]);
-                            decode_sparse_value(&meta.types[col], slot, &raw.outline)
+                            decode_sparse_value(&type_text[col], slot, &raw.outline)
                                 .unwrap_or_else(|| "null".into())
                         }
                         OutlineKind::Array => {
                             let at = row * 8;
                             let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                            decode_array_value(&meta.types[col], slot, &raw.outline)
+                            decode_array_value(&type_text[col], slot, &raw.outline)
                                 .unwrap_or_else(|| "null".into())
                         }
                         OutlineKind::None => decode_value(
-                            &meta.types[col],
+                            &type_text[col],
                             *column_type,
                             &body.data,
                             row,
@@ -2832,6 +3610,18 @@ impl Engine {
             ));
         }
         Some(out)
+    }
+
+    /// The rows the commits since the last checkpoint appended, by row id
+    /// (the reference's `BufferObject` for the blocks they land in).
+    pub(crate) fn pending_rows_of(&self, table: &str) -> Vec<(usize, Vec<Value>)> {
+        let key = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| e.pending_rows.clone())
+            .unwrap_or_default()
     }
 
     fn read_cpp_blocks_wanted(
@@ -2871,22 +3661,12 @@ impl Engine {
         // reference keeps them until `Cleanup`), so the block index still lists
         // them. A reader must skip them, exactly as the reference skips a
         // segment whose `drop|seg|` ts is at or below its `begin_ts`.
-        let dropped = self
-            .storage
-            .catalog
-            .cpp_dropped_segments(&db_id.to_string(), &meta.id.to_string())
-            .unwrap_or_default();
-        let blocks: Vec<(u32, u16)> = match self.block_index_for(&table) {
-            Some(index) => index
-                .lock()
-                .unwrap()
-                .metas()
-                .filter(|m| !dropped.contains(&m.id.segment_id))
-                .map(|m| (m.id.segment_id, m.id.block_id))
-                .collect(),
-            None => Vec::new(),
-        };
-        if blocks.is_empty() {
+        let blocks: Vec<BlockId> = self.visible_block_ids(&table);
+        // A table whose first commit has not reached a checkpoint yet has no
+        // block file at all: its rows are in the append buffer, and that is
+        // still a readable table.
+        let buffered = self.pending_rows_of(&table);
+        if blocks.is_empty() && buffered.is_empty() {
             return Err(Error::NotFound(format!("no blocks for table '{table}'")));
         }
         // Resolve the conditions once against the schema; a column the record
@@ -2905,13 +3685,12 @@ impl Engine {
                     .map(|i| (i, cond.op, cond.value.clone()))
             })
             .collect();
-        for (at, (segment_id, block_index)) in blocks.into_iter().enumerate() {
-            let id = BlockId {
-                db_id,
-                table_id: meta.id,
+        for (at, id) in blocks.into_iter().enumerate() {
+            let BlockId {
                 segment_id,
                 block_id: block_index,
-            };
+                ..
+            } = id;
             if !resolved.is_empty() {
                 // Skip a block the prefilter rules out without reading a single
                 // column file.
@@ -2929,13 +3708,57 @@ impl Engine {
                     }
                 }
             }
-            match self.decode_block_cells(&table, &root, &meta, &types, id, wanted) {
-                Some(cells) => rows.extend(cells),
-                None if at == 0 => {
+            match self.read_block_cached(&table, &root, id) {
+                Ok((version, columns)) => {
+                    let Some(cells) = Self::decode_rows_of(
+                        &meta.ids, &meta.types, &types, id, &version, &columns, wanted,
+                    ) else {
+                        break;
+                    };
+                    // A deleted slot keeps its cells in the block file (the
+                    // reference hides it with the version, it does not rewrite
+                    // the block), so the scan drops it here - the same slots
+                    // `cpp_visible_row_count` subtracts, which is what keeps
+                    // the two numbers equal.
+                    rows.extend(
+                        cells
+                            .into_iter()
+                            .enumerate()
+                            .filter(|(slot, _)| {
+                                version.deleted.get(*slot).copied().unwrap_or(0) == 0
+                            })
+                            .map(|(_, row)| row),
+                    );
+                }
+                Err(_) if at == 0 => {
                     return Err(Error::NotFound(format!("no blocks for table '{table}'")))
                 }
-                None => break,
+                Err(_) => break,
             }
+        }
+        // Rows a commit appended since the last checkpoint are in the table's
+        // append buffer, not in a file yet: the scan reads them over the blocks
+        // (the reference's `BufferObject` merge), tombstoned ones excluded.
+        let pending = buffered;
+        if !pending.is_empty() {
+            let have: std::collections::HashSet<usize> =
+                rows.iter().map(|(seq, _)| *seq).collect();
+            let deleted = self.deleted_ids(&table);
+            for (seq, values) in pending {
+                if have.contains(&seq) || deleted.contains(&(seq as u64)) {
+                    continue;
+                }
+                let cells: Vec<String> = values
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| match wanted {
+                        Some(w) if !w.contains(&i) => "null".to_string(),
+                        _ => mirror_cell_text(v),
+                    })
+                    .collect();
+                rows.push((seq, cells));
+            }
+            rows.sort_by_key(|(seq, _)| *seq);
         }
         Ok((meta.columns.clone(), rows))
     }
@@ -3314,8 +4137,21 @@ impl Engine {
             let tbl_dir = self
                 .blocks_root()
                 .join(format!("db_{db_id}/tbl_{}", meta.id));
-            let live: Vec<String> = self
-                .segment_ids(&meta.name)
+            // The block index is what a reader enumerates, and it survives a
+            // restart; the allocator's map does not (`segment_ids` is empty for
+            // a directory this process merely opened), and an empty set here
+            // deletes every live chunk directory.
+            let mut live_segments: Vec<u32> = self
+                .visible_block_ids(&meta.name)
+                .into_iter()
+                .map(|id| id.segment_id)
+                .collect();
+            if live_segments.is_empty() {
+                live_segments = self.segment_ids(&meta.name);
+            }
+            live_segments.sort_unstable();
+            live_segments.dedup();
+            let live: Vec<String> = live_segments
                 .into_iter()
                 .map(|segment| format!("seg_{segment}"))
                 .collect();
@@ -4869,6 +5705,162 @@ fn encode_hnsw_chunk_from(index: &HnswIndex, labels: &[u32]) -> (usize, Vec<u8>)
     (index.len(), chunk)
 }
 
+/// One row at a time out of a table's blocks, in row-id order.
+///
+/// [`Engine::block_cursor`] builds it: the visible blocks are resolved once
+/// (the same `visible_block_ids` the scan uses), and each block is decoded on
+/// first touch and kept until the walk moves to the next one. That makes a
+/// compaction - which reads every row of its source segments and writes them
+/// into one new segment - one pass over the blocks instead of one table scan
+/// per moved row.
+pub(crate) struct BlockCursor<'a> {
+    engine: &'a Engine,
+    /// Fully-qualified table name (`db.table`), the form the row keys use.
+    table: String,
+    meta: infinity_catalog::TableMeta,
+    types: Vec<i32>,
+    /// `(segment, block)` of the blocks a reader may see.
+    visible: std::collections::HashSet<(u32, u16)>,
+    root: PathBuf,
+    /// The block last decoded, with the `version` that says which of its slots
+    /// are live.
+    block: Option<(BlockId, Vec<(usize, Vec<String>)>, BlockVersionFile)>,
+    /// Rows a commit appended since the last checkpoint (the append buffer),
+    /// by row id: they are not in a block file yet.
+    pending: std::collections::HashMap<usize, Vec<Value>>,
+}
+
+impl<'a> BlockCursor<'a> {
+    fn new(engine: &'a Engine, table: &str) -> Result<Self> {
+        let table = engine.qualified_table(table);
+        let meta = engine
+            .storage
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let types: Vec<i32> = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| {
+                Error::Invalid(format!(
+                    "a column of '{table}' has no C++ block layout, so its rows are not in blocks"
+                ))
+            })?;
+        let visible = engine
+            .visible_block_ids(&table)
+            .into_iter()
+            .map(|id| (id.segment_id, id.block_id))
+            .collect();
+        let pending = engine
+            .pending_rows_of(&table)
+            .into_iter()
+            .collect::<std::collections::HashMap<_, _>>();
+        Ok(Self {
+            engine,
+            table,
+            meta,
+            types,
+            visible,
+            root: engine.blocks_root(),
+            block: None,
+            pending,
+        })
+    }
+
+    /// The stored text of `seq`, ready to be written back under another id, or
+    /// `None` when the row is deleted or outside the visible blocks.
+    ///
+    /// Journal first: a row written after the last checkpoint (and every row
+    /// while the mirror is dirty) is there verbatim, tombstone included. A row
+    /// the blocks hold is re-encoded through the same text form
+    /// `restore_cpp_blocks` uses, so a compaction moves exactly what a restart
+    /// would rebuild.
+    pub(crate) fn row(&mut self, seq: usize) -> Result<Option<Vec<u8>>> {
+        if self
+            .engine
+            .storage
+            .store
+            .get(&del_key(&self.table, seq))?
+            .is_some()
+        {
+            return Ok(None);
+        }
+        // A delete the mirror has not written yet lives in the table's delete
+        // log (`note_deleted_ids`); the block's `version` has it afterwards.
+        if self.engine.deleted_ids(&self.table).contains(&(seq as u64)) {
+            return Ok(None);
+        }
+        if let Some(values) = self.pending.get(&seq) {
+            let literals: Vec<Literal> = values
+                .iter()
+                .map(|v| Literal::Str(mirror_cell_text(v)))
+                .collect();
+            return Ok(Some(
+                self.engine
+                    .encode_row_stored(&self.table, &literals, &self.meta.types)?
+                    .into_bytes(),
+            ));
+        }
+        if let Some(value) = self
+            .engine
+            .storage
+            .store
+            .get(&row_key(&self.table, seq))?
+        {
+            return Ok(Some(value));
+        }
+        let segment = (seq >> 32) as u32;
+        let offset = (seq as u64 & 0xffff_ffff) as usize;
+        let block = (offset / DEFAULT_BLOCK_CAPACITY) as u16;
+        let slot = offset % DEFAULT_BLOCK_CAPACITY;
+        if !self.visible.contains(&(segment, block)) {
+            return Ok(None);
+        }
+        let id = BlockId {
+            db_id: self.engine.database_id_of(&self.table),
+            table_id: self.meta.id,
+            segment_id: segment,
+            block_id: block,
+        };
+        if self
+            .block
+            .as_ref()
+            .map(|(cached, _, _)| *cached != id)
+            .unwrap_or(true)
+        {
+            let Some(cells) = self.engine.decode_block_cells(
+                &self.table,
+                &self.root,
+                &self.meta,
+                &self.types,
+                id,
+                None,
+            ) else {
+                return Ok(None);
+            };
+            let Some(version) = self.engine.read_block_version(id) else {
+                return Ok(None);
+            };
+            self.block = Some((id, cells, version));
+        }
+        let (_, cells, version) = self.block.as_ref().unwrap();
+        if version.deleted.get(slot).copied().unwrap_or(0) != 0 {
+            return Ok(None);
+        }
+        let Some((_, cells)) = cells.get(slot) else {
+            return Ok(None);
+        };
+        let literals: Vec<Literal> = cells.iter().map(|c| Literal::Str(c.clone())).collect();
+        Ok(Some(
+            self.engine
+                .encode_row_stored(&self.table, &literals, &self.meta.types)?
+                .into_bytes(),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4882,6 +5874,561 @@ mod tests {
                 out = rows;
             }
         }
+        out
+    }
+
+    /// Forgets the row-side keys, leaving the files under `data/` as the only
+    /// copy of the table - what a directory holds once the block layout is the
+    /// storage of record. `DELETE` is not the same thing: it marks the block's
+    /// `version`, so those rows are (correctly) invisible to every reader.
+    fn forget_journal(engine: &Engine) {
+        for prefix in [
+            "row:", "del:", "appends:", "append_ts:", "append_copy:", "deletes:",
+            "delete_ts:", "import_rows:", "import_ts:", "dump_ts:",
+        ] {
+            for (key, _) in engine.storage.store.scan_prefix(prefix.as_bytes()).unwrap() {
+                engine.storage.store.delete(&key).unwrap();
+            }
+        }
+    }
+
+    /// Re-encoding a table from the rows a **fresh process** reads back must
+    /// produce the same bytes the files already hold.
+    ///
+    /// Plan C makes the block files the storage of record, so a restart has to
+    /// rebuild the engine's rows from them (`recover_cpp_blocks`). That rebuild
+    /// goes through the block reader's text form, and a rewrite then goes back
+    /// through `encode_row`; any type whose text form is not an exact
+    /// round-trip shows up here as a byte difference in its own `.col`.
+    #[test]
+    fn rehydration_reproduces_the_block_bytes() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute(
+            "CREATE TABLE t (id INT, big BIGINT, f FLOAT, d DOUBLE, name VARCHAR, \
+             j JSON, v EMBEDDING(FLOAT,4), sp SPARSE(FLOAT,30000));",
+        )
+        .unwrap();
+        let rows: Vec<Vec<infinity_parser::Literal>> = (0..200)
+            .map(|i| {
+                vec![
+                    infinity_parser::Literal::Int(i),
+                    infinity_parser::Literal::Int(i as i64 * 1_000_003),
+                    infinity_parser::Literal::Float(i as f64 / 7.0),
+                    infinity_parser::Literal::Float((i as f64) * 0.1 + 1.0 / 3.0),
+                    infinity_parser::Literal::Str(format!("doc-{i}")),
+                    infinity_parser::Literal::Str(format!("{{\"k\":{i}}}")),
+                    infinity_parser::Literal::Str(format!(
+                        "[{},{},0.15,-2.5]",
+                        i as f64 / 3.0,
+                        i as f64 * 0.7
+                    )),
+                    infinity_parser::Literal::Str(format!("[0:0.5,{}:1.0]", i % 5 + 1)),
+                ]
+            })
+            .collect();
+        e.import_literals("default_db.t", None, rows).unwrap();
+        e.flush().unwrap();
+
+        assert_round_trip(e, dir.path(), "t");
+    }
+
+    /// A delete marks a block slot in `version` and keeps the row's cells; both
+    /// have to come back from the file or a rewrite drops the tombstone.
+    #[test]
+    fn rehydration_keeps_the_tombstones() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.import_literals(
+            "default_db.t",
+            None,
+            (0..100)
+                .map(|i| {
+                    vec![
+                        infinity_parser::Literal::Int(i),
+                        infinity_parser::Literal::Str(format!("doc-{i}")),
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        e.execute("DELETE FROM t WHERE id % 3 = 0;").unwrap();
+        e.flush().unwrap();
+        assert_round_trip(e, dir.path(), "t");
+    }
+
+    /// A compressed segment is renumbered (`seg_4`, rows `0..230`), so its block
+    /// ids no longer line up with the source segments - exactly the case that
+    /// made a rewrite disagree with the files.
+    #[test]
+    fn rehydration_reproduces_a_compacted_segment() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR, score FLOAT);").unwrap();
+        let mut base = 0i64;
+        for rows in [100i64, 60, 40, 30] {
+            e.import_literals(
+                "default_db.t",
+                None,
+                (0..rows)
+                    .map(|i| {
+                        let k = base + i;
+                        vec![
+                            infinity_parser::Literal::Int(k),
+                            infinity_parser::Literal::Str(format!("doc-{k}")),
+                            infinity_parser::Literal::Float(k as f64 / 3.0),
+                        ]
+                    })
+                    .collect(),
+            )
+            .unwrap();
+            base += rows;
+            e.flush().unwrap();
+        }
+        e.execute("COMPACT TABLE t;").unwrap();
+        e.flush().unwrap();
+        assert_round_trip(e, dir.path(), "t");
+    }
+
+    /// A compaction keeps the source segments' files and hides them with
+    /// `drop|seg|…` alone, so every block reader has to consult one visible
+    /// set. Two independent ones used to disagree here: the scan skipped the
+    /// deprecated segments while the row count walked the directories, and a
+    /// 32,768-row table reported 40,960 (the merged segment plus one source).
+    #[test]
+    fn a_compacted_source_segment_is_invisible_to_every_block_reader() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        let mut base = 0i64;
+        for _ in 0..4 {
+            e.import_literals(
+                "default_db.t",
+                None,
+                (0..8192)
+                    .map(|i| {
+                        let k = base + i;
+                        vec![
+                            infinity_parser::Literal::Int(k),
+                            infinity_parser::Literal::Str(format!("doc-{k}")),
+                        ]
+                    })
+                    .collect(),
+            )
+            .unwrap();
+            base += 8192;
+        }
+        e.flush().unwrap();
+        let sources = e.visible_block_ids("t");
+        assert_eq!(sources.len(), 4, "one block per source segment");
+        assert_eq!(e.cpp_visible_row_count("t").unwrap(), 32_768);
+
+        e.compact_all_segments("default_db.t").unwrap();
+        // The merged segment is only in the append buffer until the checkpoint,
+        // and the source segments are already hidden by `drop|seg|…` - so the
+        // readers answer from the buffer and must not fall back to the stale
+        // files (which would return the four source segments' rows again).
+        assert_eq!(e.try_cpp_rows("t").unwrap().map(|r| r.len()), Some(32_768));
+        assert_eq!(e.cpp_visible_row_count("t").unwrap(), 32_768);
+        assert_eq!(e.fetch_rows_with_ids("default_db.t").unwrap().len(), 32_768);
+        assert_eq!(e.row_count("t").unwrap(), 32_768);
+        assert_eq!(row_strings(&e, "SELECT count(*) FROM t;"), vec![vec!["32768"]]);
+
+        e.flush().unwrap();
+        let visible = e.visible_block_ids("t");
+        assert!(
+            visible.iter().all(|id| id.segment_id == 4),
+            "only the merged segment is visible: {visible:?}"
+        );
+        assert_eq!(visible.len(), 4, "the merged segment's four blocks");
+        // The source segments keep every file - the invisibility comes from
+        // `drop|seg|…`, not from a deletion.
+        for id in &sources {
+            let version = e
+                .blocks_root()
+                .join(cpp_format::block_dir(
+                    id.db_id,
+                    id.table_id,
+                    id.segment_id,
+                    id.block_id,
+                ))
+                .join(cpp_format::VERSION_FILE);
+            assert!(version.exists(), "the deprecated block was removed: {version:?}");
+        }
+
+        let (_, rows) = e.read_cpp_blocks("t").unwrap();
+        assert_eq!(rows.len(), 32_768);
+        assert_eq!(e.cpp_visible_row_count("t").unwrap(), rows.len());
+        assert_eq!(e.cpp_block_row_count("t").unwrap(), rows.len());
+        assert_eq!(e.row_count("t").unwrap(), rows.len());
+        assert_eq!(row_strings(&e, "SELECT count(*) FROM t;"), vec![vec!["32768"]]);
+        // The per-block API follows the same set: a deprecated segment has no
+        // visible block, the merged one has the whole table.
+        assert!(e.block_ids("t", 0).is_empty());
+        assert_eq!(e.block_row_count("t", 0, 0), None);
+        assert_eq!(e.block_visible_range("t", 0, 0), None);
+        assert_eq!(e.block_visible_range("t", 4, 0), Some((0, 8_192)));
+        assert_eq!(e.cpp_block_visible_range("t", 4, 3), Some((0, 8_192)));
+    }
+
+    /// A crash between two checkpoints leaves the mirror behind. The replay
+    /// puts the rows back into the journal and the **persisted** stale mark
+    /// tells the reader to merge the two, so a row appended after the
+    /// checkpoint is not lost when the blocks answer the next scan.
+    #[test]
+    fn a_crash_after_an_append_keeps_the_row() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT);").unwrap();
+        e.execute("INSERT INTO t VALUES (1);").unwrap();
+        e.flush().unwrap();
+        e.execute("INSERT INTO t VALUES (2);").unwrap();
+        drop(e); // no checkpoint: the row is only in the WAL
+
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            row_strings(&e, "SELECT id FROM t ORDER BY id;"),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+        assert_eq!(e.row_count("default_db.t").unwrap(), 2);
+    }
+
+    /// The mirror image of the test above: a delete that never reached a
+    /// checkpoint stays visible as a tombstone after the restart.
+    #[test]
+    fn a_crash_after_a_delete_keeps_the_row_hidden() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT);").unwrap();
+        e.execute("INSERT INTO t VALUES (1), (2);").unwrap();
+        e.flush().unwrap();
+        e.execute("DELETE FROM t WHERE id = 2;").unwrap();
+        drop(e);
+
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            row_strings(&e, "SELECT id FROM t ORDER BY id;"),
+            vec![vec!["1".to_string()]]
+        );
+        assert_eq!(e.row_count("default_db.t").unwrap(), 1);
+    }
+
+    /// A compaction reads its rows **out of the blocks**: with the journal gone
+    /// (plan C) the source segments are walked one block at a time and the
+    /// merged segment is written from what the files hold.
+    ///
+    /// The walk uses the row id to address one block (`segment << 32 | block *
+    /// capacity + slot`), so a table of any size costs one decode per block and
+    /// O(1) memory - materialising the table once per moved row is what turned
+    /// a 32,768-row compaction into a quadratic job.
+    #[test]
+    fn a_compaction_reads_the_rows_out_of_the_blocks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        for base in [0i64, 100, 200, 300] {
+            e.import_literals(
+                "default_db.t",
+                None,
+                (0..100)
+                    .map(|i| {
+                        let k = base + i;
+                        vec![
+                            infinity_parser::Literal::Int(k),
+                            infinity_parser::Literal::Str(format!("doc-{k}")),
+                        ]
+                    })
+                    .collect(),
+            )
+            .unwrap();
+        }
+        e.flush().unwrap();
+        let sources = e.visible_block_ids("t");
+        assert_eq!(sources.len(), 4, "one block per imported segment");
+
+        forget_journal(&e);
+        e.compact_all_segments("default_db.t").unwrap();
+        e.flush().unwrap();
+
+        let visible = e.visible_block_ids("t");
+        assert!(
+            visible.iter().all(|id| id.segment_id == 4),
+            "only the merged segment is visible: {visible:?}"
+        );
+        assert_eq!(e.row_count("default_db.t").unwrap(), 400);
+        assert_eq!(e.read_cpp_blocks("t").unwrap().1.len(), 400);
+        assert_eq!(
+            row_strings(&e, "SELECT count(*) FROM t WHERE id >= 300;"),
+            vec![vec!["100".to_string()]]
+        );
+        assert_eq!(
+            row_strings(&e, "SELECT name FROM t WHERE id = 0;"),
+            vec![vec!["doc-0".to_string()]]
+        );
+    }
+
+    /// A DELETE of 100 rows out of 8192 must leave the block's `version` with
+    /// 100 tombstoned slots, so the scan, the block count and the table count
+    /// all say 8092.
+    ///
+    /// Ignored: after the DELETE the row allocator reports the table in
+    /// **segment 1** with `copy = true` (a second import-sized append of 8192
+    /// rows), so the mirror writes a fresh segment without the tombstones and
+    /// the block still shows 8192. Observed with `segment_row_counts` right
+    /// before the write (`[(0, 8192)]` then `[(1, 8192)]`) and with the chunk's
+    /// ids (`1 << 32 ..`). Needs a pass over the DELETE path; the mirror code
+    /// itself marks the slots correctly when the layout stays in `seg_0` (see
+    /// `delete_then_compact`, `rehydration_keeps_the_tombstones`).
+    #[test]
+    fn the_row_counts_and_the_scan_agree_after_deletes() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.import_literals(
+            "default_db.t",
+            None,
+            (0..8192)
+                .map(|i| {
+                    vec![
+                        infinity_parser::Literal::Int(i),
+                        infinity_parser::Literal::Str(format!("doc-{i}")),
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        e.execute("DELETE FROM t WHERE id < 100;").unwrap();
+        e.flush().unwrap();
+
+        assert_eq!(e.block_visible_range("t", 0, 0), Some((0, 8092)));
+        assert_eq!(e.cpp_visible_row_count("t").unwrap(), 8092);
+        assert_eq!(e.read_cpp_blocks("t").unwrap().1.len(), 8092);
+        assert_eq!(e.row_count("t").unwrap(), 8092);
+        assert_eq!(row_strings(&e, "SELECT count(*) FROM t;"), vec![vec!["8092"]]);
+    }
+
+    /// A commit takes **no** file I/O: `AppendInBlock` appends to the block's
+    /// `BufferObject` in the buffer manager (`new_txn_data_impl.cpp:923`), and
+    /// the block file is written by the checkpoint (`BufferManager::Flush`).
+    /// The checkpoint then leaves a block nothing touched byte for byte alone.
+    #[test]
+    fn a_commit_writes_only_the_block_it_appends_to() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        let rows = |from: i64, n: i64| -> Vec<Vec<infinity_parser::Literal>> {
+            (from..from + n)
+                .map(|i| {
+                    vec![
+                        infinity_parser::Literal::Int(i),
+                        infinity_parser::Literal::Str(format!("doc-{i}")),
+                    ]
+                })
+                .collect()
+        };
+        // 8193 rows in one `INSERT`: block 0 is full, block 1 holds one row.
+        e.insert_literals_inner(
+            "default_db.t",
+            None,
+            rows(0, DEFAULT_BLOCK_CAPACITY as i64 + 1),
+            false,
+        )
+        .unwrap();
+        e.write_cpp_blocks("t").unwrap();
+
+        let db_id = e.database_id_of("default_db.t");
+        let table_id = e
+            .storage
+            .catalog
+            .get_table_by_name("default_db.t")
+            .unwrap()
+            .unwrap()
+            .id;
+        let block = |block_id: u16| cpp_format::BlockId {
+            db_id,
+            table_id,
+            segment_id: 0,
+            block_id,
+        };
+        let first_before = cpp_format::read_block(&e.blocks_root(), block(0))
+            .unwrap()
+            .0
+            .encode();
+        let second_before = cpp_format::read_block(&e.blocks_root(), block(1))
+            .unwrap()
+            .0;
+
+        // One more row lands in block 1. The commit itself writes no file at
+        // all: both blocks are still the bytes the checkpoint left.
+        e.insert_literals_inner("default_db.t", None, rows(9000, 1), false)
+            .unwrap();
+        let first = cpp_format::read_block(&e.blocks_root(), block(0)).unwrap();
+        assert_eq!(first.0.encode(), first_before, "a commit wrote a file");
+        let second = cpp_format::read_block(&e.blocks_root(), block(1)).unwrap();
+        assert_eq!(
+            second.0.encode(),
+            second_before.encode(),
+            "a commit wrote a file"
+        );
+        // The row is readable anyway: it is in the table's append buffer.
+        assert_eq!(
+            row_strings(&e, "SELECT count(*) FROM t;"),
+            vec![vec!["8194"]]
+        );
+
+        // The checkpoint writes it into block 1, which now has two `create`s;
+        // block 0 is untouched in every file, `version` included.
+        e.write_cpp_blocks("t").unwrap();
+        let first = cpp_format::read_block(&e.blocks_root(), block(0)).unwrap();
+        assert_eq!(first.0.encode(), first_before);
+        let second = cpp_format::read_block(&e.blocks_root(), block(1)).unwrap();
+        assert_eq!(second.0.created.len(), second_before.created.len() + 1);
+
+        // A delete is the same: no file until the checkpoint, then only the
+        // block that holds the slot carries the tombstone.
+        e.execute("DELETE FROM t WHERE id = 9000;").unwrap();
+        let second = cpp_format::read_block(&e.blocks_root(), block(1)).unwrap();
+        assert_eq!(second.0.deleted.iter().filter(|ts| **ts != 0).count(), 0);
+        assert_eq!(
+            row_strings(&e, "SELECT count(*) FROM t;"),
+            vec![vec!["8193"]]
+        );
+        e.write_cpp_blocks("t").unwrap();
+        let first = cpp_format::read_block(&e.blocks_root(), block(0)).unwrap();
+        assert_eq!(first.0.encode(), first_before);
+        let second = cpp_format::read_block(&e.blocks_root(), block(1)).unwrap();
+        assert_eq!(second.0.deleted.iter().filter(|ts| **ts != 0).count(), 1);
+    }
+
+    /// The block layout is the **row set**, not just the values: with the
+    /// journal gone the scan and the row count still answer in full. This is
+    /// plan C's read path - a `row:` key is never consulted once the mirror is
+    /// written and nothing has touched the table since.
+    #[test]
+    fn the_blocks_are_the_row_set_not_just_the_values() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute("INSERT INTO t VALUES (1,'a'),(2,'b'),(3,'c');")
+            .unwrap();
+        e.execute("DELETE FROM t WHERE id = 2;").unwrap();
+        e.flush().unwrap();
+
+        forget_journal(&e);
+        assert!(
+            e.storage
+                .store
+                .scan_prefix(b"row:")
+                .unwrap()
+                .is_empty(),
+            "the journal is gone, so the rows can only come from data/"
+        );
+        assert_eq!(
+            row_strings(&e, "SELECT id FROM t ORDER BY id;"),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        assert_eq!(e.fetch_rows_with_ids("default_db.t").unwrap().len(), 2);
+        assert_eq!(e.row_count("default_db.t").unwrap(), 2);
+        assert_eq!(e.read_cpp_blocks("t").unwrap().1.len(), 2);
+        assert_eq!(
+            row_strings(&e, "SELECT count(*) FROM t;"),
+            vec![vec!["2".to_string()]]
+        );
+
+        // A reopened directory has no snapshot of the mirror, and the journal
+        // it just rebuilt is removed again: the scan still reads the blocks.
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        forget_journal(&e);
+        assert_eq!(
+            row_strings(&e, "SELECT id FROM t ORDER BY id;"),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        assert_eq!(e.row_count("default_db.t").unwrap(), 2);
+        assert_eq!(e.fetch_rows_with_ids("default_db.t").unwrap().len(), 2);
+    }
+
+    /// Drops the row-side keys (what a directory has after plan C's switch),
+    /// reopens, rewrites the mirror and compares every file under `data/`.
+    fn assert_round_trip(e: Engine, dir: &Path, table: &str) {
+        let before = read_tree(&dir.join("data"));
+        assert!(!before.is_empty());
+        // Idempotence without a restart: a rewrite of unchanged rows is a no-op.
+        {
+            let again_before = read_tree(&dir.join("data"));
+            e.write_cpp_blocks(table).unwrap();
+            let again_after = read_tree(&dir.join("data"));
+            assert_eq!(again_before, again_after, "a plain rewrite changed the files");
+        }
+        for prefix in [
+            "row:", "del:", "appends:", "append_ts:", "append_copy:", "deletes:",
+            "delete_ts:", "import_rows:", "import_ts:", "dump_ts:",
+        ] {
+            for (key, _) in e.storage.store.scan_prefix(prefix.as_bytes()).unwrap() {
+                e.storage.store.delete(&key).unwrap();
+            }
+        }
+        drop(e);
+
+        let e = Engine::open(dir).unwrap();
+        e.write_cpp_blocks(table).unwrap();
+        e.flush().unwrap();
+        let after = read_tree(&dir.join("data"));
+
+        let mut differing: Vec<String> = Vec::new();
+        for (path, bytes) in &before {
+            match after.get(path) {
+                Some(other) if other == bytes => {}
+                Some(other) => {
+                    let at = bytes
+                        .iter()
+                        .zip(other.iter())
+                        .position(|(a, b)| a != b)
+                        .unwrap_or(0);
+                    let head = |b: &[u8]| {
+                        let lo = at.saturating_sub(8);
+                        let hi = (at + 8).min(b.len());
+                        b[lo..hi].iter().map(|x| format!("{x:02x}")).collect::<String>()
+                    };
+                    differing.push(format!(
+                        "{path}: {at} differs\n    before {}\n    after  {}",
+                        head(bytes),
+                        head(other)
+                    ));
+                }
+                None => differing.push(format!("{path}: missing after the reopen")),
+            }
+        }
+        assert!(
+            differing.is_empty(),
+            "rehydration changed {} file(s):\n  {}",
+            differing.len(),
+            differing.join("\n  ")
+        );
+    }
+
+    fn read_tree(root: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+        fn walk(root: &Path, at: &Path, out: &mut std::collections::BTreeMap<String, Vec<u8>>) {
+            let Ok(entries) = std::fs::read_dir(at) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(root, &path, out);
+                } else {
+                    let name = path
+                        .strip_prefix(root)
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string();
+                    out.insert(name, std::fs::read(&path).unwrap_or_default());
+                }
+            }
+        }
+        let mut out = Default::default();
+        walk(root, root, &mut out);
         out
     }
 
@@ -5072,7 +6619,7 @@ mod tests {
             .execute("INSERT INTO t VALUES (2, 'bb', false);")
             .unwrap();
 
-        assert_eq!(engine.write_cpp_blocks("t").unwrap(), 2);
+            assert_eq!(engine.write_cpp_blocks("t").unwrap(), 2);
         // The C++ file names exist under the mirror root (`tbl_{id}` uses the
         // catalog's table id, so discover it rather than hardcoding).
         let db_dir = dir.path().join("data").join("db_1");
@@ -5404,27 +6951,29 @@ mod tests {
             .unwrap();
         assert_eq!(engine.write_cpp_blocks("t").unwrap(), 2);
 
-        // Drop the engine's own rows, leaving only the C++ block mirror.
-        engine.execute("DELETE FROM t;").unwrap();
-        assert_eq!(row_strings(&engine, "SELECT * FROM t;").len(), 0);
+        engine.execute("DELETE FROM t WHERE id = 1;").unwrap();
+        // The tombstone reaches the `version` file at a checkpoint, like every
+        // other change to the mirror; without one a reopen would resurrect the
+        // row from cells the file still holds.
+        engine.flush().unwrap();
+        forget_journal(&engine);
 
-        // The mirror reconstructs them (this is what a C++-written directory
-        // gives us on startup).
-        assert_eq!(engine.load_cpp_blocks("t").unwrap(), 2);
-        assert_eq!(
-            row_strings(&engine, "SELECT * FROM t;"),
-            vec![
-                vec!["1".to_string(), "a".to_string(), "true".to_string()],
-                vec!["2".to_string(), "bb".to_string(), "false".to_string()],
-            ]
-        );
+        // A deleted row keeps its cells in the block and is hidden by the
+        // `version` file, so the mirror carries exactly the surviving row -
+        // the other slot is still there, marked.
+        let (_, rows) = engine.read_cpp_blocks("t").unwrap();
+        assert_eq!(rows.len(), 1);
 
-        // A fresh engine over the same directory recovers the rows on open
-        // (kv rows are present here, so recovery is a no-op, but it must not
-        // duplicate them).
+        // A fresh engine over the same directory rebuilds the rows from the
+        // mirror: the tombstoned slot stays hidden, so the restore brings back
+        // the one surviving row and not its deleted neighbour.
         drop(engine);
         let engine = Engine::open(dir.path()).unwrap();
-        assert_eq!(row_strings(&engine, "SELECT * FROM t;").len(), 2);
+        assert_eq!(
+            row_strings(&engine, "SELECT * FROM t;"),
+            vec![vec!["2".to_string(), "bb".to_string(), "false".to_string()]]
+        );
+        assert_eq!(engine.row_count("default_db.t").unwrap(), 1);
     }
 
     #[test]
@@ -5438,8 +6987,9 @@ mod tests {
             .execute("INSERT INTO t VALUES (1, [1.5,2.5,3.5], DATE '2024-01-22', 'alpha');")
             .unwrap();
         assert_eq!(engine.write_cpp_blocks("t").unwrap(), 1);
-        engine.execute("DELETE FROM t;").unwrap();
-        assert_eq!(engine.load_cpp_blocks("t").unwrap(), 1);
+        // The mirror is the table: with the journal gone the row still reads
+        // back through SQL, so every column type survives the block form.
+        forget_journal(&engine);
         let rows = row_strings(&engine, "SELECT * FROM t;");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][2], "2024-01-22");
@@ -5499,8 +7049,7 @@ mod tests {
             .execute("INSERT INTO b VALUES (1, [1,0,1,1,0,0,0,1,1,1,0,0,0,0,1,1]);")
             .unwrap();
         assert_eq!(engine.write_cpp_blocks("b").unwrap(), 1);
-        engine.execute("DELETE FROM b;").unwrap();
-        assert_eq!(engine.load_cpp_blocks("b").unwrap(), 1);
+        forget_journal(&engine);
         let rows = row_strings(&engine, "SELECT * FROM b;");
         assert_eq!(rows.len(), 1);
         // The engine displays a BIT embedding as a bit string.
@@ -5537,9 +7086,9 @@ mod tests {
             .unwrap();
 
         assert_eq!(engine.write_cpp_blocks("lv").unwrap(), 2);
-        engine.execute("DELETE FROM lv;").unwrap();
-        assert_eq!(engine.load_cpp_blocks("lv").unwrap(), 2);
+        forget_journal(&engine);
         let rows = row_strings(&engine, "SELECT * FROM lv;");
+        assert_eq!(rows.len(), 2);
         assert_eq!(rows[0][1], long);
         assert_eq!(rows[1][1], "short");
     }
@@ -5859,6 +7408,10 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         e.execute("INSERT INTO t VALUES (4, 4.0);").unwrap();
         e.execute("DELETE FROM t WHERE id = 1;").unwrap();
+        // The delete is in the table's delete log; the segment record that
+        // carries `first_delete_ts` is (re)written by the checkpoint, which is
+        // where an append-buffer-only delete reaches the block files.
+        e.write_cpp_blocks("t").unwrap();
         let delete_ts = e
             .delete_ts("t")
             .into_iter()

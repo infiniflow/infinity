@@ -445,6 +445,29 @@ def test_a_multi_segment_table_matches_across_segments():
     assert rust_answers["secondary_eq_third"] == [SEG_STARTS[2] + 30]
 
 
+def _block_seg_jsonl(path, rows):
+    """One JSON object per row: a CSV cell cannot carry a vector's commas.
+
+    `{"0": 0.5}` is the sparse form both engines' JSONL reader accepts (the
+    dense column is a plain array).
+    """
+    with open(path, "w", buffering=1 << 20) as handle:
+        for i in range(rows):
+            handle.write(
+                json.dumps(
+                    {
+                        "id": i,
+                        "title": f"title-{i}",
+                        "body": f"doc{i} alpha",
+                        "vec": [0.1, 0.2, 0.3, 0.4],
+                        "sp": {"0": 0.5, "1": 1.0},
+                        "score": i * 0.5,
+                    }
+                )
+                + "\n"
+            )
+
+
 def _block_seg_phase(conn, directory):
     db = conn.get_database("default_db")
     db.drop_table(BLOCK_SEG_TABLE, ConflictType.Ignore)
@@ -499,7 +522,7 @@ def test_a_segment_with_many_blocks_keeps_one_chunk_per_index():
     rust_root = os.path.join(ROOT, "block_segment_rust")
     directory = tempfile.mkdtemp(prefix="block-segment-csv-")
     try:
-        _seg_csv(os.path.join(directory, "big.csv"), 0, BLOCK_SEG_ROWS)
+        _block_seg_jsonl(os.path.join(directory, "big.jsonl"), BLOCK_SEG_ROWS)
         phase = lambda conn: _block_seg_phase(conn, directory)
         _run_engine("cpp", cpp_root, 5432, seed=phase)
         _run_engine("rust", rust_root, 5433, seed=phase)

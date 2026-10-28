@@ -128,9 +128,11 @@ fn truncated_wal_recovers_exactly_the_valid_prefix() {
         let store: Arc<dyn MetaStore> =
             Arc::new(RocksMetaStore::open(d2.path().join("kv")).unwrap());
         let m = TxnManager::open(d2.path().join("wal.log"), store.clone()).unwrap();
-        m.recover(0).unwrap(); // must not panic
+        let mut appends = Vec::new();
+        let mut deletes = Vec::new();
+        m.recover_into(0, 0, &mut appends, &mut deletes).unwrap(); // must not panic
         let expected = WalManager::read_all(&wal2).unwrap().len();
-        let got = store.scan_prefix(b"row:").unwrap().len();
+        let got = appends.iter().map(|a| a.rows.len()).sum::<usize>();
         assert_eq!(
             got, expected,
             "cut={cut}: recovered {got} rows, expected {expected}"
@@ -213,11 +215,20 @@ fn append_is_a_typed_command_and_replays_the_same_rows() {
         other => panic!("expected an Append command, got {other:?}"),
     }
 
-    // Recovery into an empty KV reproduces the rows byte for byte.
+    // Recovery hands the rows back for the engine to append to the segment
+    // (`AppendInBlock`); the log itself no longer carries `row:` keys.
     let store = Arc::new(RocksMetaStore::open(dir.path().join("kv2")).unwrap());
     let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
-    m.recover(0).unwrap();
-    assert_eq!(store.scan_prefix(b"row:").unwrap(), expected);
+    let mut appends = Vec::new();
+    let mut deletes = Vec::new();
+    m.recover_into(0, 0, &mut appends, &mut deletes).unwrap();
+    assert!(deletes.is_empty());
+    let rows: Vec<(u64, String)> = appends.iter().flat_map(|a| a.rows.clone()).collect();
+    assert_eq!(rows.len(), expected.len());
+    for ((seq, text), (key, value)) in rows.iter().zip(expected.iter()) {
+        assert_eq!(&row("default_db.t", *seq), key);
+        assert_eq!(text.as_bytes(), value.as_slice());
+    }
 }
 
 /// A delete commits as a typed `WalCmd::Delete` and replays the tombstones.
@@ -251,11 +262,17 @@ fn delete_is_a_typed_command_and_replays_the_tombstones() {
         other => panic!("expected a Delete command, got {other:?}"),
     }
 
+    // The tombstones come back as ids for the block's `version`
+    // (`DeleteInBlock`); the log holds no `del:` key of its own.
     let store = Arc::new(RocksMetaStore::open(dir.path().join("kv2")).unwrap());
     let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
-    m.recover(0).unwrap();
-    assert_eq!(store.get(&del_key(table, 3)).unwrap(), Some(b"1".to_vec()));
-    assert_eq!(store.get(&del_key(table, 4)).unwrap(), Some(b"1".to_vec()));
+    let mut appends = Vec::new();
+    let mut deletes = Vec::new();
+    m.recover_into(0, 0, &mut appends, &mut deletes).unwrap();
+    assert!(appends.is_empty());
+    assert_eq!(deletes.len(), 1);
+    assert_eq!(deletes[0].table, table);
+    assert_eq!(deletes[0].row_ids, vec![3, 4]);
 }
 
 /// Catalog records keep their exact value in a `KvBatch` and replay verbatim.
@@ -451,7 +468,11 @@ fn checkpoint_ts_skips_already_applied_records() {
     // recovery transaction's ts first): replaying past the first one leaves
     // the other two.
     assert_eq!(m.recover(4).unwrap(), 2);
-    assert_eq!(store.scan_prefix(b"row:").unwrap().len(), 2);
+    let mut appends = Vec::new();
+    let mut deletes = Vec::new();
+    assert_eq!(m.recover_into(4, 4, &mut appends, &mut deletes).unwrap(), 2);
+    let rows: usize = appends.iter().map(|a| a.rows.len()).sum();
+    assert_eq!(rows, 2);
 }
 
 /// `WalManager::Flush` swaps the file inside its own loop when it reaches a

@@ -442,6 +442,7 @@ impl Catalog {
         }
     }
 
+
     /// Whether this catalog persists only the C++ key space.
     pub fn is_cpp_only(&self) -> bool {
         self.cpp_only
@@ -491,7 +492,16 @@ impl Catalog {
                 }
             }
         }
-        Ok(out)
+        // A record a `drop|db|…` marker deprecated is not a database
+        // (`CatalogMeta::GetDBMeta` reports the name as gone; only `Cleanup`
+        // removes the record).
+        let mut live = Vec::with_capacity(out.len());
+        for name in out {
+            if self.has_database_record(&name)? {
+                live.push(name);
+            }
+        }
+        Ok(live)
     }
 
     /// Runs `f` against the store as the DDL in flight sees it: either the
@@ -508,7 +518,16 @@ impl Catalog {
     }
 
     fn cpp_tables(&self) -> Result<Vec<TableMeta>> {
-        self.with_view(|store| crate::cpp_layout::read_cpp_tables_as_meta(store))
+        // A table hanging under a database `drop|db|…` deprecated is gone with
+        // it: the reference's `CleanDB` walks the database's tables, and a
+        // reader resolves the name against the live databases first.
+        let live = self.cpp_databases()?;
+        let mut tables = self.with_view(|store| crate::cpp_layout::read_cpp_tables_as_meta(store))?;
+        tables.retain(|t| {
+            let db = t.name.split('.').next().unwrap_or(&t.name).to_string();
+            live.iter().any(|d| *d == db)
+        });
+        Ok(tables)
     }
 
     fn cpp_indexes(&self) -> Result<Vec<IndexMeta>> {
@@ -685,6 +704,14 @@ impl Catalog {
             if value.is_none() {
                 continue;
             }
+            // A `drop|…` marker carries its timestamp in the **value**
+            // (`KeyEncode::DropTableKey(…) -> to_string(commit_ts)`), and the
+            // key names the object's create ts - restamping the key would move
+            // the marker off the record it deprecates.
+            if key.starts_with(b"drop|") {
+                *value = Some(ts.to_string().into_bytes());
+                continue;
+            }
             if let Ok(text) = std::str::from_utf8(key) {
                 if text.ends_with(&from) {
                     let mut replaced = text[..text.len() - from.len()].to_string();
@@ -750,15 +777,32 @@ impl Catalog {
     }
 
     /// The segments of `db_id`.`table_id` a compaction deprecated.
+    ///
+    /// Read through the DDL-in-flight's view, like every other layout read: a
+    /// transaction that marks the segments and then asks what is visible (a
+    /// `Cleanup` in the same transaction, a read right after `COMPACT`) has to
+    /// see its own marks, or it treats the deprecated source segments as live
+    /// and reads their rows a second time next to the merged segment's.
     pub fn cpp_dropped_segments(&self, db_id: &str, table_id: &str) -> Result<Vec<u32>> {
-        crate::cpp_layout::cpp_dropped_segments(self.store.as_ref(), db_id, table_id)
+        self.with_view(|store| crate::cpp_layout::cpp_dropped_segments(store, db_id, table_id))
     }
 
     /// The deletes a C++-layout rewrite performs before writing the layout.
+    ///
+    /// A `drop|…` marker deprecates records without removing them - that is
+    /// `Cleanup`'s job - so the sweep has to leave them alone: republishing the
+    /// layout is what a `DROP TABLE t; CREATE TABLE t` does, and deleting the
+    /// dropped table's records here would give the directory a key space the
+    /// reference never has.
     fn cpp_layout_sweep(&self, store: &dyn MetaStore) -> Result<Vec<BatchItem>> {
         let mut deletes: Vec<BatchItem> = Vec::new();
+        let keep = crate::cpp_layout::dropped_record_prefixes(store)?;
         for prefix in CPP_KEY_PREFIXES {
             for (k, _) in store.scan_prefix(prefix.as_bytes())? {
+                let key = String::from_utf8_lossy(&k);
+                if keep.iter().any(|p| key.starts_with(p.as_str())) {
+                    continue;
+                }
                 deletes.push((k, None));
             }
         }
@@ -781,16 +825,30 @@ impl Catalog {
     /// The caller holds `counter_lock` and commits both in one batch, so the
     /// counter can never run ahead of the table record (`alloc_id` used to
     /// commit it on its own, leaving a gap if the process died right after).
-    fn reserve_table_id(&self) -> Result<(u64, u64)> {
+    fn reserve_table_id(&self, table: &str) -> Result<(u64, u64)> {
         if self.cpp_only {
-            // No native counter: the id is one past the highest table id, which
-            // is exactly what `write_cpp_layout_from` derives from the tables.
-            let next = self
+            // Table ids are **per database** (`DBMeta::GetNextTableID` on the
+            // database's own `next_table_id` tag), and the counter only ever
+            // grows: a dropped table's id is never handed out again, or the new
+            // table would inherit its block directory.
+            let db_name = table.split('.').next().unwrap_or(table);
+            let db_id = self
+                .database_id_of_name(db_name)?
+                .unwrap_or(1)
+                .to_string();
+            let tag = infinity_storage::catalog_format::catalog_db_tag_key(&db_id, "next_table_id");
+            let previous: u64 = self
+                .with_view(|store| store.get(tag.as_bytes()))?
+                .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+                .unwrap_or(0);
+            let surviving = self
                 .cpp_tables()?
                 .iter()
-                .map(|t| t.id)
+                .filter(|t| t.name.split('.').next() == Some(db_name))
+                .map(|t| t.id + 1)
                 .max()
-                .map_or(0, |v| v + 1);
+                .unwrap_or(0);
+            let next = previous.max(surviving);
             return Ok((next, next + 1));
         }
         // Table ids start at 0, as the C++ engine's do; the counter holds the
@@ -887,7 +945,7 @@ impl Catalog {
         // must be held until the batch lands: two concurrent `CREATE TABLE`s
         // must not claim one id.
         let _counter = self.counter_lock.lock().unwrap();
-        let (id, next_counter) = self.reserve_table_id()?;
+        let (id, next_counter) = self.reserve_table_id(name)?;
         let (types, sparse_stores) = normalize_types(types, sparse_stores, columns.len());
         let meta = TableMeta {
             id,
@@ -1078,20 +1136,31 @@ impl Catalog {
     }
 
     /// Drops a table by name. Returns `true` if it existed.
+    ///
+    /// A **marker**, like the reference's `NewTxn::PrepareCommitDropTable`: the
+    /// records it deprecates (columns, segment layer, index records) stay until
+    /// `Cleanup` walks them, and the name stops resolving because
+    /// `get_table_by_name` refuses a record with a marker.
     pub fn drop_table(&self, name: &str) -> Result<bool> {
         if self.cpp_only {
-            let mut tables = self.cpp_tables()?;
-            let before = tables.len();
-            tables.retain(|t| t.name != name);
-            if tables.len() == before {
+            // A name that already has a marker is gone: `DROP TABLE` reports it
+            // as absent, exactly as `CatalogMeta::GetTableMeta` does.
+            if self.get_table_by_name(name)?.is_none() {
                 return Ok(false);
             }
-            let indexes: Vec<IndexMeta> = self
-                .cpp_indexes()?
-                .into_iter()
-                .filter(|i| i.table != name)
-                .collect();
-            self.rewrite_cpp(&self.cpp_databases()?, &tables, &indexes)?;
+            let (db_id, bare) = self.db_and_bare_name(name)?;
+            let Some((table_id, create_ts)) =
+                crate::cpp_layout::cpp_table_record(self.store.as_ref(), &db_id, &bare)?
+            else {
+                return Ok(false);
+            };
+            let key = crate::cpp_layout::cpp_dropped_table_key(
+                &db_id,
+                &bare,
+                create_ts,
+                &table_id.to_string(),
+            );
+            self.stage(&[(key.into_bytes(), Some(Self::drop_marker_value()))])?;
             return Ok(true);
         }
         match self.get_table_by_name(name)? {
@@ -1154,6 +1223,16 @@ impl Catalog {
             // `db|1|next_table_id` *and* `db|2|next_table_id`, and
             // `catalog|db|default_db|{ts}` would end up carrying the second id.
             if !dbs.iter().any(|d| d == name) {
+                // `NewTxn::CreateDatabase` applies `IncrLatestID(next_database_id)`
+                // and writes the counter in the same transaction. The id is what
+                // keeps a **re-created** name apart from the record a `drop|db|…`
+                // marker still holds: reusing it would write the new record over
+                // the old key, and the marker would go on hiding the database.
+                let id = self.next_cpp_database_id()?;
+                self.stage(&[(
+                    infinity_storage::catalog_format::NEXT_DATABASE_ID.as_bytes().to_vec(),
+                    Some(id.to_string().into_bytes()),
+                )])?;
                 dbs.push(name.to_string());
             }
             self.rewrite_cpp(&dbs, &self.cpp_tables()?, &self.cpp_indexes()?)?;
@@ -1180,6 +1259,62 @@ impl Catalog {
         Ok(())
     }
 
+    /// Stages one write into the open capture, or applies it at once when there
+    /// is none (a checkpoint or an import path without a DDL transaction).
+    ///
+    /// The write joins the capture's **view** as well: a statement that writes
+    /// a counter and then reads it back (a `CREATE DATABASE` bumping
+    /// `next_database_id` before its layout rewrite) must see its own write,
+    /// not the value the store had when the statement started.
+    pub(crate) fn stage(&self, items: &[BatchItem]) -> Result<()> {
+        let mut slot = self.capture.lock().unwrap();
+        match slot.as_mut() {
+            Some(capture) => {
+                for (key, value) in items {
+                    capture.view.insert(key.clone(), value.clone());
+                }
+                capture.batch.extend(items.iter().cloned());
+                Ok(())
+            }
+            None => self.store.atomic_batch(items),
+        }
+    }
+
+    /// The value a `drop|…` marker carries: the commit ts of the transaction
+    /// that deprecated the object.
+    fn drop_marker_value() -> Vec<u8> {
+        DDL_TS_SENTINEL.to_string().into_bytes()
+    }
+
+    /// `(db_id, bare table name)` for a qualified table name.
+    fn db_and_bare_name(&self, table: &str) -> Result<(String, String)> {
+        let (db_name, bare) = match table.split_once('.') {
+            Some((db, bare)) => (db.to_string(), bare.to_string()),
+            None => (self.cpp_databases()?.first().cloned().unwrap_or_else(|| "default_db".into()), table.to_string()),
+        };
+        let db_id = self
+            .database_id_of_name(&db_name)?
+            .unwrap_or(1)
+            .to_string();
+        Ok((db_id, bare))
+    }
+
+    /// Writes the two system tags a C++-written directory always carries
+    /// (`NewCatalog::Init`): the catalog version and the database counter. Both
+    /// only when absent - a directory that already has them keeps its values.
+    pub fn init_cpp_key_space(&self) -> Result<()> {
+        use infinity_storage::catalog_format::{CATALOG_VERSION, META_VERSION, NEXT_DATABASE_ID};
+        if self.store.get(META_VERSION.as_bytes())?.is_none() {
+            self.store
+                .put(META_VERSION.as_bytes(), CATALOG_VERSION.as_bytes())?;
+        }
+        if self.store.get(NEXT_DATABASE_ID.as_bytes())?.is_none() {
+            self.store.put(NEXT_DATABASE_ID.as_bytes(), b"0")?;
+        }
+        self.store.flush()?;
+        Ok(())
+    }
+
     /// The id `CREATE DATABASE` hands out next: the stored counter + 1
     /// (`IncrLatestID(db_id_str, NEXT_DATABASE_ID)`).
     pub fn next_database_id(&self) -> Result<u64> {
@@ -1189,6 +1324,35 @@ impl Catalog {
             .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
             .unwrap_or(0)
             + 1)
+    }
+
+    /// The same for the C++ key space: `IncrLatestID(NEXT_DATABASE_ID)`, which
+    /// is the stored counter + 1 (`NewTxn::CreateDatabase`).
+    ///
+    /// The counter is the authority (`NewCatalog::Init` writes it on the first
+    /// open). A directory that predates it - one this port wrote before the
+    /// counter existed - starts from the highest recorded id instead.
+    fn next_cpp_database_id(&self) -> Result<u64> {
+        let counter = match self
+            .store
+            .get(NEXT_DATABASE_ID_KEY)?
+            .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+        {
+            Some(counter) => counter,
+            // No counter (a directory this port wrote before it existed, or a
+            // catalog driven without `init_cpp_key_space`): the ids in use are
+            // the recorded ones plus the id `default_db` is implied to have -
+            // it is the first database, and `db_id_of` numbers it by position.
+            None => self
+                .store
+                .scan_prefix(b"catalog|db|")?
+                .into_iter()
+                .filter_map(|(_, v)| String::from_utf8_lossy(&v).parse::<u64>().ok())
+                .max()
+                .unwrap_or(0)
+                .max(self.cpp_databases()?.len() as u64),
+        };
+        Ok(counter + 1)
     }
 
     /// Every recorded database with its id, in name order.
@@ -1204,6 +1368,13 @@ impl Catalog {
 
     /// The id of `name`; `None` when the database has no record.
     pub fn database_id_of_name(&self, name: &str) -> Result<Option<u64>> {
+        if self.cpp_only {
+            // The C++ key space keeps the id in the record's value, and that is
+            // what names the `db_{id}` directory - including for a database
+            // that was dropped and created again (the dropped record is still
+            // there, so the newest one is the live id).
+            return Ok(crate::cpp_layout::cpp_db_record(self.store.as_ref(), name)?.map(|(id, _)| id));
+        }
         Ok(self
             .store
             .get(&db_key(name))?
@@ -1219,36 +1390,45 @@ impl Catalog {
     /// already existing.
     pub fn has_database_record(&self, name: &str) -> Result<bool> {
         if self.cpp_only {
-            return Ok(self.cpp_database_records()?.iter().any(|d| d == name));
+            // A record a `drop|db|…` marker deprecated is not a database:
+            // `CatalogMeta::GetDBMeta` reports the name as gone and only
+            // `Cleanup` takes the record away.
+            let Some((id, ts)) = crate::cpp_layout::cpp_db_record(self.store.as_ref(), name)?
+            else {
+                return Ok(false);
+            };
+            let marker = crate::cpp_layout::cpp_dropped_db_key(name, ts, &id.to_string());
+            return Ok(self.store.get(marker.as_bytes())?.is_none());
         }
         Ok(self.store.get(&db_key(name))?.is_some())
     }
 
     /// Removes a database registration. `if_exists` tolerates a missing name.
+    ///
+    /// Like [`Self::drop_table`] this is a marker in the C++ key space:
+    /// `NewTxn::PrepareCommitDropDB` writes
+    /// `drop|db|{name}/{create_ts}/{db_id}` and `CatalogMeta::GetDBMeta` reports
+    /// the name as gone. The database's tables are **not** touched here — the
+    /// reference's cleanup walks them (`NewCatalog::CleanDB`) and removes the
+    /// records and files.
     pub fn drop_database(&self, name: &str, if_exists: bool) -> Result<bool> {
         if self.cpp_only {
-            let mut dbs = self.cpp_databases()?;
-            let existed = self.cpp_database_records()?.iter().any(|d| d == name);
-            dbs.retain(|d| d != name);
-            if !existed && !if_exists {
-                return Err(Error::Catalog(format!("database '{name}' does not exist")));
+            if !self.has_database_record(name)? {
+                return if if_exists {
+                    Ok(false)
+                } else {
+                    Err(Error::Catalog(format!("database '{name}' does not exist")))
+                };
             }
-            if existed {
-                let prefix = format!("{name}.");
-                let tables: Vec<TableMeta> = self
-                    .cpp_tables()?
-                    .into_iter()
-                    .filter(|t| !t.name.starts_with(&prefix))
-                    .collect();
-                let tables_names: Vec<&str> = tables.iter().map(|t| t.name.as_str()).collect();
-                let indexes: Vec<IndexMeta> = self
-                    .cpp_indexes()?
-                    .into_iter()
-                    .filter(|i| tables_names.contains(&i.table.as_str()))
-                    .collect();
-                self.rewrite_cpp(&dbs, &tables, &indexes)?;
-            }
-            return Ok(existed);
+            let Some((db_id, create_ts)) =
+                crate::cpp_layout::cpp_db_record(self.store.as_ref(), name)?
+            else {
+                return Ok(false);
+            };
+            let key =
+                crate::cpp_layout::cpp_dropped_db_key(name, create_ts, &db_id.to_string());
+            self.stage(&[(key.into_bytes(), Some(Self::drop_marker_value()))])?;
+            return Ok(true);
         }
         let key = db_key(name);
         let existed = self.store.get(&key)?.is_some();
@@ -1294,15 +1474,48 @@ impl Catalog {
         options: &[(String, String)],
     ) -> Result<IndexMeta> {
         // Per-table index ids start at 1 and are never reused.
-        let short = table.split('.').next_back().unwrap_or(table);
-        let id = self
-            .list_indexes()?
-            .iter()
-            .filter(|i| i.table == table || i.table == short)
-            .map(|i| i.id)
-            .max()
-            .map_or(1, |v| v + 1);
+        let id = if self.cpp_only {
+            self.next_cpp_index_id(table)?
+        } else {
+            let short = table.split('.').next_back().unwrap_or(table);
+            self.list_indexes()?
+                .iter()
+                .filter(|i| i.table == table || i.table == short)
+                .map(|i| i.id)
+                .max()
+                .map_or(1, |v| v + 1)
+        };
         self.create_index_typed_with_id(name, table, column, index_type, options, id)
+    }
+
+    /// `TableMeta::GetNextIndexID`: the table's `next_index_id` tag, incremented
+    /// and stored, and the new value is the id the index gets.
+    ///
+    /// The counter is what keeps the ids monotonic: `DROP INDEX` only writes a
+    /// marker and leaves the index's records in place, so deriving the next id
+    /// from the *live* indexes would hand the dropped index's id to the new one -
+    /// which then inherits the old record's key, and with it the drop marker.
+    fn next_cpp_index_id(&self, table: &str) -> Result<u64> {
+        let (db_id, bare) = self.db_and_bare_name(table)?;
+        let Some((table_id, _)) =
+            crate::cpp_layout::cpp_table_record(self.store.as_ref(), &db_id, &bare)?
+        else {
+            return Ok(1);
+        };
+        let tag = infinity_storage::catalog_format::catalog_table_tag_key(
+            &db_id,
+            &table_id.to_string(),
+            "next_index_id",
+        );
+        let previous = self
+            .with_view(|store| store.get(tag.as_bytes()))?
+            .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+            .unwrap_or(0);
+        let id = previous + 1;
+        // The layout rewrite below re-reads this tag and keeps the larger value,
+        // so staging it is what makes the counter survive the rewrite.
+        self.stage(&[(tag.into_bytes(), Some(id.to_string().into_bytes()))])?;
+        Ok(id)
     }
 
     /// Creates an index under a **given** id.
@@ -1363,15 +1576,72 @@ impl Catalog {
 
     /// Drops every index named `name` (the plain `DROP INDEX name` statement
     /// has no table qualifier).
+    ///
+    /// A marker, like the other drops: `NewTxn::DropIndexByName` leaves
+    /// `catalog|idx|…` and the index's chunk records alone and writes
+    /// `drop|idx|{db}/{table}/{name}/{create_ts}/{index_id}`; the reference's
+    /// cleanup removes both.
     pub fn drop_index(&self, name: &str) -> Result<bool> {
         if self.cpp_only {
-            let mut indexes = self.cpp_indexes()?;
-            let before = indexes.len();
-            indexes.retain(|i| i.name != name);
-            if indexes.len() == before {
+            let mut staged: Vec<BatchItem> = Vec::new();
+            for def in crate::cpp_layout::read_cpp_indexes(self.store.as_ref())?
+                .iter()
+                .filter(|d| d.base.index_name == name)
+            {
+                let (Some((db_id, table_id)), Some(index_id)) = (def.owner.clone(), def.index_id)
+                else {
+                    continue;
+                };
+                let Some((_, create_ts)) = crate::cpp_layout::cpp_index_record(
+                    self.store.as_ref(),
+                    &db_id,
+                    &table_id,
+                    name,
+                )?
+                else {
+                    continue;
+                };
+                let key = crate::cpp_layout::cpp_dropped_index_key(
+                    &db_id,
+                    &table_id,
+                    name,
+                    create_ts,
+                    &index_id.to_string(),
+                );
+                staged.push((key.into_bytes(), Some(Self::drop_marker_value())));
+            }
+            // An index whose target is an expression has no `IndexBase` and
+            // therefore no `catalog|idx|` record to mark: its name lives in the
+            // table's `rust_name_only_indexes` tag, so dropping it means taking
+            // it out of that list.
+            for table in crate::cpp_layout::read_cpp_layout(self.store.as_ref())? {
+                let tag = infinity_storage::catalog_format::catalog_table_tag_key(
+                    &table.db_id.to_string(),
+                    &table.table_id.to_string(),
+                    "rust_name_only_indexes",
+                );
+                let Some(bytes) = self.store.get(tag.as_bytes())? else {
+                    continue;
+                };
+                let text = String::from_utf8_lossy(&bytes).to_string();
+                let names: Vec<&str> = text.split(',').filter(|n| !n.is_empty()).collect();
+                if !names.contains(&name) {
+                    continue;
+                }
+                let kept: Vec<&str> = names.into_iter().filter(|n| *n != name).collect();
+                staged.push((
+                    tag.into_bytes(),
+                    if kept.is_empty() {
+                        None
+                    } else {
+                        Some(kept.join(",").into_bytes())
+                    },
+                ));
+            }
+            if staged.is_empty() {
                 return Ok(false);
             }
-            self.rewrite_cpp(&self.cpp_databases()?, &self.cpp_tables()?, &indexes)?;
+            self.stage(&staged)?;
             return Ok(true);
         }
         // The name is shared by every table that owns it, so all of its
@@ -1481,7 +1751,8 @@ mod tests {
         assert_eq!(reopened.list_tables().unwrap().len(), 1);
         assert_eq!(reopened.list_indexes().unwrap().len(), 1);
 
-        // Drops clean up the records, not just the in-memory view.
+        // A drop is a marker, exactly as in the reference: the name stops
+        // resolving, and the records it deprecated stay until `Cleanup`.
         assert!(reopened.drop_index("i1").unwrap());
         assert!(!reopened.drop_index("i1").unwrap());
         assert!(reopened.drop_table("db2.t").unwrap());
@@ -1490,8 +1761,33 @@ mod tests {
         assert_eq!(reopened.list_databases().unwrap(), vec!["default_db"]);
         assert!(reopened.list_tables().unwrap().is_empty());
         assert!(reopened.list_indexes().unwrap().is_empty());
-        assert!(store.scan_prefix(b"catalog|idx|").unwrap().is_empty());
-        assert!(store.scan_prefix(b"idx|").unwrap().is_empty());
+        assert!(
+            !store.scan_prefix(b"drop|idx|").unwrap().is_empty()
+                && !store.scan_prefix(b"drop|tbl|").unwrap().is_empty()
+                && !store.scan_prefix(b"drop|db|").unwrap().is_empty(),
+            "each drop wrote its marker"
+        );
+        assert!(
+            !store.scan_prefix(b"catalog|idx|").unwrap().is_empty(),
+            "the deprecated records stay until Cleanup"
+        );
+        // ... and a **later** rewrite must not sweep them away: the records a
+        // marker owns are still part of the directory the reference reads.
+        let before: Vec<Vec<u8>> = ["catalog|tbl|", "tbl|", "tbl|col|", "catalog|idx|"]
+            .iter()
+            .flat_map(|p| store.scan_prefix(p.as_bytes()).unwrap())
+            .map(|(k, _)| k)
+            .collect();
+        assert!(!before.is_empty(), "the dropped records are in the store");
+        reopened.create_database("db3", false).unwrap();
+        reopened.rewrite_cpp_layout(store.as_ref()).unwrap();
+        for key in &before {
+            assert!(
+                store.get(key).unwrap().is_some(),
+                "a layout rewrite deleted a deprecated record: {}",
+                String::from_utf8_lossy(key)
+            );
+        }
     }
 
     #[test]

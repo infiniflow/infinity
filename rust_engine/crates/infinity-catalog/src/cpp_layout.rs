@@ -825,9 +825,17 @@ impl Catalog {
         // that already exists keeps its timestamp; a record this DDL creates
         // gets the placeholder the caller replaces with the transaction's
         // commit timestamp.
-        let ts_of = |prefix: &str| -> Result<Option<u64>> {
+        // The timestamp a record keeps, but only for the **same** entity: a
+        // re-created name has a new id, so the dropped record's ts belongs to a
+        // different instance and must not be reused - reusing it would write
+        // the new record over the old key and leave `Cleanup` deleting a live
+        // table.
+        let ts_of_id = |prefix: &str, id: &str| -> Result<Option<u64>> {
             let mut newest = None;
-            for (k, _) in ts_source.scan_prefix(prefix.as_bytes())? {
+            for (k, v) in ts_source.scan_prefix(prefix.as_bytes())? {
+                if String::from_utf8_lossy(&v) != id {
+                    continue;
+                }
                 let text = String::from_utf8_lossy(&k).to_string();
                 if let Some(ts) = text.rsplit('|').next().and_then(|t| t.parse::<u64>().ok()) {
                     newest = Some(newest.map_or(ts, |n: u64| n.max(ts)));
@@ -841,25 +849,87 @@ impl Catalog {
         // directory `db_{db_id}`), so the first database is 1, not 0.
         // The id the database was created with, as `CREATE DATABASE` recorded
         // it; a database the caller only implied falls back to its position.
+        //
+        // The record is authoritative: a name that was dropped and created
+        // again must not fall back to a position, which the dropped record
+        // (kept until `Cleanup`) would still be holding.
         let db_id_of = |name: &str| -> u64 {
+            let records = |store: &dyn MetaStore| -> Vec<(u64, u64)> {
+                store
+                    .scan_prefix(format!("catalog|db|{name}|").as_bytes())
+                    .map(|rows| {
+                        rows.into_iter()
+                            .filter_map(|(k, v)| {
+                                let ts = String::from_utf8_lossy(&k)
+                                    .rsplit('|')
+                                    .next()?
+                                    .parse::<u64>()
+                                    .ok()?;
+                                let id = String::from_utf8_lossy(&v).parse::<u64>().ok()?;
+                                (id > 0).then_some((ts, id))
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            };
+            // Only a record a `drop|db|…` marker does **not** deprecate names
+            // the live database: a re-created name has to take the id the
+            // counter hands out, not the dropped record's, or the new record
+            // lands on the old key and the old marker keeps hiding it.
+            let newest_live = |store: &dyn MetaStore| -> Option<u64> {
+                records(store)
+                    .into_iter()
+                    .filter(|(ts, id)| {
+                        !is_dropped(
+                            store,
+                            &crate::cpp_layout::cpp_dropped_db_key(name, *ts, &id.to_string()),
+                        )
+                        .unwrap_or(false)
+                    })
+                    .max()
+                    .map(|(_, id)| id)
+            };
+            // The native `db:{name}` tag is the id `CREATE DATABASE` recorded
+            // (native catalogs only), then the live record, then the counter
+            // (`CREATE DATABASE` bumps it before the rewrite, so a name whose
+            // records are all deprecated is the one it just re-created), then
+            // the position.
+            let counter = |store: &dyn MetaStore| -> Option<u64> {
+                store
+                    .get(b"next_database_id")
+                    .ok()
+                    .flatten()
+                    .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+            };
+            let any_record = !records(ts_source).is_empty() || !records(store).is_empty();
             ts_source
                 .get(format!("db:{name}").as_bytes())
                 .ok()
                 .flatten()
                 .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
                 .filter(|id| *id > 0)
+                .or_else(|| newest_live(ts_source))
+                .or_else(|| newest_live(store))
+                .or_else(|| counter(ts_source).filter(|_| any_record))
                 .unwrap_or_else(|| dbs.iter().position(|d| d == name).unwrap_or(0) as u64 + 1)
         };
 
         for db in dbs.iter() {
-            let ts = ts_of(&format!("catalog|db|{db}|"))?.unwrap_or(crate::DDL_TS_SENTINEL);
             let db_str = db_id_of(db).to_string();
+            let ts = ts_of_id(&format!("catalog|db|{db}|"), &db_str)?
+                .unwrap_or(crate::DDL_TS_SENTINEL);
             // The counter is **per database** and monotonic
             // (`TableMeta::next_table_id_`): a `DROP TABLE` must not rewind it,
             // or the next table reuses the dropped table's id and its block
             // directory. Keep the larger of what the store already had and what
             // the surviving tables imply.
-            let previous: u64 = store
+            //
+            // Read through `ts_source`, not the sink this layout is being
+            // recorded into: the tag was written by an earlier transaction, and
+            // the sink is empty. (Reading the sink reset the counter to the live
+            // tables on every rewrite, so dropping the newest table handed its
+            // id out again.)
+            let previous: u64 = ts_source
                 .get(key::catalog_db_tag_key(&db_str, "next_table_id").as_bytes())?
                 .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
                 .unwrap_or(0);
@@ -869,7 +939,10 @@ impl Catalog {
                 .map(|t| t.id)
                 .max()
                 .map_or(0, |id| id + 1);
-            let next_table_id = previous.max(surviving).max(1);
+            // `DBMeta::InitSet` starts the tag at "0" (`SetNextTableID("0")`)
+            // and `GetNextTableID` hands that value out, so an empty database's
+            // first table is **0**, not 1.
+            let next_table_id = previous.max(surviving);
             store.put(key::catalog_db_key(db, ts).as_bytes(), db_str.as_bytes())?;
             store.put(
                 key::catalog_db_tag_key(&db_str, "next_table_id").as_bytes(),
@@ -891,13 +964,31 @@ impl Catalog {
             let db_str = db_id.to_string();
             let tbl_str = t.id.to_string();
             let name = table_of(&t.name);
-            let ts =
-                ts_of(&format!("catalog|tbl|{db_str}|{name}|"))?.unwrap_or(crate::DDL_TS_SENTINEL);
+            let ts = ts_of_id(&format!("catalog|tbl|{db_str}|{name}|"), &tbl_str)?
+                .unwrap_or(crate::DDL_TS_SENTINEL);
 
             store.put(
                 key::catalog_table_key(&db_str, name, ts).as_bytes(),
                 tbl_str.as_bytes(),
             )?;
+            // `next_index_id` is the **last** id handed out
+            // (`TableMeta::GetNextIndexID` increments and returns the new
+            // value), and it has to survive a rewrite: `DROP INDEX` keeps the
+            // index's records, so an index re-created under the old id would
+            // inherit the dropped record's key - and its marker.
+            let counter_tag =
+                key::catalog_table_tag_key(&db_str, &tbl_str, "next_index_id");
+            let previous_index_id: u64 = ts_source
+                .get(counter_tag.as_bytes())?
+                .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+                .unwrap_or(0);
+            let live_index_max = indexes
+                .iter()
+                .filter(|i| i.table == t.name || table_of(&i.table) == name)
+                .map(|i| i.id)
+                .max()
+                .unwrap_or(0);
+            let next_index_id = previous_index_id.max(live_index_max);
             for (tag, value) in [
                 // The next id to hand out; dropping a column leaves a hole.
                 (
@@ -905,10 +996,12 @@ impl Catalog {
                     t.ids.iter().copied().max().map_or(0, |v| v + 1),
                 ),
                 ("next_segment_id", 0),
-                ("unsealed_segment_id", 0),
-                // `next_index_id` starts at 0 (`table_meta_impl.cpp:281-282`);
-                // the C++ reader takes it as the next id to hand out.
-                ("next_index_id", 0),
+                // `unsealed_segment_id` is **not** a creation-time tag: the
+                // reference writes it when a segment is opened for appends and
+                // removes it when the segment is sealed
+                // (`NewTxn::SetSealedSegment`), so a table that never took a row
+                // does not have it. `write_cpp_segments` writes it below.
+                ("next_index_id", next_index_id),
             ] {
                 store.put(
                     key::catalog_table_tag_key(&db_str, &tbl_str, tag).as_bytes(),
@@ -977,13 +1070,14 @@ impl Catalog {
             // after the table tags so the real `next_segment_id` /
             // `unsealed_segment_id` replace the 0 defaults above.
             //
-            // Match on the table id alone and re-key the set to this layout's
-            // database id: the publisher derives its db id from the engine's
-            // 1-based numbering while the layout numbers databases from 0, and
-            // a mismatch here meant no set was ever found - the sweep below
-            // deletes every `catalog|` key, so the segment records were dropped
-            // on every checkpoint and the reference saw a segmentless table.
-            if let Some(set) = segments.iter().find(|s| s.table_id == t.id.to_string()) {
+            // Table ids are **per database**, so two databases can hold a table
+            // with the same id: the set has to be matched on both, or `d2.x`
+            // would be handed `default_db.kb`'s segment layer.
+            let table_id_str = t.id.to_string();
+            let set = segments
+                .iter()
+                .find(|s| s.db_id == db_id.to_string() && s.table_id == table_id_str);
+            if let Some(set) = set {
                 let mut set = set.clone();
                 set.db_id = db_id.to_string();
                 written += write_cpp_segments(store, &set)?;
@@ -1017,37 +1111,27 @@ impl Catalog {
                     .position(|o| o.name == im.name)
                     .map_or(1, |p| p + 1) as u64
             };
+            let index_str = index_id.to_string();
             store.put(
                 key::catalog_index_key(
                     db_str,
                     tbl_str,
                     &im.name,
-                    ts_of(&format!("catalog|idx|{db_str}|{tbl_str}|{}|", im.name))?
-                        .unwrap_or(crate::DDL_TS_SENTINEL),
+                    ts_of_id(
+                        &format!("catalog|idx|{db_str}|{tbl_str}|{}|", im.name),
+                        &index_str,
+                    )?
+                    .unwrap_or(crate::DDL_TS_SENTINEL),
                 )
                 .as_bytes(),
-                index_id.to_string().as_bytes(),
+                index_str.as_bytes(),
             )?;
             store.put(
-                key::catalog_index_tag_key(db_str, tbl_str, &index_id.to_string(), "index_base")
+                key::catalog_index_tag_key(db_str, tbl_str, &index_str, "index_base")
                     .as_bytes(),
                 &value_format::index_def_bytes(&def),
             )?;
             written += 2;
-        }
-        // Record how many ids each table handed out.
-        for (db_str, tbl_str, _, cpp) in &resolved {
-            let count = indexes
-                .iter()
-                .filter(|o| table_of(&o.table) == cpp.table_name && db_of(&o.table) == cpp.db_name)
-                .count();
-            if count > 0 {
-                // The C++ tag holds the last id handed out, and ids are 1-based.
-                store.put(
-                    key::catalog_table_tag_key(db_str, tbl_str, "next_index_id").as_bytes(),
-                    count.to_string().as_bytes(),
-                )?;
-            }
         }
         // An index whose target is an expression this engine does not
         // materialise (`CREATE INDEX … (c1 + 5)`) has an **empty** `column`, so
@@ -1209,17 +1293,36 @@ impl Catalog {
 }
 
 /// Reads a C++-layout catalog back, one entry per table.
+///
+/// A name resolves to its **newest** record - the reference picks the record
+/// with the highest `commit_ts` at or below the reader's begin ts
+/// (`DBMeta::GetTableID`, `CatalogMeta::GetDBMeta`) - and is then checked
+/// against its `drop|…` marker. Both halves matter: `DROP` leaves the record in
+/// place, so a re-created name has two records and only the marker says which
+/// one is live.
 pub fn read_cpp_layout(store: &dyn MetaStore) -> Result<Vec<CppTable>> {
-    let mut dbs: Vec<(u64, String)> = Vec::new();
-    // `catalog|db|` - note `catalog_db_prefix("")` would emit a doubled pipe.
+    // `catalog|db|{name}|{ts}` -> the id, newest ts per name. Note
+    // `catalog_db_prefix("")` would emit a doubled pipe.
+    let mut newest_db: std::collections::HashMap<String, (u64, u64)> =
+        std::collections::HashMap::new();
     for (k, v) in store.scan_prefix(b"catalog|db|")? {
         let key = String::from_utf8_lossy(&k).to_string();
-        // `catalog|db|{name}|{ts}` -> the name may itself contain '|', so take
-        // the last two fields off the right.
+        // The name may itself contain '|', so take the last two fields off the
+        // right.
         let mut it = key.rsplitn(3, '|');
-        let _ts = it.next();
+        let ts = it.next().and_then(|t| t.parse::<u64>().ok()).unwrap_or(0);
         let name = it.next().unwrap_or_default().to_string();
         let id = String::from_utf8_lossy(&v).parse().unwrap_or(0);
+        let slot = newest_db.entry(name).or_insert((0, 0));
+        if ts >= slot.0 {
+            *slot = (ts, id);
+        }
+    }
+    let mut dbs: Vec<(u64, String)> = Vec::new();
+    for (name, (ts, id)) in newest_db {
+        if is_dropped(store, &cpp_dropped_db_key(&name, ts, &id.to_string()))? {
+            continue;
+        }
         dbs.push((id, name));
     }
     dbs.sort();
@@ -1227,15 +1330,39 @@ pub fn read_cpp_layout(store: &dyn MetaStore) -> Result<Vec<CppTable>> {
     let mut out = Vec::new();
     for (db_id, db_name) in &dbs {
         let prefix = key::catalog_db_table_prefix(&db_id.to_string());
+        // `catalog|tbl|{db_id}|{name}|{ts}` -> `(ts, id)`, newest per name.
+        let mut newest_table: std::collections::HashMap<String, (u64, u64)> =
+            std::collections::HashMap::new();
         for (k, v) in store.scan_prefix(prefix.as_bytes())? {
             let key = String::from_utf8_lossy(&k).to_string();
             let mut it = key.rsplitn(2, '|');
-            let _ts = it.next();
+            let ts = it.next().and_then(|t| t.parse::<u64>().ok()).unwrap_or(0);
             let rest = it.next().unwrap_or_default().to_string();
             // `catalog|tbl|{db_id}|{table_name}` - the name is the 4th field.
             let table_name = rest.splitn(4, '|').nth(3).unwrap_or_default().to_string();
             let table_id: u64 = String::from_utf8_lossy(&v).parse().unwrap_or(0);
-
+            let slot = newest_table.entry(table_name).or_insert((0, 0));
+            if ts >= slot.0 {
+                *slot = (ts, table_id);
+            }
+        }
+        let mut names: Vec<(String, u64, u64)> = newest_table
+            .into_iter()
+            .map(|(name, (ts, id))| (name, ts, id))
+            .collect();
+        names.sort();
+        for (table_name, ts, table_id) in names {
+            if is_dropped(
+                store,
+                &cpp_dropped_table_key(
+                    &db_id.to_string(),
+                    &table_name,
+                    ts,
+                    &table_id.to_string(),
+                ),
+            )? {
+                continue;
+            }
             let mut columns = Vec::new();
             let col_prefix = key::table_column_prefix(&db_id.to_string(), &table_id.to_string());
             for (_, cv) in store.scan_prefix(col_prefix.as_bytes())? {
@@ -1270,23 +1397,53 @@ pub fn read_cpp_layout(store: &dyn MetaStore) -> Result<Vec<CppTable>> {
 
 /// Reads back the index records written by [`Catalog::write_cpp_layout`]:
 /// every `idx|…|index_base` tag, decoded.
+///
+/// A name resolves to its newest record and is checked against its
+/// `drop|idx|…` marker, the way `DBMeta::GetIndexID` resolves it; `DROP INDEX`
+/// leaves both records in place until `Cleanup`.
 pub fn read_cpp_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
-    let mut out = Vec::new();
+    // `catalog|idx|{db}|{tbl}|{name}|{ts}` -> `(ts, id)`, newest per name.
+    let mut newest: std::collections::HashMap<(String, String, String), (u64, String)> =
+        std::collections::HashMap::new();
     for (k, v) in store.scan_prefix(b"catalog|idx|")? {
         let key = String::from_utf8_lossy(&k).to_string();
-        // `catalog|idx|{db}|{tbl}|{name}|{ts}` - six fields. The value is the
-        // numeric index id that locates the `index_base` tag.
+        // Six fields: the value is the numeric index id that locates the
+        // `index_base` tag.
         let fields: Vec<&str> = key.split('|').collect();
         if fields.len() != 6 {
             continue;
         }
+        let Ok(ts) = fields[5].parse::<u64>() else {
+            continue;
+        };
         let index_id = String::from_utf8_lossy(&v).to_string();
-        let tag = key::catalog_index_tag_key(fields[2], fields[3], &index_id, "index_base");
+        let slot = newest
+            .entry((
+                fields[2].to_string(),
+                fields[3].to_string(),
+                fields[4].to_string(),
+            ))
+            .or_insert((0, String::new()));
+        if ts >= slot.0 {
+            *slot = (ts, index_id);
+        }
+    }
+    let mut names: Vec<((String, String, String), (u64, String))> = newest.into_iter().collect();
+    names.sort();
+    let mut out = Vec::new();
+    for ((db_id, table_id, index_name), (ts, index_id)) in names {
+        if is_dropped(
+            store,
+            &cpp_dropped_index_key(&db_id, &table_id, &index_name, ts, &index_id),
+        )? {
+            continue;
+        }
+        let tag = key::catalog_index_tag_key(&db_id, &table_id, &index_id, "index_base");
         if let Some(bytes) = store.get(tag.as_bytes())? {
             if let Some(mut def) = value_format::index_def_from_bytes(&bytes) {
                 // The record's key names the table the index belongs to; the
                 // index base does not.
-                def.owner = Some((fields[2].to_string(), fields[3].to_string()));
+                def.owner = Some((db_id, table_id));
                 // The record's value is the id the reference handed out; it
                 // names the index's directory and records, so it has to
                 // survive the round trip.
@@ -1409,6 +1566,198 @@ pub fn cpp_dropped_index_segment_key(
     segment_id: u32,
 ) -> String {
     format!("drop|idx_seg|{db_id}/{table_id}/{index_id}/{segment_id}")
+}
+
+/// `drop|db|{name}/{create_ts}/{db_id}` — the commit ts at which
+/// `DROP DATABASE` deprecated the database (`NewTxn::PrepareCommitDropDB` ->
+/// `KeyEncode::DropDBKey`).
+///
+/// The marker is the **whole** drop: the reference leaves `catalog|db|…` and
+/// every record below it in place and only writes this key, which is what makes
+/// `CatalogMeta::GetDBMeta` report the database as gone. `Cleanup` deletes the
+/// marker and the records it deprecated, in that order, so a directory that
+/// crashed between the two is still readable.
+pub fn cpp_dropped_db_key(db_name: &str, create_ts: u64, db_id: &str) -> String {
+    format!("drop|db|{db_name}/{create_ts}/{db_id}")
+}
+
+/// `drop|tbl|{db}/{name}/{create_ts}/{table_id}` — the same for a table
+/// (`NewTxn::PrepareCommitDropTable`; `DBMeta::GetTableID` consults it after
+/// resolving the name to its newest `catalog|tbl|…` record).
+pub fn cpp_dropped_table_key(
+    db_id: &str,
+    table_name: &str,
+    create_ts: u64,
+    table_id: &str,
+) -> String {
+    format!("drop|tbl|{db_id}/{table_name}/{create_ts}/{table_id}")
+}
+
+/// `drop|idx|{db}/{table}/{name}/{create_ts}/{index_id}` — the same for an
+/// index (`NewTxn::ReplayDropIndex`).
+pub fn cpp_dropped_index_key(
+    db_id: &str,
+    table_id: &str,
+    index_name: &str,
+    create_ts: u64,
+    index_id: &str,
+) -> String {
+    format!("drop|idx|{db_id}/{table_id}/{index_name}/{create_ts}/{index_id}")
+}
+
+/// Whether `key` (a `drop|…` record) is present.
+fn is_dropped(store: &dyn MetaStore, key: &str) -> Result<bool> {
+    Ok(store.get(key.as_bytes())?.is_some())
+}
+
+/// The newest `catalog|tbl|{db}/{name}/{ts}` record of a table:
+/// `(table_id, create_ts)`. Ignoring the drop markers is deliberate - a `DROP`
+/// needs the record it is about to deprecate.
+pub fn cpp_table_record(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_name: &str,
+) -> Result<Option<(u64, u64)>> {
+    let mut newest: Option<(u64, u64)> = None;
+    for (k, v) in store.scan_prefix(key::catalog_table_prefix(db_id, table_name).as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let ts = key
+            .rsplit('|')
+            .next()
+            .and_then(|t| t.parse::<u64>().ok())
+            .unwrap_or(0);
+        let id = String::from_utf8_lossy(&v).parse().unwrap_or(0);
+        if newest.is_none_or(|(_, t)| ts >= t) {
+            newest = Some((id, ts));
+        }
+    }
+    Ok(newest)
+}
+
+/// The newest `catalog|db|{name}/{ts}` record: `(db_id, create_ts)`.
+pub fn cpp_db_record(store: &dyn MetaStore, db_name: &str) -> Result<Option<(u64, u64)>> {
+    let mut newest: Option<(u64, u64)> = None;
+    for (k, v) in store.scan_prefix(key::catalog_db_prefix(db_name).as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let ts = key
+            .rsplit('|')
+            .next()
+            .and_then(|t| t.parse::<u64>().ok())
+            .unwrap_or(0);
+        let id = String::from_utf8_lossy(&v).parse().unwrap_or(0);
+        if newest.is_none_or(|(_, t)| ts >= t) {
+            newest = Some((id, ts));
+        }
+    }
+    Ok(newest)
+}
+
+/// The newest `catalog|idx|{db}/{table}/{name}/{ts}` record:
+/// `(index_id, create_ts)`.
+pub fn cpp_index_record(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_id: &str,
+    index_name: &str,
+) -> Result<Option<(u64, u64)>> {
+    let prefix = format!("catalog|idx|{db_id}|{table_id}|{index_name}|");
+    let mut newest: Option<(u64, u64)> = None;
+    for (k, v) in store.scan_prefix(prefix.as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let ts = key
+            .rsplit('|')
+            .next()
+            .and_then(|t| t.parse::<u64>().ok())
+            .unwrap_or(0);
+        let id = String::from_utf8_lossy(&v).parse().unwrap_or(0);
+        if newest.is_none_or(|(_, t)| ts >= t) {
+            newest = Some((id, ts));
+        }
+    }
+    Ok(newest)
+}
+
+/// `drop|{kind}|…` records, split into their fields: `(kind, fields)`, where
+/// `fields` are the `/`-separated parts after the kind.
+fn dropped_records(store: &dyn MetaStore) -> Result<Vec<(String, Vec<String>)>> {
+    let mut out = Vec::new();
+    for (k, _) in store.scan_prefix(b"drop|")? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let mut fields = key.split('|');
+        if fields.next() != Some("drop") {
+            continue;
+        }
+        let Some(kind) = fields.next() else { continue };
+        let Some(rest) = fields.next() else { continue };
+        out.push((
+            kind.to_string(),
+            rest.split('/').map(str::to_string).collect(),
+        ));
+    }
+    Ok(out)
+}
+
+/// The catalog keys a layout rewrite must **not** delete: every record that a
+/// `drop|…` marker has deprecated and `Cleanup` has not reclaimed yet.
+///
+/// `DROP DATABASE`/`DROP TABLE`/`DROP INDEX` write only a marker (that is the
+/// whole transaction in the reference), so the records they deprecate stay in
+/// the store and a reader resolves the name, then consults the marker. A DDL
+/// that republishes the layout in between — `DROP TABLE t; CREATE TABLE t` is
+/// the everyday case — sweeps `catalog|`/`tbl|`/`col|`/`idx|` and would delete
+/// exactly those records, so the sweep has to know they are still owned.
+pub fn dropped_record_prefixes(store: &dyn MetaStore) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    for (kind, f) in dropped_records(store)? {
+        match (kind.as_str(), f.len()) {
+            ("db", 3) => {
+                let (name, ts, id) = (&f[0], &f[1], &f[2]);
+                out.push(format!("catalog|db|{name}|{ts}"));
+                out.push(format!("db|{id}|"));
+                out.extend(
+                    [
+                        "catalog|tbl|",
+                        "tbl|col|",
+                        "col|",
+                        "tbl|",
+                        "catalog|seg|",
+                        "catalog|blk|",
+                        "catalog|idx|",
+                        "idx|",
+                    ]
+                    .iter()
+                    .map(|p| format!("{p}{id}|")),
+                );
+            }
+            ("tbl", 4) => {
+                let (db, name, ts, id) = (&f[0], &f[1], &f[2], &f[3]);
+                out.push(format!("catalog|tbl|{db}|{name}|{ts}"));
+                out.extend(
+                    [
+                        "tbl|col|",
+                        "col|",
+                        "tbl|",
+                        "catalog|seg|",
+                        "catalog|blk|",
+                        "catalog|idx|",
+                        "idx|",
+                    ]
+                    .iter()
+                    .map(|p| format!("{p}{db}|{id}|")),
+                );
+            }
+            ("idx", 5) => {
+                let (db, table, name, ts, id) = (&f[0], &f[1], &f[2], &f[3], &f[4]);
+                out.push(format!("catalog|idx|{db}|{table}|{name}|{ts}"));
+                out.push(format!("idx|{db}|{table}|{id}|"));
+            }
+            // `drop|seg|`/`drop|idx_seg|` deprecate a segment whose records a
+            // layout rewrite already carries over (`read_cpp_segments`); the
+            // other kinds are not written by this port.
+            _ => {}
+        }
+    }
+    Ok(out)
 }
 
 /// Records `segments` as deprecated at `ts`, for the table and for each of its
@@ -2023,11 +2372,15 @@ fn sparse_store_of(column_type: &Json) -> Option<SparseStore> {
     let Json::Obj(fields) = column_type else {
         return None;
     };
-    let sparse = fields.iter().find(|(k, _)| k == "sparse_type")?.1.clone();
-    let Json::Obj(sparse) = sparse else {
+    // `DataType::Serialize()` nests `SparseInfo::Serialize()` under `type_info`
+    // (`{"data_type":…,"type_info":{"data_type":…,"dimension":…,"index_type":…,
+    // "sort":0|1}}`), so the hint is `type_info.sort` - only a sparse type has
+    // one.
+    let info = fields.iter().find(|(k, _)| k == "type_info")?.1.clone();
+    let Json::Obj(info) = info else {
         return None;
     };
-    let sort = sparse.iter().find(|(k, _)| k == "sort")?.1.clone();
+    let sort = info.iter().find(|(k, _)| k == "sort")?.1.clone();
     let sort = match sort {
         Json::Int(v) => v,
         Json::Uint(v) => v as i64,

@@ -338,7 +338,19 @@ def test_the_fast_rough_filters_match_byte_for_byte():
 
 
 def _phase_catalog_keys(conn):
-    """The smallest workload that touches every catalog record family."""
+    """The smallest workload that touches every catalog record family.
+
+    It ends with one drop of each kind, because a **drop is a marker** in the
+    reference: `DROP TABLE`/`DROP INDEX`/`DROP DATABASE` write `drop|tbl|…`,
+    `drop|idx|…`, `drop|db|…` and leave every record they deprecated in place
+    until `Cleanup` (`NewTxn::PrepareCommitDropTable`, `DropIndexByName`,
+    `PrepareCommitDropDB`). The catalog of a directory that has dropped
+    something is therefore *larger* than the live schema, and both engines must
+    agree on the whole of it - markers included, values included.
+
+    Cleanup is off in this harness (`cleanup_interval = 0`), so nothing is
+    reclaimed between the seed and the dump.
+    """
     db = conn.get_database("default_db")
     db.drop_table("kb", ConflictType.Ignore)
     t = db.create_table(
@@ -355,15 +367,47 @@ def _phase_catalog_keys(conn):
     )
     t.delete("id = 2")
 
+    # `drop|tbl|…`: a table that held a row, so its records, its segment layer
+    # and its block mirror all have to survive the drop untouched. The flush is
+    # what materialises the port's block mirror - the reference writes the
+    # segment layer at insert time, the port at a checkpoint - so the seed
+    # flushes before the drop and both engines hold the same layer to preserve.
+    gone = db.create_table("gone", {"id": {"type": "int"}}, ConflictType.Error)
+    gone.insert([{"id": 1}])
+    conn.flush_data()
+    db.drop_table("gone", ConflictType.Error)
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "the port's catalog still holds four keys the reference does not "
-        "(`__counter:table`, `db:<name>`, `tbl:<id>`, `tblname:<db>.<tbl>`) and "
-        "a separate row store under persistence/; see PORTING.md §3.1"
-    ),
-)
+    # `drop|db|…`: a database that held a table. The session has to be back on
+    # `default_db` first - the reference refuses to drop the database it is
+    # using (3033).
+    conn.create_database("d2")
+    d2 = conn.get_database("d2")
+    d2.create_table("x", {"id": {"type": "int"}}, ConflictType.Error)
+    conn.get_database("default_db")
+    conn.drop_database("d2")
+    # A checkpoint is what makes the reference's catalog durable: its writes
+    # reach RocksDB through the checkpoint, not on every commit.
+    conn.flush_data()
+
+
+def _seed_catalog_keys(engine, root, pg_port):
+    """Seed a directory and leave its catalog on disk.
+
+    The seed ends with `flush_data()`: a checkpoint is what writes the
+    reference's catalog through to RocksDB, so a directory that was merely
+    killed would be compared half-written.
+
+    It is retried when nothing landed: the reference answers Thrift before its
+    storage leaves the admin role, and DDLs that arrive in that window go into a
+    catalog the engine then throws away.
+    """
+    for _ in range(3):
+        _run_engine(engine, root, pg_port, seed=_phase_catalog_keys, graceful=True)
+        if len(_raw_catalog_hex(root)) >= 3:
+            return
+    raise AssertionError(f"{engine}: the seed never reached the catalog")
+
+
 @pytest.mark.skipif(
     not os.access(CPP_BIN, os.X_OK), reason=f"{CPP_BIN} is not executable"
 )
@@ -373,15 +417,16 @@ def _phase_catalog_keys(conn):
 def test_the_catalog_key_set_and_values_match_exactly():
     """The catalog holds **exactly** the reference's keys, with equal values.
 
-    Not "the records we know about match" - the whole key space. A key the port
-    writes and the reference does not (its own bookkeeping) is as much a
+    Not "the records we know about match" - the whole key space, in both
+    directions: a key the port writes and the reference does not (its own
+    bookkeeping, or a marker written at the wrong moment) is as much a
     divergence as a value that differs, because a directory must be readable by
     either engine and hold nothing the reference would not have written.
     """
     cpp_root = os.path.join(ROOT, "catalog_keys_cpp")
     rust_root = os.path.join(ROOT, "catalog_keys_rust")
-    _run_engine("cpp", cpp_root, 5432, seed=_phase_catalog_keys)
-    _run_engine("rust", rust_root, 5433, seed=_phase_catalog_keys)
+    _seed_catalog_keys("cpp", cpp_root, 5432)
+    _seed_catalog_keys("rust", rust_root, 5433)
 
     cpp = _raw_catalog_hex(cpp_root)
     rust = _raw_catalog_hex(rust_root)

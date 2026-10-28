@@ -131,7 +131,7 @@ impl Txn {
         self.writes.len() + self.deletes.len()
     }
     pub fn is_empty(&self) -> bool {
-        self.writes.is_empty() && self.deletes.is_empty()
+        self.writes.is_empty() && self.deletes.is_empty() && self.typed_commands.is_empty()
     }
 }
 
@@ -756,6 +756,28 @@ impl TxnManager {
     /// Each record is decoded through [`WalEntryIterator::make`] and its typed
     /// commands are applied. Idempotent: re-applying is safe.
     pub fn recover(&self, checkpoint_ts: TxnTimeStamp) -> Result<usize> {
+        let mut appends = Vec::new();
+        let mut deletes = Vec::new();
+        self.recover_into(checkpoint_ts, checkpoint_ts, &mut appends, &mut deletes)
+    }
+
+    /// [`Self::recover`], with the two row commands handed back instead of being
+    /// written to the KV store.
+    ///
+    /// The engine keeps its rows in the blocks, not in `row:` keys: an append
+    /// that never reached a block is applied by the caller (`AppendInBlock`),
+    /// and a delete marks the block's `version`. `block_floor` is how far the
+    /// block files already go (the newest ts they carry), which is a *different*
+    /// boundary from `checkpoint_ts` - the store's applied mark is written
+    /// before the bottom half runs, so a crash in between leaves a commit the
+    /// KV has and the block has not.
+    pub fn recover_into(
+        &self,
+        checkpoint_ts: TxnTimeStamp,
+        block_floor: TxnTimeStamp,
+        appends: &mut Vec<ReplayedAppend>,
+        deletes: &mut Vec<ReplayedDelete>,
+    ) -> Result<usize> {
         let mut applied = 0;
         for path in segment_paths(&self.wal_path)? {
             let mut iter = WalEntryIterator::make(&path, false)?;
@@ -763,7 +785,9 @@ impl TxnManager {
                 let Some(entry) = iter.next() else {
                     break; // torn / corrupt tail
                 };
-                if entry.commit_ts <= checkpoint_ts {
+                let for_kv = entry.commit_ts > checkpoint_ts;
+                let for_blocks = entry.commit_ts > block_floor;
+                if !for_kv && !for_blocks {
                     continue;
                 }
                 let mut writes = Vec::new();
@@ -775,27 +799,44 @@ impl TxnManager {
                             row_ranges,
                             block,
                             ..
-                        } => writes.extend(
-                            append_writes(db_name, table_name, row_ranges, block)?
-                                .into_iter()
-                                .map(|(k, v)| (k, Some(v))),
-                        ),
+                        } => {
+                            // Rows live in the block, never in a `row:` key.
+                            if for_blocks {
+                                appends.push(ReplayedAppend {
+                                    table: join_table(db_name, table_name),
+                                    commit_ts: entry.commit_ts,
+                                    rows: append_rows(db_name, table_name, row_ranges, block)?,
+                                });
+                            }
+                        }
                         WalCmd::Delete {
                             db_name,
                             table_name,
                             row_ids,
                             ..
-                        } => writes.extend(
-                            delete_writes(db_name, table_name, row_ids)
-                                .into_iter()
-                                .map(|(k, v)| (k, Some(v))),
-                        ),
+                        } => {
+                            // The tombstone is the block's `version`; the KV
+                            // keeps no `del:` key.
+                            if for_blocks {
+                                deletes.push(ReplayedDelete {
+                                    table: join_table(db_name, table_name),
+                                    commit_ts: entry.commit_ts,
+                                    row_ids: row_ids.iter().map(|id| id.to_u64()).collect(),
+                                });
+                            }
+                        }
                         WalCmd::KvBatch {
                             kind: KvBatchKind::Delete,
                             writes: batch,
-                        } => writes.extend(batch.iter().map(|(k, _)| (k.clone(), None))),
+                        } => {
+                            if for_kv {
+                                writes.extend(batch.iter().map(|(k, _)| (k.clone(), None)));
+                            }
+                        }
                         WalCmd::KvBatch { writes: batch, .. } => {
-                            writes.extend(batch.iter().cloned().map(|(k, v)| (k, Some(v))))
+                            if for_kv {
+                                writes.extend(batch.iter().cloned().map(|(k, v)| (k, Some(v))))
+                            }
                         }
                         WalCmd::Checkpoint { .. } => {}
                         other => {
@@ -809,15 +850,17 @@ impl TxnManager {
                             // directory the reference had just written
                             // unopenable ("cannot replay typed command
                             // CreateDatabaseV2 without the executor"). Only the
-                            // row commands above have to reach the KV store.
+                            // row commands above have to reach the storage.
                             let _ = other.command_type();
                         }
                     }
                 }
-                writes.push((
-                    APPLIED_TS_KEY.to_vec(),
-                    Some(entry.commit_ts.to_le_bytes().to_vec()),
-                ));
+                if for_kv {
+                    writes.push((
+                        APPLIED_TS_KEY.to_vec(),
+                        Some(entry.commit_ts.to_le_bytes().to_vec()),
+                    ));
+                }
                 apply_split(self.store.as_ref(), self.catalog_store.as_ref(), writes)?;
                 self.max_applied
                     .fetch_max(entry.commit_ts, Ordering::SeqCst);
@@ -1295,29 +1338,56 @@ fn build_append(
     }
 }
 
-/// Replay of [`WalCmd::Append`]: row keys and their stored row text.
-fn append_writes(
-    db_name: &str,
-    table_name: &str,
+/// An append the WAL recorded but the block files do not have yet.
+#[derive(Debug, Clone)]
+pub struct ReplayedAppend {
+    /// Qualified table name (`db.tbl`, or `tbl` when the log has no db part).
+    pub table: String,
+    /// The transaction's commit ts, which is the `create` the block's
+    /// `version` has to carry (`BlockVersion::Append`).
+    pub commit_ts: TxnTimeStamp,
+    /// `(row id, stored row text)` per row of the frame's block.
+    pub rows: Vec<(u64, String)>,
+}
+
+/// A delete the WAL recorded that the block's `version` does not mark yet.
+#[derive(Debug, Clone)]
+pub struct ReplayedDelete {
+    pub table: String,
+    pub commit_ts: TxnTimeStamp,
+    pub row_ids: Vec<u64>,
+}
+
+/// Replay of [`WalCmd::Append`]: `(row id, stored row text)` per row, which the
+/// caller writes into the block (`AppendInBlock`).
+fn append_rows(
+    _db_name: &str,
+    _table_name: &str,
     row_ranges: &[(WalRowId, u64)],
     block: &[infinity_storage::wal::block::BlockColumn],
-) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let block = infinity_storage::wal::block::to_data_block(block).ok_or_else(|| {
-        Error::Wal("append command carries a block this build cannot replay".into())
-    })?;
+) -> Result<Vec<(u64, String)>> {
+    // A block holding a column this build's `DataBlock` cannot represent (a
+    // multi-vector, a tensor) has no rows to hand back here: the rows live in
+    // the segment's block files, which the checkpoint wrote, and refusing the
+    // frame would make the directory unopenable.
+    let Some(block) = infinity_storage::wal::block::to_data_block(block) else {
+        return Ok(Vec::new());
+    };
     let block = &block;
-    let table = join_table(db_name, table_name);
     let mut out = Vec::new();
     let mut row = 0usize;
     for (base, count) in row_ranges {
         let base_seq = base.to_u64();
         for offset in 0..*count {
+            // A column the encoder could not give a value for makes the row
+            // unreadable here; the block the checkpoint wrote still holds it,
+            // so the replay skips it rather than refusing to open the
+            // directory.
             let Some(text) = row_text(block, row) else {
-                return Err(Error::Wal(format!(
-                    "append command for {table} is missing row {row} of its block"
-                )));
+                row += 1;
+                continue;
             };
-            out.push((row_key(&table, base_seq + offset), text.into_bytes()));
+            out.push((base_seq + offset, text));
             row += 1;
         }
     }
@@ -1333,9 +1403,21 @@ fn append_writes(
 /// reference's `WalCmdAppendV2` carries the table's real typed columns instead
 /// (`DataBlock::WriteAdv`), so they have to be rendered back.
 fn row_text(block: &DataBlock, row: usize) -> Option<String> {
+    // A table whose columns carry no per-row scalar (a multi-vector) reports a
+    // zero row count; the row still has to come back, so the bound only applies
+    // when the block does count rows.
+    if block.row_count() > 0 && row >= block.row_count() {
+        return None;
+    }
     let mut cells = Vec::with_capacity(block.column_count());
     for column in 0..block.column_count() {
-        cells.push(cell_text(&block.get_value(column, row)?));
+        // Inside the block a missing value is a NULL slot (`BlockValue::Null`
+        // is the encoder's own marker, the decoder reports the slot as absent),
+        // and the stored text of a NULL row is the literal `null`.
+        cells.push(match block.get_value(column, row) {
+            Some(value) => cell_text(&value),
+            None => "null".to_string(),
+        });
     }
     Some(cells.join("\t"))
 }

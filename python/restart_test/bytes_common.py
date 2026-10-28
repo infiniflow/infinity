@@ -308,7 +308,9 @@ def _seed(conn, row_count=ROWS):
     time.sleep(2)
 
 
-def _run_engine(engine, root, pg_port, row_count=ROWS, seed=None, quota="2GB"):
+def _run_engine(
+    engine, root, pg_port, row_count=ROWS, seed=None, quota="2GB", graceful=False
+):
     """Seed one engine's directory, retrying a boot that dies during init.
 
     The Thrift server accepts connections before storage finishes initialising,
@@ -316,11 +318,19 @@ def _run_engine(engine, root, pg_port, row_count=ROWS, seed=None, quota="2GB"):
     bytes"). That is a startup race, not a format difference, so a boot that
     dies before the seed completes is retried once on a clean directory; a real
     crash fails both attempts and is reported.
+
+    `graceful` stops the engine with `SIGTERM` and waits for it to exit. The
+    reference's catalog writes are **not** flushed on every commit (its own
+    transactional WAL is what carries them), so a `SIGKILL`ed reference
+    directory holds only the last checkpointed catalog - a catalog comparison
+    has to let it close.
     """
     last = None
     for _ in range(2):
         try:
-            return _boot_and_seed(engine, root, pg_port, row_count, seed, quota)
+            return _boot_and_seed(
+                engine, root, pg_port, row_count, seed, quota, graceful
+            )
         except AssertionError as err:
             last = err
             _wait_port_free()
@@ -328,14 +338,14 @@ def _run_engine(engine, root, pg_port, row_count=ROWS, seed=None, quota="2GB"):
     raise last
 
 
-def _boot_and_seed(engine, root, pg_port, row_count, seed, quota):
+def _boot_and_seed(engine, root, pg_port, row_count, seed, quota, graceful=False):
     # The engines bind a fixed port without `SO_REUSEADDR`; a previous engine
     # (or anything else on the machine) still holding it makes this one abort
     # with "Could not bind: Address already in use".
     _wait_port_free()
     shutil.rmtree(root, ignore_errors=True)
     _write_config(engine, root, pg_port, quota)
-    _spawn_and_run(engine, root, seed or (lambda c: _seed(c, row_count)))
+    _spawn_and_run(engine, root, seed or (lambda c: _seed(c, row_count)), graceful)
 
 
 def _write_config(engine, root, pg_port, quota="2GB"):
@@ -345,7 +355,7 @@ def _write_config(engine, root, pg_port, quota="2GB"):
         handle.write(_config(root, engine, pg_port, quota))
 
 
-def _run_phases(engine, root, pg_port, phases, quota="2GB"):
+def _run_phases(engine, root, pg_port, phases, quota="2GB", graceful=False):
     """Run each phase in its own engine process, over the same directory.
 
     A phase is just a callable taking the connection; whether it ends with
@@ -354,16 +364,18 @@ def _run_phases(engine, root, pg_port, phases, quota="2GB"):
 
     `quota` is passed to `_config`; see there for why a ts-comparing test
     disables the background dump.
+
+    `graceful` stops each phase's engine with `SIGTERM`; see [`_run_engine`].
     """
     _wait_port_free()
     shutil.rmtree(root, ignore_errors=True)
     _write_config(engine, root, pg_port, quota)
     for seed in phases:
-        _spawn_and_run(engine, root, seed)
+        _spawn_and_run(engine, root, seed, graceful)
     return root
 
 
-def _spawn_and_run(engine, root, seed):
+def _spawn_and_run(engine, root, seed, graceful=False):
     config = os.path.join(root, "engine.toml")
     if engine == "rust":
         # The port's CLI takes the root as the parent of `persistence_dir`, so
@@ -382,6 +394,7 @@ def _spawn_and_run(engine, root, seed):
         # Its own process group, so the whole group can be killed below.
         start_new_session=True,
     )
+    pgid = proc.pid
     conn = None
     try:
         for _ in range(120):
@@ -417,7 +430,20 @@ def _spawn_and_run(engine, root, seed):
         # killing only the shim would orphan the engine, which would keep
         # holding the port and make the next engine abort on startup.
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            if graceful:
+                # Let the engine close: the reference's catalog is flushed on
+                # shutdown, not on every commit. `pgid` is captured at spawn
+                # time - the shim may already be gone while its child still
+                # runs, and `os.getpgid` would then fail.
+                os.killpg(pgid, signal.SIGTERM)
+                try:
+                    proc.wait(timeout=60)
+                except subprocess.TimeoutExpired:
+                    pass
+        except (ProcessLookupError, PermissionError):
+            pass
+        try:
+            os.killpg(pgid, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
             pass
         try:

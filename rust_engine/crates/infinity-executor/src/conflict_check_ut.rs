@@ -14,7 +14,7 @@ use tempfile::tempdir;
 
 fn expect_conflict(e: &Engine, table: &str, seqs: &[usize], txn: Txn) {
     assert!(matches!(
-        e.commit_with_deletes(table, seqs, 0, txn),
+        e.commit_with_deletes(table, seqs, 0, &[], txn),
         Err(Error::TxnConflict(_))
     ));
 }
@@ -53,7 +53,7 @@ fn conflict_check_delete() {
         let txn2 = delete_row(&[seq_of[0]]);
         let txn3 = delete_row(&[seq_of[0]]);
 
-        e.commit_with_deletes(table, &[seq_of[0]], 0, txn1).unwrap();
+        e.commit_with_deletes(table, &[seq_of[0]], 0, &[], txn1).unwrap();
         expect_conflict(&e, table, &[seq_of[0]], txn2);
         expect_conflict(&e, table, &[seq_of[0]], txn3);
         assert_eq!(e.row_count(table).unwrap(), 9);
@@ -63,7 +63,7 @@ fn conflict_check_delete() {
         let txn2 = delete_row(&[seq_of[1]]);
         let txn3 = delete_row(&[seq_of[1]]);
 
-        e.commit_with_deletes(table, &[seq_of[1]], 0, txn2).unwrap();
+        e.commit_with_deletes(table, &[seq_of[1]], 0, &[], txn2).unwrap();
         expect_conflict(&e, table, &[seq_of[1]], txn1);
         expect_conflict(&e, table, &[seq_of[1]], txn3);
         assert_eq!(e.row_count(table).unwrap(), 8);
@@ -73,7 +73,7 @@ fn conflict_check_delete() {
         let txn2 = delete_row(&[seq_of[2]]);
         let txn3 = delete_row(&[seq_of[2]]);
 
-        e.commit_with_deletes(table, &[seq_of[2]], 0, txn3).unwrap();
+        e.commit_with_deletes(table, &[seq_of[2]], 0, &[], txn3).unwrap();
         expect_conflict(&e, table, &[seq_of[2]], txn2);
         expect_conflict(&e, table, &[seq_of[2]], txn1);
         assert_eq!(e.row_count(table).unwrap(), 7);
@@ -82,7 +82,7 @@ fn conflict_check_delete() {
         let txn1 = delete_row(&[seq_of[3]]);
         let txn2 = delete_row(&[seq_of[3], seq_of[4]]);
 
-        e.commit_with_deletes(table, &[seq_of[3]], 0, txn1).unwrap();
+        e.commit_with_deletes(table, &[seq_of[3]], 0, &[], txn1).unwrap();
         expect_conflict(&e, table, &[seq_of[3], seq_of[4]], txn2);
         assert_eq!(e.row_count(table).unwrap(), 6);
     }
@@ -90,7 +90,7 @@ fn conflict_check_delete() {
         let txn1 = delete_row(&[seq_of[5], seq_of[6]]);
         let txn2 = delete_row(&[seq_of[5]]);
 
-        e.commit_with_deletes(table, &[seq_of[5], seq_of[6]], 0, txn1)
+        e.commit_with_deletes(table, &[seq_of[5], seq_of[6]], 0, &[], txn1)
             .unwrap();
         expect_conflict(&e, table, &[seq_of[5]], txn2);
         assert_eq!(e.row_count(table).unwrap(), 4);
