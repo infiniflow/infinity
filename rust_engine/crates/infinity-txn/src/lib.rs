@@ -659,6 +659,12 @@ impl TxnManager {
             .map(|info| info.begin_ts)
             .min()
             .unwrap_or(TxnTimeStamp::MAX);
+        // The key log `CleanupTxnBottomNolock` prunes too: a write older than
+        // every live transaction's snapshot can never conflict again.
+        self.write_ts
+            .lock()
+            .unwrap()
+            .retain(|_, ts| *ts >= oldest);
         let mut candidates = self.candidates.lock().unwrap();
         // A transaction that committed before the oldest live transaction began
         // can no longer conflict with anything (`CleanupTxnBottomNolock`,

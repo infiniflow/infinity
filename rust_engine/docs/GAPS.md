@@ -52,7 +52,6 @@ DUMP → `DumpMemIndex`，DDL 各自一种，快照 → `Snapshot`）。
 |---|---|---|---|---|
 | 读没有语句级快照 | 每条语句一个 `begin_ts` + RocksDB 快照，语句内看不到之后的提交 | 普通 SELECT 直接读最新已发布状态（读路径没有 ts 参数） | 一条 SELECT 执行期间别的语句提交的行会出现在结果里；跨语句不受影响（端口没有跨语句事务） | `new_txn_manager_impl.cpp:113`、`kv_store_impl.cpp:429-438`；`infinity-executor/src/lib.rs:14321-14332` |
 | 没有 `kv_commit_ts` | 冲突可见性按 KV 真正提交的时刻判，边界相等用 `last_kv_commit_ts` / `last_commit_ts` 消歧 | 端口的 KV 批就在提交里落（`apply_split`），`commit_ts` 即"KV 提交时刻"，那两个冻结值没有对应物 | 参考里"KV 提交与 commit_ts 不同步"的边界分支在端口不存在；候选可见性用 `finished && commit_ts < begin_ts` 表达同一件事 | `new_txn_manager_impl.cpp:776-825`；`infinity-txn/src/lib.rs:722-760` |
-| `write_ts` 不裁剪 | `check_txn_map_` 随最老 begin_ts 弹出 | 候选表已按同一规则裁剪；`write_ts`（未分类语句的键集兜底）仍只增不减 | 只有 `TxnOp::Other` 的语句会往里写，量很小；长期运行仍是无界增长 | `new_txn_manager_impl.cpp:669-694`；`infinity-txn/src/lib.rs:314` |
 | Optimize 不是事务 | `NewTxn::OptimizeIndex` 是写事务（占 ts、参与矩阵：Optimize-vs-Optimize 恒冲突、vs Append/Update 表级、vs Compact 段级） | 端口 `optimize_indexes` 只 bump `index_epoch` 并重写 chunk，不取 ts、不进候选表 | 并发的两次 optimize、optimize 与写入之间没有冲突保护（结果是内容级重建，不产生行错位） | `new_txn_impl.cpp:3949-4087`；`infinity-executor/src/lib.rs:20028-20037` |
 | Cleanup / Checkpoint 不进候选表 | 两者都是事务，`Cleanup` 与快照冲突 | `append_cleanup` / `append_checkpoint` 各自写帧并花 ts，但不经过 `commit_at`，因此不登记候选 | 快照与 cleanup 并发时没有 4002 | `new_txn_impl.cpp:4410-4466`、`:4536-4558`；`infinity-txn/src/lib.rs:1072-1136` |
 
