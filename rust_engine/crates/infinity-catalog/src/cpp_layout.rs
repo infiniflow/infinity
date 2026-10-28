@@ -2133,6 +2133,132 @@ pub fn read_cpp_index_chunks(
     Ok(out)
 }
 
+/// `drop|idx_chunk|{db}|{tbl}|{idx}|{seg}|{chunk}` (`KeyEncode::DropChunkIndexKey`,
+/// `kv_code_impl.cpp:287`): the marker a commit writes for each chunk an
+/// optimize superseded. `Cleanup` deletes the chunk file and only then the
+/// marker, so a crash in between leaves the chunk invisible instead of
+/// resurrecting it.
+pub fn drop_cpp_index_chunk_key(
+    db_id: &str,
+    table_id: &str,
+    index_id: &str,
+    segment_id: u32,
+    chunk_id: u64,
+) -> String {
+    format!("drop|idx_chunk|{db_id}|{table_id}|{index_id}|{segment_id}|{chunk_id}")
+}
+
+/// The prefix every marker of one segment index shares.
+pub fn drop_cpp_index_chunk_prefix(
+    db_id: &str,
+    table_id: &str,
+    index_id: &str,
+    segment_id: u32,
+) -> String {
+    format!("drop|idx_chunk|{db_id}|{table_id}|{index_id}|{segment_id}|")
+}
+
+/// Whatever an optimize merged away, in the reference's two steps: the chunk
+/// leaves the segment's chunk list now (`SegmentIndexMeta::RemoveChunkIDs`,
+/// `segment_index_meta_impl.cpp:109`) and its bytes are reclaimed by a later
+/// `Cleanup`. The marker `PrepareCommitDumpIndex`
+/// (`new_txn_index_impl.cpp:3043`) writes is what survives until then.
+pub fn deprecate_cpp_index_chunks(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_id: &str,
+    index_id: &str,
+    segment_id: u32,
+    chunk_ids: &[u32],
+    ts: u64,
+) -> Result<usize> {
+    let value = ts.to_string();
+    let mut written = 0usize;
+    for chunk_id in chunk_ids {
+        store.put(
+            drop_cpp_index_chunk_key(db_id, table_id, index_id, segment_id, u64::from(*chunk_id))
+                .as_bytes(),
+            value.as_bytes(),
+        )?;
+        store.delete(
+            key::catalog_index_chunk_key(db_id, table_id, index_id, segment_id, u64::from(*chunk_id))
+                .as_bytes(),
+        )?;
+        store.delete(
+            key::catalog_index_chunk_tag_key(
+                db_id,
+                table_id,
+                index_id,
+                segment_id,
+                u64::from(*chunk_id),
+                "chunk_info",
+            )
+            .as_bytes(),
+        )?;
+        written += 1;
+    }
+    Ok(written)
+}
+
+/// The chunk ids of one segment index that are deprecated but not reclaimed
+/// yet, read from the `drop|idx_chunk|…` markers.
+pub fn deprecated_cpp_index_chunks(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_id: &str,
+    index_id: &str,
+    segment_id: u32,
+) -> Result<Vec<u64>> {
+    let prefix = drop_cpp_index_chunk_prefix(db_id, table_id, index_id, segment_id);
+    let mut out = Vec::new();
+    for (key, _) in store.scan_prefix(prefix.as_bytes())? {
+        let text = String::from_utf8_lossy(&key).to_string();
+        if let Some(id) = text
+            .strip_prefix(&prefix)
+            .and_then(|suffix| suffix.parse::<u64>().ok())
+        {
+            out.push(id);
+        }
+    }
+    out.sort_unstable();
+    Ok(out)
+}
+
+/// Drops a deprecated chunk for good: its marker, its chunk-list entry and its
+/// `chunk_info`. The caller deletes the file first - a leftover file the
+/// reference still lists would be read as a chunk.
+pub fn reclaim_cpp_index_chunks(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_id: &str,
+    index_id: &str,
+    segment_id: u32,
+    chunk_ids: &[u64],
+) -> Result<usize> {
+    let mut reclaimed = 0usize;
+    for chunk_id in chunk_ids {
+        store.delete(
+            drop_cpp_index_chunk_key(db_id, table_id, index_id, segment_id, *chunk_id).as_bytes(),
+        )?;
+        store.delete(
+            key::catalog_index_chunk_key(db_id, table_id, index_id, segment_id, *chunk_id).as_bytes(),
+        )?;
+        store.delete(
+            key::catalog_index_chunk_tag_key(
+                db_id,
+                table_id,
+                index_id,
+                segment_id,
+                *chunk_id,
+                "chunk_info",
+            )
+            .as_bytes(),
+        )?;
+        reclaimed += 1;
+    }
+    Ok(reclaimed)
+}
+
 /// The commit ts of the transaction that created `index_id`
 /// (`catalog|idx|{db}|{table}|{name}|{ts}` → the index id).
 fn index_create_ts(

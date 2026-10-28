@@ -33,7 +33,11 @@ impl WalCmdCreateTableV2 {
         self.table_def.write_adv(out);
     }
 
-    pub fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
+    /// C++ `WalCmdCreateTableV2::ReadAdv`. The replay path builds the command
+    /// from `wal_ddl`'s parser, so only `wal_cmd`'s round-trip test calls this
+    /// decoder.
+    #[allow(dead_code)]
+    pub(crate) fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
         if r.u8()? != CREATE_TABLE_V2 {
             return Err(Error::Storage("not a CreateTableV2 command".into()));
         }
@@ -82,7 +86,7 @@ impl WalCmdCreateIndexV2 {
 mod tests {
     use super::*;
     use crate::wal::ddl_def::{
-        ColumnDef, ConstantExpr, DataType, EmbeddingDataType, LiteralType, LogicalType,
+        ColumnDef, ConstantExpr, DataType, EmbeddingDataType, LogicalType,
         SparseStoreType, TypeInfo,
     };
 
@@ -94,7 +98,7 @@ mod tests {
     }
 
     fn wdldl_table() -> TableDef {
-        let mut col = |id, lt, name: &str| ColumnDef {
+        let col = |id, lt, name: &str| ColumnDef {
             id,
             column_type: DataType::new(lt),
             name: name.into(),

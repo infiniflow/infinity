@@ -56,14 +56,6 @@ impl ColumnRecord {
             .to_string()
     }
 
-    fn data_type(&self) -> i8 {
-        as_i64(extract(&self.doc, ".column_type.data_type")).unwrap_or(36) as i8
-    }
-
-    fn type_info(&self, key: &str) -> Option<i64> {
-        as_i64(extract(&self.doc, &format!(".column_type.type_info.{key}")))
-    }
-
     pub fn to_column_def(&self) -> ColumnDef {
         ColumnDef {
             id: self.id(),

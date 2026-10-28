@@ -6,7 +6,7 @@
 //! transactions with overlapping delete sets. After each block the live row
 //! count drops by exactly the number of rows the winner deleted.
 
-use crate::{del_key, Engine};
+use crate::Engine;
 use infinity_common::Error;
 use infinity_expression::Value;
 use infinity_txn::Txn;

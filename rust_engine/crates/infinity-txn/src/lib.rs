@@ -270,13 +270,11 @@ pub struct TxnManager {
     /// `Delete` command (`WalCmdAppend::db_id_` / `table_id_`); a reader that
     /// resolves a table by id needs them, so an empty string is a real loss.
     table_ids: Mutex<HashMap<String, (String, String)>>,
-    wal_path: PathBuf,
     /// `wal/wal.log`: the **active** log the reference reads. It carries the
     /// transaction records and, after a checkpoint, the `kNewCheckpoint` frame
     /// the checkpoint wrote into the fresh file (the swap keeps the previous
-    /// records in `wal.log.<seal_ts>`). Same file as [`Self::wal_path`]; kept
-    /// apart for the two call sites' intent.
-    checkpoint_path: PathBuf,
+    /// records in `wal.log.<seal_ts>`).
+    wal_path: PathBuf,
     /// `WalManager::last_swap_wal_ts_`: the seal timestamp of the last swap, so
     /// a checkpoint with nothing new does not rotate an empty log.
     last_swap: AtomicU64,
@@ -421,7 +419,6 @@ impl TxnManager {
         // directory written by an older build of this engine also keeps its
         // records in `wal.rust`; `segment_paths` still reads that.
         let wal_path = wal_path.into();
-        let checkpoint_path = wal_path.clone();
         let recs = read_all_segments(&wal_path)?;
         let applied_ts = store
             .get(APPLIED_TS_KEY)?
@@ -456,7 +453,6 @@ impl TxnManager {
             table_ids: Mutex::new(HashMap::new()),
             wal: WalWriter::start(wal),
             wal_path,
-            checkpoint_path,
             last_swap: AtomicU64::new(0),
             next_txn_id: AtomicU64::new(max_id + 1),
             // A checkpoint may have truncated the WAL, so the applied marker in
@@ -1872,15 +1868,6 @@ fn cell_text(value: &BlockValue) -> String {
         BlockValue::Json(v) => v.compact(),
         BlockValue::RowId(v) => format!("{}:{}", v.segment_id, v.segment_offset),
     }
-}
-
-/// Replay of [`WalCmd::Delete`]: the tombstones the commit wrote.
-fn delete_writes(db_name: &str, table_name: &str, row_ids: &[WalRowId]) -> Vec<(Vec<u8>, Vec<u8>)> {
-    let table = join_table(db_name, table_name);
-    row_ids
-        .iter()
-        .map(|row_id| (del_key(&table, row_id.to_u64()), b"1".to_vec()))
-        .collect()
 }
 
 /// Keys a WAL entry wrote, used to rebuild the conflict state on open.

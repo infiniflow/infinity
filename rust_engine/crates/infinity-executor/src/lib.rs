@@ -48,6 +48,7 @@ use crate::query_builder::QueryNode;
 mod deferred_catalog;
 mod scheduler;
 mod dependent;
+mod porter;
 mod explain;
 
 #[cfg(test)]
@@ -3416,11 +3417,39 @@ struct TextTokenizer {
     /// The analyzer the index was created with, when it is not one of the
     /// families `delims` already reproduces.
     analyzer: Option<String>,
+    /// `standard-<language>`: the stemmer that replaces the English default.
+    /// `None` for plain `standard` and for a suffix the reference does not
+    /// know, both of which keep `STEM_LANG_ENGLISH`.
+    stemmer: Option<analyzer::Stemmer>,
 }
 
 impl TextTokenizer {
     fn new(delims: Option<Vec<char>>, analyzer: Option<String>) -> Self {
-        Self { delims, analyzer }
+        Self {
+            delims,
+            analyzer,
+            stemmer: None,
+        }
+    }
+
+    /// The `standard` analyzer this column tokenises with: the English default,
+    /// or - for `standard-<language>` - that language's stemmer with
+    /// `AnalyzerPool::GetAnalyzer`'s `standard` tokenizer config (divides
+    /// `@#$`, unites `/`).
+    fn standard(&self, stem_only: bool) -> analyzer::StandardAnalyzer {
+        let mut analyzer = analyzer::StandardAnalyzer::new();
+        match self.stemmer {
+            Some(stemmer) => {
+                let mut config = analyzer::TokenizeConfig::default();
+                config.add_divides("@#$");
+                config.add_unites("/");
+                analyzer.set_tokenizer_config(config);
+                analyzer.init_stemmer(stemmer);
+            }
+            None => analyzer.init_stemmer_english(),
+        }
+        analyzer.set_stem_only(stem_only);
+        analyzer
     }
 
     /// A `keyword` / `whitespace` field splits only on its delimiters and
@@ -8187,7 +8216,7 @@ impl Engine {
     /// Attaches the `BottomExecutor` the reference keeps in `Storage`
     /// (`wal_manager_impl.cpp:92`): commits then run their bottom half on a
     /// worker, sharded by table id.
-    pub fn attach_bottom_executor(
+    pub(crate) fn attach_bottom_executor(
         self: &Arc<Self>,
         executor: Arc<infinity_storage::wal::bottom_executor::BottomExecutor<BottomWork>>,
     ) {
@@ -8265,7 +8294,7 @@ impl Engine {
     }
 
     /// Attaches the full-text appender (`Storage::mem_index_appender`).
-    pub fn attach_mem_index_appender(self: &Arc<Self>, appender: Arc<MemIndexAppender>) {
+    pub(crate) fn attach_mem_index_appender(self: &Arc<Self>, appender: Arc<MemIndexAppender>) {
         self.install_engine_handle();
         *self.mem_index_appender.lock().unwrap() = Some(appender);
     }
@@ -9094,27 +9123,6 @@ impl Engine {
             entry.deleted_ids = Some(self.load_id_log(&deletes_key(&tkey)));
         }
         entry.deleted_ids.clone().unwrap_or_default()
-    }
-
-    /// Records deleted rows, so the next block mirror marks their slots in
-    /// `deleted_` instead of dropping them (the reference keeps a deleted
-    /// row's cells in the block and hides it with the version file).
-    fn note_deletes(&self, table: &str, ids: &[usize]) {
-        if ids.is_empty() {
-            return;
-        }
-        let mut log = self.deleted_ids(table);
-        log.extend(ids.iter().map(|s| *s as u64));
-        let tkey = self.table_key(table);
-        {
-            let mut tables = self.tables.lock().unwrap();
-            let entry = tables.entry(tkey.clone()).or_default();
-            entry.deleted_ids = Some(log.clone());
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
-        }
-        self.write_mirror_dirty(&tkey);
-        let _ = self.write_id_log(&deletes_key(&tkey), &log);
     }
 
     /// Records deleted row ids **in memory** only.
@@ -15953,7 +15961,6 @@ impl Engine {
                         .map(|(_, dim, _)| dim)
                         .unwrap_or(0);
                     let mut subspaces = 1usize;
-                    let mut bits = 8u32;
                     for (k, v) in opts {
                         if k.eq_ignore_ascii_case("pq_subspace_num") {
                             subspaces = v.trim().parse().unwrap_or(0);
@@ -15963,7 +15970,7 @@ impl Engine {
                                 ));
                             }
                         } else if k.eq_ignore_ascii_case("pq_subspace_bits") {
-                            bits = v.trim().parse().unwrap_or(0);
+                            let bits: u32 = v.trim().parse().unwrap_or(0);
                             if bits != 8 && bits != 16 {
                                 return Err(Error::Invalid(
                                     "Invalid index parameter type: pq_subspace_bits".into(),
@@ -16066,10 +16073,32 @@ impl Engine {
     /// `index_delims` derives plus the analyzer the index was created with.
     /// C++: `AnalyzerPool::GetAnalyzer` handed to the column's inverter.
     fn index_tokenizer(&self, table: &str, column: &str) -> TextTokenizer {
-        TextTokenizer::new(
+        let mut tokenizer = TextTokenizer::new(
             self.index_delims(table, column),
             self.index_analyzer(table, column),
-        )
+        );
+        tokenizer.stemmer = self.index_stemmer(table, column);
+        tokenizer
+    }
+
+    /// The stemmer of a `standard-<language>` column, when the suffix selects
+    /// something other than the English default (which `standard` itself and
+    /// every unknown suffix keep, like the reference's if-chain).
+    fn index_stemmer(&self, table: &str, column: &str) -> Option<analyzer::Stemmer> {
+        let key = self.table_key(table);
+        let name = {
+            let guard = self.tables.lock().unwrap();
+            guard.get(&key)?.analyzers.get(column)?.clone()
+        };
+        let analyzer::AnalyzerName::Standard { language } =
+            analyzer::parse_analyzer_name(&name).ok()?
+        else {
+            return None;
+        };
+        match analyzer::standard_stemmer(language) {
+            analyzer::Stemmer::Snowball(rust_stemmers::Algorithm::English) => None,
+            stemmer => Some(stemmer),
+        }
     }
 
     /// The analyzer name a column was indexed with, when it is a family the
@@ -21201,10 +21230,12 @@ fn tokenize_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
     // — so the `None` (standard) case stems English and drops the word form.
     // `keyword`/`whitespace`(±chars) do not.
     if delims.is_none() {
-        let mut analyzer = analyzer::StandardAnalyzer::new();
-        analyzer.init_stemmer_english();
-        analyzer.set_stem_only(true);
-        return analyzer.analyze(s).into_iter().map(|t| t.text).collect();
+        return tokenizer
+            .standard(true)
+            .analyze(s)
+            .into_iter()
+            .map(|t| t.text)
+            .collect();
     }
     split_words(s, delims)
 }
@@ -21228,9 +21259,12 @@ fn tokenize_index_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
     if delims.is_some() {
         return split_words(s, delims);
     }
-    let mut analyzer = analyzer::StandardAnalyzer::new();
-    analyzer.init_stemmer_english();
-    analyzer.analyze(s).into_iter().map(|t| t.text).collect()
+    tokenizer
+        .standard(false)
+        .analyze(s)
+        .into_iter()
+        .map(|t| t.text)
+        .collect()
 }
 
 /// Index-side tokens **with their position**. The C++ analyzer emits a token's
@@ -21253,9 +21287,8 @@ fn tokenize_index_positions(s: &str, tokenizer: &TextTokenizer) -> Vec<(String, 
             .map(|(pos, word)| (word, pos as u32))
             .collect();
     }
-    let mut analyzer = analyzer::StandardAnalyzer::new();
-    analyzer.init_stemmer_english();
-    analyzer
+    tokenizer
+        .standard(false)
         .analyze(s)
         .into_iter()
         .map(|t| (t.text, t.word_offset))
@@ -26840,6 +26873,51 @@ mod tests {
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].labels.len(), 4);
 
+        // The superseded chunks are out of the chunk list but their bytes are
+        // still on disk: the reference's `RemoveChunkIDs` runs inside the
+        // commit and `PrepareCommitDumpIndex` leaves one `drop|idx_chunk|…`
+        // marker per id; `Cleanup` is what deletes the files.
+        let chunk_dir = e.cpp_hnsw_dir("ot", "ot_i").unwrap();
+        assert!(
+            chunk_dir.join("chunk_0.idx").is_file() && chunk_dir.join("chunk_1.idx").is_file(),
+            "the merge must not delete the chunks it superseded"
+        );
+        let store = e.storage.catalog.store().clone();
+        let db_id = e.database_id_of("ot").to_string();
+        let table_id = e
+            .storage
+            .catalog
+            .get_table_by_name("default_db.ot")
+            .unwrap()
+            .unwrap()
+            .id
+            .to_string();
+        let index_id = e
+            .cpp_index_position("default_db.ot", "ot_i")
+            .unwrap()
+            .to_string();
+        assert_eq!(
+            infinity_catalog::cpp_layout::deprecated_cpp_index_chunks(
+                store.as_ref(),
+                &db_id,
+                &table_id,
+                &index_id,
+                0
+            )
+            .unwrap(),
+            vec![0, 1]
+        );
+        for deprecated in 0..2 {
+            let key = infinity_storage::catalog_format::catalog_index_chunk_key(
+                &db_id, &table_id, &index_id, 0, deprecated,
+            );
+            assert!(
+                store.get(key.as_bytes()).unwrap().is_none(),
+                "a deprecated chunk leaves the chunk list"
+            );
+        }
+
+
         // The entry reached the log: one command, naming chunk 2 as the new one
         // and 0/1 as the ones it supersedes.
         let wal = dir.path().join("wal").join("wal.log");
@@ -26868,6 +26946,24 @@ mod tests {
         assert_eq!(merged.1[0].row_count, 4);
         assert_eq!(merged.1[0].base_row_id, infinity_storage::wal_entry::WalRowId::new(0, 0));
         assert_eq!(merged.1[0].deprecate_ts, u64::MAX);
+
+        // `Cleanup` is the half that reclaims the bytes: the files go, the
+        // markers go, and only the merged chunk is left.
+        e.cleanup().unwrap();
+        assert!(
+            !chunk_dir.join("chunk_0.idx").exists() && !chunk_dir.join("chunk_1.idx").exists(),
+            "cleanup reclaims the bytes"
+        );
+        assert!(infinity_catalog::cpp_layout::deprecated_cpp_index_chunks(
+            store.as_ref(),
+            &db_id,
+            &table_id,
+            &index_id,
+            0
+        )
+        .unwrap()
+        .is_empty());
+        assert_eq!(e.hnsw_chunk_ids("ot", "ot_i"), vec![2]);
     }
 
     /// C++ `OptimizeKnnTest.test_hnsw_optimize` (`test_optimize_ut.cpp`):

@@ -30,9 +30,9 @@ use infinity_parser::{CmpOp, ExprAst, Literal, Predicate, SelectItem, Statement}
 
 use crate::{subquery_sql_arg, substitute_outer_row};
 
-/// How many times the inner side was executed. The dependent join runs it once
-/// per distinct key, so a test can pin "not once per outer row" without timing
-/// anything.
+// How many times the inner side was executed. The dependent join runs it once
+// per distinct key, so a test can pin "not once per outer row" without timing
+// anything.
 #[cfg(test)]
 thread_local! {
     pub(crate) static INNER_RUNS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };

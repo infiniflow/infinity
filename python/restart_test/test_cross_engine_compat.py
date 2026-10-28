@@ -512,8 +512,20 @@ ANALYZER_NAMES = [
     "RAG-fine",
 ]
 
-ANALYZER_ROWS = ["a,b", "a b", "a-b", "alpha,beta", "quick brown", "2023-01-01"]
-ANALYZER_QUERIES = ["a", "b", "alpha", "beta", "quick", "a,b", "2023-01-01"]
+# `skies`/`ties` are the words the two Porter algorithms disagree on: the
+# reference stems with the 1980 Porter (`ski`, `ti`), Porter2 answers `sky`,
+# `tie`. A `standard-porter` table indexed on `skies` therefore only answers
+# the `ski` query when the right stemmer is in place.
+ANALYZER_ROWS = [
+    "a,b",
+    "a b",
+    "a-b",
+    "alpha,beta",
+    "quick brown",
+    "2023-01-01",
+    "skies ties",
+]
+ANALYZER_QUERIES = ["a", "b", "alpha", "beta", "quick", "a,b", "2023-01-01", "ski", "ti"]
 
 
 def _analyzer_probe(conn):

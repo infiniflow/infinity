@@ -561,11 +561,6 @@ impl<'a> Cursor<'a> {
         out
     }
 
-    fn skip_aligned(&mut self, align: usize, n: usize) {
-        self.align(align);
-        self.at += n;
-    }
-
     fn take(&mut self, n: usize) -> Result<&'a [u8], FormatError> {
         if self.at + n > self.buf.len() {
             return Err(FormatError::Truncated {

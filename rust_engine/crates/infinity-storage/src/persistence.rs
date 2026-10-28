@@ -894,13 +894,13 @@ mod tests {
             .pm
             .persist(Path::new(&file_path), Path::new(&file_path))
             .expect("persist");
-        &fixture.pm.apply_write_result(&result).unwrap();
+        fixture.pm.apply_write_result(&result).unwrap();
         let obj_addr = &result.obj_addr;
         assert!(obj_addr.valid());
         assert_eq!(obj_addr.part_size, persist_str.len());
 
         let result2 = fixture.pm.current_obj_finalize();
-        &fixture.pm.apply_write_result(&result2).unwrap();
+        fixture.pm.apply_write_result(&result2).unwrap();
 
         fixture.check_obj_data(Path::new(&file_path), persist_str);
     }
@@ -922,7 +922,7 @@ mod tests {
                 .pm
                 .persist(Path::new(&file_path), Path::new(&file_path))
                 .expect("persist");
-            &fixture.pm.apply_write_result(&result).unwrap();
+            fixture.pm.apply_write_result(&result).unwrap();
             assert!(result.obj_addr.valid());
             assert_eq!(result.obj_addr.part_size, persist_strs[i].len());
             obj_addrs.push(result.obj_addr);
@@ -931,7 +931,7 @@ mod tests {
         assert_eq!(file_paths.len(), obj_addrs.len());
 
         let result = fixture.pm.current_obj_finalize();
-        &fixture.pm.apply_write_result(&result).unwrap();
+        fixture.pm.apply_write_result(&result).unwrap();
 
         for (path, data) in file_paths.iter().zip(persist_strs.iter()) {
             fixture.check_obj_data(Path::new(path), data);
@@ -975,7 +975,7 @@ mod tests {
         assert_eq!(file_paths.len(), obj_addrs.lock().unwrap().len());
 
         let result = fixture.pm.current_obj_finalize();
-        &fixture.pm.apply_write_result(&result).unwrap();
+        fixture.pm.apply_write_result(&result).unwrap();
 
         for (path, data) in file_paths.iter().zip(persist_strs.iter()) {
             fixture.check_obj_data(Path::new(path), data);
@@ -997,7 +997,7 @@ mod tests {
                 .pm
                 .persist(Path::new(&file_path), Path::new(&file_path))
                 .expect("persist");
-            &fixture.pm.apply_write_result(&result).unwrap();
+            fixture.pm.apply_write_result(&result).unwrap();
             assert!(result.obj_addr.valid());
             assert_eq!(result.obj_addr.part_size, persist_str.len());
             file_paths.push(file_path);
@@ -1015,7 +1015,7 @@ mod tests {
         assert_eq!(file_paths.len(), obj_addrs.len());
 
         let result = fixture.pm.current_obj_finalize();
-        &fixture.pm.apply_write_result(&result).unwrap();
+        fixture.pm.apply_write_result(&result).unwrap();
 
         for (path, data) in file_paths.iter().zip(persist_strs.iter()) {
             fixture.check_obj_data(Path::new(path), data);
@@ -1029,7 +1029,7 @@ mod tests {
         file_paths.rotate_left(3);
         for file_path in &file_paths {
             let result = fixture.pm.cleanup(Path::new(file_path)).expect("cleanup");
-            &fixture.pm.apply_write_result(&result).unwrap();
+            fixture.pm.apply_write_result(&result).unwrap();
         }
         for obj_path in &obj_paths {
             assert!(!Path::new(obj_path).exists(), "{obj_path} still exists");
@@ -1115,7 +1115,7 @@ mod tests {
             .unwrap();
         let object = fixture.pm.get_obj_path(&result.obj_addr.obj_key);
         let sealed = fixture.pm.current_obj_finalize();
-        &fixture.pm.apply_write_result(&sealed).unwrap();
+        fixture.pm.apply_write_result(&sealed).unwrap();
         let bytes = fs::read(&object).unwrap();
         // Two parts -> a `u32 = 1` footer after the aligned payload.
         assert_eq!(&bytes[bytes.len() - 4..], &1u32.to_le_bytes());

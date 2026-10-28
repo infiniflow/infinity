@@ -401,7 +401,7 @@ impl DataType {
         }
     }
 
-    pub fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
+    pub(crate) fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
         let logical_type = LogicalType::from_i8(r.u8()? as i8)?;
         let type_info = match logical_type {
             LogicalType::Array => TypeInfo::Array(Box::new(Self::read_adv(r)?)),
@@ -468,7 +468,7 @@ impl ConstantExpr {
         }
     }
 
-    pub fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
+    pub(crate) fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
         let literal_type = LiteralType::from_i32(r.i32()?)?;
         Ok(match literal_type {
             LiteralType::Null | LiteralType::EmptyArray | LiteralType::CurlyBracketsArray => {
@@ -520,7 +520,7 @@ impl ColumnDef {
         put_u8(out, if self.build_bloom_filter { 1 } else { 0 });
     }
 
-    pub fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
+    pub(crate) fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
         let id = r.i64()?;
         let column_type = DataType::read_adv(r)?;
         let name = r.string()?;
@@ -564,7 +564,7 @@ impl TableDef {
         }
     }
 
-    pub fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
+    pub(crate) fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
         let schema_name = r.string()?;
         let table_name = r.string()?;
         let table_comment = r.string()?;

@@ -31,8 +31,6 @@ use infinity_txn::{OptimizeEntry, TxnOp};
 /// the data of one `OptimizeIndexStoreEntry` (`new_chunk_infos_` /
 /// `deprecate_chunks_`).
 pub(crate) struct ChunkRewrite {
-    /// The directory the chunks live in (`idx_{id}/seg_{s}`).
-    pub dir: PathBuf,
     pub segment: u32,
     pub chunk_id: u32,
     pub row_count: u32,
@@ -431,7 +429,13 @@ fn publish_fulltext_chunks(seg_dir: &Path) -> Vec<CppIndexChunk> {
 /// PLAID). An HNSW chunk's header carries its vector count, so a multi-chunk
 /// index can be described exactly; the other kinds still write one chunk, which
 /// covers the whole snapshot.
-fn publish_chunk_files(seg_dir: &Path, rows: u64, hnsw: bool, segment: u32) -> Vec<CppIndexChunk> {
+fn publish_chunk_files(
+    seg_dir: &Path,
+    rows: u64,
+    hnsw: bool,
+    segment: u32,
+    deprecated: &std::collections::HashSet<u64>,
+) -> Vec<CppIndexChunk> {
     let mut ids: Vec<u32> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(seg_dir) {
         for entry in entries.flatten() {
@@ -443,6 +447,11 @@ fn publish_chunk_files(seg_dir: &Path, rows: u64, hnsw: bool, segment: u32) -> V
             else {
                 continue;
             };
+            // A chunk an optimize superseded has left the segment's chunk list
+            // even though its file is still on disk until `Cleanup`.
+            if deprecated.contains(&u64::from(id)) {
+                continue;
+            }
             ids.push(id);
         }
     }
@@ -2048,7 +2057,7 @@ impl Engine {
                     block_id: block_index as u16,
                 };
                 self.context.buffer.lock().unwrap().invalidate(&early_id);
-                let mut chunk = self.mirror_block_rows(
+                let chunk = self.mirror_block_rows(
                     &table,
                     &meta,
                     &types,
@@ -2828,11 +2837,13 @@ impl Engine {
                         commit_ts: 0,
                     }]
                 } else {
+                    let deprecated = self.deprecated_chunk_ids(table, &im.name, *segment);
                     publish_chunk_files(
                         &seg_dir,
                         *seg_rows,
                         im.index_type.eq_ignore_ascii_case("HNSW"),
                         *segment,
+                        &deprecated,
                     )
                 };
                 if chunks.is_empty() {
@@ -3175,7 +3186,7 @@ impl Engine {
         rows: &[(usize, Vec<Value>)],
     ) -> Result<()> {
         let table = self.qualified_table(table);
-        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+        let Ok(Some(_meta)) = self.storage.catalog.get_table_by_name(&table) else {
             return Ok(());
         };
         let tkey = self.table_key(&table);
@@ -3893,7 +3904,7 @@ impl Engine {
     /// into another's directory (the HNSW chunk landed under the sparse
     /// index) and the reference then read the sparse chunk with the HNSW
     /// parser and aborted.
-    fn cpp_index_position(&self, table: &str, index_name: &str) -> Result<usize> {
+    pub(crate) fn cpp_index_position(&self, table: &str, index_name: &str) -> Result<usize> {
         let short = table.split('.').next_back().unwrap_or(table);
         let indexes = self.storage.catalog.list_indexes()?;
         let id = indexes
@@ -4051,7 +4062,7 @@ impl Engine {
     ///
     /// Returns the segments it wrote a chunk for - the entries an optimize
     /// transaction records (`OptimizeIndexTxnStore::entries_`).
-    pub fn merge_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<Vec<ChunkRewrite>> {
+    pub(crate) fn merge_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<Vec<ChunkRewrite>> {
         self.write_cpp_hnsw_chunk(table, index_name, false, true)
             .map(|written| written.1)
     }
@@ -4189,7 +4200,6 @@ impl Engine {
             // `deprecate_chunks_`, which its optimize transaction removes from
             // the segment's chunk list.
             rewrites.push(ChunkRewrite {
-                dir: dir.clone(),
                 segment: *segment,
                 chunk_id,
                 row_count: count as u32,
@@ -4239,8 +4249,7 @@ impl Engine {
         let ts = turn.ts();
         let mut txn = self.txn.begin();
         let mut entries: Vec<OptimizeEntry> = Vec::new();
-        let mut rewrites: Vec<ChunkRewrite> = Vec::new();
-        let outcome = self.merge_optimizable_indexes(&mut entries, &mut rewrites);
+        let outcome = self.merge_optimizable_indexes(&mut entries);
         // `OptimizeIndexTxnStore::ToWalEntry`: one `WalCmdDumpIndexV2` per
         // entry, carrying the merged chunk and the chunks it supersedes. The
         // reference's `dump_cause_` is not part of the frame. A failed pass never
@@ -4249,6 +4258,21 @@ impl Engine {
             Ok(()) => self.optimize_index_commands(&entries)?,
             Err(_) => Vec::new(),
         };
+        // The deprecations the commit has to publish: `RemoveChunkIDs` takes the
+        // superseded chunks out of the segment's chunk list and one
+        // `drop|idx_chunk|…` marker per id stays behind for `Cleanup`. The
+        // entries are moved into the transaction, so keep the list here.
+        let deprecations: Vec<(String, String, u32, Vec<u32>)> = entries
+            .iter()
+            .map(|entry| {
+                (
+                    entry.table.clone(),
+                    entry.index.clone(),
+                    entry.segment,
+                    entry.deprecate_ids.clone(),
+                )
+            })
+            .collect();
         txn.set_op(TxnOp::OptimizeIndex { entries });
         if !commands.is_empty() {
             txn.set_typed_commands(commands);
@@ -4256,17 +4280,28 @@ impl Engine {
         match outcome {
             Ok(()) => match self.txn.commit_at(txn, ts) {
                 Ok(_) => {
-                    // `RemoveChunkIDs(deprecate_ids)`: the merged chunk is what
-                    // the segment holds from now on, so the ones it replaced stop
-                    // being read. The port's chunk list *is* the directory, so
-                    // "removed from the list" is "removed from the directory"; the
-                    // reference reclaims the same bytes in cleanup, one step later.
-                    for rewrite in &rewrites {
-                        for id in &rewrite.deprecate_ids {
-                            let path = rewrite.dir.join(format!("chunk_{id}.idx"));
-                            let _ = std::fs::remove_file(path);
+                    // `RemoveChunkIDs(deprecate_ids)` + `PrepareCommitDumpIndex`
+                    // of the reference: the merged chunk is what the segment holds
+                    // from now on, so the chunks it replaced leave the chunk list,
+                    // but their bytes stay on disk until `Cleanup` deletes them.
+                    for (table, index, segment, ids) in &deprecations {
+                        // The merge is already committed, so a failed
+                        // deprecation must not turn the pass into an error:
+                        // the superseded chunks stay readable (a retry would
+                        // merge them again), which is noisier than losing
+                        // them but never loses a row.
+                        if let Err(error) =
+                            self.deprecate_cpp_chunks(table, index, *segment, ids, ts)
+                        {
+                            eprintln!(
+                                "optimize: deprecating the chunks {index} superseded failed: {error}"
+                            );
                         }
                     }
+                    // The decoded graphs of the superseded chunks are no longer
+                    // part of the index; reconcile the in-memory set now instead
+                    // of at the next checkpoint.
+                    self.reload_vector_indexes();
                     Ok(())
                 }
                 // A concurrent merge (or a drop that took the index away) is a
@@ -4308,16 +4343,11 @@ impl Engine {
     }
 
     /// The merge half of an optimize pass, recording what it rewrote.
-    fn merge_optimizable_indexes(
-        &self,
-        entries: &mut Vec<OptimizeEntry>,
-        rewrites: &mut Vec<ChunkRewrite>,
-    ) -> Result<()> {
+    fn merge_optimizable_indexes(&self, entries: &mut Vec<OptimizeEntry>) -> Result<()> {
         for im in self.storage.catalog.list_indexes()? {
             if im.index_type.eq_ignore_ascii_case("PLAID") {
                 if let Some(rewrite) = self.merge_cpp_plaid_index(&im.table, &im.name)? {
                     entries.push(self.optimize_entry(&im.table, &im.name, &rewrite));
-                    rewrites.push(rewrite);
                 }
                 continue;
             }
@@ -4336,7 +4366,7 @@ impl Engine {
             let Some(dir) = self.cpp_hnsw_dir(&im.table, &im.name) else {
                 continue;
             };
-            let chunks = hnsw_chunks(&dir);
+            let chunks = self.live_chunk_files(&im.table, &im.name, 0, &dir);
             if chunks.len() < 2 {
                 continue;
             }
@@ -4380,7 +4410,6 @@ impl Engine {
             }
             for rewrite in self.merge_cpp_hnsw_index(&im.table, &im.name)? {
                 entries.push(self.optimize_entry(&im.table, &im.name, &rewrite));
-                rewrites.push(rewrite);
             }
         }
         Ok(())
@@ -4464,22 +4493,28 @@ impl Engine {
         Ok(())
     }
 
-    /// Removes the index chunks that a merged chunk supersedes. The reference
-    /// only cleans up chunks after `optimize` merged every live row into the
-    /// newest one; when the newest chunk does not cover the table, every
-    /// chunk is still needed and is kept.
+    /// Reclaims the chunk bytes an optimize deprecated, and - as a safety net
+    /// for a directory whose deprecation marker is missing - the chunks a
+    /// merged chunk plainly supersedes.
+    ///
+    /// The reference splits the two halves: the optimize commit takes the
+    /// superseded chunks out of the segment's chunk list and leaves a
+    /// `drop|idx_chunk|…` marker, and `Cleanup` deletes the files those markers
+    /// name (`CleanChunkIndex` -> `ChunkIndexMeta::UninitSet`). This is that
+    /// second half.
     pub fn cleanup_cpp_index_chunks(&self) -> Result<()> {
         self.prune_dead_segment_index_dirs()?;
         for im in self.storage.catalog.list_indexes()? {
             if im.index_type.eq_ignore_ascii_case("PLAID") {
-                // PLAID chunks carry their own document count in the header,
-                // so this mirrors `OptimizePlaidIndex`'s "the merged chunk
-                // holds every document of the older ones" without decoding.
-                // The merge drops its inputs itself; this reclaims them when
-                // that removal failed.
                 let Ok(mirror) = self.cpp_plaid_mirror(&im.table, &im.name) else {
                     continue;
                 };
+                self.reclaim_deprecated_cpp_chunks(&im.table, &im.name, 0, &mirror.dir)?;
+                // The safety net: a merge that ran before the markers existed
+                // leaves files whose ids no marker names. PLAID chunks carry
+                // their own document count in the header, so "the newest chunk
+                // holds every document of the older ones" is readable without
+                // decoding.
                 let chunks = hnsw_chunks(&mirror.dir);
                 let Some(((_, newest), older)) = chunks.split_last() else {
                     continue;
@@ -4508,6 +4543,7 @@ impl Engine {
             let Some(dir) = self.cpp_hnsw_dir(&im.table, &im.name) else {
                 continue;
             };
+            self.reclaim_deprecated_cpp_chunks(&im.table, &im.name, 0, &dir)?;
             let chunks = hnsw_chunks(&dir);
             let covered = self
                 .cpp_hnsw_chunk_path(&im.table, &im.name)
@@ -4544,7 +4580,7 @@ impl Engine {
     }
 
     /// The directory holding `table`'s HNSW mirror, if the table exists.
-    fn cpp_hnsw_dir(&self, table: &str, index_name: &str) -> Option<PathBuf> {
+    pub(crate) fn cpp_hnsw_dir(&self, table: &str, index_name: &str) -> Option<PathBuf> {
         let table = self.qualified_table(table);
         let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
         let index_id = self.cpp_index_position(&table, index_name).ok()?;
@@ -4555,12 +4591,141 @@ impl Engine {
         )
     }
 
+    /// The chunk ids of one segment index that an optimize deprecated and
+    /// `cleanup_cpp_index_chunks` has not reclaimed yet: the reference's
+    /// `drop|idx_chunk|…` markers (`PrepareCommitDumpIndex`,
+    /// `new_txn_index_impl.cpp:3043`).
+    fn deprecated_chunk_ids(
+        &self,
+        table: &str,
+        index_name: &str,
+        segment: u32,
+    ) -> std::collections::HashSet<u64> {
+        let table = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return Default::default();
+        };
+        let Ok(index_id) = self.cpp_index_position(&table, index_name) else {
+            return Default::default();
+        };
+        let db_id = self.database_id_of(&table);
+        infinity_catalog::cpp_layout::deprecated_cpp_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id.to_string(),
+            &meta.id.to_string(),
+            &index_id.to_string(),
+            segment,
+        )
+        .map(|ids| ids.into_iter().collect())
+        .unwrap_or_default()
+    }
+
+    /// The chunks of one segment that are still part of the index: the files
+    /// minus the deprecated ids. The reference only ever enumerates the chunk
+    /// list, and a deprecated chunk has left it even though its bytes are still
+    /// on disk until `Cleanup`.
+    fn live_chunk_files(
+        &self,
+        table: &str,
+        index_name: &str,
+        segment: u32,
+        dir: &Path,
+    ) -> Vec<(u64, PathBuf)> {
+        let deprecated = self.deprecated_chunk_ids(table, index_name, segment);
+        hnsw_chunks(dir)
+            .into_iter()
+            .filter(|(id, _)| !deprecated.contains(id))
+            .collect()
+    }
+
+    /// `SegmentIndexMeta::RemoveChunkIDs` + `PrepareCommitDumpIndex`: the
+    /// chunks leave the segment's chunk list and one `drop|idx_chunk|…` marker
+    /// is written per id, so `Cleanup` can delete the bytes later. Nothing on
+    /// disk is touched here - that is the reference's split, and it is what
+    /// keeps the chunk files readable until `cleanup_cpp_index_chunks` runs.
+    fn deprecate_cpp_chunks(
+        &self,
+        table: &str,
+        index_name: &str,
+        segment: u32,
+        chunk_ids: &[u32],
+        ts: u64,
+    ) -> Result<()> {
+        if chunk_ids.is_empty() {
+            return Ok(());
+        }
+        let table = self.qualified_table(table);
+        let Some(meta) = self.storage.catalog.get_table_by_name(&table)? else {
+            // A `DROP` took the table while the optimize transaction was
+            // running: its chunk records went with it.
+            return Ok(());
+        };
+        let index_id = self.cpp_index_position(&table, index_name)?;
+        let db_id = self.database_id_of(&table);
+        infinity_catalog::cpp_layout::deprecate_cpp_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id.to_string(),
+            &meta.id.to_string(),
+            &index_id.to_string(),
+            segment,
+            chunk_ids,
+            ts,
+        )?;
+        Ok(())
+    }
+
+
+    /// `Cleanup`'s half of a deprecation: delete the bytes of every chunk a
+    /// `drop|idx_chunk|…` marker names, then drop the marker together with the
+    /// chunk's record. A crash in between leaves the marker, so the next
+    /// cleanup retries; the other order would make a leftover file look live
+    /// again.
+    fn reclaim_deprecated_cpp_chunks(
+        &self,
+        table: &str,
+        index_name: &str,
+        segment: u32,
+        dir: &Path,
+    ) -> Result<()> {
+        let deprecated = self.deprecated_chunk_ids(table, index_name, segment);
+        if deprecated.is_empty() {
+            return Ok(());
+        }
+        let mut gone = Vec::new();
+        for id in deprecated {
+            let path = dir.join(format!("chunk_{id}.idx"));
+            if !path.exists() || std::fs::remove_file(&path).is_ok() {
+                gone.push(id);
+            }
+        }
+        if gone.is_empty() {
+            return Ok(());
+        }
+        let table = self.qualified_table(table);
+        let Some(meta) = self.storage.catalog.get_table_by_name(&table)? else {
+            return Ok(());
+        };
+        let Ok(index_id) = self.cpp_index_position(&table, index_name) else {
+            return Ok(());
+        };
+        let db_id = self.database_id_of(&table);
+        infinity_catalog::cpp_layout::reclaim_cpp_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id.to_string(),
+            &meta.id.to_string(),
+            &index_id.to_string(),
+            segment,
+            &gone,
+        )?;
+        Ok(())
+    }
+
     /// The newest chunk file of `table`'s HNSW mirror.
     fn cpp_hnsw_chunk_path(&self, table: &str, index_name: &str) -> Result<PathBuf> {
         let dir = self
             .cpp_hnsw_dir(table, index_name)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
-        hnsw_chunks(&dir)
+        self.live_chunk_files(table, index_name, 0, &dir)
             .pop()
             .map(|(_, p)| p)
             .ok_or_else(|| Error::NotFound(format!("no HNSW mirror at {}", dir.display())))
@@ -4937,7 +5102,7 @@ impl Engine {
             return Vec::new();
         };
         let mut out = Vec::new();
-        for (chunk_id, path) in hnsw_chunks(&dir) {
+        for (chunk_id, path) in self.live_chunk_files(&table, index_name, 0, &dir) {
             if after.is_some_and(|a| chunk_id <= a) {
                 continue;
             }
@@ -4963,7 +5128,10 @@ impl Engine {
         let Some(dir) = self.cpp_hnsw_dir(&table, index_name) else {
             return Vec::new();
         };
-        hnsw_chunks(&dir).into_iter().map(|(id, _)| id).collect()
+        self.live_chunk_files(&table, index_name, 0, &dir)
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect()
     }
 
     /// Decodes one on-disk chunk by id.
@@ -4975,7 +5143,8 @@ impl Engine {
     ) -> Option<LoadedVectorIndex> {
         let table = self.qualified_table(table);
         let dir = self.cpp_hnsw_dir(&table, index_name)?;
-        let path = hnsw_chunks(&dir)
+        let path = self
+            .live_chunk_files(&table, index_name, 0, &dir)
             .into_iter()
             .find(|(id, _)| *id == chunk_id)
             .map(|(_, path)| path)?;
@@ -4994,7 +5163,7 @@ impl Engine {
         let Some(dir) = self.cpp_hnsw_dir(&table, index_name) else {
             return Default::default();
         };
-        hnsw_chunks(&dir)
+        self.live_chunk_files(&table, index_name, 0, &dir)
             .into_iter()
             .map(|(id, path)| (id, file_stamp(&path)))
             .collect()
@@ -5647,7 +5816,7 @@ impl Engine {
             .plaid_options(&self.qualified_table(table), index_name)
             .nbits;
         let mut chunks = Vec::new();
-        for (id, path) in hnsw_chunks(&mirror.dir) {
+        for (id, path) in self.live_chunk_files(table, index_name, 0, &mirror.dir) {
             let bytes = std::fs::read(&path).map_err(|e| Error::Io {
                 path: path.clone(),
                 source: e,
@@ -5656,7 +5825,7 @@ impl Engine {
                 PlaidIndex::from_bytes(0, mirror.dims, nbits, &bytes).map_err(|e| {
                     Error::Invalid(format!("bad PLAID chunk '{}': {e}", path.display()))
                 })?;
-            chunks.push(PlaidChunkFile { id, path, index });
+            chunks.push(PlaidChunkFile { id, index });
         }
         Ok(chunks)
     }
@@ -5715,7 +5884,7 @@ impl Engine {
     /// for a removal that failed. Returns the merged document count.
     /// Returns the chunk it folded the segment's chunks into, or `None` when
     /// there was nothing to merge - the entry an optimize transaction records.
-    pub fn merge_cpp_plaid_index(
+    pub(crate) fn merge_cpp_plaid_index(
         &self,
         table: &str,
         index_name: &str,
@@ -5726,7 +5895,6 @@ impl Engine {
             return Ok(None);
         }
         let next = chunks.last().map(|c| c.id + 1).unwrap_or(0);
-        let paths: Vec<PathBuf> = chunks.iter().map(|c| c.path.clone()).collect();
         let deprecate_ids: Vec<u32> = chunks.iter().map(|c| c.id as u32).collect();
         let indexes: Vec<PlaidIndex> = chunks.into_iter().map(|c| c.index).collect();
         let merged = Self::merge_plaid_chunk_indexes(&indexes)?;
@@ -5735,11 +5903,7 @@ impl Engine {
             path: path.clone(),
             source: e,
         })?;
-        for old in paths {
-            let _ = std::fs::remove_file(old);
-        }
         Ok(Some(ChunkRewrite {
-            dir: mirror.dir,
             segment: 0,
             chunk_id: next as u32,
             row_count: merged.doc_num() as u32,
@@ -5878,7 +6042,6 @@ struct PlaidMirror {
 /// One `chunk_{id}.idx` of a PLAID mirror.
 struct PlaidChunkFile {
     id: u64,
-    path: PathBuf,
     index: PlaidIndex,
 }
 
@@ -7756,14 +7919,22 @@ mod tests {
             );
         }
 
-        // A merge whose removal failed leaves the superseded chunks behind; the
-        // cleanup pass is what reclaims them.
+        // The bytes of the chunks a merge superseded stay on disk until
+        // `Cleanup` - the optimize commit only takes them out of the chunk
+        // list. Putting them back proves both halves: a reader does not see
+        // them now, and cleanup is what deletes the files.
         std::fs::write(dir.join("chunk_0.idx"), &chunk_bytes[0]).unwrap();
         std::fs::write(dir.join("chunk_1.idx"), &chunk_bytes[1]).unwrap();
-        assert_eq!(engine.read_cpp_plaid_chunks("pc", "pidx").unwrap().len(), 3);
+        assert_eq!(
+            engine.read_cpp_plaid_chunks("pc", "pidx").unwrap().len(),
+            1,
+            "the superseded chunks are out of the chunk list"
+        );
         engine.cleanup().unwrap();
+        assert!(!dir.join("chunk_0.idx").exists(), "cleanup deletes the bytes");
+        assert!(!dir.join("chunk_1.idx").exists());
         let after = engine.read_cpp_plaid_chunks("pc", "pidx").unwrap();
-        assert_eq!(after.len(), 1, "cleanup drops the superseded chunks");
+        assert_eq!(after.len(), 1, "cleanup leaves the merged chunk");
         assert_eq!(after[0].doc_num(), 260);
         assert_eq!(
             row_strings(&engine, query),

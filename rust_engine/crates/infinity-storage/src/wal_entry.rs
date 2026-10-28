@@ -957,12 +957,6 @@ fn put_u64<S: Sink>(sink: &mut S, v: u64) {
 fn put_i64<S: Sink>(sink: &mut S, v: i64) {
     sink.put(&v.to_le_bytes());
 }
-fn put_f32<S: Sink>(sink: &mut S, v: f32) {
-    sink.put(&v.to_le_bytes());
-}
-fn put_f64<S: Sink>(sink: &mut S, v: f64) {
-    sink.put(&v.to_le_bytes());
-}
 fn put_str<S: Sink>(sink: &mut S, v: &str) {
     put_i32(sink, v.len() as i32);
     sink.put(v.as_bytes());
@@ -1041,36 +1035,6 @@ impl<'a> Cursor<'a> {
     }
 }
 
-fn logical_type_code(t: LogicalType) -> (u8, u32) {
-    match t {
-        LogicalType::Invalid => (0, 0),
-        LogicalType::Boolean => (1, 0),
-        LogicalType::TinyInt => (2, 0),
-        LogicalType::SmallInt => (3, 0),
-        LogicalType::Integer => (4, 0),
-        LogicalType::BigInt => (5, 0),
-        LogicalType::HugeInt => (6, 0),
-        LogicalType::Float => (7, 0),
-        LogicalType::Double => (8, 0),
-        LogicalType::Decimal => (9, 0),
-        LogicalType::Varchar => (10, 0),
-        LogicalType::Date => (11, 0),
-        LogicalType::Time => (12, 0),
-        LogicalType::DateTime => (13, 0),
-        LogicalType::Timestamp => (14, 0),
-        LogicalType::Interval => (15, 0),
-        LogicalType::Uuid => (16, 0),
-        LogicalType::Array => (17, 0),
-        LogicalType::Mixed => (18, 0),
-        LogicalType::Embedding(dim) => (19, dim),
-        LogicalType::Null => (20, 0),
-        LogicalType::Tuple => (21, 0),
-        LogicalType::RowID => (22, 0),
-        LogicalType::Missing => (23, 0),
-        LogicalType::Json => (24, 0),
-    }
-}
-
 fn logical_type_from(code: u8, dim: u32) -> Option<LogicalType> {
     Some(match code {
         0 => LogicalType::Invalid,
@@ -1100,106 +1064,6 @@ fn logical_type_from(code: u8, dim: u32) -> Option<LogicalType> {
         24 => LogicalType::Json,
         _ => return None,
     })
-}
-
-fn put_block_value<S: Sink>(sink: &mut S, value: &BlockValue) {
-    match value {
-        BlockValue::Null => put_u8(sink, 0),
-        BlockValue::Bool(v) => {
-            put_u8(sink, 1);
-            put_u8(sink, u8::from(*v));
-        }
-        BlockValue::TinyInt(v) => {
-            put_u8(sink, 2);
-            put_i8(sink, *v);
-        }
-        BlockValue::SmallInt(v) => {
-            put_u8(sink, 3);
-            sink.put(&v.to_le_bytes());
-        }
-        BlockValue::Int32(v) => {
-            put_u8(sink, 4);
-            put_i32(sink, *v);
-        }
-        BlockValue::Int(v) => {
-            put_u8(sink, 5);
-            put_i64(sink, *v);
-        }
-        BlockValue::HugeInt(v) => {
-            put_u8(sink, 6);
-            sink.put(&v.to_le_bytes());
-        }
-        BlockValue::Float(v) => {
-            put_u8(sink, 7);
-            put_f32(sink, *v);
-        }
-        BlockValue::Double(v) => {
-            put_u8(sink, 8);
-            put_f64(sink, *v);
-        }
-        BlockValue::Decimal(v) => {
-            put_u8(sink, 9);
-            sink.put(&v.value.to_le_bytes());
-            put_u32(sink, v.scale);
-        }
-        BlockValue::Str(v) => {
-            put_u8(sink, 10);
-            put_str(sink, v);
-        }
-        BlockValue::Date(v) => {
-            put_u8(sink, 11);
-            put_i32(sink, v.value);
-        }
-        BlockValue::Time(v) => {
-            put_u8(sink, 12);
-            put_i32(sink, v.value);
-        }
-        BlockValue::DateTime(v) => {
-            put_u8(sink, 13);
-            put_i32(sink, v.date);
-            put_i32(sink, v.time);
-        }
-        BlockValue::Timestamp(v) => {
-            put_u8(sink, 14);
-            put_i32(sink, v.date);
-            put_i32(sink, v.time);
-        }
-        BlockValue::Interval(v) => {
-            put_u8(sink, 15);
-            put_i32(sink, v.value);
-        }
-        BlockValue::Uuid(v) => {
-            put_u8(sink, 16);
-            sink.put(v);
-        }
-        BlockValue::Embedding(v) => {
-            put_u8(sink, 17);
-            put_len(sink, v.len());
-            for x in v {
-                put_f32(sink, *x);
-            }
-        }
-        BlockValue::Array(v) => {
-            put_u8(sink, 18);
-            put_len(sink, v.len());
-            for x in v {
-                put_i64(sink, *x);
-            }
-        }
-        BlockValue::Mixed(v) => {
-            put_u8(sink, 19);
-            put_str(sink, &v.text());
-        }
-        BlockValue::RowId(v) => {
-            put_u8(sink, 20);
-            put_u32(sink, v.segment_id);
-            put_u32(sink, v.segment_offset);
-        }
-        BlockValue::Json(v) => {
-            put_u8(sink, 21);
-            put_str(sink, &v.compact());
-        }
-    }
 }
 
 fn read_block_value(cursor: &mut Cursor<'_>) -> Option<BlockValue> {
@@ -1422,44 +1286,6 @@ fn decode_chunk_info(cursor: &mut Cursor<'_>) -> Option<WalChunkIndexInfo> {
         term_count: cursor.u32()?,
         index_size: cursor.u32()?,
         deprecate_ts: cursor.u64()?,
-    })
-}
-
-fn encode_column_def<S: Sink>(sink: &mut S, def: &WalColumnDef) {
-    put_u32(sink, def.column_id);
-    put_str(sink, &def.name);
-    let (code, dim) = logical_type_code(def.logical_type);
-    put_u8(sink, code);
-    if code == 19 {
-        put_u32(sink, dim);
-    }
-    put_len(sink, def.constraints.len());
-    for constraint in &def.constraints {
-        put_u8(sink, *constraint as u8);
-    }
-}
-
-fn decode_column_def(cursor: &mut Cursor<'_>) -> Option<WalColumnDef> {
-    let column_id = cursor.u32()?;
-    let name = cursor.string()?;
-    let code = cursor.u8()?;
-    let dim = if code == 19 { cursor.u32()? } else { 0 };
-    let logical_type = logical_type_from(code, dim)?;
-    let count = cursor.len()?;
-    let mut constraints = Vec::with_capacity(count);
-    for _ in 0..count {
-        constraints.push(match cursor.u8()? {
-            1 => ConstraintType::PrimaryKey,
-            2 => ConstraintType::NotNull,
-            3 => ConstraintType::Unique,
-            _ => ConstraintType::Invalid,
-        });
-    }
-    Some(WalColumnDef {
-        column_id,
-        name,
-        logical_type,
-        constraints,
     })
 }
 

@@ -154,7 +154,7 @@ impl IndexBase {
         }
     }
 
-    pub fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
+    pub(crate) fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
         let index_type = IndexType::from_i32(r.i32()?)?;
         let index_name = r.string()?;
         let index_comment = r.string()?;
@@ -354,7 +354,7 @@ impl IndexDef {
         }
     }
 
-    pub fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
+    pub(crate) fn read_adv(r: &mut Reader<'_>) -> Result<Self> {
         let base = IndexBase::read_adv(r)?;
         Ok(match base.index_type {
             IndexType::Secondary => IndexDef::Secondary {

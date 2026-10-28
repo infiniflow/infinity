@@ -140,7 +140,7 @@ pub struct StandardAnalyzer {
     extract_eng_stem: bool,
     /// C++: the `STEM_LANG_*` selected by `InitStemmer`. `None` until a
     /// stemmer is initialized.
-    stemmer: Option<rust_stemmers::Algorithm>,
+    stemmer: Option<Stemmer>,
     stem_only: bool,
     char_offset: bool,
 }
@@ -166,11 +166,11 @@ impl StandardAnalyzer {
 
     /// C++: `CommonLanguageAnalyzer::InitStemmer(STEM_LANG_ENGLISH)`.
     pub fn init_stemmer_english(&mut self) {
-        self.init_stemmer(rust_stemmers::Algorithm::English);
+        self.init_stemmer(Stemmer::Snowball(rust_stemmers::Algorithm::English));
     }
 
     /// C++: `CommonLanguageAnalyzer::InitStemmer`.
-    pub fn init_stemmer(&mut self, algorithm: rust_stemmers::Algorithm) {
+    pub fn init_stemmer(&mut self, algorithm: Stemmer) {
         self.stemmer = Some(algorithm);
     }
 
@@ -221,9 +221,7 @@ impl StandardAnalyzer {
             let lower = token.to_ascii_lowercase();
             let stem = if self.extract_eng_stem {
                 match self.stemmer {
-                    Some(algorithm) => rust_stemmers::Stemmer::create(algorithm)
-                        .stem(&lower)
-                        .to_string(),
+                    Some(stemmer) => stemmer.stem(&lower),
                     None => lower.clone(),
                 }
             } else {
@@ -686,36 +684,57 @@ impl Analyzer {
     }
 }
 
+/// The stemmer C++'s `InitStemmer` selects, by `STEM_LANG_*`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stemmer {
+    /// A Snowball algorithm: every `STEM_LANG_*` but `STEM_LANG_PORT` is a
+    /// Snowball program, and rust-stemmers ships the same generator output.
+    Snowball(rust_stemmers::Algorithm),
+    /// `STEM_LANG_PORT`: the original Porter stemmer, which rust-stemmers does
+    /// not ship (its `English` is Porter2).
+    Porter,
+}
+
+impl Stemmer {
+    /// Stems one already-lowercased word.
+    pub fn stem(&self, word: &str) -> String {
+        match self {
+            Self::Snowball(algorithm) => rust_stemmers::Stemmer::create(*algorithm)
+                .stem(word)
+                .to_string(),
+            Self::Porter => super::porter::stem(word),
+        }
+    }
+}
+
 /// C++ `STEM_LANG_*` names accepted by `standard-<language>`.
-const STANDARD_LANGUAGES: &[(&str, rust_stemmers::Algorithm)] = &[
-    ("danish", rust_stemmers::Algorithm::Danish),
-    ("dutch", rust_stemmers::Algorithm::Dutch),
-    ("english", rust_stemmers::Algorithm::English),
-    ("finnish", rust_stemmers::Algorithm::Finnish),
-    ("french", rust_stemmers::Algorithm::French),
-    ("german", rust_stemmers::Algorithm::German),
-    ("hungarian", rust_stemmers::Algorithm::Hungarian),
-    ("italian", rust_stemmers::Algorithm::Italian),
-    ("norwegian", rust_stemmers::Algorithm::Norwegian),
-    // C++ maps "-porter" to `STEM_LANG_PORT` (the original Porter stemmer);
-    // rust-stemmers ships Porter2 as `Algorithm::English`, its closest match.
-    ("porter", rust_stemmers::Algorithm::English),
-    ("portuguese", rust_stemmers::Algorithm::Portuguese),
-    ("romanian", rust_stemmers::Algorithm::Romanian),
-    ("russian", rust_stemmers::Algorithm::Russian),
-    ("spanish", rust_stemmers::Algorithm::Spanish),
-    ("swedish", rust_stemmers::Algorithm::Swedish),
-    ("turkish", rust_stemmers::Algorithm::Turkish),
+const STANDARD_LANGUAGES: &[(&str, Stemmer)] = &[
+    ("danish", Stemmer::Snowball(rust_stemmers::Algorithm::Danish)),
+    ("dutch", Stemmer::Snowball(rust_stemmers::Algorithm::Dutch)),
+    ("english", Stemmer::Snowball(rust_stemmers::Algorithm::English)),
+    ("finnish", Stemmer::Snowball(rust_stemmers::Algorithm::Finnish)),
+    ("french", Stemmer::Snowball(rust_stemmers::Algorithm::French)),
+    ("german", Stemmer::Snowball(rust_stemmers::Algorithm::German)),
+    ("hungarian", Stemmer::Snowball(rust_stemmers::Algorithm::Hungarian)),
+    ("italian", Stemmer::Snowball(rust_stemmers::Algorithm::Italian)),
+    ("norwegian", Stemmer::Snowball(rust_stemmers::Algorithm::Norwegian)),
+    ("porter", Stemmer::Porter),
+    ("portuguese", Stemmer::Snowball(rust_stemmers::Algorithm::Portuguese)),
+    ("romanian", Stemmer::Snowball(rust_stemmers::Algorithm::Romanian)),
+    ("russian", Stemmer::Snowball(rust_stemmers::Algorithm::Russian)),
+    ("spanish", Stemmer::Snowball(rust_stemmers::Algorithm::Spanish)),
+    ("swedish", Stemmer::Snowball(rust_stemmers::Algorithm::Swedish)),
+    ("turkish", Stemmer::Snowball(rust_stemmers::Algorithm::Turkish)),
 ];
 
 /// The stemmer C++ selects for `standard-<language>`; unknown suffixes keep the
 /// English default, exactly like the reference's if-chain.
-fn standard_stemmer(language: &str) -> rust_stemmers::Algorithm {
+pub(crate) fn standard_stemmer(language: &str) -> Stemmer {
     STANDARD_LANGUAGES
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case(language))
-        .map(|(_, algorithm)| *algorithm)
-        .unwrap_or(rust_stemmers::Algorithm::English)
+        .map(|(_, stemmer)| *stemmer)
+        .unwrap_or(Stemmer::Snowball(rust_stemmers::Algorithm::English))
 }
 
 /// The name grammar of C++ `AnalyzerPool::GetAnalyzer`.
@@ -5667,6 +5686,29 @@ mod analyzer_pool_tests {
 
         // The Slovak instance is unaffected by the later English one.
         assert_eq!(slovak.tokenize("daňové"), "danove");
+    }
+
+    /// `standard-porter` runs the reference's `STEM_LANG_PORT`, the 1980
+    /// Porter stemmer - not rust-stemmers' `English`, which is Porter2. The
+    /// two disagree exactly where Porter2 revised the rules, so these words
+    /// pin the choice: Porter2 answers `sky`/`tie`, the reference `ski`/`ti`.
+    #[test]
+    fn standard_porter_stems_with_the_original_porter() {
+        assert_eq!(standard_stemmer("porter"), Stemmer::Porter);
+        assert_eq!(standard_stemmer("PORTER"), Stemmer::Porter);
+        assert_eq!(
+            standard_stemmer("english"),
+            Stemmer::Snowball(rust_stemmers::Algorithm::English)
+        );
+        let mut analyzer = StandardAnalyzer::new();
+        analyzer.init_stemmer(Stemmer::Porter);
+        let texts: Vec<String> = analyzer
+            .analyze("skies ties ability")
+            .into_iter()
+            .map(|term| term.text)
+            .collect();
+        // A differing stem is emitted next to the lowercased word.
+        assert_eq!(texts, vec!["skies", "ski", "ties", "ti", "ability", "abil"]);
     }
 
     /// C++ `AnalyzerPool::GetAnalyzer`, name by name: the family is matched

@@ -239,7 +239,7 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 | §3 不可逐字节比对 | HNSW 图区、IVF 质心、`catalog/` 的 RocksDB 文件字节（键与值已逐键比对）、NULL slot 与内联 padding、后台 dump 的 chunk 切分 | 否，参考自身不确定 |
 | §4 覆盖不到的输入空间 | 带索引的 8M 行表、三段以上的容量切分、PLAID/EMVB/MULTIVECTOR chunk 字节 | 是，但代价高 |
 
-已登记的性能/口径差异（相关子查询的作用域边界、`CREATE TABLE … AS SELECT`、视图、`INSERT … SELECT`、`standard-porter` 的词干）在 `GAPS.md` §5，不是待办。
+已登记的性能/口径差异（相关子查询的作用域边界、`CREATE TABLE … AS SELECT`、视图、`INSERT … SELECT`）在 `GAPS.md` §5，不是待办。
 
 ---
 
