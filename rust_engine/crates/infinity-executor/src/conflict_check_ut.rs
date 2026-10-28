@@ -40,13 +40,9 @@ fn conflict_check_delete() {
         })
         .collect();
 
-    let delete_row = |seqs: &[usize]| {
-        let mut txn = e.txn.begin();
-        for seq in seqs {
-            txn.delete(del_key(table, *seq));
-        }
-        txn
-    };
+    // `commit_with_deletes` stages the `DeleteV2` tombstones itself; the
+    // transactions here only have to exist, as `NewTxn::Delete` begins them.
+    let delete_row = |_seqs: &[usize]| e.txn.begin();
 
     {
         let txn1 = delete_row(&[seq_of[0]]);

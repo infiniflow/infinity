@@ -335,7 +335,11 @@ pub struct TxnManager {
 struct Candidate {
     txn_id: u64,
     op: TxnOp,
-    finished: bool,
+    /// `TxnContext::kv_commit_ts_`: when the transaction's KV batch became
+    /// visible to new snapshots, or `None` while it is still in flight
+    /// (the reference's `UNCOMMIT_TS`). The port applies the batch inside the
+    /// commit, so a finished transaction's value is its commit ts.
+    kv_commit_ts: Option<TxnTimeStamp>,
 }
 
 /// One write transaction's place in commit-ts order (`NewTxnManager::
@@ -586,7 +590,12 @@ impl TxnManager {
             if candidate.txn_id == txn.id {
                 continue;
             }
-            if candidate.finished && *ts < txn.begin_ts {
+            // `NewTxnManager::GetCheckCandidateTxns`: a transaction whose KV
+            // batch is already visible to this snapshot cannot conflict.
+            if candidate
+                .kv_commit_ts
+                .is_some_and(|kv_ts| kv_ts < txn.begin_ts)
+            {
                 continue;
             }
             if let Some(conflict) = conflict_between(&txn.op, &candidate.op) {
@@ -675,7 +684,35 @@ impl TxnManager {
             Candidate {
                 txn_id: txn.id,
                 op: txn.op.clone(),
-                finished: false,
+                kv_commit_ts: None,
+            },
+        );
+    }
+
+    /// Registers a transaction the manager drives itself (`Checkpoint`,
+    /// `Cleanup`): the reference opens both as write transactions, so they take
+    /// a commit ts and take part in the conflict matrix (`Cleanup` versus a
+    /// snapshot, `new_txn_impl.cpp:4410-4466`), but there is no `Txn` handle -
+    /// by the time the frame is written the transaction is finished.
+    fn note_standalone(&self, op: TxnOp, commit_ts: TxnTimeStamp) {
+        let oldest = self
+            .active
+            .lock()
+            .unwrap()
+            .values()
+            .map(|info| info.begin_ts)
+            .min()
+            .unwrap_or(TxnTimeStamp::MAX);
+        let mut candidates = self.candidates.lock().unwrap();
+        candidates.retain(|ts, _| *ts >= oldest);
+        candidates.insert(
+            commit_ts,
+            Candidate {
+                // The manager's own transactions have no id of their own in
+                // `txn_map_`; `u64::MAX` can never equal a live transaction's.
+                txn_id: u64::MAX,
+                op,
+                kv_commit_ts: Some(commit_ts),
             },
         );
     }
@@ -685,7 +722,7 @@ impl TxnManager {
     fn finish_candidate(&self, commit_ts: TxnTimeStamp, committed: bool) {
         let mut candidates = self.candidates.lock().unwrap();
         match candidates.get_mut(&commit_ts) {
-            Some(candidate) if committed => candidate.finished = true,
+            Some(candidate) if committed => candidate.kv_commit_ts = Some(commit_ts),
             _ => {
                 candidates.remove(&commit_ts);
             }
@@ -1265,6 +1302,7 @@ impl TxnManager {
         if rotate {
             self.last_swap.store(seal, Ordering::SeqCst);
         }
+        self.note_standalone(TxnOp::Checkpoint, commit_ts);
         // The checkpoint transaction is committed: its commit ts is the clock's
         // new position, exactly as `CommitBottom` leaves `current_ts_`.
         self.current_ts.store(commit_ts, Ordering::SeqCst);
@@ -1296,6 +1334,7 @@ impl TxnManager {
             wal.append(&entry)?;
             wal.flush()
         })?;
+        self.note_standalone(TxnOp::Cleanup, commit_ts);
         self.current_ts.store(commit_ts, Ordering::SeqCst);
         Ok(())
     }

@@ -11,6 +11,14 @@
 
 表里只有以上三种状态，没有 `partial`/`gap` 行；类层面的状态与 `partial` 在 [`CLASS_MAP.md`](CLASS_MAP.md) §2。
 
+**最近一次核对（2026-10-28）**：脚本逐行读本表，取映射列里的 Rust 用例名，在 `rust_engine/crates` 下检查
+`fn <name>` 是否存在——951 个 `ported` 行全部命中，没有失效映射；再把每行的 `#[ignore]` 与 C++ 用例的
+`DISABLED_` 前缀对比，唯一不同的一组是 `s3_client_minio_ut` / `virtual_store_ut` 的 5 个用例（参考需要
+MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 显式打开）。事务层（§2.1）的对应关系：
+`storage/txn/conflict_check_ut` 1/1、`new_catalog/new_txn_mgr_ut` 2/2（2 个 `DISABLED_SLOW_`）、
+`storage/txn/{table,database,system}_snapshot_ut` 14/14、`new_catalog/cleanup_rollback_txn` 1/1、
+`new_request/conflict_request_ut` 10/10。
+
 | # | 文件 | Fixture | 用例 | 状态 |
 |---:|---|---|---|---|
 | 1 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_default_is_english_and_coarse` | ported | `infinity-executor` `analyzer::analyzer_pool_tests::test_rag_default_is_english_and_coarse` |

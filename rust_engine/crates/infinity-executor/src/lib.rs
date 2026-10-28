@@ -5627,10 +5627,13 @@ impl<'a> EngineTxn<'a> {
         for (segment_id, offset) in row_ids {
             let seq = ((*segment_id as usize) << 32) | (*offset as usize);
             if self.engine.row_is_present(&table, seq) {
+                // A deferred tombstone: it rides in the WAL's `DeleteV2` and is
+                // applied by the bottom half (`DeleteInBlock`), not as a key -
+                // the reference has no `del:` key space.
                 self.txn
                     .as_mut()
                     .expect("transaction is open")
-                    .delete(del_key(&table, seq));
+                    .delete_deferred(del_key(&table, seq));
                 self.deletes.push((table.clone(), seq));
                 ids.push(seq);
                 staged += 1;
@@ -10071,16 +10074,10 @@ impl Engine {
             // transaction must leave no trace, and this closure runs after the
             // commit was accepted.
             let first_delete = engine.note_deleted_ids(&bottom_table, &bottom_deletes);
-            if !engine.has_block_layout(&bottom_table) {
-                // A table with no block files hides a deleted row the only way
-                // it can: with a tombstone key.
-                for seq in &bottom_deletes {
-                    engine
-                        .storage
-                        .store
-                        .put(&del_key(&bottom_table, *seq), b"1")?;
-                }
-            }
+            // The slot is hidden by the block's `version` (`BlockVersion::
+            // Delete`), which is what the reference has: no tombstone key is
+            // written. `column_type_of` covers every type the DDL accepts, so
+            // `has_block_layout` is true for every table that exists.
             // An UPDATE stages its rewritten rows as an append in the same
             // transaction (`reserve_rows` already logged the create), so the
             // block's `version` has to record this ts for them as well
@@ -10737,9 +10734,10 @@ impl Engine {
                 if !rows.is_empty() {
                     let mut t = self.txn.begin();
                     for (seq, row) in &rows {
-                        // retire the old row, write it under the new table name
-                        // at the same sequence id
-                        t.put(del_key(table, *seq), b"1".to_vec());
+                        // The text copy moves to the new name at the same
+                        // sequence id; the old one is swept below. No tombstone
+                        // key: the rename is a catalog move, and the rows live
+                        // in `tbl_<id>`, which the rename keeps.
                         let encoded = row
                             .iter()
                             .map(|v| v.to_slt_string())
@@ -25490,10 +25488,10 @@ mod tests {
     /// two get `kTxnConflict`; overlapping sets behave the same way.
     #[test]
     fn delete_conflicts_follow_the_reference() {
-        fn stale_delete(e: &Engine, table: &str, seq: usize) -> Txn {
-            let mut txn = e.txn.begin();
-            txn.delete(del_key(table, seq));
-            txn
+        fn stale_delete(e: &Engine) -> Txn {
+            // `commit_with_deletes` stages the tombstones; the transaction only
+            // has to be open, exactly as `NewTxn::Delete` begins it.
+            e.txn.begin()
         }
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
@@ -25508,9 +25506,9 @@ mod tests {
             .map(|(seq, _)| *seq)
             .collect();
 
-        let t1 = stale_delete(&e, table, seqs[0]);
-        let t2 = stale_delete(&e, table, seqs[0]);
-        let t3 = stale_delete(&e, table, seqs[0]);
+        let t1 = stale_delete(&e);
+        let t2 = stale_delete(&e);
+        let t3 = stale_delete(&e);
         e.commit_with_deletes(table, &[seqs[0]], 0, &[], t1).unwrap();
         assert!(matches!(
             e.commit_with_deletes(table, &[seqs[0]], 0, &[], t2),
@@ -25523,15 +25521,14 @@ mod tests {
         assert_eq!(e.row_count("dc").unwrap(), 6);
 
         // A transaction that starts after the winning commit is not stale.
-        let t4 = stale_delete(&e, table, seqs[1]);
+        let t4 = stale_delete(&e);
         e.commit_with_deletes(table, &[seqs[1]], 0, &[], t4).unwrap();
         assert_eq!(e.row_count("dc").unwrap(), 5);
 
         // Overlapping delete sets: the later committer conflicts on the shared
         // row even though it has its own disjoint write.
-        let mut a = stale_delete(&e, table, seqs[2]);
-        a.delete(del_key(table, seqs[3]));
-        let b = stale_delete(&e, table, seqs[2]);
+        let a = stale_delete(&e);
+        let b = stale_delete(&e);
         e.commit_with_deletes(table, &[seqs[2], seqs[3]], 0, &[], a)
             .unwrap();
         assert!(matches!(

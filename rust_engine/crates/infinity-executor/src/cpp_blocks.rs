@@ -4112,7 +4112,9 @@ impl Engine {
     pub fn optimize_cpp_index_chunks(&self) -> Result<()> {
         for im in self.storage.catalog.list_indexes()? {
             if im.index_type.eq_ignore_ascii_case("PLAID") {
-                let _ = self.merge_cpp_plaid_index(&im.table, &im.name);
+                if self.begin_optimize_txn(&im)? {
+                    let _ = self.merge_cpp_plaid_index(&im.table, &im.name);
+                }
                 continue;
             }
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
@@ -4166,9 +4168,39 @@ impl Engine {
             if rebuild_bytes > 1024 * 1024 * 1024 {
                 continue;
             }
-            let _ = self.merge_cpp_hnsw_index(&im.table, &im.name);
+            if self.begin_optimize_txn(&im)? {
+                let _ = self.merge_cpp_hnsw_index(&im.table, &im.name);
+            }
         }
         Ok(())
+    }
+
+    /// `NewTxn::OptimizeIndex`: a write transaction of its own, opened only
+    /// when the index really is going to be merged (a tick with nothing to do
+    /// must not spend a timestamp).
+    ///
+    /// The reference's store has no command to log (`WalCommandType` has no
+    /// `OPTIMIZE_INDEX_V2`), so the entry is empty; what the transaction buys is
+    /// its place in the conflict matrix - two merges of one index never run
+    /// together, and a merge meets the appends and updates on its table.
+    fn begin_optimize_txn(&self, im: &infinity_catalog::IndexMeta) -> Result<bool> {
+        let segments: Vec<u32> = self.segment_ids(&im.table);
+        let turn = self.txn.reserve_commit_ts();
+        let ts = turn.ts();
+        let mut txn = self.txn.begin();
+        txn.set_op(infinity_txn::TxnOp::OptimizeIndex {
+            table: self.qualified_table(&im.table),
+            index: im.name.clone(),
+            segments,
+        });
+        match self.txn.commit_at(txn, ts) {
+            Ok(_) => Ok(true),
+            // A concurrent merge (or a drop that took the index away) is a
+            // conflict; this tick simply leaves the chunks alone.
+            Err(infinity_common::Error::TxnConflict(_))
+            | Err(infinity_common::Error::TxnConflictNoRetry(_)) => Ok(false),
+            Err(error) => Err(error),
+        }
     }
 
     /// Drops `idx_{id}/seg_{s}` directories whose segment no longer exists.
@@ -6406,6 +6438,14 @@ mod tests {
                 .unwrap()
                 .is_empty(),
             "the journal is gone, so the rows can only come from data/"
+        );
+        assert!(
+            e.storage
+                .store
+                .scan_prefix(b"del:")
+                .unwrap()
+                .is_empty(),
+            "a delete is a `version` mark, not a key - the reference has no `del:` key space"
         );
         assert_eq!(
             row_strings(&e, "SELECT id FROM t ORDER BY id;"),
