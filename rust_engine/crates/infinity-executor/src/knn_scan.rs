@@ -13,9 +13,13 @@ pub(crate) struct KnnScanOptions {
     pub threshold: Option<f64>,
 }
 
-/// Looks up `name` in a `k=v;k=v` option string, case-insensitively.
+/// Looks up `name` in an option string, case-insensitively.
+///
+/// Two spellings reach this: the legacy SDK string `k=v;k=v` and the SQL
+/// `WITH (k=v, k=v)` clause, which the server also forwards to `with_opts`.
+/// Splitting on both separators is what lets `threshold=…` survive the second.
 fn option(opts: &str, name: &str) -> Option<String> {
-    opts.split(';').find_map(|p| {
+    opts.split([';', ',']).find_map(|p| {
         let (k, v) = p.split_once('=')?;
         k.trim()
             .eq_ignore_ascii_case(name)

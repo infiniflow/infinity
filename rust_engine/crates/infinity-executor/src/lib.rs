@@ -4471,7 +4471,9 @@ fn parse_bmp_search_options(
             .filter(|v| (0.0..=1.0).contains(v))
     };
     for source in [Some(params), with_opts].into_iter().flatten() {
-        for part in source.split(';') {
+        // The SQL `WITH (…)` clause is comma-separated; the SDK's option
+        // string is semicolon-separated (see `knn_scan::option`).
+        for part in source.split([';', ',']) {
             let Some((key, value)) = part.split_once('=') else {
                 continue;
             };
