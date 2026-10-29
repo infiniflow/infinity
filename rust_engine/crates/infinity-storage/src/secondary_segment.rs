@@ -1803,6 +1803,14 @@ impl SecondarySegmentReader {
         // comes from `kind` and not from a constant.
         let stride = kind.key_width() + 4;
         let mut row_count = None;
+        // The chunk carries no header, so the row count is the `n` whose tail
+        // header starts at `n * stride`, repeats `n`, repeats the chunk's own
+        // first key and ends exactly at EOF. The first-key test is what keeps a
+        // candidate from matching *inside* the offsets array: rows
+        // `[10,10,10,20]` with offsets `[0,1,3,2]` let `n = 3` pass on the
+        // repeated count alone (offset[2] is 3), and the reader then answered
+        // three rows - one row's key never came back.
+        let first_key = map.get(..kind.first_key_width()).map(|k| k.to_vec());
         for n in 0..=map.len() / stride {
             let pgm_at = n * stride;
             if pgm_at + 4 > map.len() {
@@ -1811,6 +1819,12 @@ impl SecondarySegmentReader {
             let pgm_n = u32::from_le_bytes(map[pgm_at..pgm_at + 4].try_into().unwrap()) as usize;
             if pgm_n != n {
                 continue;
+            }
+            if n > 0 {
+                let key_at = map.get(pgm_at + 4..pgm_at + 4 + kind.first_key_width());
+                if key_at != first_key.as_deref() {
+                    continue;
+                }
             }
             let ok = match kind {
                 KeyKind::U64 => Pgm::header(&map, pgm_at)
@@ -1967,6 +1981,27 @@ impl SecondarySegmentReader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A chunk whose offsets make a *smaller* row count look valid: the reader
+    /// used to pick `n = 3` here (offset[2] is 3 and the bytes after it happened
+    /// to look like a tail), so the last row's key never came back and
+    /// `where c2 = 10` over three matching rows answered two.
+    #[test]
+    fn typed_chunk_keeps_every_row_when_an_offset_mimics_the_row_count() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("seg_0_0_4.idx");
+        let entries = vec![
+            (Key::I32(10), 0u32),
+            (Key::I32(10), 1),
+            (Key::I32(10), 3),
+            (Key::I32(20), 2),
+        ];
+        write_secondary_segment_typed(&path, KeyKind::I32, &entries).unwrap();
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::I32).unwrap();
+        assert_eq!(reader.row_count(), 4, "the tail header repeats the real count");
+        assert_eq!(reader.lookup(Key::I32(10)), vec![0, 1, 3]);
+        assert_eq!(reader.lookup(Key::I32(20)), vec![2]);
+    }
 
     fn u64_lookup(reader: &SecondarySegmentReader, key: u64) -> Vec<u32> {
         reader.lookup(Key::U64(key))
