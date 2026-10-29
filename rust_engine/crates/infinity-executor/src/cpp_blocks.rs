@@ -603,10 +603,8 @@ pub fn tensor_shape(type_text: &str) -> Option<(i32, usize, i32)> {
     let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
     let dim: usize = parts.get(1)?.parse().ok()?;
     let code = element_code(parts.first()?)?;
-    if code == 0 {
-        // Bit-packed *tensors* are not covered here (only embeddings are).
-        return None;
-    }
+    // A bit tensor packs `dim` bits per row into `ceil(dim/8)` bytes, the same
+    // element packing an `EMBEDDING(BIT, dim)` uses.
     Some((column_type, dim, code))
 }
 
@@ -618,7 +616,6 @@ pub fn tensor_shape(type_text: &str) -> Option<(i32, usize, i32)> {
 /// `column_vector_impl.cpp:2792-2805`; `GetTensorArrayMeta`, `:2784-2790`),
 /// each of which carries that tensor's own element count and data offset. The
 /// mirror therefore writes every tensor's body first and their meta array last.
-/// Bit elements are excluded for the same reason as tensors.
 pub fn tensorarray_shape(type_text: &str) -> Option<(i32, usize, i32)> {
     let up = type_text.trim().to_ascii_uppercase();
     let rest = up.strip_prefix("TENSORARRAY(")?;
@@ -626,10 +623,6 @@ pub fn tensorarray_shape(type_text: &str) -> Option<(i32, usize, i32)> {
     let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
     let dim: usize = parts.get(1)?.parse().ok()?;
     let code = element_code(parts.first()?)?;
-    if code == 0 {
-        // Bit-packed tensors are not covered here (only embeddings are).
-        return None;
-    }
     Some((12, dim, code))
 }
 
@@ -1182,7 +1175,12 @@ fn encode_tensor_slot(
     }
     let (_, dim, elem) = tensor_shape(type_text)
         .ok_or_else(|| Error::Invalid(format!("not a tensor type: '{type_text}'")))?;
-    let vectors = cpp_format::parse_nested_f64(value);
+    let value = if elem == 0 {
+        expand_bit_literals(value)
+    } else {
+        value.to_string()
+    };
+    let vectors = cpp_format::parse_nested_f64(&value);
     let offset = outline.len() as u64;
     let body = cpp_format::pack_tensor_body(&vectors, dim, elem);
     outline.extend_from_slice(&body);
@@ -1197,18 +1195,36 @@ fn decode_tensor_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<S
     let word = u64::from_le_bytes(slot.try_into().ok()?);
     let count = (word & 0xffff) as usize;
     let offset = (word >> 16) as usize;
-    let width = element_width(elem);
+    let width = tensor_row_width(dim, elem);
     let mut parts = Vec::with_capacity(count);
     for v in 0..count {
-        let at = offset + v * dim * width;
-        let mut elems = Vec::with_capacity(dim);
-        for k in 0..dim {
-            let s = outline.get(at + k * width..at + (k + 1) * width)?;
-            elems.push(embedding_element_text(s, elem)?);
-        }
-        parts.push(format!("[{}]", elems.join(",")));
+        let at = offset + v * width;
+        parts.push(tensor_row_text(outline, at, dim, elem)?);
     }
     Some(format!("[{}]", parts.join(",")))
+}
+
+/// Expands packed bit strings inside a tensor literal so the ordinary numeric
+/// parser can read both spellings: [[[10110001]]] becomes [[[1,0,1,1,0,0,0,1]]].
+/// Only used for kElemBit element types - a float tensor's 10110001 is a number.
+fn expand_bit_literals(text: &str) -> String {
+    let t = text.trim();
+    let Some(inner) = t.strip_prefix('[').and_then(|s| s.strip_suffix(']')) else {
+        return t.to_string();
+    };
+    if !inner.contains('[') {
+        let trimmed = inner.trim();
+        if trimmed.len() > 1 && trimmed.chars().all(|c| c == '0' || c == '1') {
+            let bits: Vec<String> = trimmed.chars().map(|c| c.to_string()).collect();
+            return format!("[{}]", bits.join(","));
+        }
+        return t.to_string();
+    }
+    let parts: Vec<String> = crate::split_top_level(inner)
+        .iter()
+        .map(|g| expand_bit_literals(g))
+        .collect();
+    format!("[{}]", parts.join(","))
 }
 
 /// Encodes one tensor-array value: appends every tensor's body to `outline`,
@@ -1224,8 +1240,15 @@ fn encode_tensorarray_slot(
     }
     let (_, dim, elem) = tensorarray_shape(type_text)
         .ok_or_else(|| Error::Invalid(format!("not a tensor-array type: '{type_text}'")))?;
-    // `[[[a,b],[c,d]], …]`: one entry per tensor, each a list of rows.
-    let tensors = cpp_format::parse_tensorarray_f64(value);
+    // `[[[a,b],[c,d]], …]`: one entry per tensor, each a list of rows. A bit
+    // element may already arrive packed (`[[[10110001]]]`), which the numeric
+    // parser would read as one number.
+    let value = if elem == 0 {
+        expand_bit_literals(value)
+    } else {
+        value.to_string()
+    };
+    let tensors = cpp_format::parse_tensorarray_f64(&value);
     let mut metas: Vec<[u8; 8]> = Vec::with_capacity(tensors.len());
     for rows in &tensors {
         let offset = outline.len() as u64;
@@ -1251,7 +1274,7 @@ fn decode_tensorarray_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Opt
     let word = u64::from_le_bytes(slot.try_into().ok()?);
     let tensor_num = (word & 0xffff) as usize;
     let meta_offset = (word >> 16) as usize;
-    let width = element_width(elem);
+    let width = tensor_row_width(dim, elem);
     let mut tensors = Vec::with_capacity(tensor_num);
     for t in 0..tensor_num {
         let at = meta_offset + t * 8;
@@ -1260,17 +1283,43 @@ fn decode_tensorarray_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Opt
         let offset = (meta >> 16) as usize;
         let mut vecs = Vec::with_capacity(rows);
         for v in 0..rows {
-            let base = offset + v * dim * width;
-            let mut elems = Vec::with_capacity(dim);
-            for k in 0..dim {
-                let s = outline.get(base + k * width..base + (k + 1) * width)?;
-                elems.push(embedding_element_text(s, elem)?);
-            }
-            vecs.push(format!("[{}]", elems.join(",")));
+            vecs.push(tensor_row_text(outline, offset + v * width, dim, elem)?);
         }
         tensors.push(format!("[{}]", vecs.join(",")));
     }
     Some(format!("[{}]", tensors.join(",")))
+}
+
+/// Bytes one tensor row of `dim` elements occupies. A `kElemBit` row packs
+/// `dim` bits into `ceil(dim/8)` bytes; every other element type is fixed
+/// width.
+fn tensor_row_width(dim: usize, elem: i32) -> usize {
+    if elem == 0 {
+        dim.div_ceil(8)
+    } else {
+        dim * element_width(elem)
+    }
+}
+
+/// One tensor row as the reference renders it: `[a,b,c]` for numeric
+/// elements, the bit string `[10110001]` for `kElemBit`
+/// (`embedding_type.h:253-262`, the same form an `EMBEDDING(BIT, dim)` prints).
+fn tensor_row_text(outline: &[u8], at: usize, dim: usize, elem: i32) -> Option<String> {
+    if elem == 0 {
+        let mut bits = String::with_capacity(dim);
+        for k in 0..dim {
+            let byte = outline.get(at + k / 8)?;
+            bits.push(if byte & (1 << (k % 8)) != 0 { '1' } else { '0' });
+        }
+        return Some(format!("[{bits}]"));
+    }
+    let width = element_width(elem);
+    let mut elems = Vec::with_capacity(dim);
+    for k in 0..dim {
+        let s = outline.get(at + k * width..at + (k + 1) * width)?;
+        elems.push(embedding_element_text(s, elem)?);
+    }
+    Some(format!("[{}]", elems.join(",")))
 }
 
 /// Renders one embedding element the way the reference's `ToString` does:
@@ -1382,7 +1431,13 @@ pub fn encode_fulltext_chunk(
 /// six decimals would round the value (and the bytes) away from the reference's.
 fn mirror_cell_text(value: &Value) -> String {
     match value {
-        Value::Float(f) => format!("{f}"),
+        // A float cell has to stay recognisable as one: `format!("{f}")` renders
+        // `4.0` as `4`, and the reader of this text (`parse_value`) answers an
+        // `Int` for that, so a FLOAT column with an integral value came back as
+        // an integer - and printed `4` where the reference prints `4.000000`.
+        // `exact_float` keeps the shortest round-tripping digits and leaves the
+        // `.0` in place.
+        Value::Float(f) => crate::exact_float(*f),
         other => other.to_slt_string(),
     }
 }
@@ -7041,11 +7096,11 @@ mod tests {
         assert_eq!(column_type_of("TENSOR(FLOAT,4)"), Some(11));
         assert_eq!(column_type_of("MULTIVECTOR(FLOAT,4)"), Some(14));
         assert_eq!(column_type_of("TENSORARRAY(FLOAT,4)"), Some(12));
-        // Bit embeddings pack to `ceil(dim/8)` bytes; bit *tensors* (and hence
-        // bit tensor arrays) are not covered by the block writer.
+        // Bit embeddings pack to `ceil(dim/8)` bytes, and a bit tensor row packs
+        // `dim` bits the same way (`tensor_row_width`).
         assert_eq!(column_type_of("EMBEDDING(BIT,8)"), Some(10));
-        assert_eq!(column_type_of("TENSOR(BIT,8)"), None);
-        assert_eq!(column_type_of("TENSORARRAY(BIT,8)"), None);
+        assert_eq!(column_type_of("TENSOR(BIT,8)"), Some(11));
+        assert_eq!(column_type_of("TENSORARRAY(BIT,8)"), Some(12));
     }
 
     #[test]
@@ -7446,7 +7501,7 @@ mod tests {
         assert_eq!(tensor_shape("TENSOR(FLOAT,3)"), Some((11, 3, 6)));
         assert_eq!(tensor_shape("MULTIVECTOR(FLOAT,3)"), Some((14, 3, 6)));
         assert_eq!(tensor_shape("TENSORARRAY(FLOAT,3)"), None);
-        assert_eq!(tensor_shape("TENSOR(BIT,8)"), None);
+        assert_eq!(tensor_shape("TENSOR(BIT,8)"), Some((11, 8, 0)));
     }
 
     #[test]
@@ -7454,7 +7509,7 @@ mod tests {
         assert_eq!(tensorarray_shape("TENSORARRAY(FLOAT,3)"), Some((12, 3, 6)));
         assert_eq!(tensorarray_shape("TENSORARRAY(DOUBLE,2)"), Some((12, 2, 7)));
         assert_eq!(tensorarray_shape("TENSOR(FLOAT,3)"), None);
-        assert_eq!(tensorarray_shape("TENSORARRAY(BIT,8)"), None);
+        assert_eq!(tensorarray_shape("TENSORARRAY(BIT,8)"), Some((12, 8, 0)));
     }
 
     #[test]
@@ -7602,15 +7657,24 @@ mod tests {
     }
 
     #[test]
-    fn blocks_reject_unsupported_column_types() {
+    fn a_bit_tensor_array_survives_a_block_round_trip() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
-        // A bit tensor array: bit tensors are outside the block writer's scope.
+        // A bit tensor row packs `dim` bits into `ceil(dim/8)` bytes; the block
+        // reader renders it back as the bit string the reference prints.
         engine
             .execute("CREATE TABLE v (id INT, ta TENSORARRAY(BIT,8));")
             .unwrap();
-        let err = engine.write_cpp_blocks("v").unwrap_err();
-        assert!(err.to_string().contains("not supported"), "{err}");
+        engine
+            .execute("INSERT INTO v VALUES (1, '[[[1, 1, 1, 0, 1, 0, 1, 1]]]');")
+            .unwrap();
+        engine.write_cpp_blocks("v").unwrap();
+        let rows = engine.fetch_rows("v").unwrap();
+        assert_eq!(
+            rows[0].get(1).map(|v| v.to_slt_string()),
+            Some("[[[11101011]]]".to_string()),
+            "{rows:?}"
+        );
     }
 
     #[test]

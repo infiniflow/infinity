@@ -1054,6 +1054,14 @@ fn pack_bit_leaves(text: &str) -> String {
             .collect();
         format!("[{}]", groups.join(","))
     } else {
+        let trimmed = inner.trim();
+        // Already a bit string (`10110001`): the packing is idempotent. Without
+        // this, re-encoding a value that was packed once parses the whole run
+        // as one number and collapses it to `[1]`, which is what a row reproject
+        // after a block read would do.
+        if trimmed.len() > 1 && trimmed.chars().all(|c| c == '0' || c == '1') {
+            return format!("[{trimmed}]");
+        }
         let bits: String = inner
             .split([',', ' '])
             .filter(|x| !x.trim().is_empty())
@@ -27583,4 +27591,5 @@ mod tests {
             vec![vec!["7".to_string()]]
         );
     }
+
 }

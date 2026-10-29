@@ -651,6 +651,19 @@ pub fn parse_tensorarray_f64(cell: &str) -> Vec<Vec<Vec<f64>>> {
 pub fn pack_tensor_body(vectors: &[Vec<f64>], dim: usize, element_type: i32) -> Vec<u8> {
     let mut body = Vec::new();
     for v in vectors {
+        if element_type == 0 {
+            // `kElemBit`: a row of `dim` bits is `ceil(dim/8)` bytes, bit `k`
+            // at `byte[k/8]` bit `k%8` - the same packing an `EMBEDDING(BIT, dim)`
+            // body uses (`embedding_type.h:253-262`).
+            let mut packed = vec![0u8; dim.div_ceil(8)];
+            for k in 0..dim {
+                if v.get(k).copied().unwrap_or(0.0) != 0.0 {
+                    packed[k / 8] |= 1 << (k % 8);
+                }
+            }
+            body.extend_from_slice(&packed);
+            continue;
+        }
         for k in 0..dim {
             push_embedding_element(&mut body, element_type, v.get(k).copied().unwrap_or(0.0));
         }
