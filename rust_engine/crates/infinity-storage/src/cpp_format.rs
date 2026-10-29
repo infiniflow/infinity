@@ -819,7 +819,11 @@ pub fn push_embedding_element(out: &mut Vec<u8>, element_type: i32, value: f64) 
         5 => out.extend_from_slice(&(value as i64).to_le_bytes()),
         7 => out.extend_from_slice(&value.to_le_bytes()),
         8 => out.extend_from_slice(&f32_to_f16_bits(value as f32).to_le_bytes()),
-        9 => out.extend_from_slice(&((value as f32).to_bits() >> 16).to_le_bytes()),
+        // A bfloat is two bytes: the high half of the `f32`'s bits. Narrowing
+        // is what makes the element half as wide as a float - without it the
+        // shift's `u32` is written whole and every later element lands past
+        // where the reader (`read_embedding_element`, width 2) looks.
+        9 => out.extend_from_slice(&(((value as f32).to_bits() >> 16) as u16).to_le_bytes()),
         _ => out.extend_from_slice(&(value as f32).to_le_bytes()), // Float32
     }
 }

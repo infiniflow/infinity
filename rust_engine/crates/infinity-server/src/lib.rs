@@ -7087,6 +7087,9 @@ pub fn write_show_index_response(
     o.write_field_end().map_err(tw)?;
     o.write_field_stop().map_err(tw)?;
     o.write_struct_end().map_err(tw)?; // ShowIndex_result
+    // The reply sits in the buffered writer until it is flushed; without this
+    // the caller waits for a frame that never leaves the server.
+    o.flush().map_err(tw)?;
     Ok(())
 }
 

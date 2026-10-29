@@ -687,10 +687,24 @@ pub fn parse_sparse_literal(cell: &str) -> (Vec<i64>, Vec<f64>) {
     let mut idx = Vec::new();
     let mut val = Vec::new();
     for part in inner.split(',') {
-        if let Some((i, v)) = part.split_once(':') {
-            if let (Ok(i), Ok(v)) = (i.trim().parse::<i64>(), v.trim().parse::<f64>()) {
-                idx.push(i);
-                val.push(v);
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        match part.split_once(':') {
+            Some((i, v)) => {
+                if let (Ok(i), Ok(v)) = (i.trim().parse::<i64>(), v.trim().parse::<f64>()) {
+                    idx.push(i);
+                    val.push(v);
+                }
+            }
+            // An index-only literal is a `SPARSE(BIT, …)` vector: every listed
+            // position is present and carries the implicit value 1.
+            None => {
+                if let Ok(i) = part.parse::<i64>() {
+                    idx.push(i);
+                    val.push(1.0);
+                }
             }
         }
     }
@@ -741,6 +755,11 @@ fn decode_sparse_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<S
     let elem_width = if elem == 0 { 0 } else { element_width(elem) };
     let mut idx_at = offset;
     let mut val_at = offset + nnz * index_width;
+    if nnz == 0 {
+        // The stored text of an empty sparse vector is the reference's marker
+        // (`reshape_sparse`): a `SELECT` prints it as-is.
+        return Some("(empty)".to_string());
+    }
     let mut parts = Vec::with_capacity(nnz);
     for _ in 0..nnz {
         let i = match index_width {
@@ -760,7 +779,16 @@ fn decode_sparse_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<S
             cpp_format::read_embedding_element(outline.get(val_at..val_at + elem_width)?, elem)?
         };
         val_at += elem_width;
-        parts.push(format!("{}:{}", i as i64, v));
+        // A `kElemBit` column lists the present positions only, and a float
+        // element prints with the reference's six decimals
+        // (`SparseT::ToString` -> `std::to_string`); an integer one is exact.
+        parts.push(if elem == 0 {
+            format!("{}", i as i64)
+        } else if elem >= 6 {
+            format!("{}:{v:.6}", i as i64)
+        } else {
+            format!("{}:{}", i as i64, v as i64)
+        });
     }
     Some(format!("[{}]", parts.join(",")))
 }
@@ -1599,23 +1627,25 @@ fn decode_value(
                 2 => i16::from_le_bytes(slot.try_into().unwrap()).to_string(),
                 3 => i32::from_le_bytes(slot.try_into().unwrap()).to_string(),
                 4 => i64::from_le_bytes(slot.try_into().unwrap()).to_string(),
-                // `Value::to_slt_string` renders floats with six decimals. That
-                // is fine for display, but a block stores the raw value: a
-                // six-decimal rendering would both lose digits here and make
-                // the port's blocks differ from the reference's.
-                5 => format!("{}", f32::from_le_bytes(slot.try_into().unwrap())),
-                6 => format!("{}", f64::from_le_bytes(slot.try_into().unwrap())),
+                // The cell text has to stay a *float*: `parse_value` answers an
+                // `Int` for a spelling without a decimal point, so a FLOAT
+                // column holding `0` would print `0` where the reference
+                // prints `0.000000`. `exact_float` keeps the shortest
+                // round-tripping digits and leaves the `.0` in place, so a
+                // rewrite of the block reproduces the same bits.
+                5 => crate::exact_float(f64::from(f32::from_le_bytes(
+                    slot.try_into().unwrap(),
+                ))),
+                6 => crate::exact_float(f64::from_le_bytes(slot.try_into().unwrap())),
                 // The 16-bit floats are two bytes wide and render like the
                 // other floats: an IEEE half (`float16_t`) and a bfloat whose
                 // raw bits are the high half of an `f32` (`bfloat16_t`).
-                7 => format!(
-                    "{}",
-                    crate::f16_bits_to_f32(u16::from_le_bytes(slot.try_into().unwrap()))
-                ),
-                8 => format!(
-                    "{}",
-                    f32::from_bits((u16::from_le_bytes(slot.try_into().unwrap()) as u32) << 16)
-                ),
+                7 => crate::exact_float(f64::from(crate::f16_bits_to_f32(
+                    u16::from_le_bytes(slot.try_into().unwrap()),
+                ))),
+                8 => crate::exact_float(f64::from(f32::from_bits(
+                    (u16::from_le_bytes(slot.try_into().unwrap()) as u32) << 16,
+                ))),
                 // Date/time values are stored as integers but must come back as
                 // text, matching how the engine renders them.
                 16 => cpp_format::days_to_date(i32::from_le_bytes(slot.try_into().unwrap())),
@@ -7327,11 +7357,14 @@ mod tests {
 
         assert_eq!(engine.write_cpp_blocks("sp").unwrap(), 2);
         let (_, rows) = engine.read_cpp_blocks("sp").unwrap();
+        // The cell text is the reference's rendering (`SparseT::ToString`
+        // prints floats with six decimals), which is also what the engine
+        // stores, so a rewrite of this block reproduces the same bytes.
         assert_eq!(
             rows,
             vec![
-                vec!["1".to_string(), "[0:1.5,3:2.5]".to_string()],
-                vec!["2".to_string(), "[7:3.5]".to_string()],
+                vec!["1".to_string(), "[0:1.500000,3:2.500000]".to_string()],
+                vec!["2".to_string(), "[7:3.500000]".to_string()],
             ]
         );
     }
@@ -7355,11 +7388,12 @@ mod tests {
 
         assert_eq!(engine.write_cpp_blocks("spb").unwrap(), 2);
         let (_, rows) = engine.read_cpp_blocks("spb").unwrap();
+        // A bit sparse renders as its present positions only.
         assert_eq!(
             rows,
             vec![
-                vec!["1".to_string(), "[0:1,20:1,80:1]".to_string()],
-                vec!["2".to_string(), "[7:1]".to_string()],
+                vec!["1".to_string(), "[0,20,80]".to_string()],
+                vec!["2".to_string(), "[7]".to_string()],
             ]
         );
     }
