@@ -450,6 +450,9 @@ class RemoteTable:
         return self
 
     def sort(self, order_by_expr_list: list[list[str, SortType]] | None):
+        if order_by_expr_list is None:
+            self.query_builder.sort(None)
+            return self
         for order_by_expr in order_by_expr_list:
             if len(order_by_expr) != 2:
                 raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE,

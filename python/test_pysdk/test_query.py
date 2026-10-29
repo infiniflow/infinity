@@ -92,3 +92,30 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_query_builder", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    def test_none_clears_optional_clauses(self, request):
+        # the optional query clauses all accept None in their type hints, but
+        # the builders crashed on it: sort/highlight/output raised TypeError
+        # iterating None, filter/having died inside sqlglot with "ParseError:
+        # SQL cannot be None", and only group_by had a None guard. None now
+        # clears the clause, matching limit(None)/offset(None).
+        from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
+        qb = InfinityThriftQueryBuilder(None)
+        for clause in (qb.output, qb.highlight, qb.filter, qb.having, qb.group_by, qb.sort):
+            clause(None)
+        assert qb._columns is None and qb._highlight is None
+        assert qb._filter is None and qb._having is None
+        assert qb._groupby is None and qb._sort is None
+        # a real clause still applies after the None clears
+        qb.output(["c1"])
+        assert qb._columns is not None
+
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded part needs the embedded engine")
+        from infinity_embedded.local_infinity.query_builder import InfinityLocalQueryBuilder
+        qb = InfinityLocalQueryBuilder(None)
+        for clause in (qb.output, qb.highlight, qb.filter, qb.having, qb.group_by, qb.sort):
+            clause(None)
+        assert qb._columns is None and qb._highlight is None
+        assert qb._filter is None and qb._having is None
+        assert qb._group_by is None and qb._sort is None
