@@ -120,8 +120,11 @@ impl Error {
             // 3049 NOT_SUPPORTED_TYPE_CONVERSION.
             Error::Invalid(m) if m.starts_with("not supported type conversion") => 3049,
             // 3032 NOT_SUPPORTED: a column type the reference's
-            // `VerifyColumnDataType` refuses at DDL time.
+            // `VerifyColumnDataType` refuses at DDL time, and a distance
+            // metric that does not fit the column (`hamming` on a float
+            // vector; the reference answers NOT_SUPPORTED, not 3013).
             Error::Invalid(m) if m.starts_with("Not supported data type") => 3032,
+            Error::Invalid(m) if m.contains("hamming") && m.contains("bit vector") => 3032,
             // 3010 DATA_TYPE_MISMATCH / INVALID_KNN_DISTANCE_TYPE.
             Error::Invalid(m)
                 if m.starts_with("invalid distance type")
