@@ -1209,6 +1209,41 @@ impl Catalog {
     /// Registers a database name. `if_not_exists` tolerates an existing name.
     pub fn create_database(&self, name: &str, if_not_exists: bool) -> Result<()> {
         if self.cpp_only {
+            // `NewTxn::CreateDatabase` writes one record, one tag and the id
+            // counter. A name that already has a record - a live one, a dropped
+            // one the `drop|db|…` marker still holds, or the implied
+            // `default_db` - keeps the full rewrite below, whose sweep is what
+            // reconciles the leftovers. Anything else is the common case, and
+            // the rewrite rebuilt every table and index record for nothing:
+            // 1000 databases cost 43 ms per call, 10,000 over twenty minutes.
+            if name != "default_db" && !self.has_database_record(name)? {
+                let id = self.next_cpp_database_id()?;
+                self.stage(&[
+                    (
+                        infinity_storage::catalog_format::NEXT_DATABASE_ID
+                            .as_bytes()
+                            .to_vec(),
+                        Some(id.to_string().into_bytes()),
+                    ),
+                    (
+                        infinity_storage::catalog_format::catalog_db_key(
+                            name,
+                            crate::DDL_TS_SENTINEL,
+                        )
+                        .into_bytes(),
+                        Some(id.to_string().into_bytes()),
+                    ),
+                    (
+                        infinity_storage::catalog_format::catalog_db_tag_key(
+                            &id.to_string(),
+                            "next_table_id",
+                        )
+                        .into_bytes(),
+                        Some(b"0".to_vec()),
+                    ),
+                ])?;
+                return Ok(());
+            }
             let mut dbs = self.cpp_databases()?;
             if self.cpp_database_records()?.iter().any(|d| d == name) {
                 return if if_not_exists {
@@ -1220,46 +1255,16 @@ impl Catalog {
             // `cpp_databases()` already lists `default_db` (the reference
             // implies it), so pushing it again would write the database twice
             // and hand it two ids: the layout would then emit
-            // `db|1|next_table_id` *and* `db|2|next_table_id`, and
-            // `catalog|db|default_db|{ts}` would end up carrying the second id.
+            // `db|1|next_table_id` *and* `db|2|next_table_id`.
             if !dbs.iter().any(|d| d == name) {
                 // `NewTxn::CreateDatabase` applies `IncrLatestID(next_database_id)`
-                // and writes the counter in the same transaction. The id is what
-                // keeps a **re-created** name apart from the record a `drop|db|…`
-                // marker still holds: reusing it would write the new record over
-                // the old key, and the marker would go on hiding the database.
+                // and writes the counter in the same transaction.
                 let id = self.next_cpp_database_id()?;
                 self.stage(&[(
                     infinity_storage::catalog_format::NEXT_DATABASE_ID.as_bytes().to_vec(),
                     Some(id.to_string().into_bytes()),
                 )])?;
                 dbs.push(name.to_string());
-            }
-            // A brand-new database writes one record and one tag. The full
-            // rewrite below also rebuilds every table and index record, which
-            // turned N `CREATE DATABASE`s into O(n^2): 1000 databases cost
-            // 43 ms per call and 10,000 took over twenty minutes. A name that
-            // already has a record (or the implied `default_db`) keeps the old
-            // path, where the sweep is what reconciles it.
-            if name != "default_db" && !self.has_database_record(name)? {
-                let id = self.next_cpp_database_id()?;
-                self.stage(&[
-                    (
-                        infinity_storage::catalog_format::NEXT_DATABASE_ID
-                            .as_bytes()
-                            .to_vec(),
-                        Some(id.to_string().into_bytes()),
-                    ),
-                    (
-                        infinity_storage::catalog_format::catalog_db_key(name, crate::DDL_TS_SENTINEL).into_bytes(),
-                        Some(id.to_string().into_bytes()),
-                    ),
-                    (
-                        infinity_storage::catalog_format::catalog_db_tag_key(&id.to_string(), "next_table_id").into_bytes(),
-                        Some(b"0".to_vec()),
-                    ),
-                ])?;
-                return Ok(());
             }
             self.rewrite_cpp(&dbs, &self.cpp_tables()?, &self.cpp_indexes()?)?;
             return Ok(());
