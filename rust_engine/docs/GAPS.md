@@ -35,9 +35,7 @@
 
 回归覆盖：`tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`cpp_blocks::tests::a_checkpoint_writes_only_the_committed_prefix`、`tests::a_multivector_table_round_trips_through_its_blocks`、门禁 30 / 40。当前规模：executor 704 passed / 29 ignored、catalog 54、storage 463 passed / 5 ignored、txn 30，全绿。
 
-**一处 `.slt` 仍未对齐（已复现，未修）**，Gate A 因此是 1556/1560：
-
-- `ddl/drop/test_drop_column.slt` 4 条：`ALTER TABLE … DROP COLUMN` **之后**创建的 snapshot，`RESTORE TABLE SNAPSHOT` 回来行数翻倍（3 行变 6 行、再开一次变 9 行）并报 `block 0.0 holds 6 of the 6 rows committed at ts …`；快照里的块文件与 `version` 都是 3 行（已核对），所以问题在恢复后 WAL 回放把旧 append 再叠了一遍。最小复现：建三列表 → 插 3 行 → 建二级索引 → snapshot → `DROP COLUMN(c1)` → snapshot → `DROP TABLE` → `RESTORE` 第二个 snapshot → 再开一次进程读表。
+**Gate A 现在是 1560/1560。** 恢复快照时列文件要跟着新表的列 id 改名：`DROP COLUMN` 之后幸存列保留原 id（`1.col`、`2.col`），而 `create_table_typed` 把重建表的列从 0 编号，读侧按 `meta.ids` 找不到 `0.col` 就整块解码失败、表读成空（`substitute_column_id`）。
 
 ### 2.1 事务冲突检查 / 回滚
 

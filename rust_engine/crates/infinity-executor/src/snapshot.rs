@@ -702,7 +702,7 @@ impl Engine {
             &vec![None; columns.len()],
         )?;
         let db_id = self.database_id_of(&name);
-        let out = self.copy_files_back(table, db_id, meta.id)?;
+        let out = self.copy_files_back(table, db_id, meta.id, &column_id_map(table))?;
         // The copied block files carry the rows, but the port reads a table
         // through its row journal, so decode them back into it. The reference
         // serves the restored table straight from the files it copied.
@@ -739,7 +739,13 @@ impl Engine {
     /// `SnapshotInfo::RestoreSnapshotFiles` (`snapshot_info_impl.cpp:498`):
     /// copies each file of the snapshot into the data directory, substituting
     /// the ids the restore handed out for the ones the snapshot recorded.
-    fn copy_files_back(&self, snapshot: &Json, db_id: u64, table_id: u64) -> Result<Vec<String>> {
+    fn copy_files_back(
+        &self,
+        snapshot: &Json,
+        db_id: u64,
+        table_id: u64,
+        columns: &[(u64, u64)],
+    ) -> Result<Vec<String>> {
         let name = json_str(snapshot, "snapshot_name");
         let root = self.snapshot_dir().join(&name);
         let data = self.blocks_root();
@@ -750,7 +756,10 @@ impl Engine {
             if !src.exists() {
                 continue;
             }
-            let dst_relative = substitute_ids(&file, &db_id.to_string(), &table_id.to_string());
+            let dst_relative = substitute_column_id(
+                &substitute_ids(&file, &db_id.to_string(), &table_id.to_string()),
+                columns,
+            );
             let dst = data.join(&dst_relative);
             if let Some(parent) = dst.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
@@ -917,6 +926,51 @@ fn split_qualified(name: &str) -> (String, String) {
 
 /// The reference's path rewrite: the `db_*` / `tbl_*` ids of the snapshot are
 /// replaced by the ones the restore handed out (`snapshot_info_impl.cpp:511`).
+/// `(snapshot column id, restored column id)` for every column of a table
+/// snapshot. `create_table_typed` numbers the restored table's columns from
+/// zero, while a `DROP COLUMN` leaves the surviving columns with their
+/// original ids (`1.col`, `2.col`), so the files have to follow the new ids.
+fn column_id_map(table: &Json) -> Vec<(u64, u64)> {
+    json_arr(table, "column_definition")
+        .iter()
+        .enumerate()
+        .map(|(i, column)| {
+            let old = json_get(column, "column_id")
+                .map(json_int)
+                .unwrap_or(i as i64) as u64;
+            (old, i as u64)
+        })
+        .collect()
+}
+
+/// Renames a block column file (`{id}.col`, `col_{id}_out`) to the id the
+/// restored table gave that column. Without it the reader looks for `0.col`
+/// in a block that holds `1.col`, `2.col`: the decode fails and the restored
+/// table reads as empty (Gate A's `test_drop_column`).
+fn substitute_column_id(file: &str, columns: &[(u64, u64)]) -> String {
+    let Some((dir, name)) = file.rsplit_once('/') else {
+        return file.to_string();
+    };
+    let mapped = |id: u64| columns.iter().find(|(old, _)| *old == id).map(|(_, new)| *new);
+    let renamed = if let Some(stem) = name.strip_suffix(".col") {
+        stem.parse::<u64>().ok().and_then(mapped).map(|id| format!("{id}.col"))
+    } else if let Some(rest) = name
+        .strip_prefix("col_")
+        .and_then(|r| r.strip_suffix("_out"))
+    {
+        rest.parse::<u64>()
+            .ok()
+            .and_then(mapped)
+            .map(|id| format!("col_{id}_out"))
+    } else {
+        None
+    };
+    match renamed {
+        Some(name) => format!("{dir}/{name}"),
+        None => file.to_string(),
+    }
+}
+
 fn substitute_ids(file: &str, db_id: &str, table_id: &str) -> String {
     let mut out = file.to_string();
     if let Some(pos) = out.find("db_") {
