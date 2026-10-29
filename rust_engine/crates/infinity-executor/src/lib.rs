@@ -9379,7 +9379,7 @@ impl Engine {
             seg += 1;
             off = 0;
         }
-        // Exactly `DEFAULT_SEGMENT_CAPACITY` rows seal a segment
+        // Exactly `Self::SEGMENT_CAPACITY` rows seal a segment
         // (`catalog_cache_impl.cpp:61`): the next append opens the following
         // one, which is how a table larger than 8,388,608 rows gets its second
         // segment without any compaction.
@@ -14738,6 +14738,10 @@ impl Engine {
     /// Rows committed per block while streaming a `COPY … FROM`.
     const COPY_BATCH_ROWS: usize = 8192;
 
+    /// `Self::SEGMENT_CAPACITY` (`table_meta.cppm`): the rows one segment
+    /// holds. A `COPY` that reaches it seals the segment and opens the next.
+    const SEGMENT_CAPACITY: usize = 1024 * 8192;
+
     /// Number of segments `table` has: at least one per write batch, and more
     /// when a single import exceeds the segment capacity.
     /// The table's segments with their row counts, for `SHOW SEGMENTS`. A table
@@ -17611,6 +17615,10 @@ impl Engine {
         let t = self.txn.begin();
         let mut staged = 0usize;
         let mut segments: Vec<u32> = Vec::new();
+        // One entry per staged batch: the block `version` keeps a `create`
+        // boundary per append, and a statement that rolls over into a second
+        // segment must keep the boundaries of both.
+        let mut batches_all: Vec<usize> = Vec::new();
         // `(row id, stored text)` per row, so the commit can hand the block the
         // values it publishes without a second pass over the file.
         let mut encoded_rows: Vec<(usize, String)> = Vec::new();
@@ -17662,43 +17670,65 @@ impl Engine {
                 // The statement keeps its own segment cursor: the table's
                 // shared counter belongs to whoever allocated last, and an
                 // `INSERT` during a long `COPY` moves it on.
-                let (range, next_cursor) = match cursor.take() {
-                    Some(cursor) => self.reserve_import_rows(table, batch.len(), cursor)?,
-                    None => {
-                        let opened = self.begin_import(table)?;
-                        self.reserve_import_rows(table, batch.len(), opened)?
-                    }
-                };
-                let base = range.base;
-                cursor = Some(next_cursor);
-                self.note_index_insert(table, batch.len());
-                for (k, row) in batch.iter().enumerate() {
-                    // The rows ride in the transaction only as its `ImportV2`
-                    // extent; their values go to the block buffer at commit.
-                    let encoded = self.encode_row_stored(table, row, &types_for_scan)?;
-                    encoded_rows.push((base + k, encoded));
-                }
-                let segment = (base >> 32) as u32;
-                if !segments.contains(&segment) {
-                    segments.push(segment);
-                }
+                //
+                // `Self::SEGMENT_CAPACITY` bounds one segment: the reference
+                // seals a full segment and continues in the next, so a `COPY`
+                // of more rows than that ends up with two segments - the one
+                // the extent fills and the one the remainder opens.
                 let schema = self.table_schema(table).unwrap_or_default();
-                for (k, row) in batch.iter().enumerate() {
-                    self.update_indexes_on_insert(table, base + k, row, &schema)?;
-                    let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-                    self.update_text_indexes(table, base + k, &texts, &schema);
-                    self.update_vector_caches(table, base + k, &texts);
+                let mut start = 0usize;
+                while start < batch.len() {
+                    let mut current = cursor.take();
+                    if current
+                        .as_ref()
+                        .is_some_and(|c| c.offset as usize >= Self::SEGMENT_CAPACITY)
+                    {
+                        current = None;
+                    }
+                    let room = current.as_ref().map_or(Self::SEGMENT_CAPACITY, |c| {
+                        Self::SEGMENT_CAPACITY - c.offset as usize
+                    });
+                    let take = (batch.len() - start).min(room);
+                    let (range, next_cursor) = match current {
+                        Some(cursor) => self.reserve_import_rows(table, take, cursor)?,
+                        None => {
+                            let opened = self.begin_import(table)?;
+                            self.reserve_import_rows(table, take, opened)?
+                        }
+                    };
+                    let base = range.base;
+                    cursor = Some(next_cursor);
+                    batches_all.push(take);
+                    self.note_index_insert(table, take);
+                    for (k, row) in batch[start..start + take].iter().enumerate() {
+                        // The rows ride in the transaction only as its `ImportV2`
+                        // extent; their values go to the block buffer at commit.
+                        let encoded = self.encode_row_stored(table, row, &types_for_scan)?;
+                        encoded_rows.push((base + k, encoded));
+                    }
+                    let segment = (base >> 32) as u32;
+                    if !segments.contains(&segment) {
+                        segments.push(segment);
+                    }
+                    for (k, row) in batch[start..start + take].iter().enumerate() {
+                        self.update_indexes_on_insert(table, base + k, row, &schema)?;
+                        let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
+                        self.update_text_indexes(table, base + k, &texts, &schema);
+                        self.update_vector_caches(table, base + k, &texts);
+                    }
+                    total += take;
+                    staged += take;
+                    start += take;
                 }
-                total += batch.len();
-                staged += batch.len();
             }
             if eof {
                 break;
             }
         }
         if staged > 0 {
-            let batches = cursor.map(|cursor| cursor.batches).unwrap_or_default();
-            self.commit_import_chunk(table, t, &segments, &encoded_rows, &batches)?;
+            // One `create` boundary per staged batch, across every segment this
+            // statement opened.
+            self.commit_import_chunk(table, t, &segments, &encoded_rows, &batches_all)?;
         } else {
             drop(t);
         }

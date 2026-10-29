@@ -1235,6 +1235,32 @@ impl Catalog {
                 )])?;
                 dbs.push(name.to_string());
             }
+            // A brand-new database writes one record and one tag. The full
+            // rewrite below also rebuilds every table and index record, which
+            // turned N `CREATE DATABASE`s into O(n^2): 1000 databases cost
+            // 43 ms per call and 10,000 took over twenty minutes. A name that
+            // already has a record (or the implied `default_db`) keeps the old
+            // path, where the sweep is what reconciles it.
+            if name != "default_db" && !self.has_database_record(name)? {
+                let id = self.next_cpp_database_id()?;
+                self.stage(&[
+                    (
+                        infinity_storage::catalog_format::NEXT_DATABASE_ID
+                            .as_bytes()
+                            .to_vec(),
+                        Some(id.to_string().into_bytes()),
+                    ),
+                    (
+                        infinity_storage::catalog_format::catalog_db_key(name, crate::DDL_TS_SENTINEL).into_bytes(),
+                        Some(id.to_string().into_bytes()),
+                    ),
+                    (
+                        infinity_storage::catalog_format::catalog_db_tag_key(&id.to_string(), "next_table_id").into_bytes(),
+                        Some(b"0".to_vec()),
+                    ),
+                ])?;
+                return Ok(());
+            }
             self.rewrite_cpp(&dbs, &self.cpp_tables()?, &self.cpp_indexes()?)?;
             return Ok(());
         }
