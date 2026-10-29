@@ -6,7 +6,7 @@
 
 - `ported`：Rust 有同等场景的用例，映射列给出 `crate 模块::测试名`。少数以 native 组件等价替代 C++ 第三方（例如 RocksDB 事务 KV → `txn_kv`、后台线程池 → `bg_task`），映射列直接指向替代实现，不声称字节级一致。
 - `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point`/`Line`/`Box`/`Path`/`Polygon`/`Circle`）相关用例——这些类型不移植。
-- `exempt`：SIMD/第三方夹具、整段或整块位于 `#if 0` 的用例（C++ 构建中不存在），以及登记为设计变更的组件——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 事务型 KV、无 WAL 的 checkpoint 模式、后台任务线程池等（后三项的等价实现已在 `ported` 行给出）。
+- `exempt`：SIMD/第三方夹具、整段或整块位于 `#if 0` 的用例（C++ 构建中不存在），以及**只测第三方 API 本身**的夹具——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 自己的 `TransactionDB` 环境、后台线程池。它们要覆盖的**行为**由 native 等价实现兜住，并在 `ported` 行给出映射：事务型 KV → `infinity-storage` 的 `txn_kv`（`kv_store0`..`kv_store5`、`wal`、`txn_conflict_same_key_snapshot_isolation` 全部通过，`kv_store1` 按参考的 `DISABLED_SLOW_` 标 `#[ignore]`；`kv_store6` 在 `infinity-executor` 的 `kv_ut`），线程池 → `bg_task`。
 - 带 `#[ignore]` 的 `ported` 行：C++ 的 `DISABLED_*` 用例，Rust 用 `#[ignore]` 表达，需 `cargo test -- --ignored` 显式运行。
 
 表里只有以上三种状态，没有 `partial`/`gap` 行；类层面的状态与 `partial` 在 [`CLASS_MAP.md`](CLASS_MAP.md) §2。

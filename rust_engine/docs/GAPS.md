@@ -35,6 +35,11 @@
 
 回归覆盖：`tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`cpp_blocks::tests::a_checkpoint_writes_only_the_committed_prefix`、`tests::a_multivector_table_round_trips_through_its_blocks`、门禁 30 / 40。当前规模：executor 704 passed / 29 ignored、catalog 54、storage 463 passed / 5 ignored、txn 30，全绿。
 
+**两条 `.slt` 仍未对齐（已复现，未修）**，Gate A 因此是 1555/1560：
+
+- `ddl/drop/test_drop_column.slt` 4 条：`ALTER TABLE … DROP COLUMN` **之后**创建的 snapshot，`RESTORE TABLE SNAPSHOT` 回来是空表（`SELECT *` 无行，索引查找也无行）。最小复现：建三列表 → 插 3 行 → 建二级索引 → snapshot → `DROP COLUMN(c1)` → snapshot → `DROP TABLE` → `RESTORE` 第二个 snapshot。
+- `dql/aggregate/test_agg_search.slt` 1 条：`INSERT (1,10),(2,10),(3,20),(4,10)` + `CREATE INDEX ON (c2)` 之后，`WHERE c2 = 10` 只回 2 行（应为 3）；`SELECT ROW_ID(), …` 的全表路径回 3 行，说明漏在 `index_lookup` 的 chunk/页查找一侧。
+
 ### 2.1 事务冲突检查 / 回滚
 
 **本节没有待办项。** 下面是这一层现在的口径。
