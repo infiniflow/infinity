@@ -573,6 +573,29 @@ fn round_bf16(x: f32) -> f32 {
     f32::from_bits(x.to_bits() & 0xffff_0000)
 }
 
+/// Whether a column's stored text is exactly what `to_slt_string` renders, so a
+/// projected cell can be passed through instead of parsed and re-formatted.
+///
+/// Integers keep their digits and `VARCHAR` is already the text; a `FLOAT`
+/// column renders `4.0` in the block but `4.000000` on the wire, so it must
+/// keep the numeric path.
+fn text_is_display(declared: &str) -> bool {
+    let t = declared.trim().to_ascii_uppercase();
+    if t.is_empty() {
+        return false;
+    }
+    t.starts_with("VARCHAR")
+        || t.starts_with("CHAR")
+        || t.starts_with("TEXT")
+        || t.starts_with("STRING")
+        || t.starts_with("TINYINT")
+        || t.starts_with("SMALLINT")
+        || t.starts_with("BIGINT")
+        || t.starts_with("INTEGER")
+        || t.starts_with("INT")
+        || t.starts_with("UINT")
+}
+
 fn is_float_type(type_text: &str) -> bool {
     matches!(
         type_text.to_ascii_uppercase().as_str(),
@@ -12155,7 +12178,7 @@ impl Engine {
                     columns,
                     rows: rows
                         .into_iter()
-                        .map(|r| r.into_iter().map(|v| v.to_slt_string()).collect())
+                        .map(|r| r.into_iter().map(|v| v.into_slt_string()).collect())
                         .collect(),
                 })
             }
@@ -13376,7 +13399,7 @@ impl Engine {
         // to be dropped here.
         let deleted = self.tombstone_set(table)?;
         let out: Vec<Vec<Value>> = rows
-            .iter()
+            .into_iter()
             .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
             .map(|(_, cells)| cells.iter().map(|c| parse_value(c)).collect())
             .collect();

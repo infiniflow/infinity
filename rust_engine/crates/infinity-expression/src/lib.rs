@@ -52,6 +52,16 @@ impl Value {
         }
     }
 
+    /// [`Self::to_slt_string`] without the copy of a `Str` cell: the caller owns
+    /// the value, so a text column's cell moves into the result instead of being
+    /// cloned (20000 rows of a VARCHAR projection paid 20000 extra allocations).
+    pub fn into_slt_string(self) -> String {
+        match self {
+            Value::Str(s) => s,
+            other => other.to_slt_string(),
+        }
+    }
+
     fn as_f64(&self) -> Option<f64> {
         match self {
             Value::Int(i) => Some(*i as f64),
