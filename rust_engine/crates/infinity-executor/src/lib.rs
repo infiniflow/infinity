@@ -1015,6 +1015,13 @@ fn pack_bit_vector(s: &str) -> String {
     if inner.trim().is_empty() {
         return "[]".to_string();
     }
+    // Already a bit string (`0100000000000000`): packing is idempotent. Without
+    // this, re-encoding a stored row (a KNN hit rebuilt from its text) parsed
+    // the whole run as one number and collapsed the vector to `[1]`.
+    let trimmed = inner.trim();
+    if trimmed.len() > 1 && trimmed.chars().all(|c| c == '0' || c == '1') {
+        return format!("[{trimmed}]");
+    }
     let bits: String = inner
         .split([',', ' '])
         .filter(|x| !x.trim().is_empty())
