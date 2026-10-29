@@ -13566,17 +13566,6 @@ impl Engine {
     ///
     /// The text form is what the full-text and vector paths score, so they ask
     /// for it directly instead of going through a `Vec<Value>`.
-    /// Drops the append buffer of `table`: the caller is replacing the whole
-    /// row set (a compaction renumbers every row, so what was buffered for the
-    /// source segments is gone with them).
-    fn clear_pending_rows(&self, table: &str) {
-        let key = self.table_key(table);
-        if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
-            entry.pending_rows.clear();
-        }
-    }
-
-    /// [`Self::row_texts`] for one row id.
     fn row_texts(&self, table: &str, ids: &[u64]) -> Result<Vec<(usize, Vec<u8>)>> {
         let mut out = Vec::with_capacity(ids.len());
         if let Ok(mut cursor) = self.block_cursor(table) {
@@ -15198,6 +15187,13 @@ impl Engine {
         // Compaction rewrites segments, so both the manual and the periodic
         // task require `kWritable` (`compaction_process_impl.cpp:270-295`).
         self.ensure_writable()?;
+        // One write batch at a time per table: a compaction moves every row it
+        // merges and drops the buffer entries of the segments it consumed, so
+        // it must not interleave with an import's commit or with its block
+        // write (a row the compaction cleared but never re-published left the
+        // mirror with an empty block).
+        let gate = self.batch_gate(table);
+        let _batch = gate.lock().unwrap();
         self.invalidate_row_cache(table);
         // Compaction moves rows between segments without changing how many are
         // live, so the counter survives even though the mirror's row-id
@@ -15371,13 +15367,35 @@ impl Engine {
         // segment directories the reference keeps until `Cleanup`.
         // The merge renumbers every row: whatever the append buffer held for
         // the source segments is gone with them.
-        self.clear_pending_rows(table);
+        // The merged segments' rows are gone with them (they are re-published
+        // under the new segment's ids below); the rows of segments this
+        // compaction did not pick stay in the buffer - clearing all of them
+        // dropped the rows of an import that had committed but whose mirror
+        // write had not run yet, and the next write then found an empty block.
+        {
+            let tkey = self.table_key(table);
+            let mut tables = self.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&tkey) {
+                entry
+                    .pending_rows
+                    .retain(|(seq, _)| !sources.contains(&((*seq >> 32) as u32)));
+            }
+        }
         let merged: Vec<(usize, Vec<u8>)> = rows
             .iter()
             .enumerate()
             .map(|(i, (_, text))| (base + i, text.clone()))
             .collect();
         self.publish_encoded_rows(table, &merged)?;
+        // `CommitBottomCompact`: the merged segment's blocks and records belong
+        // to the compaction transaction, so they are written before it is
+        // acknowledged. Deferring them to the next checkpoint left the mirror
+        // inconsistent for a crash in between: the `drop|seg|…` markers above
+        // are durable, so every source segment was deprecated on disk while the
+        // merged one had no blocks at all - the table came back empty.
+        if !rows.is_empty() && self.has_block_layout(table) {
+            self.write_cpp_blocks_bounded(table, compact_ts)?;
+        }
         // The merge renumbered every row, so every index posting now points at
         // a dead row id. Rebuild the declared indexes from the merged rows.
         self.rebuild_indexes()?;
@@ -17502,6 +17520,10 @@ impl Engine {
         path: &str,
         opts: &[(String, String)],
     ) -> Result<QueryResult> {
+        // The import writes its blocks inside its own commit, so a background
+        // compaction must not run between the commit and the write.
+        let gate = self.batch_gate(table);
+        let _batch = gate.lock().unwrap();
         if self.storage.catalog.get_table_by_name(table)?.is_none() {
             return Err(Error::NotFound(format!("table '{table}'")));
         }

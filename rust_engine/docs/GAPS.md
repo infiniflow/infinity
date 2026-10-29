@@ -33,9 +33,10 @@
 - **多值 / 张量表的文本行副本**：这类表的 WAL 帧用本 build 的 `DataBlock` 还原不了行，checkpoint 没跑过时靠 `needs_text_rows` 保留的文本行读出，块仍是权威。
 - **列投影的并发守卫**：块文件就是行集，不需要「本进程写过镜像」的快照，快照只做并发守卫（`try_cpp_projection`）。
 
+崩溃恢复的口径：**compaction 在自己的提交里写它合并出的段**（`write_cpp_blocks_bounded`，块与 `catalog|seg|…` 记录一起落盘），否则崩溃时 `drop|seg|…` 标记已经 durable、新段却还没有块，表会读成空；**WAL 回放除表名外还比表 id**（`ReplayedAppend::table_id`），快照恢复把表换成了新 id，旧 id 的 append 帧不会再叠到恢复出来的行上；**checkpoint 的 segment 清理保留被提交上界裁掉的段**，否则一个先于某次提交开始的 checkpoint 会删掉那次提交刚写好的块目录。
+
 回归覆盖：`tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`cpp_blocks::tests::a_checkpoint_writes_only_the_committed_prefix`、`tests::a_multivector_table_round_trips_through_its_blocks`、门禁 30 / 40。当前规模：executor 704 passed / 29 ignored、catalog 54、storage 464 passed / 5 ignored、txn 30，全绿。
 
-**崩溃恢复的三处未对齐（`restart_test`，kill -9 后重启）**：`test_compact.py::test_restart_compact_index`、`test_compact.py::test_compact_restart_repeatedly`、`test_snapshot.py::test_snapshot_basic_restart` 失败：重启后表的行数与崩溃前不一致（前者读成 0 行，后者 5 vs 3），随后一次 checkpoint 还会报 `block 93.0 holds 0 of the 3 rows committed at ts 214`。这批用例在 `35a6f0aa5` 上同样失败，与本次导入/DDL 改动无关；触发面是「最后一批 append/compact 之后没有 checkpoint 就崩溃」——块文件没写过、WAL 回放要重建这批行。
 
 **导入在自己的提交里封段、落块**：`commit_import_chunk` 提交后按段容量（8,388,608 行）回绕、记录导入 extent（它决定段是否「封存」，也就是块和段要不要写 fast rough filter），再 `write_cpp_blocks_bounded` 把这一批行写进块；`copy_from` 的 `FORMAT FVECS` 分支同样。所以 `COPY` 结束就能看到磁盘上的真实分块：8,388,608 行 → 1 段 1024 块，8,388,609 行 → 2 段（1024 + 1 块）。
 

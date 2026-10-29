@@ -2025,6 +2025,13 @@ impl Engine {
             counts = by_segment.into_iter().collect();
         }
         counts.sort_unstable();
+        // Every segment the table holds **before** the clip below. A commit that
+        // landed after this write's bound has no block in it yet, and its
+        // directory must survive the sweep that drops segments the rewrite did
+        // not produce - otherwise a checkpoint that started before an import
+        // committed deleted the block the import had just written, and the
+        // segment was left with rows and no file.
+        let known_segments: Vec<u32> = counts.iter().map(|(segment, _)| *segment).collect();
         // `NewTxn::Checkpoint` writes the rows of the transactions that had
         // finished by `checkpoint_ts`: a block holds the rows whose append was
         // stamped at or before it (`GetRowCnt1` -> `GetRowCount(begin_ts)`).
@@ -2339,6 +2346,7 @@ impl Engine {
             .iter()
             .map(|segment| format!("seg_{}", segment.segment_id))
             .chain(dropped.iter().map(|segment| format!("seg_{segment}")))
+            .chain(known_segments.iter().map(|segment| format!("seg_{segment}")))
             .collect();
         if let Ok(entries) = std::fs::read_dir(&tbl_dir) {
             for entry in entries.flatten() {
@@ -3209,6 +3217,15 @@ impl Engine {
             Default::default();
         for append in &appends {
             let table = self.qualified_table(&append.table);
+            // The frame names the table **id** it was written for. A snapshot
+            // restore re-creates the table under a new id (and a dropped name
+            // can come back the same way), so rows of a frame that names an
+            // older id belong to a table that no longer exists - replaying them
+            // appended the pre-restore rows on top of the restored ones.
+            match self.storage.catalog.get_table_by_name(&table) {
+                Ok(Some(meta)) if append.table_id == u64::MAX || append.table_id == meta.id => {}
+                _ => continue,
+            }
             let defaults = self.table_defaults(&table).unwrap_or_default();
             // A row the block files already hold is not re-appended: the frame
             // may describe a commit that reached the blocks before the crash
@@ -3247,6 +3264,12 @@ impl Engine {
         }
         for delete in &deletes {
             let table = self.qualified_table(&delete.table);
+            // A tombstone for an id the table no longer has (see the append
+            // loop) cannot mark a row of the table that exists now.
+            match self.storage.catalog.get_table_by_name(&table) {
+                Ok(Some(meta)) if delete.table_id == u64::MAX || delete.table_id == meta.id => {}
+                _ => continue,
+            }
             let ids: Vec<usize> = delete.row_ids.iter().map(|id| *id as usize).collect();
             self.note_deleted_ids(&table, &ids);
             self.settle_delete_ts(&table, ids.len(), delete.commit_ts);

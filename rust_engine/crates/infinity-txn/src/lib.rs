@@ -1167,6 +1167,7 @@ impl TxnManager {
                         WalCmd::Append {
                             db_name,
                             table_name,
+                            table_id,
                             row_ranges,
                             block,
                             ..
@@ -1175,6 +1176,7 @@ impl TxnManager {
                             if for_blocks {
                                 appends.push(ReplayedAppend {
                                     table: join_table(db_name, table_name),
+                                    table_id: table_id.parse().unwrap_or(u64::MAX),
                                     commit_ts: entry.commit_ts,
                                     rows: append_rows(db_name, table_name, row_ranges, block)?,
                                 });
@@ -1183,6 +1185,7 @@ impl TxnManager {
                         WalCmd::Delete {
                             db_name,
                             table_name,
+                            table_id,
                             row_ids,
                             ..
                         } => {
@@ -1191,6 +1194,7 @@ impl TxnManager {
                             if for_blocks {
                                 deletes.push(ReplayedDelete {
                                     table: join_table(db_name, table_name),
+                                    table_id: table_id.parse().unwrap_or(u64::MAX),
                                     commit_ts: entry.commit_ts,
                                     row_ids: row_ids.iter().map(|id| id.to_u64()).collect(),
                                 });
@@ -1727,6 +1731,10 @@ fn build_append(
 pub struct ReplayedAppend {
     /// Qualified table name (`db.tbl`, or `tbl` when the log has no db part).
     pub table: String,
+    /// The table **id** the frame was written for. A restore re-creates the
+    /// table under a new id, and a dropped name can be created again: rows of
+    /// a frame that names an older id belong to a table that no longer exists.
+    pub table_id: u64,
     /// The transaction's commit ts, which is the `create` the block's
     /// `version` has to carry (`BlockVersion::Append`).
     pub commit_ts: TxnTimeStamp,
@@ -1738,6 +1746,8 @@ pub struct ReplayedAppend {
 #[derive(Debug, Clone)]
 pub struct ReplayedDelete {
     pub table: String,
+    /// See [`ReplayedAppend::table_id`].
+    pub table_id: u64,
     pub commit_ts: TxnTimeStamp,
     pub row_ids: Vec<u64>,
 }
