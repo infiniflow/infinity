@@ -27,18 +27,19 @@
 
 **本节没有未接线项。** 这一层的现状：
 
-- **行以列式块为存储本体**（方案 C）：提交不写 block 文件——行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件只由 checkpoint（`flush_cpp_blocks` → `write_cpp_blocks`）写；`row:` 停写（块格式表达不了的列类型另留一份文本行副本，见 `needs_text_rows`），`del:` 一律不写（块的 `version` 是唯一墓碑）。读全部把 buffer 盖在块上：整表 / 剪枝 / 列投影 / 点取 / 含墓碑 / 计数 / `row_is_present`；回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧。`persistence/` 因此没有 `row:`/`del:` 子树，只剩侧车文件。
+- **行以列式块为存储本体**（方案 C）：`INSERT` 的行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件由 checkpoint（`flush_cpp_blocks` → `write_cpp_blocks`）写，`COPY` 例外（见下）；`row:` 停写（块格式表达不了的列类型另留一份文本行副本，见 `needs_text_rows`），`del:` 一律不写（块的 `version` 是唯一墓碑）。读全部把 buffer 盖在块上：整表 / 剪枝 / 列投影 / 点取 / 含墓碑 / 计数 / `row_is_present`；回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧。`persistence/` 因此没有 `row:`/`del:` 子树，只剩侧车文件。
 - **cleanup 的活段判据**是 `visible_block_ids()`（块索引，跨重启有效），不是 `segment_ids()`（分配器，重开目录后为空；用它会把每个 `idx_*/seg_{n}` 当死段删掉）。
 - **行号的次序**：冲突检查之后、写 WAL 之前按 `commit_ts` 分配（`TxnManager::begin_write` / `commit_at_deferred_with`，对应参考的 `wait_conflict_ck_` / `SubmitForAllocation`），checkpoint 的上界是 `current_ts`（已完成的 commit_ts），块的窗口按 `append_totals` + `append_ts` 裁到 `ts <= 上界`，块内 id 必须是窗口的稠密前缀。
 - **多值 / 张量表的文本行副本**：这类表的 WAL 帧用本 build 的 `DataBlock` 还原不了行，checkpoint 没跑过时靠 `needs_text_rows` 保留的文本行读出，块仍是权威。
 - **列投影的并发守卫**：块文件就是行集，不需要「本进程写过镜像」的快照，快照只做并发守卫（`try_cpp_projection`）。
 
-回归覆盖：`tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`cpp_blocks::tests::a_checkpoint_writes_only_the_committed_prefix`、`tests::a_multivector_table_round_trips_through_its_blocks`、门禁 30 / 40。当前规模：executor 704 passed / 29 ignored、catalog 54、storage 463 passed / 5 ignored、txn 30，全绿。
+回归覆盖：`tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`cpp_blocks::tests::a_checkpoint_writes_only_the_committed_prefix`、`tests::a_multivector_table_round_trips_through_its_blocks`、门禁 30 / 40。当前规模：executor 704 passed / 29 ignored、catalog 54、storage 464 passed / 5 ignored、txn 30，全绿。
 
-**两处 `pysdk` 未对齐（有复现，未修）**：
+**崩溃恢复的三处未对齐（`restart_test`，kill -9 后重启）**：`test_compact.py::test_restart_compact_index`、`test_compact.py::test_compact_restart_repeatedly`、`test_snapshot.py::test_snapshot_basic_restart` 失败：重启后表的行数与崩溃前不一致（前者读成 0 行，后者 5 vs 3），随后一次 checkpoint 还会报 `block 93.0 holds 0 of the 3 rows committed at ts 214`。这批用例在 `35a6f0aa5` 上同样失败，与本次导入/DDL 改动无关；触发面是「最后一批 append/compact 之后没有 checkpoint 就崩溃」——块文件没写过、WAL 回放要重建这批行。
 
-- **导入不封段、不落块**：`reserve_import_rows_inline`（`lib.rs:9450`）只把 import cursor 的 offset 加上本批行数，没有 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）的回绕；`commit_import_chunk`（`lib.rs:17403`）只把行 `publish_encoded_rows` 进缓冲，块文件要等 checkpoint（参考在导入事务里 `AppendInBlock` + `CommitBottomAppend`）。后果：一次 `COPY` 8,388,609 行后 `show_segments()` 只有 1 段、`show_blocks(0)` 为空（`test_import_exceeding_rows`、`test_import_more_than_one_segment`）。在 `commit_import_chunk` / `copy_from` 里补一次 `write_cpp_blocks` 能让小导入的 `show_blocks` 有内容，但整跑 `query` 从 1560 退到 1552：`tensor_maxsim.slt` 的 MaxSim 分数变成乱码（例如 `test66 4940.13`）。定位到的关键事实：**导入期这一次写本身就把 tensor 的 payload 写歪了**（打点显示每次写都是新建块、没有旧 `version`，所以不是「写两遍」的问题），之后 checkpoint 再从这些坏 cell 重编码，错误就固化了。也就是说导入期的 `write_cpp_blocks`（段尚未封存时）与 checkpoint 的写结果不同——差异在 `block_bitmap_bits` / outline 基准一类的导入期状态，需要把「封段 + 写块」作为一个整体对齐到参考的 `CommitBottomAppend`，而不是在导入提交后补一次通用写。
-- **DDL 每次重写整份目录**：`Catalog::create_database` / `drop_database`（`lib.rs:1210`）固定做 `cpp_databases` + `cpp_database_records` + `cpp_tables` + `cpp_indexes` 再 `rewrite_cpp`（`lib.rs:606`，全量 sweep + 重新生成所有 db/tbl/idx 记录）。1000 个库实测 create 43 ms/次、drop 19 ms/次，随库数线性变差；`test_show_big_databases`（10,000 库）因此 >23 分钟，`test_index`/`test_table`/`test_table_snapshot` 同理超时。修法是只动库级记录的增量 batch（`catalog|db|{name}|{ts}`、`db|{id}|next_table_id`），并用 `write_cpp_layout_batch_matches_the_direct_writer` 的对比方式证明键值不变。
+**导入在自己的提交里封段、落块**：`commit_import_chunk` 提交后按段容量（8,388,608 行）回绕、记录导入 extent（它决定段是否「封存」，也就是块和段要不要写 fast rough filter），再 `write_cpp_blocks_bounded` 把这一批行写进块；`copy_from` 的 `FORMAT FVECS` 分支同样。所以 `COPY` 结束就能看到磁盘上的真实分块：8,388,608 行 → 1 段 1024 块，8,388,609 行 → 2 段（1024 + 1 块）。
+
+**DDL 是增量写，不重写整份目录**：`create_database` / `drop_database` 只写库级记录；`create_table` 走 `stage_cpp_new_table`（表记录 + 三个建表 tag + 每列一条 column 记录 + 库的 `next_table_id`），只有「这个名字已经有记录」时才回退到整份 `rewrite_cpp` 的 sweep。名字解析是点查（`read_cpp_table` 扫 `catalog|tbl|{db_id}|{name}|`），不再为取一张表把全目录每张表的每一列都解码；`DROP DATABASE` 取「这个库有哪些表」也只扫这个库的前缀。提交期的持久化只同步日志（`MetaStore::sync` → RocksDB `flush_wal(true)`）：一次 DDL 一次 memtable flush 会在 10,000 条 DDL 后堆出成千上万个小 L0 文件，让每次提交随规模变慢。实测 10,000 个库：create 1.4 ms/次、drop 1.4 ms/次，与库数无关。
 
 **Gate A 现在是 1560/1560。** 恢复快照时列文件要跟着新表的列 id 改名：`DROP COLUMN` 之后幸存列保留原 id（`1.col`、`2.col`），而 `create_table_typed` 把重建表的列从 0 编号，读侧按 `meta.ids` 找不到 `0.col` 就整块解码失败、表读成空（`substitute_column_id`）。
 

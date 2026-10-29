@@ -109,6 +109,10 @@ impl MetaStore for RocksMetaStore {
         Ok(out)
     }
 
+    fn sync(&self) -> Result<()> {
+        self.db.flush_wal(true).map_err(re)
+    }
+
     fn flush(&self) -> Result<()> {
         // `flush` + WAL sync is the durability barrier the trait contract wants:
         // `flush` moves the memtable into an SST, and only `flush_wal(true)`

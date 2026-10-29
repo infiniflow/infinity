@@ -837,18 +837,22 @@ impl Catalog {
                 .unwrap_or(1)
                 .to_string();
             let tag = infinity_storage::catalog_format::catalog_db_tag_key(&db_id, "next_table_id");
-            let previous: u64 = self
+            let previous = self
                 .with_view(|store| store.get(tag.as_bytes()))?
-                .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
-                .unwrap_or(0);
-            let surviving = self
-                .cpp_tables()?
-                .iter()
-                .filter(|t| t.name.split('.').next() == Some(db_name))
-                .map(|t| t.id + 1)
-                .max()
-                .unwrap_or(0);
-            let next = previous.max(surviving);
+                .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok());
+            // The tag is the counter a CREATE TABLE keeps, and it only grows. A
+            // directory without it (one this port never stamped) falls back to
+            // the live ids, which costs a whole-catalog read.
+            let next = match previous {
+                Some(previous) => previous,
+                None => self
+                    .cpp_tables()?
+                    .iter()
+                    .filter(|t| t.name.split('.').next() == Some(db_name))
+                    .map(|t| t.id + 1)
+                    .max()
+                    .unwrap_or(0),
+            };
             return Ok((next, next + 1));
         }
         // Table ids start at 0, as the C++ engine's do; the counter holds the
@@ -959,6 +963,25 @@ impl Catalog {
             sparse_stores,
         };
         if self.cpp_only {
+            let db_name = name.split('.').next().unwrap_or(name).to_string();
+            let bare = name.rsplit('.').next().unwrap_or(name).to_string();
+            let db_id = self.database_id_of_name(&db_name)?.unwrap_or(1);
+            // A fresh name under a live database is one table's worth of
+            // records; only a name that already has a record needs the full
+            // sweep, which is what reconciles the leftovers (a re-created name,
+            // a dropped table's column records).
+            let name_records = self.with_view(|store| {
+                let prefix = infinity_storage::catalog_format::catalog_table_prefix(
+                    &db_id.to_string(),
+                    &bare,
+                );
+                store.scan_prefix(prefix.as_bytes())
+            })?;
+            if name_records.is_empty() && self.has_database_record(&db_name)? {
+                let batch = crate::cpp_layout::stage_cpp_new_table(db_id, &meta, id + 1)?;
+                self.stage(&batch)?;
+                return Ok(meta);
+            }
             let mut tables = self.cpp_tables()?;
             tables.push(meta.clone());
             self.rewrite_cpp(&self.cpp_databases()?, &tables, &self.cpp_indexes()?)?;
@@ -1110,8 +1133,29 @@ impl Catalog {
         }
     }
 
+    /// The tables of one database (a `DROP DATABASE` only needs those).
+    pub fn tables_of_database(&self, db: &str) -> Result<Vec<TableMeta>> {
+        if !self.cpp_only {
+            return Ok(self
+                .list_tables()?
+                .into_iter()
+                .filter(|t| t.name.starts_with(&format!("{db}.")))
+                .collect());
+        }
+        let tables = self.with_view(|store| crate::cpp_layout::read_cpp_tables_of_db(store, db))?;
+        Ok(tables.iter().map(crate::cpp_layout::table_meta_of).collect())
+    }
+
     pub fn get_table_by_name(&self, name: &str) -> Result<Option<TableMeta>> {
         if self.cpp_only {
+            // A qualified name resolves by its own record; only a bare one has
+            // to search every database (the session qualifies names before they
+            // get here, so this is the rare path).
+            if let Some((db, table)) = name.split_once('.') {
+                let found =
+                    self.with_view(|store| crate::cpp_layout::read_cpp_table(store, db, table))?;
+                return Ok(found.as_ref().map(crate::cpp_layout::table_meta_of));
+            }
             return Ok(self.cpp_tables()?.into_iter().find(|t| t.name == name));
         }
         match self.store.get(&name_key(name))? {
@@ -1725,6 +1769,11 @@ impl Catalog {
 
     pub fn flush(&self) -> Result<()> {
         self.store.flush()
+    }
+
+    /// Syncs the log without materialising an SST (see `MetaStore::sync`).
+    pub fn sync(&self) -> Result<()> {
+        self.store.sync()
     }
 }
 

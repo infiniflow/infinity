@@ -76,6 +76,17 @@ pub trait MetaStore: Send + Sync {
     }
     /// Flush to disk (durability barrier).
     fn flush(&self) -> Result<()>;
+    /// Make the writes already handed to the store survive a crash, without
+    /// forcing the memtable out to an SST.
+    ///
+    /// A statement's commit needs exactly this: the log that carries it is
+    /// already appended, so syncing the log is the barrier. `flush`
+    /// additionally materialises an SST, which a per-statement commit must not
+    /// do - one flush per DDL turns a 10,000-statement run into thousands of
+    /// tiny L0 files and the cost of each commit grows with them.
+    fn sync(&self) -> Result<()> {
+        self.flush()
+    }
 }
 
 /// C++: `String2UInt64AddOperator` (`catalog/kv_store.cpp:91`) — both merge

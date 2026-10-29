@@ -573,28 +573,6 @@ fn round_bf16(x: f32) -> f32 {
     f32::from_bits(x.to_bits() & 0xffff_0000)
 }
 
-/// Whether a column's stored text is exactly what `to_slt_string` renders, so a
-/// projected cell can be passed through instead of parsed and re-formatted.
-///
-/// Integers keep their digits and `VARCHAR` is already the text; a `FLOAT`
-/// column renders `4.0` in the block but `4.000000` on the wire, so it must
-/// keep the numeric path.
-fn text_is_display(declared: &str) -> bool {
-    let t = declared.trim().to_ascii_uppercase();
-    if t.is_empty() {
-        return false;
-    }
-    t.starts_with("VARCHAR")
-        || t.starts_with("CHAR")
-        || t.starts_with("TEXT")
-        || t.starts_with("STRING")
-        || t.starts_with("TINYINT")
-        || t.starts_with("SMALLINT")
-        || t.starts_with("BIGINT")
-        || t.starts_with("INTEGER")
-        || t.starts_with("INT")
-        || t.starts_with("UINT")
-}
 
 fn is_float_type(type_text: &str) -> bool {
     matches!(
@@ -1921,6 +1899,29 @@ fn invalidates_result_cache(stmt: &Statement) -> bool {
             | Statement::RestoreDatabaseSnapshot { .. }
             | Statement::RestoreSystemSnapshot { .. }
             | Statement::Copy { from: true, .. }
+    )
+}
+
+/// Whether a mutating statement writes the row/meta store, as opposed to only
+/// the catalog.
+///
+/// The two live in different RocksDB instances, so the difference decides
+/// whether a commit has to sync one store or two. The catalog-only statements
+/// are the schema/lifecycle DDL: they put catalog records and nothing else.
+fn statement_touches_rows(stmt: &Statement) -> bool {
+    !matches!(
+        stmt,
+        Statement::CreateDatabase { .. }
+            | Statement::DropDatabase { .. }
+            | Statement::CreateTable { .. }
+            | Statement::DropTable { .. }
+            | Statement::CreateIndex { .. }
+            | Statement::DropIndex { .. }
+            | Statement::RenameTable { .. }
+            | Statement::CreateCollection { .. }
+            | Statement::DropCollection { .. }
+            | Statement::CreateView { .. }
+            | Statement::DropView { .. }
     )
 }
 
@@ -8094,15 +8095,23 @@ impl Engine {
                 self.plan_cache.clear();
             }
             out.push(self.execute_stmt_retrying(&qualified, sql)?);
-            // Durability: a committed mutation must survive a crash, so both the
-            // catalog and the row/meta KV are fsynced before acknowledging.
+            // Durability: a committed mutation must survive a crash. The
+            // transaction's log frame is appended and synced by the commit, so
+            // the stores only have to sync their own logs - a memtable flush
+            // per statement would write an SST per DDL, and thousands of them
+            // make every later commit slower. Without a WAL the stores have no
+            // log to sync, so the commit does not publish the statement at all.
+            //
+            // Two RocksDB instances sit under the engine (the catalog at
+            // <dir>/catalog, the row/meta store at <dir>/persistence); one that
+            // the statement did not write has nothing to sync.
             if mutating {
-                // Without a WAL the catalog is checkpoint-durable only: a
-                // commit must not fsync (and publish) the DDL.
                 if self.wal_enabled {
-                    self.storage.catalog.flush()?;
+                    self.storage.catalog.sync()?;
                 }
-                self.storage.store.flush()?;
+                if statement_touches_rows(&qualified) {
+                    self.storage.store.sync()?;
+                }
             }
             self.txn.end_statement();
         }
@@ -10440,20 +10449,20 @@ impl Engine {
     /// catalog key (`catalog|db|{name}|{ts}` → db id). Must be called before
     /// the drop deletes the record.
     fn drop_database_command(&self, db: &str) -> Result<Option<infinity_storage::WalCmd>> {
-        for (k, v) in self.storage.catalog.store().scan_prefix(b"catalog|db|")? {
-            let key = String::from_utf8_lossy(&k).into_owned();
-            let parts: Vec<&str> = key.split('|').collect();
-            if parts.len() >= 4 && parts[2] == db {
-                let create_ts = parts[3].parse::<u64>().unwrap_or(0);
-                let db_id = String::from_utf8_lossy(&v).into_owned();
-                return Ok(Some(infinity_storage::WalCmd::DropDatabase {
-                    db_name: db.to_string(),
-                    db_id,
-                    create_ts,
-                }));
-            }
-        }
-        Ok(None)
+        // Point lookup by name: scanning every database record made a DROP
+        // DATABASE O(databases) on a catalog with thousands of them.
+        let Some((db_id, create_ts)) = infinity_catalog::cpp_layout::cpp_db_record(
+            self.storage.catalog.store().as_ref(),
+            db,
+        )?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(infinity_storage::WalCmd::DropDatabase {
+            db_name: db.to_string(),
+            db_id: db_id.to_string(),
+            create_ts,
+        }))
     }
 
     /// Builds the reference's `WalCmdDropTableV2` for `table` from its catalog
@@ -11197,9 +11206,8 @@ impl Engine {
                 let held: Vec<String> = self
                     .storage
                     .catalog
-                    .list_tables()?
+                    .tables_of_database(name)?
                     .into_iter()
-                    .filter(|t| t.name.starts_with(&format!("{name}.")))
                     .map(|t| t.name)
                     .collect();
                 self.ddl_commit_typed(
@@ -17446,9 +17454,22 @@ impl Engine {
             self.note_append(table, *rows, true, Some(ts));
         }
         for segment in segments {
+            // The extent is what marks the segment sealed, and a sealed segment
+            // is the only one whose blocks (and segment) get a fast rough
+            // filter - so it has to be recorded **before** the block write.
+            let rows = self.segment_rows(table, *segment as usize) as u64;
+            self.note_import_rows(table, *segment, rows);
             self.note_import_ts(table, *segment, ts);
         }
         self.publish_encoded_rows(table, encoded_rows)?;
+        // `AppendInBlock` / `CommitBottomAppend`: the reference writes each
+        // block inside the import transaction, so a `COPY` leaves readable
+        // block files (and `SHOW BLOCKS` sees them) without a checkpoint. A
+        // table whose columns the block format cannot express has no mirror -
+        // it keeps its rows in the store.
+        if self.has_block_layout(table) {
+            self.write_cpp_blocks_bounded(table, ts)?;
+        }
         // `CommitBottomAppend` for the imported segments on the table's worker.
         let bottom_table = table.to_string();
         let shard_key = bottom_table.clone();
@@ -17560,8 +17581,16 @@ impl Engine {
             let t3 = std::time::Instant::now();
             let _visible = BottomGuard::new(&self.txn, ts);
             self.note_append(table, rows.len(), true, Some(ts));
-            self.note_import_ts(table, (base >> 32) as u32, ts);
+            let segment = (base >> 32) as u32;
+            let imported = self.segment_rows(table, segment as usize) as u64;
+            self.note_import_rows(table, segment, imported);
+            self.note_import_ts(table, segment, ts);
             self.publish_rows(table, base, &rows)?;
+            // `AppendInBlock`: the import's block is readable as soon as the
+            // statement commits, exactly like the CSV path.
+            if self.has_block_layout(table) {
+                self.write_cpp_blocks_bounded(table, ts)?;
+            }
             drop(_visible);
             let t_bottom = t3.elapsed();
             if profile {

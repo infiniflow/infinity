@@ -1292,6 +1292,283 @@ impl Catalog {
     }
 }
 
+/// The column records of one table (`tbl|col|{db_id}|{table_id}|…|{ts}`),
+/// newest version per **column id**, plus the table's `next_column_id` tag.
+///
+/// A column is versioned like the table records, so a key restaged under
+/// another ts (a restore writes the sentinel-ts copy, the next layout rewrite a
+/// real one) must resolve to its newest record - reading every version listed
+/// the column twice.
+fn read_cpp_columns(
+    store: &dyn MetaStore,
+    db_id: u64,
+    table_id: u64,
+) -> Result<(Vec<ColumnDefValue>, u64)> {
+    let col_prefix = key::table_column_prefix(&db_id.to_string(), &table_id.to_string());
+    let mut newest_column: std::collections::HashMap<i64, (u64, ColumnDefValue)> =
+        std::collections::HashMap::new();
+    for (k, cv) in store.scan_prefix(col_prefix.as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let ts = key
+            .rsplit('|')
+            .next()
+            .and_then(|t| t.parse::<u64>().ok())
+            .unwrap_or(0);
+        let Some(col) = value_format::column_def_from_bytes(&cv) else {
+            continue;
+        };
+        match newest_column.entry(col.column_id) {
+            std::collections::hash_map::Entry::Occupied(mut slot) if ts >= slot.get().0 => {
+                slot.insert((ts, col));
+            }
+            std::collections::hash_map::Entry::Vacant(slot) => {
+                slot.insert((ts, col));
+            }
+            _ => {}
+        }
+    }
+    let mut columns: Vec<ColumnDefValue> =
+        newest_column.into_iter().map(|(_, (_, col))| col).collect();
+    columns.sort_by_key(|c| c.column_id);
+    let next_column_id = store
+        .get(
+            key::catalog_table_tag_key(&db_id.to_string(), &table_id.to_string(), "next_column_id")
+                .as_bytes(),
+        )?
+        .and_then(|v| String::from_utf8_lossy(&v).parse().ok())
+        .unwrap_or(columns.len() as u64);
+    Ok((columns, next_column_id))
+}
+
+/// One table, resolved **by name**: its newest `catalog|tbl|` record and that
+/// record's columns.
+///
+/// This is the point lookup `get_table_by_name` needs. Reading the whole layout
+/// instead made every statement that touches a table (`SELECT`, `INSERT`, a DDL
+/// on another table) decode every table and every column in the catalog - O(n)
+/// work per row on a directory with many tables.
+pub fn read_cpp_table(
+    store: &dyn MetaStore,
+    db_name: &str,
+    table_name: &str,
+) -> Result<Option<CppTable>> {
+    let Some((db_id, db_ts)) = cpp_db_record(store, db_name)? else {
+        return Ok(None);
+    };
+    if is_dropped(
+        store,
+        &cpp_dropped_db_key(db_name, db_ts, &db_id.to_string()),
+    )? {
+        return Ok(None);
+    }
+    let prefix = key::catalog_db_table_prefix(&db_id.to_string()) + table_name + "|";
+    let mut newest: Option<(u64, u64)> = None;
+    for (k, v) in store.scan_prefix(prefix.as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let ts = key
+            .rsplit('|')
+            .next()
+            .and_then(|t| t.parse::<u64>().ok())
+            .unwrap_or(0);
+        let id = String::from_utf8_lossy(&v).parse::<u64>().unwrap_or(0);
+        if newest.is_none_or(|(seen, _)| ts >= seen) {
+            newest = Some((ts, id));
+        }
+    }
+    let Some((ts, table_id)) = newest else {
+        return Ok(None);
+    };
+    if is_dropped(
+        store,
+        &cpp_dropped_table_key(&db_id.to_string(), table_name, ts, &table_id.to_string()),
+    )? {
+        return Ok(None);
+    }
+    let (columns, next_column_id) = read_cpp_columns(store, db_id, table_id)?;
+    Ok(Some(CppTable {
+        db_name: db_name.to_string(),
+        db_id,
+        table_name: table_name.to_string(),
+        table_id,
+        columns,
+        next_column_id,
+    }))
+}
+
+/// [`read_cpp_layout`]'s entry as the engine's `TableMeta`.
+pub fn table_meta_of(t: &CppTable) -> TableMeta {
+    // `type_text_of` carries `WITH (SORTED)` for a kSorted sparse column;
+    // split it back into the bare type text plus the hint field.
+    let declared: Vec<(String, Option<SparseStore>)> = t
+        .columns
+        .iter()
+        .map(|c| {
+            let text = type_text_of(&c.column_type).unwrap_or_default();
+            let (bare, store) = split_sparse_store_suffix(&text);
+            // The C++ record renders a sparse type as
+            // SPARSE(<elem>,<index>,<bound>), so the WITH (SORTED) suffix is
+            // not there to read back; the store kind lives in the type
+            // object's sort field.
+            let store = store.or_else(|| sparse_store_of(&c.column_type));
+            (bare.to_string(), store)
+        })
+        .collect();
+    TableMeta {
+        id: t.table_id,
+        name: format!("{}.{}", t.db_name, t.table_name),
+        columns: t.columns.iter().map(|c| c.column_name.clone()).collect(),
+        // Carry everything the record holds, so a reader comparing views sees
+        // the same schema (types, NOT NULL, defaults, comments).
+        defaults: t
+            .columns
+            .iter()
+            .map(|c| c.default.as_ref().and_then(default_text_of))
+            .collect(),
+        not_nulls: t.columns.iter().map(is_not_null).collect(),
+        types: declared.iter().map(|(text, _)| text.clone()).collect(),
+        comments: t.columns.iter().map(|c| c.column_comment.clone()).collect(),
+        ids: t
+            .columns
+            .iter()
+            .map(|c| c.column_id.max(0) as u64)
+            .collect(),
+        sparse_stores: declared.into_iter().map(|(_, store)| store).collect(),
+    }
+}
+
+/// The records one **new** table contributes to the C++ layout, so a
+/// `CREATE TABLE` does not have to rewrite the whole catalog.
+///
+/// The keys and values are exactly what [write_cpp_layout_with_ts] writes for a
+/// table that has no segments and no indexes: the table record, its three
+/// creation-time tags, one column record per column, and the database's
+/// `next_table_id` counter. Callers must only take this path for a name that
+/// has no record yet - otherwise the sweep a full rewrite performs is what
+/// reconciles the leftover.
+pub fn stage_cpp_new_table(
+    db_id: u64,
+    meta: &TableMeta,
+    next_table_id: u64,
+) -> Result<Vec<(Vec<u8>, Option<Vec<u8>>)>> {
+    let db_str = db_id.to_string();
+    let tbl_str = meta.id.to_string();
+    let name = meta.name.rsplit('.').next().unwrap_or(&meta.name);
+    let ts = crate::DDL_TS_SENTINEL;
+    let mut batch: Vec<(Vec<u8>, Option<Vec<u8>>)> = Vec::new();
+    batch.push((
+        key::catalog_table_key(&db_str, name, ts).into_bytes(),
+        Some(tbl_str.clone().into_bytes()),
+    ));
+    for (tag, value) in [
+        (
+            "next_column_id",
+            meta.ids.iter().copied().max().map_or(0, |v| v + 1),
+        ),
+        ("next_segment_id", 0),
+        ("next_index_id", 0),
+    ] {
+        batch.push((
+            key::catalog_table_tag_key(&db_str, &tbl_str, tag).into_bytes(),
+            Some(value.to_string().into_bytes()),
+        ));
+    }
+    for (i, col) in meta.columns.iter().enumerate() {
+        let type_text = meta.types.get(i).cloned().unwrap_or_default();
+        let sparse_store = meta.sparse_stores.get(i).copied().flatten();
+        let Some(data_type) = data_type_of_text_with_store(&type_text, sparse_store) else {
+            return Err(Error::Catalog(format!(
+                "column '{col}' of '{}' has a type the C++ catalog encoding does not cover yet: '{type_text}'",
+                meta.name
+            )));
+        };
+        let column_id = meta.ids.get(i).copied().unwrap_or(i as u64) as i64;
+        let mut value = ColumnDefValue::new(data_type, column_id, col.clone());
+        value.column_comment = meta.comments.get(i).cloned().flatten();
+        // The C++ records NOT NULL as the `kNotNull` constraint and a default
+        // as a `ConstantExpr::Serialize()` object; a column without one still
+        // records the null constant (`column_def.cpp:122-124`).
+        if meta.not_nulls.get(i).copied().unwrap_or(false) {
+            value.constraints = vec![1]; // ConstraintType::kNotNull
+        }
+        value.default = Some(
+            meta.defaults
+                .get(i)
+                .cloned()
+                .flatten()
+                .as_deref()
+                .and_then(default_constant_expr)
+                .unwrap_or_else(|| {
+                    value_format::constant_expr_json(value_format::literal::NULL, None)
+                }),
+        );
+        batch.push((
+            key::table_column_key(&db_str, &tbl_str, col, ts).into_bytes(),
+            Some(value_format::column_def_bytes(&value)),
+        ));
+    }
+    batch.push((
+        key::catalog_db_tag_key(&db_str, "next_table_id").into_bytes(),
+        Some(next_table_id.to_string().into_bytes()),
+    ));
+    Ok(batch)
+}
+
+/// The tables of **one** database, resolved like [`read_cpp_table`] (newest record
+/// per name, drop markers honoured).
+///
+/// A `DROP DATABASE` has to know which tables go with it, and listing the whole
+/// catalog to filter them by name cost a prefix scan per database - 10,000
+/// databases turned one drop into a quarter of a second.
+pub fn read_cpp_tables_of_db(store: &dyn MetaStore, db_name: &str) -> Result<Vec<CppTable>> {
+    let Some((db_id, db_ts)) = cpp_db_record(store, db_name)? else {
+        return Ok(Vec::new());
+    };
+    if is_dropped(
+        store,
+        &cpp_dropped_db_key(db_name, db_ts, &db_id.to_string()),
+    )? {
+        return Ok(Vec::new());
+    }
+    let prefix = key::catalog_db_table_prefix(&db_id.to_string());
+    let mut newest: std::collections::HashMap<String, (u64, u64)> = Default::default();
+    for (k, v) in store.scan_prefix(prefix.as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let mut it = key.rsplitn(2, '|');
+        let ts = it.next().and_then(|t| t.parse::<u64>().ok()).unwrap_or(0);
+        let rest = it.next().unwrap_or_default().to_string();
+        let table_name = rest.splitn(4, '|').nth(3).unwrap_or_default().to_string();
+        let table_id: u64 = String::from_utf8_lossy(&v).parse().unwrap_or(0);
+        let slot = newest.entry(table_name).or_insert((0, 0));
+        if ts >= slot.0 {
+            *slot = (ts, table_id);
+        }
+    }
+    let mut names: Vec<(String, u64, u64)> = newest
+        .into_iter()
+        .map(|(name, (ts, id))| (name, ts, id))
+        .collect();
+    names.sort();
+    let mut out = Vec::new();
+    for (table_name, ts, table_id) in names {
+        if is_dropped(
+            store,
+            &cpp_dropped_table_key(&db_id.to_string(), &table_name, ts, &table_id.to_string()),
+        )? {
+            continue;
+        }
+        let (columns, next_column_id) = read_cpp_columns(store, db_id, table_id)?;
+        out.push(CppTable {
+            db_name: db_name.to_string(),
+            db_id,
+            table_name,
+            table_id,
+            columns,
+            next_column_id,
+        });
+    }
+    Ok(out)
+}
+
 /// Reads a C++-layout catalog back, one entry per table.
 ///
 /// A name resolves to its **newest** record - the reference picks the record
@@ -1363,25 +1640,7 @@ pub fn read_cpp_layout(store: &dyn MetaStore) -> Result<Vec<CppTable>> {
             )? {
                 continue;
             }
-            let mut columns = Vec::new();
-            let col_prefix = key::table_column_prefix(&db_id.to_string(), &table_id.to_string());
-            for (_, cv) in store.scan_prefix(col_prefix.as_bytes())? {
-                if let Some(col) = value_format::column_def_from_bytes(&cv) {
-                    columns.push(col);
-                }
-            }
-            columns.sort_by_key(|c| c.column_id);
-            let next_column_id = store
-                .get(
-                    key::catalog_table_tag_key(
-                        &db_id.to_string(),
-                        &table_id.to_string(),
-                        "next_column_id",
-                    )
-                    .as_bytes(),
-                )?
-                .and_then(|v| String::from_utf8_lossy(&v).parse().ok())
-                .unwrap_or(columns.len() as u64);
+            let (columns, next_column_id) = read_cpp_columns(store, *db_id, table_id)?;
             out.push(CppTable {
                 db_name: db_name.clone(),
                 db_id: *db_id,
@@ -2520,47 +2779,7 @@ fn sparse_store_of(column_type: &Json) -> Option<SparseStore> {
 }
 
 pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> {
-    let mut out = Vec::new();
-    for t in read_cpp_layout(store)? {
-        // `type_text_of` carries `WITH (SORTED)` for a kSorted sparse column;
-        // split it back into the bare type text plus the hint field.
-        let declared: Vec<(String, Option<SparseStore>)> = t
-            .columns
-            .iter()
-            .map(|c| {
-                let text = type_text_of(&c.column_type).unwrap_or_default();
-                let (bare, store) = split_sparse_store_suffix(&text);
-                // The C++ record renders a sparse type as
-                // `SPARSE(<elem>,<index>,<bound>)`, so the `WITH (SORTED)`
-                // suffix is not there to read back; the store kind lives in the
-                // type object's `sort` field.
-                let store = store.or_else(|| sparse_store_of(&c.column_type));
-                (bare.to_string(), store)
-            })
-            .collect();
-        out.push(TableMeta {
-            id: t.table_id,
-            name: format!("{}.{}", t.db_name, t.table_name),
-            columns: t.columns.iter().map(|c| c.column_name.clone()).collect(),
-            // Carry everything the record holds, so a reader comparing views
-            // sees the same schema (types, NOT NULL, defaults, comments).
-            defaults: t
-                .columns
-                .iter()
-                .map(|c| c.default.as_ref().and_then(default_text_of))
-                .collect(),
-            not_nulls: t.columns.iter().map(is_not_null).collect(),
-            types: declared.iter().map(|(text, _)| text.clone()).collect(),
-            comments: t.columns.iter().map(|c| c.column_comment.clone()).collect(),
-            ids: t
-                .columns
-                .iter()
-                .map(|c| c.column_id.max(0) as u64)
-                .collect(),
-            sparse_stores: declared.into_iter().map(|(_, store)| store).collect(),
-        });
-    }
-    Ok(out)
+    Ok(read_cpp_layout(store)?.iter().map(table_meta_of).collect())
 }
 
 #[cfg(test)]
