@@ -157,3 +157,7 @@ minio/
 !Dockerfile*
 
 vcpkg_installed/
+
+# The pysdk suite generates its fixtures under python/test/data (a copy of
+# test/data); the C++ CI copies it the same way.
+python/test/data/
