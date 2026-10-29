@@ -35,6 +35,11 @@
 
 回归覆盖：`tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`cpp_blocks::tests::a_checkpoint_writes_only_the_committed_prefix`、`tests::a_multivector_table_round_trips_through_its_blocks`、门禁 30 / 40。当前规模：executor 704 passed / 29 ignored、catalog 54、storage 463 passed / 5 ignored、txn 30，全绿。
 
+**两处 `pysdk` 未对齐（有复现，未修）**：
+
+- **导入不封段、不落块**：`reserve_import_rows_inline`（`lib.rs:9450`）只把 import cursor 的 offset 加上本批行数，没有 `DEFAULT_SEGMENT_CAPACITY`（8,388,608 行）的回绕；`commit_import_chunk`（`lib.rs:17403`）只把行 `publish_encoded_rows` 进缓冲，块文件要等 checkpoint（参考在导入事务里 `AppendInBlock` + `CommitBottomAppend`）。后果：一次 `COPY` 8,388,609 行后 `show_segments()` 只有 1 段、`show_blocks(0)` 为空（`test_import_exceeding_rows`、`test_import_more_than_one_segment`）。在 `copy_from` 提交后补一次 `write_cpp_blocks` 能让小导入的 `show_blocks` 有内容，但整跑会让 `.slt` 退回 36 条（缓冲与块的计数边界不一致），所以必须把封段与写块放进同一 bottom half 并对已写块幂等。
+- **DDL 每次重写整份目录**：`Catalog::create_database` / `drop_database`（`lib.rs:1210`）固定做 `cpp_databases` + `cpp_database_records` + `cpp_tables` + `cpp_indexes` 再 `rewrite_cpp`（`lib.rs:606`，全量 sweep + 重新生成所有 db/tbl/idx 记录）。1000 个库实测 create 43 ms/次、drop 19 ms/次，随库数线性变差；`test_show_big_databases`（10,000 库）因此 >23 分钟，`test_index`/`test_table`/`test_table_snapshot` 同理超时。修法是只动库级记录的增量 batch（`catalog|db|{name}|{ts}`、`db|{id}|next_table_id`），并用 `write_cpp_layout_batch_matches_the_direct_writer` 的对比方式证明键值不变。
+
 **Gate A 现在是 1560/1560。** 恢复快照时列文件要跟着新表的列 id 改名：`DROP COLUMN` 之后幸存列保留原 id（`1.col`、`2.col`），而 `create_table_typed` 把重建表的列从 0 编号，读侧按 `meta.ids` 找不到 `0.col` 就整块解码失败、表读成空（`substitute_column_id`）。
 
 ### 2.1 事务冲突检查 / 回滚
