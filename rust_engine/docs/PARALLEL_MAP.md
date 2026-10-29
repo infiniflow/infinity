@@ -151,5 +151,5 @@
 
 1. **池计数器**：`BOTTOM_WORKS`、`TEXT_APPENDS`、`bg_task_ut` 的 `drain()` 断言——证明工作真的换了线程，而不是文档里写了一句。
 2. **外部口径**：`test/sql/explain/explain_fragment.slt` 钉住 `FRAGMENT (1, <type>)` 与 sink/source，类型由计划里有无阻塞算子决定（`ParallelStream` / `ParallelMaterialize` / `SerialMaterialize`）；`EXPLAIN` 的 merge 算子（`TOP`/`AGGREGATE`）与参考一致。
-3. **可见性单测**：commit-ts 顺序发布、同表下半部顺序、索引写完才返回——都在 `infinity-txn` 与执行器单测里；语句路径的窗口是 `GAPS.md` §2 的待办。
+3. **可见性单测**：commit-ts 顺序发布、同表下半部顺序、索引写完才返回——都在 `infinity-txn` 与执行器单测里；语句路径的读窗口取 `begin_ts = current_ts + 1`，口径见 `GAPS.md` §2.1。
 4. **并发门禁**：Gate D（`run_gate_d.sh`）覆盖并发本身；字节门禁保持单客户端串行（`PORTING.md` §2.2）。

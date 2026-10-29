@@ -25,12 +25,15 @@
 
 ## 2 未实现 / 未接线
 
-| 项 | 现状 | 影响 | 依据 |
-|---|---|---|---|
-| ~~行以列式块为存储本体（方案 C）~~ **已完成** | 提交零 block 文件 I/O：行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件只由 checkpoint（`flush_cpp_blocks` → `write_cpp_blocks`）写；`row:`/`del:` 停写（块格式表达不了的列类型另留文本行副本；`del:` 一律不写，块的 `version` 是唯一墓碑）。读全部把 buffer 盖在块上：整表/剪枝/列投影/点取/含墓碑/计数/`row_is_present`。回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧 | `persistence/` 不再有 `row:`/`del:` 子树（只剩侧车文件） | executor 700 passed / 29 ignored；catalog 54、storage 463、txn 30 全绿 |
-| ~~`Cleanup` 之后 Rust 侧丢了 HNSW 的合并段 chunk（门禁 30）~~ **已修** | `prune_dead_segment_index_dirs` 曾用 `segment_ids()`（分配器，重开目录后为空）当"活段"，把每个 `idx_*/seg_4` 都删掉；改用 `visible_block_ids()`（块索引，跨重启有效） | 门禁 30：8 passed / 1 skipped | `cpp_blocks.rs::prune_dead_segment_index_dirs` |
-| ~~门禁 40：SDK 单列读多值表拿不到行~~ **已修** | ①列投影在"本进程没写过镜像"（重开目录）时因缺快照直接放弃，现在块文件就是行集、快照只做并发守卫；②多值/张量表的 WAL 帧用本 build 的 `DataBlock` 还原不了行，checkpoint 没跑过就会丢——这类表额外保留一份文本行（`needs_text_rows`），块仍是权威 | 门禁 40：3 passed | `lib.rs::try_cpp_projection`、`needs_text_rows`；回归用例 `tests::a_multivector_table_round_trips_through_its_blocks` |
-| ~~并发插入偶发丢行（`tests::concurrent_inserts_and_vector_searches_do_not_deadlock`）~~ **已修** | 根因是**分配与提交的次序**，不是 checkpoint 的写法：端口在执行期就发号（`reserve_rows`），参考在提交期发号且按 commit_ts 排序（`GetWriteCommitTS` 登记 → `SubmitForAllocation` 只从最小的 ts 放行 → `TxnAllocator::Process` → `PrepareAppend`）。执行期的号序和提交序不一致时，buffer 里会出现"高号已到、低号未到"，checkpoint 把块首当窗口起点就写歪（打点：`want=4 got=4 missing=[4,5] extra=2`）。现在：提交按 commit_ts 串行（`TxnManager::begin_write` / `commit_at_deferred_with`，对应 `wait_conflict_ck_`），行号在冲突检查之后、写 WAL 之前分配，`note_append` 当场带上 commit ts；checkpoint 的上界是 `current_ts`（已完成的 commit_ts），段的窗口按 `append_totals`+`append_ts` 裁到 `ts <= 上界`，块内 id 必须是窗口的稠密前缀（不再是"跳过带空洞的块"） | 全量 executor 700 passed / 29 ignored、txn 30、catalog 54、storage 463；字节门禁 00–60 全绿（新增 `tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`cpp_blocks::tests::a_checkpoint_writes_only_the_committed_prefix`） | `infinity-txn::TxnManager::begin_write`、`lib.rs::committed_rows`、`cpp_blocks.rs::write_cpp_blocks_mode`；参考 `new_txn_manager_impl.cpp:207-220`、`840-881`、`new_txn_impl.cpp:1763-1764` |
+**本节没有未接线项。** 这一层的现状：
+
+- **行以列式块为存储本体**（方案 C）：提交不写 block 文件——行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件只由 checkpoint（`flush_cpp_blocks` → `write_cpp_blocks`）写；`row:` 停写（块格式表达不了的列类型另留一份文本行副本，见 `needs_text_rows`），`del:` 一律不写（块的 `version` 是唯一墓碑）。读全部把 buffer 盖在块上：整表 / 剪枝 / 列投影 / 点取 / 含墓碑 / 计数 / `row_is_present`；回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧。`persistence/` 因此没有 `row:`/`del:` 子树，只剩侧车文件。
+- **cleanup 的活段判据**是 `visible_block_ids()`（块索引，跨重启有效），不是 `segment_ids()`（分配器，重开目录后为空；用它会把每个 `idx_*/seg_{n}` 当死段删掉）。
+- **行号的次序**：冲突检查之后、写 WAL 之前按 `commit_ts` 分配（`TxnManager::begin_write` / `commit_at_deferred_with`，对应参考的 `wait_conflict_ck_` / `SubmitForAllocation`），checkpoint 的上界是 `current_ts`（已完成的 commit_ts），块的窗口按 `append_totals` + `append_ts` 裁到 `ts <= 上界`，块内 id 必须是窗口的稠密前缀。
+- **多值 / 张量表的文本行副本**：这类表的 WAL 帧用本 build 的 `DataBlock` 还原不了行，checkpoint 没跑过时靠 `needs_text_rows` 保留的文本行读出，块仍是权威。
+- **列投影的并发守卫**：块文件就是行集，不需要「本进程写过镜像」的快照，快照只做并发守卫（`try_cpp_projection`）。
+
+回归覆盖：`tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`cpp_blocks::tests::a_checkpoint_writes_only_the_committed_prefix`、`tests::a_multivector_table_round_trips_through_its_blocks`、门禁 30 / 40。当前规模：executor 704 passed / 29 ignored、catalog 54、storage 463 passed / 5 ignored、txn 30，全绿。
 
 ### 2.1 事务冲突检查 / 回滚
 
@@ -58,8 +61,8 @@ DUMP → `DumpMemIndex`，OPTIMIZE → `OptimizeIndex{entries}`（一次 optimiz
 `current_ts_ + 1`，端口读同一个位置的唯一可能值。候选按 `kv_commit_ts < 最老活跃 begin_ts` 裁剪
 （`CleanupTxnBottomNolock`），键日志（未分类语句的兜底）同一把尺子。
 
-**行级判定不再有 `del:` 键**：DELETE/UPDATE 把行 id 放进 `TxnOp`，按交集比较（参考的 `row_ids_`）；块的 `version`
-是唯一的墓碑记录，端口不再往 KV 写任何 `del:` 记录（`cpp_blocks::tests::the_blocks_are_the_row_set_not_just_the_values`
+**行级判定没有 `del:` 键**：DELETE/UPDATE 把行 id 放进 `TxnOp`，按交集比较（参考的 `row_ids_`）；块的 `version`
+是唯一的墓碑记录，KV 里没有任何 `del:` 记录（`cpp_blocks::tests::the_blocks_are_the_row_set_not_just_the_values`
 断言 `row:` 与 `del:` 前缀都为空）。键集比较只留给没有分类的语句。
 
 **读按语句的 `begin_ts`**：`execute_stmt` 进入时把本线程的读时间戳设成 `current_ts + 1`（`NewTxn::BeginTS`），
@@ -94,10 +97,10 @@ IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）
 `new_catalog/new_txn_mgr_ut` 2 个（另 2 个 `DISABLED_SLOW_` 在端口是 `#[ignore]`）、
 `cleanup_rollback_txn` 1 个，全部有对应用例。
 
-**其余接线项当前为空。** 原先记在这里的接线项——多 fragment/tasklet 与交换队列、`BottomExecutor` 与
-`MemIndexAppender`、相关子查询、压缩/`IMPORT` 的 WAL 帧、DDL 的 typed 命令、`COMPACT` 的候选集、
-`IndexScanBuilder`、`ResultCacheGetter`、`MATCH TEXT` 走倒排、`fast_rough_filter`、`compact_interval`、
-分析器家族、稀疏检索选项、快照——已经按参考落地，逐条记录在 [`CLASS_MAP.md`](CLASS_MAP.md)（类/方法级）
+**其余接线项当前为空。** 多 fragment/tasklet 与交换队列、`BottomExecutor` 与 `MemIndexAppender`、相关子查询、
+压缩/`IMPORT` 的 WAL 帧、DDL 的 typed 命令、`COMPACT` 的候选集、`IndexScanBuilder`、`ResultCacheGetter`、
+`MATCH TEXT` 走倒排、`fast_rough_filter`、`compact_interval`、分析器家族（含 `STEM_LANG_*` 全套词干）、
+稀疏检索选项、快照，都按参考落地，逐条记录在 [`CLASS_MAP.md`](CLASS_MAP.md)（类/方法级）
 与 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §6（门禁级）。
 
 ## 3 不可逐字节比对（参考侧不确定）
