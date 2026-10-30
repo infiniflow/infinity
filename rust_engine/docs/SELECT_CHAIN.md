@@ -73,7 +73,19 @@
 
 同机、两台引擎背靠背各跑一轮；机器上有 IDE/浏览器，绝对值 ±20%，看同一轮内的比值。三条查询在最近的几轮里都已经与参考同量级（`SELECT id` 与点查多数轮次更快）。
 
-## 7 还剩什么
+## 7 写路径（参考 vs 端口）
 
-1. **覆盖**：连接 / 聚合 / `DISTINCT` / CTE / `SEARCH` / `total_hits` / 非标量列仍走行式路径；它们是算子层的能力，不是表示层的问题。
-2. **导入的写块成本**：每次 `COPY` 提交都会整表重写块（`write_cpp_blocks_bounded`，`partial` 分支目前关闭），所以 1,000 次 3 行导入的耗时随行数线性增长（实测 150 行时 70 ms/次，900 行时 293 ms/次）。参考只写本次导入落到的那个块。这是导入路径的问题，`test_select` 的 `test_select_big_embedding` 因此要跑 10 分钟以上。
+块文件的写入时机也按参考改过（`c7bd76ba2`、`a8377407b`、`6bc3d9a59`）：
+
+| 场景 | 参考 | 端口 |
+|---|---|---|
+| `COPY` 提交 | `NewTxn::Import` → `WriteDataBlockToFile` 只写本次输入块 | 只写本次行/删除命中的块（封存段整段重写，因为 filter 要覆盖整段） |
+| checkpoint | `NewTxn::CheckpointTable`：`block_lock->checkpoint_ts_ < min(checkpoint_ts, max_ts)` 才写这个块的 version/列文件 | 同一判据：块的 `blk|…` 记录 ts < `min(checkpoint_ts, 该块最新变更 ts)`（后台追加日志/删除日志给出）才写 |
+| 整表重写（`ALTER TABLE … ADD/DROP COLUMN`） | 重新编码所有块 | 显式给出全部行 → 全量写 |
+
+效果：300 次 3 行 COPY 从 88 s 降到 4.1 s（6.6 → 13.8 ms/次，随行数增长很慢）；40,000 行表上插一行后 checkpoint 约 20 ms（原先整表重写约 47 ms）；101 行数据重启后仍在。
+
+## 8 还剩什么
+
+1. **覆盖**：连接 / 聚合 / `GROUP BY` / `DISTINCT` / CTE / `SEARCH` / `total_hits` / 非标量列仍走行式路径。`SelectReq` 没有 `DISTINCT` 字段（SQL 的 `DISTINCT` 走 `execute`），`group_by`/`having` 是拼回 SQL 交给 `execute`；把它们搬到列式执行是算子层重写。
+2. **待补的验证**：写路径这三处改动（COPY/checkpoint 的增量写、按 ts 选块）还没跑过字节门禁（块文件与 `fast_rough_filter` 的逐字节比对），要等下一批改动一起跑。
