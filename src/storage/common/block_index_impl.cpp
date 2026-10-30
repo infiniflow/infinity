@@ -69,7 +69,7 @@ void BlockIndex::NewInit(const std::shared_ptr<TableMeta> &table_meta) {
         RecoverableError(status);
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
-        NewSegmentSnapshot &segment_snapshot = new_segment_block_index_.try_emplace(segment_id).first->second;
+        NewSegmentSnapshot &segment_snapshot = new_segment_block_index_[segment_id];
         segment_snapshot.segment_meta_ = std::make_unique<SegmentMeta>(segment_id, *table_meta_);
     }
 }
