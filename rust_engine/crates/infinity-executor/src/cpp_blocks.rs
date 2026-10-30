@@ -2002,7 +2002,12 @@ impl Engine {
     /// `BlockVersion::GetRowCount(begin_ts)`), so a row id handed out by a
     /// transaction still in flight stays out of the files.
     pub fn write_cpp_blocks_bounded(&self, table: &str, checkpoint_ts: u64) -> Result<usize> {
-        self.write_cpp_blocks_mode(table, &[], true, checkpoint_ts)
+        // The reference's checkpoint flushes only the blocks whose data changed
+        // since the last one (NewTxn::CheckpointTable writes a block when
+        // block_lock->checkpoint_ts_ < min(checkpoint_ts, max_ts)), and a commit
+        // writes only the blocks it appended to. So a bounded write is partial
+        // too: the touched set is the blocks holding rows or deletes it carries.
+        self.write_cpp_blocks_mode(table, &[], false, checkpoint_ts)
     }
 
     /// Writes only the blocks this commit's rows and deletes land in.
