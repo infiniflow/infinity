@@ -146,25 +146,26 @@ IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）
 
 | 查询（40,000 行，落块后，端到端 wall） | 参考 | 端口 |
 |---|---|---|
-| `SELECT id` | 1.85 ms | 6.58 ms |
-| `SELECT id, name` | 14.31 ms | 26.41 ms |
-| `WHERE id = 39999` | 0.93–1.66 ms | 1.74–2.03 ms |
+| `SELECT id` | 2.1–2.4 ms | 5.3–5.5 ms |
+| `SELECT id, name` | 16.2–16.7 ms | 25.1–26.6 ms |
+| `WHERE id = 39999` | 1.3–2.8 ms | 2.1 ms |
 
 SDK driver（20,000 行，未 checkpoint，8 次最好值）：参考 insert 0.293 s / select 9.45 ms / 点查 1.31 ms；端口 0.300 s / 11.6 ms / 3.3 ms。`check_benchmark_result.py` 比三阶段**均值**，0.30 s 的 insert 把两个读阶段摊薄成 ~+3%。
 
-已改（`a5596c690`、`ac56246bf`、`7cb05cb00`、`46ded495f`、`859c3443e`）：
+已改（`a5596c690`、`ac56246bf`、`7cb05cb00`、`46ded495f`、`859c3443e`、`2191fa03e`）：
 
-1. **纯列投影不再走算子链**（`direct_projection`）：`Projection(Scan)` / `Projection(Filter(Scan))` 直接出行，列被裁剪时按 `pos` 把行压回扫描列顺序。算子链原本占 `SELECT id, name` 的 28 ms 里约 15 ms。
-2. **只解码用得到的列**：投影列 ∪ 谓词列（`predicate_columns`）交给块读，行宽不变、其余为 NULL。
-3. **标量 cell 直接出 `Value`**（`decode_rows_of_values`）：整数/浮点/布尔从 slot 构造，不再 `format!` 再解析；文本型 `parse_owned_value` 把文本 move 进 `Str`。
-4. **缓冲区不再绕文本**（`buffered_rows_values`），且只克隆投影要的 cell。
-5. **列体每列切分一次**、`EMBEDDING` 形状每列解析一次：块读从 O(行数 × 块字节) 降下来（40,000 行 179 ms → 30 ms）。
-6. **等值谓词在读出时执行**（`read_cpp_blocks_filtered_values`）：`col = 常量` 在行缓冲上求值，被拒的行不再各自分配；谓词先按 `pos` 从扫描列位置改写到行位置。
+1. **结果是类型化的，不再经文本**（`2191fa03e`）：`QueryResult::Rows` 从 `Vec<Vec<String>>` 改成 `Vec<Vec<Value>>`，协议层直接按 `Value` 打包，文本只在 CLI / `.slt` / HTTP / postgres 出口渲染。`SELECT id` 服务端 4.79 → 3.77 ms。
+2. **纯列投影不再走算子链**（`direct_projection`）：`Projection(Scan)` / `Projection(Filter(Scan))` 直接出行，列被裁剪时按 `pos` 把行压回扫描列顺序。
+3. **只解码用得到的列**：投影列 ∪ 谓词列（`predicate_columns`）交给块读，行宽不变、其余为 NULL。
+4. **标量 cell 直接出 `Value`**（`decode_rows_of_values`）：整数/浮点/布尔从 slot 构造；文本型 `parse_owned_value` 把文本 move 进 `Str`。
+5. **缓冲区不再绕文本**（`buffered_rows_values`），且只克隆投影要的 cell。
+6. **列体每列切分一次**、`EMBEDDING` 形状每列解析一次：块读从 O(行数 × 块字节) 降下来（40,000 行 179 ms → 30 ms）。
+7. **等值谓词在读出时执行**（`read_cpp_blocks_filtered_values`）：`col = 常量` 在行缓冲上求值，被拒的行不再各自分配。
 
-块级 prefilter 与参考一致：`blk|…|fast_rough_filter` / `seg|…|fast_rough_filter` 只在段**封存**时写（import、compact、段写满 8,388,608 行），扫描读这些记录剪枝；未封存段两边都没有统计，端口**不再**另做进程内缓存（`859c3443e` 移除了那一版）。
+块级 prefilter 与参考一致：`blk|…|fast_rough_filter` / `seg|…|fast_rough_filter` 只在段**封存**时写（import、compact、段写满 8,388,608 行），扫描读这些记录剪枝；未封存段两边都没有统计，端口不另做进程内缓存。
 
-仍然慢的原因（详见 `SELECT_CHAIN.md` §4）：
+仍然慢的原因（详见 `SELECT_CHAIN.md` §6）：
 
-1. **结果是行式文本**：执行器出口把每个 cell 渲染成 `String`（`QueryResult::Rows` 是 `Vec<Vec<String>>`），协议层再 `parse` 回数字打成 thrift 的列块。`SELECT id` 的服务端 4.8 ms 里 1.9 ms 是这一趟往返。
-2. **扫描与结果是行式的**：每行一个 `Vec<Value>`、每 cell 一个枚举；参考全程是 `ColumnVector` / `DataBlock` 列缓冲（`memcpy` 到 wire）。perf 里端口 ~55% 在 malloc/free。
-3. **文本型列必须解析**：varchar/json/date 的 cell 只有文本形态；`SELECT id, name` 的读块 + 解码 7.85 ms 里约 5.7 ms 是 varchar 这一列（整型那列只要 2.1 ms）。
+1. **`Value` 行缓冲 vs 类型化列缓冲**：参考的扫描产出 `ColumnVector`（连续 `i32` + null 位图），协议层整块 `memcpy`；端口是 `Vec<Vec<Value>>`，每 cell 一个 24 字节枚举、每行一次分配。`SELECT id` 的 3.77 ms 里解码 2.1 ms，perf 里约一半在 malloc/free。
+2. **文本型列必须解析**：varchar/json/date 只有文本形态；`SELECT id, name` 的解码 7.9 ms 里约 5.7 ms 是 varchar 这一列。
+3. 这两条要根治得把结果与扫描都换成类型化列缓冲、表达式按列求值 —— 即把 `Value` 模型换成 `DataBlock` 模型（见 `chunk.rs` 的设计说明），属于另一层改造。

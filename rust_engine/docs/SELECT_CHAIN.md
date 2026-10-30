@@ -52,10 +52,38 @@
 
 结论：**端口比参考多两次「值 ↔ 文本」转换**（执行器出口渲染、协议入口解析），而且扫描与结果都是行式的。参考从扫描到 wire 全程是列缓冲。
 
-## 5 修复路径（下一步）
+## 5 已修：结果不再经过文本（`2191fa03e`）
 
-1. `QueryResult::Rows` 携带列式数据（`Vec<Value>` 的列向量或新的 `Batch` 变体），文本渲染只在 CLI / `.slt` 出口做；
-2. 协议层从列缓冲直接打包（一列一个 `binary` 块，标量 `memcpy`），删掉逐 cell `parse`；
-3. 扫描直接产出列缓冲，`direct_projection` 不再逐行分配 `Vec<Value>`。
+`QueryResult::Rows` 原先存 `Vec<Vec<String>>`：执行器在出口把每个 cell 渲染成显示文本，协议层再把它解析回要发送的二进制列块。现在存 `Vec<Vec<Value>>`：
 
-按第 2 条之外的两条一起做的估计：`SELECT id` 服务端 5.0 → ~1.5 ms（与参考持平），`SELECT id, name` 14 → ~4 ms（剩下的 varchar 解析是格式本身的要求）。
+- `rows_text()` 按需渲染，只给真正要看文本的地方（CLI、`.slt` runner、HTTP/postgres writer、单测的 `rows()` helper）；
+- thrift 打包直接从 `Value` 取数（`cell_int`/`cell_float`/`cell_bool`），只有本来只有文本形态的列（varchar/json/date/array/tensor/sparse）才走 `cell_text`；
+- 无声明类型的表达式列（`SELECT 1+1`）改为看值推断列类型，不再解析文本。
+
+服务端每查询（40,000 行）：`SELECT id` **4.79 → 3.77 ms**（exec 4.37 → 2.92，渲染那 1.5 ms 没了），`SELECT id, name` **10.44 → 9.23 ms**。响应字节数不变（156 / 653 KiB），客户端解码成本不变。
+
+## 6 仍未对齐：`Value` 行缓冲 vs 列缓冲
+
+剩下的差距不在边界，而在扫描的产出形式：
+
+- 参考的扫描产出 `ColumnVector`：定长、连续、类型化的缓冲（`i32` 数组 + null 位图），谓词按列求值，协议层整块 `memcpy`；
+- 端口产出 `Vec<Vec<Value>>`：每个 cell 一个 24 字节的枚举，每行一次 `Vec` 分配。`SELECT id`（40,000 行）的服务端 3.77 ms 里，解码 2.1 ms、打包 0.85 ms，perf 里约一半在 malloc/free。
+
+这是端口有意的取舍：[`chunk.rs`](../crates/infinity-executor/src/chunk.rs) 记录过——表达式一律在 `Value` 上求值，复用磁盘上的 `BlockValue` 列缓冲会在每个算子边界引入逐 cell 转换，正是算子模型要消除的东西。要再往前一步，得让结果与扫描都改成**类型化列缓冲**（`Vec<i32>` 这类），并把表达式求值改成按列；那是把 `Value` 模型换成 `DataBlock` 模型，属于另一层次的改造，不是 SELECT 链路的接线问题。
+
+### 数字（本轮结束）
+
+| 查询（40,000 行，端到端 wall） | 参考 | 端口 | 倍数 |
+|---|---|---|---|
+| `SELECT id` | 2.1–2.4 ms | 5.3–5.5 ms | 2.3x |
+| `SELECT id, name` | 16.2–16.7 ms | 25.1–26.6 ms | 1.6x |
+| `WHERE id = 39999` | 1.3–2.8 ms | 2.1 ms | ~1x |
+
+服务端分段（端口，40,000 行）：
+
+| 阶段 | `SELECT id` | `SELECT id, name` |
+|---|---|---|
+| 解析/绑定/优化/调度 | 0.7 ms | 0.6 ms |
+| 读块 + 解码 | 2.1 ms | 7.9 ms |
+| 打包 thrift 列块 | 0.85 ms | 1.08 ms |
+| 服务端合计 | 3.77 ms | 9.23 ms |
