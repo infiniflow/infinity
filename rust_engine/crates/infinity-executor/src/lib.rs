@@ -1564,6 +1564,39 @@ fn split_table_name(table: &str) -> (String, String) {
 /// both sound and simple. An operator the prefilter cannot answer (`NE`, `LIKE`,
 /// `IN`, …) makes its conjunct disappear — the scan then reads more blocks, not
 /// fewer rows.
+/// The columns a predicate reads.
+///
+/// A scan only has to decode the columns its projection and its predicate
+/// touch; the rest of a wide row (an embedding, a tensor) costs nothing.
+fn predicate_columns(expr: &Expr, out: &mut Vec<usize>) {
+    match expr {
+        Expr::Column(i) => out.push(*i),
+        Expr::Literal(_) => {}
+        Expr::Cmp(a, _, b)
+        | Expr::And(a, b)
+        | Expr::Or(a, b)
+        | Expr::Like(a, b, ..)
+        | Expr::Binary(a, _, b) => {
+            predicate_columns(a, out);
+            predicate_columns(b, out);
+        }
+        Expr::Not(a) | Expr::IsNull(a, _) => predicate_columns(a, out),
+        Expr::In(a, list, _) => {
+            predicate_columns(a, out);
+            for e in list {
+                predicate_columns(e, out);
+            }
+        }
+        Expr::Func { args, .. } => {
+            for e in args {
+                predicate_columns(e, out);
+            }
+        }
+        Expr::FullText(i, ..) => out.push(*i),
+        Expr::Regex(i, _) => out.push(*i),
+    }
+}
+
 fn prune_conditions(pred: &Expr, columns: &[String]) -> Vec<crate::fast_rough_filter::PruneCond> {
     use crate::fast_rough_filter::{PruneCond, PruneOp};
     let mut out = Vec::new();
@@ -12898,7 +12931,30 @@ impl Engine {
                 let prune = predicate
                     .map(|pred| prune_conditions(pred, columns))
                     .unwrap_or_default();
-                self.fetch_rows_pruned(table, &prune).ok()?
+                // Decode only the columns the projection and the predicate
+                // read: on a wide row (an embedding, a tensor) the rest is not
+                // even looked at. The reader keeps the row width, so every
+                // index the plan carries still lines up.
+                // The plan's indices are positions in the scan's (pruned) list;
+                // the reader wants positions in the table's.
+                let mut needed: Vec<usize> = indices.iter().filter_map(|i| pos.get(*i).copied()).collect();
+                if let Some(pred) = predicate {
+                    let mut pred_cols = Vec::new();
+                    predicate_columns(pred, &mut pred_cols);
+                    needed.extend(pred_cols.iter().filter_map(|i| pos.get(*i).copied()));
+                }
+                needed.sort_unstable();
+                needed.dedup();
+                let narrowed = (!self.needs_text_rows(table))
+                    .then(|| {
+                        self.read_cpp_blocks_pruned_values(table, &needed, &prune)
+                            .ok()
+                    })
+                    .flatten();
+                match narrowed {
+                    Some((_, rows)) => rows.into_iter().map(|(_, cells)| cells).collect(),
+                    None => self.fetch_rows_pruned(table, &prune).ok()?,
+                }
             }
         };
         if !pos.iter().copied().eq(0..pos.len()) {

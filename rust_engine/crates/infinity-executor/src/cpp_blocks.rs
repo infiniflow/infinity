@@ -4025,20 +4025,33 @@ impl Engine {
         if !self.visible_block_ids(&table).is_empty() {
             return None;
         }
-        let buffered = self.pending_rows_of(&table);
-        if buffered.is_empty() {
+        let key = self.table_key(&table);
+        if self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|entry| entry.pending_rows.is_empty())
+            .unwrap_or(true)
+        {
             return None;
         }
         let read_ts = crate::read_ts();
         let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
         let view = self.append_view(&table, read_ts);
-        let mut out: Vec<(usize, Vec<Value>)> = Vec::with_capacity(buffered.len());
-        for (seq, values) in buffered {
-            if dead.contains(&(seq as u64)) {
+        // The buffer is cloned cell by cell under its own lock: cloning the
+        // whole row first (`pending_rows_of`) copied the columns this read does
+        // not want - a 20,000-row point filter copied 20,000 varchar strings to
+        // throw them away.
+        let tables = self.tables.lock().unwrap();
+        let entry = tables.get(&key)?;
+        let mut out: Vec<(usize, Vec<Value>)> = Vec::with_capacity(entry.pending_rows.len());
+        for (seq, values) in &entry.pending_rows {
+            if dead.contains(&(*seq as u64)) {
                 continue;
             }
             if let Some(view) = &view {
-                if !view.covers(seq, read_ts) {
+                if !view.covers(*seq, read_ts) {
                     continue;
                 }
             }
@@ -4050,8 +4063,9 @@ impl Engine {
                     _ => v.clone(),
                 })
                 .collect();
-            out.push((seq, cells));
+            out.push((*seq, cells));
         }
+        drop(tables);
         out.sort_by_key(|(seq, _)| *seq);
         Some(out)
     }
