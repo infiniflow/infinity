@@ -5182,15 +5182,6 @@ pub struct Engine {
     context: Context,
     /// cached `SELECT` results keyed by the statement text
     result_cache: Mutex<HashMap<String, Vec<QueryResult>>>,
-    /// Per-block min/max of a column, collected while a block is decoded and
-    /// reused by later statements.
-    ///
-    /// The reference writes `blk|…|fast_rough_filter` only for a **sealed**
-    /// segment, so a table whose rows were appended has no prefilter at all and
-    /// `WHERE id = 5` reads every block. The key carries the block's `version`
-    /// file identity, so a rewritten block misses the cache instead of
-    /// returning rows from stats that no longer describe it.
-    block_stats: Mutex<HashMap<(u64, u64, u32, u16, usize, u128, u64), (Value, Value)>>,
     /// `ResultCacheManager`: plan-node results the optimizer's
     /// `ResultCacheGetter` reads and the scan fills (`result_cache` config).
     plan_cache: Arc<infinity_planner::result_cache::SharedCache>,
@@ -6360,7 +6351,6 @@ impl Engine {
             wal_enabled: options.wal_enabled,
             index_epoch: std::sync::atomic::AtomicU64::new(0),
             result_cache: Mutex::new(HashMap::new()),
-            block_stats: Mutex::new(HashMap::new()),
             plan_cache: Arc::new(infinity_planner::result_cache::SharedCache::new()),
             current_db: Mutex::new("default_db".to_string()),
             tables: Arc::new(Mutex::new(HashMap::new())),
