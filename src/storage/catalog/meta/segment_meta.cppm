@@ -84,7 +84,6 @@ public:
     Status CommitBlock(BlockID block_id, TxnTimeStamp commit_ts);
 
     std::tuple<std::vector<BlockID> *, Status> GetBlockIDs1();
-    std::tuple<std::vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp commit_ts);
 
     std::tuple<size_t, Status> GetRowCnt1();
 

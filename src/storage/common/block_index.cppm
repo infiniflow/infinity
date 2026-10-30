@@ -35,7 +35,8 @@ public:
     std::unique_ptr<SegmentMeta> segment_meta_;
 
 private:
-    mutable std::vector<std::unique_ptr<BlockMeta>> block_map_;
+    mutable std::mutex block_map_mtx_;
+    mutable std::vector<std::unique_ptr<BlockMeta>> block_map_; // only used in function block_map()
 };
 
 export struct BlockIndex {

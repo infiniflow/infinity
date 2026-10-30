@@ -41,6 +41,7 @@ SegmentOffset NewSegmentSnapshot::segment_offset() const {
 }
 
 const std::vector<std::unique_ptr<BlockMeta>> &NewSegmentSnapshot::block_map() const {
+    std::lock_guard<std::mutex> lock(block_map_mtx_);
     if (block_map_.size()) {
         return block_map_;
     }
@@ -68,7 +69,7 @@ void BlockIndex::NewInit(const std::shared_ptr<TableMeta> &table_meta) {
         RecoverableError(status);
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
-        NewSegmentSnapshot &segment_snapshot = new_segment_block_index_.emplace(segment_id, NewSegmentSnapshot()).first->second;
+        NewSegmentSnapshot &segment_snapshot = new_segment_block_index_.try_emplace(segment_id).first->second;
         segment_snapshot.segment_meta_ = std::make_unique<SegmentMeta>(segment_id, *table_meta_);
     }
 }
@@ -105,11 +106,16 @@ BlockMeta *BlockIndex::GetBlockMeta(u32 segment_id, u16 block_id) const {
     if (seg_it == new_segment_block_index_.end()) {
         return nullptr;
     }
-    const auto &blocks_info = seg_it->second;
-    if (blocks_info.block_map().size() <= block_id) {
+    // block_map() is sorted by id (GetTableSegmentBlocks sorts the ids) but holds only the blocks
+    // visible to this transaction, so block_id is a key, not a position in the vector.
+    const std::vector<std::unique_ptr<BlockMeta>> &block_map = seg_it->second.block_map();
+    auto it = std::lower_bound(block_map.begin(), block_map.end(), block_id, [](const std::unique_ptr<BlockMeta> &block_meta, BlockID id) {
+        return block_meta->block_id() < id;
+    });
+    if (it == block_map.end() || (*it)->block_id() != block_id) {
         return nullptr;
     }
-    return blocks_info.block_map()[block_id].get();
+    return it->get();
 }
 void IndexIndex::Insert(std::string index_name, std::shared_ptr<NewIndexSnapshot> new_index_snapshot) {
     new_index_snapshots_vec_.push_back(new_index_snapshot.get());

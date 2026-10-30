@@ -1270,7 +1270,10 @@ void GetRerankerScore(std::vector<MatchTensorRerankDoc> &rerank_docs,
         const BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
         const BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
         ColumnVector column_vec;
-        BlockMeta *block_meta = block_index->new_segment_block_index_.at(segment_id).block_map().at(block_id).get();
+        BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
+        if (block_meta == nullptr) [[unlikely]] {
+            UnrecoverableError(fmt::format("MatchTensor rerank: block not found. segment_id: {}, block_id: {}", segment_id, block_id));
+        }
         ColumnMeta column_meta(column_id, *block_meta);
         auto [block_row_cnt, status] = block_meta->GetRowCnt1();
         if (!status.ok()) {
