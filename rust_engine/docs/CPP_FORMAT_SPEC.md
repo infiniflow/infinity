@@ -90,13 +90,13 @@ score     += smooth_idf * smooth_tf * weight
 
 | 子系统 | 现状 | 差距 |
 |---|---|---|
-| 表数据 | 行文本 `row:<table>:<seq>` 存于 RocksDB | **字节级布局已实现**（`infinity-storage::cpp_format`：数据文件框架 / `version` 文件 / `[data_region][null_bitmap]` 列体 / outline / 块目录读写，含逐字节单测）；**尚未接入执行器的读写路径** |
-| Catalog/Meta | RocksDB（与参考同一底座） | 键空间兼容（§2） |
-| 向量索引 | 仅内存，`open` 时重建 | 未持久化，无 §6-4 的文件 |
-| 全文索引 | 内存匹配 + 自研 BM25 | 未落盘，无 §6-5 的文件 |
-| 二级索引 | 内存 BTree | 无 PGM 文件 |
+| 表数据 | 列式块是行的存储本体：`infinity-executor::cpp_blocks` 写/读，`infinity-storage::cpp_format` 编解码（数据文件框架 / `version` 文件 / `[data_region][null_bitmap]` 列体 / outline / 块目录）。`INSERT` 先进缓冲、checkpoint 落块；`COPY` 与 `COMPACT` 在各自提交里落块 | 无（`GAPS.md` §3：NULL 定长 slot 与 `VARCHAR` 内联 padding 是参考不写的字节） |
+| Catalog/Meta | RocksDB（与参考同一底座），键集与同键的值逐字节比对 | 无（`catalog/` 的 SST 文件字节不可比，见 §3） |
+| 向量索引 | HNSW / IVF 的 chunk 与侧车文件按参考布局写进 `idx_*` 目录 | 图区与质心随机，按内容比（`GAPS.md` §3） |
+| 全文索引 | 倒排按参考的 `.dic` / `.pos` / `.len` 三段落盘（`encode_fulltext_chunk`），打分与参考逐位一致 | 无 |
+| 二级索引 | PGM chunk 按参考 `secondary_index_pgm.cppm` 的布局写 | 无 |
 
-> 结论：**§2.6.1 的四项均未达标**；本文件是施工前置件（任务 #67 的第一半）。§6 的 #1/#2/#3 已冻结（见 §8），并已在 `cpp_format` 中落成可读写、可逐字节验证的实现；#68 的剩余部分是把该格式**接入执行器的表数据路径**，#69–#71 仍需按 §6 清单补齐字节级细节后再实现。
+> 结论：§6 的 #1/#2/#3 已冻结（见 §8），并在 `cpp_format` / `cpp_blocks` 里落成可读写、可逐字节验证的实现，**已接入执行器的表数据路径**。与参考仍不同之处只有 `GAPS.md` 登记的四类：有意不移植（§1）、不可逐字节比对（§3）、覆盖不到的输入空间（§4，当前为空）、已登记的口径差异（§5）。
 
 ---
 

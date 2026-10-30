@@ -235,9 +235,9 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 | 类别 | 现在有什么 | 是否待办 |
 |---|---|---|
 | §1 有意不移植 | 对象存储 `obj_key` 打包、DiskANN、geo 类型 | 否，是决定 |
-| §2 未实现 / 未接线 | **两项并发待办**：执行器的多 fragment / tasklet（D4）、事务下半部的执行者与按 commit_ts 推进可见性；其余接线项（相关子查询、压缩/IMPORT 的 WAL 帧、`IndexScanBuilder`、`ResultCacheGetter`、`MATCH` 走索引、`fast_rough_filter`、分析器家族、稀疏检索选项、快照）已接线并有门禁 | 是，待办 |
-| §3 不可逐字节比对 | HNSW 图区、IVF 质心、`catalog/` 的 RocksDB 文件字节（键与值已逐键比对）、NULL slot 与内联 padding、后台 dump 的 chunk 切分 | 否，参考自身不确定 |
-| §4 覆盖不到的输入空间 | 带索引的 8M 行表、三段以上的容量切分、PLAID/EMVB/MULTIVECTOR chunk 字节 | 是，但代价高 |
+| §2 未实现 / 未接线 | **无待办**：块即行本体，事务冲突矩阵、导入 / 压缩 / 优化 / DumpIndex 的 WAL 帧、`fast_rough_filter`、分析器家族、稀疏检索选项、快照恢复都已接线，逐项在 `CLASS_MAP.md`（类/方法级）与 `FORMAT_EQUIVALENCE_TESTS.md`（门禁级） | 否，已收口 |
+| §3 不可逐字节比对 | HNSW 图区、IVF 质心、PLAID 训练、`catalog/` 的 RocksDB 文件字节（键与值已逐键比对）、NULL slot 与内联 padding、后台 dump 的 chunk 切分 | 否，参考自身不确定 |
+| §4 覆盖不到的输入空间 | **当前为空**：8,388,609 行导入已验两段（1024 + 1 块），PLAID/EMVB/MULTIVECTOR 的 chunk 按内容比 | 否 |
 
 已登记的性能/口径差异（相关子查询的作用域边界、`CREATE TABLE … AS SELECT`、视图、`INSERT … SELECT`）在 `GAPS.md` §5，不是待办。
 
