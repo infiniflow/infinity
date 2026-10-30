@@ -1557,6 +1557,73 @@ fn split_table_name(table: &str) -> (String, String) {
     }
 }
 
+/// Whether a predicate is a single `col = constant` (either order).
+///
+/// The reader filters rows while it builds them, which pays off only when most
+/// of them will be rejected; this is the shape that says so.
+fn is_equality_predicate(expr: &Expr) -> bool {
+    match expr {
+        Expr::Cmp(a, infinity_parser::CmpOp::Eq, b) => {
+            (matches!(**a, Expr::Column(_)) && matches!(**b, Expr::Literal(_)))
+                || (matches!(**b, Expr::Column(_)) && matches!(**a, Expr::Literal(_)))
+        }
+        _ => false,
+    }
+}
+
+/// Rewrites a predicate's column positions through `pos` (scan index -> row
+/// index), so a filter can run on the rows as they are laid out.
+///
+/// The scan hands its predicate down to the reader, which builds full-width
+/// rows: without this the predicate would read the wrong columns whenever the
+/// lowerer pruned some (the common case for a narrow projection).
+fn remap_columns(expr: &Expr, pos: &[usize]) -> Expr {
+    fn map(i: usize, pos: &[usize]) -> usize {
+        pos.get(i).copied().unwrap_or(usize::MAX)
+    }
+    match expr {
+        Expr::Column(i) => Expr::Column(map(*i, pos)),
+        Expr::Literal(v) => Expr::Literal(v.clone()),
+        Expr::Cmp(a, op, b) => Expr::Cmp(
+            Box::new(remap_columns(a, pos)),
+            *op,
+            Box::new(remap_columns(b, pos)),
+        ),
+        Expr::And(a, b) => Expr::And(
+            Box::new(remap_columns(a, pos)),
+            Box::new(remap_columns(b, pos)),
+        ),
+        Expr::Or(a, b) => Expr::Or(
+            Box::new(remap_columns(a, pos)),
+            Box::new(remap_columns(b, pos)),
+        ),
+        Expr::Not(a) => Expr::Not(Box::new(remap_columns(a, pos))),
+        Expr::IsNull(a, negated) => Expr::IsNull(Box::new(remap_columns(a, pos)), *negated),
+        Expr::Like(a, b, esc, negated) => Expr::Like(
+            Box::new(remap_columns(a, pos)),
+            Box::new(remap_columns(b, pos)),
+            *esc,
+            *negated,
+        ),
+        Expr::In(a, list, negated) => Expr::In(
+            Box::new(remap_columns(a, pos)),
+            list.iter().map(|e| remap_columns(e, pos)).collect(),
+            *negated,
+        ),
+        Expr::Binary(a, op, b) => Expr::Binary(
+            Box::new(remap_columns(a, pos)),
+            *op,
+            Box::new(remap_columns(b, pos)),
+        ),
+        Expr::Func { name, args } => Expr::Func {
+            name: name.clone(),
+            args: args.iter().map(|e| remap_columns(e, pos)).collect(),
+        },
+        Expr::FullText(i, query, opts) => Expr::FullText(map(*i, pos), query.clone(), opts.clone()),
+        Expr::Regex(i, pattern) => Expr::Regex(map(*i, pos), Box::new(remap_columns(pattern, pos))),
+    }
+}
+
 /// The comparisons a block prefilter can answer, out of a scan predicate.
 ///
 /// Only conjunctions are pushed down (`a AND b`): a disjunction could be
@@ -5115,6 +5182,15 @@ pub struct Engine {
     context: Context,
     /// cached `SELECT` results keyed by the statement text
     result_cache: Mutex<HashMap<String, Vec<QueryResult>>>,
+    /// Per-block min/max of a column, collected while a block is decoded and
+    /// reused by later statements.
+    ///
+    /// The reference writes `blk|…|fast_rough_filter` only for a **sealed**
+    /// segment, so a table whose rows were appended has no prefilter at all and
+    /// `WHERE id = 5` reads every block. The key carries the block's `version`
+    /// file identity, so a rewritten block misses the cache instead of
+    /// returning rows from stats that no longer describe it.
+    block_stats: Mutex<HashMap<(u64, u64, u32, u16, usize, u128, u64), (Value, Value)>>,
     /// `ResultCacheManager`: plan-node results the optimizer's
     /// `ResultCacheGetter` reads and the scan fills (`result_cache` config).
     plan_cache: Arc<infinity_planner::result_cache::SharedCache>,
@@ -6284,6 +6360,7 @@ impl Engine {
             wal_enabled: options.wal_enabled,
             index_epoch: std::sync::atomic::AtomicU64::new(0),
             result_cache: Mutex::new(HashMap::new()),
+            block_stats: Mutex::new(HashMap::new()),
             plan_cache: Arc::new(infinity_planner::result_cache::SharedCache::new()),
             current_db: Mutex::new("default_db".to_string()),
             tables: Arc::new(Mutex::new(HashMap::new())),
@@ -12925,6 +13002,7 @@ impl Engine {
         };
         // Only now that the shape is known is the materialised row set taken:
         // it is the caller's, and a plan this function declines must keep it.
+        let mut filtered = false;
         let mut rows = match rows.take() {
             Some(rows) => rows,
             None => {
@@ -12945,12 +13023,28 @@ impl Engine {
                 }
                 needed.sort_unstable();
                 needed.dedup();
-                let narrowed = (!self.needs_text_rows(table))
-                    .then(|| {
-                        self.read_cpp_blocks_pruned_values(table, &needed, &prune)
-                            .ok()
-                    })
-                    .flatten();
+                // A predicate runs inside the reader, on the row buffer, so a
+                // row it rejects is never built: the plan's indices are in the
+                // scan's layout, so the predicate is rewritten to the row's.
+                // A predicate is only run inside the reader when it is expected
+                // to reject most rows (`=` against a constant): filtering there
+                // saves the rejected rows' buffers, while a predicate that
+                // matches everything would only add a copy of each row.
+                let narrowed = if self.needs_text_rows(table) {
+                    None
+                } else if let Some(pred) = predicate.filter(|pred| is_equality_predicate(pred)) {
+                    let predicate = remap_columns(pred, &pos);
+                    let read = self
+                        .read_cpp_blocks_filtered_values(table, &needed, &prune, &|row: &[Value]| {
+                            predicate.eval_predicate(row)
+                        })
+                        .ok();
+                    filtered = read.is_some();
+                    read
+                } else {
+                    self.read_cpp_blocks_pruned_values(table, &needed, &prune)
+                        .ok()
+                };
                 match narrowed {
                     Some((_, rows)) => rows.into_iter().map(|(_, cells)| cells).collect(),
                     None => self.fetch_rows_pruned(table, &prune).ok()?,
@@ -12967,7 +13061,7 @@ impl Engine {
                 })
                 .collect();
         }
-        if let Some(pred) = predicate {
+        if let (Some(pred), false) = (predicate, filtered) {
             rows.retain(|row| pred.eval_predicate(row));
         }
         // The scan already produced the selected columns in order: hand the rows

@@ -3745,7 +3745,19 @@ impl Engine {
         wanted: &[usize],
         prune: &[crate::fast_rough_filter::PruneCond],
     ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
-        self.read_cpp_blocks_values(table, Some(wanted), prune)
+        self.read_cpp_blocks_values(table, Some(wanted), prune, None)
+    }
+
+    /// [`Self::read_cpp_blocks_pruned_values`] with a row predicate applied
+    /// while the rows are built: a rejected row never becomes a `Vec`.
+    pub fn read_cpp_blocks_filtered_values(
+        &self,
+        table: &str,
+        wanted: &[usize],
+        prune: &[crate::fast_rough_filter::PruneCond],
+        keep: &dyn Fn(&[Value]) -> bool,
+    ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
+        self.read_cpp_blocks_values(table, Some(wanted), prune, Some(keep))
     }
 
     /// Every row the blocks hold, tombstoned slots included.
@@ -3828,7 +3840,9 @@ impl Engine {
         columns: &[cpp_format::RawBlockColumn],
         wanted: Option<&[usize]>,
     ) -> Option<Vec<(usize, Vec<String>)>> {
-        let rows = Self::decode_rows_of_values(ids, type_text, types, id, version, columns, wanted)?;
+        let rows = Self::decode_rows_of_values(
+            ids, type_text, types, id, version, columns, wanted, None, None,
+        )?;
         Some(
             rows.into_iter()
                 .map(|(seq, cells)| (seq, cells.iter().map(mirror_cell_text).collect()))
@@ -3852,6 +3866,8 @@ impl Engine {
         version: &cpp_format::BlockVersionFile,
         columns: &[cpp_format::RawBlockColumn],
         wanted: Option<&[usize]>,
+        keep: Option<&dyn Fn(&[Value]) -> bool>,
+        mut observe: Option<&mut dyn FnMut(&[Value])>,
     ) -> Option<Vec<(usize, Vec<Value>)>> {
         let row_count: usize = version
             .created
@@ -3893,9 +3909,14 @@ impl Engine {
                 layout,
             }));
         }
+        // One row buffer for the whole block: a row the predicate rejects never
+        // becomes its own `Vec`, which is what a selective scan spent most of
+        // its time allocating.
+        let mut scratch: Vec<Value> = Vec::with_capacity(types.len());
         let mut out = Vec::with_capacity(row_count);
         for row in 0..row_count {
-            let mut cells = Vec::with_capacity(types.len());
+            scratch.clear();
+            let cells = &mut scratch;
             for (col, column_type) in types.iter().enumerate() {
                 let Some(column) = prepared[col].as_ref() else {
                     cells.push(Value::Null);
@@ -3971,11 +3992,24 @@ impl Engine {
                 };
                 cells.push(value);
             }
-            out.push((
-                ((id.segment_id as usize) << 32)
-                    | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + row),
-                cells,
-            ));
+            if let Some(observe) = observe.as_deref_mut() {
+                observe(cells);
+            }
+            let seq = ((id.segment_id as usize) << 32)
+                | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + row);
+            match keep {
+                Some(keep) => {
+                    if keep(cells) {
+                        out.push((seq, cells.clone()));
+                    }
+                }
+                // No predicate: the row takes its buffer with it, which is the
+                // one allocation a scanned row always paid.
+                None => {
+                    out.push((seq, std::mem::take(&mut scratch)));
+                    scratch = Vec::with_capacity(types.len());
+                }
+            }
         }
         Some(out)
     }
@@ -4070,6 +4104,121 @@ impl Engine {
         Some(out)
     }
 
+    /// The identity of a block's `version` file: `(mtime, len)`.
+    ///
+    /// A checkpoint rewrites the file when it rewrites the block, so the pair
+    /// changes with the bytes the stats were derived from. It is one `stat` per
+    /// block per statement - far cheaper than decoding the block to find out.
+    fn block_identity(
+        root: &Path,
+        db_id: u64,
+        table_id: u64,
+        segment: u32,
+        block: u16,
+    ) -> (u128, u64) {
+        let version = root
+            .join(cpp_format::block_dir(db_id, table_id, segment, block))
+            .join("version");
+        match std::fs::metadata(version) {
+            Ok(md) => {
+                let mtime = md
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0);
+                (mtime, md.len())
+            }
+            Err(_) => (0, 0),
+        }
+    }
+
+    /// Whether the cached stats of a block prove that none of `conds` can hold
+    /// in it.
+    ///
+    /// A condition whose column has no stats (never decoded since the block was
+    /// written, or a type the scan skips) simply cannot refute: the block is
+    /// read, exactly as before.
+    fn block_stats_refute(
+        &self,
+        db_id: u64,
+        table_id: u64,
+        segment: u32,
+        block: u16,
+        identity: (u128, u64),
+        conds: &[(usize, crate::fast_rough_filter::PruneOp, Value)],
+    ) -> bool {
+        use crate::fast_rough_filter::PruneOp;
+        let stats = self.block_stats.lock().unwrap();
+        conds.iter().any(|(column, op, value)| {
+            let Some((min, max)) = stats.get(&(
+                db_id,
+                table_id,
+                segment,
+                block,
+                *column,
+                identity.0,
+                identity.1,
+            )) else {
+                return false;
+            };
+            match op {
+                PruneOp::Eq => matches!(value.partial_cmp_value(min), Some(std::cmp::Ordering::Less))
+                    || matches!(value.partial_cmp_value(max), Some(std::cmp::Ordering::Greater)),
+                PruneOp::Lt => matches!(
+                    min.partial_cmp_value(value),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ),
+                PruneOp::Le => matches!(
+                    min.partial_cmp_value(value),
+                    Some(std::cmp::Ordering::Greater)
+                ),
+                PruneOp::Gt => matches!(
+                    max.partial_cmp_value(value),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                ),
+                PruneOp::Ge => matches!(max.partial_cmp_value(value), Some(std::cmp::Ordering::Less)),
+            }
+        })
+    }
+
+    /// Records the min/max of every column of a block that was just decoded.
+    ///
+    /// Only the columns the scan asked for have values; the others are NULL in
+    /// every row and are skipped, so the cache never claims to know a column it
+    /// has not seen.
+    fn record_block_stats(
+        &self,
+        root: &Path,
+        db_id: u64,
+        table_id: u64,
+        segment: u32,
+        block: u16,
+        observed: &[Option<(Value, Value)>],
+    ) {
+        let identity = Self::block_identity(root, db_id, table_id, segment, block);
+        if identity == (0, 0) {
+            return;
+        }
+        let mut stats = self.block_stats.lock().unwrap();
+        for (column, bounds) in observed.iter().enumerate() {
+            // A column with no non-null cell keeps no entry: nothing is known
+            // about it, so a predicate on it must read the block.
+            if let Some((min, max)) = bounds {
+                stats.insert(
+                    (db_id, table_id, segment, block, column, identity.0, identity.1),
+                    (min.clone(), max.clone()),
+                );
+            }
+        }
+        // A long-lived engine must not accumulate one entry per block forever;
+        // dropping the whole map only costs the next scan a decode it was doing
+        // anyway.
+        if stats.len() > 200_000 {
+            stats.clear();
+        }
+    }
+
     /// Every row of the table as the engine works with it: the block files'
     /// cells (decoded by `decode_rows_of_values`) plus the append buffer's,
     /// which are `Value`s already.
@@ -4078,6 +4227,7 @@ impl Engine {
         table: &str,
         wanted: Option<&[usize]>,
         prune: &[crate::fast_rough_filter::PruneCond],
+        keep: Option<&dyn Fn(&[Value]) -> bool>,
     ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
         let table = self.qualified_table(table);
         let meta = self
@@ -4157,11 +4307,72 @@ impl Engine {
                         }
                     }
                 }
+                // No catalog prefilter (the reference writes one only for a
+                // sealed segment): the stats this engine collected when it last
+                // decoded the block answer the same question.
+                let identity = Self::block_identity(&root, db_id, meta.id, segment_id, block_index);
+                if self.block_stats_refute(
+                    db_id,
+                    meta.id,
+                    segment_id,
+                    block_index,
+                    identity,
+                    &resolved,
+                ) {
+                    #[cfg(test)]
+                    PRUNED_BLOCKS.with(|n| n.set(n.get() + 1));
+                    continue;
+                }
             }
             match self.read_block_cached(&table, &root, id) {
                 Ok((version, columns)) => {
+                    // The stats are taken from every decoded row, before `keep`
+                    // drops the ones the predicate rejects - otherwise a
+                    // filtered scan would record only the rows that matched and
+                    // the next statement would believe the block holds nothing
+                    // else.
+                    let mut observed: Vec<Option<(Value, Value)>> =
+                        vec![None; types.len()];
+                    let mut observe = |cells: &[Value]| {
+                        for (column, value) in cells.iter().enumerate() {
+                            if matches!(value, Value::Null) {
+                                continue;
+                            }
+                            match &observed[column] {
+                                Some((min, max)) => {
+                                    let mut next = (min.clone(), max.clone());
+                                    if min.partial_cmp_value(value)
+                                        == Some(std::cmp::Ordering::Greater)
+                                    {
+                                        next.0 = value.clone();
+                                    }
+                                    if max.partial_cmp_value(value)
+                                        == Some(std::cmp::Ordering::Less)
+                                    {
+                                        next.1 = value.clone();
+                                    }
+                                    observed[column] = Some(next);
+                                }
+                                None => observed[column] = Some((value.clone(), value.clone())),
+                            }
+                        }
+                    };
                     let Some(cells) = Self::decode_rows_of_values(
-                        &meta.ids, &meta.types, &types, id, &version, &columns, wanted,
+                        &meta.ids,
+                        &meta.types,
+                        &types,
+                        id,
+                        &version,
+                        &columns,
+                        wanted,
+                        keep,
+                        // Only a predicate can use the stats, and the bookkeeping
+                        // is a comparison per cell: skip it otherwise.
+                        if resolved.is_empty() {
+                            None
+                        } else {
+                            Some(&mut observe)
+                        },
                     ) else {
                         break;
                     };
@@ -4175,6 +4386,18 @@ impl Engine {
                     // (`BlockVersion::GetRowCount(begin_ts)`): a slot created
                     // after it does not exist yet, and one deleted after it is
                     // still there.
+                    if !resolved.is_empty() {
+                        // The block is decoded anyway: keep what a later
+                        // statement needs to skip it without decoding again.
+                        self.record_block_stats(
+                            &root,
+                            db_id,
+                            meta.id,
+                            segment_id,
+                            block_index,
+                            &observed,
+                        );
+                    }
                     let created_at = Self::created_at(&version, read_ts);
                     rows.extend(
                         cells
@@ -4218,6 +4441,9 @@ impl Engine {
                         _ => v.clone(),
                     })
                     .collect();
+                if keep.is_some_and(|keep| !keep(&cells)) {
+                    continue;
+                }
                 rows.push((seq, cells));
             }
             rows.sort_by_key(|(seq, _)| *seq);
@@ -4233,7 +4459,7 @@ impl Engine {
         wanted: Option<&[usize]>,
         prune: &[crate::fast_rough_filter::PruneCond],
     ) -> Result<(Vec<String>, Vec<(usize, Vec<String>)>)> {
-        let (columns, rows) = self.read_cpp_blocks_values(table, wanted, prune)?;
+        let (columns, rows) = self.read_cpp_blocks_values(table, wanted, prune, None)?;
         Ok((
             columns,
             rows.into_iter()
@@ -6715,6 +6941,57 @@ mod tests {
     use super::*;
     use crate::QueryResult;
     use tempfile::tempdir;
+
+
+    /// A later statement skips a block the engine has already measured.
+    ///
+    /// The reference writes `blk|…|fast_rough_filter` only for a sealed
+    /// segment, so a table whose rows were appended has no prefilter; the scan
+    /// therefore decodes every block. The min/max collected during that decode
+    /// let the next statement skip a block that cannot hold the value - as long
+    /// as the block is unchanged, which the key's `version` identity checks.
+    #[test]
+    fn the_read_side_stats_skip_a_block_that_cannot_match() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE stats_t (a INT);").unwrap();
+        let values: Vec<String> = (0..8_200).map(|i| format!("({i})")).collect();
+        e.execute(&format!("INSERT INTO stats_t VALUES {};", values.join(", ")))
+            .unwrap();
+        e.flush().unwrap();
+        // Two blocks: a = 8_199 is in the second one.
+        assert_eq!(
+            row_strings(&e, "SELECT a FROM stats_t WHERE a = 8199;"),
+            vec![vec!["8199".to_string()]]
+        );
+        // The first scan measured both blocks; the second one can skip the
+        // first without reading it.
+        let before = PRUNED_BLOCKS.with(|n| n.get());
+        assert_eq!(
+            row_strings(&e, "SELECT a FROM stats_t WHERE a = 8199;"),
+            vec![vec!["8199".to_string()]]
+        );
+        assert!(PRUNED_BLOCKS.with(|n| n.get()) > before);
+        // A value no block holds still answers empty, and a range keeps the
+        // blocks its bounds do not rule out.
+        assert!(row_strings(&e, "SELECT a FROM stats_t WHERE a = 999999;").is_empty());
+        assert_eq!(
+            row_strings(&e, "SELECT a FROM stats_t WHERE a >= 8198;"),
+            vec![vec!["8198".to_string()], vec!["8199".to_string()]]
+        );
+        // A rewrite moves the block's `version`, so the stale stats are not
+        // used: the new row is found, and the old ones still are.
+        e.execute("INSERT INTO stats_t VALUES (8200);").unwrap();
+        e.flush().unwrap();
+        assert_eq!(
+            row_strings(&e, "SELECT a FROM stats_t WHERE a = 8200;"),
+            vec![vec!["8200".to_string()]]
+        );
+        assert_eq!(
+            row_strings(&e, "SELECT a FROM stats_t WHERE a = 8199;"),
+            vec![vec!["8199".to_string()]]
+        );
+    }
 
     fn row_strings(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
         let mut out = Vec::new();
