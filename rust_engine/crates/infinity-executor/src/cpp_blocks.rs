@@ -4412,8 +4412,13 @@ impl Engine {
                 },
                 _ => return None,
             };
-            out.push_value(&value);
-            valid.push(!matches!(value, Value::Null));
+            if let Value::Str(text) = value {
+                out.push_text(text);
+                valid.push(true);
+            } else {
+                valid.push(!matches!(value, Value::Null));
+                out.push_value(&value);
+            }
         }
         Some(())
     }

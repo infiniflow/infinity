@@ -60,6 +60,16 @@ impl ColumnData {
         }
     }
 
+    /// Appends a text cell, moving the string when the column is text (a text
+    /// column is the common case, and a clone per cell is what a varchar
+    /// projection cannot afford).
+    pub fn push_text(&mut self, s: String) {
+        match self {
+            ColumnData::Text(v) => v.push(s),
+            other => other.push_value(&Value::Str(s)),
+        }
+    }
+
     pub fn value_at(&self, i: usize) -> Value {
         match self {
             ColumnData::Int(v) => v.get(i).map(|i| Value::Int(*i)).unwrap_or(Value::Null),
