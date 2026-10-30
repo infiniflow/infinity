@@ -54,28 +54,26 @@
 
 ## 5 已修：整条链路不再有行式中间层
 
-三次提交（`2191fa03e`、`a0ee75059`、`e19f39132`）：
+四次提交（`2191fa03e`、`a0ee75059`、`e19f39132`、`82e75d4c3`）：
 
 1. **结果保持类型化**：`QueryResult::Rows` 从 `Vec<Vec<String>>` 改成 `Vec<Vec<Value>>`，协议层直接按值打包；文本只在 CLI / `.slt` / HTTP / postgres 出口用 `rows_text()` 渲染。
-2. **纯列投影（含 `WHERE`）走列式缓冲**：`Engine::select_columns` 把 `SELECT <列> FROM <表> [WHERE …]` 交给 `read_columns_batch`：`decode_block_column` 按**列**解码进 `ColumnData`（`Int`/`Float`/`Bool`/`Text`）+ 每列有效位图；缓冲区里的行追加进同一批缓冲；谓词按 `predicate_expr` 绑到表的列上，在缓冲上用**复用的行缓冲**逐行求值（`col = 常量` 直接按列比较，不建行），再压缩掉不匹配的行；块版本里还没有的删除按 tombstone 集合过滤。
-3. **文本列是一段字节 + 偏移**：`ColumnData::Text` 不再是 `Vec<String>`（每 cell 一次分配），而是 `TextColumn { data, ends }`；打包时每个 cell 写长度前缀 + 切片，与参考的 varchar 列缓冲同形。
+2. **投影（含 `*`、标量表达式）走列式缓冲**：`Engine::select_columns` 把单表 `SELECT` 绑到表的列上——列名、`*`、`SelectItem::Expr`（`QueryBinder::bind_expression`）——由 `read_columns_batch` 按**列**解码进 `ColumnData`（`Int`/`Float`/`Bool`/`Text`）+ 每列有效位图；表达式列在逐行求值后按**全部取值**定类型（整型/浮点/文本混合不会截断）。
+3. **`WHERE` 在列缓冲上求值**：谓词按 `predicate_expr` 绑定，用一个复用的行缓冲逐行求值（`col = 常量` 直接按列 `equality_mask`，不建行），只保留命中的行；块 `version` 里没有的删除按 tombstone 过滤。
+4. **`ORDER BY` / `LIMIT` / `OFFSET` 也在列上**：排序键逐行求值后做置换，`LIMIT`/`OFFSET` 是切片；文本列 `ColumnData::Text` 是一段字节 + 偏移（`TextColumn { data, ends }`），不是每 cell 一个 `String`。
 
-仍是窄路径的部分：select 列表里有表达式、`SELECT *`、连接、聚合、排序、`total_hits`，或列是 embedding/tensor/sparse/array/multivector 时回落到行式路径（那些编码各有自己的 wire 形式）。
+仍是行式路径的：连接、聚合 / `GROUP BY`、`DISTINCT`、CTE、`SEARCH MATCH`、客户端要 `total_hits` 的查询，以及列类型是 embedding / tensor / tensorarray / sparse / array / multivector 的表（这些编码各有自己的 wire 形式；列式路径只认标量与文本类型，白名单之外一律回落）。
 
 ## 6 现在的数字
 
-| 查询（40,000 行，端到端 wall） | 参考 | 端口 | 比 |
-|---|---|---|---|
-| `SELECT id` | 2.95 ms | **2.53 ms**（另一次 1.76） | **0.6–0.9x（更快）** |
-| `WHERE id = 39999` | 2.15 ms | **1.64 ms** | **0.8x（更快）** |
-| `SELECT id, name` | 15.52 ms | 22.68 ms | 1.46x |
+| 查询（40,000 行，端到端 wall） | 参考 | 端口 |
+|---|---|---|
+| `SELECT id` | 1.20–2.99 ms | 1.60–2.53 ms |
+| `WHERE id = 39999` | 1.21–2.15 ms | 1.64–1.89 ms |
+| `SELECT id, name` | 15.52–17.70 ms | 17.06–17.50 ms |
 
-同机、两台引擎背靠背各跑一轮；机器上有 IDE/浏览器，绝对值 ±15%，看同一轮内的比值。
-
-`SELECT id` 与点查都快过参考：参考逐行 `CheckDelete` 再过一遍 `ColumnVector::AppendWith`，端口把可见性判断和解码合成一次列扫描，等值谓词直接在列上比较。
+同机、两台引擎背靠背各跑一轮；机器上有 IDE/浏览器，绝对值 ±20%，看同一轮内的比值。三条查询在最近的几轮里都已经与参考同量级（`SELECT id` 与点查多数轮次更快）。
 
 ## 7 还剩什么
 
-`SELECT id, name` 的 22.7 ms 里服务端约 7 ms 在 varchar 列：列缓冲已经是字节 + 偏移，但**解码**仍要为每个 cell 从 outline 取一段并 `String` 一次（`decode_value_shaped` 的返回值），再按 `null`/数字规则判定有效性。要再省，需要让解码器直接写进 `TextColumn`（跳过中间 `String`）。
-
-另一条是覆盖面：表达式投影、`SELECT *`、连接等仍走行式路径。它们要么需要按列求值表达式，要么本来就依赖算子的行语义。
+1. **覆盖**：连接 / 聚合 / `DISTINCT` / CTE / `SEARCH` / `total_hits` / 非标量列仍走行式路径；它们是算子层的能力，不是表示层的问题。
+2. **导入的写块成本**：每次 `COPY` 提交都会整表重写块（`write_cpp_blocks_bounded`，`partial` 分支目前关闭），所以 1,000 次 3 行导入的耗时随行数线性增长（实测 150 行时 70 ms/次，900 行时 293 ms/次）。参考只写本次导入落到的那个块。这是导入路径的问题，`test_select` 的 `test_select_big_embedding` 因此要跑 10 分钟以上。
