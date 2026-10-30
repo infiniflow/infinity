@@ -3753,63 +3753,82 @@ impl Engine {
             .last()
             .map(|c| c.cumulative_row_count as usize)
             .unwrap_or(0);
+        // Everything a cell needs from its **column** - the body split, the
+        // outline kind and the outline bytes - is the same for every row.
+        // Splitting the body per cell copied the whole block's
+        // `[data][bitmap]` once per cell, which made a block read
+        // O(rows x block_bytes): 40,000 rows spent 68% of the time in memmove.
+        struct Prepared<'a> {
+            body: cpp_format::ColumnBody,
+            kind: OutlineKind,
+            outline: &'a [u8],
+        }
+        let mut prepared: Vec<Option<Prepared>> = Vec::with_capacity(types.len());
+        for (col, column_type) in types.iter().enumerate() {
+            if let Some(wanted) = wanted {
+                if !wanted.contains(&col) {
+                    prepared.push(None);
+                    continue;
+                }
+            }
+            let column_id = ids.get(col).copied().unwrap_or(col as u64);
+            let raw = columns.iter().find(|c| c.column_id == column_id)?;
+            let layout = layout_of(&type_text[col], *column_type)?;
+            prepared.push(Some(Prepared {
+                body: cpp_format::split_body_for_layout(
+                    raw.body.as_slice(),
+                    DEFAULT_BLOCK_CAPACITY,
+                    layout,
+                ),
+                kind: outline_kind(&type_text[col]),
+                outline: raw.outline.as_slice(),
+            }));
+        }
         let mut out = Vec::with_capacity(row_count);
         for row in 0..row_count {
             let mut cells = Vec::with_capacity(types.len());
             for (col, column_type) in types.iter().enumerate() {
-                if let Some(wanted) = wanted {
-                    if !wanted.contains(&col) {
-                        cells.push("null".to_string());
-                        continue;
-                    }
-                }
-                let column_id = ids.get(col).copied().unwrap_or(col as u64);
-                let raw = columns.iter().find(|c| c.column_id == column_id)?;
-                let layout = layout_of(&type_text[col], *column_type)?;
-                let body = cpp_format::split_body_for_layout(
-                    raw.body.as_slice(),
-                    DEFAULT_BLOCK_CAPACITY,
-                    layout,
-                );
+                let Some(column) = prepared[col].as_ref() else {
+                    cells.push("null".to_string());
+                    continue;
+                };
+                let body = &column.body;
+                let outline = column.outline;
                 let value = if body.null_bitmap.len() > row / 8
                     && body.null_bitmap[row / 8] & (1 << (row % 8)) == 0
                 {
                     "null".to_string()
                 } else {
                     // Tensor / sparse slots point into the column's outline.
-                    match outline_kind(&type_text[col]) {
+                    match column.kind {
                         OutlineKind::Tensor => {
                             let at = row * 8;
                             let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                            decode_tensor_value(&type_text[col], slot, &raw.outline)
+                            decode_tensor_value(&type_text[col], slot, outline)
                                 .unwrap_or_else(|| "null".into())
                         }
                         OutlineKind::TensorArray => {
                             let at = row * 8;
                             let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                            decode_tensorarray_value(&type_text[col], slot, &raw.outline)
+                            decode_tensorarray_value(&type_text[col], slot, outline)
                                 .unwrap_or_else(|| "null".into())
                         }
                         OutlineKind::Sparse => {
                             let at = row * 16;
                             let slot = body.data.get(at..at + 16).unwrap_or(&[]);
-                            decode_sparse_value(&type_text[col], slot, &raw.outline)
+                            decode_sparse_value(&type_text[col], slot, outline)
                                 .unwrap_or_else(|| "null".into())
                         }
                         OutlineKind::Array => {
                             let at = row * 8;
                             let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                            decode_array_value(&type_text[col], slot, &raw.outline)
+                            decode_array_value(&type_text[col], slot, outline)
                                 .unwrap_or_else(|| "null".into())
                         }
-                        OutlineKind::None => decode_value(
-                            &type_text[col],
-                            *column_type,
-                            &body.data,
-                            row,
-                            &raw.outline,
-                        )
-                        .unwrap_or_else(|| "null".into()),
+                        OutlineKind::None => {
+                            decode_value(&type_text[col], *column_type, &body.data, row, outline)
+                                .unwrap_or_else(|| "null".into())
+                        }
                     }
                 };
                 cells.push(value);
