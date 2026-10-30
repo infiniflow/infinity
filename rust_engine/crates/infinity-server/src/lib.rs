@@ -5959,7 +5959,10 @@ pub fn column_fields_from_batch(columns: &[String], types: &[String], batch: &Ba
                 }
             }
             Some(ColumnData::Text(v)) => {
-                for s in v {
+                // The column is one buffer plus offsets; each cell is a slice of
+                // it, so packing is a length prefix and a copy.
+                for i in 0..v.len() {
+                    let s = v.get(i);
                     match code {
                         16 => chunk.extend_from_slice(&date_to_days(s).unwrap_or(0).to_le_bytes()),
                         17 => chunk.extend_from_slice(&time_to_secs(s).unwrap_or(0).to_le_bytes()),

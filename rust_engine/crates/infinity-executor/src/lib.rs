@@ -1680,7 +1680,7 @@ fn remap_columns(expr: &Expr, pos: &[usize]) -> Expr {
 ///
 /// A scan only has to decode the columns its projection and its predicate
 /// touch; the rest of a wide row (an embedding, a tensor) costs nothing.
-fn predicate_columns(expr: &Expr, out: &mut Vec<usize>) {
+pub(crate) fn predicate_columns(expr: &Expr, out: &mut Vec<usize>) {
     match expr {
         Expr::Column(i) => out.push(*i),
         Expr::Literal(_) => {}
@@ -8295,7 +8295,6 @@ impl Engine {
             return Ok(None);
         };
         if join.is_some()
-            || where_pred.is_some()
             || !group_by.is_empty()
             || having.is_some()
             || !order_by.is_empty()
@@ -8335,6 +8334,12 @@ impl Engine {
         if wanted.is_empty() {
             return Ok(None);
         }
+        // A predicate is bound against the table's columns and evaluated on the
+        // buffers; everything below the shape check stays the same.
+        let predicate = match where_pred.as_ref() {
+            Some(pred) => Some(infinity_planner::predicate_expr(pred, &schema)?),
+            None => None,
+        };
         // Only the scalar and text columns are packed from column buffers;
         // an embedding / tensor / sparse / array column has its own wire
         // encoding, and decoding it here only to fall back would pay twice.
@@ -8365,7 +8370,8 @@ impl Engine {
         let _query = self.begin_query(statement, sql);
         let _read = ReadTsGuard::enter(self.txn.current_ts() + 1);
         let t0 = std::time::Instant::now();
-        let batch = self.read_columns_batch(&table, &wanted, labels);
+        let batch = self
+            .read_columns_batch(&table, &wanted, labels, predicate.as_ref(), schema.len());
         if std::env::var_os("INF_SEL_TRACE").is_some() {
             eprintln!(
                 "[batch] {table} rows={:?} {:.3}ms",

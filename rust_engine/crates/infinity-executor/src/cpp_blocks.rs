@@ -24,6 +24,7 @@ use infinity_catalog::cpp_layout::{
     CppBlock, CppIndexChunk, CppIndexSegment, CppSegment, CppSegmentSet, CPP_MIRROR_TS, UNCOMMIT_TS,
 };
 use crate::columnar::{Batch, ColumnData};
+use crate::Expr;
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
 use infinity_storage::WalCmd;
@@ -1594,7 +1595,7 @@ fn column_buffer(declared: &str) -> ColumnData {
         "FLOAT" | "DOUBLE" | "FLOAT16" | "BFLOAT16" => ColumnData::Float(Vec::new()),
         "TINYINT" | "SMALLINT" | "INT" | "INTEGER" | "BIGINT" | "UINT8" | "UINT16"
         | "UINT32" | "UINT64" => ColumnData::Int(Vec::new()),
-        _ => ColumnData::Text(Vec::new()),
+        _ => ColumnData::Text(crate::columnar::TextColumn::default()),
     }
 }
 
@@ -1604,7 +1605,13 @@ fn permute_column(column: &ColumnData, order: &[usize]) -> ColumnData {
         ColumnData::Int(v) => ColumnData::Int(order.iter().map(|i| v[*i]).collect()),
         ColumnData::Float(v) => ColumnData::Float(order.iter().map(|i| v[*i]).collect()),
         ColumnData::Bool(v) => ColumnData::Bool(order.iter().map(|i| v[*i]).collect()),
-        ColumnData::Text(v) => ColumnData::Text(order.iter().map(|i| v[*i].clone()).collect()),
+        ColumnData::Text(v) => {
+            let mut out = crate::columnar::TextColumn::default();
+            for i in order {
+                out.push(v.get(*i));
+            }
+            ColumnData::Text(out)
+        }
     }
 }
 fn decode_value(
@@ -4224,6 +4231,8 @@ impl Engine {
         table: &str,
         wanted: &[usize],
         labels: Vec<String>,
+        pred: Option<&infinity_expression::Expr>,
+        width: usize,
     ) -> Option<Batch> {
         let table = self.qualified_table(table);
         let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
@@ -4235,12 +4244,22 @@ impl Engine {
         let root = self.blocks_root();
         let read_ts = crate::read_ts();
         let blocks = self.visible_block_ids(&table);
+        // The predicate reads columns the projection may not name, so decode the
+        // union once and drop the extra buffers after filtering.
+        let mut needed: Vec<usize> = wanted.to_vec();
+        if let Some(pred) = pred {
+            let mut extra = Vec::new();
+            crate::predicate_columns(pred, &mut extra);
+            needed.extend(extra);
+        }
+        needed.sort_unstable();
+        needed.dedup();
         let mut seqs: Vec<usize> = Vec::new();
-        let mut data: Vec<ColumnData> = wanted
+        let mut data: Vec<ColumnData> = needed
             .iter()
             .map(|pos| column_buffer(&meta.types[*pos]))
             .collect();
-        let mut valid: Vec<Vec<bool>> = vec![Vec::new(); wanted.len()];
+        let mut valid: Vec<Vec<bool>> = vec![Vec::new(); needed.len()];
         let mut out_of_order = false;
         let mut last = 0usize;
         for id in &blocks {
@@ -4267,7 +4286,7 @@ impl Engine {
                     seqs.push(seq);
                 }
             }
-            for (out, pos) in wanted.iter().enumerate() {
+            for (out, pos) in needed.iter().enumerate() {
                 Self::decode_block_column(
                     &meta.ids,
                     &meta.types,
@@ -4301,7 +4320,7 @@ impl Engine {
                 }
                 last = seq;
                 seqs.push(seq);
-                for (out, pos) in wanted.iter().enumerate() {
+                for (out, pos) in needed.iter().enumerate() {
                     match values.get(*pos) {
                         Some(v) if !matches!(v, Value::Null) => {
                             data[out].push_value(v);
@@ -4318,7 +4337,7 @@ impl Engine {
         if blocks.is_empty() && seqs.is_empty() {
             return None;
         }
-        let row_count = seqs.len();
+        let mut row_count = seqs.len();
         if out_of_order {
             let mut order: Vec<usize> = (0..row_count).collect();
             order.sort_by_key(|i| seqs[*i]);
@@ -4329,10 +4348,90 @@ impl Engine {
                 *v = order.iter().map(|i| v[*i]).collect();
             }
         }
+        // A delete that has not reached the block's `version` yet lives in the
+        // tombstone set; the row path filters those, and so must this one.
+        let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
+        if !dead.is_empty() && row_count > 0 {
+            let keep: Vec<bool> = seqs.iter().map(|s| !dead.contains(&(*s as u64))).collect();
+            if keep.iter().any(|k| !k) {
+                for k in 0..needed.len() {
+                    data[k].retain(&keep);
+                    let mut at = 0usize;
+                    valid[k].retain(|_| {
+                        let v = keep.get(at).copied().unwrap_or(false);
+                        at += 1;
+                        v
+                    });
+                }
+                seqs = seqs
+                    .into_iter()
+                    .zip(keep.iter())
+                    .filter(|(_, k)| **k)
+                    .map(|(s, _)| s)
+                    .collect();
+                row_count = seqs.len();
+            }
+        }
+        // The predicate runs on the column buffers: one reused row buffer, and
+        // only the rows that pass are kept.
+        if let Some(pred) = pred {
+            // `col = constant` is answered straight off the column buffer.
+            let mut direct: Option<Vec<bool>> = None;
+            if let Expr::Cmp(a, infinity_parser::CmpOp::Eq, b) = pred {
+                let (col, value) = match (&**a, &**b) {
+                    (Expr::Column(i), Expr::Literal(v)) => (Some(*i), Some(v)),
+                    (Expr::Literal(v), Expr::Column(i)) => (Some(*i), Some(v)),
+                    _ => (None, None),
+                };
+                if let (Some(pos), Some(value)) = (col, value) {
+                    if let Some(k) = needed.iter().position(|p| *p == pos) {
+                        direct = Some(data[k].equality_mask(&valid[k], value));
+                    }
+                }
+            }
+            let mut scratch = vec![Value::Null; width];
+            let keep: Vec<bool> = match direct {
+                Some(mask) => mask,
+                None => {
+                    let mut mask: Vec<bool> = Vec::with_capacity(row_count);
+                    for r in 0..row_count {
+                for (k, pos) in needed.iter().enumerate() {
+                    if *pos < width {
+                        scratch[*pos] = if valid[k].get(r).copied() == Some(false) {
+                            Value::Null
+                        } else {
+                            data[k].value_at(r)
+                        };
+                    }
+                }
+                        mask.push(pred.eval_predicate(&scratch));
+                    }
+                    mask
+                }
+            };
+            for (k, _) in needed.iter().enumerate() {
+                data[k].retain(&keep);
+                let mut at = 0usize;
+                valid[k].retain(|_| {
+                    let v = keep.get(at).copied().unwrap_or(false);
+                    at += 1;
+                    v
+                });
+            }
+            row_count = keep.iter().filter(|k| **k).count();
+        }
+        // Only the requested columns, in the requested order.
+        let mut out_data = Vec::with_capacity(wanted.len());
+        let mut out_valid = Vec::with_capacity(wanted.len());
+        for pos in wanted {
+            let k = needed.iter().position(|p| p == pos)?;
+            out_data.push(data[k].clone());
+            out_valid.push(valid[k].clone());
+        }
         Some(Batch {
             columns: labels,
-            data,
-            valid,
+            data: out_data,
+            valid: out_valid,
             row_count,
         })
     }
