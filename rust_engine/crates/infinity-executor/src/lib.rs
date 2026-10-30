@@ -8580,21 +8580,33 @@ impl Engine {
                     labels.push(label.clone());
                 }
                 Out::Expr { expr, label } => {
-                    let mut column: Option<ColumnData> = None;
-                    let mut col_valid = Vec::with_capacity(batch.row_count);
+                    // The column's type is decided from **all** the values: a
+                    // JSON number can be an integer in one row and a float in
+                    // the next, and picking the first one would truncate.
+                    let mut values: Vec<Value> = Vec::with_capacity(batch.row_count);
                     for r in 0..batch.row_count {
                         fill_row(&mut scratch, &batch, r);
-                        let value = expr.eval(&scratch);
-                        col_valid.push(!matches!(value, Value::Null));
-                        let target = column.get_or_insert_with(|| match value {
-                            Value::Float(_) => ColumnData::Float(Vec::new()),
-                            Value::Bool(_) => ColumnData::Bool(Vec::new()),
-                            Value::Str(_) => ColumnData::Text(Default::default()),
-                            _ => ColumnData::Int(Vec::new()),
-                        });
-                        target.push_value(&value);
+                        values.push(expr.eval(&scratch));
                     }
-                    data.push(column.unwrap_or(ColumnData::Int(Vec::new())));
+                    let mut column = if values.iter().any(|v| matches!(v, Value::Str(_))) {
+                        ColumnData::Text(Default::default())
+                    } else if values.iter().any(|v| matches!(v, Value::Float(_))) {
+                        ColumnData::Float(Vec::new())
+                    } else if values
+                        .iter()
+                        .any(|v| matches!(v, Value::Bool(_)))
+                        && !values.iter().any(|v| matches!(v, Value::Int(_)))
+                    {
+                        ColumnData::Bool(Vec::new())
+                    } else {
+                        ColumnData::Int(Vec::new())
+                    };
+                    let mut col_valid = Vec::with_capacity(values.len());
+                    for value in &values {
+                        col_valid.push(!matches!(value, Value::Null));
+                        column.push_value(value);
+                    }
+                    data.push(column);
                     valid.push(col_valid);
                     labels.push(label.clone());
                 }
