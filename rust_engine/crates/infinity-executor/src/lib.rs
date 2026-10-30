@@ -12820,6 +12820,121 @@ impl Engine {
         Ok((columns, rows))
     }
 
+    /// Answers `Projection(Scan)` and `Projection(Filter(Scan))` from the
+    /// materialised rows, without the operator chain.
+    ///
+    /// The chain is generic: every row is pushed into a `DataChunk` (cloning
+    /// each `Value`), the projection expression is evaluated per row by the
+    /// interpreter and the result is copied back out. For a select list that is
+    /// nothing but column references - the overwhelming majority of scans - all
+    /// of that is a copy of the row. Measured on 40,000 `INT + VARCHAR` rows,
+    /// the chain is ~15 ms of a ~28 ms `SELECT id, name`.
+    ///
+    /// `None` leaves the plan to the operators (an expression in the select
+    /// list, an aggregate, a sort, an index scan, ...).
+    fn direct_projection(
+        &self,
+        plan: &LogicalPlan,
+        rows: &mut Option<Vec<Vec<Value>>>,
+        source_columns: Option<&Vec<String>>,
+    ) -> Option<(Vec<String>, Vec<Vec<Value>>)> {
+        let LogicalPlan::Projection { input, exprs, names } = plan else {
+            return None;
+        };
+        let mut indices = Vec::with_capacity(exprs.len());
+        for expr in exprs {
+            match expr {
+                Expr::Column(i) => indices.push(*i),
+                _ => return None,
+            }
+        }
+        // The indices are positions in the scan's column list. When the scan
+        // was lowered against a *pruned* list while the rows were materialised
+        // in the unpruned one (an index scan, a `LazyLoad` projection), the two
+        // do not line up and the operators' remapping is what makes the answer
+        // right - leave such a plan to them.
+        let scan_columns = match &**input {
+            LogicalPlan::Scan { columns, .. } => Some(columns),
+            LogicalPlan::Filter { input, .. } => match &**input {
+                LogicalPlan::Scan { columns, .. } => Some(columns),
+                _ => None,
+            },
+            _ => None,
+        };
+        let Some(scan_columns) = scan_columns else {
+            return None;
+        };
+        if indices.iter().any(|i| *i >= scan_columns.len()) {
+            return None;
+        }
+        // The rows are laid out as `source_columns`; the plan's indices are
+        // positions in `scan_columns` (the lowerer prunes the ones the query
+        // does not read). Map one onto the other, and - when they differ -
+        // compact each row to the scan layout once, so the projection and the
+        // predicate index the same list.
+        let pos: Vec<usize> = match source_columns {
+            Some(full) if full != scan_columns => {
+                let mut pos = Vec::with_capacity(scan_columns.len());
+                for name in scan_columns {
+                    pos.push(full.iter().position(|c| c == name)?);
+                }
+                pos
+            }
+            _ => (0..scan_columns.len()).collect(),
+        };
+        let (table, columns, predicate) = match &**input {
+            LogicalPlan::Scan { table, columns } => (table, columns, None),
+            LogicalPlan::Filter { input, predicate } => match &**input {
+                LogicalPlan::Scan { table, columns } => (table, columns, Some(predicate)),
+                _ => return None,
+            },
+            _ => return None,
+        };
+        // Only now that the shape is known is the materialised row set taken:
+        // it is the caller's, and a plan this function declines must keep it.
+        let mut rows = match rows.take() {
+            Some(rows) => rows,
+            None => {
+                let prune = predicate
+                    .map(|pred| prune_conditions(pred, columns))
+                    .unwrap_or_default();
+                self.fetch_rows_pruned(table, &prune).ok()?
+            }
+        };
+        if !pos.iter().copied().eq(0..pos.len()) {
+            rows = rows
+                .into_iter()
+                .map(|row| {
+                    pos.iter()
+                        .map(|p| row.get(*p).cloned().unwrap_or(Value::Null))
+                        .collect()
+                })
+                .collect();
+        }
+        if let Some(pred) = predicate {
+            rows.retain(|row| pred.eval_predicate(row));
+        }
+        // The scan already produced the selected columns in order: hand the rows
+        // over instead of copying every cell out of them again.
+        let identity = indices.iter().copied().eq(0..indices.len());
+        let out = if identity {
+            for row in &mut rows {
+                row.truncate(indices.len());
+            }
+            rows
+        } else {
+            rows.into_iter()
+                .map(|row| {
+                    indices
+                        .iter()
+                        .map(|i| row.get(*i).cloned().unwrap_or(Value::Null))
+                        .collect()
+                })
+                .collect()
+        };
+        Some((names.clone(), out))
+    }
+
     /// Runs an optimized plan.
     ///
     /// `source_columns` is the unpruned column list the caller materialised its
@@ -12829,7 +12944,7 @@ impl Engine {
     fn run_plan(
         &self,
         plan: LogicalPlan,
-        override_rows: Option<Vec<Vec<Value>>>,
+        mut override_rows: Option<Vec<Vec<Value>>>,
         source_columns: Option<Vec<String>>,
         candidate: Option<infinity_planner::index_scan::IndexScanCandidate>,
         unmatchable: bool,
@@ -12890,6 +13005,19 @@ impl Engine {
         };
         #[cfg(test)]
         LAST_PLAN_DEBUG.with(|slot| *slot.borrow_mut() = Some(format!("{plan:?}")));
+        // A projection over a plain scan is a column selection (plus, at most, a
+        // row predicate): answer it here, where every row costs one `Value`
+        // clone instead of a trip through the `DataChunk` machinery.
+        // A cached plan goes through the operators: the cache node the
+        // optimizer inserted is what answers the repeat, and it only runs in
+        // the operator chain.
+        if !cacheable && candidate.is_none() && !unmatchable && !fulltext_substring {
+            let mut rows = override_rows.take();
+            if let Some(out) = self.direct_projection(&plan, &mut rows, source_columns.as_ref()) {
+                return Ok(out);
+            }
+            override_rows = rows;
+        }
         // Lower the plan to the operator chain and build the fragment's source.
         // `lower` is total: every `LogicalPlan` node has an operator.
         let crate::operators::lower::Lowered {
@@ -13290,6 +13418,14 @@ impl Engine {
             .get(&key)
             .and_then(|e| e.cpp_block_rows.clone());
         let wanted: Vec<usize> = (0..schema.len()).collect();
+        // All rows still buffered: read them as the `Value`s they already are
+        // (see `buffered_rows_values`). The visibility rules are the ones the
+        // block reader applies to the same rows.
+        if !self.needs_text_rows(table) {
+            if let Some(rows) = self.buffered_rows_values(table, None) {
+                return Ok(Some(rows));
+            }
+        }
         let Ok((_, rows)) = self.read_cpp_blocks_pruned(table, &wanted, prune) else {
             return Ok(None);
         };
@@ -13401,6 +13537,21 @@ impl Engine {
         // set, and the guard below is only there to catch a rewrite that ran
         // under this read.
 
+        // A table whose rows are all still in the append buffer (no checkpoint
+        // yet) is read straight out of it: the block reader would render every
+        // cell to text and this function would parse it back to the `Value` the
+        // buffer already holds.
+        if !self.needs_text_rows(table) {
+            if let Some(rows) = self.buffered_rows_values(table, Some(&wanted)) {
+                let deleted = self.tombstone_set(table)?;
+                return Ok(Some(
+                    rows.into_iter()
+                        .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
+                        .map(|(_, cells)| cells)
+                        .collect(),
+                ));
+            }
+        }
         let Ok((_, rows)) = self.read_cpp_blocks_pruned(table, &wanted, &[]) else {
             return Ok(None);
         };
@@ -22943,11 +23094,17 @@ mod tests {
         e.execute("INSERT INTO of VALUES (1, 10), (2, 20), (3, 30);")
             .unwrap();
         let before = crate::operators::operator_run_count();
+        // An expression in the select list keeps the plan on the operator
+        // model; a plain column list is answered by `direct_projection`.
+        assert_eq!(
+            rows(&e, "SELECT b + 1 FROM of WHERE a > 1;"),
+            vec![vec!["21".to_string()], vec!["31".to_string()]]
+        );
+        assert_eq!(crate::operators::operator_run_count(), before + 1);
         assert_eq!(
             rows(&e, "SELECT b FROM of WHERE a > 1;"),
             vec![vec!["20".to_string()], vec!["30".to_string()]]
         );
-        assert_eq!(crate::operators::operator_run_count(), before + 1);
         // No match: the projection still defines the schema.
         let mut result = e.execute("SELECT b FROM of WHERE a > 9;").unwrap();
         let QueryResult::Rows { columns, rows } = result.remove(0) else {

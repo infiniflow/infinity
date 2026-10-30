@@ -1590,7 +1590,30 @@ fn decode_value(
     row: usize,
     outline: &[u8],
 ) -> Option<String> {
-    if let Some((dim, elem)) = embedding_shape(type_text) {
+    decode_value_shaped(
+        type_text,
+        column_type,
+        body,
+        row,
+        outline,
+        embedding_shape(type_text),
+    )
+}
+
+/// [`decode_value`] with the `EMBEDDING`/`VECTOR` shape already parsed.
+///
+/// The shape belongs to the column, not the cell: a scan parses it once per
+/// column (`decode_rows_of`) instead of once per cell, which also removes the
+/// uppercased copy of the type text that `embedding_shape` allocates.
+fn decode_value_shaped(
+    type_text: &str,
+    column_type: i32,
+    body: &[u8],
+    row: usize,
+    outline: &[u8],
+    shape: Option<(usize, i32)>,
+) -> Option<String> {
+    if let Some((dim, elem)) = shape {
         if elem == 0 {
             // BIT: emit the comma-separated form the engine's SQL accepts
             // (its *display* form is the bit string `[10110001]`, which
@@ -3762,6 +3785,7 @@ impl Engine {
             body: cpp_format::ColumnBody,
             kind: OutlineKind,
             outline: &'a [u8],
+            shape: Option<(usize, i32)>,
         }
         let mut prepared: Vec<Option<Prepared>> = Vec::with_capacity(types.len());
         for (col, column_type) in types.iter().enumerate() {
@@ -3782,6 +3806,7 @@ impl Engine {
                 ),
                 kind: outline_kind(&type_text[col]),
                 outline: raw.outline.as_slice(),
+                shape: embedding_shape(&type_text[col]),
             }));
         }
         let mut out = Vec::with_capacity(row_count);
@@ -3825,10 +3850,15 @@ impl Engine {
                             decode_array_value(&type_text[col], slot, outline)
                                 .unwrap_or_else(|| "null".into())
                         }
-                        OutlineKind::None => {
-                            decode_value(&type_text[col], *column_type, &body.data, row, outline)
-                                .unwrap_or_else(|| "null".into())
-                        }
+                        OutlineKind::None => decode_value_shaped(
+                            &type_text[col],
+                            *column_type,
+                            &body.data,
+                            row,
+                            outline,
+                            column.shape,
+                        )
+                        .unwrap_or_else(|| "null".into()),
                     }
                 };
                 cells.push(value);
@@ -3866,6 +3896,56 @@ impl Engine {
             .get(&key)
             .map(|e| e.pending_rows.clone())
             .unwrap_or_default()
+    }
+
+    /// The append buffer as a scan reads it, **already in `Value`s**.
+    ///
+    /// This is the table whose rows have not reached a checkpoint yet - the
+    /// shape a fresh import leaves behind, and what the SDK benchmark measures.
+    /// The generic path renders every cell to text (`mirror_cell_text`) and the
+    /// caller parses it back, so a row that is already a `Value` pays two
+    /// allocations per cell; here it is cloned once and used as it is.
+    ///
+    /// `None` means the table has blocks, and the caller takes the block path
+    /// (where the same rows may be shadowed by a block's cells).
+    pub(crate) fn buffered_rows_values(
+        &self,
+        table: &str,
+        wanted: Option<&[usize]>,
+    ) -> Option<Vec<(usize, Vec<Value>)>> {
+        let table = self.qualified_table(table);
+        if !self.visible_block_ids(&table).is_empty() {
+            return None;
+        }
+        let buffered = self.pending_rows_of(&table);
+        if buffered.is_empty() {
+            return None;
+        }
+        let read_ts = crate::read_ts();
+        let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
+        let view = self.append_view(&table, read_ts);
+        let mut out: Vec<(usize, Vec<Value>)> = Vec::with_capacity(buffered.len());
+        for (seq, values) in buffered {
+            if dead.contains(&(seq as u64)) {
+                continue;
+            }
+            if let Some(view) = &view {
+                if !view.covers(seq, read_ts) {
+                    continue;
+                }
+            }
+            let cells: Vec<Value> = values
+                .iter()
+                .enumerate()
+                .map(|(i, v)| match wanted {
+                    Some(w) if !w.contains(&i) => Value::Null,
+                    _ => v.clone(),
+                })
+                .collect();
+            out.push((seq, cells));
+        }
+        out.sort_by_key(|(seq, _)| *seq);
+        Some(out)
     }
 
     fn read_cpp_blocks_wanted(
