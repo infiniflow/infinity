@@ -211,6 +211,10 @@ pub(crate) mod fast_rough_filter;
 /// The batch of rows the physical operators exchange (C++ `DataBlock`).
 pub mod chunk;
 
+/// A typed, column-major result set for the plain-projection fast path.
+pub mod columnar;
+pub use columnar::{Batch, ColumnData};
+
 /// The push-based physical operator model (C++ `PhysicalOperator`).
 pub mod operators;
 
@@ -8252,6 +8256,125 @@ impl Engine {
             self.txn.end_statement();
         }
         Ok(out)
+    }
+
+
+    /// The plain-projection fast path the thrift writer uses: a `SELECT` whose
+    /// list is nothing but columns over one table, with no other clause, is
+    /// answered as typed column buffers instead of `Value` rows.
+    ///
+    /// `None` means "run it through `execute`": the shape does not qualify (a
+    /// predicate, a join, an expression, a star, a non-scalar column) and the
+    /// generic path owns it.
+    pub fn select_columns(&self, sql: &str) -> Result<Option<Batch>> {
+        let statements = parse(sql)?;
+        if statements.len() != 1 {
+            return Ok(None);
+        }
+        let statement = &statements[0];
+        let Statement::Select {
+            items,
+            from: Some(from),
+            join,
+            where_pred,
+            group_by,
+            aliases,
+            having,
+            order_by,
+            limit,
+            offset,
+            search,
+            distinct,
+            highlight,
+            ctes,
+            cross_tables,
+            limit_expr,
+            offset_expr,
+        } = statement
+        else {
+            return Ok(None);
+        };
+        if join.is_some()
+            || where_pred.is_some()
+            || !group_by.is_empty()
+            || having.is_some()
+            || !order_by.is_empty()
+            || limit.is_some()
+            || offset.is_some()
+            || search.is_some()
+            || *distinct
+            || !highlight.is_empty()
+            || !ctes.is_empty()
+            || !cross_tables.is_empty()
+            || limit_expr.is_some()
+            || offset_expr.is_some()
+        {
+            return Ok(None);
+        }
+        let table = self.qualified_table(from);
+        let schema = self.table_schema(&table)?;
+        let mut labels = Vec::with_capacity(items.len());
+        let mut wanted = Vec::with_capacity(items.len());
+        for (i, item) in items.iter().enumerate() {
+            let SelectItem::Column(name) = item else {
+                return Ok(None);
+            };
+            let base = name.rsplit('.').next().unwrap_or(name.as_str());
+            let Some(pos) = schema.iter().position(|c| c == base) else {
+                return Ok(None);
+            };
+            labels.push(
+                aliases
+                    .get(i)
+                    .cloned()
+                    .flatten()
+                    .unwrap_or_else(|| base.to_string()),
+            );
+            wanted.push(pos);
+        }
+        if wanted.is_empty() {
+            return Ok(None);
+        }
+        // Only the scalar and text columns are packed from column buffers;
+        // an embedding / tensor / sparse / array column has its own wire
+        // encoding, and decoding it here only to fall back would pay twice.
+        if let Some(meta) = self.storage.catalog.get_table_by_name(&table)? {
+            for pos in &wanted {
+                let Some(declared) = meta.types.get(*pos) else {
+                    return Ok(None);
+                };
+                let up = declared.trim().to_ascii_uppercase();
+                if crate::cpp_blocks::embedding_shape(declared).is_some()
+                    || crate::cpp_blocks::tensor_shape(declared).is_some()
+                    || crate::cpp_blocks::array_shape(declared).is_some()
+                    || up.starts_with("MULTIVECTOR")
+                    || up.starts_with("SPARSE")
+                {
+                    return Ok(None);
+                }
+            }
+        } else {
+            return Ok(None);
+        }
+        // The same statement prologue as `execute`: an id for the statement,
+        // visibility at `current_ts + 1`, and the query registry entry.
+        self.txn.ensure_statement_id();
+        self.context
+            .query_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let _query = self.begin_query(statement, sql);
+        let _read = ReadTsGuard::enter(self.txn.current_ts() + 1);
+        let t0 = std::time::Instant::now();
+        let batch = self.read_columns_batch(&table, &wanted, labels);
+        if std::env::var_os("INF_SEL_TRACE").is_some() {
+            eprintln!(
+                "[batch] {table} rows={:?} {:.3}ms",
+                batch.as_ref().map(|b| b.row_count),
+                t0.elapsed().as_secs_f64() * 1e3
+            );
+        }
+        self.txn.end_statement();
+        Ok(batch)
     }
 
     /// The session's current database.

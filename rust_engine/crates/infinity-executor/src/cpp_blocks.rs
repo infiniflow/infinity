@@ -23,6 +23,7 @@ thread_local! {
 use infinity_catalog::cpp_layout::{
     CppBlock, CppIndexChunk, CppIndexSegment, CppSegment, CppSegmentSet, CPP_MIRROR_TS, UNCOMMIT_TS,
 };
+use crate::columnar::{Batch, ColumnData};
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
 use infinity_storage::WalCmd;
@@ -1583,6 +1584,29 @@ fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option
 }
 
 /// Decodes a slot back into the text form the engine renders.
+
+/// The buffer a column of `declared` type is decoded into.
+fn column_buffer(declared: &str) -> ColumnData {
+    let t = declared.trim().to_ascii_uppercase();
+    let base = t.split('(').next().unwrap_or("").trim();
+    match base {
+        "BOOL" | "BOOLEAN" => ColumnData::Bool(Vec::new()),
+        "FLOAT" | "DOUBLE" | "FLOAT16" | "BFLOAT16" => ColumnData::Float(Vec::new()),
+        "TINYINT" | "SMALLINT" | "INT" | "INTEGER" | "BIGINT" | "UINT8" | "UINT16"
+        | "UINT32" | "UINT64" => ColumnData::Int(Vec::new()),
+        _ => ColumnData::Text(Vec::new()),
+    }
+}
+
+/// `column` reordered by `order`.
+fn permute_column(column: &ColumnData, order: &[usize]) -> ColumnData {
+    match column {
+        ColumnData::Int(v) => ColumnData::Int(order.iter().map(|i| v[*i]).collect()),
+        ColumnData::Float(v) => ColumnData::Float(order.iter().map(|i| v[*i]).collect()),
+        ColumnData::Bool(v) => ColumnData::Bool(order.iter().map(|i| v[*i]).collect()),
+        ColumnData::Text(v) => ColumnData::Text(order.iter().map(|i| v[*i].clone()).collect()),
+    }
+}
 fn decode_value(
     type_text: &str,
     column_type: i32,
@@ -4188,6 +4212,211 @@ impl Engine {
         Some(out)
     }
 
+
+    /// Every visible row of `table` as typed column buffers.
+    ///
+    /// `wanted` are the table positions to read, in output order; `labels` names
+    /// them. This is the column-major counterpart of `read_cpp_blocks_values`,
+    /// used by the plain-projection fast path: the per-row `Vec<Value>` is never
+    /// built.
+    pub(crate) fn read_columns_batch(
+        &self,
+        table: &str,
+        wanted: &[usize],
+        labels: Vec<String>,
+    ) -> Option<Batch> {
+        let table = self.qualified_table(table);
+        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
+        let types: Vec<i32> = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()?;
+        let root = self.blocks_root();
+        let read_ts = crate::read_ts();
+        let blocks = self.visible_block_ids(&table);
+        let mut seqs: Vec<usize> = Vec::new();
+        let mut data: Vec<ColumnData> = wanted
+            .iter()
+            .map(|pos| column_buffer(&meta.types[*pos]))
+            .collect();
+        let mut valid: Vec<Vec<bool>> = vec![Vec::new(); wanted.len()];
+        let mut out_of_order = false;
+        let mut last = 0usize;
+        for id in &blocks {
+            let Ok((version, columns)) = self.read_block_cached(&table, &root, *id) else {
+                break;
+            };
+            let row_count: usize = version
+                .created
+                .last()
+                .map(|c| c.cumulative_row_count as usize)
+                .unwrap_or(0);
+            let created_at = Self::created_at(&version, read_ts);
+            let visible: Vec<bool> = (0..row_count)
+                .map(|slot| Self::slot_visible(&version, slot, created_at, read_ts))
+                .collect();
+            for (slot, shown) in visible.iter().enumerate() {
+                if *shown {
+                    let seq = ((id.segment_id as usize) << 32)
+                        | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot);
+                    if seq < last {
+                        out_of_order = true;
+                    }
+                    last = seq;
+                    seqs.push(seq);
+                }
+            }
+            for (out, pos) in wanted.iter().enumerate() {
+                Self::decode_block_column(
+                    &meta.ids,
+                    &meta.types,
+                    &types,
+                    &columns,
+                    *pos,
+                    row_count,
+                    &visible,
+                    &mut data[out],
+                    &mut valid[out],
+                )?;
+            }
+        }
+        // Rows a commit appended since the last checkpoint live in the append
+        // buffer; they are `Value`s, so they are appended as they are.
+        let buffered = self.pending_rows_of(&table);
+        if !buffered.is_empty() {
+            let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
+            let view = self.append_view(&table, read_ts);
+            for (seq, values) in buffered {
+                if dead.contains(&(seq as u64)) {
+                    continue;
+                }
+                if let Some(view) = &view {
+                    if !view.covers(seq, read_ts) {
+                        continue;
+                    }
+                }
+                if seq < last {
+                    out_of_order = true;
+                }
+                last = seq;
+                seqs.push(seq);
+                for (out, pos) in wanted.iter().enumerate() {
+                    match values.get(*pos) {
+                        Some(v) if !matches!(v, Value::Null) => {
+                            data[out].push_value(v);
+                            valid[out].push(true);
+                        }
+                        _ => {
+                            data[out].push_value(&Value::Null);
+                            valid[out].push(false);
+                        }
+                    }
+                }
+            }
+        }
+        if blocks.is_empty() && seqs.is_empty() {
+            return None;
+        }
+        let row_count = seqs.len();
+        if out_of_order {
+            let mut order: Vec<usize> = (0..row_count).collect();
+            order.sort_by_key(|i| seqs[*i]);
+            for column in &mut data {
+                *column = permute_column(column, &order);
+            }
+            for v in &mut valid {
+                *v = order.iter().map(|i| v[*i]).collect();
+            }
+        }
+        Some(Batch {
+            columns: labels,
+            data,
+            valid,
+            row_count,
+        })
+    }
+
+    /// Appends one column of a decoded block to `out`, skipping the rows the
+    /// version hides.
+    #[allow(clippy::too_many_arguments)]
+    fn decode_block_column(
+        ids: &[u64],
+        type_text: &[String],
+        types: &[i32],
+        columns: &[cpp_format::RawBlockColumn],
+        pos: usize,
+        row_count: usize,
+        visible: &[bool],
+        out: &mut ColumnData,
+        valid: &mut Vec<bool>,
+    ) -> Option<()> {
+        let column_type = types.get(pos)?;
+        let column_id = ids.get(pos).copied().unwrap_or(pos as u64);
+        let raw = columns.iter().find(|c| c.column_id == column_id)?;
+        let layout = layout_of(&type_text[pos], *column_type)?;
+        let body = cpp_format::split_body_for_layout(
+            raw.body.as_slice(),
+            DEFAULT_BLOCK_CAPACITY,
+            layout,
+        );
+        let kind = outline_kind(&type_text[pos]);
+        let shape = embedding_shape(&type_text[pos]);
+        for row in 0..row_count {
+            let shown = visible.get(row).copied().unwrap_or(false);
+            let null = body.null_bitmap.len() > row / 8
+                && body.null_bitmap[row / 8] & (1 << (row % 8)) == 0;
+            if !shown {
+                continue;
+            }
+            if null {
+                out.push_value(&Value::Null);
+                valid.push(false);
+                continue;
+            }
+            let value = match kind {
+                OutlineKind::None => match layout {
+                    ColumnLayout::CompactBit => body
+                        .data
+                        .get(row / 8)
+                        .map(|b| Value::Bool(b & (1 << (row % 8)) != 0))
+                        .unwrap_or(Value::Null),
+                    ColumnLayout::Fixed(width) => match decode_scalar_value(
+                        *column_type,
+                        width,
+                        &body.data,
+                        row,
+                    ) {
+                        Some(v) => v,
+                        None => decode_value_shaped(
+                            &type_text[pos],
+                            *column_type,
+                            &body.data,
+                            row,
+                            raw.outline.as_slice(),
+                            shape,
+                        )
+                        .map(parse_owned_value)
+                        .unwrap_or(Value::Null),
+                    },
+                    ColumnLayout::VarLen(_) => decode_value_shaped(
+                        &type_text[pos],
+                        *column_type,
+                        &body.data,
+                        row,
+                        raw.outline.as_slice(),
+                        shape,
+                    )
+                    .map(parse_owned_value)
+                    .unwrap_or(Value::Null),
+                },
+                _ => return None,
+            };
+            out.push_value(&value);
+            valid.push(!matches!(value, Value::Null));
+        }
+        Some(())
+    }
     /// Every row of the table as the engine works with it: the block files'
     /// cells (decoded by `decode_rows_of_values`) plus the append buffer's,
     /// which are `Value`s already.

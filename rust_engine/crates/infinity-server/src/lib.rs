@@ -30,7 +30,7 @@ use std::sync::{Arc, Mutex};
 use infinity_common::{Error, Result};
 
 use crate::peer::PeerManager;
-use infinity_executor::{with_zero_dimension_sparse, Engine, QueryResult, Value};
+use infinity_executor::{with_zero_dimension_sparse, Batch, ColumnData, Engine, QueryResult, Value};
 
 use thrift::protocol::{
     TBinaryInputProtocol, TBinaryOutputProtocol, TFieldIdentifier, TInputProtocol, TListIdentifier,
@@ -1060,7 +1060,35 @@ fn handle_connection(
                         eprintln!("[SELECT] {}", req.to_sql());
                     }
                     let exec_started = std::time::Instant::now();
-                    let resp = match &engine {
+                    // Plain projection over one table with no other clause: the
+                    // engine hands back typed column buffers and the writer packs
+                    // them without a `Value` per cell.
+                    let batch_resp = match &engine {
+                        Some(eng) if !req.total_hits => eng
+                            .select_columns(&req.to_sql())
+                            .ok()
+                            .flatten()
+                            .map(|batch| {
+                                let mut columns = batch.columns.clone();
+                                if !req.star && req.names.len() == columns.len() {
+                                    columns = req.names.clone();
+                                } else if req.star
+                                    && !req.names.is_empty()
+                                    && columns.len() >= req.names.len()
+                                {
+                                    let start = columns.len() - req.names.len();
+                                    for (i, n) in req.names.iter().enumerate() {
+                                        columns[start + i] = n.clone();
+                                    }
+                                }
+                                let types = declared_types(eng, &req.table_name, &columns);
+                                select_response_from_batch(&columns, &types, &batch)
+                            }),
+                        _ => None,
+                    };
+                    let resp = match batch_resp {
+                        Some(resp) => resp,
+                        None => match &engine {
                         Some(eng) => match eng.execute(&req.to_sql()) {
                             Ok(rs) => {
                                 let mut columns: Vec<String> = Vec::new();
@@ -1152,6 +1180,7 @@ fn handle_connection(
                             },
                         },
                         None => err("no engine bound".into()),
+                        },
                     };
                     write_select_response(&mut writer, seq, &resp)?;
                 }
@@ -5807,6 +5836,173 @@ pub fn select_response_from_typed(
         error_msg: "OK".into(),
         column_defs,
         column_fields: rows_to_column_fields_typed(columns, types, rows),
+        extra_result: String::new(),
+    }
+}
+
+
+/// The wire `ColumnDef` of result column `i`.
+fn column_def_of(columns: &[String], types: &[String], i: usize, kind: ColKind) -> ColumnDefWire {
+    let name = &columns[i];
+    let declared = types.get(i).map(String::as_str).unwrap_or("");
+    let (logic_type, physical) = match kind {
+        ColKind::Embedding(dim, elem) => (
+            LOGIC_EMBEDDING,
+            PhysicalWire::Embedding {
+                dimension: dim,
+                element_type: elem,
+            },
+        ),
+        ColKind::Sparse {
+            dimension,
+            element_type,
+            index_type,
+        } => (
+            LOGIC_SPARSE,
+            PhysicalWire::Sparse {
+                dimension,
+                element_type,
+                index_type,
+            },
+        ),
+        ColKind::Tensor {
+            column_type,
+            dimension,
+            element_type,
+        } => (
+            column_type_to_logic(column_type),
+            PhysicalWire::Embedding {
+                dimension,
+                element_type,
+            },
+        ),
+        ColKind::Array { .. } => (
+            LOGIC_ARRAY,
+            array_info(declared)
+                .map(|(logic, _col, physical)| PhysicalWire::Array {
+                    element_logic_type: logic,
+                    element: Box::new(physical),
+                })
+                .unwrap_or(PhysicalWire::None),
+        ),
+        ColKind::Scalar(code) => (column_type_to_logic(code), PhysicalWire::None),
+    };
+    ColumnDefWire {
+        id: i as i32,
+        name: name.clone(),
+        default: None,
+        not_null: false,
+        logic_type,
+        physical,
+        comment: String::new(),
+    }
+}
+
+/// The result column's kind when the rows are typed column buffers.
+fn classify_batch_column(declared: &str, batch: &Batch, i: usize) -> ColKind {
+    let kind = classify_column(declared, &[], i);
+    if declared.trim().is_empty() {
+        if let ColKind::Scalar(_) = kind {
+            return ColKind::Scalar(match batch.data.get(i) {
+                Some(ColumnData::Int(_)) => 3,
+                Some(ColumnData::Float(_)) => 6,
+                Some(ColumnData::Bool(_)) => 0,
+                Some(ColumnData::Text(_)) | None => 9,
+            });
+        }
+    }
+    kind
+}
+
+/// Packs typed column buffers into `ColumnField`s: one contiguous chunk per
+/// column, no per-cell `Value` and no text round trip.
+pub fn column_fields_from_batch(columns: &[String], types: &[String], batch: &Batch) -> Vec<ColumnField> {
+    let mut out = Vec::with_capacity(columns.len());
+    for (i, name) in columns.iter().enumerate() {
+        let declared = types.get(i).map(String::as_str).unwrap_or("");
+        let code = match classify_batch_column(declared, batch, i) {
+            ColKind::Scalar(code) => code,
+            // The batch path only ever holds scalars and text.
+            _ => 9,
+        };
+        let valid = batch.valid.get(i).cloned().unwrap_or_default();
+        let mut chunk: Vec<u8> = Vec::with_capacity(batch.row_count * 8);
+        match batch.data.get(i) {
+            Some(ColumnData::Int(v)) => {
+                for n in v {
+                    match code {
+                        1 => chunk.push(*n as i8 as u8),
+                        2 => chunk.extend_from_slice(&(*n as i16).to_le_bytes()),
+                        3 => chunk.extend_from_slice(&(*n as i32).to_le_bytes()),
+                        16 => chunk.extend_from_slice(&(*n as i32).to_le_bytes()),
+                        17 => chunk.extend_from_slice(&(*n as i32).to_le_bytes()),
+                        18 => chunk.extend_from_slice(&(*n as i32).to_le_bytes()),
+                        _ => chunk.extend_from_slice(&n.to_le_bytes()),
+                    }
+                }
+            }
+            Some(ColumnData::Float(v)) => {
+                for f in v {
+                    match code {
+                        5 => chunk.extend_from_slice(&(*f as f32).to_le_bytes()),
+                        7 => chunk.extend_from_slice(&f32_to_f16_bits(*f as f32).to_le_bytes()),
+                        8 => {
+                            chunk.extend_from_slice(&(((*f as f32).to_bits() >> 16) as u16).to_le_bytes())
+                        }
+                        _ => chunk.extend_from_slice(&f.to_le_bytes()),
+                    }
+                }
+            }
+            Some(ColumnData::Bool(v)) => {
+                for b in v {
+                    chunk.push(u8::from(*b));
+                }
+            }
+            Some(ColumnData::Text(v)) => {
+                for s in v {
+                    match code {
+                        16 => chunk.extend_from_slice(&date_to_days(s).unwrap_or(0).to_le_bytes()),
+                        17 => chunk.extend_from_slice(&time_to_secs(s).unwrap_or(0).to_le_bytes()),
+                        18 => {
+                            let (d, t) = datetime_to_pair(s).unwrap_or((0, 0));
+                            chunk.extend_from_slice(&d.to_le_bytes());
+                            chunk.extend_from_slice(&t.to_le_bytes());
+                        }
+                        _ => {
+                            chunk.extend_from_slice(&(s.len() as u32).to_le_bytes());
+                            chunk.extend_from_slice(s.as_bytes());
+                        }
+                    }
+                }
+            }
+            None => {}
+        }
+        out.push(ColumnField {
+            column_type: code,
+            column_name: name.clone(),
+            column_vectors: vec![chunk],
+            bitmasks: if valid.iter().all(|v| *v) {
+                Vec::new()
+            } else {
+                valid
+            },
+        });
+    }
+    out
+}
+
+/// A `SelectResponse` built from typed column buffers.
+pub fn select_response_from_batch(columns: &[String], types: &[String], batch: &Batch) -> SelectResponseWire {
+    let column_defs = columns
+        .iter()
+        .enumerate()
+        .map(|(i, _)| column_def_of(columns, types, i, classify_batch_column(types.get(i).map(String::as_str).unwrap_or(""), batch, i)))
+        .collect();
+    SelectResponseWire {
+        error_code: 0,
+        error_msg: "OK".into(),
+        column_defs,
+        column_fields: column_fields_from_batch(columns, types, batch),
         extra_result: String::new(),
     }
 }
