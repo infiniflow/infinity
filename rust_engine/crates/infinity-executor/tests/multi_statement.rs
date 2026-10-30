@@ -5,9 +5,9 @@
 
 use infinity_executor::{Engine, QueryResult};
 
-fn rows(rs: &[QueryResult]) -> &Vec<Vec<String>> {
+fn rows(rs: &[QueryResult]) -> Vec<Vec<String>> {
     match &rs[0] {
-        QueryResult::Rows { rows, .. } => rows,
+        QueryResult::Rows { .. } => rs[0].rows_text(),
         other => panic!("expected rows, got {other:?}"),
     }
 }

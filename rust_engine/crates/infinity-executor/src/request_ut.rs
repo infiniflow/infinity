@@ -27,8 +27,8 @@ fn default_import_csv() -> String {
 /// The rows of a query, as rendered strings.
 fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
     for result in e.execute(sql).unwrap() {
-        if let QueryResult::Rows { rows, .. } = result {
-            return rows;
+        if let QueryResult::Rows { .. } = result {
+            return result.rows_text();
         }
     }
     panic!("query returned no rows: {sql}");
@@ -42,7 +42,7 @@ fn count(e: &Engine, table: &str) -> usize {
         .unwrap()
     {
         if let QueryResult::Rows { rows, .. } = result {
-            return rows[0][0].parse().unwrap();
+            return rows[0][0].to_slt_string().parse().unwrap();
         }
     }
     panic!("count(*) returned no rows");

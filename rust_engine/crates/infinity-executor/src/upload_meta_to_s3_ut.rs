@@ -123,8 +123,8 @@ fn minio_upload_meta_to_s3() {
 
     let mut rows = Vec::new();
     for result in restored.execute("SELECT col1, col2 FROM db1.tb1;").unwrap() {
-        if let crate::QueryResult::Rows { rows: out, .. } = result {
-            rows = out;
+        if let crate::QueryResult::Rows { .. } = result {
+            rows = result.rows_text();
         }
     }
     assert_eq!(

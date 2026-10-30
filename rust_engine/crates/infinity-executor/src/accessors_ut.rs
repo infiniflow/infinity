@@ -16,14 +16,14 @@ use tempfile::tempdir;
 /// The value behind `SHOW VARIABLE <name>` at global scope.
 fn global(engine: &Engine, name: &str) -> String {
     match engine.show_variable(name, Scope::Global).unwrap() {
-        QueryResult::Rows { rows, .. } => rows[0][0].clone(),
+        QueryResult::Rows { rows, .. } => rows[0][0].to_slt_string(),
         other => panic!("SHOW VARIABLE {name} returned {other:?}"),
     }
 }
 
 fn session(engine: &Engine, name: &str) -> String {
     match engine.show_variable(name, Scope::Session).unwrap() {
-        QueryResult::Rows { rows, .. } => rows[0][0].clone(),
+        QueryResult::Rows { rows, .. } => rows[0][0].to_slt_string(),
         other => panic!("SHOW SESSION VARIABLE {name} returned {other:?}"),
     }
 }

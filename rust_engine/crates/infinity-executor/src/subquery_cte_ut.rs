@@ -16,14 +16,14 @@ fn engine() -> (tempfile::TempDir, Engine) {
 }
 
 fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-    match e
+    let r = e
         .execute(sql)
         .unwrap()
         .into_iter()
         .next()
-        .unwrap_or_else(|| panic!("no result for {sql}"))
-    {
-        QueryResult::Rows { rows, .. } => rows,
+        .unwrap_or_else(|| panic!("no result for {sql}"));
+    match &r {
+        QueryResult::Rows { .. } => r.rows_text(),
         other => panic!("expected rows for {sql}, got {other:?}"),
     }
 }

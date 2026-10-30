@@ -10,7 +10,7 @@ use infinity_storage::WalManager;
 fn count(e: &Engine) -> i64 {
     let rs = e.execute("SELECT COUNT(*) FROM t;").unwrap();
     match &rs[0] {
-        QueryResult::Rows { rows, .. } => rows[0][0].parse().unwrap(),
+        QueryResult::Rows { rows, .. } => rows[0][0].to_slt_string().parse().unwrap(),
         other => panic!("expected rows, got {other:?}"),
     }
 }

@@ -604,7 +604,7 @@ fn column_types(engine: &Engine, table: &str) -> Vec<(String, String)> {
             if let QueryResult::Rows { rows, .. } = r {
                 for row in rows {
                     if row.len() >= 2 {
-                        out.push((row[0].clone(), row[1].clone()));
+                        out.push((row[0].to_slt_string(), row[1].to_slt_string()));
                     }
                 }
             }
@@ -1075,7 +1075,10 @@ fn rows_of(results: Vec<QueryResult>) -> (Vec<String>, Vec<Vec<String>>) {
     for r in results {
         if let QueryResult::Rows { columns, rows: rs } = r {
             cols = columns;
-            rows = rs;
+            rows = rs
+                .iter()
+                .map(|r| r.iter().map(|v| v.to_slt_string()).collect())
+                .collect();
         }
     }
     (cols, rows)
@@ -2025,7 +2028,7 @@ pub fn route(
                         QueryResult::Rows { rows, .. } => rows
                             .first()
                             .and_then(|r| r.first())
-                            .cloned()
+                            .map(|v| v.to_slt_string())
                             .unwrap_or_default(),
                         _ => String::new(),
                     };
@@ -2380,7 +2383,7 @@ pub fn route(
                     let value = rows
                         .first()
                         .and_then(|r| r.first())
-                        .cloned()
+                        .map(|v| v.to_slt_string())
                         .unwrap_or_default();
                     (
                         200,

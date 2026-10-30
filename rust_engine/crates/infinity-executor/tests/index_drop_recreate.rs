@@ -8,7 +8,10 @@ use infinity_executor::{Engine, QueryResult};
 fn ids(engine: &Engine, sql: &str) -> Vec<i64> {
     let rs = engine.execute(sql).expect("select");
     match &rs[0] {
-        QueryResult::Rows { rows, .. } => rows.iter().map(|r| r[0].parse().unwrap()).collect(),
+        QueryResult::Rows { rows, .. } => rows
+            .iter()
+            .map(|r| r[0].to_slt_string().parse().unwrap())
+            .collect(),
         other => panic!("expected rows, got {other:?}"),
     }
 }

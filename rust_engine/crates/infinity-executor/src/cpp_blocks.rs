@@ -6754,8 +6754,8 @@ mod tests {
     fn row_strings(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
         let mut out = Vec::new();
         for r in engine.execute(sql).unwrap() {
-            if let QueryResult::Rows { rows, .. } = r {
-                out = rows;
+            if let QueryResult::Rows { .. } = r {
+                out = r.rows_text();
             }
         }
         out

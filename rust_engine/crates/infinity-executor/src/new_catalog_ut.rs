@@ -17,8 +17,8 @@ use std::path::Path;
 /// Rows of the first `Rows` result of `sql`.
 pub(crate) fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
     for result in engine.execute(sql).unwrap() {
-        if let QueryResult::Rows { rows, .. } = result {
-            return rows;
+        if let QueryResult::Rows { .. } = result {
+            return result.rows_text();
         }
     }
     panic!("query returned no rows: {sql}");

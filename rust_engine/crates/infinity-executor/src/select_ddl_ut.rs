@@ -19,9 +19,17 @@ fn result(e: &Engine, sql: &str) -> QueryResult {
     e.execute(sql).unwrap().into_iter().next().unwrap()
 }
 
+/// Rows as display text, for assertions.
+fn texts(rows: &[Vec<crate::Value>]) -> Vec<Vec<String>> {
+    rows.iter()
+        .map(|r| r.iter().map(|v| v.to_slt_string()).collect())
+        .collect()
+}
+
 fn select_rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-    match result(e, sql) {
-        QueryResult::Rows { rows, .. } => rows,
+    let r = result(e, sql);
+    match &r {
+        QueryResult::Rows { .. } => r.rows_text(),
         other => panic!("expected rows, got {other:?}"),
     }
 }
@@ -168,7 +176,7 @@ fn describe_returns_the_reference_columns_in_definition_order() {
     };
     assert_eq!(columns, vec!["name", "type", "default", "comment"]);
     assert_eq!(
-        rows,
+        texts(&rows),
         vec![
             vec![
                 "id".to_string(),

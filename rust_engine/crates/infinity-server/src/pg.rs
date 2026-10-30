@@ -352,7 +352,9 @@ impl<R: Read, W: Write> PGProtocolHandler<R, W> {
                     if let QueryResult::Rows { columns, rows } = result {
                         out.extend_from_slice(&row_description_frame(&columns));
                         for row in &rows {
-                            out.extend_from_slice(&data_row_frame(row));
+                            let texts: Vec<String> =
+                                row.iter().map(|v| v.to_slt_string()).collect();
+                            out.extend_from_slice(&data_row_frame(&texts));
                         }
                         rows_sent += rows.len();
                     }

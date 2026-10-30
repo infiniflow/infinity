@@ -23,8 +23,8 @@ use tempfile::tempdir;
 
 fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
     for result in e.execute(sql).unwrap() {
-        if let QueryResult::Rows { rows, .. } = result {
-            return rows;
+        if let QueryResult::Rows { .. } = result {
+            return result.rows_text();
         }
     }
     Vec::new()

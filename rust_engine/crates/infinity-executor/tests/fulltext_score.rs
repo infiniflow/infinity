@@ -19,8 +19,8 @@ fn scores(engine: &Engine, query: &str) -> Vec<(i64, f64)> {
     };
     rows.iter()
         .map(|r| {
-            let id = r[0].parse::<i64>().expect("id");
-            let score = r[1].parse::<f64>().expect("score");
+            let id = r[0].to_slt_string().parse::<i64>().expect("id");
+            let score = r[1].to_slt_string().parse::<f64>().expect("score");
             (id, score)
         })
         .collect()

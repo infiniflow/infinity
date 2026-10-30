@@ -22,7 +22,8 @@ use std::sync::{Arc, Mutex};
 
 use infinity_catalog::{Catalog, SparseStore as CatalogSparseStore};
 use infinity_common::{Error, Result};
-use infinity_expression::{Expr, Value};
+use infinity_expression::Expr;
+pub use infinity_expression::Value;
 use infinity_index::{Index, SecondaryIndex};
 use infinity_parser::{
     parse, AggFunc, CmpOp, ColumnDef, ExprAst, JoinClause, Literal, MatchClause, Predicate,
@@ -216,6 +217,7 @@ pub mod operators;
 /// Result of executing one statement.
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueryResult {
+
     CreatedTable {
         id: u64,
         name: String,
@@ -248,11 +250,50 @@ pub enum QueryResult {
     Updated {
         count: usize,
     },
+    /// A result set. The rows stay as the engine's `Value`s: the text a client
+    /// sees is rendered at the edge (the CLI, the `.slt` runner, the thrift /
+    /// HTTP / postgres writers), so a scan no longer renders every cell to a
+    /// `String` only for the protocol layer to parse it back into the column
+    /// chunk it sends.
     Rows {
         columns: Vec<String>,
-        rows: Vec<Vec<String>>,
+        rows: Vec<Vec<Value>>,
     },
 }
+/// Rows that are already display text, as `Value::Str` cells (which
+/// `rows_text()` renders back unchanged).
+fn text_rows(rows: Vec<Vec<String>>) -> Vec<Vec<Value>> {
+    rows.into_iter()
+        .map(|r| r.into_iter().map(Value::Str).collect())
+        .collect()
+}
+
+impl QueryResult {
+    /// This result's rows as display text (what a `.slt` file or the CLI shows).
+    pub fn rows_text(&self) -> Vec<Vec<String>> {
+        match self {
+            QueryResult::Rows { rows, .. } => rows
+                .iter()
+                .map(|r| r.iter().map(|v| v.to_slt_string()).collect())
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// A result set whose rows are already display text (`SHOW`, `DESCRIBE`,
+    /// `EXPLAIN`, ...): each cell becomes a `Value::Str`, which renders back to
+    /// exactly the same text.
+    pub fn text(columns: Vec<String>, rows: Vec<Vec<String>>) -> Self {
+        QueryResult::Rows {
+            columns,
+            rows: rows
+                .into_iter()
+                .map(|r| r.into_iter().map(Value::Str).collect())
+                .collect(),
+        }
+    }
+}
+
 
 fn row_key(table: &str, seq: usize) -> Vec<u8> {
     format!("row:{table}:{seq:016}").into_bytes()
@@ -6436,11 +6477,6 @@ impl Engine {
     fn derived_table(&self, sql: &str) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
         for r in self.execute(sql)? {
             if let QueryResult::Rows { columns, rows } = r {
-                // `QueryResult` renders cells as text; the scan works on values.
-                let rows = rows
-                    .into_iter()
-                    .map(|r| r.iter().map(|c| parse_value(c)).collect())
-                    .collect();
                 return Ok((columns, rows));
             }
         }
@@ -9841,7 +9877,7 @@ impl Engine {
                 "default".to_string(),
                 "comment".to_string(),
             ],
-            rows,
+            rows: text_rows(rows),
         })
     }
 
@@ -10788,10 +10824,10 @@ impl Engine {
             let tokenizer = self.index_tokenizer(table, name);
             let qterms = tokenize_index_text(&query, &tokenizer);
             for row in rows.iter_mut() {
-                let Some(text) = row.get(i).cloned() else {
+                let Some(text) = row.get(i).map(|v| v.to_slt_string()) else {
                     continue;
                 };
-                row[i] = highlight_text(&text, &qterms, &tokenizer.delims);
+                row[i] = Value::Str(highlight_text(&text, &qterms, &tokenizer.delims));
             }
         }
     }
@@ -11356,19 +11392,20 @@ impl Engine {
                             "commit".to_string(),
                             "size".to_string(),
                         ],
-                        rows: self
-                            .snapshot_briefs()?
-                            .into_iter()
-                            .map(|b| {
-                                vec![
-                                    b.name,
-                                    b.scope,
-                                    b.create_time,
-                                    b.commit_ts.to_string(),
-                                    crate::snapshot::SnapshotBrief::format_size(b.size),
-                                ]
-                            })
-                            .collect(),
+                        rows: text_rows(
+                            self.snapshot_briefs()?
+                                .into_iter()
+                                .map(|b| {
+                                    vec![
+                                        b.name,
+                                        b.scope,
+                                        b.create_time,
+                                        b.commit_ts.to_string(),
+                                        crate::snapshot::SnapshotBrief::format_size(b.size),
+                                    ]
+                                })
+                                .collect(),
+                        ),
                     }),
                     // `SHOW SNAPSHOT <name>` describes one
                     // (`physical_show_snapshot_impl.cpp`).
@@ -11383,7 +11420,7 @@ impl Engine {
                             })?;
                         Ok(QueryResult::Rows {
                             columns: vec!["name".to_string(), "value".to_string()],
-                            rows: vec![
+                            rows: text_rows(vec![
                                 vec!["snapshot_name".to_string(), brief.name],
                                 vec!["snapshot_scope".to_string(), brief.scope],
                                 vec!["create_time".to_string(), brief.create_time],
@@ -11392,7 +11429,7 @@ impl Engine {
                                     "snapshot_size".to_string(),
                                     crate::snapshot::SnapshotBrief::format_size(brief.size),
                                 ],
-                            ],
+                            ]),
                         })
                     }
                     _ => Ok(QueryResult::Rows {
@@ -11666,7 +11703,10 @@ impl Engine {
                         }
                         Ok(QueryResult::Rows {
                             columns: vec![],
-                            rows: lines.into_iter().map(|l| vec![l]).collect(),
+                            rows: lines
+                                .into_iter()
+                                .map(|l| vec![Value::Str(l)])
+                                .collect(),
                         })
                     }
                     None => {
@@ -11976,7 +12016,7 @@ impl Engine {
                 };
                 Ok(QueryResult::Rows {
                     columns: vec![],
-                    rows: vec![vec![v]],
+                    rows: vec![vec![Value::Str(v)]],
                 })
             }
             Statement::ShowTableColumns { table } => {
@@ -12005,7 +12045,7 @@ impl Engine {
                     .collect();
                 Ok(QueryResult::Rows {
                     columns: vec![],
-                    rows,
+                    rows: text_rows(rows),
                 })
             }
             // `SHOW TABLE <t>`: two columns (`name`, `value`) with the six
@@ -12021,14 +12061,14 @@ impl Engine {
                     .unwrap_or(("default_db", table.as_str()));
                 Ok(QueryResult::Rows {
                     columns: vec!["name".to_string(), "value".to_string()],
-                    rows: vec![
+                    rows: text_rows(vec![
                         vec!["database_name".to_string(), db.to_string()],
                         vec!["table_name".to_string(), name.to_string()],
                         vec!["table_comment".to_string(), String::new()],
                         vec!["storage_directory".to_string(), String::new()],
                         vec!["column_count".to_string(), meta.columns.len().to_string()],
                         vec!["segment_count".to_string(), "0".to_string()],
-                    ],
+                    ]),
                 })
             }
             Statement::CreateSnapshot { name, table } => {
@@ -12290,14 +12330,11 @@ impl Engine {
                 })
             }
             Statement::Select { .. } => {
+                // The rows stay `Value`s: rendering every cell to text here only
+                // for the protocol layer to parse it back was ~40% of a scan's
+                // server time (`docs/SELECT_CHAIN.md`).
                 let (columns, rows) = self.run_select(stmt)?;
-                Ok(QueryResult::Rows {
-                    columns,
-                    rows: rows
-                        .into_iter()
-                        .map(|r| r.into_iter().map(|v| v.into_slt_string()).collect())
-                        .collect(),
-                })
+                Ok(QueryResult::Rows { columns, rows })
             }
         }
     }
@@ -19891,7 +19928,7 @@ impl Engine {
         };
         Ok(QueryResult::Rows {
             columns: vec!["value".to_string()],
-            rows: vec![vec![value]],
+            rows: vec![vec![Value::Str(value)]],
         })
     }
 
@@ -20386,7 +20423,7 @@ impl Engine {
                 "dir".to_string(),
                 "comment".to_string(),
             ],
-            rows,
+            rows: text_rows(rows),
         })
     }
 
@@ -20432,7 +20469,7 @@ impl Engine {
                 "create_ts".to_string(),
                 "comment".to_string(),
             ],
-            rows,
+            rows: text_rows(rows),
         })
     }
 
@@ -23151,11 +23188,22 @@ mod tests {
     /// The rows of a `SELECT`, as rendered strings.
     fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
         for r in e.execute(sql).unwrap() {
-            if let QueryResult::Rows { rows, .. } = r {
-                return rows;
+            if let QueryResult::Rows { .. } = r {
+                return r.rows_text();
             }
         }
         Vec::new()
+    }
+
+    /// Rows as display text, for assertions.
+    fn texts(rows: &[Vec<Value>]) -> Vec<Vec<String>> {
+        rows.iter()
+            .map(|r| r.iter().map(|v| v.to_slt_string()).collect())
+            .collect()
+    }
+
+    fn row_text(rows: &[Vec<Value>], i: usize) -> Vec<String> {
+        rows[i].iter().map(|v| v.to_slt_string()).collect()
     }
 
     /// Round-4 review G1: prove that production `run_plan` (not `plan_select`)
@@ -23810,8 +23858,7 @@ mod tests {
              FUSION('match_tensor', 'column_name=t;search_tensor=[[10.0,0.0]];\
              tensor_data_type=float;match_method=MaxSim;topn=2');",
         );
-        assert_eq!(
-            rows,
+        assert_eq!(rows,
             vec![
                 vec!["a".to_string(), "10.000000".to_string()],
                 vec!["b".to_string(), "0.000000".to_string()],
@@ -24020,8 +24067,8 @@ mod tests {
             QueryResult::Rows { rows, columns } => {
                 assert_eq!(columns, &vec!["id".to_string(), "name".to_string()]);
                 assert_eq!(rows.len(), 2);
-                assert_eq!(rows[0], vec!["2".to_string(), "a".to_string()]);
-                assert_eq!(rows[1], vec!["4".to_string(), "a".to_string()]);
+                assert_eq!(row_text(rows, 0), vec!["2".to_string(), "a".to_string()]);
+                assert_eq!(row_text(rows, 1), vec!["4".to_string(), "a".to_string()]);
             }
             other => panic!("{other:?}"),
         }
@@ -24050,8 +24097,7 @@ mod tests {
                     .map(|s| s.to_string())
                     .collect::<Vec<_>>()
                 );
-                assert_eq!(
-                    rows,
+                assert_eq!(texts(rows),
                     &[["4", "10", "2.500000", "1", "4"]
                         .iter()
                         .map(|s| s.to_string())
@@ -24076,9 +24122,8 @@ mod tests {
                     columns,
                     &vec!["name".to_string(), "count(star)".to_string()]
                 );
-                assert_eq!(
-                    rows,
-                    &vec![
+                assert_eq!(texts(rows),
+                    vec![
                         vec!["a".to_string(), "2".to_string()],
                         vec!["b".to_string(), "1".to_string()],
                         vec!["c".to_string(), "1".to_string()]
@@ -24110,7 +24155,7 @@ mod tests {
         {
             QueryResult::Rows { columns, rows } => {
                 assert_eq!(columns, &vec!["aid".to_string(), "bn".to_string()]);
-                assert_eq!(rows, &vec![vec!["2".to_string(), "yy".to_string()]]);
+                assert_eq!(texts(rows), vec![vec!["2".to_string(), "yy".to_string()]]);
             }
             other => panic!("{other:?}"),
         }
@@ -24143,7 +24188,7 @@ mod tests {
             e.execute("SELECT 1, 'x';").unwrap(),
             vec![QueryResult::Rows {
                 columns: vec!["c0".into(), "c1".into()],
-                rows: vec![vec!["1".into(), "x".into()]]
+                rows: vec![vec![Value::Int(1), Value::Str("x".into())]]
             }]
         );
         assert!(e.execute("SELECT * FROM nope;").is_err());
@@ -24162,7 +24207,7 @@ mod tests {
         e.execute("CREATE INDEX idx_id ON t (id);").unwrap();
         match &e.execute("SELECT id FROM t WHERE name = 'a';").unwrap()[0] {
             QueryResult::Rows { rows, .. } => {
-                assert_eq!(rows, &vec![vec!["1".to_string()], vec!["3".to_string()]]);
+                assert_eq!(texts(rows), vec![vec!["1".to_string()], vec!["3".to_string()]]);
             }
             other => panic!("{other:?}"),
         }
@@ -24188,7 +24233,9 @@ mod tests {
     /// The first column of a one-column query over `t`.
     fn query_column(e: &Engine, sql: &str) -> Vec<String> {
         match &e.execute(sql).unwrap()[0] {
-            QueryResult::Rows { rows, .. } => rows.iter().map(|row| row[0].clone()).collect(),
+            QueryResult::Rows { rows, .. } => {
+                rows.iter().map(|row| row[0].to_slt_string()).collect()
+            }
             other => panic!("{other:?}"),
         }
     }
@@ -24220,8 +24267,8 @@ mod tests {
                 .iter()
                 .map(|row| {
                     (
-                        row[0].parse().expect("id is an integer"),
-                        row[1].parse().expect("ROW_ID() is an integer"),
+                        row[0].to_slt_string().parse().expect("id is an integer"),
+                        row[1].to_slt_string().parse().expect("ROW_ID() is an integer"),
                     )
                 })
                 .collect(),
@@ -24520,9 +24567,9 @@ mod tests {
         match &e.execute("SELECT * FROM t ORDER BY id;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows.len(), 3);
-                assert_eq!(rows[0], vec!["1".to_string(), "a".to_string()]);
-                assert_eq!(rows[1], vec!["2".to_string(), "X".to_string()]);
-                assert_eq!(rows[2], vec!["3".to_string(), "X".to_string()]);
+                assert_eq!(row_text(rows, 0), vec!["1".to_string(), "a".to_string()]);
+                assert_eq!(row_text(rows, 1), vec!["2".to_string(), "X".to_string()]);
+                assert_eq!(row_text(rows, 2), vec!["3".to_string(), "X".to_string()]);
             }
             other => panic!("{other:?}"),
         }
@@ -24585,8 +24632,8 @@ mod tests {
         {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows.len(), 3);
-                assert_eq!(rows[0], vec!["8", "3", "0.966755"]);
-                assert_eq!(rows[2], vec!["4", "1", "0.823532"]);
+                assert_eq!(row_text(rows, 0), vec!["8", "3", "0.966755"]);
+                assert_eq!(row_text(rows, 2), vec!["4", "1", "0.823532"]);
             }
             other => panic!("{other:?}"),
         }
@@ -24600,7 +24647,7 @@ mod tests {
             )
             .unwrap()[0]
         {
-            QueryResult::Rows { rows, .. } => assert_eq!(rows, &vec![vec!["8".to_string()]]),
+            QueryResult::Rows { rows, .. } => assert_eq!(texts(rows), vec![vec!["8".to_string()]]),
             other => panic!("{other:?}"),
         }
 
@@ -24614,7 +24661,7 @@ mod tests {
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => {
-                assert_eq!(rows, &vec![vec!["6".to_string()], vec!["4".to_string()]]);
+                assert_eq!(texts(rows), vec![vec!["6".to_string()], vec!["4".to_string()]]);
             }
             other => panic!("{other:?}"),
         }
@@ -24801,9 +24848,8 @@ mod tests {
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => {
-                assert_eq!(
-                    rows,
-                    &vec![
+                assert_eq!(texts(rows),
+                    vec![
                         vec!["4".to_string()],
                         vec!["2".to_string()],
                         vec!["1".to_string()]
@@ -24829,8 +24875,8 @@ mod tests {
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => {
-                assert_eq!(rows[0], vec!["2".to_string(), "-5.190000".to_string()]);
-                assert_eq!(rows[1], vec!["4".to_string(), "-9.660000".to_string()]);
+                assert_eq!(row_text(rows, 0), vec!["2".to_string(), "-5.190000".to_string()]);
+                assert_eq!(row_text(rows, 1), vec!["4".to_string(), "-9.660000".to_string()]);
             }
             other => panic!("{other:?}"),
         }
@@ -26135,9 +26181,9 @@ mod tests {
         match &e.execute("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, columns } => {
                 assert_eq!(columns.len(), 4);
-                assert_eq!(rows[0], vec!["1", "2", "default", "null"]);
-                assert_eq!(rows[1], vec!["2", "2", "default", "null"]);
-                assert_eq!(rows[2], vec!["3", "2", "hello", "4"]);
+                assert_eq!(row_text(rows, 0), vec!["1", "2", "default", "null"]);
+                assert_eq!(row_text(rows, 1), vec!["2", "2", "default", "null"]);
+                assert_eq!(row_text(rows, 2), vec!["3", "2", "hello", "4"]);
             }
             other => panic!("{other:?}"),
         }
@@ -26227,7 +26273,7 @@ mod tests {
         e.execute("CREATE TABLE t (a INT);").unwrap();
         e.execute("INSERT INTO t VALUES (2);").unwrap();
         let rows = |sql: &str| match &e.execute(sql).unwrap()[0] {
-            QueryResult::Rows { rows, .. } => rows.clone(),
+            QueryResult::Rows { .. } => e.execute(sql).unwrap()[0].rows_text(),
             other => panic!("{other:?}"),
         };
         assert_eq!(rows("SELECT * FROM t;"), vec![vec!["2".to_string()]]);

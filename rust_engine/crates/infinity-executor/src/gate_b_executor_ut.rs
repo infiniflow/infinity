@@ -213,7 +213,12 @@ fn plan_fragment_test1() {
     assert!(!rows.is_empty(), "fragment plan is empty");
     let text = rows
         .iter()
-        .map(|row| row.join(" "))
+        .map(|row| {
+            row.iter()
+                .map(|v| v.to_slt_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
         .collect::<Vec<_>>()
         .join("\n");
     assert!(
@@ -261,12 +266,13 @@ fn fragment_test_build_fragment() {
     };
     assert_eq!(columns.len(), 2);
     assert_eq!(rows.len(), 6);
+    let shown: Vec<Vec<String>> = show_table[0].rows_text();
     assert_eq!(
-        rows[0],
+        shown[0],
         vec!["database_name".to_string(), "default_db".to_string()]
     );
-    assert_eq!(rows[1], vec!["table_name".to_string(), "t2".to_string()]);
-    assert_eq!(rows[4], vec!["column_count".to_string(), "1".to_string()]);
+    assert_eq!(shown[1], vec!["table_name".to_string(), "t2".to_string()]);
+    assert_eq!(shown[4], vec!["column_count".to_string(), "1".to_string()]);
 
     assert!(matches!(
         engine.execute("drop table t3").unwrap()[0],

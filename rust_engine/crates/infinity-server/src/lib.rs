@@ -30,7 +30,7 @@ use std::sync::{Arc, Mutex};
 use infinity_common::{Error, Result};
 
 use crate::peer::PeerManager;
-use infinity_executor::{with_zero_dimension_sparse, Engine, QueryResult};
+use infinity_executor::{with_zero_dimension_sparse, Engine, QueryResult, Value};
 
 use thrift::protocol::{
     TBinaryInputProtocol, TBinaryOutputProtocol, TFieldIdentifier, TInputProtocol, TListIdentifier,
@@ -1064,7 +1064,7 @@ fn handle_connection(
                         Some(eng) => match eng.execute(&req.to_sql()) {
                             Ok(rs) => {
                                 let mut columns: Vec<String> = Vec::new();
-                                let mut rows: Vec<Vec<String>> = Vec::new();
+                                let mut rows: Vec<Vec<Value>> = Vec::new();
                                 for r in rs {
                                     if let QueryResult::Rows {
                                         columns: c,
@@ -1401,7 +1401,7 @@ fn handle_connection(
                     let resp = match engine.as_ref() {
                         Some(eng) => match eng.execute(&sql) {
                             Ok(rs) => {
-                                let mut rows: Vec<Vec<String>> = Vec::new();
+                                let mut rows: Vec<Vec<Value>> = Vec::new();
                                 for r in rs {
                                     if let QueryResult::Rows { rows: rw, .. } = r {
                                         rows = rw;
@@ -1629,10 +1629,12 @@ fn handle_connection(
                         read_table_args(&mut ip)?
                     };
                     let _ = (sid, &db);
-                    let rows = engine
-                        .as_ref()
-                        .map(|e| show_segments_rows(e, &table))
-                        .unwrap_or_default();
+                    let rows = text_cells(
+                        engine
+                            .as_ref()
+                            .map(|e| show_segments_rows(e, &table))
+                            .unwrap_or_default(),
+                    );
                     let columns: Vec<String> = SHOW_SEGMENTS_COLUMNS
                         .iter()
                         .map(|c| c.to_string())
@@ -1648,10 +1650,12 @@ fn handle_connection(
                         read_block_args(&mut ip)?
                     };
                     let _ = (sid, &db);
-                    let rows = engine
-                        .as_ref()
-                        .map(|e| show_blocks_rows(e, &table, segment.max(0) as u32))
-                        .unwrap_or_default();
+                    let rows = text_cells(
+                        engine
+                            .as_ref()
+                            .map(|e| show_blocks_rows(e, &table, segment.max(0) as u32))
+                            .unwrap_or_default(),
+                    );
                     let columns: Vec<String> =
                         SHOW_BLOCKS_COLUMNS.iter().map(|c| c.to_string()).collect();
                     let types: Vec<String> =
@@ -1728,7 +1732,7 @@ fn handle_connection(
                     let resp = match &engine {
                         Some(eng) => match eng.execute(&format!("SHOW TABLE {full} COLUMNS;")) {
                             Ok(rs) => {
-                                let mut rows: Vec<Vec<String>> = Vec::new();
+                                let mut rows: Vec<Vec<Value>> = Vec::new();
                                 for r in rs {
                                     if let QueryResult::Rows { rows: rw, .. } = r {
                                         rows = rw;
@@ -1737,7 +1741,7 @@ fn handle_connection(
                                 // The SQL renderer marks an absent comment
                                 // `(empty)`; the SDK sees an empty string.
                                 for row in rows.iter_mut() {
-                                    if let Some(c) = row.get_mut(3) {
+                                    if let Some(Value::Str(c)) = row.get_mut(3) {
                                         if c == "(empty)" {
                                             c.clear();
                                         }
@@ -2611,7 +2615,7 @@ fn sparse_index_code(name: &str) -> Option<i32> {
 
 /// Classifies a column from its declared type text, falling back to value
 /// inference when the type is unknown.
-fn classify_column(declared: &str, rows: &[Vec<String>], ci: usize) -> ColKind {
+fn classify_column(declared: &str, rows: &[Vec<Value>], ci: usize) -> ColKind {
     if let Some((dim, elem)) = embedding_info(declared) {
         return ColKind::Embedding(dim, elem);
     }
@@ -2933,23 +2937,80 @@ fn pack_array_element(chunk: &mut Vec<u8>, element_column_type: i32, text: &str)
 
 /// Infers the wire `ColumnType` for a column from its values (the response path
 /// has no declared types available): ints, floats, bools, otherwise varchar.
-fn infer_column_type(rows: &[Vec<String>], ci: usize) -> i32 {
+/// The text of a cell, borrowed when it already is text.
+fn cell_text(value: &Value) -> std::borrow::Cow<'_, str> {
+    match value {
+        Value::Str(s) => std::borrow::Cow::Borrowed(s),
+        other => std::borrow::Cow::Owned(other.to_slt_string()),
+    }
+}
+
+/// A cell as an integer, straight from the value (a scan no longer hands the
+/// protocol layer rendered text, so there is nothing to parse for the common
+/// case).
+fn cell_int(value: Option<&Value>) -> Option<i64> {
+    match value? {
+        Value::Int(i) => Some(*i),
+        Value::Float(f) => Some(*f as i64),
+        Value::Bool(b) => Some(*b as i64),
+        Value::Str(s) => s.trim().parse().ok(),
+        Value::Null => None,
+    }
+}
+
+fn cell_float(value: Option<&Value>) -> Option<f64> {
+    match value? {
+        Value::Int(i) => Some(*i as f64),
+        Value::Float(f) => Some(*f),
+        Value::Bool(b) => Some(*b as i64 as f64),
+        Value::Str(s) => s.trim().parse().ok(),
+        Value::Null => None,
+    }
+}
+
+fn cell_bool(value: Option<&Value>) -> Option<bool> {
+    match value? {
+        Value::Bool(b) => Some(*b),
+        Value::Int(i) => Some(*i != 0),
+        Value::Str(s) => Some(s.trim().eq_ignore_ascii_case("true")),
+        _ => None,
+    }
+}
+
+fn infer_column_type(rows: &[Vec<Value>], ci: usize) -> i32 {
     let (mut int, mut flt, mut boolean, mut any) = (true, true, true, false);
     for r in rows {
-        let Some(v) = r.get(ci) else { continue };
-        let t = v.trim();
-        if t.is_empty() || t == "null" {
+        let Some(v) = r.get(ci).filter(|v| !matches!(v, Value::Null)) else {
             continue;
-        }
+        };
         any = true;
-        if t.parse::<i64>().is_err() {
-            int = false;
-        }
-        if t.parse::<f64>().is_err() {
-            flt = false;
-        }
-        if !(t.eq_ignore_ascii_case("true") || t.eq_ignore_ascii_case("false")) {
-            boolean = false;
+        match v {
+            Value::Int(_) => {
+                boolean = false;
+            }
+            Value::Float(_) => {
+                int = false;
+                boolean = false;
+            }
+            Value::Bool(_) => {
+                int = false;
+                flt = false;
+            }
+            // A text cell is inferred from its content: a computed expression
+            // can still produce text.
+            Value::Str(s) => {
+                let t = s.trim();
+                if t.parse::<i64>().is_err() {
+                    int = false;
+                }
+                if t.parse::<f64>().is_err() {
+                    flt = false;
+                }
+                if !(t.eq_ignore_ascii_case("true") || t.eq_ignore_ascii_case("false")) {
+                    boolean = false;
+                }
+            }
+            Value::Null => {}
         }
     }
     if !any {
@@ -2969,7 +3030,23 @@ fn infer_column_type(rows: &[Vec<String>], ci: usize) -> i32 {
 /// is a single chunk packed for its `ColumnType` (the SDK unpacks it with
 /// `struct.unpack`); NULL values contribute zero bytes and a `false` bitmask.
 pub fn rows_to_column_fields(columns: &[String], rows: &[Vec<String>]) -> Vec<ColumnField> {
-    rows_to_column_fields_typed(columns, &[], rows)
+    // No declared type is known here, so the SQL NULL marker is the spelling
+    // the text pipeline used: "null" in any case.
+    let values: Vec<Vec<Value>> = rows
+        .iter()
+        .map(|r| {
+            r.iter()
+                .map(|c| {
+                    if c.eq_ignore_ascii_case("null") {
+                        Value::Null
+                    } else {
+                        Value::Str(c.clone())
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    rows_to_column_fields_typed(columns, &[], &values)
 }
 
 /// Packs each column for its `ColumnType`; a declared embedding column is a raw
@@ -2977,27 +3054,21 @@ pub fn rows_to_column_fields(columns: &[String], rows: &[Vec<String>]) -> Vec<Co
 pub fn rows_to_column_fields_typed(
     columns: &[String],
     types: &[String],
-    rows: &[Vec<String>],
+    rows: &[Vec<Value>],
 ) -> Vec<ColumnField> {
     let mut out = Vec::new();
     for (ci, name) in columns.iter().enumerate() {
         let declared = types.get(ci).map(String::as_str).unwrap_or("");
-        // Text cells keep any spelling (`Null` is data); other columns treat
-        // `null`/`NULL` as the SQL NULL marker.
-        let text_col = declared.trim().to_ascii_uppercase().starts_with("VARCHAR");
-        let is_null = |v: &str| {
-            if text_col {
-                v == "null"
-            } else {
-                v.eq_ignore_ascii_case("null")
-            }
-        };
+        // A NULL is the `Value::Null` the scan produced; a varchar cell that
+        // happens to spell "null" is data.
         let kind = classify_column(declared, rows, ci);
         if let ColKind::Array { .. } = kind {
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
+                let value = r.get(ci).filter(|v| !matches!(v, Value::Null));
+                let text = value.map(cell_text);
+                let cell = text.as_deref();
                 masks.push(cell.is_some());
                 let levels = array_levels(declared);
                 match cell {
@@ -3026,7 +3097,9 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
+                let value = r.get(ci).filter(|v| !matches!(v, Value::Null));
+                let text = value.map(cell_text);
+                let cell = text.as_deref();
                 masks.push(cell.is_some());
                 let (idx, val) = cell.map(parse_sparse_literal).unwrap_or_default();
                 let nnz = idx.len() as u32;
@@ -3073,7 +3146,9 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
+                let value = r.get(ci).filter(|v| !matches!(v, Value::Null));
+                let text = value.map(cell_text);
+                let cell = text.as_deref();
                 masks.push(cell.is_some());
                 let cell = cell.unwrap_or("");
                 if column_type == 12 {
@@ -3110,7 +3185,9 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
+                let value = r.get(ci).filter(|v| !matches!(v, Value::Null));
+                let text = value.map(cell_text);
+                let cell = text.as_deref();
                 masks.push(cell.is_some());
                 // A bit vector is packed `dim` bits into `ceil(dim/8)` bytes
                 // (LSB first), which is what the SDK unpacks.
@@ -3166,53 +3243,30 @@ pub fn rows_to_column_fields_typed(
         let mut chunk: Vec<u8> = Vec::new();
         let mut masks = Vec::with_capacity(rows.len());
         for r in rows {
-            let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
-            let valid = cell.is_some();
+            let value = r.get(ci).filter(|v| !matches!(v, Value::Null));
+            let text = value.map(cell_text);
+            let cell = text.as_deref();
+            let valid = value.is_some();
             match code {
-                1 => {
-                    let n: i8 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0);
-                    chunk.push(n as u8);
-                }
-                2 => {
-                    let n: i16 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0);
-                    chunk.extend_from_slice(&n.to_le_bytes());
-                }
-                3 => {
-                    let n: i32 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0);
-                    chunk.extend_from_slice(&n.to_le_bytes());
-                }
-                4 => {
-                    let n: i64 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0);
-                    chunk.extend_from_slice(&n.to_le_bytes());
-                }
-                5 => {
-                    let f: f32 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0.0);
-                    chunk.extend_from_slice(&f.to_le_bytes());
-                }
-                6 => {
-                    let f: f64 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0.0);
-                    chunk.extend_from_slice(&f.to_le_bytes());
-                }
+                // The integers and floats come straight from the value: the
+                // scan hands over `Value`s, so there is no text to parse.
+                1 => chunk.push(cell_int(value).unwrap_or(0) as i8 as u8),
+                2 => chunk.extend_from_slice(&(cell_int(value).unwrap_or(0) as i16).to_le_bytes()),
+                3 => chunk.extend_from_slice(&(cell_int(value).unwrap_or(0) as i32).to_le_bytes()),
+                4 => chunk.extend_from_slice(&cell_int(value).unwrap_or(0).to_le_bytes()),
+                5 => chunk.extend_from_slice(&(cell_float(value).unwrap_or(0.0) as f32).to_le_bytes()),
+                6 => chunk.extend_from_slice(&cell_float(value).unwrap_or(0.0).to_le_bytes()),
                 7 => {
                     // ColumnFloat16: IEEE half precision.
-                    let f: f32 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0.0);
+                    let f = cell_float(value).unwrap_or(0.0) as f32;
                     chunk.extend_from_slice(&f32_to_f16_bits(f).to_le_bytes());
                 }
                 8 => {
                     // ColumnBFloat16: the C++ bfloat16_t keeps the top 16 bits.
-                    let f: f32 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0.0);
+                    let f = cell_float(value).unwrap_or(0.0) as f32;
                     chunk.extend_from_slice(&((f.to_bits() >> 16) as u16).to_le_bytes());
                 }
-                0 => chunk.push(
-                    if cell
-                        .map(|v| v.eq_ignore_ascii_case("true"))
-                        .unwrap_or(false)
-                    {
-                        1
-                    } else {
-                        0
-                    },
-                ),
+                0 => chunk.push(u8::from(cell_bool(value).unwrap_or(false))),
                 16 => {
                     // ColumnDate: i32 days since the epoch.
                     let n = cell.and_then(date_to_days).unwrap_or(0);
@@ -5424,9 +5478,16 @@ pub fn read_select_call(r: &mut impl Read) -> Result<(i32, SelectReq)> {
     Ok((msg.sequence_number, req))
 }
 
+/// Text rows as `Value::Str` cells: the SHOW builders still produce text.
+fn text_cells(rows: Vec<Vec<String>>) -> Vec<Vec<Value>> {
+    rows.into_iter()
+        .map(|r| r.into_iter().map(Value::Str).collect())
+        .collect()
+}
+
 /// Builds a `SelectResponse` from a materialized result set (no declared types).
 pub fn select_response_from(columns: &[String], rows: &[Vec<String>]) -> SelectResponseWire {
-    select_response_from_typed(columns, &[], rows)
+    select_response_from_typed(columns, &[], &text_cells(rows.to_vec()))
 }
 
 /// Resolves each result column to its declared type text via
@@ -5446,7 +5507,10 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
             if let QueryResult::Rows { rows, .. } = r {
                 for row in rows {
                     if row.len() >= 2 {
-                        map.insert(row[0].to_ascii_lowercase(), row[1].clone());
+                        map.insert(
+                            row[0].to_slt_string().to_ascii_lowercase(),
+                            row[1].to_slt_string(),
+                        );
                     }
                 }
             }
@@ -5677,7 +5741,7 @@ pub fn show_blocks_rows(engine: &Engine, table: &str, segment: u32) -> Vec<Vec<S
 pub fn select_response_from_typed(
     columns: &[String],
     types: &[String],
-    rows: &[Vec<String>],
+    rows: &[Vec<Value>],
 ) -> SelectResponseWire {
     let column_defs = columns
         .iter()
@@ -8037,7 +8101,7 @@ mod tests {
             "{\"a\":1}".to_string(),
         ]];
 
-        let fields = rows_to_column_fields_typed(&cols, &types, &rows);
+        let fields = rows_to_column_fields_typed(&cols, &types, &text_cells(rows.clone()));
         // ColumnDate: i32 days since the epoch (2024-01-22 -> 19744).
         assert_eq!(fields[0].column_type, 16);
         assert_eq!(
@@ -8065,7 +8129,7 @@ mod tests {
         assert_eq!(&j[4..], b"{\"a\":1}");
 
         // ... and the announced LogicType is the matching one.
-        let resp = select_response_from_typed(&cols, &types, &rows);
+        let resp = select_response_from_typed(&cols, &types, &text_cells(rows.clone()));
         let logic: Vec<i32> = resp.column_defs.iter().map(|c| c.logic_type).collect();
         assert_eq!(logic, vec![17, 18, 19, 23]); // Date, Time, DateTime, Json
         assert!(resp
@@ -8077,14 +8141,14 @@ mod tests {
         let scols = vec!["v".to_string()];
         let stypes = vec!["SPARSE(FLOAT,100)".to_string()];
         let srows = vec![vec!["[0:1.5,3:2.5]".to_string()]];
-        let sf = rows_to_column_fields_typed(&scols, &stypes, &srows);
+        let sf = rows_to_column_fields_typed(&scols, &stypes, &text_cells(srows.clone()));
         assert_eq!(sf[0].column_type, 13); // ColumnSparse
         let b = &sf[0].column_vectors[0];
         assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 2); // nnz
         assert_eq!(&b[4..6], &[0u8, 3u8]); // indices as i8
         assert_eq!(f32::from_le_bytes(b[6..10].try_into().unwrap()), 1.5);
         assert_eq!(f32::from_le_bytes(b[10..14].try_into().unwrap()), 2.5);
-        let sresp = select_response_from_typed(&scols, &stypes, &srows);
+        let sresp = select_response_from_typed(&scols, &stypes, &text_cells(srows.clone()));
         assert_eq!(sresp.column_defs[0].logic_type, 15); // Sparse
         assert_eq!(
             sresp.column_defs[0].physical,
@@ -8097,14 +8161,14 @@ mod tests {
 
         // An empty sparse vector still emits an `nnz = 0` prefix.
         let erows = vec![vec!["(empty)".to_string()]];
-        let ef = rows_to_column_fields_typed(&scols, &stypes, &erows);
+        let ef = rows_to_column_fields_typed(&scols, &stypes, &text_cells(erows.clone()));
         assert_eq!(ef[0].column_vectors[0], vec![0, 0, 0, 0]);
 
         // Tensor: u32 byte-length + dim*rows little-endian elements per row.
         let tcols = vec!["t".to_string()];
         let ttypes = vec!["TENSOR(FLOAT,3)".to_string()];
         let trows = vec![vec!["[[1,2,3],[4,5,6]]".to_string()]];
-        let tf = rows_to_column_fields_typed(&tcols, &ttypes, &trows);
+        let tf = rows_to_column_fields_typed(&tcols, &ttypes, &text_cells(trows.clone()));
         assert_eq!(tf[0].column_type, 11); // ColumnTensor
         let b = &tf[0].column_vectors[0];
         assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 24); // 2*3*4 bytes
@@ -8112,7 +8176,7 @@ mod tests {
             .map(|i| f32::from_le_bytes(b[4 + i * 4..8 + i * 4].try_into().unwrap()))
             .collect();
         assert_eq!(vals, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        let tresp = select_response_from_typed(&tcols, &ttypes, &trows);
+        let tresp = select_response_from_typed(&tcols, &ttypes, &text_cells(trows.clone()));
         assert_eq!(tresp.column_defs[0].logic_type, 13); // Tensor
         assert_eq!(
             tresp.column_defs[0].physical,
@@ -8126,7 +8190,7 @@ mod tests {
         let acols = vec!["a".to_string()];
         let atypes = vec!["TENSORARRAY(FLOAT,3)".to_string()];
         let arows = vec![vec!["[[[1,2,3],[5,7,8]],[[9,9,9]]]".to_string()]];
-        let af = rows_to_column_fields_typed(&acols, &atypes, &arows);
+        let af = rows_to_column_fields_typed(&acols, &atypes, &text_cells(arows.clone()));
         assert_eq!(af[0].column_type, 12); // ColumnTensorArray
         let b = &af[0].column_vectors[0];
         assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 2); // tensor_n
@@ -8136,21 +8200,21 @@ mod tests {
             u32::from_le_bytes(b[second..second + 4].try_into().unwrap()),
             12
         );
-        let aresp = select_response_from_typed(&acols, &atypes, &arows);
+        let aresp = select_response_from_typed(&acols, &atypes, &text_cells(arows.clone()));
         assert_eq!(aresp.column_defs[0].logic_type, 14); // TensorArray
 
         // Array: u32 element count + each element packed for its ColumnType.
         let rcols = vec!["r".to_string()];
         let rtypes = vec!["ARRAY(INT)".to_string()];
         let rrows = vec![vec!["{1,2,3}".to_string()]];
-        let rf = rows_to_column_fields_typed(&rcols, &rtypes, &rrows);
+        let rf = rows_to_column_fields_typed(&rcols, &rtypes, &text_cells(rrows.clone()));
         assert_eq!(rf[0].column_type, 21); // ColumnArray
         let b = &rf[0].column_vectors[0];
         assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 3);
         assert_eq!(i32::from_le_bytes(b[4..8].try_into().unwrap()), 1);
         assert_eq!(i32::from_le_bytes(b[8..12].try_into().unwrap()), 2);
         assert_eq!(i32::from_le_bytes(b[12..16].try_into().unwrap()), 3);
-        let rresp = select_response_from_typed(&rcols, &rtypes, &rrows);
+        let rresp = select_response_from_typed(&rcols, &rtypes, &text_cells(rrows.clone()));
         assert_eq!(rresp.column_defs[0].logic_type, 22); // Array
         assert_eq!(
             rresp.column_defs[0].physical,
@@ -8164,7 +8228,7 @@ mod tests {
         let vcols = vec!["s".to_string()];
         let vtypes = vec!["ARRAY(VARCHAR)".to_string()];
         let vrows = vec![vec!["{ab,cd}".to_string()]];
-        let vf = rows_to_column_fields_typed(&vcols, &vtypes, &vrows);
+        let vf = rows_to_column_fields_typed(&vcols, &vtypes, &text_cells(vrows.clone()));
         let b = &vf[0].column_vectors[0];
         assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 2);
         assert_eq!(u32::from_le_bytes(b[4..8].try_into().unwrap()), 2); // "ab"
@@ -8174,7 +8238,7 @@ mod tests {
         let ncols = vec!["n".to_string()];
         let ntypes = vec!["ARRAY(ARRAY(INT))".to_string()];
         let nrows = vec![vec!["{{1,2},{3}}".to_string()]];
-        let nf = rows_to_column_fields_typed(&ncols, &ntypes, &nrows);
+        let nf = rows_to_column_fields_typed(&ncols, &ntypes, &text_cells(nrows.clone()));
         let b = &nf[0].column_vectors[0];
         assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 2); // outer
         assert_eq!(u32::from_le_bytes(b[4..8].try_into().unwrap()), 2); // inner #1
@@ -8182,7 +8246,7 @@ mod tests {
         assert_eq!(i32::from_le_bytes(b[12..16].try_into().unwrap()), 2);
         assert_eq!(u32::from_le_bytes(b[16..20].try_into().unwrap()), 1); // inner #2
         assert_eq!(i32::from_le_bytes(b[20..24].try_into().unwrap()), 3);
-        let nresp = select_response_from_typed(&ncols, &ntypes, &nrows);
+        let nresp = select_response_from_typed(&ncols, &ntypes, &text_cells(nrows.clone()));
         assert_eq!(nresp.column_defs[0].logic_type, 22); // Array
         assert_eq!(
             nresp.column_defs[0].physical,

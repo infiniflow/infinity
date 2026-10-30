@@ -12,8 +12,9 @@ fn engine() -> (tempfile::TempDir, Engine) {
 }
 
 fn result(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-    match e.execute(sql).unwrap().into_iter().next().unwrap() {
-        crate::QueryResult::Rows { rows, .. } => rows,
+    let r = e.execute(sql).unwrap().into_iter().next().unwrap();
+    match &r {
+        crate::QueryResult::Rows { .. } => r.rows_text(),
         other => panic!("expected rows, got {other:?}"),
     }
 }

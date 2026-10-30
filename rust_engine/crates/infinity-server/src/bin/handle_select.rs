@@ -25,7 +25,13 @@ fn main() {
 
     let resp = match engine.execute(&req.to_sql()) {
         Ok(rs) => match rs.into_iter().next() {
-            Some(QueryResult::Rows { columns, rows }) => select_response_from(&columns, &rows),
+            Some(QueryResult::Rows { columns, rows }) => {
+                let text: Vec<Vec<String>> = rows
+                    .iter()
+                    .map(|r| r.iter().map(|v| v.to_slt_string()).collect())
+                    .collect();
+                select_response_from(&columns, &text)
+            }
             other => SelectResponseWire {
                 error_code: 1,
                 error_msg: format!("unexpected result: {other:?}"),

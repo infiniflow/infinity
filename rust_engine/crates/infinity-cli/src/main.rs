@@ -536,7 +536,7 @@ fn run(args: &[String]) -> infinity_common::Result<()> {
                     if let Some(QueryResult::Rows { rows, .. }) = out.first() {
                         for row in rows {
                             if let Some(v) = row.first() {
-                                if let Ok(id) = v.parse::<u64>() {
+                                if let Ok(id) = v.to_slt_string().parse::<u64>() {
                                     got.push(id);
                                 }
                             }
@@ -654,7 +654,8 @@ fn print_result(r: &QueryResult) {
                 println!("{}", columns.join(" | "));
             }
             for row in rows {
-                println!("{}", row.join(" | "));
+                let cells: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
+                println!("{}", cells.join(" | "));
             }
             println!("({} row(s))", rows.len());
         }
@@ -851,7 +852,10 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
                             for row in r {
                                 // normalize each column, then join — matches
                                 // `default_validator` in sqllogictest-rs.
-                                let cols: Vec<String> = row.iter().map(|c| norm(c)).collect();
+                                let cols: Vec<String> = row
+                                    .iter()
+                                    .map(|c| norm(&c.to_slt_string()))
+                                    .collect();
                                 rows.push(cols.join(" "));
                             }
                         }
