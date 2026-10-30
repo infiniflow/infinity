@@ -4667,6 +4667,10 @@ void NewTxn::PostCommit() {
             // Shouldn't set the ckp ts if checkpoint is skipped.
             wal_manager->SetLastCheckpointTS(current_ckp_ts_);
             wal_manager->SetLastCkpWalSize(wal_size_); // Update last checkpoint wal size
+            // Any rotated wal.log.* file whose max commit ts is <= current_ckp_ts_ is redundant now
+            // that this checkpoint is committed. RecycleWalFile() only deletes them once the
+            // checkpoint entry itself is on disk.
+            wal_manager->RecycleWalFile(current_ckp_ts_);
         }
     }
 

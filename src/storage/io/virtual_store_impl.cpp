@@ -173,15 +173,14 @@ Status VirtualStore::DeleteFile(const std::string &file_name) {
         LOG_WARN(fmt::format("The {} to be deleted does not exists ", file_name));
         return Status::OK();
     }
-    bool is_deleted = std::filesystem::remove(p, error_code);
-    if (error_code.value() != 0) {
-        UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, strerror(errno)));
-    }
-    if (!is_deleted) {
-        std::string error_msg = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
-        LOG_ERROR(error_msg);
-        Status status = Status::IOError(error_msg);
-        return status;
+    // A failed deletion is reported through the Status instead of aborting: the WAL recycler treats
+    // it as best-effort and retries at the next checkpoint.
+    if (!std::filesystem::remove(p, error_code)) {
+        if (error_code.value() != 0) {
+            return Status::IOError(fmt::format("Delete file {} exception: {}", file_name, error_code.message()));
+        }
+        LOG_DEBUG(fmt::format("The {} was already removed", file_name));
+        return Status::OK();
     }
     LOG_DEBUG(fmt::format("Clean file: {}", file_name));
     return Status::OK();
@@ -307,6 +306,25 @@ Status VirtualStore::Truncate(const std::string &file_name, size_t new_length) {
     std::filesystem::resize_file(file_name, new_length, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Failed to truncate {} to size {}", file_name, strerror(errno)));
+    }
+    return Status::OK();
+}
+
+Status VirtualStore::SyncFile(const std::string &path) {
+    if (!std::filesystem::path(path).is_absolute()) {
+        UnrecoverableError(fmt::format("{} isn't absolute path.", path));
+    }
+    // O_RDWR without O_CREAT: a missing file has to fail here instead of being created, otherwise
+    // the caller would record a durable write for a file that was never written.
+    const i32 fd = open(path.c_str(), O_RDWR | O_CLOEXEC);
+    if (fd == -1) {
+        return Status::IOError(fmt::format("Can't open file to sync: {}: {}", path, strerror(errno)));
+    }
+    const i32 ret = fsync(fd);
+    const i32 sync_errno = errno;
+    close(fd);
+    if (ret == -1) {
+        return Status::IOError(fmt::format("Can't sync file: {}: {}", path, strerror(sync_errno)));
     }
     return Status::OK();
 }

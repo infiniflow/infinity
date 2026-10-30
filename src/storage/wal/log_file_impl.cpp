@@ -90,20 +90,23 @@ std::string WalFile::WalFilename(TxnTimeStamp max_commit_ts) { return fmt::forma
 
 std::string WalFile::TempWalFilename() { return std::string(WAL_FILE_TEMP_FILE); }
 
-// /**
-//  * @brief Gc the old wal files.
-//  * Only delete the wal.log.* files. the wal.log file is current wal file.
-//  * Check if the wal.log.* files are too old.
-//  * if * is less than the max_commit_ts, we will delete it.
-//  */
-// void WalFile::RecycleWalFile(TxnTimeStamp max_commit_ts, const std::string &wal_dir) {
-//     auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
-//     for (const auto &wal_info : wal_infos) {
-//         if (wal_info.max_commit_ts_ <= max_commit_ts) {
-//             LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
-//             VirtualStore::DeleteFile(wal_info.path_);
-//         }
-//     }
-// }
+// Deletes the rotated wal.log.<ts> files covered by the checkpoint at ckp_ts. The current wal.log is
+// not part of the rotated set, so it is never touched.
+void WalFile::Recycle(TxnTimeStamp ckp_ts, const std::string &wal_dir) {
+    auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
+    for (const auto &wal_info : wal_infos) {
+        if (wal_info.max_commit_ts_ <= ckp_ts) {
+            // Reclaiming wal is best-effort: the file is retried at the next checkpoint, so a
+            // transient filesystem error must not take down the commit path.
+            Status status = VirtualStore::DeleteFile(wal_info.path_);
+            if (status.ok()) {
+                LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
+            } else {
+                LOG_WARN(
+                    fmt::format("Failed to delete checkpointed wal file {}, will retry on next checkpoint: {}", wal_info.path_, status.message()));
+            }
+        }
+    }
+}
 
 } // namespace infinity

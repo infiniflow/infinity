@@ -99,6 +99,10 @@ public:
     TxnTimeStamp LastCheckpointTS() const;
     void SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts);
 
+    // ckp_ts is the begin ts of the checkpoint being completed. It identifies which checkpoint's WAL
+    // entry must already be on disk, and bounds the wal.log.<ts> files that checkpoint covers.
+    void RecycleWalFile(TxnTimeStamp ckp_ts);
+
     std::vector<std::shared_ptr<std::string>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
 
@@ -143,6 +147,12 @@ private:
     i64 wal_size_{};
     i64 last_ckp_wal_size_{};
     std::atomic<bool> checkpoint_in_progress_{false};
+
+    // Begin ts of the last checkpoint whose WAL entry reached the disk (0: none yet). Written by the
+    // WAL flush thread after its fsync, read by the thread committing that checkpoint: RecycleWalFile()
+    // only deletes the wal.log.* files when the checkpoint it is asked to recycle carries this ts, so
+    // an unsynced checkpoint keeps them for the next one.
+    std::atomic<TxnTimeStamp> last_synced_ckp_ts_{0};
 
     // Only Checkpoint/Cleanup thread access following members
     mutable std::mutex last_ckp_ts_mutex_{};
