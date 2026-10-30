@@ -13426,7 +13426,7 @@ impl Engine {
                 return Ok(Some(rows));
             }
         }
-        let Ok((_, rows)) = self.read_cpp_blocks_pruned(table, &wanted, prune) else {
+        let Ok((_, rows)) = self.read_cpp_blocks_pruned_values(table, &wanted, prune) else {
             return Ok(None);
         };
         // The snapshot and the scan both list the rows the mirror makes
@@ -13446,7 +13446,6 @@ impl Engine {
         let hidden = self.tombstone_set_at(table, crate::read_ts())?;
         let mut out: Vec<(usize, Vec<Value>)> = rows
             .into_iter()
-            .map(|(seq, cells)| (seq, cells.iter().map(|c| parse_value(c)).collect()))
             .filter(|(seq, _): &(usize, Vec<Value>)| !hidden.contains(&(*seq as u64)))
             .collect();
         // A mirror that is untouched since it was written is the whole table.
@@ -13552,7 +13551,7 @@ impl Engine {
                 ));
             }
         }
-        let Ok((_, rows)) = self.read_cpp_blocks_pruned(table, &wanted, &[]) else {
+        let Ok((_, rows)) = self.read_cpp_blocks_pruned_values(table, &wanted, &[]) else {
             return Ok(None);
         };
         // The files alone hold `snapshot.len()` rows; the append buffer adds
@@ -13569,7 +13568,7 @@ impl Engine {
         let out: Vec<Vec<Value>> = rows
             .into_iter()
             .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
-            .map(|(_, cells)| cells.iter().map(|c| parse_value(c)).collect())
+            .map(|(_, cells)| cells)
             .collect();
         Ok(Some(out))
     }

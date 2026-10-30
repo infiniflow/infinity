@@ -1715,6 +1715,52 @@ fn decode_value_shaped(
     }
 }
 
+
+/// The `Value` of a fixed-width scalar slot, or `None` for a type this does not
+/// decode (`DATE`/`TIME`/`DATETIME`, whose cell is rendered text).
+fn decode_scalar_value(
+    column_type: i32,
+    width: usize,
+    body: &[u8],
+    row: usize,
+) -> Option<Value> {
+    let at = row.checked_mul(width)?;
+    let slot = body.get(at..at + width)?;
+    Some(match column_type {
+        1 => Value::Int(slot[0] as i8 as i64),
+        2 => Value::Int(i16::from_le_bytes(slot.try_into().ok()?) as i64),
+        3 => Value::Int(i32::from_le_bytes(slot.try_into().ok()?) as i64),
+        4 => Value::Int(i64::from_le_bytes(slot.try_into().ok()?)),
+        5 => Value::Float(f64::from(f32::from_le_bytes(slot.try_into().ok()?))),
+        6 => Value::Float(f64::from_le_bytes(slot.try_into().ok()?)),
+        7 => Value::Float(f64::from(crate::f16_bits_to_f32(u16::from_le_bytes(
+            slot.try_into().ok()?,
+        )))),
+        8 => Value::Float(f64::from(f32::from_bits(
+            (u16::from_le_bytes(slot.try_into().ok()?) as u32) << 16,
+        ))),
+        _ => return None,
+    })
+}
+
+/// [`crate::parse_value`] for a cell the decoder already owns, so a text cell
+/// moves into `Value::Str` instead of being copied into it.
+fn parse_owned_value(cell: String) -> Value {
+    if let Ok(i) = cell.parse::<i64>() {
+        Value::Int(i)
+    } else if let Ok(f) = cell.parse::<f64>() {
+        Value::Float(f)
+    } else if cell.eq_ignore_ascii_case("null") {
+        Value::Null
+    } else if cell.eq_ignore_ascii_case("true") {
+        Value::Bool(true)
+    } else if cell.eq_ignore_ascii_case("false") {
+        Value::Bool(false)
+    } else {
+        Value::Str(cell)
+    }
+}
+
 /// The IVF index options the mirror has to honour
 /// (`IndexIVFCentroidOption` + `IndexIVFStorageOption`).
 struct IvfOptions {
@@ -3691,6 +3737,17 @@ impl Engine {
         self.read_cpp_blocks_wanted(table, Some(wanted), prune)
     }
 
+    /// [`Self::read_cpp_blocks_pruned`] with the cells already decoded to
+    /// `Value`: what a scan reads, so it does not parse the text back.
+    pub fn read_cpp_blocks_pruned_values(
+        &self,
+        table: &str,
+        wanted: &[usize],
+        prune: &[crate::fast_rough_filter::PruneCond],
+    ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
+        self.read_cpp_blocks_values(table, Some(wanted), prune)
+    }
+
     /// Every row the blocks hold, tombstoned slots included.
     ///
     /// The index mirrors are built from a column and keep deleted rows (the
@@ -3771,14 +3828,39 @@ impl Engine {
         columns: &[cpp_format::RawBlockColumn],
         wanted: Option<&[usize]>,
     ) -> Option<Vec<(usize, Vec<String>)>> {
+        let rows = Self::decode_rows_of_values(ids, type_text, types, id, version, columns, wanted)?;
+        Some(
+            rows.into_iter()
+                .map(|(seq, cells)| (seq, cells.iter().map(mirror_cell_text).collect()))
+                .collect(),
+        )
+    }
+
+    /// The rows of one block, as the `Value`s the engine works with.
+    ///
+    /// A scalar cell (`INT8..INT64`, `FLOAT`, `DOUBLE`, the 16-bit floats, a
+    /// `BOOL`) is built from its slot directly. Rendering it to text and parsing
+    /// it back - what the block mirror used to do for every cell - cost a
+    /// `format!` and a re-parse per cell; the types that only exist as text
+    /// (varchar, json, date, tensor, sparse, ...) keep the text form, and its
+    /// parse, because that is also what a rewrite writes.
+    pub(crate) fn decode_rows_of_values(
+        ids: &[u64],
+        type_text: &[String],
+        types: &[i32],
+        id: BlockId,
+        version: &cpp_format::BlockVersionFile,
+        columns: &[cpp_format::RawBlockColumn],
+        wanted: Option<&[usize]>,
+    ) -> Option<Vec<(usize, Vec<Value>)>> {
         let row_count: usize = version
             .created
             .last()
             .map(|c| c.cumulative_row_count as usize)
             .unwrap_or(0);
         // Everything a cell needs from its **column** - the body split, the
-        // outline kind and the outline bytes - is the same for every row.
-        // Splitting the body per cell copied the whole block's
+        // outline kind, the layout and the outline bytes - is the same for
+        // every row. Splitting the body per cell copied the whole block's
         // `[data][bitmap]` once per cell, which made a block read
         // O(rows x block_bytes): 40,000 rows spent 68% of the time in memmove.
         struct Prepared<'a> {
@@ -3786,6 +3868,7 @@ impl Engine {
             kind: OutlineKind,
             outline: &'a [u8],
             shape: Option<(usize, i32)>,
+            layout: ColumnLayout,
         }
         let mut prepared: Vec<Option<Prepared>> = Vec::with_capacity(types.len());
         for (col, column_type) in types.iter().enumerate() {
@@ -3807,6 +3890,7 @@ impl Engine {
                 kind: outline_kind(&type_text[col]),
                 outline: raw.outline.as_slice(),
                 shape: embedding_shape(&type_text[col]),
+                layout,
             }));
         }
         let mut out = Vec::with_capacity(row_count);
@@ -3814,7 +3898,7 @@ impl Engine {
             let mut cells = Vec::with_capacity(types.len());
             for (col, column_type) in types.iter().enumerate() {
                 let Some(column) = prepared[col].as_ref() else {
-                    cells.push("null".to_string());
+                    cells.push(Value::Null);
                     continue;
                 };
                 let body = &column.body;
@@ -3822,35 +3906,35 @@ impl Engine {
                 let value = if body.null_bitmap.len() > row / 8
                     && body.null_bitmap[row / 8] & (1 << (row % 8)) == 0
                 {
-                    "null".to_string()
-                } else {
-                    // Tensor / sparse slots point into the column's outline.
-                    match column.kind {
-                        OutlineKind::Tensor => {
-                            let at = row * 8;
-                            let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                            decode_tensor_value(&type_text[col], slot, outline)
-                                .unwrap_or_else(|| "null".into())
+                    Value::Null
+                } else if column.kind == OutlineKind::None {
+                    match column.layout {
+                        ColumnLayout::CompactBit => match body
+                            .data
+                            .get(row / 8)
+                            .map(|b| b & (1 << (row % 8)) != 0)
+                        {
+                            Some(bit) => Value::Bool(bit),
+                            None => Value::Null,
+                        },
+                        ColumnLayout::Fixed(width) => {
+                            match decode_scalar_value(*column_type, width, &body.data, row) {
+                                Some(value) => value,
+                                // A fixed layout this decoder does not cover
+                                // (`DATE`, `TIME`, `DATETIME`): keep the text.
+                                None => decode_value_shaped(
+                                    &type_text[col],
+                                    *column_type,
+                                    &body.data,
+                                    row,
+                                    outline,
+                                    column.shape,
+                                )
+                                .map(parse_owned_value)
+                                .unwrap_or(Value::Null),
+                            }
                         }
-                        OutlineKind::TensorArray => {
-                            let at = row * 8;
-                            let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                            decode_tensorarray_value(&type_text[col], slot, outline)
-                                .unwrap_or_else(|| "null".into())
-                        }
-                        OutlineKind::Sparse => {
-                            let at = row * 16;
-                            let slot = body.data.get(at..at + 16).unwrap_or(&[]);
-                            decode_sparse_value(&type_text[col], slot, outline)
-                                .unwrap_or_else(|| "null".into())
-                        }
-                        OutlineKind::Array => {
-                            let at = row * 8;
-                            let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                            decode_array_value(&type_text[col], slot, outline)
-                                .unwrap_or_else(|| "null".into())
-                        }
-                        OutlineKind::None => decode_value_shaped(
+                        ColumnLayout::VarLen(_) => decode_value_shaped(
                             &type_text[col],
                             *column_type,
                             &body.data,
@@ -3858,8 +3942,32 @@ impl Engine {
                             outline,
                             column.shape,
                         )
-                        .unwrap_or_else(|| "null".into()),
+                        .map(parse_owned_value)
+                        .unwrap_or(Value::Null),
                     }
+                } else {
+                    // Tensor / sparse / array slots point into the column's
+                    // outline; their cells exist only as text.
+                    let text = match column.kind {
+                        OutlineKind::Tensor => {
+                            let at = row * 8;
+                            decode_tensor_value(&type_text[col], body.data.get(at..at + 8).unwrap_or(&[]), outline)
+                        }
+                        OutlineKind::TensorArray => {
+                            let at = row * 8;
+                            decode_tensorarray_value(&type_text[col], body.data.get(at..at + 8).unwrap_or(&[]), outline)
+                        }
+                        OutlineKind::Sparse => {
+                            let at = row * 16;
+                            decode_sparse_value(&type_text[col], body.data.get(at..at + 16).unwrap_or(&[]), outline)
+                        }
+                        OutlineKind::Array => {
+                            let at = row * 8;
+                            decode_array_value(&type_text[col], body.data.get(at..at + 8).unwrap_or(&[]), outline)
+                        }
+                        OutlineKind::None => None,
+                    };
+                    text.map(parse_owned_value).unwrap_or(Value::Null)
                 };
                 cells.push(value);
             }
@@ -3948,12 +4056,15 @@ impl Engine {
         Some(out)
     }
 
-    fn read_cpp_blocks_wanted(
+    /// Every row of the table as the engine works with it: the block files'
+    /// cells (decoded by `decode_rows_of_values`) plus the append buffer's,
+    /// which are `Value`s already.
+    fn read_cpp_blocks_values(
         &self,
         table: &str,
         wanted: Option<&[usize]>,
         prune: &[crate::fast_rough_filter::PruneCond],
-    ) -> Result<(Vec<String>, Vec<(usize, Vec<String>)>)> {
+    ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -3975,7 +4086,7 @@ impl Engine {
         let root = self.blocks_root();
         let read_ts = crate::read_ts();
 
-        let mut rows: Vec<(usize, Vec<String>)> = Vec::new();
+        let mut rows: Vec<(usize, Vec<Value>)> = Vec::new();
         // The mirror is segmented (`seg_{id}/blk_{n}`), and a row's id carries
         // its segment in the high 32 bits, so the block map - not a hardcoded
         // `seg_0` - decides what a row's id is. Reading only `seg_0` here made
@@ -4035,7 +4146,7 @@ impl Engine {
             }
             match self.read_block_cached(&table, &root, id) {
                 Ok((version, columns)) => {
-                    let Some(cells) = Self::decode_rows_of(
+                    let Some(cells) = Self::decode_rows_of_values(
                         &meta.ids, &meta.types, &types, id, &version, &columns, wanted,
                     ) else {
                         break;
@@ -4085,12 +4196,12 @@ impl Engine {
                         continue;
                     }
                 }
-                let cells: Vec<String> = values
+                let cells: Vec<Value> = values
                     .iter()
                     .enumerate()
                     .map(|(i, v)| match wanted {
-                        Some(w) if !w.contains(&i) => "null".to_string(),
-                        _ => mirror_cell_text(v),
+                        Some(w) if !w.contains(&i) => Value::Null,
+                        _ => v.clone(),
                     })
                     .collect();
                 rows.push((seq, cells));
@@ -4098,6 +4209,23 @@ impl Engine {
             rows.sort_by_key(|(seq, _)| *seq);
         }
         Ok((meta.columns.clone(), rows))
+    }
+
+    /// [`Self::read_cpp_blocks_values`] as the canonical cell text, which is what
+    /// the index builders and the block-mirror dump compare against.
+    fn read_cpp_blocks_wanted(
+        &self,
+        table: &str,
+        wanted: Option<&[usize]>,
+        prune: &[crate::fast_rough_filter::PruneCond],
+    ) -> Result<(Vec<String>, Vec<(usize, Vec<String>)>)> {
+        let (columns, rows) = self.read_cpp_blocks_values(table, wanted, prune)?;
+        Ok((
+            columns,
+            rows.into_iter()
+                .map(|(seq, cells)| (seq, cells.iter().map(mirror_cell_text).collect()))
+                .collect(),
+        ))
     }
 
     /// The C++ index id of `index_name` within `table`: the id the catalog
