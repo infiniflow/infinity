@@ -434,6 +434,9 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         Bitmask bitmask;
 
         BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
+        if (block_meta == nullptr) [[unlikely]] {
+            UnrecoverableError(fmt::format("MatchSparseScan: block not found. segment_id: {}, block_id: {}", segment_id, block_id));
+        }
         LOG_DEBUG(fmt::format("MatchSparseScan: segment_id: {}, block_id: {}", segment_id, block_id));
 
         std::tie(row_cnt, status) = block_meta->GetRowCnt1();

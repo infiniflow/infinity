@@ -189,22 +189,27 @@ Status SegmentMeta::AddBlockWithID(TxnTimeStamp commit_ts, BlockID block_id) {
 }
 
 std::pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
-    Status status;
-
     BlockID block_id = 0;
     {
-        std::vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = GetBlockIDs1(commit_ts);
-        if (!status.ok()) {
-            return {INVALID_BLOCK_ID, status};
+        // Hold the lock across the whole read-modify-write: otherwise two appends of the same
+        // segment can both read the same last id and hand out the same one, and push_back can
+        // grow the vector while another thread is iterating it.
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (!block_ids1_) {
+            block_ids1_ = infinity::GetTableSegmentBlocks(&kv_instance_,
+                                                          table_meta_.db_id_str(),
+                                                          table_meta_.table_id_str(),
+                                                          segment_id_,
+                                                          begin_ts_,
+                                                          commit_ts);
         }
-        block_id = block_ids_ptr->empty() ? 0 : block_ids_ptr->back() + 1;
+        block_id = block_ids1_->empty() ? 0 : block_ids1_->back() + 1;
         block_ids1_->push_back(block_id);
     }
 
     std::string block_id_key = KeyEncode::CatalogTableSegmentBlockKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, block_id);
     std::string commit_ts_str = fmt::format("{}", commit_ts);
-    status = kv_instance_.Put(block_id_key, commit_ts_str);
+    Status status = kv_instance_.Put(block_id_key, commit_ts_str);
     if (!status.ok()) {
         return {0, status};
     }
@@ -226,14 +231,6 @@ std::tuple<std::vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
     if (!block_ids1_) {
         block_ids1_ =
             infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
-    }
-    return {&*block_ids1_, Status::OK()};
-}
-
-std::tuple<std::vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp commit_ts) {
-    if (!block_ids1_) {
-        block_ids1_ =
-            infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts);
     }
     return {&*block_ids1_, Status::OK()};
 }
