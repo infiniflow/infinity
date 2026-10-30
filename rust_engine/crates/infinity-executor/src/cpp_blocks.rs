@@ -1586,6 +1586,15 @@ fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option
 /// Decodes a slot back into the text form the engine renders.
 
 
+
+/// The commit ts of the append that wrote row `offset`, from the append log.
+///
+/// `totals[i]` is the cumulative row count after append `i` and `ts[i]` its
+/// commit ts; a row lands in the first append whose total passes it.
+fn append_ts_of(offset: u64, totals: &[u64], ts: &[u64]) -> Option<u64> {
+    let i = totals.partition_point(|total| *total <= offset);
+    ts.get(i).copied().filter(|t| *t != 0)
+}
 /// The block a row id lands in: `(segment, block)` of the mirror's layout.
 fn block_of(seq: usize) -> (u32, u16) {
     (
@@ -2030,8 +2039,9 @@ impl Engine {
         extra: &[(usize, Vec<Value>)],
     ) -> Result<usize> {
         // An explicit rewrite carries the rows the caller wants written (a
-        // column change re-encodes every cell), so nothing is clipped.
-        self.write_cpp_blocks_mode(table, extra, extra.is_empty(), u64::MAX)
+        // column change re-encodes every cell), so nothing is clipped and every
+        // block is written: the rows are the table, not an append to it.
+        self.write_cpp_blocks_mode(table, extra, true, u64::MAX)
     }
 
     /// `full` rewrites every block; otherwise only the blocks this commit
@@ -2181,20 +2191,6 @@ impl Engine {
             merged.extend(buffered.into_iter().filter(|(seq, _)| !have.contains(seq)));
         }
         let extra: &[(usize, Vec<Value>)] = &merged;
-        // The blocks this write changes: the ones its rows land in and the ones
-        // that hold a slot it deletes.
-        let touched: std::collections::HashSet<(u32, u16)> = if partial {
-            let mut set = std::collections::HashSet::new();
-            for (seq, _) in &merged {
-                set.insert(block_of(*seq));
-            }
-            for id in deleted_at.keys() {
-                set.insert(block_of(*id));
-            }
-            set
-        } else {
-            std::collections::HashSet::new()
-        };
         let mut written = 0usize;
         // A row id carries its segment in the high 32 bits (`segment_id << 32 |
         // in-segment offset`). The reference writes one `seg_{id}/` directory
@@ -2209,6 +2205,51 @@ impl Engine {
         let totals = self.append_totals(&table);
         let append_ts = self.append_ts(&table);
         let mut counts = self.segment_row_counts(&table);
+        // The reference decides per block, by ts: a block is flushed when
+        // `record_ts < min(checkpoint_ts, block_max_ts)` where `record_ts` is
+        // the ts at which the block was last written and `block_max_ts` the
+        // newest change it holds (NewTxn::CheckpointTable).
+        let touched: std::collections::HashSet<(u32, u16)> = if partial {
+            let mut newest: std::collections::HashMap<(u32, u16), u64> = Default::default();
+            for (seq, _) in &merged {
+                let key = block_of(*seq);
+                let offset = (*seq & 0xffff_ffff) as u64;
+                let ts = append_ts_of(offset, &totals, &append_ts).unwrap_or(u64::MAX);
+                let slot = newest.entry(key).or_insert(ts);
+                *slot = (*slot).max(ts);
+            }
+            for id in deleted_at.keys() {
+                let key = block_of(*id);
+                let ts = deleted_at[id];
+                let slot = newest.entry(key).or_insert(ts);
+                *slot = (*slot).max(ts);
+            }
+            let mut set = std::collections::HashSet::new();
+            for (key, ts) in newest {
+                let record = self
+                    .storage
+                    .catalog
+                    .store()
+                    .get(
+                        infinity_storage::catalog_format::catalog_block_key(
+                            &db_id.to_string(),
+                            &meta.id.to_string(),
+                            key.0,
+                            key.1,
+                        )
+                        .as_bytes(),
+                    )?
+                    .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+                    // No record means the block was never written: it has to be.
+                    .unwrap_or(0);
+                if record < checkpoint_ts.min(ts) {
+                    set.insert(key);
+                }
+            }
+            set
+        } else {
+            std::collections::HashSet::new()
+        };
         if counts.is_empty() && !merged.is_empty() {
             // The allocator's per-segment map is per-process; a table the
             // catalog just re-registered (a DDL, a rename) has none. The rows
