@@ -52,7 +52,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `infinity_catalog` + `value_format` | 76 |
 | `PhysicalOperator` + `OperatorState`（状态结构） | 73 |
 | `infinity_storage`/执行器对应模块 | 36 |
-| `vector::{HnswIndex, Store}` + `hnsw_handler`/`lvq`/`rabitq`/`lsg` | 50 |
+| `vector::{HnswIndex, Store, PlainVecs}` + `parallel_build`/`hnsw_handler`/`lvq`/`rabitq`/`lsg` | 50 |
 | `infinity_txn::{Txn, TxnManager}` | 46 |
 | `Vec<u8>`/`BufferObj` 等存储原语 | 40 |
 | `infinity_storage::wal` | 40 |

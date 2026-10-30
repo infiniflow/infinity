@@ -3469,6 +3469,10 @@ impl Engine {
     /// alone, so a reader that misses the mark returns the merged rows *and*
     /// the source rows: 40,960 rows for a 32,768-row table.
     pub(crate) fn visible_block_ids(&self, table: &str) -> Vec<BlockId> {
+        self.visible_block_ids_inner(table)
+    }
+
+    fn visible_block_ids_inner(&self, table: &str) -> Vec<BlockId> {
         let table = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
             return Vec::new();
@@ -3495,6 +3499,40 @@ impl Engine {
 
     /// A block's `version` file alone - the row count and the tombstones,
     /// without decoding a single column.
+    /// The ids of every live row, without decoding any column. A KNN scan only
+    /// needs the row set to verify that the index covers the table; reading the
+    /// vectors to get it made an indexed query cost a full scan.
+    pub(crate) fn live_row_ids(&self, table: &str) -> Vec<usize> {
+        let table = self.qualified_table(table);
+        let read_ts = crate::read_ts();
+        let deleted = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
+        let mut out: Vec<usize> = Vec::new();
+        for id in self.visible_block_ids(&table) {
+            let Some(version) = self.read_block_version(id) else {
+                continue;
+            };
+            let created = Self::created_at(&version, read_ts);
+            for slot in 0..created {
+                if !Self::slot_visible(&version, slot, created, read_ts) {
+                    continue;
+                }
+                let seq = ((id.segment_id as u64) << 32)
+                    | (u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64 + slot as u64);
+                if !deleted.contains(&seq) {
+                    out.push(seq as usize);
+                }
+            }
+        }
+        // Rows above the last checkpoint live in the journal only.
+        for (seq, _) in self.pending_rows_of(&table) {
+            if !deleted.contains(&(seq as u64)) {
+                out.push(seq);
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
     fn read_block_version(&self, id: BlockId) -> Option<BlockVersionFile> {
         let dir = self.blocks_root().join(cpp_format::block_dir(
             id.db_id,
@@ -3745,7 +3783,7 @@ impl Engine {
         wanted: &[usize],
         prune: &[crate::fast_rough_filter::PruneCond],
     ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
-        self.read_cpp_blocks_values(table, Some(wanted), prune, None)
+        self.read_cpp_blocks_values(table, Some(wanted), prune, None, None)
     }
 
     /// [`Self::read_cpp_blocks_pruned_values`] with a row predicate applied
@@ -3757,7 +3795,22 @@ impl Engine {
         prune: &[crate::fast_rough_filter::PruneCond],
         keep: &dyn Fn(&[Value]) -> bool,
     ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
-        self.read_cpp_blocks_values(table, Some(wanted), prune, Some(keep))
+        self.read_cpp_blocks_values(table, Some(wanted), prune, Some(keep), None)
+    }
+
+    /// [`Self::read_cpp_blocks_pruned_values`] restricted to `rows`: a row the
+    /// index did not return is skipped before its cells are decoded, so an
+    /// indexed query costs its candidates rather than the table.
+    pub fn read_cpp_blocks_candidates_values(
+        &self,
+        table: &str,
+        wanted: &[usize],
+        rows: &std::collections::HashSet<usize>,
+    ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
+        // `None` = every column: a result row carries all of them, and asking for
+        // a column subset here would pad the rest with NULL.
+        let wanted = (!wanted.is_empty()).then_some(wanted);
+        self.read_cpp_blocks_values(table, wanted, &[], None, Some(rows))
     }
 
     /// Every row the blocks hold, tombstoned slots included.
@@ -3841,7 +3894,7 @@ impl Engine {
         wanted: Option<&[usize]>,
     ) -> Option<Vec<(usize, Vec<String>)>> {
         let rows = Self::decode_rows_of_values(
-            ids, type_text, types, id, version, columns, wanted, None,
+            ids, type_text, types, id, version, columns, wanted, None, None,
         )?;
         Some(
             rows.into_iter()
@@ -3867,6 +3920,7 @@ impl Engine {
         columns: &[cpp_format::RawBlockColumn],
         wanted: Option<&[usize]>,
         keep: Option<&dyn Fn(&[Value]) -> bool>,
+        rows_wanted: Option<&std::collections::HashSet<usize>>,
     ) -> Option<Vec<(usize, Vec<Value>)>> {
         let row_count: usize = version
             .created
@@ -3879,7 +3933,11 @@ impl Engine {
         // `[data][bitmap]` once per cell, which made a block read
         // O(rows x block_bytes): 40,000 rows spent 68% of the time in memmove.
         struct Prepared<'a> {
-            body: cpp_format::ColumnBody,
+            /// Borrowed slices of the block: splitting a body is arithmetic, and
+            /// copying it made a ten-row query allocate and copy every column
+            /// body of every block it touched (~160 KB per query here).
+            body_data: &'a [u8],
+            body_null: &'a [u8],
             kind: OutlineKind,
             outline: &'a [u8],
             shape: Option<(usize, i32)>,
@@ -3896,12 +3954,14 @@ impl Engine {
             let column_id = ids.get(col).copied().unwrap_or(col as u64);
             let raw = columns.iter().find(|c| c.column_id == column_id)?;
             let layout = layout_of(&type_text[col], *column_type)?;
+            let (body_data, body_null) = cpp_format::split_body_refs(
+                raw.body.as_slice(),
+                DEFAULT_BLOCK_CAPACITY,
+                layout,
+            );
             prepared.push(Some(Prepared {
-                body: cpp_format::split_body_for_layout(
-                    raw.body.as_slice(),
-                    DEFAULT_BLOCK_CAPACITY,
-                    layout,
-                ),
+                body_data,
+                body_null,
                 kind: outline_kind(&type_text[col]),
                 outline: raw.outline.as_slice(),
                 shape: embedding_shape(&type_text[col]),
@@ -3913,7 +3973,37 @@ impl Engine {
         // its time allocating.
         let mut scratch: Vec<Value> = Vec::with_capacity(types.len());
         let mut out = Vec::with_capacity(row_count);
+        // The slots of this block the index kept, ascending. Row ids inside a
+        // block are consecutive, so a cursor over a sorted list answers "is this
+        // slot wanted" in O(1) amortised - a `HashSet` test per slot hashed
+        // 2048 integers per block, which `perf` showed inside this loop.
+        let wanted_slots: Option<Vec<usize>> = rows_wanted.map(|rows| {
+            let base = ((id.segment_id as usize) << 32)
+                | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY);
+            let mut slots: Vec<usize> = rows
+                .iter()
+                .filter(|seq| **seq >= base && **seq < base + DEFAULT_BLOCK_CAPACITY)
+                .map(|seq| *seq - base)
+                .collect();
+            slots.sort_unstable();
+            slots
+        });
+        let mut slot_at = 0usize;
         for row in 0..row_count {
+            let seq = ((id.segment_id as usize) << 32)
+                | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + row);
+            // An index answered: this row is not a candidate, so its cells are
+            // never decoded. Doing the check here rather than in `keep` is the
+            // difference between decoding a candidate and decoding the table -
+            // `keep` only sees a row after its cells exist.
+            if let Some(slots) = &wanted_slots {
+                while slot_at < slots.len() && slots[slot_at] < row {
+                    slot_at += 1;
+                }
+                if slot_at == slots.len() || slots[slot_at] != row {
+                    continue;
+                }
+            }
             scratch.clear();
             let cells = &mut scratch;
             for (col, column_type) in types.iter().enumerate() {
@@ -3921,16 +4011,16 @@ impl Engine {
                     cells.push(Value::Null);
                     continue;
                 };
-                let body = &column.body;
+                let body_data = column.body_data;
+                let body_null = column.body_null;
                 let outline = column.outline;
-                let value = if body.null_bitmap.len() > row / 8
-                    && body.null_bitmap[row / 8] & (1 << (row % 8)) == 0
+                let value = if body_null.len() > row / 8
+                    && body_null[row / 8] & (1 << (row % 8)) == 0
                 {
                     Value::Null
                 } else if column.kind == OutlineKind::None {
                     match column.layout {
-                        ColumnLayout::CompactBit => match body
-                            .data
+                        ColumnLayout::CompactBit => match body_data
                             .get(row / 8)
                             .map(|b| b & (1 << (row % 8)) != 0)
                         {
@@ -3938,14 +4028,14 @@ impl Engine {
                             None => Value::Null,
                         },
                         ColumnLayout::Fixed(width) => {
-                            match decode_scalar_value(*column_type, width, &body.data, row) {
+                            match decode_scalar_value(*column_type, width, body_data, row) {
                                 Some(value) => value,
                                 // A fixed layout this decoder does not cover
                                 // (`DATE`, `TIME`, `DATETIME`): keep the text.
                                 None => decode_value_shaped(
                                     &type_text[col],
                                     *column_type,
-                                    &body.data,
+                                    body_data,
                                     row,
                                     outline,
                                     column.shape,
@@ -3957,7 +4047,7 @@ impl Engine {
                         ColumnLayout::VarLen(_) => decode_value_shaped(
                             &type_text[col],
                             *column_type,
-                            &body.data,
+                            body_data,
                             row,
                             outline,
                             column.shape,
@@ -3971,19 +4061,19 @@ impl Engine {
                     let text = match column.kind {
                         OutlineKind::Tensor => {
                             let at = row * 8;
-                            decode_tensor_value(&type_text[col], body.data.get(at..at + 8).unwrap_or(&[]), outline)
+                            decode_tensor_value(&type_text[col], body_data.get(at..at + 8).unwrap_or(&[]), outline)
                         }
                         OutlineKind::TensorArray => {
                             let at = row * 8;
-                            decode_tensorarray_value(&type_text[col], body.data.get(at..at + 8).unwrap_or(&[]), outline)
+                            decode_tensorarray_value(&type_text[col], body_data.get(at..at + 8).unwrap_or(&[]), outline)
                         }
                         OutlineKind::Sparse => {
                             let at = row * 16;
-                            decode_sparse_value(&type_text[col], body.data.get(at..at + 16).unwrap_or(&[]), outline)
+                            decode_sparse_value(&type_text[col], body_data.get(at..at + 16).unwrap_or(&[]), outline)
                         }
                         OutlineKind::Array => {
                             let at = row * 8;
-                            decode_array_value(&type_text[col], body.data.get(at..at + 8).unwrap_or(&[]), outline)
+                            decode_array_value(&type_text[col], body_data.get(at..at + 8).unwrap_or(&[]), outline)
                         }
                         OutlineKind::None => None,
                     };
@@ -3991,8 +4081,6 @@ impl Engine {
                 };
                 cells.push(value);
             }
-            let seq = ((id.segment_id as usize) << 32)
-                | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + row);
             match keep {
                 Some(keep) => {
                     if keep(cells) {
@@ -4109,6 +4197,7 @@ impl Engine {
         wanted: Option<&[usize]>,
         prune: &[crate::fast_rough_filter::PruneCond],
         keep: Option<&dyn Fn(&[Value]) -> bool>,
+        rows_wanted: Option<&std::collections::HashSet<usize>>,
     ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
         let table = self.qualified_table(table);
         let meta = self
@@ -4189,10 +4278,32 @@ impl Engine {
                     }
                 }
             }
+            // An index answered: a block that holds none of the wanted rows is
+            // never read. Skipping the row *decode* (below) still paid for the
+            // block read, its version file and its column bodies - on a 20k-row
+            // table a ten-row result touched twenty blocks.
+            if let Some(rows) = rows_wanted {
+                let any = rows.iter().any(|seq| {
+                    ((*seq >> 32) as u32) == id.segment_id
+                        && (*seq as u64 & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY as u64
+                            == u64::from(id.block_id)
+                });
+                if !any {
+                    continue;
+                }
+            }
             match self.read_block_cached(&table, &root, id) {
                 Ok((version, columns)) => {
                     let Some(cells) = Self::decode_rows_of_values(
-                        &meta.ids, &meta.types, &types, id, &version, &columns, wanted, keep,
+                        &meta.ids,
+                        &meta.types,
+                        &types,
+                        id,
+                        &version,
+                        &columns,
+                        wanted,
+                        keep,
+                        rows_wanted,
                     ) else {
                         break;
                     };
@@ -4267,7 +4378,7 @@ impl Engine {
         wanted: Option<&[usize]>,
         prune: &[crate::fast_rough_filter::PruneCond],
     ) -> Result<(Vec<String>, Vec<(usize, Vec<String>)>)> {
-        let (columns, rows) = self.read_cpp_blocks_values(table, wanted, prune, None)?;
+        let (columns, rows) = self.read_cpp_blocks_values(table, wanted, prune, None, None)?;
         Ok((
             columns,
             rows.into_iter()
@@ -4334,6 +4445,61 @@ impl Engine {
         Ok(out)
     }
 
+    /// `dense_index_building_worker`: the reference's dense-index pool size,
+    /// `hardware_concurrency() / 2` clamped to at least 2 (`config_impl.cpp:516-518`).
+    pub(crate) fn hnsw_build_workers(&self) -> usize {
+        std::thread::available_parallelism()
+            .map(|count| count.get() / 2)
+            .unwrap_or(1)
+            .max(2)
+    }
+
+    /// The cells of `column` in every row the block mirror holds, tombstoned
+    /// slots included - the reference's `IndexBuilder` reads the column, not the
+    /// table, and decodes only that column's body.
+    pub(crate) fn read_cpp_block_column_including_deleted(
+        &self,
+        table: &str,
+        column: usize,
+    ) -> Vec<(usize, String)> {
+        let table = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return Vec::new();
+        };
+        let Some(types) = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()
+        else {
+            return Vec::new();
+        };
+        let root = self.blocks_root();
+        let wanted = [column];
+        let mut out = Vec::new();
+        for id in self.visible_block_ids(&table) {
+            if let Some(cells) =
+                self.decode_block_cells(&table, &root, &meta, &types, id, Some(&wanted))
+            {
+                for (seq, mut cells) in cells {
+                    let text = if column < cells.len() {
+                        std::mem::take(&mut cells[column])
+                    } else {
+                        String::new()
+                    };
+                    out.push((seq, text));
+                }
+            }
+        }
+        for (seq, values) in self.pending_rows_of(&table) {
+            if let Some(v) = values.get(column) {
+                out.push((seq, mirror_cell_text(v)));
+            }
+        }
+        out.sort_by_key(|(seq, _)| *seq);
+        out
+    }
+
     /// Builds a C++ HNSW `chunk_0.idx` body for `column`'s vectors (task #70).
     ///
     /// The graph is built by the engine's own `HnswIndex` and serialized with the
@@ -4366,11 +4532,10 @@ impl Engine {
         // column, then build the graph with the trained store.
         let rows: Vec<Vec<f32>> = vectors.iter().map(|(_, v)| v.clone()).collect();
         index.train_store(&rows, options.lsg);
-        let mut labels = Vec::with_capacity(vectors.len());
-        for (label, v) in &vectors {
-            index.add(v);
-            labels.push(*label);
-        }
+        let labels: Vec<u32> = vectors.iter().map(|(label, _)| *label).collect();
+        // Bucket-parallel construction, as the reference does on its dense-index
+        // pool; a store that is not plain keeps the serial path.
+        index.add_batch(&rows, self.hnsw_build_workers());
         Ok(encode_hnsw_chunk_from(&index, &labels))
     }
 

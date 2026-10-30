@@ -32,7 +32,7 @@ if [[ "${1:-}" == --config=* ]]; then
   fi
   "$bin" "$@"
   code=$?
-  echo "$(date '+%F %T') exit=$code args=$*" >> "${INFINITY_SHIM_LOG:-/tmp/infinity_shim.log}"
+  echo "$(date '+%F %T') exit=$code args=$*" >> "${INFINITY_SHIM_LOG:-$here/../../.scratch/infinity_shim.log}"
   exit $code
 fi
 exec "$bin" serve "$data_dir"

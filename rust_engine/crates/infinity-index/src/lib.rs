@@ -19,6 +19,7 @@ pub mod lsg;
 pub mod lvq;
 pub mod merge_knn;
 pub mod multivector;
+pub mod parallel_build;
 pub mod plaid;
 pub mod rabitq;
 pub mod smve;

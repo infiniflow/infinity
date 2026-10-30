@@ -3929,7 +3929,6 @@ struct VectorCache {
     dims: usize,
     rows: Vec<(usize, Vec<f64>)>,
     live: std::collections::HashSet<usize>,
-    built_at: std::time::Instant,
 }
 type SharedVectorCache = Arc<std::sync::RwLock<VectorCache>>;
 
@@ -5278,7 +5277,7 @@ pub struct Engine {
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
-    /// The previous `cpu_usage` sample: `(process cpu ticks, wall clock)`.
+    /// Decoded block `version` files, keyed by block and file stamp. A query
     /// C++'s `SystemInfo::CPUUsage` sleeps 200 ms between two snapshots; an
     /// accessor must not block, so this engine keeps the previous sample and
     /// reports the delta since the last call instead.
@@ -8150,8 +8149,9 @@ impl Engine {
     }
 
     pub fn execute(&self, sql: &str) -> Result<Vec<QueryResult>> {
+        let __q_p = parse(sql)?;
         let mut out = Vec::new();
-        for s in parse(sql)? {
+        for s in __q_p {
             // `NewTxnManager::BeginTxnShared` runs once per statement, read-only
             // ones included; the id lands in the WAL frame of a write. An RPC
             // that already took one for its statement keeps it.
@@ -11816,7 +11816,8 @@ impl Engine {
                     self.text_index_for(table, column, tokenizer)?;
                 }
                 if has_rows && index_type.eq_ignore_ascii_case("HNSW") {
-                    self.build_hnsw_index(table, column)?;
+                    let __r = self.build_hnsw_index(table, column);
+            __r?;
                 }
                 // A multi-vector index is materialised when it is created, so
                 // queries only read segment files; later inserts go to the
@@ -13895,6 +13896,7 @@ impl Engine {
     /// for it directly instead of going through a `Vec<Value>`.
     fn row_texts(&self, table: &str, ids: &[u64]) -> Result<Vec<(usize, Vec<u8>)>> {
         let mut out = Vec::with_capacity(ids.len());
+        let mut __fk = 0usize;
         if let Ok(mut cursor) = self.block_cursor(table) {
             for &id in ids {
                 let seq = id as usize;
@@ -13981,23 +13983,23 @@ impl Engine {
         dims: usize,
     ) -> Result<SharedVectorCache> {
         let key = index_key(table, column);
-        // A bulk load may bypass the incremental hooks; the key count is the
-        // authority on how many live rows the cache must hold.
-        let expected = self.row_count(table)?;
-        // Hold the map lock across a rebuild: concurrent readers noticing the
-        // same gap would each allocate a copy. A 250 ms floor keeps a
-        // write-heavy workload from rebuilding on every query.
         let map = self.vector_cache.lock().unwrap();
+        // Answer from the cache when the table's published row count is the one
+        // the cache was built for. Counting rows from scratch
+        // (`block_visible_row_count`) walks every block's version file and every
+        // slot, which cost 15 ms per query on a 20k-row table - it must not run
+        // on the query path. Every write path maintains `live_rows`
+        // (`note_live_rows`/`set_live_rows`), so a mismatch is the signal that
+        // the cache is stale.
         if let Some(cache) = map.get(&key) {
-            let (live, built_at) = cache
-                .read()
-                .map(|g| (g.live.len(), g.built_at))
-                .unwrap_or((0, std::time::Instant::now()));
-            // Throttle only big caches: on a small table a stale snapshot would
-            // change results, and a rebuild is cheap.
-            let throttled =
-                live > 10_000 && built_at.elapsed() < std::time::Duration::from_millis(250);
-            if live == expected || throttled {
+            let published = self
+                .tables
+                .lock()
+                .unwrap()
+                .get(&self.table_key(table))
+                .and_then(|e| e.live_rows);
+            let live = cache.read().map(|g| g.live.len()).unwrap_or(0);
+            if published.is_some_and(|rows| rows == live) {
                 return Ok(cache.clone());
             }
         }
@@ -14010,7 +14012,6 @@ impl Engine {
             dims,
             rows: Vec::new(),
             live: Default::default(),
-            built_at: std::time::Instant::now(),
         };
         for (seq, cells) in self.fetch_rows_with_ids_projected(table, col)? {
             if let Some(Value::Str(text)) = cells.get(col) {
@@ -14021,12 +14022,20 @@ impl Engine {
                 }
             }
         }
+        let built = cache.live.len();
         drop(map);
         let shared = Arc::new(std::sync::RwLock::new(cache));
         self.vector_cache
             .lock()
             .unwrap()
             .insert(key, shared.clone());
+        // Record what the cache now holds, so the next lookup can compare
+        // against the published count without recounting the blocks.
+        let table_key = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        if tables.get(&table_key).and_then(|e| e.live_rows).is_none() {
+            tables.entry(table_key).or_default().live_rows = Some(built);
+        }
         Ok(shared)
     }
 
@@ -14038,13 +14047,100 @@ impl Engine {
         let Some(ci) = schema.iter().position(|c| c == column) else {
             return Ok(());
         };
-        for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
-            let texts: Vec<String> = cells.iter().map(|v| v.to_slt_string()).collect();
-            self.note_hnsw_insert(table, seq as u64, &texts);
+        let profile = std::env::var_os("INFINITY_PROFILE_IMPORT").is_some();
+        let t_read = std::time::Instant::now();
+        // Read the column, then hand it to the memory segment as one batch: the
+        // reference's `IndexBuilder` calls `InsertVecs` once for the table, and
+        // `InsertVecs` builds it in buckets across the dense-index pool. Feeding
+        // the rows one at a time made `CREATE INDEX` a serial point-by-point
+        // build.
+        let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
+        for (seq, text) in self.read_cpp_block_column_including_deleted(table, ci) {
+            let v: Vec<f32> = parse_vec_str(&text).iter().map(|x| *x as f32).collect();
+            rows.push((seq as u64, v));
+        }
+        let read = t_read.elapsed();
+        let segments = self.hnsw_mem_segments(table, column)?;
+        let t_build = std::time::Instant::now();
+        for mem in segments {
+            if let Ok(mut mem) = mem.lock() {
+                let batch: Vec<(u64, Vec<f32>)> = rows
+                    .iter()
+                    .filter(|(_, v)| v.len() == mem.dims)
+                    .map(|(seq, v)| (*seq, v.clone()))
+                    .collect();
+                if !batch.is_empty() {
+                    mem.insert_batch(&batch, self.hnsw_build_workers());
+                }
+            }
+        }
+        if profile {
+            eprintln!(
+                "hnsw build profile: read {read:?} ({} rows) build {:?}",
+                rows.len(),
+                t_build.elapsed()
+            );
         }
         Ok(())
     }
-
+    fn hnsw_mem_segments(
+        &self,
+        table: &str,
+        column: &str,
+    ) -> Result<Vec<Arc<Mutex<hnsw_mem::HnswIndexInMem>>>> {
+        let key = self.table_key(table);
+        let schema = self.table_schema(table)?;
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(key).or_default();
+        if entry.hnsw_mem.is_empty() && !entry.hnsw_probed {
+            entry.hnsw_probed = true;
+            let indexes = self.storage.catalog.list_indexes()?;
+            let types = self.column_types(table)?;
+            let short = table.split('.').next_back().unwrap_or(table);
+            for im in indexes {
+                if !(im.table == table || im.table == short)
+                    || !im.index_type.eq_ignore_ascii_case("HNSW")
+                {
+                    continue;
+                }
+                let Some(ci) = schema.iter().position(|c| c == &im.column) else {
+                    continue;
+                };
+                let Some(dims) = types.get(ci).and_then(|t| type_dim(t)) else {
+                    continue;
+                };
+                let opt = |name: &str| -> Option<usize> {
+                    im.options
+                        .iter()
+                        .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                        .and_then(|(_, v)| v.parse().ok())
+                };
+                let m = opt("M").unwrap_or(16);
+                let efc = opt("EF_CONSTRUCTION").unwrap_or(200);
+                let opt = |name: &str| {
+                    im.options
+                        .iter()
+                        .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                        .map(|(_, v)| v.clone())
+                };
+                let metric = infinity_index::vector::Metric::parse(
+                    &opt("metric").unwrap_or_else(|| "l2".into()),
+                );
+                let encoding =
+                    infinity_index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
+                entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
+                    Arc::new(Mutex::new(hnsw_mem::HnswIndexInMem::new_with(
+                        dims, m, efc, metric, encoding,
+                    )))
+                });
+            }
+        }
+        Ok(entry
+            .hnsw_mem
+            .get(column)
+            .map(|m| vec![m.clone()])
+            .unwrap_or_default())
+    }
     /// Feeds an inserted/rewritten row into the in-memory HNSW segment of every
     /// vector index on `table` — the reference's `HnswIndexInMem`, which holds
     /// the rows written since the last dump. The sealed (on-disk) graph lives in
@@ -19255,15 +19351,13 @@ impl Engine {
             let col = match_columns(&m.column).first()?.clone();
             self.vector_cache_for(table, &col, dims).ok()
         })();
-        // Score from the vector column alone unless a filter needs the other
-        // columns. Rows are fetched in full only for the surviving top-n.
-        let rows = if cache.is_some() {
-            Vec::new()
-        } else if pred.is_none() && in_filter.is_none() && search_filter.is_none() {
-            self.fetch_rows_with_ids_projected(table, col_idx)?
-        } else {
-            self.fetch_rows_with_ids(table)?
-        };
+        // Rows come from whichever consumer needs them: an index answers with a
+        // candidate set and only those rows are decoded; the exact scan needs
+        // the table. `rows` therefore starts empty and is filled once the
+        // candidate set is known.
+        let has_filter = pred.is_some() || in_filter.is_some() || search_filter.is_some();
+        let mut rows: Vec<(usize, Vec<Value>)> = Vec::new();
+        // The cache path scores from `score_cache` and never touches `rows`.
         // A `bit` sparse column scores and renders as an integer.
         let bit_sparse = is_sparse && types.get(col_idx).map(|t| is_bit_type(t)).unwrap_or(false);
         // Walk a persisted HNSW graph instead of every row when one is loaded
@@ -19288,17 +19382,41 @@ impl Engine {
             if qv.is_empty() {
                 return None;
             }
+            // A predicate can exclude rows the graph returned, so the graph alone
+            // cannot decide the top-k: the reference re-scores every row the
+            // filter admits. Keep the exact scan for filtered queries.
+            if has_filter {
+                return None;
+            }
             self.knn_candidates(&knn_scan::KnnCandidateScan {
                 table,
                 column: &col_name,
                 query: &qv,
                 rows: &rows,
+                live_rows: None,
                 cache: cache.as_ref(),
                 topn,
                 metric: &metric,
                 options: &knn_opts,
             })
         })();
+        // The candidate set is known: decode only the rows it kept, or the whole
+        // table when no index answered.
+        if cache.is_none() {
+            rows = match &vector_candidates {
+                // A predicate reads other columns, so a filtered query needs the
+                // whole row; an unfiltered one is scored from the vector column
+                // alone and gets its output rows from the block pass below.
+                Some(cands) if !cands.is_empty() => {
+                    let wanted: &[usize] = if has_filter { &[] } else { &[col_idx] };
+                    let (_, got) =
+                        self.read_cpp_blocks_candidates_values(table, wanted, cands)?;
+                    got
+                }
+                Some(_) => Vec::new(),
+                None => self.fetch_rows_with_ids(table)?,
+            };
+        }
         // One BMP index per query over the scanned rows: sparse vectors use the
         // ported block-max scoring; other kinds leave this empty.
         let bmp_scores: HashMap<usize, f64> = (|| {
@@ -19455,15 +19573,33 @@ impl Engine {
             cache: cache.as_ref(),
             vector_candidates,
         };
+        // Scoring only ever reads the vector column, so the rows it decoded are
+        // projections of it. The result rows are read separately (all columns),
+        // which is why this scan cannot reuse them.
         let state = scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores)?);
         let use_sim = state.use_sim;
         let scored = state.scored;
 
-        let wanted: Vec<u64> = scored.iter().map(|(seq, _, _)| *seq as u64).collect();
-        let mut by_id: HashMap<usize, Vec<Value>> = self
-            .fetch_some_rows_with_ids(table, &wanted)?
-            .into_iter()
+        // The result rows are read from the blocks in one pass. The scoring pass
+        // decoded only the vector column (a projection), so it cannot supply
+        // them, and a point read per row took the journal/KV path at ~3 ms a
+        // row - ten result rows spent 28 ms after the query had finished in
+        // 0.2 ms.
+        let mut by_id: HashMap<usize, Vec<Value>> = HashMap::new();
+        let missing: Vec<u64> = scored
+            .iter()
+            .map(|(seq, _, _)| *seq as u64)
+            .filter(|seq| !by_id.contains_key(&(*seq as usize)))
             .collect();
+        if !missing.is_empty() {
+            let set: std::collections::HashSet<usize> =
+                missing.iter().map(|seq| *seq as usize).collect();
+            // One pass over the blocks that hold any of the wanted rows, not a
+            // point read per row: a point read took the journal/KV path and cost
+            // ~3 ms per row on this table, so ten result rows spent 28 ms after
+            // the query itself had finished in 0.2 ms.
+            by_id.extend(self.read_cpp_blocks_candidates_values(table, &[], &set)?.1);
+        }
         let num = |f: f64| {
             if bit_sparse {
                 Value::Int(f as i64)

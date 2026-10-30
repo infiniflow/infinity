@@ -10,16 +10,18 @@
 #
 # Usage:
 #   scripts/check_restart.sh [data_dir] [addr] [python] [sdk_pythonpath]
-# Defaults: /tmp/infinity_restart_check, 127.0.0.1:23818, python3,
+# Defaults: <repo>/.scratch/infinity_restart_check, 127.0.0.1:23818, python3,
 #           ../python/infinity_sdk
 set -uo pipefail
 
-DATA_DIR="${1:-/tmp/infinity_restart_check}"
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+DATA_DIR="${1:-$root/.scratch/infinity_restart_check}"
 ADDR="${2:-127.0.0.1:23818}"
 PY="${3:-python3}"
 SDK="${4:-$(cd "$(dirname "$0")/../.." && pwd)/python/infinity_sdk}"
 BIN="$(cd "$(dirname "$0")/.." && pwd)/target/release/infinity"
-LOG=/tmp/restart_check_server.log
+LOG="$root/.scratch/restart_check_server.log"
+mkdir -p "$root/.scratch"
 PORT="${ADDR##*:}"
 
 # The SDK itself must be importable in the chosen interpreter.

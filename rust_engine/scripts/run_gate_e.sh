@@ -14,7 +14,11 @@ set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 status=0
-latest=/tmp/infinity-bench.log
+# Scratch stays inside the checkout (.scratch/) so a run can be reproduced
+# from the tree; nothing is written to /tmp.
+scratch="$root/.scratch"
+mkdir -p "$scratch"
+latest="$scratch/infinity-bench.log"
 
 echo "== Gate E =="
 checker="$root/tools/ci_tools/check_benchmark_result.py"
@@ -30,9 +34,9 @@ if [[ $# -ge 1 ]]; then
   # C++ engine, so the candidate must use the same driver and workload.
   golden="$1"
   rows="${INFINITY_BENCH_ROWS:-20000}"
-  data="$(mktemp -d)/infinity-bench"
+  data="$scratch/gate-e-data/infinity-bench"
   cargo build -q --release -p infinity-server || exit 1
-  "$here/../target/release/infinity-server" "$data" >/tmp/infinity-bench-server.log 2>&1 &
+  "$here/../target/release/infinity-server" "$data" >"$scratch/infinity-bench-server.log" 2>&1 &
   srv=$!
   trap 'kill "$srv" 2>/dev/null' EXIT
   sleep 4
@@ -45,11 +49,11 @@ if [[ $# -ge 1 ]]; then
 else
   # No golden: a within-machine regression detector over the CLI driver.
   run_bench() {
-    cargo run -q --release -p infinity-cli -- bench "$(mktemp -d)/infinity-bench" \
+    cargo run -q --release -p infinity-cli -- bench "$scratch/gate-e-self/infinity-bench" \
       "${INFINITY_BENCH_ROWS:-2000}" | tee "$1"
   }
   run_bench "$latest" || status=1
-  golden=/tmp/infinity-bench.golden.log
+  golden="$scratch/infinity-bench.golden.log"
   echo "no golden passed — establishing a self-baseline at $golden"
   cp "$latest" "$golden"
   run_bench "$latest" || status=1

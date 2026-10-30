@@ -36,26 +36,30 @@ impl HnswHandler {
 
     /// C++: `InsertVecs(Iter, config)`.
     ///
-    /// The reference builds in buckets across the dense-index thread pool; the
-    /// port inserts in order (scheduler design change, plan §4.4 D4). Returns
-    /// the number of vectors inserted; vectors with the wrong dimension are
-    /// skipped.
+    /// The reference stores the whole batch and then builds it in buckets
+    /// across the dense-index thread pool (`kBuildBucketSize`); `add_batch`
+    /// does the same. Returns the number of vectors inserted; vectors with the
+    /// wrong dimension are skipped.
     pub fn insert_vecs<I>(&mut self, vectors: I) -> usize
     where
         I: IntoIterator<Item = Vec<f32>>,
     {
-        let dims = self.index.dims();
-        let mut inserted = 0;
-        for vector in vectors {
-            if vector.len() != dims {
-                continue;
-            }
-            self.index.add(&vector);
-            inserted += 1;
-        }
-        inserted
+        self.insert_vecs_threaded(vectors, 1)
     }
 
+    /// `InsertVecs` with the dense-index pool size; `threads <= 1` keeps the
+    /// serial path.
+    pub fn insert_vecs_threaded<I>(&mut self, vectors: I, threads: usize) -> usize
+    where
+        I: IntoIterator<Item = Vec<f32>>,
+    {
+        let dims = self.index.dims();
+        let batch: Vec<Vec<f32>> = vectors.into_iter().filter(|v| v.len() == dims).collect();
+        if batch.is_empty() {
+            return 0;
+        }
+        self.index.add_batch(&batch, threads)
+    }
     /// C++: `SearchIndex(q, k, option)` without a filter.
     pub fn search_index(
         &self,

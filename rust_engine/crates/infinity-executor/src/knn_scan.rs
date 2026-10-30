@@ -60,10 +60,45 @@ pub(crate) struct KnnCandidateScan<'a> {
     pub column: &'a str,
     pub query: &'a [f32],
     pub rows: &'a [(usize, Vec<Value>)],
+    /// The live row ids, when the caller has them: the coverage check needs the
+    /// row set, not the rows, so an indexed query never decodes the table.
+    pub live_rows: Option<&'a [usize]>,
     pub cache: Option<&'a SharedVectorCache>,
     pub topn: usize,
     pub metric: &'a str,
     pub options: &'a KnnScanOptions,
+}
+
+/// Whether the index covers every live row.
+///
+/// The HNSW path asks this as a *count*: labels are disjoint across segments
+/// and each names one row, so "as many labels as live rows" is the same
+/// statement as "every live row is labelled", at no set cost. Building a
+/// 20k-entry set per query was 240-360 us of the ~600 us an indexed query
+/// spent on the server. The IVF path knows its offsets only as a set, so it
+/// keeps the identity test.
+fn all_covered(q: &KnnCandidateScan<'_>, labelled: usize) -> bool {
+    if let Some(live) = q.live_rows {
+        return labelled == live.len();
+    }
+    if let Some(c) = &q.cache {
+        return c.read().map(|g| labelled == g.live.len()).unwrap_or(false);
+    }
+    labelled == q.rows.len()
+}
+
+/// [`all_covered`] over an explicit offset set (the IVF probe's form).
+fn covers_set(q: &KnnCandidateScan<'_>, covered: &HashSet<usize>) -> bool {
+    if let Some(live) = q.live_rows {
+        return live.iter().all(|seq| covered.contains(seq));
+    }
+    if let Some(c) = &q.cache {
+        return c
+            .read()
+            .map(|g| g.live.iter().all(|s| covered.contains(s)))
+            .unwrap_or(false);
+    }
+    q.rows.iter().all(|(seq, _)| covered.contains(seq))
 }
 
 impl Engine {
@@ -106,32 +141,29 @@ impl Engine {
             }
             // Rows written after the mirror are not covered; fall back to
             // the exact scan rather than returning an incomplete top-k.
-            let all_covered = if let Some(c) = &q.cache {
-                c.read()
-                    .map(|g| g.live.iter().all(|s| covered.contains(s)))
-                    .unwrap_or(false)
-            } else {
-                q.rows.iter().all(|(seq, _)| covered.contains(seq))
-            };
+            let all_covered = covers_set(q, &covered);
             if !all_covered {
                 return None;
             }
             return Some(candidates);
         }
+        // Sealed segments. `CREATE INDEX` builds the graph into the memory
+        // segment (`hnsw_mem`) and a checkpoint seals it into a chunk, so a
+        // fresh index has no sealed segment at all - an empty list here must not
+        // skip the memory segment below, which is what made every query after
+        // `CREATE INDEX` fall back to a full table scan.
         let segments = {
             let tables = self.tables.lock().unwrap();
             tables
                 .get(&tkey)
-                .and_then(|e| e.vector.get(q.column).cloned())?
+                .and_then(|e| e.vector.get(q.column).cloned())
+                .unwrap_or_default()
         };
-        if segments.is_empty() {
-            return None;
-        }
         // Every sealed segment is its own graph; the query searches each
         // and merges the results through the reference's `MergeKnn`
         // (`src/storage/knn_index/merge_knn.cppm`). The union of their
         // labels must cover the live q.rows, else the exact scan runs.
-        let mut covered: std::collections::HashSet<usize> = Default::default();
+        let mut labelled = 0usize;
         // `KnnSearchOption.ef_`: the candidate list size for the bottom
         // layer (`WITH (ef = ...)`).
         let search_option = infinity_index::hnsw_handler::KnnSearchOption { ef: q.options.ef };
@@ -147,7 +179,7 @@ impl Engine {
             if seg.index.dims() != q.query.len() {
                 return None;
             }
-            covered.extend(seg.labels.iter().map(|s| *s as usize));
+            labelled += seg.labels.len();
             let seg_k = k.min(seg.labels.len().max(1));
             let hits: Vec<(f32, u64)> = seg
                 .index
@@ -167,9 +199,13 @@ impl Engine {
             .and_then(|e| e.hnsw_mem.get(q.column).cloned());
         if let Some(mem) = mem {
             if let Ok(mem) = mem.lock() {
-                for (row, dist) in mem.search(q.query, k) {
+                // Coverage is what the segment *holds*, not what it returned: a
+                // `topn * 4` result set can never cover a table, so adding only
+                // the hits made every indexed query declare itself incomplete and
+                // fall back to the exact scan.
+                labelled += mem.rows().len();
+                for (row, dist) in mem.search_with_ef(q.query, k, q.options.ef) {
                     merge.add_result(0, dist, row);
-                    covered.insert(row as usize);
                 }
             }
         }
@@ -179,13 +215,7 @@ impl Engine {
             .into_iter()
             .map(|r| r as usize)
             .collect();
-        let uncovered = if let Some(c) = &q.cache {
-            c.read()
-                .map(|g| g.live.iter().any(|s| !covered.contains(s)))
-                .unwrap_or(true)
-        } else {
-            q.rows.iter().any(|(seq, _)| !covered.contains(seq))
-        };
+        let uncovered = !all_covered(q, labelled);
         if uncovered {
             return None;
         }
@@ -448,14 +478,38 @@ impl PhysicalKnnScan<'_> {
         if qv.is_empty() || qv.len() != guard.dims {
             return;
         }
+        // An index already said which rows can win: walk the candidates, not the
+        // cache. Iterating the table and testing membership is the same answer
+        // for O(n) hash lookups instead of O(k), and on a 20k-row table that was
+        // most of the query's time.
+        if let Some(cands) = &self.vector_candidates {
+            // One sorted walk, not a lookup per candidate: the cache is in id
+            // order (`fetch_rows_with_ids_projected` returns sorted rows and the
+            // update path only replaces values in place), so both sides can be
+            // swept together. 64 binary searches over 20k rows was costing 1.27 ms
+            // of the query - more than the HNSW search itself.
+            let mut wanted: Vec<usize> = cands.iter().copied().collect();
+            wanted.sort_unstable();
+            let mut at = 0usize;
+            for seq in wanted {
+                while at < guard.rows.len() && guard.rows[at].0 < seq {
+                    at += 1;
+                }
+                if at == guard.rows.len() {
+                    break;
+                }
+                if guard.rows[at].0 != seq {
+                    continue;
+                }
+                let v = &guard.rows[at].1;
+                let (sim, dist) = crate::vector_score(&qv, v, self.metric);
+                scored.push((seq, sim, dist));
+            }
+            return;
+        }
         for (seq, v) in &guard.rows {
             if !guard.live.contains(seq) {
                 continue;
-            }
-            if let Some(cands) = &self.vector_candidates {
-                if !cands.contains(seq) {
-                    continue;
-                }
             }
             let (sim, dist) = crate::vector_score(&qv, v, self.metric);
             scored.push((*seq, sim, dist));

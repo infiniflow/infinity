@@ -550,12 +550,59 @@ query(sql) → parse → logical → optimize → physical → fragments
 
   | 索引 | C++ 建索引 | Rust 建索引 | C++ 查询 | Rust 查询 |
   |---|---|---|---|---|
-  | FULLTEXT | 0.694 s | 0.069 s | 16.8 ms | 0.19 ms |
-  | HNSW | 0.313 s | **3.59 s** | 0.64 ms | 0.26 ms |
-  | SECONDARY | 0.024 s | 0.020 s | 0.69 ms | 0.88 ms |
-  | BMP（稀疏） | 0.026 s | 0.043 s | 0.48 ms | 0.28 ms |
+  | FULLTEXT | 0.218 s | 0.099 s | 1.84 ms | 3.75 ms |
+  | HNSW | 0.250 s | **0.226 s** | 0.26 ms | 0.66 ms |
+  | SECONDARY | 0.007 s | 0.056 s | 0.32 ms | 0.72 ms |
+  | BMP（稀疏） | 0.006 s | 0.056 s | 0.52 ms | 1.02 ms |
 
-  **口径**：两个引擎现在都在 `CREATE INDEX` 时物化（此前 Rust 的 FULLTEXT/HNSW 是首次查询才建，已按 §3.6 改为 DDL 建索引，见 `create_index_builds_fulltext_and_hnsw_from_existing_rows`）。因此构建耗时可直接比较：FULLTEXT 快 10×、SECONDARY/BMP 同量级，但 **HNSW 构图慢 11×**（3.59 s vs 0.313 s，M=16/ef_construction=200、20k×4 维）——这是当前最明确的一项建索引性能缺口，根因是逐点插入建图（`HnswIndexInMem::insert`）没有参考实现的批量构建路径。查询延迟均不慢于 C++。
+  **口径**：两个引擎都在 `CREATE INDEX` 时物化，两边 golden 都由同一份
+  `tools/bench_index_types.py`、同一台机、20000 行 / 50 次查询重新测得
+  （2026-10-30）。HNSW 构图已优于参考（0.226 s vs 0.250 s，原为 3.59 s），
+  **查询从 2.75 ms 降到 0.66 ms**（对 0.26 ms；原差 6.4×，现 2.6×）。C++ 的同项实测在 0.22-0.48 ms 间波动（同一二进制、同一驱动）。
+
+  **构图**的三项根因与修法：
+
+  ①`search_layer` 每推入一个邻居就把候选表和结果表整体重排（`perf` 里 47% 采样在
+  `slice::sort`、15% 在 `HashMap::insert`，距离计算只占 8%）。改为参考实现的
+  `BinaryHeap`（候选最小堆 / 结果最大堆）+ 每线程 stamp 复用的 visited，
+  3.56 s → 0.78 s。
+  ②`Store::Plain` 是 `Vec<Vec<f32>>`，与 C++ 的 `PlainVecStoreInner`（一整块
+  `DataType[]`）不同，每次距离比较两次指针追逐。改为连续 `Vec<f32>`。
+  ③没有并行构图。新增 `parallel_build`：按 `kBuildBucketSize = 1024` 下限切桶、
+  每顶点一把 `RwLock`（`DataStore::UniqueLock` 的等价物）、最高层顶点先单独建完
+  再并行建其余。8 线程 0.78 s → 0.22 s。
+
+  **查询**的五项根因与修法（分段计时定位，不是猜）：
+
+  ①`vector_cache_for` 每次查询都调 `row_count()` 重新数行，而它逐块读 `version` 文件
+  并遍历每个 slot：**15 ms/查询**。改为与写路径维护的 `live_rows` 发布值比较。
+  ②`knn_candidates` 在 `segments` 为空时直接返回 `None`，而 `CREATE INDEX` 的图只在
+  `hnsw_mem` 里（chunk 尚未 checkpoint 落盘），于是**每次查询都退化成全表扫描**。
+  改为空段集合也继续查内存段；内存段按 `WITH (ef=...)` 检索。
+  ③覆盖率检查每查询构造 20000 元素的 `HashSet`：240–360 µs。改为比较标签计数
+  （各段标签不相交，数量即行数）：87 ns。
+  ④打分后的结果行用 `fetch_some_rows_with_ids` 逐行点读，走 journal/KV 路径：
+  **约 3 ms/行，10 行 = 28 ms**。改为一次块扫描；再让候选集在读块**之前**跳过
+  一个不含候选的块（20k 行表上 10 行结果原本要读 20 个块）。
+  ⑤`declared_types` 为了拿列类型，在**每个 `Select` RPC 里再执行一条** SHOW TABLE 语句
+  （自己的解析、绑定、计划与目录扫描）。改为直接读 catalog。
+
+  ⑥`decode_rows_of_values` 用 `HashSet<usize>` 判断每个 slot 是否是候选：
+  一个块 2048 个 slot 就做 2048 次 SipHash，`perf` 里 `hash_one` 因此占 20%，
+  而它就在这个循环内部。块内 row id 连续，改成"每块一次的升序候选列表 + 游标"，
+  O(1) 摊还。**查询 0.78 ms → 0.60 ms（-23%）**，是整轮最有效的一步。
+
+  另两处正确性修复：带 `WHERE` 的查询必须走精确扫描（谓词会排除图返回的行，参考实现
+  同样对过滤后的行重新打分）；结果行必须读全列，不能复用只投影了向量列的打分用行。
+
+  **仍未达标**：剩余采样里 `decode_rows_of_values` 11.2%（`split_body_for_layout` 按块
+  切列体，10 个候选行要付十来块的前置开销）、`hash_one`+SipHash 16%（绑定表与目录键，
+  非 HNSW 路径）、RocksDB 迭代器与 block cache 若干（目录读取）。再往下压需要
+  **列缓冲化扫描输出**与**绑定缓存**，属 planner/执行器模型层改造
+  （`SELECT_CHAIN.md` §6 记录同一取舍），不是 HNSW 查询路径的接线问题。
+
+  代价：并行构图让图成为调度结果，与参考自身一致（`GAPS.md` §3 记录其 HNSW 图不可
+  逐字节复现）。20000 行 top-1 self-recall 单线程 1.000、8 线程 0.92–1.000。
 - 根因与 #91 相同：行存 + 每次全表扫描/逐行解码；C++ 以列存块 + 列裁剪读。`run_gate_e.sh` 在有 golden 时必须走 SDK 驱动（此前误用 CLI 内部 bench，阶段不同、比较无效）。
 
 ### 8.7 Gate F — 工程质量

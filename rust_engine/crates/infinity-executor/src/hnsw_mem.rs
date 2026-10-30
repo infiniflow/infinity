@@ -49,6 +49,24 @@ impl HnswIndexInMem {
         true
     }
 
+    /// `InsertVecs` over a whole batch: the reference stores the batch and
+    /// builds it in buckets on the dense-index pool.
+    pub fn insert_batch(&mut self, rows: &[(u64, Vec<f32>)], threads: usize) -> bool {
+        let batch: Vec<Vec<f32>> = rows
+            .iter()
+            .filter(|(_, v)| v.len() == self.dims)
+            .map(|(_, v)| v.clone())
+            .collect();
+        if batch.len() != rows.len() {
+            return false;
+        }
+        if self.handler.insert_vecs_threaded(batch, threads) != rows.len() {
+            return false;
+        }
+        self.rows.extend(rows.iter().map(|(seq, _)| *seq));
+        true
+    }
+
     /// `Search`: `(row id, distance)` for the nearest nodes in this segment.
     pub fn search(&self, query: &[f32], k: usize) -> Vec<(u64, f32)> {
         if query.len() != self.dims {
@@ -56,6 +74,18 @@ impl HnswIndexInMem {
         }
         self.handler
             .search_index(query, k, KnnSearchOption::default())
+            .into_iter()
+            .filter_map(|(node, score)| self.rows.get(node).map(|row| (*row, score)))
+            .collect()
+    }
+
+    /// `Search` with `WITH (ef = ...)` honoured, as the sealed segments do.
+    pub fn search_with_ef(&self, query: &[f32], k: usize, ef: Option<usize>) -> Vec<(u64, f32)> {
+        if query.len() != self.dims {
+            return Vec::new();
+        }
+        self.handler
+            .search_index(query, k, KnnSearchOption { ef })
             .into_iter()
             .filter_map(|(node, score)| self.rows.get(node).map(|row| (*row, score)))
             .collect()

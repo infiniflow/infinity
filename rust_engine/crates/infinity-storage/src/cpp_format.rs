@@ -484,6 +484,19 @@ pub fn split_body_for_layout(raw: &[u8], capacity: usize, layout: ColumnLayout) 
     split_body_at(raw, cap_bytes)
 }
 
+/// [`split_body_for_layout`] without copying: the data and NULL-bitmap regions
+/// of a block module column body, as slices.
+pub fn split_body_refs(raw: &[u8], capacity: usize, layout: ColumnLayout) -> (&[u8], &[u8]) {
+    let cap_bytes = match layout {
+        ColumnLayout::CompactBit => ColumnBody::null_bitmap_len(capacity),
+        ColumnLayout::Fixed(width) | ColumnLayout::VarLen(width) => capacity * width,
+    };
+    let data = raw.get(..cap_bytes).unwrap_or(raw);
+    let bitmap_len = raw.len().saturating_sub(cap_bytes);
+    let null_bitmap = raw.get(cap_bytes..cap_bytes + bitmap_len).unwrap_or(&[]);
+    (data, null_bitmap)
+}
+
 fn split_body_at(raw: &[u8], cap_bytes: usize) -> ColumnBody {
     let bitmap_len = raw.len().saturating_sub(cap_bytes);
     let data = raw.get(..cap_bytes).unwrap_or(raw).to_vec();

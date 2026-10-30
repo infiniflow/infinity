@@ -5502,18 +5502,13 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
     } else {
         format!("default_db.{table}")
     };
-    if let Ok(rs) = engine.execute(&format!("SHOW TABLE {qualified} COLUMNS;")) {
-        for r in rs {
-            if let QueryResult::Rows { rows, .. } = r {
-                for row in rows {
-                    if row.len() >= 2 {
-                        map.insert(
-                            row[0].to_slt_string().to_ascii_lowercase(),
-                            row[1].to_slt_string(),
-                        );
-                    }
-                }
-            }
+    // Straight from the catalog, not by running `SHOW TABLE ... COLUMNS` through
+    // the executor: that executed a second statement (its own parse, bind, plan
+    // and catalog scan) inside every `Select` RPC, which `perf` showed as 5% of
+    // the query. The catalog read is the same data without the round trip.
+    if let Ok(Some(meta)) = engine.catalog().get_table_by_name(&qualified) {
+        for (name, ty) in meta.columns.iter().zip(meta.types.iter()) {
+            map.insert(name.to_ascii_lowercase(), ty.clone());
         }
     }
     columns

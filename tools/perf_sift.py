@@ -25,6 +25,10 @@ from restart_test import bytes_common as bc  # noqa: E402
 SIFT = "/home/zhichyu/benchmark/sift1M"
 DIMS = 128
 
+# Everything this driver writes stays inside the checkout (`.scratch/`), so a
+# run is reproducible from the tree alone and no state hides in /tmp.
+SCRATCH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".scratch")
+
 
 def read_fvecs(path, limit=None):
     out = []
@@ -107,7 +111,7 @@ def main():
     args = ap.parse_args()
 
     port = args.port or (5432 if args.engine == "cpp" else 23817)
-    root = f"/tmp/perf-{args.engine}"
+    root = os.path.join(SCRATCH, f"perf-{args.engine}")
     shutil.rmtree(root, ignore_errors=True)
     os.makedirs(root, exist_ok=True)
     bc._write_config(args.engine, root, port)
@@ -125,7 +129,7 @@ def main():
     if args.rows:
         base = subset_fvecs(
             os.path.join(SIFT, "sift_base.fvecs"),
-            f"/tmp/sift_base_{args.rows}.fvecs",
+            os.path.join(SCRATCH, f"sift_base_{args.rows}.fvecs"),
             args.rows,
         )
 
