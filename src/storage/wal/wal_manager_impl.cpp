@@ -144,6 +144,21 @@ void WalManager::SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts) {
     return;
 }
 
+void WalManager::RecycleWalFile(TxnTimeStamp ckp_ts) {
+    // Reclaiming wal is optional, dropping a segment that replay still needs is not: every check
+    // here fails closed, keeping the files for the next checkpoint.
+    if (ckp_ts == 0 || ckp_ts == UNCOMMIT_TS) {
+        LOG_ERROR(fmt::format("Skip recycling wal files, unexpected checkpoint ts: {}", ckp_ts));
+        return;
+    }
+    // Recycling deletes: only a checkpoint whose entry is already synced may do it.
+    if (last_synced_ckp_ts_.load() != ckp_ts) {
+        LOG_ERROR(fmt::format("Skip recycling wal files: checkpoint entry of ts {} is not synced", ckp_ts));
+        return;
+    }
+    WalFile::Recycle(ckp_ts, wal_dir_);
+}
+
 std::vector<std::shared_ptr<std::string>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
 
     std::vector<std::shared_ptr<std::string>> log_strings;
@@ -260,6 +275,7 @@ void WalManager::NewFlush() {
 
         LOG_TRACE(fmt::format("Attempt to write {} logs", txn_batch.size()));
 
+        NewTxn *checkpoint_txn = nullptr;
         for (const auto &txn : txn_batch) {
             if (txn == nullptr) {
                 // terminate entry
@@ -290,6 +306,7 @@ void WalManager::NewFlush() {
                                      txn->BeginTS(),
                                      txn->CommitTS(),
                                      txn->TxnID()));
+                checkpoint_txn = txn;
                 this->SwapWalFile(max_commit_ts_, true);
             }
 
@@ -338,6 +355,20 @@ void WalManager::NewFlush() {
             case FlushOptionType::kFlushPerSecond: {
                 ofs_.flush(); // FIXME: not flush, flush per second
                 break;
+            }
+        }
+
+        // The checkpoint entry is the proof that the wal.log.* files it covers are redundant, so it
+        // must be on disk before RecycleWalFile() deletes them. The flush above (checked) handed it
+        // to the kernel, so this fsync settles the file's data and inode. It does not fsync wal_dir_:
+        // the name of the wal.log created by the swap above is durable only as far as the filesystem
+        // orders its metadata writes. On failure last_synced_ckp_ts_ stays behind and the recycler
+        // skips.
+        if (checkpoint_txn != nullptr) {
+            if (Status status = VirtualStore::SyncFile(wal_path_); status.ok()) {
+                last_synced_ckp_ts_ = checkpoint_txn->BeginTS();
+            } else {
+                LOG_ERROR(fmt::format("Fail to sync checkpoint entry in {}: {}", wal_path_, status.message()));
             }
         }
 

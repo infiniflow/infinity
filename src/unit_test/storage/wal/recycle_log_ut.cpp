@@ -34,6 +34,7 @@ import :txn_state;
 import :new_txn;
 import :new_txn_manager;
 import :wal_manager;
+import :virtual_store;
 
 import global_resource_usage;
 import compilation_config;
@@ -117,6 +118,10 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
+        { // every rotated wal file is covered by the checkpoint, so none of them survives it
+            auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
+            EXPECT_TRUE(wal_infos.empty());
+        }
         infinity::InfinityContext::instance().UnInit();
 
 #ifdef INFINITY_DEBUG
@@ -150,4 +155,44 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         infinity::GlobalResourceUsage::UnInit();
 #endif
     }
+}
+
+// Reclaiming a rotated segment is gated on the checkpoint entry being fsynced: the flush thread is
+// the only one that knows which file holds it, so it publishes the ts it made durable and the
+// reclaimer compares against that. A failed fsync leaves exactly the state built below, so covering
+// the initial state covers that path too.
+TEST_P(RecycleLogTest, recycle_requires_synced_checkpoint_entry) {
+    infinity::InfinityContext::instance().UnInit();
+    CleanupDbDirs();
+#ifdef INFINITY_DEBUG
+    infinity::GlobalResourceUsage::Init();
+#endif
+    std::shared_ptr<std::string> config_path = RecycleLogTest::test_ckp_recycle_config();
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
+
+    Storage *storage = infinity::InfinityContext::instance().storage();
+    WalManager *wal_manager = storage->wal_manager();
+    const std::string &wal_dir = storage->config()->WALDir();
+
+    // A rotated segment whose commit ts a completed checkpoint would be allowed to reclaim.
+    constexpr TxnTimeStamp ckp_ts = 100;
+    const std::string segment_path = wal_dir + "/" + WalFile::WalFilename(ckp_ts);
+    ASSERT_TRUE(VirtualStore::Truncate(segment_path, 0).ok());
+
+    // No checkpoint entry has been fsynced in this instance, so nothing may be deleted.
+    wal_manager->RecycleWalFile(ckp_ts);
+    {
+        auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
+        ASSERT_EQ(wal_infos.size(), 1u);
+        EXPECT_EQ(wal_infos.front().max_commit_ts_, ckp_ts);
+    }
+
+    infinity::InfinityContext::instance().UnInit();
+
+#ifdef INFINITY_DEBUG
+    EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+    EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+    infinity::GlobalResourceUsage::UnInit();
+#endif
 }

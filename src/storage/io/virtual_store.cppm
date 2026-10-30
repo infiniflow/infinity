@@ -63,6 +63,7 @@ public:
     static void RecursiveCleanupAllEmptyDir(const std::string &path);
     static Status Rename(const std::string &old_path, const std::string &new_path);
     static Status Truncate(const std::string &file_name, size_t new_length);
+    static Status SyncFile(const std::string &path);
     static Status Merge(const std::string &dst_file, const std::string &src_file);
     static Status Copy(const std::string &dst_file, const std::string &src_file);
     static std::tuple<std::vector<std::shared_ptr<std::filesystem::directory_entry>>, Status> ListDirectory(const std::string &path);
