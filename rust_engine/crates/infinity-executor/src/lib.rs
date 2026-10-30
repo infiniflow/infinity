@@ -8398,17 +8398,45 @@ impl Engine {
         let Some(meta) = self.storage.catalog.get_table_by_name(&table)? else {
             return Ok(None);
         };
+        // A whitelist, not a blacklist: the columnar reader knows the scalar and
+        // text layouts, and anything else (embedding, tensor, tensor array,
+        // sparse, array, multi-vector) has a wire encoding of its own.
         for pos in &needed {
             let Some(declared) = meta.types.get(*pos) else {
                 return Ok(None);
             };
             let up = declared.trim().to_ascii_uppercase();
-            if crate::cpp_blocks::embedding_shape(declared).is_some()
-                || crate::cpp_blocks::tensor_shape(declared).is_some()
-                || crate::cpp_blocks::array_shape(declared).is_some()
-                || up.starts_with("MULTIVECTOR")
-                || up.starts_with("SPARSE")
-            {
+            let base = up.split('(').next().unwrap_or("").split(',').next().unwrap_or("").trim();
+            let known = matches!(
+                base,
+                "BOOL"
+                    | "BOOLEAN"
+                    | "TINYINT"
+                    | "SMALLINT"
+                    | "INT"
+                    | "INTEGER"
+                    | "BIGINT"
+                    | "UINT8"
+                    | "UINT16"
+                    | "UINT32"
+                    | "UINT64"
+                    | "FLOAT"
+                    | "FLOAT32"
+                    | "DOUBLE"
+                    | "FLOAT64"
+                    | "FLOAT16"
+                    | "BFLOAT16"
+                    | "VARCHAR"
+                    | "CHAR"
+                    | "TEXT"
+                    | "STRING"
+                    | "JSON"
+                    | "DATE"
+                    | "TIME"
+                    | "DATETIME"
+                    | "TIMESTAMP"
+            );
+            if !known {
                 return Ok(None);
             }
         }
