@@ -140,27 +140,31 @@ IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）
 | `INSERT … SELECT` | 只支持 select list 全为常量：参考的 `PhysicalInsert` 把投影表达式交给 `ExpressionState::CreateState`，那里没有 `Column` 分支，任何列引用（含 `SELECT *`）都会死在该处（`expression_state_impl.cpp:68`）。端口报同一条 `Unknown expression type: Column. expression name: {col}`，常量情形与参考一样按源行数插入 | `select_ddl_ut::insert_select_is_refused_when_the_select_list_reads_a_column` |
 | `CREATE SNAPSHOT … ON TABLE <db>.<tbl>` | 参考的文法是 `IDENTIFIER`，带库名的写法是解析错误（`unexpected '.', expecting end of file`）；端口接受限定名（HTTP 层就按这个拼），无库名时用会话库 | `infinity-parser` 的 `CREATE SNAPSHOT` 分支（`parser.rs:362`） |
 
-### 5.1 读路径比参考慢（已定位，未改结构）
+### 5.1 读路径比参考慢（已收窄，未追平）
 
 同一台机、同一个 SDK driver（`tools/bench_sdk_driver.py`，20,000 行 `INT + VARCHAR`）：
 
-| 阶段 | 参考 | 端口 | 倍数 |
+| 阶段 | 参考 | 修前 | 现在 |
 |---|---|---|---|
-| insert | 0.293 s | 0.290 s | 1.0 |
-| 全表 `SELECT id, name` | 9.45 ms | 21.6 ms | 2.3 |
-| 点查 `WHERE id = 19999` | 1.31 ms | 9.24 ms | 7.0 |
-| `count(*)`（40,000 行） | 0.91 ms | 0.33 ms | 0.4 |
-| `SELECT id`（40,000 行，已落块） | 1.14 ms | 28.4 ms | 25 |
+| insert | 0.293 s | 0.290 s | 0.281–0.307 s（持平） |
+| 全表 `SELECT id, name` | 9.45 ms | 21.6 ms | 12.0–12.8 ms（1.3x） |
+| 点查 `WHERE id = 19999` | 1.31 ms | 9.24 ms | 3.4–3.9 ms（2.7x） |
+| `count(*)`（40,000 行） | 0.91 ms | 0.33 ms | 0.40 ms |
+| `SELECT id`（40,000 行，落块后） | 1.14 ms | 28.4 ms | 13.5 ms（12x） |
 
-`check_benchmark_result.py` 比的是三阶段的**均值**，0.29 s 的 insert 把两个读阶段摊薄成 +2.5%，所以 Gate E 报 PASS 而读路径实际慢 2-25 倍。
+`check_benchmark_result.py` 比的是三阶段**均值**，0.29 s 的 insert 把两个读阶段摊薄成 +3%，所以 Gate E 报 PASS 而读路径仍慢。
 
-四处结构性原因（按影响排序）：
+已改（`ac56246bf`、`a5596c690`）：
 
-1. **缓冲区读路径把 `Value` 转成文本再解析回来**：`pending_rows_of`（`cpp_blocks.rs`）每次语句都深拷贝整条 append buffer，`mirror_cell_text` 把每个 cell 重新渲染成 `String`，调用方 `try_cpp_rows_pruned` 再用 `parse_value` 解析回 `Value`。已经有 `Value` 的行白走一趟（每 cell 两次分配）。40,000 行时 `count(*)` 5.0 ms，而同样这些行落块后是 0.33 ms。
-2. **扫描结果是行式的 `Vec<Vec<Value>>`**：`TableScan`/`RowsSource` 把每行 `push_row` 进 `DataChunk`（每个 `Value` 克隆一次），算子用解释执行的 `Expr::eval` 逐行求值，最后再拷回 `Vec<Vec<Value>>`。40,000 行 `SELECT id` 的 28 ms 里约 15 ms 在这一段。
-3. **普通谓词不剪枝、也不裁列**：`try_cpp_rows_pruned` 传 `wanted = 全部列`，`WHERE id = 5` 的 prefilter 列表是空的，所以点查要解码每个块的每一列（实测 `id = 5`／`id = 39999`／`id = -1` 都是 20 ms，与命中位置无关）。参考在解出的列上做谓词、只投影需要的列（0.55 ms）。
-4. **块解码逐 cell 解析类型文本**：`decode_value` 每个 cell 都调 `embedding_shape`／`array_shape`（内部 `trim().to_ascii_uppercase()` 分配一个 `String`）。perf 里 `embedding_shape` 3.6%、`trim_matches` 3.7%、`array_shape` 2.1%。
+1. **纯列投影不再走算子链**（`direct_projection`）：`Projection(Scan)` 与 `Projection(Filter(Scan))` 直接出行，谓词用同一个 `Expr::eval_predicate`，列裁剪过的扫描先把行压回扫描列顺序。修前 40,000 行的算子链占 `SELECT id, name` 的 28 ms 里约 15 ms。带结果缓存的计划、select 列表含表达式的计划仍走算子链。
+2. **缓冲区里的行直接用 `Value`**（`buffered_rows_values`）：行还没 checkpoint 时不再 `mirror_cell_text` → `parse_value` 绕一圈。
+3. **`EMBEDDING` 形状按列解析一次**（`decode_value_shaped`）：原先每 cell 调 `embedding_shape`，内部 `to_ascii_uppercase()` 分配一次。
+4. **列体每列切分一次**：`decode_rows_of` 原先把 `split_body_for_layout`（整段 `[data][bitmap]` 拷贝）放在行循环里，块读是 O(行数 × 块字节)；40,000 行块扫描 179 ms → 30 ms。
 
-已修的一处（`a5596c690`）：`decode_rows_of` 原先把 `split_body_for_layout`（整段 `[data][bitmap]` 的拷贝）放在行循环里，块读是 O(行数 × 块字节)；40,000 行的块扫描 179 ms → 30 ms（`SELECT id, name` 197 → 49 ms）。这条只影响**落块之后**的读，Gate E 的 workload 不 checkpoint，所以驱动数字没变。
+仍然慢的原因：
 
-修法（未做）：① 缓冲区与块解码都直接产出 `Value`／列向量，不再经过文本；② 扫描按列下推谓词与投影，块级 prefilter 接上 `fast_rough_filter`；③ 类型文本按列解析一次。
+1. **块解码仍逐 cell 生成文本再解析回 `Value`**：第 2 条只覆盖了缓冲区；落块后的读每个 cell 仍要 `format!` 一个 `String` 再 `parse_value`。`SELECT id`（40,000 行）13.5 ms 里约 11 ms 在这两步。
+2. **普通谓词不剪枝、不裁列**：`fetch_rows_pruned` 传 `wanted = 全部列`，而块的 `fast_rough_filter` 记录只在段封存时写（参考同样如此），所以 `WHERE id = 5` 与全表扫描等价，实测 `id = 5`／`id = 39999`／`id = -1` 同价。参考在解出的列上做谓词、只投影需要的列。
+3. **每行一个 `Vec<Value>`**：列式执行才根治；现在是行式，40,000 行就是 40,000 次堆分配。
+
+修法：① 块解码按列产出 `Value`（跳过文本）；② 扫描按列下推谓词与投影，读侧自建块级 min/max 而不依赖目录记录；③ 列式结果缓冲。
