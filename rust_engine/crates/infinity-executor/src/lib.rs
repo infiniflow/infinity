@@ -18275,7 +18275,7 @@ impl Engine {
         // table whose columns the block format cannot express has no mirror -
         // it keeps its rows in the store.
         if self.has_block_layout(table) {
-            self.write_cpp_blocks_bounded(table, ts)?;
+            self.write_cpp_blocks_commit(table, ts)?;
         }
         // `CommitBottomAppend` for the imported segments on the table's worker.
         let bottom_table = table.to_string();
@@ -18400,7 +18400,7 @@ impl Engine {
             // `AppendInBlock`: the import's block is readable as soon as the
             // statement commits, exactly like the CSV path.
             if self.has_block_layout(table) {
-                self.write_cpp_blocks_bounded(table, ts)?;
+                self.write_cpp_blocks_commit(table, ts)?;
             }
             drop(_visible);
             let t_bottom = t3.elapsed();

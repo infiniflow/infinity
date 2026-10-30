@@ -1585,6 +1585,14 @@ fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option
 
 /// Decodes a slot back into the text form the engine renders.
 
+
+/// The block a row id lands in: `(segment, block)` of the mirror's layout.
+fn block_of(seq: usize) -> (u32, u16) {
+    (
+        (seq >> 32) as u32,
+        ((seq & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY) as u16,
+    )
+}
 /// The buffer a column of `declared` type is decoded into.
 fn column_buffer(declared: &str) -> ColumnData {
     let t = declared.trim().to_ascii_uppercase();
@@ -1997,6 +2005,14 @@ impl Engine {
         self.write_cpp_blocks_mode(table, &[], true, checkpoint_ts)
     }
 
+    /// Writes only the blocks this commit's rows and deletes land in.
+    ///
+    /// That is the reference's `AppendInBlock` / `DeleteInBlock`: a `COPY` of a
+    /// few rows into a growing segment touches one block, not the table.
+    pub(crate) fn write_cpp_blocks_commit(&self, table: &str, ts: u64) -> Result<usize> {
+        self.write_cpp_blocks_mode(table, &[], false, ts)
+    }
+
     /// [`Self::write_cpp_blocks`] with the rows a commit is publishing.
     ///
     /// `extra` is `(row id, values)` for the rows of the transaction that just
@@ -2094,8 +2110,6 @@ impl Engine {
         // table's append buffer; this write is the checkpoint, so it takes them
         // all. `extra` carries the rows of a rewrite (a column change, a
         // replay, a compaction) that no commit buffered.
-        // A checkpoint writes every block, so nothing is "untouched".
-        let touched: std::collections::HashSet<(u32, u16)> = std::collections::HashSet::new();
         let layout_total: u64 = self
             .segment_row_counts(&table)
             .iter()
@@ -2126,17 +2140,18 @@ impl Engine {
         // row set is the previous one plus this batch - otherwise another
         // transaction reserved ids that are not on disk yet, and the read side
         // has to keep merging the journal.
-        let epoch = {
+        let (epoch, prev_rows) = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey.clone()).or_default();
             entry.block_index = None;
+            let prev = entry.cpp_block_rows.clone();
             entry.cpp_block_rows = None;
-            entry.mirror_epoch
+            (entry.mirror_epoch, prev)
         };
-        // A checkpoint writes the whole table: the block files are the durable
-        // copy and there is no in-place append to them any more.
-        let partial = false;
-        let _ = full;
+        // A whole-table write (a checkpoint, a restore, a column rewrite) rebuilds
+        // every block. A commit only rewrites the blocks its rows and deletes
+        // land in - the reference's AppendInBlock / DeleteInBlock.
+        let partial = !full;
         // The mirror's file writes are serialised; the table lock is **not**
         // held across them (a commit takes the bottom gate before this, and the
         // checkpoint takes the table lock on its own, so holding both here in
@@ -2161,6 +2176,20 @@ impl Engine {
             merged.extend(buffered.into_iter().filter(|(seq, _)| !have.contains(seq)));
         }
         let extra: &[(usize, Vec<Value>)] = &merged;
+        // The blocks this write changes: the ones its rows land in and the ones
+        // that hold a slot it deletes.
+        let touched: std::collections::HashSet<(u32, u16)> = if partial {
+            let mut set = std::collections::HashSet::new();
+            for (seq, _) in &merged {
+                set.insert(block_of(*seq));
+            }
+            for id in deleted_at.keys() {
+                set.insert(block_of(*id));
+            }
+            set
+        } else {
+            std::collections::HashSet::new()
+        };
         let mut written = 0usize;
         // A row id carries its segment in the high 32 bits (`segment_id << 32 |
         // in-segment offset`). The reference writes one `seg_{id}/` directory
@@ -2542,9 +2571,24 @@ impl Engine {
         // wrote the blocks it touched, so its row set is the previous one with
         // this batch's rows added and its deletes removed.
         let written_ids: std::collections::HashSet<usize> = block_rows.iter().copied().collect();
-        entry.cpp_block_rows = Some(std::sync::Arc::new(block_rows));
+        // A whole-table write replaces the row set; a commit adds the rows it
+        // wrote to the previous set and drops the ones it deleted.
+        let rows_now: Vec<usize> = if partial {
+            let mut rows: Vec<usize> = prev_rows
+                .as_ref()
+                .map(|rows| rows.as_ref().clone())
+                .unwrap_or_default();
+            rows.extend(block_rows.iter().copied());
+            rows.retain(|id| !deleted_at.contains_key(id));
+            rows.sort_unstable();
+            rows.dedup();
+            rows
+        } else {
+            block_rows.clone()
+        };
+        entry.cpp_block_rows = Some(std::sync::Arc::new(rows_now.clone()));
         // What the files hold now: the row set this write walked.
-        entry.mirror_rows = Some(written as u64);
+        entry.mirror_rows = Some(rows_now.len() as u64);
         // The mark retires only when this write took **every** row it was
         // handed: a row outside the segment windows it walked (`counts` and the
         // append buffer disagreeing) is still only in memory, and a commit that
