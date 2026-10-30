@@ -8259,13 +8259,13 @@ impl Engine {
     }
 
 
-    /// The plain-projection fast path the thrift writer uses: a `SELECT` whose
-    /// list is nothing but columns over one table, with no other clause, is
-    /// answered as typed column buffers instead of `Value` rows.
+    /// The columnar fast path the thrift writer uses: a single-table `SELECT`
+    /// whose items are columns, `*`, or scalar expressions, optionally with
+    /// `WHERE`, `ORDER BY`, `LIMIT` and `OFFSET`.
     ///
-    /// `None` means "run it through `execute`": the shape does not qualify (a
-    /// predicate, a join, an expression, a star, a non-scalar column) and the
-    /// generic path owns it.
+    /// `None` means "run it through `execute`": a join, an aggregate, `GROUP BY`,
+    /// `DISTINCT`, a CTE, a search, a non-scalar column, or a stat function the
+    /// scalar binder does not cover.
     pub fn select_columns(&self, sql: &str) -> Result<Option<Batch>> {
         let statements = parse(sql)?;
         if statements.len() != 1 {
@@ -8297,9 +8297,6 @@ impl Engine {
         if join.is_some()
             || !group_by.is_empty()
             || having.is_some()
-            || !order_by.is_empty()
-            || limit.is_some()
-            || offset.is_some()
             || search.is_some()
             || *distinct
             || !highlight.is_empty()
@@ -8312,55 +8309,110 @@ impl Engine {
         }
         let table = self.qualified_table(from);
         let schema = self.table_schema(&table)?;
-        let mut labels = Vec::with_capacity(items.len());
-        let mut wanted = Vec::with_capacity(items.len());
-        for (i, item) in items.iter().enumerate() {
-            let SelectItem::Column(name) = item else {
-                return Ok(None);
-            };
-            let base = name.rsplit('.').next().unwrap_or(name.as_str());
-            let Some(pos) = schema.iter().position(|c| c == base) else {
-                return Ok(None);
-            };
-            labels.push(
-                aliases
-                    .get(i)
-                    .cloned()
-                    .flatten()
-                    .unwrap_or_else(|| base.to_string()),
-            );
-            wanted.push(pos);
+        let binder = infinity_planner::binder::QueryBinder::new();
+
+        // One output column: a table column, or a scalar expression evaluated
+        // per row.
+        enum Out {
+            Column { pos: usize, label: String },
+            Expr { expr: Expr, label: String },
         }
-        if wanted.is_empty() {
+        let mut projection: Vec<Out> = Vec::with_capacity(items.len());
+        for (i, item) in items.iter().enumerate() {
+            let label = aliases.get(i).cloned().flatten();
+            match item {
+                SelectItem::Star => {
+                    for (pos, name) in schema.iter().enumerate() {
+                        projection.push(Out::Column {
+                            pos,
+                            label: name.clone(),
+                        });
+                    }
+                }
+                SelectItem::Column(name) => {
+                    let base = name.rsplit('.').next().unwrap_or(name.as_str());
+                    let Some(pos) = schema.iter().position(|c| c == base) else {
+                        return Ok(None);
+                    };
+                    projection.push(Out::Column {
+                        pos,
+                        label: label.unwrap_or_else(|| base.to_string()),
+                    });
+                }
+                SelectItem::Expr(ast) => {
+                    let expr = binder.bind_expression(ast, &schema)?;
+                    projection.push(Out::Expr {
+                        expr,
+                        label: label.unwrap_or_else(|| infinity_planner::item_label(item)),
+                    });
+                }
+                _ => return Ok(None),
+            }
+        }
+        if projection.is_empty() {
             return Ok(None);
         }
-        // A predicate is bound against the table's columns and evaluated on the
-        // buffers; everything below the shape check stays the same.
+
         let predicate = match where_pred.as_ref() {
             Some(pred) => Some(infinity_planner::predicate_expr(pred, &schema)?),
             None => None,
         };
-        // Only the scalar and text columns are packed from column buffers;
-        // an embedding / tensor / sparse / array column has its own wire
-        // encoding, and decoding it here only to fall back would pay twice.
-        if let Some(meta) = self.storage.catalog.get_table_by_name(&table)? {
-            for pos in &wanted {
-                let Some(declared) = meta.types.get(*pos) else {
-                    return Ok(None);
-                };
-                let up = declared.trim().to_ascii_uppercase();
-                if crate::cpp_blocks::embedding_shape(declared).is_some()
-                    || crate::cpp_blocks::tensor_shape(declared).is_some()
-                    || crate::cpp_blocks::array_shape(declared).is_some()
-                    || up.starts_with("MULTIVECTOR")
-                    || up.starts_with("SPARSE")
-                {
-                    return Ok(None);
+        // Sort keys: a plain column, or the expression when there is one.
+        let mut keys: Vec<(Expr, bool)> = Vec::with_capacity(order_by.len());
+        for key in order_by {
+            let expr = match &key.expr {
+                Some(ast) => binder.bind_expression(ast, &schema)?,
+                None => {
+                    let base = key.column.rsplit('.').next().unwrap_or(key.column.as_str());
+                    let Some(pos) = schema.iter().position(|c| c == base) else {
+                        return Ok(None);
+                    };
+                    Expr::Column(pos)
                 }
+            };
+            keys.push((expr, key.asc));
+        }
+
+        // The columns the work needs, in table order.
+        let mut needed: Vec<usize> = Vec::new();
+        for out in &projection {
+            match out {
+                Out::Column { pos, .. } => needed.push(*pos),
+                // An expression reads columns the projection does not name.
+                Out::Expr { expr, .. } => predicate_columns(expr, &mut needed),
             }
-        } else {
+        }
+        if let Some(pred) = &predicate {
+            predicate_columns(pred, &mut needed);
+        }
+        for (key, _) in &keys {
+            predicate_columns(key, &mut needed);
+        }
+        needed.sort_unstable();
+        needed.dedup();
+        if needed.is_empty() {
             return Ok(None);
         }
+        // Only scalar and text columns are packed from column buffers; an
+        // embedding / tensor / sparse / array column has its own wire encoding.
+        let Some(meta) = self.storage.catalog.get_table_by_name(&table)? else {
+            return Ok(None);
+        };
+        for pos in &needed {
+            let Some(declared) = meta.types.get(*pos) else {
+                return Ok(None);
+            };
+            let up = declared.trim().to_ascii_uppercase();
+            if crate::cpp_blocks::embedding_shape(declared).is_some()
+                || crate::cpp_blocks::tensor_shape(declared).is_some()
+                || crate::cpp_blocks::array_shape(declared).is_some()
+                || up.starts_with("MULTIVECTOR")
+                || up.starts_with("SPARSE")
+            {
+                return Ok(None);
+            }
+        }
+
         // The same statement prologue as `execute`: an id for the statement,
         // visibility at `current_ts + 1`, and the query registry entry.
         self.txn.ensure_statement_id();
@@ -8369,20 +8421,165 @@ impl Engine {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let _query = self.begin_query(statement, sql);
         let _read = ReadTsGuard::enter(self.txn.current_ts() + 1);
-        let t0 = std::time::Instant::now();
-        let batch = self
-            .read_columns_batch(&table, &wanted, labels, predicate.as_ref(), schema.len());
-        if std::env::var_os("INF_SEL_TRACE").is_some() {
-            eprintln!(
-                "[batch] {table} rows={:?} {:.3}ms",
-                batch.as_ref().map(|b| b.row_count),
-                t0.elapsed().as_secs_f64() * 1e3
-            );
-        }
+        let batch = self.read_columns_batch(&table, &needed);
         self.txn.end_statement();
-        Ok(batch)
-    }
+        let Some(mut batch) = batch else {
+            return Ok(None);
+        };
 
+        // One row buffer, filled from the decoded columns, for the predicate,
+        // the sort keys and the projected expressions.
+        let width = schema.len();
+        let mut scratch = vec![Value::Null; width];
+        let fill_row = |scratch: &mut Vec<Value>, batch: &Batch, r: usize| {
+            for (c, pos) in needed.iter().enumerate() {
+                if *pos < width {
+                    scratch[*pos] = if batch.valid.get(c).and_then(|v| v.get(r)).copied()
+                        == Some(false)
+                    {
+                        Value::Null
+                    } else {
+                        batch.data[c].value_at(r)
+                    };
+                }
+            }
+        };
+
+        if let Some(pred) = &predicate {
+            // `col = constant` is answered straight off the column.
+            let mut mask: Option<Vec<bool>> = None;
+            if let Expr::Cmp(a, infinity_parser::CmpOp::Eq, b) = pred {
+                let (col, value) = match (&**a, &**b) {
+                    (Expr::Column(i), Expr::Literal(v)) => (Some(*i), Some(v)),
+                    (Expr::Literal(v), Expr::Column(i)) => (Some(*i), Some(v)),
+                    _ => (None, None),
+                };
+                if let (Some(pos), Some(value)) = (col, value) {
+                    if let Some(c) = needed.iter().position(|p| *p == pos) {
+                        mask = Some(batch.data[c].equality_mask(&batch.valid[c], value));
+                    }
+                }
+            }
+            let mask = match mask {
+                Some(mask) => mask,
+                None => {
+                    let mut mask = Vec::with_capacity(batch.row_count);
+                    for r in 0..batch.row_count {
+                        fill_row(&mut scratch, &batch, r);
+                        mask.push(pred.eval_predicate(&scratch));
+                    }
+                    mask
+                }
+            };
+            if mask.iter().any(|k| !k) {
+                for c in 0..batch.data.len() {
+                    batch.data[c].retain(&mask);
+                    let mut at = 0usize;
+                    batch.valid[c].retain(|_| {
+                        let v = mask.get(at).copied().unwrap_or(false);
+                        at += 1;
+                        v
+                    });
+                }
+                batch.row_count = mask.iter().filter(|k| **k).count();
+            }
+        }
+
+        if !keys.is_empty() && batch.row_count > 1 {
+            let mut order: Vec<usize> = (0..batch.row_count).collect();
+            let mut sort_keys: Vec<Vec<Value>> = Vec::with_capacity(keys.len());
+            for (key, _) in &keys {
+                let mut column = Vec::with_capacity(batch.row_count);
+                for r in 0..batch.row_count {
+                    fill_row(&mut scratch, &batch, r);
+                    column.push(key.eval(&scratch));
+                }
+                sort_keys.push(column);
+            }
+            order.sort_by(|a, b| {
+                for (k, (_, asc)) in keys.iter().enumerate() {
+                    let ord = sort_keys[k][*a].partial_cmp_value(&sort_keys[k][*b]);
+                    let Some(ord) = ord else { continue };
+                    if ord != std::cmp::Ordering::Equal {
+                        return if *asc { ord } else { ord.reverse() };
+                    }
+                }
+                a.cmp(b)
+            });
+            for column in &mut batch.data {
+                *column = crate::cpp_blocks::permute_column(column, &order);
+            }
+            for v in &mut batch.valid {
+                *v = order.iter().map(|i| v[*i]).collect();
+            }
+        }
+
+        let skip = offset.unwrap_or(0) as usize;
+        let skip = skip.min(batch.row_count);
+        let take = match limit {
+            Some(n) => (*n as usize).min(batch.row_count - skip),
+            None => batch.row_count - skip,
+        };
+        let keep: Vec<bool> = (0..batch.row_count)
+            .map(|r| r >= skip && r < skip + take)
+            .collect();
+        if skip > 0 || take < batch.row_count {
+            for c in 0..batch.data.len() {
+                batch.data[c].retain(&keep);
+                let mut at = 0usize;
+                batch.valid[c].retain(|_| {
+                    let v = keep.get(at).copied().unwrap_or(false);
+                    at += 1;
+                    v
+                });
+            }
+            batch.row_count = take;
+        }
+
+        // Projection: hand over the decoded column, or evaluate the expression
+        // per row into a new one.
+        let mut data = Vec::with_capacity(projection.len());
+        let mut valid = Vec::with_capacity(projection.len());
+        let mut labels = Vec::with_capacity(projection.len());
+        for out in &projection {
+            match out {
+                Out::Column { pos, label } => {
+                    let Some(c) = needed.iter().position(|p| p == pos) else {
+                        return Ok(None);
+                    };
+                    data.push(batch.data[c].clone());
+                    valid.push(batch.valid[c].clone());
+                    labels.push(label.clone());
+                }
+                Out::Expr { expr, label } => {
+                    let mut column: Option<ColumnData> = None;
+                    let mut col_valid = Vec::with_capacity(batch.row_count);
+                    for r in 0..batch.row_count {
+                        fill_row(&mut scratch, &batch, r);
+                        let value = expr.eval(&scratch);
+                        col_valid.push(!matches!(value, Value::Null));
+                        let target = column.get_or_insert_with(|| match value {
+                            Value::Float(_) => ColumnData::Float(Vec::new()),
+                            Value::Bool(_) => ColumnData::Bool(Vec::new()),
+                            Value::Str(_) => ColumnData::Text(Default::default()),
+                            _ => ColumnData::Int(Vec::new()),
+                        });
+                        target.push_value(&value);
+                    }
+                    data.push(column.unwrap_or(ColumnData::Int(Vec::new())));
+                    valid.push(col_valid);
+                    labels.push(label.clone());
+                }
+            }
+        }
+        let row_count = batch.row_count;
+        Ok(Some(Batch {
+            columns: labels,
+            data,
+            valid,
+            row_count,
+        }))
+    }
     /// The session's current database.
     fn db(&self) -> String {
         self.current_db.lock().unwrap().clone()

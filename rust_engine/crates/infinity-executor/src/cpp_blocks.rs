@@ -24,7 +24,6 @@ use infinity_catalog::cpp_layout::{
     CppBlock, CppIndexChunk, CppIndexSegment, CppSegment, CppSegmentSet, CPP_MIRROR_TS, UNCOMMIT_TS,
 };
 use crate::columnar::{Batch, ColumnData};
-use crate::Expr;
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
 use infinity_storage::WalCmd;
@@ -1600,7 +1599,7 @@ fn column_buffer(declared: &str) -> ColumnData {
 }
 
 /// `column` reordered by `order`.
-fn permute_column(column: &ColumnData, order: &[usize]) -> ColumnData {
+pub(crate) fn permute_column(column: &ColumnData, order: &[usize]) -> ColumnData {
     match column {
         ColumnData::Int(v) => ColumnData::Int(order.iter().map(|i| v[*i]).collect()),
         ColumnData::Float(v) => ColumnData::Float(order.iter().map(|i| v[*i]).collect()),
@@ -1747,6 +1746,73 @@ fn decode_value_shaped(
 }
 
 
+
+/// Decodes one cell of a text column straight into its buffer: no `Value`, no
+/// intermediate `String` for varchar/json.
+fn decode_text_cell(
+    type_text: &str,
+    column_type: i32,
+    layout: ColumnLayout,
+    body: &[u8],
+    row: usize,
+    outline: &[u8],
+    text: &mut crate::columnar::TextColumn,
+) -> Option<bool> {
+    match layout {
+        ColumnLayout::VarLen(16) => {
+            let at = row * 16;
+            let w0 = u64::from_le_bytes(body.get(at..at + 8)?.try_into().ok()?);
+            let len = (w0 & 0x00ff_ffff) as usize;
+            let bytes = if len <= 13 {
+                &body.get(at + 3..at + 16)?[..len]
+            } else {
+                let offset =
+                    u64::from_le_bytes(body.get(at + 8..at + 16)?.try_into().ok()?) as usize;
+                outline.get(offset..offset + len)?
+            };
+            if type_text.trim().eq_ignore_ascii_case("json") {
+                let cell = match infinity_common::json::Json::from_bson(bytes) {
+                    Some(json) => json.compact(),
+                    None => String::from_utf8_lossy(bytes).to_string(),
+                };
+                text.push(&cell);
+                return Some(true);
+            }
+            let cell = std::str::from_utf8(bytes).unwrap_or("");
+            // A varchar cell spelled `null` is the SQL NULL marker on the row
+            // path (`parse_owned_value`); keep that reading.
+            if cell.eq_ignore_ascii_case("null") {
+                text.push("");
+                Some(false)
+            } else {
+                text.push(cell);
+                Some(true)
+            }
+        }
+        ColumnLayout::Fixed(width) => {
+            let at = row * width;
+            let slot = body.get(at..at + width)?;
+            let cell = match column_type {
+                16 => cpp_format::days_to_date(i32::from_le_bytes(slot.try_into().ok()?)),
+                17 => cpp_format::secs_to_time(i32::from_le_bytes(slot.try_into().ok()?)),
+                18 => {
+                    let d = i32::from_le_bytes(slot[..4].try_into().ok()?);
+                    let t = i32::from_le_bytes(slot[4..8].try_into().ok()?);
+                    format!("{} {}", cpp_format::days_to_date(d), cpp_format::secs_to_time(t))
+                }
+                _ => return None,
+            };
+            text.push(&cell);
+            Some(true)
+        }
+        ColumnLayout::CompactBit => {
+            let bit = body.get(row / 8).map(|b| b & (1 << (row % 8)) != 0)?;
+            text.push(if bit { "true" } else { "false" });
+            Some(true)
+        }
+        ColumnLayout::VarLen(_) => None,
+    }
+}
 /// The `Value` of a fixed-width scalar slot, or `None` for a type this does not
 /// decode (`DATE`/`TIME`/`DATETIME`, whose cell is rendered text).
 fn decode_scalar_value(
@@ -4220,20 +4286,13 @@ impl Engine {
     }
 
 
-    /// Every visible row of `table` as typed column buffers.
+    /// Every visible row of `table` for the columns at `wanted`, as typed
+    /// column buffers.
     ///
-    /// `wanted` are the table positions to read, in output order; `labels` names
-    /// them. This is the column-major counterpart of `read_cpp_blocks_values`,
-    /// used by the plain-projection fast path: the per-row `Vec<Value>` is never
-    /// built.
-    pub(crate) fn read_columns_batch(
-        &self,
-        table: &str,
-        wanted: &[usize],
-        labels: Vec<String>,
-        pred: Option<&infinity_expression::Expr>,
-        width: usize,
-    ) -> Option<Batch> {
+    /// The caller decides what to do with them (filter, sort, project); this
+    /// only decodes, in column order, skipping the rows the block's version and
+    /// the tombstone set hide.
+    pub(crate) fn read_columns_batch(&self, table: &str, wanted: &[usize]) -> Option<Batch> {
         let table = self.qualified_table(table);
         let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
         let types: Vec<i32> = meta
@@ -4244,22 +4303,12 @@ impl Engine {
         let root = self.blocks_root();
         let read_ts = crate::read_ts();
         let blocks = self.visible_block_ids(&table);
-        // The predicate reads columns the projection may not name, so decode the
-        // union once and drop the extra buffers after filtering.
-        let mut needed: Vec<usize> = wanted.to_vec();
-        if let Some(pred) = pred {
-            let mut extra = Vec::new();
-            crate::predicate_columns(pred, &mut extra);
-            needed.extend(extra);
-        }
-        needed.sort_unstable();
-        needed.dedup();
         let mut seqs: Vec<usize> = Vec::new();
-        let mut data: Vec<ColumnData> = needed
+        let mut data: Vec<ColumnData> = wanted
             .iter()
             .map(|pos| column_buffer(&meta.types[*pos]))
             .collect();
-        let mut valid: Vec<Vec<bool>> = vec![Vec::new(); needed.len()];
+        let mut valid: Vec<Vec<bool>> = vec![Vec::new(); wanted.len()];
         let mut out_of_order = false;
         let mut last = 0usize;
         for id in &blocks {
@@ -4286,7 +4335,7 @@ impl Engine {
                     seqs.push(seq);
                 }
             }
-            for (out, pos) in needed.iter().enumerate() {
+            for (out, pos) in wanted.iter().enumerate() {
                 Self::decode_block_column(
                     &meta.ids,
                     &meta.types,
@@ -4320,7 +4369,7 @@ impl Engine {
                 }
                 last = seq;
                 seqs.push(seq);
-                for (out, pos) in needed.iter().enumerate() {
+                for (out, pos) in wanted.iter().enumerate() {
                     match values.get(*pos) {
                         Some(v) if !matches!(v, Value::Null) => {
                             data[out].push_value(v);
@@ -4337,24 +4386,13 @@ impl Engine {
         if blocks.is_empty() && seqs.is_empty() {
             return None;
         }
-        let mut row_count = seqs.len();
-        if out_of_order {
-            let mut order: Vec<usize> = (0..row_count).collect();
-            order.sort_by_key(|i| seqs[*i]);
-            for column in &mut data {
-                *column = permute_column(column, &order);
-            }
-            for v in &mut valid {
-                *v = order.iter().map(|i| v[*i]).collect();
-            }
-        }
         // A delete that has not reached the block's `version` yet lives in the
         // tombstone set; the row path filters those, and so must this one.
         let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
-        if !dead.is_empty() && row_count > 0 {
+        if !dead.is_empty() && !seqs.is_empty() {
             let keep: Vec<bool> = seqs.iter().map(|s| !dead.contains(&(*s as u64))).collect();
             if keep.iter().any(|k| !k) {
-                for k in 0..needed.len() {
+                for k in 0..wanted.len() {
                     data[k].retain(&keep);
                     let mut at = 0usize;
                     valid[k].retain(|_| {
@@ -4369,73 +4407,29 @@ impl Engine {
                     .filter(|(_, k)| **k)
                     .map(|(s, _)| s)
                     .collect();
-                row_count = seqs.len();
             }
         }
-        // The predicate runs on the column buffers: one reused row buffer, and
-        // only the rows that pass are kept.
-        if let Some(pred) = pred {
-            // `col = constant` is answered straight off the column buffer.
-            let mut direct: Option<Vec<bool>> = None;
-            if let Expr::Cmp(a, infinity_parser::CmpOp::Eq, b) = pred {
-                let (col, value) = match (&**a, &**b) {
-                    (Expr::Column(i), Expr::Literal(v)) => (Some(*i), Some(v)),
-                    (Expr::Literal(v), Expr::Column(i)) => (Some(*i), Some(v)),
-                    _ => (None, None),
-                };
-                if let (Some(pos), Some(value)) = (col, value) {
-                    if let Some(k) = needed.iter().position(|p| *p == pos) {
-                        direct = Some(data[k].equality_mask(&valid[k], value));
-                    }
-                }
+        let row_count = seqs.len();
+        if out_of_order && row_count > 0 {
+            let mut order: Vec<usize> = (0..row_count).collect();
+            order.sort_by_key(|i| seqs[*i]);
+            for column in &mut data {
+                *column = permute_column(column, &order);
             }
-            let mut scratch = vec![Value::Null; width];
-            let keep: Vec<bool> = match direct {
-                Some(mask) => mask,
-                None => {
-                    let mut mask: Vec<bool> = Vec::with_capacity(row_count);
-                    for r in 0..row_count {
-                for (k, pos) in needed.iter().enumerate() {
-                    if *pos < width {
-                        scratch[*pos] = if valid[k].get(r).copied() == Some(false) {
-                            Value::Null
-                        } else {
-                            data[k].value_at(r)
-                        };
-                    }
-                }
-                        mask.push(pred.eval_predicate(&scratch));
-                    }
-                    mask
-                }
-            };
-            for (k, _) in needed.iter().enumerate() {
-                data[k].retain(&keep);
-                let mut at = 0usize;
-                valid[k].retain(|_| {
-                    let v = keep.get(at).copied().unwrap_or(false);
-                    at += 1;
-                    v
-                });
+            for v in &mut valid {
+                *v = order.iter().map(|i| v[*i]).collect();
             }
-            row_count = keep.iter().filter(|k| **k).count();
-        }
-        // Only the requested columns, in the requested order.
-        let mut out_data = Vec::with_capacity(wanted.len());
-        let mut out_valid = Vec::with_capacity(wanted.len());
-        for pos in wanted {
-            let k = needed.iter().position(|p| p == pos)?;
-            out_data.push(data[k].clone());
-            out_valid.push(valid[k].clone());
         }
         Some(Batch {
-            columns: labels,
-            data: out_data,
-            valid: out_valid,
+            columns: wanted
+                .iter()
+                .map(|pos| meta.columns.get(*pos).cloned().unwrap_or_default())
+                .collect(),
+            data,
+            valid,
             row_count,
         })
     }
-
     /// Appends one column of a decoded block to `out`, skipping the rows the
     /// version hides.
     #[allow(clippy::too_many_arguments)]
@@ -4472,6 +4466,31 @@ impl Engine {
                 out.push_value(&Value::Null);
                 valid.push(false);
                 continue;
+            }
+            // A text column is written straight into its buffer: the cell never
+            // becomes a `Value` and, for varchar, never a `String` either.
+            if matches!(out, ColumnData::Text(_)) {
+                if kind != OutlineKind::None {
+                    return None;
+                }
+                let ColumnData::Text(text) = out else {
+                    unreachable!()
+                };
+                match decode_text_cell(
+                    &type_text[pos],
+                    *column_type,
+                    layout,
+                    &body.data,
+                    row,
+                    raw.outline.as_slice(),
+                    text,
+                ) {
+                    Some(ok) => {
+                        valid.push(ok);
+                        continue;
+                    }
+                    None => return None,
+                }
             }
             let value = match kind {
                 OutlineKind::None => match layout {
