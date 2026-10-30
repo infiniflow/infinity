@@ -144,11 +144,11 @@ IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）
 
 逐阶段的耗时分布与架构对比见 [`SELECT_CHAIN.md`](SELECT_CHAIN.md)（同一台机、同一份数据、perf 采样）。这里只放结论：
 
-| 查询（40,000 行，落块后） | 参考 服务端CPU | 端口 服务端CPU |
+| 查询（40,000 行，落块后，端到端 wall） | 参考 | 端口 |
 |---|---|---|
-| `SELECT id` | 1.50 ms | 5.00 ms |
-| `SELECT id, name` | 3.00 ms | 14.00 ms |
-| `WHERE id = 39999` | 4.50 ms | 2.00 ms |
+| `SELECT id` | 1.85 ms | 6.58 ms |
+| `SELECT id, name` | 14.31 ms | 26.41 ms |
+| `WHERE id = 39999` | 0.93–1.66 ms | 1.74–2.03 ms |
 
 SDK driver（20,000 行，未 checkpoint，8 次最好值）：参考 insert 0.293 s / select 9.45 ms / 点查 1.31 ms；端口 0.300 s / 11.6 ms / 3.3 ms。`check_benchmark_result.py` 比三阶段**均值**，0.30 s 的 insert 把两个读阶段摊薄成 ~+3%。
 
@@ -165,6 +165,6 @@ SDK driver（20,000 行，未 checkpoint，8 次最好值）：参考 insert 0.2
 
 仍然慢的原因（详见 `SELECT_CHAIN.md` §4）：
 
-1. **结果是行式文本**：执行器出口把每个 cell 渲染成 `String`（`QueryResult::Rows` 是 `Vec<Vec<String>>`），协议层再 `parse` 回数字打成 thrift 的列块。`SELECT id` 的 5 ms 里 1.9 ms 是这一趟往返。
+1. **结果是行式文本**：执行器出口把每个 cell 渲染成 `String`（`QueryResult::Rows` 是 `Vec<Vec<String>>`），协议层再 `parse` 回数字打成 thrift 的列块。`SELECT id` 的服务端 4.8 ms 里 1.9 ms 是这一趟往返。
 2. **扫描与结果是行式的**：每行一个 `Vec<Value>`、每 cell 一个枚举；参考全程是 `ColumnVector` / `DataBlock` 列缓冲（`memcpy` 到 wire）。perf 里端口 ~55% 在 malloc/free。
-3. **文本型列必须解析**：varchar/json/date 的 cell 只有文本形态，varchar 列的 `SELECT id, name` 14 ms 里约 8 ms 在这一列的解码与重新编码。
+3. **文本型列必须解析**：varchar/json/date 的 cell 只有文本形态；`SELECT id, name` 的读块 + 解码 7.85 ms 里约 5.7 ms 是 varchar 这一列（整型那列只要 2.1 ms）。
