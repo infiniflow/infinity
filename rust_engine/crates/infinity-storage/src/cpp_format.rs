@@ -406,6 +406,11 @@ pub struct RawBlockColumn {
 ///
 /// Files are created in the C++ order: every column's `{id}.col` (followed by
 /// its `col_{id}_out` when present), and the `version` file **last**.
+///
+/// Every file is fsynced as it is written, like the reference's
+/// `FileWorker::WriteToFile` (`src/storage/buffer/file_worker/file_worker_impl.cpp:167`):
+/// a block a checkpoint published must survive a power loss on its own, not
+/// only through the page cache.
 pub fn write_block(
     root: &Path,
     id: BlockId,
@@ -415,17 +420,26 @@ pub fn write_block(
     let dir = root.join(block_dir(id.db_id, id.table_id, id.segment_id, id.block_id));
     std::fs::create_dir_all(&dir)?;
     for col in columns {
-        std::fs::write(
-            dir.join(column_file(col.column_id)),
-            encode_data_file(&col.body.encode()),
+        write_synced(
+            &dir.join(column_file(col.column_id)),
+            &encode_data_file(&col.body.encode()),
         )?;
         if !col.outline.is_empty() {
             // The outline file is raw: no header, no trailer.
-            std::fs::write(dir.join(column_outline_file(col.column_id)), &col.outline)?;
+            write_synced(&dir.join(column_outline_file(col.column_id)), &col.outline)?;
         }
     }
-    std::fs::write(dir.join(VERSION_FILE), version.encode())?;
+    write_synced(&dir.join(VERSION_FILE), &version.encode())?;
     Ok(dir)
+}
+
+/// `VirtualStore::Open` + `Append` + `Sync`: write the file and fsync it before
+/// returning (no directory fsync — the reference does not fsync directories).
+fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut file = std::fs::File::create(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()
 }
 
 /// Reads a block directory written by [`write_block`] (or by the C++ engine).

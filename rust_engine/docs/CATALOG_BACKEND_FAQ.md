@@ -51,7 +51,7 @@
 
 **语义**：承诺的持久化边界是 **checkpoint，不是 commit**——commit 只写页缓存，掉电可以把它丢掉。进程崩溃（页缓存还在）通常会保留到 WAL 尾部，但那不是承诺。
 
-**掉电后真正持久的是两个 RocksDB 的 SST**（RocksDB 在 flush 里自己 fsync SST 与 MANIFEST），外加 checkpoint 里那些自己 sync 过的索引文件。块镜像（`data/**`）不是：`cpp_format::write_block` 走 `std::fs::write`，全路径没有 fsync（参考在 `file_worker_impl.cpp:129` 等处对块文件做 `fsync`）。行数据的权威副本是 `persistence` 库里的行记录，块只是镜像——恢复时 `recover_cpp_blocks` → `reconcile_mirror_marks` 按 KV 与块文件的行数差重建，下一次 checkpoint 再把块写全。所以块文件落后不会丢数据，只会让这次恢复多干一点活。
+**掉电后持久的是什么**：两个 RocksDB 的 SST（RocksDB 在 flush 里自己 fsync SST 与 MANIFEST）**加上块文件**。块文件对齐参考的 `FileWorker::WriteToFile`（`file_worker_impl.cpp:167`）：`{id}.col` / `col_{id}_out` / `version` 每个文件写完就 fsync（`cpp_format::write_synced`），目录本身不 fsync（参考也不 fsync 目录）。行数据的权威副本仍是 `persistence` 库里的行记录：块是镜像，恢复时 `recover_cpp_blocks` → `reconcile_mirror_marks` 按 KV 与块文件的行数差重建，所以块文件落后不会丢数据，只会让这次恢复多干一点活。索引 chunk 文件各有各自的 writer，`infinity-index` 的持久化走 `sync_all`，`cpp_blocks` 里少数 chunk 镜像仍是普通 `std::fs::write`（参考对这些文件也做 fsync），这是还没对齐的一处。
 
 **两个库的处理**：参考只有一份 KV，catalog 记录与 `applied` 标记天然同库，丢一起丢。端口有两个 RocksDB（`catalog` 与 `persistence`），所以 `applied` 标记**两边都写**、重放下界取两者**最小值**（`apply_split` / `TxnManager::applied_ts`）。否则 RocksDB 后台把其中一个 memtable 刷成 SST、另一个随崩溃丢掉时，重放会相信领先的那个标记，跳过落后的库丢掉的记录。
 
