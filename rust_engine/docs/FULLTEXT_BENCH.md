@@ -323,9 +323,15 @@ set_memindex_capacity(2) 把 20 行切成约 10 个段，断言四条查询（�
 
 | 端口的 checkpoint 步骤 | 耗时 |
 |---|---|
-| RocksDB flush()（catalog） | 4–5 ms |
-| WAL fsync | 5–6 ms |
+| RocksDB flush()（catalog，memtable → SST） | 3.3–4.5 ms |
+| catalog 这个 RocksDB 自己的 WAL fsync | 0.6–1.2 ms |
+| txn WAL（wal.log）fsync | 5–6 ms |
 | flush_cpp_blocks（块镜像 + 失效索引目录清理） | 2.5–3.4 ms |
+
+只有第一行和参考的 kv store `Flush()`（`src/storage/catalog/kv_store_impl.cpp:390`，
+一次 `transaction_db_->Flush(flush_opts)`）是同一个动作；第二行是我们独有的——参考的
+catalog RocksDB 直接 `write_options_.disableWAL = true`（`kv_store_impl.cpp:307-311`），
+根本不写这条 WAL，也就没有它的 fsync。
 
 这 13.6 ms 与全文索引无关（此时索引还是空的），它衡量的是持久化实现各自的同步粒度，
 把它塞进「建索引」那一行只会掩盖索引本身的成本——所以**对比测试里不计**：基准默认只
