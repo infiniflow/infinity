@@ -3230,7 +3230,7 @@ impl MemoryIndexer {
     /// C++: `MemoryIndexer::Insert` for one document. Returns `false` when the
     /// document would push the segment past `budget`, leaving it unchanged.
     fn insert(&mut self, seq: u64, text: &str, tokenizer: &TextTokenizer, budget: usize) -> bool {
-        let toks = tokenize_index_positions(text, tokenizer);
+        let mut toks = tokenize_index_positions(text, tokenizer);
         // ~32 B per posting entry plus the positions and the term string.
         let mut cost = 64usize;
         for (term, _) in &toks {
@@ -3257,11 +3257,22 @@ impl MemoryIndexer {
         if !self.runs.is_empty() && self.run_containing(seq).is_some() {
             self.newest.insert(seq, IN_TAIL);
         }
-        let mut pos: FastMap<&str, Vec<u32>> = FastMap::default();
-        for (term, at) in &toks {
-            pos.entry(term.as_str()).or_default().push(*at);
-        }
-        for (term, positions) in pos {
+        // Group the document's tokens by term without a hash map: sorting once
+        // and walking the runs costs no allocation, where the per-document map
+        // and its per-term `Vec`s were ~10% of an import (measured, see
+        // `docs/FULLTEXT_BENCH.md` §8.1). The compare includes the position so
+        // equal terms come out ascending, which the position encoder relies on.
+        toks.sort_unstable_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+        let mut positions: Vec<u32> = Vec::new();
+        let mut at = 0usize;
+        while at < toks.len() {
+            let first = at;
+            while at < toks.len() && toks[at].0 == toks[first].0 {
+                at += 1;
+            }
+            let term = toks[first].0.as_str();
+            positions.clear();
+            positions.extend(toks[first..at].iter().map(|entry| entry.1));
             // Only the first posting of a term allocates its key: looking up by
             // the borrowed term keeps the per-document cost down (a 20k-row
             // column adds a couple of million postings).

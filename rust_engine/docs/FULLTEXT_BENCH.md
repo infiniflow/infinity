@@ -68,8 +68,8 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 |---|---|---|---|
 | CREATE INDEX（DDL 本身，见 §4.11） | 3–5 ms（参考读数含它自己的 Flush） | 1.1–1.9 ms | 持平 |
 | ReadJsonl（不计入） | 17–29 ms | 60–62 ms | — |
-| INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 2.59 s | ≈2.5× 慢 |
-| IMPORT 20000 行 | ≈2 s | 2.45–2.46 s | ≈1.2× 慢 |
+| INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 2.37–2.39 s | ≈2.4× 慢（计时口径见 §7） |
+| IMPORT 20000 行 | ≈2 s | **2.26 s** | ≈1.13× 慢 |
 | Optimize（合并索引 chunk） | 360–512 µs | 299–397 µs | 同量级 |
 | 查询 1 `harmful "social custom"` | 1–5 ms | **0.32 ms** | 反超 |
 | 查询 2 `social custom "harmful chemical"` | 0.93–1 ms | **0.37 ms** | 反超 |
@@ -358,6 +358,25 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 行、内存尾 0 行）；`new_catalog_index_internal_ut::test_index` / `test_populate_index0`
 里「full-text 从第 0 行重建」的断言改成 checkpoint dump 之后的形状，与其它索引一致。
 
+### 4.13 词干 memo 与「排序分组」（写路径的常数项）
+
+§8.1 的 profile 指出两处纯常数开销，都已改掉：
+
+| 改动 | 内容 |
+|---|---|
+| 词干 memo | `Stemmer::stem_memo`：thread-local 的 `算法 -> (词 -> 词干)` 表（不跨线程加锁），命中重复词直接取结果；表满 64k 条就整表清空，不会随词表无限长。`analyze` 用它，查询侧同样受益 |
+| 分组不再用 map | `MemoryIndexer::insert` 先把 token 按 `(term, position)` 排序，再走连续段把位置写进各词的 arena：省掉每文档一个 `FastMap` 和每词一个 `Vec` |
+
+实测（同机同语料，各跑两轮）：
+
+| 阶段 | 改前 | 改后 |
+|---|---|---|
+| IMPORT 20000 行 | 2.49 s | **2.26 s**（参考 ≈2 s） |
+| INSERT 20000 行（batch=500） | 2.59 s | **2.37–2.39 s** |
+| 查询（repeat=20 取最小） | 0.27 / 0.32 / 0.25 / 0.27 / 1.36 / 2.96 / 1.36 ms | 0.28 / 0.33 / 0.26 / 0.28 / 1.41 / 3.05 / 1.37 ms（无变化） |
+
+产物不变：`cargo test -p infinity-executor`（707 + 集成）全绿，包括全文格式的字节门禁。
+
 ## 5. 顺带修掉的一个格式缺陷
 
 `encode_fulltext_chunk`（`crates/infinity-executor/src/cpp_blocks.rs`）原来对
@@ -395,9 +414,10 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 
 （插桩是临时的 `INF_FT_PROF`，已移除；数字为本机 20k 文档、单次运行的累计值。）
 
-### 8.1 IMPORT 2.49 s（参考 ≈2 s）
+### 8.1 IMPORT（参考 ≈2 s）
 
-370 万 token / 2 万文档，`MemoryIndexer::insert` 及其调用链的拆分：
+370 万 token / 2 万文档，`MemoryIndexer::insert` 及其调用链的拆分。下表是**改动前**（2.49 s）的
+快照；其中的 analyze 与 posmap 两块已经按下面的 1/3 条改掉，现在是 2.26 s：
 
 | 阶段 | 耗时 | 占比 | 内容 |
 |---|---|---|---|
@@ -408,14 +428,15 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 | 其余 | ~180 ms | 7% | 校验、行编码、`index_rows`、`publish_encoded_rows`、提交 |
 
 每行的固定开销可以忽略（收集索引句柄 2.1 ms、`index_delete_row` 1.9 ms、向量缓存 6.3 ms），
-所以这一项不是「每行太重」，而是上面四块。按性价比排序：
+所以这一项不是「每行太重」，而是上面四块。按性价比排序（前两条已实现，见 §4.13）：
 
-1. **seal 877 ms**：FST 与 posting 编码是实打实的活，posting 编解码已经吃过 SIMD（隔离 1.2–3.5×）。
+1. **analyze 861 ms**：3.7M 次 `String` 分配 + 词干。**已做词干 memo**：thread-local、按算法分表、
+   64k 条上限，命中重复词就不跑 Snowball。还没做的是 token interning（把 `Term::text` 换成 ID，
+   连带把 postings 的查表变成整数比较）。
+2. **posmap 238 ms**：**已做**——每文档的哈希 map 与每词一个 `Vec` 换成「按 (term, position) 排序后
+   走连续段」，一次分配都不做（`MemoryIndexer::insert`）。
+3. **seal 877 ms**：FST 与 posting 编码是实打实的活，posting 编解码已经吃过 SIMD（隔离 1.2–3.5×）。
    真正能省的是把它挪到后台（参考的 `DumpMemIndexTask`）——那就是 §7 里决定**不做**的第 2 项。
-2. **analyze 861 ms**：3.7M 次 `String` 分配 + 词干。词干 memo（每列一张 词→stem）能吃掉重复词部分，
-   自然文本约 60–70% 命中，估计省 150–250 ms；把 token 变成 interned id 还能连带把 postings 的查表变整数比较。
-3. **posmap 238 ms**：把「每文档一个哈希 map + 每词一个 Vec」换成「对 token 列表按 term 排序后分组」，
-   一次性写进各词的 arena，省掉 map 和 Vec 的分配。
 4. **postings 321 ms**：`HashMap<String, …>` 的 memcmp 查表 + `Vec::insert`；term 改成 interned id 后可换整数键的开放寻址表。
 
 ### 8.2 14 词查询 1.36–1.50 ms（参考 0.84–1 ms）

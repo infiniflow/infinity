@@ -253,7 +253,7 @@ impl StandardAnalyzer {
             };
             let stem: Option<String> = match self.stemmer {
                 Some(stemmer) if self.extract_eng_stem => {
-                    let stem = stemmer.stem(&lower);
+                    let stem = stemmer.stem_memo(&lower);
                     // Only a stem that differs from the word becomes a term, so
                     // an unchanged one costs no allocation.
                     if stem.as_ref() == lower.as_ref() {
@@ -750,6 +750,56 @@ impl Stemmer {
             Self::Porter => std::borrow::Cow::Owned(super::porter::stem(word)),
         }
     }
+
+    /// [`Self::stem`], memoised per thread.
+    ///
+    /// Natural text repeats its words heavily (60–70% of the tokens of the
+    /// benchmark corpus), so the stem of most tokens is one already computed:
+    /// looking it up costs a short hash instead of a whole Snowball run. The
+    /// cache is per thread (no lock on the index path), per algorithm (two
+    /// languages must not share entries) and bounded — reaching the bound
+    /// clears it instead of growing with the vocabulary forever.
+    fn stem_memo(&self, word: &str) -> std::borrow::Cow<'_, str> {
+        match self {
+            Self::Snowball(algorithm) => {
+                std::borrow::Cow::Owned(memoized_stem(*algorithm, word).into_string())
+            }
+            Self::Porter => std::borrow::Cow::Owned(super::porter::stem(word)),
+        }
+    }
+}
+
+/// Entries a thread's stem cache may hold before it is dropped wholesale.
+const STEM_MEMO_LIMIT: usize = 1 << 16;
+
+thread_local! {
+    /// `algorithm -> (word -> stem)`, one map per algorithm seen on this thread.
+    static STEM_MEMO: std::cell::RefCell<Vec<(rust_stemmers::Algorithm, HashMap<Box<str>, Box<str>>)>>
+        = std::cell::RefCell::new(Vec::new());
+}
+
+/// The stem of `word`, from this thread's cache when it is already there.
+fn memoized_stem(algorithm: rust_stemmers::Algorithm, word: &str) -> Box<str> {
+    STEM_MEMO.with(|cell| {
+        let mut maps = cell.borrow_mut();
+        let index = match maps.iter().position(|(a, _)| *a == algorithm) {
+            Some(index) => index,
+            None => {
+                maps.push((algorithm, HashMap::new()));
+                maps.len() - 1
+            }
+        };
+        let map = &mut maps[index].1;
+        if let Some(stem) = map.get(word) {
+            return stem.clone();
+        }
+        let stem: Box<str> = Box::from(snowball(algorithm).stem(word).as_ref());
+        if map.len() >= STEM_MEMO_LIMIT {
+            map.clear();
+        }
+        map.insert(Box::from(word), stem.clone());
+        stem
+    })
 }
 
 /// The Snowball environment for an algorithm, created once per process. The
