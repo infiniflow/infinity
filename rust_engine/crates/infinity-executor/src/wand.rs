@@ -488,34 +488,50 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.candidate_score = score;
                 return true;
             }
-            self.skip_block_range(doc, pivot);
+            self.skip_blocks(doc, pivot);
         }
         self.doc_id = None;
         false
     }
 
-    /// The reference's block-skip path (blockmax_wand_iterator_impl.cpp:449-524):
-    /// every document in [doc, skip_to) is bounded by the prefix's block maxima,
-    /// which stayed below the k-th score, so the whole run is stepped over in one
-    /// seek per cursor. The run is capped at the next document any cursor is
-    /// already sitting on, which keeps documents that a later pivot still needs
-    /// reachable.
-    fn skip_block_range(&mut self, doc: u64, pivot: usize) {
-        let up_to = self.cursors.get(pivot + 1).and_then(|c| c.cur);
-        let mut block_last = u64::MAX;
-        for cursor in &mut self.cursors[..=pivot] {
-            block_last = block_last.min(cursor.block_last());
-        }
-        let skip_to = match up_to {
-            Some(up_to) => (block_last + 1).min(up_to),
-            None => block_last + 1,
-        };
-        debug_assert!(skip_to > doc);
-        for i in 0..=pivot {
-            let cursor = &mut self.cursors[i];
-            if cursor.cur.is_some_and(|cur| cur < skip_to) {
-                cursor.seek(skip_to);
+    /// The reference's block-skip path (`blockmax_wand_iterator_impl.cpp:449-524`):
+    /// while the prefix's block bound cannot reach the k-th score, step every
+    /// prefix cursor to the end of its block and try again. Nothing is resolved
+    /// here, so the skipped ranges never decode document offsets (`NextShallow`).
+    fn skip_blocks(&mut self, mut from: u64, pivot: usize) {
+        loop {
+            // `block_last_doc` of the prefix is fresh: either the caller just
+            // computed the block bound, or the loop below did.
+            let up_to = self.cursors.get(pivot + 1).and_then(|c| c.cur);
+            let mut block_last = u64::MAX;
+            for i in 0..=pivot {
+                block_last = block_last.min(self.cursors[i].block_last());
             }
+            if block_last == u64::MAX {
+                return;
+            }
+            let skip_to = match up_to {
+                Some(up_to) => (block_last + 1).min(up_to),
+                None => block_last + 1,
+            };
+            if skip_to <= from {
+                return;
+            }
+            for i in 0..=pivot {
+                self.cursors[i].seek(skip_to);
+            }
+            // The bound of the blocks the prefix cursors now sit on.
+            let mut bound = 0.0;
+            let mut last = u64::MAX;
+            for i in 0..=pivot {
+                let field = self.cursors[i].field;
+                bound += self.cursors[i].block_max(&*self.doc_lens[field], self.mode);
+                last = last.min(self.cursors[i].block_last());
+            }
+            if bound >= self.threshold || last == u64::MAX {
+                return;
+            }
+            from = skip_to;
         }
     }
 

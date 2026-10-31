@@ -152,10 +152,19 @@ boolean 模式下短语仍按词拆成多个游标（权重取字段 boost）；
 确实没有解位置。
 
 **实测这一版没有变快**（仍是 2.48 ms）：因为 WAND 的循环紧接着就要 `ensure()` 拿
-`cur` 去排序/找 pivot，延迟的那次解析在下一步就发生了。要真省下来，得把参考的
-**浅层循环**也搬过来——在 `ensure` 之前先用各游标的块上界和 `block_last` 连续跳块，
-直到上界够到阈值才解析。这一步改的是 `BlockMaxWandIterator::next` 的控制流，
-留给下一轮。
+`cur` 去排序/找 pivot，延迟的那次解析在下一步就发生了。
+
+浅层循环也搬过来了（`BlockMaxWandIterator::skip_blocks`）：在上界够不到阈值时，用
+各游标的 `block_last` 连续把前缀游标推到块尾并重算块上界，全程不 `ensure()`。
+但**这个负载下的数字仍然不动**（`"one of"` 2.47–2.63 ms、单独 `of` 2.90 ms）：
+两个词在每个块里的最大 tf 都很高，块上界 `min_i(...)` 始终高于第 10 名的分数，
+一次都不会剪。参考在同样数据上也是同样的界，所以它也不会剪——它那 1–2 ms 的差别
+只能来自「每篇文档走一遍」的单价，不是剪枝。
+
+要用上浅层循环，得让块上界真正掉到阈值以下（短语里带一个稀有词、或 top-k 分数差异
+大）；`phrase_unit_prunes_blocks_without_phrase_matches` 和
+`top_k_in_the_first_block_never_scores_later_blocks` 就是这种构造，断言精确打分次数
+被压在首块内。
 
 参考侧是块级 WAND + 跳表流式推进（命中 k 个就停），只投影 `row_id`/score 两列，
 所以耗时基本与语料规模无关（20k 文档仍在 1 ms 量级）。
