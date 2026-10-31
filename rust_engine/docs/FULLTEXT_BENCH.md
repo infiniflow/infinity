@@ -390,3 +390,53 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 | 写路径流水线化（参考的 `AppendMemIndexTask`） | **不做** | INSERT 的 2.6 倍主要是**计时口径**：参考把全文 mem-index 追加交给后台 appender（`new_txn_index_impl.cpp:892` → `mem_index_appender_impl.cpp`），insert 返回时索引还没建完，`sleep(10)` 之后才查询；端口是同步建索引。真实吞吐看 IMPORT（1.25×）。要做就得重做提交路径的时序与错误处理（dump/checkpoint 前 `WaitForCompletion`），风险高于收益 |
 | 词干 memo / 词项表（IMPORT 还差 1.25×） | 待分析 | §4.10 的 profile：词干 ~22%、分配器 ~22%、词项查表（memcmp）~10% |
 | 14 词查询（1.36 ms vs 0.84–1 ms） | 待分析 | 先 profile：每单元 `ensure()`、块窗口、`score_with` 的逐单元循环 |
+
+## 8. 分析：IMPORT 的 1.25× 与 14 词查询的 1.4×
+
+（插桩是临时的 `INF_FT_PROF`，已移除；数字为本机 20k 文档、单次运行的累计值。）
+
+### 8.1 IMPORT 2.49 s（参考 ≈2 s）
+
+370 万 token / 2 万文档，`MemoryIndexer::insert` 及其调用链的拆分：
+
+| 阶段 | 耗时 | 占比 | 内容 |
+|---|---|---|---|
+| analyze | 861 ms | 34% | `tokenize_index_positions`：分词、小写、Snowball 词干，**每个 token 一个 `String`** |
+| seal | 877 ms | 35% | 触发预算后把内存段写成 `ft_*.{dic,pos,len,row}`：FST 构建 + posting 编码 + 逐文件 fsync |
+| postings | 321 ms | 13% | `HashMap<String, TermPostings>` 查表 + arena 追加 + 升序列表插入 |
+| posmap | 238 ms | 10% | 每文档一个 `FastMap<&str, Vec<u32>>`（每词一个 `Vec`，每个文档一个 map） |
+| 其余 | ~180 ms | 7% | 校验、行编码、`index_rows`、`publish_encoded_rows`、提交 |
+
+每行的固定开销可以忽略（收集索引句柄 2.1 ms、`index_delete_row` 1.9 ms、向量缓存 6.3 ms），
+所以这一项不是「每行太重」，而是上面四块。按性价比排序：
+
+1. **seal 877 ms**：FST 与 posting 编码是实打实的活，posting 编解码已经吃过 SIMD（隔离 1.2–3.5×）。
+   真正能省的是把它挪到后台（参考的 `DumpMemIndexTask`）——那就是 §7 里决定**不做**的第 2 项。
+2. **analyze 861 ms**：3.7M 次 `String` 分配 + 词干。词干 memo（每列一张 词→stem）能吃掉重复词部分，
+   自然文本约 60–70% 命中，估计省 150–250 ms；把 token 变成 interned id 还能连带把 postings 的查表变整数比较。
+3. **posmap 238 ms**：把「每文档一个哈希 map + 每词一个 Vec」换成「对 token 列表按 term 排序后分组」，
+   一次性写进各词的 arena，省掉 map 和 Vec 的分配。
+4. **postings 321 ms**：`HashMap<String, …>` 的 memcmp 查表 + `Vec::insert`；term 改成 interned id 后可换整数键的开放寻址表。
+
+### 8.2 14 词查询 1.36–1.50 ms（参考 0.84–1 ms）
+
+同一次运行里把「搜索前的准备」与 WAND 本体拆开，并读 WAND 的剪枝计数：
+
+| 查询 | prep | WAND | 精确打分次数 | 最深块号 |
+|---|---|---|---|---|
+| `harmful "social custom"` | 175 µs | 57 µs | 70 | 0 |
+| `"annual American awards"`（0 命中） | 287 µs | 2.7 µs | 0 | 0 |
+| `"one of"` | 82 µs | 1.17 ms | 73 | 977 |
+| 13 词 | 132 µs | 2.80 ms | 494 | 140 |
+| 14 词 | 153 µs | 1.12 ms | 269 | 25 |
+
+- **剪枝没问题**：0 命中的短语 0 次精确打分；`"one of"` 只精确打分 73 次却推进了 977 个块——上界够就整块跳过。
+- 14 词的 1.12 ms 摊在 **25 个块 × 14 个 cursor** 上，约 45 µs/块；13 词是 140 块、约 20 µs/块。
+  精确打分只有 269 次，所以钱花在「块级游标推进 + 每块重算上界」而不是打分。
+- 另外约 300 µs 是 `search_text_terms` **之外**的固定开销（SQL 解析、计划、命中行的取回/投影）：
+  `harmful "social custom"` 的 `execute` 是 533 µs = prep 175 + wand 57 + ≈300。
+
+结论：14 词这 0.35 ms 的差距一半来自那 300 µs 的固定开销（对所有查询生效，受益面最大），
+另一半是块循环的常数因子。块循环与参考同构（skip list 为空，两边都现场算块上界），
+要继续压只能动「每块每 cursor 解 128 条 posting」这条路径，收益上限不大。
+
