@@ -292,7 +292,8 @@ pub fn write_bmp_file(
         std::fs::create_dir_all(parent)
             .map_err(|e| FormatError::Io(format!("{}: {e}", parent.display())))?;
     }
-    std::fs::write(path, bytes).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
+    crate::cpp_format::write_synced(path, &bytes)
+        .map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
 }
 
 /// A BMP file mapped read-only, parsed into the same tables the reference

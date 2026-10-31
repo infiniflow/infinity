@@ -99,7 +99,8 @@ pub fn write_bmp_segment(
         std::fs::create_dir_all(parent)
             .map_err(|e| FormatError::Io(format!("{}: {e}", parent.display())))?;
     }
-    std::fs::write(path, out).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
+    crate::cpp_format::write_synced(path, &out)
+        .map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
 }
 
 /// A segment file mapped read-only.

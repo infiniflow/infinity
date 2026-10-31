@@ -327,7 +327,7 @@ set_memindex_capacity(2) 把 20 行切成约 10 个段，断言四条查询（�
 | RocksDB flush()（persistence 行库） | 2.9 ms | 没有对应物：参考只有一份 KV，行在块文件里 |
 | flush_cpp_blocks（块镜像 + 失效索引目录清理） | 2.2 ms | 有，写数据块 |
 
-块文件写完即 fsync（对齐 `FileWorker::WriteToFile`），20,000 行那次的 `flush_cpp_blocks` 从 2.495 s 变成 2.514 s：块文件少（3 个块），fsync 的增量约 19 ms。
+块文件与索引 chunk 写完即 fsync（对齐 `FileWorker::WriteToFile`，见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) §3）。20,000 行那次的 `flush_cpp_blocks`：2.495 s → 2.514 s（块文件，+19 ms）→ 2.584 s（再加上全文 chunk 的 `.dic`/`.pos`/`.len`，+70 ms）。
 
 两个 `Flush` 都不再 fsync 日志：catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，
 `kv_store_impl.cpp:441`），`wal.log` 在任何路径上都不 fsync（对齐 `ofs_.write` + `ofs_.flush()`）。

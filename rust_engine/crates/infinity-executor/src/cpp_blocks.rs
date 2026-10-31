@@ -357,7 +357,7 @@ fn publish_bmp_chunks(
             .max(term_bound as i32) as usize;
         let bytes = infinity_storage::bmp_cpp::encode_bmp(block_size, width, &docs, term_num);
         let path = seg_dir.join(format!("chunk_{block}.idx"));
-        if std::fs::write(&path, &bytes).is_err() {
+        if cpp_format::write_synced(&path, &bytes).is_err() {
             continue;
         }
         chunks.push(CppIndexChunk {
@@ -2519,7 +2519,7 @@ impl Engine {
                             .join(&block_dir)
                             .join(cpp_format::column_outline_file(meta.ids[i]));
                         if !path.exists() {
-                            let _ = std::fs::write(&path, b"");
+                            let _ = cpp_format::write_synced(&path, b"");
                         }
                     }
                 }
@@ -3163,7 +3163,7 @@ impl Engine {
                         continue;
                     };
                     if std::fs::create_dir_all(&seg_dir).is_err()
-                        || std::fs::write(seg_dir.join("chunk_0.idx"), &bytes).is_err()
+                        || cpp_format::write_synced(&seg_dir.join("chunk_0.idx"), &bytes).is_err()
                     {
                         continue;
                     }
@@ -3185,7 +3185,7 @@ impl Engine {
                         continue;
                     };
                     if std::fs::create_dir_all(&seg_dir).is_err()
-                        || std::fs::write(seg_dir.join("chunk_0.idx"), &bytes).is_err()
+                        || cpp_format::write_synced(&seg_dir.join("chunk_0.idx"), &bytes).is_err()
                     {
                         continue;
                     }
@@ -5210,7 +5210,7 @@ impl Engine {
                 .unwrap_or(0)
                 .try_into()
                 .unwrap_or(u32::MAX);
-            std::fs::write(dir.join(name), &chunk).map_err(|e| Error::Io {
+            cpp_format::write_synced(&dir.join(name), &chunk).map_err(|e| Error::Io {
                 path: dir.clone(),
                 source: e,
             })?;
@@ -5929,7 +5929,7 @@ impl Engine {
                     (format!("{base}.len"), &len),
                 ] {
                     let path = dir.join(&name);
-                    std::fs::write(&path, bytes).map_err(|e| Error::Io { path, source: e })?;
+                    cpp_format::write_synced(&path, bytes).map_err(|e| Error::Io { path, source: e })?;
                 }
                 written += block_rows.len();
             }
@@ -6488,7 +6488,7 @@ impl Engine {
                 path: dir.clone(),
                 source: e,
             })?;
-            std::fs::write(dir.join("chunk_0.idx"), &chunk).map_err(|e| Error::Io {
+            cpp_format::write_synced(&dir.join("chunk_0.idx"), &chunk).map_err(|e| Error::Io {
                 path: dir.clone(),
                 source: e,
             })?;
@@ -6918,7 +6918,7 @@ impl Engine {
         let indexes: Vec<PlaidIndex> = chunks.into_iter().map(|c| c.index).collect();
         let merged = Self::merge_plaid_chunk_indexes(&indexes)?;
         let path = mirror.dir.join(format!("chunk_{next}.idx"));
-        std::fs::write(&path, merged.to_bytes()).map_err(|e| Error::Io {
+        cpp_format::write_synced(&path, &merged.to_bytes()).map_err(|e| Error::Io {
             path: path.clone(),
             source: e,
         })?;
@@ -6952,7 +6952,7 @@ impl Engine {
             let (count, bytes) =
                 self.cpp_plaid_chunk(&table, &mirror.column, mirror.dims as usize, &options)?;
             let path = mirror.dir.join("chunk_0.idx");
-            std::fs::write(&path, &bytes).map_err(|e| Error::Io {
+            cpp_format::write_synced(&path, &bytes).map_err(|e| Error::Io {
                 path: path.clone(),
                 source: e,
             })?;
@@ -6965,7 +6965,7 @@ impl Engine {
                 .and_then(|chunks| chunks.into_iter().next())
             {
                 let centroids_path = mirror.dir.join("plaid_centroids.bin");
-                std::fs::write(&centroids_path, index.save_plaid_centroids()).map_err(|e| {
+                cpp_format::write_synced(&centroids_path, &index.save_plaid_centroids()).map_err(|e| {
                     Error::Io {
                         path: centroids_path.clone(),
                         source: e,
@@ -7020,7 +7020,7 @@ impl Engine {
         index.add_multiple_docs_embeddings(&flat, &lens)?;
         let next = chunks.last().map(|c| c.id + 1).unwrap_or(0);
         let path = mirror.dir.join(format!("chunk_{next}.idx"));
-        std::fs::write(&path, index.to_bytes()).map_err(|e| Error::Io {
+        cpp_format::write_synced(&path, &index.to_bytes()).map_err(|e| Error::Io {
             path: path.clone(),
             source: e,
         })?;

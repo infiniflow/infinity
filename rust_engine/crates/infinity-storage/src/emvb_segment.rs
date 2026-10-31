@@ -507,7 +507,8 @@ fn write_bytes(path: &Path, bytes: Vec<u8>) -> Result<(), FormatError> {
         std::fs::create_dir_all(parent)
             .map_err(|e| FormatError::Io(format!("{}: {e}", parent.display())))?;
     }
-    std::fs::write(path, bytes).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
+    crate::cpp_format::write_synced(path, &bytes)
+        .map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
 }
 
 /// The persisted residual product quantizer of one EMVB segment (plan #82).

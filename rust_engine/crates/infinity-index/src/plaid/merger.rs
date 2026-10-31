@@ -367,12 +367,9 @@ impl PlaidIndexDiskMerger {
 
     /// C++: `PlaidIndexDiskMerger::SaveManifest`.
     pub fn save_manifest(path: &str, manifest: &PlaidMergeManifest) -> Result<()> {
-        if let Some(dir) = Path::new(path).parent() {
-            std::fs::create_dir_all(dir)
-                .map_err(|e| Error::Invalid(format!("merge manifest dir: {e}")))?;
-        }
-        std::fs::write(path, manifest.to_json())
-            .map_err(|e| Error::Invalid(format!("merge manifest write: {e}")))
+        crate::write_synced(Path::new(path), manifest.to_json().as_bytes()).map_err(|e| {
+            Error::Invalid(format!("merge manifest write: {e}"))
+        })
     }
 
     /// C++: `PlaidIndexDiskMerger::CalculateMergeSize`.

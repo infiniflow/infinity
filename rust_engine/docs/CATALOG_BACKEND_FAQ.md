@@ -51,7 +51,7 @@
 
 **语义**：承诺的持久化边界是 **checkpoint，不是 commit**——commit 只写页缓存，掉电可以把它丢掉。进程崩溃（页缓存还在）通常会保留到 WAL 尾部，但那不是承诺。
 
-**掉电后持久的是什么**：两个 RocksDB 的 SST（RocksDB 在 flush 里自己 fsync SST 与 MANIFEST）**加上块文件**。块文件对齐参考的 `FileWorker::WriteToFile`（`file_worker_impl.cpp:167`）：`{id}.col` / `col_{id}_out` / `version` 每个文件写完就 fsync（`cpp_format::write_synced`），目录本身不 fsync（参考也不 fsync 目录）。行数据的权威副本仍是 `persistence` 库里的行记录：块是镜像，恢复时 `recover_cpp_blocks` → `reconcile_mirror_marks` 按 KV 与块文件的行数差重建，所以块文件落后不会丢数据，只会让这次恢复多干一点活。索引 chunk 文件各有各自的 writer，`infinity-index` 的持久化走 `sync_all`，`cpp_blocks` 里少数 chunk 镜像仍是普通 `std::fs::write`（参考对这些文件也做 fsync），这是还没对齐的一处。
+**掉电后持久的是什么**：两个 RocksDB 的 SST（RocksDB 在 flush 里自己 fsync SST 与 MANIFEST）**加上块文件**。块文件对齐参考的 `FileWorker::WriteToFile`（`file_worker_impl.cpp:167`）：`{id}.col` / `col_{id}_out` / `version` 每个文件写完就 fsync（`cpp_format::write_synced`），目录本身不 fsync（参考也不 fsync 目录）。行数据的权威副本仍是 `persistence` 库里的行记录：块是镜像，恢复时 `recover_cpp_blocks` → `reconcile_mirror_marks` 按 KV 与块文件的行数差重建，所以块文件落后不会丢数据，只会让这次恢复多干一点活。索引 chunk 文件同样逐文件 fsync：`cpp_blocks` 的各类 chunk 镜像（BMP / IVF / SMVE / EMVB / HNSW / PLAID / 全文 `.dic`/`.pos`/`.len`）、`bmp_cpp`/`bmp_segment`/`emvb_segment` 的 writer、`infinity-index` 的 `save_sparse` 与 PLAID merge manifest 都走 `write_synced`（同一个 `File::create` + `write_all` + `sync_all`），对应参考 `memory_indexer_impl.cpp:535-536,762-763`、`column_index_merger_impl.cpp:151-152` 的 `FileWriter::Sync`。
 
 **两个库的处理**：参考只有一份 KV，catalog 记录与 `applied` 标记天然同库，丢一起丢。端口有两个 RocksDB（`catalog` 与 `persistence`），所以 `applied` 标记**两边都写**、重放下界取两者**最小值**（`apply_split` / `TxnManager::applied_ts`）。否则 RocksDB 后台把其中一个 memtable 刷成 SST、另一个随崩溃丢掉时，重放会相信领先的那个标记，跳过落后的库丢掉的记录。
 

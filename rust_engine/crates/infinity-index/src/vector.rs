@@ -766,7 +766,7 @@ impl HnswIndex {
                 }
             }
         }
-        std::fs::write(path, out).map_err(|e| Error::io(path, e))
+        crate::write_synced(path, &out)
     }
 
     /// Loads an index written by [`HnswIndex::save_sparse`].

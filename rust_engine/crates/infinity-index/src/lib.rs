@@ -39,6 +39,23 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
+/// Writes an index file and fsyncs it before returning.
+///
+/// The reference syncs every file its index workers finish
+/// (`memory_indexer_impl.cpp:535-536,762-763`, and `FileWriter::Sync` for the
+/// KNN writers): a chunk a catalog record names must be on disk on its own, not
+/// only in the page cache. No directory fsync — the reference does not fsync
+/// directories either.
+pub(crate) fn write_synced(path: &Path, bytes: &[u8]) -> Result<()> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| Error::Invalid(format!("{}: {e}", dir.display())))?;
+    }
+    let mut file = fs::File::create(path).map_err(|e| Error::io(path, e))?;
+    file.write_all(bytes).map_err(|e| Error::io(path, e))?;
+    file.sync_all().map_err(|e| Error::io(path, e))?;
+    Ok(())
+}
+
 use infinity_common::{Error, Result};
 
 const MAGIC: u32 = 0x5345_4331; // "SEC1"
