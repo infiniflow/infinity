@@ -27,12 +27,16 @@ const QUALIFIED: &str = "default_db.ft_dbpedia_benchmark";
 const INDEX: &str = "ft_dbpedia_index";
 
 /// The five queries `BenchmarkQuery` runs (two of them phrase queries).
-const QUERIES: [&str; 5] = [
+const QUERIES: [&str; 7] = [
     "harmful \"social custom\"",
     "social custom \"harmful chemical\"",
     "\"annual American awards\"",
     "harmful chemical",
     "\"one of\"",
+    // Multi-term (10+ OR terms): every term is a WAND cursor in the same pass,
+    // which is where the per-posting cursor machinery shows up.
+    "harmful chemical social custom annual American awards one of the first world war",
+    "national football league high school state university population family city game season team player",
 ];
 
 /// Reads the JSONL corpus every value of which is a string.

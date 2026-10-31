@@ -36,7 +36,9 @@ cargo build --release -p infinity-cli
 环境变量：`FTBENCH_QUERY_REPEAT=n` 每条查询在进程内跑 n 次取最小；
 `FTBENCH_EXTRA_QUERY=…` 追加一条查询。
 
-五条查询与参考一致（`fields="text"`、默认 `topn=10`、投影 `ROW_ID(), SCORE()`）：
+前五条是参考里的查询（`fields="text"`、默认 `topn=10`、投影 `ROW_ID(), SCORE()`）；
+后两条是本轮加进**两边**基准（`fulltext_benchmark.cpp` 与 `fulltext-bench`）的多词查询，
+用来覆盖「一条查询里十几个 WAND 游标」这种形态：
 
 ```
 harmful "social custom"
@@ -44,7 +46,12 @@ social custom "harmful chemical"
 "annual American awards"
 harmful chemical
 "one of"
+
+harmful chemical social custom annual American awards one of the first world war   (13 词)
+national football league high school state university population family city game season team player  (14 词)
 ```
+
+> 参考的日志把耗时打印成整毫秒（`2ms` / `837us`），多词查询的读数只有 1 ms 的粒度。
 
 ## 2. 数据集
 
@@ -69,9 +76,18 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 | 查询 3 `"annual American awards"`（0 行） | 0.27–0.73 ms | **0.43–0.44 ms**（14.8–18.4 ms） | 同量级 |
 | 查询 4 `harmful chemical` | 0.58–0.97 ms | **0.40 ms**（13.2–14.9 ms） | 反超 |
 | 查询 5 `"one of"` | 1–2 ms | **2.49–2.51 ms**（30.8–33.3 ms） | ≈2× |
+| 查询 6（13 词） | 2–3 ms | **6.21–6.26 ms** | ≈2.5× 慢 |
+| 查询 7（14 词） | 0.84–1 ms | **2.19–2.27 ms** | ≈2.2× 慢 |
 
 括号里是改成流式读取之前的数字。写入仍是同一个量级上慢 3 倍（每批插入都要
-更新全文索引）；查询从 13–30 倍降到「四条比参考快，一条约 2 倍」。
+更新全文索引）；查询从 13–30 倍降到「1–2 个词的查询比参考快，长查询仍慢 2 倍」。
+
+多词查询是唯一还明显落后的形态，原因在 profile 里能直接看到（13 词查询，self time）：
+`SegmentIndexReader::doc_len_of_row` 4.3% + `ordinal` 4.1%（每次打分都要沿
+row id 二分查段内序号，再读 `len`）、`MergeCursor::settle` 5.4%、
+`TermDocCursor::ensure` 3.6%、`TermStream::load` 3.5%、分配器约 13%、
+`memmove` 4.5%、词项哈希查表约 6%（`memcmp` + SipHash）。参考的 `TermDocIterator`
+直接持有段内 doc id 和 `GetColumnLength`，没有这层反查。
 
 ## 4. 这一轮改了什么
 

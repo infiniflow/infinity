@@ -308,7 +308,10 @@ void BenchmarkQuery(std::shared_ptr<Infinity> infinity,
                      "social custom \"harmful chemical\"",
                      "\"annual American awards\"",
                      "harmful chemical",
-                     "\"one of\""};
+                     "\"one of\"",
+                     // Multi-term (10+ OR terms): every term is a WAND cursor in the same pass.
+                     "harmful chemical social custom annual American awards one of the first world war",
+                     "national football league high school state university population family city game season team player"};
     }
 
     for (auto match_text : query_vec) {
