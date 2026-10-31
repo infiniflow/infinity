@@ -229,10 +229,13 @@ fn test_index() {
         "SELECT col1 FROM db1.tb1 SEARCH MATCH TEXT ('col2', 'abcdefghijklmnopqrstuvwxyz', 'topn=1');",
     );
 
-    // Every memory index restarts at row id 8192 and holds one block. The
-    // full-text index is rebuilt from all rows on first use (0, 16384).
+    // Every memory index restarts at row id 8192 and holds one block: the
+    // checkpoint dumps each index's memory tail, and the full-text index is
+    // dumped with the rest (the reference's `DumpMemIndexTask` does that in the
+    // background; the port folds it into the checkpoint). Before the dump the
+    // full-text tail was rebuilt from row 0 on first use.
     assert_eq!(e.secondary_tail("db1.tb1", "col1"), Some((8192, 8192)));
-    assert_eq!(e.fulltext_tail("db1.tb1", "col2"), Some((0, 16384)));
+    assert_eq!(e.fulltext_tail("db1.tb1", "col2"), Some((8192, 8192)));
     assert_eq!(e.ivf_tail("db1.tb1", "col3"), Some((8192, 8192)));
     assert_eq!(e.hnsw_tail("db1.tb1", "col3"), Some((8192, 8192)));
     assert_eq!(e.sparse_tail("db1.tb1", "col4"), Some((8192, 8192)));
@@ -276,10 +279,10 @@ fn test_populate_index0() {
     );
 
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
-    // Everything is sealed: the secondary tail is empty.
+    // Everything is sealed: the secondary and full-text memory tails are empty
+    // after the checkpoint's dump.
     assert_eq!(e.secondary_tail("db1.tb1", "col1"), None);
-    // The full-text index is built from every row on first use.
-    assert_eq!(e.fulltext_tail("db1.tb1", "col2"), Some((0, 16384)));
+    assert_eq!(e.fulltext_tail("db1.tb1", "col2"), None);
     // One chunk covering all 16384 rows from base row id 0.
     assert_eq!(e.secondary_chunks("db1.tb1", "col1"), vec![(0, 16384)]);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);

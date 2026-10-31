@@ -4022,6 +4022,19 @@ impl Engine {
         &self,
         table: &str,
     ) -> Vec<(usize, Vec<String>)> {
+        self.read_cpp_blocks_including_deleted_from(table, 0)
+    }
+
+    /// [`Self::read_cpp_blocks_including_deleted`] from row id `first` on.
+    ///
+    /// Blocks below `first` are never decoded, so a reopened engine can index
+    /// only the rows its sealed chunks do not cover - the reference's
+    /// `MemoryIndexer` does the same when it starts past a dumped segment.
+    pub(crate) fn read_cpp_blocks_including_deleted_from(
+        &self,
+        table: &str,
+        first: usize,
+    ) -> Vec<(usize, Vec<String>)> {
         let table = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
             return Vec::new();
@@ -4037,13 +4050,24 @@ impl Engine {
         let root = self.blocks_root();
         let mut out = Vec::new();
         for id in self.visible_block_ids(&table) {
+            // A block covers `segment << 32 | block * capacity` for
+            // `DEFAULT_BLOCK_CAPACITY` rows, so its end decides whether it can
+            // be skipped without decoding it.
+            let block_first = (u64::from(id.segment_id) << 32)
+                + u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64;
+            if block_first + DEFAULT_BLOCK_CAPACITY as u64 <= first as u64 {
+                continue;
+            }
             if let Some(cells) =
                 self.decode_block_cells(&table, &root, &meta, &types, id, None)
             {
-                out.extend(cells);
+                out.extend(cells.into_iter().filter(|(seq, _)| *seq >= first));
             }
         }
         for (seq, values) in self.pending_rows_of(&table) {
+            if seq < first {
+                continue;
+            }
             out.push((seq, values.iter().map(mirror_cell_text).collect()));
         }
         out.sort_by_key(|(seq, _)| *seq);

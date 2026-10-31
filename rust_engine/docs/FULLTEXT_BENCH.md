@@ -339,6 +339,25 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 打印、不并进读数。参考那边沿用它的 `BenchmarkCreateIndex`（CreateIndex + Flush 一起计），
 所以表里 3–5 ms 是它 DDL 的上界。
 
+### 4.12 重启后不再重建全文索引
+
+原来 `TextIndex::new` 从空开始，`text_index_for` 一旦发现内存索引的文档数少于表的
+行数，就把**整表重新分词建索引**：20k 文档重开目录后的第一条查询要 2.41 s。
+
+| 改动 | 内容 |
+|---|---|
+| checkpoint dump 全文内存尾段 | `flush_storage` 里新增 `seal_text_indexes()`，与 secondary / IVF / HNSW / sparse 一致（参考由后台 `DumpMemIndexTask` 做）：把 `ft_{首行:016x}.{dic,pos,len,row}` 落盘并 fsync（`fulltext_segment::write_segment_index` 走 `cpp_format::write_synced`） |
+| 打开时映射已有 chunk | `TextIndex::load_sealed()` 扫 `fulltext/<key>/ft_*.dic`，逐段 `SegmentIndexReader::open`（mmap），返回第一个未被覆盖的行号；`text_index_for` 只从那一行往后建索引 |
+| 尾部只读增量 | `fetch_rows_with_ids_projected_from` → `read_cpp_blocks_including_deleted_from`：行号 `segment<<32 | block*8192` 之外的块整块跳过，不解码 |
+
+实测（20k 文档，checkpoint 后重开）：第一条查询 **2.41 s → 29 ms**，第二条 0.73 ms，
+命中行数与重启前一致。映射不成功的 chunk（崩溃时的半截写）会让 `load_sealed` 退回 0，
+即整表重建——「一半来自磁盘、一半重建」会把同一批文档数两次。
+
+回归测试：`a_reopened_engine_indexes_only_the_unsealed_tail`（重开后 sealed 段覆盖 12
+行、内存尾 0 行）；`new_catalog_index_internal_ut::test_index` / `test_populate_index0`
+里「full-text 从第 0 行重建」的断言改成 checkpoint dump 之后的形状，与其它索引一致。
+
 ## 5. 顺带修掉的一个格式缺陷
 
 `encode_fulltext_chunk`（`crates/infinity-executor/src/cpp_blocks.rs`）原来对
@@ -360,6 +379,14 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 
 - 只跑了 20k 文档（dbpedia 语料缺失）。插入/查询的量级关系已经稳定，但绝对值会随语料变。
 - 短语查询（§4.3）已接进 WAND 并有块级剪枝；只剩「两个词都很高频」的短语约比参考慢 2 倍（上界被高频词撑松，剪不掉多少）。
-- `import` 之后的查询、以及重启后的查询没进对比表：端口重开目录时会**从行数据重建
-  全文索引**（20k 文档约 3.1 s），而不是加载落盘的 `.dic`/`.pos`，这是另一条待查的路径。
+- 重启后的第一条查询已从 2.41 s 降到 29 ms（§4.12）；`import` 之后的查询仍未进对比表。
 - 参考的 `sleep(10)` 之后才查询（后台 flush 已完成），端口是 optimize 后立刻查询。
+
+## 7. 取舍记录
+
+| 项 | 决定 | 理由 |
+|---|---|---|
+| 重启加载已有 chunk（§4.12） | **做** | 20k 文档 2.41 s → 29 ms，是重启/跨引擎交接后第一条查询的必经路径；改动局部，不碰提交路径 |
+| 写路径流水线化（参考的 `AppendMemIndexTask`） | **不做** | INSERT 的 2.6 倍主要是**计时口径**：参考把全文 mem-index 追加交给后台 appender（`new_txn_index_impl.cpp:892` → `mem_index_appender_impl.cpp`），insert 返回时索引还没建完，`sleep(10)` 之后才查询；端口是同步建索引。真实吞吐看 IMPORT（1.25×）。要做就得重做提交路径的时序与错误处理（dump/checkpoint 前 `WaitForCompletion`），风险高于收益 |
+| 词干 memo / 词项表（IMPORT 还差 1.25×） | 待分析 | §4.10 的 profile：词干 ~22%、分配器 ~22%、词项查表（memcmp）~10% |
+| 14 词查询（1.36 ms vs 0.84–1 ms） | 待分析 | 先 profile：每单元 `ensure()`、块窗口、`score_with` 的逐单元循环 |

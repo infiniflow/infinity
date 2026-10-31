@@ -172,7 +172,8 @@ pub fn write_segment_index(
 
     let write = |suffix: &str, bytes: &[u8]| -> Result<(), FormatError> {
         let path = fulltext_chunk_file(index_dir, base_name, suffix);
-        fs::write(&path, bytes).map_err(|e| FormatError::Io(e.to_string()))
+        crate::cpp_format::write_synced(std::path::Path::new(&path), &bytes)
+            .map_err(|e| FormatError::Io(e.to_string()))
     };
     write(FULLTEXT_DICT_SUFFIX, &dic)?;
     write(FULLTEXT_POSTING_SUFFIX, &pos)?;

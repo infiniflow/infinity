@@ -4733,6 +4733,66 @@ impl TextIndex {
         }
     }
 
+    /// Maps the chunks a previous process sealed under `dir`
+    /// (`ft_{first_row:016x}.{dic,pos,len,row}`) instead of re-indexing the rows
+    /// they cover, and returns the first row id they do **not** cover — 0 when
+    /// nothing could be loaded, so the caller rebuilds from the rows.
+    ///
+    /// A chunk that cannot be mapped (a torn write at a crash) discards the
+    /// whole set: indexing half the table from disk and rebuilding the other
+    /// half would count the same documents twice.
+    fn load_sealed(&mut self) -> u64 {
+        let Ok(entries) = std::fs::read_dir(&self.dir) else {
+            return 0;
+        };
+        let mut bases: Vec<String> = entries
+            .flatten()
+            .filter_map(|entry| {
+                let name = entry.file_name().into_string().ok()?;
+                name.strip_suffix(".dic").map(|base| base.to_string())
+            })
+            .collect();
+        if bases.is_empty() {
+            return 0;
+        }
+        // The base name is the chunk's first row id in hex, zero padded, so the
+        // name order is the row order.
+        bases.sort_unstable();
+        let mut segments = Vec::with_capacity(bases.len());
+        let mut next = 0u64;
+        for base in &bases {
+            let Ok(reader) = infinity_storage::fulltext_segment::SegmentIndexReader::open(
+                &self.dir,
+                base,
+                0,
+                infinity_storage::inverted_format::TermMetaFlags::default(),
+            ) else {
+                return 0;
+            };
+            let docs = reader.doc_count();
+            if docs == 0 {
+                continue;
+            }
+            let total_len: u64 = (0..docs as u32)
+                .filter_map(|doc| reader.doc_len(doc))
+                .map(u64::from)
+                .sum();
+            if let Some((_, last)) = reader.row_range() {
+                next = next.max(last + 1);
+            }
+            segments.push(SealedSegment {
+                docs: docs as u32,
+                total_len,
+                reader,
+            });
+        }
+        if segments.is_empty() {
+            return 0;
+        }
+        self.reader.segments = segments;
+        next
+    }
+
     /// Documents in the column across the sealed segments and the unsealed
     /// segment (the memory tail plus its spill runs).
     fn total_docs(&self) -> usize {
@@ -8382,6 +8442,28 @@ impl Engine {
 
     /// Dumps the memory tail of every disk-backed secondary index into new
     /// chunks, so memory stays bounded by the rows written since the last dump.
+    /// Dumps every full-text memory tail into its segment files
+    /// (`ft_{first_row:016x}.{dic,pos,len,row}`).
+    ///
+    /// The reference's checkpoint dumps each index's mem index
+    /// (`NewTxn::CheckpointTable` -> `DumpMemIndex`). Doing it here also leaves
+    /// a reopened engine with chunks to map instead of the whole table to
+    /// re-index (`TextIndex::load_sealed`).
+    fn seal_text_indexes(&self) {
+        let indexes: Vec<SharedTextIndex> = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .values()
+                .flat_map(|entry| entry.text.values().cloned())
+                .collect()
+        };
+        for shared in indexes {
+            if let Ok(mut index) = shared.write() {
+                index.seal();
+            }
+        }
+    }
+
     fn seal_secondary_indexes(&self) {
         self.seal_secondary_indexes_filtered(None);
     }
@@ -14874,20 +14956,41 @@ impl Engine {
     }
 
     fn fetch_rows_including_deleted(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
+        self.fetch_rows_including_deleted_from(table, 0)
+    }
+
+    /// [`Self::fetch_rows_including_deleted`] from row id `first` on.
+    ///
+    /// Blocks below `first` are skipped without decoding them and the journal
+    /// range starts at `first`, so a reopened engine indexes only the rows its
+    /// sealed chunks do not cover.
+    fn fetch_rows_including_deleted_from(
+        &self,
+        table: &str,
+        first: usize,
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
         let name = self.table_key(table);
         // The blocks hold every row a segment ever held, tombstoned slots
         // included - which is what the index mirrors count. The journal adds
         // the rows above the last checkpoint (and hides the ones deleted after
         // it), exactly as it does for a visible scan.
         let mut rows: Vec<(usize, Vec<Value>)> = self
-            .read_cpp_blocks_including_deleted(&name)
+            .read_cpp_blocks_including_deleted_from(&name, first)
             .into_iter()
             .map(|(seq, cells)| (seq, cells.iter().map(|c| parse_value(c)).collect()))
             .collect();
         let seen: std::collections::HashSet<usize> = rows.iter().map(|(seq, _)| *seq).collect();
         let prefix = row_prefix(&name);
         let defaults = self.table_defaults(&name).unwrap_or_default();
-        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
+        // The prefix plus a `0xFF` sorts above every decimal row id, so this is
+        // exactly "[first, end of the table)".
+        let mut end = prefix.clone();
+        end.push(0xff);
+        for (k, v) in self
+            .storage
+            .store
+            .scan_range(&row_key(&name, first), &end)?
+        {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
@@ -15708,7 +15811,11 @@ impl Engine {
             .to_string_lossy()
             .into_owned();
         let mut index = TextIndex::new(dir, tokenizer);
-        for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, col)? {
+        // Map the chunks a previous process sealed instead of re-indexing the
+        // rows they already cover: a reopened engine pays for the unsealed tail
+        // only, not for the whole table.
+        let first = index.load_sealed() as usize;
+        for (seq, cells) in self.fetch_rows_with_ids_projected_from(table, col, first)? {
             let text = match cells.get(col) {
                 Some(Value::Str(s)) => s.clone(),
                 Some(other) => other.to_slt_string(),
@@ -16379,8 +16486,18 @@ impl Engine {
         table: &str,
         idx: usize,
     ) -> Result<Vec<(usize, Vec<Value>)>> {
+        self.fetch_rows_with_ids_projected_from(table, idx, 0)
+    }
+
+    /// [`Self::fetch_rows_with_ids_projected_all`] from row id `first` on.
+    fn fetch_rows_with_ids_projected_from(
+        &self,
+        table: &str,
+        idx: usize,
+        first: usize,
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
         Ok(self
-            .fetch_rows_including_deleted(table)?
+            .fetch_rows_including_deleted_from(table, first)?
             .into_iter()
             .map(|(seq, cells)| {
                 let value = cells.get(idx).cloned().unwrap_or(Value::Null);
@@ -21242,6 +21359,7 @@ impl Engine {
         // error, so a failing block mirror (e.g. an unsupported column type)
         // must not leave the memory tails unbounded — that is what pushed the
         // heavy import into the OOM killer (Gate C).
+        self.seal_text_indexes();
         self.seal_multivector_indexes();
         self.seal_sparse_indexes();
         self.seal_secondary_indexes();
@@ -24555,6 +24673,56 @@ mod tests {
     /// not with the standard one: an `ngram-3` index turns `quick` into
     /// `qui`/`uic`/`ick`, so a literal `qui` is a token there and not in a
     /// `standard` index.
+
+    /// A reopened engine maps the chunks the previous process sealed instead of
+    /// re-indexing the table, so its memory tail holds no document and the
+    /// sealed readers cover every row.
+    #[test]
+    fn a_reopened_engine_indexes_only_the_unsealed_tail() {
+        let dir = tempdir().unwrap();
+        let before = {
+            let e = Engine::open(dir.path()).unwrap();
+            e.set_memindex_capacity(4);
+            e.execute("CREATE TABLE rt (id INTEGER, body VARCHAR)")
+                .unwrap();
+            e.execute("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
+                .unwrap();
+            for i in 0..12 {
+                e.execute(&format!("INSERT INTO rt VALUES ({i}, 'alpha beta row{i}');"))
+                    .unwrap();
+            }
+            e.flush().unwrap();
+            rows(
+                &e,
+                "SELECT id FROM rt SEARCH MATCH TEXT (body, 'alpha', 100);",
+            )
+        };
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM rt SEARCH MATCH TEXT (body, 'alpha', 100);",
+            ),
+            before
+            // Rows come back in the same order: the mapped chunks and the
+            // unsealed tail are searched exactly as the single in-memory index
+            // was before the restart.
+        );
+        let (sealed, pending) = {
+            let tables = e.tables.lock().unwrap();
+            let (mut sealed, mut pending) = (0, 0);
+            for entry in tables.values() {
+                for shared in entry.text.values() {
+                    let guard = shared.read().unwrap();
+                    sealed += guard.reader.doc_count();
+                    pending += guard.mem.pending_docs();
+                }
+            }
+            (sealed, pending)
+        };
+        assert_eq!(sealed, 12, "the sealed chunks should cover the table");
+        assert_eq!(pending, 0, "no row should be indexed again");
+    }
 
     /// A query that spans several sealed segments plus the memory tail must
     /// return exactly what one unsealed segment returns: same rows, same order.
