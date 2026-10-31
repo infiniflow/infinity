@@ -6400,7 +6400,6 @@ pub struct Engine {
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     batches_since_trim: std::sync::atomic::AtomicUsize,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
-    /// Decoded block `version` files, keyed by block and file stamp. A query
     /// C++'s `SystemInfo::CPUUsage` sleeps 200 ms between two snapshots; an
     /// accessor must not block, so this engine keeps the previous sample and
     /// reports the delta since the last call instead.
@@ -9549,7 +9548,30 @@ impl Engine {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let _query = self.begin_query(statement, sql);
         let _read = ReadTsGuard::enter(self.txn.current_ts() + 1);
-        let batch = self.read_columns_batch(&table, &needed);
+        // An equality on an indexed column already names its rows; decoding the
+        // whole table first made every such lookup cost the same as a full scan.
+        let indexed_rows = match predicate.as_ref() {
+            Some(Expr::Cmp(a, infinity_parser::CmpOp::Eq, b)) => {
+                let (pos, value) = match (&**a, &**b) {
+                    (Expr::Column(pos), Expr::Literal(v)) => (Some(*pos), Some(v)),
+                    (Expr::Literal(v), Expr::Column(pos)) => (Some(*pos), Some(v)),
+                    _ => (None, None),
+                };
+                match (pos.and_then(|p| schema.get(p).map(|n| (p, n))), value) {
+                    (Some((_, name)), Some(value)) => {
+                        self.index_lookup(&table, name, &value_to_literal(value.clone()))
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+        let batch = match &indexed_rows {
+            Some(ids) => self
+                .read_columns_batch_for_rows(&table, &needed, ids)
+                .or_else(|| self.read_columns_batch(&table, &needed)),
+            None => self.read_columns_batch(&table, &needed),
+        };
         self.txn.end_statement();
         let Some(mut batch) = batch else {
             return Ok(None);
@@ -10380,15 +10402,19 @@ impl Engine {
         table: &str,
     ) -> Option<Arc<Mutex<infinity_storage::block_index::BlockIndex>>> {
         let table = self.table_key(table);
-        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
-        let db_id = self.database_id_of(&table);
-        let key = table;
+        let key = table.clone();
+        // The cache check comes first: resolving the name through the catalog
+        // reads the table's metadata from the store, and a scan asks for the
+        // index once per block, so a lookup that never used the cache made a
+        // ten-row result pay for a catalog read per block it touched.
         {
             let tables = self.tables.lock().unwrap();
             if let Some(index) = tables.get(&key).and_then(|e| e.block_index.clone()) {
                 return Some(index);
             }
         }
+        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
+        let db_id = self.database_id_of(&table);
         let index =
             infinity_storage::block_index::BlockIndex::open(self.blocks_root(), db_id, meta.id)
                 .ok()?;

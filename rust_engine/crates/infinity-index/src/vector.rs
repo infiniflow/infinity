@@ -10,7 +10,7 @@
 //! above. Queries use the same greedy descent + layer-0 beam search (`ef`).
 
 use std::cmp::{Ordering, Reverse};
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::Path;
 
@@ -189,7 +189,7 @@ fn sparse_ip(a: &[(u32, f32)], b: &[(u32, f32)]) -> f32 {
     dot
 }
 
-/// The visited set of one `SearchLayer` call.
+/// The per-search working set of one `SearchLayer` call.
 ///
 /// The reference allocates `std::vector<bool> visited(cur_vec_num)` per call
 /// and zeroes it, which is O(n) per insert - O(n^2) over a build, and `perf`
@@ -197,14 +197,14 @@ fn sparse_ip(a: &[(u32, f32)], b: &[(u32, f32)]) -> f32 {
 /// per entry gives the same semantics with no clearing: a node counts as
 /// visited when its stamp equals the current one, so a new search is one
 /// increment.
-pub(crate) struct SearchScratch {
+pub(crate) struct Visited {
     /// One stamp per vertex; a vertex is in the current search when
     /// `seen[node] == stamp`.
     seen: Vec<u32>,
     stamp: u32,
 }
 
-impl SearchScratch {
+impl Visited {
     pub(crate) const fn new() -> Self {
         Self {
             seen: Vec::new(),
@@ -233,6 +233,41 @@ impl SearchScratch {
         }
         self.seen[node] = self.stamp;
         true
+    }
+}
+
+/// Everything one graph traversal owns, reused across the traversals of a
+/// build.
+///
+/// The visited stamps, the two heaps and the neighbour buffer are all sized by
+/// the graph and then thrown away by the reference's `SearchLayer`; a build
+/// runs that call once per vertex per layer, so keeping them on the caller's
+/// stack is the difference between one allocation per build and one per layer.
+pub(crate) struct SearchScratch {
+    pub(crate) visited: Visited,
+    /// The frontier, smallest distance first (`Cand` orders by distance).
+    pub(crate) candidate: std::collections::BinaryHeap<std::cmp::Reverse<Cand>>,
+    /// The result set, largest distance first.
+    pub(crate) result: std::collections::BinaryHeap<Cand>,
+    /// The neighbours of the vertex being expanded.
+    pub(crate) neighbors: Vec<usize>,
+}
+
+impl SearchScratch {
+    pub(crate) const fn new() -> Self {
+        Self {
+            visited: Visited::new(),
+            candidate: std::collections::BinaryHeap::new(),
+            result: std::collections::BinaryHeap::new(),
+            neighbors: Vec::new(),
+        }
+    }
+
+    /// Starts a search over `nodes` vertices, then marks `first`.
+    pub(crate) fn begin(&mut self, nodes: usize, first: usize) {
+        self.visited.begin(nodes, first);
+        self.candidate.clear();
+        self.result.clear();
     }
 }
 
@@ -380,6 +415,14 @@ impl Store {
             Store::SparseIp { data } => data.push(v.to_vec()),
             _ => panic!("sparse insert into a dense store"),
         }
+    }
+
+    /// Whether `make_query_at(node)` is just the node's stored vector.
+    ///
+    /// True for the plain store, where `GetVecToQuery` copies `dims` floats
+    /// that a caller can read in place instead.
+    pub(crate) fn queries_are_stored_vectors(&self) -> bool {
+        matches!(self, Store::Plain { .. })
     }
 
     /// The query for the vector stored at `node` (the reference's `GetVecToQuery`).
@@ -1488,9 +1531,17 @@ impl HnswIndex {
         ep: usize,
         scratch: &mut SearchScratch,
     ) -> Vec<(f32, usize)> {
-        let mut candidate: BinaryHeap<Reverse<Cand>> = BinaryHeap::with_capacity(ef);
+        // The heaps live in the scratch: one per call would be two allocations
+        // and two frees per layer per vertex over a whole build. They are
+        // destructured out so the visited stamp and the heaps can be borrowed
+        // at the same time.
+        let SearchScratch {
+            visited,
+            candidate,
+            result,
+            neighbors: _,
+        } = scratch;
         candidate.push(Reverse(Cand(ep_d, ep)));
-        let mut result: BinaryHeap<Cand> = BinaryHeap::with_capacity(ef);
         if allowed(ep) {
             result.push(Cand(ep_d, ep));
         }
@@ -1506,7 +1557,7 @@ impl HnswIndex {
                 continue;
             };
             for &nb in list {
-                if nb >= nodes || !scratch.visit(nb) {
+                if nb >= nodes || !visited.visit(nb) {
                     continue;
                 }
                 let d = self.distance_query(q, self_id, nb);
@@ -1528,7 +1579,7 @@ impl HnswIndex {
                 }
             }
         }
-        let mut out: Vec<(f32, usize)> = result.into_iter().map(|c| (c.0, c.1)).collect();
+        let mut out: Vec<(f32, usize)> = result.drain().map(|c| (c.0, c.1)).collect();
         out.sort_unstable_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         out
     }

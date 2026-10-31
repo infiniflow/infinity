@@ -14,7 +14,6 @@
 //! graph is acyclic and there is no lock-order deadlock.
 
 use std::cmp::{Ordering, Reverse};
-use std::collections::BinaryHeap;
 use std::sync::RwLock;
 
 use crate::lsg::LsgIndex;
@@ -22,6 +21,37 @@ use crate::vector::{Cand, SearchScratch, Store};
 
 /// The graph with one lock per vertex, the shape a concurrent build needs.
 pub(crate) type LockedLinks = Vec<Vec<RwLock<Vec<usize>>>>;
+
+/// The query a build searches with.
+///
+/// A vertex is searched for by its own stored vector, so the graph's own copy
+/// can stand in for it. Stores that derive a query from a code (LVQ, RaBitQ)
+/// keep the owned form, because their query is not the stored bytes.
+enum QueryRef {
+    Owned(crate::vector::HnswQuery),
+    Node(usize),
+}
+
+impl QueryRef {
+    /// The query a build searches with, in the cheapest form the store allows.
+    fn for_node(store: &crate::vector::Store, node: usize) -> QueryRef {
+        if store.queries_are_stored_vectors() {
+            QueryRef::Node(node)
+        } else {
+            QueryRef::Owned(store.make_query_at(node))
+        }
+    }
+}
+
+/// The working set of `SelectNeighborsHeuristic`.
+#[derive(Default)]
+pub(crate) struct SelectScratch {
+    sorted: Vec<(f32, usize)>,
+    kept: Vec<(f32, usize)>,
+    /// The selected neighbours, farthest first (the reference writes them
+    /// straight into the vertex's list; this is the buffer it writes from).
+    out: Vec<usize>,
+}
 
 /// What a bucket needs to build a vertex: the stored vectors, the levels the
 /// caller already sampled, and the locked graph being filled in.
@@ -63,8 +93,9 @@ impl<'a> Builder<'a> {
     /// Runs `Build` for every vertex in `[start, end)`.
     pub(crate) fn build_range(&self, start: usize, end: usize) {
         let mut scratch = SearchScratch::new();
+        let mut select = SelectScratch::default();
         for node in start..end {
-            self.build(node, &mut scratch);
+            self.build(node, &mut scratch, &mut select);
         }
     }
 
@@ -75,8 +106,14 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn distance_to(&self, q: &crate::vector::HnswQuery, self_id: Option<usize>, i: usize) -> f32 {
-        let d = self.store.distance_query(q, i);
+    fn distance_to(&self, q: &QueryRef, self_id: Option<usize>, i: usize) -> f32 {
+        let d = match q {
+            QueryRef::Owned(q) => self.store.distance_query(q, i),
+            // The query of a build is the vertex's own stored vector, so
+            // scoring against it is a node-to-node distance. Copying it into
+            // an `HnswQuery` first costs one allocation per vertex built.
+            QueryRef::Node(node) => self.store.distance_nodes(*node, i),
+        };
         self.adjust(d, self_id, i)
     }
 
@@ -85,32 +122,34 @@ impl<'a> Builder<'a> {
         self.adjust(d, Some(a), b)
     }
 
-    /// `GetNeighbors`: a copy, so the lock is released before the caller
-    /// computes distances (the reference holds a `shared_lock` for the span of
-    /// its neighbour loop; copying is cheaper than holding it across the
-    /// distance calls because a writer only ever appends to its own vertex).
-    fn neighbors(&self, layer: usize, node: usize) -> Vec<usize> {
-        match self.links.get(layer).and_then(|l| l.get(node)) {
-            Some(cell) => cell.read().unwrap_or_else(|e| e.into_inner()).clone(),
-            None => Vec::new(),
+    /// `GetNeighbors` into `out`: a copy, so the lock is released before the
+    /// caller computes distances (the reference holds a `shared_lock` for the
+    /// span of its neighbour loop; copying is cheaper than holding it across
+    /// the distance calls because a writer only ever appends to its own
+    /// vertex). `out` is the caller's buffer, so a build does not allocate a
+    /// fresh list for every vertex it expands.
+    fn neighbors_into(&self, layer: usize, node: usize, out: &mut Vec<usize>) {
+        out.clear();
+        if let Some(cell) = self.links.get(layer).and_then(|l| l.get(node)) {
+            out.extend_from_slice(&cell.read().unwrap_or_else(|e| e.into_inner()));
         }
     }
 
     /// `Build(vertex_i)`: the vertex is already stored and levelled.
-    fn build(&self, node: usize, scratch: &mut SearchScratch) {
+    fn build(&self, node: usize, scratch: &mut SearchScratch, select: &mut SelectScratch) {
         let q_layer = self.levels[node];
-        let query = self.store.make_query_at(node);
+        let query = QueryRef::for_node(&self.store, node);
         let mut ep = self.entry;
         let mut cur = self.max_level as i64;
         while cur > q_layer as i64 {
-            ep = self.search_layer_nearest(&query, ep, cur as usize);
+            ep = self.search_layer_nearest(&query, ep, cur as usize, &mut scratch.neighbors);
             cur -= 1;
         }
         let mut l = q_layer.min(self.max_level) as i64;
         while l >= 0 {
             let layer = l as usize;
             let cands = self.search_layer(&query, ep, self.ef_construction, layer, node, scratch);
-            let neighbors = self.select_neighbors(&cands, self.m);
+            let neighbors = self.select_neighbors(&cands, self.m, select);
             if neighbors.is_empty() {
                 l -= 1;
                 continue;
@@ -121,17 +160,25 @@ impl<'a> Builder<'a> {
                     .write()
                     .unwrap_or_else(|e| e.into_inner());
                 own.clear();
-                own.extend_from_slice(&neighbors);
+                own.extend_from_slice(neighbors);
             }
-            for &nb in &neighbors {
-                self.connect_neighbors(nb, node, layer);
+            // A reverse-link prune runs the heuristic again, which reuses
+            // `select`'s buffers, so the loop walks its own copy of the list.
+            for nb in neighbors.to_vec() {
+                self.connect_neighbors(nb, node, layer, select);
             }
             l -= 1;
         }
     }
 
     /// `ConnectNeighbors`: append, or prune the list when it is at `Mmax`.
-    fn connect_neighbors(&self, target: usize, node: usize, layer: usize) {
+    fn connect_neighbors(
+        &self,
+        target: usize,
+        node: usize,
+        layer: usize,
+        select: &mut SelectScratch,
+    ) {
         let max_m = if layer == 0 { self.m * 2 } else { self.m };
         let mut list = self.links[layer][target]
             .write()
@@ -152,22 +199,35 @@ impl<'a> Builder<'a> {
         for &nb in list.iter() {
             cands.push((self.distance_nodes(target, nb), nb));
         }
-        let kept = self.select_neighbors(&cands, max_m);
+        let kept = self.select_neighbors(&cands, max_m, select);
         list.clear();
         list.extend(kept);
     }
 
     /// `SelectNeighborsHeuristic`: closer-than-a-kept-neighbour candidates are
     /// dropped and the list comes back farthest first.
-    fn select_neighbors(&self, cands: &[(f32, usize)], m: usize) -> Vec<usize> {
-        let mut sorted = cands.to_vec();
+    ///
+    /// `scratch` carries the sort buffer and the kept list; a build runs this
+    /// once per layer per vertex plus once per pruned reverse link, so two
+    /// fresh `Vec`s per call were most of its allocations.
+    fn select_neighbors<'s>(
+        &self,
+        cands: &[(f32, usize)],
+        m: usize,
+        scratch: &'s mut SelectScratch,
+    ) -> &'s [usize] {
+        let SelectScratch { sorted, kept, out } = scratch;
+        sorted.clear();
+        sorted.extend_from_slice(cands);
+        out.clear();
         if sorted.len() < m {
             sorted.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
-            return sorted.into_iter().map(|(_, n)| n).collect();
+            out.extend(sorted.iter().map(|(_, n)| *n));
+            return out;
         }
         sorted.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
-        let mut kept: Vec<(f32, usize)> = Vec::with_capacity(m);
-        for (d, node) in sorted {
+        kept.clear();
+        for &(d, node) in sorted.iter() {
             if kept.len() == m {
                 break;
             }
@@ -175,22 +235,24 @@ impl<'a> Builder<'a> {
                 kept.push((d, node));
             }
         }
-        kept.reverse();
-        kept.into_iter().map(|(_, n)| n).collect()
+        out.extend(kept.iter().rev().map(|(_, n)| *n));
+        out
     }
 
     /// `SearchLayerNearest`: greedy descent on one upper layer.
     fn search_layer_nearest(
         &self,
-        q: &crate::vector::HnswQuery,
+        q: &QueryRef,
         start: usize,
         layer: usize,
+        buf: &mut Vec<usize>,
     ) -> usize {
         let mut cur = start;
         let mut cur_d = self.distance_to(q, None, cur);
         loop {
+            self.neighbors_into(layer, cur, buf);
             let mut changed = false;
-            for nb in self.neighbors(layer, cur).into_iter().rev() {
+            for &nb in buf.iter().rev() {
                 if nb >= self.store.len() {
                     continue;
                 }
@@ -210,7 +272,7 @@ impl<'a> Builder<'a> {
     /// `SearchLayer`: the beam search that feeds `select_neighbors`.
     fn search_layer(
         &self,
-        q: &crate::vector::HnswQuery,
+        q: &QueryRef,
         ep: usize,
         ef: usize,
         layer: usize,
@@ -220,9 +282,16 @@ impl<'a> Builder<'a> {
         let nodes = self.store.len();
         scratch.begin(nodes, ep);
         let ep_d = self.distance_to(q, Some(self_id), ep);
-        let mut candidate: BinaryHeap<Reverse<Cand>> = BinaryHeap::with_capacity(ef);
+        // The heaps and the neighbour buffer belong to the scratch: this runs
+        // once per vertex per layer, so a fresh allocation per call is the
+        // build's dominant allocator traffic.
+        let SearchScratch {
+            visited,
+            candidate,
+            result,
+            neighbors,
+        } = scratch;
         candidate.push(Reverse(Cand(ep_d, ep)));
-        let mut result: BinaryHeap<Cand> = BinaryHeap::with_capacity(ef);
         // The vertex being built must never enter its own result set. The
         // serial path is safe by construction (a vertex has no links until it
         // is built, so nothing points at it); in a batch the entry vertex is
@@ -236,8 +305,9 @@ impl<'a> Builder<'a> {
             if result.len() >= ef && cd > worst {
                 break;
             }
-            for nb in self.neighbors(layer, c) {
-                if nb >= nodes || nb == self_id || !scratch.visit(nb) {
+            self.neighbors_into(layer, c, neighbors);
+            for &nb in neighbors.iter() {
+                if nb >= nodes || nb == self_id || !visited.visit(nb) {
                     continue;
                 }
                 let d = self.distance_to(q, Some(self_id), nb);
@@ -255,7 +325,7 @@ impl<'a> Builder<'a> {
                 }
             }
         }
-        let mut out: Vec<(f32, usize)> = result.into_iter().map(|c| (c.0, c.1)).collect();
+        let mut out: Vec<(f32, usize)> = result.drain().map(|c| (c.0, c.1)).collect();
         out.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
         out
     }

@@ -4620,6 +4620,175 @@ impl Engine {
             row_count,
         })
     }
+    /// The rows at `rows` only, decoded in rowid order, as typed column
+    /// buffers.
+    ///
+    /// The indexed-lookup counterpart of read_columns_batch: that one decodes
+    /// every visible row of the table, which is right for a scan and wrong for a
+    /// secondary-index lookup that already knows the few rows it matched. Each
+    /// block named by a rowid is read and decoded once, and the decoder's
+    /// visibility mask is narrowed to the requested slots, so the emitted cells
+    /// line up one-for-one with the sorted run of rowids.
+    pub(crate) fn read_columns_batch_for_rows(
+        &self,
+        table: &str,
+        wanted: &[usize],
+        rows: &[u64],
+    ) -> Option<Batch> {
+        let table = self.qualified_table(table);
+        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
+        let types: Vec<i32> = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()?;
+        let root = self.blocks_root();
+        let read_ts = crate::read_ts();
+        let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
+        let buffered: std::collections::HashMap<usize, Vec<Value>> =
+            self.pending_rows_of(&table).into_iter().collect();
+        let blocks = self.visible_block_ids(&table);
+
+        let mut order: Vec<usize> = (0..rows.len()).collect();
+        order.sort_by_key(|i| rows[*i]);
+
+        let mut data: Vec<ColumnData> = wanted
+            .iter()
+            .map(|pos| column_buffer(&meta.types[*pos]))
+            .collect();
+        let mut valid: Vec<Vec<bool>> = vec![Vec::new(); wanted.len()];
+        let mut count = 0usize;
+
+        let mut at = 0usize;
+        while at < order.len() {
+            let seq = rows[order[at]] as usize;
+            let segment_id = (seq >> 32) as u32;
+            let offset = (seq as u64) & 0xffff_ffff;
+            let block_index = (offset / DEFAULT_BLOCK_CAPACITY as u64) as u16;
+            let mut end = at + 1;
+            while end < order.len() {
+                let s = rows[order[end]] as usize;
+                let o = (s as u64) & 0xffff_ffff;
+                if (s >> 32) as u32 != segment_id
+                    || (o / DEFAULT_BLOCK_CAPACITY as u64) as u16 != block_index
+                {
+                    break;
+                }
+                end += 1;
+            }
+            let slots: Vec<usize> = (at..end)
+                .map(|k| {
+                    ((rows[order[k]] as u64 & 0xffff_ffff) % DEFAULT_BLOCK_CAPACITY as u64)
+                        as usize
+                })
+                .collect();
+            let decoded = blocks
+                .iter()
+                .find(|b| b.segment_id == segment_id && b.block_id == block_index)
+                .and_then(|id| {
+                    let block = self.block_map(&table, &root, *id).ok()?;
+                    let version = block.version();
+                    let row_count: usize = version
+                        .created
+                        .last()
+                        .map(|c| c.cumulative_row_count as usize)
+                        .unwrap_or(0);
+                    let created_at = Self::created_at(version, read_ts);
+                    let mut visible = vec![false; row_count];
+                    for slot in &slots {
+                        if *slot < row_count
+                            && Self::slot_visible(version, *slot, created_at, read_ts)
+                        {
+                            visible[*slot] = true;
+                        }
+                    }
+                    let mut cols: Vec<ColumnData> = wanted
+                        .iter()
+                        .map(|pos| column_buffer(&meta.types[*pos]))
+                        .collect();
+                    let mut vals: Vec<Vec<bool>> = vec![Vec::new(); wanted.len()];
+                    for (o, pos) in wanted.iter().enumerate() {
+                        Self::decode_block_column(
+                            &meta.ids,
+                            &meta.types,
+                            &types,
+                            block.as_ref(),
+                            *pos,
+                            row_count,
+                            &visible,
+                            &mut cols[o],
+                            &mut vals[o],
+                        )?;
+                    }
+                    Some((cols, vals))
+                });
+            // The decoder emits only the visible slots of this run, in ascending
+            // slot order, so position k in its output is the k-th *visible* slot
+            // — a hidden slot shortens the list and would shift every later row
+            // if the slot's index inside the run were used directly.
+            let visible_run: Vec<Option<usize>> = match &decoded {
+                Some((_, vals)) => {
+                    let mut emitted = 0usize;
+                    slots
+                        .iter()
+                        .map(|slot| {
+                            let at_emitted = emitted;
+                            if vals[0].get(*slot).copied().is_some() {
+                                emitted += 1;
+                                Some(at_emitted)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
+                }
+                None => vec![None; slots.len()],
+            };
+            for k in at..end {
+                let s = rows[order[k]] as usize;
+                let is_dead = dead.contains(&(s as u64));
+                let run_index = visible_run[k - at];
+                count += 1;
+                for (o, pos) in wanted.iter().enumerate() {
+                    let cell = if is_dead {
+                        None
+                    } else if let (Some((cols, vals)), Some(ri)) = (&decoded, run_index) {
+                        if vals[o].get(ri).copied() == Some(false) {
+                            Some(Value::Null)
+                        } else {
+                            Some(cols[o].value_at(ri))
+                        }
+                    } else if decoded.is_some() {
+                        // The slot is hidden by the block version.
+                        Some(Value::Null)
+                    } else {
+                        buffered.get(&s).and_then(|v| v.get(*pos).cloned())
+                    };
+                    match cell {
+                        Some(v) if !matches!(v, Value::Null) => {
+                            data[o].push_value(&v);
+                            valid[o].push(true);
+                        }
+                        _ => {
+                            data[o].push_value(&Value::Null);
+                            valid[o].push(false);
+                        }
+                    }
+                }
+            }
+            at = end;
+        }
+
+        Some(Batch {
+            columns: wanted
+                .iter()
+                .map(|pos| meta.columns.get(*pos).cloned().unwrap_or_default())
+                .collect(),
+            data,
+            valid,
+            row_count: count,
+        })
+    }
     /// Appends one column of a decoded block to `out`, skipping the rows the
     /// version hides.
     #[allow(clippy::too_many_arguments)]

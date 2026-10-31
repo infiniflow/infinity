@@ -1014,6 +1014,7 @@ fn handle_connection(
                     write_reply_common(&mut writer, "Insert", seq, &resp)?;
                 }
                 "Select" => {
+                    let rpc_started = std::time::Instant::now();
                     let req = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         match read_select_args(&mut ip) {
@@ -1060,6 +1061,7 @@ fn handle_connection(
                         eprintln!("[SELECT] {}", req.to_sql());
                     }
                     let exec_started = std::time::Instant::now();
+                    let srv_started = exec_started;
                     // Plain projection over one table with no other clause: the
                     // engine hands back typed column buffers and the writer packs
                     // them without a `Value` per cell.
@@ -1182,6 +1184,15 @@ fn handle_connection(
                         None => err("no engine bound".into()),
                         },
                     };
+                    if std::env::var_os("INF_SERVER_TIMER").is_some() {
+                        let ms = |d: std::time::Duration| d.as_secs_f64() * 1000.0;
+                        eprintln!(
+                            "[SRV] plan_ms {:.3} search_ms {:.3} ser_ms 0.000 total_ms {:.3}",
+                            ms(srv_started.duration_since(rpc_started)),
+                            ms(srv_started.elapsed()),
+                            ms(rpc_started.elapsed())
+                        );
+                    }
                     write_select_response(&mut writer, seq, &resp)?;
                 }
                 // Lifecycle / maintenance RPCs returning a plain `CommonResponse`.
