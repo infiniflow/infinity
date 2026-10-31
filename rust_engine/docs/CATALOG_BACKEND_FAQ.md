@@ -49,7 +49,9 @@
 
 调用链：`Engine::flush_storage()` → `catalog.flush()`（SST）→ `txn.flush()`（store 的 SST）→ `append_checkpoint()`（必要时 rotate，再写帧）。
 
-**语义**：承诺的持久化边界是 **checkpoint，不是 commit**——commit 只写页缓存，掉电可以把它丢掉；checkpoint 之后的数据由块文件与 SST 承载，掉电也不丢。进程崩溃（页缓存还在）通常会保留到 WAL 尾部，但那不是承诺。
+**语义**：承诺的持久化边界是 **checkpoint，不是 commit**——commit 只写页缓存，掉电可以把它丢掉。进程崩溃（页缓存还在）通常会保留到 WAL 尾部，但那不是承诺。
+
+**掉电后真正持久的是两个 RocksDB 的 SST**（RocksDB 在 flush 里自己 fsync SST 与 MANIFEST），外加 checkpoint 里那些自己 sync 过的索引文件。块镜像（`data/**`）不是：`cpp_format::write_block` 走 `std::fs::write`，全路径没有 fsync（参考在 `file_worker_impl.cpp:129` 等处对块文件做 `fsync`）。行数据的权威副本是 `persistence` 库里的行记录，块只是镜像——恢复时 `recover_cpp_blocks` → `reconcile_mirror_marks` 按 KV 与块文件的行数差重建，下一次 checkpoint 再把块写全。所以块文件落后不会丢数据，只会让这次恢复多干一点活。
 
 **两个库的处理**：参考只有一份 KV，catalog 记录与 `applied` 标记天然同库，丢一起丢。端口有两个 RocksDB（`catalog` 与 `persistence`），所以 `applied` 标记**两边都写**、重放下界取两者**最小值**（`apply_split` / `TxnManager::applied_ts`）。否则 RocksDB 后台把其中一个 memtable 刷成 SST、另一个随崩溃丢掉时，重放会相信领先的那个标记，跳过落后的库丢掉的记录。
 

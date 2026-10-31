@@ -5,7 +5,7 @@
 //! boundary, then verifies recovery keeps **exactly the committed prefix**:
 //!
 //!   commit:     append WAL (no fsync) → write the KV (no WAL)
-//!   checkpoint: block files fsync → KV flush (memtable → SST) → checkpoint entry
+//!   checkpoint: block files written → KV flush (memtable → SST) → checkpoint entry
 //!   recovery:   read checkpoint ts from KV, replay WAL ts > cp, reconstruct
 //!               any block file the WAL still knows
 //!
