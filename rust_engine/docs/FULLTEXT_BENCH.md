@@ -66,10 +66,10 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 
 | 阶段 | 参考 C++ | 端口 Rust | 比值 |
 |---|---|---|---|
-| CREATE INDEX + Flush | 3–5 ms | 14.6–17.6 ms | ≈3.5× 慢 |
+| CREATE INDEX + Flush | 3–5 ms | 16–19 ms | ≈4× 慢（见 §4.10） |
 | ReadJsonl（不计入） | 17–29 ms | 60–62 ms | — |
-| INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 3.24–3.28 s | ≈3× 慢 |
-| IMPORT 20000 行 | ≈2 s | 3.14 s | ≈1.6× 慢 |
+| INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 2.59 s | ≈2.5× 慢 |
+| IMPORT 20000 行 | ≈2 s | 2.45–2.46 s | ≈1.2× 慢 |
 | Optimize（合并索引 chunk） | 360–512 µs | 299–397 µs | 同量级 |
 | 查询 1 `harmful "social custom"` | 1–5 ms | **0.32 ms** | 反超 |
 | 查询 2 `social custom "harmful chemical"` | 0.93–1 ms | **0.37 ms** | 反超 |
@@ -79,7 +79,7 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 | 查询 6（13 词） | 2–3 ms | **3.03 ms** | 同量级 |
 | 查询 7（14 词） | 0.84–1 ms | **1.40 ms** | ≈1.5× 慢 |
 
-写入仍是同一个量级上慢 3 倍（每批插入都要更新全文索引）。查询从最初的 13–30 倍
+写入从 3.2 s 降到 2.5 s（IMPORT 1.2 倍、INSERT 2.5 倍）；查询从最初的 13–30 倍
 降到「1–2 个词的查询全面反超，13/14 词的长查询在 1–1.5 倍以内」。
 
 ## 4. 这一轮改了什么
@@ -290,6 +290,43 @@ set_memindex_capacity(2) 把 20 行切成约 10 个段，断言四条查询（�
 - **把长度取用改成懒解析**（Lens::Map/Segment，用时才按序号读 .len）：块上界本身就要
   遍历块内每一条 posting，把取用从 load() 挪到 block_stats() 只是换位置，实测反而慢
   3–4%（多一次 enum 匹配），已回退。
+
+### 4.10 建索引/导入：把每 token 的分配和每 posting 的 Vec 去掉
+
+先用两个开关把 3.09 s 的 IMPORT 拆开（现已移除）：整个导入里 **95% 是全文索引**
+（跳过 index_row 后只剩 0.15 s），其中 analyze 1.33 s、postings 1.56 s。profile 也
+对得上：snowball 词干 ~22%、分配器 ~22%、memcmp（词项哈希查表）~10%。
+
+三处改动：
+
+| 改动 | 内容 |
+|---|---|
+| 分词不再分配 | tokenize 原来给每个 token 建一个字节 Vec 再转 String（3M token 就是 6M 次分配）。改成 for_each_token：token 就是输入切片（只有 UNITE 字节被丢弃时才用一块复用的缓冲），tokenize 保留为收集所有权的薄包装 |
+| 词干引擎复用 | Stemmer::stem 原来每个 token 都新建 Snowball 环境，现在每个算法一个 OnceLock；analyze 里小写化用 Cow（本来就是小写就借原文），词干没变就不分配 |
+| 位置不再逐条分配 | 内存索引里每个 term 的位置原来是一条 posting 一个 Vec<u32>（一次导入约 600 万个分配）。现在每个 term 一个只追加的 arena，posting 只记 (start, count)；重写某行时新位置追加在尾部，旧偏移依然有效 |
+
+实测（同机同语料）：
+
+| 阶段 | 改前 | 改后 |
+|---|---|---|
+| IMPORT 20000 行 | 3.09 s | **2.45–2.46 s**（参考 2 s） |
+| INSERT 20000 行（batch=500） | 3.24 s | **2.59 s** |
+| CREATE INDEX + Flush | 15–18 ms | 16–19 ms（未变，见下） |
+
+### 4.11 CREATE INDEX 那 16 ms 是 flush，不是 DDL
+
+把 Create index + flush 拆开计时（临时打点，已移除）：**DDL 2.9 ms、flush 14 ms**。
+DDL 本身已经和参考的 3 ms 持平；flush 的 14 ms 是持久化操作：
+
+| flush 步骤 | 耗时 |
+|---|---|
+| RocksDB flush()（catalog） | 4–5 ms |
+| WAL fsync | 5–6 ms |
+| flush_cpp_blocks（块镜像 + 失效索引目录清理） | 2.5–3.4 ms |
+
+参考的 Flush 不做这两次同步，所以它是 3 ms。端口这边是**持久性策略**上的选择，不是
+性能 bug：要缩短只能放宽 checkpoint 的同步语义，那会改变崩溃恢复的保证，所以这一项
+保留原样，只把差异记在这里。
 
 ## 5. 顺带修掉的一个格式缺陷
 

@@ -82,9 +82,16 @@ impl TokenizeConfig {
 /// A delimiter is skipped on its own; a unite byte is dropped while the token
 /// continues, but a *leading* unite byte starts the token (the reference's
 /// scanner behavior, verified on the engine: `x/y` -> `xy`, `/foo` -> `/foo`).
-pub fn tokenize(s: &str, config: &TokenizeConfig) -> Vec<(String, usize, usize)> {
+/// Feeds every token of the input to the callback as (text, start, end).
+///
+/// The text is a slice of the input unless a UNITE byte was dropped inside the
+/// token (an apostrophe inside a word, say); those come from a scratch buffer
+/// reused for every token. The reference's tokenizer produces the same tokens,
+/// but the port used to allocate a byte Vec and a String per token - three
+/// million of each for a 20k-row column.
+pub fn for_each_token(s: &str, config: &TokenizeConfig, mut f: impl FnMut(&str, usize, usize)) {
     let bytes = s.as_bytes();
-    let mut out = Vec::new();
+    let mut buf: Vec<u8> = Vec::new();
     let mut i = 0usize;
     while i < bytes.len() {
         while i < bytes.len() && config.class(bytes[i]) == SPACE {
@@ -98,23 +105,43 @@ pub fn tokenize(s: &str, config: &TokenizeConfig) -> Vec<(String, usize, usize)>
             continue;
         }
         let start = i;
-        let mut tok = vec![bytes[i]];
+        let mut dropped = false;
+        buf.clear();
+        buf.push(bytes[i]);
         i += 1;
         while i < bytes.len() {
             match config.class(bytes[i]) {
                 SPACE | DELIM => break,
                 ALLOW => {
-                    tok.push(bytes[i]);
+                    buf.push(bytes[i]);
                     i += 1;
                 }
-                _ => i += 1, // UNITE: dropped, the token continues
+                _ => {
+                    dropped = true;
+                    i += 1; // UNITE: dropped, the token continues
+                }
             }
         }
-        let text = String::from_utf8_lossy(&tok).into_owned();
+        let text: &str = if dropped {
+            match std::str::from_utf8(&buf) {
+                Ok(text) => text,
+                Err(_) => continue,
+            }
+        } else {
+            &s[start..i]
+        };
         if !text.is_empty() {
-            out.push((text, start, i));
+            f(text, start, i);
         }
     }
+}
+
+/// for_each_token, collecting owned tokens.
+pub fn tokenize(s: &str, config: &TokenizeConfig) -> Vec<(String, usize, usize)> {
+    let mut out = Vec::new();
+    for_each_token(s, config, |text, start, end| {
+        out.push((text.to_string(), start, end))
+    });
     out
 }
 
@@ -200,14 +227,13 @@ impl StandardAnalyzer {
         self.tokenize_config = config;
     }
 
-    /// C++: `CommonLanguageAnalyzer::AnalyzeImpl` + `StandardAnalyzer::NextToken`.
+    /// C++: CommonLanguageAnalyzer::AnalyzeImpl + StandardAnalyzer::NextToken.
     pub fn analyze(&self, input: &str) -> Vec<Term> {
         let mut out = Vec::new();
-        for (word_index, (token, start, end)) in tokenize(input, &self.tokenize_config)
-            .into_iter()
-            .enumerate()
-        {
-            let word_offset = word_index as u32;
+        let mut word_index = 0u32;
+        for_each_token(input, &self.tokenize_config, |token, start, end| {
+            let word_offset = word_index;
+            word_index += 1;
             let offset = if self.char_offset {
                 start as u32
             } else {
@@ -218,21 +244,34 @@ impl StandardAnalyzer {
             } else {
                 word_offset
             };
-            let lower = token.to_ascii_lowercase();
-            let stem = if self.extract_eng_stem {
-                match self.stemmer {
-                    Some(stemmer) => stemmer.stem(&lower),
-                    None => lower.clone(),
-                }
+            // Lower-casing only costs an allocation when the token has an
+            // uppercase byte; most words of a corpus are already lowercase.
+            let lower: std::borrow::Cow<str> = if token.bytes().any(|b| b.is_ascii_uppercase()) {
+                std::borrow::Cow::Owned(token.to_ascii_lowercase())
             } else {
-                lower.clone()
+                std::borrow::Cow::Borrowed(token)
             };
-            let stem_differs = stem != lower;
-            let lower_differs = token != lower;
+            let stem: Option<String> = match self.stemmer {
+                Some(stemmer) if self.extract_eng_stem => {
+                    let stem = stemmer.stem(&lower);
+                    // Only a stem that differs from the word becomes a term, so
+                    // an unchanged one costs no allocation.
+                    if stem.as_ref() == lower.as_ref() {
+                        None
+                    } else {
+                        Some(stem.into_owned())
+                    }
+                }
+                _ => None,
+            };
+            let lower_differs = token != lower.as_ref();
 
-            let mut emit = |text: &str| {
+            // The terms take ownership of the strings they were built from, so
+            // neither the word nor the stem is copied again: two million tokens
+            // per column makes even one clone per token visible.
+            let mut emit = |text: String| {
                 out.push(Term {
-                    text: text.to_string(),
+                    text,
                     word_offset,
                     char_offset: offset,
                     end_offset,
@@ -241,26 +280,30 @@ impl StandardAnalyzer {
                 });
             };
 
-            if stem_differs && self.stem_only {
-                emit(&stem);
-            } else if stem_differs || (self.case_sensitive && self.contain_lower && lower_differs) {
-                if self.case_sensitive {
-                    emit(&token);
+            if let Some(stem) = stem {
+                if self.stem_only {
+                    emit(stem);
+                } else if self.case_sensitive {
+                    emit(token.to_string());
+                    emit(stem);
+                    if self.contain_lower && lower_differs {
+                        emit(lower.into_owned());
+                    }
                 } else {
-                    emit(&lower);
-                }
-                if stem_differs {
-                    emit(&stem);
-                }
-                if self.case_sensitive && self.contain_lower && lower_differs {
-                    emit(&lower);
+                    emit(lower.into_owned());
+                    emit(stem);
                 }
             } else if self.case_sensitive {
-                emit(&token);
+                if self.contain_lower && lower_differs {
+                    emit(token.to_string());
+                    emit(lower.into_owned());
+                } else {
+                    emit(token.to_string());
+                }
             } else {
-                emit(&lower);
+                emit(lower.into_owned());
             }
-        }
+        });
         out
     }
 }
@@ -697,13 +740,42 @@ pub enum Stemmer {
 
 impl Stemmer {
     /// Stems one already-lowercased word.
-    pub fn stem(&self, word: &str) -> String {
+    ///
+    /// Creating a Snowball environment is not free, so one is kept per
+    /// algorithm instead of being rebuilt for every token: indexing a 20k-row
+    /// column runs this a couple of million times.
+    pub fn stem<'a>(&self, word: &'a str) -> std::borrow::Cow<'a, str> {
         match self {
-            Self::Snowball(algorithm) => rust_stemmers::Stemmer::create(*algorithm)
-                .stem(word)
-                .to_string(),
-            Self::Porter => super::porter::stem(word),
+            Self::Snowball(algorithm) => snowball(*algorithm).stem(word),
+            Self::Porter => std::borrow::Cow::Owned(super::porter::stem(word)),
         }
+    }
+}
+
+/// The Snowball environment for an algorithm, created once per process. The
+/// table is tiny, so a linear scan beats any locking.
+fn snowball(algorithm: rust_stemmers::Algorithm) -> &'static rust_stemmers::Stemmer {
+    use std::sync::OnceLock;
+    static ENGINES: OnceLock<Vec<(rust_stemmers::Algorithm, rust_stemmers::Stemmer)>> =
+        OnceLock::new();
+    let engines = ENGINES.get_or_init(|| {
+        let mut engines: Vec<(rust_stemmers::Algorithm, rust_stemmers::Stemmer)> = Vec::new();
+        for (_, stemmer) in STANDARD_LANGUAGES {
+            if let Stemmer::Snowball(algorithm) = stemmer {
+                if !engines.iter().any(|(a, _)| a == algorithm) {
+                    engines.push((*algorithm, rust_stemmers::Stemmer::create(*algorithm)));
+                }
+            }
+        }
+        engines
+    });
+    match engines.iter().find(|(a, _)| *a == algorithm) {
+        Some((_, engine)) => engine,
+        // Not reachable from SQL today: every algorithm the analyzer accepts is
+        // in the table above.
+        None => Box::leak(Box::new(rust_stemmers::Stemmer::create(
+            rust_stemmers::Algorithm::English,
+        ))),
     }
 }
 
@@ -1569,10 +1641,7 @@ impl RAGAnalyzer {
 
     fn stem_word(&self, token: &str) -> String {
         match self.stem_algorithm {
-            Some(rust_stemmers::Algorithm::English) => crate::stem_english(token),
-            Some(algorithm) => rust_stemmers::Stemmer::create(algorithm)
-                .stem(token)
-                .into_owned(),
+            Some(algorithm) => snowball(algorithm).stem(token).into_owned(),
             None => token.to_string(),
         }
     }

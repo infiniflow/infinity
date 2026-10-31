@@ -35,10 +35,10 @@ fn basic() {
         // The segment's only term is `a`; its positions are the reference's
         // decoded deltas.
         let hits = &indexer.postings["a"];
-        assert_eq!(hits.len(), 1);
-        assert_eq!(hits[0].0, index as u64);
-        assert_eq!(hits[0].1, expected_tf[index]);
-        assert_eq!(hits[0].2, expected_positions[index]);
+        assert_eq!(hits.list.len(), 1);
+        assert_eq!(hits.list[0].0, index as u64);
+        assert_eq!(hits.list[0].1, expected_tf[index]);
+        assert_eq!(hits.positions(0), expected_positions[index]);
 
         let reader =
             SegmentIndexReader::open(dir_str, &format!("chunk{}", index + 1), index as u64, flags)
