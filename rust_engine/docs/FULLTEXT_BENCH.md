@@ -128,6 +128,25 @@ boolean 模式下短语仍按词拆成多个游标（权重取字段 boost）；
 
 `merge_positions` 已经删掉；`merge` 还留给 `filter_fulltext` 的候选集路径。
 
+### 4.4 `"one of"` 还剩的 2.5 ms 是什么
+
+同一语料上单独查 `of`（不构成短语）要 **2.9 ms**，比 `"one of"` 更慢——说明这 2.5 ms
+不是短语验证的开销，而是「走一遍 2 万篇的 posting list」本身的单价：约 130 ns/篇。
+短语反而更快，是因为它的块上界取了两个词的最小值，剪得比单词更多。
+
+参考侧同样要遍历这批文档，1–2 ms 的差别在每次推进的成本，不在剪枝：
+
+- `PhraseDocIterator::NextShallow`（`phrase_doc_iterator_impl.cpp:139`）只解 skip list、
+  按块定位（注释明确写 "decode skip_list only"），只有块的 `BlockMaxBM25Score()`
+  超过阈值才调用 `GetExactPhraseMatchData` 去解位置；我们现在的 `PhraseCursor::advance`
+  必须解出「短语真的出现的下一篇」才能回答 `doc()`，所以块内每篇都要验证相邻性。
+- 参考的短语上界其实更**松**：它取 `min_i(f1/tf_i + f3/pct_i)`，我们取
+  `1 + max_i(f1/tf_i) + max_i(f3/pct_i)`（先对各词取 min tf / min pct 再套公式），
+  后者不小于前者，所以剪枝只会更多、不会更少。
+
+要再逼近，需要把「按块定位」和「求下一处匹配」拆成两个动作（参考的
+`NextShallow` / `Next`），让被剪掉的块根本不进位置验证；这是下一步。
+
 参考侧是块级 WAND + 跳表流式推进（命中 k 个就停），只投影 `row_id`/score 两列，
 所以耗时基本与语料规模无关（20k 文档仍在 1 ms 量级）。
 
