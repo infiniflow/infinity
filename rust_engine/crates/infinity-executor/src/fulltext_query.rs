@@ -931,10 +931,12 @@ impl TermLookup for MemoryColumnIndex {
         let ranker = crate::wand::Bm25Ranker::new(0.0);
         let mut units: Vec<crate::WandUnit> = Vec::new();
         for (term, boost) in terms {
-            let hits: Vec<(u64, u32)> = self
+            // Each posting carries the document length too, so the WAND
+            // never looks one up by row id.
+            let hits: Vec<(u64, u32, u32)> = self
                 .postings(column, term)
                 .into_iter()
-                .map(|(doc, tf, _)| (doc, tf))
+                .map(|(doc, tf, _)| (doc, tf, lens.get(&doc).copied().unwrap_or(1)))
                 .collect();
             if hits.is_empty() {
                 // A missing term simply drops that OR branch.
@@ -942,7 +944,7 @@ impl TermLookup for MemoryColumnIndex {
             }
             let idf = ranker.idf(n, hits.len() as f64);
             units.push(crate::WandUnit {
-                stream: Box::new(crate::TermStream::from_owned(hits)),
+                stream: crate::WandStream::Term(crate::TermStream::from_owned(hits)),
                 weight: *boost,
                 idf,
                 delta: None,
@@ -955,7 +957,6 @@ impl TermLookup for MemoryColumnIndex {
             n_docs,
             total_len: self.total_len(column),
             units,
-            doc_len: Box::new(move |row| *lens.get(&row).unwrap_or(&1)),
         }];
         let dead = std::collections::HashSet::new();
         let hits = crate::wand::BlockMaxWandIterator::new(

@@ -122,7 +122,6 @@ struct Cursor<'a> {
     /// Scores are summed in this order so the result never depends on how the
     /// doc-id sort permuted the cursors.
     ord: usize,
-    field: usize,
     term: usize,
     weight: f64,
     /// bm25_common_score_; zero for similarity=boolean.
@@ -139,7 +138,7 @@ struct Cursor<'a> {
     /// `delta_term` for a term, `delta_phrase` for a phrase.
     delta: f64,
     /// The posting stream, read one block at a time.
-    stream: Box<dyn WandStream + 'a>,
+    stream: WandStream<'a>,
     /// iter_->SeekDoc position, cached so the cursors can be sorted. `None`
     /// with `done == false` means a `seek_block` still has to be resolved.
     cur: Option<u64>,
@@ -183,14 +182,14 @@ impl<'a> Cursor<'a> {
     /// largest tf and largest tf/doc-length ratio, fed through the same BM25
     /// shape as the exact score. Cached per block like the reference's
     /// block_max_bm25_score_cache_end_id_.
-    fn block_max(&mut self, doc_len: &dyn Fn(u64) -> u32, mode: WandMode) -> f64 {
+    fn block_max(&mut self, mode: WandMode) -> f64 {
         let id = self.stream.block_id();
         if self.block_index == id {
             return self.block_max;
         }
         // `BlockMaxPhraseScore` for a phrase unit: the minimum over its terms',
         // since a phrase can occur no more often than any one of them.
-        let (last, max_tf, max_pct) = self.stream.block_stats(doc_len);
+        let (last, max_tf, max_pct) = self.stream.block_stats();
         let value = match mode {
             // One point per matched term, independent of tf and length.
             WandMode::Boolean => self.weight,
@@ -217,8 +216,6 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     mode: WandMode,
     ranker: Bm25Ranker,
     cursors: Vec<Cursor<'a>>,
-    /// One document-length provider per field (GetColumnLength).
-    doc_lens: Vec<Box<dyn Fn(u64) -> u32 + 'a>>,
     /// Top-k, sorted by score (desc) then doc id (asc), like the scan path.
     best: Vec<(u64, f64)>,
     threshold: f64,
@@ -244,16 +241,13 @@ impl<'a> BlockMaxWandIterator<'a> {
     ) -> Self {
         let ranker = Bm25Ranker::new(delta);
         let mut cursors = Vec::new();
-        let mut doc_lens = Vec::new();
         let field_count = fields.len();
-        for (fi, field) in fields.into_iter().enumerate() {
+        for field in fields {
             let WandField {
                 n_docs,
                 total_len,
                 units,
-                doc_len,
             } = field;
-            doc_lens.push(doc_len);
             let n = n_docs.max(1) as f64;
             let avg = (total_len as f64 / n).max(1e-9);
             for (ui, unit) in units.into_iter().enumerate() {
@@ -279,7 +273,6 @@ impl<'a> BlockMaxWandIterator<'a> {
                 };
                 cursors.push(Cursor {
                     ord: cursors.len(),
-                    field: fi,
                     term: ui,
                     weight: w,
                     common,
@@ -308,7 +301,6 @@ impl<'a> BlockMaxWandIterator<'a> {
             mode,
             ranker,
             cursors,
-            doc_lens,
             best: Vec::new(),
             threshold: f64::NEG_INFINITY,
             doc_id: None,
@@ -473,12 +465,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             // sits on doc, so the sum bounds doc's exact score.
             let mut block_bound = 0.0;
             for i in 0..=pivot {
-                let field = self.cursors[i].field;
-                let bound = {
-                    let cursor = &mut self.cursors[i];
-                    cursor.block_max(&*self.doc_lens[field], self.mode)
-                };
-                block_bound += bound;
+                block_bound += self.cursors[i].block_max(self.mode);
             }
             if block_bound >= self.threshold {
                 // Only now is the exact score decoded.
@@ -524,8 +511,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             let mut bound = 0.0;
             let mut last = u64::MAX;
             for i in 0..=pivot {
-                let field = self.cursors[i].field;
-                bound += self.cursors[i].block_max(&*self.doc_lens[field], self.mode);
+                bound += self.cursors[i].block_max(self.mode);
                 last = last.min(self.cursors[i].block_last());
             }
             if bound >= self.threshold || last == u64::MAX {
@@ -548,9 +534,8 @@ impl<'a> BlockMaxWandIterator<'a> {
             WandMode::Bm25 => {
                 for &i in &prefix {
                     let cursor = &mut self.cursors[i];
-                    let doc = cursor.cur.unwrap_or(0);
                     let tf = f64::from(cursor.stream.tf());
-                    let dl = f64::from(self.doc_lens[cursor.field](doc));
+                    let dl = f64::from(cursor.stream.len());
                     score += ranker.score_with(
                         tf,
                         dl,
@@ -589,13 +574,12 @@ mod tests {
         n: usize,
         weights: Vec<f64>,
     ) -> WandField<'a> {
-        let lens: HashMap<u64, u32> = doc_len.iter().copied().collect();
         let ranker = Bm25Ranker::new(0.0);
         let units = postings
             .iter()
             .enumerate()
             .map(|(i, (_term, list))| WandUnit {
-                stream: Box::new(TermStream::from_slice(list)),
+                stream: WandStream::Term(TermStream::from_slice(list, doc_len)),
                 weight: weights.get(i).copied().unwrap_or(1.0),
                 idf: ranker.idf(n.max(1) as f64, list.len() as f64),
                 delta: None,
@@ -605,7 +589,6 @@ mod tests {
             n_docs: n,
             total_len: doc_len.iter().map(|(_, l)| *l as u64).sum(),
             units,
-            doc_len: Box::new(move |row| *lens.get(&row).unwrap_or(&1)),
         }
     }
 
@@ -682,8 +665,8 @@ mod tests {
             if cursor.stream.doc().is_none() {
                 break;
             }
-            let (last, _, _) = cursor.stream.block_stats(&dl);
-            let bound = cursor.block_max(&dl, WandMode::Bm25);
+            let (last, _, _) = cursor.stream.block_stats();
+            let bound = cursor.block_max(WandMode::Bm25);
             for (doc, tf) in postings.iter().filter(|(d, _)| *d >= from && *d <= last) {
                 let exact = ranker.score(*tf as f64, f64::from(dl(*doc)), avg, idf, 1.7);
                 assert!(exact <= bound + 1e-12, "doc {doc}: {exact} > {bound}");
@@ -848,14 +831,17 @@ mod tests {
             .filter(|_| lcg(&mut rng).is_multiple_of(20))
             .collect();
 
+        let lens_slice: Vec<(u64, u32)> = lens.iter().map(|(d, l)| (*d, *l)).collect();
         let make = || {
-            let lens_map = lens.clone();
             let ranker = Bm25Ranker::new(0.0);
             let units = terms
                 .iter()
                 .enumerate()
                 .map(|(i, t)| WandUnit {
-                    stream: Box::new(TermStream::from_slice(postings[t].as_slice())),
+                    stream: WandStream::Term(TermStream::from_slice(
+                        postings[t].as_slice(),
+                        &lens_slice,
+                    )),
                     weight: weights.get(i).copied().unwrap_or(1.0),
                     idf: ranker.idf(DOCS as f64, postings[t].len() as f64),
                     delta: None,
@@ -865,7 +851,6 @@ mod tests {
                 n_docs: DOCS as usize,
                 total_len,
                 units,
-                doc_len: Box::new(move |row| *lens_map.get(&row).unwrap_or(&1)),
             }]
         };
 
@@ -950,27 +935,25 @@ mod tests {
                 b.push((doc, 1, vec![10]));
             }
         }
-        let lens: HashMap<u64, u32> = (0..DOCS).map(|d| (d, 100)).collect();
+        let lens: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 100)).collect();
         let ranker = Bm25Ranker::new(0.0);
         let n = DOCS as f64;
         let idf_a = ranker.idf(n, a.len() as f64);
         let idf_b = ranker.idf(n, b.len() as f64);
         let make = || {
             let cursor = crate::PhraseCursor::new(vec![
-                TermStream::from_postings(a.clone()),
-                TermStream::from_postings(b.clone()),
+                TermStream::from_postings(a.clone(), &lens),
+                TermStream::from_postings(b.clone(), &lens),
             ]);
-            let lens = lens.clone();
             vec![WandField {
                 n_docs: DOCS as usize,
                 total_len: DOCS * 100,
                 units: vec![WandUnit {
-                    stream: Box::new(cursor),
+                    stream: WandStream::Phrase(cursor),
                     weight: 1.0,
                     idf: idf_a + idf_b,
                     delta: None,
                 }],
-                doc_len: Box::new(move |row| *lens.get(&row).unwrap_or(&1)),
             }]
         };
         let dead = HashSet::new();
@@ -1001,9 +984,10 @@ mod tests {
                 b.push((doc, 1, vec![9u32]));
             }
         }
+        let lens: Vec<(u64, u32)> = (0..400u64).map(|d| (d, 10)).collect();
         let mut cursor = crate::PhraseCursor::new(vec![
-            TermStream::from_postings(a),
-            TermStream::from_postings(b),
+            TermStream::from_postings(a, &lens),
+            TermStream::from_postings(b, &lens),
         ]);
         assert_eq!(cursor.doc(), Some(0));
         let before = cursor.verified();

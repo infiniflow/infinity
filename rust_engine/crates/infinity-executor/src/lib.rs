@@ -3776,203 +3776,191 @@ impl ColumnIndexReader {
 }
 
 /// One ascending posting source of a term: a slice of the in-memory tail, a
-/// spilled run, or one sealed segment's `DocListReader`.
+/// spilled run, or one sealed segment's DocListReader.
 ///
 /// The cursors drive these directly: nothing is materialised, so a query pays
-/// for the documents it actually visits instead of `O(df)` per term.
-pub(crate) trait DocSource {
-    fn doc(&mut self) -> Option<u64>;
-    fn tf(&mut self) -> u32;
-    /// The current document's token offsets (empty without a position list).
-    fn positions(&mut self) -> &[u32];
-    /// Position on the first document `>= target`.
-    fn advance(&mut self, target: u64);
-    fn df(&self) -> usize;
+/// for the documents it actually visits instead of O(df) per term. An enum
+/// rather than a trait object because doc()/tf()/len() run once per visited
+/// document inside the block-max WAND loop, where the indirect call was a
+/// measurable share of the work.
+pub(crate) enum Source<'a> {
+    /// The unsealed segment's memory tail: (row, tf, positions) plus the
+    /// document-length map.
+    Mem {
+        list: &'a [(u64, u32, Vec<u32>)],
+        lens: &'a DocLenMap,
+        at: usize,
+    },
+    /// A list the caller owns: the query-syntax path's bmw_search, and the
+    /// tests. The arena holds the token offsets when the caller has them.
+    Owned {
+        list: Vec<(u64, u32, u32)>,
+        pos: PosArena,
+        at: usize,
+    },
+    /// A sealed segment or a spilled run: the reference's DocListReader,
+    /// decoding one 128-document mini-block at a time from the mmap.
+    Segment(infinity_storage::fulltext_segment::TermDocCursor<'a>),
 }
 
-/// A slice source over a materialised list (tests).
-#[cfg(test)]
-struct SliceSource<'a> {
-    list: &'a [(u64, u32)],
-    at: usize,
-}
-
-#[cfg(test)]
-impl DocSource for SliceSource<'_> {
+impl<'a> Source<'a> {
     fn doc(&mut self) -> Option<u64> {
-        self.list.get(self.at).map(|p| p.0)
+        match self {
+            Source::Mem { list, at, .. } => list.get(*at).map(|p| p.0),
+            Source::Owned { list, at, .. } => list.get(*at).map(|p| p.0),
+            Source::Segment(cur) => cur.doc(),
+        }
     }
 
     fn tf(&mut self) -> u32 {
-        self.list.get(self.at).map(|p| p.1).unwrap_or(0)
+        match self {
+            Source::Mem { list, at, .. } => list.get(*at).map(|p| p.1).unwrap_or(0),
+            Source::Owned { list, at, .. } => list.get(*at).map(|p| p.1).unwrap_or(0),
+            Source::Segment(cur) => cur.tf(),
+        }
+    }
+
+    /// The current document's length (BM25 dl).
+    fn len(&mut self) -> u32 {
+        match self {
+            Source::Mem { list, lens, at } => list
+                .get(*at)
+                .and_then(|p| lens.get(&p.0).copied())
+                .unwrap_or(1),
+            Source::Owned { list, at, .. } => list.get(*at).map(|p| p.2).unwrap_or(1),
+            Source::Segment(cur) => cur.len(),
+        }
     }
 
     fn positions(&mut self) -> &[u32] {
-        &[]
+        match self {
+            Source::Mem { list, at, .. } => list.get(*at).map(|p| p.2.as_slice()).unwrap_or(&[]),
+            Source::Owned { pos, at, .. } => pos.get(*at),
+            Source::Segment(cur) => cur.positions(),
+        }
     }
 
     fn advance(&mut self, target: u64) {
-        while self.at < self.list.len() && self.list[self.at].0 < target {
-            self.at += 1;
+        match self {
+            Source::Mem { list, at, .. } => {
+                while *at < list.len() && list[*at].0 < target {
+                    *at += 1;
+                }
+            }
+            Source::Owned { list, at, .. } => {
+                while *at < list.len() && list[*at].0 < target {
+                    *at += 1;
+                }
+            }
+            Source::Segment(cur) => cur.advance(target),
         }
     }
 
     fn df(&self) -> usize {
-        self.list.len()
+        match self {
+            Source::Mem { list, .. } => list.len(),
+            Source::Owned { list, .. } => list.len(),
+            Source::Segment(cur) => cur.df(),
+        }
     }
 }
 
-/// A materialised list a caller owns (the query-syntax path's `bmw_search`).
-struct OwnedSliceSource {
-    list: Vec<(u64, u32)>,
-    at: usize,
+/// A block's token offsets, one run after another: a per-block arena costs one
+/// allocation instead of one per posting.
+#[derive(Default)]
+pub(crate) struct PosArena {
+    starts: Vec<u32>,
+    lens: Vec<u32>,
+    buf: Vec<u32>,
 }
 
-impl DocSource for OwnedSliceSource {
-    fn doc(&mut self) -> Option<u64> {
-        self.list.get(self.at).map(|p| p.0)
+impl PosArena {
+    fn push(&mut self, positions: &[u32]) {
+        self.starts.push(self.buf.len() as u32);
+        self.lens.push(positions.len() as u32);
+        self.buf.extend_from_slice(positions);
     }
 
-    fn tf(&mut self) -> u32 {
-        self.list.get(self.at).map(|p| p.1).unwrap_or(0)
-    }
-
-    fn positions(&mut self) -> &[u32] {
-        &[]
-    }
-
-    fn advance(&mut self, target: u64) {
-        while self.at < self.list.len() && self.list[self.at].0 < target {
-            self.at += 1;
+    fn get(&self, at: usize) -> &[u32] {
+        match (self.starts.get(at), self.lens.get(at)) {
+            (Some(start), Some(len)) => self
+                .buf
+                .get(*start as usize..(*start + *len) as usize)
+                .unwrap_or(&[]),
+            _ => &[],
         }
     }
 
-    fn df(&self) -> usize {
-        self.list.len()
-    }
-}
-
-/// The memory tail's per-term list (row, tf, positions).
-struct MemSource<'a> {
-    list: &'a [(u64, u32, Vec<u32>)],
-    at: usize,
-}
-
-impl DocSource for MemSource<'_> {
-    fn doc(&mut self) -> Option<u64> {
-        self.list.get(self.at).map(|p| p.0)
-    }
-
-    fn tf(&mut self) -> u32 {
-        self.list.get(self.at).map(|p| p.1).unwrap_or(0)
-    }
-
-    fn positions(&mut self) -> &[u32] {
-        self.list.get(self.at).map(|p| p.2.as_slice()).unwrap_or(&[])
-    }
-
-    fn advance(&mut self, target: u64) {
-        while self.at < self.list.len() && self.list[self.at].0 < target {
-            self.at += 1;
-        }
-    }
-
-    fn df(&self) -> usize {
-        self.list.len()
-    }
-}
-
-/// A sealed segment's (or a spilled run's) cursor: the reference's
-/// `DocListReader`, decoding one 128-document mini-block at a time from the
-/// mmap, with the position list consumed alongside.
-struct SegmentSource<'a> {
-    cur: infinity_storage::fulltext_segment::TermDocCursor<'a>,
-}
-
-impl DocSource for SegmentSource<'_> {
-    fn doc(&mut self) -> Option<u64> {
-        self.cur.doc()
-    }
-
-    fn tf(&mut self) -> u32 {
-        self.cur.tf()
-    }
-
-    fn positions(&mut self) -> &[u32] {
-        self.cur.positions()
-    }
-
-    fn advance(&mut self, target: u64) {
-        self.cur.advance(target)
-    }
-
-    fn df(&self) -> usize {
-        self.cur.df()
+    fn clear(&mut self) {
+        self.starts.clear();
+        self.lens.clear();
+        self.buf.clear();
     }
 }
 
 /// One term's postings across every source, merged ascending by row id with the
-/// newest copy of a row winning (`PostingIterator` over the reference's
+/// newest copy of a row winning (PostingIterator over the reference's
 /// segments).
 ///
-/// `cur` is the smallest document the sources are on; it is not consumed until
-/// the caller asks for the next one, so `positions()` still belongs to it.
+/// cur is the smallest document the sources are on; it is not consumed until
+/// the caller asks for the next one, so positions() still belongs to it.
 pub(crate) struct MergeCursor<'a> {
-    sources: Vec<Box<dyn DocSource + 'a>>,
-    /// Sources `>= segment_from` are sealed segments: a row in `overridden`
-    /// has a newer copy in the unsealed segment, so its sealed copy is stale.
+    sources: Vec<Source<'a>>,
+    /// Sources >= segment_from are sealed segments: a row in overridden has a
+    /// newer copy in the unsealed segment, so its sealed copy is stale.
     segment_from: usize,
     overridden: Option<&'a std::collections::HashSet<u64>>,
-    cur: Option<(u64, u32, usize)>,
+    /// (row, tf, length, winning source)
+    cur: Option<(u64, u32, u32, usize)>,
     /// The smallest document still has to be recomputed (a source moved).
     dirty: bool,
+    /// Exactly one source and no stale copy to filter: forward every accessor
+    /// to it instead of running the k-way merge.
+    single: bool,
     df: usize,
 }
 
 impl<'a> MergeCursor<'a> {
     fn new(
-        sources: Vec<Box<dyn DocSource + 'a>>,
+        sources: Vec<Source<'a>>,
         segment_from: usize,
         overridden: Option<&'a std::collections::HashSet<u64>>,
     ) -> Self {
         let df = sources.iter().map(|s| s.df()).sum();
+        let single = sources.len() == 1
+            && (segment_from >= 1 || overridden.is_none_or(|o| o.is_empty()));
         let mut cursor = Self {
             sources,
             segment_from,
             overridden,
             cur: None,
             dirty: true,
+            single,
             df,
         };
         cursor.settle();
         cursor
     }
 
-    /// A cursor over one materialised list (tests).
-    #[cfg(test)]
-    pub(crate) fn from_slice(list: &'a [(u64, u32)]) -> Self {
-        Self::new(vec![Box::new(SliceSource { list, at: 0 })], 1, None)
-    }
-
-    /// Documents containing the term (the reference's `doc_freq`).
+    /// Documents containing the term (the reference's doc_freq).
     pub(crate) fn df(&self) -> usize {
         self.df
     }
 
     /// Recomputes the smallest current document, dropping stale sealed copies.
     fn settle(&mut self) {
-        if !self.dirty {
+        if self.single || !self.dirty {
             return;
         }
         loop {
-            let mut best: Option<(usize, u64, u32)> = None;
+            let mut best: Option<(usize, u64, u32, u32)> = None;
             for (i, src) in self.sources.iter_mut().enumerate() {
                 let Some(doc) = src.doc() else { continue };
-                if best.is_none_or(|(_, bd, _)| doc < bd) {
-                    best = Some((i, doc, src.tf()));
+                if best.is_none_or(|(_, bd, _, _)| doc < bd) {
+                    best = Some((i, doc, src.tf(), src.len()));
                 }
             }
-            let Some((winner, doc, tf)) = best else {
+            let Some((winner, doc, tf, len)) = best else {
                 self.cur = None;
                 self.dirty = false;
                 return;
@@ -3981,35 +3969,57 @@ impl<'a> MergeCursor<'a> {
                 self.sources[winner].advance(doc + 1);
                 continue;
             }
-            self.cur = Some((doc, tf, winner));
+            self.cur = Some((doc, tf, len, winner));
             self.dirty = false;
             return;
         }
     }
 
-    /// The current document (`None` once every source is exhausted).
+    /// The current document (None once every source is exhausted).
     pub(crate) fn doc(&mut self) -> Option<u64> {
+        if self.single {
+            return self.sources[0].doc();
+        }
         self.settle();
         self.cur.map(|c| c.0)
     }
 
     /// The current document's term frequency.
     pub(crate) fn tf(&mut self) -> u32 {
+        if self.single {
+            return self.sources[0].tf();
+        }
         self.settle();
         self.cur.map(|c| c.1).unwrap_or(0)
     }
 
+    /// The current document's length (BM25 dl).
+    pub(crate) fn len(&mut self) -> u32 {
+        if self.single {
+            return self.sources[0].len();
+        }
+        self.settle();
+        self.cur.map(|c| c.2).unwrap_or(1)
+    }
+
     /// The current document's token offsets.
     pub(crate) fn positions(&mut self) -> &[u32] {
+        if self.single {
+            return self.sources[0].positions();
+        }
         self.settle();
         match self.cur {
-            Some((_, _, winner)) => self.sources[winner].positions(),
+            Some((_, _, _, winner)) => self.sources[winner].positions(),
             None => &[],
         }
     }
 
-    /// `SeekDoc`: position on the first document `>= target`.
+    /// SeekDoc: position on the first document >= target.
     pub(crate) fn advance(&mut self, target: u64) {
+        if self.single {
+            self.sources[0].advance(target);
+            return;
+        }
         self.dirty = true;
         for src in &mut self.sources {
             if src.doc().is_some_and(|doc| doc < target) {
@@ -4020,55 +4030,89 @@ impl<'a> MergeCursor<'a> {
     }
 }
 
-/// One buffered posting: the document, the term's frequency in it and - for
-/// the cursors a phrase unit wraps - the term's token offsets.
-pub(crate) struct Posting {
-    pub doc: u64,
-    pub tf: u32,
-    /// Slice of the stream's position arena [`TermStream::pos_buf`].
-    pub pos_start: u32,
-    pub pos_len: u32,
+/// The interface BlockMaxWandIterator drives: a unit is a term or a phrase, and
+/// either way it can say which block it is on and what that block's largest
+/// tf / tf-length ratio is.
+pub(crate) enum WandStream<'a> {
+    Term(TermStream<'a>),
+    Phrase(PhraseCursor<'a>),
 }
 
-/// The interface `BlockMaxWandIterator` drives: a posting stream that can say
-/// which block it is on and what that block's largest tf / tf-length ratio
-/// is. Clause units implement it directly ([`TermStream`]) or through their
-/// children ([`PhraseCursor`], whose bound is the minimum over the terms').
-pub(crate) trait WandStream {
-    fn doc(&mut self) -> Option<u64>;
-    fn tf(&mut self) -> u32;
-    /// `SeekDoc`: position on the first document `>= target`, resolved.
-    fn advance(&mut self, target: u64);
-    /// `NextShallow`: reposition at document level without resolving the unit.
-    /// The default cursor has nothing to defer.
-    fn seek_block(&mut self, target: u64) {
-        self.advance(target)
+impl<'a> WandStream<'a> {
+    pub(crate) fn doc(&mut self) -> Option<u64> {
+        match self {
+            WandStream::Term(s) => s.doc(),
+            WandStream::Phrase(s) => s.doc(),
+        }
     }
-    /// Identity of the block the cursor is on (a `BlockMaxBM25Score` cache key).
-    fn block_id(&mut self) -> u64;
-    /// `(last document of the block, largest tf, largest tf/doc-length ratio)`.
-    fn block_stats(&mut self, doc_len: &dyn Fn(u64) -> u32) -> (u64, f64, f64);
+
+    pub(crate) fn tf(&mut self) -> u32 {
+        match self {
+            WandStream::Term(s) => s.tf(),
+            WandStream::Phrase(s) => s.tf(),
+        }
+    }
+
+    /// The current document's length (BM25 dl).
+    pub(crate) fn len(&mut self) -> u32 {
+        match self {
+            WandStream::Term(s) => s.len(),
+            WandStream::Phrase(s) => s.len(),
+        }
+    }
+
+    /// NextShallow: reposition at document level without resolving the unit.
+    /// A term has nothing to defer.
+    pub(crate) fn seek_block(&mut self, target: u64) {
+        match self {
+            WandStream::Term(s) => s.advance(target),
+            WandStream::Phrase(s) => s.seek_block(target),
+        }
+    }
+
+    /// Identity of the block the cursor is on (a BlockMaxBM25Score cache key).
+    pub(crate) fn block_id(&mut self) -> u64 {
+        match self {
+            WandStream::Term(s) => s.block_id(),
+            WandStream::Phrase(s) => s.block_id(),
+        }
+    }
+
+    /// (last document of the block, largest tf, largest tf/doc-length ratio).
+    pub(crate) fn block_stats(&mut self) -> (u64, f64, f64) {
+        match self {
+            WandStream::Term(s) => s.block_stats(),
+            WandStream::Phrase(s) => s.block_stats(),
+        }
+    }
 }
 
 /// One query term's postings as the block-max WAND cursor sees them: a
-/// [`MergeCursor`] plus the current 128-posting block. Blocks are aligned from
-/// the start of the list, exactly like the reference's `MAX_DOC_PER_RECORD`
-/// runs, so a block bound stays valid while the cursor walks inside it.
+/// MergeCursor plus the current 128-posting block. Blocks are aligned from the
+/// start of the list, exactly like the reference's MAX_DOC_PER_RECORD runs, so
+/// a block bound stays valid while the cursor walks inside it.
 pub(crate) struct TermStream<'a> {
     merge: MergeCursor<'a>,
-    block: Vec<Posting>,
-    /// The block's token offsets, one run after another: a phrase child needs
-    /// them, and one arena per block costs no allocation per posting.
-    pos_buf: Vec<u32>,
+    /// The block, column-major: only the three fields a posting needs.
+    docs: Vec<u64>,
+    tfs: Vec<u32>,
+    lens: Vec<u32>,
     at: usize,
     block_id: u64,
     loaded: bool,
+    /// The block's largest tf and tf/doc-length ratio, computed on the first
+    /// block_stats() call (a block the WAND never bounds never pays for it).
+    last: u64,
+    stats_ready: bool,
+    max_tf: f64,
+    max_pct: f64,
     /// Keep each posting's token offsets (phrase children need them).
     capture: bool,
+    pos: PosArena,
 }
 
-/// The number of postings a block-max bound covers (`MAX_DOC_PER_RECORD`, the
-/// same 128 [`crate::wand`] uses).
+/// The number of postings a block-max bound covers (MAX_DOC_PER_RECORD, the
+/// same 128 crate::wand uses).
 pub(crate) const WAND_BLOCK: usize = 128;
 
 impl<'a> TermStream<'a> {
@@ -4079,53 +4123,75 @@ impl<'a> TermStream<'a> {
     pub(crate) fn with_positions(merge: MergeCursor<'a>, capture: bool) -> Self {
         Self {
             merge,
-            block: Vec::new(),
-            pos_buf: Vec::new(),
+            docs: Vec::new(),
+            tfs: Vec::new(),
+            lens: Vec::new(),
             at: 0,
             block_id: 0,
             loaded: false,
+            last: u64::MAX,
+            stats_ready: false,
+            max_tf: 0.0,
+            max_pct: 0.0,
             capture,
+            pos: PosArena::default(),
         }
     }
 
-    /// A stream over an owned list (the query-syntax path).
-    pub(crate) fn from_owned(list: Vec<(u64, u32)>) -> Self {
+    /// A stream over a list the caller owns (the query-syntax path): rows,
+    /// term frequencies and lengths.
+    pub(crate) fn from_owned(list: Vec<(u64, u32, u32)>) -> Self {
         Self::new(MergeCursor::new(
-            vec![Box::new(OwnedSliceSource { list, at: 0 })],
+            vec![Source::Owned {
+                list,
+                pos: PosArena::default(),
+                at: 0,
+            }],
             1,
             None,
         ))
     }
 
+    /// A stream over one materialised list and its lengths (tests).
+    #[cfg(test)]
+    pub(crate) fn from_slice(list: &'a [(u64, u32)], lens: &'a [(u64, u32)]) -> Self {
+        let owned: Vec<(u64, u32, u32)> = list
+            .iter()
+            .map(|(doc, tf)| {
+                let len = lens
+                    .iter()
+                    .find(|(d, _)| d == doc)
+                    .map(|(_, l)| *l)
+                    .unwrap_or(1);
+                (*doc, *tf, len)
+            })
+            .collect();
+        Self::from_owned(owned)
+    }
+
     /// A stream over an owned list with token offsets (phrase tests).
     #[cfg(test)]
-    pub(crate) fn from_postings(list: Vec<(u64, u32, Vec<u32>)>) -> Self {
-        struct OwnedPositions {
-            list: Vec<(u64, u32, Vec<u32>)>,
-            at: usize,
-        }
-        impl DocSource for OwnedPositions {
-            fn doc(&mut self) -> Option<u64> {
-                self.list.get(self.at).map(|p| p.0)
-            }
-            fn tf(&mut self) -> u32 {
-                self.list.get(self.at).map(|p| p.1).unwrap_or(0)
-            }
-            fn positions(&mut self) -> &[u32] {
-                self.list.get(self.at).map(|p| p.2.as_slice()).unwrap_or(&[])
-            }
-            fn advance(&mut self, target: u64) {
-                while self.at < self.list.len() && self.list[self.at].0 < target {
-                    self.at += 1;
-                }
-            }
-            fn df(&self) -> usize {
-                self.list.len()
-            }
-        }
+    pub(crate) fn from_postings(list: Vec<(u64, u32, Vec<u32>)>, lens: &'a [(u64, u32)]) -> Self {
+        let mut pos = PosArena::default();
+        let owned: Vec<(u64, u32, u32)> = list
+            .iter()
+            .map(|(doc, tf, positions)| {
+                pos.push(positions);
+                let len = lens
+                    .iter()
+                    .find(|(d, _)| d == doc)
+                    .map(|(_, l)| *l)
+                    .unwrap_or(1);
+                (*doc, *tf, len)
+            })
+            .collect();
         Self::with_positions(
             MergeCursor::new(
-                vec![Box::new(OwnedPositions { list, at: 0 })],
+                vec![Source::Owned {
+                    list: owned,
+                    pos,
+                    at: 0,
+                }],
                 1,
                 None,
             ),
@@ -4133,55 +4199,41 @@ impl<'a> TermStream<'a> {
         )
     }
 
-    /// A stream over one materialised list (tests).
-    #[cfg(test)]
-    pub(crate) fn from_slice(list: &'a [(u64, u32)]) -> Self {
-        Self::new(MergeCursor::from_slice(list))
-    }
-
-    /// Documents containing the term (the reference's `doc_freq`).
+    /// Documents containing the term (the reference's doc_freq).
     pub(crate) fn df(&self) -> usize {
         self.merge.df()
     }
 
-    fn pull(&mut self) -> Option<Posting> {
-        let doc = self.merge.doc()?;
-        let tf = self.merge.tf();
-        let mut pos_start = 0u32;
-        let mut pos_len = 0u32;
-        if self.capture {
-            let positions = self.merge.positions();
-            pos_start = self.pos_buf.len() as u32;
-            pos_len = positions.len() as u32;
-            self.pos_buf.extend_from_slice(positions);
-        }
-        self.merge.advance(doc + 1);
-        Some(Posting {
-            doc,
-            tf,
-            pos_start,
-            pos_len,
-        })
-    }
-
-    /// Loads the next block: up to [`WAND_BLOCK`] postings starting at the
-    /// cursor. Blocks stay aligned from the start of the list.
+    /// Loads the next block: up to WAND_BLOCK postings starting at the cursor,
+    /// recording the block's bound as it goes. Blocks stay aligned from the
+    /// start of the list.
     fn load(&mut self) -> bool {
-        if self.at < self.block.len() {
+        if self.at < self.docs.len() {
             return true;
         }
-        self.block.clear();
-        self.pos_buf.clear();
+        self.docs.clear();
+        self.tfs.clear();
+        self.lens.clear();
+        self.pos.clear();
         self.at = 0;
-        while self.block.len() < WAND_BLOCK {
-            match self.pull() {
-                Some(item) => self.block.push(item),
-                None => break,
+        self.stats_ready = false;
+        while self.docs.len() < WAND_BLOCK {
+            let Some(doc) = self.merge.doc() else { break };
+            let tf = self.merge.tf();
+            let len = self.merge.len();
+            if self.capture {
+                let positions = self.merge.positions();
+                self.pos.push(positions);
             }
+            self.docs.push(doc);
+            self.tfs.push(tf);
+            self.lens.push(len);
+            self.merge.advance(doc + 1);
         }
-        if self.block.is_empty() {
+        if self.docs.is_empty() {
             return false;
         }
+        self.last = *self.docs.last().expect("block is not empty");
         if self.loaded {
             self.block_id += 1;
         } else {
@@ -4190,12 +4242,12 @@ impl<'a> TermStream<'a> {
         true
     }
 
-    /// The current document (`None` once exhausted).
+    /// The current document (None once exhausted).
     pub(crate) fn doc(&mut self) -> Option<u64> {
         if !self.load() {
             return None;
         }
-        self.block.get(self.at).map(|p| p.doc)
+        self.docs.get(self.at).copied()
     }
 
     /// The current document's term frequency.
@@ -4203,7 +4255,16 @@ impl<'a> TermStream<'a> {
         if !self.load() {
             return 0;
         }
-        self.block.get(self.at).map(|p| p.tf).unwrap_or(0)
+        self.tfs.get(self.at).copied().unwrap_or(0)
+    }
+
+    /// The current document's length (BM25 dl), from the segment ordinal the
+    /// cursor decoded - no search from the row id.
+    pub(crate) fn len(&mut self) -> u32 {
+        if !self.load() {
+            return 1;
+        }
+        self.lens.get(self.at).copied().unwrap_or(1)
     }
 
     /// The current document's token offsets.
@@ -4211,86 +4272,63 @@ impl<'a> TermStream<'a> {
         if !self.load() {
             return &[];
         }
-        let Some(p) = self.block.get(self.at) else {
-            return &[];
-        };
-        let start = p.pos_start as usize;
-        let end = start + p.pos_len as usize;
-        self.pos_buf.get(start..end).unwrap_or(&[])
+        self.pos.get(self.at)
     }
 
-    /// `SeekDoc`: position on the first document `>= target`.
+    /// SeekDoc: position on the first document >= target.
     pub(crate) fn advance(&mut self, target: u64) {
         loop {
             if !self.load() {
                 return;
             }
-            match self.block.get(self.at) {
-                Some(p) if p.doc < target => self.at += 1,
+            match self.docs.get(self.at) {
+                Some(doc) if *doc < target => self.at += 1,
                 _ => return,
             }
         }
     }
 
-    /// Identity of the loaded block: the cache key of `BlockMaxBM25Score()`.
+    /// Identity of the loaded block: the cache key of BlockMaxBM25Score().
     pub(crate) fn block_id(&mut self) -> u64 {
         self.load();
         self.block_id
     }
 
-    /// The block's `(last doc, largest tf, largest tf/doc-length ratio)`.
-    pub(crate) fn block_stats(&mut self, doc_len: &dyn Fn(u64) -> u32) -> (u64, f64, f64) {
+    /// The block's (last doc, largest tf, largest tf/doc-length ratio).
+    pub(crate) fn block_stats(&mut self) -> (u64, f64, f64) {
         if !self.load() {
             return (u64::MAX, 0.0, 0.0);
         }
-        let mut max_tf = 0.0f64;
-        let mut max_pct = 0.0f64;
-        for p in &self.block {
-            let tf = f64::from(p.tf);
-            max_tf = max_tf.max(tf);
-            let dl = f64::from(doc_len(p.doc));
-            max_pct = max_pct.max(tf / dl.max(1.0));
+        if !self.stats_ready {
+            let mut max_tf = 0.0f64;
+            let mut max_pct = 0.0f64;
+            for (tf, len) in self.tfs.iter().zip(&self.lens) {
+                let tf = f64::from(*tf);
+                max_tf = max_tf.max(tf);
+                max_pct = max_pct.max(tf / f64::from((*len).max(1)));
+            }
+            self.max_tf = max_tf;
+            self.max_pct = max_pct;
+            self.stats_ready = true;
         }
-        let last = self.block.last().map(|p| p.doc).unwrap_or(u64::MAX);
-        (last, max_tf, max_pct)
-    }
-}
-
-impl WandStream for TermStream<'_> {
-    fn doc(&mut self) -> Option<u64> {
-        TermStream::doc(self)
-    }
-
-    fn tf(&mut self) -> u32 {
-        TermStream::tf(self)
-    }
-
-    fn advance(&mut self, target: u64) {
-        TermStream::advance(self, target)
-    }
-
-    fn block_id(&mut self) -> u64 {
-        TermStream::block_id(self)
-    }
-
-    fn block_stats(&mut self, doc_len: &dyn Fn(u64) -> u32) -> (u64, f64, f64) {
-        TermStream::block_stats(self, doc_len)
+        (self.last, self.max_tf, self.max_pct)
     }
 }
 
 /// A phrase unit as one WAND cursor: it lands only on documents where the
 /// terms sit at consecutive offsets, and its block bound is the **minimum** of
 /// the terms' block bounds - a phrase can occur no more often than its rarest
-/// term (`BlockMaxPhraseScore`, `term_doc_iterator_impl.cpp`). That is what
-/// lets the iterator skip a whole block without verifying each document.
+/// term (BlockMaxPhraseScore, term_doc_iterator_impl.cpp). That is what lets
+/// the iterator skip a whole block without verifying each document.
 pub(crate) struct PhraseCursor<'a> {
     children: Vec<TermStream<'a>>,
     unit_len: usize,
     cur: Option<u64>,
     cur_tf: u32,
+    cur_len: u32,
     scratch: Vec<Vec<u32>>,
-    /// `cur` is stale: [`Self::seek_block`] repositioned the children without
-    /// verifying any phrase occurrence.
+    /// cur is stale: seek_block repositioned the children without verifying any
+    /// phrase occurrence.
     pending: bool,
     /// Documents whose offsets were decoded to answer a query (test only).
     #[cfg(test)]
@@ -4305,6 +4343,7 @@ impl<'a> PhraseCursor<'a> {
             unit_len,
             cur: None,
             cur_tf: 0,
+            cur_len: 1,
             scratch: Vec::new(),
             pending: true,
             #[cfg(test)]
@@ -4314,10 +4353,10 @@ impl<'a> PhraseCursor<'a> {
         cursor
     }
 
-    /// `NextShallow` (`phrase_doc_iterator_impl.cpp:139`): reposition the
-    /// children on `target` at document level **without** verifying a phrase
-    /// occurrence. The next [`Self::resolve`] pays for the verification, so a
-    /// block the WAND skips never has its offsets decoded.
+    /// NextShallow (phrase_doc_iterator_impl.cpp:139): reposition the children
+    /// on target at document level **without** verifying a phrase occurrence.
+    /// The next resolve() pays for the verification, so a block the WAND skips
+    /// never has its offsets decoded.
     pub(crate) fn seek_block(&mut self, target: u64) {
         for child in self.children.iter_mut() {
             if child.doc().is_some_and(|doc| doc < target) {
@@ -4328,8 +4367,8 @@ impl<'a> PhraseCursor<'a> {
         self.cur = None;
     }
 
-    /// The reference's `Next()`: verify offsets from the current position on
-    /// and stop at the next document where the phrase occurs. A no-op when the
+    /// The reference's Next(): verify offsets from the current position on and
+    /// stop at the next document where the phrase occurs. A no-op when the
     /// cursor is already resolved.
     pub(crate) fn resolve(&mut self) {
         if !self.pending && self.cur.is_some() {
@@ -4371,7 +4410,7 @@ impl<'a> PhraseCursor<'a> {
             if !aligned {
                 continue;
             }
-            // Phrase frequency at `top`, from the terms' offsets.
+            // Phrase frequency at top, from the terms' offsets.
             #[cfg(test)]
             {
                 self.verified += 1;
@@ -4386,6 +4425,12 @@ impl<'a> PhraseCursor<'a> {
             if freq > 0 {
                 self.cur = Some(top);
                 self.cur_tf = freq as u32;
+                // Any child on the aligned document has the document's length.
+                self.cur_len = self
+                    .children
+                    .first_mut()
+                    .map(|c| c.len())
+                    .unwrap_or(1);
                 return;
             }
             for child in self.children.iter_mut() {
@@ -4404,9 +4449,10 @@ impl<'a> PhraseCursor<'a> {
         self.cur_tf
     }
 
-    pub(crate) fn advance(&mut self, target: u64) {
-        self.seek_block(target);
+    /// The matched document's length (BM25 dl).
+    pub(crate) fn len(&mut self) -> u32 {
         self.resolve();
+        self.cur_len
     }
 
     pub(crate) fn block_id(&mut self) -> u64 {
@@ -4417,13 +4463,13 @@ impl<'a> PhraseCursor<'a> {
         id
     }
 
-    /// The bound covers `[cur, min over the terms' block ends]`.
-    pub(crate) fn block_stats(&mut self, doc_len: &dyn Fn(u64) -> u32) -> (u64, f64, f64) {
+    /// The bound covers [cur, min over the terms' block ends].
+    pub(crate) fn block_stats(&mut self) -> (u64, f64, f64) {
         let mut last = u64::MAX;
         let mut max_tf = f64::INFINITY;
         let mut max_pct = f64::INFINITY;
         for child in self.children.iter_mut() {
-            let (l, t, p) = child.block_stats(doc_len);
+            let (l, t, p) = child.block_stats();
             last = last.min(l);
             max_tf = max_tf.min(t);
             max_pct = max_pct.min(p);
@@ -4435,49 +4481,21 @@ impl<'a> PhraseCursor<'a> {
     }
 }
 
-impl WandStream for PhraseCursor<'_> {
-    fn doc(&mut self) -> Option<u64> {
-        PhraseCursor::doc(self)
-    }
-
-    fn seek_block(&mut self, target: u64) {
-        PhraseCursor::seek_block(self, target)
-    }
-
-    fn tf(&mut self) -> u32 {
-        PhraseCursor::tf(self)
-    }
-
-    fn advance(&mut self, target: u64) {
-        PhraseCursor::advance(self, target)
-    }
-
-    fn block_id(&mut self) -> u64 {
-        PhraseCursor::block_id(self)
-    }
-
-    fn block_stats(&mut self, doc_len: &dyn Fn(u64) -> u32) -> (u64, f64, f64) {
-        PhraseCursor::block_stats(self, doc_len)
-    }
-}
-
 /// One searched field's clause units plus the corpus statistics BM25 needs.
 pub(crate) struct WandField<'a> {
     pub n_docs: usize,
     pub total_len: u64,
     pub units: Vec<WandUnit<'a>>,
-    pub doc_len: Box<dyn Fn(u64) -> u32 + 'a>,
 }
 
 /// One clause unit of one field: a term or a phrase, with the idf and the
-/// `delta` its score uses (`delta_term` for a term, `delta_phrase` for a
-/// phrase).
+/// delta its score uses (delta_term for a term, delta_phrase for a phrase).
 pub(crate) struct WandUnit<'a> {
-    pub stream: Box<dyn WandStream + 'a>,
+    pub stream: WandStream<'a>,
     pub weight: f64,
     pub idf: f64,
-    /// `None` uses the iterator's `delta` (its `delta_term`); a phrase passes
-    /// its own `delta_phrase`.
+    /// None uses the iterator's delta (its delta_term); a phrase passes its own
+    /// delta_phrase.
     pub delta: Option<f64>,
 }
 
@@ -4572,13 +4590,6 @@ impl TextIndex {
 
     /// BM25's document length for `row`: the unsealed segment's map first
     /// (it holds the current text), then the sealed segments.
-    fn doc_len_of(&self, row: u64) -> u32 {
-        self.mem
-            .doc_len_of(row)
-            .or_else(|| self.reader.doc_len(row))
-            .unwrap_or(1)
-    }
-
     /// One term's postings as a lazy stream: the unsealed tail, the spilled
     /// runs (newest first) and the sealed segments (newest first).
     ///
@@ -4616,22 +4627,26 @@ impl TextIndex {
 
     /// The sources of one term, newest first: the unsealed tail, the spilled
     /// runs, then the sealed segments.
-    fn term_sources(&self, term: &str) -> (Vec<Box<dyn DocSource + '_>>, usize) {
-        let mut sources: Vec<Box<dyn DocSource + '_>> = Vec::new();
+    fn term_sources(&self, term: &str) -> (Vec<Source<'_>>, usize) {
+        let mut sources: Vec<Source<'_>> = Vec::new();
         if let Some(list) = self.mem.postings.get(term) {
             if !list.is_empty() {
-                sources.push(Box::new(MemSource { list, at: 0 }));
+                sources.push(Source::Mem {
+                    list,
+                    lens: &self.mem.docs,
+                    at: 0,
+                });
             }
         }
         for run in self.mem.runs.iter().rev() {
             if let Ok(Some(cur)) = run.reader.term_doc_cursor(term) {
-                sources.push(Box::new(SegmentSource { cur }));
+                sources.push(Source::Segment(cur));
             }
         }
         let segment_from = sources.len();
         for seg in self.reader.segments.iter().rev() {
             if let Ok(Some(cur)) = seg.reader.term_doc_cursor(term) {
-                sources.push(Box::new(SegmentSource { cur }));
+                sources.push(Source::Segment(cur));
             }
         }
         (sources, segment_from)
@@ -18068,7 +18083,7 @@ impl Engine {
                                 continue;
                             }
                             wand_units.push(WandUnit {
-                                stream: Box::new(cursor),
+                                stream: WandStream::Term(cursor),
                                 weight: *boost,
                                 idf: 0.0,
                                 delta: None,
@@ -18087,7 +18102,7 @@ impl Engine {
                         let cursor = PhraseCursor::new(children);
                         let idf: f64 = toks.iter().map(|t| idf_of(t)).sum();
                         wand_units.push(WandUnit {
-                            stream: Box::new(cursor),
+                            stream: WandStream::Phrase(cursor),
                             weight,
                             idf,
                             delta: Some(delta_phrase),
@@ -18100,7 +18115,7 @@ impl Engine {
                         continue;
                     }
                     wand_units.push(WandUnit {
-                        stream: Box::new(cursor),
+                        stream: WandStream::Term(cursor),
                         weight,
                         idf: idf_of(&term),
                         delta: None,
@@ -18110,7 +18125,6 @@ impl Engine {
                     n_docs: text.total_docs(),
                     total_len: text.corpus_len(),
                     units: wand_units,
-                    doc_len: Box::new(move |row| text.doc_len_of(row)),
                 });
             }
             // Tombstones still feed the corpus statistics (as the reference's

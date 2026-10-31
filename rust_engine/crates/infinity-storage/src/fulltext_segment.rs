@@ -363,6 +363,7 @@ impl SegmentIndexReader {
             left: meta.doc_freq as usize,
             rows: Vec::new(),
             tfs: Vec::new(),
+            ordinals: Vec::new(),
             at: 0,
             last_ordinal: 0,
             df: meta.doc_freq as usize,
@@ -443,9 +444,12 @@ pub struct TermDocCursor<'a> {
     off: usize,
     /// Documents still undecoded.
     left: usize,
-    /// The decoded mini-block (`row id`, `tf`) and the position inside it.
+    /// The decoded mini-block (`row id`, `tf`, segment ordinal) and the
+    /// position inside it. The ordinal indexes the segment's `.len`, so BM25's
+    /// document length costs an array read instead of a search from the row id.
     rows: Vec<u64>,
     tfs: Vec<u32>,
+    ordinals: Vec<u32>,
     at: usize,
     /// Running document ordinal (the store is ordinal-coded, see the module
     /// docs) and the term's total document frequency.
@@ -489,12 +493,14 @@ impl<'a> TermDocCursor<'a> {
             self.consume_to_end();
             self.rows.clear();
             self.tfs.clear();
+            self.ordinals.clear();
             self.at = 0;
             for (delta, tf) in docs.into_iter().zip(tfs) {
                 self.last_ordinal = self.last_ordinal.wrapping_add(delta);
                 if let Some(row) = self.reader.row_of_ordinal(self.last_ordinal) {
                     self.rows.push(row);
                     self.tfs.push(tf);
+                    self.ordinals.push(self.last_ordinal);
                 }
             }
             if !self.rows.is_empty() {
@@ -515,6 +521,21 @@ impl<'a> TermDocCursor<'a> {
             return None;
         }
         self.rows.get(self.at).copied()
+    }
+
+    /// The current document's segment ordinal (the index into `.len`).
+    pub fn ordinal(&mut self) -> u32 {
+        if !self.ensure() {
+            return u32::MAX;
+        }
+        self.ordinals.get(self.at).copied().unwrap_or(u32::MAX)
+    }
+
+    /// The current document's length (BM25 `dl`), read straight from `.len`
+    /// through the ordinal the cursor already carries.
+    pub fn len(&mut self) -> u32 {
+        let ordinal = self.ordinal();
+        self.reader.doc_len(ordinal).unwrap_or(1)
     }
 
     /// `GetCurrentTF` for the document [`Self::doc`] returned.

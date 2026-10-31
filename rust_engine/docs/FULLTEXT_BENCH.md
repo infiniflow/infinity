@@ -62,7 +62,7 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 > `ReadJsonl` 的耗时不可直接比：参考用 simdjson，端口是手写的字符串扫描；
 > 这一项不进入查询对比。
 
-## 3. 结果（本机，20k 文档，各跑 3 次）
+## 3. 结果（本机，20k 文档，A/B 交替各 3 轮，取重复 20 次的最小值）
 
 | 阶段 | 参考 C++ | 端口 Rust | 比值 |
 |---|---|---|---|
@@ -71,23 +71,16 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 | INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 3.24–3.28 s | ≈3× 慢 |
 | IMPORT 20000 行 | ≈2 s | 3.14 s | ≈1.6× 慢 |
 | Optimize（合并索引 chunk） | 360–512 µs | 299–397 µs | 同量级 |
-| 查询 1 `harmful "social custom"` | 1–5 ms | **0.40 ms**（18–20 ms） | 反超 |
-| 查询 2 `social custom "harmful chemical"` | 0.93–1 ms | **0.49–0.50 ms**（13.9–15.3 ms） | 反超 |
-| 查询 3 `"annual American awards"`（0 行） | 0.27–0.73 ms | **0.43–0.44 ms**（14.8–18.4 ms） | 同量级 |
-| 查询 4 `harmful chemical` | 0.58–0.97 ms | **0.40 ms**（13.2–14.9 ms） | 反超 |
-| 查询 5 `"one of"` | 1–2 ms | **2.49–2.51 ms**（30.8–33.3 ms） | ≈2× |
-| 查询 6（13 词） | 2–3 ms | **6.21–6.26 ms** | ≈2.5× 慢 |
-| 查询 7（14 词） | 0.84–1 ms | **2.19–2.27 ms** | ≈2.2× 慢 |
+| 查询 1 `harmful "social custom"` | 1–5 ms | **0.33–0.34 ms** | 反超 |
+| 查询 2 `social custom "harmful chemical"` | 0.93–1 ms | **0.40 ms** | 反超 |
+| 查询 3 `"annual American awards"`（0 行） | 0.27–0.73 ms | **0.35 ms** | 同量级 |
+| 查询 4 `harmful chemical` | 0.58–0.97 ms | **0.33 ms** | 反超 |
+| 查询 5 `"one of"` | 1–2 ms | **1.94 ms** | 同量级 |
+| 查询 6（13 词） | 2–3 ms | **4.49–4.51 ms** | ≈1.8× 慢 |
+| 查询 7（14 词） | 0.84–1 ms | **1.77 ms** | ≈2× 慢 |
 
-括号里是改成流式读取之前的数字。写入仍是同一个量级上慢 3 倍（每批插入都要
-更新全文索引）；查询从 13–30 倍降到「1–2 个词的查询比参考快，长查询仍慢 2 倍」。
-
-多词查询是唯一还明显落后的形态，原因在 profile 里能直接看到（13 词查询，self time）：
-`SegmentIndexReader::doc_len_of_row` 4.3% + `ordinal` 4.1%（每次打分都要沿
-row id 二分查段内序号，再读 `len`）、`MergeCursor::settle` 5.4%、
-`TermDocCursor::ensure` 3.6%、`TermStream::load` 3.5%、分配器约 13%、
-`memmove` 4.5%、词项哈希查表约 6%（`memcmp` + SipHash）。参考的 `TermDocIterator`
-直接持有段内 doc id 和 `GetColumnLength`，没有这层反查。
+写入仍是同一个量级上慢 3 倍（每批插入都要更新全文索引）。查询从最初的 13–30 倍
+降到「1–2 个词的查询比参考快或持平，长查询慢不到 2 倍」。
 
 ## 4. 这一轮改了什么
 
@@ -223,6 +216,35 @@ API，但仍是 nightly-only。因此 `rust-toolchain.toml` 固定到
 可测变化**：20k 语料上 `of` 2.64 → 2.65 ms，其余四条仍是 0.37 / 0.46 / 0.32 / 0.37 /
 1.79–1.80 ms，INSERT 3.17–3.21 s。原因是 doc list 解码只占 `of` 的百分之几——
 那 2.6 ms 花在「每篇 posting 的游标推进 + 打分」，不在 codec。
+
+### 4.7 游标层重建：序号贯通、去 trait object、块不再物件化
+
+§4.4 的结论是「长查询慢在每篇 posting 的框架开销」。三处一起改：
+
+| 改动 | 内容 |
+|---|---|
+| 段内序号贯通 | `TermDocCursor` 解码时把每篇的段内序号和 row id 一起存下，`Source::len()` 直接读 `.len[ordinal]`；`TextIndex::doc_len_of`（row → 二分的 `ordinal` → len）从打分路径上删掉，`WandField.doc_len` 那个 `Box<dyn Fn>` 也不再存在 |
+| 去 trait object | `DocSource` trait 换成 `Source` enum（Mem / Owned / Segment），`WandStream` 也从 trait 换成 enum（Term / Phrase）。只有 1 个源且没有过期副本要过滤时 `MergeCursor` 走 `single` 直达，不跑 k 路归并 |
+| 块不再物件化 | `TermStream` 的块改成三列 `docs/tfs/lens`（不再有 `Posting` 结构体），位置只在短语子游标里进 per-block arena；块上界（max tf / max tf÷len）改成第一次 `block_stats()` 时才从这三列算，被整块跳过的块完全不付 |
+
+A/B 交替（同一份 20k 语料，各 3 轮，重复 20 次取最小）：
+
+| 查询 | 改动前 | 改动后 | |
+|---|---|---|---|
+| 1 `harmful "social custom"` | 0.34 ms | 0.33 ms | −2% |
+| 2 `social custom "harmful chemical"` | 0.45 ms | 0.40 ms | −11% |
+| 3 `"annual American awards"` | 0.31 ms | 0.35 ms | +13% |
+| 4 `harmful chemical` | 0.37 ms | 0.33 ms | −9% |
+| 5 `"one of"` | 1.78 ms | 1.94 ms | +9% |
+| 6（13 词） | 6.20 ms | **4.50 ms** | **−28%** |
+| 7（14 词） | 2.17 ms | **1.77 ms** | **−19%** |
+
+长查询（本轮的目标）好了 20–30%；两条**短语**查询反而慢了 9–13%。原因：短语子游标
+现在在 `load()` 里给每条 posting 都取一次长度，而旧代码只在真要块上界时才对块内
+128 条取一次——两个高频词的短语要扫 4 万条 posting，多出来的取用把别处的收益吃掉了
+（把它改成常量做消融会让剪枝变松，反而更慢，所以这个数字是干净 A/B 对出来的）。
+下一步是把长度也做成按序号的懒取：`TermStream` 存 ordinal 加
+`&SegmentIndexReader` / `&DocLenMap`，只在 `len()` 和 `block_stats()` 时才读。
 
 ## 5. 顺带修掉的一个格式缺陷
 
