@@ -248,9 +248,6 @@ impl WalWriter {
         self.run(move |wal| wal.append(&entry).map(|_| ()))
     }
 
-    fn flush(&self) -> Result<()> {
-        self.run(|wal| wal.flush())
-    }
 }
 
 /// Owns the WAL + KV pair and hands out transactions.
@@ -1250,16 +1247,22 @@ impl TxnManager {
         Ok(applied)
     }
 
-    /// The highest commit timestamp already applied to the KV store.
+    /// The replay floor: the highest commit timestamp **both** stores hold.
+    ///
+    /// The marker is written to both (`apply_split`) and the answer is their
+    /// minimum, so a store that lost its memtable to a crash drags the floor
+    /// back instead of letting the other one skip the records it lost.
     pub fn applied_ts(&self) -> Result<TxnTimeStamp> {
-        Ok(self
-            .store
-            .get(APPLIED_TS_KEY)?
-            .and_then(|v| {
-                v.get(..8)
-                    .map(|b| TxnTimeStamp::from_le_bytes(b.try_into().unwrap()))
-            })
-            .unwrap_or(0))
+        let marker = |store: &dyn MetaStore| -> Result<TxnTimeStamp> {
+            Ok(store
+                .get(APPLIED_TS_KEY)?
+                .and_then(|v| {
+                    v.get(..8)
+                        .map(|b| TxnTimeStamp::from_le_bytes(b.try_into().unwrap()))
+                })
+                .unwrap_or(0))
+        };
+        Ok(marker(self.store.as_ref())?.min(marker(self.catalog_store.as_ref())?))
     }
 
     /// Re-publishes the checkpoint frame so it covers `max_commit_ts`, without
@@ -1294,12 +1297,8 @@ impl TxnManager {
         max_commit_ts: TxnTimeStamp,
     ) -> Result<()> {
         let entry = WalEntry::new(-1, commit_ts, vec![WalCmd::Checkpoint { max_commit_ts }]);
-        // Appending and flushing as one job keeps the frame and its fsync
-        // together on the writer.
-        self.wal.run(move |wal| {
-            wal.append(&entry)?;
-            wal.flush()
-        })
+        // One job, so no commit can slip in between the append and the return.
+        self.wal.run(move |wal| wal.append(&entry).map(|_| ()))
     }
 
     /// C++ `NewCheckpoint`: append the checkpoint entry the reference keeps.
@@ -1356,15 +1355,15 @@ impl TxnManager {
         // its loop when it reaches the checkpoint entry
         // (`wal_manager_impl.cpp:288-294`): swapping and appending as two jobs
         // let a commit land in the fresh log before the frame, which put a row
-        // frame ahead of the checkpoint. Written and fsynced: this file is the
-        // only thing that tells the reference which checkpoint the directory
-        // holds, and it refuses to open one whose entry a power loss took away.
+        // frame ahead of the checkpoint. The frame is written, not fsynced: the
+        // reference appends it through the same `ofs_` as every other entry
+        // (`wal_manager_impl.cpp:288-311`), so a power loss may take the frame
+        // away and the directory simply reopens at the previous checkpoint.
         self.wal.run(move |wal| {
             if rotate && wal.file_size()? > 0 {
                 wal.rotate(seal)?;
             }
-            wal.append(&entry)?;
-            wal.flush()
+            wal.append(&entry).map(|_| ())
         })?;
         if rotate {
             self.last_swap.store(seal, Ordering::SeqCst);
@@ -1397,10 +1396,7 @@ impl TxnManager {
                 timestamp: begin_ts,
             }],
         );
-        self.wal.run(move |wal| {
-            wal.append(&entry)?;
-            wal.flush()
-        })?;
+        self.wal.run(move |wal| wal.append(&entry).map(|_| ()))?;
         self.note_standalone(TxnOp::Cleanup, commit_ts);
         self.current_ts.store(commit_ts, Ordering::SeqCst);
         Ok(())
@@ -1448,21 +1444,22 @@ impl TxnManager {
         Ok(dropped)
     }
 
+    /// The checkpoint's store step: everything applied so far becomes an SST.
+    ///
+    /// The log is not synced — the reference has no fsync on it at all
+    /// (`wal_manager_impl.cpp:311,511-513`) — so this SST is what carries the
+    /// checkpoint. The checkpoint entry itself is appended by the caller that
+    /// owns the checkpoint (`flush_storage`, `checkpoint_wal`): a checkpoint is
+    /// a write transaction in the reference and therefore spends a timestamp, so
+    /// it must not be appended twice for one flush.
     pub fn flush(&self) -> Result<()> {
-        self.wal.flush()?;
         self.store.flush()?;
-        // Everything the KV holds is now durable, so the log up to this point
-        // can be dropped by the next checkpoint. The checkpoint entry itself is
-        // appended by the caller that owns the checkpoint (`flush_storage`,
-        // `checkpoint_wal`): a checkpoint is a write transaction in the
-        // reference and therefore spends a timestamp, so it must not be
-        // appended twice for one flush.
         let applied = self.max_applied.load(Ordering::SeqCst);
         self.synced.fetch_max(applied, Ordering::SeqCst);
         Ok(())
     }
 
-    /// Highest commit timestamp that the KV store has fsynced.
+    /// Highest commit timestamp the checkpoint has put into an SST.
     pub fn synced_ts(&self) -> TxnTimeStamp {
         self.synced.load(Ordering::SeqCst)
     }
@@ -1524,7 +1521,17 @@ fn apply_split(
         catalog_store.atomic_batch(&catalog)?;
     }
     if let Some(entry) = applied {
+        // The marker goes into **both** stores, and the replay floor is their
+        // minimum (see `TxnManager::applied_ts`). The reference keeps the
+        // catalog and this marker in one KV, so a crash cannot leave the marker
+        // ahead of the catalog. This engine has two stores and neither is
+        // fsynced before a checkpoint, so a RocksDB background flush can make
+        // one durable while the other still sits in its memtable. Writing both
+        // and taking the minimum means the lagging store drags the floor back:
+        // the replay then redoes both halves, and it converges because the KV
+        // writes are puts on the same keys.
         store.atomic_batch(std::slice::from_ref(&entry))?;
+        catalog_store.atomic_batch(std::slice::from_ref(&entry))?;
     }
     Ok(())
 }

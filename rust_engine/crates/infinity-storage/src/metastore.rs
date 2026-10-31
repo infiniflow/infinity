@@ -74,19 +74,11 @@ pub trait MetaStore: Send + Sync {
     fn count_prefix(&self, prefix: &[u8]) -> Result<usize> {
         Ok(self.scan_prefix(prefix)?.len())
     }
-    /// Flush to disk (durability barrier).
+    /// The checkpoint's store step (C++ `KVStore::Flush()`): the memtable
+    /// becomes an SST, which is what makes everything written so far durable.
+    /// There is no cheaper "sync the log" step to offer — the reference writes
+    /// these keys with `disableWAL`, so the SST is their only copy.
     fn flush(&self) -> Result<()>;
-    /// Make the writes already handed to the store survive a crash, without
-    /// forcing the memtable out to an SST.
-    ///
-    /// A statement's commit needs exactly this: the log that carries it is
-    /// already appended, so syncing the log is the barrier. `flush`
-    /// additionally materialises an SST, which a per-statement commit must not
-    /// do - one flush per DDL turns a 10,000-statement run into thousands of
-    /// tiny L0 files and the cost of each commit grows with them.
-    fn sync(&self) -> Result<()> {
-        self.flush()
-    }
 }
 
 /// C++: `String2UInt64AddOperator` (`catalog/kv_store.cpp:91`) — both merge

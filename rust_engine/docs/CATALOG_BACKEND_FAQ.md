@@ -36,21 +36,22 @@
 
 ## 3. fsync 在哪些点上
 
-**总原则**：写入路径**不**做逐条 fsync；屏障只在 checkpoint / shutdown / FLUSH。这与参考一致——参考的 WAL 走 RocksDB 且 `sync = false`，即「进程崩溃不丢、掉电可能丢」。
+**总原则**：写路径上**一次 fsync 都没有**，与参考一致。参考的 WAL 线程只做 `ofs_.write` + `ofs_.flush()`（用户态 flush，不是 fsync，`wal_manager_impl.cpp:311,329-340`），换文件只是 close + rename（`:511-513`）；catalog 的 RocksDB 写入带 `disableWAL`（`kv_store_impl.cpp:311,441`），checkpoint 时一次 `Flush()`（`:390`）把 memtable 变成 SST。
 
-| 位置 | 行为 | 说明 |
+| 位置 | 行为 | 参考对应 |
 |---|---|---|
-| `WalManager::append` | 写文件，**不 fsync** | 注释在 `wal.rs:70`：逐记录 fsync 每次插入约 10ms；屏障在 `flush()` |
-| `WalManager::flush` | `file.sync_all()` | checkpoint / shutdown / FLUSH 的屏障 |
-| `WalManager::rotate` | 先 `sync_all()` 再 rename | 封存日志段前 |
-| `WalManager::truncate_all` | `set_len(0)` + `sync_all()` | 日志被清空时 |
-| `RocksMetaStore::flush` | `db.flush()` + `db.flush_wal(true)` | `flush` 只把 memtable 写成 SST，**只有 `flush_wal(true)` 才让日志真正落盘**；两者都做才是持久化屏障 |
-| checkpoint 条目 `wal/wal.log` | 写完 `sync_all()` | 这个文件是参考判断「目录有没有 checkpoint」的唯一依据，掉电丢了参考就会拒绝打开目录 |
-| `MetaStore::put` / `delete` / `atomic_batch` | 不 fsync | 由上面的 `flush()` 统一兜底 |
+| `WalManager::append` | `write_all`，不 fsync（`File` 无用户态缓冲） | `WalManager::Flush` 的 `ofs_.write` |
+| `WalManager::rotate` | 关文件 + rename，不 fsync | `WalManager::SwapWalFile` |
+| checkpoint 帧（`append_checkpoint`） | 先 rotate 再 append，不 fsync | 同一个 `ofs_` 循环里的 `SwapWalFile` + 帧写入 |
+| `RocksMetaStore::put` / `delete` / `atomic_batch` | `WriteOptions::disable_wal(true)`；只有 `pm|` 开头的对象记录开着 WAL，随后 `flush_wal(false)` | `KVStore::Put/Delete/Merge` 默认 `disable_wal = true`；`PersistenceManager` / `ObjStatAccessor` 传 `false` 并 `FlushWAL(false)` |
+| `RocksMetaStore::flush`（checkpoint） | `db.flush()`：memtable → SST（RocksDB 自己 fsync SST 与 MANIFEST） | `KVStore::Flush()` = 一次 `transaction_db_->Flush()` |
+| 提交（语句 / 事务） | append 一条 WAL 帧 + 写 KV，没有同步步骤 | `NewTxn::CommitTxn` 把帧交给 WAL 线程 |
 
-调用链：`Engine::flush_storage()` → `txn.flush()` → （WAL `sync_all` + store `flush`）→ `append_checkpoint()`（写并 fsync `wal/wal.log`）。
+调用链：`Engine::flush_storage()` → `catalog.flush()`（SST）→ `txn.flush()`（store 的 SST）→ `append_checkpoint()`（必要时 rotate，再写帧）。
 
-**因此**：进程崩溃 → 未 checkpoint 的数据由 WAL 重放，catalog 由 `atomic_batch` 原子提交；掉电 → 最多丢最后一次 checkpoint 之后的写入，与参考的 `sync=false` 语义相同。
+**语义**：承诺的持久化边界是 **checkpoint，不是 commit**——commit 只写页缓存，掉电可以把它丢掉；checkpoint 之后的数据由块文件与 SST 承载，掉电也不丢。进程崩溃（页缓存还在）通常会保留到 WAL 尾部，但那不是承诺。
+
+**两个库的处理**：参考只有一份 KV，catalog 记录与 `applied` 标记天然同库，丢一起丢。端口有两个 RocksDB（`catalog` 与 `persistence`），所以 `applied` 标记**两边都写**、重放下界取两者**最小值**（`apply_split` / `TxnManager::applied_ts`）。否则 RocksDB 后台把其中一个 memtable 刷成 SST、另一个随崩溃丢掉时，重放会相信领先的那个标记，跳过落后的库丢掉的记录。
 
 ---
 

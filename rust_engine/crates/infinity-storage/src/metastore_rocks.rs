@@ -13,12 +13,28 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use infinity_common::{Error, Result};
-use rocksdb::{Options, WriteBatch, DB};
+use rocksdb::{Options, WriteBatch, WriteOptions, DB};
 
 use crate::metastore::MetaStore;
+use crate::persistence::{PM_OBJECT_PREFIX, PM_OBJECT_STAT_PREFIX};
 
 fn re(e: rocksdb::Error) -> Error {
     Error::Storage(format!("rocksdb: {e}"))
+}
+
+/// The reference writes its catalog keys with `disableWAL = true`
+/// (`kv_store_impl.cpp:311,441`); only the object bookkeeping keys keep the log
+/// on, and then flush it with `FlushWAL(false)` — a userspace flush, never an
+/// `fsync` (`persistence_manager_impl.cpp:141`, `obj_stat_accessor_impl.cpp:160`).
+fn keeps_wal(key: &[u8]) -> bool {
+    key.starts_with(PM_OBJECT_PREFIX.as_bytes())
+        || key.starts_with(PM_OBJECT_STAT_PREFIX.as_bytes())
+}
+
+fn write_options(wal: bool) -> WriteOptions {
+    let mut opts = WriteOptions::default();
+    opts.disable_wal(!wal);
+    opts
 }
 
 /// A `MetaStore` over a RocksDB directory (one default column family, matching
@@ -32,8 +48,10 @@ pub struct RocksMetaStore {
 impl RocksMetaStore {
     /// Opens (creating if needed) a RocksDB database at `path`.
     ///
-    /// `create_if_missing` mirrors the C++ open path; `sync` on flush gives the
-    /// durability barrier the `MetaStore` contract asks for.
+    /// `create_if_missing` mirrors the C++ open path. Like the reference's
+    /// `KVStore`, the handle keeps a WAL only for the object bookkeeping keys —
+    /// everything else is written with `disable_wal` and becomes durable at the
+    /// checkpoint's `Flush()` (see `keeps_wal`).
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let mut opts = Options::default();
         opts.create_if_missing(true);
@@ -51,11 +69,23 @@ impl MetaStore for RocksMetaStore {
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
-        self.db.put(key, value).map_err(re)
+        let wal = keeps_wal(key);
+        self.db
+            .put_opt(key, value, &write_options(wal))
+            .map_err(re)?;
+        if wal {
+            self.db.flush_wal(false).map_err(re)?;
+        }
+        Ok(())
     }
 
     fn delete(&self, key: &[u8]) -> Result<()> {
-        self.db.delete(key).map_err(re)
+        let wal = keeps_wal(key);
+        self.db.delete_opt(key, &write_options(wal)).map_err(re)?;
+        if wal {
+            self.db.flush_wal(false).map_err(re)?;
+        }
+        Ok(())
     }
 
     fn atomic_batch(&self, items: &[(Vec<u8>, Option<Vec<u8>>)]) -> Result<()> {
@@ -66,7 +96,14 @@ impl MetaStore for RocksMetaStore {
                 None => batch.delete(key),
             }
         }
-        self.db.write(batch).map_err(re)
+        let wal = items.iter().any(|(key, _)| keeps_wal(key));
+        self.db
+            .write_opt(batch, &write_options(wal))
+            .map_err(re)?;
+        if wal {
+            self.db.flush_wal(false).map_err(re)?;
+        }
+        Ok(())
     }
 
     fn merge(&self, key: &[u8], delta: u64) -> Result<u64> {
@@ -109,19 +146,12 @@ impl MetaStore for RocksMetaStore {
         Ok(out)
     }
 
-    fn sync(&self) -> Result<()> {
-        self.db.flush_wal(true).map_err(re)
-    }
-
     fn flush(&self) -> Result<()> {
-        // `flush` + WAL sync is the durability barrier the trait contract wants:
-        // `flush` moves the memtable into an SST, and only `flush_wal(true)`
-        // makes the log that carried the writes durable. Without the sync the
-        // memtable is on disk but the log is not, and a crash right after a
-        // checkpoint would lose exactly the writes it claimed to have made
-        // durable.
-        self.db.flush().map_err(re)?;
-        self.db.flush_wal(true).map_err(re)
+        // `KVStore::Flush()` (`kv_store_impl.cpp:390`) is one `Flush()`: the
+        // memtable becomes an SST (RocksDB fsyncs it), and nothing syncs a log
+        // because the catalog writes never entered one. The checkpoint is the
+        // durability boundary, so that is all this step has to do.
+        self.db.flush().map_err(re)
     }
 }
 

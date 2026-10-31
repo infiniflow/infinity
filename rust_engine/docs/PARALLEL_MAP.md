@@ -88,7 +88,7 @@
 | | |
 |---|---|
 | 参考 | 独立写线程 `new_flush_thread_`（`wal_manager_impl.cpp:89`、`NewFlush`），条目从 `new_wait_flush_` 取 |
-| 端口 | `WalWriter`：名为 `wal-writer` 的线程独占 `WalManager`，`append`/`flush`/`file_size`/`rotate` 各是一个作业，调用方入队后等回执。checkpoint 是**一个**作业（换文件 → 写帧 → fsync），与参考在 `Flush` 循环里遇到 checkpoint 条目才 `SwapWalFile` 一致；`rotate_wal_if_large` 也把"看大小 + 轮换"合成一个作业。`TxnManager` 析构时关队列并 join 写线程 |
+| 端口 | `WalWriter`：名为 `wal-writer` 的线程独占 `WalManager`，`append`/`flush`/`file_size`/`rotate` 各是一个作业，调用方入队后等回执。checkpoint 是**一个**作业（换文件 → 写帧，都不 fsync），与参考在 `Flush` 循环里遇到 checkpoint 条目才 `SwapWalFile` 一致；`rotate_wal_if_large` 也把"看大小 + 轮换"合成一个作业。`TxnManager` 析构时关队列并 join 写线程 |
 | 状态 | `aligned` |
 | 证据 | `test_cross_engine_bytes_40_wal.py`（整份 `wal.log` 逐帧相同，3 passed）、`50_mutations`（8 passed）、`cargo test -p infinity-txn`（18） |
 

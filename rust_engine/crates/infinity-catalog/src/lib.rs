@@ -1770,11 +1770,6 @@ impl Catalog {
     pub fn flush(&self) -> Result<()> {
         self.store.flush()
     }
-
-    /// Syncs the log without materialising an SST (see `MetaStore::sync`).
-    pub fn sync(&self) -> Result<()> {
-        self.store.sync()
-    }
 }
 
 #[cfg(test)]

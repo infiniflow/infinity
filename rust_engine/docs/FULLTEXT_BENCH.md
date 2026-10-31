@@ -66,7 +66,7 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 
 | 阶段 | 参考 C++ | 端口 Rust | 比值 |
 |---|---|---|---|
-| CREATE INDEX（DDL 本身，见 §4.11） | 3–5 ms（参考读数含它自己的 Flush） | 2.4–2.6 ms | 持平 |
+| CREATE INDEX（DDL 本身，见 §4.11） | 3–5 ms（参考读数含它自己的 Flush） | 1.1–1.9 ms | 持平 |
 | ReadJsonl（不计入） | 17–29 ms | 60–62 ms | — |
 | INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 2.59 s | ≈2.5× 慢 |
 | IMPORT 20000 行 | ≈2 s | 2.45–2.46 s | ≈1.2× 慢 |
@@ -311,36 +311,32 @@ set_memindex_capacity(2) 把 20 行切成约 10 个段，断言四条查询（�
 |---|---|---|
 | IMPORT 20000 行 | 3.09 s | **2.45–2.46 s**（参考 2 s） |
 | INSERT 20000 行（batch=500） | 3.24 s | **2.59 s** |
-| CREATE INDEX（DDL 本身） | — | 2.4–2.6 ms（本轮未动这一项，见 §4.11） |
+| CREATE INDEX（DDL 本身） | — | 1.1–1.9 ms（提交不再同步任何日志，见 §4.11） |
 
-### 4.11 对比表里为什么不计 Flush
+### 4.11 对比表里为什么只计 DDL
 
 两边的 `Flush` 都是 checkpoint：参考的 `Flush()` 走 `PhysicalFlush`
 （`src/executor/operator/physical_flush_impl.cpp:42`），即 kv store 的 `Flush()`
 再加一个 `NewCheckpointTask` 并等它结束；端口 `Engine::flush` 走 `flush_storage`
 （`crates/infinity-executor/src/lib.rs:21257`）。**在同一张空表上**，这两次 checkpoint
-一个是 3–5 ms（参考），一个是 13.6 ms（端口），差在各自的落盘步骤：
+一个是 3–5 ms（参考），一个是 9.7 ms（端口），差在各自的落盘步骤：
 
-| 端口的 checkpoint 步骤 | 耗时 |
-|---|---|
-| RocksDB flush()（catalog，memtable → SST） | 3.3–4.5 ms |
-| catalog 这个 RocksDB 自己的 WAL fsync | 0.6–1.2 ms |
-| txn WAL（wal.log）fsync | 5–6 ms |
-| flush_cpp_blocks（块镜像 + 失效索引目录清理） | 2.5–3.4 ms |
+| 端口的 checkpoint 步骤 | 耗时 | 参考有这一步吗 |
+|---|---|---|
+| RocksDB flush()（catalog，memtable → SST） | 3.6 ms | 有，就是 `KVStore::Flush()`（`kv_store_impl.cpp:390`） |
+| RocksDB flush()（persistence 行库） | 2.9 ms | 没有对应物：参考只有一份 KV，行在块文件里 |
+| flush_cpp_blocks（块镜像 + 失效索引目录清理） | 2.2 ms | 有，写数据块 |
 
-只有第一行和参考的 kv store `Flush()`（`src/storage/catalog/kv_store_impl.cpp:390`，
-一次 `transaction_db_->Flush(flush_opts)`）是同一个动作；第二行是我们独有的——参考的
-catalog RocksDB 直接 `write_options_.disableWAL = true`（`kv_store_impl.cpp:307-311`），
-根本不写这条 WAL，也就没有它的 fsync。
+两个 `Flush` 都不再 fsync 日志：catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，
+`kv_store_impl.cpp:441`），`wal.log` 在任何路径上都不 fsync（对齐 `ofs_.write` + `ofs_.flush()`）。
+提交路径同样没有同步动作，所以 `CREATE INDEX` 的 DDL 是 1.1–1.9 ms（此前每条语句都要同步一次 catalog 日志）。
+细节见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) §3。
 
-这 13.6 ms 与全文索引无关（此时索引还是空的），它衡量的是持久化实现各自的同步粒度，
-把它塞进「建索引」那一行只会掩盖索引本身的成本——所以**对比测试里不计**：基准默认只
-计时 `CREATE INDEX`（2.4–2.6 ms），flush 需要显式打开（`FTBENCH_FLUSH=1`），
-打开后单独打印、不并进读数。参考那边沿用它的 `BenchmarkCreateIndex`（CreateIndex +
-Flush 一起计），所以表里 3–5 ms 是它 DDL 的上界。
-
-不缩短这 13.6 ms 是有意的：能砍的只有 checkpoint 的同步语义（RocksDB flush、WAL fsync、
-块镜像），那会改变崩溃恢复的保证。
+这 9.7 ms 与全文索引无关（此时索引还是空的），它衡量的是各自的落盘实现，把它塞进
+「建索引」那一行只会掩盖索引本身的成本——所以**对比测试里不计**：基准默认只计时
+`CREATE INDEX`（1.1–1.9 ms），flush 需要显式打开（`FTBENCH_FLUSH=1`），打开后单独
+打印、不并进读数。参考那边沿用它的 `BenchmarkCreateIndex`（CreateIndex + Flush 一起计），
+所以表里 3–5 ms 是它 DDL 的上界。
 
 ## 5. 顺带修掉的一个格式缺陷
 

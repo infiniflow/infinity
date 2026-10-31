@@ -2047,29 +2047,6 @@ fn invalidates_result_cache(stmt: &Statement) -> bool {
     )
 }
 
-/// Whether a mutating statement writes the row/meta store, as opposed to only
-/// the catalog.
-///
-/// The two live in different RocksDB instances, so the difference decides
-/// whether a commit has to sync one store or two. The catalog-only statements
-/// are the schema/lifecycle DDL: they put catalog records and nothing else.
-fn statement_touches_rows(stmt: &Statement) -> bool {
-    !matches!(
-        stmt,
-        Statement::CreateDatabase { .. }
-            | Statement::DropDatabase { .. }
-            | Statement::CreateTable { .. }
-            | Statement::DropTable { .. }
-            | Statement::CreateIndex { .. }
-            | Statement::DropIndex { .. }
-            | Statement::RenameTable { .. }
-            | Statement::CreateCollection { .. }
-            | Statement::DropCollection { .. }
-            | Statement::CreateView { .. }
-            | Statement::DropView { .. }
-    )
-}
-
 /// Evaluates a Lucene `minimum_should_match` spec against the number of
 /// optional clauses, returning how many terms a document must match.
 ///
@@ -9265,24 +9242,12 @@ impl Engine {
                 self.plan_cache.clear();
             }
             out.push(self.execute_stmt_retrying(&qualified, sql)?);
-            // Durability: a committed mutation must survive a crash. The
-            // transaction's log frame is appended and synced by the commit, so
-            // the stores only have to sync their own logs - a memtable flush
-            // per statement would write an SST per DDL, and thousands of them
-            // make every later commit slower. Without a WAL the stores have no
-            // log to sync, so the commit does not publish the statement at all.
-            //
-            // Two RocksDB instances sit under the engine (the catalog at
-            // <dir>/catalog, the row/meta store at <dir>/persistence); one that
-            // the statement did not write has nothing to sync.
-            if mutating {
-                if self.wal_enabled {
-                    self.storage.catalog.sync()?;
-                }
-                if statement_touches_rows(&qualified) {
-                    self.storage.store.sync()?;
-                }
-            }
+            // No per-statement durability step: the reference's commit appends
+            // its frame with `ofs_.write` (userspace, no fsync,
+            // `wal_manager_impl.cpp:311`) and writes the catalog with
+            // `disableWAL` (`kv_store_impl.cpp:311`). What a crash keeps is
+            // therefore decided by the checkpoint, not by the commit — see
+            // `Engine::flush_storage`.
             self.txn.end_statement();
         }
         Ok(out)

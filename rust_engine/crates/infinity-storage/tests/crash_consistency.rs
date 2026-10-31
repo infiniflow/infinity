@@ -4,9 +4,16 @@
 //! files, the WAL (redo log) and the metadata KV — and injects a crash at each
 //! boundary, then verifies recovery keeps **exactly the committed prefix**:
 //!
-//!   commit protocol (§附录 A.4):  write+fsync block → append+fsync WAL → commit KV
-//!   recovery:                    read checkpoint ts from KV, replay WAL ts > cp,
-//!                                reconstruct any block file the WAL still knows
+//!   commit:     append WAL (no fsync) → write the KV (no WAL)
+//!   checkpoint: block files fsync → KV flush (memtable → SST) → checkpoint entry
+//!   recovery:   read checkpoint ts from KV, replay WAL ts > cp, reconstruct
+//!               any block file the WAL still knows
+//!
+//! Neither the log nor the KV write is fsynced on commit — that is the
+//! reference's protocol (`wal_manager_impl.cpp:311`, `kv_store_impl.cpp:311`),
+//! and the checkpoint is the durability boundary. The crash points below stop
+//! the protocol early rather than simulating a power loss, so they pin the
+//! ordering and the replay prefix, not the fsync calls.
 //!
 //! This is the `rust_engine` regression form of the `rust_poc/crash-consistency`
 //! PoC, so the invariant is exercised by `cargo test` rather than only by the PoC.
@@ -69,7 +76,6 @@ fn commit_until(dir: &Path, kv: &RocksMetaStore, txn_id: u64, data: &[u8], stop:
     let mut wal = WalManager::open(dir.join("wal.log")).unwrap();
     // commit_ts = txn_id + 1 so it is strictly greater than the checkpoint 0.
     wal.append(&entry(txn_id, block_id, data)).unwrap();
-    wal.flush().unwrap();
     if stop == Stop::AfterWal {
         return;
     }

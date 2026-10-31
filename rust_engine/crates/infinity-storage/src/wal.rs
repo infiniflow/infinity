@@ -76,30 +76,21 @@ impl WalManager {
         self.file
             .write_all(&buf)
             .map_err(|e| Error::io(&self.path, e))?;
-        // The reference writes its WAL through RocksDB with `sync = false`, so a
-        // commit is durable against a process crash but not against a power
-        // loss. A per-record `fsync` here cost ~10 ms per insert batch; the
-        // explicit barrier lives in `flush()` (checkpoint / shutdown / FLUSH).
+        // The reference's WAL never reaches the disk on its own: `WalManager::Flush`
+        // appends with `ofs_.write` and only calls `ofs_.flush()`
+        // (`wal_manager_impl.cpp:311,329-340`), a userspace flush, and even
+        // `SwapWalFile` just closes and renames (`:511-513`). `File` is
+        // unbuffered, so `write_all` already lands where `ofs_.flush()` does;
+        // no `fsync` happens here or anywhere else on the log. What survives a
+        // power loss is decided by the checkpoint's data files and the catalog
+        // SST, not by the log.
         Ok(offset)
     }
 
-    pub fn flush(&mut self) -> Result<()> {
-        self.file.sync_all().map_err(|e| Error::io(&self.path, e))
-    }
-
-    /// Empties the file (used at a checkpoint once every record is applied to
-    /// the KV store). The append handle stays usable: with `O_APPEND` the next
-    /// write lands at the new end of file.
-    pub fn truncate_all(&mut self) -> Result<()> {
-        self.file.set_len(0).map_err(|e| Error::io(&self.path, e))?;
-        self.file.sync_all().map_err(|e| Error::io(&self.path, e))
-    }
-
     /// Seals the active log as `wal.log.{seal_ts}` and starts a fresh one.
-    /// Rotation is O(1); the sealed segment can be deleted once every record it
-    /// holds is applied to the KV store.
+    /// Rotation is O(1); like `WalManager::SwapWalFile` it closes the old file
+    /// and renames it, without syncing.
     pub fn rotate(&mut self, seal_ts: TxnTimeStamp) -> Result<()> {
-        self.file.sync_all().map_err(|e| Error::io(&self.path, e))?;
         let sealed = self.path.with_extension(format!("log.{seal_ts}"));
         std::fs::rename(&self.path, &sealed).map_err(|e| Error::io(&sealed, e))?;
         self.file = OpenOptions::new()
