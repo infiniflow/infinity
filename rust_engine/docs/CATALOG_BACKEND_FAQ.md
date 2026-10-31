@@ -36,18 +36,20 @@
 
 ## 3. fsync 在哪些点上
 
-**总原则**：写路径上**一次 fsync 都没有**，与参考一致。参考的 WAL 线程只做 `ofs_.write` + `ofs_.flush()`（用户态 flush，不是 fsync，`wal_manager_impl.cpp:311,329-340`），换文件只是 close + rename（`:511-513`）；catalog 的 RocksDB 写入带 `disableWAL`（`kv_store_impl.cpp:311,441`），checkpoint 时一次 `Flush()`（`:390`）把 memtable 变成 SST。
+**总原则**：commit 路径上**没有 fsync**（与参考一致），持久化只发生在 checkpoint；checkpoint 里 fsync 的是**数据**（块文件、索引 chunk、两个 RocksDB 的 SST）和**checkpoint 帧本身**。参考的 WAL 线程只做 `ofs_.write` + `ofs_.flush()`（用户态 flush，不是 fsync，`wal_manager_impl.cpp:311,329-340`），换文件只是 close + rename（`:511-513`）；catalog 的 RocksDB 写入带 `disableWAL`（`kv_store_impl.cpp:311,441`），checkpoint 时一次 `Flush()`（`:390`）把 memtable 变成 SST。帧那一处 fsync 是端口**有意偏离**参考的，理由见下。
 
 | 位置 | 行为 | 参考对应 |
 |---|---|---|
 | `WalManager::append` | `write_all`，不 fsync（`File` 无用户态缓冲） | `WalManager::Flush` 的 `ofs_.write` |
-| `WalManager::rotate` | 关文件 + rename，不 fsync | `WalManager::SwapWalFile` |
-| checkpoint 帧（`append_checkpoint`） | 先 rotate 再 append，不 fsync | 同一个 `ofs_` 循环里的 `SwapWalFile` + 帧写入 |
+| `WalManager::rotate` | 关文件 + rename，再 **fsync 所在目录** | `WalManager::SwapWalFile`（只 close + rename） |
+| checkpoint 帧（`append_checkpoint`） | 先 rotate，append 帧，再 fsync 这个文件 | 同一个 `ofs_` 循环里的 `SwapWalFile` + 帧写入，**不 fsync**（端口有意偏离，见下） |
 | `RocksMetaStore::put` / `delete` / `atomic_batch` | `WriteOptions::disable_wal(true)`；只有 `pm|` 开头的对象记录开着 WAL，随后 `flush_wal(false)` | `KVStore::Put/Delete/Merge` 默认 `disable_wal = true`；`PersistenceManager` / `ObjStatAccessor` 传 `false` 并 `FlushWAL(false)` |
 | `RocksMetaStore::flush`（checkpoint） | `db.flush()`：memtable → SST（RocksDB 自己 fsync SST 与 MANIFEST） | `KVStore::Flush()` = 一次 `transaction_db_->Flush()` |
 | 提交（语句 / 事务） | append 一条 WAL 帧 + 写 KV，没有同步步骤 | `NewTxn::CommitTxn` 把帧交给 WAL 线程 |
 
-调用链：`Engine::flush_storage()` → `catalog.flush()`（SST）→ `txn.flush()`（store 的 SST）→ `append_checkpoint()`（必要时 rotate，再写帧）。
+调用链：`Engine::flush_storage()` → `catalog.flush()`（SST）→ `txn.flush()`（store 的 SST）→ `append_checkpoint()`（必要时 rotate，写帧，fsync 帧）。
+
+**为什么帧要 fsync（与参考唯一的偏离）**：帧是「这个目录停在哪一次 checkpoint」的唯一标记，`GetReplayEntries` 从它取 `max_checkpoint_ts`；一个非空却没有帧的日志会让参考直接 abort（`WAL replay: No checkpoint found in wal`，`wal_manager_impl.cpp:670`）。端口在 checkpoint 之后会删掉已被覆盖的封存段（`drop_sealed_wal_up_to`），所以新帧常常是目录里**唯一**的那一个：它若只留在页缓存，掉电后目录对参考就不再可打开（数据本身还在 SST 与块文件里，端口自己能开，跨引擎交接却会失败）。帧只有几十字节，fsync 一次约 1 ms（空表 checkpoint 8.7–11.3 ms，与之前的 8.9–9.7 ms 同量级，落在同一轮的波动里）。这个 fsync 放在 checkpoint 的**最后**（`flush_storage` 末尾的 `TxnManager::sync_wal`）：块镜像、索引 chunk、两个 SST 都落盘之后才同步帧，于是“帧在”蕴含“它声明的数据也在”；帧丢了就退回上一帧重放。rotate 时顺带 fsync 目录，是因为 rename 与新文件的名字本身也要落盘，否则「帧丢了还能退回上一帧」这条退路也不成立。
 
 **语义**：承诺的持久化边界是 **checkpoint，不是 commit**——commit 只写页缓存，掉电可以把它丢掉。进程崩溃（页缓存还在）通常会保留到 WAL 尾部，但那不是承诺。
 

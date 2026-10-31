@@ -329,8 +329,7 @@ set_memindex_capacity(2) 把 20 行切成约 10 个段，断言四条查询（�
 
 块文件与索引 chunk 写完即 fsync（对齐 `FileWorker::WriteToFile`，见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) §3）。20,000 行那次的 `flush_cpp_blocks`：2.495 s → 2.514 s（块文件，+19 ms）→ 2.584 s（再加上全文 chunk 的 `.dic`/`.pos`/`.len`，+70 ms）。
 
-两个 `Flush` 都不再 fsync 日志：catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，
-`kv_store_impl.cpp:441`），`wal.log` 在任何路径上都不 fsync（对齐 `ofs_.write` + `ofs_.flush()`）。
+catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_store_impl.cpp:441`）；`wal.log` 只在 checkpoint 帧那一处 fsync（这是端口有意比参考多做的一步，理由见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) §3），commit 记录不 fsync（对齐 `ofs_.write` + `ofs_.flush()`）。
 提交路径同样没有同步动作，所以 `CREATE INDEX` 的 DDL 是 1.1–1.9 ms（此前每条语句都要同步一次 catalog 日志）。
 细节见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) §3。
 

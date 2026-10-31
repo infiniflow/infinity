@@ -21307,6 +21307,13 @@ impl Engine {
             infinity_storage::s3::sync_tree(&client, &self.dir.join("catalog"), "catalog")?;
             infinity_storage::s3::sync_tree(&client, &self.dir.join("persistence"), "persistence")?;
         }
+        // The frame goes last, once every file it claims is on disk: the block
+        // mirror, the index chunks and the two SSTs are all fsynced above, so a
+        // power loss either keeps the frame together with its data or loses it
+        // and reopens at the previous checkpoint. This is the only fsync on
+        // `wal.log` — commit records stay in the page cache, as in the
+        // reference, which does not sync the frame either.
+        self.txn.sync_wal()?;
         Ok(())
     }
 
@@ -22276,6 +22283,9 @@ impl Engine {
         // A checkpoint keeps its sealed segment; `Cleanup` reclaims it, as in
         // `WalManager::Cleanup`.
         let _ = self.txn.rotate_wal_if_large();
+        // The data this frame claims is already durable (`synced_ts`), so the
+        // frame may be synced on its own.
+        let _ = self.txn.sync_wal();
     }
 
     /// Runs the reference's optimize pass over the index mirrors: a mirror

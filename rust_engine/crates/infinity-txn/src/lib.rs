@@ -1298,6 +1298,8 @@ impl TxnManager {
     ) -> Result<()> {
         let entry = WalEntry::new(-1, commit_ts, vec![WalCmd::Checkpoint { max_commit_ts }]);
         // One job, so no commit can slip in between the append and the return.
+        // The frame itself is written, not synced: the caller syncs it with
+        // [`Self::sync_wal`] once the data it claims is on disk.
         self.wal.run(move |wal| wal.append(&entry).map(|_| ()))
     }
 
@@ -1355,10 +1357,8 @@ impl TxnManager {
         // its loop when it reaches the checkpoint entry
         // (`wal_manager_impl.cpp:288-294`): swapping and appending as two jobs
         // let a commit land in the fresh log before the frame, which put a row
-        // frame ahead of the checkpoint. The frame is written, not fsynced: the
-        // reference appends it through the same `ofs_` as every other entry
-        // (`wal_manager_impl.cpp:288-311`), so a power loss may take the frame
-        // away and the directory simply reopens at the previous checkpoint.
+        // frame ahead of the checkpoint. The caller syncs the frame once the
+        // data it claims is on disk (`TxnManager::sync_wal`).
         self.wal.run(move |wal| {
             if rotate && wal.file_size()? > 0 {
                 wal.rotate(seal)?;
@@ -1446,8 +1446,8 @@ impl TxnManager {
 
     /// The checkpoint's store step: everything applied so far becomes an SST.
     ///
-    /// The log is not synced — the reference has no fsync on it at all
-    /// (`wal_manager_impl.cpp:311,511-513`) — so this SST is what carries the
+    /// This does not sync the log (only the checkpoint frame in
+    /// [`Self::append_checkpoint`] is synced) — the SST is what carries the
     /// checkpoint. The checkpoint entry itself is appended by the caller that
     /// owns the checkpoint (`flush_storage`, `checkpoint_wal`): a checkpoint is
     /// a write transaction in the reference and therefore spends a timestamp, so
@@ -1457,6 +1457,17 @@ impl TxnManager {
         let applied = self.max_applied.load(Ordering::SeqCst);
         self.synced.fetch_max(applied, Ordering::SeqCst);
         Ok(())
+    }
+
+    /// Makes the checkpoint frame durable.
+    ///
+    /// The only fsync on the log: the frame is the marker every later open (this
+    /// engine's and the reference's) needs, and a checkpoint that lost it would
+    /// reopen at an older position — or, once the older sealed segment has been
+    /// pruned, not open at all. Commit records stay unsynced, as in the
+    /// reference; the checkpoint's data is what carries them.
+    pub fn sync_wal(&self) -> Result<()> {
+        self.wal.run(|wal| wal.sync())
     }
 
     /// Highest commit timestamp the checkpoint has put into an SST.

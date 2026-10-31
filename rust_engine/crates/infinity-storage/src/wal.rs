@@ -80,16 +80,27 @@ impl WalManager {
         // appends with `ofs_.write` and only calls `ofs_.flush()`
         // (`wal_manager_impl.cpp:311,329-340`), a userspace flush, and even
         // `SwapWalFile` just closes and renames (`:511-513`). `File` is
-        // unbuffered, so `write_all` already lands where `ofs_.flush()` does;
-        // no `fsync` happens here or anywhere else on the log. What survives a
-        // power loss is decided by the checkpoint's data files and the catalog
-        // SST, not by the log.
+        // unbuffered, so `write_all` already lands where `ofs_.flush()` does.
+        // Commit records are therefore never synced — what survives a power loss
+        // is decided by the checkpoint's data files and the catalog SST. The one
+        // exception is the checkpoint frame, which `TxnManager` syncs through
+        // [`WalManager::sync`] so the marker itself cannot be lost.
         Ok(offset)
+    }
+
+    /// Makes everything appended so far durable.
+    ///
+    /// Only the checkpoint frame is synced (see `TxnManager::append_checkpoint`):
+    /// commit records stay in the page cache, which is the reference's
+    /// contract, but the frame is the marker every later open needs.
+    pub fn sync(&mut self) -> Result<()> {
+        self.file.sync_all().map_err(|e| Error::io(&self.path, e))
     }
 
     /// Seals the active log as `wal.log.{seal_ts}` and starts a fresh one.
     /// Rotation is O(1); like `WalManager::SwapWalFile` it closes the old file
-    /// and renames it, without syncing.
+    /// and renames it. The directory is synced because the rename and the new
+    /// file's name only survive a power loss once the directory entry does.
     pub fn rotate(&mut self, seal_ts: TxnTimeStamp) -> Result<()> {
         let sealed = self.path.with_extension(format!("log.{seal_ts}"));
         std::fs::rename(&self.path, &sealed).map_err(|e| Error::io(&sealed, e))?;
@@ -98,6 +109,10 @@ impl WalManager {
             .append(true)
             .open(&self.path)
             .map_err(|e| Error::io(&self.path, e))?;
+        if let Some(dir) = self.path.parent() {
+            let handle = std::fs::File::open(dir).map_err(|e| Error::io(dir, e))?;
+            handle.sync_all().map_err(|e| Error::io(dir, e))?;
+        }
         Ok(())
     }
 
