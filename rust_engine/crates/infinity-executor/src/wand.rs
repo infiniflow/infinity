@@ -140,8 +140,11 @@ struct Cursor<'a> {
     delta: f64,
     /// The posting stream, read one block at a time.
     stream: Box<dyn WandStream + 'a>,
-    /// iter_->SeekDoc position, cached so the cursors can be sorted.
+    /// iter_->SeekDoc position, cached so the cursors can be sorted. `None`
+    /// with `done == false` means a `seek_block` still has to be resolved.
     cur: Option<u64>,
+    /// The unit is exhausted.
+    done: bool,
     /// BlockMaxBM25Score() cache: the block it was computed for, its bound and
     /// the block's last document (used by the block-skip path).
     block_index: u64,
@@ -152,13 +155,23 @@ struct Cursor<'a> {
 impl<'a> Cursor<'a> {
     fn refresh(&mut self) {
         self.cur = self.stream.doc();
+        self.done = self.cur.is_none();
     }
 
-    /// PostingIterator::SeekDoc: position on the first document >= doc. Only
-    /// decodes the block the seek lands in, never a score.
+    /// Resolves a cursor that was only block-seeked.
+    fn ensure(&mut self) {
+        if !self.done && self.cur.is_none() {
+            self.refresh();
+        }
+    }
+
+    /// PostingIterator::SeekDoc at the block level: the unit may still have to
+    /// verify its own positions, which `ensure` pays for - so the range the
+    /// WAND skips over is never resolved (`NextShallow`).
     fn seek(&mut self, doc: u64) {
-        self.stream.advance(doc);
-        self.refresh();
+        self.stream.seek_block(doc);
+        self.cur = None;
+        self.done = false;
     }
 
     /// BlockLastDocID(): the last document of the current block.
@@ -279,6 +292,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                     delta: unit_delta,
                     stream,
                     cur: None,
+                    done: false,
                     block_index: u64::MAX,
                     block_max: 0.0,
                     block_last_doc: u64::MAX,
@@ -408,8 +422,11 @@ impl<'a> BlockMaxWandIterator<'a> {
         loop {
             // Next() keeps the cursors sorted by doc id and drops the exhausted
             // tail, subtracting its upper bound from the total.
+            for cursor in self.cursors.iter_mut() {
+                cursor.ensure();
+            }
             self.cursors.sort_by_key(|c| c.cur.unwrap_or(u64::MAX));
-            while self.cursors.last().is_some_and(|c| c.cur.is_none()) {
+            while self.cursors.last().is_some_and(|c| c.done) {
                 self.cursors.pop();
             }
             if self.cursors.is_empty() {
@@ -950,5 +967,37 @@ mod tests {
             evaluations <= BLOCK_SIZE,
             "{evaluations} exact scores: the later blocks were not pruned"
         );
+    }
+
+    /// `seek_block` is the reference's `NextShallow`: it repositions the unit
+    /// without decoding any offsets, so a block the WAND skips never pays for
+    /// the phrase verification.
+    #[test]
+    fn phrase_seek_block_defers_the_offset_check() {
+        let mut a = Vec::new();
+        let mut b = Vec::new();
+        for doc in 0..400u64 {
+            if doc < 128 {
+                a.push((doc, 2, vec![0u32, 2]));
+                b.push((doc, 2, vec![1u32, 3]));
+            } else {
+                a.push((doc, 1, vec![0u32]));
+                b.push((doc, 1, vec![9u32]));
+            }
+        }
+        let mut cursor = crate::PhraseCursor::new(vec![
+            TermStream::from_postings(a),
+            TermStream::from_postings(b),
+        ]);
+        assert_eq!(cursor.doc(), Some(0));
+        let before = cursor.verified();
+        cursor.seek_block(200);
+        assert_eq!(
+            cursor.verified(),
+            before,
+            "seek_block decoded offsets for documents it skipped"
+        );
+        assert_eq!(cursor.doc(), None);
+        assert!(cursor.verified() > before, "resolve must verify");
     }
 }

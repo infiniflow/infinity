@@ -144,8 +144,18 @@ boolean 模式下短语仍按词拆成多个游标（权重取字段 boost）；
   `1 + max_i(f1/tf_i) + max_i(f3/pct_i)`（先对各词取 min tf / min pct 再套公式），
   后者不小于前者，所以剪枝只会更多、不会更少。
 
-要再逼近，需要把「按块定位」和「求下一处匹配」拆成两个动作（参考的
-`NextShallow` / `Next`），让被剪掉的块根本不进位置验证；这是下一步。
+拆成两个动作已经做了：`PhraseCursor::seek_block`（对应 `NextShallow`，只把子游标
+移到目标文档，不解位置）和 `PhraseCursor::resolve`（对应 `Next`，验证相邻性直到找到
+下一处匹配），`WandStream` 上的 `seek_block` 默认等于 `advance`（单词没有可延迟的
+东西），`Cursor::seek` 改成调用它并把 `cur` 标记为待解析，`next()` 每轮开头再 `ensure`。
+`phrase_seek_block_defers_the_offset_check` 用 `verified` 计数器证明 `seek_block`
+确实没有解位置。
+
+**实测这一版没有变快**（仍是 2.48 ms）：因为 WAND 的循环紧接着就要 `ensure()` 拿
+`cur` 去排序/找 pivot，延迟的那次解析在下一步就发生了。要真省下来，得把参考的
+**浅层循环**也搬过来——在 `ensure` 之前先用各游标的块上界和 `block_last` 连续跳块，
+直到上界够到阈值才解析。这一步改的是 `BlockMaxWandIterator::next` 的控制流，
+留给下一轮。
 
 参考侧是块级 WAND + 跳表流式推进（命中 k 个就停），只投影 `row_id`/score 两列，
 所以耗时基本与语料规模无关（20k 文档仍在 1 ms 量级）。

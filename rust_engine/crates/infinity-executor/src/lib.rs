@@ -4006,8 +4006,13 @@ pub(crate) struct Posting {
 pub(crate) trait WandStream {
     fn doc(&mut self) -> Option<u64>;
     fn tf(&mut self) -> u32;
-    /// `SeekDoc`: position on the first document `>= target`.
+    /// `SeekDoc`: position on the first document `>= target`, resolved.
     fn advance(&mut self, target: u64);
+    /// `NextShallow`: reposition at document level without resolving the unit.
+    /// The default cursor has nothing to defer.
+    fn seek_block(&mut self, target: u64) {
+        self.advance(target)
+    }
     /// Identity of the block the cursor is on (a `BlockMaxBM25Score` cache key).
     fn block_id(&mut self) -> u64;
     /// `(last document of the block, largest tf, largest tf/doc-length ratio)`.
@@ -4235,6 +4240,12 @@ pub(crate) struct PhraseCursor<'a> {
     cur: Option<u64>,
     cur_tf: u32,
     scratch: Vec<Vec<u32>>,
+    /// `cur` is stale: [`Self::seek_block`] repositioned the children without
+    /// verifying any phrase occurrence.
+    pending: bool,
+    /// Documents whose offsets were decoded to answer a query (test only).
+    #[cfg(test)]
+    verified: usize,
 }
 
 impl<'a> PhraseCursor<'a> {
@@ -4246,13 +4257,45 @@ impl<'a> PhraseCursor<'a> {
             cur: None,
             cur_tf: 0,
             scratch: Vec::new(),
+            pending: true,
+            #[cfg(test)]
+            verified: 0,
         };
-        cursor.settle();
+        cursor.resolve();
         cursor
     }
 
-    /// Advances to the next document where every term is present and the
-    /// phrase actually occurs.
+    /// `NextShallow` (`phrase_doc_iterator_impl.cpp:139`): reposition the
+    /// children on `target` at document level **without** verifying a phrase
+    /// occurrence. The next [`Self::resolve`] pays for the verification, so a
+    /// block the WAND skips never has its offsets decoded.
+    pub(crate) fn seek_block(&mut self, target: u64) {
+        for child in self.children.iter_mut() {
+            if child.doc().is_some_and(|doc| doc < target) {
+                child.advance(target);
+            }
+        }
+        self.pending = true;
+        self.cur = None;
+    }
+
+    /// The reference's `Next()`: verify offsets from the current position on
+    /// and stop at the next document where the phrase occurs. A no-op when the
+    /// cursor is already resolved.
+    pub(crate) fn resolve(&mut self) {
+        if !self.pending && self.cur.is_some() {
+            return;
+        }
+        self.settle();
+        self.pending = false;
+    }
+
+    /// Test-only: how many documents had their offsets decoded.
+    #[cfg(test)]
+    pub(crate) fn verified(&self) -> usize {
+        self.verified
+    }
+
     fn settle(&mut self) {
         loop {
             let mut top: Option<u64> = None;
@@ -4280,6 +4323,10 @@ impl<'a> PhraseCursor<'a> {
                 continue;
             }
             // Phrase frequency at `top`, from the terms' offsets.
+            #[cfg(test)]
+            {
+                self.verified += 1;
+            }
             self.scratch.resize(self.unit_len, Vec::new());
             let (children, scratch) = (&mut self.children, &mut self.scratch);
             for (i, child) in children.iter_mut().enumerate() {
@@ -4299,20 +4346,18 @@ impl<'a> PhraseCursor<'a> {
     }
 
     pub(crate) fn doc(&mut self) -> Option<u64> {
+        self.resolve();
         self.cur
     }
 
     pub(crate) fn tf(&mut self) -> u32 {
+        self.resolve();
         self.cur_tf
     }
 
     pub(crate) fn advance(&mut self, target: u64) {
-        for child in self.children.iter_mut() {
-            if child.doc().is_some_and(|doc| doc < target) {
-                child.advance(target);
-            }
-        }
-        self.settle();
+        self.seek_block(target);
+        self.resolve();
     }
 
     pub(crate) fn block_id(&mut self) -> u64 {
@@ -4344,6 +4389,10 @@ impl<'a> PhraseCursor<'a> {
 impl WandStream for PhraseCursor<'_> {
     fn doc(&mut self) -> Option<u64> {
         PhraseCursor::doc(self)
+    }
+
+    fn seek_block(&mut self, target: u64) {
+        PhraseCursor::seek_block(self, target)
     }
 
     fn tf(&mut self) -> u32 {
