@@ -66,7 +66,7 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 
 | 阶段 | 参考 C++ | 端口 Rust | 比值 |
 |---|---|---|---|
-| CREATE INDEX + Flush | 3–5 ms | 16–19 ms | ≈4× 慢（见 §4.10） |
+| CREATE INDEX（DDL 本身，见 §4.11） | 3–5 ms（参考读数含它自己的 Flush） | 2.4–2.6 ms | 持平 |
 | ReadJsonl（不计入） | 17–29 ms | 60–62 ms | — |
 | INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 2.59 s | ≈2.5× 慢 |
 | IMPORT 20000 行 | ≈2 s | 2.45–2.46 s | ≈1.2× 慢 |
@@ -311,22 +311,30 @@ set_memindex_capacity(2) 把 20 行切成约 10 个段，断言四条查询（�
 |---|---|---|
 | IMPORT 20000 行 | 3.09 s | **2.45–2.46 s**（参考 2 s） |
 | INSERT 20000 行（batch=500） | 3.24 s | **2.59 s** |
-| CREATE INDEX + Flush | 15–18 ms | 16–19 ms（未变，见下） |
+| CREATE INDEX（DDL 本身） | — | 2.4–2.6 ms（本轮未动这一项，见 §4.11） |
 
-### 4.11 CREATE INDEX 那 16 ms 是 flush，不是 DDL
+### 4.11 对比表里为什么不计 Flush
 
-把 Create index + flush 拆开计时（临时打点，已移除）：**DDL 2.9 ms、flush 14 ms**。
-DDL 本身已经和参考的 3 ms 持平；flush 的 14 ms 是持久化操作：
+两边的 `Flush` 都是 checkpoint：参考的 `Flush()` 走 `PhysicalFlush`
+（`src/executor/operator/physical_flush_impl.cpp:42`），即 kv store 的 `Flush()`
+再加一个 `NewCheckpointTask` 并等它结束；端口 `Engine::flush` 走 `flush_storage`
+（`crates/infinity-executor/src/lib.rs:21257`）。**在同一张空表上**，这两次 checkpoint
+一个是 3–5 ms（参考），一个是 13.6 ms（端口），差在各自的落盘步骤：
 
-| flush 步骤 | 耗时 |
+| 端口的 checkpoint 步骤 | 耗时 |
 |---|---|
 | RocksDB flush()（catalog） | 4–5 ms |
 | WAL fsync | 5–6 ms |
 | flush_cpp_blocks（块镜像 + 失效索引目录清理） | 2.5–3.4 ms |
 
-参考的 Flush 不做这两次同步，所以它是 3 ms。端口这边是**持久性策略**上的选择，不是
-性能 bug：要缩短只能放宽 checkpoint 的同步语义，那会改变崩溃恢复的保证，所以这一项
-保留原样，只把差异记在这里。
+这 13.6 ms 与全文索引无关（此时索引还是空的），它衡量的是持久化实现各自的同步粒度，
+把它塞进「建索引」那一行只会掩盖索引本身的成本——所以**对比测试里不计**：基准默认只
+计时 `CREATE INDEX`（2.4–2.6 ms），flush 需要显式打开（`FTBENCH_FLUSH=1`），
+打开后单独打印、不并进读数。参考那边沿用它的 `BenchmarkCreateIndex`（CreateIndex +
+Flush 一起计），所以表里 3–5 ms 是它 DDL 的上界。
+
+不缩短这 13.6 ms 是有意的：能砍的只有 checkpoint 的同步语义（RocksDB flush、WAL fsync、
+块镜像），那会改变崩溃恢复的保证。
 
 ## 5. 顺带修掉的一个格式缺陷
 
