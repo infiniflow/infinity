@@ -3189,7 +3189,14 @@ impl TermPostings {
 struct MemoryIndexer {
     /// `doc -> length`, used for BM25's document length.
     docs: DocLenMap,
-    postings: FastMap<String, TermPostings>,
+    /// One entry per interned term, indexed by its id: a document's tokens cost
+    /// an integer lookup instead of hashing the term string per posting.
+    postings: Vec<TermPostings>,
+    /// `term -> id` and `id -> term`. The dictionary outlives the tail's postings
+    /// (a spill keeps using the same ids) and is rebuilt from the rows when a
+    /// process opens a directory.
+    term_ids: FastMap<String, u32>,
+    term_names: Vec<String>,
     live: std::collections::HashSet<u64>,
     n_docs: usize,
     total_len: u64,
@@ -3273,16 +3280,20 @@ impl MemoryIndexer {
             let term = toks[first].0.as_str();
             positions.clear();
             positions.extend(toks[first..at].iter().map(|entry| entry.1));
-            // Only the first posting of a term allocates its key: looking up by
-            // the borrowed term keeps the per-document cost down (a 20k-row
-            // column adds a couple of million postings).
-            let list = match self.postings.get_mut(term) {
-                Some(list) => list,
-                None => self
-                    .postings
-                    .entry(term.to_string())
-                    .or_insert_with(TermPostings::default),
+            // Only a term's first appearance allocates: the dictionary maps the
+            // borrowed term to an id, and the postings live in a Vec indexed by
+            // it (a 20k-row column adds a couple of million postings).
+            let id = match self.term_ids.get(term) {
+                Some(id) => *id as usize,
+                None => {
+                    let id = self.term_names.len();
+                    self.term_names.push(term.to_string());
+                    self.term_ids.insert(term.to_string(), id as u32);
+                    self.postings.push(TermPostings::default());
+                    id
+                }
             };
+            let list = &mut self.postings[id];
             let (start, count) = list.append_positions(&positions);
             let entry = (seq, positions.len() as u32, start, count);
             // Keep the list ascending and unique: the query path walks it as a
@@ -3301,6 +3312,13 @@ impl MemoryIndexer {
             }
         }
         true
+    }
+
+    /// The tail's postings for a term, if the term was ever indexed here.
+    fn postings_of(&self, term: &str) -> Option<&TermPostings> {
+        self.term_ids
+            .get(term)
+            .map(|id| &self.postings[*id as usize])
     }
 
     /// C++: deleting a document only drops its live marker; the postings and
@@ -3337,6 +3355,9 @@ impl MemoryIndexer {
     fn clear_tail(&mut self) {
         self.postings.clear();
         self.postings.shrink_to_fit();
+        self.term_ids.clear();
+        self.term_names.clear();
+        self.term_names.shrink_to_fit();
         self.docs.clear();
         self.live.clear();
         self.row_range = None;
@@ -3393,7 +3414,11 @@ impl MemoryIndexer {
             String,
             Vec<infinity_storage::fulltext_segment::PostingEntry>,
         > = std::collections::BTreeMap::new();
-        for (term, list) in &self.postings {
+        for (id, term) in self.term_names.iter().enumerate() {
+            let list = &self.postings[id];
+            if list.list.is_empty() {
+                continue;
+            }
             let mut hits: Vec<infinity_storage::fulltext_segment::PostingEntry> = list
                 .list
                 .iter()
@@ -3401,6 +3426,8 @@ impl MemoryIndexer {
                 .map(|(i, (row, tf, _, _))| (*row, *tf, list.positions(i).to_vec()))
                 .collect();
             dedupe_posting_entries(&mut hits);
+            // The map is keyed by the term text, so its iteration order is the
+            // ascending byte order the FST builder requires.
             postings.insert(term.clone(), hits);
         }
         Some((docs, postings))
@@ -3570,7 +3597,8 @@ impl MemoryIndexer {
                 }
             }
         }
-        for (term, list) in &self.postings {
+        for (id, term) in self.term_names.iter().enumerate() {
+            let list = &self.postings[id];
             let positions: Vec<(u64, u32, &[u32])> = list
                 .list
                 .iter()
@@ -3616,8 +3644,7 @@ impl MemoryIndexer {
     /// text of a re-inserted row disappears.
     fn postings_newest_first(&self, term: &str) -> Vec<(u64, u32)> {
         let mut hits: Vec<(u64, u32)> = self
-            .postings
-            .get(term)
+            .postings_of(term)
             .map(|list| {
                 list.list
                     .iter()
@@ -4922,7 +4949,7 @@ impl TextIndex {
     /// runs, then the sealed segments.
     fn term_sources(&self, term: &str) -> (Vec<Source<'_>>, usize) {
         let mut sources: Vec<Source<'_>> = Vec::new();
-        if let Some(list) = self.mem.postings.get(term) {
+        if let Some(list) = self.mem.postings_of(term) {
             if !list.list.is_empty() {
                 sources.push(Source::Mem {
                     list: &list.list,
@@ -19430,7 +19457,7 @@ impl Engine {
         // loaded with the reader, so `postings` covers the memory tail only.
         text.mem
             .postings
-            .values()
+            .iter()
             .map(|postings| postings.list.len())
             .sum::<usize>() as u32
     }
@@ -24396,6 +24423,7 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
+
     /// A `NULL` slot and a vector column both reach the WAL as typed columns:
     /// the first through the null bitmap, the second as inline element bytes.
     #[test]
@@ -28521,7 +28549,7 @@ mod tests {
         assert!(mem.insert(10, "alpha beta alpha", &delims, usize::MAX));
         assert_eq!(mem.doc_count(), 1);
         assert_eq!(mem.docs[&10], 3);
-        let alpha = &mem.postings["alpha"];
+        let alpha = mem.postings_of("alpha").unwrap();
         assert_eq!(alpha.list.len(), 1);
         assert_eq!(alpha.list[0].0, 10);
         assert_eq!(alpha.list[0].1, 2);
@@ -28989,7 +29017,7 @@ mod tests {
             ("transducer", &[(0, 1), (4, 4)]),
         ];
         for (term, want) in expected {
-            let got: Vec<(u64, u32)> = mem.postings[term]
+            let got: Vec<(u64, u32)> = mem.postings_of(term).unwrap()
                 .list
                 .iter()
                 .map(|(doc, tf, _, _)| (*doc, *tf))
@@ -29009,7 +29037,7 @@ mod tests {
         for i in 0..8192u64 {
             assert!(mem.insert(i, paragraph, &TextTokenizer::default(), usize::MAX));
         }
-        let a = &mem.postings["a"];
+        let a = mem.postings_of("a").unwrap();
         assert_eq!(a.list.len(), 8192);
         for (i, (doc, tf, _, _)) in a.list.iter().enumerate() {
             assert_eq!(*tf, 7, "doc {doc}");
@@ -29042,7 +29070,7 @@ mod tests {
             ("transducer", &[(0, 1), (4, 4)]),
         ];
         for (term, want) in expected {
-            let got: Vec<(u64, u32)> = mem.postings[term]
+            let got: Vec<(u64, u32)> = mem.postings_of(term).unwrap()
                 .list
                 .iter()
                 .map(|(doc, tf, _, _)| (*doc, *tf))
@@ -29060,7 +29088,7 @@ mod tests {
         assert!(!mem.live.contains(&7));
         // The reference keeps deleted documents until compaction.
         assert_eq!(mem.doc_count(), 1);
-        assert_eq!(mem.postings["alpha"].list.len(), 1);
+        assert_eq!(mem.postings_of("alpha").unwrap().list.len(), 1);
     }
 
     /// A checkpoint dumps only the memory segment; new rows form the next

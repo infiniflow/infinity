@@ -68,8 +68,8 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 |---|---|---|---|
 | CREATE INDEX（DDL 本身，见 §4.11） | 3–5 ms（参考读数含它自己的 Flush） | 1.1–1.9 ms | 持平 |
 | ReadJsonl（不计入） | 17–29 ms | 60–62 ms | — |
-| INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 2.37–2.39 s | ≈2.4× 慢（计时口径见 §7） |
-| IMPORT 20000 行 | ≈2 s | **2.26 s** | ≈1.13× 慢 |
+| INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 2.29–2.30 s | ≈2.3× 慢（计时口径见 §7） |
+| IMPORT 20000 行 | ≈2 s | **2.18 s** | ≈1.09× 慢 |
 | Optimize（合并索引 chunk） | 360–512 µs | 299–397 µs | 同量级 |
 | 查询 1 `harmful "social custom"` | 1–5 ms | **0.32 ms** | 反超 |
 | 查询 2 `social custom "harmful chemical"` | 0.93–1 ms | **0.37 ms** | 反超 |
@@ -377,6 +377,24 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 
 产物不变：`cargo test -p infinity-executor`（707 + 集成）全绿，包括全文格式的字节门禁。
 
+### 4.14 term 换内部 id
+
+`MemoryIndexer` 原来用 `FastMap<String, TermPostings>`：每篇文档的每个词都要按字符串
+哈希、比较一次。改成内部 id：
+
+| 部分 | 内容 |
+|---|---|
+| 词典 | `term_ids: FastMap<String, u32>`（词 → id）+ `term_names: Vec<String>`（id → 词），只在词第一次出现时分配 |
+| posting 表 | `Vec<TermPostings>`，按 id 下标访问，查表退化成整数索引 |
+| 落盘 | **不变**：dump 时仍按词构造 `BTreeMap<String, …>`，FST 拿到的仍是词字节升序（`segment_payload` / `merged_segment`） |
+| 查询 | 尾段按 `term_ids` 映射后取下标；封存段仍按词查 `.dic`；`load_sealed` 之后词典为空，未知词只会命中封存段 |
+
+实测：IMPORT 2.26 s → **2.18 s**，INSERT 2.37 s → **2.29 s**（各 −3.5%），查询不变
+（0.28/0.33/0.26/0.28/1.32/2.94/1.37 ms）。收益比预估的 180–250 ms 小，因为预估里
+「每 token 一个 `String`」那 ~100 ms 属于分词器的输出形式，这次没动。
+
+格式没变：`fulltext_format` 的字节门禁与跨引擎用例照旧通过。
+
 ## 5. 顺带修掉的一个格式缺陷
 
 `encode_fulltext_chunk`（`crates/infinity-executor/src/cpp_blocks.rs`）原来对
@@ -437,7 +455,7 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
    走连续段」，一次分配都不做（`MemoryIndexer::insert`）。
 3. **seal 877 ms**：FST 与 posting 编码是实打实的活，posting 编解码已经吃过 SIMD（隔离 1.2–3.5×）。
    真正能省的是把它挪到后台（参考的 `DumpMemIndexTask`）——那就是 §7 里决定**不做**的第 2 项。
-4. **postings 321 ms**：`HashMap<String, …>` 的 memcmp 查表 + `Vec::insert`；term 改成 interned id 后可换整数键的开放寻址表。
+4. **postings 321 ms**：**已做**——term 换成内部 id：`term_ids: FastMap<String,u32>` + `term_names: Vec<String>`，postings 变成按 id 下标的 `Vec<TermPostings>`，查表从字符串哈希/比较变成整数下标。剩下的「每 token 一个 String」还没动（需要分词器直接吐 `&str`，另算约 100 ms）。
 
 ### 8.2 14 词查询 1.36–1.50 ms（参考 0.84–1 ms）
 

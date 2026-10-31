@@ -34,7 +34,7 @@ fn basic() {
 
         // The segment's only term is `a`; its positions are the reference's
         // decoded deltas.
-        let hits = &indexer.postings["a"];
+        let hits = indexer.postings_of("a").unwrap();
         assert_eq!(hits.list.len(), 1);
         assert_eq!(hits.list[0].0, index as u64);
         assert_eq!(hits.list[0].1, expected_tf[index]);
