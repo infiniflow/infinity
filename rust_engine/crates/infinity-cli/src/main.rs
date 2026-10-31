@@ -10,6 +10,7 @@
 //!   infinity smoke <dir>          # create table + commit kv + reopen + verify
 
 mod config;
+mod fulltext_bench;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -46,7 +47,7 @@ fn open_txn(dir: &Path) -> infinity_common::Result<(TxnManager, Arc<dyn MetaStor
 
 fn usage() -> ! {
     eprintln!(
-        "usage: infinity <create-table|list-tables|put|get|dump-catalog|recover|query|bench|serve|import-csv|conformance|smoke> <dir> [args...]
+        "usage: infinity <create-table|list-tables|put|get|dump-catalog|recover|query|bench|fulltext-bench|serve|import-csv|conformance|smoke> <dir> [args...]
 "
     );
     std::process::exit(2);
@@ -618,6 +619,19 @@ fn run(args: &[String]) -> infinity_common::Result<()> {
             e.flush()?;
             println!("imported {total} row(s) into {table} from {file}");
             Ok(())
+        }
+        // `infinity fulltext-bench <dir> <mode> <corpus.jsonl> [batch]`: the
+        // reference's `fulltext_benchmark` (insert/import/merge/query).
+        "fulltext-bench" => {
+            let mode = args.get(2).cloned().unwrap_or_else(|| "query".into());
+            let corpus = args.get(3).cloned().unwrap_or_default();
+            if corpus.is_empty() {
+                return Err(infinity_common::Error::Invalid(
+                    "fulltext-bench needs a corpus.jsonl path".into(),
+                ));
+            }
+            let batch: usize = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(500);
+            fulltext_bench::run(&dir, &mode, &corpus, batch)
         }
         "conformance" => {
             let slt_dir = dir.to_string_lossy().to_string();

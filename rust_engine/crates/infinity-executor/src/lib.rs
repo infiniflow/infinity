@@ -3153,11 +3153,20 @@ impl MemoryIndexer {
             pos.entry(term.as_str()).or_default().push(*at);
         }
         for (term, positions) in pos {
-            self.postings.entry(term.to_string()).or_default().push((
-                seq,
-                positions.len() as u32,
-                positions,
-            ));
+            let entry = (seq, positions.len() as u32, positions);
+            let list = self.postings.entry(term.to_string()).or_default();
+            // Keep the list ascending and unique: the query path walks it as a
+            // sorted posting source, and a re-indexed row replaces its copy
+            // instead of showing up twice.
+            match list.last().map(|p| p.0) {
+                None => list.push(entry),
+                Some(last) if last < seq => list.push(entry),
+                Some(last) if last == seq => *list.last_mut().unwrap() = entry,
+                _ => match list.binary_search_by_key(&seq, |p| p.0) {
+                    Ok(i) => list[i] = entry,
+                    Err(i) => list.insert(i, entry),
+                },
+            }
         }
         true
     }
@@ -3737,13 +3746,641 @@ impl ColumnIndexReader {
     }
 }
 
-/// The postings and corpus statistics a query sees: the sealed segments plus
-/// the unsealed tail, with stale (re-indexed) rows removed.
-struct MergedIndex {
-    n_docs: usize,
-    total_len: u64,
-    postings: HashMap<String, Vec<(u64, u32)>>,
-    doc_len: HashMap<u64, u32>,
+/// One ascending posting source of a term: a slice of the in-memory tail, a
+/// spilled run, or one sealed segment's `DocListReader`.
+///
+/// The cursors drive these directly: nothing is materialised, so a query pays
+/// for the documents it actually visits instead of `O(df)` per term.
+pub(crate) trait DocSource {
+    fn doc(&mut self) -> Option<u64>;
+    fn tf(&mut self) -> u32;
+    /// The current document's token offsets (empty without a position list).
+    fn positions(&mut self) -> &[u32];
+    /// Position on the first document `>= target`.
+    fn advance(&mut self, target: u64);
+    fn df(&self) -> usize;
+}
+
+/// A slice source over a materialised list (tests).
+#[cfg(test)]
+struct SliceSource<'a> {
+    list: &'a [(u64, u32)],
+    at: usize,
+}
+
+#[cfg(test)]
+impl DocSource for SliceSource<'_> {
+    fn doc(&mut self) -> Option<u64> {
+        self.list.get(self.at).map(|p| p.0)
+    }
+
+    fn tf(&mut self) -> u32 {
+        self.list.get(self.at).map(|p| p.1).unwrap_or(0)
+    }
+
+    fn positions(&mut self) -> &[u32] {
+        &[]
+    }
+
+    fn advance(&mut self, target: u64) {
+        while self.at < self.list.len() && self.list[self.at].0 < target {
+            self.at += 1;
+        }
+    }
+
+    fn df(&self) -> usize {
+        self.list.len()
+    }
+}
+
+/// A materialised list a caller owns (the query-syntax path's `bmw_search`).
+struct OwnedSliceSource {
+    list: Vec<(u64, u32)>,
+    at: usize,
+}
+
+impl DocSource for OwnedSliceSource {
+    fn doc(&mut self) -> Option<u64> {
+        self.list.get(self.at).map(|p| p.0)
+    }
+
+    fn tf(&mut self) -> u32 {
+        self.list.get(self.at).map(|p| p.1).unwrap_or(0)
+    }
+
+    fn positions(&mut self) -> &[u32] {
+        &[]
+    }
+
+    fn advance(&mut self, target: u64) {
+        while self.at < self.list.len() && self.list[self.at].0 < target {
+            self.at += 1;
+        }
+    }
+
+    fn df(&self) -> usize {
+        self.list.len()
+    }
+}
+
+/// The memory tail's per-term list (row, tf, positions).
+struct MemSource<'a> {
+    list: &'a [(u64, u32, Vec<u32>)],
+    at: usize,
+}
+
+impl DocSource for MemSource<'_> {
+    fn doc(&mut self) -> Option<u64> {
+        self.list.get(self.at).map(|p| p.0)
+    }
+
+    fn tf(&mut self) -> u32 {
+        self.list.get(self.at).map(|p| p.1).unwrap_or(0)
+    }
+
+    fn positions(&mut self) -> &[u32] {
+        self.list.get(self.at).map(|p| p.2.as_slice()).unwrap_or(&[])
+    }
+
+    fn advance(&mut self, target: u64) {
+        while self.at < self.list.len() && self.list[self.at].0 < target {
+            self.at += 1;
+        }
+    }
+
+    fn df(&self) -> usize {
+        self.list.len()
+    }
+}
+
+/// A sealed segment's (or a spilled run's) cursor: the reference's
+/// `DocListReader`, decoding one 128-document mini-block at a time from the
+/// mmap, with the position list consumed alongside.
+struct SegmentSource<'a> {
+    cur: infinity_storage::fulltext_segment::TermDocCursor<'a>,
+}
+
+impl DocSource for SegmentSource<'_> {
+    fn doc(&mut self) -> Option<u64> {
+        self.cur.doc()
+    }
+
+    fn tf(&mut self) -> u32 {
+        self.cur.tf()
+    }
+
+    fn positions(&mut self) -> &[u32] {
+        self.cur.positions()
+    }
+
+    fn advance(&mut self, target: u64) {
+        self.cur.advance(target)
+    }
+
+    fn df(&self) -> usize {
+        self.cur.df()
+    }
+}
+
+/// One term's postings across every source, merged ascending by row id with the
+/// newest copy of a row winning (`PostingIterator` over the reference's
+/// segments).
+///
+/// `cur` is the smallest document the sources are on; it is not consumed until
+/// the caller asks for the next one, so `positions()` still belongs to it.
+pub(crate) struct MergeCursor<'a> {
+    sources: Vec<Box<dyn DocSource + 'a>>,
+    /// Sources `>= segment_from` are sealed segments: a row in `overridden`
+    /// has a newer copy in the unsealed segment, so its sealed copy is stale.
+    segment_from: usize,
+    overridden: Option<&'a std::collections::HashSet<u64>>,
+    cur: Option<(u64, u32, usize)>,
+    /// The smallest document still has to be recomputed (a source moved).
+    dirty: bool,
+    df: usize,
+}
+
+impl<'a> MergeCursor<'a> {
+    fn new(
+        sources: Vec<Box<dyn DocSource + 'a>>,
+        segment_from: usize,
+        overridden: Option<&'a std::collections::HashSet<u64>>,
+    ) -> Self {
+        let df = sources.iter().map(|s| s.df()).sum();
+        let mut cursor = Self {
+            sources,
+            segment_from,
+            overridden,
+            cur: None,
+            dirty: true,
+            df,
+        };
+        cursor.settle();
+        cursor
+    }
+
+    /// A cursor over one materialised list (tests).
+    #[cfg(test)]
+    pub(crate) fn from_slice(list: &'a [(u64, u32)]) -> Self {
+        Self::new(vec![Box::new(SliceSource { list, at: 0 })], 1, None)
+    }
+
+    /// Documents containing the term (the reference's `doc_freq`).
+    pub(crate) fn df(&self) -> usize {
+        self.df
+    }
+
+    /// Recomputes the smallest current document, dropping stale sealed copies.
+    fn settle(&mut self) {
+        if !self.dirty {
+            return;
+        }
+        loop {
+            let mut best: Option<(usize, u64, u32)> = None;
+            for (i, src) in self.sources.iter_mut().enumerate() {
+                let Some(doc) = src.doc() else { continue };
+                if best.is_none_or(|(_, bd, _)| doc < bd) {
+                    best = Some((i, doc, src.tf()));
+                }
+            }
+            let Some((winner, doc, tf)) = best else {
+                self.cur = None;
+                self.dirty = false;
+                return;
+            };
+            if winner >= self.segment_from && self.overridden.is_some_and(|o| o.contains(&doc)) {
+                self.sources[winner].advance(doc + 1);
+                continue;
+            }
+            self.cur = Some((doc, tf, winner));
+            self.dirty = false;
+            return;
+        }
+    }
+
+    /// The current document (`None` once every source is exhausted).
+    pub(crate) fn doc(&mut self) -> Option<u64> {
+        self.settle();
+        self.cur.map(|c| c.0)
+    }
+
+    /// The current document's term frequency.
+    pub(crate) fn tf(&mut self) -> u32 {
+        self.settle();
+        self.cur.map(|c| c.1).unwrap_or(0)
+    }
+
+    /// The current document's token offsets.
+    pub(crate) fn positions(&mut self) -> &[u32] {
+        self.settle();
+        match self.cur {
+            Some((_, _, winner)) => self.sources[winner].positions(),
+            None => &[],
+        }
+    }
+
+    /// `SeekDoc`: position on the first document `>= target`.
+    pub(crate) fn advance(&mut self, target: u64) {
+        self.dirty = true;
+        for src in &mut self.sources {
+            if src.doc().is_some_and(|doc| doc < target) {
+                src.advance(target);
+            }
+        }
+        self.settle();
+    }
+}
+
+/// One buffered posting: the document, the term's frequency in it and - for
+/// the cursors a phrase unit wraps - the term's token offsets.
+pub(crate) struct Posting {
+    pub doc: u64,
+    pub tf: u32,
+    pub positions: Vec<u32>,
+}
+
+/// The interface `BlockMaxWandIterator` drives: a posting stream that can say
+/// which block it is on and what that block's largest tf / tf-length ratio
+/// is. Clause units implement it directly ([`TermStream`]) or through their
+/// children ([`PhraseCursor`], whose bound is the minimum over the terms').
+pub(crate) trait WandStream {
+    fn doc(&mut self) -> Option<u64>;
+    fn tf(&mut self) -> u32;
+    /// `SeekDoc`: position on the first document `>= target`.
+    fn advance(&mut self, target: u64);
+    /// Identity of the block the cursor is on (a `BlockMaxBM25Score` cache key).
+    fn block_id(&mut self) -> u64;
+    /// `(last document of the block, largest tf, largest tf/doc-length ratio)`.
+    fn block_stats(&mut self, doc_len: &dyn Fn(u64) -> u32) -> (u64, f64, f64);
+}
+
+/// One query term's postings as the block-max WAND cursor sees them: a
+/// [`MergeCursor`] plus the current 128-posting block. Blocks are aligned from
+/// the start of the list, exactly like the reference's `MAX_DOC_PER_RECORD`
+/// runs, so a block bound stays valid while the cursor walks inside it.
+pub(crate) struct TermStream<'a> {
+    merge: MergeCursor<'a>,
+    block: Vec<Posting>,
+    at: usize,
+    block_id: u64,
+    loaded: bool,
+    /// Keep each posting's token offsets (phrase children need them).
+    capture: bool,
+}
+
+/// The number of postings a block-max bound covers (`MAX_DOC_PER_RECORD`, the
+/// same 128 [`crate::wand`] uses).
+pub(crate) const WAND_BLOCK: usize = 128;
+
+impl<'a> TermStream<'a> {
+    fn new(merge: MergeCursor<'a>) -> Self {
+        Self::with_positions(merge, false)
+    }
+
+    pub(crate) fn with_positions(merge: MergeCursor<'a>, capture: bool) -> Self {
+        Self {
+            merge,
+            block: Vec::new(),
+            at: 0,
+            block_id: 0,
+            loaded: false,
+            capture,
+        }
+    }
+
+    /// A stream over an owned list (the query-syntax path).
+    pub(crate) fn from_owned(list: Vec<(u64, u32)>) -> Self {
+        Self::new(MergeCursor::new(
+            vec![Box::new(OwnedSliceSource { list, at: 0 })],
+            1,
+            None,
+        ))
+    }
+
+    /// A stream over an owned list with token offsets (phrase tests).
+    #[cfg(test)]
+    pub(crate) fn from_postings(list: Vec<(u64, u32, Vec<u32>)>) -> Self {
+        struct OwnedPositions {
+            list: Vec<(u64, u32, Vec<u32>)>,
+            at: usize,
+        }
+        impl DocSource for OwnedPositions {
+            fn doc(&mut self) -> Option<u64> {
+                self.list.get(self.at).map(|p| p.0)
+            }
+            fn tf(&mut self) -> u32 {
+                self.list.get(self.at).map(|p| p.1).unwrap_or(0)
+            }
+            fn positions(&mut self) -> &[u32] {
+                self.list.get(self.at).map(|p| p.2.as_slice()).unwrap_or(&[])
+            }
+            fn advance(&mut self, target: u64) {
+                while self.at < self.list.len() && self.list[self.at].0 < target {
+                    self.at += 1;
+                }
+            }
+            fn df(&self) -> usize {
+                self.list.len()
+            }
+        }
+        Self::with_positions(
+            MergeCursor::new(
+                vec![Box::new(OwnedPositions { list, at: 0 })],
+                1,
+                None,
+            ),
+            true,
+        )
+    }
+
+    /// A stream over one materialised list (tests).
+    #[cfg(test)]
+    pub(crate) fn from_slice(list: &'a [(u64, u32)]) -> Self {
+        Self::new(MergeCursor::from_slice(list))
+    }
+
+    /// Documents containing the term (the reference's `doc_freq`).
+    pub(crate) fn df(&self) -> usize {
+        self.merge.df()
+    }
+
+    fn pull(&mut self) -> Option<Posting> {
+        let doc = self.merge.doc()?;
+        let tf = self.merge.tf();
+        let positions = if self.capture {
+            self.merge.positions().to_vec()
+        } else {
+            Vec::new()
+        };
+        self.merge.advance(doc + 1);
+        Some(Posting { doc, tf, positions })
+    }
+
+    /// Loads the next block: up to [`WAND_BLOCK`] postings starting at the
+    /// cursor. Blocks stay aligned from the start of the list.
+    fn load(&mut self) -> bool {
+        if self.at < self.block.len() {
+            return true;
+        }
+        self.block.clear();
+        self.at = 0;
+        while self.block.len() < WAND_BLOCK {
+            match self.pull() {
+                Some(item) => self.block.push(item),
+                None => break,
+            }
+        }
+        if self.block.is_empty() {
+            return false;
+        }
+        if self.loaded {
+            self.block_id += 1;
+        } else {
+            self.loaded = true;
+        }
+        true
+    }
+
+    /// The current document (`None` once exhausted).
+    pub(crate) fn doc(&mut self) -> Option<u64> {
+        if !self.load() {
+            return None;
+        }
+        self.block.get(self.at).map(|p| p.doc)
+    }
+
+    /// The current document's term frequency.
+    pub(crate) fn tf(&mut self) -> u32 {
+        if !self.load() {
+            return 0;
+        }
+        self.block.get(self.at).map(|p| p.tf).unwrap_or(0)
+    }
+
+    /// The current document's token offsets.
+    pub(crate) fn positions(&mut self) -> &[u32] {
+        if !self.load() {
+            return &[];
+        }
+        self.block.get(self.at).map(|p| p.positions.as_slice()).unwrap_or(&[])
+    }
+
+    /// `SeekDoc`: position on the first document `>= target`.
+    pub(crate) fn advance(&mut self, target: u64) {
+        loop {
+            if !self.load() {
+                return;
+            }
+            match self.block.get(self.at) {
+                Some(p) if p.doc < target => self.at += 1,
+                _ => return,
+            }
+        }
+    }
+
+    /// Identity of the loaded block: the cache key of `BlockMaxBM25Score()`.
+    pub(crate) fn block_id(&mut self) -> u64 {
+        self.load();
+        self.block_id
+    }
+
+    /// The block's `(last doc, largest tf, largest tf/doc-length ratio)`.
+    pub(crate) fn block_stats(&mut self, doc_len: &dyn Fn(u64) -> u32) -> (u64, f64, f64) {
+        if !self.load() {
+            return (u64::MAX, 0.0, 0.0);
+        }
+        let mut max_tf = 0.0f64;
+        let mut max_pct = 0.0f64;
+        for p in &self.block {
+            let tf = f64::from(p.tf);
+            max_tf = max_tf.max(tf);
+            let dl = f64::from(doc_len(p.doc));
+            max_pct = max_pct.max(tf / dl.max(1.0));
+        }
+        let last = self.block.last().map(|p| p.doc).unwrap_or(u64::MAX);
+        (last, max_tf, max_pct)
+    }
+}
+
+impl WandStream for TermStream<'_> {
+    fn doc(&mut self) -> Option<u64> {
+        TermStream::doc(self)
+    }
+
+    fn tf(&mut self) -> u32 {
+        TermStream::tf(self)
+    }
+
+    fn advance(&mut self, target: u64) {
+        TermStream::advance(self, target)
+    }
+
+    fn block_id(&mut self) -> u64 {
+        TermStream::block_id(self)
+    }
+
+    fn block_stats(&mut self, doc_len: &dyn Fn(u64) -> u32) -> (u64, f64, f64) {
+        TermStream::block_stats(self, doc_len)
+    }
+}
+
+/// A phrase unit as one WAND cursor: it lands only on documents where the
+/// terms sit at consecutive offsets, and its block bound is the **minimum** of
+/// the terms' block bounds - a phrase can occur no more often than its rarest
+/// term (`BlockMaxPhraseScore`, `term_doc_iterator_impl.cpp`). That is what
+/// lets the iterator skip a whole block without verifying each document.
+pub(crate) struct PhraseCursor<'a> {
+    children: Vec<TermStream<'a>>,
+    unit_len: usize,
+    cur: Option<u64>,
+    cur_tf: u32,
+    scratch: Vec<Vec<u32>>,
+}
+
+impl<'a> PhraseCursor<'a> {
+    pub(crate) fn new(children: Vec<TermStream<'a>>) -> Self {
+        let unit_len = children.len();
+        let mut cursor = Self {
+            children,
+            unit_len,
+            cur: None,
+            cur_tf: 0,
+            scratch: Vec::new(),
+        };
+        cursor.settle();
+        cursor
+    }
+
+    /// Advances to the next document where every term is present and the
+    /// phrase actually occurs.
+    fn settle(&mut self) {
+        loop {
+            let mut top: Option<u64> = None;
+            for child in self.children.iter_mut() {
+                let Some(doc) = child.doc() else {
+                    self.cur = None;
+                    return;
+                };
+                top = Some(top.map_or(doc, |t: u64| t.max(doc)));
+            }
+            let Some(top) = top else {
+                self.cur = None;
+                return;
+            };
+            let mut aligned = true;
+            for child in self.children.iter_mut() {
+                if child.doc() != Some(top) {
+                    child.advance(top);
+                    if child.doc() != Some(top) {
+                        aligned = false;
+                    }
+                }
+            }
+            if !aligned {
+                continue;
+            }
+            // Phrase frequency at `top`, from the terms' offsets.
+            self.scratch.resize(self.unit_len, Vec::new());
+            let (children, scratch) = (&mut self.children, &mut self.scratch);
+            for (i, child) in children.iter_mut().enumerate() {
+                scratch[i].clear();
+                scratch[i].extend_from_slice(child.positions());
+            }
+            let freq = phrase_freq_lists(scratch, self.unit_len);
+            if freq > 0 {
+                self.cur = Some(top);
+                self.cur_tf = freq as u32;
+                return;
+            }
+            for child in self.children.iter_mut() {
+                child.advance(top + 1);
+            }
+        }
+    }
+
+    pub(crate) fn doc(&mut self) -> Option<u64> {
+        self.cur
+    }
+
+    pub(crate) fn tf(&mut self) -> u32 {
+        self.cur_tf
+    }
+
+    pub(crate) fn advance(&mut self, target: u64) {
+        for child in self.children.iter_mut() {
+            if child.doc().is_some_and(|doc| doc < target) {
+                child.advance(target);
+            }
+        }
+        self.settle();
+    }
+
+    pub(crate) fn block_id(&mut self) -> u64 {
+        let mut id = 0u64;
+        for child in self.children.iter_mut() {
+            id = id.wrapping_mul(31).wrapping_add(child.block_id());
+        }
+        id
+    }
+
+    /// The bound covers `[cur, min over the terms' block ends]`.
+    pub(crate) fn block_stats(&mut self, doc_len: &dyn Fn(u64) -> u32) -> (u64, f64, f64) {
+        let mut last = u64::MAX;
+        let mut max_tf = f64::INFINITY;
+        let mut max_pct = f64::INFINITY;
+        for child in self.children.iter_mut() {
+            let (l, t, p) = child.block_stats(doc_len);
+            last = last.min(l);
+            max_tf = max_tf.min(t);
+            max_pct = max_pct.min(p);
+        }
+        if !max_tf.is_finite() {
+            return (u64::MAX, 0.0, 0.0);
+        }
+        (last, max_tf, max_pct)
+    }
+}
+
+impl WandStream for PhraseCursor<'_> {
+    fn doc(&mut self) -> Option<u64> {
+        PhraseCursor::doc(self)
+    }
+
+    fn tf(&mut self) -> u32 {
+        PhraseCursor::tf(self)
+    }
+
+    fn advance(&mut self, target: u64) {
+        PhraseCursor::advance(self, target)
+    }
+
+    fn block_id(&mut self) -> u64 {
+        PhraseCursor::block_id(self)
+    }
+
+    fn block_stats(&mut self, doc_len: &dyn Fn(u64) -> u32) -> (u64, f64, f64) {
+        PhraseCursor::block_stats(self, doc_len)
+    }
+}
+
+/// One searched field's clause units plus the corpus statistics BM25 needs.
+pub(crate) struct WandField<'a> {
+    pub n_docs: usize,
+    pub total_len: u64,
+    pub units: Vec<WandUnit<'a>>,
+    pub doc_len: Box<dyn Fn(u64) -> u32 + 'a>,
+}
+
+/// One clause unit of one field: a term or a phrase, with the idf and the
+/// `delta` its score uses (`delta_term` for a term, `delta_phrase` for a
+/// phrase).
+pub(crate) struct WandUnit<'a> {
+    pub stream: Box<dyn WandStream + 'a>,
+    pub weight: f64,
+    pub idf: f64,
+    /// `None` uses the iterator's `delta` (its `delta_term`); a phrase passes
+    /// its own `delta_phrase`.
+    pub delta: Option<f64>,
 }
 
 impl TextIndex {
@@ -3823,13 +4460,91 @@ impl TextIndex {
         }
     }
 
+    /// Total token count of the column across the sealed segments and the
+    /// unsealed segment (BM25's `avgdl`).
+    fn corpus_len(&self) -> u64 {
+        self.mem.pending_len() + self.reader.total_len()
+    }
+
+    /// BM25's document length for `row`, or `None` when no segment of this
+    /// column holds it (the scan path scores such a row with length 0).
+    fn doc_len_opt(&self, row: u64) -> Option<u32> {
+        self.mem.doc_len_of(row).or_else(|| self.reader.doc_len(row))
+    }
+
+    /// BM25's document length for `row`: the unsealed segment's map first
+    /// (it holds the current text), then the sealed segments.
+    fn doc_len_of(&self, row: u64) -> u32 {
+        self.mem
+            .doc_len_of(row)
+            .or_else(|| self.reader.doc_len(row))
+            .unwrap_or(1)
+    }
+
+    /// One term's postings as a lazy stream: the unsealed tail, the spilled
+    /// runs (newest first) and the sealed segments (newest first).
+    ///
+    /// Nothing is materialised: each source is a cursor the WAND iterator seeks
+    /// in place, so an unread part of a posting list costs nothing.
+    fn term_stream(&self, term: &str) -> TermStream<'_> {
+        let (sources, segment_from) = self.term_sources(term);
+        TermStream::new(MergeCursor::new(
+            sources,
+            segment_from,
+            Some(&self.overridden),
+        ))
+    }
+
+    /// [`Self::term_stream`] with the postings' token offsets captured.
+    fn term_stream_capture(&self, term: &str, capture: bool) -> TermStream<'_> {
+        let (sources, segment_from) = self.term_sources(term);
+        TermStream::with_positions(
+            MergeCursor::new(sources, segment_from, Some(&self.overridden)),
+            capture,
+        )
+    }
+
+    /// Documents containing `term` (the reference's `doc_freq`).
+    fn term_df(&self, term: &str) -> usize {
+        self.term_stream(term).df()
+    }
+
+    /// One term's postings as a plain cursor: the phrase path walks documents
+    /// one at a time and reads their positions, so it needs no block cache.
+    fn term_cursor(&self, term: &str) -> MergeCursor<'_> {
+        let (sources, segment_from) = self.term_sources(term);
+        MergeCursor::new(sources, segment_from, Some(&self.overridden))
+    }
+
+    /// The sources of one term, newest first: the unsealed tail, the spilled
+    /// runs, then the sealed segments.
+    fn term_sources(&self, term: &str) -> (Vec<Box<dyn DocSource + '_>>, usize) {
+        let mut sources: Vec<Box<dyn DocSource + '_>> = Vec::new();
+        if let Some(list) = self.mem.postings.get(term) {
+            if !list.is_empty() {
+                sources.push(Box::new(MemSource { list, at: 0 }));
+            }
+        }
+        for run in self.mem.runs.iter().rev() {
+            if let Ok(Some(cur)) = run.reader.term_doc_cursor(term) {
+                sources.push(Box::new(SegmentSource { cur }));
+            }
+        }
+        let segment_from = sources.len();
+        for seg in self.reader.segments.iter().rev() {
+            if let Ok(Some(cur)) = seg.reader.term_doc_cursor(term) {
+                sources.push(Box::new(SegmentSource { cur }));
+            }
+        }
+        (sources, segment_from)
+    }
+
     /// Postings and corpus statistics for `terms`, merging every sealed segment
     /// with the unsealed one. Stale copies of re-indexed rows are dropped.
     fn merge(&self, terms: &[String]) -> MergedIndex {
         let n_docs = self.mem.pending_docs() + self.reader.doc_count();
         let total_len = self.mem.pending_len() + self.reader.total_len();
         let mut postings: HashMap<String, Vec<(u64, u32)>> = HashMap::new();
-        let mut doc_len: HashMap<u64, u32> = HashMap::new();
         for term in terms {
             let mut list = self.mem.postings_newest_first(term);
             // A re-indexed row's *sealed* copy is stale, but the copy in the
@@ -3842,69 +4557,17 @@ impl TextIndex {
                     .filter(|(d, _)| !self.overridden.contains(d)),
             );
             dedupe_postings(&mut list);
-            for (d, _) in &list {
-                if let Some(l) = self.mem.doc_len_of(*d) {
-                    doc_len.insert(*d, l);
-                    continue;
-                }
-                let dl = self.reader.doc_len(*d).unwrap_or(1);
-                doc_len.insert(*d, dl);
-            }
             postings.insert(term.clone(), list);
         }
         MergedIndex {
             n_docs,
             total_len,
             postings,
-            doc_len,
         }
     }
 
-    /// `term -> doc -> positions` for `terms`, from the same postings
-    /// [`Self::merge`] walks.
-    ///
-    /// A phrase query needs the token offsets of every term it names, which the
-    /// `(doc, tf)` postings do not carry; the unsealed tail keeps them inline
-    /// and every sealed segment serves them from its `.pos` half
-    /// (`SegmentIndexReader::positions`). A re-indexed row's sealed copy is
-    /// stale and is dropped, exactly as [`Self::merge`] does.
-    fn merge_positions(&self, terms: &[String]) -> HashMap<String, HashMap<u64, Vec<u32>>> {
-        let mut out: HashMap<String, HashMap<u64, Vec<u32>>> = HashMap::new();
-        for term in terms {
-            let mut per_doc: HashMap<u64, Vec<u32>> = HashMap::new();
-            // Newest first: the memory tail, then the spilled runs, then the
-            // sealed segments. The first copy of a row wins.
-            if let Some(list) = self.mem.postings.get(term) {
-                for (row, _, positions) in list {
-                    per_doc.entry(*row).or_insert_with(|| positions.clone());
-                }
-            }
-            for run in self.mem.runs.iter().rev() {
-                let Ok(Some(list)) = run.reader.positions(term) else {
-                    continue;
-                };
-                for (row, positions) in list {
-                    if !self.mem.run_entry_is_current(run.id, row) {
-                        continue;
-                    }
-                    per_doc.entry(row).or_insert(positions);
-                }
-            }
-            for segment in &self.reader.segments {
-                let Ok(Some(list)) = segment.reader.positions(term) else {
-                    continue;
-                };
-                for (row, positions) in list {
-                    if self.overridden.contains(&row) {
-                        continue;
-                    }
-                    per_doc.entry(row).or_insert(positions);
-                }
-            }
-            out.insert(term.clone(), per_doc);
-        }
-        out
-    }
+
+
 }
 
 /// Cap for one in-memory inverted index. The heavy import tests build several
@@ -3927,6 +4590,13 @@ fn text_segment_bytes() -> usize {
     })
 }
 
+/// The postings and corpus statistics a query sees: the sealed segments plus
+/// the unsealed tail, with stale (re-indexed) rows removed.
+struct MergedIndex {
+    n_docs: usize,
+    total_len: u64,
+    postings: HashMap<String, Vec<(u64, u32)>>,
+}
 type SharedTextIndex = Arc<std::sync::RwLock<TextIndex>>;
 
 struct VectorCache {
@@ -14317,31 +14987,6 @@ impl Engine {
         Ok(out)
     }
 
-    /// Block-max WAND over the in-memory postings, mirroring the reference's
-    /// `BlockMaxWandIterator::Next`: pick the pivot document from the per-term
-    /// BM25 upper bounds, advance the prefix cursors to it, prune with the
-    /// block-max bound, and score exactly only when the bound beats the current
-    /// k-th score. Terms must be single-unit (no phrase / require-all) OR terms.
-    ///
-    /// `dead` holds tombstoned rows: they still contribute to the corpus
-    /// statistics (the reference's segments do until compaction) but never rank,
-    /// exactly like the scan path's live check.
-    /// How `wand_scan` turns matched terms into a score. The reference scores
-    /// `similarity=boolean` as one point per matched term (per field), while
-    /// the default is BM25.
-    #[allow(clippy::too_many_arguments)]
-    fn wand_scan(
-        fields: &[(MergedIndex, Vec<f64>)],
-        terms: &[String],
-        k: usize,
-        dead: &std::collections::HashSet<u64>,
-        delta: f64,
-        min_should: usize,
-        mode: wand::WandMode,
-    ) -> Vec<(u64, f64)> {
-        wand::BlockMaxWandIterator::new(fields, terms, k, dead, delta, min_should, mode).run()
-    }
-
     fn vector_cache_for(
         &self,
         table: &str,
@@ -14703,8 +15348,20 @@ impl Engine {
         let key = index_key(table, column);
         let tkey = self.table_key(table);
         // A bulk load that bypasses the DML hooks would leave the index short of
-        // rows; compare against the cheap reservation counter and rebuild.
-        let reserved = self.row_count(table).unwrap_or(0);
+        // rows; compare against the published row count and rebuild. Prefer the
+        // counter the write paths maintain: `row_count` walks the blocks'
+        // `version` files, which costs milliseconds on a table of a few blocks
+        // and must not run on the query path.
+        let reserved = {
+            let tables = self.tables.lock().unwrap();
+            match tables.get(&tkey).and_then(|e| e.live_rows) {
+                Some(n) => n,
+                None => {
+                    drop(tables);
+                    self.row_count(table).unwrap_or(0)
+                }
+            }
+        };
         {
             let tables = self.tables.lock().unwrap();
             if let Some(idx) = tables.get(&tkey).and_then(|e| e.text.get(column)) {
@@ -17274,27 +17931,89 @@ impl Engine {
         if rank_features.is_empty()
             && !tokenizer.keyword()
             && !field_specs.is_empty()
-            && units
-                .iter()
-                .all(|(phrase, toks, _)| !*phrase && toks.len() == 1)
+            && units.iter().all(|(_, toks, _)| !toks.is_empty())
         {
-            let wterms: Vec<String> = units.iter().map(|(_, toks, _)| toks[0].clone()).collect();
-            // One merged index per field, with that field's weights.
-            let mut merged_fields: Vec<(MergedIndex, Vec<f64>)> = Vec::new();
+            // One lazy posting stream per (field, term): nothing is materialised,
+            // so the WAND cursors pay only for the documents they visit. The
+            // guards stay alive for the whole scan because the streams borrow
+            // the indexes.
+            let mut indexes = Vec::with_capacity(field_specs.len());
             for (ci, boost, d) in &field_specs {
                 let name = schema[*ci].clone();
-                let index = self.text_index_for(table, &name, d.clone())?;
-                let guard = index.read().unwrap();
-                let merged = guard.merge(&wterms);
-                drop(guard);
-                // Boolean similarity ignores per-term boosts (one point per
-                // matched term, weighted by the field boost).
-                let weights: Vec<f64> = if boolean {
-                    vec![*boost; wterms.len()]
-                } else {
-                    units.iter().map(|(_, _, ub)| boost * ub).collect()
+                indexes.push((*boost, self.text_index_for(table, &name, d.clone())?));
+            }
+            // The guards borrow the arcs, so both stay alive for the scan.
+            let mut held = Vec::with_capacity(indexes.len());
+            for (boost, index) in &indexes {
+                held.push((*boost, index.read().unwrap()));
+            }
+            let mut fields: Vec<WandField<'_>> = Vec::with_capacity(held.len());
+            for (boost, guard) in &held {
+                let text: &TextIndex = guard;
+                let n = text.total_docs().max(1) as f64;
+                let idf_of = |term: &str| {
+                    let df = text.term_df(term).max(1) as f64;
+                    (1.0 + (n - df + 0.5) / (df + 0.5)).ln()
                 };
-                merged_fields.push((merged, weights));
+                let mut wand_units: Vec<WandUnit<'_>> = Vec::with_capacity(units.len());
+                for (phrase, toks, uboost) in &units {
+                    // Boolean similarity ignores per-term boosts (one point per
+                    // matched unit, weighted by the field boost).
+                    let weight = if boolean { *boost } else { boost * uboost };
+                    if boolean {
+                        // `similarity=boolean` counts matched *terms*, not units:
+                        // a phrase contributes one cursor per term, and the
+                        // adjacency requirement does not apply.
+                        for term in toks {
+                            let cursor = text.term_stream(term);
+                            if cursor.df() == 0 {
+                                continue;
+                            }
+                            wand_units.push(WandUnit {
+                                stream: Box::new(cursor),
+                                weight: *boost,
+                                idf: 0.0,
+                                delta: None,
+                            });
+                        }
+                        continue;
+                    }
+                    if *phrase && toks.len() > 1 {
+                        // One cursor per phrase: it lands only on documents
+                        // where the terms are consecutive, and its block bound
+                        // is the minimum over the terms' (BlockMaxPhraseScore).
+                        let children: Vec<TermStream<'_>> = toks
+                            .iter()
+                            .map(|t| text.term_stream_capture(t, true))
+                            .collect();
+                        let cursor = PhraseCursor::new(children);
+                        let idf: f64 = toks.iter().map(|t| idf_of(t)).sum();
+                        wand_units.push(WandUnit {
+                            stream: Box::new(cursor),
+                            weight,
+                            idf,
+                            delta: Some(delta_phrase),
+                        });
+                        continue;
+                    }
+                    let term = toks[0].clone();
+                    let cursor = text.term_stream(&term);
+                    if cursor.df() == 0 {
+                        continue;
+                    }
+                    wand_units.push(WandUnit {
+                        stream: Box::new(cursor),
+                        weight,
+                        idf: idf_of(&term),
+                        delta: None,
+                    });
+                }
+                fields.push(WandField {
+                    n_docs: text.total_docs(),
+                    total_len: text.corpus_len(),
+                    units: wand_units,
+                    doc_len: Box::new(move |row| text.doc_len_of(row)),
+                });
             }
             // Tombstones still feed the corpus statistics (as the reference's
             // segments do until compaction) but never rank.
@@ -17326,21 +18045,27 @@ impl Engine {
             } else {
                 wand::WandMode::Bm25
             };
-            let hits = Self::wand_scan(
-                &merged_fields,
-                &wterms,
+            let hits = wand::BlockMaxWandIterator::new(
+                fields,
                 topn.max(1),
                 &dead,
                 delta_term,
                 min_should,
                 mode,
-            );
+            )
+            .run();
             let scored: Vec<(usize, f64)> = hits
                 .into_iter()
                 .map(|(seq, score)| (seq as usize, score))
                 .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
                 .collect();
-            if !scored.is_empty() {
+            // For plain OR terms this path is the whole answer: an empty result
+            // is empty, and falling through would redo the same work on the
+            // generic posting path.
+            if scored.is_empty() {
+                return Ok((Vec::new(), hidden.to_vec()));
+            }
+            {
                 let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq as u64).collect();
                 let mut by_id: HashMap<usize, Vec<Value>> = self
                     .fetch_some_rows_with_ids(table, &wanted)?
@@ -17379,46 +18104,42 @@ impl Engine {
             }
             out
         };
-        let mut field_postings: Vec<HashMap<String, HashMap<u64, (u32, Vec<u32>)>>> = Vec::new();
-        let mut field_lens: Vec<HashMap<u64, u32>> = Vec::new();
-        let mut field_stats: Vec<(usize, f64)> = Vec::new();
-        let mut dfs: Vec<HashMap<String, usize>> = Vec::new();
-        let mut candidates: std::collections::BTreeSet<u64> = Default::default();
-        for (ci, _, d) in &field_specs {
+        // Streaming scoring: one merge cursor per (field, query term). A
+        // cursor walks its term's postings in document order and serves the
+        // positions of the document it is parked on, so neither the posting
+        // lists nor a per-document position map is ever materialised.
+        let mut indexes = Vec::with_capacity(field_specs.len());
+        for (ci, boost, d) in &field_specs {
             let name = schema[*ci].clone();
-            let index = self.text_index_for(table, &name, d.clone())?;
-            let guard = index.read().unwrap();
-            let merged = guard.merge(&query_terms);
-            let positions = guard.merge_positions(&query_terms);
-            let n = merged.n_docs;
+            indexes.push((*boost, self.text_index_for(table, &name, d.clone())?));
+        }
+        let mut held = Vec::with_capacity(indexes.len());
+        for (boost, index) in &indexes {
+            held.push((*boost, index.read().unwrap()));
+        }
+        let mut field_texts: Vec<&TextIndex> = Vec::with_capacity(held.len());
+        let mut field_cursors: Vec<Vec<MergeCursor<'_>>> = Vec::with_capacity(held.len());
+        let mut field_stats: Vec<(usize, f64)> = Vec::with_capacity(held.len());
+        let mut dfs: Vec<Vec<usize>> = Vec::with_capacity(held.len());
+        for (_, guard) in &held {
+            let text: &TextIndex = guard;
+            let cursors: Vec<MergeCursor<'_>> =
+                query_terms.iter().map(|t| text.term_cursor(t)).collect();
+            let n = text.total_docs();
             let avg = if n == 0 {
                 1.0
             } else {
-                let a = merged.total_len as f64 / n as f64;
+                let a = text.corpus_len() as f64 / n as f64;
                 if a <= 0.0 {
                     1.0
                 } else {
                     a
                 }
             };
-            let mut per_term: HashMap<String, HashMap<u64, (u32, Vec<u32>)>> = HashMap::new();
-            let mut df: HashMap<String, usize> = HashMap::new();
-            for term in &query_terms {
-                let list = merged.postings.get(term).cloned().unwrap_or_default();
-                let pos = positions.get(term).cloned().unwrap_or_default();
-                let mut per_doc: HashMap<u64, (u32, Vec<u32>)> = HashMap::with_capacity(list.len());
-                for (doc, tf) in list {
-                    candidates.insert(doc);
-                    let at = pos.get(&doc).cloned().unwrap_or_default();
-                    per_doc.insert(doc, (tf, at));
-                }
-                df.insert(term.clone(), per_doc.len());
-                per_term.insert(term.clone(), per_doc);
-            }
-            field_postings.push(per_term);
-            field_lens.push(merged.doc_len);
+            dfs.push(cursors.iter().map(|c| c.df()).collect());
+            field_cursors.push(cursors);
             field_stats.push((n, avg));
-            dfs.push(df);
+            field_texts.push(text);
         }
         let n_docs = field_stats.first().map(|(n, _)| *n).unwrap_or(1).max(1);
         let avg_lens: Vec<f64> = field_stats.iter().map(|(_, a)| *a).collect();
@@ -17429,169 +18150,215 @@ impl Engine {
         // reference's segments do until compaction) but never rank.
         let mut dead = self.tombstone_set(table)?;
         // Filters and rank features need values from the row; only the
-        // candidates can score, so only they are read.
+        // documents the cursors reach are read.
         let needs_values = pred.is_some()
             || in_filter.is_some()
             || opt_filter.is_some()
             || !rank_features.is_empty();
-        let mut values: HashMap<u64, Vec<Value>> = HashMap::new();
-        if needs_values {
-            let ids: Vec<u64> = candidates.iter().copied().collect();
-            let defaults = self.table_defaults(table).unwrap_or_default();
-            for (seq, mut row) in self.fetch_some_rows_with_ids(table, &ids)? {
-                while row.len() < defaults.len() {
-                    let i = row.len();
-                    row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
-                        Some(d) => Value::from_literal(&default_literal(d)),
-                        None => Value::Null,
-                    });
+        let defaults = if needs_values {
+            self.table_defaults(table).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let mut scored: Vec<(usize, f64)> = Vec::new();
+        // Reused per document: each phrase unit's terms' positions.
+        let mut phrase_positions: Vec<Vec<u32>> = Vec::new();
+        loop {
+            let mut doc: Option<u64> = None;
+            for field in field_cursors.iter_mut() {
+                for cursor in field.iter_mut() {
+                    if let Some(d) = cursor.doc() {
+                        doc = Some(doc.map_or(d, |best: u64| best.min(d)));
+                    }
                 }
-                let ok = pred
-                    .as_ref()
-                    .map(|p| p.eval_predicate(&row))
-                    .unwrap_or(true)
-                    && in_filter
+            }
+            let Some(doc) = doc else { break };
+            let mut value_row: Option<Vec<Value>> = None;
+            if needs_values {
+                if let Some((_, mut row)) = self
+                    .fetch_some_rows_with_ids(table, &[doc])?
+                    .into_iter()
+                    .next()
+                {
+                    while row.len() < defaults.len() {
+                        let i = row.len();
+                        row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
+                            Some(d) => Value::from_literal(&default_literal(d)),
+                            None => Value::Null,
+                        });
+                    }
+                    let ok = pred
                         .as_ref()
                         .map(|p| p.eval_predicate(&row))
                         .unwrap_or(true)
-                    && opt_filter
-                        .as_ref()
-                        .map(|p| p.eval_predicate(&row))
-                        .unwrap_or(true);
-                if !ok {
-                    dead.insert(seq as u64);
+                        && in_filter
+                            .as_ref()
+                            .map(|p| p.eval_predicate(&row))
+                            .unwrap_or(true)
+                        && opt_filter
+                            .as_ref()
+                            .map(|p| p.eval_predicate(&row))
+                            .unwrap_or(true);
+                    if !ok {
+                        dead.insert(doc);
+                    }
+                    value_row = Some(row);
                 }
-                values.insert(seq as u64, row);
             }
-        }
-        let mut scored: Vec<(usize, f64)> = Vec::new();
-        for doc in candidates {
-            if dead.contains(&doc) {
-                continue;
-            }
-            // `rank_features=<col>^<tag>^<weight>` adds `value * weight`.
-            let rank_bonus: f64 = match values.get(&doc) {
-                Some(row) if !rank_features.is_empty() => rank_features
-                    .iter()
-                    .map(|(ci, tags)| {
-                        let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
-                        rank_features_bonus(&cell, tags)
-                    })
-                    .sum(),
-                _ => 0.0,
-            };
-            // `similarity=boolean` scores each field on its own: a
-            // `keyword`/`whitespace` field contributes its boost once, a
-            // standard field one boost per matching term.
-            if boolean {
-                let (mut bhits, mut bscore) = (0usize, 0.0f64);
-                for (f, (_, boost, d)) in field_specs.iter().enumerate() {
-                    let postings = &field_postings[f];
-                    let matched = query_terms
+            if !dead.contains(&doc) {
+                // `rank_features=<col>^<tag>^<weight>` adds `value * weight`.
+                let rank_bonus: f64 = match (value_row.as_ref(), rank_features.is_empty()) {
+                    (Some(row), false) => rank_features
                         .iter()
-                        .filter(|t| {
-                            postings
-                                .get(*t)
-                                .map(|m| m.contains_key(&doc))
-                                .unwrap_or(false)
+                        .map(|(ci, tags)| {
+                            let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
+                            rank_features_bonus(&cell, tags)
                         })
-                        .count();
-                    if matched > 0 {
-                        bhits += matched;
-                        bscore += boost * if d.keyword() { 1.0 } else { matched as f64 };
-                    }
-                }
-                let bscore = bscore + rank_bonus;
-                if bhits >= min_should
-                    && bhits > 0
-                    && threshold.map(|t| bscore >= t).unwrap_or(true)
-                {
-                    scored.push((doc as usize, bscore));
-                }
-                continue;
-            }
-            let mut score = 0.0f64;
-            // Units matched in *any* field, for `minimum_should_match`.
-            let mut unit_hits = vec![false; units.len()];
-            for (f, (_, boost, _)) in field_specs.iter().enumerate() {
-                let postings = &field_postings[f];
-                let len = field_lens[f].get(&doc).copied().unwrap_or(0) as f64;
-                let avg_len = avg_lens[f];
-                let idf_of = |term: &str| -> f64 {
-                    let df = dfs[f].get(term).copied().unwrap_or(0).max(1) as f64;
-                    (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln()
+                        .sum(),
+                    _ => 0.0,
                 };
-                let tf_of = |term: &str| -> Option<u32> {
-                    postings
-                        .get(term)
-                        .and_then(|m| m.get(&doc))
-                        .map(|(tf, _)| *tf)
-                };
-                if keyword_field {
-                    let mut any = false;
-                    for (ui, (_, unit, _)) in units.iter().enumerate() {
-                        if unit.iter().any(|t| tf_of(t).is_some()) {
-                            unit_hits[ui] = true;
-                            any = true;
-                        }
-                    }
-                    if any {
-                        score += boost;
-                    }
-                    continue;
-                }
-                for (ui, (phrase, unit, uboost)) in units.iter().enumerate() {
-                    let uboost = *uboost;
-                    if (*phrase || require_all) && unit.len() > 1 {
-                        // A phrase scores like one term whose `tf` is the phrase
-                        // frequency and whose `idf` is the sum over its terms
-                        // (Lucene `PhraseWeight`); the frequency comes from the
-                        // index's position lists, not from the row's text.
-                        let mut at: HashMap<u32, Vec<&str>> = HashMap::new();
-                        for term in unit {
-                            if let Some((_, positions)) =
-                                postings.get(term).and_then(|m| m.get(&doc))
-                            {
-                                for p in positions {
-                                    at.entry(*p).or_default().push(term.as_str());
-                                }
+                // `similarity=boolean` scores each field on its own: a
+                // `keyword`/`whitespace` field contributes its boost once, a
+                // standard field one boost per matching term.
+                if boolean {
+                    let (mut bhits, mut bscore) = (0usize, 0.0f64);
+                    for (f, (_, boost, d)) in field_specs.iter().enumerate() {
+                        let mut matched = 0usize;
+                        for cursor in field_cursors[f].iter_mut() {
+                            if cursor.doc() == Some(doc) {
+                                matched += 1;
                             }
                         }
-                        let freq = phrase_freq(&at, unit);
-                        if freq == 0 {
+                        if matched > 0 {
+                            bhits += matched;
+                            bscore += boost * if d.keyword() { 1.0 } else { matched as f64 };
+                        }
+                    }
+                    let bscore = bscore + rank_bonus;
+                    if bhits >= min_should
+                        && bhits > 0
+                        && threshold.map(|t| bscore >= t).unwrap_or(true)
+                    {
+                        scored.push((doc as usize, bscore));
+                    }
+                } else {
+                    let mut score = 0.0f64;
+                    // Units matched in *any* field, for `minimum_should_match`.
+                    let mut unit_hits = vec![false; units.len()];
+                    for (f, (_, boost, _)) in field_specs.iter().enumerate() {
+                        let len = field_texts[f].doc_len_opt(doc).unwrap_or(0) as f64;
+                        let avg_len = avg_lens[f];
+                        let idf_of = |ti: usize| -> f64 {
+                            let df = dfs[f].get(ti).copied().unwrap_or(0).max(1) as f64;
+                            (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln()
+                        };
+                        let cursors = &mut field_cursors[f];
+                        let tf_of = |cursors: &mut Vec<MergeCursor<'_>>, ti: usize| -> Option<u32> {
+                            let c = cursors.get_mut(ti)?;
+                            (c.doc() == Some(doc)).then(|| c.tf())
+                        };
+                        if keyword_field {
+                            let mut any = false;
+                            for (ui, (_, unit, _)) in units.iter().enumerate() {
+                                let hit = unit.iter().any(|t| {
+                                    query_terms.iter().position(|q| q == t).is_some_and(|ti| {
+                                        tf_of(cursors, ti).is_some()
+                                    })
+                                });
+                                if hit {
+                                    unit_hits[ui] = true;
+                                    any = true;
+                                }
+                            }
+                            if any {
+                                score += boost;
+                            }
                             continue;
                         }
-                        unit_hits[ui] = true;
-                        let idf_sum: f64 = unit.iter().map(|t| idf_of(t)).sum();
-                        let tf = freq as f64;
-                        let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
-                        score += idf_sum * (norm + delta_phrase) * boost * uboost;
-                        continue;
+                        for (ui, (phrase, unit, uboost)) in units.iter().enumerate() {
+                            let uboost = *uboost;
+                            if (*phrase || require_all) && unit.len() > 1 {
+                                // A phrase scores like one term whose `tf` is the phrase
+                                // frequency and whose `idf` is the sum over its terms
+                                // (Lucene `PhraseWeight`); the frequency comes from the
+                                // index's position lists, not from the row's text.
+                                if phrase_positions.len() < unit.len() {
+                                    phrase_positions.resize(unit.len(), Vec::new());
+                                }
+                                for (k, term) in unit.iter().enumerate() {
+                                    phrase_positions[k].clear();
+                                    let Some(ti) = query_terms.iter().position(|q| q == term) else {
+                                        continue;
+                                    };
+                                    let Some(cursor) = cursors.get_mut(ti) else { continue };
+                                    if cursor.doc() == Some(doc) {
+                                        phrase_positions[k].extend_from_slice(cursor.positions());
+                                    }
+                                }
+                                let freq = phrase_freq_lists(&phrase_positions[..unit.len()], unit.len());
+                                if freq == 0 {
+                                    continue;
+                                }
+                                unit_hits[ui] = true;
+                                let idf_sum: f64 = unit
+                                    .iter()
+                                    .map(|t| {
+                                        let ti = query_terms
+                                            .iter()
+                                            .position(|q| q == t)
+                                            .unwrap_or(usize::MAX);
+                                        if ti == usize::MAX {
+                                            0.0
+                                        } else {
+                                            idf_of(ti)
+                                        }
+                                    })
+                                    .sum();
+                                let tf = freq as f64;
+                                let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
+                                score += idf_sum * (norm + delta_phrase) * boost * uboost;
+                                continue;
+                            }
+                            for term in unit {
+                                let Some(ti) = query_terms.iter().position(|q| q == term) else {
+                                    continue;
+                                };
+                                let Some(tf) = tf_of(cursors, ti) else { continue };
+                                unit_hits[ui] = true;
+                                let idf = idf_of(ti);
+                                let tf = tf as f64;
+                                let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
+                                score += idf * (norm + delta_term) * boost * uboost;
+                            }
+                        }
                     }
-                    for term in unit {
-                        let Some(tf) = tf_of(term) else { continue };
-                        unit_hits[ui] = true;
-                        let idf = idf_of(term);
-                        let tf = tf as f64;
-                        let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
-                        score += idf * (norm + delta_term) * boost * uboost;
+                    let hits: usize = if require_all {
+                        // one count per required clause
+                        unit_hits.iter().filter(|m| **m).count()
+                    } else {
+                        units
+                            .iter()
+                            .zip(unit_hits.iter())
+                            .filter(|(_, m)| **m)
+                            .map(|((_, u, _), _)| u.len())
+                            .sum()
+                    };
+                    score += rank_bonus;
+                    if hits >= min_should
+                        && hits > 0
+                        && threshold.map(|t| score >= t).unwrap_or(true)
+                    {
+                        scored.push((doc as usize, score));
                     }
                 }
             }
-            let hits: usize = if require_all {
-                // one count per required clause
-                unit_hits.iter().filter(|m| **m).count()
-            } else {
-                units
-                    .iter()
-                    .zip(unit_hits.iter())
-                    .filter(|(_, m)| **m)
-                    .map(|((_, u, _), _)| u.len())
-                    .sum()
-            };
-            score += rank_bonus;
-            if hits >= min_should && hits > 0 && threshold.map(|t| score >= t).unwrap_or(true) {
-                scored.push((doc as usize, score));
+            // Every cursor parked on this document moves past it.
+            for field in field_cursors.iter_mut() {
+                for cursor in field.iter_mut() {
+                    if cursor.doc() == Some(doc) {
+                        cursor.advance(doc + 1);
+                    }
+                }
             }
         }
         scored.sort_by(|a, b| {
@@ -22539,6 +23306,31 @@ fn stem_english(token: &str) -> String {
     s.stem(token).to_string()
 }
 
+/// Counts the occurrences of a phrase at consecutive positions, straight from
+/// the terms' position lists: a start position counts when `unit[k]` sits at
+/// `start + k` in every term's list. This is the same count a position map
+/// answers, without building the map - the phrase path scores one document at
+/// a time and the map was an allocation per document.
+fn phrase_freq_lists(lists: &[Vec<u32>], unit_len: usize) -> usize {
+    if unit_len == 0 || lists.len() < unit_len {
+        return 0;
+    }
+    let mut n = 0usize;
+    for &start in &lists[0] {
+        let mut ok = true;
+        for (k, list) in lists.iter().enumerate().take(unit_len).skip(1) {
+            if list.binary_search(&(start + k as u32)).is_err() {
+                ok = false;
+                break;
+            }
+        }
+        if ok {
+            n += 1;
+        }
+    }
+    n
+}
+
 /// Splits a field-query group body into terms, keeping a quoted phrase together
 /// and dropping the quote marks (`doc:"a b" doc2:c` -> `["doc:a b", "doc2:c"]`).
 fn split_query_terms(s: &str) -> Vec<String> {
@@ -22562,34 +23354,6 @@ fn split_query_terms(s: &str) -> Vec<String> {
     out
 }
 
-/// Counts the occurrences of `unit` at consecutive positions in a document.
-/// Both the original token and its stem live at one position, so a query term
-/// matches a position when either form is there.
-fn phrase_freq(at: &HashMap<u32, Vec<&str>>, unit: &[String]) -> usize {
-    if unit.is_empty() {
-        return 0;
-    }
-    let mut n = 0usize;
-    for (start, terms) in at {
-        if !terms.iter().any(|t| *t == unit[0]) {
-            continue;
-        }
-        let mut ok = true;
-        for (k, q) in unit.iter().enumerate().skip(1) {
-            match at.get(&(start + k as u32)) {
-                Some(ts) if ts.contains(&q.as_str()) => {}
-                _ => {
-                    ok = false;
-                    break;
-                }
-            }
-        }
-        if ok {
-            n += 1;
-        }
-    }
-    n
-}
 
 /// Splits a `MATCH TEXT` query into scoring units, keeping quoted groups
 /// together: `"second default text"` is one phrase unit that only matches where

@@ -53,10 +53,10 @@ use crate::inverted_format::position_list::{
     decode_position_list, PositionListEncoder, OF_POSITION_LIST, OF_TERM_FREQUENCY,
 };
 use crate::inverted_format::{
-    build_fst, decode_dic_meta_at, decode_u32_block, dic_fst, encode_column_lengths, encode_dic,
-    encode_term_meta_region_with_offsets, encode_u32_block, fst_get, fulltext_chunk_file,
-    FstStream, TermMeta, TermMetaFlags, TermPostings, FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX,
-    FULLTEXT_POSTING_SUFFIX, POSTING_MINI_BLOCK,
+    build_fst, decode_dic_meta_at, decode_u32_block, decode_u32_block_all, dic_fst,
+    encode_column_lengths, encode_dic, encode_term_meta_region_with_offsets, encode_u32_block,
+    fst_get, fulltext_chunk_file, FstStream, TermMeta, TermMetaFlags, TermPostings,
+    FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX, FULLTEXT_POSTING_SUFFIX, POSTING_MINI_BLOCK,
 };
 
 /// Auxiliary file: `u64[doc_count]` row ids, one per dense document ordinal.
@@ -315,6 +315,72 @@ impl SegmentIndexReader {
         Ok(out)
     }
 
+    /// A lazy reader over one term's doc list: the reference's
+    /// `DocListReader`, decoded one 128-document mini-block at a time straight
+    /// from the mmap. `postings()` above materialises the whole list; the query
+    /// path uses this instead so a lookup costs `O(block)` and not `O(df)`.
+    pub fn term_doc_cursor(&self, term: &str) -> Result<Option<TermDocCursor<'_>>, FormatError> {
+        let Some(meta) = self.lookup(term)? else {
+            return Ok(None);
+        };
+        let start = meta.doc_start as usize;
+        let end = meta.pos_end as usize;
+        let slice = self.pos.get(start..end).ok_or(FormatError::Truncated {
+            need: end,
+            got: self.pos.len(),
+        })?;
+        // Framing: `VInt doc_skip_len, VInt doc_list_len, doc_skip, doc_list, …`
+        let (doc_skip_len, n1) = crate::inverted_format::read_vint(slice)?;
+        let (doc_list_len, n2) = crate::inverted_format::read_vint(&slice[n1..])?;
+        let body = n1 + n2 + doc_skip_len as usize;
+        let doc_list =
+            slice
+                .get(body..body + doc_list_len as usize)
+                .ok_or(FormatError::Truncated {
+                    need: body + doc_list_len as usize,
+                    got: slice.len(),
+                })?;
+        // The position half is the second framed pair of the slice
+        // (`VInt pos_skip_len, VInt pos_list_len, pos_skip, pos_list`); take a
+        // slice of it instead of decoding the whole list.
+        let mut pos_bytes = None;
+        let mut at = body + doc_list_len as usize;
+        if let Ok((pos_skip_len, n3)) = crate::inverted_format::read_vint(&slice[at..]) {
+            at += n3;
+            if let Ok((pos_list_len, n4)) = crate::inverted_format::read_vint(&slice[at..]) {
+                let start = at + n4 + pos_skip_len as usize;
+                if let Some(list) = slice.get(start..start + pos_list_len as usize) {
+                    if !list.is_empty() {
+                        pos_bytes = Some(list);
+                    }
+                }
+            }
+        }
+        Ok(Some(TermDocCursor {
+            reader: self,
+            doc_list,
+            off: 0,
+            left: meta.doc_freq as usize,
+            rows: Vec::new(),
+            tfs: Vec::new(),
+            at: 0,
+            last_ordinal: 0,
+            df: meta.doc_freq as usize,
+            pos_bytes,
+            pos_off: 0,
+            pos_buf: Vec::new(),
+            pos_at: 0,
+            consumed: 0,
+            cur_positions: Vec::new(),
+        }))
+    }
+
+    /// Read side of [`Self::postings`] for the WAND cursor: not `pub` because
+    /// the caller drives it through [`TermDocCursor`].
+    fn row_of_ordinal(&self, ordinal: u32) -> Option<u64> {
+        self.rows.get(ordinal as usize).copied()
+    }
+
     /// The positions of `term`, per document, the read side of
     /// `Lookup(term, fetch_position = true)` (`column_index_reader.cppm:56`).
     ///
@@ -364,6 +430,174 @@ impl SegmentIndexReader {
             at += tf;
         }
         Ok(Some(out))
+    }
+}
+
+/// The reference's `DocListReader` for one term of one sealed segment
+/// (`doc_list_reader.cppm`, `SkipListReader` + `DocListDecoder`): the 128-document
+/// mini-blocks are decoded on demand, so `seek` costs at most one block decode
+/// per call and a query that prunes never touches the rest of the list.
+pub struct TermDocCursor<'a> {
+    reader: &'a SegmentIndexReader,
+    doc_list: &'a [u8],
+    off: usize,
+    /// Documents still undecoded.
+    left: usize,
+    /// The decoded mini-block (`row id`, `tf`) and the position inside it.
+    rows: Vec<u64>,
+    tfs: Vec<u32>,
+    at: usize,
+    /// Running document ordinal (the store is ordinal-coded, see the module
+    /// docs) and the term's total document frequency.
+    last_ordinal: u32,
+    df: usize,
+    /// The position half of the term's `.pos` slice, decoded one record at a
+    /// time (`MAX_POS_PER_RECORD` delta-coded positions per `u8`-framed record).
+    pos_bytes: Option<&'a [u8]>,
+    pos_off: usize,
+    pos_buf: Vec<u32>,
+    pos_at: usize,
+    /// Documents of the loaded block whose positions were consumed.
+    consumed: usize,
+    /// The current document's absolute positions (reused buffer).
+    cur_positions: Vec<u32>,
+}
+
+impl<'a> TermDocCursor<'a> {
+    /// `GetDF`: documents containing the term in this segment.
+    pub fn df(&self) -> usize {
+        self.df
+    }
+
+    /// Decodes the next mini-block. Returns false at the end of the list.
+    fn fill(&mut self) -> bool {
+        while self.left > 0 {
+            let take = self.left.min(POSTING_MINI_BLOCK);
+            let Ok((docs, used)) = decode_u32_block(&self.doc_list[self.off..], take) else {
+                self.left = 0;
+                return false;
+            };
+            self.off += used;
+            let Ok((tfs, used)) = decode_u32_block(&self.doc_list[self.off..], take) else {
+                self.left = 0;
+                return false;
+            };
+            self.off += used;
+            self.left -= take;
+            // The position stream is sequential, so the documents this block
+            // still holds consume their deltas before the block is dropped.
+            self.consume_to_end();
+            self.rows.clear();
+            self.tfs.clear();
+            self.at = 0;
+            for (delta, tf) in docs.into_iter().zip(tfs) {
+                self.last_ordinal = self.last_ordinal.wrapping_add(delta);
+                if let Some(row) = self.reader.row_of_ordinal(self.last_ordinal) {
+                    self.rows.push(row);
+                    self.tfs.push(tf);
+                }
+            }
+            if !self.rows.is_empty() {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn ensure(&mut self) -> bool {
+        self.at < self.rows.len() || self.fill()
+    }
+
+    /// The current document (`INVALID_ROW_ID` on the reference's exhausted
+    /// cursor).
+    pub fn doc(&mut self) -> Option<u64> {
+        if !self.ensure() {
+            return None;
+        }
+        self.rows.get(self.at).copied()
+    }
+
+    /// `GetCurrentTF` for the document [`Self::doc`] returned.
+    pub fn tf(&mut self) -> u32 {
+        self.ensure();
+        self.tfs.get(self.at).copied().unwrap_or(0)
+    }
+
+    /// `GetCurrentPosition`: the current document's token offsets, in order.
+    /// Empty when the term carries no position list.
+    pub fn positions(&mut self) -> &[u32] {
+        if !self.ensure() {
+            return &[];
+        }
+        while self.consumed < self.at {
+            let tf = self.tfs.get(self.consumed).copied().unwrap_or(0);
+            self.consume_doc(tf);
+            self.consumed += 1;
+        }
+        if self.consumed == self.at {
+            let tf = self.tfs.get(self.at).copied().unwrap_or(0);
+            self.consume_doc(tf);
+            self.consumed += 1;
+        }
+        &self.cur_positions
+    }
+
+    /// Positions of every document of the loaded block that was not consumed
+    /// yet (the block is about to be replaced).
+    fn consume_to_end(&mut self) {
+        while self.consumed < self.rows.len() {
+            let tf = self.tfs.get(self.consumed).copied().unwrap_or(0);
+            self.consume_doc(tf);
+            self.consumed += 1;
+        }
+    }
+
+    fn consume_doc(&mut self, tf: u32) {
+        self.cur_positions.clear();
+        let mut pos = 0u32;
+        for _ in 0..tf {
+            let Some(delta) = self.next_delta() else {
+                break;
+            };
+            pos = pos.wrapping_add(delta);
+            self.cur_positions.push(pos);
+        }
+    }
+
+    /// The next delta-coded offset from the position stream.
+    fn next_delta(&mut self) -> Option<u32> {
+        while self.pos_at >= self.pos_buf.len() {
+            let bytes = self.pos_bytes?;
+            let words = usize::from(*bytes.get(self.pos_off)?);
+            self.pos_off += 1;
+            let end = self.pos_off + words * 4;
+            let payload = bytes.get(self.pos_off..end)?;
+            self.pos_off = end;
+            self.pos_buf = decode_u32_block_all(payload).ok()?;
+            self.pos_at = 0;
+            if self.pos_buf.is_empty() {
+                return None;
+            }
+        }
+        let delta = self.pos_buf[self.pos_at];
+        self.pos_at += 1;
+        Some(delta)
+    }
+
+    /// `SeekDoc`: position on the first document `>= target`.
+    pub fn advance(&mut self, target: u64) {
+        loop {
+            if !self.ensure() {
+                return;
+            }
+            let Some(doc) = self.rows.get(self.at).copied() else {
+                return;
+            };
+            if doc >= target {
+                return;
+            }
+            self.at += 1;
+        }
     }
 }
 
@@ -727,13 +961,24 @@ mod tests {
         assert!(meta.pos_start > meta.doc_start && meta.pos_end > meta.pos_start);
         assert_eq!(
             reader.positions("repeat").unwrap(),
-            Some(vec![(base, doc0), (base + 1, doc1)])
+            Some(vec![(base, doc0.clone()), (base + 1, doc1.clone())])
         );
         // The (row, tf) API is unaffected.
         assert_eq!(
             reader.postings("repeat").unwrap(),
             vec![(base, 200), (base + 1, 3)]
         );
+        // The lazy cursor serves the same positions document by document;
+        // seeking past a document consumes its share of the position stream.
+        let mut cursor = reader.term_doc_cursor("repeat").unwrap().unwrap();
+        assert_eq!(cursor.doc(), Some(base));
+        assert_eq!(cursor.positions(), doc0.as_slice());
+        assert_eq!(cursor.positions(), doc0.as_slice(), "idempotent");
+        cursor.advance(base + 1);
+        assert_eq!(cursor.doc(), Some(base + 1));
+        assert_eq!(cursor.positions(), doc1.as_slice());
+        cursor.advance(base + 2);
+        assert_eq!(cursor.doc(), None);
     }
 
     /// (b) A phrase must match on consecutive occurrences only.

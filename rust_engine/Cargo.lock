@@ -277,6 +277,7 @@ dependencies = [
  "infinity-catalog",
  "infinity-common",
  "infinity-executor",
+ "infinity-parser",
  "infinity-server",
  "infinity-storage",
  "infinity-txn",

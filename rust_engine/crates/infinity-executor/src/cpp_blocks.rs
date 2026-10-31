@@ -1418,11 +1418,24 @@ pub fn encode_fulltext_chunk(
             infinity_storage::inverted_format::position_list::PositionListEncoder::new(
                 OPTION_FLAG_ALL,
             );
-        for (doc, position) in docs {
-            doc_encoder.add_position();
-            pos_encoder.add_position(*position);
-            doc_encoder.end_document(*doc, lengths[*doc as usize], 0);
+        // `GeneratePosting` (`column_inverter_impl.cpp:253-257`) emits one
+        // `EndDocument` per **document**, after every position of that
+        // document was added: the doc list's per-document term frequency is
+        // the number of positions, and `df` counts documents. Calling
+        // `end_document` per position instead repeats the doc id in the doc
+        // list and makes `df` count occurrences.
+        let mut at = 0;
+        while at < docs.len() {
+            let doc = docs[at].0;
+            let mut end = at;
+            while end < docs.len() && docs[end].0 == doc {
+                doc_encoder.add_position();
+                pos_encoder.add_position(docs[end].1);
+                end += 1;
+            }
+            doc_encoder.end_document(doc, lengths[doc as usize], 0);
             pos_encoder.end_document();
+            at = end;
         }
         let doc_start = pos.len() as u64;
         let doc_bytes = doc_encoder.dump(false);
@@ -4309,6 +4322,22 @@ impl Engine {
             .get(&key)
             .map(|e| e.pending_rows.clone())
             .unwrap_or_default()
+    }
+
+    /// One row of the append buffer. The point-read path must not clone the
+    /// whole buffer (a 20k-row insert made every search pay for 20k rows).
+    pub(crate) fn pending_row(&self, table: &str, seq: usize) -> Option<Vec<Value>> {
+        let key = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| {
+                e.pending_rows
+                    .iter()
+                    .find(|(row, _)| *row == seq)
+                    .map(|(_, values)| values.clone())
+            })
     }
 
     /// The append buffer as a scan reads it, **already in `Value`s**.
@@ -7214,10 +7243,7 @@ pub(crate) struct BlockCursor<'a> {
     root: PathBuf,
     /// The block last decoded, with the `version` that says which of its slots
     /// are live.
-    block: Option<(BlockId, Vec<(usize, Vec<String>)>, BlockVersionFile)>,
-    /// Rows a commit appended since the last checkpoint (the append buffer),
-    /// by row id: they are not in a block file yet.
-    pending: std::collections::HashMap<usize, Vec<Value>>,
+    block: Option<(BlockId, Arc<Vec<cpp_format::RawBlockColumn>>, BlockVersionFile)>,
 }
 
 impl<'a> BlockCursor<'a> {
@@ -7243,10 +7269,6 @@ impl<'a> BlockCursor<'a> {
             .into_iter()
             .map(|id| (id.segment_id, id.block_id))
             .collect();
-        let pending = engine
-            .pending_rows_of(&table)
-            .into_iter()
-            .collect::<std::collections::HashMap<_, _>>();
         Ok(Self {
             engine,
             table,
@@ -7255,7 +7277,6 @@ impl<'a> BlockCursor<'a> {
             visible,
             root: engine.blocks_root(),
             block: None,
-            pending,
         })
     }
 
@@ -7282,7 +7303,7 @@ impl<'a> BlockCursor<'a> {
         if self.engine.deleted_ids(&self.table).contains(&(seq as u64)) {
             return Ok(None);
         }
-        if let Some(values) = self.pending.get(&seq) {
+        if let Some(values) = self.engine.pending_row(&self.table, seq) {
             let literals: Vec<Literal> = values
                 .iter()
                 .map(|v| Literal::Str(mirror_cell_text(v)))
@@ -7320,28 +7341,38 @@ impl<'a> BlockCursor<'a> {
             .map(|(cached, _, _)| *cached != id)
             .unwrap_or(true)
         {
-            let Some(cells) = self.engine.decode_block_cells(
-                &self.table,
-                &self.root,
-                &self.meta,
-                &self.types,
-                id,
-                None,
-            ) else {
+            let Ok((version, columns)) =
+                self.engine.read_block_cached(&self.table, &self.root, id)
+            else {
                 return Ok(None);
             };
-            let Some(version) = self.engine.read_block_version(id) else {
-                return Ok(None);
-            };
-            self.block = Some((id, cells, version));
+            self.block = Some((id, columns, version));
         }
-        let (_, cells, version) = self.block.as_ref().unwrap();
+        let (_, columns, version) = self.block.as_ref().unwrap();
         if version.deleted.get(slot).copied().unwrap_or(0) != 0 {
             return Ok(None);
         }
-        let Some((_, cells)) = cells.get(slot) else {
+        // Decode only the slot this call asked for. The full-block decode this
+        // used to do materialised 8192 rows (text column included) to return a
+        // handful of search hits, which was the query path's largest cost.
+        let wanted: std::collections::HashSet<usize> = [seq].into_iter().collect();
+        let Some(rows) = Engine::decode_rows_of_values(
+            &self.meta.ids,
+            &self.meta.types,
+            &self.types,
+            id,
+            version,
+            columns,
+            None,
+            None,
+            Some(&wanted),
+        ) else {
             return Ok(None);
         };
+        let Some((_, cell_values)) = rows.first() else {
+            return Ok(None);
+        };
+        let cells: Vec<String> = cell_values.iter().map(mirror_cell_text).collect();
         let literals: Vec<Literal> = cells.iter().map(|c| Literal::Str(c.clone())).collect();
         Ok(Some(
             self.engine

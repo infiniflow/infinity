@@ -926,8 +926,11 @@ impl TermLookup for MemoryColumnIndex {
         topn: usize,
     ) -> Option<Vec<(u64, f64)>> {
         let lens = self.doc_lens(column);
-        let mut postings = HashMap::new();
-        for (term, _) in terms {
+        let n_docs = self.doc_count(column);
+        let n = n_docs.max(1) as f64;
+        let ranker = crate::wand::Bm25Ranker::new(0.0);
+        let mut units: Vec<crate::WandUnit> = Vec::new();
+        for (term, boost) in terms {
             let hits: Vec<(u64, u32)> = self
                 .postings(column, term)
                 .into_iter()
@@ -937,24 +940,26 @@ impl TermLookup for MemoryColumnIndex {
                 // A missing term simply drops that OR branch.
                 continue;
             }
-            postings.insert(term.clone(), hits);
+            let idf = ranker.idf(n, hits.len() as f64);
+            units.push(crate::WandUnit {
+                stream: Box::new(crate::TermStream::from_owned(hits)),
+                weight: *boost,
+                idf,
+                delta: None,
+            });
         }
-        if postings.len() < 2 {
+        if units.len() < 2 {
             return None;
         }
-        let index = crate::MergedIndex {
-            n_docs: self.doc_count(column),
+        let fields = vec![crate::WandField {
+            n_docs,
             total_len: self.total_len(column),
-            postings,
-            doc_len: lens,
-        };
-        let weights: Vec<f64> = terms.iter().map(|(_, boost)| *boost).collect();
-        let term_names: Vec<String> = terms.iter().map(|(term, _)| term.clone()).collect();
-        let fields = vec![(index, weights)];
+            units,
+            doc_len: Box::new(move |row| *lens.get(&row).unwrap_or(&1)),
+        }];
         let dead = std::collections::HashSet::new();
         let hits = crate::wand::BlockMaxWandIterator::new(
-            &fields,
-            &term_names,
+            fields,
             topn,
             &dead,
             0.0,
