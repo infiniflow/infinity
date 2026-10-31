@@ -6,6 +6,10 @@
 //! design. Indexes are pluggable behind the [`Index`] trait.
 
 #![forbid(unsafe_code)]
+// The distance kernels use portable SIMD (`std::simd`, still nightly-only) to
+// mirror the reference's `F32L2*` / `F32IP*` / `F32Cos*` intrinsics; see
+// `simd.rs` for why that is `std::simd` and not `std::arch`.
+#![feature(portable_simd)]
 
 pub mod bp;
 pub mod emvb;
@@ -22,6 +26,7 @@ pub mod multivector;
 pub mod parallel_build;
 pub mod plaid;
 pub mod rabitq;
+pub mod simd;
 pub mod smve;
 pub mod sparse;
 pub mod vector;

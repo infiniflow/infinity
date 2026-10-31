@@ -16,20 +16,11 @@ pub struct FlatHit {
 
 fn distance(metric: Metric, query: &[f32], base: &[f32]) -> f32 {
     match metric {
-        Metric::L2 => crate::vector::l2_sq(query, base),
+        Metric::L2 => crate::simd::l2_sq(query, base),
         // Inner product: the reference reports and ranks by the similarity,
         // largest first.
-        Metric::Ip => query.iter().zip(base).map(|(a, b)| a * b).sum::<f32>(),
-        Metric::Cos => {
-            let dot: f32 = query.iter().zip(base).map(|(a, b)| a * b).sum();
-            let na: f32 = query.iter().map(|a| a * a).sum::<f32>().sqrt();
-            let nb: f32 = base.iter().map(|b| b * b).sum::<f32>().sqrt();
-            if na == 0.0 || nb == 0.0 {
-                0.0
-            } else {
-                -dot / (na * nb)
-            }
-        }
+        Metric::Ip => crate::simd::ip(query, base),
+        Metric::Cos => crate::simd::cos_dist(query, base),
     }
 }
 

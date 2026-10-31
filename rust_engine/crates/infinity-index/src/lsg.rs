@@ -65,18 +65,9 @@ pub enum Metric {
 /// inner product and cosine similarity (larger is closer).
 fn distance(a: &[f32], b: &[f32], metric: Metric) -> f32 {
     match metric {
-        Metric::L2 => a.iter().zip(b).map(|(x, y)| (x - y) * (x - y)).sum(),
-        Metric::Ip => a.iter().zip(b).map(|(x, y)| x * y).sum::<f32>(),
-        Metric::Cos => {
-            let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-            let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-            let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-            if na == 0.0 || nb == 0.0 {
-                0.0
-            } else {
-                dot / (na * nb)
-            }
-        }
+        Metric::L2 => crate::simd::l2_sq(a, b),
+        Metric::Ip => crate::simd::ip(a, b),
+        Metric::Cos => crate::simd::cosine(a, b),
     }
 }
 

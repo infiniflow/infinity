@@ -100,7 +100,7 @@ pub fn merge_topk(per_segment: Vec<Vec<(usize, f32)>>, k: usize) -> Vec<(usize, 
 }
 
 fn dot(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| x * y).sum()
+    crate::simd::ip(a, b)
 }
 
 #[cfg(test)]

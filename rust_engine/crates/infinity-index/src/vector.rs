@@ -42,9 +42,9 @@ impl Ord for Cand {
     }
 }
 
-/// Squared L2 distance.
+/// Squared L2 distance (crate::simd::l2_sq, the reference's F32L2 family).
 pub fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| (x - y) * (x - y)).sum()
+    crate::simd::l2_sq(a, b)
 }
 
 /// Exact brute-force kNN.
@@ -310,20 +310,11 @@ pub enum Store {
 
 fn plain_distance(a: &[f32], b: &[f32], metric: Metric) -> f32 {
     match metric {
-        Metric::L2 => l2_sq(a, b),
-        Metric::Ip => -a.iter().zip(b).map(|(x, y)| x * y).sum::<f32>(),
-        Metric::Cos => {
-            // C++ `PlainCosDist` returns `-cosine` (the SIMD kernel returns
-            // the similarity), so smaller is closer for every metric.
-            let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-            let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-            let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-            if na == 0.0 || nb == 0.0 {
-                0.0
-            } else {
-                -dot / (na * nb)
-            }
-        }
+        Metric::L2 => crate::simd::l2_sq(a, b),
+        Metric::Ip => -crate::simd::ip(a, b),
+        // C++ PlainCosDist returns -cosine (the SIMD kernel returns the
+        // similarity), so smaller is closer for every metric.
+        Metric::Cos => crate::simd::cos_dist(a, b),
     }
 }
 
