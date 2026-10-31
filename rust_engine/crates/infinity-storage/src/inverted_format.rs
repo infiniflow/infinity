@@ -1609,6 +1609,15 @@ fn pack_mini_block(values: &[u32], w: u8, out: &mut Vec<u8>) {
 
 /// Unpacks one 128-value mini-block of width `w` from `buf`, appending up to
 /// `count` values.
+/// Decodes one SIMD-BP128 mini-block: 128 values of `w` bits, stored **vertically**
+/// (the fastpfor layout the reference writes through `SIMDBinaryPacking`): the
+/// values are four lanes, each lane's `w`-bit values packed back to back into
+/// its own bit stream (`words[lane], words[lane + 4], words[lane + 8], ...`).
+///
+/// The reference unpacks the four lanes with SSE/AVX intrinsics. This port keeps
+/// the same layout byte for byte and decodes lane by lane with 64-bit windows:
+/// one or two word loads and two shifts per value instead of a bit-at-a-time
+/// loop, which was `w` bounds-checked loads per value.
 fn unpack_mini_block(
     buf: &[u8],
     w: u8,
@@ -1623,17 +1632,33 @@ fn unpack_mini_block(
             got: buf.len(),
         });
     }
-    let word = |i: usize| -> u32 { u32::from_le_bytes(buf[i * 4..i * 4 + 4].try_into().unwrap()) };
-    for idx in 0..count {
-        let lane = idx % 4;
-        let pos = idx / 4;
-        let mut value = 0u32;
-        for bpos in 0..w {
-            let gb = pos * w + bpos;
-            let bitval = (word(lane + 4 * (gb / 32)) >> (gb % 32)) & 1;
-            value |= bitval << bpos;
+    let base = out.len();
+    out.resize(base + count, 0);
+    if w == 0 {
+        return Ok(());
+    }
+    let word = |i: usize| -> u64 {
+        u32::from_le_bytes(buf[i * 4..i * 4 + 4].try_into().unwrap()) as u64
+    };
+    let mask: u64 = if w >= 32 { u64::from(u32::MAX) } else { (1u64 << w) - 1 };
+    let words_per_lane = w;
+    for lane in 0..4usize {
+        let mut bit = 0usize;
+        let mut idx = lane;
+        while idx < count {
+            let word_index = bit / 32;
+            let bit_off = bit % 32;
+            let lo = word(lane + 4 * word_index);
+            let hi = if word_index + 1 < words_per_lane {
+                word(lane + 4 * (word_index + 1))
+            } else {
+                0
+            };
+            let window = (lo | (hi << 32)) >> bit_off;
+            out[base + idx] = (window & mask) as u32;
+            bit += w;
+            idx += 4;
         }
-        out.push(value);
     }
     Ok(())
 }

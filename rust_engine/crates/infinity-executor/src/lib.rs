@@ -3084,10 +3084,39 @@ impl SpilledRun {
 /// and the corpus statistics.
 ///
 /// C++: `MemoryIndexer` (`src/storage/invertedindex/memory_indexer.cppm`).
+///
+/// Identity hashing for the document-length maps: their keys are row ids, and
+/// the maps are probed once per posting on the query path - SipHash there cost
+/// more than the lookup it protects.
+#[derive(Default)]
+pub(crate) struct IdHasher(u64);
+
+impl std::hash::Hasher for IdHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        // Only `u64` keys are used; keep the trait implementation total.
+        let mut h = 0xcbf29ce484222325u64;
+        for b in bytes {
+            h = (h ^ u64::from(*b)).wrapping_mul(0x100000001b3);
+        }
+        self.0 = h;
+    }
+
+    fn write_u64(&mut self, i: u64) {
+        self.0 = i;
+    }
+}
+
+/// `row id -> document length`, with [`IdHasher`].
+pub(crate) type DocLenMap = HashMap<u64, u32, std::hash::BuildHasherDefault<IdHasher>>;
+
 #[derive(Default)]
 struct MemoryIndexer {
     /// `doc -> length`, used for BM25's document length.
-    docs: HashMap<u64, u32>,
+    docs: DocLenMap,
     postings: HashMap<String, Vec<(u64, u32, Vec<u32>)>>,
     live: std::collections::HashSet<u64>,
     n_docs: usize,
@@ -3996,7 +4025,9 @@ impl<'a> MergeCursor<'a> {
 pub(crate) struct Posting {
     pub doc: u64,
     pub tf: u32,
-    pub positions: Vec<u32>,
+    /// Slice of the stream's position arena [`TermStream::pos_buf`].
+    pub pos_start: u32,
+    pub pos_len: u32,
 }
 
 /// The interface `BlockMaxWandIterator` drives: a posting stream that can say
@@ -4026,6 +4057,9 @@ pub(crate) trait WandStream {
 pub(crate) struct TermStream<'a> {
     merge: MergeCursor<'a>,
     block: Vec<Posting>,
+    /// The block's token offsets, one run after another: a phrase child needs
+    /// them, and one arena per block costs no allocation per posting.
+    pos_buf: Vec<u32>,
     at: usize,
     block_id: u64,
     loaded: bool,
@@ -4046,6 +4080,7 @@ impl<'a> TermStream<'a> {
         Self {
             merge,
             block: Vec::new(),
+            pos_buf: Vec::new(),
             at: 0,
             block_id: 0,
             loaded: false,
@@ -4112,13 +4147,21 @@ impl<'a> TermStream<'a> {
     fn pull(&mut self) -> Option<Posting> {
         let doc = self.merge.doc()?;
         let tf = self.merge.tf();
-        let positions = if self.capture {
-            self.merge.positions().to_vec()
-        } else {
-            Vec::new()
-        };
+        let mut pos_start = 0u32;
+        let mut pos_len = 0u32;
+        if self.capture {
+            let positions = self.merge.positions();
+            pos_start = self.pos_buf.len() as u32;
+            pos_len = positions.len() as u32;
+            self.pos_buf.extend_from_slice(positions);
+        }
         self.merge.advance(doc + 1);
-        Some(Posting { doc, tf, positions })
+        Some(Posting {
+            doc,
+            tf,
+            pos_start,
+            pos_len,
+        })
     }
 
     /// Loads the next block: up to [`WAND_BLOCK`] postings starting at the
@@ -4128,6 +4171,7 @@ impl<'a> TermStream<'a> {
             return true;
         }
         self.block.clear();
+        self.pos_buf.clear();
         self.at = 0;
         while self.block.len() < WAND_BLOCK {
             match self.pull() {
@@ -4167,7 +4211,12 @@ impl<'a> TermStream<'a> {
         if !self.load() {
             return &[];
         }
-        self.block.get(self.at).map(|p| p.positions.as_slice()).unwrap_or(&[])
+        let Some(p) = self.block.get(self.at) else {
+            return &[];
+        };
+        let start = p.pos_start as usize;
+        let end = start + p.pos_len as usize;
+        self.pos_buf.get(start..end).unwrap_or(&[])
     }
 
     /// `SeekDoc`: position on the first document `>= target`.

@@ -166,6 +166,22 @@ boolean 模式下短语仍按词拆成多个游标（权重取字段 boost）；
 `top_k_in_the_first_block_never_scores_later_blocks` 就是这种构造，断言精确打分次数
 被压在首块内。
 
+### 4.5 每篇 posting 的固定开销：三处
+
+§4.4 说了剩下的差距是「每篇文档走一遍」的单价。逐个消掉之后：
+
+| 问题 | 改法 | `of` 的耗时 |
+|---|---|---|
+| 短语子游标给每条 posting 各分配一个 `Vec<u32>` 存位置 | 每条只记 `(pos_start, pos_len)`，位置写进每个块一块复用的 `pos_buf`，块边界清空 | 2.91 → 2.82 ms（短语 2.48 → 2.01） |
+| SIMD-BP128 的解码是**逐位**循环（每个值 `w` 次带边界检查的 32 位读取） | 按 fastpfor 的**纵向**布局整字解：每个 lane 的位流用两个 `u32` 拼成 64 位窗口，每个值 1–2 次读取 + 2 次移位 | 2.82 → 2.78 ms |
+| 文档长度用 `HashMap<u64, u32>` 查，默认 SipHash；每个 posting 要查两次（块统计 + 打分） | `DocLenMap` + 恒等哈希（key 本身就是行号） | 2.78 → 2.64 ms |
+
+关于 SIMD 本身：参考的 posting 编解码走 `fastpfor`（`src/storage/common/fastpfor_impl.cpp`
+里的 `SIMDBinaryPacking`），是真的 SSE/AVX intrinsics；端口**格式**与它逐字节一致
+（`encode_u32_block` 写的还是同一套纵向位平面布局），但解码一直是标量。这次把它从
+「逐位」改成「按 lane 的 64 位窗口」，指令层面仍然没有 SIMD——核心 crate 有
+`#![forbid(unsafe_code)]`，用不了 `std::arch` intrinsics。要走真正的 SIMD，需要
+单独开一个允许 intrinsics 的小 crate（或稳定后的 `std::simd`），这是我建议的下一步。
 参考侧是块级 WAND + 跳表流式推进（命中 k 个就停），只投影 `row_id`/score 两列，
 所以耗时基本与语料规模无关（20k 文档仍在 1 ms 量级）。
 
