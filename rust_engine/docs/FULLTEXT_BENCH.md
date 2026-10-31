@@ -71,16 +71,16 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 | INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 3.24–3.28 s | ≈3× 慢 |
 | IMPORT 20000 行 | ≈2 s | 3.14 s | ≈1.6× 慢 |
 | Optimize（合并索引 chunk） | 360–512 µs | 299–397 µs | 同量级 |
-| 查询 1 `harmful "social custom"` | 1–5 ms | **0.33–0.34 ms** | 反超 |
-| 查询 2 `social custom "harmful chemical"` | 0.93–1 ms | **0.40 ms** | 反超 |
-| 查询 3 `"annual American awards"`（0 行） | 0.27–0.73 ms | **0.35 ms** | 同量级 |
-| 查询 4 `harmful chemical` | 0.58–0.97 ms | **0.33 ms** | 反超 |
-| 查询 5 `"one of"` | 1–2 ms | **1.94 ms** | 同量级 |
-| 查询 6（13 词） | 2–3 ms | **4.49–4.51 ms** | ≈1.8× 慢 |
-| 查询 7（14 词） | 0.84–1 ms | **1.77 ms** | ≈2× 慢 |
+| 查询 1 `harmful "social custom"` | 1–5 ms | **0.32 ms** | 反超 |
+| 查询 2 `social custom "harmful chemical"` | 0.93–1 ms | **0.37 ms** | 反超 |
+| 查询 3 `"annual American awards"`（0 行） | 0.27–0.73 ms | **0.27 ms** | 同量级 |
+| 查询 4 `harmful chemical` | 0.58–0.97 ms | **0.32 ms** | 反超 |
+| 查询 5 `"one of"` | 1–2 ms | **1.42 ms** | 反超/持平 |
+| 查询 6（13 词） | 2–3 ms | **3.03 ms** | 同量级 |
+| 查询 7（14 词） | 0.84–1 ms | **1.40 ms** | ≈1.5× 慢 |
 
 写入仍是同一个量级上慢 3 倍（每批插入都要更新全文索引）。查询从最初的 13–30 倍
-降到「1–2 个词的查询比参考快或持平，长查询慢不到 2 倍」。
+降到「1–2 个词的查询全面反超，13/14 词的长查询在 1–1.5 倍以内」。
 
 ## 4. 这一轮改了什么
 
@@ -245,6 +245,51 @@ A/B 交替（同一份 20k 语料，各 3 轮，重复 20 次取最小）：
 （把它改成常量做消融会让剪枝变松，反而更慢，所以这个数字是干净 A/B 对出来的）。
 下一步是把长度也做成按序号的懒取：`TermStream` 存 ordinal 加
 `&SegmentIndexReader` / `&DocLenMap`，只在 `len()` 和 `block_stats()` 时才读。
+
+### 4.8 归并换拼接：段之间的 posting 直接首尾相接
+
+多词/短语查询原来的最大单项是 MergeCursor::settle（一次查询里每个 term 要归并
+2–3 个源：sealed segment + 内存尾段），13 词查询的 self time 里占 9.5%。
+
+但段之间是按行区间切分的——第 1 段是 [0, N1)，第 2 段 [N1, N2)，尾段在其后——
+区间互不重叠，**归并的结果就等于按区间顺序拼接**。所以 MergeCursor 新增一条
+concat 路径：
+
+- 判决条件：源数 ≥ 2、overridden 为空（没有新副本落在旧区间里）、每个源都能报出
+  自己的行区间（段用 rows.first()/rows.last()，尾段用插入时维护的 min/max），
+  且按区间起点排序后两两不相交；满足才把源按区间升序重排并走拼接；
+- 拼接时 next 指向当前源，源走空就换下一个，**每篇 posting 只访问一个源**，
+  没有比较、没有 k 路挑选；advance(target) 先整段跳过区间已经落在 target 之前的源；
+- 不满足（有 UPDATE 造成的重复行、或 spill run 与尾段区间重叠）就退回原来的 k 路归并。
+
+A/B（交替 3 轮，重复 20 次取最小；第 3 轮机器被别处占满，取前两轮）：
+
+| 查询 | 拼接前 | 拼接后 | |
+|---|---|---|---|
+| 1 harmful "social custom" | 0.335 ms | 0.315 ms | −6% |
+| 2 social custom "harmful chemical" | 0.398 ms | 0.365 ms | −8% |
+| 3 "annual American awards" | 0.353 ms | **0.274 ms** | −22% |
+| 4 harmful chemical | 0.328 ms | 0.317 ms | −3% |
+| 5 "one of" | 1.95 ms | **1.42 ms** | −27% |
+| 6（13 词） | 4.51 ms | **3.03 ms** | −33% |
+| 7（14 词） | 1.77 ms | **1.40 ms** | −21% |
+
+profile 里 MergeCursor::settle 从前三（9.5%）直接消失，剩下的最大项是
+memmove / 分配器 / TermStream::load / TermDocCursor::ensure，都是填充块本身的工作。
+
+回归测试：a_query_over_many_segments_matches_a_single_segment 用
+set_memindex_capacity(2) 把 20 行切成约 10 个段，断言四条查询（单词、短语、两词 OR、
+三词 OR）的结果与单段建索引**逐行逐序**相同。
+
+### 4.9 试过但没走通的两条路
+
+- **从 doc skip list 直接读块上界**：格式里确实有 block_max_tf /
+  block_max_percentage，但参考在这套配置下写的是空 skip list——解析真实 .pos 的前
+  200 个 term，doc_skip_len 全为 0（我们的文件与参考逐字节相同）。所以块上界只能像
+  现在这样从 doc list 块现场算。
+- **把长度取用改成懒解析**（Lens::Map/Segment，用时才按序号读 .len）：块上界本身就要
+  遍历块内每一条 posting，把取用从 load() 挪到 block_stats() 只是换位置，实测反而慢
+  3–4%（多一次 enum 匹配），已回退。
 
 ## 5. 顺带修掉的一个格式缺陷
 

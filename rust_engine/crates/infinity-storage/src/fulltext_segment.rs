@@ -252,6 +252,13 @@ impl SegmentIndexReader {
         Some(u32::from_le_bytes(bytes.try_into().ok()?))
     }
 
+    /// The row range the segment covers (first and last row id), when it holds
+    /// any document. Consecutive segments are disjoint, which is what lets a
+    /// query concatenate their posting lists instead of merging them.
+    pub fn row_range(&self) -> Option<(u64, u64)> {
+        Some((*self.rows.first()?, *self.rows.last()?))
+    }
+
     /// Number of documents in the segment.
     pub fn doc_count(&self) -> usize {
         self.len.len() / 4
@@ -521,6 +528,12 @@ impl<'a> TermDocCursor<'a> {
             return None;
         }
         self.rows.get(self.at).copied()
+    }
+
+    /// The reader the cursor decodes from, for the row range a query needs to
+    /// decide whether two sources can be concatenated.
+    pub fn reader(&self) -> &'a SegmentIndexReader {
+        self.reader
     }
 
     /// The current document's segment ordinal (the index into `.len`).

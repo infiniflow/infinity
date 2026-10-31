@@ -3123,6 +3123,10 @@ struct MemoryIndexer {
     total_len: u64,
     /// Approximate bytes held by this segment, for the memindex budget.
     bytes: usize,
+    /// The row range the tail covers, for the query path's concat test: the
+    /// tail appends after every sealed segment, so their ranges are disjoint
+    /// unless a row was re-indexed (then the overridden set is non-empty).
+    row_range: Option<(u64, u64)>,
     /// The sorted runs the tail was spilled into, oldest first. Their postings
     /// stay on disk and are read on demand, so a column that outgrows the
     /// budget keeps indexing instead of going dark.
@@ -3170,6 +3174,10 @@ impl MemoryIndexer {
             Some(old) => self.total_len = self.total_len.saturating_sub(old as u64),
             None => self.n_docs += 1,
         }
+        self.row_range = Some(match self.row_range {
+            None => (seq, seq),
+            Some((lo, hi)) => (lo.min(seq), hi.max(seq)),
+        });
         self.total_len += toks.len() as u64;
         self.live.insert(seq);
         // A row that is rewritten after it was spilled leaves a stale copy in
@@ -3236,6 +3244,7 @@ impl MemoryIndexer {
         self.postings.shrink_to_fit();
         self.docs.clear();
         self.live.clear();
+        self.row_range = None;
         self.bytes = 0;
         self.n_docs = 0;
         self.total_len = 0;
@@ -3790,6 +3799,8 @@ pub(crate) enum Source<'a> {
         list: &'a [(u64, u32, Vec<u32>)],
         lens: &'a DocLenMap,
         at: usize,
+        /// The rows the tail covers, for the concat test.
+        range: (u64, u64),
     },
     /// A list the caller owns: the query-syntax path's bmw_search, and the
     /// tests. The arena holds the token offsets when the caller has them.
@@ -3823,7 +3834,7 @@ impl<'a> Source<'a> {
     /// The current document's length (BM25 dl).
     fn len(&mut self) -> u32 {
         match self {
-            Source::Mem { list, lens, at } => list
+            Source::Mem { list, lens, at, .. } => list
                 .get(*at)
                 .and_then(|p| lens.get(&p.0).copied())
                 .unwrap_or(1),
@@ -3853,6 +3864,16 @@ impl<'a> Source<'a> {
                 }
             }
             Source::Segment(cur) => cur.advance(target),
+        }
+    }
+
+    /// The row range this source covers: sealed segments and the memory tail
+    /// know it, which is what the concat path needs.
+    fn range(&self) -> Option<(u64, u64)> {
+        match self {
+            Source::Mem { range, .. } => Some(*range),
+            Source::Owned { list, .. } => Some((list.first()?.0, list.last()?.0)),
+            Source::Segment(cur) => cur.reader().row_range(),
         }
     }
 
@@ -3904,6 +3925,35 @@ impl PosArena {
 ///
 /// cur is the smallest document the sources are on; it is not consumed until
 /// the caller asks for the next one, so positions() still belongs to it.
+/// The order in which the sources can simply be concatenated: every source
+/// must know its row range and no two ranges may overlap. Returns the
+/// permutation, or None when a real merge is needed.
+fn concat_order(sources: &[Source<'_>]) -> Option<Vec<usize>> {
+    if sources.len() < 2 {
+        return None;
+    }
+    let mut ranges: Vec<(usize, (u64, u64))> = Vec::with_capacity(sources.len());
+    for (i, source) in sources.iter().enumerate() {
+        ranges.push((i, source.range()?));
+    }
+    ranges.sort_by_key(|(_, (lo, _))| *lo);
+    for pair in ranges.windows(2) {
+        if pair[0].1 .1 >= pair[1].1 .0 {
+            return None;
+        }
+    }
+    Some(ranges.into_iter().map(|(i, _)| i).collect())
+}
+
+/// Reorders the sources into the given permutation.
+fn reorder<T>(items: Vec<T>, order: &[usize]) -> Vec<T> {
+    let mut slots: Vec<Option<T>> = items.into_iter().map(Some).collect();
+    order
+        .iter()
+        .map(|i| slots[*i].take().expect("a permutation of the sources"))
+        .collect()
+}
+
 pub(crate) struct MergeCursor<'a> {
     sources: Vec<Source<'a>>,
     /// Sources >= segment_from are sealed segments: a row in overridden has a
@@ -3917,6 +3967,14 @@ pub(crate) struct MergeCursor<'a> {
     /// Exactly one source and no stale copy to filter: forward every accessor
     /// to it instead of running the k-way merge.
     single: bool,
+    /// The sources cover disjoint, ascending row ranges, so the merged list is
+    /// their concatenation: next walks them in order and no comparison runs
+    /// per posting (the common case after a table has sealed a few segments).
+    concat: bool,
+    /// Index of the source the concat path is reading.
+    next: usize,
+    /// The document doc() last returned (the concat path caches it).
+    cached: Option<u64>,
     df: usize,
 }
 
@@ -3927,8 +3985,14 @@ impl<'a> MergeCursor<'a> {
         overridden: Option<&'a std::collections::HashSet<u64>>,
     ) -> Self {
         let df = sources.iter().map(|s| s.df()).sum();
-        let single = sources.len() == 1
-            && (segment_from >= 1 || overridden.is_none_or(|o| o.is_empty()));
+        let no_stale = overridden.is_none_or(|o| o.is_empty());
+        let single = sources.len() == 1 && (segment_from >= 1 || no_stale);
+        // Ranges that do not overlap make the merge a concatenation. A stale
+        // copy (an overridden row) spans ranges, so it rules the path out.
+        let (sources, concat) = match (single || !no_stale, concat_order(&sources)) {
+            (false, Some(order)) => (reorder(sources, &order), true),
+            _ => (sources, false),
+        };
         let mut cursor = Self {
             sources,
             segment_from,
@@ -3936,10 +4000,31 @@ impl<'a> MergeCursor<'a> {
             cur: None,
             dirty: true,
             single,
+            concat,
+            next: 0,
+            cached: None,
             df,
         };
-        cursor.settle();
+        if concat {
+            cursor.cached = cursor.pull_concat();
+        } else {
+            cursor.settle();
+        }
         cursor
+    }
+
+    /// Pulls the next document from the concatenation of the sources: walk the
+    /// current source, and move to the next one when it runs out.
+    fn pull_concat(&mut self) -> Option<u64> {
+        loop {
+            if let Some(doc) = self.sources[self.next].doc() {
+                return Some(doc);
+            }
+            if self.next + 1 >= self.sources.len() {
+                return None;
+            }
+            self.next += 1;
+        }
     }
 
     /// Documents containing the term (the reference's doc_freq).
@@ -3980,6 +4065,12 @@ impl<'a> MergeCursor<'a> {
         if self.single {
             return self.sources[0].doc();
         }
+        if self.concat {
+            if self.cached.is_none() {
+                self.cached = self.pull_concat();
+            }
+            return self.cached;
+        }
         self.settle();
         self.cur.map(|c| c.0)
     }
@@ -3988,6 +4079,10 @@ impl<'a> MergeCursor<'a> {
     pub(crate) fn tf(&mut self) -> u32 {
         if self.single {
             return self.sources[0].tf();
+        }
+        if self.concat {
+            let _ = self.doc();
+            return self.sources[self.next].tf();
         }
         self.settle();
         self.cur.map(|c| c.1).unwrap_or(0)
@@ -3998,6 +4093,10 @@ impl<'a> MergeCursor<'a> {
         if self.single {
             return self.sources[0].len();
         }
+        if self.concat {
+            let _ = self.doc();
+            return self.sources[self.next].len();
+        }
         self.settle();
         self.cur.map(|c| c.2).unwrap_or(1)
     }
@@ -4006,6 +4105,10 @@ impl<'a> MergeCursor<'a> {
     pub(crate) fn positions(&mut self) -> &[u32] {
         if self.single {
             return self.sources[0].positions();
+        }
+        if self.concat {
+            let _ = self.doc();
+            return self.sources[self.next].positions();
         }
         self.settle();
         match self.cur {
@@ -4018,6 +4121,20 @@ impl<'a> MergeCursor<'a> {
     pub(crate) fn advance(&mut self, target: u64) {
         if self.single {
             self.sources[0].advance(target);
+            return;
+        }
+        if self.concat {
+            self.cached = None;
+            // A source whose last row is behind the target cannot contribute:
+            // step over it whole.
+            while self.next + 1 < self.sources.len()
+                && self.sources[self.next]
+                    .range()
+                    .is_some_and(|(_, hi)| hi < target)
+            {
+                self.next += 1;
+            }
+            self.sources[self.next].advance(target);
             return;
         }
         self.dirty = true;
@@ -4635,6 +4752,7 @@ impl TextIndex {
                     list,
                     lens: &self.mem.docs,
                     at: 0,
+                    range: self.mem.row_range.unwrap_or((0, 0)),
                 });
             }
         }
@@ -24333,6 +24451,49 @@ mod tests {
     /// not with the standard one: an `ngram-3` index turns `quick` into
     /// `qui`/`uic`/`ick`, so a literal `qui` is a token there and not in a
     /// `standard` index.
+
+    /// A query that spans several sealed segments plus the memory tail must
+    /// return exactly what one unsealed segment returns: same rows, same order.
+    /// That is the concat path's contract (the segments' row ranges are
+    /// disjoint, so their posting lists are concatenated instead of merged).
+    #[test]
+    fn a_query_over_many_segments_matches_a_single_segment() {
+        const QUERIES: [&str; 4] = [
+            "SELECT id FROM seg SEARCH MATCH TEXT (body, 'alpha', 100);",
+            "SELECT id FROM seg SEARCH MATCH TEXT (body, '\"beta gamma\"', 100);",
+            "SELECT id FROM seg SEARCH MATCH TEXT (body, 'alpha beta', 100);",
+            "SELECT id FROM seg SEARCH MATCH TEXT (body, 'gamma epsilon alpha', 100);",
+        ];
+        let build = |capacity: usize| -> Vec<Vec<Vec<String>>> {
+            let dir = tempdir().unwrap();
+            let e = Engine::open(dir.path()).unwrap();
+            // Two rows per segment: the query has to walk several of them.
+            e.set_memindex_capacity(capacity);
+            e.execute("CREATE TABLE seg (id INTEGER, body VARCHAR)")
+                .unwrap();
+            e.execute("CREATE INDEX seg_idx ON seg (body) USING FULLTEXT")
+                .unwrap();
+            for i in 0..20 {
+                let body = match i % 4 {
+                    0 => "alpha beta gamma",
+                    1 => "alpha delta",
+                    2 => "beta gamma",
+                    _ => "gamma epsilon",
+                };
+                e.execute(&format!("INSERT INTO seg VALUES ({i}, '{body}');"))
+                    .unwrap();
+            }
+            e.flush().unwrap();
+            QUERIES.iter().map(|sql| rows(&e, sql)).collect()
+        };
+        let many = build(2);
+        let one = build(1024);
+        for (i, sql) in QUERIES.iter().enumerate() {
+            assert!(!one[i].is_empty(), "query {i} returned nothing: {sql}");
+            assert_eq!(many[i], one[i], "query {i}: {sql}");
+        }
+    }
+
     #[test]
     fn a_fulltext_index_uses_its_declared_analyzer() {
         let dir = tempdir().unwrap();
