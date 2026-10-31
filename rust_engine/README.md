@@ -38,6 +38,10 @@ cargo test --workspace
 cargo run -p infinity-cli -- smoke /tmp/infinity-smoke
 ```
 
+> The toolchain is pinned in `rust-toolchain.toml`: a dated **nightly**, because
+> the posting codec decodes fastpfor's SIMD-BP128 blocks with `std::simd`
+> (portable SIMD is still nightly-only; `std::arch` would need `unsafe`).
+>
 > The workspace `.cargo/config.toml` routes crates.io through a local proxy for
 > environments without direct egress.
 

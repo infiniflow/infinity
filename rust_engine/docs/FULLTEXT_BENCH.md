@@ -173,17 +173,40 @@ boolean 模式下短语仍按词拆成多个游标（权重取字段 boost）；
 | 问题 | 改法 | `of` 的耗时 |
 |---|---|---|
 | 短语子游标给每条 posting 各分配一个 `Vec<u32>` 存位置 | 每条只记 `(pos_start, pos_len)`，位置写进每个块一块复用的 `pos_buf`，块边界清空 | 2.91 → 2.82 ms（短语 2.48 → 2.01） |
-| SIMD-BP128 的解码是**逐位**循环（每个值 `w` 次带边界检查的 32 位读取） | 按 fastpfor 的**纵向**布局整字解：每个 lane 的位流用两个 `u32` 拼成 64 位窗口，每个值 1–2 次读取 + 2 次移位 | 2.82 → 2.78 ms |
+| SIMD-BP128 解码是**逐位**循环（每个值 `w` 次带边界检查的 32 位读取） | 按 fastpfor 的**纵向**布局整字解（先 64 位窗口，后改成 portable SIMD，见 §4.6） | 2.82 → 2.78 ms |
 | 文档长度用 `HashMap<u64, u32>` 查，默认 SipHash；每个 posting 要查两次（块统计 + 打分） | `DocLenMap` + 恒等哈希（key 本身就是行号） | 2.78 → 2.64 ms |
 
-关于 SIMD 本身：参考的 posting 编解码走 `fastpfor`（`src/storage/common/fastpfor_impl.cpp`
-里的 `SIMDBinaryPacking`），是真的 SSE/AVX intrinsics；端口**格式**与它逐字节一致
-（`encode_u32_block` 写的还是同一套纵向位平面布局），但解码一直是标量。这次把它从
-「逐位」改成「按 lane 的 64 位窗口」，指令层面仍然没有 SIMD——核心 crate 有
-`#![forbid(unsafe_code)]`，用不了 `std::arch` intrinsics。要走真正的 SIMD，需要
-单独开一个允许 intrinsics 的小 crate（或稳定后的 `std::simd`），这是我建议的下一步。
 参考侧是块级 WAND + 跳表流式推进（命中 k 个就停），只投影 `row_id`/score 两列，
 所以耗时基本与语料规模无关（20k 文档仍在 1 ms 量级）。
+
+### 4.6 posting 编解码：真正的 SIMD（nightly）
+
+参考的 posting 编解码走 `fastpfor`（`src/storage/common/fastpfor_impl.cpp` 的
+`SIMDBinaryPacking`），是一组 SSE2 intrinsics。端口此前的**格式**与它逐字节一致
+（`encode_u32_block` 写的就是同一套纵向位平面布局），但指令层面一直是标量。
+
+现在 `unpack_mini_block` / `pack_mini_block` 都用 `std::simd::u32x4`：四个 lane 的
+数据逐字交错，所以一个 128 位寄存器正好装「四个 lane 的同一个字」，每个 4 值组只需
+一次移位对 + 一次 OR + 一次 store（解码），编码是对称的
+`words[i] |= v << off; words[i + 1] |= v >> (32 - off)`。
+
+**为什么是 nightly**：`std::arch` 的 intrinsics 早已 stable，但全是 `unsafe`，而这个
+crate 是 `#![deny(unsafe_code)]`（只对 mmap / FFI 逐点 `allow`）；`std::simd` 是安全
+API，但仍是 nightly-only。因此 `rust-toolchain.toml` 固定到
+`nightly-2026-10-29`（仍按日期 pin，保持「同一台机器/CI 用同一个编译器」）。
+
+**代码生成**（`rustc --emit asm` 核对，不是"看起来像 SIMD"）：`movdqu` / `psrld` /
+`pslld` / `por` / `pandn`。
+
+**字节不变**：编码仍与 C++ 逐字节相同——既有固定向量
+`u32_block_matches_the_cpp_bytes`（1/2/7/9/14/17 位 + VB 尾）之外，新增
+`packed_blocks_match_the_bit_at_a_time_packer`（1..=32 全宽度，与逐位写法的输出比对）
+和 `simd_decoder_matches_the_lane_by_lane_decoder`（1..=32 全宽度，与旧解码比对）。
+
+**收益**：codec 本身 1.2–3.5×（`w=16` 典型 3.1×，解码约 0.48 ns/值）；但**端到端没有
+可测变化**：20k 语料上 `of` 2.64 → 2.65 ms，其余四条仍是 0.37 / 0.46 / 0.32 / 0.37 /
+1.79–1.80 ms，INSERT 3.17–3.21 s。原因是 doc list 解码只占 `of` 的百分之几——
+那 2.6 ms 花在「每篇 posting 的游标推进 + 打分」，不在 codec。
 
 ## 5. 顺带修掉的一个格式缺陷
 

@@ -55,7 +55,7 @@ Rust 侧只登记**已存在**的测试，名称与 `cargo test` 输出一致；
 
 | # | 项 | 说明 |
 |---|---|---|
-| E1 | `miri` / sanitizer 的 crate 范围 | `run_gate_d.sh` 跑 miri、AddressSanitizer、ThreadSanitizer（`nightly-2025-04-04`），只覆盖纯 Rust 核心（`infinity-parser`/`infinity-expression`/`infinity-planner`，各 38 用例）。`infinity-storage`/`infinity-catalog`/`infinity-executor` 的依赖 MSRV 高于该 pinned nightly，带 FFI/SIMD 的 crate 未纳入；要覆盖需升级 pinned toolchain |
+| E1 | `miri` / sanitizer 的 crate 范围 | `run_gate_d.sh` 跑 miri、AddressSanitizer、ThreadSanitizer（`nightly-2025-04-04`），只覆盖纯 Rust 核心（`infinity-parser`/`infinity-expression`/`infinity-planner`，各 38 用例）。`infinity-storage`/`infinity-catalog`/`infinity-executor` 的依赖 MSRV 高于该 pinned nightly，带 FFI/SIMD 的 crate 未纳入；要覆盖需把 Gate D 的 pin 升到工作区当前用的 toolchain（`rust-toolchain.toml` 因 `std::simd` 固定为 `nightly-2026-10-29`） |
 | E2 | 索引文件族契约的测试形态 | `index_file_family.rs`（4 用例）固定：路径形状 `db_{db}/tbl_{tbl}/idx_{index}/seg_{seg}`、向量族 `chunk_{n}.idx`、块数据 `db_{db}/tbl_{tbl}/seg_{seg}/blk_{blk}` 与 `{col}.col`/`col_{id}_out`/`version`；全文族后缀 `.dic`/`.pos`/`.spill`（瞬时）/`.len`；并用真实编解码器把 `.dic`+`.pos`+`.len` 组成可回读的倒排索引 |
 | E3 | 全文精确分值 | 单调性（tf、长度、命中）由 `fulltext_score.rs` 与 §2 的精确口径单测兜住；与参考的逐值一致性由 Gate A（`.slt` 全量）和 `FORMAT_EQUIVALENCE_TESTS.md` §6.2 承担，不在本清单里重复 |
 

@@ -14,6 +14,11 @@
 // (`malloc_trim`, `posix_fadvise`) that keep RSS and the page cache bounded
 // during large imports. Every site documents why no safe API can express it.
 #![deny(unsafe_code)]
+// The workspace pins a nightly toolchain (see `rust-toolchain.toml`) because
+// `std::simd` is still unstable: the posting decoder unpacks fastpfor's four
+// lanes with portable SIMD, so the crate needs neither `std::arch` intrinsics
+// (which would need `unsafe`) nor a bit-at-a-time scalar loop.
+#![feature(portable_simd)]
 
 /// Releases free heap pages back to the OS (glibc). A no-op on other targets.
 /// Long imports allocate per-batch buffers; without this the allocator retains

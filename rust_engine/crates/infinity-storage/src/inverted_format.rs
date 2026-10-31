@@ -16,6 +16,8 @@
 //!
 //! None of the three files carries a magic number, a version or a checksum.
 
+use std::simd::u32x4;
+
 use crate::cpp_format::FormatError;
 
 pub mod doc_list;
@@ -1584,40 +1586,64 @@ fn max_bits(v: u32) -> u8 {
 
 /// Packs one 128-value mini-block at width `w` into `4*w` words (the lane
 /// layout above).
+///
+/// The mirror of [`unpack_mini_block`]: one register carries the four lanes of
+/// one word, so a group of four values costs one shift pair and two ORs.
 fn pack_mini_block(values: &[u32], w: u8, out: &mut Vec<u8>) {
-    let w = w as usize;
-    let mut words = vec![0u32; 4 * w];
-    for lane in 0..4usize {
-        let mut bit = 0usize;
-        let mut idx = lane;
-        while idx < values.len() {
-            let v = values[idx];
-            for bpos in 0..w {
-                if (v >> bpos) & 1 != 0 {
-                    let gb = bit + bpos;
-                    words[lane + 4 * (gb / 32)] |= 1 << (gb % 32);
-                }
+    let width = w as usize;
+    if width == 0 {
+        // Every value is zero and the block occupies no words.
+        return;
+    }
+    // `words[4 * i..][..4]` is word `i` of the four lanes, i.e. one register.
+    let mut words = vec![u32x4::splat(0); width];
+    let full = values.len() / 4;
+    let mut bit = 0usize;
+    for group in 0..full {
+        let value = u32x4::from_slice(&values[4 * group..]);
+        let word_index = bit >> 5;
+        let bit_off = (bit & 31) as u32;
+        if bit_off == 0 {
+            words[word_index] |= value;
+        } else {
+            words[word_index] |= value << u32x4::splat(bit_off);
+            if word_index + 1 < width {
+                words[word_index + 1] |= value >> u32x4::splat(32 - bit_off);
             }
-            bit += w;
-            idx += 4;
+        }
+        bit += width;
+    }
+    // A mini-block is 128 values, so there is no remainder; keep the loop total
+    // for any other length rather than writing a silently short block.
+    for (lane, &value) in values[full * 4..].iter().enumerate() {
+        let word_index = bit >> 5;
+        let bit_off = (bit & 31) as u32;
+        let mut word = words[word_index].to_array();
+        word[lane] |= value << bit_off;
+        words[word_index] = u32x4::from_array(word);
+        if bit_off != 0 && word_index + 1 < width {
+            let mut next = words[word_index + 1].to_array();
+            next[lane] |= value >> (32 - bit_off);
+            words[word_index + 1] = u32x4::from_array(next);
         }
     }
-    for word in words {
-        out.extend_from_slice(&word.to_le_bytes());
+    for word in &words {
+        for lane in word.to_array() {
+            out.extend_from_slice(&lane.to_le_bytes());
+        }
     }
 }
 
 /// Unpacks one 128-value mini-block of width `w` from `buf`, appending up to
 /// `count` values.
-/// Decodes one SIMD-BP128 mini-block: 128 values of `w` bits, stored **vertically**
-/// (the fastpfor layout the reference writes through `SIMDBinaryPacking`): the
-/// values are four lanes, each lane's `w`-bit values packed back to back into
-/// its own bit stream (`words[lane], words[lane + 4], words[lane + 8], ...`).
 ///
-/// The reference unpacks the four lanes with SSE/AVX intrinsics. This port keeps
-/// the same layout byte for byte and decodes lane by lane with 64-bit windows:
-/// one or two word loads and two shifts per value instead of a bit-at-a-time
-/// loop, which was `w` bounds-checked loads per value.
+/// SIMD-BP128 as the reference writes it through `SIMDBinaryPacking`: 128
+/// values of `w` bits stored **vertically**, i.e. four lanes with each lane's
+/// values packed back to back into its own bit stream (`words[lane],
+/// words[lane + 4], words[lane + 8], ...`). One 128-bit register therefore
+/// holds the same bit window of all four lanes - the four values at positions
+/// `4k .. 4k + 3` - so a group costs one shift pair and one store, the shape of
+/// the reference's `_mm_srli_epi32` / `_mm_or_si128` loop.
 fn unpack_mini_block(
     buf: &[u8],
     w: u8,
@@ -1637,27 +1663,49 @@ fn unpack_mini_block(
     if w == 0 {
         return Ok(());
     }
-    let word = |i: usize| -> u64 {
-        u32::from_le_bytes(buf[i * 4..i * 4 + 4].try_into().unwrap()) as u64
-    };
-    let mask: u64 = if w >= 32 { u64::from(u32::MAX) } else { (1u64 << w) - 1 };
-    let words_per_lane = w;
-    for lane in 0..4usize {
-        let mut bit = 0usize;
-        let mut idx = lane;
-        while idx < count {
-            let word_index = bit / 32;
-            let bit_off = bit % 32;
-            let lo = word(lane + 4 * word_index);
-            let hi = if word_index + 1 < words_per_lane {
-                word(lane + 4 * (word_index + 1))
+    // The 4 * w words are the four lanes interleaved word by word, so the four
+    // words of one register hold the same bit window of every lane.
+    let mut words = [0u32; 4 * 32];
+    for (i, word) in words.iter_mut().enumerate().take(nwords) {
+        *word = u32::from_le_bytes(buf[i * 4..i * 4 + 4].try_into().unwrap());
+    }
+    let mask = u32x4::splat(if w >= 32 { u32::MAX } else { (1u32 << w) - 1 });
+    let mut bit = 0usize;
+    for group in 0..count / 4 {
+        let word_index = bit >> 5;
+        let bit_off = (bit & 31) as u32;
+        let lo = u32x4::from_slice(&words[4 * word_index..]);
+        let value = if bit_off == 0 {
+            lo
+        } else if word_index + 1 < w {
+            let hi = u32x4::from_slice(&words[4 * (word_index + 1)..]);
+            (lo >> u32x4::splat(bit_off)) | (hi << u32x4::splat(32 - bit_off))
+        } else {
+            lo >> u32x4::splat(bit_off)
+        };
+        let start = base + 4 * group;
+        out[start..start + 4].copy_from_slice(&(value & mask).to_array());
+        bit += w;
+    }
+    // Only the last mini-block of a list can be short; its leftover values are
+    // the low lanes of the position after the last full group.
+    let done = count / 4 * 4;
+    if done < count {
+        let word_index = bit >> 5;
+        let bit_off = (bit & 31) as u32;
+        let wide = if w >= 32 {
+            u64::from(u32::MAX)
+        } else {
+            (1u64 << w) - 1
+        };
+        for lane in 0..count - done {
+            let lo = u64::from(words[lane + 4 * word_index]);
+            let hi = if word_index + 1 < w {
+                u64::from(words[lane + 4 * (word_index + 1)])
             } else {
                 0
             };
-            let window = (lo | (hi << 32)) >> bit_off;
-            out[base + idx] = (window & mask) as u32;
-            bit += w;
-            idx += 4;
+            out[base + done + lane] = (((lo | (hi << 32)) >> bit_off) & wide) as u32;
         }
     }
     Ok(())
@@ -2814,6 +2862,141 @@ mod tests {
             let (got, used) = decode_u32_block(&want, values.len()).unwrap();
             assert_eq!(&got, values, "{label}: decode");
             assert_eq!(used, want.len(), "{label}: bytes consumed");
+        }
+    }
+
+    /// The reference's packer written the obvious way: one bit at a time
+    /// (`SIMDBinaryPacking::pack` without the intrinsics). The SIMD packer
+    /// must produce exactly these bytes, whatever the width.
+    fn pack_mini_block_scalar(values: &[u32], w: u8) -> Vec<u8> {
+        let w = w as usize;
+        let mut words = vec![0u32; 4 * w];
+        for lane in 0..4usize {
+            let mut bit = 0usize;
+            let mut idx = lane;
+            while idx < values.len() {
+                let v = values[idx];
+                for bpos in 0..w {
+                    if (v >> bpos) & 1 != 0 {
+                        let gb = bit + bpos;
+                        words[lane + 4 * (gb / 32)] |= 1 << (gb % 32);
+                    }
+                }
+                bit += w;
+                idx += 4;
+            }
+        }
+        let mut out = Vec::new();
+        for word in words {
+            out.extend_from_slice(&word.to_le_bytes());
+        }
+        out
+    }
+
+    /// The decoder written lane by lane with 64-bit windows: an oracle for the
+    /// portable-SIMD one, independent of how it shifts.
+    fn unpack_mini_block_scalar(buf: &[u8], w: u8, count: usize) -> Vec<u32> {
+        let w = w as usize;
+        let word = |i: usize| u32::from_le_bytes(buf[i * 4..i * 4 + 4].try_into().unwrap()) as u64;
+        let mask = if w >= 32 {
+            u64::from(u32::MAX)
+        } else {
+            (1u64 << w) - 1
+        };
+        let mut out = vec![0u32; count];
+        for lane in 0..4usize {
+            let mut bit = 0usize;
+            let mut idx = lane;
+            while idx < count {
+                let word_index = bit / 32;
+                let bit_off = bit % 32;
+                let lo = word(lane + 4 * word_index);
+                let hi = if word_index + 1 < w {
+                    word(lane + 4 * (word_index + 1))
+                } else {
+                    0
+                };
+                out[idx] = (((lo | (hi << 32)) >> bit_off) & mask) as u32;
+                bit += w;
+                idx += 4;
+            }
+        }
+        out
+    }
+
+    /// The portable-SIMD decoder agrees with the lane-by-lane one at every
+    /// width, including the widths whose window straddles two words.
+    #[test]
+    fn simd_decoder_matches_the_lane_by_lane_decoder() {
+        let mut state = 0x1234_5678_9abc_def1u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for w in 1..=32u32 {
+            let mask = if w == 32 { u32::MAX } else { (1u32 << w) - 1 };
+            let values: Vec<u32> = (0..128).map(|_| (next() as u32) & mask).collect();
+            let bytes = pack_mini_block_scalar(&values, w as u8);
+            let want = unpack_mini_block_scalar(&bytes, w as u8, values.len());
+            let mut got = Vec::new();
+            unpack_mini_block(&bytes, w as u8, values.len(), &mut got).unwrap();
+            assert_eq!(got, want, "width {w}");
+            assert_eq!(got, values, "width {w}");
+        }
+    }
+
+    /// The SIMD packer must be byte-identical to the bit-at-a-time reference,
+    /// for every width the format can choose (1..=32).
+    #[test]
+    fn packed_blocks_match_the_bit_at_a_time_packer() {
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for w in 1..=32u32 {
+            let mask = if w == 32 { u32::MAX } else { (1u32 << w) - 1 };
+            let mut values: Vec<u32> = (0..128).map(|_| (next() as u32) & mask).collect();
+            values[0] = mask;
+            let want = pack_mini_block_scalar(&values, w as u8);
+            let mut got_bytes = Vec::new();
+            pack_mini_block(&values, w as u8, &mut got_bytes);
+            assert_eq!(got_bytes, want, "width {w}");
+            assert_eq!(want.len(), 4 * w as usize * 4, "width {w}: size");
+            // And it decodes back.
+            let mut got = Vec::new();
+            unpack_mini_block(&want, w as u8, values.len(), &mut got).unwrap();
+            assert_eq!(got, values, "width {w}: decode");
+        }
+    }
+
+    /// Every SIMD-BP128 width round-trips. The decoder is written against the
+    /// four-lane layout, so a width where the window straddles two words (or
+    /// hits the 32-bit boundary) is the interesting case; the fixed vectors
+    /// above cover only a few of them against the C++ bytes.
+    #[test]
+    fn every_u32_block_width_round_trips() {
+        let mut state = 0x2545_f491_4f6c_dd1du64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for w in 1..=32u32 {
+            let mask = if w == 32 { u32::MAX } else { (1u32 << w) - 1 };
+            // 256 values: two mini-blocks, so the second one starts at a fresh
+            // bit offset, and the largest value pins the width exactly.
+            let mut values: Vec<u32> = (0..256).map(|_| (next() as u32) & mask).collect();
+            values[7] = mask;
+            let encoded = encode_u32_block(&values);
+            let (decoded, used) = decode_u32_block(&encoded, values.len()).unwrap();
+            assert_eq!(decoded, values, "width {w}");
+            assert_eq!(used, encoded.len(), "width {w}: bytes consumed");
         }
     }
 

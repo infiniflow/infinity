@@ -1,6 +1,10 @@
 [toolchain]
 # Pin the compiler/toolchain for reproducible builds (plan §6 Gate F:
 # "固定 rustc/edition、codegen 版本、全部依赖版本（Cargo.lock）").
-channel = "1.94.1"
+#
+# Nightly, for `std::simd` in the posting codec: fastpfor's SIMD-BP128 blocks
+# are decoded with portable SIMD. Pinning a dated nightly keeps the "same
+# compiler everywhere" property the channel pin had.
+channel = "nightly-2026-10-29"
 components = ["rustfmt", "clippy"]
 profile = "minimal"
