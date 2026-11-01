@@ -344,10 +344,13 @@ pub struct Catalog {
     /// one filled *during* it would be stale afterwards: reads bypass the
     /// cache while this is non-zero, and the guard clears it again on exit.
     ddl_depth: std::sync::atomic::AtomicUsize,
+    /// Bumped on every invalidation. A read that began before one must not
+    /// publish what it read: the record it holds may predate the change that
+    /// caused the invalidation.
+    ddl_epoch: std::sync::atomic::AtomicU64,
 }
 
-/// Clears the table cache on drop, so a DDL that changed a table cannot leave
-/// a pre-change record behind even when it returns early.
+/// Ends a DDL call: leaves the depth and drops what was cached while it ran.
 struct DdlGuard<'a> {
     catalog: &'a Catalog,
 }
@@ -357,7 +360,7 @@ impl Drop for DdlGuard<'_> {
         self.catalog
             .ddl_depth
             .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
-        self.catalog.table_cache.lock().unwrap().clear();
+        self.catalog.invalidate_tables();
     }
 }
 
@@ -459,6 +462,7 @@ impl Catalog {
             capture: Mutex::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
+            ddl_epoch: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -472,6 +476,7 @@ impl Catalog {
             capture: Mutex::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
+            ddl_epoch: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -480,8 +485,24 @@ impl Catalog {
     fn begin_ddl(&self) -> DdlGuard<'_> {
         self.ddl_depth
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        self.table_cache.lock().unwrap().clear();
+        self.invalidate_tables();
         DdlGuard { catalog: self }
+    }
+
+    /// Drops every cached table record and makes in-flight reads decline to
+    /// publish theirs.
+    ///
+    /// A DDL calls this twice: entering it (so the call does not read a record
+    /// from before its own change) and again after the commit lands. The second
+    /// one is what matters for correctness: a DDL method returns *before* its
+    /// transaction commits, and a reader in that window would otherwise
+    /// repopulate the cache with the pre-commit schema, which the commit then
+    /// makes permanently stale.
+    pub fn invalidate_tables(&self) {
+        let mut cache = self.table_cache.lock().unwrap();
+        self.ddl_epoch
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        cache.clear();
     }
 
     /// Whether this catalog persists only the C++ key space.
@@ -1208,15 +1229,20 @@ impl Catalog {
         {
             return self.get_table_by_name_uncached(name);
         }
+        let epoch = self.ddl_epoch.load(std::sync::atomic::Ordering::SeqCst);
         if let Some(meta) = self.table_cache.lock().unwrap().get(name) {
             return Ok(Some(meta.clone()));
         }
         let found = self.get_table_by_name_uncached(name)?;
         if let Some(meta) = &found {
-            self.table_cache
-                .lock()
-                .unwrap()
-                .insert(name.to_string(), meta.clone());
+            // Publish only a record read inside one invalidation epoch. The
+            // comparison and the insert hold the cache lock, which
+            // `invalidate_tables` also takes to bump the epoch, so a clear
+            // cannot slip between them.
+            let mut cache = self.table_cache.lock().unwrap();
+            if self.ddl_epoch.load(std::sync::atomic::Ordering::SeqCst) == epoch {
+                cache.insert(name.to_string(), meta.clone());
+            }
         }
         Ok(found)
     }

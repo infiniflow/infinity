@@ -12115,7 +12115,13 @@ impl Engine {
         if let Some(cmd) = typed {
             txn.set_typed_commands(vec![cmd]);
         }
-        self.txn.commit_at(txn, commit_ts)?;
+        // A DDL's catalog method returns before its transaction commits (it
+        // hands the batch back for the WAL and the commit), so the cache has to
+        // be dropped again here: a reader between the two would otherwise
+        // repopulate it with the pre-commit schema.
+        let committed = self.txn.commit_at(txn, commit_ts);
+        self.storage.catalog.invalidate_tables();
+        committed?;
         Ok(out)
     }
 
