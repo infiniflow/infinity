@@ -64,6 +64,9 @@ use infinity_storage::cpp_format::{
 use infinity_storage::mapped_block::MappedBlock;
 use infinity_storage::knn_format;
 
+use infinity_expression::Expr;
+use infinity_parser::CmpOp;
+
 use crate::{parse_value, Engine};
 use infinity_parser::Literal;
 
@@ -4424,6 +4427,30 @@ impl Engine {
             .unwrap_or_default()
     }
 
+
+    /// The buffered rows among `ids`, looked up once for the whole batch: the
+    /// per-row `pending_row` paid a `table_key` (a formatted, lowercased
+    /// string) and a lock for every id.
+    pub(crate) fn buffered_rows_for(
+        &self,
+        table: &str,
+        ids: &std::collections::HashSet<usize>,
+    ) -> std::collections::HashMap<usize, Vec<Value>> {
+        let key = self.table_key(table);
+        let tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get(&key) else {
+            return Default::default();
+        };
+        if entry.pending_rows.is_empty() {
+            return Default::default();
+        }
+        entry
+            .pending_rows
+            .iter()
+            .filter(|(seq, _)| ids.contains(seq))
+            .map(|(seq, values)| (*seq, values.clone()))
+            .collect()
+    }
     /// One row of the append buffer. The point-read path must not clone the
     /// whole buffer (a 20k-row insert made every search pay for 20k rows), and
     /// it must not scan it either: the buffer keeps a `seq -> position` map, so
@@ -4523,13 +4550,128 @@ impl Engine {
     }
 
 
+
+
+
+    /// The rows whose `bounds` column falls in range, read straight out of the
+    /// blocks: a `DELETE`/`UPDATE` needs the row ids, not the rows, and
+    /// materialising 100k `Value` rows to find 5k of them was most of the
+    /// statement.
+    pub(crate) fn row_ids_in_bounds(
+        &self,
+        table: &str,
+        bounds: &ColumnBounds,
+    ) -> Option<Vec<usize>> {
+        let table = self.qualified_table(table);
+        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
+        let types: Vec<i32> = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()?;
+        let root = self.blocks_root();
+        let read_ts = crate::read_ts();
+        let mut out: Vec<usize> = Vec::new();
+        for id in self.visible_block_ids(&table) {
+            let Ok(block) = self.block_map(&table, &root, id) else {
+                break;
+            };
+            let version = block.version();
+            let row_count: usize = version
+                .created
+                .last()
+                .map(|c| c.cumulative_row_count as usize)
+                .unwrap_or(0);
+            let created_at = Self::created_at(version, read_ts);
+            let scan = Self::column_scan(&block, &meta, &types, bounds)?;
+            for slot in 0..row_count {
+                if !Self::slot_visible(version, slot, created_at, read_ts) || !scan.matches(slot) {
+                    continue;
+                }
+                out.push(
+                    ((id.segment_id as usize) << 32)
+                        | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot),
+                );
+            }
+        }
+        // Rows above the last checkpoint are buffered as `Value`s; the same
+        // bounds are applied to them directly.
+        let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
+        let lo = bounds.lo.as_ref();
+        let hi = bounds.hi.as_ref();
+        for (seq, values) in self.pending_rows_of(&table) {
+            if dead.contains(&(seq as u64)) {
+                continue;
+            }
+            let Some(value) = values.get(bounds.pos) else {
+                continue;
+            };
+            if matches!(value, Value::Null) {
+                continue;
+            }
+            let low = lo.is_none_or(|lo| {
+                matches!(value.partial_cmp_value(lo), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
+            });
+            let high = hi.is_none_or(|hi| {
+                matches!(value.partial_cmp_value(hi), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal))
+            });
+            if low && high {
+                out.push(seq);
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        Some(out)
+    }
     /// Every visible row of `table` for the columns at `wanted`, as typed
     /// column buffers.
     ///
     /// The caller decides what to do with them (filter, sort, project); this
     /// only decodes, in column order, skipping the rows the block's version and
     /// the tombstone set hide.
-    pub(crate) fn read_columns_batch(&self, table: &str, wanted: &[usize]) -> Option<Batch> {
+    /// The bounds check for one block, or `None` when the column cannot be
+    /// read that way (var-length, a 16-bit float, no layout).
+    fn column_scan<'a>(
+        block: &'a MappedBlock,
+        meta: &infinity_catalog::TableMeta,
+        types: &[i32],
+        bounds: &ColumnBounds,
+    ) -> Option<ColumnScan<'a>> {
+        let column_type = *types.get(bounds.pos)?;
+        let column_id = meta.ids.get(bounds.pos).copied()?;
+        let declared = meta.types.get(bounds.pos)?;
+        let layout = layout_of(declared, column_type)?;
+        let (body, _) = <MappedBlock as infinity_storage::cpp_format::BlockColumns>::column(block, column_id)?;
+        let (data, nulls) = cpp_format::split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
+        let number = |value: &Value| -> Option<Num> {
+            match value {
+                Value::Float(f) => Some(Num::F(*f)),
+                Value::Int(i) => Some(Num::I(*i)),
+                _ => None,
+            }
+        };
+        Some(ColumnScan {
+            data,
+            nulls,
+            layout,
+            column_type,
+            lo: match &bounds.lo {
+                Some(value) => Some(number(value)?),
+                None => None,
+            },
+            hi: match &bounds.hi {
+                Some(value) => Some(number(value)?),
+                None => None,
+            },
+        })
+    }
+
+    pub(crate) fn read_columns_batch(
+        &self,
+        table: &str,
+        wanted: &[usize],
+        bounds: Option<&ColumnBounds>,
+    ) -> Option<Batch> {
         let table = self.qualified_table(table);
         let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
         let types: Vec<i32> = meta
@@ -4560,11 +4702,21 @@ impl Engine {
                 .map(|c| c.cumulative_row_count as usize)
                 .unwrap_or(0);
             let created_at = Self::created_at(&version, read_ts);
+            // A predicate on a fixed-width column is applied here, on the
+            // mapped bytes: decoding every row into `Value`s and comparing
+            // afterwards is what made a filtered scan cost more than an
+            // unfiltered one.
+            let scan = bounds.and_then(|bounds| Self::column_scan(&block, &meta, &types, bounds));
             // The slots this block shows, ascending: one pass over the
             // version decides them and every column decodes just those.
             shown_slots.clear();
             for slot in 0..row_count {
                 if Self::slot_visible(&version, slot, created_at, read_ts) {
+                    if let Some(scan) = &scan {
+                        if !scan.matches(slot) {
+                            continue;
+                        }
+                    }
                     shown_slots.push(slot);
                     let seq = ((id.segment_id as usize) << 32)
                         | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot);
@@ -4708,21 +4860,24 @@ impl Engine {
         // append buffer: an index lookup names a handful of ids, and cloning
         // the whole buffer for them made every lookup pay for the buffer's
         // size (20k rows = 20 ms per query).
-        let requested: std::collections::HashSet<usize> =
-            rows.iter().map(|seq| *seq as usize).collect();
+        // Nothing is buffered for a table that was checkpointed, and building
+        // the membership set anyway hashed every id of every lookup (11% of a
+        // 1000-row indexed range query).
         let buffered: std::collections::HashMap<usize, Vec<Value>> = {
             let tables = self.tables.lock().unwrap();
-            tables
-                .get(&self.table_key(&table))
-                .map(|entry| {
+            match tables.get(&self.table_key(&table)) {
+                Some(entry) if !entry.pending_rows.is_empty() => {
+                    let requested: std::collections::HashSet<usize> =
+                        rows.iter().map(|seq| *seq as usize).collect();
                     entry
                         .pending_rows
                         .iter()
                         .filter(|(seq, _)| requested.contains(seq))
                         .cloned()
                         .collect()
-                })
-                .unwrap_or_default()
+                }
+                _ => Default::default(),
+            }
         };
         let blocks = self.visible_block_ids(&table);
 
@@ -7549,6 +7704,216 @@ impl AppendView {
     }
 }
 
+/// A scan predicate the column reader applies itself: column `pos` between
+/// `lo` and `hi` (inclusive; either end open).
+///
+/// The caller still applies the full predicate to the rows that survive, so a
+/// bound one row too wide (`>` mapped to `>=`) costs nothing - while the rows
+/// it excludes are never decoded into a `Value` at all.
+pub(crate) struct ColumnBounds {
+    pub pos: usize,
+    pub lo: Option<Value>,
+    pub hi: Option<Value>,
+}
+
+impl ColumnBounds {
+    /// The bounds a `WHERE` predicate implies for one column, or `None` when it
+    /// is not a conjunction of comparisons on a single column.
+    ///
+    /// `>` and `<` become inclusive bounds: the row they exclude is one row the
+    /// residual predicate then drops, so the narrowing stays exact.
+    pub(crate) fn from_expr(expr: &Expr) -> Option<Self> {
+        fn axis(expr: &Expr) -> Option<(usize, CmpOp, &Value)> {
+            match expr {
+                Expr::Cmp(a, op, b) => match (&**a, &**b) {
+                    (Expr::Column(pos), Expr::Literal(value)) => Some((*pos, *op, value)),
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+        if let Some((pos, op, value)) = axis(expr) {
+            let mut bounds = ColumnBounds {
+                pos,
+                lo: None,
+                hi: None,
+            };
+            match op {
+                CmpOp::Eq => {
+                    bounds.lo = Some(value.clone());
+                    bounds.hi = Some(value.clone());
+                }
+                CmpOp::Gt | CmpOp::Ge => bounds.lo = Some(value.clone()),
+                CmpOp::Lt | CmpOp::Le => bounds.hi = Some(value.clone()),
+                _ => return None,
+            }
+            return Some(bounds);
+        }
+        if let Expr::And(left, right) = expr {
+            let (lpos, lop, lvalue) = axis(left)?;
+            let (rpos, rop, rvalue) = axis(right)?;
+            if lpos != rpos {
+                return None;
+            }
+            let mut bounds = ColumnBounds {
+                pos: lpos,
+                lo: None,
+                hi: None,
+            };
+            for (op, value) in [(lop, lvalue), (rop, rvalue)] {
+                match op {
+                    CmpOp::Gt | CmpOp::Ge => bounds.lo = Some(value.clone()),
+                    CmpOp::Lt | CmpOp::Le => bounds.hi = Some(value.clone()),
+                    CmpOp::Eq => {
+                        bounds.lo = Some(value.clone());
+                        bounds.hi = Some(value.clone());
+                    }
+                    _ => return None,
+                }
+            }
+            return Some(bounds);
+        }
+        None
+    }
+}
+
+impl ColumnBounds {
+    /// The bounds a `WHERE` predicate implies for one column, from the parsed
+    /// form the DML statements carry (`UPDATE`/`DELETE` scan for their rows).
+    pub(crate) fn from_predicate(
+        schema: &[String],
+        pred: &infinity_parser::Predicate,
+    ) -> Option<Self> {
+        use infinity_parser::{BoolOp, CmpOp, ExprAst, Predicate as P};
+        fn axis(p: &P) -> Option<(&str, CmpOp, &infinity_parser::Literal)> {
+            match p {
+                P::Cmp(ExprAst::Column(name), op, ExprAst::Literal(value)) => {
+                    Some((name.as_str(), *op, value))
+                }
+                _ => None,
+            }
+        }
+        let position = |name: &str| schema.iter().position(|c| c == name);
+        let mut bounds;
+        if let Some((column, op, value)) = axis(pred) {
+            bounds = ColumnBounds {
+                pos: position(column)?,
+                lo: None,
+                hi: None,
+            };
+            match op {
+                CmpOp::Eq => {
+                    bounds.lo = Some(Value::from_literal(value));
+                    bounds.hi = Some(Value::from_literal(value));
+                }
+                CmpOp::Gt | CmpOp::Ge => bounds.lo = Some(Value::from_literal(value)),
+                CmpOp::Lt | CmpOp::Le => bounds.hi = Some(Value::from_literal(value)),
+                _ => return None,
+            }
+            return Some(bounds);
+        }
+        if let P::Bool(left, BoolOp::And, right) = pred {
+            let (lcolumn, lop, lvalue) = axis(left)?;
+            let (rcolumn, rop, rvalue) = axis(right)?;
+            if lcolumn != rcolumn {
+                return None;
+            }
+            let mut bounds = ColumnBounds {
+                pos: position(lcolumn)?,
+                lo: None,
+                hi: None,
+            };
+            for (op, value) in [(lop, lvalue), (rop, rvalue)] {
+                match op {
+                    CmpOp::Gt | CmpOp::Ge => bounds.lo = Some(Value::from_literal(value)),
+                    CmpOp::Lt | CmpOp::Le => bounds.hi = Some(Value::from_literal(value)),
+                    CmpOp::Eq => {
+                        bounds.lo = Some(Value::from_literal(value));
+                        bounds.hi = Some(Value::from_literal(value));
+                    }
+                    _ => return None,
+                }
+            }
+            return Some(bounds);
+        }
+        None
+    }
+}
+/// One numeric bound, in the column's own domain.
+#[derive(Clone, Copy)]
+enum Num {
+    F(f64),
+    I(i64),
+}
+
+/// One block's column, read for a bounds check.
+struct ColumnScan<'a> {
+    data: &'a [u8],
+    nulls: &'a [u8],
+    layout: ColumnLayout,
+    column_type: i32,
+    lo: Option<Num>,
+    hi: Option<Num>,
+}
+
+impl<'a> ColumnScan<'a> {
+    /// Whether `slot` falls in the bounds. One 1-8 byte load and a compare; a
+    /// NULL never matches (SQL three-valued logic drops it too).
+    fn matches(&self, slot: usize) -> bool {
+        if self.nulls.len() > slot / 8 && self.nulls[slot / 8] & (1 << (slot % 8)) == 0 {
+            return false;
+        }
+        let width = match self.layout {
+            ColumnLayout::Fixed(width) => width,
+            // A bit-packed boolean has no byte slot to load, and a var-length
+            // column's cell is not comparable without decoding it.
+            ColumnLayout::CompactBit | ColumnLayout::VarLen(_) => return true,
+        };
+        let at = slot * width;
+        let Some(bytes) = self.data.get(at..at + width) else {
+            return true;
+        };
+        let in_range = |value: f64, lo: Option<Num>, hi: Option<Num>| -> bool {
+            let low = match lo {
+                Some(Num::F(f)) => value >= f,
+                Some(Num::I(i)) => value >= i as f64,
+                None => true,
+            };
+            let high = match hi {
+                Some(Num::F(f)) => value <= f,
+                Some(Num::I(i)) => value <= i as f64,
+                None => true,
+            };
+            low && high
+        };
+        match self.column_type {
+            // TINYINT/SMALLINT/INT/BIGINT (and DATE/TIME/DATETIME as ordered
+            // counts), compared as integers so a 64-bit id stays exact.
+            1 | 2 | 3 | 4 | 16 | 17 | 18 => {
+                let value = match width {
+                    1 => i64::from(bytes[0] as i8),
+                    2 => i64::from(i16::from_le_bytes(bytes.try_into().unwrap())),
+                    4 => i64::from(i32::from_le_bytes(bytes.try_into().unwrap())),
+                    8 => i64::from_le_bytes(bytes.try_into().unwrap()),
+                    _ => return true,
+                };
+                let low = match self.lo { Some(Num::I(i)) => value >= i, Some(Num::F(f)) => value as f64 >= f, None => true };
+                let high = match self.hi { Some(Num::I(i)) => value <= i, Some(Num::F(f)) => value as f64 <= f, None => true };
+                low && high
+            }
+            5 => in_range(
+                f64::from(f32::from_le_bytes(bytes.try_into().unwrap())),
+                self.lo,
+                self.hi,
+            ),
+            6 => in_range(f64::from_le_bytes(bytes.try_into().unwrap()), self.lo, self.hi),
+            // FLOAT16/BFLOAT16 and anything else keep every row: the residual
+            // predicate decides.
+            _ => true,
+        }
+    }
+}
+
 pub(crate) struct BlockCursor<'a> {
     engine: &'a Engine,
     /// Fully-qualified table name (`db.table`), the form the row keys use.
@@ -7605,6 +7970,94 @@ impl<'a> BlockCursor<'a> {
         })
     }
 
+
+    /// Many rows at once, in id order.
+    ///
+    /// The ids are grouped by block and each block is decoded once, instead of
+    /// once per row: a 5k-row `UPDATE` names 5k ids that all live in one block,
+    /// and decoding the block per id was most of its scan.
+    pub(crate) fn rows(&mut self, ids: &[u64]) -> Result<Vec<(usize, Vec<Value>)>> {
+        let mut sorted: Vec<usize> = ids.iter().map(|id| *id as usize).collect();
+        sorted.sort_unstable();
+        sorted.dedup();
+        let mut out: Vec<(usize, Vec<Value>)> = Vec::with_capacity(sorted.len());
+        let mut at = 0usize;
+        while at < sorted.len() {
+            let seq = sorted[at];
+            let segment = (seq >> 32) as u32;
+            let block_no = ((seq & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY) as u16;
+            let mut end = at + 1;
+            while end < sorted.len()
+                && (sorted[end] >> 32) as u32 == segment
+                && ((sorted[end] & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY) as u16 == block_no
+            {
+                end += 1;
+            }
+            let run = &sorted[at..end];
+            at = end;
+            // The buffer is consulted once for the whole run, not per row.
+            let live: std::collections::HashSet<usize> = run
+                .iter()
+                .copied()
+                .filter(|seq| !self.dead.contains(&(*seq as u64)))
+                .collect();
+            let mut pending = self.engine.buffered_rows_for(&self.table, &live);
+            let mut wanted: std::collections::HashSet<usize> = Default::default();
+            for seq in &live {
+                if let Some(values) = pending.remove(seq) {
+                    out.push((*seq, values));
+                    continue;
+                }
+                wanted.insert(*seq);
+            }
+            if wanted.is_empty() || !self.visible.contains(&(segment, block_no)) {
+                continue;
+            }
+            let id = BlockId {
+                db_id: self.engine.database_id_of(&self.table),
+                table_id: self.meta.id,
+                segment_id: segment,
+                block_id: block_no,
+            };
+            if self
+                .block
+                .as_ref()
+                .map(|(cached, _)| *cached != id)
+                .unwrap_or(true)
+            {
+                let Ok(block) = self.engine.block_map(&self.table, &self.root, id) else {
+                    continue;
+                };
+                self.block = Some((id, block));
+            }
+            let (_, block) = self.block.as_ref().unwrap();
+            let version = block.version();
+            // A slot the version marks deleted has no row to return.
+            wanted.retain(|seq| {
+                let slot = (*seq & 0xffff_ffff) % DEFAULT_BLOCK_CAPACITY;
+                version.deleted.get(slot).copied().unwrap_or(0) == 0
+            });
+            if wanted.is_empty() {
+                continue;
+            }
+            let Some(rows) = Engine::decode_rows_of_values(
+                &self.meta.ids,
+                &self.meta.types,
+                &self.types,
+                id,
+                version,
+                block.as_ref(),
+                None,
+                None,
+                Some(&wanted),
+            ) else {
+                continue;
+            };
+            out.extend(rows);
+        }
+        out.sort_by_key(|(seq, _)| *seq);
+        Ok(out)
+    }
     /// The stored text of `seq`, ready to be written back under another id, or
     /// `None` when the row is deleted or outside the visible blocks.
     ///

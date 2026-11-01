@@ -1018,15 +1018,23 @@ impl TxnManager {
             .cloned()
             .map(|(k, v)| (k, Some(v)))
             .collect();
-        for key in &txn.deletes {
-            // A tombstone is applied by the caller's bottom half
-            // (`DeleteInBlock`), not by this batch: the row must stay visible
-            // until the commit publishes. It still rides in `deletes` so the
-            // entry lists the `DeleteV2` command the reference writes.
-            if txn.deferred_deletes.contains(key) {
-                continue;
+        // A tombstone is applied by the caller's bottom half (`DeleteInBlock`),
+        // not by this batch: the row must stay visible until the commit
+        // publishes. It still rides in `deletes` so the entry lists the
+        // `DeleteV2` command the reference writes.
+        //
+        // The deferred set is looked up through a hash, and the common case
+        // (every delete deferred, as a row `DELETE` is) skips the loop: a
+        // linear `contains` per key made a 5k-row delete quadratic.
+        if txn.deferred_deletes.len() != txn.deletes.len() {
+            let deferred: std::collections::HashSet<&[u8]> =
+                txn.deferred_deletes.iter().map(|key| key.as_slice()).collect();
+            for key in &txn.deletes {
+                if deferred.contains(key.as_slice()) {
+                    continue;
+                }
+                writes.push((key.clone(), None));
             }
-            writes.push((key.clone(), None));
         }
         // No applied marker: the replay floor comes from the WAL's checkpoint
         // frame (`TxnManager::last_checkpoint_ts`), exactly as the reference

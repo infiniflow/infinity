@@ -9229,28 +9229,23 @@ impl Engine {
             (reg.disk.get(column).cloned(), tail)
         };
         let mut candidates: Vec<u64> = Vec::new();
-        let mut seen: std::collections::HashSet<u64> = Default::default();
         if let Some(segments) = &disk {
             for (base, reader) in segments {
                 for (start, end) in &keys {
                     for off in reader.range(*start, *end) {
-                        let id = base | u64::from(off);
-                        if seen.insert(id) {
-                            candidates.push(id);
-                        }
+                        candidates.push(base | u64::from(off));
                     }
                 }
             }
         }
-        for id in tail {
-            if seen.insert(id) {
-                candidates.push(id);
-            }
-        }
+        candidates.extend(tail);
         // No per-candidate row decode here, for the same reason as
         // `index_lookup`: both callers re-apply the range to the rows they
-        // fetch, and a stale id contributes no row.
+        // fetch, and a stale id contributes no row. Dedupe by sorting instead
+        // of hashing every id: a 1000-row range spent 11% of the query in
+        // SipHash.
         candidates.sort_unstable();
+        candidates.dedup();
         Some(candidates)
     }
 
@@ -9555,11 +9550,22 @@ impl Engine {
         let indexed_rows = predicate
             .as_ref()
             .and_then(|expr| self.indexed_predicate_rows(&table, schema.as_slice(), expr));
+        // No index answered: the scan still narrows itself. A predicate on one
+        // fixed-width column is checked against the block's bytes, so the rows
+        // it excludes are never decoded - the difference between a filtered
+        // scan costing more than an unfiltered one (it did: everything was
+        // materialised, then filtered) and costing what it returns.
+        let scan_bounds = match &indexed_rows {
+            Some(_) => None,
+            None => predicate
+                .as_ref()
+                .and_then(|expr| crate::cpp_blocks::ColumnBounds::from_expr(expr)),
+        };
         let batch = match &indexed_rows {
             Some(ids) => self
                 .read_columns_batch_for_rows(&table, &needed, ids)
-                .or_else(|| self.read_columns_batch(&table, &needed)),
-            None => self.read_columns_batch(&table, &needed),
+                .or_else(|| self.read_columns_batch(&table, &needed, scan_bounds.as_ref())),
+            None => self.read_columns_batch(&table, &needed, scan_bounds.as_ref()),
         };
         self.txn.end_statement();
         let Some(mut batch) = batch else {
@@ -11776,7 +11782,7 @@ impl Engine {
         &self,
         table: &str,
         deletes: &[usize],
-        rows: Vec<Vec<Value>>,
+        rows: &[Vec<Value>],
         txn: Txn,
         prepare: F,
     ) -> Result<usize>
@@ -11815,6 +11821,8 @@ impl Engine {
         let range = allocated.get();
         let base = range.base;
         let _visible = BottomGuard::new(&self.txn, ts);
+        // One copy of the rewritten rows: the block buffer takes them as
+        // `Value`s, and the caller keeps its slice for the index hooks.
         let extra: Vec<(usize, Vec<Value>)> = rows
             .iter()
             .enumerate()
@@ -13642,11 +13650,11 @@ impl Engine {
                     let block = typed_append_block(&literals, &types);
                     let table_name = table.to_string();
                     let table_ident = self.table_ident(table)?;
-                    let literals_for_wal = literals.clone();
+                    let row_count = literals.len();
                     let base = self.commit_rewritten_rows(
                         table,
                         &to_del,
-                        new_rows.clone(),
+                        &new_rows,
                         t,
                         move |txn, base| {
                             match table_ident {
@@ -13657,7 +13665,7 @@ impl Engine {
                                             &table_name,
                                             &table_id,
                                             base,
-                                            literals_for_wal.len(),
+                                            row_count,
                                             block,
                                         ),
                                     ]),
@@ -15095,16 +15103,10 @@ impl Engine {
         let mut out = Vec::with_capacity(ids.len());
         // A point read: the id names its segment, block and slot, so the row
         // comes out of one block (or the append buffer, when it was written
-        // after the last checkpoint). The cursor also answers "tombstoned"
-        // for both.
+        // after the last checkpoint). The cursor decodes each block the ids
+        // touch once, so a bulk statement does not pay a block decode per row.
         if let Ok(mut cursor) = self.block_cursor(table) {
-            for &id in ids {
-                let seq = id as usize;
-                if let Some(text) = cursor.row(seq)? {
-                    out.push((seq, self.parse_stored_row(table, &defaults, &text)?));
-                }
-            }
-            return Ok(out);
+            return cursor.rows(ids);
         }
         // A table whose columns have no block layout lives in the buffer only.
         for &id in ids {
@@ -16224,6 +16226,19 @@ impl Engine {
     ) -> Result<Vec<(usize, Vec<Value>)>> {
         if let Some((col, CmpOp::Eq, val)) = where_pred.and_then(|p| p.as_column_literal()) {
             if let Some(ids) = self.index_lookup(table, col, val) {
+                return self.fetch_some_rows_with_ids(table, &ids);
+            }
+        }
+        // No index answered, but the predicate still names its rows: a
+        // comparison on one column is checked against the block's bytes, so
+        // only the matching rows are ever decoded (this is the scan half of an
+        // `UPDATE`/`DELETE`, which materialised the whole table before).
+        if let Some(bounds) = where_pred.and_then(|p| {
+            let schema = self.table_schema(table).ok()?;
+            crate::cpp_blocks::ColumnBounds::from_predicate(&schema, p)
+        }) {
+            if let Some(ids) = self.row_ids_in_bounds(table, &bounds) {
+                let ids: Vec<u64> = ids.into_iter().map(|id| id as u64).collect();
                 return self.fetch_some_rows_with_ids(table, &ids);
             }
         }
