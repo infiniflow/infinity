@@ -162,7 +162,9 @@ pub fn smve_transform(
         let mut worst = f32::NEG_INFINITY;
         for j in 0..width {
             let col = &projection_matrix[j * dim..(j + 1) * dim];
-            let score: f32 = token.iter().zip(col).map(|(a, b)| a * b).sum();
+            // SIMD inner product: this is `n_tokens * width` calls per build
+            // (2048 columns by default), the whole cost of `smve_transform`.
+            let score = crate::simd::ip(token, col);
             if best.len() == keep && score <= worst {
                 continue;
             }
@@ -256,8 +258,51 @@ impl SmveIndex {
         // `add_document` rebuilds the BMP so the incremental insert path can
         // query right after one row; a bulk build must not pay that per row -
         // 20k rows of full rebuilds was 4.2 s, the whole SMVE build.
-        for (row_id, tokens) in docs {
-            self.add_document_unbuilt(*row_id, tokens)?;
+        //
+        // The transform only reads the projection matrix, so the documents are
+        // independent: encode them across the available parallelism and add
+        // the codes in order, which keeps the BMP's document ids stable.
+        let threads = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1);
+        let encoded: Vec<Result<Vec<(u32, f32)>>> = if threads <= 1 || docs.len() < 4096 {
+            docs.iter()
+                .map(|(_, tokens)| self.encode_tokens(tokens))
+                .collect()
+        } else {
+            let chunk = docs.len().div_ceil(threads);
+            let index = &*self;
+            let mut slots: Vec<Option<Result<Vec<(u32, f32)>>>> =
+                (0..docs.len()).map(|_| None).collect();
+            std::thread::scope(|scope| {
+                let mut rest: &mut [Option<Result<Vec<(u32, f32)>>>] = &mut slots;
+                let mut start = 0usize;
+                let mut handles = Vec::new();
+                while start < docs.len() {
+                    let end = (start + chunk).min(docs.len());
+                    let (mine, tail) = rest.split_at_mut(end - start);
+                    rest = tail;
+                    handles.push(scope.spawn(move || {
+                        for (offset, slot) in mine.iter_mut().enumerate() {
+                            *slot = Some(index.encode_tokens(&docs[start + offset].1));
+                        }
+                    }));
+                    start = end;
+                }
+                for h in handles {
+                    h.join().unwrap();
+                }
+            });
+            slots
+                .into_iter()
+                .map(|s| s.expect("every slot is filled"))
+                .collect()
+        };
+        for ((row_id, _), toks) in docs.iter().zip(encoded) {
+            let toks = toks?;
+            self.bmp.add_doc(&toks);
+            self.docs.push((*row_id, toks));
+            self.labels.push(*row_id);
         }
         self.bmp.build();
         self.built = true;

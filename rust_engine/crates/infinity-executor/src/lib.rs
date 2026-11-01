@@ -15583,7 +15583,19 @@ impl Engine {
     ) -> Result<Arc<std::sync::RwLock<MultiVectorIndex>>> {
         let key = index_key(table, column);
         let tkey = self.table_key(table);
-        let reserved = self.row_count(table).unwrap_or(0);
+        // Prefer the counter the write paths maintain (live_rows): row_count
+        // walks every block version file and every slot, which cost 0.67 ms of
+        // a 1.6 ms multivector query on a 20k-row table.
+        let reserved = {
+            let tables = self.tables.lock().unwrap();
+            match tables.get(&tkey).and_then(|e| e.live_rows) {
+                Some(n) => n,
+                None => {
+                    drop(tables);
+                    self.row_count(table).unwrap_or(0)
+                }
+            }
+        };
         {
             let tables = self.tables.lock().unwrap();
             if let Some(idx) = tables.get(&tkey).and_then(|e| e.mv.get(column)) {

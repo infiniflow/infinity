@@ -322,19 +322,64 @@ impl PlaidIndex {
         const MAX_SAMPLE_FOR_QUANTIZER: usize = 50_000;
         let sample_size = MAX_SAMPLE_FOR_QUANTIZER.min(embedding_num);
         let ids = sample_indices(embedding_num, sample_size);
-        let mut residuals = Vec::with_capacity(sample_size * dim);
-        for id in ids {
-            let emb = &embedding_data[id * dim..(id + 1) * dim];
-            let cid = self.nearest_centroid(emb);
-            let centroid = &self.centroids_data[cid as usize * dim..(cid as usize + 1) * dim];
+        let mut sample = Vec::with_capacity(sample_size * dim);
+        for &id in &ids {
+            sample.extend_from_slice(&embedding_data[id * dim..(id + 1) * dim]);
+        }
+        let mut centroid_ids = vec![0u32; sample_size];
+        self.assign_nearest_parallel(&sample, sample_size, &mut centroid_ids);
+        let centroids = self.centroids_data();
+        let mut residuals = vec![0f32; sample_size * dim];
+        for (i, &cid) in centroid_ids.iter().enumerate() {
+            let centroid = &centroids[cid as usize * dim..(cid as usize + 1) * dim];
             for d in 0..dim {
-                residuals.push(emb[d] - centroid[d]);
+                residuals[i * dim + d] = sample[i * dim + d] - centroid[d];
             }
         }
         self.quantizer
             .as_mut()
             .expect("PLAID mode has a quantizer")
             .train(&residuals, sample_size)
+    }
+
+    /// Assigns `n` embeddings to their nearest centroid, splitting the rows
+    /// across the available parallelism.
+    ///
+    /// Training the quantizer scores 50K sampled residuals against the whole
+    /// centroid table, so it does the same `n * n_centroids * dim` work
+    /// `add_multiple_docs_embeddings` already spreads over threads.
+    #[allow(clippy::needless_range_loop)]
+    fn assign_nearest_parallel(&self, embeddings: &[f32], n: usize, out: &mut [u32]) {
+        let dim = self.embedding_dimension as usize;
+        let threads = std::thread::available_parallelism()
+            .map(|x| x.get())
+            .unwrap_or(1);
+        let chunk = if threads <= 1 || n < 4096 {
+            n.max(1)
+        } else {
+            n.div_ceil(threads)
+        };
+        std::thread::scope(|scope| {
+            let mut rest: &mut [u32] = out;
+            let mut handles = Vec::new();
+            let mut start = 0usize;
+            while start < n {
+                let end = (start + chunk).min(n);
+                let (mine, tail) = rest.split_at_mut(end - start);
+                rest = tail;
+                let index = self;
+                handles.push(scope.spawn(move || {
+                    for (offset, slot) in mine.iter_mut().enumerate() {
+                        let i = start + offset;
+                        *slot = index.nearest_centroid(&embeddings[i * dim..(i + 1) * dim]);
+                    }
+                }));
+                start = end;
+            }
+            for h in handles {
+                h.join().unwrap();
+            }
+        });
     }
 
     fn compute_centroid_norms(&mut self) {
@@ -355,17 +400,25 @@ impl PlaidIndex {
         let norms = self.centroid_norms_neg_half();
         let mut best = 0u32;
         let mut best_neg = f32::MIN;
-        for k in 0..self.n_centroids as usize {
-            let c = &centroids[k * dim..(k + 1) * dim];
-            let dot: f32 = embedding.iter().zip(c).map(|(a, b)| a * b).sum();
-            let neg = if self.colbertsar_mode {
-                dot
-            } else {
-                dot + norms[k]
-            };
-            if neg > best_neg {
-                best_neg = neg;
-                best = k as u32;
+        // Walk the centroid table as one flat slice: `k * dim` indexing forced a
+        // bounds check per centroid, and this loop runs
+        // `embedding_num * n_centroids` times over a build (80k * 2048 here).
+        let n = self.n_centroids as usize;
+        if self.colbertsar_mode {
+            for (k, c) in centroids.chunks_exact(dim).take(n).enumerate() {
+                let neg = crate::simd::ip(embedding, c);
+                if neg > best_neg {
+                    best_neg = neg;
+                    best = k as u32;
+                }
+            }
+        } else {
+            for (k, c) in centroids.chunks_exact(dim).take(n).enumerate() {
+                let neg = crate::simd::ip(embedding, c) + norms[k];
+                if neg > best_neg {
+                    best_neg = neg;
+                    best = k as u32;
+                }
             }
         }
         best
@@ -635,25 +688,76 @@ impl PlaidIndex {
         let old_embeddings = self.n_total_embeddings;
         let packed_dim = self.packed_dim() as usize;
 
-        let mut assignments = Vec::with_capacity(total);
-        for i in 0..total {
-            let emb = &embedding_data[i * dim..(i + 1) * dim];
-            let cid = self.nearest_centroid(emb);
-            assignments.push(cid);
-            if !self.colbertsar_mode {
-                let centroid = &self.centroids_data()[cid as usize * dim..(cid as usize + 1) * dim];
-                let mut residual = vec![0f32; dim];
-                for d in 0..dim {
-                    residual[d] = emb[d] - centroid[d];
+        // Assign every embedding to its nearest centroid and collect the
+        // residual. Both steps only read the centroid table, so the rows are
+        // independent and split across the available parallelism; 80k
+        // embeddings against 2048 centroids on one thread was the whole
+        // remaining cost of a 20k-row build.
+        let mut assignments = vec![0u32; total];
+        let mut residuals = if self.colbertsar_mode {
+            Vec::new()
+        } else {
+            vec![0f32; total * dim]
+        };
+        {
+            let index = &*self;
+            let threads = std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1);
+            let chunk = if threads <= 1 || total < 4096 {
+                total.max(1)
+            } else {
+                total.div_ceil(threads)
+            };
+            std::thread::scope(|scope| {
+                let mut rest_a: &mut [u32] = &mut assignments;
+                let mut rest_r: &mut [f32] = &mut residuals;
+                let mut handles = Vec::new();
+                let mut start = 0usize;
+                while start < total {
+                    let end = (start + chunk).min(total);
+                    let (mine_a, tail_a) = rest_a.split_at_mut(end - start);
+                    rest_a = tail_a;
+                    let mine_r = if index.colbertsar_mode {
+                        &mut [][..]
+                    } else {
+                        let (mine_r, tail_r) = rest_r.split_at_mut((end - start) * dim);
+                        rest_r = tail_r;
+                        mine_r
+                    };
+                    handles.push(scope.spawn(move || {
+                        for (offset, slot) in mine_a.iter_mut().enumerate() {
+                            let i = start + offset;
+                            let emb = &embedding_data[i * dim..(i + 1) * dim];
+                            let cid = index.nearest_centroid(emb);
+                            *slot = cid;
+                            if let Some(row) = mine_r.get_mut(offset * dim..(offset + 1) * dim) {
+                                let centroid = &index.centroids_data()
+                                    [cid as usize * dim..(cid as usize + 1) * dim];
+                                for d in 0..dim {
+                                    row[d] = emb[d] - centroid[d];
+                                }
+                            }
+                        }
+                    }));
+                    start = end;
                 }
-                let packed = self
-                    .quantizer
-                    .as_ref()
-                    .expect("PLAID mode has a quantizer")
-                    .quantize(&residual, 1)?;
-                debug_assert_eq!(packed.len(), packed_dim);
-                self.packed_residuals.extend_from_slice(&packed);
-            }
+                for h in handles {
+                    h.join().unwrap();
+                }
+            });
+        }
+        // One batch quantize rather than one call per embedding: the quantizer
+        // walks the residuals anyway, and a call per row allocated a buffer for
+        // each.
+        if !self.colbertsar_mode && total > 0 {
+            let packed = self
+                .quantizer
+                .as_ref()
+                .expect("PLAID mode has a quantizer")
+                .quantize(&residuals, total)?;
+            debug_assert_eq!(packed.len(), total * packed_dim);
+            self.packed_residuals.extend_from_slice(&packed);
         }
 
         self.centroid_ids.extend_from_slice(&assignments);
@@ -759,19 +863,21 @@ impl PlaidIndex {
         let centroids = self.centroids_data();
         let norms = self.centroid_norms_neg_half();
         let mut scores = vec![0f32; n_query_tokens * k];
+        // One SIMD dot product per (token, centroid) instead of a scalar loop
+        // over the dimensions: every query pays this over the whole table.
         for q in 0..n_query_tokens {
             let token = &query[q * dim..(q + 1) * dim];
-            for c in 0..k {
-                let cent = &centroids[c * dim..(c + 1) * dim];
-                let mut dot = 0f32;
-                for d in 0..dim {
-                    dot += token[d] * cent[d];
+            let row = &mut scores[q * k..(q + 1) * k];
+            if self.colbertsar_mode {
+                for (slot, cent) in row.iter_mut().zip(centroids.chunks_exact(dim)) {
+                    *slot = crate::simd::ip(token, cent);
                 }
-                scores[q * k + c] = if self.colbertsar_mode {
-                    dot
-                } else {
-                    dot + norms[c]
-                };
+            } else {
+                for ((slot, cent), &norm) in
+                    row.iter_mut().zip(centroids.chunks_exact(dim)).zip(norms)
+                {
+                    *slot = crate::simd::ip(token, cent) + norm;
+                }
             }
         }
         scores
@@ -1081,6 +1187,14 @@ impl PlaidIndex {
         for q in 0..n_query_tokens {
             let mut ranked: Vec<(f32, u32)> =
                 (0..k).map(|c| (scores[q * k + c], c as u32)).collect();
+            // Only the top `n_ivf_probe` matter, and `k` is the whole centroid
+            // table: a full sort ranked 2048 entries to read 8 of them, on every
+            // query token.
+            let take = n_ivf_probe.min(ranked.len());
+            if take > 0 && take < ranked.len() {
+                ranked.select_nth_unstable_by(take - 1, |a, b| b.0.total_cmp(&a.0));
+                ranked.truncate(take);
+            }
             ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
             for &(_, cid) in ranked.iter().take(n_ivf_probe) {
                 if !selected[cid as usize] {

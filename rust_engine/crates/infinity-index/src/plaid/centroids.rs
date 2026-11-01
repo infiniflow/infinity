@@ -61,9 +61,14 @@ pub fn kmeans_l2(
 
     let mut partition_id = vec![0u32; training_num];
     let mut previous_total = f32::MAX;
-    let threads = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
+    let threads = std::env::var("INF_KMEANS_THREADS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+        });
     for _ in 0..iteration_max {
         // Assign every training vector to its nearest centroid.
         //
@@ -73,7 +78,14 @@ pub fn kmeans_l2(
         // each thread sums its own distance; the per-thread sums are then added
         // in a fixed order so the result does not depend on thread arrival.
         let total_distance = if threads <= 1 || training_num < 4096 {
-            assign_rows(&training, dimension, partition_num, &centroids, &mut partition_id, 0)
+            assign_rows(
+                &training,
+                dimension,
+                partition_num,
+                &centroids,
+                &mut partition_id,
+                0,
+            )
         } else {
             let chunk = training_num.div_ceil(threads);
             let mut sums = vec![0f32; threads];
@@ -95,14 +107,8 @@ pub fn kmeans_l2(
                     let training = &training;
                     let centroids = &centroids;
                     handles.push(scope.spawn(move || {
-                        *slot = assign_rows(
-                            training,
-                            dimension,
-                            partition_num,
-                            centroids,
-                            mine,
-                            start,
-                        );
+                        *slot =
+                            assign_rows(training, dimension, partition_num, centroids, mine, start);
                     }));
                 }
                 for h in handles {
@@ -168,7 +174,10 @@ pub fn kmeans_l2(
 }
 
 fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| (x - y) * (x - y)).sum()
+    // The SIMD kernel the vector indexes already use. The k-means assignment
+    // loop calls this `training_num * partition_num` times, and the scalar
+    // version was 57% of a 20k-row PLAID build.
+    crate::simd::l2_sq(a, b)
 }
 
 /// Assigns the training rows in `slots` to their nearest centroid, returning
@@ -181,22 +190,78 @@ fn assign_rows(
     slots: &mut [u32],
     first: usize,
 ) -> f32 {
-    let mut total = 0.0f32;
-    for (offset, slot) in slots.iter_mut().enumerate() {
-        let row = first + offset;
-        let v = &training[row * dimension..(row + 1) * dimension];
-        let mut best = 0usize;
-        let mut best_d = f32::INFINITY;
-        for k in 0..partition_num {
-            let c = &centroids[k * dimension..(k + 1) * dimension];
-            let d = l2_sq(v, c);
-            if d < best_d {
-                best_d = d;
-                best = k;
-            }
+    // `|v - c|^2 = |v|^2 - 2 v.c + |c|^2`, and `|v|^2` does not change which
+    // centroid wins, so the comparison is on `|c|^2 - 2 v.c` - one dot product
+    // per centroid instead of a subtract-square-add over the dimensions. The
+    // squared distance is still reported for the convergence test.
+    let norms: Vec<f32> = centroids
+        .chunks_exact(dimension)
+        .take(partition_num)
+        .map(|c| c.iter().map(|x| x * x).sum::<f32>())
+        .collect();
+    use std::simd::f32x8;
+    use std::simd::num::SimdFloat;
+    // The centroids transposed: `transposed[d * partition_num + k]` is the
+    // `d`-th component of centroid `k`. The kernels below read eight
+    // consecutive centroids for one dimension, which is one vector load; the
+    // row-major layout made that eight strided scalar reads per dimension and
+    // ate the whole gain.
+    let mut transposed = vec![0f32; dimension * partition_num];
+    for k in 0..partition_num {
+        for d in 0..dimension {
+            transposed[d * partition_num + k] = centroids[k * dimension + d];
         }
-        *slot = best as u32;
-        total += best_d;
+    }
+    let mut total = 0.0f32;
+    // Four rows against eight centroids per block: the centroids are loaded
+    // once and reused by all four rows, which is the reuse the reference gets
+    // from its SGEMM (`matrixA_multiply_transpose_matrixB`) instead of a dot
+    // product per (row, centroid) pair.
+    let mut at = 0usize;
+    while at < slots.len() {
+        let rows = (slots.len() - at).min(4);
+        let mut best_k = [0usize; 4];
+        let mut best_neg = [f32::INFINITY; 4];
+        // `|c|^2 - 2 v.c` per lane; a lane holds one centroid of the block.
+        let mut k = 0usize;
+        while k < partition_num {
+            let lanes = (partition_num - k).min(8);
+            let mut acc = [f32x8::splat(0.0); 4];
+            for d in 0..dimension {
+                let base = d * partition_num + k;
+                let cd = if lanes == 8 {
+                    f32x8::from_slice(&transposed[base..])
+                } else {
+                    let mut col = [0.0f32; 8];
+                    col[..lanes].copy_from_slice(&transposed[base..base + lanes]);
+                    f32x8::from_array(col)
+                };
+                for r in 0..rows {
+                    let row = first + at + r;
+                    acc[r] += f32x8::splat(training[row * dimension + d]) * cd;
+                }
+            }
+            for r in 0..rows {
+                let mut neg = f32x8::splat(-2.0) * acc[r];
+                for lane in 0..lanes {
+                    neg[lane] += norms[k + lane];
+                }
+                for lane in 0..lanes {
+                    if neg[lane] < best_neg[r] {
+                        best_neg[r] = neg[lane];
+                        best_k[r] = k + lane;
+                    }
+                }
+            }
+            k += lanes;
+        }
+        for r in 0..rows {
+            let row = first + at + r;
+            let v = &training[row * dimension..(row + 1) * dimension];
+            slots[at + r] = best_k[r] as u32;
+            total += crate::simd::ip(v, v) + best_neg[r];
+        }
+        at += rows;
     }
     total
 }
