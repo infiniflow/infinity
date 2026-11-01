@@ -8479,10 +8479,8 @@ impl Engine {
         let index_name = index.to_string();
         let secondary = is_secondary_kind(&version.index.index_type);
         self.run_commit_bottom(&shard_key, move |engine| {
-            engine.storage.store.put(
-                &dump_ts_key(&bottom_table, &index_name),
-                &ts.to_le_bytes(),
-            )?;
+            // (The dump ts lives in the `idx_chunk` records the chunk stamp
+            // below writes; there is no per-index sidecar to keep.)
             // The chunk record the reference writes in this transaction
             // (`AddChunkIndexID1`): the chunks already published for the index
             // now belong to `ts`.
@@ -10164,14 +10162,13 @@ impl Engine {
     }
 
     fn write_mirror_dirty(&self, key: &str) {
-        let _ = self
-            .storage
-            .store
-            .put(&Self::mirror_dirty_key(key), b"1");
+        // In-memory only: the block files are the only row copy now, and a
+        // restart decides staleness by comparing them with the WAL.
+        let _ = key;
     }
 
     fn clear_mirror_dirty(&self, key: &str) {
-        let _ = self.storage.store.delete(&Self::mirror_dirty_key(key));
+        let _ = key;
     }
 
     /// Whether the files under `data/` no longer describe the table's rows:
@@ -10217,12 +10214,9 @@ impl Engine {
             if !self.has_block_mirror(&key) {
                 continue;
             }
-            let blocks = self.block_visible_row_count(&key);
-            let rows = self.storage.store.count_prefix(&row_prefix(&key))?;
-            let hidden = self.storage.store.count_prefix(&del_prefix(&key))?;
-            // No row keys at all means the blocks are the only copy (plan C):
-            // there is nothing for them to be behind.
-            let behind = rows > 0 && rows.saturating_sub(hidden) != blocks;
+            // The blocks are the only copy of the rows (plan A): there is no
+            // second store for them to be behind.
+            let behind = false;
             {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(key.clone()).or_default();
@@ -10272,44 +10266,10 @@ impl Engine {
         // Both spellings: `DROP TABLE t` and a qualified `db.t` write the same
         // rows under whichever name reached the executor, so a sweep keyed on
         // only one of them can miss half the prefixes.
-        let qualified = self.table_key(name);
-        let mut keys: std::collections::BTreeSet<Vec<u8>> = std::collections::BTreeSet::new();
-        for table in [name, qualified.as_str()] {
-            for prefix in [row_prefix(table), del_prefix(table)] {
-                for (k, _) in self.storage.store.scan_prefix(&prefix)? {
-                    keys.insert(k);
-                }
-            }
-        }
-        // The row keys are what the mirror was behind; a table this drop leaves
-        // behind must not look stale to the next `CREATE`.
-        let mut keys = keys;
-        keys.insert(Self::mirror_dirty_key(&qualified));
-        // The mirror's sidecars are keyed by the table's **name**, which a
-        // re-created table reuses: an append log left behind would describe the
-        // dropped table's rows, and the next checkpoint would clip this table's
-        // extent to ids that no longer exist.
-        for key in [
-            appends_key(&qualified),
-            append_ts_key(&qualified),
-            append_copy_key(&qualified),
-            deletes_key(&qualified),
-            delete_ts_key(&qualified),
-        ] {
-            keys.insert(key);
-        }
-        // The per-segment import extent is keyed the same way.
-        for prefix in [
-            format!("import_ts:{qualified}:"),
-            format!("import_rows:{qualified}:"),
-        ] {
-            for (k, _) in self.storage.store.scan_prefix(prefix.as_bytes())? {
-                keys.insert(k);
-            }
-        }
-        let deletes: Vec<(Vec<u8>, Option<Vec<u8>>)> =
-            keys.into_iter().map(|k| (k, None)).collect();
-        self.storage.store.atomic_batch(&deletes)
+        // Nothing to sweep: the rows and every journal live in the block
+        // files, which the drop removes with the table's directory.
+        let _ = name;
+        Ok(())
     }
 
     /// `CREATE TABLE` deletes the row keys a crashed `DROP TABLE` of the same
@@ -12569,23 +12529,8 @@ impl Engine {
                     }
                     self.txn.commit(t)?;
                 }
-                for (k, _) in self.storage.store.scan_prefix(&row_prefix(table))? {
-                    self.storage.store.delete(&k)?;
-                }
-                for (k, _) in self.storage.store.scan_prefix(&del_prefix(table))? {
-                    self.storage.store.delete(&k)?;
-                }
                 // The block directory is keyed by table id, which a rename
-                // keeps, so the files are already the renamed table's. The text
-                // records written under the new name go, and the append/delete
-                // logs are rebuilt from the `version` files under the new key.
-                for (k, _) in self.storage.store.scan_prefix(&row_prefix(new_name))? {
-                    self.storage.store.delete(&k)?;
-                }
-                for (k, _) in self.storage.store.scan_prefix(&del_prefix(new_name))? {
-                    self.storage.store.delete(&k)?;
-                }
-                let _ = self.restore_cpp_blocks(new_name);
+                // keeps, so the files are already the renamed table's.
                 // Move the per-table entry (allocator, registries) to the new
                 // name; the row ids it describes did not change.
                 let old_tkey = self.table_key(table);
@@ -12727,14 +12672,7 @@ impl Engine {
                     },
                     |_| dc_cmd,
                 )?;
-                // The rows are in the blocks now; the text records the rewrite
-                // staged only served the transaction.
-                for (k, _) in self.storage.store.scan_prefix(&row_prefix(table))? {
-                    self.storage.store.delete(&k)?;
-                }
-                for (k, _) in self.storage.store.scan_prefix(&del_prefix(table))? {
-                    self.storage.store.delete(&k)?;
-                }
+                // The rows are in the blocks now: there is no text copy to drop.
                 if !rewritten.is_empty() {
                     self.rewrite_cpp_blocks(table, &rewritten)?;
                 }
@@ -16442,13 +16380,7 @@ impl Engine {
 
     /// Tombstoned sequence ids of a table; index hits are validated against it.
     fn tombstone_set(&self, table: &str) -> Result<std::collections::HashSet<u64>> {
-        let dp = del_prefix(table);
         let mut dead: std::collections::HashSet<u64> = Default::default();
-        for (k, _) in self.storage.store.scan_prefix(&dp)? {
-            if let Ok(seq) = String::from_utf8_lossy(&k[dp.len()..]).parse() {
-                dead.insert(seq);
-            }
-        }
         // A delete the checkpoint has not written yet is in the table's delete
         // log (`note_deleted_ids`, `DeleteInBlock`); the block's `version`
         // carries it after the flush.
@@ -21365,16 +21297,8 @@ impl Engine {
             self.tables.lock().unwrap().entry(key).or_default().live_rows = Some(rows);
             return Ok(rows);
         }
-        let total = self.storage.store.count_prefix(&row_prefix(&name))?;
-        if total == 0 {
-            // No `row:` keys at all: the blocks are the only copy of the rows,
-            // stale or not, and their `version` files are the count.
-            let rows = self.block_visible_row_count(&name);
-            self.tables.lock().unwrap().entry(key).or_default().live_rows = Some(rows);
-            return Ok(rows);
-        }
-        let deleted = self.storage.store.count_prefix(&del_prefix(&name))?;
-        Ok(total.saturating_sub(deleted))
+        // No block layout means no row files either; the count is nothing.
+        Ok(0)
     }
 
     /// The storage's lifecycle mode (C++ `Storage::GetStorageMode`).
