@@ -13679,15 +13679,20 @@ impl Engine {
                             Ok(())
                         },
                     )?;
-                    let schema = self.table_schema(table).unwrap_or_default();
-                    for (k, nr) in new_rows.iter().enumerate() {
-                        let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
-                        self.update_indexes_on_insert_text(table, base + k, &texts, &schema)?;
-                        self.update_text_indexes(table, base + k, &texts, &schema);
-                        self.update_vector_caches(table, base + k, &texts);
+                    // A table with no index has nothing to feed: rendering every
+                    // cell to text for the hooks cost a `format!` per cell on
+                    // every rewritten row.
+                    if self.has_index_declaration(table) || self.any_in_memory_index() {
+                        let schema = self.table_schema(table).unwrap_or_default();
+                        for (k, nr) in new_rows.iter().enumerate() {
+                            let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
+                            self.update_indexes_on_insert_text(table, base + k, &texts, &schema)?;
+                            self.update_text_indexes(table, base + k, &texts, &schema);
+                            self.update_vector_caches(table, base + k, &texts);
+                        }
+                        self.drop_text_index_rows(table, &to_del);
+                        self.drop_vector_cache_rows(table, &to_del);
                     }
-                    self.drop_text_index_rows(table, &to_del);
-                    self.drop_vector_cache_rows(table, &to_del);
                 }
                 Ok(QueryResult::Updated {
                     count: to_del.len(),
