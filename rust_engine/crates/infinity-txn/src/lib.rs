@@ -417,13 +417,19 @@ impl TxnManager {
         // records in `wal.rust`; `segment_paths` still reads that.
         let wal_path = wal_path.into();
         let recs = read_all_segments(&wal_path)?;
-        let applied_ts = store
-            .get(APPLIED_TS_KEY)?
-            .and_then(|v| {
-                v.get(..8)
-                    .map(|b| TxnTimeStamp::from_le_bytes(b.try_into().unwrap()))
+        // The newest checkpoint frame is the floor, exactly as the reference
+        // takes `max_checkpoint_ts` from the newest `kNewCheckpoint` entry: the
+        // log is the only place the clock's position is written down.
+        let frame_ts = recs
+            .iter()
+            .flat_map(|entry| entry.cmds.iter())
+            .filter_map(|cmd| match cmd {
+                WalCmd::Checkpoint { max_commit_ts } => Some(*max_commit_ts),
+                _ => None,
             })
+            .max()
             .unwrap_or(0);
+        let applied_ts = frame_ts;
         let max_ts = recs.iter().map(|r| r.commit_ts).max().unwrap_or(0);
         let max_id = recs
             .iter()
@@ -1022,14 +1028,10 @@ impl TxnManager {
             }
             writes.push((key.clone(), None));
         }
-        // The applied-timestamp marker rides along with the batch, so a replay
-        // after a reopen never re-applies records that are already in the KV.
-        let applied = self.max_applied.fetch_max(commit_ts, Ordering::SeqCst);
-        let applied = applied.max(commit_ts);
-        writes.push((
-            APPLIED_TS_KEY.to_vec(),
-            Some(applied.to_le_bytes().to_vec()),
-        ));
+        // No applied marker: the replay floor comes from the WAL's checkpoint
+        // frame (`TxnManager::last_checkpoint_ts`), exactly as the reference
+        // derives it, so the KV holds nothing but the keys themselves.
+        self.max_applied.fetch_max(commit_ts, Ordering::SeqCst);
         apply_split(self.store.as_ref(), self.catalog_store.as_ref(), writes)?;
         {
             let mut seen = self.write_ts.lock().unwrap();
@@ -1227,12 +1229,6 @@ impl TxnManager {
                         }
                     }
                 }
-                if for_kv {
-                    writes.push((
-                        APPLIED_TS_KEY.to_vec(),
-                        Some(entry.commit_ts.to_le_bytes().to_vec()),
-                    ));
-                }
                 apply_split(self.store.as_ref(), self.catalog_store.as_ref(), writes)?;
                 self.max_applied
                     .fetch_max(entry.commit_ts, Ordering::SeqCst);
@@ -1247,22 +1243,31 @@ impl TxnManager {
         Ok(applied)
     }
 
-    /// The replay floor: the highest commit timestamp **both** stores hold.
+    /// The replay floor: the timestamp the newest checkpoint frame covers.
     ///
-    /// The marker is written to both (`apply_split`) and the answer is their
-    /// minimum, so a store that lost its memtable to a crash drags the floor
-    /// back instead of letting the other one skip the records it lost.
+    /// The reference derives `max_checkpoint_ts` from the newest
+    /// `kNewCheckpoint` entry and keeps no marker in the KV store
+    /// (`wal_manager_impl.cpp:598-670`); doing the same here is what keeps the
+    /// KV free of bookkeeping keys, so the row store can go away entirely.
+    ///
+    /// A missing frame means "nothing was ever checkpointed", i.e. floor 0: the
+    /// whole log replays (the block half is still gated by the blocks' own
+    /// timestamps, so nothing is applied twice).
     pub fn applied_ts(&self) -> Result<TxnTimeStamp> {
-        let marker = |store: &dyn MetaStore| -> Result<TxnTimeStamp> {
-            Ok(store
-                .get(APPLIED_TS_KEY)?
-                .and_then(|v| {
-                    v.get(..8)
-                        .map(|b| TxnTimeStamp::from_le_bytes(b.try_into().unwrap()))
-                })
-                .unwrap_or(0))
-        };
-        Ok(marker(self.store.as_ref())?.min(marker(self.catalog_store.as_ref())?))
+        for path in segment_paths(&self.wal_path)?.into_iter().rev() {
+            let mut newest = 0;
+            for entry in WalManager::read_all(&path)? {
+                for cmd in &entry.cmds {
+                    if let WalCmd::Checkpoint { max_commit_ts } = cmd {
+                        newest = newest.max(*max_commit_ts);
+                    }
+                }
+            }
+            if newest > 0 {
+                return Ok(newest);
+            }
+        }
+        Ok(0)
     }
 
     /// Re-publishes the checkpoint frame so it covers `max_commit_ts`, without
@@ -1490,11 +1495,9 @@ impl TxnManager {
 /// A row command (`row:`/`del:`, the keys [`build_commands`] turns into
 /// `Append`/`Delete`) belongs to the row store; everything else is a catalog
 /// record and belongs to the catalog store - the same split the reference makes
-/// between its block files and `kv_instance_`. The replay marker
-/// (`meta:applied_ts`) also belongs to the row store, because it says how much
-/// of the row WAL is in it. Both halves are written as one atomic batch each,
-/// rows first: a crash between them replays the catalog records from the WAL
-/// into the catalog store, which is idempotent.
+/// between its block files and `kv_instance_`. Both halves are written as one
+/// atomic batch each, rows first: a crash between them replays the catalog
+/// records from the WAL into the catalog store, which is idempotent.
 fn apply_split(
     store: &dyn MetaStore,
     catalog_store: &dyn MetaStore,
@@ -1502,16 +1505,7 @@ fn apply_split(
 ) -> Result<()> {
     let mut rows: Vec<(Vec<u8>, Option<Vec<u8>>)> = Vec::new();
     let mut catalog: Vec<(Vec<u8>, Option<Vec<u8>>)> = Vec::new();
-    // The applied marker goes **last**: it is what tells a replay which records
-    // the KV already holds, so it may only move once both halves are in. Written
-    // with the rows, a crash between the two batches would leave the catalog
-    // records out while the marker skipped them on the next open.
-    let mut applied: Option<(Vec<u8>, Option<Vec<u8>>)> = None;
     for (key, value) in writes {
-        if key == APPLIED_TS_KEY {
-            applied = Some((key, value));
-            continue;
-        }
         let is_row = parse_row_key(&key, ROW_PREFIX).is_some()
             || parse_row_key(&key, DEL_PREFIX).is_some();
         if is_row {
@@ -1530,19 +1524,6 @@ fn apply_split(
     }
     if !catalog.is_empty() {
         catalog_store.atomic_batch(&catalog)?;
-    }
-    if let Some(entry) = applied {
-        // The marker goes into **both** stores, and the replay floor is their
-        // minimum (see `TxnManager::applied_ts`). The reference keeps the
-        // catalog and this marker in one KV, so a crash cannot leave the marker
-        // ahead of the catalog. This engine has two stores and neither is
-        // fsynced before a checkpoint, so a RocksDB background flush can make
-        // one durable while the other still sits in its memtable. Writing both
-        // and taking the minimum means the lagging store drags the floor back:
-        // the replay then redoes both halves, and it converges because the KV
-        // writes are puts on the same keys.
-        store.atomic_batch(std::slice::from_ref(&entry))?;
-        catalog_store.atomic_batch(std::slice::from_ref(&entry))?;
     }
     Ok(())
 }
@@ -1992,9 +1973,6 @@ fn read_all_segments(wal_path: &std::path::Path) -> Result<Vec<WalEntry>> {
     }
     Ok(out)
 }
-
-/// Key of the applied-commit-timestamp marker in the row/meta store.
-const APPLIED_TS_KEY: &[u8] = b"meta:applied_ts";
 
 #[cfg(test)]
 mod tests;

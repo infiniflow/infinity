@@ -11626,18 +11626,10 @@ impl Engine {
             engine.bump_writes(&bottom_table);
             engine.note_live_rows(&bottom_table, bottom_rows.len() as isize);
             engine.append_row_cache(&bottom_table, base, &bottom_encoded);
-            // The WAL frame of a multi-value/tensor table cannot be turned back
-            // into rows (`to_data_block` has no such column), so a directory
-            // whose checkpoint never ran would lose them: keep the stored text
-            // as the readable copy for exactly those tables.
-            if engine.needs_text_rows(&bottom_table) {
-                for (k, encoded) in bottom_encoded.iter().enumerate() {
-                    engine
-                        .storage
-                        .store
-                        .put(&row_key(&bottom_table, base + k), encoded.as_bytes())?;
-                }
-            }
+            // No row key for the multi-value/tensor tables either: their WAL
+            // frame is decoded back into row text by `block::to_data_block`
+            // (tensor and sparse columns render their text form), so the block
+            // is the only copy, as in the reference.
             if !engine.has_block_layout(&bottom_table) {
                 for (k, encoded) in bottom_encoded.iter().enumerate() {
                     engine
