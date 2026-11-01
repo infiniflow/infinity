@@ -3568,7 +3568,7 @@ impl Engine {
 
     /// Whether the delete journal holds `seq`. Reads the loaded journal in
     /// place, and only pays for loading it when this is the first look.
-    fn is_deleted(&self, table: &str, seq: usize) -> bool {
+    pub(crate) fn is_deleted(&self, table: &str, seq: usize) -> bool {
         let key = self.table_key(table);
         {
             let tables = self.tables.lock().unwrap();
@@ -4441,7 +4441,7 @@ impl Engine {
     /// block cursor cannot serve (a table whose columns have no block layout has
     /// nothing but the append buffer).
     pub(crate) fn pending_row_text(&self, table: &str, seq: usize) -> Result<Option<Vec<u8>>> {
-        if self.deleted_ids(table).contains(&(seq as u64)) {
+        if self.is_deleted(table, seq) {
             return Ok(None);
         }
         let Some(values) = self.pending_row(table, seq) else {
@@ -7561,6 +7561,10 @@ pub(crate) struct BlockCursor<'a> {
     /// The block last decoded, with the `version` that says which of its slots
     /// are live.
     block: Option<(BlockId, Arc<MappedBlock>)>,
+    /// Rows deleted since the last checkpoint, as one set: `row` asks once per
+    /// row, and scanning (or cloning) the delete journal there made a point
+    /// read cost the journal's length.
+    dead: std::collections::HashSet<u64>,
 }
 
 impl<'a> BlockCursor<'a> {
@@ -7586,6 +7590,9 @@ impl<'a> BlockCursor<'a> {
             .into_iter()
             .map(|id| (id.segment_id, id.block_id))
             .collect();
+        let dead = engine
+            .tombstone_set_at(&table, crate::read_ts())
+            .unwrap_or_default();
         Ok(Self {
             engine,
             table,
@@ -7594,6 +7601,7 @@ impl<'a> BlockCursor<'a> {
             visible,
             root: engine.blocks_root(),
             block: None,
+            dead,
         })
     }
 
@@ -7607,7 +7615,8 @@ impl<'a> BlockCursor<'a> {
     pub(crate) fn row(&mut self, seq: usize) -> Result<Option<Vec<u8>>> {
         // A delete the mirror has not written yet lives in the table's delete
         // log (`note_deleted_ids`); the block's `version` has it afterwards.
-        if self.engine.deleted_ids(&self.table).contains(&(seq as u64)) {
+        // One set for the whole cursor: this runs once per row.
+        if self.dead.contains(&(seq as u64)) {
             return Ok(None);
         }
         if let Some(values) = self.engine.pending_row(&self.table, seq) {
