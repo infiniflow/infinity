@@ -118,6 +118,16 @@ bool TermDocIterator::Next(RowID doc_id) {
     }
 }
 
+bool TermDocIterator::NextNoSkip(RowID doc_id) {
+    assert(doc_id != INVALID_ROWID);
+    if (doc_id_ != INVALID_ROWID && doc_id_ >= doc_id) {
+        return true;
+    }
+    ++seek_cnt_;
+    doc_id_ = iter_->SeekDoc(doc_id);
+    return doc_id_ != INVALID_ROWID;
+}
+
 bool TermDocIterator::NextShallow(RowID doc_id) {
     ++block_skip_cnt_;
     if (threshold_ > BM25ScoreUpperBound()) [[unlikely]] {

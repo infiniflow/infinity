@@ -63,6 +63,10 @@ public:
 
     bool Next(RowID doc_id) override;
 
+    // Seeks to the target doc only, without the threshold_-driven per-doc loop (saves tf / column
+    // length decoding)
+    bool NextNoSkip(RowID doc_id) override;
+
     float BM25Score() override;
 
     float Score() override {

@@ -39,6 +39,12 @@ public:
     virtual bool NextShallow(RowID doc_id) = 0;
 
     virtual float BM25Score() = 0;
+
+    // Positioning only (SeekDoc): skips the "walk docs by local threshold" loop. When the caller
+    // (e.g. block-max WAND) re-checks competitiveness with its own block bounds afterwards,
+    // decoding tf / doc length for every candidate is wasted work. The default implementation
+    // forwards to Next(); non-term iterators can keep it.
+    virtual bool NextNoSkip(RowID doc_id) { return Next(doc_id); }
 };
 
 } // namespace infinity

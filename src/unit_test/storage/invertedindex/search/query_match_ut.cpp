@@ -191,10 +191,10 @@ TEST_P(QueryMatchTest, bmw_many_terms) {
 
     constexpr u32 topn = 10;
     FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, topn);
-    context.early_term_algo_ = EarlyTermAlgo::kBMW;
+    context.early_term_algo_ = EarlyTermAlgo::kHeapBMW;
     context.query_tree_ = driver.ParseSingleWithFields("text", words(200));
     std::unique_ptr<DocIterator> doc_iterator = query_builder.CreateSearch(context);
-    ASSERT_EQ(doc_iterator->GetType(), DocIteratorType::kBMWIterator);
+    ASSERT_EQ(doc_iterator->GetType(), DocIteratorType::kHeapBMWIterator);
 
     float scores[topn];
     RowID row_ids[topn];
@@ -205,6 +205,117 @@ TEST_P(QueryMatchTest, bmw_many_terms) {
         }
     }
     EXPECT_EQ(result_heap.GetResultSize(), topn);
+    EXPECT_TRUE(txn_mgr->CommitTxn(txn).ok());
+}
+
+// Differential test: same index, same long query -- naive OR and heap block-max WAND must return
+// exactly the same doc sequence and scores (without a threshold) and the same top-k scores (with
+// threshold feedback). This is the main correctness guard for heap BMW: any pruning bug shows up as
+// a missing doc or a wrong score.
+TEST_P(QueryMatchTest, bmw_heap_differential) {
+    CreateDBAndTable(db_name_, table_name_);
+    CreateIndex(db_name_, table_name_, index_name_, "standard");
+    std::mt19937 rng(2024);
+    auto pick = [&rng] { return fmt::format("term{:03d} ", rng() % (1 + rng() % 120)); };
+    auto words = [&pick](u32 n) {
+        std::string s;
+        for (u32 i = 0; i < n; ++i) {
+            s += pick();
+        }
+        return s;
+    };
+    for (u32 seg = 0; seg < 2; ++seg) {
+        datas_.clear();
+        for (u32 i = 0; i < 800; ++i) {
+            datas_.push_back({std::to_string(seg * 800 + i), "title", words(40)});
+        }
+        InsertData(db_name_, table_name_);
+    }
+
+    NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("query match"), TransactionType::kRead);
+    auto [table_info, status] = txn->GetTableInfo(db_name_, table_name_);
+    std::shared_ptr<IndexReader> index_reader;
+    status = txn->GetFullTextIndexReader(db_name_, table_name_, index_reader);
+    EXPECT_TRUE(status.ok());
+
+    const std::string long_query = words(200);
+    const std::string mid_query = words(40);
+
+    // No threshold: full scan, doc sequence and scores must match one by one.
+    auto run_full_scan = [&](EarlyTermAlgo algo, const std::string &query_text) {
+        QueryBuilder query_builder(table_info);
+        query_builder.Init(index_reader);
+        SearchDriver driver(query_builder.GetColumn2Analyzer(), "text");
+        FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 0);
+        context.early_term_algo_ = algo;
+        context.query_tree_ = driver.ParseSingleWithFields("text", query_text);
+        std::unique_ptr<DocIterator> doc_iterator = query_builder.CreateSearch(context);
+        EXPECT_NE(doc_iterator, nullptr);
+        std::vector<std::pair<RowID, float>> result;
+        while (doc_iterator->Next()) {
+            result.emplace_back(doc_iterator->DocID(), doc_iterator->Score());
+        }
+        return result;
+    };
+
+    for (const std::string &query_text : {long_query, mid_query}) {
+        auto naive_result = run_full_scan(EarlyTermAlgo::kNaive, query_text);
+        auto bmw_result = run_full_scan(EarlyTermAlgo::kHeapBMW, query_text);
+        ASSERT_GT(naive_result.size(), 0u);
+        ASSERT_EQ(naive_result.size(), bmw_result.size());
+        for (size_t i = 0; i < naive_result.size(); ++i) {
+            ASSERT_EQ(naive_result[i].first, bmw_result[i].first) << "doc mismatch at " << i;
+            const float expected = naive_result[i].second;
+            const float tolerance = 1e-4F * std::max(1.0F, std::abs(expected));
+            ASSERT_NEAR(expected, bmw_result[i].second, tolerance) << "score mismatch at doc " << i;
+        }
+    }
+
+    // Enable threshold feedback (top-k) and compare the top-k score sets.
+    auto run_top_k = [&](EarlyTermAlgo algo, const std::string &query_text) {
+        constexpr u32 topn = 10;
+        QueryBuilder query_builder(table_info);
+        query_builder.Init(index_reader);
+        SearchDriver driver(query_builder.GetColumn2Analyzer(), "text");
+        FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, topn);
+        context.early_term_algo_ = algo;
+        context.query_tree_ = driver.ParseSingleWithFields("text", query_text);
+        std::unique_ptr<DocIterator> doc_iterator = query_builder.CreateSearch(context);
+        EXPECT_NE(doc_iterator, nullptr);
+        std::array<float, topn> scores{};
+        std::array<RowID, topn> row_ids{};
+        FullTextScoreResultHeap result_heap(topn, scores.data(), row_ids.data());
+        while (doc_iterator->Next()) {
+            if (result_heap.AddResult(doc_iterator->Score(), doc_iterator->DocID())) {
+                doc_iterator->UpdateScoreThreshold(result_heap.GetScoreThreshold());
+            }
+        }
+        std::vector<std::pair<RowID, float>> top;
+        for (size_t i = 0; i < result_heap.GetResultSize(); ++i) {
+            top.emplace_back(row_ids[i], scores[i]);
+        }
+        std::sort(top.begin(), top.end(), [](const auto &lhs, const auto &rhs) {
+            if (lhs.second != rhs.second) {
+                return lhs.second > rhs.second;
+            }
+            return lhs.first < rhs.first;
+        });
+        return top;
+    };
+
+    for (const std::string &query_text : {long_query, mid_query}) {
+        auto naive_top = run_top_k(EarlyTermAlgo::kNaive, query_text);
+        auto bmw_top = run_top_k(EarlyTermAlgo::kHeapBMW, query_text);
+        ASSERT_EQ(naive_top.size(), bmw_top.size());
+        ASSERT_FALSE(naive_top.empty());
+        for (size_t i = 0; i < naive_top.size(); ++i) {
+            const float expected = naive_top[i].second;
+            ASSERT_NEAR(expected, bmw_top[i].second, 1e-4F * std::max(1.0F, std::abs(expected)))
+                << "rank " << i << " naive doc " << naive_top[i].first.ToString() << " bmw doc " << bmw_top[i].first.ToString();
+        }
+    }
+
     EXPECT_TRUE(txn_mgr->CommitTxn(txn).ok());
 }
 

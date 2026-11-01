@@ -226,13 +226,90 @@ void BenchmarkOptimize(std::shared_ptr<Infinity> infinity, const std::string &db
     profiler.End();
 }
 
-void BenchmarkQuery(std::shared_ptr<Infinity> infinity, const std::string &db_name, const std::string &table_name) {
+// Tunables of the long-query benchmark: --terms / --topn / --algo
+struct QueryBenchOptions {
+    size_t terms_{0}; // 0 keeps the original 5 short queries
+    size_t topn_{10};
+    std::string algo_{"auto"}; // auto / bmw / batch / naive / compare, mapped to MATCH's block_max option
+    size_t repeat_{1};         // long-query repeats (words are re-sampled each time)
+};
+
+// Samples a vocabulary from the corpus for building long queries (they must use real words,
+// otherwise nothing matches)
+std::vector<std::string> LoadVocabulary(const std::string &srcfile, size_t docs_per_batch, size_t max_terms) {
+    std::vector<std::string> vocab;
+    std::unordered_set<std::string> seen;
+    std::ifstream input_file(srcfile);
+    if (!input_file.is_open()) {
+        LOG_ERROR(fmt::format("Fail to open corpus file {}", srcfile));
+        return vocab;
+    }
+    std::vector<std::tuple<char *, char *, char *>> batch;
+    while (vocab.size() < max_terms) {
+        ReadJsonl(input_file, docs_per_batch, batch);
+        if (batch.empty()) {
+            break;
+        }
+        for (auto &[id, title, text] : batch) {
+            std::string_view sv(text);
+            size_t pos = 0;
+            while (pos < sv.size()) {
+                while (pos < sv.size() && !std::isalnum(static_cast<unsigned char>(sv[pos]))) {
+                    ++pos;
+                }
+                const size_t start = pos;
+                while (pos < sv.size() && std::isalnum(static_cast<unsigned char>(sv[pos]))) {
+                    ++pos;
+                }
+                if (pos > start) {
+                    std::string word(sv.substr(start, pos - start));
+                    std::transform(word.begin(), word.end(), word.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (word.size() >= 3 && seen.insert(word).second) {
+                        vocab.push_back(std::move(word));
+                        if (vocab.size() >= max_terms) {
+                            break;
+                        }
+                    }
+                }
+            }
+            free(id);
+            free(title);
+            free(text);
+        }
+        if (input_file.eof()) {
+            break;
+        }
+    }
+    LOG_INFO(fmt::format("Vocabulary loaded: {} terms from {}", vocab.size(), srcfile));
+    return vocab;
+}
+
+void BenchmarkQuery(std::shared_ptr<Infinity> infinity,
+                    const std::string &db_name,
+                    const std::string &table_name,
+                    const QueryBenchOptions &opts,
+                    const std::vector<std::string> &vocab,
+                    size_t round) {
     std::string fields = "text";
-    std::vector<std::string> query_vec = {"harmful \"social custom\"",
-                                          "social custom \"harmful chemical\"",
-                                          "\"annual American awards\"",
-                                          "harmful chemical",
-                                          "\"one of\""};
+    std::vector<std::string> query_vec;
+    if (opts.terms_ > 0 && vocab.size() >= opts.terms_) {
+        // Long query: sample terms_ words from the corpus vocabulary
+        std::mt19937 rng(static_cast<std::mt19937::result_type>(20260601 + round));
+        std::uniform_int_distribution<size_t> dist(0, vocab.size() - 1);
+        std::string query_text;
+        query_text.reserve(opts.terms_ * 10);
+        for (size_t i = 0; i < opts.terms_; ++i) {
+            query_text += vocab[dist(rng)];
+            query_text += ' ';
+        }
+        query_vec.push_back(std::move(query_text));
+    } else {
+        query_vec = {"harmful \"social custom\"",
+                     "social custom \"harmful chemical\"",
+                     "\"annual American awards\"",
+                     "harmful chemical",
+                     "\"one of\""};
+    }
 
     for (auto match_text : query_vec) {
         BaseProfiler profiler;
@@ -244,6 +321,9 @@ void BenchmarkQuery(std::shared_ptr<Infinity> infinity, const std::string &db_na
             auto *match_expr = new MatchExpr();
             match_expr->fields_ = fields;
             match_expr->matching_text_ = match_text;
+            // Push topn and the early-termination algorithm through MATCH options (same as SQL
+            // 'topn=10;block_max=bmw')
+            match_expr->options_text_ = fmt::format("topn={};block_max={}", opts.topn_, opts.algo_);
             exprs->push_back(match_expr);
             search_expr->SetExprs(exprs);
         }
@@ -302,13 +382,18 @@ void RegisterSignal() {
     sigaction(SIGUSR2, &sig_action, NULL);
 #endif
 }
-void BenchmarkMoreQuery(std::shared_ptr<Infinity> infinity, const std::string &db_name, const std::string &table_name, int query_times = 10) {
+void BenchmarkMoreQuery(std::shared_ptr<Infinity> infinity,
+                        const std::string &db_name,
+                        const std::string &table_name,
+                        const QueryBenchOptions &opts,
+                        const std::vector<std::string> &vocab) {
     BaseProfiler profiler;
     profiler.Begin();
-    for (int i = 0; i < query_times; i++) {
-        BenchmarkQuery(infinity, db_name, table_name);
+    const size_t rounds = opts.terms_ > 0 ? std::max<size_t>(opts.repeat_, 1) : 1;
+    for (size_t i = 0; i < rounds; i++) {
+        BenchmarkQuery(infinity, db_name, table_name, opts, vocab, i);
     }
-    LOG_INFO(fmt::format("run benchmark query {} times cost: {}", query_times, profiler.ElapsedToString()));
+    LOG_INFO(fmt::format("run benchmark query {} times cost: {}", rounds, profiler.ElapsedToString()));
     profiler.End();
 }
 
@@ -324,6 +409,11 @@ int main(int argc, char *argv[]) {
         ->required()
         ->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
     app.add_option("--insert-batch", insert_batch, "batch size of each insert, valid only at insert and merge mode, default value 500");
+    QueryBenchOptions query_opts;
+    app.add_option("--terms", query_opts.terms_, "terms per query in query mode, 0 keeps the built-in short queries, default 0");
+    app.add_option("--topn", query_opts.topn_, "topn pushed down as MATCH option in query mode, default 10");
+    app.add_option("--algo", query_opts.algo_, "early termination algo pushed down as block_max option: auto|heap_bmw|bmw|batch|naive|compare");
+    app.add_option("--repeat", query_opts.repeat_, "how many long queries to run in query mode, default 1");
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError &e) {
@@ -365,7 +455,15 @@ int main(int argc, char *argv[]) {
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
             BenchmarkOptimize(infinity, db_name, table_name);
             sleep(10);
-            BenchmarkMoreQuery(infinity, db_name, table_name, 1);
+            std::vector<std::string> vocab;
+            if (query_opts.terms_ > 0) {
+                vocab = LoadVocabulary(srcfile, 1000, 20000);
+                if (vocab.size() < query_opts.terms_) {
+                    LOG_ERROR(fmt::format("Vocabulary too small: {} < {} (--terms)", vocab.size(), query_opts.terms_));
+                    break;
+                }
+            }
+            BenchmarkMoreQuery(infinity, db_name, table_name, query_opts, vocab);
             break;
         }
         default: {
