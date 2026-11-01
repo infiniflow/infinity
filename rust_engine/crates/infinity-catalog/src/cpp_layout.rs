@@ -173,10 +173,7 @@ pub fn data_type_of_text_with_store(type_text: &str, store: Option<SparseStore>)
             // that dimension".
             let (elem, dim) = match parts.next() {
                 Some(dim) => (first, dim.trim().parse::<i64>().ok()?),
-                None => (
-                    "FLOAT".to_string(),
-                    first.parse::<i64>().ok()?,
-                ),
+                None => ("FLOAT".to_string(), first.parse::<i64>().ok()?),
             };
             Some(data_type_json(
                 lt,
@@ -916,8 +913,8 @@ impl Catalog {
 
         for db in dbs.iter() {
             let db_str = db_id_of(db).to_string();
-            let ts = ts_of_id(&format!("catalog|db|{db}|"), &db_str)?
-                .unwrap_or(crate::DDL_TS_SENTINEL);
+            let ts =
+                ts_of_id(&format!("catalog|db|{db}|"), &db_str)?.unwrap_or(crate::DDL_TS_SENTINEL);
             // The counter is **per database** and monotonic
             // (`TableMeta::next_table_id_`): a `DROP TABLE` must not rewind it,
             // or the next table reuses the dropped table's id and its block
@@ -976,8 +973,7 @@ impl Catalog {
             // value), and it has to survive a rewrite: `DROP INDEX` keeps the
             // index's records, so an index re-created under the old id would
             // inherit the dropped record's key - and its marker.
-            let counter_tag =
-                key::catalog_table_tag_key(&db_str, &tbl_str, "next_index_id");
+            let counter_tag = key::catalog_table_tag_key(&db_str, &tbl_str, "next_index_id");
             let previous_index_id: u64 = ts_source
                 .get(counter_tag.as_bytes())?
                 .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
@@ -1127,8 +1123,7 @@ impl Catalog {
                 index_str.as_bytes(),
             )?;
             store.put(
-                key::catalog_index_tag_key(db_str, tbl_str, &index_str, "index_base")
-                    .as_bytes(),
+                key::catalog_index_tag_key(db_str, tbl_str, &index_str, "index_base").as_bytes(),
                 &value_format::index_def_bytes(&def),
             )?;
             written += 2;
@@ -1244,6 +1239,9 @@ impl Catalog {
     /// returns how many tables were created. A table that already exists under
     /// the same name is skipped.
     pub fn import_cpp_layout(&self, store: &dyn MetaStore) -> Result<usize> {
+        // This writes table records directly, so it must not read through (or
+        // leave behind) a cached record.
+        let _ddl = self.begin_ddl();
         let cpp_tables = read_cpp_layout(store)?;
         let mut imported = 0usize;
         for t in &cpp_tables {
@@ -1631,12 +1629,7 @@ pub fn read_cpp_layout(store: &dyn MetaStore) -> Result<Vec<CppTable>> {
         for (table_name, ts, table_id) in names {
             if is_dropped(
                 store,
-                &cpp_dropped_table_key(
-                    &db_id.to_string(),
-                    &table_name,
-                    ts,
-                    &table_id.to_string(),
-                ),
+                &cpp_dropped_table_key(&db_id.to_string(), &table_name, ts, &table_id.to_string()),
             )? {
                 continue;
             }
@@ -2440,8 +2433,14 @@ pub fn deprecate_cpp_index_chunks(
             value.as_bytes(),
         )?;
         store.delete(
-            key::catalog_index_chunk_key(db_id, table_id, index_id, segment_id, u64::from(*chunk_id))
-                .as_bytes(),
+            key::catalog_index_chunk_key(
+                db_id,
+                table_id,
+                index_id,
+                segment_id,
+                u64::from(*chunk_id),
+            )
+            .as_bytes(),
         )?;
         store.delete(
             key::catalog_index_chunk_tag_key(
@@ -2500,7 +2499,8 @@ pub fn reclaim_cpp_index_chunks(
             drop_cpp_index_chunk_key(db_id, table_id, index_id, segment_id, *chunk_id).as_bytes(),
         )?;
         store.delete(
-            key::catalog_index_chunk_key(db_id, table_id, index_id, segment_id, *chunk_id).as_bytes(),
+            key::catalog_index_chunk_key(db_id, table_id, index_id, segment_id, *chunk_id)
+                .as_bytes(),
         )?;
         store.delete(
             key::catalog_index_chunk_tag_key(

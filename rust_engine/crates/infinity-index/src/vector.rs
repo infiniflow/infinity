@@ -249,8 +249,6 @@ pub(crate) struct SearchScratch {
     pub(crate) candidate: std::collections::BinaryHeap<std::cmp::Reverse<Cand>>,
     /// The result set, largest distance first.
     pub(crate) result: std::collections::BinaryHeap<Cand>,
-    /// The neighbours of the vertex being expanded.
-    pub(crate) neighbors: Vec<usize>,
 }
 
 impl SearchScratch {
@@ -259,7 +257,6 @@ impl SearchScratch {
             visited: Visited::new(),
             candidate: std::collections::BinaryHeap::new(),
             result: std::collections::BinaryHeap::new(),
-            neighbors: Vec::new(),
         }
     }
 
@@ -1539,7 +1536,6 @@ impl HnswIndex {
             visited,
             candidate,
             result,
-            neighbors: _,
         } = scratch;
         candidate.push(Reverse(Cand(ep_d, ep)));
         if allowed(ep) {

@@ -330,6 +330,35 @@ pub struct Catalog {
     /// are stamped with [`DDL_TS_SENTINEL`] and the caller substitutes the
     /// transaction's commit timestamp with [`Self::restamp`].
     capture: Mutex<Option<Capture>>,
+    /// Decoded table records, keyed by qualified name.
+    ///
+    /// Resolving a name reads the catalog store and decodes the record, which
+    /// costs ~14 us; one query resolves its table's schema about nine times
+    /// (scan, index catalog, declared types, row reader, ...), so the engine
+    /// spent more time decoding the same record than scanning its rows. Every
+    /// path that changes a table clears this first, so a hit answers what a
+    /// re-read would.
+    table_cache: Mutex<std::collections::HashMap<String, TableMeta>>,
+    /// How many DDL calls are in flight. A DDL reads the table it is about to
+    /// change and then writes it, so both a cache filled before the call and
+    /// one filled *during* it would be stale afterwards: reads bypass the
+    /// cache while this is non-zero, and the guard clears it again on exit.
+    ddl_depth: std::sync::atomic::AtomicUsize,
+}
+
+/// Clears the table cache on drop, so a DDL that changed a table cannot leave
+/// a pre-change record behind even when it returns early.
+struct DdlGuard<'a> {
+    catalog: &'a Catalog,
+}
+
+impl Drop for DdlGuard<'_> {
+    fn drop(&mut self) {
+        self.catalog
+            .ddl_depth
+            .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        self.catalog.table_cache.lock().unwrap().clear();
+    }
 }
 
 /// The C++ key-space prefixes this catalog owns. Sweeping them is how the
@@ -428,6 +457,8 @@ impl Catalog {
             counter_lock: Mutex::new(()),
             cpp_only: false,
             capture: Mutex::new(None),
+            table_cache: Mutex::new(std::collections::HashMap::new()),
+            ddl_depth: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -439,9 +470,19 @@ impl Catalog {
             counter_lock: Mutex::new(()),
             cpp_only: true,
             capture: Mutex::new(None),
+            table_cache: Mutex::new(std::collections::HashMap::new()),
+            ddl_depth: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
+    /// Enters a DDL call: reads stop using the cache and the cache is dropped
+    /// both now and when the returned guard goes out of scope.
+    fn begin_ddl(&self) -> DdlGuard<'_> {
+        self.ddl_depth
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.table_cache.lock().unwrap().clear();
+        DdlGuard { catalog: self }
+    }
 
     /// Whether this catalog persists only the C++ key space.
     pub fn is_cpp_only(&self) -> bool {
@@ -522,7 +563,8 @@ impl Catalog {
         // it: the reference's `CleanDB` walks the database's tables, and a
         // reader resolves the name against the live databases first.
         let live = self.cpp_databases()?;
-        let mut tables = self.with_view(|store| crate::cpp_layout::read_cpp_tables_as_meta(store))?;
+        let mut tables =
+            self.with_view(|store| crate::cpp_layout::read_cpp_tables_as_meta(store))?;
         tables.retain(|t| {
             let db = t.name.split('.').next().unwrap_or(&t.name).to_string();
             live.iter().any(|d| *d == db)
@@ -729,6 +771,7 @@ impl Catalog {
     /// resurrect on the next open. Like [`Self::rewrite_cpp`], the sweep and
     /// the rewrite are one commit.
     pub fn rewrite_cpp_layout(&self, store: &dyn MetaStore) -> Result<usize> {
+        let _ddl = self.begin_ddl();
         let dbs = self.list_databases()?;
         let tables = self.list_tables()?;
         let indexes = self.list_indexes()?;
@@ -749,6 +792,7 @@ impl Catalog {
     /// after [`Self::rewrite_cpp_layout`] (or, in C++-only mode, after the DDL
     /// that created the mirror).
     pub fn publish_cpp_segments(&self, set: &crate::cpp_layout::CppSegmentSet) -> Result<usize> {
+        let _ddl = self.begin_ddl();
         crate::cpp_layout::write_cpp_segments(self.store.as_ref(), set)
     }
 
@@ -832,10 +876,7 @@ impl Catalog {
             // grows: a dropped table's id is never handed out again, or the new
             // table would inherit its block directory.
             let db_name = table.split('.').next().unwrap_or(table);
-            let db_id = self
-                .database_id_of_name(db_name)?
-                .unwrap_or(1)
-                .to_string();
+            let db_id = self.database_id_of_name(db_name)?.unwrap_or(1).to_string();
             let tag = infinity_storage::catalog_format::catalog_db_tag_key(&db_id, "next_table_id");
             let previous = self
                 .with_view(|store| store.get(tag.as_bytes()))?
@@ -876,6 +917,7 @@ impl Catalog {
         columns: &[String],
         defaults: &[Option<String>],
     ) -> Result<TableMeta> {
+        let _ddl = self.begin_ddl();
         self.create_table_full(name, columns, defaults, &vec![false; columns.len()])
     }
 
@@ -887,6 +929,7 @@ impl Catalog {
         defaults: &[Option<String>],
         not_nulls: &[bool],
     ) -> Result<TableMeta> {
+        let _ddl = self.begin_ddl();
         self.create_table_typed(
             name,
             columns,
@@ -907,6 +950,7 @@ impl Catalog {
         types: &[String],
         comments: &[Option<String>],
     ) -> Result<TableMeta> {
+        let _ddl = self.begin_ddl();
         self.create_table_typed_with_sparse_stores(
             name,
             columns,
@@ -937,6 +981,7 @@ impl Catalog {
         comments: &[Option<String>],
         sparse_stores: &[Option<SparseStore>],
     ) -> Result<TableMeta> {
+        let _ddl = self.begin_ddl();
         // The `CREATE TABLE … PROPERTIES (bloom_filter_columns = …)` flag is
         // **not** recorded here: the reference's `ColumnDef::ToJson` omits
         // `build_bloom_filter_`, so the catalog it writes reads back as
@@ -1006,6 +1051,7 @@ impl Catalog {
         defaults: &[Option<String>],
         not_nulls: &[bool],
     ) -> Result<TableMeta> {
+        let _ddl = self.begin_ddl();
         self.add_columns_typed(
             name,
             columns,
@@ -1026,6 +1072,7 @@ impl Catalog {
         types: &[String],
         comments: &[Option<String>],
     ) -> Result<TableMeta> {
+        let _ddl = self.begin_ddl();
         self.add_columns_typed_with_sparse_stores(
             name,
             columns,
@@ -1050,6 +1097,7 @@ impl Catalog {
         comments: &[Option<String>],
         sparse_stores: &[Option<SparseStore>],
     ) -> Result<TableMeta> {
+        let _ddl = self.begin_ddl();
         let mut meta = self
             .get_table_by_name(name)?
             .ok_or_else(|| Error::Catalog(format!("table '{name}' does not exist")))?;
@@ -1083,6 +1131,7 @@ impl Catalog {
 
     /// Removes a column from an existing table.
     pub fn drop_column(&self, name: &str, column: &str) -> Result<usize> {
+        let _ddl = self.begin_ddl();
         let mut meta = self
             .get_table_by_name(name)?
             .ok_or_else(|| Error::Catalog(format!("table '{name}' does not exist")))?;
@@ -1143,10 +1192,36 @@ impl Catalog {
                 .collect());
         }
         let tables = self.with_view(|store| crate::cpp_layout::read_cpp_tables_of_db(store, db))?;
-        Ok(tables.iter().map(crate::cpp_layout::table_meta_of).collect())
+        Ok(tables
+            .iter()
+            .map(crate::cpp_layout::table_meta_of)
+            .collect())
     }
 
     pub fn get_table_by_name(&self, name: &str) -> Result<Option<TableMeta>> {
+        // Inside a capture the read is answered through an overlay of the
+        // transaction's own uncommitted DDL, so a cached record would answer
+        // from before that DDL. Captures are DDL-only and short, so they simply
+        // bypass the cache.
+        if self.capture.lock().unwrap().is_some()
+            || self.ddl_depth.load(std::sync::atomic::Ordering::SeqCst) > 0
+        {
+            return self.get_table_by_name_uncached(name);
+        }
+        if let Some(meta) = self.table_cache.lock().unwrap().get(name) {
+            return Ok(Some(meta.clone()));
+        }
+        let found = self.get_table_by_name_uncached(name)?;
+        if let Some(meta) = &found {
+            self.table_cache
+                .lock()
+                .unwrap()
+                .insert(name.to_string(), meta.clone());
+        }
+        Ok(found)
+    }
+
+    fn get_table_by_name_uncached(&self, name: &str) -> Result<Option<TableMeta>> {
         if self.cpp_only {
             // A qualified name resolves by its own record; only a bare one has
             // to search every database (the session qualifies names before they
@@ -1186,6 +1261,7 @@ impl Catalog {
     /// `Cleanup` walks them, and the name stops resolving because
     /// `get_table_by_name` refuses a record with a marker.
     pub fn drop_table(&self, name: &str) -> Result<bool> {
+        let _ddl = self.begin_ddl();
         if self.cpp_only {
             // A name that already has a marker is gone: `DROP TABLE` reports it
             // as absent, exactly as `CatalogMeta::GetTableMeta` does.
@@ -1221,6 +1297,7 @@ impl Catalog {
 
     /// Renames a table, keeping its id and metadata.
     pub fn rename_table(&self, old: &str, new: &str) -> Result<()> {
+        let _ddl = self.begin_ddl();
         if self.get_table_by_name(new)?.is_some() {
             return Err(Error::Catalog(format!("table '{new}' already exists")));
         }
@@ -1252,6 +1329,7 @@ impl Catalog {
 
     /// Registers a database name. `if_not_exists` tolerates an existing name.
     pub fn create_database(&self, name: &str, if_not_exists: bool) -> Result<()> {
+        let _ddl = self.begin_ddl();
         if self.cpp_only {
             // `NewTxn::CreateDatabase` writes one record, one tag and the id
             // counter. A name that already has a record - a live one, a dropped
@@ -1305,7 +1383,9 @@ impl Catalog {
                 // and writes the counter in the same transaction.
                 let id = self.next_cpp_database_id()?;
                 self.stage(&[(
-                    infinity_storage::catalog_format::NEXT_DATABASE_ID.as_bytes().to_vec(),
+                    infinity_storage::catalog_format::NEXT_DATABASE_ID
+                        .as_bytes()
+                        .to_vec(),
                     Some(id.to_string().into_bytes()),
                 )])?;
                 dbs.push(name.to_string());
@@ -1365,12 +1445,15 @@ impl Catalog {
     fn db_and_bare_name(&self, table: &str) -> Result<(String, String)> {
         let (db_name, bare) = match table.split_once('.') {
             Some((db, bare)) => (db.to_string(), bare.to_string()),
-            None => (self.cpp_databases()?.first().cloned().unwrap_or_else(|| "default_db".into()), table.to_string()),
+            None => (
+                self.cpp_databases()?
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "default_db".into()),
+                table.to_string(),
+            ),
         };
-        let db_id = self
-            .database_id_of_name(&db_name)?
-            .unwrap_or(1)
-            .to_string();
+        let db_id = self.database_id_of_name(&db_name)?.unwrap_or(1).to_string();
         Ok((db_id, bare))
     }
 
@@ -1448,7 +1531,9 @@ impl Catalog {
             // what names the `db_{id}` directory - including for a database
             // that was dropped and created again (the dropped record is still
             // there, so the newest one is the live id).
-            return Ok(crate::cpp_layout::cpp_db_record(self.store.as_ref(), name)?.map(|(id, _)| id));
+            return Ok(
+                crate::cpp_layout::cpp_db_record(self.store.as_ref(), name)?.map(|(id, _)| id)
+            );
         }
         Ok(self
             .store
@@ -1487,6 +1572,7 @@ impl Catalog {
     /// reference's cleanup walks them (`NewCatalog::CleanDB`) and removes the
     /// records and files.
     pub fn drop_database(&self, name: &str, if_exists: bool) -> Result<bool> {
+        let _ddl = self.begin_ddl();
         if self.cpp_only {
             if !self.has_database_record(name)? {
                 return if if_exists {
@@ -1500,8 +1586,7 @@ impl Catalog {
             else {
                 return Ok(false);
             };
-            let key =
-                crate::cpp_layout::cpp_dropped_db_key(name, create_ts, &db_id.to_string());
+            let key = crate::cpp_layout::cpp_dropped_db_key(name, create_ts, &db_id.to_string());
             self.stage(&[(key.into_bytes(), Some(Self::drop_marker_value()))])?;
             return Ok(true);
         }

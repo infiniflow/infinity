@@ -122,16 +122,20 @@ impl<'a> Builder<'a> {
         self.adjust(d, Some(a), b)
     }
 
-    /// `GetNeighbors` into `out`: a copy, so the lock is released before the
-    /// caller computes distances (the reference holds a `shared_lock` for the
-    /// span of its neighbour loop; copying is cheaper than holding it across
-    /// the distance calls because a writer only ever appends to its own
-    /// vertex). `out` is the caller's buffer, so a build does not allocate a
-    /// fresh list for every vertex it expands.
-    fn neighbors_into(&self, layer: usize, node: usize, out: &mut Vec<usize>) {
-        out.clear();
-        if let Some(cell) = self.links.get(layer).and_then(|l| l.get(node)) {
-            out.extend_from_slice(&cell.read().unwrap_or_else(|e| e.into_inner()));
+    /// `GetNeighbors` with the read lock held for the span of `f`, which is
+    /// what the reference does (`shared_lock` around its neighbour loop).
+    ///
+    /// Copying the list first cost a `memmove` per vertex expanded - 10% of a
+    /// 200k build under `perf`. Holding the read lock is safe because the
+    /// closure only reads memory and computes distances: it takes no other
+    /// lock, so a writer waiting for this vertex cannot block the holder.
+    fn with_neighbors<R>(&self, layer: usize, node: usize, f: impl FnOnce(&[usize]) -> R) -> R {
+        match self.links.get(layer).and_then(|l| l.get(node)) {
+            Some(cell) => {
+                let list = cell.read().unwrap_or_else(|e| e.into_inner());
+                f(&list)
+            }
+            None => f(&[]),
         }
     }
 
@@ -142,7 +146,7 @@ impl<'a> Builder<'a> {
         let mut ep = self.entry;
         let mut cur = self.max_level as i64;
         while cur > q_layer as i64 {
-            ep = self.search_layer_nearest(&query, ep, cur as usize, &mut scratch.neighbors);
+            ep = self.search_layer_nearest(&query, ep, cur as usize);
             cur -= 1;
         }
         let mut l = q_layer.min(self.max_level) as i64;
@@ -240,32 +244,30 @@ impl<'a> Builder<'a> {
     }
 
     /// `SearchLayerNearest`: greedy descent on one upper layer.
-    fn search_layer_nearest(
-        &self,
-        q: &QueryRef,
-        start: usize,
-        layer: usize,
-        buf: &mut Vec<usize>,
-    ) -> usize {
+    fn search_layer_nearest(&self, q: &QueryRef, start: usize, layer: usize) -> usize {
         let mut cur = start;
         let mut cur_d = self.distance_to(q, None, cur);
         loop {
-            self.neighbors_into(layer, cur, buf);
-            let mut changed = false;
-            for &nb in buf.iter().rev() {
-                if nb >= self.store.len() {
-                    continue;
+            let nodes = self.store.len();
+            let next = self.with_neighbors(layer, cur, |list| {
+                let mut best = (cur, cur_d);
+                // Farthest first, as the reference walks its list.
+                for &nb in list.iter().rev() {
+                    if nb >= nodes {
+                        continue;
+                    }
+                    let d = self.distance_to(q, None, nb);
+                    if d < best.1 {
+                        best = (nb, d);
+                    }
                 }
-                let d = self.distance_to(q, None, nb);
-                if d < cur_d {
-                    cur = nb;
-                    cur_d = d;
-                    changed = true;
-                }
-            }
-            if !changed {
+                best
+            });
+            if next.0 == cur {
                 return cur;
             }
+            cur = next.0;
+            cur_d = next.1;
         }
     }
 
@@ -289,7 +291,6 @@ impl<'a> Builder<'a> {
             visited,
             candidate,
             result,
-            neighbors,
         } = scratch;
         candidate.push(Reverse(Cand(ep_d, ep)));
         // The vertex being built must never enter its own result set. The
@@ -305,25 +306,30 @@ impl<'a> Builder<'a> {
             if result.len() >= ef && cd > worst {
                 break;
             }
-            self.neighbors_into(layer, c, neighbors);
-            for &nb in neighbors.iter() {
-                if nb >= nodes || nb == self_id || !visited.visit(nb) {
-                    continue;
-                }
-                let d = self.distance_to(q, Some(self_id), nb);
-                let worst = result.peek().map(|x| x.0).unwrap_or(f32::INFINITY);
-                if result.len() < ef || d <= worst {
-                    candidate.push(Reverse(Cand(d, nb)));
-                    if result.len() == ef {
-                        if result.peek().is_some_and(|top| Cand(d, nb) < *top) {
-                            result.pop();
+            // The neighbour list is walked under its read lock instead of
+            // being copied out: `memmove` of these lists was 10% of a 200k
+            // build. The closure takes no other lock, so a writer waiting on
+            // this vertex cannot block the holder.
+            self.with_neighbors(layer, c, |list| {
+                for &nb in list {
+                    if nb >= nodes || nb == self_id || !visited.visit(nb) {
+                        continue;
+                    }
+                    let d = self.distance_to(q, Some(self_id), nb);
+                    let worst = result.peek().map(|x| x.0).unwrap_or(f32::INFINITY);
+                    if result.len() < ef || d <= worst {
+                        candidate.push(Reverse(Cand(d, nb)));
+                        if result.len() == ef {
+                            if result.peek().is_some_and(|top| Cand(d, nb) < *top) {
+                                result.pop();
+                                result.push(Cand(d, nb));
+                            }
+                        } else {
                             result.push(Cand(d, nb));
                         }
-                    } else {
-                        result.push(Cand(d, nb));
                     }
                 }
-            }
+            });
         }
         let mut out: Vec<(f32, usize)> = result.drain().map(|c| (c.0, c.1)).collect();
         out.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
