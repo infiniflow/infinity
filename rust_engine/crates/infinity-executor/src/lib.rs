@@ -6076,6 +6076,37 @@ struct SecondaryIndexes {
     disk_backed: std::collections::HashSet<String>,
 }
 
+impl TableEntry {
+    /// Appends rows to the append buffer, keeping `pending_pos` current.
+    pub(crate) fn buffer_rows(&mut self, rows: impl IntoIterator<Item = (usize, Vec<Value>)>) {
+        for (seq, values) in rows {
+            self.pending_pos.insert(seq, self.pending_rows.len());
+            self.pending_rows.push((seq, values));
+        }
+    }
+
+    /// Drops the buffered rows `keep` rejects, keeping `pending_pos` current.
+    pub(crate) fn retain_buffered(
+        &mut self,
+        mut keep: impl FnMut(&(usize, Vec<Value>)) -> bool,
+    ) {
+        self.pending_rows.retain(|row| keep(row));
+        self.pending_pos.clear();
+        for (at, (seq, _)) in self.pending_rows.iter().enumerate() {
+            self.pending_pos.insert(*seq, at);
+        }
+    }
+
+    /// The buffered row `seq`, if the commit that appended it is still above
+    /// the last checkpoint.
+    pub(crate) fn buffered_row(&self, seq: usize) -> Option<&Vec<Value>> {
+        self.pending_pos
+            .get(&seq)
+            .and_then(|at| self.pending_rows.get(*at))
+            .map(|(_, values)| values)
+    }
+}
+
 /// Per-table write bookkeeping and row-id allocation.
 ///
 /// C++ counterpart: the runtime state behind `TableMeta` / `SegmentMeta`
@@ -6108,6 +6139,13 @@ struct TableEntry {
     /// holders. A sealed block needs no such buffer - it is mapped (see
     /// `Context::block_maps`).
     pending_rows: Vec<(usize, Vec<Value>)>,
+    /// `seq -> position in pending_rows`.
+    ///
+    /// A point read asks for one row at a time (`BlockCursor::row`), and
+    /// scanning the buffer per call made a 5k-row `DELETE` quadratic against a
+    /// 20k-row buffer (34% of the statement). Kept in step by
+    /// [`Self::buffer_rows`] / [`Self::retain_buffered`].
+    pending_pos: std::collections::HashMap<usize, usize>,
     /// The next mirror write must take its rows from this rewrite rather than
     /// from the block files (a column change re-encodes every cell, so the
     /// files' cells are stale). Set by `rewrite_cpp_blocks`.
@@ -8977,30 +9015,79 @@ impl Engine {
                 candidates.push(id);
             }
         }
-        let float_col = col.is_some_and(|ci| {
-            self.column_types(table)
-                .ok()
-                .and_then(|types| types.get(ci).cloned())
-                .is_some_and(|ty| is_float_type(&ty))
-        });
-        let texts: std::collections::HashMap<u64, Vec<u8>> = self
-            .row_texts(table, &candidates)
-            .map(|texts| {
-                texts
-                    .into_iter()
-                    .map(|(seq, text)| (seq as u64, text))
-                    .collect()
-            })
-            .unwrap_or_default();
-        let mut out: Vec<u64> = Vec::with_capacity(candidates.len());
-        for id in candidates {
-            let Some(raw) = texts.get(&id) else { continue };
-            if self.stored_row_matches(raw, col, &want, float_col) {
-                out.push(id);
+        // The candidates are not re-checked against the stored rows here: both
+        // callers apply the predicate to the rows they fetch (the scan's
+        // `IndexScan` evaluator and the columnar select's filter), and a stale
+        // id - a delete the index has not seen - simply fetches no row. Doing
+        // it here decoded one row per candidate only to throw it away, which
+        // made an indexed lookup cost the same as scanning the rows it named.
+        candidates.sort_unstable();
+        Some(candidates)
+    }
+
+    /// The rows an indexed predicate names, for the columnar select.
+    ///
+    /// `col = v` probes the key (memory tail + sealed chunks); a conjunction of
+    /// bounds on one column becomes one range read. `None` means the predicate
+    /// is neither, or the index cannot order the key (a hashed varchar), and the
+    /// caller scans the table instead.
+    fn indexed_predicate_rows(
+        &self,
+        table: &str,
+        schema: &[String],
+        expr: &Expr,
+    ) -> Option<Vec<u64>> {
+        // `col <op> literal`; a literal on the left is left to the scan.
+        fn axis(expr: &Expr) -> Option<(usize, infinity_parser::CmpOp, &Value)> {
+            match expr {
+                Expr::Cmp(a, op, b) => match (&**a, &**b) {
+                    (Expr::Column(pos), Expr::Literal(value)) => Some((*pos, *op, value)),
+                    _ => None,
+                },
+                _ => None,
             }
         }
-        out.sort_unstable();
-        Some(out)
+        if let Some((pos, op, value)) = axis(expr) {
+            let column = schema.get(pos)?;
+            if op == infinity_parser::CmpOp::Eq {
+                let literal = value_to_literal(value.clone());
+                return self.index_lookup(table, column, &literal);
+            }
+            let (lo, hi) = match op {
+                infinity_parser::CmpOp::Gt | infinity_parser::CmpOp::Ge => {
+                    (value.clone(), Value::Int(i64::MAX))
+                }
+                infinity_parser::CmpOp::Lt | infinity_parser::CmpOp::Le => {
+                    (Value::Int(i64::MIN), value.clone())
+                }
+                _ => return None,
+            };
+            return self.index_range_lookup(table, column, &[(lo, hi)]);
+        }
+        // `a >= lo AND a < hi` (either order, either bound): one interval.
+        if let Expr::And(left, right) = expr {
+            let (lpos, lop, lvalue) = axis(left)?;
+            let (rpos, rop, rvalue) = axis(right)?;
+            if lpos != rpos {
+                return None;
+            }
+            let column = schema.get(lpos)?;
+            let mut lo = Value::Int(i64::MIN);
+            let mut hi = Value::Int(i64::MAX);
+            for (op, value) in [(lop, lvalue), (rop, rvalue)] {
+                match op {
+                    infinity_parser::CmpOp::Gt | infinity_parser::CmpOp::Ge => lo = value.clone(),
+                    infinity_parser::CmpOp::Lt | infinity_parser::CmpOp::Le => hi = value.clone(),
+                    infinity_parser::CmpOp::Eq => {
+                        lo = value.clone();
+                        hi = value.clone();
+                    }
+                    _ => return None,
+                }
+            }
+            return self.index_range_lookup(table, column, &[(lo, hi)]);
+        }
+        None
     }
 
     /// The row ids of a range predicate the planner already pushed down: the
@@ -9160,122 +9247,11 @@ impl Engine {
                 candidates.push(id);
             }
         }
-        // One pass over the rows, as in `index_lookup`: a range probe over a
-        // large table cannot afford a block cursor per candidate.
-        let texts: std::collections::HashMap<u64, Vec<u8>> = self
-            .row_texts(table, &candidates)
-            .map(|texts| {
-                texts
-                    .into_iter()
-                    .map(|(seq, text)| (seq as u64, text))
-                    .collect()
-            })
-            .unwrap_or_default();
-        let mut out: Vec<u64> = Vec::with_capacity(candidates.len());
-        for id in candidates {
-            let Some(raw) = texts.get(&id) else { continue };
-            if Self::stored_row_in_range(raw, col, ranges, kind, &column_type) {
-                out.push(id);
-            }
-        }
-        out.sort_unstable();
-        Some(out)
-    }
-
-    /// Does the row's stored text still hold `want` in `col`? A chunk or tail
-    /// entry is only a hit when the row is live and still holds the probed
-    /// value (UPDATE re-appends, DROP COLUMN re-keys). The row is
-    /// already known to be live (`row_texts` dropped the dead ones), so this
-    /// is pure text work.
-    fn stored_row_matches(
-        &self,
-        raw: &[u8],
-        col: Option<usize>,
-        want: &str,
-        float_col: bool,
-    ) -> bool {
-        let Some(ci) = col else {
-            return true;
-        };
-        match String::from_utf8_lossy(raw)
-            .split('\t')
-            .nth(ci)
-            .map(str::trim)
-        {
-            Some(cell) if cell == want => true,
-            // A float cell keeps the shortest text that round-trips (the
-            // reference stores the typed value), while `want` is the `.slt`
-            // six-decimal form, so values off that grid differ as text;
-            // compare them numerically instead.
-            Some(cell) => {
-                float_col
-                    && matches!(
-                        (cell.parse::<f64>(), want.parse::<f64>()),
-                        (Ok(a), Ok(b)) if a == b
-                    )
-            }
-            None => false,
-        }
-    }
-
-    /// `stored_row_matches` for a range probe: the column's current value in a
-    /// live row falls in one of `ranges`. UPDATE re-appends and DROP
-    /// COLUMN re-keys, so a chunk or tail entry alone is not authoritative.
-    /// `kind` (and the declared type it came from) selects how the stored cell
-    /// is read: the ordered integer, a float, or a date/time text.
-    fn stored_row_in_range(
-        raw: &[u8],
-        col: usize,
-        ranges: &[(Value, Value)],
-        kind: KeyKind,
-        declared: &str,
-    ) -> bool {
-        let field = String::from_utf8_lossy(raw)
-            .split('\t')
-            .nth(col)
-            .map(str::trim)
-            .map(str::to_string);
-        let Some(field) = field else {
-            return false;
-        };
-        match kind {
-            KeyKind::U64 => {
-                let Ok(value) = field.parse::<i64>() else {
-                    return false;
-                };
-                ranges.iter().any(|(lo, hi)| match (lo, hi) {
-                    (Value::Int(lo), Value::Int(hi)) => *lo <= value && value <= *hi,
-                    _ => false,
-                })
-            }
-            KeyKind::F32 | KeyKind::F64 => {
-                let Ok(value) = field.parse::<f64>() else {
-                    return false;
-                };
-                ranges.iter().any(|(lo, hi)| {
-                    matches!((value_as_f64(lo), value_as_f64(hi)),
-                        (Some(lo), Some(hi)) if lo <= value && value <= hi)
-                })
-            }
-            KeyKind::I32 | KeyKind::I64 if key_domain(declared) == KeyDomain::Integer => {
-                let Ok(value) = field.parse::<i64>() else {
-                    return false;
-                };
-                ranges.iter().any(|(lo, hi)| match (lo, hi) {
-                    (Value::Int(lo), Value::Int(hi)) => *lo <= value && value <= *hi,
-                    _ => false,
-                })
-            }
-            KeyKind::I32 | KeyKind::I64 => {
-                let Some(value) = temporal_key(declared, &field) else {
-                    return false;
-                };
-                ranges.iter().any(|(lo, hi)| {
-                    matches!((temporal_bound(declared, lo), temporal_bound(declared, hi)),
-                        (Some(lo), Some(hi)) if lo <= value && value <= hi)
-                })
-            }
-        }
+        // No per-candidate row decode here, for the same reason as
+        // `index_lookup`: both callers re-apply the range to the rows they
+        // fetch, and a stale id contributes no row.
+        candidates.sort_unstable();
+        Some(candidates)
     }
 
     fn fetch_rows_by_ids(&self, table: &str, ids: &[u64]) -> Result<Vec<Vec<Value>>> {
@@ -9572,24 +9548,13 @@ impl Engine {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let _query = self.begin_query(statement, sql);
         let _read = ReadTsGuard::enter(self.txn.current_ts() + 1);
-        // An equality on an indexed column already names its rows; decoding the
-        // whole table first made every such lookup cost the same as a full scan.
-        let indexed_rows = match predicate.as_ref() {
-            Some(Expr::Cmp(a, infinity_parser::CmpOp::Eq, b)) => {
-                let (pos, value) = match (&**a, &**b) {
-                    (Expr::Column(pos), Expr::Literal(v)) => (Some(*pos), Some(v)),
-                    (Expr::Literal(v), Expr::Column(pos)) => (Some(*pos), Some(v)),
-                    _ => (None, None),
-                };
-                match (pos.and_then(|p| schema.get(p).map(|n| (p, n))), value) {
-                    (Some((_, name)), Some(value)) => {
-                        self.index_lookup(&table, name, &value_to_literal(value.clone()))
-                    }
-                    _ => None,
-                }
-            }
-            _ => None,
-        };
+        // A predicate the secondary index can answer already names its rows:
+        // decoding the whole table first made every indexed lookup cost the
+        // same as a full scan. An equality probes the key, a conjunction of
+        // bounds scans the key range - both land in `read_columns_batch_for_rows`.
+        let indexed_rows = predicate
+            .as_ref()
+            .and_then(|expr| self.indexed_predicate_rows(&table, schema.as_slice(), expr));
         let batch = match &indexed_rows {
             Some(ids) => self
                 .read_columns_batch_for_rows(&table, &needed, ids)
@@ -17022,9 +16987,7 @@ impl Engine {
             let tkey = self.table_key(table);
             let mut tables = self.tables.lock().unwrap();
             if let Some(entry) = tables.get_mut(&tkey) {
-                entry
-                    .pending_rows
-                    .retain(|(seq, _)| !sources.contains(&((*seq >> 32) as u32)));
+                entry.retain_buffered(|(seq, _)| !sources.contains(&((*seq >> 32) as u32)));
             }
         }
         let merged: Vec<(usize, Vec<u8>)> = rows
@@ -24745,6 +24708,65 @@ mod tests {
     }
 
     /// The rows of a `SELECT`, as rendered strings.
+    /// A secondary index answers an equality predicate **after** a checkpoint:
+    /// the memory tail the index was built into is dumped into a sealed chunk,
+    /// and the lookup has to read that chunk with the same key the writer wrote.
+    #[test]
+    fn a_secondary_index_answers_equality_after_a_checkpoint() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE si (id INT, score DOUBLE, name VARCHAR);")
+            .unwrap();
+        for base in (0..20000).step_by(2000) {
+            let values: Vec<String> = (base..base + 2000)
+                .map(|i| format!("({i}, {}.0, 'n-{i}')", i % 100))
+                .collect();
+            e.execute(&format!("INSERT INTO si VALUES {};", values.join(", ")))
+                .unwrap();
+        }
+        e.execute("CREATE INDEX si_id ON si (id);").unwrap();
+        e.execute("CREATE INDEX si_score ON si (score);").unwrap();
+        e.execute("CREATE INDEX si_name ON si (name);").unwrap();
+        let count = |sql: &str| rows(&e, sql).len();
+        assert_eq!(count("SELECT id FROM si WHERE id = 5;"), 1);
+        assert_eq!(count("SELECT id FROM si WHERE score = 5.0;"), 200);
+        assert_eq!(count("SELECT id FROM si WHERE name = 'n-5';"), 1);
+        e.flush().unwrap();
+        assert_eq!(
+            count("SELECT id FROM si WHERE id = 5;"),
+            1,
+            "an INT key must still be found in the sealed chunk"
+        );
+        assert_eq!(
+            count("SELECT id FROM si WHERE score = 5.0;"),
+            200,
+            "a DOUBLE key must still be found in the sealed chunk"
+        );
+        assert_eq!(
+            count("SELECT id FROM si WHERE name = 'n-5';"),
+            1,
+            "a VARCHAR key must still be found in the sealed chunk"
+        );
+        // The server's SELECT goes through the columnar batch path, which maps
+        // the index's row ids onto the block's visible slots: a mis-mapped run
+        // returned NULL cells for every row whose slot was not the first few.
+        let batch = |sql: &str| {
+            e.select_columns(sql)
+                .unwrap()
+                .unwrap_or_else(|| panic!("{sql} did not take the columnar path"))
+        };
+        assert_eq!(
+            batch("SELECT id FROM si WHERE id = 5;").row_count,
+            1,
+            "a columnar select must find a sealed row by its index"
+        );
+        assert_eq!(
+            batch("SELECT id FROM si WHERE score = 5.0;").row_count,
+            200,
+            "every row the index names must survive the batch mapping"
+        );
+        assert_eq!(batch("SELECT id FROM si WHERE id > 10;").row_count, 19989);
+    }
     fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
         for r in e.execute(sql).unwrap() {
             if let QueryResult::Rows { .. } = r {

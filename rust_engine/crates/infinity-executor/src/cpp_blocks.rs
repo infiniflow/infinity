@@ -2651,9 +2651,7 @@ impl Engine {
         // stays buffered for the next checkpoint. Clearing by the *input* set
         // would drop a row whose window was short; clearing the whole buffer
         // would drop the rows a concurrent commit added meanwhile.
-        entry
-            .pending_rows
-            .retain(|(seq, _)| !written_ids.contains(seq));
+        entry.retain_buffered(|(seq, _)| !written_ids.contains(seq));
         // The mark retires only when nothing is left to write and no commit
         // landed while this one ran.
         let covered = entry.mirror_epoch == epoch && entry.pending_rows.is_empty();
@@ -2822,7 +2820,7 @@ impl Engine {
         {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey.clone()).or_default();
-            entry.pending_rows.extend(extra.iter().cloned());
+            entry.buffer_rows(extra.iter().cloned());
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
         }
@@ -3500,7 +3498,7 @@ impl Engine {
             let ids: std::collections::HashSet<usize> = rows.iter().map(|(seq, _)| *seq).collect();
             let mut tables = self.tables.lock().unwrap();
             if let Some(entry) = tables.get_mut(&tkey) {
-                entry.pending_rows.retain(|(seq, _)| !ids.contains(seq));
+                entry.retain_buffered(|(seq, _)| !ids.contains(seq));
             }
         }
         let written = self.write_cpp_blocks_extra(&table, rows);
@@ -3517,18 +3515,18 @@ impl Engine {
     /// with the rows in the blocks there is no key to look up.
     pub(crate) fn row_is_present(&self, table: &str, seq: usize) -> bool {
         let table = self.qualified_table(table);
-        if self.deleted_ids(&table).contains(&(seq as u64)) {
+        // Every check below reads the engine's state *in place*: this runs once
+        // per row of a bulk `DELETE`/`UPDATE`, and cloning the delete journal
+        // and the append buffer per row made a 5k-row statement quadratic
+        // (300 us/row against 16 us/row with nothing buffered).
+        if self.is_deleted(&table, seq) {
             return false;
         }
         // A row a commit appended since the last checkpoint is in the table's
         // append buffer, not in a block file: it exists all the same
         // (`DeleteInBlock` addresses the same slot whether or not the block has
         // been written out yet).
-        if self
-            .pending_rows_of(&table)
-            .iter()
-            .any(|(pending, _)| *pending == seq)
-        {
+        if self.pending_contains(&table, seq) {
             return true;
         }
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
@@ -3543,14 +3541,42 @@ impl Engine {
         if !self.visible_block_ids(&table).contains(&id) {
             return false;
         }
-        let Some(version) = self.read_block_version(id) else {
+        // The block's mapping is shared, so a bulk statement reads each
+        // `version` file once instead of once per row.
+        let Ok(block) = self.block_map(&table, &self.blocks_root(), id) else {
             return false;
         };
+        let version = block.version();
         let slot = (seq & 0xffff_ffff) % DEFAULT_BLOCK_CAPACITY;
-        if slot >= Self::visible_rows_of(&version) {
+        if slot >= Self::visible_rows_of(version) {
             return false;
         }
         version.deleted.get(slot).copied().unwrap_or(0) == 0
+    }
+
+    /// Whether `seq` is in the table's append buffer. Scans it in place - no
+    /// copy of the rows, which is what a per-row caller can afford.
+    fn pending_contains(&self, table: &str, seq: usize) -> bool {
+        let key = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|entry| entry.buffered_row(seq).is_some())
+            .unwrap_or(false)
+    }
+
+    /// Whether the delete journal holds `seq`. Reads the loaded journal in
+    /// place, and only pays for loading it when this is the first look.
+    fn is_deleted(&self, table: &str, seq: usize) -> bool {
+        let key = self.table_key(table);
+        {
+            let tables = self.tables.lock().unwrap();
+            if let Some(ids) = tables.get(&key).and_then(|entry| entry.deleted_ids.as_ref()) {
+                return ids.contains(&(seq as u64));
+            }
+        }
+        self.deleted_ids(table).contains(&(seq as u64))
     }
 
     /// The blocks a reader may see: the table's block index minus every segment
@@ -4227,22 +4253,31 @@ impl Engine {
             slots.sort_unstable();
             slots
         });
-        let mut slot_at = 0usize;
-        for row in 0..row_count {
+        // An index answered: only the slots it kept are decoded, so the loop
+        // walks *those* slots instead of the block's whole window. Scanning
+        // `0..row_count` and testing each slot cost a point read 8192
+        // iterations to decode one row (~8 us per row on an index scan).
+        let mut all_at = 0usize;
+        let mut kept_at = 0usize;
+        loop {
+            let row = match &wanted_slots {
+                Some(slots) => match slots.get(kept_at) {
+                    Some(slot) => {
+                        kept_at += 1;
+                        *slot
+                    }
+                    None => break,
+                },
+                None => {
+                    if all_at >= row_count {
+                        break;
+                    }
+                    all_at += 1;
+                    all_at - 1
+                }
+            };
             let seq = ((id.segment_id as usize) << 32)
                 | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + row);
-            // An index answered: this row is not a candidate, so its cells are
-            // never decoded. Doing the check here rather than in `keep` is the
-            // difference between decoding a candidate and decoding the table -
-            // `keep` only sees a row after its cells exist.
-            if let Some(slots) = &wanted_slots {
-                while slot_at < slots.len() && slots[slot_at] < row {
-                    slot_at += 1;
-                }
-                if slot_at == slots.len() || slots[slot_at] != row {
-                    continue;
-                }
-            }
             scratch.clear();
             let cells = &mut scratch;
             for (col, column_type) in types.iter().enumerate() {
@@ -4390,19 +4425,16 @@ impl Engine {
     }
 
     /// One row of the append buffer. The point-read path must not clone the
-    /// whole buffer (a 20k-row insert made every search pay for 20k rows).
+    /// whole buffer (a 20k-row insert made every search pay for 20k rows), and
+    /// it must not scan it either: the buffer keeps a `seq -> position` map, so
+    /// this is one lookup plus the row's own clone.
     pub(crate) fn pending_row(&self, table: &str, seq: usize) -> Option<Vec<Value>> {
         let key = self.table_key(table);
         self.tables
             .lock()
             .unwrap()
             .get(&key)
-            .and_then(|e| {
-                e.pending_rows
-                    .iter()
-                    .find(|(row, _)| *row == seq)
-                    .map(|(_, values)| values.clone())
-            })
+            .and_then(|e| e.buffered_row(seq).cloned())
     }
 
     /// The stored text of one buffered row, for the paths that read a table the
@@ -4516,6 +4548,7 @@ impl Engine {
         let mut valid: Vec<Vec<bool>> = vec![Vec::new(); wanted.len()];
         let mut out_of_order = false;
         let mut last = 0usize;
+        let mut shown_slots: Vec<usize> = Vec::new();
         for id in &blocks {
             let Ok(block) = self.block_map(&table, &root, *id) else {
                 break;
@@ -4527,11 +4560,12 @@ impl Engine {
                 .map(|c| c.cumulative_row_count as usize)
                 .unwrap_or(0);
             let created_at = Self::created_at(&version, read_ts);
-            let visible: Vec<bool> = (0..row_count)
-                .map(|slot| Self::slot_visible(&version, slot, created_at, read_ts))
-                .collect();
-            for (slot, shown) in visible.iter().enumerate() {
-                if *shown {
+            // The slots this block shows, ascending: one pass over the
+            // version decides them and every column decodes just those.
+            shown_slots.clear();
+            for slot in 0..row_count {
+                if Self::slot_visible(&version, slot, created_at, read_ts) {
+                    shown_slots.push(slot);
                     let seq = ((id.segment_id as usize) << 32)
                         | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot);
                     if seq < last {
@@ -4548,20 +4582,30 @@ impl Engine {
                     &types,
                     block.as_ref(),
                     *pos,
-                    row_count,
-                    &visible,
+                    &shown_slots,
                     &mut data[out],
                     &mut valid[out],
                 )?;
             }
         }
         // Rows a commit appended since the last checkpoint live in the append
-        // buffer; they are `Value`s, so they are appended as they are.
-        let buffered = self.pending_rows_of(&table);
-        if !buffered.is_empty() {
-            let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
-            let view = self.append_view(&table, read_ts);
-            for (seq, values) in buffered {
+        // buffer; they are `Value`s, so they are appended as they are. The
+        // buffer is walked in place: copying it first cost a full row copy per
+        // scan (20k buffered rows made every query 20 ms slower).
+        let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
+        let view = self.append_view(&table, read_ts);
+        let buffered_empty = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&self.table_key(&table))
+                .map(|entry| entry.pending_rows.is_empty())
+                .unwrap_or(true)
+        };
+        if !buffered_empty {
+            let tables = self.tables.lock().unwrap();
+            let entry = tables.get(&self.table_key(&table));
+            for (seq, values) in entry.map(|e| e.pending_rows.as_slice()).unwrap_or(&[]) {
+                let seq = *seq;
                 if dead.contains(&(seq as u64)) {
                     continue;
                 }
@@ -4594,7 +4638,6 @@ impl Engine {
         }
         // A delete that has not reached the block's `version` yet lives in the
         // tombstone set; the row path filters those, and so must this one.
-        let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
         if !dead.is_empty() && !seqs.is_empty() {
             let keep: Vec<bool> = seqs.iter().map(|s| !dead.contains(&(*s as u64))).collect();
             if keep.iter().any(|k| !k) {
@@ -4661,8 +4704,26 @@ impl Engine {
         let root = self.blocks_root();
         let read_ts = crate::read_ts();
         let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
-        let buffered: std::collections::HashMap<usize, Vec<Value>> =
-            self.pending_rows_of(&table).into_iter().collect();
+        // Only the buffered rows this read asks for are copied out of the
+        // append buffer: an index lookup names a handful of ids, and cloning
+        // the whole buffer for them made every lookup pay for the buffer's
+        // size (20k rows = 20 ms per query).
+        let requested: std::collections::HashSet<usize> =
+            rows.iter().map(|seq| *seq as usize).collect();
+        let buffered: std::collections::HashMap<usize, Vec<Value>> = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&self.table_key(&table))
+                .map(|entry| {
+                    entry
+                        .pending_rows
+                        .iter()
+                        .filter(|(seq, _)| requested.contains(seq))
+                        .cloned()
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
         let blocks = self.visible_block_ids(&table);
 
         let mut order: Vec<usize> = (0..rows.len()).collect();
@@ -4710,14 +4771,17 @@ impl Engine {
                         .map(|c| c.cumulative_row_count as usize)
                         .unwrap_or(0);
                     let created_at = Self::created_at(version, read_ts);
-                    let mut visible = vec![false; row_count];
-                    for slot in &slots {
-                        if *slot < row_count
-                            && Self::slot_visible(version, *slot, created_at, read_ts)
-                        {
-                            visible[*slot] = true;
-                        }
-                    }
+                    // Only the candidate slots this block holds, and only the
+                    // ones its `version` still shows: the decoder walks that
+                    // list, never the block's whole window.
+                    let shown: Vec<usize> = slots
+                        .iter()
+                        .copied()
+                        .filter(|slot| {
+                            *slot < row_count
+                                && Self::slot_visible(version, *slot, created_at, read_ts)
+                        })
+                        .collect();
                     let mut cols: Vec<ColumnData> = wanted
                         .iter()
                         .map(|pos| column_buffer(&meta.types[*pos]))
@@ -4730,26 +4794,28 @@ impl Engine {
                             &types,
                             block.as_ref(),
                             *pos,
-                            row_count,
-                            &visible,
+                            &shown,
                             &mut cols[o],
                             &mut vals[o],
                         )?;
                     }
-                    Some((cols, vals))
+                    Some((cols, vals, shown))
                 });
-            // The decoder emits only the visible slots of this run, in ascending
-            // slot order, so position k in its output is the k-th *visible* slot
-            // — a hidden slot shortens the list and would shift every later row
-            // if the slot's index inside the run were used directly.
+            // The decoder emits only the *shown* slots of this run, in
+            // ascending slot order, so the k-th shown slot is the k-th row of
+            // its output. A hidden slot shortens the output and would shift
+            // every later row, so each slot is mapped through the same
+            // visibility the decoder used - not through its own position.
             let visible_run: Vec<Option<usize>> = match &decoded {
-                Some((_, vals)) => {
+                Some((_, _, shown)) => {
                     let mut emitted = 0usize;
                     slots
                         .iter()
                         .map(|slot| {
-                            let at_emitted = emitted;
-                            if vals[0].get(*slot).copied().is_some() {
+                            // `shown` is ascending, so a pointer walk answers
+                            // "was this slot emitted" in O(1) amortised.
+                            if shown.get(emitted) == Some(slot) {
+                                let at_emitted = emitted;
                                 emitted += 1;
                                 Some(at_emitted)
                             } else {
@@ -4768,7 +4834,7 @@ impl Engine {
                 for (o, pos) in wanted.iter().enumerate() {
                     let cell = if is_dead {
                         None
-                    } else if let (Some((cols, vals)), Some(ri)) = (&decoded, run_index) {
+                    } else if let (Some((cols, vals, _)), Some(ri)) = (&decoded, run_index) {
                         if vals[o].get(ri).copied() == Some(false) {
                             Some(Value::Null)
                         } else {
@@ -4814,11 +4880,13 @@ impl Engine {
         types: &[i32],
         columns: &dyn BlockColumns,
         pos: usize,
-        row_count: usize,
-        visible: &[bool],
+        // The block's slots to emit, ascending: every visible slot for a scan,
+        // the index's candidates for a lookup. Walking them costs the kept
+        // rows, not the block's whole window.
+        slots: &[usize],
         out: &mut ColumnData,
         valid: &mut Vec<bool>,
-    ) -> Option<()> {
+) -> Option<()> {
         let column_type = types.get(pos)?;
         let column_id = ids.get(pos).copied().unwrap_or(pos as u64);
         let (raw_body, raw_outline) = columns.column(column_id)?;
@@ -4826,13 +4894,9 @@ impl Engine {
         let body = cpp_format::split_body_for_layout(raw_body, DEFAULT_BLOCK_CAPACITY, layout);
         let kind = outline_kind(&type_text[pos]);
         let shape = embedding_shape(&type_text[pos]);
-        for row in 0..row_count {
-            let shown = visible.get(row).copied().unwrap_or(false);
+        for row in slots.iter().copied() {
             let null = body.null_bitmap.len() > row / 8
                 && body.null_bitmap[row / 8] & (1 << (row % 8)) == 0;
-            if !shown {
-                continue;
-            }
             if null {
                 out.push_value(&Value::Null);
                 valid.push(false);

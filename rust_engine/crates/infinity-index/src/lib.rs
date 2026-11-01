@@ -77,6 +77,12 @@ pub trait Index {
 #[derive(Debug, Default, Clone)]
 pub struct SecondaryIndex {
     map: BTreeMap<Vec<u8>, Vec<RowID>>,
+    /// Approximate heap bytes, maintained by the mutators.
+    ///
+    /// The unified memindex quota is checked on every row, so this used to walk
+    /// the whole map per check: with three 100k-key indexes a 5k-row `UPDATE`
+    /// spent 50% of its time summing keys it already knew.
+    bytes: usize,
 }
 
 impl SecondaryIndex {
@@ -86,15 +92,13 @@ impl SecondaryIndex {
 
     /// Approximate heap bytes held by the map, for the unified memindex budget.
     pub fn approx_bytes(&self) -> usize {
-        self.map
-            .iter()
-            .map(|(k, v)| k.len() + 16 + v.len() * 8)
-            .sum()
+        self.bytes
     }
 
     /// Removes and returns every entry, leaving the index empty. Used when a
     /// memory tail is dumped into a sealed segment.
     pub fn take(&mut self) -> BTreeMap<Vec<u8>, Vec<RowID>> {
+        self.bytes = 0;
         std::mem::take(&mut self.map)
     }
 
@@ -187,6 +191,7 @@ impl SecondaryIndex {
         }
         let n = rd_u64(&buf, &mut p)?;
         let mut map = BTreeMap::new();
+        let mut bytes = 0usize;
         for _ in 0..n {
             let klen = rd_u32(&buf, &mut p)? as usize;
             if p + klen > buf.len() {
@@ -199,15 +204,26 @@ impl SecondaryIndex {
             for _ in 0..m {
                 ids.push(rd_u64(&buf, &mut p)?);
             }
+            bytes += k.len() + 16 + 24 + ids.len() * std::mem::size_of::<RowID>();
             map.insert(k, ids);
         }
-        Ok(Self { map })
+        Ok(Self { map, bytes })
     }
 }
 
 impl Index for SecondaryIndex {
     fn insert(&mut self, key: &[u8], row_id: RowID) {
-        self.map.entry(key.to_vec()).or_default().push(row_id);
+        match self.map.get_mut(key) {
+            Some(ids) => {
+                ids.push(row_id);
+                self.bytes += std::mem::size_of::<RowID>();
+            }
+            None => {
+                // The key, the row-id vector and its first element.
+                self.bytes += key.len() + 16 + 24 + std::mem::size_of::<RowID>();
+                self.map.insert(key.to_vec(), vec![row_id]);
+            }
+        }
     }
 
     fn lookup(&self, key: &[u8]) -> &[RowID] {
