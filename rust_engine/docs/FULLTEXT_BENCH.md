@@ -53,6 +53,11 @@ national football league high school state university population family city gam
 
 > 参考的日志把耗时打印成整毫秒（`2ms` / `837us`），多词查询的读数只有 1 ms 的粒度。
 
+**跨引擎、走服务端的那一组数字**（`INDEX fulltext build|query`）来自 `tools/bench_index_types.py`，
+由 `tools/run_index_bench.sh index-types` 起停两端引擎；与上面的 `fulltext-bench`（进程内、参考
+`fulltext_benchmark` 的移植）是两条不同的路径，数字不要混用。全索引类型的入口见
+[`INDEX_PERF.md`](INDEX_PERF.md)。
+
 ## 2. 数据集
 
 参考写死 `test/data/benchmark/dbpedia-entity/corpus.jsonl`，**这个文件不在仓库里**。

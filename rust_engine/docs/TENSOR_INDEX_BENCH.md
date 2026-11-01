@@ -8,7 +8,7 @@
 没有任何 driver 覆盖 `tensor` 列上的多向量索引。`benchmark/` 与 `test/` 下也没有对应基准，
 只有一个生成 slt 用例的脚本 `generate_multivector_knn_scan.py`。
 
-因此新增 `tools/bench_multivector.py`（配 `.scratch/bench_multivector.sh` 起停引擎），
+因此新增 `tools/bench_multivector.py`（由 `tools/run_index_bench.sh multivector` 起停两端引擎），
 覆盖引擎对多向量列提供的三种索引：`EMVB`、`PLAID`、`SMVE`。
 
 ## 口径
@@ -131,9 +131,8 @@ PLAID Rust [6455, 4999, 4804, 13826, 12370, 13436, 3348, 3543, 10914, 2087]
 ## 复现
 
 ```bash
-# 两端各起一个引擎并跑三种索引
-.scratch/bench_multivector.sh rust 23827
-.scratch/bench_multivector.sh cpp  23817
+# 两端各起一个引擎并跑三种索引（≥ 2048 行：EMVB 要求 embedding ≥ 8192）
+tools/run_index_bench.sh multivector 20000 50
 
 # 只跑索引层，绕过服务端（拆分 k-means / 量化器 / 建表）
 cd rust_engine

@@ -6,7 +6,7 @@
 
 | 项 | 说明 |
 |---|---|
-| 驱动 | `tools/bench_index_types.py`，两端用同一脚本、同一份数据、同一批语句 |
+| 驱动 | `tools/bench_index_types.py`（`tools/run_index_bench.sh index-types` 起停两端引擎），两端用同一脚本、同一份数据、同一批语句 |
 | 数据 | `id int, title varchar, body varchar, vec vector,4,float, sp sparse`；`vec` 是小整数格点 |
 | 索引 | HNSW `M=16, ef_construction=200, metric=l2` |
 | 查询 | `match_dense(vec, [0.5,0.5,0.25,0.75], l2, 10)`，warm 1 次后连续 50 次取均值 |
@@ -62,7 +62,11 @@
 ## 复现
 
 ```bash
-.scratch/bench_index_types.sh rust 23827
-.scratch/bench_index_types.sh cpp  23817
-BENCH_ROWS=200000 BENCH_QUERIES=50 .scratch/bench_index_types.sh rust 23827
+# 20k 行：两端各起一次引擎，同一个驱动
+tools/run_index_bench.sh index-types 20000 50
+# 200k 行
+tools/run_index_bench.sh index-types 200000 50
 ```
+
+驱动本身是 `tools/bench_index_types.py`，它连一个已经在跑的引擎（`127.0.0.1:23817`）；
+`run_index_bench.sh` 负责起停两端（各在自己的网络命名空间里）。

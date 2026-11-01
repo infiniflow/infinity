@@ -1,7 +1,8 @@
 # 二级索引性能：参考 vs 重写版
 
-> 复现：`tools/run_secondary_bench.sh lookup`（建索引 + 查询 + 一次维护）与
-> `tools/run_secondary_bench.sh maint`（维护成本随索引数增长）。
+> 复现：`tools/run_index_bench.sh secondary-lookup`（建索引 + 查询 + 一次维护）与
+> `tools/run_index_bench.sh secondary-maint`（维护成本随索引数增长）；
+> `tools/run_secondary_bench.sh lookup|maint` 是同两个 workload 的别名。
 > 数据落在 `.scratch/sec-{cpp,rust}/`，脚本见 `tools/bench_secondary_{lookup,maint}.py`。
 
 ## 1 口径
