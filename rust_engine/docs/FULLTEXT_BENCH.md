@@ -34,7 +34,9 @@ cargo build --release -p infinity-cli
 | `mode=query-only` | 不建表不插入，直接在已有目录上跑查询（给 profiler 用） |
 
 环境变量：`FTBENCH_QUERY_REPEAT=n` 每条查询在进程内跑 n 次取最小；
-`FTBENCH_EXTRA_QUERY=…` 追加一条查询。
+`FTBENCH_EXTRA_QUERY=…` 追加一条查询；`FTBENCH_TOPN` 改 `topn`（默认 10）；
+`FTBENCH_BLOCK_MAX` 填参考的 `block_max` 值（`auto`/`heap_bmw`/`bmw`/`batch`/`false`，
+`false` 就是无剪枝的 naive 基线）。
 
 前五条是参考里的查询（`fields="text"`、默认 `topn=10`、投影 `ROW_ID(), SCORE()`）；
 后两条是本轮加进**两边**基准（`fulltext_benchmark.cpp` 与 `fulltext-bench`）的多词查询，
@@ -468,18 +470,28 @@ A/B 用临时开关 `INF_FT_NO_STREAM`（已移除）关掉流式：
 旧写法每轮把整个游标数组按值排序，`Cursor` 里带着 `WandStream`（若干个 `Vec`），
 一次排序要搬 100 多个 100 字节以上的结构体，而堆里只搬 16 字节的 `(doc, ord)`。
 
-| 查询词数 | 每轮整表排序 | 文档序最小堆 | |
-|---|---|---|---|
-| 10 | 4.19 ms | 3.97 ms | 1.06x |
-| 50 | 121.44 ms | 23.21 ms | 5.23x |
-| 100 | 482.72 ms | 55.26 ms | 8.74x |
-| 200 | 1153.36 ms | 145.98 ms | 7.90x |
+同一份索引上三路对比（`topn=10`，进程内 3 次取最小、3 个进程再取最小）：
 
-语料（`rust_engine/tools/gen_long_query_corpus.py`）：词表取 enwiki 10 万篇的词频前 20k（分词规则与参考
-`LoadVocabulary` 一致：连续 alnum、长度 ≥ 3、小写），每篇按词频（zipf 形状）采样 40 个词，
-共 100 万篇，按 10 万一批插入 → 31 个索引 chunk、全文索引 196 MB、插入 20 s。
-查询词从同一词表均匀采样，`topn=10`；读数是进程内 3 次取最小、3 个进程再取最小。
-四个查询长度下两个实现返回的 `ROW_ID()/SCORE()` 逐字节相同。
+| 查询词数 | naive（`block_max=false`） | 每轮整表排序 | 文档序最小堆 | naive/heap | sort/heap |
+|---|---|---|---|---|---|
+| 10 | 6.06 ms | 4.24 ms | 4.04 ms | 1.50x | 1.05x |
+| 50 | 30.70 ms | 122.57 ms | 23.71 ms | 1.29x | 5.17x |
+| 100 | 68.10 ms | 490.37 ms | 56.13 ms | 1.21x | 8.74x |
+| 200 | 216.53 ms | 1138.43 ms | 146.54 ms | 1.48x | 7.77x |
+
+三个实现返回的 `ROW_ID()/SCORE()` 在四个长度下逐字节相同。
+
+堆对 naive 只赢 1.2–1.5x，比参考的 3.5–5.4x 小：这里的 naive 是按块读 posting、只给「真的命中的
+(term, doc)」打分（参考 100 词 82.7 ms，这里 68.1 ms，同一量级），省的块级 I/O 它也有；
+而这份语料的 term 极密（`the` 覆盖 94% 的文档），块上界松，能剪掉的比例本来就低。
+堆 100 词 56 ms 对参考 19.9 ms，差在剪枝率（打分次数）而不是单次推进，原因待查。
+
+语料（`cargo run --release --bin gen-corpus -- --corpus <enwiki.tsv> --out <jsonl>`）：
+词表取 enwiki 10 万篇的词频前 20k（分词规则与参考 `LoadVocabulary` 一致：连续 alnum、长度 ≥ 3、小写），
+每篇按词频（zipf 形状）采样 40 个词，共 100 万篇，按 10 万一批插入 → 31 个索引 chunk、
+全文索引 1.2 GB、插入 20 s、生成 2.8 s。查询词从同一词表均匀采样；
+计时用 `FTBENCH_EXTRA_QUERY` 加一条长查询、`FTBENCH_BLOCK_MAX=false` 切到 naive。
+
 
 > 参考那边的表还有一列 naive（100 词 82.7 ms、200 词 234.1 ms）：参考有 `block_max=naive` 选项可以切到全扫，
 > 端口没有这个开关，所以这里只比两个 WAND 实现。

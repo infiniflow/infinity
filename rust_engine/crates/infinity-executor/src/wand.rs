@@ -229,6 +229,11 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     /// the reference's [0, pivot_] slice: what offer() counts matches over and
     /// what the next round repositions.
     prefix: Vec<usize>,
+    /// Score every candidate instead of pruning (the reference's
+    /// `EarlyTermAlgo::kNaive`, i.e. `block_max=false`): no pivot, no block
+    /// bound, no early termination. It exists to measure what the pruning is
+    /// worth, and is never selected unless asked for.
+    naive: bool,
     /// Top-k, sorted by score (desc) then doc id (asc), like the scan path.
     best: Vec<(u64, f64)>,
     threshold: f64,
@@ -324,6 +329,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             heap,
             total_upper,
             prefix: Vec::new(),
+            naive: false,
             best: Vec::new(),
             threshold: f64::NEG_INFINITY,
             doc_id: None,
@@ -331,6 +337,14 @@ impl<'a> BlockMaxWandIterator<'a> {
             score_evaluations: 0,
             max_scored_block: 0,
         }
+    }
+
+    /// `block_max=false`: score every document that any unit matches, in
+    /// document order, and let only the top-k survive. Same answers as the
+    /// pruned path, without the pruning.
+    pub fn with_naive(mut self) -> Self {
+        self.naive = true;
+        self
     }
 
     /// Drives the reference's Next() loop until the cursors are exhausted or the
@@ -422,6 +436,9 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// score, decoding the exact score only for that document. Returns false and
     /// clears doc_id when the iterator is exhausted.
     fn next(&mut self, target: Option<u64>) -> bool {
+        if self.naive {
+            return self.next_naive(target);
+        }
         if let Some(target) = target {
             if self.doc_id.is_some_and(|current| current >= target) {
                 return true;
@@ -501,6 +518,40 @@ impl<'a> BlockMaxWandIterator<'a> {
         }
         self.doc_id = None;
         false
+    }
+
+    /// block_max=false: hand back the smallest document any unit matches, with
+    /// every cursor parked on it scored. Those cursors leave the heap for the
+    /// round exactly like the pruned path's prefix, so nothing is scored twice
+    /// and nothing is skipped.
+    fn next_naive(&mut self, target: Option<u64>) -> bool {
+        if let Some(target) = target {
+            if self.doc_id.is_some_and(|current| current >= target) {
+                return true;
+            }
+            for i in std::mem::take(&mut self.prefix) {
+                let cursor = &mut self.cursors[i];
+                if cursor.cur.is_some_and(|doc| doc < target) {
+                    cursor.seek(target);
+                }
+                self.push_back(i);
+            }
+        }
+        self.prefix.clear();
+        let Some(&Reverse((doc, _))) = self.heap.peek() else {
+            self.doc_id = None;
+            return false;
+        };
+        while let Some(&Reverse((tied, i))) = self.heap.peek() {
+            if tied != doc {
+                break;
+            }
+            self.heap.pop();
+            self.prefix.push(i);
+        }
+        self.candidate_score = self.score_prefix();
+        self.doc_id = Some(doc);
+        true
     }
 
     /// The reference's block-skip path (`blockmax_wand_iterator_impl.cpp:449-524`):
@@ -1023,6 +1074,46 @@ mod tests {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    /// block_max=false must not change a single answer: it only scores every
+    /// candidate instead of pruning. Dense and sparse lists interleaved, so the
+    /// pivot, the document-gap jump and the block skip all fire on the pruned path.
+    #[test]
+    fn naive_and_pruned_agree() {
+        const DOCS: u64 = 3000;
+        let doc_len: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 10 + (d % 90) as u32)).collect();
+        let (mut a, mut b, mut c) = (Vec::new(), Vec::new(), Vec::new());
+        let mut rng = 0xabcd_1234_5678_9ef1u64;
+        for doc in 0..DOCS {
+            if lcg(&mut rng) % 100 < 40 {
+                a.push((doc, 1 + (lcg(&mut rng) % 5) as u32));
+            }
+            if lcg(&mut rng) % 100 < 15 {
+                b.push((doc, 1 + (lcg(&mut rng) % 9) as u32));
+            }
+            if lcg(&mut rng) % 100 < 3 {
+                c.push((doc, 1 + (lcg(&mut rng) % 3) as u32));
+            }
+        }
+        let dead = HashSet::new();
+        let make = || {
+            vec![field(
+                &[("a", &a), ("b", &b), ("c", &c)],
+                &doc_len,
+                DOCS as usize,
+                vec![1.0, 0.5, 2.0],
+            )]
+        };
+        for k in [1usize, 5, 100, DOCS as usize] {
+            for mode in [WandMode::Bm25, WandMode::Boolean] {
+                let pruned = BlockMaxWandIterator::new(make(), k, &dead, 0.0, 1, mode).run();
+                let naive = BlockMaxWandIterator::new(make(), k, &dead, 0.0, 1, mode)
+                    .with_naive()
+                    .run();
+                assert_eq!(pruned, naive, "k={k}");
             }
         }
     }

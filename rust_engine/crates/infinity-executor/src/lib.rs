@@ -10257,6 +10257,11 @@ impl Engine {
     fn drop_table_all(&self, name: &str) -> Result<bool> {
         let table_id = self.storage.catalog.get_table_by_name(name)?.map(|m| m.id);
         let key = self.table_key(name);
+        // Full-text chunks live in `<dir>/fulltext/<db>.<table>.<column>`, keyed by
+        // name rather than by table id: a table recreated under the same name
+        // would otherwise reopen the dropped one's chunks and score those
+        // documents a second time.
+        let fulltext_columns = self.table_schema(&key).unwrap_or_default();
         self.tables.lock().unwrap().remove(&key);
         // A dropped table's blocks are gone: so are the mappings of them.
         if let Some(id) = table_id {
@@ -10266,6 +10271,15 @@ impl Engine {
         // Rows are the port's own key space (`row:`/`del:`), not the
         // reference's, so nothing else would ever remove them.
         self.clear_orphan_rows(name)?;
+        for column in &fulltext_columns {
+            let dir = self
+                .dir
+                .join("fulltext")
+                .join(format!("{}.{column}", key.replace('/', "_")));
+            if dir.is_dir() {
+                let _ = std::fs::remove_dir_all(dir);
+            }
+        }
         if self.storage.catalog.is_cpp_only() {
             return Ok(existed);
         }
@@ -18107,6 +18121,27 @@ impl Engine {
         // several words must appear as a phrase (iresearch's `AndQuery`).
         let min_should = if require_all { units.len() } else { min_should };
         let topn = parse_topn_param(&params).unwrap_or(10);
+        // `block_max=…`: the reference's `EarlyTermAlgo` switch
+        // (`bound_select_statement_impl.cpp:168-183`). The port has one block-max
+        // iterator, so every accepted value selects it except the no-pruning
+        // ones (`false` / `batch`), which score every candidate. `compare` is the
+        // reference's diagnostic three-way run; here it is the normal path.
+        let naive_scan = match params
+            .split(';')
+            .filter_map(|p| p.split_once('='))
+            .find(|(k, _)| k.trim().eq_ignore_ascii_case("block_max"))
+            .map(|(_, v)| v.trim().to_ascii_lowercase())
+            .as_deref()
+        {
+            None | Some("") | Some("auto") | Some("heap") | Some("heap_bmw") | Some("true")
+            | Some("bmw") | Some("compare") => false,
+            Some("false") | Some("batch") => true,
+            Some(other) => {
+                return Err(Error::Syntax(format!(
+                    "block_max option must be empty, auto, heap_bmw, bmw, true, batch, false, or compare, got '{other}'"
+                )))
+            }
+        };
         let in_filter = match m.filter.as_ref() {
             Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
             None => None,
@@ -18300,15 +18335,18 @@ impl Engine {
             } else {
                 wand::WandMode::Bm25
             };
-            let hits = wand::BlockMaxWandIterator::new(
+            let mut iterator = wand::BlockMaxWandIterator::new(
                 fields,
                 topn.max(1),
                 &dead,
                 delta_term,
                 min_should,
                 mode,
-            )
-            .run();
+            );
+            if naive_scan {
+                iterator = iterator.with_naive();
+            }
+            let hits = iterator.run();
             let scored: Vec<(usize, f64)> = hits
                 .into_iter()
                 .map(|(seq, score)| (seq as usize, score))
@@ -20458,6 +20496,7 @@ impl Engine {
                 let known = matches!(
                     key.as_str(),
                     "topn"
+                        | "block_max"
                         | "threshold"
                         | "ef"
                         | "ef_search"
@@ -27093,6 +27132,55 @@ mod tests {
     /// row is re-tokenised (`MATCH_ROWS_TOKENIZED` stays 0), which is what the
     /// row-scan path used to do for every query it could not answer from the
     /// postings alone.
+    /// DROP TABLE must take the full-text chunks with it. The chunk directory is
+    /// keyed by <db>.<table>.<column>, not by table id, so a table recreated
+    /// under the same name would otherwise search the dropped one's documents
+    /// (and score them twice).
+    #[test]
+    fn a_recreated_table_does_not_search_the_dropped_tables_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE rt (id INT, body VARCHAR);").unwrap();
+        e.execute("INSERT INTO rt VALUES (1,'alpha beta'),(2,'alpha gamma');")
+            .unwrap();
+        e.execute("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
+            .unwrap();
+        e.flush().unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM rt SEARCH MATCH TEXT (body,'alpha','topn=10');"
+            )
+            .len(),
+            2
+        );
+
+        e.execute("DROP TABLE rt;").unwrap();
+        e.execute("CREATE TABLE rt (id INT, body VARCHAR);").unwrap();
+        e.execute("INSERT INTO rt VALUES (1,'delta epsilon');")
+            .unwrap();
+        e.execute("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
+            .unwrap();
+        e.flush().unwrap();
+
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM rt SEARCH MATCH TEXT (body,'alpha','topn=10');"
+            ),
+            Vec::<Vec<String>>::new(),
+            "the dropped table's documents came back"
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM rt SEARCH MATCH TEXT (body,'delta','topn=10');"
+            )
+            .len(),
+            1
+        );
+    }
+
     #[test]
     fn a_phrase_match_answers_from_the_index() {
         let dir = tempdir().unwrap();

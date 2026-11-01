@@ -161,10 +161,18 @@ fn run_queries(e: &Engine) -> infinity_common::Result<()> {
         .unwrap_or(1)
         .max(1);
     let extra = std::env::var("FTBENCH_EXTRA_QUERY").ok();
+    // The reference's QueryBenchOptions: topn, and the block_max switch that
+    // selects naive / sort / heap (its `--topn` / `--algo`).
+    let topn = std::env::var("FTBENCH_TOPN").unwrap_or_else(|_| "10".into());
+    let block_max = std::env::var("FTBENCH_BLOCK_MAX").ok();
+    let options = match block_max.as_deref() {
+        Some(algo) if !algo.is_empty() => format!("topn={topn};block_max={algo}"),
+        _ => format!("topn={topn}"),
+    };
     let queries: Vec<&str> = QUERIES.iter().copied().chain(extra.as_deref()).collect();
     for query in queries {
         let sql = format!(
-            "SELECT ROW_ID(), SCORE() FROM {TABLE} SEARCH MATCH TEXT ('text', '{query}', 'topn=10');"
+            "SELECT ROW_ID(), SCORE() FROM {TABLE} SEARCH MATCH TEXT ('text', '{query}', '{options}');"
         );
         let mut best = std::time::Duration::MAX;
         let mut first = std::time::Duration::ZERO;
@@ -219,7 +227,9 @@ pub fn run(dir: &Path, mode: &str, corpus: &str, batch: usize) -> infinity_commo
     e.execute(&create_index_sql)?;
     let create_index = t.elapsed();
     match checkpoint_cost(&e)? {
-        Some(flush) => println!("Create index cost: {create_index:?} (DDL; Flush {flush:?} not included)"),
+        Some(flush) => {
+            println!("Create index cost: {create_index:?} (DDL; Flush {flush:?} not included)")
+        }
         None => println!("Create index cost: {create_index:?} (DDL only, Flush excluded)"),
     }
 
