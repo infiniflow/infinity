@@ -14,7 +14,7 @@
 |---|---|
 | 代码 | `RocksMetaStore`（rust-rocksdb 0.25） |
 | catalog 目录 | `<dir>/catalog`（RocksDB；`catalog\| db\| tbl\| col\| idx\| seg\| blk\|` 与原生键空间同库） |
-| 行/元数据目录 | `<dir>/persistence`（RocksDB） |
+| 行数据 | 不在 KV 里：块文件（`data/…`）+ WAL 未 checkpoint 的尾巴 |
 | 目录可被 C++ 打开 | ✅ 同一个底座、同一套键 |
 | Catalog 语义 | `Catalog::with_store`（原生键空间 + C++ 布局镜像；checkpoint 时把布局写全） |
 
@@ -36,7 +36,7 @@
 
 ## 3. fsync 在哪些点上
 
-**总原则**：commit 路径上**没有 fsync**（与参考一致），持久化只发生在 checkpoint；checkpoint 里 fsync 的是**数据**（块文件、索引 chunk、两个 RocksDB 的 SST）和**checkpoint 帧本身**。参考的 WAL 线程只做 `ofs_.write` + `ofs_.flush()`（用户态 flush，不是 fsync，`wal_manager_impl.cpp:311,329-340`），换文件只是 close + rename（`:511-513`）；catalog 的 RocksDB 写入带 `disableWAL`（`kv_store_impl.cpp:311,441`），checkpoint 时一次 `Flush()`（`:390`）把 memtable 变成 SST。帧那一处 fsync 是端口**有意偏离**参考的，理由见下。
+**总原则**：commit 路径上**没有 fsync**（与参考一致），持久化只发生在 checkpoint；checkpoint 里 fsync 的是**数据**（块文件、索引 chunk、RocksDB 的 SST）和**checkpoint 帧本身**。参考的 WAL 线程只做 `ofs_.write` + `ofs_.flush()`（用户态 flush，不是 fsync，`wal_manager_impl.cpp:311,329-340`），换文件只是 close + rename（`:511-513`）；catalog 的 RocksDB 写入带 `disableWAL`（`kv_store_impl.cpp:311,441`），checkpoint 时一次 `Flush()`（`:390`）把 memtable 变成 SST。帧那一处 fsync 是端口**有意偏离**参考的，理由见下。
 
 | 位置 | 行为 | 参考对应 |
 |---|---|---|
@@ -47,15 +47,15 @@
 | `RocksMetaStore::flush`（checkpoint） | `db.flush()`：memtable → SST（RocksDB 自己 fsync SST 与 MANIFEST） | `KVStore::Flush()` = 一次 `transaction_db_->Flush()` |
 | 提交（语句 / 事务） | append 一条 WAL 帧 + 写 KV，没有同步步骤 | `NewTxn::CommitTxn` 把帧交给 WAL 线程 |
 
-调用链：`Engine::flush_storage()` → `catalog.flush()`（SST）→ `txn.flush()`（store 的 SST）→ `append_checkpoint()`（必要时 rotate，写帧，fsync 帧）。
+调用链：`Engine::flush_storage()` → `catalog.flush()`（SST）→ `txn.flush()`（同一个库，幂等）→ `append_checkpoint()`（必要时 rotate，写帧，fsync 帧）。
 
-**为什么帧要 fsync（与参考唯一的偏离）**：帧是「这个目录停在哪一次 checkpoint」的唯一标记，`GetReplayEntries` 从它取 `max_checkpoint_ts`；一个非空却没有帧的日志会让参考直接 abort（`WAL replay: No checkpoint found in wal`，`wal_manager_impl.cpp:670`）。端口在 checkpoint 之后会删掉已被覆盖的封存段（`drop_sealed_wal_up_to`），所以新帧常常是目录里**唯一**的那一个：它若只留在页缓存，掉电后目录对参考就不再可打开（数据本身还在 SST 与块文件里，端口自己能开，跨引擎交接却会失败）。帧只有几十字节，fsync 一次约 1 ms（空表 checkpoint 8.7–11.3 ms，与之前的 8.9–9.7 ms 同量级，落在同一轮的波动里）。这个 fsync 放在 checkpoint 的**最后**（`flush_storage` 末尾的 `TxnManager::sync_wal`）：块镜像、索引 chunk、两个 SST 都落盘之后才同步帧，于是“帧在”蕴含“它声明的数据也在”；帧丢了就退回上一帧重放。rotate 时顺带 fsync 目录，是因为 rename 与新文件的名字本身也要落盘，否则「帧丢了还能退回上一帧」这条退路也不成立。
+**为什么帧要 fsync（与参考唯一的偏离）**：帧是「这个目录停在哪一次 checkpoint」的唯一标记，`GetReplayEntries` 从它取 `max_checkpoint_ts`；一个非空却没有帧的日志会让参考直接 abort（`WAL replay: No checkpoint found in wal`，`wal_manager_impl.cpp:670`）。端口在 checkpoint 之后会删掉已被覆盖的封存段（`drop_sealed_wal_up_to`），所以新帧常常是目录里**唯一**的那一个：它若只留在页缓存，掉电后目录对参考就不再可打开（数据本身还在 SST 与块文件里，端口自己能开，跨引擎交接却会失败）。帧只有几十字节，fsync 一次约 1 ms（空表 checkpoint 8.7–11.3 ms，与之前的 8.9–9.7 ms 同量级，落在同一轮的波动里）。这个 fsync 放在 checkpoint 的**最后**（`flush_storage` 末尾的 `TxnManager::sync_wal`）：块镜像、索引 chunk、SST 都落盘之后才同步帧，于是“帧在”蕴含“它声明的数据也在”；帧丢了就退回上一帧重放。rotate 时顺带 fsync 目录，是因为 rename 与新文件的名字本身也要落盘，否则「帧丢了还能退回上一帧」这条退路也不成立。
 
 **语义**：承诺的持久化边界是 **checkpoint，不是 commit**——commit 只写页缓存，掉电可以把它丢掉。进程崩溃（页缓存还在）通常会保留到 WAL 尾部，但那不是承诺。
 
-**掉电后持久的是什么**：两个 RocksDB 的 SST（RocksDB 在 flush 里自己 fsync SST 与 MANIFEST）**加上块文件**。块文件对齐参考的 `FileWorker::WriteToFile`（`file_worker_impl.cpp:167`）：`{id}.col` / `col_{id}_out` / `version` 每个文件写完就 fsync（`cpp_format::write_synced`），目录本身不 fsync（参考也不 fsync 目录）。行数据的权威副本仍是 `persistence` 库里的行记录：块是镜像，恢复时 `recover_cpp_blocks` → `reconcile_mirror_marks` 按 KV 与块文件的行数差重建，所以块文件落后不会丢数据，只会让这次恢复多干一点活。索引 chunk 文件同样逐文件 fsync：`cpp_blocks` 的各类 chunk 镜像（BMP / IVF / SMVE / EMVB / HNSW / PLAID / 全文 `.dic`/`.pos`/`.len`）、`bmp_cpp`/`bmp_segment`/`emvb_segment` 的 writer、`infinity-index` 的 `save_sparse` 与 PLAID merge manifest 都走 `write_synced`（同一个 `File::create` + `write_all` + `sync_all`），对应参考 `memory_indexer_impl.cpp:535-536,762-763`、`column_index_merger_impl.cpp:151-152` 的 `FileWriter::Sync`。
+**掉电后持久的是什么**：一个 RocksDB 的 SST（RocksDB 在 flush 里自己 fsync SST 与 MANIFEST）**加上块文件与 WAL**。块文件对齐参考的 `FileWorker::WriteToFile`（`file_worker_impl.cpp:167`）：`{id}.col` / `col_{id}_out` / `version` 每个文件写完就 fsync（`cpp_format::write_synced`），目录本身不 fsync（参考也不 fsync 目录）。行数据只有这两份：checkpoint 过的在块文件里，最后一次 checkpoint 之后的在 WAL 里，恢复时 `recover_cpp_blocks` 读块文件、`TxnManager::recover_into` 从 checkpoint 帧之上重放。索引 chunk 文件同样逐文件 fsync：`cpp_blocks` 的各类 chunk 镜像（BMP / IVF / SMVE / EMVB / HNSW / PLAID / 全文 `.dic`/`.pos`/`.len`）、`bmp_cpp`/`bmp_segment`/`emvb_segment` 的 writer、`infinity-index` 的 `save_sparse` 与 PLAID merge manifest 都走 `write_synced`（同一个 `File::create` + `write_all` + `sync_all`），对应参考 `memory_indexer_impl.cpp:535-536,762-763`、`column_index_merger_impl.cpp:151-152` 的 `FileWriter::Sync`。
 
-**两个库的处理**：参考只有一份 KV，catalog 记录与 `applied` 标记天然同库，丢一起丢。端口有两个 RocksDB（`catalog` 与 `persistence`），所以 `applied` 标记**两边都写**、重放下界取两者**最小值**（`apply_split` / `TxnManager::applied_ts`）。否则 RocksDB 后台把其中一个 memtable 刷成 SST、另一个随崩溃丢掉时，重放会相信领先的那个标记，跳过落后的库丢掉的记录。
+**单库**：端口与参考一样只有一份 KV（`<dir>/catalog`），catalog 记录、索引 chunk 登记、WAL 元信息都在这一个库里，丢一起丢；行数据不在 KV 里（见上）。重放下界不对应任何 KV 标记，而是 WAL 里最新的 checkpoint 帧的 `max_commit_ts`（`TxnManager::applied_ts`），与参考的 `GetReplayEntries` 同口径。
 
 ---
 

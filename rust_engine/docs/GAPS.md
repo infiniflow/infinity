@@ -27,10 +27,11 @@
 
 **本节没有未接线项。** 这一层的现状：
 
-- **行以列式块为存储本体**（方案 C）：`INSERT` 的行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件由 checkpoint（`flush_cpp_blocks` → `write_cpp_blocks`）写，`COPY` 例外（见下）；`row:` 停写（块格式表达不了的列类型另留一份文本行副本，见 `needs_text_rows`），`del:` 一律不写（块的 `version` 是唯一墓碑）。读全部把 buffer 盖在块上：整表 / 剪枝 / 列投影 / 点取 / 含墓碑 / 计数 / `row_is_present`；回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧。`persistence/` 因此没有 `row:`/`del:` 子树，只剩侧车文件。
+- **行以列式块为存储本体**（方案 C）：`INSERT` 的行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件由 checkpoint（`flush_cpp_blocks` → `write_cpp_blocks`）写，`COPY` 例外（见下）。KV 里**没有任何行键**：`row:` 既不写也不读，`del:` 只剩事务命令流里的名字（`wal_delete_key`，用于构造 `WalCmdDeleteV2` 与行级冲突判定），不落盘；行侧车（`persistence/rowdata_*.bin`）与 `persistence/` 里的行记录一并去掉（该目录只剩参考版形状的空目录）。读全部把 buffer 盖在块上：整表 / 剪枝 / 列投影 / 点取 / 含墓碑 / 计数 / `row_is_present`；回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧。
 - **cleanup 的活段判据**是 `visible_block_ids()`（块索引，跨重启有效），不是 `segment_ids()`（分配器，重开目录后为空；用它会把每个 `idx_*/seg_{n}` 当死段删掉）。
 - **行号的次序**：冲突检查之后、写 WAL 之前按 `commit_ts` 分配（`TxnManager::begin_write` / `commit_at_deferred_with`，对应参考的 `wait_conflict_ck_` / `SubmitForAllocation`），checkpoint 的上界是 `current_ts`（已完成的 commit_ts），块的窗口按 `append_totals` + `append_ts` 裁到 `ts <= 上界`，块内 id 必须是窗口的稠密前缀。
-- **多值 / 张量表的文本行副本**：这类表的 WAL 帧用本 build 的 `DataBlock` 还原不了行，checkpoint 没跑过时靠 `needs_text_rows` 保留的文本行读出，块仍是权威。
+- **多值 / 张量表的读路径**：这类表的解码文本形式在写入与扫描两条路上不稳定，`wide_text_columns` 只用来关掉「直接读 buffer 的 `Value`」快路径，改走块解码；不再保留文本行副本。
+- **块格式表达不了的列类型**（DDL 拒绝之外的类型）：没有块可写，也没有行日志可写，这类表的行只活在 append buffer 里（进程内可见，重启即失）。现有 DDL 支持的列类型全部有块布局，所以这条路径目前不可达。
 - **列投影的并发守卫**：块文件就是行集，不需要「本进程写过镜像」的快照，快照只做并发守卫（`try_cpp_projection`）。
 
 崩溃恢复的口径：**compaction 在自己的提交里写它合并出的段**（`write_cpp_blocks_bounded`，块与 `catalog|seg|…` 记录一起落盘），否则崩溃时 `drop|seg|…` 标记已经 durable、新段却还没有块，表会读成空；**WAL 回放除表名外还比表 id**（`ReplayedAppend::table_id`），快照恢复把表换成了新 id，旧 id 的 append 帧不会再叠到恢复出来的行上；**checkpoint 的 segment 清理保留被提交上界裁掉的段**，否则一个先于某次提交开始的 checkpoint 会删掉那次提交刚写好的块目录。

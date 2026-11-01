@@ -213,7 +213,7 @@
 | 方面 | C++ 参考 | 重写版（现状） |
 |---|---|---|
 | 上传单元 | 打包对象（≤128MB，多文件，8 字节对齐，多 part 加 4 字节 footer） | 单个文件（路径树） |
-| S3 对象键 | 裸 `obj_key`（UUID） | 相对路径（`data/...`、`catalog/...`、`persistence/...`） |
+| S3 对象键 | 裸 `obj_key`（UUID） | 相对路径（`data/...`、`catalog/...`） |
 | catalog 上传 | RocksDB listener 同步到 `meta/`、`meta/sst/` | 作为路径树的一部分 |
 | 数据文件恢复 | 按 `pm|object|` 记录惰性下载 | 启动时 `restore_missing_files` 扫描 |
 
@@ -230,7 +230,7 @@
 | 冲突 | 先取 ts 再查冲突，回滚也照样占掉这个 ts | 同 |
 | 提交顺序 | `CommitBottom` 按提交 ts 推进 `current_ts_` | 同 |
 | 重放 | `CommitReplayTxn` 把两个指针置成该 entry 的提交 ts | 同 |
-| 起始值 | `start_ts` = 最新 checkpoint frame 的提交 ts | 同（`max(checkpoint 提交 ts, KV 的 applied 标记)`） |
+| 起始值 | `start_ts` = 最新 checkpoint frame 的提交 ts | 同（WAL 里最新 `WalCmd::Checkpoint` 的 `max_commit_ts`，KV 里没有 applied 标记） |
 | checkpoint | 一个写事务：命令带 `begin_ts`（奇数，`NewTxn::Checkpoint` 拒绝偶数），frame 的提交 ts 是它 +1 | 同 |
 | DDL | 每条 DDL 一个写事务（`kDDL`） | 同：catalog 写收集成批，提交前按提交 ts 重盖（`Catalog::restamp`），typed WAL 一条 |
 | 启动 | 引导（ts 2）、首个 checkpoint（ts 4）、首次连接建 `default_db`（ts 6）各占一个写事务；重启时 `SetNewSystemTS` + `BeginRecoveryTxn`（`prepare_commit_ts_ = current_ts_ + 2`）再跑一次 checkpoint | 同 |

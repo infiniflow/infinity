@@ -63,7 +63,7 @@ use infinity_storage::cpp_format::{
 };
 use infinity_storage::knn_format;
 
-use crate::{del_key, parse_value, row_key, Engine};
+use crate::{parse_value, Engine};
 use infinity_parser::Literal;
 
 /// `(row id, vector)` pairs read back from a vector index mirror.
@@ -1962,7 +1962,7 @@ impl Engine {
         let first = ((segment_id as usize) << 32) | start as usize;
         let last = ((segment_id as usize) << 32) | end as usize;
         let mut journal: std::collections::BTreeMap<usize, Vec<Value>> = self
-            .fetch_rows_including_deleted_range(table, first, last)?
+            .pending_range(table, first, last)
             .into_iter()
             .collect();
         // The mirror is the authoritative copy of the rows it already holds
@@ -2664,11 +2664,6 @@ impl Engine {
         let covered = entry.mirror_epoch == epoch && entry.pending_rows.is_empty();
         entry.mirror_dirty = !covered;
         drop(tables);
-        if covered {
-            // The blocks now cover everything the journal holds, so a restart
-            // may read them without it - the mark is what a reader consults.
-            self.clear_mirror_dirty(&tkey);
-        }
         Ok(written)
     }
 
@@ -2825,39 +2820,6 @@ impl Engine {
             return Ok(());
         }
         let table = self.qualified_table(table);
-        let meta = match self.storage.catalog.get_table_by_name(&table) {
-            Ok(Some(meta)) => meta,
-            // The catalog could not answer right now (a concurrent reload): the
-            // rows are already committed, so they must still be buffered - the
-            // checkpoint re-checks the schema before it writes anything.
-            _ => {
-                let tkey = self.table_key(&table);
-                let mut tables = self.tables.lock().unwrap();
-                let entry = tables.entry(tkey.clone()).or_default();
-                entry.pending_rows.extend(extra.iter().cloned());
-                entry.mirror_dirty = true;
-                entry.mirror_epoch += 1;
-                drop(tables);
-                self.write_mirror_dirty(&tkey);
-                return Ok(());
-            }
-        };
-        if !meta.types.iter().all(|t| column_type_of(t).is_some()) {
-            // No block can hold this table's rows: it keeps them in the store,
-            // the way every table did before the blocks became the storage of
-            // record.
-            for (seq, values) in extra {
-                let literals: Vec<Literal> = values
-                    .iter()
-                    .map(|v| Literal::Str(mirror_cell_text(v)))
-                    .collect();
-                let text = self.encode_row_stored(&table, &literals, &meta.types)?;
-                self.storage
-                    .catalog.store()
-                    .put(&row_key(&table, *seq), text.as_bytes())?;
-            }
-            return Ok(());
-        }
         // No file I/O here: the rows go into the table's append buffer, which
         // is what the reference's `AppendInBlock` does to the block's
         // `BufferObject`. The block file is written by the checkpoint.
@@ -2869,7 +2831,6 @@ impl Engine {
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
         }
-        self.write_mirror_dirty(&tkey);
         Ok(())
     }
 
@@ -3473,17 +3434,12 @@ impl Engine {
                 if on_disk.contains(&(*seq as usize)) {
                     continue;
                 }
-                match self.parse_stored_row(&table, &defaults, text.as_bytes()) {
-                    Ok(row) => batch.push((*seq as usize, row)),
-                    // A column whose text form the row parser cannot rebuild (a
-                    // multi-vector) keeps the replayed text in the store: the
-                    // block side of the read cannot decode that column either,
-                    // so the row has nowhere else to come from.
-                    Err(_) => {
-                        self.storage
-                            .catalog.store()
-                            .put(&row_key(&table, *seq as usize), text.as_bytes())?;
-                    }
+                // A row whose text form the row parser cannot rebuild is not
+                // buffered: the append buffer is the only place a row the block
+                // files do not hold can live, and the port keeps no row journal
+                // to hold its text instead.
+                if let Ok(row) = self.parse_stored_row(&table, &defaults, text.as_bytes()) {
+                    batch.push((*seq as usize, row));
                 }
             }
             // One `create` per append transaction, stamped with its commit ts.
@@ -3561,32 +3517,12 @@ impl Engine {
     }
 
     /// Whether `seq` names a row a delete may hide: a live slot of a visible
-    /// block, or (for a directory an older build wrote) a `row:` key.
+    /// block.
     ///
     /// The reference decides this from the block's `BlockOffset` and `version`;
     /// with the rows in the blocks there is no key to look up.
     pub(crate) fn row_is_present(&self, table: &str, seq: usize) -> bool {
         let table = self.qualified_table(table);
-        if self
-            .storage
-            .catalog.store()
-            .get(&del_key(&table, seq))
-            .ok()
-            .flatten()
-            .is_some()
-        {
-            return false;
-        }
-        if self
-            .storage
-            .catalog.store()
-            .get(&row_key(&table, seq))
-            .ok()
-            .flatten()
-            .is_some()
-        {
-            return true;
-        }
         if self.deleted_ids(&table).contains(&(seq as u64)) {
             return false;
         }
@@ -4388,6 +4324,32 @@ impl Engine {
         })
     }
 
+    /// [`Self::pending_rows_of`] restricted to the id window `[first, last)`,
+    /// in row-id order.
+    pub(crate) fn pending_range(
+        &self,
+        table: &str,
+        first: usize,
+        last: usize,
+    ) -> Vec<(usize, Vec<Value>)> {
+        let key = self.table_key(table);
+        let mut rows: Vec<(usize, Vec<Value>)> = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| {
+                e.pending_rows
+                    .iter()
+                    .filter(|(seq, _)| *seq >= first && *seq < last)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+        rows.sort_by_key(|(seq, _)| *seq);
+        rows
+    }
+
     /// The rows the commits since the last checkpoint appended, by row id
     /// (the reference's `BufferObject` for the blocks they land in).
     pub(crate) fn pending_rows_of(&self, table: &str) -> Vec<(usize, Vec<Value>)> {
@@ -4414,6 +4376,27 @@ impl Engine {
                     .find(|(row, _)| *row == seq)
                     .map(|(_, values)| values.clone())
             })
+    }
+
+    /// The stored text of one buffered row, for the paths that read a table the
+    /// block cursor cannot serve (a table whose columns have no block layout has
+    /// nothing but the append buffer).
+    pub(crate) fn pending_row_text(&self, table: &str, seq: usize) -> Result<Option<Vec<u8>>> {
+        if self.deleted_ids(table).contains(&(seq as u64)) {
+            return Ok(None);
+        }
+        let Some(values) = self.pending_row(table, seq) else {
+            return Ok(None);
+        };
+        let types = self.column_types(table)?;
+        let literals: Vec<Literal> = values
+            .iter()
+            .map(|v| Literal::Str(mirror_cell_text(v)))
+            .collect();
+        Ok(Some(
+            self.encode_row_stored(table, &literals, &types)?
+                .into_bytes(),
+        ))
     }
 
     /// The append buffer as a scan reads it, **already in `Value`s**.
@@ -7359,21 +7342,11 @@ impl<'a> BlockCursor<'a> {
     /// The stored text of `seq`, ready to be written back under another id, or
     /// `None` when the row is deleted or outside the visible blocks.
     ///
-    /// Journal first: a row written after the last checkpoint (and every row
-    /// while the mirror is dirty) is there verbatim, tombstone included. A row
-    /// the blocks hold is re-encoded through the same text form
+    /// Buffer first: a row written after the last checkpoint is in the append
+    /// buffer. A row the blocks hold is re-encoded through the same text form
     /// `restore_cpp_blocks` uses, so a compaction moves exactly what a restart
     /// would rebuild.
     pub(crate) fn row(&mut self, seq: usize) -> Result<Option<Vec<u8>>> {
-        if self
-            .engine
-            .storage
-            .catalog.store()
-            .get(&del_key(&self.table, seq))?
-            .is_some()
-        {
-            return Ok(None);
-        }
         // A delete the mirror has not written yet lives in the table's delete
         // log (`note_deleted_ids`); the block's `version` has it afterwards.
         if self.engine.deleted_ids(&self.table).contains(&(seq as u64)) {
@@ -7389,14 +7362,6 @@ impl<'a> BlockCursor<'a> {
                     .encode_row_stored(&self.table, &literals, &self.meta.types)?
                     .into_bytes(),
             ));
-        }
-        if let Some(value) = self
-            .engine
-            .storage
-            .catalog.store()
-            .get(&row_key(&self.table, seq))?
-        {
-            return Ok(Some(value));
         }
         let segment = (seq >> 32) as u32;
         let offset = (seq as u64 & 0xffff_ffff) as usize;

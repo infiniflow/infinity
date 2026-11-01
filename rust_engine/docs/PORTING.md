@@ -125,10 +125,8 @@
 drop 的数据库。
 
 **行只在 `data/` 的块文件里**：提交把行交给块的 append 缓冲区（`TableEntry::pending_rows`，即参考的
-`BufferObject`），checkpoint 才写文件；`persistence/` 里只剩 append/delete 历史与侧车文件，
-不再有 `row:`/`del:` 键。唯一例外是块格式表达不了的列类型（多值/张量/稀疏）：那类表额外留一份文本行，
-因为块解码与 WAL 块解码都还原不了这些列，否则快速重启（checkpoint 没跑过）会丢行；这类表的计数与读
-仍以块为准。
+`BufferObject`），checkpoint 才写文件；WAL 里未 checkpoint 的尾巴在重启时重放回这块缓冲区。KV 里既没有
+`row:` 也没有 `del:` 键，也没有行侧车：行数据只有「块文件 + WAL」两份。
 
 **行号在提交序里发，checkpoint 只写已完成的**：两条一起才保证块内 id 是稠密前缀（块按 slot 寻址，
 行 *n* 的 id 是 `segment << 32 | block * 8192 + n`，中间缺一行就会把后面的行写错位）。
@@ -176,13 +174,13 @@ drop 的数据库。
 `cpp_blocks::tests::a_commit_writes_only_the_block_it_appends_to`：两次 `INSERT` 后第一块的
 `version` 逐字节不变、第二块多一条 `create`，随后一次 `DELETE` 只给第二块加墓碑。
 
-UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交给 buffer 或整表重写），没有哪条路径再从
-`row:` 取行。唯一要守住的是块的寻址方式：块按 **slot** 寻址（行 *n* 的 id 是
+UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交给 buffer 或整表重写），没有哪条路径去 KV 取行。唯一要守住的是块的寻址方式：块按 **slot** 寻址（行 *n* 的 id 是
 `segment << 32 | block * 8192 + n`），所以写入前要校验 `chunk` 的 id 是否从块首连续——带空洞的块宁可
 这次不写（行留在 buffer 等下次 checkpoint），也不能紧凑写，否则空洞之后的行会整体挪位。
 
-所以"一个目录里的键与参考完全一致"现在对 `catalog/`、`data/` 与 `wal/` 三者都成立；`persistence/`
-里剩下的每一样（append/delete 历史、行侧车）都是参考版放在同一位置的东西。
+所以"一个目录里的键与参考完全一致"现在对 `catalog/`、`data/` 与 `wal/` 三者都成立。数据目录下没有行载荷：
+`catalog/` 是唯一的 KV（参考放在 `persistence/`，端口放在 `catalog/`），行只在 `data/` 的块文件与 `wal/` 里；
+`persistence/`、`log/`、`tmp/` 只是按参考的目录形状建出来的空目录。
 
 **drop 是标记，物理回收在 cleanup**。`DROP DATABASE` / `DROP TABLE` / `DROP INDEX` 只写
 `drop|db|{name}/{create_ts}/{db_id}`、`drop|tbl|{db}/{name}/{create_ts}/{table_id}`、

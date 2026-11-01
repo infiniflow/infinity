@@ -24,9 +24,6 @@ use infinity_txn::TxnManager;
 fn catalog_dir(dir: &Path) -> PathBuf {
     dir.join("catalog")
 }
-fn kv_dir(dir: &Path) -> PathBuf {
-    dir.join("persistence")
-}
 fn wal_path(dir: &Path) -> PathBuf {
     dir.join("wal").join("wal.log")
 }
@@ -36,7 +33,8 @@ fn open_catalog(dir: &Path) -> infinity_common::Result<Catalog> {
 }
 
 fn open_txn(dir: &Path) -> infinity_common::Result<(TxnManager, Arc<dyn MetaStore>)> {
-    let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(kv_dir(dir))?);
+    // One RocksDB, like the engine: the catalog and every other record share it.
+    let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(catalog_dir(dir))?);
     std::fs::create_dir_all(dir.join("wal")).map_err(|e| infinity_common::Error::Io {
         path: dir.join("wal"),
         source: e,
@@ -113,14 +111,10 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     };
     if let Some(client) = &object_store {
         // Every tree the checkpoints upload has to come back, not only the
-        // C++-format `data/`: the catalog holds the tables and the row store
-        // holds their rows, so restoring `data/` alone opens an empty engine
-        // in which the mirrored block files have nothing to belong to.
-        for (dir, prefix) in [
-            ("data", "data"),
-            ("catalog", "catalog"),
-            ("persistence", "persistence"),
-        ] {
+        // C++-format `data/`: the catalog holds the tables, so restoring `data/`
+        // alone opens an empty engine in which the block files have nothing to
+        // belong to.
+        for (dir, prefix) in [("data", "data"), ("catalog", "catalog")] {
             match infinity_storage::s3::restore_tree(client, &root.join(dir), prefix) {
                 Ok(n) if n > 0 => println!("object store: restored {n} {prefix} file(s) from s3"),
                 Ok(_) => {}

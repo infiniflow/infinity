@@ -15,8 +15,6 @@
 #![forbid(unsafe_code)]
 
 use std::collections::HashMap;
-use std::io::Write;
-use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -299,13 +297,13 @@ impl QueryResult {
 }
 
 
-fn row_key(table: &str, seq: usize) -> Vec<u8> {
-    format!("row:{table}:{seq:016}").into_bytes()
-}
-fn row_prefix(table: &str) -> Vec<u8> {
-    format!("row:{table}:").into_bytes()
-}
-fn del_key(table: &str, seq: usize) -> Vec<u8> {
+/// The key that names a row delete in the transaction's command stream.
+///
+/// Nothing is ever written under it - the tombstone lives in the block's
+/// `version` file - but the WAL builder reads the `del:` form as the signal to
+/// emit the reference's `WalCmdDeleteV2` for that `(table, row id)`, and the
+/// conflict check keys row deletes the same way.
+fn wal_delete_key(table: &str, seq: usize) -> Vec<u8> {
     format!("del:{table}:{seq:016}").into_bytes()
 }
 /// The block mirror's append log: the cumulative row count after every append
@@ -6066,7 +6064,7 @@ struct TableEntry {
     /// Row ids the C++ block mirror was written from, in block order.
     ///
     /// The mirror is a snapshot: rows appended after it was written are read
-    /// from the row journal, and rows deleted since it was written are hidden
+    /// from the append buffer, and rows deleted since it was written are hidden
     /// by their tombstones (`TableEntry`'s block snapshot is the Rust stand-in
     /// for the reference's per-block row ranges + delete bitmap).
     cpp_block_rows: Option<Arc<Vec<usize>>>,
@@ -6082,12 +6080,6 @@ struct TableEntry {
     /// from the block files (a column change re-encodes every cell, so the
     /// files' cells are stale). Set by `rewrite_cpp_blocks`.
     rewrite_rows: bool,
-    /// The sidecar holding this table's wide cells, so a row's stored text
-    /// stays small: `persistence/rowdata_{table}.bin`, compressed one cell at a
-    /// time. Not a directory of its own - the reference has no `rowdata/` tree -
-    /// and not a memory buffer either: the stored rows carry `\x01B{offset}`
-    /// references that have to resolve after a restart.
-    row_blob: Option<Arc<Mutex<std::fs::File>>>,
     /// `(segment, offset, sealed)` of the row-id allocator.
     row_counter: Option<(u32, u32, bool)>,
     /// Cumulative row count after every append transaction of this table
@@ -6158,7 +6150,7 @@ struct TableEntry {
     /// row set writes a different one. Keep the same rule: only a table that
     /// moved is rewritten.
     mirror_dirty: bool,
-    /// Counts every change a reader would have to merge out of the journal:
+    /// Counts every change a reader would have to merge out of the buffer:
     /// an append, a delete, a schema/row-id rewrite. A mirror write captures it
     /// before it reads the rows and only clears `mirror_dirty` when the value is
     /// unchanged - a write that lands during the flush stays visible.
@@ -6685,20 +6677,9 @@ fn run_bottom(
         .chain(deletes.iter().map(|(table, _)| table.as_str()))
         .collect();
     for table in touched {
-        if !engine.has_block_layout(table) {
-            // A column the block format cannot express has no block to hold the
-            // row; such a table keeps its rows in the store, the way every table
-            // did before the blocks became the storage of record.
-            for append in appends.iter().filter(|append| append.table == table) {
-                for (k, text) in append.encoded.iter().enumerate() {
-                    engine
-                        .storage
-                        .catalog.store()
-                        .put(&row_key(table, append.base + k), text.as_bytes())?;
-                }
-            }
-            continue;
-        }
+        // A column the block format cannot express has no block to hold the
+        // row, and the port keeps no row journal either: such a table's rows
+        // stay in the append buffer (see `has_block_layout`).
         let defaults = engine.table_defaults(table).unwrap_or_default();
         let mut published: Vec<(usize, Vec<Value>)> = Vec::new();
         for append in appends.iter().filter(|append| append.table == table) {
@@ -6921,33 +6902,22 @@ impl<'a> EngineTxn<'a> {
         }
         // `WalCmdAppendV2`: the rows ride in the log's `DataBlock` (the
         // reference's command), and the commit writes them straight into the
-        // block - the engine keeps no `row:` key for either. A column the WAL
-        // encoder cannot express keeps the old text record, so replay still has
-        // the row.
+        // block - the engine keeps no `row:` key for either. A table no block
+        // can hold, or a row the WAL encoder cannot express, contributes no
+        // command: its rows reach the disk with the block buffer at the next
+        // checkpoint.
         let table_id = meta.id.to_string();
-        // A table no block can hold keeps its rows in the store (and a text
-        // record in the log, which is what replay of such a table expects).
-        let typed = typed_append_block(&rows, &types)
-            .filter(|_| self.engine.has_block_layout(&table));
-        match typed {
-            Some(block) => {
-                if let Some(txn) = self.txn.as_mut() {
-                    txn.set_typed_commands(vec![self.engine.append_command(
-                        &table,
-                        &table_id,
-                        base,
-                        rows.len(),
-                        block,
-                    )]);
-                }
-            }
-            None => {
-                for (k, text) in encoded.iter().enumerate() {
-                    self.txn
-                        .as_mut()
-                        .expect("transaction is open")
-                        .put(row_key(&table, base + k), text.as_bytes().to_vec());
-                }
+        if let Some(block) = typed_append_block(&rows, &types)
+            .filter(|_| self.engine.has_block_layout(&table))
+        {
+            if let Some(txn) = self.txn.as_mut() {
+                txn.set_typed_commands(vec![self.engine.append_command(
+                    &table,
+                    &table_id,
+                    base,
+                    rows.len(),
+                    block,
+                )]);
             }
         }
         let n = rows.len();
@@ -6984,7 +6954,7 @@ impl<'a> EngineTxn<'a> {
                 self.txn
                     .as_mut()
                     .expect("transaction is open")
-                    .delete_deferred(del_key(&table, seq));
+                    .delete_deferred(wal_delete_key(&table, seq));
                 self.deletes.push((table.clone(), seq));
                 ids.push(seq);
                 staged += 1;
@@ -7537,9 +7507,10 @@ impl Engine {
         // (the reference's checkpoint record gives it the same floor).
         let hydrated = engine.recover_cpp_blocks()?;
         // Two floors, because the two halves of a commit reach the disk in
-        // sequence: the KV batch (with its applied mark) is written first, the
-        // block in `CommitBottom` after. A record above `applied` still has KV
-        // work to do; a record above `hydrated` still has to reach a block.
+        // sequence: the KV batch is written first, the block in `CommitBottom`
+        // after. A record above `applied` (the newest checkpoint frame) still
+        // has KV work to do; a record above `hydrated` still has to reach a
+        // block.
         let applied = engine.txn.applied_ts()?;
         let mut replayed_appends = Vec::new();
         let mut replayed_deletes = Vec::new();
@@ -7550,11 +7521,6 @@ impl Engine {
             &mut replayed_deletes,
         )?;
         engine.apply_replayed_rows(replayed_appends, replayed_deletes)?;
-        // Whether the blocks still describe the table is decided from the two
-        // counts, not assumed: a replay, a directory the reference wrote and a
-        // journal this build did not write all leave rows in the KV that the
-        // files do not have.
-        engine.reconcile_mirror_marks()?;
         engine.rebuild_indexes()?;
         // `Storage::Init` finishes with two write transactions: the startup
         // checkpoint and (on a directory that has no system timestamp yet) the
@@ -10113,96 +10079,30 @@ impl Engine {
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
         }
-        self.write_mirror_dirty(&key);
-    }
-
-    /// The per-table "the mirror is behind the journal" mark.
-    ///
-    /// It is persisted, because the decision it drives - read the blocks or
-    /// read the journal - has to survive a restart. A crash after an append or
-    /// a delete and before the checkpoint leaves the rows in the WAL: the
-    /// replay puts them back in the KV, and the same key says the blocks no
-    /// longer cover the table.
-    fn mirror_dirty_key(table: &str) -> Vec<u8> {
-        format!("dirty:{table}").into_bytes()
-    }
-
-    fn write_mirror_dirty(&self, key: &str) {
-        // In-memory only: the block files are the only row copy now, and a
-        // restart decides staleness by comparing them with the WAL.
-        let _ = key;
-    }
-
-    fn clear_mirror_dirty(&self, key: &str) {
-        let _ = key;
     }
 
     /// Whether the files under `data/` no longer describe the table's rows:
     /// a row was appended or deleted, a column was dropped or a compaction
     /// renumbered the rows, and the next checkpoint has not rewritten the
-    /// mirror yet. A reader must then read the journal, not the blocks.
+    /// mirror yet. A reader must then merge the append buffer over the blocks.
+    ///
+    /// Per process only: a restart rebuilds the buffer by replaying the WAL
+    /// above the newest checkpoint frame, so a mark kept in the store would say
+    /// nothing the replay does not.
     pub(crate) fn mirror_dirty(&self, table: &str) -> bool {
         let key = self.table_key(table);
-        if let Some(entry) = self.tables.lock().unwrap().get(&key) {
-            return entry.mirror_dirty;
-        }
-        // No entry yet (a table this process never touched): the persisted
-        // mark is the answer, and it seeds the entry.
-        let dirty = self
-            .storage
-            .catalog.store()
-            .get(&Self::mirror_dirty_key(&key))
-            .ok()
-            .flatten()
-            .is_some();
-        if dirty {
-            self.tables
-                .lock()
-                .unwrap()
-                .entry(key)
-                .or_default()
-                .mirror_dirty = true;
-        }
-        dirty
-    }
-
-    /// Recomputes "the blocks are behind the journal" for every table at open.
-    ///
-    /// The journal holds one `row:` key per visible row the last checkpoint put
-    /// there (plus whatever a replay added above it). When the two counts agree
-    /// the files are the table and a reader never has to look at the journal;
-    /// when the journal is ahead - a replay, a directory the reference wrote, a
-    /// build that did not maintain the mark - the next read merges the two and
-    /// the next checkpoint rewrites the mirror.
-    fn reconcile_mirror_marks(&self) -> Result<()> {
-        for meta in self.storage.catalog.list_tables()? {
-            let key = self.table_key(&meta.name);
-            if !self.has_block_mirror(&key) {
-                continue;
-            }
-            // The blocks are the only copy of the rows (plan A): there is no
-            // second store for them to be behind.
-            let behind = false;
-            {
-                let mut tables = self.tables.lock().unwrap();
-                let entry = tables.entry(key.clone()).or_default();
-                let was_dirty = entry.mirror_dirty;
-                entry.mirror_dirty = behind || was_dirty;
-                if behind && !was_dirty {
-                    entry.mirror_epoch += 1;
-                }
-            }
-            if behind {
-                self.write_mirror_dirty(&key);
-            }
-        }
-        Ok(())
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|entry| entry.mirror_dirty)
+            .unwrap_or(false)
     }
 
     /// Whether the table has block files at all. A table whose rows were only
-    /// ever written to the journal (an import replayed from the WAL, a
-    /// directory that was never checkpointed) has none, and its clean
-    /// `mirror_dirty` flag must not be read as "the blocks are the table".
+    /// ever buffered (an import replayed from the WAL, a directory that was
+    /// never checkpointed) has none, and its clean `mirror_dirty` flag must not
+    /// be read as "the blocks are the table".
     pub(crate) fn has_block_mirror(&self, table: &str) -> bool {
         self.block_index_for(table)
             .map(|index| !index.lock().unwrap().is_empty())
@@ -10569,7 +10469,6 @@ impl Engine {
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
         }
-        self.write_mirror_dirty(&tkey);
         // A hint for the mirror, not committed state: if the process dies
         // before the rows do, the mirror clips every total to the rows it
         // actually has and falls back to one create when they disagree.
@@ -10958,15 +10857,15 @@ impl Engine {
     ) -> Result<RowRange> {
         let key = self.table_key(table);
         // The allocator's counter, resolved **before** the entry is locked:
-        // `next_row_seq` reads the block layout when the journal is empty, and
-        // that reaches `block_index_for`, which takes the same lock.
+        // `next_row_seq` reads the block layout, which reaches
+        // `block_index_for` and takes the same lock.
         let mut tables = self.tables.lock().unwrap();
         let start = match tables.entry(key.clone()).or_default().row_counter {
             Some(v) => v,
             None => {
                 // Resolve the first counter without the lock - the block layout
-                // has to be read when the journal is empty - then take the lock
-                // again and re-check: another writer may have opened the
+                // has to be read - then take the lock again and re-check:
+                // another writer may have opened the
                 // segment while this thread was reading, and both must not hand
                 // out the same ids.
                 drop(tables);
@@ -11604,15 +11503,6 @@ impl Engine {
             // frame is decoded back into row text by `block::to_data_block`
             // (tensor and sparse columns render their text form), so the block
             // is the only copy, as in the reference.
-            if !engine.has_block_layout(&bottom_table) {
-                for (k, encoded) in bottom_encoded.iter().enumerate() {
-                    engine
-                        .storage
-                        .catalog.store()
-                        .put(&row_key(&bottom_table, base + k), encoded.as_bytes())?;
-                }
-                return Ok(());
-            }
             // `AppendInBlock`: this batch's rows go into the block's buffer -
             // they are the batch's only copy, there is no `row:` key to read
             // them back from.
@@ -11760,7 +11650,7 @@ impl Engine {
         // reference hides a deleted row through the block's `version` file, so
         // a directory whose version was not refreshed would show it again.
         for seq in deletes {
-            txn.delete_deferred(del_key(table, *seq));
+            txn.delete_deferred(wal_delete_key(table, *seq));
         }
         // `NewTxn::Delete`: row level against other deletes and updates, table
         // level against a compaction.
@@ -11846,7 +11736,7 @@ impl Engine {
         self.note_live_rows(table, -(deletes.len() as isize));
         let mut txn = txn;
         for seq in deletes {
-            txn.delete_deferred(del_key(table, *seq));
+            txn.delete_deferred(wal_delete_key(table, *seq));
         }
         // `NewTxn::Update`: table level against another update, row level
         // against a delete, segment level against a memory-index dump.
@@ -12459,27 +12349,10 @@ impl Engine {
                     return Err(Error::Invalid(format!("table '{new_name}' already exists")));
                 }
                 let _ = meta;
-                let rows = self.fetch_rows_with_ids(table)?;
-                // `RenameTable` moves the catalog and row keys; the row ids
-                // themselves are unchanged, so the segment ids stay the same
-                // (the reference's `cleanup_and_rename_table` asserts the
-                // pre-rename segment id).
-                if !rows.is_empty() {
-                    let mut t = self.txn.begin();
-                    for (seq, row) in &rows {
-                        // The text copy moves to the new name at the same
-                        // sequence id; the old one is swept below. No tombstone
-                        // key: the rename is a catalog move, and the rows live
-                        // in `tbl_<id>`, which the rename keeps.
-                        let encoded = row
-                            .iter()
-                            .map(|v| v.to_slt_string())
-                            .collect::<Vec<_>>()
-                            .join("\t");
-                        t.put(row_key(new_name, *seq), encoded.into_bytes());
-                    }
-                    self.txn.commit(t)?;
-                }
+                // `RenameTable` moves the catalog only: the row ids and the
+                // segment ids stay the same (the reference's
+                // `cleanup_and_rename_table` asserts the pre-rename segment id),
+                // and so does the block directory, which is keyed by table id.
                 // The block directory is keyed by table id, which a rename
                 // keeps, so the files are already the renamed table's.
                 // Move the per-table entry (allocator, registries) to the new
@@ -12574,30 +12447,18 @@ impl Engine {
                     Some(i) => i,
                     None => return Err(Error::Invalid(format!("unknown column '{column}'"))),
                 };
-                // rewrite rows without the dropped column (an empty table has
-                // nothing to rewrite, and committing an empty txn is an error).
-                // The row ids stay unchanged — dropping a column only removes
-                // its values, it does not move the rows to a new segment (the
-                // reference's `cleanup_and_drop_columns` keeps segment {2}).
-                // The rewritten rows keep their ids; the blocks are re-encoded
-                // from them once the catalog no longer has the column.
+                // Rewrite the rows without the dropped column. The row ids stay
+                // unchanged - dropping a column only removes its values, it does
+                // not move the rows to a new segment (the reference's
+                // `cleanup_and_drop_columns` keeps segment {2}). The cells are
+                // re-encoded into the blocks; there is no row record to update.
                 let mut rewritten: Vec<(usize, Vec<Value>)> = Vec::with_capacity(rows.len());
-                if !rows.is_empty() {
-                    let mut t = self.txn.begin();
-                    for (seq, row) in &rows {
-                        let mut nr = row.clone();
-                        if idx < nr.len() {
-                            nr.remove(idx);
-                        }
-                        let encoded = nr
-                            .iter()
-                            .map(|v| v.to_slt_string())
-                            .collect::<Vec<_>>()
-                            .join("\t");
-                        t.put(row_key(table, *seq), encoded.into_bytes());
-                        rewritten.push((*seq, nr));
+                for (seq, row) in &rows {
+                    let mut nr = row.clone();
+                    if idx < nr.len() {
+                        nr.remove(idx);
                     }
-                    self.txn.commit(t)?;
+                    rewritten.push((*seq, nr));
                 }
                 // The rewrite changed the stored layout but not the ids.
                 self.invalidate_row_cache(table);
@@ -13742,19 +13603,10 @@ impl Engine {
                                             block,
                                         ),
                                     ]),
-                                    // A column the WAL encoder cannot express
-                                    // keeps the text record so replay still has
-                                    // the row.
-                                    None => {
-                                        for (k, row) in literals_for_wal.iter().enumerate() {
-                                            let encoded = row
-                                                .iter()
-                                                .map(|v| v.to_slt_string())
-                                                .collect::<Vec<_>>()
-                                                .join("\t");
-                                            txn.put(row_key(&table_name, base + k), encoded.into_bytes());
-                                        }
-                                    }
+                                    // A row the WAL encoder cannot express keeps
+                                    // its `DeleteV2` only: the new cells reach the
+                                    // block buffer, and no row record is kept.
+                                    None => {}
                                 },
                                 None => {}
                             }
@@ -14503,7 +14355,7 @@ impl Engine {
                 // to reject most rows (`=` against a constant): filtering there
                 // saves the rejected rows' buffers, while a predicate that
                 // matches everything would only add a copy of each row.
-                let narrowed = if self.needs_text_rows(table) {
+                let narrowed = if self.wide_text_columns(table) {
                     None
                 } else if let Some(pred) = predicate.filter(|pred| is_equality_predicate(pred)) {
                     let predicate = remap_columns(pred, &pos);
@@ -14771,26 +14623,18 @@ impl Engine {
     }
 
     /// Next storage sequence id for `table` (max existing + 1).
+    ///
+    /// The ids in use are the blocks' (a directory whose rows live there) plus
+    /// the append buffer's, which holds the commits above the last checkpoint.
+    /// Handing out an id twice would overwrite a row the mirror already holds.
     fn next_row_seq(&self, table: &str) -> Result<usize> {
-        let prefix = row_prefix(table);
-        let mut max = 0usize;
-        for (k, _v) in self.storage.catalog.store().scan_prefix(&prefix)? {
-            if let Ok(seq) = String::from_utf8_lossy(&k[prefix.len()..]).parse::<usize>() {
-                // A compacted (renumbered) row is tombstoned at its old id;
-                // it must not push the next id past the live range.
-                if self.storage.catalog.store().get(&del_key(table, seq))?.is_some() {
-                    continue;
-                }
-                max = max.max(seq + 1);
-            }
-        }
-        if max == 0 {
-            // No journal rows: the ids in use are the blocks' (a directory
-            // whose rows live there). Handing out 0 again would overwrite a
-            // row the mirror already holds.
-            if let Some((segment, rows)) = self.block_segment_row_counts(table).last() {
-                max = ((*segment as usize) << 32) | *rows as usize;
-            }
+        let mut max = self
+            .block_segment_row_counts(table)
+            .last()
+            .map(|(segment, rows)| ((*segment as usize) << 32) | *rows as usize)
+            .unwrap_or(0);
+        for (seq, _) in self.pending_rows_of(table) {
+            max = max.max(seq + 1);
         }
         Ok(max)
     }
@@ -14856,40 +14700,22 @@ impl Engine {
 
     /// Every live row of `table`, as a scan reads them.
     ///
-    /// One place decides where a row comes from - the blocks when they cover
-    /// the table, the journal for the tail above the last checkpoint - so the
-    /// scan, the count and the compaction answer from the same set.
+    /// One place decides where a row comes from - the blocks, plus the append
+    /// buffer for the tail above the last checkpoint - so the scan, the count
+    /// and the compaction answer from the same set. A table no block can hold
+    /// has only the buffer: the port keeps no row journal.
     fn row_set_from(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
         // The block mirror is the authoritative value source once it covers every
-        // live row; the map then only supplies the row-id list (the write-ahead
-        // journal between checkpoints).
+        // live row; the buffer then only supplies the rows appended since.
         if let Some(rows) = self.try_cpp_rows(table)? {
             return Ok(rows);
         }
-        let prefix = row_prefix(table);
-        let defaults = self.table_defaults(table).unwrap_or_default();
-        // Collect tombstones with one prefix scan: a point lookup per row
-        // would add O(rows) KV round trips to every full scan.
         let deleted = self.tombstone_set_at(table, crate::read_ts())?;
-        let mut rows = Vec::new();
-        for (k, v) in self.storage.catalog.store().scan_prefix(&prefix)? {
-            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
-                .parse()
-                .unwrap_or(0);
-            if deleted.contains(&(seq as u64)) {
-                continue; // deleted
-            }
-            let mut cells = self.parse_stored_row(table, &defaults, &v)?;
-            while cells.len() < defaults.len() {
-                let i = cells.len();
-                cells.push(match defaults.get(i).and_then(|d| d.as_deref()) {
-                    Some(d) => Value::from_literal(&default_literal(d)),
-                    None => Value::Null,
-                });
-            }
-            rows.push((seq, cells));
-        }
-        Ok(rows)
+        Ok(self
+            .pending_rows_of(table)
+            .into_iter()
+            .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
+            .collect())
     }
 
     /// Keeps a decoded row set for the next scan, when it is small and scalar.
@@ -14918,44 +14744,6 @@ impl Engine {
         });
     }
 
-    /// Like `fetch_rows_with_ids`, but including tombstoned rows. Full-text
-    /// corpus statistics keep counting deleted documents, as the reference's
-    /// segments do until compaction, so the scan path must see them too.
-    /// [`Self::fetch_rows_including_deleted`] over one id window
-    /// `[first, last)`, in id order.
-    ///
-    /// The block mirror reads one block's window at a time, so a table of any
-    /// size is mirrored with a block's worth of memory - the same shape as the
-    /// reference, which streams the rows through its buffer manager.
-    fn fetch_rows_including_deleted_range(
-        &self,
-        table: &str,
-        first: usize,
-        last: usize,
-    ) -> Result<Vec<(usize, Vec<Value>)>> {
-        let prefix = row_prefix(table);
-        let defaults = self.table_defaults(table).unwrap_or_default();
-        let mut rows = Vec::new();
-        for (k, v) in self
-            .storage
-            .catalog.store()
-            .scan_range(&row_key(table, first), &row_key(table, last))?
-        {
-            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
-                .parse()
-                .unwrap_or(0);
-            let mut cells = self.parse_stored_row(table, &defaults, &v)?;
-            while cells.len() < defaults.len() {
-                let i = cells.len();
-                cells.push(match defaults.get(i).and_then(|d| d.as_deref()) {
-                    Some(d) => Value::from_literal(&default_literal(d)),
-                    None => Value::Null,
-                });
-            }
-            rows.push((seq, cells));
-        }
-        Ok(rows)
-    }
 
     fn fetch_rows_including_deleted(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
         self.fetch_rows_including_deleted_from(table, 0)
@@ -14963,8 +14751,8 @@ impl Engine {
 
     /// [`Self::fetch_rows_including_deleted`] from row id `first` on.
     ///
-    /// Blocks below `first` are skipped without decoding them and the journal
-    /// range starts at `first`, so a reopened engine indexes only the rows its
+    /// Blocks below `first` are skipped without decoding them and the buffer
+    /// starts at `first`, so a reopened engine indexes only the rows its
     /// sealed chunks do not cover.
     fn fetch_rows_including_deleted_from(
         &self,
@@ -14973,42 +14761,21 @@ impl Engine {
     ) -> Result<Vec<(usize, Vec<Value>)>> {
         let name = self.table_key(table);
         // The blocks hold every row a segment ever held, tombstoned slots
-        // included - which is what the index mirrors count. The journal adds
-        // the rows above the last checkpoint (and hides the ones deleted after
-        // it), exactly as it does for a visible scan.
+        // included - which is what the index mirrors count. The append buffer
+        // adds the rows above the last checkpoint, exactly as it does for a
+        // visible scan.
         let mut rows: Vec<(usize, Vec<Value>)> = self
             .read_cpp_blocks_including_deleted_from(&name, first)
             .into_iter()
             .map(|(seq, cells)| (seq, cells.iter().map(|c| parse_value(c)).collect()))
             .collect();
         let seen: std::collections::HashSet<usize> = rows.iter().map(|(seq, _)| *seq).collect();
-        let prefix = row_prefix(&name);
-        let defaults = self.table_defaults(&name).unwrap_or_default();
-        // The prefix plus a `0xFF` sorts above every decimal row id, so this is
-        // exactly "[first, end of the table)".
-        let mut end = prefix.clone();
-        end.push(0xff);
-        for (k, v) in self
-            .storage
-            .catalog.store()
-            .scan_range(&row_key(&name, first), &end)?
-        {
-            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
-                .parse()
-                .unwrap_or(0);
-            if seen.contains(&seq) {
-                continue;
-            }
-            let mut cells = self.parse_stored_row(&name, &defaults, &v)?;
-            while cells.len() < defaults.len() {
-                let i = cells.len();
-                cells.push(match defaults.get(i).and_then(|d| d.as_deref()) {
-                    Some(d) => Value::from_literal(&default_literal(d)),
-                    None => Value::Null,
-                });
-            }
-            rows.push((seq, cells));
-        }
+        rows.extend(
+            self.pending_rows_of(&name)
+                .into_iter()
+                .filter(|(seq, _)| *seq >= first && !seen.contains(seq)),
+        );
+        rows.sort_by_key(|(seq, _)| *seq);
         Ok(rows)
     }
 
@@ -15065,7 +14832,7 @@ impl Engine {
         // All rows still buffered: read them as the `Value`s they already are
         // (see `buffered_rows_values`). The visibility rules are the ones the
         // block reader applies to the same rows.
-        if !self.needs_text_rows(table) {
+        if !self.wide_text_columns(table) {
             if let Some(rows) = self.buffered_rows_values(table, None) {
                 return Ok(Some(rows));
             }
@@ -15099,26 +14866,15 @@ impl Engine {
         if prune.is_empty() && !self.mirror_dirty(table) {
             return Ok(Some(out));
         }
-        // The tail above the last checkpoint is the journal's: rows it holds
-        // that the blocks do not, minus the ones deleted since.
+        // The tail above the last checkpoint is the append buffer's: rows it
+        // holds that the blocks do not, minus the ones deleted since.
         let have: std::collections::HashSet<usize> = out.iter().map(|(seq, _)| *seq).collect();
-        let prefix = row_prefix(table);
-        let defaults = self.table_defaults(table).unwrap_or_default();
-        for (k, v) in self.storage.catalog.store().scan_prefix(&prefix)? {
-            let Some(raw) = k.get(prefix.len()..) else {
-                continue;
-            };
-            let Ok(raw) = std::str::from_utf8(raw) else {
-                continue;
-            };
-            let Ok(seq) = raw.parse::<usize>() else {
-                continue;
-            };
-            if hidden.contains(&(seq as u64)) || have.contains(&seq) {
-                continue;
-            }
-            out.push((seq, self.parse_stored_row(table, &defaults, &v)?));
-        }
+        out.extend(
+            self.pending_rows_of(table)
+                .into_iter()
+                .filter(|(seq, _)| !hidden.contains(&(*seq as u64)) && !have.contains(seq)),
+        );
+        out.sort_by_key(|(seq, _)| *seq);
         Ok(Some(out))
     }
 
@@ -15184,7 +14940,7 @@ impl Engine {
         // yet) is read straight out of it: the block reader would render every
         // cell to text and this function would parse it back to the `Value` the
         // buffer already holds.
-        if !self.needs_text_rows(table) {
+        if !self.wide_text_columns(table) {
             if let Some(rows) = self.buffered_rows_values(table, Some(&wanted)) {
                 let deleted = self.tombstone_set(table)?;
                 return Ok(Some(
@@ -15218,16 +14974,11 @@ impl Engine {
     }
 
     /// The sidecar holding a table's wide (blob-referenced) cells.
-    ///
-    /// It lives under `persistence/`, not in a directory of its own: the
-    /// reference has no such tree, and a `rowdata/` at the top would be a
-    /// directory the other engine does not write. The bytes have to reach disk
-    /// (an in-memory buffer lost them on restart, so a row's `\x01B{offset}`
-    /// reference pointed past the end of an empty buffer).
-    /// Whether a table keeps its rows as stored text as well as in the blocks:
-    /// true when a column has no per-row scalar the block decoder returns (a
-    /// multi-vector, a tensor, a tensor array).
-    pub(crate) fn needs_text_rows(&self, table: &str) -> bool {
+    /// Whether a table has a column whose stored text form is not stable across
+    /// the write and scan paths (a multi-vector, a tensor, a sparse vector), so
+    /// the buffered `Value` fast path must not answer for it and the read goes
+    /// through the block decoder instead.
+    pub(crate) fn wide_text_columns(&self, table: &str) -> bool {
         match self.storage.catalog.get_table_by_name(table) {
             Ok(Some(meta)) => meta.types.iter().any(|t| {
                 let t = t.trim().to_ascii_uppercase();
@@ -15239,124 +14990,20 @@ impl Engine {
         }
     }
 
-    fn blob_path(&self, table: &str) -> std::path::PathBuf {
-        let key = self.table_key(table);
-        self.dir
-            .join("persistence")
-            .join(format!("rowdata_{}.bin", key.replace('.', "_")))
-    }
 
-    fn blob_buffer(&self, table: &str) -> Result<Arc<Mutex<std::fs::File>>> {
-        let key = self.table_key(table);
-        if let Some(f) = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&key)
-            .and_then(|e| e.row_blob.clone())
-        {
-            return Ok(f);
-        }
-        let path = self.blob_path(table);
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| Error::Invalid(format!("row blob dir: {e}")))?;
-        }
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .read(true)
-            .append(true)
-            .open(&path)
-            .map_err(|e| Error::Invalid(format!("row blob {}: {e}", path.display())))?;
-        let shared = Arc::new(Mutex::new(file));
-        self.tables.lock().unwrap().entry(key).or_default().row_blob = Some(shared.clone());
-        Ok(shared)
-    }
-
-    fn append_blob(&self, table: &str, bytes: &[u8]) -> Result<(u64, u64)> {
-        let file = self.blob_buffer(table)?;
-        let mut file = file.lock().unwrap();
-        let offset = file
-            .metadata()
-            .map_err(|e| Error::Invalid(format!("row blob size: {e}")))?
-            .len();
-        // Decimal vector text compresses ~2.5x, which is what keeps the stored
-        // rows small.
-        let packed = lz4_flex::compress_prepend_size(bytes);
-        file.write_all(&packed)
-            .map_err(|e| Error::Invalid(format!("row blob write: {e}")))?;
-        Ok((offset, packed.len() as u64))
-    }
-
-    fn read_blob(&self, table: &str, offset: u64, len: usize) -> Result<Vec<u8>> {
-        let file = self.blob_buffer(table)?;
-        let file = file.lock().unwrap();
-        let mut buf = vec![0u8; len];
-        file.read_exact_at(&mut buf, offset)
-            .map_err(|e| Error::Invalid(format!("row blob read: {e}")))?;
-        lz4_flex::decompress_size_prepended(&buf)
-            .map_err(|e| Error::Invalid(format!("row blob decompress: {e}")))
-    }
-
-    /// Flushes dirty sidecar pages so they become clean, reclaimable page
-    /// cache instead of accumulating as unswappable dirty memory (Gate C).
-    fn sync_row_blobs(&self) {
-        let files: Vec<Arc<Mutex<std::fs::File>>> = self
-            .tables
-            .lock()
-            .unwrap()
-            .values()
-            .filter_map(|e| e.row_blob.clone())
-            .collect();
-        for file in files {
-            if let Ok(file) = file.lock() {
-                let _ = file.sync_data();
-            }
-        }
-    }
-
-
-    /// Decodes one stored cell. Wide vector-like cells live in the sidecar and
-    /// carry a `\x01B{offset}:{len}` reference.
-    fn decode_cell(&self, table: &str, cell: &str) -> Result<Value> {
-        if let Some(rest) = cell.strip_prefix('\u{1}').and_then(|r| r.strip_prefix('B')) {
-            let (offset, len) = rest
-                .split_once(':')
-                .ok_or_else(|| Error::Invalid("corrupt row blob reference".into()))?;
-            let offset: u64 = offset
-                .parse()
-                .map_err(|_| Error::Invalid("corrupt row blob offset".into()))?;
-            let len: usize = len
-                .parse()
-                .map_err(|_| Error::Invalid("corrupt row blob length".into()))?;
-            let bytes = self.read_blob(table, offset, len)?;
-            return Ok(parse_value(&String::from_utf8_lossy(&bytes)));
-        }
+    /// Decodes one stored cell.
+    fn decode_cell(&self, _table: &str, cell: &str) -> Result<Value> {
         Ok(parse_value(cell))
     }
 
-    /// [`encode_row`] plus sidecar offload for wide vector-like cells.
-    fn encode_row_stored(&self, table: &str, row: &[Literal], types: &[String]) -> Result<String> {
-        let rendered = encode_row(row, types);
-        if !types.iter().any(|t| is_blob_type(t)) {
-            return Ok(rendered);
-        }
-        let mut cells: Vec<String> = rendered.split('\t').map(str::to_string).collect();
-        for (i, ty) in types.iter().enumerate() {
-            if !is_blob_type(ty) {
-                continue;
-            }
-            let Some(cell) = cells.get(i) else { continue };
-            if cell.len() > 64 && cell != "null" {
-                let (offset, len) = self.append_blob(table, cell.as_bytes())?;
-                cells[i] = format!("\u{1}B{offset}:{len}");
-            }
-        }
-        Ok(cells.join("\t"))
+    /// The stored text form of one row, which the block writer and the reader
+    /// agree on.
+    fn encode_row_stored(&self, _table: &str, row: &[Literal], types: &[String]) -> Result<String> {
+        Ok(encode_row(row, types))
     }
 
-    /// The stored text of the given row ids, from the blocks (or from a
-    /// `row:` key a directory an older build wrote still has).
+    /// The stored text of the given row ids, from the blocks (or from the
+    /// append buffer for a table the block cursor cannot serve).
     ///
     /// The text form is what the full-text and vector paths score, so they ask
     /// for it directly instead of going through a `Vec<Value>`.
@@ -15374,11 +15021,8 @@ impl Engine {
         }
         for &id in ids {
             let seq = id as usize;
-            if self.storage.catalog.store().get(&del_key(table, seq))?.is_some() {
-                continue;
-            }
-            if let Some(v) = self.storage.catalog.store().get(&row_key(table, seq))? {
-                out.push((seq, v));
+            if let Some(text) = self.pending_row_text(table, seq)? {
+                out.push((seq, text));
             }
         }
         Ok(out)
@@ -15392,8 +15036,9 @@ impl Engine {
         let defaults = self.table_defaults(table).unwrap_or_default();
         let mut out = Vec::with_capacity(ids.len());
         // A point read: the id names its segment, block and slot, so the row
-        // comes out of one block (or the journal, when it was written after the
-        // last checkpoint). The cursor also answers "tombstoned" for both.
+        // comes out of one block (or the append buffer, when it was written
+        // after the last checkpoint). The cursor also answers "tombstoned"
+        // for both.
         if let Ok(mut cursor) = self.block_cursor(table) {
             for &id in ids {
                 let seq = id as usize;
@@ -15403,15 +15048,11 @@ impl Engine {
             }
             return Ok(out);
         }
-        // A table whose columns have no block layout lives in the journal only.
+        // A table whose columns have no block layout lives in the buffer only.
         for &id in ids {
             let seq = id as usize;
-            // A stale index entry may point at a tombstoned row.
-            if self.storage.catalog.store().get(&del_key(table, seq))?.is_some() {
-                continue;
-            }
-            if let Some(v) = self.storage.catalog.store().get(&row_key(table, seq))? {
-                out.push((seq, self.parse_stored_row(table, &defaults, &v)?));
+            if let Some(text) = self.pending_row_text(table, seq)? {
+                out.push((seq, self.parse_stored_row(table, &defaults, &text)?));
             }
         }
         Ok(out)
@@ -16035,7 +15676,7 @@ impl Engine {
         Some(cfg)
     }
 
-    /// Exact MaxSim of one row against `query`, read from the row journal
+    /// Exact MaxSim of one row against `query`, read from the row
     /// (used to re-rank SMVE candidates the way the reference reads the column).
     fn exact_tensor_score(
         &self,
@@ -16047,13 +15688,12 @@ impl Engine {
     ) -> Option<f32> {
         let schema = self.table_schema(table).ok()?;
         let ci = schema.iter().position(|c| c == column)?;
-        let raw = self
-            .storage
-            .catalog.store()
-            .get(&row_key(table, seq as usize))
-            .ok()??;
-        let defaults = self.table_defaults(table).unwrap_or_default();
-        let cells = self.parse_stored_row(table, &defaults, &raw).ok()?;
+        let cells = self
+            .fetch_some_rows_with_ids(table, &[seq])
+            .ok()?
+            .into_iter()
+            .next()?
+            .1;
         let text = match cells.get(ci)? {
             Value::Str(s) => s.clone(),
             other => other.to_slt_string(),
@@ -21239,10 +20879,8 @@ impl Engine {
             self.tables.lock().unwrap().entry(key).or_default().live_rows = Some(rows);
             return Ok(rows);
         }
-        // A table the block format covers is counted from the blocks, whether or
-        // not a text copy of its rows exists (`needs_text_rows` keeps one for the
-        // columns neither decoder can rebuild): the text copy is a per-row
-        // fallback, not a second source of truth.
+        // A table the block format covers is counted from the blocks: they are
+        // the only row copy there is.
         if self.has_block_layout(&name) {
             let rows = self.block_visible_row_count(&name);
             self.tables.lock().unwrap().entry(key).or_default().live_rows = Some(rows);
@@ -21352,8 +20990,8 @@ impl Engine {
         self.seal_sparse_indexes();
         self.seal_secondary_indexes();
         self.dump_hnsw_segments();
-        // The C++ block mirror is best-effort: large tables are skipped by its
-        // budget and the row store remains authoritative.
+        // The C++ block mirror is the storage of record; a table it cannot
+        // write (a column with no block layout) keeps its rows buffered only.
         let mirror = self.flush_cpp_blocks(checkpoint_ts);
         // `EngineOptions::object_dir`: publish this checkpoint's data files as
         // the reference does (`pm|object|` + packed objects).
@@ -21364,12 +21002,9 @@ impl Engine {
         }
         // The mirror writes the vector/IVF chunks, so reload after it.
         self.reload_vector_indexes();
-        // Write back the row sidecars: dirty file pages cannot be reclaimed and
-        // are what pushes a long import into the OOM killer.
-        self.sync_row_blobs();
         // Bound the page cache the way the reference's buffer manager does:
-        // segment files and the row sidecar are written back and their clean
-        // pages dropped, so RSS tracks live structures rather than file cache.
+        // segment files are written back and their clean pages dropped, so RSS
+        // tracks live structures rather than file cache.
         for sub in [
             "fulltext",
             "multivector",
@@ -27828,7 +27463,7 @@ mod tests {
     }
 
     #[test]
-    fn wide_vectors_live_in_the_row_sidecar() {
+    fn wide_vectors_stay_inline_and_survive_a_reopen() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.execute("CREATE TABLE sb (id INT, v EMBEDDING(FLOAT,64), s SPARSE(FLOAT,64));")
@@ -27845,9 +27480,9 @@ mod tests {
             "INSERT INTO sb VALUES (1, [{vector}], [{sparse}]);"
         ))
         .unwrap();
-        // The row is no longer a KV text: the block is where it lives, and the
-        // *stored* form is what has to stay small - the wide cells go to the
-        // sidecar and the row carries a `\x01B{offset}:{len}` reference.
+        // The block is where the row lives, and its stored text form is inline:
+        // the port keeps no row sidecar, so nothing of the row lands on disk
+        // outside the block files.
         let types = e.column_types("default_db.sb").unwrap();
         let row = e.fetch_rows_with_ids("default_db.sb").unwrap()[0]
             .1
@@ -27859,15 +27494,15 @@ mod tests {
         let raw = e
             .encode_row_stored("default_db.sb", &literals, &types)
             .unwrap();
-        assert!(raw.len() < 200, "row is {} bytes", raw.len());
+        assert!(raw.len() > 200, "row is only {} bytes", raw.len());
         assert!(
-            raw.as_bytes().contains(&1u8),
-            "row carries a blob reference: {raw}"
+            !raw.as_bytes().contains(&1u8),
+            "no cell is offloaded: {raw}"
         );
-        // The sidecar is a working buffer, not a directory: the reference has
-        // no `rowdata/` tree, so a directory that this engine wrote must not
-        // have one either.
+        // No row payload outside the blocks: the reference has no `rowdata/`
+        // tree and this engine keeps no sidecar either.
         assert!(!dir.path().join("rowdata").exists());
+        assert!(!dir.path().join("persistence").exists());
 
         let vector = rows(&e, "SELECT v FROM sb;");
         assert_eq!(vector.len(), 1);
@@ -29368,8 +29003,7 @@ mod tests {
     /// `DataBlock`s); array/vector tables do not, because their decoded form is
     /// not stable across the write and scan paths.
     /// Once the mirror covers every live row, full scans read the values from
-    /// the column blocks: the row KV only supplies the row-id list. Poisoning
-    /// the KV values proves the read path no longer depends on them.
+    /// the column blocks, and the KV holds no row record at all.
     #[test]
     fn full_rows_come_from_the_block_mirror_when_current() {
         let dir = tempdir().unwrap();
@@ -29381,11 +29015,8 @@ mod tests {
         // The scalar row cache would answer first; drop it so the test proves
         // the block path.
         e.invalidate_row_cache("default_db.bm");
-        for seq in 0..2 {
-            e.store()
-                .put(&row_key("default_db.bm", seq), b"999\t[9.0,9.0]")
-                .unwrap();
-        }
+        // No row record exists anywhere in the KV: the blocks are the table.
+        assert!(e.store().scan_prefix(b"row:").unwrap().is_empty());
         let rows = e.fetch_rows("default_db.bm").unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0][0], Value::Int(1));
@@ -29402,14 +29033,6 @@ mod tests {
             .unwrap();
         e.flush().unwrap();
         e.invalidate_row_cache("default_db.bmu");
-        // Poison the journal: the mirror must still supply every row it
-        // snapshotted, and only the rows written after the checkpoint may come
-        // from the journal.
-        for seq in 0..3 {
-            e.store()
-                .put(&row_key("default_db.bmu", seq), b"999\tzzz")
-                .unwrap();
-        }
         e.execute("DELETE FROM bmu WHERE id = 2;").unwrap();
         e.execute("UPDATE bmu SET name = 'u' WHERE id = 3;")
             .unwrap();
