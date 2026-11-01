@@ -18,7 +18,8 @@
 //! query therefore pays for the documents it visits, not for the terms' whole
 //! document frequency.
 
-use std::collections::HashSet;
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashSet};
 
 #[cfg(test)]
 use super::WAND_BLOCK;
@@ -216,13 +217,24 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     mode: WandMode,
     ranker: Bm25Ranker,
     cursors: Vec<Cursor<'a>>,
+    /// The live cursors ordered by document id. The reference keeps a child
+    /// array it re-sorts after every reposition; a doc-ordered min-heap gives
+    /// FindPivotOptimized the same prefix while only the cursors that actually
+    /// move are touched (O(log n) per move instead of O(n log n) per round).
+    heap: BinaryHeap<Reverse<(u64, usize)>>,
+    /// Sum of upper_bound over the cursors in the heap, i.e. the whole query's
+    /// upper bound minus everything already retired.
+    total_upper: f64,
+    /// The cursors the last pivot parked on the candidate, in doc order. This is
+    /// the reference's [0, pivot_] slice: what offer() counts matches over and
+    /// what the next round repositions.
+    prefix: Vec<usize>,
     /// Top-k, sorted by score (desc) then doc id (asc), like the scan path.
     best: Vec<(u64, f64)>,
     threshold: f64,
-    /// doc_id_ / pivot_ / bm25_score_cache_ of the reference: the last candidate
-    /// Next() stopped on and the prefix that matched it.
+    /// doc_id_ / bm25_score_cache_ of the reference: the last candidate Next()
+    /// stopped on and its exact score.
     doc_id: Option<u64>,
-    pivot: usize,
     candidate_score: f64,
     /// Instrumentation: exact per-document score decodes (calc_score_cnt_) and
     /// the deepest block any of them came from.
@@ -293,6 +305,14 @@ impl<'a> BlockMaxWandIterator<'a> {
                 cursors.last_mut().unwrap().refresh();
             }
         }
+        let mut heap = BinaryHeap::with_capacity(cursors.len());
+        let mut total_upper = 0.0;
+        for cursor in &cursors {
+            if let Some(doc) = cursor.cur {
+                heap.push(Reverse((doc, cursor.ord)));
+                total_upper += cursor.upper_bound;
+            }
+        }
         Self {
             fields: field_count,
             dead,
@@ -301,10 +321,12 @@ impl<'a> BlockMaxWandIterator<'a> {
             mode,
             ranker,
             cursors,
+            heap,
+            total_upper,
+            prefix: Vec::new(),
             best: Vec::new(),
             threshold: f64::NEG_INFINITY,
             doc_id: None,
-            pivot: 0,
             candidate_score: 0.0,
             score_evaluations: 0,
             max_scored_block: 0,
@@ -340,6 +362,18 @@ impl<'a> BlockMaxWandIterator<'a> {
         (self.best, self.score_evaluations, self.max_scored_block)
     }
 
+    /// Hands a cursor the last round popped back to the heap, resolving the
+    /// block cursor it was seek-ed to. A cursor that ran out is retired: its
+    /// whole upper bound leaves the search.
+    fn push_back(&mut self, i: usize) {
+        let cursor = &mut self.cursors[i];
+        cursor.ensure();
+        match cursor.cur {
+            Some(doc) => self.heap.push(Reverse((doc, cursor.ord))),
+            None => self.total_upper -= cursor.upper_bound,
+        }
+    }
+
     /// Keeps the candidate if it survives minimum_should_match, the tombstone
     /// filter and the k-th score (ties broken by the smaller doc id).
     fn offer(&mut self, doc_id: u64, score: f64) {
@@ -348,12 +382,12 @@ impl<'a> BlockMaxWandIterator<'a> {
         let matched = match self.mode {
             WandMode::Bm25 => {
                 let mut seen = HashSet::new();
-                for cursor in &self.cursors[..=self.pivot] {
-                    seen.insert(cursor.term);
+                for &i in &self.prefix {
+                    seen.insert(self.cursors[i].term);
                 }
                 seen.len()
             }
-            WandMode::Boolean => self.pivot + 1,
+            WandMode::Boolean => self.prefix.len(),
         };
         if matched < self.min_should.max(1) || self.dead.contains(&doc_id) {
             return;
@@ -388,94 +422,82 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// score, decoding the exact score only for that document. Returns false and
     /// clears doc_id when the iterator is exhausted.
     fn next(&mut self, target: Option<u64>) -> bool {
-        match target {
-            // doc_id_ == INVALID_ROWID: initialize the children via Next(0).
-            None => {
-                for cursor in &mut self.cursors {
-                    cursor.seek(0);
-                }
+        if let Some(target) = target {
+            if self.doc_id.is_some_and(|current| current >= target) {
+                return true;
             }
-            Some(target) => {
-                if let Some(current) = self.doc_id {
-                    if current >= target {
-                        return true;
-                    }
+            // Reposition the cursors the last pivot parked on the candidate.
+            // Everything else still in the heap already sits above doc_id, so
+            // this is the whole of the reference's "lists[0] .. lists[pivot]".
+            for i in std::mem::take(&mut self.prefix) {
+                let cursor = &mut self.cursors[i];
+                if cursor.cur.is_some_and(|doc| doc < target) {
+                    cursor.seek(target);
                 }
-                // Move all pointers from lists[0] to lists[pivot] to target.
-                let last = self.pivot.min(self.cursors.len().saturating_sub(1));
-                for i in 0..=last {
-                    let cursor = &mut self.cursors[i];
-                    if cursor.cur.is_some_and(|doc| doc < target) {
-                        cursor.seek(target);
-                    }
-                }
+                self.push_back(i);
             }
         }
         loop {
-            // Next() keeps the cursors sorted by doc id and drops the exhausted
-            // tail, subtracting its upper bound from the total.
-            for cursor in self.cursors.iter_mut() {
-                cursor.ensure();
-            }
-            self.cursors.sort_by_key(|c| c.cur.unwrap_or(u64::MAX));
-            while self.cursors.last().is_some_and(|c| c.done) {
-                self.cursors.pop();
-            }
-            if self.cursors.is_empty() {
+            self.prefix.clear();
+            // '<' (not '<='): a document that ties the k-th score can still win
+            // on the smaller doc id, and the heap is already doc-ordered, so
+            // this needs no extra bookkeeping.
+            if self.total_upper < self.threshold {
                 break;
             }
-            let total: f64 = self.cursors.iter().map(|c| c.upper_bound).sum();
-            // '<' (not '<='): a document that ties the k-th score can still win on
-            // the smaller doc id.
-            if total < self.threshold {
-                break;
-            }
-            // FindPivotOptimized: pivot = first prefix whose upper bound reaches
-            // the threshold.
-            let mut pivot = self.cursors.len();
-            let mut prefix = 0.0;
-            for (pos, cursor) in self.cursors.iter().enumerate() {
-                prefix += cursor.upper_bound;
-                if prefix >= self.threshold {
-                    pivot = pos;
+            // FindPivotOptimized: the pivot is the first prefix whose upper
+            // bound reaches the threshold, so pop just that prefix.
+            let mut sum = 0.0;
+            let mut pivot = None;
+            while let Some(Reverse((doc, i))) = self.heap.pop() {
+                sum += self.cursors[i].upper_bound;
+                self.prefix.push(i);
+                if sum >= self.threshold {
+                    pivot = Some(doc);
                     break;
                 }
             }
-            if pivot >= self.cursors.len() {
-                break;
-            }
-            let Some(doc) = self.cursors[pivot].cur else {
+            let Some(doc) = pivot else {
                 break;
             };
-            while pivot + 1 < self.cursors.len() && self.cursors[pivot + 1].cur == Some(doc) {
-                pivot += 1;
+            // Every other cursor tied on the pivot document joins the prefix.
+            while let Some(&Reverse((tied, i))) = self.heap.peek() {
+                if tied != doc {
+                    break;
+                }
+                self.heap.pop();
+                self.prefix.push(i);
             }
             // If lists[0] is not on the pivot document yet, another list owns it:
             // move the prefix up to it and re-pivot.
-            if self.cursors[0].cur != Some(doc) {
-                for i in 0..pivot {
+            if self.cursors[self.prefix[0]].cur != Some(doc) {
+                for i in std::mem::take(&mut self.prefix) {
                     let cursor = &mut self.cursors[i];
                     if cursor.cur.is_some_and(|cur| cur < doc) {
                         cursor.seek(doc);
                     }
+                    self.push_back(i);
                 }
                 continue;
             }
             // NextShallow + BlockMaxBM25Score over the prefix. Every prefix cursor
             // sits on doc, so the sum bounds doc's exact score.
             let mut block_bound = 0.0;
-            for i in 0..=pivot {
+            for k in 0..self.prefix.len() {
+                let i = self.prefix[k];
                 block_bound += self.cursors[i].block_max(self.mode);
             }
             if block_bound >= self.threshold {
                 // Only now is the exact score decoded.
-                let score = self.score_prefix(pivot);
+                let score = self.score_prefix();
                 self.doc_id = Some(doc);
-                self.pivot = pivot;
                 self.candidate_score = score;
                 return true;
             }
-            self.skip_blocks(doc, pivot);
+            self.skip_blocks(doc);
+            for i in std::mem::take(&mut self.prefix) {
+                self.push_back(i);
+            }
         }
         self.doc_id = None;
         false
@@ -485,14 +507,15 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// while the prefix's block bound cannot reach the k-th score, step every
     /// prefix cursor to the end of its block and try again. Nothing is resolved
     /// here, so the skipped ranges never decode document offsets (`NextShallow`).
-    fn skip_blocks(&mut self, mut from: u64, pivot: usize) {
+    fn skip_blocks(&mut self, mut from: u64) {
         loop {
             // `block_last_doc` of the prefix is fresh: either the caller just
-            // computed the block bound, or the loop below did.
-            let up_to = self.cursors.get(pivot + 1).and_then(|c| c.cur);
+            // computed the block bound, or the loop below did. A block never
+            // runs past the next cursor in doc order.
+            let up_to = self.heap.peek().map(|&Reverse((doc, _))| doc);
             let mut block_last = u64::MAX;
-            for i in 0..=pivot {
-                block_last = block_last.min(self.cursors[i].block_last());
+            for k in 0..self.prefix.len() {
+                block_last = block_last.min(self.cursors[self.prefix[k]].block_last());
             }
             if block_last == u64::MAX {
                 return;
@@ -504,13 +527,15 @@ impl<'a> BlockMaxWandIterator<'a> {
             if skip_to <= from {
                 return;
             }
-            for i in 0..=pivot {
+            for k in 0..self.prefix.len() {
+                let i = self.prefix[k];
                 self.cursors[i].seek(skip_to);
             }
             // The bound of the blocks the prefix cursors now sit on.
             let mut bound = 0.0;
             let mut last = u64::MAX;
-            for i in 0..=pivot {
+            for k in 0..self.prefix.len() {
+                let i = self.prefix[k];
                 bound += self.cursors[i].block_max(self.mode);
                 last = last.min(self.cursors[i].block_last());
             }
@@ -523,16 +548,17 @@ impl<'a> BlockMaxWandIterator<'a> {
 
     /// Sums the exact BM25Score() of the prefix cursors, all parked on the same
     /// document.
-    fn score_prefix(&mut self, pivot: usize) -> f64 {
+    fn score_prefix(&mut self) -> f64 {
         let ranker = Bm25Ranker::new(self.ranker.delta);
         let mut score = 0.0;
         // Sum in cursor creation order (field-major, then term) so the value is
-        // independent of the doc-id sort, matching the scan path bit for bit.
-        let mut prefix: Vec<usize> = (0..=pivot).collect();
-        prefix.sort_by_key(|&i| self.cursors[i].ord);
+        // independent of the document order the heap handed us, matching the
+        // scan path bit for bit. Doc order is not needed after this point.
+        self.prefix.sort_by_key(|&i| self.cursors[i].ord);
         match self.mode {
             WandMode::Bm25 => {
-                for &i in &prefix {
+                for k in 0..self.prefix.len() {
+                    let i = self.prefix[k];
                     let cursor = &mut self.cursors[i];
                     let tf = f64::from(cursor.stream.tf());
                     let dl = f64::from(cursor.stream.len());
@@ -548,14 +574,15 @@ impl<'a> BlockMaxWandIterator<'a> {
             }
             // similarity=boolean: one point per matched term.
             WandMode::Boolean => {
-                for &i in &prefix {
-                    score += self.cursors[i].weight;
+                for k in 0..self.prefix.len() {
+                    score += self.cursors[self.prefix[k]].weight;
                 }
             }
         }
         self.score_evaluations += 1;
-        for cursor in &self.cursors[..=pivot] {
-            self.max_scored_block = self.max_scored_block.max(cursor.block_index);
+        for k in 0..self.prefix.len() {
+            let block = self.cursors[self.prefix[k]].block_index;
+            self.max_scored_block = self.max_scored_block.max(block);
         }
         score
     }
@@ -912,6 +939,92 @@ mod tests {
             "{evaluations} exact scores for {} candidates: no pruning happened",
             candidates.len()
         );
+    }
+
+    /// The heap must not change a single answer. Several corpora, each mixing
+    /// dense lists (deep prefixes, block skips) with sparse ones (document gaps
+    /// between cursors, which is the "lists[0] is not on the pivot document"
+    /// jump), compared against the naive OR scan on document ids *and* scores.
+    #[test]
+    fn heap_wand_matches_naive_scan_on_many_corpora() {
+        const DOCS: u64 = 400;
+        for seed in [
+            0x1234_5678_9abc_def1u64,
+            0x0f0f_0f0f_1111_2222,
+            0xdead_beef_cafe_0001,
+        ] {
+            let mut rng = seed;
+            let terms: Vec<String> = (0..6).map(|i| format!("t{i}")).collect();
+            let mut lens = HashMap::new();
+            for doc in 0..DOCS {
+                lens.insert(doc, 3 + (lcg(&mut rng) % 97) as u32);
+            }
+            let mut postings: HashMap<String, Vec<(u64, u32)>> = HashMap::new();
+            for (ti, term) in terms.iter().enumerate() {
+                let density = if ti % 2 == 0 { 55 } else { 7 };
+                let mut list = Vec::new();
+                for doc in 0..DOCS {
+                    if lcg(&mut rng) % 100 < density {
+                        let len = lens[&doc];
+                        let tf = 1 + (lcg(&mut rng) % len as u64) as u32;
+                        list.push((doc, tf));
+                    }
+                }
+                postings.insert(term.clone(), list);
+            }
+            let total_len: u64 = lens.values().map(|l| *l as u64).sum();
+            let weights = vec![1.0, 0.5, 2.0, 1.0, 1.5, 0.25];
+            let dead: HashSet<u64> = (0..DOCS).filter(|_| lcg(&mut rng) % 13 == 0).collect();
+            let lens_slice: Vec<(u64, u32)> = lens.iter().map(|(d, l)| (*d, *l)).collect();
+            let make = || {
+                let ranker = Bm25Ranker::new(0.0);
+                let units = terms
+                    .iter()
+                    .enumerate()
+                    .map(|(i, t)| WandUnit {
+                        stream: WandStream::Term(TermStream::from_slice(
+                            postings[t].as_slice(),
+                            &lens_slice,
+                        )),
+                        weight: weights[i],
+                        idf: ranker.idf(DOCS as f64, postings[t].len() as f64),
+                        delta: None,
+                    })
+                    .collect();
+                vec![WandField {
+                    n_docs: DOCS as usize,
+                    total_len,
+                    units,
+                }]
+            };
+
+            for k in [1usize, 3, 25, DOCS as usize] {
+                for (delta, min_should) in [(0.0, 1usize), (0.3, 3)] {
+                    for mode in [WandMode::Bm25, WandMode::Boolean] {
+                        let want = full_scan(
+                            &postings,
+                            &lens,
+                            DOCS as usize,
+                            total_len,
+                            &weights,
+                            &terms,
+                            k,
+                            &dead,
+                            delta,
+                            min_should,
+                            mode,
+                        );
+                        let got =
+                            BlockMaxWandIterator::new(make(), k, &dead, delta, min_should, mode)
+                                .run();
+                        assert_eq!(
+                            got, want,
+                            "seed={seed:x} k={k} delta={delta} min_should={min_should}"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     /// A phrase unit's block bound is the minimum over its terms', so blocks

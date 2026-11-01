@@ -437,6 +437,38 @@ A/B 用临时开关 `INF_FT_NO_STREAM`（已移除）关掉流式：
 收益随 term 数放大，与预期一致；standard 的绝对值不变（1.86 s）。词典类分析器要等
 各自的切分是否能借出 `&str` 单独确认（`traditional` 走 opencc 转换，天生要新串）。
 
+### 4.17 多词查询：子游标走文档序最小堆
+
+10 个词以上的一条查询会有同样多的 WAND 游标，参考在每轮 pivot 之后都要把子游标数组重新排一遍。
+端口把「排好序的数组」换成 `BinaryHeap<Reverse<(doc, ord)>>`（`wand.rs` 的 `heap`），加一个
+`prefix` 缓冲保存本轮弹出的前缀：
+
+- `FindPivotOptimized` 变成「从堆里弹出最短前缀，直到上界和 ≥ 阈值」，每次弹出 O(log n)，
+  且只碰真正移动过的游标；旧写法每轮要 `ensure()` 全部游标再整体 `sort_by_key`。
+- 阈值口径不变（第 k 名分数，`<` 而非 `<=`，平分再看 doc id）；`total_upper` 增量维护，
+  游标耗尽（`ensure()` 拿到 `None`）时从总上界里减掉自己那一条。
+- `skip_blocks` 里「块尾不越过下一篇」取 `heap.peek()`；跳完把前缀游标 `push_back` 回堆，
+  `push_back` 顺带解析这次 `seek` 留下的待定文档。
+- 打分仍按创建序（field-major，再按 term）累加，`score_prefix` 对 `prefix` 按 `ord` 就地排序，
+  所以分数不随堆的次序变化，与扫描路径逐位一致。
+
+20k 语料、`topn=10`、进程内 5 次取最小、4 个进程再取最小：
+
+| 查询词数 | 每轮整表排序 | 文档序最小堆 | |
+|---|---|---|---|
+| 13 / 14 | 3.23 / 1.76 ms | 3.38 / 1.69 ms | 差异在噪声内 |
+| 25 | 22.01 ms | 19.87 ms | 1.11x |
+| 40 | 27.37 ms | 22.40 ms | 1.22x |
+| 64 | 37.31 ms | 29.26 ms | 1.28x |
+
+排序的代价是每轮 O(n log n)，游标一多才显出来；十几个游标以内它被 posting 解码和块推进盖住
+（同一张表里 2–4 词的另外五条查询都在 ±4% 内）。
+
+对拍：`wand_matches_full_scan_on_a_random_corpus`（2000 篇，k=1/10/100）和
+`heap_wand_matches_naive_scan_on_many_corpora`（3 组语料、稠密与稀疏混排、k 从 1 到全量、
+两种 `delta`/`min_should`、BM25 与 boolean）拿朴素 OR 全扫逐条比 row id 与分数；
+`test/sql/dql/fulltext` 的 50 条语句、82 条查询在新旧实现下输出逐字节相同。
+
 ## 5. 顺带修掉的一个格式缺陷
 
 `encode_fulltext_chunk`（`crates/infinity-executor/src/cpp_blocks.rs`）原来对
