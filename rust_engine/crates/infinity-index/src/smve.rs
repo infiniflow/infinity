@@ -151,17 +151,29 @@ pub fn smve_transform(
         return Err(Error::Invalid("SMVETransform: buffer too short".into()));
     }
     let mut sparse = vec![0f32; n_tokens * width];
+    let keep = topk.min(width);
     for t in 0..n_tokens {
         let token = &tensor[t * dim..(t + 1) * dim];
-        let mut scored: Vec<(f32, u32)> = (0..width)
-            .map(|j| {
-                let col = &projection_matrix[j * dim..(j + 1) * dim];
-                let score: f32 = token.iter().zip(col).map(|(a, b)| a * b).sum();
-                (score, j as u32)
-            })
-            .collect();
-        scored.sort_by(|a, b| b.0.total_cmp(&a.0));
-        for &(score, idx) in scored.iter().take(topk.min(width)) {
+        // A token keeps its `topk` best-scoring columns out of `width`, and
+        // `width` is 2048 by default. Sorting all of them per token put an
+        // O(width log width) sort on the build for a result of `topk` entries;
+        // a bounded insertion keeps the same set in O(width * topk).
+        let mut best: Vec<(f32, u32)> = Vec::with_capacity(keep + 1);
+        let mut worst = f32::NEG_INFINITY;
+        for j in 0..width {
+            let col = &projection_matrix[j * dim..(j + 1) * dim];
+            let score: f32 = token.iter().zip(col).map(|(a, b)| a * b).sum();
+            if best.len() == keep && score <= worst {
+                continue;
+            }
+            let at = best.partition_point(|(s, _)| *s >= score);
+            best.insert(at, (score, j as u32));
+            if best.len() > keep {
+                best.pop();
+                worst = best.last().map(|(s, _)| *s).unwrap_or(f32::NEG_INFINITY);
+            }
+        }
+        for &(score, idx) in best.iter() {
             sparse[t * width + idx as usize] = score;
         }
     }
@@ -241,12 +253,45 @@ impl SmveIndex {
     /// C++: `SMVEIndexInMem::BuildFromColumn` — the sparse code of each
     /// document is its average-pooled SMVE transform.
     pub fn build_from_column(&mut self, docs: &[(u32, Vec<Vec<f32>>)]) -> Result<usize> {
+        // `add_document` rebuilds the BMP so the incremental insert path can
+        // query right after one row; a bulk build must not pay that per row -
+        // 20k rows of full rebuilds was 4.2 s, the whole SMVE build.
         for (row_id, tokens) in docs {
-            self.add_document(*row_id, tokens)?;
+            self.add_document_unbuilt(*row_id, tokens)?;
         }
         self.bmp.build();
         self.built = true;
         Ok(self.labels.len())
+    }
+
+    /// [`Self::add_document`] without the BMP rebuild, for a bulk caller that
+    /// builds the BMP once at the end.
+    fn add_document_unbuilt(&mut self, row_id: u32, tokens: &[Vec<f32>]) -> Result<()> {
+        let toks = self.encode_tokens(tokens)?;
+        self.bmp.add_doc(&toks);
+        self.docs.push((row_id, toks));
+        self.labels.push(row_id);
+        Ok(())
+    }
+
+    /// The SMVE sparse code of one document's tokens.
+    fn encode_tokens(&self, tokens: &[Vec<f32>]) -> Result<Vec<(u32, f32)>> {
+        let flat: Vec<f32> = tokens.iter().flatten().copied().collect();
+        let smve = smve_transform(
+            &flat,
+            tokens.len(),
+            self.embedding_dim as usize,
+            &self.projection_matrix,
+            self.width as usize,
+            self.topk as usize,
+            false,
+        )?;
+        Ok(smve
+            .indices
+            .into_iter()
+            .zip(smve.values)
+            .filter(|(_, v)| *v != 0.0)
+            .collect())
     }
 
     /// One row of `BuildFromColumn` (also the incremental insert path).

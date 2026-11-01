@@ -5293,6 +5293,17 @@ impl MultiVectorIndex {
         }
     }
 
+    /// Whether this column's queries can reach the EMVB chunks.
+    ///
+    /// A PLAID or SMVE index answers a `SEARCH MATCH TENSOR` from its own
+    /// structures and returns before the EMVB prefilter runs, so a segment's
+    /// `.emvb` file would never be read. Anything else - a bare
+    /// multi-vector column, or a column indexed with EMVB itself - does reach
+    /// it, and needs the chunk.
+    fn wants_emvb_chunk(&self) -> bool {
+        self.plaid.is_none() && self.smve.is_none()
+    }
+
     /// Builds the reference's `PlaidIndexInMem` over every buffered document.
     ///
     /// Called before the tail is sealed (the reference builds it while the
@@ -5445,8 +5456,11 @@ impl MultiVectorIndex {
         // live in memory (SMVE, and EMVB over the tail) have to be built from
         // these documents **before** the tail is taken - the chunk writer
         // serializes them, it does not rebuild from the rows.
-        self.build_smve();
-        self.build_emvb_tail();
+        // Nothing here builds the memory-side indexes: the tail is taken below
+        // and dumped to segment files, and after that the search path reads
+        // `self.sealed` only. Building them first is work whose result is
+        // thrown away one line later (`build_emvb_tail` cost 1.0-1.5 s of a
+        // 20k-row create, and `build_smve` another 4.2 s).
         #[allow(clippy::type_complexity)]
         let mut by_segment: std::collections::BTreeMap<u64, Vec<(u64, Vec<Vec<f32>>)>> =
             Default::default();
@@ -5470,27 +5484,37 @@ impl MultiVectorIndex {
                 continue;
             }
             // The reference's EMVB chunk (coarse centroids, document tables and
-            // inverted lists) lives beside the raw-token segment. Borrow the
-            // token rows so sealing does not duplicate the vectors.
-            let emvb: Vec<(u32, &[Vec<f32>])> = docs
-                .iter()
-                .zip(ids.iter())
-                .map(|(doc, seq)| ((*seq & 0xffff_ffff) as u32, doc.as_slice()))
-                .collect();
-            let _ = infinity_storage::emvb_segment::write_emvb_segment_refs(
-                &path.with_extension("emvb"),
-                self.dims,
-                (segment & 0xffff_ffff) as u32,
-                &emvb,
-            );
+            // inverted lists) lives beside the raw-token segment. It is what
+            // `SEARCH MATCH TENSOR` prefilters through before scoring the
+            // survivors from the raw tokens - but only when the query reaches
+            // that path: a PLAID or SMVE index answers from its own structures
+            // and returns before the EMVB chunks are consulted, so building one
+            // for such a column was 1.5 s of a 20k-row create that no query
+            // could read. Build it when nothing more specific will answer.
+            let pq = if self.wants_emvb_chunk() {
+                // Borrow the token rows so sealing does not duplicate the
+                // vectors.
+                let emvb: Vec<(u32, &[Vec<f32>])> = docs
+                    .iter()
+                    .zip(ids.iter())
+                    .map(|(doc, seq)| ((*seq & 0xffff_ffff) as u32, doc.as_slice()))
+                    .collect();
+                let _ = infinity_storage::emvb_segment::write_emvb_segment_refs(
+                    &path.with_extension("emvb"),
+                    self.dims,
+                    (segment & 0xffff_ffff) as u32,
+                    &emvb,
+                );
+                infinity_storage::emvb_segment::EmvbReader::open(&path.with_extension("emvb"))
+                    .ok()
+                    .and_then(|r| r.pq_index())
+                    .map(Arc::new)
+            } else {
+                None
+            };
             if let Ok(reader) =
                 infinity_storage::multivector_segment::MultiVectorSegmentReader::open(&path)
             {
-                let pq =
-                    infinity_storage::emvb_segment::EmvbReader::open(&path.with_extension("emvb"))
-                        .ok()
-                        .and_then(|r| r.pq_index())
-                        .map(Arc::new);
                 self.sealed.push((Arc::new(reader), Arc::new(ids), pq));
             }
         }

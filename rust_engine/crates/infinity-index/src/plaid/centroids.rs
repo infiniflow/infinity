@@ -61,24 +61,56 @@ pub fn kmeans_l2(
 
     let mut partition_id = vec![0u32; training_num];
     let mut previous_total = f32::MAX;
+    let threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
     for _ in 0..iteration_max {
         // Assign every training vector to its nearest centroid.
-        let mut total_distance = 0.0f32;
-        for (i, slot) in partition_id.iter_mut().enumerate() {
-            let v = &training[i * dimension..(i + 1) * dimension];
-            let mut best = 0usize;
-            let mut best_d = f32::INFINITY;
-            for k in 0..partition_num {
-                let c = &centroids[k * dimension..(k + 1) * dimension];
-                let d = l2_sq(v, c);
-                if d < best_d {
-                    best_d = d;
-                    best = k;
+        //
+        // This is the whole cost of the iteration - `training_num` vectors
+        // against `partition_num` centroids - and one thread walked all of it.
+        // The assignments are independent, so the rows are split evenly and
+        // each thread sums its own distance; the per-thread sums are then added
+        // in a fixed order so the result does not depend on thread arrival.
+        let total_distance = if threads <= 1 || training_num < 4096 {
+            assign_rows(&training, dimension, partition_num, &centroids, &mut partition_id, 0)
+        } else {
+            let chunk = training_num.div_ceil(threads);
+            let mut sums = vec![0f32; threads];
+            std::thread::scope(|scope| {
+                let mut handles = Vec::with_capacity(threads);
+                let mut rest: &mut [u32] = &mut partition_id;
+                for (t, slot) in sums.iter_mut().enumerate() {
+                    let start = t * chunk;
+                    let end = (start + chunk).min(training_num);
+                    if start >= end {
+                        *slot = 0.0;
+                        continue;
+                    }
+                    // Take the next slice off the front: `rest` has already
+                    // lost the previous chunks, so the offset inside it is
+                    // always zero.
+                    let (mine, tail) = rest.split_at_mut(end - start);
+                    rest = tail;
+                    let training = &training;
+                    let centroids = &centroids;
+                    handles.push(scope.spawn(move || {
+                        *slot = assign_rows(
+                            training,
+                            dimension,
+                            partition_num,
+                            centroids,
+                            mine,
+                            start,
+                        );
+                    }));
                 }
-            }
-            *slot = best as u32;
-            total_distance += best_d;
-        }
+                for h in handles {
+                    h.join().unwrap();
+                }
+            });
+            sums.iter().sum::<f32>()
+        };
         let mut counts = vec![0u32; partition_num];
         for &p in &partition_id {
             counts[p as usize] += 1;
@@ -137,6 +169,36 @@ pub fn kmeans_l2(
 
 fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
     a.iter().zip(b).map(|(x, y)| (x - y) * (x - y)).sum()
+}
+
+/// Assigns the training rows in `slots` to their nearest centroid, returning
+/// the summed distance. `first` is the row index `slots[0]` stands for.
+fn assign_rows(
+    training: &[f32],
+    dimension: usize,
+    partition_num: usize,
+    centroids: &[f32],
+    slots: &mut [u32],
+    first: usize,
+) -> f32 {
+    let mut total = 0.0f32;
+    for (offset, slot) in slots.iter_mut().enumerate() {
+        let row = first + offset;
+        let v = &training[row * dimension..(row + 1) * dimension];
+        let mut best = 0usize;
+        let mut best_d = f32::INFINITY;
+        for k in 0..partition_num {
+            let c = &centroids[k * dimension..(k + 1) * dimension];
+            let d = l2_sq(v, c);
+            if d < best_d {
+                best_d = d;
+                best = k;
+            }
+        }
+        *slot = best as u32;
+        total += best_d;
+    }
+    total
 }
 
 /// C++: `RandomPermutatePartially` (`kmeans_partition.cppm`).
