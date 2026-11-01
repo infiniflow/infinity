@@ -13684,18 +13684,16 @@ impl Engine {
                     // every rewritten row.
                     if self.has_index_declaration(table) || self.any_in_memory_index() {
                         let schema = self.table_schema(table).unwrap_or_default();
-                        let texts: Vec<Vec<String>> = new_rows
-                            .iter()
-                            .map(|nr| nr.iter().map(|v| v.to_slt_string()).collect())
-                            .collect();
-                        self.update_secondary_indexes_batch(table, base, &texts, &schema);
+                        self.update_secondary_indexes_batch(table, base, &new_rows, &schema);
                         // The text/vector hooks key off their own registries; a
                         // table with only secondary indexes must not pay a lock
                         // per row for them.
                         if self.has_text_or_vector_index(table) {
-                            for (k, row_texts) in texts.iter().enumerate() {
-                                self.update_text_indexes(table, base + k, row_texts, &schema);
-                                self.update_vector_caches(table, base + k, row_texts);
+                            for (k, nr) in new_rows.iter().enumerate() {
+                                let row_texts: Vec<String> =
+                                    nr.iter().map(|v| v.to_slt_string()).collect();
+                                self.update_text_indexes(table, base + k, &row_texts, &schema);
+                                self.update_vector_caches(table, base + k, &row_texts);
                             }
                             self.drop_text_index_rows(table, &to_del);
                             self.drop_vector_cache_rows(table, &to_del);
@@ -14659,7 +14657,7 @@ impl Engine {
         &self,
         table: &str,
         base: usize,
-        rows: &[Vec<String>],
+        rows: &[Vec<Value>],
         schema: &[String],
     ) {
         if rows.is_empty() {
@@ -14678,11 +14676,13 @@ impl Engine {
                 targets.push((pos, idx));
             }
         }
+        // Only the indexed cells are rendered: the key is the cell's stored
+        // text, and a wide table has no reason to format the rest.
         for (k, values) in rows.iter().enumerate() {
             let seq = (base + k) as u64;
             for (pos, idx) in targets.iter_mut() {
                 if let Some(value) = values.get(*pos) {
-                    idx.insert(value.as_bytes(), seq);
+                    idx.insert(value.to_slt_string().as_bytes(), seq);
                 }
             }
         }
