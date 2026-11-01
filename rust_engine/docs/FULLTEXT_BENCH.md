@@ -68,8 +68,8 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 |---|---|---|---|
 | CREATE INDEX（DDL 本身，见 §4.11） | 3–5 ms（参考读数含它自己的 Flush） | 1.1–1.9 ms | 持平 |
 | ReadJsonl（不计入） | 17–29 ms | 60–62 ms | — |
-| INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 2.29–2.30 s | ≈2.3× 慢（计时口径见 §7） |
-| IMPORT 20000 行 | ≈2 s | **2.18 s** | ≈1.09× 慢 |
+| INSERT 20000 行（batch=500） | ≈1 s（日志只到整秒） | 1.95–2.00 s | ≈2× 慢（计时口径见 §7） |
+| IMPORT 20000 行 | ≈2 s | **1.876 s** | 反超 |
 | Optimize（合并索引 chunk） | 360–512 µs | 299–397 µs | 同量级 |
 | 查询 1 `harmful "social custom"` | 1–5 ms | **0.32 ms** | 反超 |
 | 查询 2 `social custom "harmful chemical"` | 0.93–1 ms | **0.37 ms** | 反超 |
@@ -79,7 +79,7 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 | 查询 6（13 词） | 2–3 ms | **3.03 ms** | 同量级 |
 | 查询 7（14 词） | 0.84–1 ms | **1.40 ms** | ≈1.5× 慢 |
 
-写入从 3.2 s 降到 2.5 s（IMPORT 1.2 倍、INSERT 2.5 倍）；查询从最初的 13–30 倍
+写入从 3.2 s 降到 1.88 s（IMPORT 已快过参考，INSERT 的 2× 是 §7 说的计时口径）；查询从最初的 13–30 倍
 降到「1–2 个词的查询全面反超，13/14 词的长查询在 1–1.5 倍以内」。
 
 ## 4. 这一轮改了什么
@@ -395,6 +395,24 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 
 格式没变：`fulltext_format` 的字节门禁与跨引擎用例照旧通过。
 
+### 4.15 分词器直接吐 `&str`（写路径最后一个常数项）
+
+§4.14 之后剩下的开销是「每个 term 一个 `String`」：`tokenize_index_positions` 先建
+`Vec<(String, u32)>`，`insert` 再拿它去查表。现在改成流式：
+
+| 部分 | 内容 |
+|---|---|
+| 分析器 | `StandardAnalyzer::for_each_term`：边分词边把 `TermView { text: &str, … }` 交给回调；`analyze` 现在是它的薄包装（逐项 `to_string()`），两条路径不会再跑偏 |
+| 词干 memo | `Stemmer::with_stem` 把缓存里的 stem **按引用**交给回调（命中时零分配）；原来的 `stem_memo` 返回 `Cow::Owned`，命中也要克隆一次 |
+| 索引 | `for_each_index_term`：标准分析器走流式，analyzer/delims 两种配置仍回落 `tokenize_index_positions`；`insert` 边分词边 intern，直接产出 `Vec<(u32 id, u32 pos)>` |
+
+实测：IMPORT 2.18 s → **1.876 s**，INSERT 2.29 s → **1.95–2.00 s**（各再降 14%）。
+相对参考：IMPORT 已经反超（参考 ≈2 s），INSERT 的 2× 是 §7 说的计时口径。查询不变
+（0.30/0.33/0.26/0.28/1.39/2.92/1.37 ms），checkpoint 不变（≈10 ms）。
+
+一个副作用要记住：intern 发生在预算检查之前，被预算拒掉的文档可能留下一个空的
+词典项——它的 posting 列表为空，所有消费者（dump / merged_segment / 查询）本来就跳过空列表。
+
 ## 5. 顺带修掉的一个格式缺陷
 
 `encode_fulltext_chunk`（`crates/infinity-executor/src/cpp_blocks.rs`）原来对
@@ -448,9 +466,8 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 每行的固定开销可以忽略（收集索引句柄 2.1 ms、`index_delete_row` 1.9 ms、向量缓存 6.3 ms），
 所以这一项不是「每行太重」，而是上面四块。按性价比排序（前两条已实现，见 §4.13）：
 
-1. **analyze 861 ms**：3.7M 次 `String` 分配 + 词干。**已做词干 memo**：thread-local、按算法分表、
-   64k 条上限，命中重复词就不跑 Snowball。还没做的是 token interning（把 `Term::text` 换成 ID，
-   连带把 postings 的查表变成整数比较）。
+1. **analyze 861 ms**：3.7M 次 `String` 分配 + 词干。**已做**：词干 memo（§4.13）与流式分词
+   + intern（§4.14 / §4.15），现在这条路径既不为每个 term 建 `String`，也不按字符串查表。
 2. **posmap 238 ms**：**已做**——每文档的哈希 map 与每词一个 `Vec` 换成「按 (term, position) 排序后
    走连续段」，一次分配都不做（`MemoryIndexer::insert`）。
 3. **seal 877 ms**：FST 与 posting 编码是实打实的活，posting 编解码已经吃过 SIMD（隔离 1.2–3.5×）。

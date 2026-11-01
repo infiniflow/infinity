@@ -3237,12 +3237,28 @@ impl MemoryIndexer {
     /// C++: `MemoryIndexer::Insert` for one document. Returns `false` when the
     /// document would push the segment past `budget`, leaving it unchanged.
     fn insert(&mut self, seq: u64, text: &str, tokenizer: &TextTokenizer, budget: usize) -> bool {
-        let mut toks = tokenize_index_positions(text, tokenizer);
+        // Terms are streamed and interned on the way in: no `String` per term
+        // (a 20k-row column is ~3.7M of them) and no per-document list of
+        // borrowed strings to keep alive. Interning happens before the budget
+        // check, so a rejected document may leave an unused dictionary entry;
+        // its posting list stays empty, which every consumer already skips.
+        let mut toks: Vec<(u32, u32)> = Vec::new();
         // ~32 B per posting entry plus the positions and the term string.
         let mut cost = 64usize;
-        for (term, _) in &toks {
+        for_each_index_term(text, tokenizer, |term, pos| {
             cost += term.len() + 32;
-        }
+            let id = match self.term_ids.get(term) {
+                Some(id) => *id,
+                None => {
+                    let id = self.term_names.len() as u32;
+                    self.term_names.push(term.to_string());
+                    self.term_ids.insert(term.to_string(), id);
+                    self.postings.push(TermPostings::default());
+                    id
+                }
+            };
+            toks.push((id, pos));
+        });
         if self.bytes + cost > budget {
             return false;
         }
@@ -3277,22 +3293,9 @@ impl MemoryIndexer {
             while at < toks.len() && toks[at].0 == toks[first].0 {
                 at += 1;
             }
-            let term = toks[first].0.as_str();
+            let id = toks[first].0 as usize;
             positions.clear();
             positions.extend(toks[first..at].iter().map(|entry| entry.1));
-            // Only a term's first appearance allocates: the dictionary maps the
-            // borrowed term to an id, and the postings live in a Vec indexed by
-            // it (a 20k-row column adds a couple of million postings).
-            let id = match self.term_ids.get(term) {
-                Some(id) => *id as usize,
-                None => {
-                    let id = self.term_names.len();
-                    self.term_names.push(term.to_string());
-                    self.term_ids.insert(term.to_string(), id as u32);
-                    self.postings.push(TermPostings::default());
-                    id
-                }
-            };
             let list = &mut self.postings[id];
             let (start, count) = list.append_positions(&positions);
             let entry = (seq, positions.len() as u32, start, count);
@@ -23540,6 +23543,23 @@ fn tokenize_index_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
 /// original and its stem at the same offset (`common_analyzer_impl.cpp`
 /// re-uses `offset_` for both), so both share a position; `offset_` itself
 /// advances once per raw token. Phrase queries need this.
+/// Feeds `(term, position)` for the terms this column indexes, borrowing the
+/// term text so the caller can intern it without a `String` per term.
+///
+/// The dictionary-driven analyzers and the delimiter fields still produce a
+/// whole `Vec` (they are not on the hot path); the standard analyzer streams.
+fn for_each_index_term(text: &str, tokenizer: &TextTokenizer, mut f: impl FnMut(&str, u32)) {
+    if tokenizer.analyzer.is_some() || tokenizer.delims.is_some() {
+        for (term, pos) in tokenize_index_positions(text, tokenizer) {
+            f(&term, pos);
+        }
+        return;
+    }
+    tokenizer
+        .standard(false)
+        .for_each_term(text, |term| f(term.text, term.word_offset));
+}
+
 fn tokenize_index_positions(s: &str, tokenizer: &TextTokenizer) -> Vec<(String, u32)> {
     if let Some(terms) = tokenizer.analyze(s) {
         return terms

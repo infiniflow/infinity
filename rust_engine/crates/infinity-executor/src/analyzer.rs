@@ -145,6 +145,16 @@ pub fn tokenize(s: &str, config: &TokenizeConfig) -> Vec<(String, usize, usize)>
     out
 }
 
+/// One term the analyzer emits, borrowed from the input (or from the stem
+/// cache) — the shape [`StandardAnalyzer::for_each_term`] hands out so the
+/// index path can intern a term without building a `String` for it.
+pub struct TermView<'a> {
+    pub text: &'a str,
+    pub word_offset: u32,
+    pub char_offset: u32,
+    pub end_offset: u32,
+}
+
 /// C++: `Term`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Term {
@@ -227,9 +237,13 @@ impl StandardAnalyzer {
         self.tokenize_config = config;
     }
 
-    /// C++: CommonLanguageAnalyzer::AnalyzeImpl + StandardAnalyzer::NextToken.
-    pub fn analyze(&self, input: &str) -> Vec<Term> {
-        let mut out = Vec::new();
+    /// Feeds every term the analyzer emits to `f`, borrowing the text.
+    ///
+    /// The index path needs a term only long enough to intern it, so it walks
+    /// the terms here instead of calling [`Self::analyze`]: a 20k-row column is
+    /// ~3.7M terms, and a `String` per term was measurable (see
+    /// `docs/FULLTEXT_BENCH.md` §8.1).
+    pub fn for_each_term(&self, input: &str, mut f: impl FnMut(TermView<'_>)) {
         let mut word_index = 0u32;
         for_each_token(input, &self.tokenize_config, |token, start, end| {
             let word_offset = word_index;
@@ -239,11 +253,7 @@ impl StandardAnalyzer {
             } else {
                 word_offset
             };
-            let end_offset = if self.char_offset {
-                end as u32
-            } else {
-                word_offset
-            };
+            let end_offset = if self.char_offset { end as u32 } else { word_offset };
             // Lower-casing only costs an allocation when the token has an
             // uppercase byte; most words of a corpus are already lowercase.
             let lower: std::borrow::Cow<str> = if token.bytes().any(|b| b.is_ascii_uppercase()) {
@@ -251,61 +261,69 @@ impl StandardAnalyzer {
             } else {
                 std::borrow::Cow::Borrowed(token)
             };
-            let stem: Option<String> = match self.stemmer {
-                Some(stemmer) if self.extract_eng_stem => {
-                    let stem = stemmer.stem_memo(&lower);
-                    // Only a stem that differs from the word becomes a term, so
-                    // an unchanged one costs no allocation.
-                    if stem.as_ref() == lower.as_ref() {
-                        None
-                    } else {
-                        Some(stem.into_owned())
-                    }
-                }
-                _ => None,
-            };
             let lower_differs = token != lower.as_ref();
-
-            // The terms take ownership of the strings they were built from, so
-            // neither the word nor the stem is copied again: two million tokens
-            // per column makes even one clone per token visible.
-            let mut emit = |text: String| {
-                out.push(Term {
+            let mut emit = |text: &str| {
+                f(TermView {
                     text,
                     word_offset,
                     char_offset: offset,
                     end_offset,
-                    is_index: true,
-                    payload: 0,
-                });
+                })
             };
-
-            if let Some(stem) = stem {
-                if self.stem_only {
-                    emit(stem);
-                } else if self.case_sensitive {
-                    emit(token.to_string());
-                    emit(stem);
+            let emit = &mut emit;
+            let stem_emitted = match self.stemmer {
+                Some(stemmer) if self.extract_eng_stem => stemmer.with_stem(&lower, |stem| {
+                    // Only a stem that differs from the word becomes a term.
+                    if stem == lower.as_ref() {
+                        return false;
+                    }
+                    if self.stem_only {
+                        emit(stem);
+                    } else if self.case_sensitive {
+                        emit(token);
+                        emit(stem);
+                        if self.contain_lower && lower_differs {
+                            emit(&lower);
+                        }
+                    } else {
+                        emit(&lower);
+                        emit(stem);
+                    }
+                    true
+                }),
+                _ => false,
+            };
+            if !stem_emitted {
+                if self.case_sensitive {
                     if self.contain_lower && lower_differs {
-                        emit(lower.into_owned());
+                        emit(token);
+                        emit(&lower);
+                    } else {
+                        emit(token);
                     }
                 } else {
-                    emit(lower.into_owned());
-                    emit(stem);
+                    emit(&lower);
                 }
-            } else if self.case_sensitive {
-                if self.contain_lower && lower_differs {
-                    emit(token.to_string());
-                    emit(lower.into_owned());
-                } else {
-                    emit(token.to_string());
-                }
-            } else {
-                emit(lower.into_owned());
             }
+        });
+    }
+
+    /// C++: CommonLanguageAnalyzer::AnalyzeImpl + StandardAnalyzer::NextToken.
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        let mut out = Vec::new();
+        self.for_each_term(input, |term| {
+            out.push(Term {
+                text: term.text.to_string(),
+                word_offset: term.word_offset,
+                char_offset: term.char_offset,
+                end_offset: term.end_offset,
+                is_index: true,
+                payload: 0,
+            })
         });
         out
     }
+
 }
 
 /// C++: `NGramAnalyzer` (`ngram_analyzer.cppm`, `ngram_analyzer_impl.cpp`).
@@ -751,7 +769,7 @@ impl Stemmer {
         }
     }
 
-    /// [`Self::stem`], memoised per thread.
+    /// Calls `f` with the stem of `word`, memoised per thread.
     ///
     /// Natural text repeats its words heavily (60–70% of the tokens of the
     /// benchmark corpus), so the stem of most tokens is one already computed:
@@ -759,12 +777,17 @@ impl Stemmer {
     /// cache is per thread (no lock on the index path), per algorithm (two
     /// languages must not share entries) and bounded — reaching the bound
     /// clears it instead of growing with the vocabulary forever.
-    fn stem_memo(&self, word: &str) -> std::borrow::Cow<'_, str> {
+    ///
+    /// The stem is handed to `f` by reference and rather than returned, so a
+    /// cache hit neither clones the stem nor allocates: the caller (the index
+    /// path) only needs it long enough to intern it.
+    fn with_stem<R>(&self, word: &str, f: impl FnOnce(&str) -> R) -> R {
         match self {
-            Self::Snowball(algorithm) => {
-                std::borrow::Cow::Owned(memoized_stem(*algorithm, word).into_string())
+            Self::Snowball(algorithm) => memoized_stem(*algorithm, word, f),
+            Self::Porter => {
+                let stem = super::porter::stem(word);
+                f(stem.as_ref())
             }
-            Self::Porter => std::borrow::Cow::Owned(super::porter::stem(word)),
         }
     }
 }
@@ -778,8 +801,13 @@ thread_local! {
         = std::cell::RefCell::new(Vec::new());
 }
 
-/// The stem of `word`, from this thread's cache when it is already there.
-fn memoized_stem(algorithm: rust_stemmers::Algorithm, word: &str) -> Box<str> {
+/// Calls `f` with the stem of `word`, from this thread's cache when it is
+/// already there.
+fn memoized_stem<R>(
+    algorithm: rust_stemmers::Algorithm,
+    word: &str,
+    f: impl FnOnce(&str) -> R,
+) -> R {
     STEM_MEMO.with(|cell| {
         let mut maps = cell.borrow_mut();
         let index = match maps.iter().position(|(a, _)| *a == algorithm) {
@@ -790,15 +818,14 @@ fn memoized_stem(algorithm: rust_stemmers::Algorithm, word: &str) -> Box<str> {
             }
         };
         let map = &mut maps[index].1;
-        if let Some(stem) = map.get(word) {
-            return stem.clone();
+        if !map.contains_key(word) {
+            let stem: Box<str> = Box::from(snowball(algorithm).stem(word).as_ref());
+            if map.len() >= STEM_MEMO_LIMIT {
+                map.clear();
+            }
+            map.insert(Box::from(word), stem);
         }
-        let stem: Box<str> = Box::from(snowball(algorithm).stem(word).as_ref());
-        if map.len() >= STEM_MEMO_LIMIT {
-            map.clear();
-        }
-        map.insert(Box::from(word), stem.clone());
-        stem
+        f(map.get(word).map(|s| s.as_ref()).unwrap_or(""))
     })
 }
 
