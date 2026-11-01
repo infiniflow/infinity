@@ -34,7 +34,7 @@ pub mod vector;
 #[cfg(test)]
 mod quantizer_perf;
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -73,10 +73,16 @@ pub trait Index {
     fn key_count(&self) -> usize;
 }
 
-/// A byte-keyed ordered multimap.
+/// A byte-keyed multimap.
+///
+/// The map is unordered: an insert hashes the key instead of walking a
+/// B-tree's nodes (at 100k keys a `BTreeMap` insert spent its time in
+/// `memcmp` over ~17 levels), and every reader either looks a key up or scans
+/// all of them. The chunk dump sorts what it writes, so the files stay
+/// deterministic.
 #[derive(Debug, Default, Clone)]
 pub struct SecondaryIndex {
-    map: BTreeMap<Vec<u8>, Vec<RowID>>,
+    map: HashMap<Vec<u8>, Vec<RowID>>,
     /// Approximate heap bytes, maintained by the mutators.
     ///
     /// The unified memindex quota is checked on every row, so this used to walk
@@ -97,7 +103,7 @@ impl SecondaryIndex {
 
     /// Removes and returns every entry, leaving the index empty. Used when a
     /// memory tail is dumped into a sealed segment.
-    pub fn take(&mut self) -> BTreeMap<Vec<u8>, Vec<RowID>> {
+    pub fn take(&mut self) -> HashMap<Vec<u8>, Vec<RowID>> {
         self.bytes = 0;
         std::mem::take(&mut self.map)
     }
@@ -113,16 +119,13 @@ impl SecondaryIndex {
         self.map.values().flatten().min().copied()
     }
 
-    /// Visits every `(key, row ids)` pair in ascending **byte** order, without
-    /// cloning, so a caller can apply its own comparison.
+    /// Visits every `(key, row ids)` pair, without cloning, so a caller can
+    /// apply its own comparison. The order is unspecified.
     ///
-    /// This order is not the order of the values the keys were built from: the
-    /// memory tail is keyed by `Literal::to_slt_string().as_bytes()`
-    /// (`infinity-executor`'s `index_lookup`), so `b"10"` sorts before
-    /// `b"9"`. A numeric range scan must decode and compare each key it visits
-    /// — it must **not** stop early or slice the walk at a bound, or it will
-    /// silently drop rows. [`Index::range`] is byte-order-only for the same
-    /// reason.
+    /// A range scan must decode and compare each key it visits - it must
+    /// **not** stop early or slice the walk at a bound: the memory tail is
+    /// keyed by the cell's stored text (`Literal::to_slt_string().as_bytes()`),
+    /// so `b"10"` sorts before `b"9"` and numeric order is not byte order.
     pub fn for_each_in_order(&self, mut f: impl FnMut(&[u8], &[RowID])) {
         for (key, ids) in &self.map {
             f(key, ids);
@@ -190,7 +193,7 @@ impl SecondaryIndex {
             return Err(bad());
         }
         let n = rd_u64(&buf, &mut p)?;
-        let mut map = BTreeMap::new();
+        let mut map = HashMap::new();
         let mut bytes = 0usize;
         for _ in 0..n {
             let klen = rd_u32(&buf, &mut p)? as usize;
@@ -231,13 +234,17 @@ impl Index for SecondaryIndex {
     }
 
     fn range(&self, lo: Option<&[u8]>, hi: Option<&[u8]>) -> Vec<(Vec<u8>, Vec<RowID>)> {
-        use std::ops::Bound::{Excluded, Included, Unbounded};
-        let lower = lo.map(|k| Included(k.to_vec())).unwrap_or(Unbounded);
-        let upper = hi.map(|k| Excluded(k.to_vec())).unwrap_or(Unbounded);
-        self.map
-            .range((lower, upper))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect()
+        let mut out: Vec<(Vec<u8>, Vec<RowID>)> = self
+            .map
+            .iter()
+            .filter(|(key, _)| {
+                lo.map(|lo| key.as_slice() >= lo).unwrap_or(true)
+                    && hi.map(|hi| key.as_slice() < hi).unwrap_or(true)
+            })
+            .map(|(key, ids)| (key.clone(), ids.clone()))
+            .collect();
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out
     }
 
     fn key_count(&self) -> usize {

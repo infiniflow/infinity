@@ -14677,12 +14677,23 @@ impl Engine {
             }
         }
         // Only the indexed cells are rendered: the key is the cell's stored
-        // text, and a wide table has no reason to format the rest.
+        // text, and a wide table has no reason to format the rest. A varchar
+        // cell *is* its stored text, so it goes in without a copy; everything
+        // else is formatted into one buffer reused across the batch.
+        let mut key = String::new();
         for (k, values) in rows.iter().enumerate() {
             let seq = (base + k) as u64;
             for (pos, idx) in targets.iter_mut() {
-                if let Some(value) = values.get(*pos) {
-                    idx.insert(value.to_slt_string().as_bytes(), seq);
+                let Some(value) = values.get(*pos) else {
+                    continue;
+                };
+                match value {
+                    Value::Str(text) => idx.insert(text.as_bytes(), seq),
+                    other => {
+                        key.clear();
+                        key.push_str(&other.to_slt_string());
+                        idx.insert(key.as_bytes(), seq);
+                    }
                 }
             }
         }
