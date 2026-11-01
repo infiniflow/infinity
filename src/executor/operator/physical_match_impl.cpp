@@ -89,7 +89,8 @@ QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
             case EarlyTermAlgo::kAuto:
             case EarlyTermAlgo::kNaive:
             case EarlyTermAlgo::kBatch:
-            case EarlyTermAlgo::kBMW: {
+            case EarlyTermAlgo::kBMW:
+            case EarlyTermAlgo::kBlockAtATime: {
                 // ok
                 break;
             }
@@ -117,7 +118,8 @@ QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
         case EarlyTermAlgo::kAuto:
         case EarlyTermAlgo::kNaive:
         case EarlyTermAlgo::kBatch:
-        case EarlyTermAlgo::kBMW: {
+        case EarlyTermAlgo::kBMW:
+        case EarlyTermAlgo::kBlockAtATime: {
             query_iterators.query_iter = get_iter(early_term_algo);
             break;
         }
