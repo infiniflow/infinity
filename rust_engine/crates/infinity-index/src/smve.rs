@@ -309,16 +309,6 @@ impl SmveIndex {
         Ok(self.labels.len())
     }
 
-    /// [`Self::add_document`] without the BMP rebuild, for a bulk caller that
-    /// builds the BMP once at the end.
-    fn add_document_unbuilt(&mut self, row_id: u32, tokens: &[Vec<f32>]) -> Result<()> {
-        let toks = self.encode_tokens(tokens)?;
-        self.bmp.add_doc(&toks);
-        self.docs.push((row_id, toks));
-        self.labels.push(row_id);
-        Ok(())
-    }
-
     /// The SMVE sparse code of one document's tokens.
     fn encode_tokens(&self, tokens: &[Vec<f32>]) -> Result<Vec<(u32, f32)>> {
         let flat: Vec<f32> = tokens.iter().flatten().copied().collect();

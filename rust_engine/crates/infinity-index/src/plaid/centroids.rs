@@ -173,13 +173,6 @@ pub fn kmeans_l2(
     Ok(centroids)
 }
 
-fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
-    // The SIMD kernel the vector indexes already use. The k-means assignment
-    // loop calls this `training_num * partition_num` times, and the scalar
-    // version was 57% of a 20k-row PLAID build.
-    crate::simd::l2_sq(a, b)
-}
-
 /// Assigns the training rows in `slots` to their nearest centroid, returning
 /// the summed distance. `first` is the row index `slots[0]` stands for.
 fn assign_rows(
@@ -200,7 +193,6 @@ fn assign_rows(
         .map(|c| c.iter().map(|x| x * x).sum::<f32>())
         .collect();
     use std::simd::f32x8;
-    use std::simd::num::SimdFloat;
     // The centroids transposed: `transposed[d * partition_num + k]` is the
     // `d`-th component of centroid `k`. The kernels below read eight
     // consecutive centroids for one dimension, which is one vector load; the
@@ -236,9 +228,9 @@ fn assign_rows(
                     col[..lanes].copy_from_slice(&transposed[base..base + lanes]);
                     f32x8::from_array(col)
                 };
-                for r in 0..rows {
+                for (r, a) in acc.iter_mut().enumerate().take(rows) {
                     let row = first + at + r;
-                    acc[r] += f32x8::splat(training[row * dimension + d]) * cd;
+                    *a += f32x8::splat(training[row * dimension + d]) * cd;
                 }
             }
             for r in 0..rows {
