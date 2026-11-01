@@ -5958,7 +5958,6 @@ impl SparseIndex {
 /// tables and their metadata. The `Engine` composes it.
 pub struct Storage {
     catalog: Catalog,
-    store: Arc<dyn MetaStore>,
     /// Serializes checkpoints: the block mirror rewrites `seg_0`, so two
     /// concurrent flushes would race on its files.
     flush_lock: Mutex<()>,
@@ -6725,7 +6724,7 @@ fn run_bottom(
                 for (k, text) in append.encoded.iter().enumerate() {
                     engine
                         .storage
-                        .store
+                        .catalog.store()
                         .put(&row_key(table, append.base + k), text.as_bytes())?;
                 }
             }
@@ -7480,18 +7479,16 @@ impl Engine {
             None => None,
         };
         // The row/meta store, on the same substrate as the catalog.
-        let store: Arc<dyn MetaStore> = infinity_storage::open_store(&dir.join("persistence"))?;
         let wal_dir = dir.join("wal");
         std::fs::create_dir_all(&wal_dir).map_err(|e| Error::Io {
             path: wal_dir.clone(),
             source: e,
         })?;
-        let txn = TxnManager::open(wal_dir.join("wal.log"), store.clone())?
+        let txn = TxnManager::open(wal_dir.join("wal.log"), catalog.store().clone())?
             .with_catalog_store(catalog.store().clone());
         let engine = Self {
             storage: Storage {
                 catalog,
-                store,
                 flush_lock: Mutex::new(()),
                 // The subsystems are built above, so the storage is writable
                 // the moment it exists: the reference's standalone/leader
@@ -10184,7 +10181,7 @@ impl Engine {
         // mark is the answer, and it seeds the entry.
         let dirty = self
             .storage
-            .store
+            .catalog.store()
             .get(&Self::mirror_dirty_key(&key))
             .ok()
             .flatten()
@@ -10502,7 +10499,7 @@ impl Engine {
     /// A `u64` list persisted under `key`, loaded once per table.
     fn load_id_log(&self, key: &[u8]) -> Vec<u64> {
         self.storage
-            .store
+            .catalog.store()
             .get(key)
             .ok()
             .flatten()
@@ -10519,7 +10516,7 @@ impl Engine {
         for id in ids {
             bytes.extend_from_slice(&id.to_le_bytes());
         }
-        self.storage.store.put(key, &bytes)
+        self.storage.catalog.store().put(key, &bytes)
     }
 
     /// The cumulative row count after every append transaction.
@@ -11657,7 +11654,7 @@ impl Engine {
                 for (k, encoded) in bottom_encoded.iter().enumerate() {
                     engine
                         .storage
-                        .store
+                        .catalog.store()
                         .put(&row_key(&bottom_table, base + k), encoded.as_bytes())?;
                 }
                 return Ok(());
@@ -14823,11 +14820,11 @@ impl Engine {
     fn next_row_seq(&self, table: &str) -> Result<usize> {
         let prefix = row_prefix(table);
         let mut max = 0usize;
-        for (k, _v) in self.storage.store.scan_prefix(&prefix)? {
+        for (k, _v) in self.storage.catalog.store().scan_prefix(&prefix)? {
             if let Ok(seq) = String::from_utf8_lossy(&k[prefix.len()..]).parse::<usize>() {
                 // A compacted (renumbered) row is tombstoned at its old id;
                 // it must not push the next id past the live range.
-                if self.storage.store.get(&del_key(table, seq))?.is_some() {
+                if self.storage.catalog.store().get(&del_key(table, seq))?.is_some() {
                     continue;
                 }
                 max = max.max(seq + 1);
@@ -14921,7 +14918,7 @@ impl Engine {
         // would add O(rows) KV round trips to every full scan.
         let deleted = self.tombstone_set_at(table, crate::read_ts())?;
         let mut rows = Vec::new();
-        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
+        for (k, v) in self.storage.catalog.store().scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
@@ -14987,7 +14984,7 @@ impl Engine {
         let mut rows = Vec::new();
         for (k, v) in self
             .storage
-            .store
+            .catalog.store()
             .scan_range(&row_key(table, first), &row_key(table, last))?
         {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
@@ -15039,7 +15036,7 @@ impl Engine {
         end.push(0xff);
         for (k, v) in self
             .storage
-            .store
+            .catalog.store()
             .scan_range(&row_key(&name, first), &end)?
         {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
@@ -15153,7 +15150,7 @@ impl Engine {
         let have: std::collections::HashSet<usize> = out.iter().map(|(seq, _)| *seq).collect();
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
-        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
+        for (k, v) in self.storage.catalog.store().scan_prefix(&prefix)? {
             let Some(raw) = k.get(prefix.len()..) else {
                 continue;
             };
@@ -15423,10 +15420,10 @@ impl Engine {
         }
         for &id in ids {
             let seq = id as usize;
-            if self.storage.store.get(&del_key(table, seq))?.is_some() {
+            if self.storage.catalog.store().get(&del_key(table, seq))?.is_some() {
                 continue;
             }
-            if let Some(v) = self.storage.store.get(&row_key(table, seq))? {
+            if let Some(v) = self.storage.catalog.store().get(&row_key(table, seq))? {
                 out.push((seq, v));
             }
         }
@@ -15456,10 +15453,10 @@ impl Engine {
         for &id in ids {
             let seq = id as usize;
             // A stale index entry may point at a tombstoned row.
-            if self.storage.store.get(&del_key(table, seq))?.is_some() {
+            if self.storage.catalog.store().get(&del_key(table, seq))?.is_some() {
                 continue;
             }
-            if let Some(v) = self.storage.store.get(&row_key(table, seq))? {
+            if let Some(v) = self.storage.catalog.store().get(&row_key(table, seq))? {
                 out.push((seq, self.parse_stored_row(table, &defaults, &v)?));
             }
         }
@@ -16098,7 +16095,7 @@ impl Engine {
         let ci = schema.iter().position(|c| c == column)?;
         let raw = self
             .storage
-            .store
+            .catalog.store()
             .get(&row_key(table, seq as usize))
             .ok()??;
         let defaults = self.table_defaults(table).unwrap_or_default();
@@ -21249,7 +21246,7 @@ impl Engine {
     /// The underlying row/meta store (exposed for tests and tooling that need to
     /// inspect the on-disk key space).
     pub fn store(&self) -> &std::sync::Arc<dyn MetaStore> {
-        &self.storage.store
+        &self.storage.catalog.store()
     }
 
     /// TRUE when `table` exists (the name is qualified with the session's
@@ -21460,7 +21457,6 @@ impl Engine {
         // simply absent after the local files were wiped).
         if let Some(client) = self.context.object_store.lock().unwrap().clone() {
             infinity_storage::s3::sync_tree(&client, &self.dir.join("catalog"), "catalog")?;
-            infinity_storage::s3::sync_tree(&client, &self.dir.join("persistence"), "persistence")?;
         }
         // The frame goes last, once every file it claims is on disk: the block
         // mirror, the index chunks and the two SSTs are all fsynced above, so a
@@ -21484,7 +21480,6 @@ impl Engine {
         self.flush()?;
         if let Some(client) = self.context.object_store.lock().unwrap().clone() {
             infinity_storage::s3::sync_tree(&client, &self.dir.join("catalog"), "catalog")?;
-            infinity_storage::s3::sync_tree(&client, &self.dir.join("persistence"), "persistence")?;
         }
         Ok(())
     }

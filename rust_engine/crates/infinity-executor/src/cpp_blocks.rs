@@ -2853,7 +2853,7 @@ impl Engine {
                     .collect();
                 let text = self.encode_row_stored(&table, &literals, &meta.types)?;
                 self.storage
-                    .store
+                    .catalog.store()
                     .put(&row_key(&table, *seq), text.as_bytes())?;
             }
             return Ok(());
@@ -3095,7 +3095,7 @@ impl Engine {
             // for this index is that transaction.
             let dump_ts = self
                 .storage
-                .store
+                .catalog.store()
                 .get(&crate::dump_ts_key(&self.qualified_table(table), &im.name))
                 .ok()
                 .flatten()
@@ -3482,7 +3482,7 @@ impl Engine {
                     // so the row has nowhere else to come from.
                     Err(_) => {
                         self.storage
-                            .store
+                            .catalog.store()
                             .put(&row_key(&table, *seq as usize), text.as_bytes())?;
                     }
                 }
@@ -3570,7 +3570,7 @@ impl Engine {
         let table = self.qualified_table(table);
         if self
             .storage
-            .store
+            .catalog.store()
             .get(&del_key(&table, seq))
             .ok()
             .flatten()
@@ -3580,7 +3580,7 @@ impl Engine {
         }
         if self
             .storage
-            .store
+            .catalog.store()
             .get(&row_key(&table, seq))
             .ok()
             .flatten()
@@ -7395,7 +7395,7 @@ impl<'a> BlockCursor<'a> {
         if self
             .engine
             .storage
-            .store
+            .catalog.store()
             .get(&del_key(&self.table, seq))?
             .is_some()
         {
@@ -7420,7 +7420,7 @@ impl<'a> BlockCursor<'a> {
         if let Some(value) = self
             .engine
             .storage
-            .store
+            .catalog.store()
             .get(&row_key(&self.table, seq))?
         {
             return Ok(Some(value));
@@ -7511,8 +7511,8 @@ mod tests {
             "row:", "del:", "appends:", "append_ts:", "append_copy:", "deletes:",
             "delete_ts:", "import_rows:", "import_ts:", "dump_ts:",
         ] {
-            for (key, _) in engine.storage.store.scan_prefix(prefix.as_bytes()).unwrap() {
-                engine.storage.store.delete(&key).unwrap();
+            for (key, _) in engine.storage.catalog.store().scan_prefix(prefix.as_bytes()).unwrap() {
+                engine.storage.catalog.store().delete(&key).unwrap();
             }
         }
     }
@@ -7980,7 +7980,7 @@ mod tests {
         forget_journal(&e);
         assert!(
             e.storage
-                .store
+                .catalog.store()
                 .scan_prefix(b"row:")
                 .unwrap()
                 .is_empty(),
@@ -7988,7 +7988,7 @@ mod tests {
         );
         assert!(
             e.storage
-                .store
+                .catalog.store()
                 .scan_prefix(b"del:")
                 .unwrap()
                 .is_empty(),
@@ -8035,8 +8035,8 @@ mod tests {
             "row:", "del:", "appends:", "append_ts:", "append_copy:", "deletes:",
             "delete_ts:", "import_rows:", "import_ts:", "dump_ts:",
         ] {
-            for (key, _) in e.storage.store.scan_prefix(prefix.as_bytes()).unwrap() {
-                e.storage.store.delete(&key).unwrap();
+            for (key, _) in e.storage.catalog.store().scan_prefix(prefix.as_bytes()).unwrap() {
+                e.storage.catalog.store().delete(&key).unwrap();
             }
         }
         drop(e);
