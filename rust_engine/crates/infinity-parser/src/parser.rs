@@ -4058,6 +4058,46 @@ mod tests {
         assert_eq!(args[0], ExprAst::Literal(Literal::Str("15 DAYS".into())));
     }
 
+    /// Chained arithmetic is **left** associative: `a = 1 - 2 - 3` parses as
+    /// `(1 - 2) - 3`.
+    ///
+    /// The Go SDK's hand-written splitter used to split at the *first* operator
+    /// and so produced `1 - (2 - 3)` (upstream #3530); the port parses by
+    /// precedence climbing, which gives left associativity - this pins it down.
+    #[test]
+    fn chained_arithmetic_is_left_associative() {
+        let Statement::Select { where_pred, .. } = one("SELECT * FROM t where a = 1 - 2 - 3;")
+        else {
+            panic!("expected SELECT");
+        };
+        let Some(Predicate::Cmp(_, CmpOp::Eq, rhs)) = where_pred else {
+            panic!("expected a = ...");
+        };
+        let ExprAst::Binary(left, BinOp::Sub, right) = rhs else {
+            panic!("expected (1 - 2) - 3");
+        };
+        assert_eq!(right.as_ref(), &ExprAst::Literal(Literal::Int(3)));
+        let ExprAst::Binary(inner_left, BinOp::Sub, inner_right) = left.as_ref() else {
+            panic!("expected the left side to be 1 - 2");
+        };
+        assert_eq!(inner_left.as_ref(), &ExprAst::Literal(Literal::Int(1)));
+        assert_eq!(inner_right.as_ref(), &ExprAst::Literal(Literal::Int(2)));
+
+        // A mixed chain keeps precedence: `1 - 2 * 3` is `1 - (2 * 3)`.
+        let Statement::Select { where_pred, .. } = one("SELECT * FROM t where a = 1 - 2 * 3;")
+        else {
+            panic!("expected SELECT");
+        };
+        let Some(Predicate::Cmp(_, CmpOp::Eq, rhs)) = where_pred else {
+            panic!("expected a = ...");
+        };
+        let ExprAst::Binary(left, BinOp::Sub, right) = rhs else {
+            panic!("expected 1 - (2 * 3)");
+        };
+        assert_eq!(left.as_ref(), &ExprAst::Literal(Literal::Int(1)));
+        assert!(matches!(right.as_ref(), ExprAst::Binary(_, BinOp::Mul, _)));
+    }
+
     /// `SelectStatementParsingTest.bad_test1`: `OFFSET` requires `LIMIT`.
     #[test]
     fn offset_without_limit_is_rejected() {
