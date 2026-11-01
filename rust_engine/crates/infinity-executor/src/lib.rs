@@ -10841,13 +10841,52 @@ impl Engine {
 
     /// Every row id deleted since the table was created.
     fn deleted_ids(&self, table: &str) -> Vec<u64> {
+        self.load_deletes(table).0
+    }
+
+    /// The deleted row ids and their delete timestamps, both loaded together.
+    ///
+    /// The block `version` files say which rows are gone and when
+    /// (`BlockVersion::deleted_`); the KV delete log is a cache of the same
+    /// history and only contributes ids the files do not have yet. Loading
+    /// both here keeps `deleted_ids` and `delete_ts` aligned by construction
+    /// and outside the table lock (the block read takes it).
+    fn load_deletes(&self, table: &str) -> (Vec<u64>, Vec<u64>) {
         let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey.clone()).or_default();
-        if entry.deleted_ids.is_none() {
-            entry.deleted_ids = Some(self.load_id_log(&deletes_key(&tkey)));
+        {
+            let tables = self.tables.lock().unwrap();
+            if let Some(ids) = tables.get(&tkey).and_then(|entry| entry.deleted_ids.clone()) {
+                let mut ts = tables
+                    .get(&tkey)
+                    .and_then(|entry| entry.delete_ts.clone())
+                    .unwrap_or_else(|| vec![0; ids.len()]);
+                ts.resize(ids.len(), 0);
+                return (ids, ts);
+            }
         }
-        entry.deleted_ids.clone().unwrap_or_default()
+        let from_blocks = self.deleted_from_blocks(&tkey);
+        let mut ids: Vec<u64> = from_blocks.iter().map(|(row, _)| *row).collect();
+        let mut ts: Vec<u64> = from_blocks.iter().map(|(_, at)| *at).collect();
+        let logged = self.load_id_log(&deletes_key(&tkey));
+        let logged_ts = self.load_id_log(&delete_ts_key(&tkey));
+        for (slot, id) in logged.iter().enumerate() {
+            if ids.binary_search(id).is_ok() {
+                continue;
+            }
+            let at = logged_ts.get(slot).copied().unwrap_or(0);
+            let at_index = ids.partition_point(|known| known < id);
+            ids.insert(at_index, *id);
+            ts.insert(at_index, at);
+        }
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey).or_default();
+        if entry.deleted_ids.is_none() {
+            entry.deleted_ids = Some(ids.clone());
+        }
+        if entry.delete_ts.is_none() {
+            entry.delete_ts = Some(ts.clone());
+        }
+        (ids, ts)
     }
 
     /// Records deleted row ids **in memory** only.
@@ -10900,13 +10939,7 @@ impl Engine {
 
     /// The commit timestamp of every delete, aligned with [`Self::deleted_ids`].
     fn delete_ts(&self, table: &str) -> Vec<u64> {
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey.clone()).or_default();
-        if entry.delete_ts.is_none() {
-            entry.delete_ts = Some(self.load_id_log(&delete_ts_key(&tkey)));
-        }
-        entry.delete_ts.clone().unwrap_or_default()
+        self.load_deletes(table).1
     }
 
     /// Stamps the last `count` deletes with the commit timestamp their

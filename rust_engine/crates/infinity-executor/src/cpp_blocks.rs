@@ -3941,6 +3941,33 @@ impl Engine {
         Ok((version, Arc::new(columns)))
     }
 
+    /// Every deleted row the block mirror records, as `(row id, delete ts)`,
+    /// sorted by row id.
+    ///
+    /// The reference keeps the delete history in the block's `version` file
+    /// (`BlockVersion::deleted_`), so the files alone say which rows are gone
+    /// and when. Nothing here touches the KV store.
+    pub(crate) fn deleted_from_blocks(&self, table: &str) -> Vec<(u64, u64)> {
+        let table = self.qualified_table(table);
+        let root = self.blocks_root();
+        let mut out = Vec::new();
+        for id in self.visible_block_ids(&table) {
+            let Ok((version, _)) = self.read_block_cached(&table, &root, id) else {
+                continue;
+            };
+            let base = (u64::from(id.segment_id) << 32)
+                + u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64;
+            for (slot, ts) in version.deleted.iter().enumerate() {
+                if *ts != 0 {
+                    out.push((base + slot as u64, *ts));
+                }
+            }
+        }
+        out.sort_unstable();
+        out.dedup_by_key(|(row, _)| *row);
+        out
+    }
+
     /// Reads the block mirror back, returning `(columns, rows)`.
     ///
     /// This never consults the KV store, so a successful read proves the mirror
