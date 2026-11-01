@@ -13192,8 +13192,7 @@ impl Engine {
                     self.text_index_for(table, column, tokenizer)?;
                 }
                 if has_rows && index_type.eq_ignore_ascii_case("HNSW") {
-                    let __r = self.build_hnsw_index(table, column);
-            __r?;
+                    self.build_hnsw_index(table, column)?;
                 }
                 // A multi-vector index is materialised when it is created, so
                 // queries only read segment files; later inserts go to the

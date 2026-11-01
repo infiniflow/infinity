@@ -487,6 +487,55 @@ fn conflict_drop_column_create_index() {
         assert_eq!(count(&e, "t1"), 2);
     }
 }
+
+
+
+/// `DROP COLUMN` racing `RENAME TABLE`: the row count must not double.
+///
+/// The drop re-encodes every row without its column; the rename only moves
+/// catalog records. Both leave the append buffer holding the ids the drop
+/// rewrote, and when the rename wins the drop's `pending_rows.retain` runs
+/// against the entry the rename migrated, so the ids stay listed while the
+/// blocks already hold them. `SELECT *` merges the buffer over the blocks and
+/// skips duplicate ids; `count(*)` added both sides and reported twice the
+/// table.
+#[test]
+fn conflict_drop_column_rename() {
+    for round in 0..30 {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        let barrier = Barrier::new(2);
+        let mut drop_ok = false;
+        let mut rename_ok = false;
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                e.execute("CREATE TABLE t1(c1 INT, c2 VARCHAR);").unwrap();
+                e.execute("INSERT INTO t1 VALUES (1, 'abc'), (2, 'def');")
+                    .unwrap();
+                barrier.wait();
+                drop_ok = e.execute("ALTER TABLE t1 DROP COLUMN (c1);").is_ok();
+            });
+            s.spawn(|| {
+                barrier.wait();
+                rename_ok = e.execute("ALTER TABLE t1 RENAME TO t2;").is_ok();
+            });
+        });
+        let name = if rename_ok { "t2" } else { "t1" };
+        let read = e.execute(&format!("SELECT * FROM {name};"));
+        assert!(
+            read.is_ok(),
+            "round {round}: drop_ok={drop_ok} rename_ok={rename_ok} read({name}) failed: {:?}",
+            read.err()
+        );
+        // A scan and a count read the same table, so they must agree.
+        let n = count(&e, name);
+        assert!(
+            n == 2,
+            "round {round}: drop_ok={drop_ok} rename_ok={rename_ok} rows={n}"
+        );
+    }
+}
+
 /// C++: `src/unit_test/storage/new_request/conflict_request_ut.cpp:769`
 /// (`delete_append`): a delete and an append racing both commit.
 #[test]

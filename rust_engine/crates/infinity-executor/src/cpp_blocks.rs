@@ -3734,6 +3734,9 @@ impl Engine {
         let deleted = self.tombstone_set_at(table, read_ts).unwrap_or_default();
         let pending = self.pending_rows_of(table);
         let mut rows = 0usize;
+        // Every row id the visible blocks cover, live or not: the append buffer
+        // may still list one of them.
+        let mut have: std::collections::HashSet<usize> = Default::default();
         for id in self.visible_block_ids(table) {
             let Some(version) = self.read_block_version(id) else {
                 continue;
@@ -3755,6 +3758,18 @@ impl Engine {
                 }
             }
             rows += live;
+            // A row the mirror has since written is still listed in the append
+            // buffer. The scan drops such a row by id (it merges the buffer over
+            // the blocks and skips ids the blocks already produced), so the
+            // count has to drop it too: `DROP COLUMN` removes the rewritten ids
+            // from the buffer, but a rewrite that lands under another name - a
+            // rename racing it - leaves them there, and counting both sides
+            // reported twice the table.
+            let base = ((id.segment_id as u64) << 32)
+                | u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64;
+            for slot in 0..created as u64 {
+                have.insert((base + slot) as usize);
+            }
         }
         // Rows a commit appended since the last checkpoint live in the append
         // buffer, not in a file yet.
@@ -3762,7 +3777,8 @@ impl Engine {
         rows + pending
             .iter()
             .filter(|(seq, _)| {
-                !deleted.contains(&(*seq as u64))
+                !have.contains(seq)
+                    && !deleted.contains(&(*seq as u64))
                     && view.as_ref().map_or(true, |view| view.covers(*seq, read_ts))
             })
             .count()
