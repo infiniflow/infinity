@@ -6077,6 +6077,12 @@ struct TableEntry {
     /// (`BufferManager::Flush`), not by the commit. This is that buffer: every
     /// row the commits since the last checkpoint appended, by row id. A read
     /// merges it over the blocks, a flush writes it out and empties it.
+    ///
+    /// One buffer per table, inside the engine's `tables` map: every reader
+    /// (and every statement on every thread) sees the same unsealed rows, the
+    /// way the reference's buffer object is shared by all of its handle
+    /// holders. A sealed block needs no such buffer - it is mapped (see
+    /// `Context::block_maps`).
     pending_rows: Vec<(usize, Vec<Value>)>,
     /// The next mirror write must take its rows from this rewrite rather than
     /// from the block files (a column change re-encodes every cell, so the
