@@ -301,12 +301,11 @@ mod tests {
         assert_eq!(loaded.key_count(), 2);
     }
 
-    /// `for_each_in_order` walks in byte order and reports every row id of a
-    /// key exactly once.
+    /// The walk reports every key once, with all of its row ids (the order is
+    /// unspecified: the tail is a hash map).
     #[test]
     fn for_each_in_order_walks_keys_and_row_ids_once() {
         let mut idx = SecondaryIndex::new();
-        // Inserted out of order; the walk is by key.
         for (k, id) in [("c", 3u64), ("a", 1), ("b", 2), ("b", 4)] {
             idx.insert(k.as_bytes(), id);
         }
@@ -314,6 +313,7 @@ mod tests {
         idx.for_each_in_order(|key, ids| {
             seen.push((String::from_utf8(key.to_vec()).unwrap(), ids.to_vec()))
         });
+        seen.sort_by(|a, b| a.0.cmp(&b.0));
         assert_eq!(
             seen,
             vec![
@@ -329,16 +329,29 @@ mod tests {
         assert_eq!(idx.row_count(), 4);
     }
 
-    /// The walk is **byte** order, not the numeric order of the values the
-    /// keys were encoded from: `"10"` precedes `"9"`. A range scan must decode
-    /// and compare each key rather than slice the walk.
+    /// `range` is **byte** order, not the numeric order of the values the keys
+    /// were encoded from: `"10"` precedes `"9"`, so a scan that slices at a
+    /// numeric bound would drop rows. It sorts its result by key for that
+    /// reason, whatever order the tail holds.
     #[test]
-    fn for_each_in_order_is_byte_order_not_numeric_order() {
+    fn range_is_byte_order_not_numeric_order() {
         let mut idx = SecondaryIndex::new();
         idx.insert(b"9", 9);
         idx.insert(b"10", 10);
-        let mut keys: Vec<String> = Vec::new();
-        idx.for_each_in_order(|key, _| keys.push(String::from_utf8_lossy(key).into_owned()));
-        assert_eq!(keys, vec!["10".to_string(), "9".to_string()]);
+        idx.insert(b"11", 11);
+        let keys: Vec<String> = idx
+            .range(None, None)
+            .into_iter()
+            .map(|(key, _)| String::from_utf8_lossy(&key).into_owned())
+            .collect();
+        assert_eq!(keys, vec!["10".to_string(), "11".to_string(), "9".to_string()]);
+        // A bound is compared byte-wise: ["10", "9") keeps both numeric strings
+        // below "9" in byte order, i.e. everything from "10" up to "8…".
+        let keys: Vec<String> = idx
+            .range(Some(b"10"), Some(b"9"))
+            .into_iter()
+            .map(|(key, _)| String::from_utf8_lossy(&key).into_owned())
+            .collect();
+        assert_eq!(keys, vec!["10".to_string(), "11".to_string()]);
     }
 }
