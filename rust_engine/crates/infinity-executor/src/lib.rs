@@ -13684,14 +13684,22 @@ impl Engine {
                     // every rewritten row.
                     if self.has_index_declaration(table) || self.any_in_memory_index() {
                         let schema = self.table_schema(table).unwrap_or_default();
-                        for (k, nr) in new_rows.iter().enumerate() {
-                            let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
-                            self.update_indexes_on_insert_text(table, base + k, &texts, &schema)?;
-                            self.update_text_indexes(table, base + k, &texts, &schema);
-                            self.update_vector_caches(table, base + k, &texts);
+                        let texts: Vec<Vec<String>> = new_rows
+                            .iter()
+                            .map(|nr| nr.iter().map(|v| v.to_slt_string()).collect())
+                            .collect();
+                        self.update_secondary_indexes_batch(table, base, &texts, &schema);
+                        // The text/vector hooks key off their own registries; a
+                        // table with only secondary indexes must not pay a lock
+                        // per row for them.
+                        if self.has_text_or_vector_index(table) {
+                            for (k, row_texts) in texts.iter().enumerate() {
+                                self.update_text_indexes(table, base + k, row_texts, &schema);
+                                self.update_vector_caches(table, base + k, row_texts);
+                            }
+                            self.drop_text_index_rows(table, &to_del);
+                            self.drop_vector_cache_rows(table, &to_del);
                         }
-                        self.drop_text_index_rows(table, &to_del);
-                        self.drop_vector_cache_rows(table, &to_del);
                     }
                 }
                 Ok(QueryResult::Updated {
@@ -14640,6 +14648,45 @@ impl Engine {
         self.update_indexes_on_insert_text(table, seq, &texts, schema)
     }
 
+
+    /// Feeds a whole batch of rows into every secondary index of `table`.
+    ///
+    /// The per-row form resolved the table key (a formatted, lowercased
+    /// string) and took the registry lock for every row, and looked the indexed
+    /// column up in the schema once per index per row. A bulk statement paid
+    /// that per row; this pays it once for the batch.
+    fn update_secondary_indexes_batch(
+        &self,
+        table: &str,
+        base: usize,
+        rows: &[Vec<String>],
+        schema: &[String],
+    ) {
+        if rows.is_empty() {
+            return;
+        }
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey).or_default();
+        if entry.secondary.indexes.is_empty() {
+            return;
+        }
+        // `(position of the indexed column in the row, index)`, resolved once.
+        let mut targets: Vec<(usize, &mut SecondaryIndex)> = Vec::new();
+        for (col, idx) in entry.secondary.indexes.iter_mut() {
+            if let Some(pos) = schema.iter().position(|c| c == col) {
+                targets.push((pos, idx));
+            }
+        }
+        for (k, values) in rows.iter().enumerate() {
+            let seq = (base + k) as u64;
+            for (pos, idx) in targets.iter_mut() {
+                if let Some(value) = values.get(*pos) {
+                    idx.insert(value.as_bytes(), seq);
+                }
+            }
+        }
+    }
     /// Same, for rows already rendered in their stored text form.
     /// Feeds one row into every secondary index on `table`.
     ///
@@ -14647,6 +14694,21 @@ impl Engine {
     /// key space has no name index, so `get_table_by_name` walks the table
     /// records), and paying it per row is what once made an indexed insert an
     /// order of magnitude slower than a plain one.
+    /// Whether the table has a full-text, multi-vector or sparse index: the
+    /// hooks those need are keyed by their own registries, so a table with only
+    /// secondary indexes can skip them (they lock the table per row).
+    fn has_text_or_vector_index(&self, table: &str) -> bool {
+        let tkey = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .map(|entry| {
+                !entry.text.is_empty() || !entry.mv.is_empty() || !entry.sparse.is_empty()
+            })
+            .unwrap_or(false)
+    }
+
     fn update_indexes_on_insert_text(
         &self,
         table: &str,
