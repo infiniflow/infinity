@@ -3831,6 +3831,23 @@ impl TextTokenizer {
     /// C++ `Analyzer::Analyze`: the real analyzer's terms, when one is
     /// configured **and** can be constructed (the dictionary-driven families
     /// need their resource files).
+    /// Streams this column's terms when the analyzer can produce them by
+    /// reference. `false` means nothing was emitted and the caller has to use
+    /// [`tokenize_index_positions`].
+    fn for_each_term(&self, text: &str, f: &mut dyn FnMut(analyzer::TermView<'_>)) -> bool {
+        if let Some(name) = self.analyzer.as_deref() {
+            let Ok(analyzer) = analyzer::AnalyzerPool::instance().get_analyzer(name) else {
+                return false;
+            };
+            return analyzer.for_each_term(text, f);
+        }
+        if self.delims.is_some() {
+            return false;
+        }
+        self.standard(false).for_each_term(text, f);
+        true
+    }
+
     fn analyze(&self, text: &str) -> Option<Vec<analyzer::Term>> {
         let name = self.analyzer.as_deref()?;
         analyzer::AnalyzerPool::instance()
@@ -23549,15 +23566,14 @@ fn tokenize_index_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
 /// The dictionary-driven analyzers and the delimiter fields still produce a
 /// whole `Vec` (they are not on the hot path); the standard analyzer streams.
 fn for_each_index_term(text: &str, tokenizer: &TextTokenizer, mut f: impl FnMut(&str, u32)) {
-    if tokenizer.analyzer.is_some() || tokenizer.delims.is_some() {
+    let streamed = tokenizer.for_each_term(text, &mut |term: analyzer::TermView| {
+        f(term.text, term.word_offset)
+    });
+    if !streamed {
         for (term, pos) in tokenize_index_positions(text, tokenizer) {
             f(&term, pos);
         }
-        return;
     }
-    tokenizer
-        .standard(false)
-        .for_each_term(text, |term| f(term.text, term.word_offset));
 }
 
 fn tokenize_index_positions(s: &str, tokenizer: &TextTokenizer) -> Vec<(String, u32)> {

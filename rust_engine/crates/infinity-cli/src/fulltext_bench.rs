@@ -205,10 +205,18 @@ pub fn run(dir: &Path, mode: &str, corpus: &str, batch: usize) -> infinity_commo
     // the two `Flush`es checkpoint different storage stacks, so the checkpoint
     // is excluded from the comparison and only reproduced on demand
     // (`FTBENCH_FLUSH=1`), timed on its own. See FULLTEXT_BENCH.md §4.11.
+    // `FTBENCH_ANALYZER` builds the index with another analyzer family
+    // (`ngram-3`, `sparsegram-2-3`, …) so the same corpus exercises the
+    // streaming term paths, not just `standard`.
+    let analyzer = std::env::var("FTBENCH_ANALYZER").ok();
+    let create_index_sql = match analyzer.as_deref() {
+        Some(name) => format!(
+            "CREATE INDEX {INDEX} ON {TABLE} (text) USING FULLTEXT WITH (analyzer='{name}');"
+        ),
+        None => format!("CREATE INDEX {INDEX} ON {TABLE} (text) USING FULLTEXT;"),
+    };
     let t = Instant::now();
-    e.execute(&format!(
-        "CREATE INDEX {INDEX} ON {TABLE} (text) USING FULLTEXT;"
-    ))?;
+    e.execute(&create_index_sql)?;
     let create_index = t.elapsed();
     match checkpoint_cost(&e)? {
         Some(flush) => println!("Create index cost: {create_index:?} (DDL; Flush {flush:?} not included)"),

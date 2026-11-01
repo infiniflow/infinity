@@ -413,6 +413,25 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 一个副作用要记住：intern 发生在预算检查之前，被预算拒掉的文档可能留下一个空的
 词典项——它的 posting 列表为空，所有消费者（dump / merged_segment / 查询）本来就跳过空列表。
 
+### 4.16 ngram / sparsegram 也走流式
+
+这两个分析器产出的 term 比 standard 多得多（ngram-n 每个码点一个，sparsegram 更多），
+所以「每 term 一个 `String`」的浪费被放大。现在它们也有 `for_each_term`，`analyze` 是
+它的薄包装；`Analyzer::for_each_term` 统一分发，词典切分/转换类（chinese、ik、japanese、
+korean、rag、traditional、rank_features）返回 `false`，仍走原来的收集路径。
+
+bench 新增 `FTBENCH_ANALYZER=ngram-3` / `sparsegram-2-3`（同一个语料建对应索引），
+A/B 用临时开关 `INF_FT_NO_STREAM`（已移除）关掉流式：
+
+| 分析器 | 流式 | 收集（改前语义） | 差 |
+|---|---|---|---|
+| standard | 1.86–1.90 s | 2.09 s | −9% |
+| ngram-3 | 2.76–2.86 s | 3.38 s | **−18%** |
+| sparsegram-2-3 | 4.50 s | 5.28 s | **−15%** |
+
+收益随 term 数放大，与预期一致；standard 的绝对值不变（1.86 s）。词典类分析器要等
+各自的切分是否能借出 `&str` 单独确认（`traditional` 走 opencc 转换，天生要新串）。
+
 ## 5. 顺带修掉的一个格式缺陷
 
 `encode_fulltext_chunk`（`crates/infinity-executor/src/cpp_blocks.rs`）原来对

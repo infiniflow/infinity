@@ -340,9 +340,11 @@ impl NGramAnalyzer {
         Self { ngram }
     }
 
-    pub fn analyze(&self, input: &str) -> Vec<Term> {
+    /// Streams the n-grams; see [`StandardAnalyzer::for_each_term`] for why the
+    /// index path wants the text borrowed. An n-gram index emits one term per
+    /// code point, so the per-term allocation this avoids is amplified.
+    pub fn for_each_term(&self, input: &str, mut f: impl FnMut(TermView<'_>)) {
         let chars: Vec<(usize, char)> = input.char_indices().collect();
-        let mut out = Vec::new();
         let mut offset = 0u32;
         let mut i = 0usize;
         while i < chars.len() {
@@ -363,32 +365,42 @@ impl NGramAnalyzer {
             }
             if count < self.ngram {
                 if hit_space {
-                    // A space inside the window ends this run without emitting;
-                    // continue with the next word.
                     i = end;
                     while i < chars.len() && chars[i].1.is_whitespace() {
                         i += 1;
                     }
                     continue;
                 }
-                // Fewer than `n` code points remain: the reference stops.
                 break;
             }
             let start_byte = chars[i].0;
             let end_byte = chars.get(end).map(|(b, _)| *b).unwrap_or(input.len());
-            out.push(Term {
-                text: input[start_byte..end_byte].to_string(),
+            f(TermView {
+                text: &input[start_byte..end_byte],
                 word_offset: offset,
                 char_offset: start_byte as u32,
                 end_offset: end_byte as u32,
-                is_index: false,
-                payload: 0,
             });
             offset += 1;
             i += 1;
         }
+    }
+
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        let mut out = Vec::new();
+        self.for_each_term(input, |term| {
+            out.push(Term {
+                text: term.text.to_string(),
+                word_offset: term.word_offset,
+                char_offset: term.char_offset,
+                end_offset: term.end_offset,
+                is_index: false,
+                payload: 0,
+            })
+        });
         out
     }
+
 }
 
 // ---------------------------------------------------------------------------
@@ -547,19 +559,32 @@ impl SparseGramAnalyzer {
         })
     }
 
-    pub fn analyze(&self, input: &str) -> Vec<Term> {
-        let mut out = Vec::new();
+    /// Streams the grams: `for_each_sparse_gram` already produces them by
+    /// reference, so the index path interns them without a `String` each.
+    pub fn for_each_term(&self, input: &str, mut f: impl FnMut(TermView<'_>)) {
         let mut offset = 0u32;
         for_each_sparse_gram(input, self.min_n, self.max_n, self.fold, |gram| {
-            out.push(Term {
-                text: gram.to_string(),
+            f(TermView {
+                text: gram,
                 word_offset: offset,
                 char_offset: 0,
                 end_offset: offset + 1,
-                is_index: false,
-                payload: 0,
             });
             offset += 1;
+        });
+    }
+
+    pub fn analyze(&self, input: &str) -> Vec<Term> {
+        let mut out = Vec::new();
+        self.for_each_term(input, |term| {
+            out.push(Term {
+                text: term.text.to_string(),
+                word_offset: term.word_offset,
+                char_offset: term.char_offset,
+                end_offset: term.end_offset,
+                is_index: false,
+                payload: 0,
+            })
         });
         out
     }
@@ -725,6 +750,23 @@ impl Analyzer {
             Analyzer::Korean(_) => "korean",
             Analyzer::Traditional(_) => "traditional",
         }
+    }
+
+    /// Streams the terms of the analyzers that can produce them by reference,
+    /// returning `false` for the rest so the caller falls back to
+    /// [`Self::analyze`]. The index path uses this to intern a term without
+    /// building a `String` for it.
+    pub fn for_each_term(&self, text: &str, f: &mut dyn FnMut(TermView<'_>)) -> bool {
+        match self {
+            Analyzer::Standard(analyzer) => analyzer.for_each_term(text, f),
+            Analyzer::NGram(analyzer) => analyzer.for_each_term(text, f),
+            Analyzer::SparseGram(analyzer) => analyzer.for_each_term(text, f),
+            // The dictionary-driven and converting analyzers own their token
+            // text (segmentation buffers, folded or converted strings), so they
+            // keep the collecting path.
+            _ => return false,
+        }
+        true
     }
 
     /// C++: `Analyzer::Analyze(Term, TermList)`.
