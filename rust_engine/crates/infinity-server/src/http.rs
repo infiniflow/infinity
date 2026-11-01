@@ -2802,8 +2802,8 @@ mod tests {
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");
 
-        // The checkpoint wrote the block mirror; reading it back buffers the
-        // block, so the buffer/objects routes must list the object the test
+        // The checkpoint wrote the block mirror; reading it back maps the
+        // block, so the buffer/objects routes must list the mapping the test
         // itself touched.
         engine.read_cpp_blocks("t").unwrap();
         let (s, b) = route(&engine, &peer, "GET", "/instance/buffer", "");
@@ -2812,7 +2812,7 @@ mod tests {
         assert!(b.contains("\"buffer\":[{\"path\":\""), "{b}");
         assert!(b.contains("/seg_0/blk_0\""), "{b}");
         assert!(b.contains("\"status\":\"Loaded\""), "{b}");
-        assert!(b.contains("\"buffered_type\":\"Persistent\""), "{b}");
+        assert!(b.contains("\"buffered_type\":\"Mmap\""), "{b}");
         assert!(b.contains("\"type\":\"data\""), "{b}");
         assert!(!b.contains("\"size\":0,"), "{b}");
 

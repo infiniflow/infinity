@@ -43,6 +43,7 @@
 //! key array, which is what makes it correct for a chunk the reference wrote.
 
 use memmap2::Mmap;
+use crate::mapped::MappedFile;
 use std::cmp::Ordering;
 use std::fs::File;
 use std::path::Path;
@@ -1761,7 +1762,7 @@ fn validate_tail(buf: &[u8], at: usize, kind: KeyKind) -> Result<(), FormatError
 
 /// A chunk mapped read-only; lookups use the PGM then a binary search.
 pub struct SecondarySegmentReader {
-    map: Mmap,
+    map: MappedFile,
     row_count: usize,
     kind: KeyKind,
     /// Only a `U64` chunk decodes its model; a typed chunk is validated and
@@ -1788,7 +1789,9 @@ impl SecondarySegmentReader {
         let file =
             File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
         // SAFETY: read-only mapping of an immutable chunk file.
-        let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
+        let map = MappedFile::from_mmap(
+            unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?,
+        );
         let min = kind.empty_tail_len();
         if map.len() < min {
             return Err(FormatError::Truncated {

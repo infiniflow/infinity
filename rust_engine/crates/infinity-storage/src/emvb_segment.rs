@@ -33,6 +33,7 @@ use std::fs::File;
 use std::path::Path;
 
 use memmap2::Mmap;
+use crate::mapped::MappedFile;
 
 use infinity_index::emvb::OpqRotation;
 
@@ -603,7 +604,7 @@ pub struct EmvbHeader {
 
 /// A segment mapped read-only.
 pub struct EmvbReader {
-    map: Mmap,
+    map: MappedFile,
     header: EmvbHeader,
 }
 
@@ -613,7 +614,9 @@ impl EmvbReader {
         let file =
             File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
         // SAFETY: read-only mapping of an immutable chunk file.
-        let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
+        let map = MappedFile::from_mmap(
+            unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?,
+        );
         if map.len() < 16 {
             return Err(FormatError::Truncated {
                 need: 16,

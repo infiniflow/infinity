@@ -66,6 +66,9 @@ fn test_hnsw_index_buffer_obj_shutdown() {
     assert!(!e.table_exists("default_db.test_hnsw"));
     assert_eq!(e.mem_index_len("test_hnsw", "col1"), None);
     assert!(e.block_ids("test_hnsw", 0).is_empty());
+    // The block mappings went with the table (the reference frees the
+    // `BufferObject`s a dropped table owned).
+    assert!(e.buffer_objects().is_empty());
     assert_eq!(e.buffer_used_bytes(), 0);
 }
 
@@ -129,6 +132,13 @@ fn test_big_with_gc_and_cleanup() {
     let (columns, rows) = e.read_cpp_blocks("table1").unwrap();
     assert_eq!(columns, vec!["col1".to_string()]);
     assert_eq!(rows.len(), INSERT_N * IMPORT_SIZE);
+    // Reading a block maps it instead of copying it into a budget: every
+    // block of the table is mapped once and shared, whatever the budget says.
+    assert_eq!(
+        e.buffer_objects().len(),
+        INSERT_N,
+        "one mapping per block of the table"
+    );
     for idx in 0..INSERT_N {
         for row_id in 0..IMPORT_SIZE {
             assert_eq!(
@@ -137,10 +147,6 @@ fn test_big_with_gc_and_cleanup() {
                 "block {idx} row {row_id}"
             );
         }
-        assert!(
-            e.buffer_used_bytes() <= memory_limit,
-            "buffer manager exceeded its budget after block {idx}"
-        );
     }
 
     // `DROP TABLE` then cleanup: no block metadata survives.

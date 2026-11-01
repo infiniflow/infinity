@@ -58,9 +58,10 @@ use infinity_index::plaid::PlaidIndex;
 use infinity_index::vector::HnswIndex;
 use infinity_storage::cpp_format::{
     self, date_to_days, datetime_to_pair, element_width, embedding_size, pack_column_with_coverage,
-    push_embedding_element, time_to_secs, BlockColumn, BlockId, BlockVersionFile, ColumnLayout,
-    RawBlockColumn, DEFAULT_BLOCK_CAPACITY,
+    push_embedding_element, time_to_secs, BlockColumn, BlockColumns, BlockId, BlockVersionFile,
+    ColumnLayout, DEFAULT_BLOCK_CAPACITY,
 };
+use infinity_storage::mapped_block::MappedBlock;
 use infinity_storage::knn_format;
 
 use crate::{parse_value, Engine};
@@ -2391,17 +2392,11 @@ impl Engine {
                 let start = block_index * DEFAULT_BLOCK_CAPACITY;
                 let end = (start + DEFAULT_BLOCK_CAPACITY).min(seg_rows_total as usize);
                 let slot_base = seg_start + start;
-                // Drop the buffer manager's copy of this block **before** the
-                // rows are merged: a cached decode of an older (shorter) file
-                // would make the merge miss the rows the file holds, and the
-                // rewrite would drop them.
-                let early_id = BlockId {
-                    db_id,
-                    table_id: meta.id,
-                    segment_id,
-                    block_id: block_index as u16,
-                };
-                self.context.buffer.lock().unwrap().invalidate(&early_id);
+                // Drop the mapping of this block **before** the rows are
+                // merged: a mapped view of an older (shorter) file would make
+                // the merge miss the rows the file holds, and the rewrite
+                // would drop them.
+                self.drop_block_maps(meta.id);
                 let chunk = self.mirror_block_rows(
                     &table,
                     &meta,
@@ -2481,7 +2476,7 @@ impl Engine {
                     segment_id,
                     block_id: block_index as u16,
                 };
-                self.context.buffer.lock().unwrap().invalidate(&id);
+                self.drop_block_maps(meta.id);
                 let block_dir = cpp_format::block_dir(db_id, meta.id, segment_id, id.block_id);
                 // A rewrite replaces the block's contents; a file the schema no
                 // longer has (`ALTER TABLE … DROP COLUMN` leaves `1.col`
@@ -3350,9 +3345,10 @@ impl Engine {
         let mut total = 0u64;
         let mut newest = 0u64;
         for id in &blocks {
-            let Ok((version, _)) = self.read_block_cached(&table, &root, *id) else {
+            let Ok(block) = self.block_map(&table, &root, *id) else {
                 continue;
             };
+            let version = block.version();
             let Some(rows) = self.decode_block_cells(&table, &root, &meta, &types, *id, None) else {
                 continue;
             };
@@ -3482,7 +3478,7 @@ impl Engine {
         rows: &[(usize, Vec<Value>)],
     ) -> Result<()> {
         let table = self.qualified_table(table);
-        let Ok(Some(_meta)) = self.storage.catalog.get_table_by_name(&table) else {
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
             return Ok(());
         };
         let tkey = self.table_key(&table);
@@ -3494,9 +3490,7 @@ impl Engine {
             let mut tables = self.tables.lock().unwrap();
             tables.entry(tkey.clone()).or_default().rewrite_rows = true;
         }
-        for id in self.visible_block_ids(&table) {
-            self.context.buffer.lock().unwrap().invalidate(&id);
-        }
+        self.drop_block_maps(meta.id);
         self.invalidate_block_mirror(&table);
         // Drop the buffered copies of the slots this rewrite carries (it holds
         // the authoritative cells for them) and keep everything the buffer took
@@ -3807,37 +3801,48 @@ impl Engine {
         BlockCursor::new(self, table)
     }
 
-    /// Reads a block through the bounded buffer manager, loading it from disk on
-    /// a miss (the reference's `BufferManager::Get`).
-    fn read_block_cached(
-        &self,
-        table: &str,
-        root: &Path,
-        id: BlockId,
-    ) -> std::io::Result<(BlockVersionFile, Arc<Vec<RawBlockColumn>>)> {
-        // C++ `BlockIndex` + `BlockMeta::GetBlockColumnInfo`: the metadata
-        // lookup and the decoded payload both go through the table's block
-        // index and the engine-wide buffer manager.
-        if let Some(index) = self.block_index_for(table) {
-            let index = index.lock().unwrap();
-            let mut buffer = self.context.buffer.lock().unwrap();
-            if let Ok((_, columns)) = index.get_block(&mut buffer, &id) {
-                let dir = root.join(cpp_format::block_dir(
-                    id.db_id,
-                    id.table_id,
-                    id.segment_id,
-                    id.block_id,
-                ));
-                let version =
-                    BlockVersionFile::decode(&std::fs::read(dir.join(cpp_format::VERSION_FILE))?)
-                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-                return Ok((version, columns));
-            }
+    /// Maps a block, sharing one mapping per block with every other reader in
+    /// the process.
+    ///
+    /// The reference's block read goes through `BufferManager::Get`, which reads
+    /// the block into an owned buffer and evicts it by budget. A sealed block's
+    /// files never change, so the port maps them instead: the pages stay in the
+    /// page cache (which is what the budget was approximating) and the mapping
+    /// is shared, not copied. A block the index does not know yet (written
+    /// between its open and this read) is mapped from its directory.
+    fn block_map(&self, table: &str, root: &Path, id: BlockId) -> std::io::Result<Arc<MappedBlock>> {
+        if let Some(block) = self.context.block_maps.lock().unwrap().get(&id) {
+            self.context.block_map_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            return Ok(block.clone());
         }
-        // A block not registered in the index (e.g. written between the
-        // index's open and this read) is still readable from disk.
-        let (version, columns) = cpp_format::read_block(root, id)?;
-        Ok((version, Arc::new(columns)))
+        self.context
+            .block_map_misses
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let block = match self.block_index_for(table) {
+            Some(index) => {
+                let index = index.lock().unwrap();
+                match index.get_block(&id) {
+                    Ok((_, block)) => block,
+                    Err(_) => Arc::new(MappedBlock::open(root, id)?),
+                }
+            }
+            None => Arc::new(MappedBlock::open(root, id)?),
+        };
+        // Another reader may have mapped the block while this one did the I/O:
+        // keep the first mapping, so a block has exactly one in the process.
+        let mut maps = self.context.block_maps.lock().unwrap();
+        Ok(maps.entry(id).or_insert(block).clone())
+    }
+
+    /// Drops the mappings of every block of `table_id`: the block files under
+    /// it changed (a rewrite, a compaction, a delete), so the mappings no
+    /// longer describe them.
+    pub(crate) fn drop_block_maps(&self, table_id: u64) {
+        self.context
+            .block_maps
+            .lock()
+            .unwrap()
+            .retain(|id, _| id.table_id != table_id);
     }
 
 
@@ -3885,9 +3890,10 @@ impl Engine {
         let mut segment_first_ts: std::collections::BTreeMap<u32, u64> = Default::default();
         let mut total = 0u64;
         for id in self.visible_block_ids(&table) {
-            let Ok((version, _)) = self.read_block_cached(&table, &root, id) else {
+            let Ok(block) = self.block_map(&table, &root, id) else {
                 continue;
             };
+            let version = block.version();
             let Some(rows) = self.decode_block_cells(&table, &root, &meta, &types, id, None) else {
                 continue;
             };
@@ -4089,8 +4095,16 @@ impl Engine {
         id: BlockId,
         wanted: Option<&[usize]>,
     ) -> Option<Vec<(usize, Vec<String>)>> {
-        let (version, columns) = self.read_block_cached(table, root, id).ok()?;
-        Self::decode_rows_of(&meta.ids, &meta.types, types, id, &version, &columns, wanted)
+        let block = self.block_map(table, root, id).ok()?;
+        Self::decode_rows_of(
+            &meta.ids,
+            &meta.types,
+            types,
+            id,
+            block.version(),
+            block.as_ref(),
+            wanted,
+        )
     }
 
     /// The cells of one block, given its files - the decoder both the engine's
@@ -4102,7 +4116,7 @@ impl Engine {
         types: &[i32],
         id: BlockId,
         version: &cpp_format::BlockVersionFile,
-        columns: &[cpp_format::RawBlockColumn],
+        columns: &dyn BlockColumns,
         wanted: Option<&[usize]>,
     ) -> Option<Vec<(usize, Vec<String>)>> {
         let rows = Self::decode_rows_of_values(
@@ -4129,7 +4143,7 @@ impl Engine {
         types: &[i32],
         id: BlockId,
         version: &cpp_format::BlockVersionFile,
-        columns: &[cpp_format::RawBlockColumn],
+        columns: &dyn BlockColumns,
         wanted: Option<&[usize]>,
         keep: Option<&dyn Fn(&[Value]) -> bool>,
         rows_wanted: Option<&std::collections::HashSet<usize>>,
@@ -4164,18 +4178,15 @@ impl Engine {
                 }
             }
             let column_id = ids.get(col).copied().unwrap_or(col as u64);
-            let raw = columns.iter().find(|c| c.column_id == column_id)?;
+            let (body, outline) = columns.column(column_id)?;
             let layout = layout_of(&type_text[col], *column_type)?;
-            let (body_data, body_null) = cpp_format::split_body_refs(
-                raw.body.as_slice(),
-                DEFAULT_BLOCK_CAPACITY,
-                layout,
-            );
+            let (body_data, body_null) =
+                cpp_format::split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
             prepared.push(Some(Prepared {
                 body_data,
                 body_null,
                 kind: outline_kind(&type_text[col]),
-                outline: raw.outline.as_slice(),
+                outline,
                 shape: embedding_shape(&type_text[col]),
                 layout,
             }));
@@ -4490,9 +4501,10 @@ impl Engine {
         let mut out_of_order = false;
         let mut last = 0usize;
         for id in &blocks {
-            let Ok((version, columns)) = self.read_block_cached(&table, &root, *id) else {
+            let Ok(block) = self.block_map(&table, &root, *id) else {
                 break;
             };
+            let version = block.version();
             let row_count: usize = version
                 .created
                 .last()
@@ -4518,7 +4530,7 @@ impl Engine {
                     &meta.ids,
                     &meta.types,
                     &types,
-                    &columns,
+                    block.as_ref(),
                     *pos,
                     row_count,
                     &visible,
@@ -4615,7 +4627,7 @@ impl Engine {
         ids: &[u64],
         type_text: &[String],
         types: &[i32],
-        columns: &[cpp_format::RawBlockColumn],
+        columns: &dyn BlockColumns,
         pos: usize,
         row_count: usize,
         visible: &[bool],
@@ -4624,13 +4636,9 @@ impl Engine {
     ) -> Option<()> {
         let column_type = types.get(pos)?;
         let column_id = ids.get(pos).copied().unwrap_or(pos as u64);
-        let raw = columns.iter().find(|c| c.column_id == column_id)?;
+        let (raw_body, raw_outline) = columns.column(column_id)?;
         let layout = layout_of(&type_text[pos], *column_type)?;
-        let body = cpp_format::split_body_for_layout(
-            raw.body.as_slice(),
-            DEFAULT_BLOCK_CAPACITY,
-            layout,
-        );
+        let body = cpp_format::split_body_for_layout(raw_body, DEFAULT_BLOCK_CAPACITY, layout);
         let kind = outline_kind(&type_text[pos]);
         let shape = embedding_shape(&type_text[pos]);
         for row in 0..row_count {
@@ -4660,7 +4668,7 @@ impl Engine {
                     layout,
                     &body.data,
                     row,
-                    raw.outline.as_slice(),
+                    raw_outline,
                     text,
                 ) {
                     Some(ok) => {
@@ -4689,7 +4697,7 @@ impl Engine {
                             *column_type,
                             &body.data,
                             row,
-                            raw.outline.as_slice(),
+                            raw_outline,
                             shape,
                         )
                         .map(parse_owned_value)
@@ -4700,7 +4708,7 @@ impl Engine {
                         *column_type,
                         &body.data,
                         row,
-                        raw.outline.as_slice(),
+                        raw_outline,
                         shape,
                     )
                     .map(parse_owned_value)
@@ -4822,15 +4830,16 @@ impl Engine {
                     continue;
                 }
             }
-            match self.read_block_cached(&table, &root, id) {
-                Ok((version, columns)) => {
+            match self.block_map(&table, &root, id) {
+                Ok(block) => {
+                    let version = block.version();
                     let Some(cells) = Self::decode_rows_of_values(
                         &meta.ids,
                         &meta.types,
                         &types,
                         id,
-                        &version,
-                        &columns,
+                        version,
+                        block.as_ref(),
                         wanted,
                         keep,
                         rows_wanted,
@@ -7302,7 +7311,7 @@ pub(crate) struct BlockCursor<'a> {
     root: PathBuf,
     /// The block last decoded, with the `version` that says which of its slots
     /// are live.
-    block: Option<(BlockId, Arc<Vec<cpp_format::RawBlockColumn>>, BlockVersionFile)>,
+    block: Option<(BlockId, Arc<MappedBlock>)>,
 }
 
 impl<'a> BlockCursor<'a> {
@@ -7379,17 +7388,16 @@ impl<'a> BlockCursor<'a> {
         if self
             .block
             .as_ref()
-            .map(|(cached, _, _)| *cached != id)
+            .map(|(cached, _)| *cached != id)
             .unwrap_or(true)
         {
-            let Ok((version, columns)) =
-                self.engine.read_block_cached(&self.table, &self.root, id)
-            else {
+            let Ok(block) = self.engine.block_map(&self.table, &self.root, id) else {
                 return Ok(None);
             };
-            self.block = Some((id, columns, version));
+            self.block = Some((id, block));
         }
-        let (_, columns, version) = self.block.as_ref().unwrap();
+        let (_, block) = self.block.as_ref().unwrap();
+        let version = block.version();
         if version.deleted.get(slot).copied().unwrap_or(0) != 0 {
             return Ok(None);
         }
@@ -7403,7 +7411,7 @@ impl<'a> BlockCursor<'a> {
             &self.types,
             id,
             version,
-            columns,
+            block.as_ref(),
             None,
             None,
             Some(&wanted),
@@ -7438,6 +7446,55 @@ mod tests {
             }
         }
         out
+    }
+
+    /// A sealed block is mapped **once** and the mapping is shared: a second
+    /// reader gets the same `Arc`, no file is reopened, and no column body is
+    /// copied into the heap (the scan decodes straight out of the pages).
+    ///
+    /// Rewriting the block drops the mapping, so the next read maps the new
+    /// file rather than serving the stale one.
+    #[test]
+    fn a_sealed_block_is_mapped_once_and_shared() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE mb (id INT, name VARCHAR);")
+            .unwrap();
+        e.execute("INSERT INTO mb VALUES (1,'a'),(2,'b');").unwrap();
+        e.flush().unwrap();
+        let root = e.blocks_root();
+        let id = e.visible_block_ids("default_db.mb")[0];
+
+        let first = e.block_map("default_db.mb", &root, id).unwrap();
+        let second = e.block_map("default_db.mb", &root, id).unwrap();
+        assert!(
+            Arc::ptr_eq(&first, &second),
+            "the process holds one mapping per sealed block"
+        );
+        // The mapping covers exactly the block's files; the column payload a
+        // decoder gets is a slice of them, not a copy out of them.
+        let column_bytes: usize = std::fs::read_dir(first.dir(&root))
+            .unwrap()
+            .map(|entry| entry.unwrap())
+            .filter(|entry| {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                name.ends_with(".col") || (name.starts_with("col_") && name.ends_with("_out"))
+            })
+            .map(|entry| entry.metadata().unwrap().len() as usize)
+            .sum();
+        assert_eq!(first.bytes(), column_bytes);
+        assert!(first.column(0).is_some() && first.column(1).is_some());
+        assert_eq!(e.buffer_objects().len(), 1);
+
+        // A rewrite replaces the files, and the stale mapping goes with them.
+        e.execute("UPDATE mb SET name = 'c' WHERE id = 1;").unwrap();
+        e.flush().unwrap();
+        let rewritten = e.block_map("default_db.mb", &root, id).unwrap();
+        assert!(
+            !Arc::ptr_eq(&first, &rewritten),
+            "a rewritten block is mapped again"
+        );
+        assert_eq!(row_strings(&e, "SELECT id, name FROM mb WHERE id = 1;"), vec![vec!["1".to_string(), "c".to_string()]]);
     }
 
     /// Forgets the row-side keys, leaving the files under `data/` as the only

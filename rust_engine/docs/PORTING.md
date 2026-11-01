@@ -105,14 +105,14 @@
 
 除 `infinity-storage` 与 `infinity-cli`，每个 crate 都是 `#![forbid(unsafe_code)]`。剩下两处 `unsafe` 是刻意的：
 
-- **`memmap2::Mmap::map`**（8 个封存索引段的读者，`infinity-storage`）：`memmap2` 的 API 是 `unsafe`，因为映射可能比 `File` 活得久。改成 `std::fs::read` 虽然能消掉它，但会把整段读进堆（RSS）、失去惰性分页与 page cache 回收——首轮实测这类改动会明显拖慢大表扫描，**不再考虑**。`infinity-storage` 因此保持 `#![deny(unsafe_code)]` + 每处 `#[allow(unsafe_code)]`，并逐处写 SAFETY 注释（段一旦封存不可变，映射期间文件不会被改写）。
+- **`memmap2::Mmap::map`**（`infinity-storage` 的 `mapped::MappedFile`：封存索引段与封存块文件都走它）：`memmap2` 的 API 是 `unsafe`，因为映射可能比 `File` 活得久。改成 `std::fs::read` 虽然能消掉它，但会把整段读进堆（RSS）、失去惰性分页与 page cache 回收——首轮实测这类改动会明显拖慢大表扫描，**不再考虑**。`infinity-storage` 因此保持 `#![deny(unsafe_code)]` + 每处 `#[allow(unsafe_code)]`，并逐处写 SAFETY 注释（段/块一旦封存不可变，映射期间文件不会被改写）。
 - **`malloc_trim` / `posix_fadvise`**（`infinity-storage` 与 CLI 的 `trim_allocator`、`drop_file_cache`）：只能 FFI。它们服务于内存观测与长导入的 page cache 边界（Gate C），作用域极小、无指针、无生命周期，属于可接受的"测试/运维向"unsafe。
 
 判断标准：**性能敏感的映射必须保留**；只有"无指针、无别名、仅调用一个系统函数"的窄 FFI 才允许，且必须写清楚为什么不能用安全 API 表达。
 
 ## 3 当前状态
 
-### 3.1 存储形态：catalog 已是参考的键空间，行仍在 KV
+### 3.1 存储形态：catalog 是参考的键空间，行只在块文件与 WAL 里
 
 **catalog 只写参考版的键**。`Catalog` 以 `with_store_cpp_only` 打开，`catalog/` 里只有
 `catalog|…`、`db|…`、`tbl|…`、`col|…`、`idx|…`、`seg|…`、`blk|…`、`idx_seg|…`、
@@ -127,6 +127,17 @@ drop 的数据库。
 **行只在 `data/` 的块文件里**：提交把行交给块的 append 缓冲区（`TableEntry::pending_rows`，即参考的
 `BufferObject`），checkpoint 才写文件；WAL 里未 checkpoint 的尾巴在重启时重放回这块缓冲区。KV 里既没有
 `row:` 也没有 `del:` 键，也没有行侧车：行数据只有「块文件 + WAL」两份。
+
+**封存块与索引段都靠 mmap，参考的 `BufferManager` 不再移植**：封存块的文件不会变，读时直接
+`MappedBlock::open`（`infinity-storage::mapped_block`）把每个 `{col}.col` 映射进来，列体就是映射里的
+一个切片，槽位解码直接在 page cache 上做；索引段（全文/BMP/二维/EMVB/多值/低基数）同样由
+`mapped::MappedFile` 映射。映射本身在进程内共享：引擎的 `Context::block_maps` 每个 `BlockId` 只留一个
+`Arc<MappedBlock>`，同一块的并发读共用它，块被重写/压缩/删除时按表丢弃（`drop_block_maps`）。因此参考
+那套「读进预算内的 owned buffer + LRU 淘汰 + 溢出到临时文件 + 句柄引用计数」没有对应物：`BufferObj` /
+`BufferHandle` / `BufferPool` / `FileWorker` / `VarBuffer` 都不再存在，`[buffer] buffer_manager_size`
+只剩索引缓冲的预算。`SHOW BUFFERS` 因此一行对应一个映射（路径是块目录，状态 `Loaded`、类型 `Mmap`），
+`buffer_pool_usage` 是已映射字节/预算，`SHOW VARIABLES` 的 `buffered_object_count` 是映射数。
+未封存的行（append buffer）本来就在引擎的 `TableEntry::pending_rows` 里，按表一份，所有读者共享。
 
 **行号在提交序里发，checkpoint 只写已完成的**：两条一起才保证块内 id 是稠密前缀（块按 slot 寻址，
 行 *n* 的 id 是 `segment << 32 | block * 8192 + n`，中间缺一行就会把后面的行写错位）。

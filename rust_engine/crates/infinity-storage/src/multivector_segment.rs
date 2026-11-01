@@ -13,6 +13,7 @@
 //! ```
 
 use memmap2::Mmap;
+use crate::mapped::MappedFile;
 use std::fs::File;
 use std::path::Path;
 
@@ -59,7 +60,7 @@ pub fn write_multivector_segment(
 
 /// A multi-vector segment mapped read-only.
 pub struct MultiVectorSegmentReader {
-    map: Mmap,
+    map: MappedFile,
     dims: usize,
     doc_count: usize,
     offsets: usize,
@@ -71,7 +72,9 @@ impl MultiVectorSegmentReader {
         let file =
             File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
         // SAFETY: read-only mapping of an immutable segment file.
-        let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
+        let map = MappedFile::from_mmap(
+            unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?,
+        );
         if map.len() < HEADER_LEN || &map[..8] != MAGIC {
             return Err(FormatError::BadMagic(0));
         }

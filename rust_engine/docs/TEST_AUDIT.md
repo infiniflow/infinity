@@ -311,15 +311,15 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 288 | `src/unit_test/storage/bg_task/dump_index_task_2_ut.cpp` | `DumpMemIndexTaskTest2` | `DISABLED_SLOW_row_cnt_exceed_memory_quota` | ported | `infinity-executor` `bg_task_ut::dump_index_task_row_cnt_exceed_memory_quota` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 289 | `src/unit_test/storage/bg_task/dump_index_task_ut.cpp` | `DumpMemIndexTaskTest` | `DISABLED_SLOW_row_cnt_exceed_memindex_capacity` | ported | `infinity-executor` `bg_task_ut::dump_index_task_row_cnt_exceed_memindex_capacity` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 290 | `src/unit_test/storage/binary_fuse_filter/binary_fuse_filter_test_ut.cpp` | `BinaryFuseFilterTest` | `test_2000` | ported | `infinity-storage` `binary_fuse_filter::tests::test_2000` |
-| 291 | `src/unit_test/storage/buffer/buffer_handle_ut.cpp` | `BufferHandleTest` | `test1` | ported | `infinity-storage` `buffer::tests::buffer_handles_follow_the_reference_lifecycle` |
-| 292 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerTest` | `cleanup_test` | ported | `infinity-storage` `buffer::tests::cleanup_test` |
-| 293 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerTest` | `varfile_test` | ported | `infinity-storage` `buffer::tests::varfile_test` |
-| 294 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerParallelTest` | `parallel_test1` | ported | `infinity-storage` `buffer::tests::parallel_test1` |
-| 295 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerParallelTest` | `parallel_test2` | ported | `infinity-storage` `buffer::tests::parallel_test2` |
-| 296 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test1` | ported | `infinity-storage` `buffer::tests::buffer_obj_state_machine` |
+| 291 | `src/unit_test/storage/buffer/buffer_handle_ut.cpp` | `BufferHandleTest` | `test1` | not ported | `BufferObj`/`BufferHandle` 已去掉（封存块 mmap 后共享，没有 owned buffer） |
+| 292 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerTest` | `cleanup_test` | not ported | `BufferManager` 已去掉；映射的共享与丢弃由 `block_index::tests::every_block_maps_only_its_own_files`、`cpp_blocks::tests::a_sealed_block_is_mapped_once_and_shared` 覆盖 |
+| 293 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerTest` | `varfile_test` | not ported | 同上（`VarBuffer`/`FileWorker` 一并去掉） |
+| 294 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerParallelTest` | `parallel_test1` | not ported | 同上 |
+| 295 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerParallelTest` | `parallel_test2` | not ported | 同上 |
+| 296 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test1` | not ported | `BufferObj` 已去掉，状态机无对应物 |
 | 297 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test_hnsw_index_buffer_obj_shutdown` | ported | `infinity-executor` `buffer_obj_ut::test_hnsw_index_buffer_obj_shutdown` |
 | 298 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test_big_with_gc_and_cleanup` | ported | `infinity-executor` `buffer_obj_ut::test_big_with_gc_and_cleanup` |
-| 299 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `DISABLED_SLOW_test_multiple_threads_read` | ported | `infinity-storage` `buffer::tests::disabled_slow_test_multiple_threads_read`（`#[ignore]`） |
+| 299 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `DISABLED_SLOW_test_multiple_threads_read` | not ported | `BufferObj` 已去掉；并发读共享同一映射的性质由 `a_sealed_block_is_mapped_once_and_shared` 断言 |
 | 300 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `flat_boolean` | ported | `infinity-storage` `data_block::reference_suite::bool_flat_constant_select_slice` |
 | 301 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `contant_bool` | ported | `infinity-storage` `data_block::reference_suite::bool_flat_constant_select_slice` |
 | 302 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `bool_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::bool_flat_constant_select_slice` |

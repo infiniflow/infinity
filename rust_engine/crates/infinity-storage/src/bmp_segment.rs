@@ -19,6 +19,7 @@
 //! is read on demand, so a query touches only the postings of its terms.
 
 use memmap2::Mmap;
+use crate::mapped::MappedFile;
 use std::fs::File;
 use std::path::Path;
 
@@ -105,7 +106,7 @@ pub fn write_bmp_segment(
 
 /// A segment file mapped read-only.
 pub struct BmpSegmentReader {
-    map: Mmap,
+    map: MappedFile,
     block_size: usize,
     doc_count: usize,
     term_count: usize,
@@ -120,7 +121,9 @@ impl BmpSegmentReader {
             File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
         // SAFETY: the file is read-only and never modified while mapped; a new
         // version is written under a different name.
-        let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
+        let map = MappedFile::from_mmap(
+            unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?,
+        );
         if map.len() < HEADER_LEN || &map[..8] != MAGIC {
             return Err(FormatError::BadMagic(0));
         }

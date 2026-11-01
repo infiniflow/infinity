@@ -77,7 +77,6 @@ pub mod binary_fuse_filter;
 pub mod block_index;
 pub mod bmp_cpp;
 pub mod bmp_segment;
-pub mod buffer;
 pub mod catalog_format;
 pub mod cpp_format;
 pub mod crc;
@@ -89,6 +88,8 @@ pub mod fulltext_segment;
 pub mod inverted_format;
 pub mod io;
 pub mod knn_format;
+pub mod mapped;
+pub mod mapped_block;
 pub mod memindex_tracer;
 /// Opens the store at `path` (creating it if needed).
 ///
@@ -116,19 +117,20 @@ pub mod secondary_segment;
 pub mod selection;
 /// Transactional KV substrate (`KVStore` / `KVInstance`, plan §2.6.1).
 pub mod txn_kv;
-pub mod var_buffer;
 pub mod virtual_store;
 pub mod wal;
 pub mod wal_entry;
 
 pub use cpp_format::{
-    block_dir, chunk_index_file, column_file, column_layout, column_outline_file, date_to_days,
-    datetime_to_pair, decode_data_file, element_width, embedding_column_layout, encode_data_file,
+    block_dir, chunk_index_file, column_file, column_layout, column_outline_file, data_file_body,
+    date_to_days, datetime_to_pair, decode_data_file, element_width, embedding_column_layout,
+    encode_data_file,
     fulltext_base_name, fulltext_files, pack_column, pack_column_with_layout, pack_tensor_body,
     parse_flat, parse_nested_f64, parse_tensorarray_f64, push_embedding_element, read_block,
     read_embedding_element, segment_index_dir, sparse_slot, split_body, split_body_for_layout,
     split_top_level, strip_one_bracket, time_to_secs, varlen_count_offset_slot, write_block,
-    BlockColumn, BlockId, BlockVersionFile, ColumnBody, ColumnLayout, FormatError, RawBlockColumn,
+    BlockColumn, BlockColumns, BlockId, BlockVersionFile, ColumnBody, ColumnLayout, FormatError,
+    RawBlockColumn,
     DATA_FILE_MAGIC, DEFAULT_BLOCK_CAPACITY, VERSION_FILE,
 };
 pub use crc::crc32_ieee;

@@ -26,6 +26,7 @@
 //! 16-byte aligned, so padding is `align_to(offset, align)`.
 
 use memmap2::Mmap;
+use crate::mapped::MappedFile;
 use std::fs::File;
 use std::path::Path;
 
@@ -317,7 +318,9 @@ impl BmpCppReader {
         let file =
             File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
         // SAFETY: read-only mapping of an immutable chunk file.
-        let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
+        let map = MappedFile::from_mmap(
+            unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?,
+        );
         let mut cur = Cursor { buf: &map, at: 0 };
         let term_num = cur.u64_aligned()? as usize;
         let kths = cur.i32s_aligned(term_num)?;

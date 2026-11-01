@@ -617,11 +617,11 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 533 | `PeriodicTriggerThread` | `src/storage/bg_task/periodic_trigger_thread.cppm` | mapped | infinity_executor::bg_task 
 | 534 | `BuildFastRoughFilterTask` | `src/storage/bg_task/segment_sealing_tasks/build_fast_rough_filter_task.cppm` | mapped | infinity_executor::bg_task 
 | 535 | `BuildingSegmentFastFilters` | `src/storage/bg_task/segment_sealing_tasks/build_fast_rough_filter_task.cppm` | mapped | infinity_executor::bg_task 
-| 536 | `BufferHandle` | `src/storage/buffer/buffer_handle.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 537 | `BufferObj` | `src/storage/buffer/buffer_handle.cppm` | mapped | `infinity_storage::buffer::BufferObj` 
-| 538 | `BufferManager` | `src/storage/buffer/buffer_manager.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 539 | `BufferObjectInfo` | `src/storage/buffer/buffer_obj.cppm` | mapped | infinity_storage::{buffer, io} 
-| 540 | `VarBuffer` | `src/storage/buffer/buffer_obj.cppm` | mapped | `infinity_storage::var_buffer::VarBuffer`（Append/Get/Write/TotalSize/GetSize） |
+| 536 | `BufferHandle` | `src/storage/buffer/buffer_handle.cppm` | dropped | 不移植：封存块直接 mmap（`mapped::MappedFile`），没有 owned buffer 就没有句柄 |
+| 537 | `BufferObj` | `src/storage/buffer/buffer_obj.cppm` | dropped | 同上；块/索引段的载荷只有映射，没有「加载进预算」的对象 |
+| 538 | `BufferManager` | `src/storage/buffer/buffer_manager.cppm` | dropped | 不移植：`Context::block_maps` 每块一个共享 `Arc<MappedBlock>`，解码直接读 page cache |
+| 539 | `BufferObjectInfo` | `src/storage/buffer/buffer_obj.cppm` | mapped | `infinity_storage::mapped_block::BufferObjectInfo`（`SHOW BUFFERS` 一行 = 一个映射） |
+| 540 | `VarBuffer` | `src/storage/buffer/buffer_obj.cppm` | dropped | 随 `BufferObj` 一起去掉（没有 outline buffer 的场景） |
 | 541 | `BMPIndexFileWorker` | `src/storage/buffer/file_worker/bmp_index_file_worker.cppm` | mapped | infinity_storage::{buffer, io} 
 | 542 | `DataFileWorker` | `src/storage/buffer/file_worker/data_file_worker.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 543 | `EMVBIndexFileWorker` | `src/storage/buffer/file_worker/emvb_index_file_worker.cppm` | mapped | infinity_storage::{buffer, io} 
@@ -733,7 +733,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 649 | `SparseValueInfo` | `src/storage/column_vector/value.cppm` | mapped | infinity_storage::{data_block, mixed_column} 
 | 650 | `TensorArrayValueInfo` | `src/storage/column_vector/value.cppm` | mapped | infinity_storage::{data_block, mixed_column} 
 | 651 | `Value` | `src/storage/column_vector/value.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 652 | `VarBufferManager` | `src/storage/column_vector/var_buffer.cppm` | mapped | infinity_storage::{data_block, mixed_column} 
+| 652 | `VarBufferManager` | `src/storage/column_vector/var_buffer.cppm` | dropped | 不移植：随 `BufferObj` 一起去掉，outline 写盘由 `cpp_format` 直接做 |
 | 653 | `VectorBuffer` | `src/storage/column_vector/vector_buffer.cppm` | mapped | infinity_storage::{data_block, mixed_column} 
 | 654 | `VectorHeapChunk` | `src/storage/column_vector/vector_heap_chunk.cppm` | mapped | infinity_storage::{data_block, mixed_column} 
 | 655 | `BlockIndex` | `src/storage/common/block_index.cppm` | mapped | CLASS_MAP 已显式命名 |
@@ -1227,8 +1227,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 
 | C++ | Rust | 方法对应 | 状态 |
 |---|---|---|---|
-| `BufferManager`（`storage/buffer/buffer_manager*.cppm`） | `infinity_storage::buffer::{BufferManager, BufferPool}` | `Get`→`get`、`Put`→`put`、LRU 淘汰→`evict`、`SetBufferSize`→`set_budget`；`AllocateBufferObject`→`BufferPool::allocate`/`allocate_persistent`、加载/保存/释放→`BufferObj::{load,save,free}` | ✅ |
-| `BufferObj` / `BufferHandle`（`storage/buffer/buffer_obj.cppm`、`buffer_handle.cppm`） | `infinity_storage::buffer::{BufferObj, BufferHandle}` | `Load`→`load`（按池预算计费，超限报错）、`GetData/GetDataMut`→`data`/`data_mut`、`Save`→`save`、`Free`→`free`、`rc`/`status`/`type`；句柄 Drop 递减 rc，ephemeral 溢出到临时文件、persistent 常驻、transient 随句柄释放 | ✅ |
+| `BufferManager` / `BufferObj` / `BufferHandle`（`storage/buffer/*.cppm`） | 不移植：`infinity_storage::mapped::{MappedFile, mapping_count, mapped_bytes}` + `mapped_block::MappedBlock` | 封存块与索引段直接 mmap，块在进程内共享一个 `Arc<MappedBlock>`（`Context::block_maps`），改写/删除按表丢弃；参考的 `Get/Put/evict`、`Load/Save/Free`、rc 与临时文件溢出都没有对应物 | — |
 | `BlockVersionFile`（`storage/buffer/block_version.cppm`） | `cpp_format::BlockVersionFile` | `Decode/Encode` | ✅ |
 | `ColumnDef::ToString` / `ConstrainTypeToString` / `LogicalType2Str`（`parser/definition/column_def.cpp:213`、`parser/type/logical_type.cpp:28`） | `ColumnDefValue` 的 `Display` | 约束按 `std::set<ConstraintType>` 顺序、缺省默认打印 `Null`、`DataType` 的 C++ 拼写（`TinyInt`/`Varchar`/`Decimal(p,s)`…） | ✅ |
 | `KeyEncode`（`storage/common/kv_code.cppm`） | `infinity_storage::catalog_format` 的 `catalog|…` 与名称键两族函数 | `CatalogDbKey`/`CatalogDbPrefix`/`CatalogDbTagPrefix`/`CatalogTableKey`/`TableColumnKey`/`CatalogTableSegmentKey` 与 `DatabaseKey`/`TableKey`/`TableSegmentKey`/`TableSegmentBlockKey`/`TableSegmentBlockColumnKey`/`TableIndexKey`/`TableIndexSegmentKey`/`TableIndexChunkKey` 及各自 `*Prefix` | ✅ |
@@ -1239,7 +1238,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `MixedT`（`parser/type/mixed_type.h`） | `infinity_common::types::{MixedT, MixedValue}` | `MakeInteger/MakeFloat/MakeString/MakeTuple(count)/MakeArray(count)/MakeNull/MakeMiss`、`Insert*IntoTuple/IntoArray`（重复键/越界/满容量报错）、`GetFromTuple/GetByIndex`、`type`→`value_type`、`Reset`、值访问与渲染；14 字节短串内联阈值；C++ 的 union 内存布局与移动后 `kInvalid` 由 Rust 所有权模型取代 |
 | `BaseMixedType` / `MixedValueType`（`parser/type/base_mixed_type.h`） | `infinity_common::types::MixedValueType` | `GetTypeName`→`type_name`（Invalid/Integer/Float/Short|Long String/Tuple/Array/Null/Missing/Dummy） | ✅ |
 | `TableDef`（`storage/definition/table_def.cppm`） | `infinity_catalog::value_format::TableDef` | `Make`→`make`、`column_count`、`GetColIdByName`→`get_col_id_by_name`；字段（schema/table/comment/columns）与 `ColumnDefValue` 一致 | ✅ |
-| `Selection`（`column_vector/selection.cppm`）/ `VarBuffer`（`buffer/buffer_obj.cppm`） | `infinity_storage::selection::Selection` / `infinity_storage::var_buffer::VarBuffer` | `Initialize/Set/Append/Get/Capacity/Size/Reset`；`Append/Get/Write/TotalSize/GetSize`（分块存储 + 前缀和，零长度行返回空） | ✅ |
+| `Selection`（`column_vector/selection.cppm`） | `infinity_storage::selection::Selection` | `Initialize/Set/Append/Get/Capacity/Size/Reset` | ✅ |
 | `BlockVersion` / `CreateField`（`catalog/meta/block_version.cppm`） | `infinity_storage::mvcc::{BlockVersion, CreateField}` | `Append`→`append`（累计行数）、`CommitAppend`→`commit_append`、`Delete`→`delete`（重复删除报 `TxnWWConflict`）、`RollbackDelete`、`CheckDelete`、`GetCreateTS`/`GetDeleteTS`、`SpillToFile`/`LoadFromFile`（复用 `BlockVersionFile` 字节布局） | ✅ |
 | `TableDef` / `ColumnDef` / `IndexBase` 系列（`table_def.cppm`、`column_def.cppm`、`index_def*.cppm`） | `infinity_catalog::{TableMeta, IndexMeta, ColumnDefValue, IndexDefValue}` + `cpp_layout` | catalog 键空间按 C++ 布局编解码；`IndexFullText/Secondary/HNSW/IVF/BMP/EMVB` 的参数存于 `IndexMeta.options` | ✅ |
 | `SecondaryIndexDataBase::SaveIndexInner` | `secondary_segment::write_secondary_segment` / `SecondarySegmentReader` | 保存/查找 | ✅ |
@@ -1283,9 +1282,9 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `KnnScanSharedData` / `KnnSearchOption`（`knn_scan_data.cppm`） | `knn_scan::KnnScanOptions` | `nprobe`/`ef`/`threshold` 从 `WITH (…)` 与 legacy 串解析（`WITH` 优先），供 IVF/HNSW/阈值共用 | ✅ |
 | `PhysicalKnnScan`（`physical_knn_scan.cppm` / `physical_knn_scan_impl.cpp`） | `knn_scan::{PhysicalKnnScan, KnnScanOperatorState}` + `Engine::knn_candidates` | `GetColumnID`→`column_index`、`IsKnnMinHeap`→`is_knn_min_heap`、`Execute`→`execute`（逐行 + 行缓存的精确评分）、`PlanWithIndex` 的索引探测→`KnnCandidateScan`/`vector_candidates`、排序/阈值/截断→`finish`（`MergeKnn` 方向语义）；bitmask 过滤由过滤谓词承担，多查询由上层逐次调用 | ✅（多 block 并行由行管线代替，见 D4） |
 | `TableMeta` / `SegmentMeta` / `BlockMeta` / `ColumnMeta`（`catalog/meta/*.cppm`） | `infinity_catalog::{TableMeta}` + `infinity_storage::block_index::BlockMeta` + `cpp_layout` | 表/段/块/列的元数据按 C++ catalog 布局持久化；`BlockMeta` 提供 `block_dir`/`row_offset`/`row_count`/`GetRowCnt1` 语义，`infinity_catalog` 提供表与列定义 | ✅ |
-| `BlockIndex`（`storage/common/block_index.cppm`） | `infinity_storage::block_index::BlockIndex` | `NewInit/LoadSet`→`open`（扫描 `version` 文件恢复块与行区间）、`BlockCount`/`SegmentCount`、`GetBlockMeta`、`GetSegmentOffset`/`GetBlockOffset`、`IsEmpty`；块列解码经共享 `BufferManager` LRU；checkpoint 调 `create_block` 落块，块读与全行读（`try_cpp_rows`）都走它 | ✅ |
+| `BlockIndex`（`storage/common/block_index.cppm`） | `infinity_storage::block_index::BlockIndex` | `NewInit/LoadSet`→`open`（扫描 `version` 文件恢复块与行区间）、`BlockCount`/`SegmentCount`、`GetBlockMeta`、`GetSegmentOffset`/`GetBlockOffset`、`IsEmpty`；`get_block` 返回 `Arc<MappedBlock>`（mmap，不进预算）；checkpoint 调 `create_block` 落块，块读与全行读（`try_cpp_rows`）都走它 | ✅ |
 | `Storage`（`storage.cppm`） | 执行器 `Engine::storage: Storage` + `Engine` 的 `txn`/`dir`/`context` | `new_catalog`/`kv_store`/`new_txn_manager`/`buffer_manager`/`wal_manager`/`object_storage_processor` 分别由 `Storage` 与 `Engine` 组合；后台处理器由 CLI 定时线程 + Tokio 取代（D4） | ✅ |
-| `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`BufferManager`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联；C++ 线程池由 Tokio 取代（D4） | ✅ |
+| `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`block_maps`（取代 `BufferManager`）/`buffer_budget`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联；C++ 线程池由 Tokio 取代（D4） | ✅ |
 | `ColumnVector<T>` / `DataBlock`（`column_vector.cppm`、`data_block.cppm`） | `infinity_storage::data_block::{ColumnVector, Column, DataBlock, BlockValue}` | `Initialize/SetVectorType`→`initialize`/`set_vector_type`（含 constant/selection/slice）、`AppendValue/AppendWith`→`append_value`/`push`/`extend_value`、`GetValueByIndex`/`SetValueByIndex`→`get`/`set_value`、`Size/capacity`、`Finalize`、`Reset`、`ShallowCopy`、null bitmap→`validity`、`DataBlock::Make/AppendRow/AppendValue/Finalize/GetValue/Reset`→`new`/`push_slot`/`append_value`/`finalize`/`get_value`/`reset`（`BlockValue` 覆盖 bool/各整数宽度/float/double/decimal/varchar/date-time/interval/array/uuid/embedding/mixed）、`MemUsed`→`mem_used`；`VectorBuffer`/`Bitmask` 未复刻（Rust `Vec`） | ✅（integer 20 + date/time 20 + `data_block_ut` 2 例已移植；geo 列按用户决定排除） |
 | `FixedDimensionalEncodingConfig` / `Tensor` / `RandomGenerator`（`fixed_dimensional_encoding.cppm`） | `infinity_expression::fde::*` | 配置默认值/枚举、`Tensor` 点云访问、确定性随机（Gaussian/Bernoulli/Uniform） | ✅ |
 | `HashPartitioner` / `SparseProjector` / `EncodingAccumulator` / `EncodingPipeline`（同上） | `fde::{HashPartitioner, SparseProjector, EncodingAccumulator, EncodingPipeline}` | SimHash 分区（Gray 码）、AMS/Count-Sketch 稀疏投影、sum/average 聚合、空分区填充、最终投影；`Generate*FixedDimensionalEncoding` 与 `internal::*` | ✅（`FDEFunction`/`RegisterFDEFunction` 的 SQL 绑定待执行器接入） |
@@ -1365,8 +1364,8 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | C++ 用例 | Rust 类/方法 | Rust 测试 |
 |---|---|---|
 | `txn/conflict_check_ut.cpp::conflict_check_delete` | `TxnManager::commit` + `Txn::delete` | `infinity_txn::tests::concurrent_deletes_conflict`、`tests::delete_conflicts_follow_the_reference` |
-| `buffer/buffer_manager_ut.cpp`（容量/淘汰） | `buffer::BufferManager` | `buffer::tests::evicts_least_recently_used`、`shrinking_the_budget_evicts` |
-| `buffer/buffer_handle_ut.cpp`（预算/rc/溢出） | `buffer::{BufferPool, BufferObj, BufferHandle}` | `buffer_handles_follow_the_reference_lifecycle`（3×512B/1KB：第三次 Load 失败、rc、New、ephemeral 溢出后读回、Save）、`persistent_buffers_outlive_their_handles` |
+| `buffer/buffer_manager_ut.cpp`（容量/淘汰） | 不移植（`BufferManager` 已去掉） | 映射共享由 `block_index::tests::every_block_maps_only_its_own_files`、`cpp_blocks::tests::a_sealed_block_is_mapped_once_and_shared` 覆盖 |
+| `buffer/buffer_handle_ut.cpp`（预算/rc/溢出） | 不移植（`BufferObj` 已去掉） | 无对应物：封存块不再有句柄与预算 |
 | `invertedindex/format/*`（posting/position 编解码） | `inverted_format` | 该模块的往返/边界单测 |
 | `secondary_index` 的 PGM 查找 | `SecondarySegmentReader::lookup` | `secondary_segment::tests::pgm_lookup_matches_binary_search` |
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | `varchar_hash_matches_libstdcxx` |
@@ -1434,7 +1433,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 
 | C++ 用例 | 对应 Rust | 缺口 |
 |---|---|---|
-| `buffer/buffer_obj_ut.cpp` | `BufferObj`/`BufferPool` + 索引镜像 | 核心生命周期（Load/Save/Free/rc/溢出）已由 `buffer_handle_ut.cpp` 用例覆盖；其余用例绑定 HNSW buffer obj 与事务导入，随索引集成测试覆盖 |
+| `buffer/buffer_obj_ut.cpp` | 不移植（`BufferObj` 已去掉） | 其中绑定 HNSW/导入的两个用例仍以引擎口径覆盖（`buffer_obj_ut::test_hnsw_index_buffer_obj_shutdown`、`::test_big_with_gc_and_cleanup`），生命周期类用例无对应物 |
 | `invertedindex/format/*` 其余部分 | `inverted_format` / `fulltext_segment` | posting/positions/term-meta 编解码已覆盖；`PostingByteSlice`/`Skiplist*` 为构建期容器，已登记为设计变更 |
 | （无独立 WAND/BM25 单测） | `wand::BlockMaxWandIterator` | 已用 `ranker_matches_the_reference_formula`、`wand_matches_brute_force` 覆盖 |
 | `invertedindex/search/*`（短语/布尔组合） | `wand` 类 + 扫描路径 | WAND/BM25 已拆类；短语与布尔组合仍走扫描（由 SQL 测试覆盖） |

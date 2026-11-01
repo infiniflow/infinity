@@ -47,6 +47,7 @@ use std::collections::BTreeMap;
 use std::fs::{self, File};
 
 use memmap2::Mmap;
+use crate::mapped::MappedFile;
 
 use crate::cpp_format::FormatError;
 use crate::inverted_format::position_list::{
@@ -186,9 +187,9 @@ pub fn write_segment_index(
 /// demand: the mapping shares the page cache, so a query does not keep the
 /// table's postings in the process heap.
 pub struct SegmentIndexReader {
-    dic: Mmap,
-    pos: Mmap,
-    len: Mmap,
+    dic: MappedFile,
+    pos: MappedFile,
+    len: MappedFile,
     /// Row id per dense document ordinal.
     rows: Vec<u64>,
     flags: TermMetaFlags,
@@ -208,13 +209,14 @@ impl SegmentIndexReader {
         _base_row_id: u64,
         flags: TermMetaFlags,
     ) -> Result<Self, FormatError> {
-        let map = |suffix: &str| -> Result<Mmap, FormatError> {
+        let map = |suffix: &str| -> Result<MappedFile, FormatError> {
             let path = fulltext_chunk_file(dir, base_name, suffix);
             let file = File::open(&path).map_err(|e| FormatError::Io(e.to_string()))?;
             // SAFETY: the file is read-only for the lifetime of the mapping and
             // does not change while it is mapped (a segment is immutable once
             // sealed).
-            unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))
+            let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
+            Ok(MappedFile::from_mmap(map))
         };
         let rows_map = map(FULLTEXT_ROW_SUFFIX)?;
         let rows: Vec<u64> = rows_map

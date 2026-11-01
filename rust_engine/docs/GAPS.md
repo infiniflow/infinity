@@ -28,6 +28,7 @@
 **本节没有未接线项。** 这一层的现状：
 
 - **行以列式块为存储本体**（方案 C）：`INSERT` 的行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件由 checkpoint（`flush_cpp_blocks` → `write_cpp_blocks`）写，`COPY` 例外（见下）。KV 里**没有任何行键**：`row:` 既不写也不读，`del:` 只剩事务命令流里的名字（`wal_delete_key`，用于构造 `WalCmdDeleteV2` 与行级冲突判定），不落盘；行侧车（`persistence/rowdata_*.bin`）与 `persistence/` 里的行记录一并去掉（该目录只剩参考版形状的空目录）。读全部把 buffer 盖在块上：整表 / 剪枝 / 列投影 / 点取 / 含墓碑 / 计数 / `row_is_present`；回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧。
+- **封存块与索引段都走 mmap，参考的 `BufferManager` 不移植**：`MappedBlock`（`infinity-storage::mapped_block`）把块的每个 `{col}.col` 映射进来，列体是映射里的切片，槽位解码直接读 page cache；索引段由 `mapped::MappedFile` 映射。映射在进程内共享：`Context::block_maps` 每个 `BlockId` 只留一个 `Arc<MappedBlock>`，块被重写/压缩/删除/表被 drop 时按表丢弃（`drop_block_maps`）。未封存的行本来就在 `TableEntry::pending_rows`（每表一份，所有读者共享）。`BufferObj`/`BufferHandle`/`BufferPool`/`FileWorker`/`VarBuffer` 不再存在；`[buffer] buffer_manager_size` 只剩索引缓冲的预算，`SHOW BUFFERS` 一行 = 一个映射。
 - **cleanup 的活段判据**是 `visible_block_ids()`（块索引，跨重启有效），不是 `segment_ids()`（分配器，重开目录后为空；用它会把每个 `idx_*/seg_{n}` 当死段删掉）。
 - **行号的次序**：冲突检查之后、写 WAL 之前按 `commit_ts` 分配（`TxnManager::begin_write` / `commit_at_deferred_with`，对应参考的 `wait_conflict_ck_` / `SubmitForAllocation`），checkpoint 的上界是 `current_ts`（已完成的 commit_ts），块的窗口按 `append_totals` + `append_ts` 裁到 `ts <= 上界`，块内 id 必须是窗口的稠密前缀。
 - **多值 / 张量表的读路径**：这类表的解码文本形式在写入与扫描两条路上不稳定，`wide_text_columns` 只用来关掉「直接读 buffer 的 `Value`」快路径，改走块解码；不再保留文本行副本。

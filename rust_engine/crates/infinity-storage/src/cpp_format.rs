@@ -78,8 +78,12 @@ pub fn encode_data_file(body: &[u8]) -> Vec<u8> {
     out
 }
 
-/// Returns the body of a data file written by [`encode_data_file`] (or by C++).
-pub fn decode_data_file(buf: &[u8]) -> Result<Vec<u8>, FormatError> {
+/// The body of a data file written by [`encode_data_file`] (or by C++),
+/// borrowed from `buf`.
+///
+/// A reader that mapped the file decodes straight out of the mapping: the body
+/// is a slice of the page cache, not a copy of it.
+pub fn data_file_body(buf: &[u8]) -> Result<&[u8], FormatError> {
     let header = 8 + SIZE_OF_SIZE_T;
     if buf.len() < header + 8 {
         return Err(FormatError::Truncated {
@@ -98,7 +102,12 @@ pub fn decode_data_file(buf: &[u8]) -> Result<Vec<u8>, FormatError> {
             got: buf.len(),
         });
     }
-    Ok(buf[header..header + buffer_size].to_vec())
+    Ok(&buf[header..header + buffer_size])
+}
+
+/// Returns the body of a data file written by [`encode_data_file`] (or by C++).
+pub fn decode_data_file(buf: &[u8]) -> Result<Vec<u8>, FormatError> {
+    Ok(data_file_body(buf)?.to_vec())
 }
 
 // ---------------------------------------------------------------------------
@@ -400,6 +409,35 @@ pub struct RawBlockColumn {
     pub column_id: u64,
     pub body: Vec<u8>,
     pub outline: Vec<u8>,
+}
+
+/// A block's column payloads, **borrowed** from wherever they live: the mapping
+/// of a sealed block's files (the scan path) or an in-memory copy (a block the
+/// caller just built).
+///
+/// The decoders take `&dyn BlockColumns` so a reader never copies a column body
+/// to read a cell out of it - a mapped block answers with slices of the mapping,
+/// and the in-memory form answers with slices of its vectors.
+pub trait BlockColumns {
+    /// `(body, outline)` of `column_id`, where `body` is the
+    /// `[data_region][null_bitmap]` region of the `.col` file.
+    fn column(&self, column_id: u64) -> Option<(&[u8], &[u8])>;
+}
+
+impl BlockColumns for Vec<RawBlockColumn> {
+    fn column(&self, column_id: u64) -> Option<(&[u8], &[u8])> {
+        self.iter()
+            .find(|c| c.column_id == column_id)
+            .map(|c| (c.body.as_slice(), c.outline.as_slice()))
+    }
+}
+
+impl BlockColumns for [RawBlockColumn] {
+    fn column(&self, column_id: u64) -> Option<(&[u8], &[u8])> {
+        self.iter()
+            .find(|c| c.column_id == column_id)
+            .map(|c| (c.body.as_slice(), c.outline.as_slice()))
+    }
 }
 
 /// Writes one block directory in the C++ layout.

@@ -5,10 +5,9 @@
 //! A block is the C++ on-disk unit: one directory with one `{column_id}.col`
 //! file per column (plus its `_out` outline file) and a `version` file written
 //! last. [`BlockIndex::create_block`] writes that layout and records the
-//! block's row range; [`BlockIndex::get_block`] reads it back through a
-//! [`BufferManager`] LRU, so a scan of many blocks is bounded by
-//! `buffer_manager_size` instead of the table size. [`BlockIndex::open`]
-//! rebuilds the block map from the `version` files (`BlockMeta::GetRowCnt1`).
+//! block's row range; [`BlockIndex::get_block`] maps it back (see
+//! [`MappedBlock`]), so a scan reads the page cache instead of a heap copy.
+//! [`BlockIndex::open`] rebuilds the block map from the `version` files
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -16,11 +15,8 @@ use std::sync::Arc;
 
 use infinity_common::{Error, Result};
 
-use crate::buffer::{block_bytes, BufferManager};
-use crate::cpp_format::{
-    block_dir, read_block, write_block, BlockColumn, BlockId, BlockVersionFile, RawBlockColumn,
-    VERSION_FILE,
-};
+use crate::cpp_format::{block_dir, write_block, BlockColumn, BlockId, BlockVersionFile, VERSION_FILE};
+use crate::mapped_block::MappedBlock;
 
 /// Metadata of one block: its id and row range.
 ///
@@ -51,8 +47,8 @@ impl BlockMeta {
 /// The block map of one table.
 ///
 /// C++: `BlockIndex` (`src/storage/common/block_index.cppm`). `blocks` is the
-/// `new_segment_block_index_` snapshot; the LRU is the read path the reference
-/// implements with `BlockColumnInfo` + `BufferManager`.
+/// `new_segment_block_index_` snapshot; a read maps the block's files instead
+/// of taking a copy through a buffer manager.
 pub struct BlockIndex {
     root: PathBuf,
     blocks: BTreeMap<(u32, u16), BlockMeta>,
@@ -239,34 +235,24 @@ impl BlockIndex {
         Ok(meta)
     }
 
-    /// Reads a block's columns through the engine-wide buffer manager, serving
-    /// repeats from its LRU cache (C++ `BlockMeta::GetBlockColumnInfo` +
-    /// `BufferManager::Get`).
-    pub fn get_block(
-        &self,
-        cache: &mut BufferManager<Vec<RawBlockColumn>>,
-        id: &BlockId,
-    ) -> Result<(BlockMeta, Arc<Vec<RawBlockColumn>>)> {
+    /// Maps a block's files (C++ `BlockMeta::GetBlockColumnInfo`).
+    ///
+    /// The caller shares the returned mapping: the same `Arc` serves every
+    /// reader of the block, and its pages are the page cache's, not the
+    /// process heap.
+    pub fn get_block(&self, id: &BlockId) -> Result<(BlockMeta, Arc<MappedBlock>)> {
         let meta = self
             .blocks
             .get(&(id.segment_id, id.block_id))
             .cloned()
             .ok_or_else(|| Error::NotFound(format!("block {id:?}")))?;
-        if let Some(columns) = cache.get(id) {
-            return Ok((meta, columns));
-        }
         let dir = meta.block_dir(&self.root);
-        let (_, columns) = read_block(&self.root, *id).map_err(|e| Error::io(dir, e))?;
-        let bytes = block_bytes(&columns);
-        let columns = Arc::new(columns);
-        cache.put(*id, columns.clone(), bytes);
-        Ok((meta, columns))
+        let block = MappedBlock::open(&self.root, *id).map_err(|e| Error::io(dir, e))?;
+        Ok((meta, Arc::new(block)))
     }
 
-    /// Drops a block's cached payload (the caller owns the buffer manager) and
-    /// its metadata (block delete).
-    pub fn remove_block(&mut self, cache: &mut BufferManager<Vec<RawBlockColumn>>, id: &BlockId) {
-        cache.invalidate(id);
+    /// Drops a block's metadata (block delete).
+    pub fn remove_block(&mut self, id: &BlockId) {
         self.blocks.remove(&(id.segment_id, id.block_id));
     }
 }
@@ -274,7 +260,7 @@ impl BlockIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cpp_format::ColumnBody;
+    use crate::cpp_format::{BlockColumns, ColumnBody};
 
     fn id(segment: u32, block: u16) -> BlockId {
         BlockId {
@@ -300,7 +286,6 @@ mod tests {
     #[test]
     fn creates_and_reads_blocks() {
         let dir = tempfile::tempdir().unwrap();
-        let mut cache = BufferManager::new(1 << 20);
         let mut index = BlockIndex::new(dir.path());
         index
             .create_block(id(0, 0), 0, 4, &[column(0, &[1, 2, 3])], 3, 10)
@@ -314,10 +299,10 @@ mod tests {
         assert_eq!(index.block_offset(0, 1), Some(3));
         assert_eq!(index.segment_offset(0), Some(0));
 
-        let (meta, columns) = index.get_block(&mut cache, &id(0, 0)).unwrap();
+        let (meta, block) = index.get_block(&id(0, 0)).unwrap();
         assert_eq!(meta.row_offset, 0);
         assert_eq!(meta.row_count, 3);
-        let body = &columns.iter().find(|c| c.column_id == 0).unwrap().body;
+        let (body, _) = block.column(0).unwrap();
         assert!(body.len() >= 12, "data region + null bitmap");
         assert_eq!(
             i32::from_le_bytes(body[8..12].try_into().unwrap()),
@@ -325,42 +310,42 @@ mod tests {
             "third value of the first block"
         );
 
-        let (meta, columns) = index.get_block(&mut cache, &id(0, 1)).unwrap();
+        let (meta, block) = index.get_block(&id(0, 1)).unwrap();
         assert_eq!(meta.row_offset, 3);
+        let (body, _) = block.column(0).unwrap();
         assert_eq!(
-            i32::from_le_bytes(
-                columns.iter().find(|c| c.column_id == 0).unwrap().body[0..4]
-                    .try_into()
-                    .unwrap()
-            ),
+            i32::from_le_bytes(body[0..4].try_into().unwrap()),
             4
         );
     }
 
-    /// The decoded payload is cached and evicted by the LRU budget, but a
-    /// reload is always correct.
+    /// Each block maps only its own files, and dropping the mapping takes it
+    /// off the process-wide counter.
     #[test]
-    fn reads_go_through_the_bounded_cache() {
+    fn every_block_maps_only_its_own_files() {
         let dir = tempfile::tempdir().unwrap();
-        let mut cache = BufferManager::new(16);
+        let before = crate::mapped::mapping_count();
         let mut index = BlockIndex::new(dir.path());
         for b in 0..4u16 {
             index
                 .create_block(id(0, b), b as usize, 4, &[column(0, &[b as i32; 4])], 1, 1)
                 .unwrap();
         }
-        for b in 0..4u16 {
-            let (_, columns) = index.get_block(&mut cache, &id(0, b)).unwrap();
+        {
+            let mut mapped = Vec::new();
+            for b in 0..4u16 {
+                let (_, block) = index.get_block(&id(0, b)).unwrap();
+                let (body, _) = block.column(0).unwrap();
+                assert_eq!(i32::from_le_bytes(body[0..4].try_into().unwrap()), b as i32);
+                mapped.push(block);
+            }
             assert_eq!(
-                i32::from_le_bytes(
-                    columns.iter().find(|c| c.column_id == 0).unwrap().body[0..4]
-                        .try_into()
-                        .unwrap()
-                ),
-                b as i32
+                crate::mapped::mapping_count(),
+                before + 4,
+                "one mapping per block, shared while it is held"
             );
         }
-        assert!(cache.used_bytes() <= 16);
+        assert_eq!(crate::mapped::mapping_count(), before);
     }
 
     /// C++ `BlockIndex::NewInit`: the `version` files are enough to rebuild the
@@ -378,32 +363,23 @@ mod tests {
         drop(index);
 
         let reopened = BlockIndex::open(dir.path(), 1, 2).unwrap();
-        let mut cache = BufferManager::new(1 << 20);
         assert_eq!(reopened.block_count(), 2);
         assert_eq!(reopened.row_count(), 5);
         let offsets: Vec<usize> = reopened.metas().map(|m| m.row_offset).collect();
         assert_eq!(offsets, vec![0, 3]);
-        assert_eq!(
-            reopened
-                .get_block(&mut cache, &id(0, 1))
-                .unwrap()
-                .0
-                .row_count,
-            2
-        );
+        assert_eq!(reopened.get_block(&id(0, 1)).unwrap().0.row_count, 2);
     }
 
     #[test]
     fn removing_a_block_drops_it_from_the_index() {
         let dir = tempfile::tempdir().unwrap();
-        let mut cache = BufferManager::new(1 << 20);
         let mut index = BlockIndex::new(dir.path());
         index
             .create_block(id(0, 0), 0, 4, &[column(0, &[1])], 1, 1)
             .unwrap();
-        index.remove_block(&mut cache, &id(0, 0));
+        index.remove_block(&id(0, 0));
         assert_eq!(index.block_count(), 0);
         assert_eq!(index.row_count(), 0);
-        assert!(index.get_block(&mut cache, &id(0, 0)).is_err());
+        assert!(index.get_block(&id(0, 0)).is_err());
     }
 }

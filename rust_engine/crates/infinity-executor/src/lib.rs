@@ -18,6 +18,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use infinity_storage::mapped_block::MappedBlock;
+
 use infinity_catalog::{Catalog, SparseStore as CatalogSparseStore};
 use infinity_common::{Error, Result};
 use infinity_expression::Expr;
@@ -6263,11 +6265,24 @@ fn scalar_only(types: &[String]) -> bool {
 /// configuration, buffer manager and service handles. `Engine` composes it
 /// instead of owning these fields directly.
 struct Context {
-    /// Bounded LRU cache of decoded column blocks (the reference's
-    /// `BufferManager`), sized by `[buffer] buffer_manager_size`.
-    buffer: Mutex<
-        infinity_storage::buffer::BufferManager<Vec<infinity_storage::cpp_format::RawBlockColumn>>,
+    /// One mapping per sealed block, shared by every reader in the process.
+    ///
+    /// A block file never changes while it is sealed, so the mapping *is* the
+    /// block: the reference reaches the same bytes through a `BufferManager`
+    /// copy, which costs memory and an LRU; here the pages stay in the page
+    /// cache. The entry is dropped when the block's files are rewritten or
+    /// deleted (`Engine::drop_block_maps`).
+    block_maps: Mutex<
+        std::collections::HashMap<infinity_storage::cpp_format::BlockId, Arc<MappedBlock>>,
     >,
+    /// `[buffer] buffer_manager_size`: the budget the index buffers are held
+    /// to (`memindex_memory_quota` for the dump trigger is separate). Sealed
+    /// blocks are mapped, not buffered, so they do not spend it.
+    buffer_budget: std::sync::atomic::AtomicUsize,
+    /// Mappings served from the shared map, and mappings opened for a block
+    /// it did not hold: `SHOW VARIABLE memory_cache_miss` reports the ratio.
+    block_map_hits: std::sync::atomic::AtomicU64,
+    block_map_misses: std::sync::atomic::AtomicU64,
     /// session/global configuration set via `SET CONFIG …`
     config: Mutex<HashMap<String, String>>,
     /// `[buffer] memindex_memory_quota`, in bytes. `0` disables the dump
@@ -7438,9 +7453,10 @@ impl Engine {
             },
             txn,
             context: Context {
-                buffer: Mutex::new(infinity_storage::buffer::BufferManager::new(
-                    8 * 1024 * 1024 * 1024,
-                )),
+                block_maps: Mutex::new(std::collections::HashMap::new()),
+                buffer_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
+                block_map_hits: std::sync::atomic::AtomicU64::new(0),
+                block_map_misses: std::sync::atomic::AtomicU64::new(0),
                 config: Mutex::new(HashMap::new()),
                 memindex_quota: std::sync::atomic::AtomicU64::new(0),
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
@@ -10072,12 +10088,24 @@ impl Engine {
     /// the table even though no append went through the allocator.
     fn invalidate_block_mirror(&self, table: &str) {
         let key = self.table_key(table);
+        let table_id = self
+            .storage
+            .catalog
+            .get_table_by_name(&key)
+            .ok()
+            .flatten()
+            .map(|meta| meta.id);
         if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
             entry.cpp_block_rows = None;
             entry.block_index = None;
             entry.live_rows = None;
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
+        }
+        // The files this engine mapped no longer describe the table: drop the
+        // mappings so the next read maps what is on disk now.
+        if let Some(table_id) = table_id {
+            self.drop_block_maps(table_id);
         }
     }
 
@@ -10207,6 +10235,10 @@ impl Engine {
         let table_id = self.storage.catalog.get_table_by_name(name)?.map(|m| m.id);
         let key = self.table_key(name);
         self.tables.lock().unwrap().remove(&key);
+        // A dropped table's blocks are gone: so are the mappings of them.
+        if let Some(id) = table_id {
+            self.drop_block_maps(id);
+        }
         let existed = self.storage.catalog.drop_table(name)?;
         // Rows are the port's own key space (`row:`/`del:`), not the
         // reference's, so nothing else would ever remove them.
@@ -16521,19 +16553,36 @@ impl Engine {
         Some(len)
     }
 
-    /// Configured byte budget of the engine-wide block buffer manager.
+    /// Configured byte budget of the in-memory index buffers (the reference's
+    /// `[buffer] buffer_manager_size`).
     pub fn buffer_memory_limit(&self) -> usize {
-        self.context.buffer.lock().unwrap().budget()
+        self.context
+            .buffer_budget
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// Resizes the block buffer manager (`BufferManager::set_budget`).
+    /// Resizes that budget.
     pub fn set_buffer_memory_limit(&self, bytes: usize) {
-        self.context.buffer.lock().unwrap().set_budget(bytes);
+        self.context
+            .buffer_budget
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+        self.context
+            .hnsw_budget
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Bytes currently charged to the block buffer manager.
+    /// Bytes this engine's block mappings cover. Nothing is charged to a buffer
+    /// pool any more, so this is the page-cache footprint the buffer budget
+    /// used to approximate for blocks (the index chunks are mapped too, and
+    /// counted process-wide by `infinity_storage::mapped`).
     pub fn buffer_used_bytes(&self) -> usize {
-        self.context.buffer.lock().unwrap().used_bytes()
+        self.context
+            .block_maps
+            .lock()
+            .unwrap()
+            .values()
+            .map(|block| block.bytes())
+            .sum()
     }
 
     /// Begins a table restore that is only applied by
@@ -21073,19 +21122,13 @@ impl Engine {
         Ok(())
     }
 
-    /// Sets the column-block cache budget (the reference's
-    /// `[buffer] buffer_manager_size`).
+    /// Sets the buffer budget (the reference's `[buffer] buffer_manager_size`).
+    ///
+    /// The reference spends it on every `BufferObject`, data blocks included.
+    /// Sealed blocks are mapped here, so the whole budget belongs to the
+    /// in-memory index buffers, as the reference spends it on the index side.
     pub fn set_buffer_manager_size(&self, bytes: usize) {
-        // The reference has one `BufferManager` pool that both the data blocks
-        // and the index buffers allocate from, so their sum is bounded by
-        // `buffer_manager_size`. The port keeps two caches, so the budget is
-        // split between them instead of granting each the full size.
-        let blocks = bytes / 2;
-        let hnsw = bytes - blocks;
-        self.context.buffer.lock().unwrap().set_budget(blocks);
-        self.context
-            .hnsw_budget
-            .store(hnsw, std::sync::atomic::Ordering::Relaxed);
+        self.set_buffer_memory_limit(bytes);
     }
 
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
@@ -21311,29 +21354,30 @@ impl Engine {
         Ok(match var {
             G::QueryCount => self.query_count().to_string(),
             G::SessionCount => "1".to_string(),
-            G::BufferPoolUsage => {
-                let buffer = self.context.buffer.lock().unwrap();
-                format!("{}/{}", buffer.used_bytes(), buffer.budget())
-            }
+            // Mapped bytes over the configured budget: the reference reports
+            // what its buffer objects charge the pool, the port reports what
+            // the mappings cover (nothing is copied out of them).
+            G::BufferPoolUsage => format!(
+                "{}/{}",
+                self.buffer_used_bytes(),
+                self.buffer_memory_limit()
+            ),
             G::SchedulePolicy => "round robin".to_string(),
             G::NextTxnId => self.txn.current_transaction_id().to_string(),
-            // C++ `BufferManager::BufferedObjectCount`.
+            // C++ `BufferManager::BufferedObjectCount`: the reference counts
+            // the payloads it holds; the port counts the block mappings it
+            // shares (index chunks are mapped too, but they belong to the
+            // index structures, not to this pool).
             G::BufferedObjectCount => self
                 .context
-                .buffer
+                .block_maps
                 .lock()
                 .unwrap()
-                .buffered_object_count()
+                .len()
                 .to_string(),
-            // C++ `BufferManager::WaitingGCObjectCount`, adapted to the block
-            // cache (see `BufferManager::unreferenced_object_count`).
-            G::UnusedBufferObjectCount => self
-                .context
-                .buffer
-                .lock()
-                .unwrap()
-                .unreferenced_object_count()
-                .to_string(),
+            // C++ `BufferManager::WaitingGCObjectCount`: a mapping is either in
+            // use or gone, so nothing waits for the GC.
+            G::UnusedBufferObjectCount => "0".to_string(),
             G::ActiveTxnCount => self.txn.active_txn_count().to_string(),
             G::CurrentTs => self.txn.current_ts().to_string(),
             G::TotalCommitCount => self.total_commit_count(),
@@ -21370,14 +21414,12 @@ impl Engine {
             G::CacheResultCapacity => self.reported_result_cache_capacity().to_string(),
             G::CacheResultNum => self.result_cache.lock().unwrap().len().to_string(),
             // C++ reads the same two counters from the buffer manager; both
-            // names report `misses/requests` over the block cache.
+            // names report `misses/requests` over the block mappings.
             G::MemoryCacheMiss | G::DiskCacheMiss => {
-                let buffer = self.context.buffer.lock().unwrap();
-                format!(
-                    "{}/{}",
-                    buffer.cache_miss_count(),
-                    buffer.total_request_count()
-                )
+                use std::sync::atomic::Ordering;
+                let misses = self.context.block_map_misses.load(Ordering::Relaxed);
+                let hits = self.context.block_map_hits.load(Ordering::Relaxed);
+                format!("{}/{}", misses, hits + misses)
             }
             G::EnableProfile => self
                 .profile_enabled
@@ -21547,43 +21589,38 @@ impl Engine {
         Ok(())
     }
 
-    /// `SHOW BUFFERS`: one row per block the engine's buffer cache holds.
+    /// `SHOW BUFFERS`: one row per sealed block this process has mapped.
     ///
     /// C++: `PhysicalShow::ExecuteShowBuffer` (`physical_show_buffer_impl.cpp`)
-    /// over `BufferManager::GetBufferObjectsInfo`. The reference's buffer
-    /// objects are file-backed; this engine caches decoded blocks
-    /// (`BlockIndex::get_block`), so a row describes one cached block: its
-    /// block directory as the path, the size of the decoded columns, and
-    /// `Loaded`/`Persistent`/`data` for the state fields — the block is
-    /// resident and owned by the cache, backed by a data file.
-    pub fn buffer_objects(&self) -> Vec<infinity_storage::buffer::BufferObjectInfo> {
-        use infinity_storage::buffer::{
+    /// over `BufferManager::GetBufferObjectsInfo`. A reference row describes an
+    /// owned buffer object; here the sealed blocks are mapped and shared, so a
+    /// row describes one mapping: the block directory as the path, the bytes
+    /// its files cover, and `Loaded`/`Mmap`/`data` for the state fields.
+    pub fn buffer_objects(&self) -> Vec<infinity_storage::mapped_block::BufferObjectInfo> {
+        use infinity_storage::mapped_block::{
             BufferObjectInfo, BufferStatus, BufferType, FileWorkerType,
         };
         let root = self.blocks_root();
-        self.context
-            .buffer
+        let mut rows: Vec<BufferObjectInfo> = self
+            .context
+            .block_maps
             .lock()
             .unwrap()
-            .cached_objects()
-            .into_iter()
-            .map(|(id, size)| BufferObjectInfo {
-                object_path: root.join(infinity_storage::cpp_format::block_dir(
-                    id.db_id,
-                    id.table_id,
-                    id.segment_id,
-                    id.block_id,
-                )),
+            .values()
+            .map(|block| BufferObjectInfo {
+                object_path: block.dir(&root),
                 buffered_status: BufferStatus::Loaded,
-                buffered_type: BufferType::Persistent,
+                buffered_type: BufferType::Mmap,
                 file_type: FileWorkerType::DataFile,
-                object_size: size,
+                object_size: block.bytes(),
             })
-            .collect()
+            .collect();
+        rows.sort_by(|a, b| a.object_path.cmp(&b.object_path));
+        rows
     }
 
-    /// `SHOW OBJECT <name>`: the buffered block whose path is `name`.
-    pub fn buffer_object(&self, name: &str) -> Option<infinity_storage::buffer::BufferObjectInfo> {
+    /// `SHOW OBJECT <name>`: the mapped block whose path is `name`.
+    pub fn buffer_object(&self, name: &str) -> Option<infinity_storage::mapped_block::BufferObjectInfo> {
         self.buffer_objects()
             .into_iter()
             .find(|row| row.object_path.to_string_lossy() == name)
