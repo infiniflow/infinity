@@ -69,6 +69,9 @@ public:
 
     float BM25Score() override;
 
+    // True when the posting reader is decoded on doc_id_ (see BlockMaxLeafIterator).
+    bool IsCurrentDocDecoded() const override { return iter_->DocID() == doc_id_; }
+
     float Score() override {
         switch (ft_similarity_) {
             case FulltextSimilarity::kBM25: {

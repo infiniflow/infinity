@@ -158,7 +158,10 @@ void HeapBlockMaxWandIterator::AdvanceWithin(u32 idx, RowID target) {
     if (retired_[idx] != 0) {
         return;
     }
-    if (ctx_[idx]->DocID() >= target) {
+    // "doc_id_ >= target" is not enough: after NextShallow() the block cursor has moved past the
+    // stored doc without re-decoding it, so the iterator is stale and must be re-seeked before it can
+    // be scored (see BlockMaxLeafIterator::IsCurrentDocDecoded).
+    if (ctx_[idx]->DocID() >= target && ctx_[idx]->IsCurrentDocDecoded()) {
         return;
     }
     ++stats_.child_advances_;
@@ -329,14 +332,20 @@ void HeapBlockMaxWandIterator::SkipUncompetitiveRangeOrAdvanceOne(RowID from_doc
 
 bool HeapBlockMaxWandIterator::Next(RowID target) {
     assert(target != INVALID_ROWID);
-    score_cached_ = false;
 
     if (doc_id_ == INVALID_ROWID) {
+        // Init() resets the score cache itself.
         Init();
     } else {
         if (doc_id_ >= target) {
+            // The iterator does not move: doc_id_ (and therefore score_cache_) still describes the
+            // current document. Keep the cache, otherwise a caller that re-asks for the current doc
+            // (ScoreThresholdIterator-style pull loops, or a Next(t) that does not advance) would see
+            // Score() == 0 for a doc that was already scored.
             return true;
         }
+        // About to leave doc_id_: the cached score no longer describes the current document.
+        score_cached_ = false;
         // On the previous successful return every prefix child was positioned on doc_id_; push them to
         // >= target.
         for (const u32 idx : prefix_) {
@@ -404,13 +413,18 @@ bool HeapBlockMaxWandIterator::Next(RowID target) {
             } else if (child->BlockLastDocID() >= pivot_doc) {
                 // The candidate lies in its current block: the block bound is the candidate's bound.
                 sum_at_doc += child->BlockMaxBM25Score();
-            } else if (!child->NextShallow(pivot_doc)) {
-                Retire(idx);
-                any_retired = true;
-            } else if (child->BlockMinPossibleDocID() > pivot_doc) {
-                // The block cursor was skipped past the candidate: this child contributes nothing there.
             } else {
-                sum_at_doc += child->BlockMaxBM25Score();
+                // The candidate lies beyond the current block: a block-level seek is needed, which the
+                // statistics count regardless of whether the range-skipping path is enabled.
+                ++stats_.block_seeks_;
+                if (!child->NextShallow(pivot_doc)) {
+                    Retire(idx);
+                    any_retired = true;
+                } else if (child->BlockMinPossibleDocID() > pivot_doc) {
+                    // The block cursor was skipped past the candidate: this child contributes nothing there.
+                } else {
+                    sum_at_doc += child->BlockMaxBM25Score();
+                }
             }
         }
         if (any_retired) {
@@ -420,8 +434,17 @@ bool HeapBlockMaxWandIterator::Next(RowID target) {
             }
         }
 
-        const RowID front_doc = ctx_[prefix_.front()]->DocID();
-        const bool all_at_pivot_doc = (front_doc == pivot_doc);
+        // All prefix children must sit on pivot_doc *and* be decoded there. Checking only the front
+        // would rely on the implicit "prefix_ is doc-ascending" invariant; if that ever breaks (or a
+        // child is left stale by a block-level seek), scoring would read a mismatched posting block.
+        // This is exactly the failure mode of 473f4fa0, so verify it explicitly every round.
+        bool all_at_pivot_doc = true;
+        for (const u32 idx : prefix_) {
+            if (ctx_[idx]->DocID() != pivot_doc || !ctx_[idx]->IsCurrentDocDecoded()) {
+                all_at_pivot_doc = false;
+                break;
+            }
+        }
 
         // ------------------------------------------------------------------
         // (3) Decision

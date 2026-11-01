@@ -29,12 +29,20 @@
 //   INFINITY_BMW_IT_WORDS       words per document          (default 40)
 //   INFINITY_BMW_IT_CONFIG      Infinity config path        (default empty = built-in defaults)
 //
-// Recommended large-scale run (the config caps the buffer/memindex budgets so the process does not
-// get OOM-killed):
-//   INFINITY_BMW_IT_CONFIG=test/data/config/test_bmw_scale.toml \
-//   INFINITY_BMW_IT_SCALE=1 INFINITY_BMW_IT_SEGMENTS=30 INFINITY_BMW_IT_DOCS=1000000 \
+// Recommended large-scale runs. 10M documents is the supported scale (20 seg x 500k, verified);
+// use test_bmw_scale_10m.toml, which raises mem_index_capacity (fewer disk segments) and shrinks the
+// buffer budgets. Peak RSS is ~5.5GB, so do not run it next to other memory-hungry processes --
+// a single missing GB gets the process SIGTERMed by earlyoom around 4.5GB, which looks exactly like a
+// test hang (the log just stops at a "build progress" line).
+//   INFINITY_BMW_IT_CONFIG=test/data/config/test_bmw_scale_10m.toml \
+//   INFINITY_BMW_IT_SCALE=1 INFINITY_BMW_IT_SEGMENTS=20 INFINITY_BMW_IT_DOCS=500000 \
 //   INFINITY_BMW_IT_VOCAB=20000 ./build/src/test_main --gtest_also_run_disabled_tests \
 //   --gtest_filter='*LongQueryAtScale*'
+//   ... same env + INFINITY_BMW_IT_RANDOM=1 ... --gtest_filter='*RandomizedDifferential*'
+//   ... same env + INFINITY_BMW_IT_PERF=1 INFINITY_BMW_IT_REPEAT=2 INFINITY_BMW_IT_PERF_TERMS=100,200 \
+//   ... --gtest_filter='*LongQueryPerfComparison*'
+// For quick iteration keep the smaller corpus of test_bmw_scale.toml (or omit the config: the
+// defaults are 4 seg x 4000 docs).
 //
 // Memory constraints (important):
 //   * data is generated and written on the fly (8192 rows per DataBlock, one commit every 8
@@ -46,7 +54,12 @@
 module;
 
 #include "unit_test/gtest_expand.h"
+// jemalloc reporting is only available in release builds: CMakeLists.txt forces ENABLE_JEMALLOC=OFF
+// for Debug, which also leaves jemalloc out of the link line (so mallctl would be an undefined
+// symbol). The macro is defined together with the jemalloc flags.
+#if defined(ENABLE_JEMALLOC_PROF)
 #include <jemalloc/jemalloc.h>
+#endif
 #include <stdio.h>
 #include <unistd.h>
 
@@ -113,9 +126,11 @@ double CurrentRssMb() {
     return static_cast<double>(resident_pages) * page_mb;
 }
 
-// jemalloc accounting (this binary links jemalloc statically, so glibc mallinfo2 always returns 0).
+// jemalloc accounting (release builds link jemalloc statically, so glibc mallinfo2 always returns 0).
 // Note: mallctl returns cached values unless epoch is advanced first, so epoch:1 is required.
+// Debug builds disable jemalloc, in which case the numbers are reported as 0 (see the include guard).
 size_t JeStatMb(const char *name) {
+#if defined(ENABLE_JEMALLOC_PROF)
     u64 epoch = 1;
     if (::mallctl("epoch", nullptr, nullptr, &epoch, sizeof(epoch)) != 0) {
         return 0;
@@ -126,6 +141,10 @@ size_t JeStatMb(const char *name) {
         return 0;
     }
     return value / (1024 * 1024);
+#else
+    (void)name;
+    return 0;
+#endif
 }
 
 struct QueryRunConfig {
@@ -411,12 +430,16 @@ void BmwLongQueryTest::PrepareIndex(u32 segments, u32 docs_per_segment, u32 voca
     // corpora).
     //   MALLOC_CONF=prof:true,lg_prof_sample:19 INFINITY_BMW_IT_PROFDUMP=/tmp/bmw_heap
     if (const char *prof_dump_path = std::getenv("INFINITY_BMW_IT_PROFDUMP"); prof_dump_path != nullptr) {
+#if defined(ENABLE_JEMALLOC_PROF)
         const char *file_name = prof_dump_path;
         if (::mallctl("prof.dump", nullptr, nullptr, &file_name, sizeof(const char *)) == 0) {
             std::cerr << fmt::format("[BMW-IT] heap profile dumped to {}\n", prof_dump_path);
         } else {
             std::cerr << "[BMW-IT] heap profile dump failed\n";
         }
+#else
+        std::cerr << fmt::format("[BMW-IT] heap profile dump skipped: {} requires a jemalloc build (Debug disables jemalloc)\n", prof_dump_path);
+#endif
     }
 
     if (std::getenv("INFINITY_BMW_IT_NO_INDEX") != nullptr) {
@@ -432,10 +455,24 @@ void BmwLongQueryTest::PrepareIndex(u32 segments, u32 docs_per_segment, u32 voca
 std::string BmwLongQueryTest::MakeQuery(u32 num_terms, u64 seed) const {
     std::mt19937_64 rng(seed);
     std::uniform_int_distribution<u32> word_dist(0, vocab_size_ - 1);
+    std::vector<u32> words(num_terms);
+    for (auto &word : words) {
+        word = word_dist(rng);
+    }
+    // A WAND only exists when the query keeps at least two distinct terms: duplicate-term optimization
+    // collapses a repeated term into that term's own iterator. With a tiny vocabulary (down to vocab=1)
+    // the sample above can degenerate to a single distinct word, so repair that one case without
+    // touching the i.i.d. draws otherwise.
+    if (!words.empty() && vocab_size_ > 1) {
+        const bool all_same = std::all_of(words.begin(), words.end(), [&](u32 word) { return word == words.front(); });
+        if (all_same) {
+            words.back() = (words.front() + 1) % vocab_size_;
+        }
+    }
     std::string query;
     query.reserve(num_terms * 8);
-    for (u32 i = 0; i < num_terms; ++i) {
-        query += fmt::format("w{:05d} ", word_dist(rng));
+    for (const u32 word : words) {
+        query += fmt::format("w{:05d} ", word);
     }
     return query;
 }
@@ -708,7 +745,10 @@ TEST_F(BmwLongQueryTest, DISABLED_SLOW_LongQueryTopKAndPruningEffectiveness) {
             ASSERT_EQ(repeat.docs_[i].second, bmw_result.docs_[i].second) << "topn=" << topn << " rank " << i;
         }
 
-        ASSERT_TRUE(bmw_result.has_stats_) << "topn=" << topn;
+        // With any vocabulary larger than one, MakeQuery keeps at least two distinct terms, so the
+        // planner must have produced the WAND iterator. vocab=1 has no WAND to inspect (the query
+        // collapses to a single term iterator) and only the result checks above apply.
+        ASSERT_TRUE(bmw_result.has_stats_ || vocab_size_ < 2) << "topn=" << topn;
         std::cerr << fmt::format("[BMW-IT] topk={} docs={} elapsed={:.1f}ms (naive_all={:.1f}ms) iter={} scored={} advances={} "
                                  "block_seeks={} heap_ops={} iter/total={:.3f}\n",
                                  topn,
@@ -723,20 +763,24 @@ TEST_F(BmwLongQueryTest, DISABLED_SLOW_LongQueryTopKAndPruningEffectiveness) {
                                  double(bmw_result.stats_.iterations_) / double(total_docs));
 
         // 4) Pruning effectiveness: top-k is found without walking every doc
-        ASSERT_LT(bmw_result.stats_.iterations_, total_docs) << "topn=" << topn;
-        if (topn <= 10u) {
-            // A strong threshold (top-10) should scan a small fraction only (the ratio is meaningless
-            // on a tiny corpus)
-            if (total_docs >= 4000) {
-                ASSERT_LT(bmw_result.stats_.iterations_, total_docs / 2) << "topn=" << topn;
-                ASSERT_LT(bmw_result.stats_.docs_scored_, total_docs / 2) << "topn=" << topn;
+        if (bmw_result.has_stats_) {
+            ASSERT_LT(bmw_result.stats_.iterations_, total_docs) << "topn=" << topn;
+            if (topn <= 10u) {
+                // A strong threshold (top-10) should scan a small fraction only (the ratio is meaningless
+                // on a tiny corpus)
+                if (total_docs >= 4000) {
+                    ASSERT_LT(bmw_result.stats_.iterations_, total_docs / 2) << "topn=" << topn;
+                    ASSERT_LT(bmw_result.stats_.docs_scored_, total_docs / 2) << "topn=" << topn;
+                }
+                // Candidates that need exact scoring must be far fewer than the scan rounds
+                ASSERT_LT(bmw_result.stats_.docs_scored_, bmw_result.stats_.iterations_) << "topn=" << topn;
             }
-            // Candidates that need exact scoring must be far fewer than the scan rounds
-            ASSERT_LT(bmw_result.stats_.docs_scored_, bmw_result.stats_.iterations_) << "topn=" << topn;
-        }
-        // 5) A larger topn means a looser threshold and can only need more candidates (monotonicity)
-        if (topn == 100u) {
-            ASSERT_GE(bmw_result.stats_.iterations_, 1u);
+            // 5) A larger topn means a looser threshold and can only need more candidates (monotonicity)
+            if (topn == 100u) {
+                ASSERT_GE(bmw_result.stats_.iterations_, 1u);
+            }
+        } else {
+            std::cerr << fmt::format("[BMW-IT] topk={} pruning statistics skipped: single-child query (vocab={})\n", topn, vocab_size_);
         }
     }
 }
@@ -865,9 +909,12 @@ TEST_F(BmwLongQueryTest, DISABLED_SLOW_LongQueryAtScale) {
         for (size_t i = 0; i < top_repeat.docs_.size(); ++i) {
             ASSERT_EQ(top_repeat.docs_[i].first, top_skip.docs_[i].first) << "terms=" << num_terms << " rank " << i;
         }
-        // Pruning must really happen
-        ASSERT_TRUE(top_skip.has_stats_) << "terms=" << num_terms;
-        ASSERT_LT(top_skip.stats_.iterations_, total_docs) << "terms=" << num_terms;
+        // Pruning must really happen. Only a single-distinct-term query (vocab=1) has no WAND to
+        // inspect; with any larger vocabulary the statistics must be present.
+        ASSERT_TRUE(top_skip.has_stats_ || vocab_size_ < 2) << "terms=" << num_terms;
+        if (top_skip.has_stats_) {
+            ASSERT_LT(top_skip.stats_.iterations_, total_docs) << "terms=" << num_terms;
+        }
 
         std::cerr << fmt::format("[BMW-IT] scale terms={} matched={} lockstep_full={:.1f}ms seek_full={:.1f}ms(matched={}) | "
                                  "skip top10={:.1f}ms iter={} scored={} advances={} | seek top10={:.1f}ms iter={} scored={} advances={} | "
@@ -901,6 +948,8 @@ TEST_F(BmwLongQueryTest, DISABLED_SLOW_LongQueryAtScale) {
 //   INFINITY_BMW_IT_VOCAB=20000 INFINITY_BMW_IT_REPEAT=5 \
 //   ./build/src/test_main --gtest_also_run_disabled_tests \
 //   --gtest_filter='*BmwLongQueryTest.LongQueryPerfComparison'
+// 10M scale (see the file header): add INFINITY_BMW_IT_CONFIG=test/data/config/test_bmw_scale_10m.toml,
+// SEGMENTS=20 DOCS=500000 REPEAT=2 PERF_TERMS=100,200 (~13 min including the index build).
 TEST_F(BmwLongQueryTest, DISABLED_SLOW_LongQueryPerfComparison) {
     if (std::getenv("INFINITY_BMW_IT_PERF") == nullptr) {
         GTEST_SKIP() << "set INFINITY_BMW_IT_PERF=1 (with INFINITY_BMW_IT_SEGMENTS/DOCS/VOCAB) to run the perf comparison";
@@ -986,7 +1035,9 @@ TEST_F(BmwLongQueryTest, DISABLED_SLOW_LongQueryPerfComparison) {
         for (u32 topn : {10u, 100u, 1000u}) {
             const auto heap = run_best(query_text, {EarlyTermAlgo::kHeapBMW, topn, {}});
             const auto sort = run_best(query_text, {EarlyTermAlgo::kBMW, topn, {}});
-            ASSERT_TRUE(heap.has_stats_) << "terms=" << num_terms << " topn=" << topn;
+            // vocab=1 has a single distinct term, so the planner collapses the query and there is no
+            // WAND structure; every larger vocabulary must produce one.
+            ASSERT_TRUE(heap.has_stats_ || vocab_size_ < 2) << "terms=" << num_terms << " topn=" << topn;
             // Correctness guard: the heap variant (default path) must return the right count.
             ASSERT_EQ(heap.docs_.size(), std::min<size_t>(topn, naive.matched_)) << "terms=" << num_terms << " topn=" << topn;
             // The legacy sort-based one has a known recall issue; only record the difference (its
@@ -1092,6 +1143,13 @@ TEST_F(BmwLongQueryTest, DISABLED_SLOW_LongQueryStability) {
             ASSERT_EQ(doc_iterator->DocID(), reference.docs_[cursor].first) << "probe " << probe;
             const float expected = reference.docs_[cursor].second;
             ASSERT_NEAR(expected, doc_iterator->Score(), 1e-4F * std::max(1.0F, std::abs(expected))) << "probe " << probe;
+            // A Next() that does not move (target == current doc) must keep the cached score:
+            // ScoreThresholdIterator-style callers can re-ask for the current doc and then read Score().
+            const RowID settled_doc = doc_iterator->DocID();
+            const float settled_score = doc_iterator->Score();
+            ASSERT_TRUE(doc_iterator->Next(settled_doc)) << "probe " << probe;
+            ASSERT_EQ(doc_iterator->DocID(), settled_doc) << "probe " << probe;
+            ASSERT_EQ(doc_iterator->Score(), settled_score) << "probe " << probe;
         }
         EXPECT_TRUE(txn_mgr->CommitTxn(txn).ok());
     }
@@ -1165,5 +1223,119 @@ TEST_F(BmwLongQueryTest, DISABLED_SLOW_LongQueryStability) {
         }
         ASSERT_EQ(failure_count.load(), 0u);
         std::cerr << fmt::format("[BMW-IT] concurrency: {} threads x {} rounds done\n", kThreads, kRounds);
+    }
+}
+// Randomized differential stress (opt-in): random query length / topn / minimum_should_match, plus
+// random Next(RowID) jumps. The jump variant is the important one for the "stale posting block"
+// failure class (473f4fa0): it needs a block-level seek inside one iterator followed by a score on
+// that same iterator, which a plain doc-ordered scan rarely produces.
+//   INFINITY_BMW_IT_RANDOM=1 INFINITY_BMW_IT_SEGMENTS=8 INFINITY_BMW_IT_DOCS=125000 \
+//   INFINITY_BMW_IT_VOCAB=20000 INFINITY_BMW_IT_RANDOM_ROUNDS=12 \
+//   ./build/src/test_main --gtest_also_run_disabled_tests --gtest_filter='*RandomizedDifferential*'
+TEST_F(BmwLongQueryTest, DISABLED_SLOW_LongQueryRandomizedDifferential) {
+    if (std::getenv("INFINITY_BMW_IT_RANDOM") == nullptr) {
+        GTEST_SKIP() << "set INFINITY_BMW_IT_RANDOM=1 (with INFINITY_BMW_IT_SEGMENTS/DOCS/VOCAB) to run the randomized differential";
+    }
+    PrepareIndex();
+    const size_t total_docs = size_t(segments_) * docs_per_segment_;
+    const u32 rounds = std::max<u32>(1, EnvU32("INFINITY_BMW_IT_RANDOM_ROUNDS", 12));
+    std::mt19937_64 rng(20261101);
+    // Mutation check: pointing the differential at the legacy sort-based iterator (known recall
+    // issues) must make this test fail, which proves the probe actually has detection power.
+    const EarlyTermAlgo algo = std::getenv("INFINITY_BMW_IT_RANDOM_ALGO_BMW") != nullptr ? EarlyTermAlgo::kBMW : EarlyTermAlgo::kHeapBMW;
+    std::cerr << fmt::format("[BMW-RAND] corpus={} docs ({} seg x {}), vocab={}, rounds={}\n",
+                             total_docs,
+                             segments_,
+                             docs_per_segment_,
+                             vocab_size_,
+                             rounds);
+
+    // Drives only the heap BMW with a monotonically increasing, randomly sized target sequence and
+    // checks every hop against the naive reference (full scan, doc ascending). A stale block would
+    // either abort here (FastPFor on a mismatched skip entry) or return a wrong doc / wrong score.
+    const auto jump_probe =
+        [&](const std::string &query_text, const MinimumShouldMatchOption &msm, const std::vector<std::pair<RowID, float>> &reference, u32 jumps) {
+            size_t mismatches = 0;
+            std::string first_mismatch;
+            NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("bmw rand jump"), TransactionType::kRead);
+            {
+                OpenQuery query(txn, db_name_, table_name_, index_reader_, query_text, {algo, 0, msm});
+                EXPECT_TRUE(query.ok());
+                if (query.ok()) {
+                    DocIterator *doc_iterator = query.iterator();
+                    size_t cursor = 0;
+                    u64 target_value = 0;
+                    for (u32 i = 0; i < jumps; ++i) {
+                        target_value += 1 + rng() % 4096;
+                        while (cursor < reference.size() && reference[cursor].first.ToUint64() < target_value) {
+                            ++cursor;
+                        }
+                        if (cursor >= reference.size()) {
+                            break;
+                        }
+                        const bool has = doc_iterator->Next(RowID(target_value));
+                        const float expected = reference[cursor].second;
+                        const bool doc_ok = has && doc_iterator->DocID() == reference[cursor].first;
+                        const float actual = has ? doc_iterator->Score() : 0.0F;
+                        const bool score_ok = has && std::abs(expected - actual) <= 1e-4F * std::max(1.0F, std::abs(expected));
+                        if (!doc_ok || !score_ok) {
+                            ++mismatches;
+                            if (first_mismatch.empty()) {
+                                first_mismatch =
+                                    fmt::format("target={} expected_doc={} expected_score={} actual_has={} actual_doc={} actual_score={}",
+                                                target_value,
+                                                reference[cursor].first.ToString(),
+                                                expected,
+                                                has,
+                                                has ? doc_iterator->DocID().ToString() : "n/a",
+                                                actual);
+                            }
+                            if (mismatches >= 3) {
+                                break;
+                            }
+                        }
+                        target_value = reference[cursor].first.ToUint64();
+                    }
+                }
+            }
+            EXPECT_TRUE(txn_mgr->CommitTxn(txn).ok());
+            return std::make_pair(mismatches, first_mismatch);
+        };
+
+    const u32 topn_choices[] = {0u, 1u, 10u, 100u, 1000u};
+    const char *msm_choices[] = {"1", "2", "3"};
+    for (u32 round = 0; round < rounds; ++round) {
+        const u32 num_terms = 5 + static_cast<u32>(rng() % 500);
+        const u32 topn = topn_choices[rng() % 5];
+        const char *msm_text = msm_choices[rng() % 3];
+        const MinimumShouldMatchOption msm = ParseMinimumShouldMatchOption(msm_text);
+        const std::string query_text = MakeQuery(num_terms, rng());
+        const bool materialize = std::getenv("INFINITY_BMW_IT_RANDOM_NO_MATERIALIZE") == nullptr;
+        std::cerr << fmt::format("[BMW-RAND] round={}/{} terms={} topn={} msm={}\n", round + 1, rounds, num_terms, topn, msm_text);
+
+        // (1) lockstep full-scan parity (zero extra memory)
+        const auto parity = CompareFullScan(query_text, {EarlyTermAlgo::kNaive, 0, msm}, {algo, 0, msm}, 10);
+        ASSERT_EQ(parity.mismatches_, 0u) << "round=" << round << " terms=" << num_terms << " " << parity.first_mismatch_;
+
+        // (2) random jumps against the naive reference
+        if (materialize) {
+            auto reference = Run(query_text, {EarlyTermAlgo::kNaive, 0, msm});
+            ASSERT_GT(reference.docs_.size(), 0u) << "round=" << round;
+            const auto [jump_mismatches, jump_first] = jump_probe(query_text, msm, reference.docs_, 200);
+            ASSERT_EQ(jump_mismatches, 0u) << "round=" << round << " terms=" << num_terms << " " << jump_first;
+        }
+
+        // (3) top-k against the naive top-k on the same threshold feedback
+        if (topn > 0) {
+            auto naive_top = Run(query_text, {EarlyTermAlgo::kNaive, topn, msm});
+            auto heap_top = Run(query_text, {algo, topn, msm});
+            ASSERT_EQ(heap_top.docs_.size(), naive_top.docs_.size()) << "round=" << round << " topn=" << topn;
+            for (size_t i = 0; i < heap_top.docs_.size(); ++i) {
+                const float expected = naive_top.docs_[i].second;
+                ASSERT_NEAR(expected, heap_top.docs_[i].second, 1e-4F * std::max(1.0F, std::abs(expected)))
+                    << "round=" << round << " topn=" << topn << " rank " << i;
+            }
+        }
     }
 }
