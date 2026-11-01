@@ -116,6 +116,13 @@ std::shared_ptr<Infinity> CreateDbAndTable(const std::string &db_name, const std
     return infinity;
 }
 
+// Opens the directory as it stands: no database, table or index DDL, and
+// nothing dropped (CreateDbAndTable drops the table with kIgnore).
+std::shared_ptr<Infinity> ConnectExisting() {
+    Infinity::LocalInit("/var/infinity");
+    return Infinity::LocalConnect();
+}
+
 void BenchmarkImport(std::shared_ptr<Infinity> infinity, const std::string &db_name, const std::string &table_name, const std::string &import_from) {
     if (!VirtualStore::Exists(import_from)) {
         LOG_ERROR(fmt::format("Data file doesn't exist: {}", import_from));
@@ -404,11 +411,15 @@ int main(int argc, char *argv[]) {
     CLI::App app{"fulltext_benchmark"};
     // https://github.com/CLIUtils/CLI11/blob/main/examples/enum.cpp
     // Using enumerations in an option
-    enum class Mode : u8 { kInsert, kImport, kMerge, kQuery };
-    std::map<std::string, Mode> mode_map{{"insert", Mode::kInsert}, {"import", Mode::kImport}, {"merge", Mode::kMerge}, {"query", Mode::kQuery}};
+    enum class Mode : u8 { kInsert, kImport, kMerge, kQuery, kQueryOnly };
+    std::map<std::string, Mode> mode_map{{"insert", Mode::kInsert},
+                                         {"import", Mode::kImport},
+                                         {"merge", Mode::kMerge},
+                                         {"query", Mode::kQuery},
+                                         {"query-only", Mode::kQueryOnly}};
     Mode mode(Mode::kInsert);
     size_t insert_batch = 500;
-    app.add_option("--mode", mode, "Benchmark mode, one of insert, import, merge, query")
+    app.add_option("--mode", mode, "Benchmark mode, one of insert, import, merge, query, query-only")
         ->required()
         ->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
     app.add_option("--insert-batch", insert_batch, "batch size of each insert, valid only at insert and merge mode, default value 500");
@@ -431,10 +442,15 @@ int main(int argc, char *argv[]) {
     srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
     // srcfile += "/benchmark/enwiki.33332620.csv";
 
+    // query-only reuses the directory a previous run left behind (no DDL, no
+    // insert), so the query times are the query path alone.
+    const bool reuse = mode == Mode::kQueryOnly;
     printf("Cleanup /var/infinity\n");
-    system("rm -rf /var/infinity/data /var/infinity/log /var/infinity/persistence /var/infinity/tmp /var/infinity/wal");
+    if (!reuse) {
+        system("rm -rf /var/infinity/data /var/infinity/log /var/infinity/persistence /var/infinity/tmp /var/infinity/wal");
+    }
 
-    std::shared_ptr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
+    std::shared_ptr<Infinity> infinity = reuse ? ConnectExisting() : CreateDbAndTable(db_name, table_name);
 
     switch (mode) {
         case Mode::kInsert: {
@@ -469,11 +485,25 @@ int main(int argc, char *argv[]) {
             BenchmarkMoreQuery(infinity, db_name, table_name, query_opts, vocab);
             break;
         }
+        case Mode::kQueryOnly: {
+            std::vector<std::string> vocab;
+            if (query_opts.terms_ > 0) {
+                vocab = LoadVocabulary(srcfile, 1000, 20000);
+                if (vocab.size() < query_opts.terms_) {
+                    LOG_ERROR(fmt::format("Vocabulary too small: {} < {} (--terms)", vocab.size(), query_opts.terms_));
+                    break;
+                }
+            }
+            BenchmarkMoreQuery(infinity, db_name, table_name, query_opts, vocab);
+            break;
+        }
         default: {
             printf("Unsupported benchmark mode: %u\n", static_cast<u8>(mode));
         }
     }
-    sleep(10);
+    if (!reuse) {
+        sleep(10);
+    }
 
     Infinity::LocalUnInit();
 }

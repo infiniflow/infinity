@@ -367,6 +367,17 @@ impl<'a> BlockMaxWandIterator<'a> {
             self.offer(doc_id, score);
             target = Some(doc_id + 1);
         }
+        // How much the pruning actually saved: exact score decodes against the
+        // cursors' whole document frequency.
+        if std::env::var_os("INFINITY_WAND_STATS").is_some() {
+            let df: u64 = self.cursors.iter().map(|c| c.stream.df()).sum();
+            eprintln!(
+                "[WAND] scored={} cursors={} df_total={}",
+                self.score_evaluations,
+                self.cursors.len(),
+                df
+            );
+        }
     }
 
     /// Test-only view of the pruning counters.

@@ -17,6 +17,10 @@ docker exec infinity_stable_build bash -c 'cd /infinity && \
   （`log_to_stdout: false`，stdout 上没有耗时行）。
 - 语料路径是 `$(INFINITY_ROOT_PATH)/test/data/benchmark/dbpedia-entity/corpus.jsonl`；
   `INFINITY_ROOT_PATH` 默认是 `.`，所以在仓库根跑也能对上。
+- `--mode query-only` 复用上一次留下的目录，不建表不插入；`--terms N` / `--topn N` /
+  `--algo auto|heap_bmw|bmw|batch|false` 把长查询和 `block_max` 透传给 `MATCH`
+  （`false` 是无剪枝的 naive 基线，`bmw` 是旧的排序实现）。参考的行数上限是 8192，
+  `--insert-batch` 超过它插入会被拒绝。
 
 端口（Rust）：
 
@@ -36,7 +40,8 @@ cargo build --release -p infinity-cli
 环境变量：`FTBENCH_QUERY_REPEAT=n` 每条查询在进程内跑 n 次取最小；
 `FTBENCH_EXTRA_QUERY=…` 追加一条查询；`FTBENCH_TOPN` 改 `topn`（默认 10）；
 `FTBENCH_BLOCK_MAX` 填参考的 `block_max` 值（`auto`/`heap_bmw`/`bmw`/`batch`/`false`，
-`false` 就是无剪枝的 naive 基线）。
+`false` 就是无剪枝的 naive 基线）。`INFINITY_WAND_STATS=1` 让 WAND 往 stderr 打一行
+`[WAND] scored=<精确打分次数> cursors=<游标数> df_total=<候选文档总数>`，用来看剪枝率。
 
 前五条是参考里的查询（`fields="text"`、默认 `topn=10`、投影 `ROW_ID(), SCORE()`）；
 后两条是本轮加进**两边**基准（`fulltext_benchmark.cpp` 与 `fulltext-bench`）的多词查询，
@@ -88,6 +93,41 @@ title/日期/正文）前 20000 行生成 JSONL（`{"id","title","text"}`），�
 
 写入从 3.2 s 降到 1.88 s（IMPORT 已快过参考，INSERT 的 2× 是 §7 说的计时口径）；查询从最初的 13–30 倍
 降到「1–2 个词的查询全面反超，13/14 词的长查询在 1–1.5 倍以内」。
+
+## 3.1 1M 文档：索引构建与三路对比（C++ vs Rust）
+
+语料由 `cargo run --release --bin gen-corpus -- --corpus <enwiki.tsv> --out <jsonl>` 生成：词表取
+enwiki 10 万篇的词频前 20k（分词规则与参考 `LoadVocabulary` 一致），每篇按词频（zipf 形状）采样 40 词，
+共 100 万篇，生成 2.8 s。两边读同一份 JSONL；查询词由参考自己的 `LoadVocabulary` 词表采样（固定种子），
+先跑参考，再把它日志里的查询文本原样喂给端口（`FTBENCH_EXTRA_QUERY`），所以两边打的是同一批词。
+`topn=10`，每条查询进程内 3 次取最小、3 个进程再取最小；两边都只测查询路径（参考这轮加了
+`--mode query-only`，与端口的 `query-only` 对应）。
+
+| 阶段 | 参考 C++ | 端口 Rust | 比值 |
+|---|---|---|---|
+| INSERT 100 万行 | 31 s（`--insert-batch 8192`，参考的行数上限） | 20.4 s（batch 100000） | 端口快 1.5× |
+| 索引体积 | 1.2 GB | 1.2 GB（31 个 chunk） | 持平 |
+| CREATE INDEX（DDL） | 33 ms | 12 ms | 端口快 2.8× |
+| 查询 10 词 | 4.0 ms | 4.4 ms | 1.1× |
+| 查询 50 词 | 16 ms | 22.0 ms | 1.4× |
+| 查询 100 词 | 33 ms | 44.9 ms | 1.4× |
+| 查询 200 词 | 79 ms | 100.6 ms | 1.3× |
+
+三路对比（同一批查询，单位 ms，三条查询取中位数；「旧 sort」是端口按值重排整个游标数组的实现）：
+
+| 查询词数 | C++ naive | C++ heap | C++ 旧 sort | Rust naive | Rust heap | Rust 旧 sort |
+|---|---|---|---|---|---|---|
+| 10 | 12.0 | 4.0 | 4.0 | 6.3 | 4.4 | 4.8 |
+| 50 | 47 | 16 | 42 | 28.2 | 22.0 | 123.5 |
+| 100 | 113 | 33 | 152 | 54.4 | 44.9 | 422.5 |
+| 200 | 317 | 79 | 560 | 115.8 | 100.6 | 1274.1 |
+
+- 堆对旧排序版：参考 1.0–7.1×，端口 1.1–12.7×（旧版排序要搬 `Cursor` 整个结构体，词一多就爆）。
+- 端口的 naive 比参考快 1.9–2.7×（同一条 posting 的单价更低），堆却比参考慢 1.3–1.4×。
+- 端口的堆只比自己的 naive 快 1.2–1.3×，参考是 3.5×。剪枝本身是有效的：
+  `INFINITY_WAND_STATS=1` 打印的 `[WAND] scored=288 cursors=100 df_total=277838` 说明 100 词只精确
+  打分 288 次（候选 24.4 万），200 词 448 次（候选 50.4 万）；差的是「每轮从堆里弹前缀、再回推」的
+  常数项，参考在同样的候选数上更便宜。
 
 ## 4. 这一轮改了什么
 
@@ -466,35 +506,9 @@ A/B 用临时开关 `INF_FT_NO_STREAM`（已移除）关掉流式：
 排序的代价是每轮 O(n log n)，游标一多才显出来；十几个游标以内它被 posting 解码和块推进盖住
 （同一张表里 2–4 词的另外五条查询都在 ±4% 内）。
 
-1M 文档（100 万篇、词表 20k、每篇 40 词，语料见下）：10 个词还不明显，游标一多差距就是数量级的——
-旧写法每轮把整个游标数组按值排序，`Cursor` 里带着 `WandStream`（若干个 `Vec`），
-一次排序要搬 100 多个 100 字节以上的结构体，而堆里只搬 16 字节的 `(doc, ord)`。
-
-同一份索引上三路对比（`topn=10`，进程内 3 次取最小、3 个进程再取最小）：
-
-| 查询词数 | naive（`block_max=false`） | 每轮整表排序 | 文档序最小堆 | naive/heap | sort/heap |
-|---|---|---|---|---|---|
-| 10 | 6.06 ms | 4.24 ms | 4.04 ms | 1.50x | 1.05x |
-| 50 | 30.70 ms | 122.57 ms | 23.71 ms | 1.29x | 5.17x |
-| 100 | 68.10 ms | 490.37 ms | 56.13 ms | 1.21x | 8.74x |
-| 200 | 216.53 ms | 1138.43 ms | 146.54 ms | 1.48x | 7.77x |
-
-三个实现返回的 `ROW_ID()/SCORE()` 在四个长度下逐字节相同。
-
-堆对 naive 只赢 1.2–1.5x，比参考的 3.5–5.4x 小：这里的 naive 是按块读 posting、只给「真的命中的
-(term, doc)」打分（参考 100 词 82.7 ms，这里 68.1 ms，同一量级），省的块级 I/O 它也有；
-而这份语料的 term 极密（`the` 覆盖 94% 的文档），块上界松，能剪掉的比例本来就低。
-堆 100 词 56 ms 对参考 19.9 ms，差在剪枝率（打分次数）而不是单次推进，原因待查。
-
-语料（`cargo run --release --bin gen-corpus -- --corpus <enwiki.tsv> --out <jsonl>`）：
-词表取 enwiki 10 万篇的词频前 20k（分词规则与参考 `LoadVocabulary` 一致：连续 alnum、长度 ≥ 3、小写），
-每篇按词频（zipf 形状）采样 40 个词，共 100 万篇，按 10 万一批插入 → 31 个索引 chunk、
-全文索引 1.2 GB、插入 20 s、生成 2.8 s。查询词从同一词表均匀采样；
-计时用 `FTBENCH_EXTRA_QUERY` 加一条长查询、`FTBENCH_BLOCK_MAX=false` 切到 naive。
-
-
-> 参考那边的表还有一列 naive（100 词 82.7 ms、200 词 234.1 ms）：参考有 `block_max=naive` 选项可以切到全扫，
-> 端口没有这个开关，所以这里只比两个 WAND 实现。
+1M 文档上的索引构建与三路对比（参考与端口并排，含 naive 与旧排序版）见 §3.1：词一多差距就是
+数量级的——旧写法每轮把整个游标数组按值排序，`Cursor` 里带着 `WandStream`（若干个 `Vec`），
+一次排序要搬上百个 100 字节以上的结构体，而堆里只搬 16 字节的 `(doc, ord)`。
 
 对拍：`wand_matches_full_scan_on_a_random_corpus`（2000 篇，k=1/10/100）和
 `heap_wand_matches_naive_scan_on_many_corpora`（3 组语料、稠密与稀疏混排、k 从 1 到全量、

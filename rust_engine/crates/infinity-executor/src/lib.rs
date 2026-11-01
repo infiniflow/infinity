@@ -4298,6 +4298,15 @@ pub(crate) enum WandStream<'a> {
 }
 
 impl<'a> WandStream<'a> {
+    /// Documents this unit can match (the reference's doc_freq); a phrase can
+    /// match no more often than its rarest term.
+    pub(crate) fn df(&self) -> u64 {
+        match self {
+            WandStream::Term(s) => s.df() as u64,
+            WandStream::Phrase(s) => s.children.iter().map(|c| c.df() as u64).min().unwrap_or(0),
+        }
+    }
+
     pub(crate) fn doc(&mut self) -> Option<u64> {
         match self {
             WandStream::Term(s) => s.doc(),

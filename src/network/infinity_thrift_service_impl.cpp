@@ -766,6 +766,8 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     //
     // auto start4 = std::chrono::steady_clock::now();
 
+    auto __t_search_done = std::chrono::steady_clock::now();
+
     if (result.IsOk()) {
         auto &columns = response.column_fields;
         columns.resize(result.result_table_->ColumnCount());
