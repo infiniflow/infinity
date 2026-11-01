@@ -371,6 +371,16 @@ fn import_rows_key(table: &str, segment: u32) -> Vec<u8> {
 fn append_copy_key(table: &str) -> Vec<u8> {
     format!("append_copy:{table}").into_bytes()
 }
+/// The append/delete journals a table's block files record, rebuilt on first
+/// use by [`Engine::ensure_journals`].
+struct Journals {
+    appends: Vec<u64>,
+    append_ts: Vec<u64>,
+    append_copy: Vec<u64>,
+    deletes: Vec<u64>,
+    delete_ts: Vec<u64>,
+}
+
 fn del_prefix(table: &str) -> Vec<u8> {
     format!("del:{table}:").into_bytes()
 }
@@ -6135,6 +6145,9 @@ struct TableEntry {
     segments: std::collections::BTreeMap<u32, SegmentEntry>,
     /// Full-text analyzer per column (`CREATE INDEX … WITH (analyzer=…)`).
     analyzers: HashMap<String, String>,
+    /// Import extent per sealed segment `(segment, rows, first create ts)`,
+    /// rebuilt from the block `version` records and the segment's prefilter.
+    imports: Option<Vec<(u32, u64, u64)>>,
     /// Analyzer per index name: two indexes on one column may differ.
     analyzers_by_index: HashMap<String, String>,
     /// `CREATE INDEX … COMMENT '…'` per index name.
@@ -10557,13 +10570,55 @@ impl Engine {
     /// stamps each one with its commit ts and the port writes its mirror ts,
     /// which the format test takes out before comparing.
     fn append_totals(&self, table: &str) -> Vec<u64> {
+        self.ensure_journals(table).appends
+    }
+
+    /// The append/delete/import journals, rebuilt from the block files on the
+    /// first use in this process.
+    ///
+    /// All five lists come out of one derivation so their lengths agree - the
+    /// block `version` writer zips `totals` with `ts` and would otherwise write
+    /// a `create` list that differs from the reference's.
+    fn ensure_journals(&self, table: &str) -> Journals {
         let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey.clone()).or_default();
-        if entry.append_totals.is_none() {
-            entry.append_totals = Some(self.load_id_log(&appends_key(&tkey)));
+        let cached = {
+            let tables = self.tables.lock().unwrap();
+            tables.get(&tkey).and_then(|entry| {
+                Some((
+                    entry.append_totals.clone()?,
+                    entry.append_ts.clone()?,
+                    entry.append_copy.clone()?,
+                    entry.deleted_ids.clone()?,
+                    entry.delete_ts.clone()?,
+                ))
+            })
+        };
+        if let Some((appends, append_ts, append_copy, deletes, delete_ts)) = cached {
+            return Journals {
+                appends,
+                append_ts,
+                append_copy,
+                deletes,
+                delete_ts,
+            };
         }
-        entry.append_totals.clone().unwrap_or_default()
+        let (appends, append_ts, append_copy, deletes, delete_ts, imports) =
+            self.journals_from_blocks(&tkey);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey).or_default();
+        entry.append_totals = Some(appends);
+        entry.append_ts = Some(append_ts);
+        entry.append_copy = Some(append_copy);
+        entry.deleted_ids = Some(deletes);
+        entry.delete_ts = Some(delete_ts);
+        entry.imports = Some(imports);
+        Journals {
+            appends: entry.append_totals.clone().unwrap_or_default(),
+            append_ts: entry.append_ts.clone().unwrap_or_default(),
+            append_copy: entry.append_copy.clone().unwrap_or_default(),
+            deletes: entry.deleted_ids.clone().unwrap_or_default(),
+            delete_ts: entry.delete_ts.clone().unwrap_or_default(),
+        }
     }
 
     /// Records an append of `n` rows, so the next block mirror writes a
@@ -10607,8 +10662,6 @@ impl Engine {
         // A hint for the mirror, not committed state: if the process dies
         // before the rows do, the mirror clips every total to the rows it
         // actually has and falls back to one create when they disagree.
-        let _ = self.write_id_log(&appends_key(&tkey), &totals);
-        let _ = self.write_id_log(&append_ts_key(&tkey), &settled);
         let mut kinds = self.append_copy(table);
         kinds.resize(totals.len(), 0);
         if let Some(last) = kinds.last_mut() {
@@ -10618,7 +10671,6 @@ impl Engine {
             let mut tables = self.tables.lock().unwrap();
             tables.entry(tkey.clone()).or_default().append_copy = Some(kinds.clone());
         }
-        let _ = self.write_id_log(&append_copy_key(&tkey), &kinds);
         index
     }
 
@@ -10640,11 +10692,8 @@ impl Engine {
         log.resize(n, 0);
         log[index] = ts;
         let tkey = self.table_key(table);
-        {
-            let mut tables = self.tables.lock().unwrap();
-            tables.entry(tkey.clone()).or_default().append_ts = Some(log.clone());
-        }
-        let _ = self.write_id_log(&append_ts_key(&tkey), &log);
+        let mut tables = self.tables.lock().unwrap();
+        tables.entry(tkey).or_default().append_ts = Some(log);
     }
 
     /// Rewrites the append log after a compaction merged `sources` into a new
@@ -10706,13 +10755,7 @@ impl Engine {
 
     /// Per-append provenance, aligned with [`Self::append_totals`].
     fn append_copy(&self, table: &str) -> Vec<u64> {
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey.clone()).or_default();
-        if entry.append_copy.is_none() {
-            entry.append_copy = Some(self.load_id_log(&append_copy_key(&tkey)));
-        }
-        entry.append_copy.clone().unwrap_or_default()
+        self.ensure_journals(table).append_copy
     }
 
     /// The null bitmap's coverage for a block written by `COPY`/`IMPORT`.
@@ -10764,13 +10807,7 @@ impl Engine {
 
     /// The commit timestamp of every append, aligned with [`Self::append_totals`].
     fn append_ts(&self, table: &str) -> Vec<u64> {
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey.clone()).or_default();
-        if entry.append_ts.is_none() {
-            entry.append_ts = Some(self.load_id_log(&append_ts_key(&tkey)));
-        }
-        entry.append_ts.clone().unwrap_or_default()
+        self.ensure_journals(table).append_ts
     }
 
     /// Stamps the newest append with the commit timestamp its transaction got.
@@ -10788,40 +10825,72 @@ impl Engine {
         log.resize(n.saturating_sub(count), 0);
         log.resize(n, ts);
         let tkey = self.table_key(table);
-        {
-            let mut tables = self.tables.lock().unwrap();
-            tables.entry(tkey.clone()).or_default().append_ts = Some(log.clone());
-        }
-        let _ = self.write_id_log(&append_ts_key(&tkey), &log);
+        let mut tables = self.tables.lock().unwrap();
+        tables.entry(tkey).or_default().append_ts = Some(log);
     }
 
     /// Records that `segment` (and the batches after it) were written by an
     /// import whose transaction committed at `ts`.
     fn note_import_ts(&self, table: &str, segment: u32, ts: u64) {
-        let key = import_ts_key(&self.table_key(table), segment);
-        let _ = self.storage.store.put(&key, &ts.to_le_bytes());
+        self.note_import(table, segment, None, Some(ts));
+    }
+
+    /// Records a segment's import extent in memory.
+    ///
+    /// The extents live in the block `version` records (a `COPY` seals the
+    /// segment it wrote, and the segment's prefilter plus its row count is the
+    /// extent), so a fresh process rebuilds them in `ensure_journals`; the
+    /// statement that performs the `COPY` only has to update the same cache.
+    fn note_import(&self, table: &str, segment: u32, rows: Option<u64>, ts: Option<u64>) {
+        let _ = self.ensure_journals(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(self.table_key(table)).or_default();
+        let list = entry.imports.get_or_insert_with(Vec::new);
+        match list.iter_mut().find(|(id, _, _)| *id == segment) {
+            Some(slot) => {
+                if let Some(rows) = rows {
+                    slot.1 = rows;
+                }
+                if let Some(ts) = ts {
+                    slot.2 = ts;
+                }
+            }
+            None => list.push((segment, rows.unwrap_or(0), ts.unwrap_or(0))),
+        }
     }
 
     /// The commit ts of the `COPY` that opened `segment`, if it was imported.
     pub(crate) fn import_ts(&self, table: &str, segment: u32) -> Option<u64> {
-        let key = import_ts_key(&self.table_key(table), segment);
-        let bytes = self.storage.store.get(&key).ok().flatten()?;
-        Some(u64::from_le_bytes(bytes.get(..8)?.try_into().ok()?))
+        let journals = self.ensure_journals(table);
+        let _ = journals;
+        let tables = self.tables.lock().unwrap();
+        let entry = tables.get(&self.table_key(table))?;
+        let (_, _, ts) = entry
+            .imports
+            .as_ref()?
+            .iter()
+            .find(|(id, _, _)| *id == segment)?;
+        Some(*ts)
     }
 
     /// Records how many rows `segment` held when its `COPY` finished.
     fn note_import_rows(&self, table: &str, segment: u32, rows: u64) {
-        let key = import_rows_key(&self.table_key(table), segment);
-        let _ = self.storage.store.put(&key, &rows.to_le_bytes());
+        self.note_import(table, segment, Some(rows), None);
     }
 
     /// The imported extent of `segment`, when it still holds exactly the rows a
     /// `COPY` wrote (`None` once an `INSERT` appended to it).
     pub(crate) fn imported_extent(&self, table: &str, segment: u32, rows: u64) -> Option<u64> {
-        let key = import_rows_key(&self.table_key(table), segment);
-        let bytes = self.storage.store.get(&key).ok().flatten()?;
-        let imported = u64::from_le_bytes(bytes.get(..8)?.try_into().ok()?);
-        (imported == rows).then_some(imported)
+        let journals = self.ensure_journals(table);
+        let _ = journals;
+        let tables = self.tables.lock().unwrap();
+        let entry = tables.get(&self.table_key(table))?;
+        let (_, imported, _) = entry
+            .imports
+            .as_ref()?
+            .iter()
+            .find(|(id, _, _)| *id == segment)?;
+        (*imported == rows).then_some(*imported)
     }
 
     /// After a `COPY`: every segment whose row count grew was written by this
@@ -10852,41 +10921,8 @@ impl Engine {
     /// both here keeps `deleted_ids` and `delete_ts` aligned by construction
     /// and outside the table lock (the block read takes it).
     fn load_deletes(&self, table: &str) -> (Vec<u64>, Vec<u64>) {
-        let tkey = self.table_key(table);
-        {
-            let tables = self.tables.lock().unwrap();
-            if let Some(ids) = tables.get(&tkey).and_then(|entry| entry.deleted_ids.clone()) {
-                let mut ts = tables
-                    .get(&tkey)
-                    .and_then(|entry| entry.delete_ts.clone())
-                    .unwrap_or_else(|| vec![0; ids.len()]);
-                ts.resize(ids.len(), 0);
-                return (ids, ts);
-            }
-        }
-        let from_blocks = self.deleted_from_blocks(&tkey);
-        let mut ids: Vec<u64> = from_blocks.iter().map(|(row, _)| *row).collect();
-        let mut ts: Vec<u64> = from_blocks.iter().map(|(_, at)| *at).collect();
-        let logged = self.load_id_log(&deletes_key(&tkey));
-        let logged_ts = self.load_id_log(&delete_ts_key(&tkey));
-        for (slot, id) in logged.iter().enumerate() {
-            if ids.binary_search(id).is_ok() {
-                continue;
-            }
-            let at = logged_ts.get(slot).copied().unwrap_or(0);
-            let at_index = ids.partition_point(|known| known < id);
-            ids.insert(at_index, *id);
-            ts.insert(at_index, at);
-        }
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey).or_default();
-        if entry.deleted_ids.is_none() {
-            entry.deleted_ids = Some(ids.clone());
-        }
-        if entry.delete_ts.is_none() {
-            entry.delete_ts = Some(ts.clone());
-        }
-        (ids, ts)
+        let journals = self.ensure_journals(table);
+        (journals.deletes, journals.delete_ts)
     }
 
     /// Records deleted row ids **in memory** only.
@@ -10930,11 +10966,8 @@ impl Engine {
             log[slot] = ts;
         }
         let tkey = self.table_key(table);
-        {
-            let mut tables = self.tables.lock().unwrap();
-            tables.entry(tkey.clone()).or_default().delete_ts = Some(log.clone());
-        }
-        let _ = self.write_id_log(&delete_ts_key(&tkey), &log);
+        let mut tables = self.tables.lock().unwrap();
+        tables.entry(tkey).or_default().delete_ts = Some(log);
     }
 
     /// The commit timestamp of every delete, aligned with [`Self::deleted_ids`].
@@ -10953,11 +10986,8 @@ impl Engine {
         log.resize(n - count.min(n), 0);
         log.resize(n, ts);
         let tkey = self.table_key(table);
-        {
-            let mut tables = self.tables.lock().unwrap();
-            tables.entry(tkey.clone()).or_default().delete_ts = Some(log.clone());
-        }
-        let _ = self.write_id_log(&delete_ts_key(&tkey), &log);
+        let mut tables = self.tables.lock().unwrap();
+        tables.entry(tkey).or_default().delete_ts = Some(log);
     }
 
     fn reserve_rows(&self, table: &str, n: usize, new_segment: bool) -> Result<RowRange> {

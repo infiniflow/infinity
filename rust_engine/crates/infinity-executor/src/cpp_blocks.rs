@@ -63,8 +63,7 @@ use infinity_storage::cpp_format::{
 };
 use infinity_storage::knn_format;
 
-use crate::{append_copy_key, append_ts_key, appends_key, del_key, delete_ts_key, deletes_key,
-    import_rows_key, import_ts_key, parse_value, row_key, Engine};
+use crate::{del_key, parse_value, row_key, Engine};
 use infinity_parser::Literal;
 
 /// `(row id, vector)` pairs read back from a vector index mirror.
@@ -3380,7 +3379,7 @@ impl Engine {
             return Ok(0); // a column the block format cannot express has no file
         };
         let blocks: Vec<BlockId> = self.visible_block_ids(&table);
-        let mut writes: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
+        let _writes: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
         let mut appends: Vec<u64> = Vec::new();
         let mut append_ts: Vec<u64> = Vec::new();
         let mut appends_copy: Vec<u64> = Vec::new();
@@ -3424,45 +3423,10 @@ impl Engine {
                 }
             }
         }
-        // `import_rows`/`import_ts`: a `COPY` is what seals its segment, and the
-        // reference records that by writing the segment-level prefilter and by
-        // taking the segment's create ts from the append that opened it.
-        for (segment, rows) in &segment_rows {
-            let sealed = self
-                .storage
-                .catalog
-                .store()
-                .get(
-                    format!("seg|{db_id}|{}|{segment}|fast_rough_filter", meta.id).as_bytes(),
-                )
-                .ok()
-                .flatten()
-                .is_some();
-            if !sealed {
-                continue;
-            }
-            writes.push((
-                import_rows_key(&table, *segment),
-                rows.to_le_bytes().to_vec(),
-            ));
-            if let Some(ts) = segment_first_ts.get(segment) {
-                writes.push((import_ts_key(&table, *segment), ts.to_le_bytes().to_vec()));
-            }
-        }
-        if !writes.is_empty() {
-            self.storage.store.atomic_write(&writes)?;
-        }
-        for (key, values) in [
-            (appends_key(&table), &appends),
-            (append_ts_key(&table), &append_ts),
-            (append_copy_key(&table), &appends_copy),
-            (deletes_key(&table), &deletes),
-            (delete_ts_key(&table), &delete_ts),
-        ] {
-            if !values.is_empty() {
-                let _ = self.write_id_log(&key, values);
-            }
-        }
+        // The journals are not written anywhere: they are derived from the same
+        // files on demand (`Engine::ensure_journals`), which is why the port
+        // needs no second KV. `segment_rows`/`segment_first_ts` only feed that
+        // derivation now.
         Ok(newest)
     }
 
@@ -3966,6 +3930,94 @@ impl Engine {
         out.sort_unstable();
         out.dedup_by_key(|(row, _)| *row);
         out
+    }
+
+    /// The append/delete/import journals a table's block files record.
+    ///
+    /// The reference keeps this history in the files themselves: one `create`
+    /// per append and one ts per deleted slot in each block's `version`, and a
+    /// segment's prefilter for its import extent. The KV copies are therefore
+    /// only a cache, and a fresh process rebuilds them here.
+    ///
+    /// Returns `(appends, append_ts, append_copy, deletes, delete_ts, imports)`
+    /// with `imports` as `(segment, rows, first create ts)`.
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn journals_from_blocks(
+        &self,
+        table: &str,
+    ) -> (
+        Vec<u64>,
+        Vec<u64>,
+        Vec<u64>,
+        Vec<u64>,
+        Vec<u64>,
+        Vec<(u32, u64, u64)>,
+    ) {
+        let table = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return Default::default();
+        };
+        let db_id = self.database_id_of(&table);
+        let root = self.blocks_root();
+        let Some(types) = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()
+        else {
+            return Default::default();
+        };
+        let mut appends = Vec::new();
+        let mut append_ts = Vec::new();
+        let mut append_copy = Vec::new();
+        let mut deletes = Vec::new();
+        let mut delete_ts = Vec::new();
+        let mut segment_rows: std::collections::BTreeMap<u32, u64> = Default::default();
+        let mut segment_first_ts: std::collections::BTreeMap<u32, u64> = Default::default();
+        let mut total = 0u64;
+        for id in self.visible_block_ids(&table) {
+            let Ok((version, _)) = self.read_block_cached(&table, &root, id) else {
+                continue;
+            };
+            let Some(rows) = self.decode_block_cells(&table, &root, &meta, &types, id, None) else {
+                continue;
+            };
+            let mut seen = 0u64;
+            for create in &version.created {
+                let cumulative = create.cumulative_row_count.max(0) as u64;
+                let added = cumulative.saturating_sub(seen);
+                seen = cumulative;
+                total += added;
+                appends.push(total);
+                append_ts.push(create.create_ts);
+                append_copy.push(0);
+                segment_first_ts.entry(id.segment_id).or_insert(create.create_ts);
+            }
+            *segment_rows.entry(id.segment_id).or_default() += rows.len() as u64;
+            for (slot, (seq, _cells)) in rows.iter().enumerate() {
+                if let Some(ts) = version.deleted.get(slot).copied().filter(|t| *t != 0) {
+                    deletes.push(*seq as u64);
+                    delete_ts.push(ts);
+                }
+            }
+        }
+        let mut imports = Vec::new();
+        for (segment, rows) in &segment_rows {
+            let sealed = self
+                .storage
+                .catalog
+                .store()
+                .get(format!("seg|{db_id}|{}|{segment}|fast_rough_filter", meta.id).as_bytes())
+                .ok()
+                .flatten()
+                .is_some();
+            if !sealed {
+                continue;
+            }
+            let first = segment_first_ts.get(segment).copied().unwrap_or(0);
+            imports.push((*segment, *rows, first));
+        }
+        (appends, append_ts, append_copy, deletes, delete_ts, imports)
     }
 
     /// Reads the block mirror back, returning `(columns, rows)`.
