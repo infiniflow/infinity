@@ -314,12 +314,7 @@ fn del_key(table: &str, seq: usize) -> Vec<u8> {
 fn appends_key(table: &str) -> Vec<u8> {
     format!("appends:{table}").into_bytes()
 }
-/// The block mirror's delete log: every row id deleted since the table was
-/// created (`u64` each). The reference marks a deleted row in the block's
-/// `deleted_` array and keeps its cells, so the mirror needs the same ids.
-fn deletes_key(table: &str) -> Vec<u8> {
-    format!("dellog:{table}").into_bytes()
-}
+
 /// The commit timestamp of every append, one per entry of [`appends_key`].
 ///
 /// A block's `version` file carries one `create` per append **stamped with
@@ -328,11 +323,7 @@ fn deletes_key(table: &str) -> Vec<u8> {
 fn append_ts_key(table: &str) -> Vec<u8> {
     format!("append_ts:{table}").into_bytes()
 }
-/// The commit timestamp of every delete, one per entry of [`deletes_key`]. The
-/// mirror writes it into the deleted slot, as `BlockVersion::Delete` does.
-fn delete_ts_key(table: &str) -> Vec<u8> {
-    format!("delete_ts:{table}").into_bytes()
-}
+
 /// Commit timestamp of the last `DumpIndex` that sealed this index, written
 /// into the `idx_chunk|…|{chunk_id}` catalog value.
 ///
@@ -343,26 +334,7 @@ fn delete_ts_key(table: &str) -> Vec<u8> {
 fn dump_ts_key(table: &str, index: &str) -> Vec<u8> {
     format!("dump_ts:{table}:{index}").into_bytes()
 }
-/// Commit ts of the `COPY` that opened `segment`, written into that segment's
-/// `idx_chunk|…|{chunk_id}` records.
-///
-/// An imported segment's chunks are produced by the import transaction itself
-/// (`NewTxn::Import` → `PopulateIndex` → `AddNewChunkIndex1`), so their ts is
-/// the import's commit ts, not a dump's. A table seeded with `INSERT` has no
-/// entry here and keeps using the `DumpIndex` ts.
-fn import_ts_key(table: &str, segment: u32) -> Vec<u8> {
-    format!("import_ts:{table}:{segment}").into_bytes()
-}
-/// Rows `segment` held when the `COPY` that wrote it committed.
-///
-/// The reference's index chunks for an imported segment are one per
-/// `mem_index_capacity` (full-text) or one for the whole segment (secondary,
-/// sparse), *not* one per block: `PopulateFtIndexInner` dumps when the memory
-/// indexer reaches the capacity and `Populate{Secondary,BMP}IndexInner` dump
-/// once, after their block loop. The mirror needs the extent to reproduce that.
-fn import_rows_key(table: &str, segment: u32) -> Vec<u8> {
-    format!("import_rows:{table}:{segment}").into_bytes()
-}
+
 /// One byte per append, aligned with [`appends_key`]: `1` when the append came
 /// from `COPY`/`IMPORT`, `0` when it came from `INSERT`/`UPDATE`.
 ///
@@ -381,9 +353,6 @@ struct Journals {
     delete_ts: Vec<u64>,
 }
 
-fn del_prefix(table: &str) -> Vec<u8> {
-    format!("del:{table}:").into_bytes()
-}
 /// `rank_features` contribution: `cell` is a JSON array of
 /// `{"<tag>": <number>}` objects, and each listed tag adds `number * weight`.
 /// A missing tag contributes nothing.
@@ -10495,21 +10464,6 @@ impl Engine {
         Some(shared)
     }
 
-    /// Reserves a contiguous block of `n` row ids for `table`.
-    /// A `u64` list persisted under `key`, loaded once per table.
-    fn load_id_log(&self, key: &[u8]) -> Vec<u64> {
-        self.storage
-            .catalog.store()
-            .get(key)
-            .ok()
-            .flatten()
-            .map(|v| {
-                v.chunks_exact(8)
-                    .map(|c| u64::from_le_bytes(c.try_into().unwrap_or([0; 8])))
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
 
     fn write_id_log(&self, key: &[u8], ids: &[u64]) -> Result<()> {
         let mut bytes = Vec::with_capacity(ids.len() * 8);
