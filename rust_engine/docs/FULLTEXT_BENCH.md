@@ -200,6 +200,36 @@ row id 折算成槽位列表传进 `decode_rows_of_values` 的 `rows_wanted`，�
 即使字节本来就合法。现在先用 `str::from_utf8` 走快路径、只在真非法时才退回 lossy，
 profile 里这块消失（墙钟在噪声内，省下的量被重新归到游标上）。
 
+### 3.3 多词 WAND 剩下的 1.2–1.3× 在哪
+
+把 §3.2 的计数换算成单价（100 词、1M 文档）：
+
+| | 参考 C++ | 端口 Rust |
+|---|---|---|
+| pivot 轮数 | 97,021 | 98,852 |
+| 每轮成本 | 340 ns | 394 ns |
+| 子游标推进 | 256,096 | 约 260,000（`child_advances` 把 resolve 和 push_back 各记一次） |
+| 每次推进成本 | 129 ns | 150 ns |
+| 精确打分 | 394 | 288 |
+| 解码的 posting | ≈推进次数（逐条走） | 277,838（正好每篇 posting 一次） |
+
+轮数、堆操作、推进次数、解码量都在 3% 以内——**算法层面没有差的了**，差的是每次推进的常数：
+端口每次推进要跨四层 `WandStream` → `TermStream` → `MergeCursor`（`single`/`concat` 分支 +
+range 判断）→ `Source` → `TermDocCursor`（`ensure` + 块内扫描），每层一次枚举匹配；参考是一次虚调用。
+
+两条还没有吃掉的开销，都在游标层：
+
+1. **每条 posting 被物化两次**：`TermDocCursor::fill` 把 128 条解进 `rows/tfs/ordinals` 三个 Vec，
+   `TermStream::load` 再通过 `posting()` 复制进自己的 `docs/tfs/lens` 三个 Vec。按 27.8 万条 posting
+   算，每条多三次写入 + 三次读取。修法是让 `load` 直接从段游标的解码块填充（或在块边界上借用它），
+   省掉中间那一份。
+2. **块上界每块重算**：`block_stats` 对 128 条 tf 扫一遍、每条做一次 `tf/len` 浮点除法（2223 块/查询，
+   约 28 万次），而参考直接从 skip list 的 `block_max_tf` / `block_max_percentage` 读，O(1)。
+
+不是杠杆的东西：**跳表 seek**。看起来端口`TermDocCursor::advance` 是线性扫描（没有用 skip list 跳块），
+但这个负载上参考自己 97k 轮只做了 2,247 次块级 seek——两个实现都在逐条推进，跳表省不到东西；
+它只对「跳很远」的稀疏词有用，不在多词查询的路径上。
+
 ## 4. 这一轮改了什么
 
 ### 4.1 posting list 改成迭代器（核心）
