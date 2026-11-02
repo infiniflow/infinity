@@ -99,6 +99,8 @@ public:
     TxnTimeStamp LastCheckpointTS() const;
     void SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts);
 
+    void RecycleWalFile(TxnTimeStamp ckp_ts);
+
     std::vector<std::shared_ptr<std::string>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
 
@@ -133,7 +135,9 @@ private:
 
     // Only Flush thread access following members
     std::ofstream ofs_{};
-    FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};
+    // Kept only for configuration compatibility. It is never read: NewFlush() supports a single
+    // behavior and always flushes + fsyncs the WAL, no matter which FlushOptionType is configured.
+    [[maybe_unused]] FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};
     std::unique_ptr<BottomExecutor> bottom_executor_{nullptr};
 
     // Flush and Checkpoint threads access following members
@@ -143,6 +147,12 @@ private:
     i64 wal_size_{};
     i64 last_ckp_wal_size_{};
     std::atomic<bool> checkpoint_in_progress_{false};
+
+    // Begin ts of the last checkpoint whose WAL entry reached the disk (0: none yet). Written by the
+    // WAL flush thread after its fsync, read by the thread committing that checkpoint: RecycleWalFile()
+    // only deletes the wal.log.* files when the checkpoint it is asked to recycle carries this ts, so
+    // an unsynced checkpoint keeps them for the next one.
+    std::atomic<TxnTimeStamp> last_synced_ckp_ts_{0};
 
     // Only Checkpoint/Cleanup thread access following members
     mutable std::mutex last_ckp_ts_mutex_{};

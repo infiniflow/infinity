@@ -144,6 +144,19 @@ void WalManager::SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts) {
     return;
 }
 
+void WalManager::RecycleWalFile(TxnTimeStamp ckp_ts) {
+    if (ckp_ts == 0 || ckp_ts == UNCOMMIT_TS) {
+        LOG_ERROR(fmt::format("Skip recycling wal files, unexpected checkpoint ts: {}", ckp_ts));
+        return;
+    }
+    // Recycling deletes: only a checkpoint whose entry is already synced may do it.
+    if (last_synced_ckp_ts_.load() != ckp_ts) {
+        LOG_ERROR(fmt::format("Skip recycling wal files: checkpoint entry of ts {} is not synced", ckp_ts));
+        return;
+    }
+    WalFile::Recycle(ckp_ts, wal_dir_);
+}
+
 std::vector<std::shared_ptr<std::string>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
 
     std::vector<std::shared_ptr<std::string>> log_strings;
@@ -260,6 +273,7 @@ void WalManager::NewFlush() {
 
         LOG_TRACE(fmt::format("Attempt to write {} logs", txn_batch.size()));
 
+        NewTxn *checkpoint_txn = nullptr;
         for (const auto &txn : txn_batch) {
             if (txn == nullptr) {
                 // terminate entry
@@ -290,6 +304,7 @@ void WalManager::NewFlush() {
                                      txn->BeginTS(),
                                      txn->CommitTS(),
                                      txn->TxnID()));
+                checkpoint_txn = txn;
                 this->SwapWalFile(max_commit_ts_, true);
             }
 
@@ -326,18 +341,20 @@ void WalManager::NewFlush() {
             break;
         }
 
-        switch (flush_option_) {
-            case FlushOptionType::kFlushAtOnce: {
-                ofs_.flush();
-                break;
-            }
-            case FlushOptionType::kOnlyWrite: {
-                ofs_.flush(); // FIXME: not flush, only write
-                break;
-            }
-            case FlushOptionType::kFlushPerSecond: {
-                ofs_.flush(); // FIXME: not flush, flush per second
-                break;
+        // Always flush and fsync, whichever FlushOptionType is configured.
+        ofs_.flush();
+        // Syncs the current wal file; entries written before a mid-batch swap are synced in SwapWalFile().
+        Status sync_status = VirtualStore::Sync(wal_path_);
+        if (!sync_status.ok()) {
+            LOG_ERROR(fmt::format("Fail to sync wal file {}: {}", wal_path_, sync_status.message()));
+        }
+
+        // Publish the checkpoint ts only after its entry is synced; the recycler skips otherwise.
+        if (checkpoint_txn != nullptr) {
+            if (sync_status.ok()) {
+                last_synced_ckp_ts_ = checkpoint_txn->BeginTS();
+            } else {
+                LOG_ERROR(fmt::format("Fail to sync checkpoint entry in {}: {}", wal_path_, sync_status.message()));
             }
         }
 
@@ -508,7 +525,12 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_dup
         return;
     }
 
+    // Sync the file before renaming it away: nothing fsyncs the rotated file afterwards.
     if (ofs_.is_open()) {
+        ofs_.flush();
+        if (Status status = VirtualStore::Sync(wal_path_); !status.ok()) {
+            LOG_ERROR(fmt::format("Fail to sync wal file {} before swapping to a new one: {}", wal_path_, status.message()));
+        }
         ofs_.close();
     }
 
