@@ -476,15 +476,8 @@ impl<'a> BlockMaxWandIterator<'a> {
                 return true;
             }
             // Reposition the cursors the last pivot parked on the candidate.
-            // Everything else still in the heap already sits above doc_id, so
-            // this is the whole of the reference's "lists[0] .. lists[pivot]".
-            for i in std::mem::take(&mut self.prefix) {
-                let cursor = &mut self.cursors[i];
-                if cursor.cur.is_some_and(|doc| doc < target) {
-                    cursor.seek(target);
-                }
-                self.push_back(i);
-            }
+            // Everything else still in the heap already sits above doc_id.
+            self.advance_prefix(target);
         }
         loop {
             self.rounds += 1;
@@ -495,8 +488,8 @@ impl<'a> BlockMaxWandIterator<'a> {
             if self.total_upper < self.threshold {
                 break;
             }
-            // FindPivotOptimized: the pivot is the first prefix whose upper
-            // bound reaches the threshold, so pop just that prefix.
+            // (1) FindPivotOptimized: the pivot is the first prefix whose upper
+            // bound reaches the threshold, plus everything tied on its document.
             let mut sum = 0.0;
             let mut pivot = None;
             while let Some(Reverse((doc, i))) = self.heap.pop() {
@@ -511,7 +504,6 @@ impl<'a> BlockMaxWandIterator<'a> {
             let Some(doc) = pivot else {
                 break;
             };
-            // Every other cursor tied on the pivot document joins the prefix.
             while let Some(&Reverse((tied, i))) = self.heap.peek() {
                 if tied != doc {
                     break;
@@ -520,32 +512,49 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.heap_ops += 1;
                 self.prefix.push(i);
             }
-            // If lists[0] is not on the pivot document yet, another list owns it:
-            // move the prefix up to it and re-pivot.
-            if self.cursors[self.prefix[0]].cur != Some(doc) {
-                self.jumps += 1;
-                for i in std::mem::take(&mut self.prefix) {
-                    let cursor = &mut self.cursors[i];
-                    if cursor.cur.is_some_and(|cur| cur < doc) {
-                        cursor.seek(doc);
-                    }
-                    self.push_back(i);
-                }
-                continue;
-            }
-            // NextShallow + BlockMaxBM25Score over the prefix. Every prefix cursor
-            // sits on doc, so the sum bounds doc's exact score.
-            let mut block_bound = 0.0;
+            // (2) Upper bound at the candidate. A cursor parked on the document
+            // or inside a block that covers it contributes that block's bound; a
+            // cursor whose block ends before the candidate contributes nothing
+            // (it has no posting there); one that has to move first gets a
+            // block-level seek, which then decides which of the two it is.
+            let mut sum_at_doc = 0.0;
             for k in 0..self.prefix.len() {
                 let i = self.prefix[k];
-                block_bound += self.cursors[i].block_max(self.mode);
+                if self.cursors[i].cur != Some(doc) {
+                    if self.cursors[i].block_last() >= doc {
+                        sum_at_doc += self.cursors[i].block_max(self.mode);
+                        continue;
+                    }
+                    self.cursors[i].seek(doc);
+                    self.resolve(i);
+                    if self.cursors[i].cur != Some(doc) {
+                        continue;
+                    }
+                }
+                sum_at_doc += self.cursors[i].block_max(self.mode);
             }
-            if block_bound >= self.threshold {
-                // Only now is the exact score decoded.
-                let score = self.score_prefix();
-                self.doc_id = Some(doc);
-                self.candidate_score = score;
-                return true;
+            // (3) Decision, the same shape as the reference's: score only when
+            // every prefix cursor is parked on the candidate, and only return a
+            // document whose exact score beats the k-th.
+            if sum_at_doc > self.threshold {
+                if self
+                    .prefix
+                    .iter()
+                    .all(|&i| self.cursors[i].cur == Some(doc))
+                {
+                    let score = self.score_prefix();
+                    if score > self.threshold {
+                        self.doc_id = Some(doc);
+                        self.candidate_score = score;
+                        return true;
+                    }
+                } else {
+                    // A cursor still sits before the candidate: advance the
+                    // prefix to it and re-pivot.
+                    self.jumps += 1;
+                    self.advance_prefix(doc);
+                    continue;
+                }
             }
             self.skip_blocks(doc);
             for i in std::mem::take(&mut self.prefix) {
@@ -554,6 +563,28 @@ impl<'a> BlockMaxWandIterator<'a> {
         }
         self.doc_id = None;
         false
+    }
+
+    /// Moves the prefix cursors that sit before doc up to it and hands them back
+    /// to the heap.
+    fn advance_prefix(&mut self, doc: u64) {
+        for i in std::mem::take(&mut self.prefix) {
+            let cursor = &mut self.cursors[i];
+            if cursor.cur.is_some_and(|cur| cur < doc) {
+                cursor.seek(doc);
+            }
+            self.push_back(i);
+        }
+    }
+
+    /// Resolves a cursor the round moved: its document, and the bound of the
+    /// block it landed on (which also refreshes block_last_doc).
+    fn resolve(&mut self, i: usize) {
+        self.cursors[i].ensure();
+        self.child_advances += 1;
+        if self.cursors[i].cur.is_some() {
+            self.cursors[i].block_max(self.mode);
+        }
     }
 
     /// block_max=false: hand back the smallest document any unit matches, with
@@ -591,46 +622,78 @@ impl<'a> BlockMaxWandIterator<'a> {
         true
     }
 
-    /// The reference's block-skip path (`blockmax_wand_iterator_impl.cpp:449-524`):
-    /// while the prefix's block bound cannot reach the k-th score, step every
-    /// prefix cursor to the end of its block and try again. Nothing is resolved
-    /// here, so the skipped ranges never decode document offsets (`NextShallow`).
-    fn skip_blocks(&mut self, mut from: u64) {
-        loop {
-            // `block_last_doc` of the prefix is fresh: either the caller just
-            // computed the block bound, or the loop below did. A block never
-            // runs past the next cursor in doc order.
-            let up_to = self.heap.peek().map(|&Reverse((doc, _))| doc);
-            let mut block_last = u64::MAX;
-            for k in 0..self.prefix.len() {
-                block_last = block_last.min(self.cursors[self.prefix[k]].block_last());
+    /// The reference's block-skip path (SkipUncompetitiveRange,
+    /// heap_blockmax_wand_iterator_impl.cpp:196-341), in its three phases: move
+    /// block cursors only, prove range by range that nothing in there can
+    /// compete while moving the cursor whose block ends first, then position the
+    /// prefix so the round can hand the cursors back to the heap.
+    fn skip_blocks(&mut self, from: u64) {
+        let start = from + 1;
+        let up_to = self.heap.peek().map(|&Reverse((doc, _))| doc);
+
+        // (1) Block-level reposition (NextShallow): a cursor whose current block
+        // already covers start stays where it is.
+        for k in 0..self.prefix.len() {
+            let i = self.prefix[k];
+            if self.cursors[i].cur.is_some_and(|cur| cur >= start) {
+                continue;
             }
-            if block_last == u64::MAX {
-                return;
+            if self.cursors[i].block_last() >= start {
+                continue;
+            }
+            self.cursors[i].seek(start);
+            self.resolve(i);
+        }
+
+        // (2) Repeat "this block range cannot compete" and push the cursor whose
+        // block ends first forward by one block.
+        let mut next_doc = start;
+        loop {
+            let mut sum_range = 0.0;
+            let mut min_last = u64::MAX;
+            let mut earliest = None;
+            for k in 0..self.prefix.len() {
+                let i = self.prefix[k];
+                if self.cursors[i].cur.is_none() {
+                    continue;
+                }
+                let last = self.cursors[i].block_last();
+                if last < next_doc {
+                    // Its block ends before the range: it contributes nothing.
+                    continue;
+                }
+                sum_range += self.cursors[i].block_max(self.mode);
+                if last < min_last {
+                    min_last = last;
+                    earliest = Some(i);
+                }
+            }
+            let Some(i) = earliest else { break };
+            // '>' like the reference: a range that can only tie cannot produce a
+            // document that beats the k-th (ties never win on a larger doc id).
+            if sum_range > self.threshold {
+                break;
             }
             let skip_to = match up_to {
-                Some(up_to) => (block_last + 1).min(up_to),
-                None => block_last + 1,
+                Some(up_to) => (min_last + 1).min(up_to),
+                None => min_last + 1,
             };
-            if skip_to <= from {
-                return;
+            if skip_to <= next_doc {
+                break;
             }
-            for k in 0..self.prefix.len() {
-                let i = self.prefix[k];
-                self.cursors[i].seek(skip_to);
+            self.cursors[i].seek(skip_to);
+            self.resolve(i);
+            next_doc = skip_to;
+        }
+
+        // (3) Position every prefix cursor at or after next_doc.
+        for k in 0..self.prefix.len() {
+            let i = self.prefix[k];
+            if self.cursors[i].cur.is_some_and(|cur| cur >= next_doc) {
+                continue;
             }
-            // The bound of the blocks the prefix cursors now sit on.
-            let mut bound = 0.0;
-            let mut last = u64::MAX;
-            for k in 0..self.prefix.len() {
-                let i = self.prefix[k];
-                bound += self.cursors[i].block_max(self.mode);
-                last = last.min(self.cursors[i].block_last());
-            }
-            if bound >= self.threshold || last == u64::MAX {
-                return;
-            }
-            from = skip_to;
+            self.cursors[i].seek(next_doc);
+            self.resolve(i);
         }
     }
 
