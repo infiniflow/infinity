@@ -186,8 +186,19 @@ heap 版参考没有这一步：它在候选文档上直接用「块覆盖候选
 `TermStream::load` 从 16% 掉到 8%、`MergeCursor::doc/advance` 直接掉出前 12；
 端到端 100 词 41.1 → 39.0 ms、200 词 86.6 → 84.8 ms（最小值），中位数变化在噪声内。
 
-现在计时里最大的一块已经不是游标，而是**取结果行**：`decode_rows_of_values` + UTF-8 校验
-+ 字符串裁剪合计约 20%，因为 10 个 row id 会解出它们所在的整个块（8192 行 × 3 列）。
+取结果行一度看着像最大的一块（profile 里 `decode_rows_of_values` + UTF-8 约 20%），实测并不是：
+
+| topn | 100 词查询 |
+|---|---|
+| 1 | 39.3 ms |
+| 10 | 39.8 ms |
+| 100 | 40.9 ms |
+
+取 10 行只比取 1 行多 0.5 ms（约 1.3%），说明这条路径**没有整块解码**——`BlockCursor::rows` 把
+row id 折算成槽位列表传进 `decode_rows_of_values` 的 `rows_wanted`，循环只走这些槽位，块里
+8192 行不会碰。那 20% 是 `String::from_utf8_lossy`：它对每个文本单元都按 UTF-8 chunk 迭代，
+即使字节本来就合法。现在先用 `str::from_utf8` 走快路径、只在真非法时才退回 lossy，
+profile 里这块消失（墙钟在噪声内，省下的量被重新归到游标上）。
 
 ## 4. 这一轮改了什么
 

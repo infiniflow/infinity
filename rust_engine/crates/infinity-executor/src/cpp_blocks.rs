@@ -1765,13 +1765,13 @@ fn decode_value_shaped(
             };
             // Json cells are BSON (`JsonManager::to_bson`), so a JSON column is
             // rendered back to its text form; varchar is already text.
-            if type_text.trim().eq_ignore_ascii_case("json") {
+            if is_json_column(type_text) {
                 Some(match infinity_common::json::Json::from_bson(bytes) {
                     Some(json) => json.compact(),
-                    None => String::from_utf8_lossy(bytes).to_string(),
+                    None => text_or_lossy(bytes),
                 })
             } else {
-                Some(String::from_utf8_lossy(bytes).to_string())
+                Some(text_or_lossy(bytes))
             }
         }
         ColumnLayout::VarLen(_) => None,
@@ -1875,6 +1875,23 @@ fn decode_scalar_value(
 
 /// [`crate::parse_value`] for a cell the decoder already owns, so a text cell
 /// moves into `Value::Str` instead of being copied into it.
+/// `JSON` / `json` / ` json `: the column's declared type, which the cell
+/// decoder re-tests for every cell it builds.
+fn is_json_column(type_text: &str) -> bool {
+    let t = type_text.trim();
+    t.len() == 4 && t.eq_ignore_ascii_case("json")
+}
+
+/// The cell's text. `String::from_utf8_lossy` walks the bytes as UTF-8 chunks
+/// even when they are valid, which is every cell of a well-formed table; try
+/// `str::from_utf8` first and keep the lossy form for the rest.
+fn text_or_lossy(bytes: &[u8]) -> String {
+    match std::str::from_utf8(bytes) {
+        Ok(text) => text.to_string(),
+        Err(_) => String::from_utf8_lossy(bytes).into_owned(),
+    }
+}
+
 fn parse_owned_value(cell: String) -> Value {
     if let Ok(i) = cell.parse::<i64>() {
         Value::Int(i)
