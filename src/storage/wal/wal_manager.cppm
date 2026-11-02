@@ -15,6 +15,7 @@
 export module infinity_core:wal_manager;
 
 import :blocking_queue;
+import :local_file_handle;
 import :log_file;
 import :options;
 
@@ -134,7 +135,8 @@ private:
     BlockingQueue<NewTxn *> new_wait_flush_{"WalManager"};
 
     // Only Flush thread access following members
-    std::ofstream ofs_{};
+    // The current wal file
+    std::unique_ptr<LocalFileHandle> wal_handle_{nullptr};
     // Kept only for configuration compatibility. It is never read: NewFlush() supports a single
     // behavior and always flushes + fsyncs the WAL, no matter which FlushOptionType is configured.
     [[maybe_unused]] FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};

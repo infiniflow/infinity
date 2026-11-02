@@ -127,6 +127,10 @@ std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const st
             fd = open(path.c_str(), O_RDWR | O_CREAT, 0666);
             break;
         }
+        case FileAccessMode::kAppend: {
+            fd = open(path.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+            break;
+        }
         case FileAccessMode::kMmapRead: {
             UnrecoverableError("Unsupported now.");
             break;
@@ -307,22 +311,6 @@ Status VirtualStore::Truncate(const std::string &file_name, size_t new_length) {
     std::filesystem::resize_file(file_name, new_length, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Failed to truncate {} to size {}", file_name, strerror(errno)));
-    }
-    return Status::OK();
-}
-
-Status VirtualStore::Sync(const std::string &file_name) {
-    if (!std::filesystem::path(file_name).is_absolute()) {
-        UnrecoverableError(fmt::format("{} isn't absolute path.", file_name));
-    }
-    const i32 fd = open(file_name.c_str(), O_RDWR | O_CLOEXEC);
-    const i32 ret = fd == -1 ? -1 : fsync(fd);
-    const i32 sync_errno = errno;
-    if (fd != -1) {
-        close(fd);
-    }
-    if (ret == -1) {
-        return Status::IOError(fmt::format("Can't sync file {}: {}", file_name, strerror(sync_errno)));
     }
     return Status::OK();
 }
