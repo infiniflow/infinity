@@ -4006,6 +4006,49 @@ impl<'a> Source<'a> {
         }
     }
 
+    /// Appends up to max postings to the caller's three columns and returns how
+    /// many it took. A sealed chunk already holds them decoded, so that case
+    /// copies the slices instead of going through posting() per entry.
+    fn extend_block(
+        &mut self,
+        docs: &mut Vec<u64>,
+        tfs: &mut Vec<u32>,
+        lens: &mut Vec<u32>,
+        max: usize,
+    ) -> usize {
+        if let Source::Segment(cur) = self {
+            // A block the cursor has not decoded yet has to be loaded first;
+            // block() only reports what is already there.
+            if cur.doc().is_none() {
+                return 0;
+            }
+            let Some((rows, tfs_at, _)) = cur.block() else {
+                return 0;
+            };
+            let n = rows.len().min(max);
+            docs.extend_from_slice(&rows[..n]);
+            tfs.extend_from_slice(&tfs_at[..n]);
+            lens.reserve(n);
+            for i in 0..n {
+                lens.push(cur.doc_len_at(i));
+            }
+            cur.skip(n);
+            return n;
+        }
+        let mut n = 0;
+        while n < max {
+            let Some((doc, tf, len)) = self.posting() else {
+                break;
+            };
+            docs.push(doc);
+            tfs.push(tf);
+            lens.push(len);
+            self.advance(doc + 1);
+            n += 1;
+        }
+        n
+    }
+
     fn advance(&mut self, target: u64) {
         match self {
             Source::Mem { list, at, .. } => {
@@ -4213,6 +4256,58 @@ impl<'a> MergeCursor<'a> {
             self.dirty = false;
             return;
         }
+    }
+
+    /// Appends postings to the caller's block, one call per source instead of
+    /// one per posting. Returns false when the cursor has nothing left.
+    pub(crate) fn extend_block(
+        &mut self,
+        docs: &mut Vec<u64>,
+        tfs: &mut Vec<u32>,
+        lens: &mut Vec<u32>,
+        max: usize,
+    ) -> bool {
+        if self.single {
+            return self.sources[0].extend_block(docs, tfs, lens, max) > 0;
+        }
+        if self.concat {
+            let mut filled = 0;
+            while filled < max {
+                if self.cached.is_none() {
+                    self.cached = self.pull_concat();
+                    if self.cached.is_none() {
+                        break;
+                    }
+                }
+                let n = self.sources[self.next].extend_block(docs, tfs, lens, max - filled);
+                if n == 0 {
+                    // This source ran out: move to the next one.
+                    self.cached = None;
+                    if self.next + 1 >= self.sources.len() {
+                        break;
+                    }
+                    self.next += 1;
+                    continue;
+                }
+                filled += n;
+            }
+            // The block holds these postings now: the merge's current document
+            // is the next one, not the one the cache still names.
+            self.cached = None;
+            return filled > 0;
+        }
+        let mut n = 0;
+        while n < max {
+            let Some((doc, tf, len)) = self.posting() else {
+                break;
+            };
+            docs.push(doc);
+            tfs.push(tf);
+            lens.push(len);
+            self.advance(doc + 1);
+            n += 1;
+        }
+        n > 0
     }
 
     /// The current posting (row, tf, document length) in one call. The single
@@ -4526,20 +4621,28 @@ impl<'a> TermStream<'a> {
         self.pos.clear();
         self.at = 0;
         self.stats_ready = false;
-        while self.docs.len() < WAND_BLOCK {
-            // One call for the whole posting: the three accessors would each
-            // re-dispatch, and the segment's would each re-run ensure().
-            let Some((doc, tf, len)) = self.merge.posting() else {
-                break;
-            };
-            if self.capture {
+        if self.capture {
+            // A phrase child needs each posting's offsets, which only the
+            // per-posting path can hand back.
+            while self.docs.len() < WAND_BLOCK {
+                let Some((doc, tf, len)) = self.merge.posting() else {
+                    break;
+                };
                 let positions = self.merge.positions();
                 self.pos.push(positions);
+                self.docs.push(doc);
+                self.tfs.push(tf);
+                self.lens.push(len);
+                self.merge.advance(doc + 1);
             }
-            self.docs.push(doc);
-            self.tfs.push(tf);
-            self.lens.push(len);
-            self.merge.advance(doc + 1);
+        } else {
+            // Nothing is copied per posting here: a sealed chunk hands back its
+            // decoded mini-block in one call, and the merge copies the columns.
+            let mut left = WAND_BLOCK - self.docs.len();
+            while left > 0 && self.merge.extend_block(&mut self.docs, &mut self.tfs, &mut self.lens, left)
+            {
+                left = WAND_BLOCK.saturating_sub(self.docs.len());
+            }
         }
         if self.docs.is_empty() {
             return false;

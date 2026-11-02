@@ -524,6 +524,34 @@ impl<'a> TermDocCursor<'a> {
         self.at < self.rows.len() || self.fill()
     }
 
+    /// The rest of the decoded mini-block as the three columns the BM25 path
+    /// reads: rows, term frequencies and segment ordinals. A caller that wants
+    /// the whole block can copy the slices instead of pulling one posting per
+    /// call; `None` once the block is exhausted.
+    pub fn block(&self) -> Option<(&[u64], &[u32], &[u32])> {
+        if self.at >= self.rows.len() {
+            return None;
+        }
+        Some((
+            &self.rows[self.at..],
+            &self.tfs[self.at..],
+            &self.ordinals[self.at..],
+        ))
+    }
+
+    /// The document length of the block entry `i` positions ahead of the
+    /// cursor (the same `.len` read [`Self::len`] does, without re-checking
+    /// the block).
+    pub fn doc_len_at(&self, i: usize) -> u32 {
+        let ordinal = self.ordinals.get(self.at + i).copied().unwrap_or(u32::MAX);
+        self.reader.doc_len(ordinal).unwrap_or(1)
+    }
+
+    /// Consumes `n` entries of the decoded block.
+    pub fn skip(&mut self, n: usize) {
+        self.at = (self.at + n).min(self.rows.len());
+    }
+
     /// The current document (`INVALID_ROW_ID` on the reference's exhausted
     /// cursor).
     pub fn doc(&mut self) -> Option<u64> {
