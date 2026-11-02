@@ -239,10 +239,10 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 
 ### 3.2 第三方依赖对照
 
-参考版通过 vcpkg 与自带 third_party/ 引入 C/C++ 库；重写版只用 9 个外部 crate（Cargo.toml）。这张表按**处理方式**分组，因为「链接同一个库」和「按字节重写」是两件不同的事，混在一张表里会读错：
+参考版通过 vcpkg 与自带 third_party/ 引入 C/C++ 库；重写版只用 9 个外部 crate（Cargo.toml）。这张表按**处理方式**分组，因为「链接同一个库」和「重写需要的部分」是两件不同的事，混在一张表里会读错：
 
 - **链接同名后端**——只有三个。它们的字节由库自己定义，重写等于重写整个库，且没有收益。
-- **按字节重写 + 金标准门禁**——凡是决定磁盘上「哪个字节是什么」的：编码器、词典格式、索引格式。每条都对着参考的真实输出做逐字节对拍，规模是实测的生产代码行数（不含注释与测试）。
+- **重写需要的部分 + 金标准门禁**——凡是决定磁盘上「哪个字节是什么」的：编码器、词典格式、索引格式。只实现参考实际走到的那条路径，每条都对着参考的真实输出做逐字节对拍；规模是实测的生产代码行数（不含注释与测试）。
 - **不移植**——GAPS.md §1 已登记的决定。
 
 #### 链接同名后端
@@ -253,26 +253,29 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 | **Thrift**（vcpkg） | src/network、RPC 与 SDK | thrift crate | 只用协议层，服务端实现自写 |
 | **roaring**（vcpkg，CRoaring） | WAL 的 NullBitmap（RoaringBitmap<true>::WriteAdv）、低基数索引的 portable 位图 | roaring crate（wal/block.rs:406、447；secondary_lowcard.rs） | 字节必须与 CRoaring 的 portable 格式一致，同样没有替代空间 |
 
-#### 按字节重写
+#### 重写需要的部分
 
-| 参考 | 用在哪 | 重写版 | 规模 | 怎么钉住 |
+每行的「行数」是**这一段功能的生产代码行数**（不含注释、不含 `#[cfg(test)]`），不是文件长度——多数文件只截取了与参考对应的那部分。
+
+| 参考 | 用在哪 | 重写版（.rs 文件 · 函数） | 行数 | 怎么钉住 |
 |---|---|---|---|---|
-| **FastPFor**（vcpkg 的 libFastPFOR.a） | 倒排 u32 块：doc id / tf / skip list / 位置 | inverted_format 的 encode_u32_block / decode_u32_block | **261 行** | u32_block_matches_the_cpp_bytes：7 组 C++ 输出 hex 字面量，覆盖纯 VB、SIMD+VB、bw1/bw2 |
-| **newpfor**（third_party/newpfor，IndexLib） | 倒排 u16 块：doc payload / term percentage | inverted_format 的 encode_u16_block / decode_u16_block | **464 行** | u16_block_decodes_the_cpp_bytes：C++ 输出逐字节，含六种特殊帧与 S9 异常区 |
-| **darts-clone**（third_party/darts） | RAG 词典 trie | analyzer::DartsTrie（读）+ darts_build（建） | **读 74 行、建 953 行** | 建出的 trie 与随包 huqie.trie 逐字节相同（1,893,632 units） |
-| **OpenCC**（third_party/opencc + marisa） | traditional 分析器、RAG 简繁转换 | analyzer::OpenCcConverter | **263 行** | test_opencc_converts_traditional_to_simplified 等 + 分词一致性 |
-| **cppjieba**（third_party/cppjieba） | chinese 分析器 | analyzer 的 JiebaDict / Jieba | **413 行** | 分词结果与参考对齐（TEST_AUDIT.md） |
-| **ijma / MeCab**（third_party/ijma） | japanese / korean 分析器 | analyzer 的 MeCab 部分（词典解析、Viterbi、连接矩阵） | **860 行** | 参考 japanese/korean 分析器单测 |
-| **zlib**（只用于 MeCab sys.bin，ijma darts.h:18 的 gzread） | 解这一个文件的 DEFLATE 流 | analyzer 的 inflate / zlib_decompress | **266 行** | 解出长度与 sys.bin 记录的 total_size 一致，再走词典解析 |
-| **RE2**（vcpkg） | regex(col, pattern) 谓词、LIKE 转正则 | infinity-expression 的 regex（回溯引擎）+ regex_literal | **525 + 681 行** | 参考 regex_impl.cpp / like_impl.cpp 的行为 |
-| **PCRE2**（vcpkg） | ① 分析器 W+ 全局替换；② 高亮器的 PCRE2_CASELESS 匹配 | ① analyzer 的 strip_non_word*（字符类 + 位置映射）；② highlight_text / highlight_with_analyzer | **14 + 约 60 行** | ① Tokenize 与 TokenizeWithPosition 的输出和位置；② highlighter_ut 的移植 |
-| **simdjson**（vcpkg） | JSONL 语料、JSON 列 | infinity_common 的 json | — | JSON 列往返 |
-| **nlohmann_json**（vcpkg） | 列值 / catalog 的 JSON | infinity_catalog 的 value_format / cpp_layout | — | catalog 键值逐字节门禁（键序相同） |
-| **zsv**（third_party/zsv） | COPY ... (FORMAT CSV) 的解析 | csv_fields（lib.rs:23019） | — | 导入用例 |
-| **pgm-index**（third_party/pgm） | 次级/稀疏索引的分段模型 | infinity-index 的 PGM | — | SECONDARY_INDEX_BENCH.md |
-| **xor_singleheader**（third_party） | fast_rough_filter 的 fuse-8 构造 | infinity_storage::binary_fuse_filter | — | 过滤器假阴性为 0 |
-| **eigen / mlas**（third_party） | IVF/PQ 的矩阵运算、SGEMM | 手写距离核与训练 | — | TENSOR_INDEX_BENCH.md |
-| **LZ4**（vcpkg） | VirtualStore 溢写临时文件 | lz4_flex crate | — | 不进数据目录 |
+| **FastPFor**（vcpkg 的 libFastPFOR.a） | 倒排 u32 块：doc id / tf / skip list / 位置 | `infinity-storage/src/inverted_format.rs` · `encode_u32_block` / `decode_u32_block` | **261** | `u32_block_matches_the_cpp_bytes`：7 组 C++ 输出 hex 字面量，覆盖纯 VB、SIMD+VB、bw1/bw2 |
+| **newpfor**（third_party/newpfor） | 倒排 u16 块：doc payload / term percentage | 同上文件 · `encode_u16_block` / `decode_u16_block` | **464** | `u16_block_decodes_the_cpp_bytes`：C++ 输出逐字节，含六种特殊帧与 S9 异常区 |
+| **darts-clone**（third_party/darts） | RAG 词典 trie | `executor/src/analyzer.rs` · `DartsTrie`（读）<br>`executor/src/darts_build.rs`（建） | **74 + 808** | 建出的 trie 与随包 `huqie.trie` 逐字节相同（1,893,632 units） |
+| **OpenCC**（third_party/opencc + marisa） | `traditional` 分析器、RAG 简繁转换 | `executor/src/analyzer.rs` · `OpenCcDict` / `OpenCcConverter` / `TraditionalChineseAnalyzer`（只重写最短路径分词，不含 marisa 构建器） | **263** | `test_opencc_converts_traditional_to_simplified` 等 + 分词一致性 |
+| **cppjieba**（third_party/cppjieba） | `chinese` 分析器 | `executor/src/analyzer.rs` · `JiebaDict` / `Jieba`（词典查找 + HMM + 粗/细切分） | **413** | 分词结果与参考对齐（`TEST_AUDIT.md`） |
+| **ijma / MeCab**（third_party/ijma） | `japanese` / `korean` 分析器 | `executor/src/analyzer.rs` · 词典解析 + Viterbi + 连接矩阵（不含 lattice 未用分支与字典训练） | **860** | 参考 `japanese`/`korean` 分析器单测 |
+| **zlib**（只用于 MeCab `sys.bin`） | 解这一个文件的 DEFLATE 流 | `executor/src/analyzer.rs` · `InflateBits` / `inflate` / `zlib_decompress`（不含压缩、gzip 封装与预设字典） | **266** | 解出长度与 `sys.bin` 记录的 `total_size` 一致 |
+| **RE2**（vcpkg） | `regex(col, pattern)` 谓词、`LIKE` 转正则 | `expression/src/regex.rs`（回溯引擎）<br>`expression/src/regex_literal.rs`（必含字面量提取） | **455 + 528** | 参考 `regex_impl.cpp` / `like_impl.cpp` 的行为 |
+| **PCRE2**（vcpkg） | ① 分析器 `\W+` 替换；② 高亮器的 case-insensitive 匹配 | ① `executor/src/analyzer.rs` · `strip_non_word*`<br>② `executor/src/lib.rs` · `highlight_text` / `highlight_with_analyzer` | **14 + 60** | ① `Tokenize` 的输出与位置；② `highlighter_ut` |
+| **simdjson**（vcpkg） | JSONL 语料、JSON 列 | `infinity-common/src/json.rs` · `Json` 解析/打印/BSON 互转 | **543** | `json::tests` 与 JSON 列往返 |
+| **nlohmann_json**（vcpkg） | 列值 / catalog 的 JSON | `infinity-catalog/src/value_format.rs` · 列定义、索引定义、类型信息的 JSON<br>`infinity-catalog/src/cpp_layout.rs` · catalog 键与值的组装 | **933 + 2131** | catalog 键值逐字节门禁（键序相同） |
+| **zsv**（third_party/zsv） | `COPY … (FORMAT CSV)` 的解析 | `executor/src/lib.rs` · `csv_fields`（引号与转义；不含参考的流式状态机） | **32** | 导入用例 |
+| **pgm-index**（third_party/pgm） | 次级/稀疏索引的分段模型 | `infinity-storage/src/secondary_segment.rs` · `Pgm` / `PgmFloat`（只做参考实例化的特化） | **1104** | chunk 尾部的 PGM 与参考同字节 |
+| **xor_singleheader**（third_party） | `fast_rough_filter` 的 fuse-8 构造 | `infinity-storage/src/binary_fuse_filter.rs` · `BinaryFuseFilter` | **322** | 假阴性为 0；130 字节记录与参考同字节 |
+| **eigen**（third_party） | `EMVBSVDSolve` 的两侧 Jacobi SVD | `infinity-index/src/emvb.rs` · `jacobi_svd` / `real_2x2_jacobi_svd` | **434** | 参考 `eigen_svd_impl` 的数值结果 |
+| **mlas**（third_party） | `SearchTopK` 的 SGEMM | `infinity-index/src/knn_flat.rs` · `top_k`（标量距离核，不做批量 SGEMM；`simd.rs` 里另有 SIMD 路径） | **53** | `l2_top_k_matches_the_reference` 等 |
+| **LZ4**（vcpkg） | `VirtualStore` 溢写临时文件 | `infinity-storage/src/virtual_store.rs` · 容器（256 字节头 + 压缩体）；压缩本身由 `lz4_flex` crate 完成 | **280** | 只影响临时文件，不进数据目录 |
 
 #### 不移植或换实现（不进门禁）
 
@@ -307,7 +310,7 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 | sha2 / hmac / rustls / rustls-native-certs | S3 签名与 HTTPS | 无：只影响传输 |
 | thiserror / tokio / tempfile(dev) | 错误类型、运行时、测试目录 | 无 |
 
-最能说明问题的是编码器：**FastPFor 261 行 + newpfor 464 行**，换来与参考逐字节相同的 posting 块，这条路径上有 C++ 输出的 hex 金标准钉着。所以这里不是「翻译了一个重量级库」，而是「只实现了用到的那个编码路径，并用金标准验证」。FastPFor 的上游还有 OptPFor、SIMDNewPFor、StreamVByte 等十几个编码器，端口一个都没有；newpfor 也只实现了 u16 的 Compress/Decompress。
+最能说明问题的是编码器：**FastPFor 261 行 + newpfor 464 行**（都在 `inverted_format.rs` 一处），换来与参考逐字节相同的 posting 块，这条路径上有 C++ 输出的 hex 金标准钉着。这不是「翻译了一个重量级库」，而是「只实现了用到的那个编码路径」。FastPFor 上游还有 OptPFor、SIMDNewPFor、StreamVByte 等十几个编码器，端口一个都没有；newpfor 也只实现了 u16 的 `Compress`/`Decompress`。表中 `simdjson 543` / `nlohmann_json 933+2131` / `pgm 1088` 这个量级也是同一回事：都是「参考用到的那个方向」，不是完整库。
 
 ## 4 当前缺口
 
