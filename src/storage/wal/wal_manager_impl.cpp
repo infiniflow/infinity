@@ -305,6 +305,10 @@ void WalManager::NewFlush() {
                 this->SwapWalFile(max_commit_ts_, true);
                 if (txn->BeginTS() > last_ckp_begin_ts) {
                     last_ckp_begin_ts = txn->BeginTS();
+                } else {
+                    LOG_WARN(fmt::format("Checkpoint begin ts {} is not newer than the recorded {}, keep the recorded ts",
+                                         txn->BeginTS(),
+                                         last_ckp_begin_ts));
                 }
             }
 
