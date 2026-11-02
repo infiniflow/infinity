@@ -46,8 +46,8 @@
 use std::collections::BTreeMap;
 use std::fs::{self, File};
 
-use memmap2::Mmap;
 use crate::mapped::MappedFile;
+use memmap2::Mmap;
 
 use crate::cpp_format::FormatError;
 use crate::inverted_format::position_list::{
@@ -552,6 +552,19 @@ impl<'a> TermDocCursor<'a> {
     pub fn len(&mut self) -> u32 {
         let ordinal = self.ordinal();
         self.reader.doc_len(ordinal).unwrap_or(1)
+    }
+
+    /// The current posting in one call: row, term frequency and document
+    /// length. One `ensure` and one `.len` read for the three fields every
+    /// BM25 score needs, instead of one call each.
+    pub fn posting(&mut self) -> Option<(u64, u32, u32)> {
+        if !self.ensure() {
+            return None;
+        }
+        let row = *self.rows.get(self.at)?;
+        let tf = self.tfs.get(self.at).copied().unwrap_or(0);
+        let ordinal = self.ordinals.get(self.at).copied().unwrap_or(u32::MAX);
+        Some((row, tf, self.reader.doc_len(ordinal).unwrap_or(1)))
     }
 
     /// `GetCurrentTF` for the document [`Self::doc`] returned.

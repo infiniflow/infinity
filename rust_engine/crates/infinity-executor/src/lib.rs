@@ -3952,6 +3952,19 @@ pub(crate) enum Source<'a> {
 }
 
 impl<'a> Source<'a> {
+    /// The current posting in one dispatch: row, term frequency and document
+    /// length. doc/tf/len each re-match the enum, and the segment's tf and len
+    /// each re-run its ensure.
+    fn posting(&mut self) -> Option<(u64, u32, u32)> {
+        match self {
+            Source::Mem { list, lens, at, .. } => list
+                .get(*at)
+                .map(|p| (p.0, p.1, lens.get(&p.0).copied().unwrap_or(1))),
+            Source::Owned { list, at, .. } => list.get(*at).map(|p| (p.0, p.1, p.2)),
+            Source::Segment(cur) => cur.posting(),
+        }
+    }
+
     fn doc(&mut self) -> Option<u64> {
         match self {
             Source::Mem { list, at, .. } => list.get(*at).map(|p| p.0),
@@ -4200,6 +4213,24 @@ impl<'a> MergeCursor<'a> {
             self.dirty = false;
             return;
         }
+    }
+
+    /// The current posting (row, tf, document length) in one call. The single
+    /// source path - a term whose postings all live in one chunk or in the
+    /// memory tail - goes straight to it, with no merge state and no per-field
+    /// dispatch.
+    pub(crate) fn posting(&mut self) -> Option<(u64, u32, u32)> {
+        if self.single {
+            return self.sources[0].posting();
+        }
+        if self.concat {
+            if self.cached.is_none() {
+                self.cached = self.pull_concat();
+            }
+            return self.sources[self.next].posting();
+        }
+        self.settle();
+        self.cur.map(|(doc, tf, len, _)| (doc, tf, len))
     }
 
     /// The current document (None once every source is exhausted).
@@ -4496,9 +4527,11 @@ impl<'a> TermStream<'a> {
         self.at = 0;
         self.stats_ready = false;
         while self.docs.len() < WAND_BLOCK {
-            let Some(doc) = self.merge.doc() else { break };
-            let tf = self.merge.tf();
-            let len = self.merge.len();
+            // One call for the whole posting: the three accessors would each
+            // re-dispatch, and the segment's would each re-run ensure().
+            let Some((doc, tf, len)) = self.merge.posting() else {
+                break;
+            };
             if self.capture {
                 let positions = self.merge.positions();
                 self.pos.push(positions);
