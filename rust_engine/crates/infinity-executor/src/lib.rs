@@ -4718,15 +4718,22 @@ impl<'a> TermStream<'a> {
             return (u64::MAX, 0.0, 0.0);
         }
         if !self.stats_ready {
-            let mut max_tf = 0.0f64;
-            let mut max_pct = 0.0f64;
+            // The largest tf and the largest tf/doc-length ratio of the block.
+            // The ratio's winner is picked by cross-multiplication so the scan
+            // pays one floating division per block instead of one per posting.
+            let mut max_tf = 0u32;
+            let mut best_tf = 0u64;
+            let mut best_len = 1u64;
             for (tf, len) in self.tfs.iter().zip(&self.lens) {
-                let tf = f64::from(*tf);
-                max_tf = max_tf.max(tf);
-                max_pct = max_pct.max(tf / f64::from((*len).max(1)));
+                let len = u64::from((*len).max(1));
+                max_tf = max_tf.max(*tf);
+                if u64::from(*tf) * best_len > best_tf * len {
+                    best_tf = u64::from(*tf);
+                    best_len = len;
+                }
             }
-            self.max_tf = max_tf;
-            self.max_pct = max_pct;
+            self.max_tf = f64::from(max_tf);
+            self.max_pct = best_tf as f64 / best_len as f64;
             self.stats_ready = true;
         }
         (self.last, self.max_tf, self.max_pct)
