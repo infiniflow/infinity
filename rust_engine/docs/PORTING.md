@@ -237,6 +237,58 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 
 ---
 
+### 3.2 第三方依赖对照
+
+参考版通过 vcpkg + 自带 `third_party/` 引入二十多个 C/C++ 库；重写版只用 11 个仓内 crate 加 14 个外部 crate（`Cargo.toml`）。**凡是对磁盘格式有影响的，都是按字节重写而不是链接同一个库**——这才是"逐字节相同"能成立的原因：链接同一个库只能保证布局一致，重写还要保证编码参数、默认值和边界条件一致，所以每一行后面都跟着门禁或单测。
+
+| 参考 | 用在哪 | 重写版 | 备注 |
+|---|---|---|---|
+| **RocksDB**（vcpkg） | `catalog/` 与行 KV | `rocksdb` crate | 唯一链接同一个后端的库：目录要能被参考打开，SST 字节也要能被参考读，没有替代品的空间 |
+| **Thrift**（vcpkg） | `src/network`、RPC 与 SDK 协议 | `thrift` crate | 只用协议层，服务端实现自己写 |
+| **FastPFor**（vcpkg `libFastPFOR.a`） | 倒排 posting 的 u32 块（doc id / tf / skip list / 位置） | `inverted_format::{encode,decode}_u32_block` | 按 SIMD-BP128 的 lane 布局重写，宽度 1..17 逐字节对拍（`FULLTEXT_BENCH.md` §5） |
+| **newpfor**（`third_party/newpfor`，IndexLib） | 倒排 posting 的 u16 块（doc payload / term percentage） | `inverted_format::{encode,decode}_u16_block` | `NewPForDeltaCompressor` + S9 异常区重写，含六种特殊帧 |
+| **darts-clone**（`third_party/darts`） | RAG 分析器词典的 trie | `analyzer::DartsTrie`（读）+ `darts_build`（建） | 读是 `u32` 单位数组；建连 `std::sort` 的顺序都复刻，产物与随包 `huqie.trie` 字节相同 |
+| **OpenCC**（`third_party/opencc`，含 marisa） | `traditional` 分析器、RAG 的简繁转换 | `analyzer::OpenCcConverter` | `OPENCCDATRIE` 二进制直接解析，最短路径分词重写；**不引入 marisa、不引入 C 库** |
+| **cppjieba**（`third_party/cppjieba`） | `chinese` 分析器 | `analyzer::ChineseAnalyzer` | 按 jieba 的词典格式与 HMM 参数重写，粗/细粒度两种切分 |
+| **ijma / MeCab**（`third_party/ijma` + `mecab/` 资源） | `japanese` / `korean` 分析器 | `analyzer` 的 MeCab 部分 | 二进制词典（`sys.bin` 等）直接解析，自带 inflate 解 zlib 流，不链接 zlib |
+| **WordNet**（资源目录） | RAG 的英文词形还原 | `analyzer::WordNetLemmatizer` | 只用到名词部分（参考也是空 POS → NOUN） |
+| **PCRE2**（vcpkg） | 分析器的 `\\W+` 替换、`regex(text, pattern)` 谓词 | `analyzer::strip_non_word*` + `infinity-expression` 自带回溯引擎 | 都是重写：前者是字符类 + 全局替换 + 位置映射，后者支持字面量/`.`/`*+?`/`{n,m}`/交替/分组/字符类/锚点 |
+| **RE2**（vcpkg） | 词典建 trie 时的 `[\\r\\n]+` / `([ \\t])` 切分 | 手写扫描 | 这几个模式就是按分隔符切，不需要正则引擎 |
+| **simdjson**（vcpkg） | JSONL 语料读取、JSON 列 | `infinity_common::json` | 自写 JSON 解析 |
+| **nlohmann_json**（vcpkg） | 列值 / catalog 的 JSON | `infinity_catalog::value_format` / `cpp_layout` | 同上，序列化顺序按参考的键序 |
+| **roaring**（vcpkg） | 位图索引 | `infinity_common::bitmap` | 兼容 `Roaring` / `Roaring64Map` 的容器格式 |
+| **zlib**（vcpkg） | WAL 校验、MeCab `sys.bin` 的 deflate 流 | `crc32fast` + 自写 inflate | CRC-32/IEEE 用 crate；deflate 走自写 inflate（分析器里约 200 行） |
+| **LZ4**（vcpkg 的 `lz4`，用于 `VirtualStore` 的临时压缩） | 大导入时的溢写 | `lz4_flex` | 只影响临时文件，不进数据目录 |
+| **Arrow / Parquet**（vcpkg） | `COPY … (FORMAT PARQUET)` | 未移植 | `GAPS.md` §1 已登记 |
+| **fmt / spdlog**（vcpkg） | 日志 | `e println!/`std` 格式化 + 自写日志 | 日志不进门禁 |
+| **CLI11**（vcpkg） | benchmark、服务端参数 | 手写参数解析 | 同上 |
+| **oatpp / Libevent / Boost.Asio**（vcpkg） | HTTP 服务、事件循环 | `infinity-server` 的手写 HTTP/1.1 + Tokio | 见 `PARALLEL_MAP.md`：并发统一 Tokio |
+| **OpenSSL**（vcpkg） | S3 / HTTPS | `rustls` + `rustls-native-certs` + `sha2`/`hmac` | 纯 Rust TLS，不用 OpenSSL |
+| **minio-cpp / curlpp / curl**（`third_party`） | 对象存储 | `infinity_storage::s3` | 手写 S3 签名与请求；`GAPS.md` §1：不对齐 `obj_key` 打包 |
+| **eigen / mlas**（`third_party`） | IVF/PQ 的矩阵运算 | 手写距离与训练 | 见 `TENSOR_INDEX_BENCH.md` |
+| **pgm-index**（`third_party/pgm`） | 稀疏索引的分段模型 | 手写 PGM | 见 `SECONDARY_INDEX_BENCH.md` |
+| **tomlplusplus / inih**（vcpkg） | 配置解析 | 自写 TOML/INI 解析 | 配置不进门禁 |
+| **GTest**（vcpkg） | 单测 | `#[test]` + `tempfile` | — |
+| **base64 / xor_singleheader / zsv**（`third_party`） | 编码、CSV | 手写 / `rust_engine` 里的对应实现 | CSV 解析与 base64 编解码都是几十行 |
+
+重写版真正的外部 crate（`Cargo.toml`，全部纯 Rust，无 C/C++ 构建步骤）：
+
+| crate | 用途 | 有没有"格式上没有替代品"的性质 |
+|---|---|---|
+| `rocksdb` | catalog/KV 后端 | 有：必须与参考共用同一个存储引擎 |
+| `thrift` | RPC 协议 | 有：协议字节要与 SDK 对得上 |
+| `rust-stemmers` | Snowball 词干（RAG 多语言） | 有：词干结果要逐词相同 |
+| `lz4_flex` | 溢写临时文件的压缩 | 无：不进数据目录 |
+| `memmap2` | 块文件 / 索引段 mmap | 无：只是读法（见 §3.1） |
+| `roaring` | 位图索引 | 有：容器格式要与参考一致 |
+| `crc32fast` | CRC-32/IEEE | 有：校验值要与参考一致 |
+| `sha2` / `hmac` / `rustls` / `rustls-native-certs` | S3 签名与 HTTPS | 无：只影响传输 |
+| `thiserror` | 错误类型 | 无 |
+| `tokio` | 并发运行时 | 无：见 `PARALLEL_MAP.md` |
+| `tempfile`（dev） | 测试目录 | 无 |
+
+一句话总结这次移植的原则：**凡是决定了磁盘上"哪个字节是什么"的库，一律不链接，按字节重写并用门禁钉死；凡是只决定"怎么算、怎么传、怎么调度"的，用现成 crate。**
+
 ## 4 当前缺口
 
 唯一的缺口总表是 [`GAPS.md`](GAPS.md)，分四类：

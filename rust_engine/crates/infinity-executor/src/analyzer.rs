@@ -1318,6 +1318,9 @@ impl DartsTrie {
 #[derive(Clone)]
 pub struct RAGAnalyzer {
     trie: Arc<DartsTrie>,
+    /// C++: RAGAnalyzer::opencc_ - traditional to simplified, applied after
+    /// StrQ2B and before the language split.
+    opencc: Arc<OpenCcConverter>,
     fine_grained: bool,
     enable_position: bool,
     fold_diacritics: bool,
@@ -1350,6 +1353,7 @@ impl RAGAnalyzer {
         };
         Ok(Self {
             trie: Arc::new(trie),
+            opencc: Arc::new(OpenCcConverter::load(root)?),
             fine_grained: false,
             enable_position: false,
             fold_diacritics: false,
@@ -1408,11 +1412,14 @@ impl RAGAnalyzer {
         // Python-style simple tokenization: re.sub(r"\W+", " ", line).
         let processed = strip_non_word(input);
         let half_width = str_q2b(&processed);
-        // OpenCC conversion is not ported; the inputs here are already
-        // simplified Chinese, for which the reference conversion is identity.
+        // C++: opencc_->convert(str1, strline) - traditional to simplified,
+        // before the language split.
+        let strline = self.opencc.convert(&half_width);
+        #[cfg(test)]
+        RAG_CONVERTED.with(|c| c.set(true));
 
         let mut res: Vec<String> = Vec::new();
-        for (segment, is_zh) in split_by_lang(&half_width) {
+        for (segment, is_zh) in split_by_lang(&strline) {
             if !is_zh {
                 // NLTK word tokenizer: punctuation was already replaced, so
                 // the remaining tokens are whitespace-delimited runs (with
@@ -1505,13 +1512,20 @@ impl RAGAnalyzer {
 
         let (processed, pcre2_map) = strip_non_word_with_position(input);
         let (str1, q2b_map) = str_q2b_with_position(&processed);
-        // OpenCC conversion is identity for the shipped inputs.
-        let strline = str1.as_str();
+        // C++: opencc_->convert(str1, strline), then BuildPositionMapping for
+        // the stage, so the offsets survive the conversion.
+        let strline = self.opencc.convert(&str1);
+        let opencc_map = build_position_mapping(&str1, &strline);
 
-        // strline byte -> original input byte.
+        // strline byte -> original input byte, through OpenCC -> StrQ2B ->
+        // the \W+ replacement -> diacritics folding, the reference's chain.
         let mut final_map = Vec::with_capacity(strline.len() + 1);
         for i in 0..strline.len() {
-            let processed_pos = q2b_map.get(i).copied().unwrap_or(processed.len() as u32) as usize;
+            let str1_pos = opencc_map.get(i).copied().unwrap_or(str1.len() as u32) as usize;
+            let processed_pos = q2b_map
+                .get(str1_pos)
+                .copied()
+                .unwrap_or(processed.len() as u32) as usize;
             let folded_pos = pcre2_map
                 .get(processed_pos)
                 .copied()
@@ -1532,7 +1546,7 @@ impl RAGAnalyzer {
 
         let mut tokens = Vec::new();
         let mut positions = Vec::new();
-        for (segment, is_zh, segment_start) in split_by_lang_spans(strline) {
+        for (segment, is_zh, segment_start) in split_by_lang_spans(&strline) {
             if segment.is_empty() {
                 continue;
             }
@@ -2172,6 +2186,12 @@ fn load_pos_table(path: &Path) -> Result<Vec<String>, String> {
 
 /// C++: `RAGAnalyzer::DENOMINATOR`.
 const DENOMINATOR: f64 = 1_000_000.0;
+
+/// Set when a RAG tokenization ran the OpenCC stage (test only).
+#[cfg(test)]
+thread_local! {
+    static RAG_CONVERTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
 /// C++: `RAGAnalyzer::Score`'s `B`.
 const SCORE_B: f64 = 30.0;
 
@@ -5797,6 +5817,38 @@ mod analyzer_pool_tests {
             .unwrap_or_else(|err| panic!("read {}: {err}", shipped_path.display()));
         assert_eq!(built.len(), shipped.len(), "unit count differs");
         assert!(built == shipped, "rebuilt trie differs from the shipped file");
+    }
+
+    /// The RAG analyzer converts traditional to simplified before it segments
+    /// (rag_analyzer_impl.cpp:1834). Without the OpenCC stage the tokens keep
+    /// the source script, so this only passes once the stage is wired in.
+    #[test]
+    fn test_rag_converts_traditional_before_segmenting() {
+        if !resource_available() {
+            panic!("Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded");
+        }
+        let traditional = get_rag_analyzer("rag").expect("rag analyzer");
+        let simplified = get_rag_analyzer("rag").expect("rag analyzer");
+        // Traditional input and its simplified twin segment identically.
+        assert_eq!(
+            analyze_to_tokens(&traditional, "臺灣大學的學生"),
+            analyze_to_tokens(&simplified, "台湾大学的学生")
+        );
+        let tokens = analyze_to_tokens(&traditional, "漢字測試");
+        assert_eq!(tokens, analyze_to_tokens(&simplified, "汉字测试"));
+        // And the stage really runs: without it the tokens would keep the
+        // traditional characters (the assertion above would still pass only if
+        // both sides skipped it, so the flag checks the wiring itself).
+        RAG_CONVERTED.with(|converted| converted.set(false));
+        let _ = analyze_to_tokens(&traditional, "漢字測試");
+        assert!(
+            RAG_CONVERTED.with(|converted| converted.get()),
+            "the RAG analyzer did not run the OpenCC stage"
+        );
+        // The offsets still point into the original input.
+        let terms = traditional.analyze("漢字 測試");
+        assert!(!terms.is_empty());
+        assert_eq!(terms[0].word_offset, 0);
     }
 
     #[test]
