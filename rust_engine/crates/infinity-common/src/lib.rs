@@ -5,7 +5,6 @@
 
 #![forbid(unsafe_code)]
 
-pub mod bitmap;
 pub mod cast;
 pub mod datetime;
 pub mod error;

@@ -2,17 +2,17 @@
 
 > **子目标 S4 · 用例级覆盖不漏**｜纲领见 [`PORTING.md`](PORTING.md) §5
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 48, `exempt` 13, `ported` 951。
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 48, `exempt` 16, `not ported` 7, `ported` 941。
 
 - `ported`：Rust 有同等场景的用例，映射列给出 `crate 模块::测试名`。少数以 native 组件等价替代 C++ 第三方（例如 RocksDB 事务 KV → `txn_kv`、后台线程池 → `bg_task`），映射列直接指向替代实现，不声称字节级一致。
 - `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point`/`Line`/`Box`/`Path`/`Polygon`/`Circle`）相关用例——这些类型不移植。
 - `exempt`：SIMD/第三方夹具、整段或整块位于 `#if 0` 的用例（C++ 构建中不存在），以及**只测第三方 API 本身**的夹具——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 自己的 `TransactionDB` 环境、后台线程池。它们要覆盖的**行为**由 native 等价实现兜住，并在 `ported` 行给出映射：事务型 KV → `infinity-storage` 的 `txn_kv`（`kv_store0`..`kv_store5`、`wal`、`txn_conflict_same_key_snapshot_isolation` 全部通过，`kv_store1` 按参考的 `DISABLED_SLOW_` 标 `#[ignore]`；`kv_store6` 在 `infinity-executor` 的 `kv_ut`），线程池 → `bg_task`。
 - 带 `#[ignore]` 的 `ported` 行：C++ 的 `DISABLED_*` 用例，Rust 用 `#[ignore]` 表达，需 `cargo test -- --ignored` 显式运行。
 
-表里只有以上三种状态，没有 `partial`/`gap` 行；类层面的状态与 `partial` 在 [`CLASS_MAP.md`](CLASS_MAP.md) §2。
+另有一类 `not ported`（7 行，存储缓冲层：`BufferObj`/`BufferHandle`/`BufferManager` 已整体去掉，块改为 mmap 直接映射），它们不是缺口，是 §3.1 的设计变更；类层面若有 `partial` 在 [`CLASS_MAP.md`](CLASS_MAP.md) §2。
 
 **最近一次核对（2026-10-28）**：脚本逐行读本表，取映射列里的 Rust 用例名，在 `rust_engine/crates` 下检查
-`fn <name>` 是否存在——951 个 `ported` 行全部命中，没有失效映射；再把每行的 `#[ignore]` 与 C++ 用例的
+`fn <name>` 是否存在——941 个 `ported` 行全部命中，没有失效映射；再把每行的 `#[ignore]` 与 C++ 用例的
 `DISABLED_` 前缀对比，唯一不同的一组是 `s3_client_minio_ut` / `virtual_store_ut` 的 5 个用例（参考需要
 MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 显式打开）。事务层（§2.1）的对应关系：
 `storage/txn/conflict_check_ut` 1/1、`new_catalog/new_txn_mgr_ut` 2/2（2 个 `DISABLED_SLOW_`）、
@@ -1030,6 +1030,6 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 1007 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_create_index_hnsw` | ported | `infinity-storage` `wal_replay_ut::wal_replay_create_index_hnsw` |
 | 1008 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `nlohmann_test` | ported | `infinity-common` `json::tests::nlohmann_test_parses_twitter_metadata` |
 | 1009 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `simdjson_test` | ported | `infinity-common` `json::tests::simdjson_test_walks_documents_by_type` |
-| 1010 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test_size` | ported | `infinity-common` `bitmap::third_party_reference_suite::roaring_size_and_optimize` |
-| 1011 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test1` | ported | `infinity-common` `bitmap::third_party_reference_suite::roaring_cardinality_32_and_64` |
-| 1012 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test2` | ported | `infinity-common` `bitmap::third_party_reference_suite::roaring_bitmap_operations` |
+| 1010 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test_size` | exempt | 只测 CRoaring API 本身；端口链接 `roaring` crate，与参考共用同一实现，字节一致性由 `infinity-storage` `wal::block::tests::the_null_bitmap_matches_the_reference_block` 与 `secondary_lowcard::tests::write_adv_framing_matches_cpp` 覆盖 |
+| 1011 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test1` | exempt | 同上：只测 CRoaring 的 32/64 位基数 API |
+| 1012 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test2` | exempt | 同上：只测 CRoaring 的集合代数与序列化 API |

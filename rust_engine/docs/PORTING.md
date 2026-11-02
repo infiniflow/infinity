@@ -239,55 +239,75 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 
 ### 3.2 第三方依赖对照
 
-参考版通过 vcpkg + 自带 `third_party/` 引入二十多个 C/C++ 库；重写版只用 11 个仓内 crate 加 14 个外部 crate（`Cargo.toml`）。**凡是对磁盘格式有影响的，都是按字节重写而不是链接同一个库**——这才是"逐字节相同"能成立的原因：链接同一个库只能保证布局一致，重写还要保证编码参数、默认值和边界条件一致，所以每一行后面都跟着门禁或单测。
+参考版通过 vcpkg 与自带 third_party/ 引入 C/C++ 库；重写版只用 9 个外部 crate（Cargo.toml）。这张表按**处理方式**分组，因为「链接同一个库」和「按字节重写」是两件不同的事，混在一张表里会读错：
+
+- **链接同名后端**——只有三个。它们的字节由库自己定义，重写等于重写整个库，且没有收益。
+- **按字节重写 + 金标准门禁**——凡是决定磁盘上「哪个字节是什么」的：编码器、词典格式、索引格式。每条都对着参考的真实输出做逐字节对拍，规模是实测的生产代码行数（不含注释与测试）。
+- **不移植**——GAPS.md §1 已登记的决定。
+
+#### 链接同名后端
 
 | 参考 | 用在哪 | 重写版 | 备注 |
 |---|---|---|---|
-| **RocksDB**（vcpkg） | `catalog/` 与行 KV | `rocksdb` crate | 唯一链接同一个后端的库：目录要能被参考打开，SST 字节也要能被参考读，没有替代品的空间 |
-| **Thrift**（vcpkg） | `src/network`、RPC 与 SDK 协议 | `thrift` crate | 只用协议层，服务端实现自己写 |
-| **FastPFor**（vcpkg `libFastPFOR.a`） | 倒排 posting 的 u32 块（doc id / tf / skip list / 位置） | `inverted_format::{encode,decode}_u32_block` | 按 SIMD-BP128 的 lane 布局重写，宽度 1..17 逐字节对拍（`FULLTEXT_BENCH.md` §5） |
-| **newpfor**（`third_party/newpfor`，IndexLib） | 倒排 posting 的 u16 块（doc payload / term percentage） | `inverted_format::{encode,decode}_u16_block` | `NewPForDeltaCompressor` + S9 异常区重写，含六种特殊帧 |
-| **darts-clone**（`third_party/darts`） | RAG 分析器词典的 trie | `analyzer::DartsTrie`（读）+ `darts_build`（建） | 读是 `u32` 单位数组；建连 `std::sort` 的顺序都复刻，产物与随包 `huqie.trie` 字节相同 |
-| **OpenCC**（`third_party/opencc`，含 marisa） | `traditional` 分析器、RAG 的简繁转换 | `analyzer::OpenCcConverter` | `OPENCCDATRIE` 二进制直接解析，最短路径分词重写；**不引入 marisa、不引入 C 库** |
-| **cppjieba**（`third_party/cppjieba`） | `chinese` 分析器 | `analyzer::ChineseAnalyzer` | 按 jieba 的词典格式与 HMM 参数重写，粗/细粒度两种切分 |
-| **ijma / MeCab**（`third_party/ijma` + `mecab/` 资源） | `japanese` / `korean` 分析器 | `analyzer` 的 MeCab 部分 | 二进制词典（`sys.bin` 等）直接解析，自带 inflate 解 zlib 流，不链接 zlib |
-| **WordNet**（资源目录） | RAG 的英文词形还原 | `analyzer::WordNetLemmatizer` | 只用到名词部分（参考也是空 POS → NOUN） |
-| **PCRE2**（vcpkg） | 分析器的 `\\W+` 替换、`regex(text, pattern)` 谓词 | `analyzer::strip_non_word*` + `infinity-expression` 自带回溯引擎 | 都是重写：前者是字符类 + 全局替换 + 位置映射，后者支持字面量/`.`/`*+?`/`{n,m}`/交替/分组/字符类/锚点 |
-| **RE2**（vcpkg） | 词典建 trie 时的 `[\\r\\n]+` / `([ \\t])` 切分 | 手写扫描 | 这几个模式就是按分隔符切，不需要正则引擎 |
-| **simdjson**（vcpkg） | JSONL 语料读取、JSON 列 | `infinity_common::json` | 自写 JSON 解析 |
-| **nlohmann_json**（vcpkg） | 列值 / catalog 的 JSON | `infinity_catalog::value_format` / `cpp_layout` | 同上，序列化顺序按参考的键序 |
-| **roaring**（vcpkg） | 位图索引 | `infinity_common::bitmap` | 兼容 `Roaring` / `Roaring64Map` 的容器格式 |
-| **zlib**（vcpkg） | WAL 校验、MeCab `sys.bin` 的 deflate 流 | `crc32fast` + 自写 inflate | CRC-32/IEEE 用 crate；deflate 走自写 inflate（分析器里约 200 行） |
-| **LZ4**（vcpkg 的 `lz4`，用于 `VirtualStore` 的临时压缩） | 大导入时的溢写 | `lz4_flex` | 只影响临时文件，不进数据目录 |
-| **Arrow / Parquet**（vcpkg） | `COPY … (FORMAT PARQUET)` | 未移植 | `GAPS.md` §1 已登记 |
-| **fmt / spdlog**（vcpkg） | 日志 | `e println!/`std` 格式化 + 自写日志 | 日志不进门禁 |
-| **CLI11**（vcpkg） | benchmark、服务端参数 | 手写参数解析 | 同上 |
-| **oatpp / Libevent / Boost.Asio**（vcpkg） | HTTP 服务、事件循环 | `infinity-server` 的手写 HTTP/1.1 + Tokio | 见 `PARALLEL_MAP.md`：并发统一 Tokio |
-| **OpenSSL**（vcpkg） | S3 / HTTPS | `rustls` + `rustls-native-certs` + `sha2`/`hmac` | 纯 Rust TLS，不用 OpenSSL |
-| **minio-cpp / curlpp / curl**（`third_party`） | 对象存储 | `infinity_storage::s3` | 手写 S3 签名与请求；`GAPS.md` §1：不对齐 `obj_key` 打包 |
-| **eigen / mlas**（`third_party`） | IVF/PQ 的矩阵运算 | 手写距离与训练 | 见 `TENSOR_INDEX_BENCH.md` |
-| **pgm-index**（`third_party/pgm`） | 稀疏索引的分段模型 | 手写 PGM | 见 `SECONDARY_INDEX_BENCH.md` |
-| **tomlplusplus / inih**（vcpkg） | 配置解析 | 自写 TOML/INI 解析 | 配置不进门禁 |
-| **GTest**（vcpkg） | 单测 | `#[test]` + `tempfile` | — |
-| **base64 / xor_singleheader / zsv**（`third_party`） | 编码、CSV | 手写 / `rust_engine` 里的对应实现 | CSV 解析与 base64 编解码都是几十行 |
+| **RocksDB**（vcpkg） | catalog/ 与行 KV | rocksdb crate（metastore_rocks.rs） | 目录要能被参考打开、SST 也要能被参考读，没有替代空间 |
+| **Thrift**（vcpkg） | src/network、RPC 与 SDK | thrift crate | 只用协议层，服务端实现自写 |
+| **roaring**（vcpkg，CRoaring） | WAL 的 NullBitmap（RoaringBitmap<true>::WriteAdv）、低基数索引的 portable 位图 | roaring crate（wal/block.rs:406、447；secondary_lowcard.rs） | 字节必须与 CRoaring 的 portable 格式一致，同样没有替代空间 |
 
-重写版真正的外部 crate（`Cargo.toml`，全部纯 Rust，无 C/C++ 构建步骤）：
+#### 按字节重写
 
-| crate | 用途 | 有没有"格式上没有替代品"的性质 |
+| 参考 | 用在哪 | 重写版 | 规模 | 怎么钉住 |
+|---|---|---|---|---|
+| **FastPFor**（vcpkg 的 libFastPFOR.a） | 倒排 u32 块：doc id / tf / skip list / 位置 | inverted_format 的 encode_u32_block / decode_u32_block | **261 行** | u32_block_matches_the_cpp_bytes：7 组 C++ 输出 hex 字面量，覆盖纯 VB、SIMD+VB、bw1/bw2 |
+| **newpfor**（third_party/newpfor，IndexLib） | 倒排 u16 块：doc payload / term percentage | inverted_format 的 encode_u16_block / decode_u16_block | **464 行** | u16_block_decodes_the_cpp_bytes：C++ 输出逐字节，含六种特殊帧与 S9 异常区 |
+| **darts-clone**（third_party/darts） | RAG 词典 trie | analyzer::DartsTrie（读）+ darts_build（建） | **读 74 行、建 953 行** | 建出的 trie 与随包 huqie.trie 逐字节相同（1,893,632 units） |
+| **OpenCC**（third_party/opencc + marisa） | traditional 分析器、RAG 简繁转换 | analyzer::OpenCcConverter | **263 行** | test_opencc_converts_traditional_to_simplified 等 + 分词一致性 |
+| **cppjieba**（third_party/cppjieba） | chinese 分析器 | analyzer 的 JiebaDict / Jieba | **413 行** | 分词结果与参考对齐（TEST_AUDIT.md） |
+| **ijma / MeCab**（third_party/ijma） | japanese / korean 分析器 | analyzer 的 MeCab 部分（词典解析、Viterbi、连接矩阵） | **860 行** | 参考 japanese/korean 分析器单测 |
+| **zlib**（只用于 MeCab sys.bin，ijma darts.h:18 的 gzread） | 解这一个文件的 DEFLATE 流 | analyzer 的 inflate / zlib_decompress | **266 行** | 解出长度与 sys.bin 记录的 total_size 一致，再走词典解析 |
+| **RE2**（vcpkg） | regex(col, pattern) 谓词、LIKE 转正则 | infinity-expression 的 regex（回溯引擎）+ regex_literal | **525 + 681 行** | 参考 regex_impl.cpp / like_impl.cpp 的行为 |
+| **PCRE2**（vcpkg） | ① 分析器 W+ 全局替换；② 高亮器的 PCRE2_CASELESS 匹配 | ① analyzer 的 strip_non_word*（字符类 + 位置映射）；② highlight_text / highlight_with_analyzer | **14 + 约 60 行** | ① Tokenize 与 TokenizeWithPosition 的输出和位置；② highlighter_ut 的移植 |
+| **simdjson**（vcpkg） | JSONL 语料、JSON 列 | infinity_common 的 json | — | JSON 列往返 |
+| **nlohmann_json**（vcpkg） | 列值 / catalog 的 JSON | infinity_catalog 的 value_format / cpp_layout | — | catalog 键值逐字节门禁（键序相同） |
+| **zsv**（third_party/zsv） | COPY ... (FORMAT CSV) 的解析 | csv_fields（lib.rs:23019） | — | 导入用例 |
+| **pgm-index**（third_party/pgm） | 次级/稀疏索引的分段模型 | infinity-index 的 PGM | — | SECONDARY_INDEX_BENCH.md |
+| **xor_singleheader**（third_party） | fast_rough_filter 的 fuse-8 构造 | infinity_storage::binary_fuse_filter | — | 过滤器假阴性为 0 |
+| **eigen / mlas**（third_party） | IVF/PQ 的矩阵运算、SGEMM | 手写距离核与训练 | — | TENSOR_INDEX_BENCH.md |
+| **LZ4**（vcpkg） | VirtualStore 溢写临时文件 | lz4_flex crate | — | 不进数据目录 |
+
+#### 不移植或换实现（不进门禁）
+
+| 参考 | 重写版 |
+|---|---|
+| **Arrow / Parquet** | 未移植，COPY ... (FORMAT PARQUET) 不支持（GAPS.md §1） |
+| **fmt / spdlog** | std 格式化 + 自写日志；日志不进任何门禁 |
+| **CLI11 / tomlplusplus / inih** | 手写参数与配置解析（infinity-cli/src/config.rs） |
+| **oatpp / Libevent / Boost.Asio** | infinity-server 手写 HTTP/1.1 + Tokio（PARALLEL_MAP.md） |
+| **OpenSSL** | rustls + rustls-native-certs + sha2/hmac |
+| **minio-cpp / curlpp / curl** | infinity_storage 的 s3 手写签名与请求；GAPS.md §1：不对齐 obj_key 打包 |
+| **GTest** | #[test] + tempfile |
+| **absl / pugixml / magic_enum** | 参考只是 find_package 了它们，代码里没有引用（grep absl:: 与 pugi:: 都为空），端口不引入 |
+| **base64**（third_party/base64） | 参考只在 `BlockTagMetaKey::ToJson` 用（`meta_key_impl.cpp:205`），而那条 JSON 只服务 `SHOW CATALOG` / `SHOW CLEAN` 的渲染；端口不实现这两个命令（`dump-catalog` 直接给原始 key/hex），所以不需要 base64，见下方说明 |
+
+两处需要说明的偏差：
+
+- **BlockTagMetaKey 的 base64 标签**：参考的 `blk|…|<tag>` 记录在 `SHOW CATALOG` / `SHOW CLEAN` 里通过 `ToJson()`（base64 编码）呈现，端口不实现这两个命令（`infinity dump-catalog` 直接输出原始 key 与 hex 值），因此不需要 base64。`blk|…|{ts}` 本体（块提交时间戳）两边都写，键空间门禁覆盖它。
+- **zlib 不是通用依赖**：参考链接 zlib 是给 ijma 的 MeCab 词典和 curl/minio 的 HTTPS 用的；WAL 的 CRC 是参考自己实现的 CRCImpl（crc.cppm:49），与 zlib 无关。端口因此只需要为 MeCab 的 sys.bin 写一个 inflate，CRC 用 crc32fast（等价 CRC-32/ISO-HDLC）。
+
+重写版链接的外部 crate（全部纯 Rust，无 C/C++ 构建步骤）：
+
+| crate | 用途 | 为什么不能换 |
 |---|---|---|
-| `rocksdb` | catalog/KV 后端 | 有：必须与参考共用同一个存储引擎 |
-| `thrift` | RPC 协议 | 有：协议字节要与 SDK 对得上 |
-| `rust-stemmers` | Snowball 词干（RAG 多语言） | 有：词干结果要逐词相同 |
-| `lz4_flex` | 溢写临时文件的压缩 | 无：不进数据目录 |
-| `memmap2` | 块文件 / 索引段 mmap | 无：只是读法（见 §3.1） |
-| `roaring` | 位图索引 | 有：容器格式要与参考一致 |
-| `crc32fast` | CRC-32/IEEE | 有：校验值要与参考一致 |
-| `sha2` / `hmac` / `rustls` / `rustls-native-certs` | S3 签名与 HTTPS | 无：只影响传输 |
-| `thiserror` | 错误类型 | 无 |
-| `tokio` | 并发运行时 | 无：见 `PARALLEL_MAP.md` |
-| `tempfile`（dev） | 测试目录 | 无 |
+| rocksdb | catalog/KV 后端 | 必须与参考共用同一个存储引擎 |
+| thrift | RPC 协议 | 协议字节要与 SDK 对得上 |
+| roaring | WAL NullBitmap、低基数索引 | portable 序列化要与 CRoaring 一致 |
+| rust-stemmers | Snowball 词干 | 词干结果要逐词相同 |
+| crc32fast | CRC-32/IEEE | 校验值要与参考一致 |
+| lz4_flex | 溢写临时文件 | 无：不进数据目录 |
+| memmap2 | 块文件 / 索引段 mmap | 无：只是读法（见 §3.1） |
+| sha2 / hmac / rustls / rustls-native-certs | S3 签名与 HTTPS | 无：只影响传输 |
+| thiserror / tokio / tempfile(dev) | 错误类型、运行时、测试目录 | 无 |
 
-一句话总结这次移植的原则：**凡是决定了磁盘上"哪个字节是什么"的库，一律不链接，按字节重写并用门禁钉死；凡是只决定"怎么算、怎么传、怎么调度"的，用现成 crate。**
+最能说明问题的是编码器：**FastPFor 261 行 + newpfor 464 行**，换来与参考逐字节相同的 posting 块，这条路径上有 C++ 输出的 hex 金标准钉着。所以这里不是「翻译了一个重量级库」，而是「只实现了用到的那个编码路径，并用金标准验证」。FastPFor 的上游还有 OptPFor、SIMDNewPFor、StreamVByte 等十几个编码器，端口一个都没有；newpfor 也只实现了 u16 的 Compress/Decompress。
 
 ## 4 当前缺口
 
