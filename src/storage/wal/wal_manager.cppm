@@ -150,12 +150,6 @@ private:
     i64 last_ckp_wal_size_{};
     std::atomic<bool> checkpoint_in_progress_{false};
 
-    // Begin ts of the last checkpoint whose WAL entry reached the disk (0: none yet). Written by the
-    // WAL flush thread after its fsync, read by the thread committing that checkpoint: RecycleWalFile()
-    // only deletes the wal.log.* files when the checkpoint it is asked to recycle carries this ts, so
-    // an unsynced checkpoint keeps them for the next one.
-    std::atomic<TxnTimeStamp> last_synced_ckp_ts_{0};
-
     // Only Checkpoint/Cleanup thread access following members
     mutable std::mutex last_ckp_ts_mutex_{};
     TxnTimeStamp last_ckp_ts_{};

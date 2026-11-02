@@ -150,13 +150,7 @@ void WalManager::RecycleWalFile(TxnTimeStamp ckp_ts) {
     if (ckp_ts == 0 || ckp_ts == UNCOMMIT_TS) {
         UnrecoverableError(fmt::format("Unexpected checkpoint ts to recycle wal files: {}", ckp_ts));
     }
-    // Recycling deletes: the checkpoint being recycled must have its entry on disk. A newer synced
-    // checkpoint covers the same files, so only "not synced yet" holds the deletion back.
-    if (last_synced_ckp_ts_.load() >= ckp_ts) {
-        WalFile::Recycle(ckp_ts, wal_dir_);
-    } else {
-        LOG_ERROR(fmt::format("Skip recycling wal files: checkpoint entry of ts {} is not synced", ckp_ts));
-    }
+    WalFile::Recycle(ckp_ts, wal_dir_);
 }
 
 std::vector<std::shared_ptr<std::string>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
@@ -277,7 +271,7 @@ void WalManager::NewFlush() {
 
         // Begin ts of the checkpoint written by this batch (0: none), assigned after the swap so that it
         // names the file the checkpoint entry was really written to.
-        TxnTimeStamp batch_last_ckp_begin_ts{0};
+        TxnTimeStamp last_ckp_begin_ts{0};
         for (const auto &txn : txn_batch) {
             if (txn == nullptr) {
                 // terminate entry
@@ -309,7 +303,9 @@ void WalManager::NewFlush() {
                                      txn->CommitTS(),
                                      txn->TxnID()));
                 this->SwapWalFile(max_commit_ts_, true);
-                batch_last_ckp_begin_ts = txn->BeginTS();
+                if (txn->BeginTS() > last_ckp_begin_ts) {
+                    last_ckp_begin_ts = txn->BeginTS();
+                }
             }
 
             for (const std::shared_ptr<WalCmd> &cmd : entry->cmds_) {
@@ -347,14 +343,9 @@ void WalManager::NewFlush() {
 
         // Appends reach the kernel during the loop above, so this fsync makes the whole batch durable.
         // It syncs the current file; a mid-batch swap syncs the rotated one before renaming it away.
-        if (Status status = wal_handle_->Sync(); !status.ok()) {
+        Status status = wal_handle_->Sync();
+        if (!status.ok()) {
             UnrecoverableError(fmt::format("Fail to sync wal file {}: {}", wal_path_, status.message()));
-        }
-
-        // The fsync above succeeded, so the checkpoint entry of this batch is durable: publish its ts
-        // for the recycler, which deletes nothing until it matches.
-        if (batch_last_ckp_begin_ts != 0) {
-            last_synced_ckp_ts_ = batch_last_ckp_begin_ts;
         }
 
         if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
@@ -367,6 +358,10 @@ void WalManager::NewFlush() {
             // TODO: if txn is checkpoint, swap WAL file
         }
         txn_batch.clear();
+
+        if (last_ckp_begin_ts != 0) {
+            RecycleWalFile(last_ckp_begin_ts);
+        }
 
         if (!VirtualStore::Exists(wal_path_)) {
             LOG_ERROR(fmt::format("WAL file: {} does not exist", wal_path_));
@@ -518,17 +513,14 @@ i64 WalManager::GetLastCkpWalSize() {
  * current wal file.
  */
 void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_duplicate) {
+    Status status = wal_handle_->Sync();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Fail to sync wal file {}: {}", wal_path_, status.message()));
+    }
+
     if (max_commit_ts <= last_swap_wal_ts_) {
         LOG_WARN(fmt::format("Skip swap wal file, max_commit_ts: {} <= last_swap_wal_ts_: {}", max_commit_ts, last_swap_wal_ts_));
         return;
-    }
-
-    // Sync the file before renaming it away: nothing fsyncs the rotated file afterwards.
-    if (wal_handle_ != nullptr) {
-        if (Status status = wal_handle_->Sync(); !status.ok()) {
-            UnrecoverableError(fmt::format("Fail to sync wal file {} before swapping to a new one: {}", wal_path_, status.message()));
-        }
-        wal_handle_.reset();
     }
 
     std::string new_file_path = fmt::format("{}/{}", wal_dir_, WalFile::WalFilename(max_commit_ts));

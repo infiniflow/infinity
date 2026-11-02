@@ -34,9 +34,10 @@ import global_resource_usage;
 namespace infinity {
 
 LocalFileHandle::~LocalFileHandle() {
-    // Close the descriptor even when the final sync fails: a destructor cannot return the error,
-    // and returning early here would leak the descriptor on every failed sync.
-    (void)Sync();
+    Status status = Sync();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Fail to sync file {} before closing it: {}", path_, status.message()));
+    }
 
     if (fd_ == -1) {
         UnrecoverableError(fmt::format("File was closed before or not open"));

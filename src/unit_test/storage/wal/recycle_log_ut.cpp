@@ -119,8 +119,19 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             EXPECT_TRUE(status.ok());
         }
         { // every rotated wal file is covered by the checkpoint, so none of them survives it
-            auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
-            EXPECT_TRUE(wal_infos.empty());
+            // The flush thread recycles after releasing the commit threads, so poll instead of asserting once.
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (true) {
+                auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
+                if (wal_infos.empty()) {
+                    break;
+                }
+                if (std::chrono::steady_clock::now() > deadline) {
+                    ADD_FAILURE() << "Still " << wal_infos.size() << " rotated wal file(s) after the checkpoint";
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
         }
         infinity::InfinityContext::instance().UnInit();
 
@@ -157,11 +168,10 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
     }
 }
 
-// Reclaiming a rotated segment is gated on the checkpoint entry being fsynced: the flush thread is
-// the only one that knows which file holds it, so it publishes the ts it made durable and the
-// reclaimer compares against that. A failed fsync leaves exactly the state built below, so covering
-// the initial state covers that path too.
-TEST_P(RecycleLogTest, recycle_requires_synced_checkpoint_entry) {
+// Reclaiming drops exactly the rotated segments the checkpoint already contains, i.e. those whose max
+// commit ts is below ckp_ts. A segment at ckp_ts itself is not covered, and the current wal.log is
+// never part of the rotated set.
+TEST_P(RecycleLogTest, recycle_deletes_only_covered_segments) {
     infinity::InfinityContext::instance().UnInit();
     CleanupDbDirs();
 #ifdef INFINITY_DEBUG
@@ -175,17 +185,22 @@ TEST_P(RecycleLogTest, recycle_requires_synced_checkpoint_entry) {
     WalManager *wal_manager = storage->wal_manager();
     const std::string &wal_dir = storage->config()->WALDir();
 
-    // A rotated segment whose commit ts a completed checkpoint would be allowed to reclaim.
     constexpr TxnTimeStamp ckp_ts = 100;
-    const std::string segment_path = wal_dir + "/" + WalFile::WalFilename(ckp_ts);
-    ASSERT_TRUE(VirtualStore::Truncate(segment_path, 0).ok());
+    ASSERT_TRUE(VirtualStore::Truncate(wal_dir + "/" + WalFile::WalFilename(ckp_ts - 2), 0).ok());
+    ASSERT_TRUE(VirtualStore::Truncate(wal_dir + "/" + WalFile::WalFilename(ckp_ts), 0).ok());
+    ASSERT_TRUE(VirtualStore::Truncate(wal_dir + "/" + WalFile::WalFilename(ckp_ts + 2), 0).ok());
 
-    // No checkpoint entry has been fsynced in this instance, so nothing may be deleted.
     wal_manager->RecycleWalFile(ckp_ts);
+
     {
         auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
-        ASSERT_EQ(wal_infos.size(), 1u);
-        EXPECT_EQ(wal_infos.front().max_commit_ts_, ckp_ts);
+        ASSERT_EQ(wal_infos.size(), 2u);
+        std::vector<TxnTimeStamp> remaining;
+        for (const auto &wal_info : wal_infos) {
+            remaining.push_back(wal_info.max_commit_ts_);
+        }
+        std::sort(remaining.begin(), remaining.end());
+        EXPECT_EQ(remaining, (std::vector<TxnTimeStamp>{ckp_ts, ckp_ts + 2}));
     }
 
     infinity::InfinityContext::instance().UnInit();
