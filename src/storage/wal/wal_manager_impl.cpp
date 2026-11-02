@@ -343,8 +343,10 @@ void WalManager::NewFlush() {
 
         // Always flush and fsync, whichever FlushOptionType is configured.
         ofs_.flush();
-        // Syncs the current wal file; entries written before a mid-batch swap are synced in SwapWalFile().
-        Status sync_status = VirtualStore::Sync(wal_path_);
+        // A failed write/flush leaves the entry unwritten while fsync still succeeds, so the stream
+        // state gates the sync result. Syncs the current file; a mid-batch swap syncs the rotated one.
+        Status sync_status = ofs_.good() ? VirtualStore::Sync(wal_path_)
+                                         : Status::IOError(fmt::format("WAL stream is in a failed state, {} is not synced", wal_path_));
         if (!sync_status.ok()) {
             LOG_ERROR(fmt::format("Fail to sync wal file {}: {}", wal_path_, sync_status.message()));
         }
