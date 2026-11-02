@@ -241,10 +241,15 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     /// stopped on and its exact score.
     doc_id: Option<u64>,
     candidate_score: f64,
-    /// Instrumentation: exact per-document score decodes (calc_score_cnt_) and
-    /// the deepest block any of them came from.
+    /// Instrumentation: exact per-document score decodes (calc_score_cnt_), the
+    /// deepest block any of them came from, and the control-structure work
+    /// (pivot rounds, heap operations, child advances).
     score_evaluations: usize,
     max_scored_block: u64,
+    rounds: u64,
+    jumps: u64,
+    heap_ops: u64,
+    child_advances: u64,
 }
 
 impl<'a> BlockMaxWandIterator<'a> {
@@ -336,6 +341,10 @@ impl<'a> BlockMaxWandIterator<'a> {
             candidate_score: 0.0,
             score_evaluations: 0,
             max_scored_block: 0,
+            rounds: 0,
+            jumps: 0,
+            heap_ops: 0,
+            child_advances: 0,
         }
     }
 
@@ -371,9 +380,17 @@ impl<'a> BlockMaxWandIterator<'a> {
         // cursors' whole document frequency.
         if std::env::var_os("INFINITY_WAND_STATS").is_some() {
             let df: u64 = self.cursors.iter().map(|c| c.stream.df()).sum();
+            let (blocks, postings) = super::take_decode_stats();
             eprintln!(
-                "[WAND] scored={} cursors={} df_total={}",
+                "[WAND] scored={} iterations={} jumps={} child_advances={} heap_ops={} retired={}                  blocks={} postings={} cursors={} df_total={}",
                 self.score_evaluations,
+                self.rounds,
+                self.jumps,
+                self.child_advances,
+                self.heap_ops,
+                self.cursors.len() - self.heap.len(),
+                blocks,
+                postings,
                 self.cursors.len(),
                 df
             );
@@ -393,8 +410,12 @@ impl<'a> BlockMaxWandIterator<'a> {
     fn push_back(&mut self, i: usize) {
         let cursor = &mut self.cursors[i];
         cursor.ensure();
+        self.child_advances += 1;
         match cursor.cur {
-            Some(doc) => self.heap.push(Reverse((doc, cursor.ord))),
+            Some(doc) => {
+                self.heap_ops += 1;
+                self.heap.push(Reverse((doc, cursor.ord)))
+            }
             None => self.total_upper -= cursor.upper_bound,
         }
     }
@@ -466,6 +487,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             }
         }
         loop {
+            self.rounds += 1;
             self.prefix.clear();
             // '<' (not '<='): a document that ties the k-th score can still win
             // on the smaller doc id, and the heap is already doc-ordered, so
@@ -478,6 +500,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             let mut sum = 0.0;
             let mut pivot = None;
             while let Some(Reverse((doc, i))) = self.heap.pop() {
+                self.heap_ops += 1;
                 sum += self.cursors[i].upper_bound;
                 self.prefix.push(i);
                 if sum >= self.threshold {
@@ -494,11 +517,13 @@ impl<'a> BlockMaxWandIterator<'a> {
                     break;
                 }
                 self.heap.pop();
+                self.heap_ops += 1;
                 self.prefix.push(i);
             }
             // If lists[0] is not on the pivot document yet, another list owns it:
             // move the prefix up to it and re-pivot.
             if self.cursors[self.prefix[0]].cur != Some(doc) {
+                self.jumps += 1;
                 for i in std::mem::take(&mut self.prefix) {
                     let cursor = &mut self.cursors[i];
                     if cursor.cur.is_some_and(|cur| cur < doc) {
@@ -558,6 +583,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                 break;
             }
             self.heap.pop();
+            self.heap_ops += 1;
             self.prefix.push(i);
         }
         self.candidate_score = self.score_prefix();

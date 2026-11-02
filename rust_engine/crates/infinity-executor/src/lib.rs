@@ -4383,6 +4383,16 @@ pub(crate) struct TermStream<'a> {
 /// same 128 crate::wand uses).
 pub(crate) const WAND_BLOCK: usize = 128;
 
+thread_local! {
+    /// (blocks loaded, postings decoded) for the current thread: the WAND prints
+    /// them under INFINITY_WAND_STATS to show what a query actually pays for.
+    pub(crate) static DECODE_STATS: std::cell::Cell<(u64, u64)> = const { std::cell::Cell::new((0, 0)) };
+}
+
+pub(crate) fn take_decode_stats() -> (u64, u64) {
+    DECODE_STATS.with(|c| c.replace((0, 0)))
+}
+
 impl<'a> TermStream<'a> {
     fn new(merge: MergeCursor<'a>) -> Self {
         Self::with_positions(merge, false)
@@ -4501,6 +4511,10 @@ impl<'a> TermStream<'a> {
         if self.docs.is_empty() {
             return false;
         }
+        DECODE_STATS.with(|c| {
+            let (blocks, postings) = c.get();
+            c.set((blocks + 1, postings + self.docs.len() as u64));
+        });
         self.last = *self.docs.last().expect("block is not empty");
         if self.loaded {
             self.block_id += 1;
