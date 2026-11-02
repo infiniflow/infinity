@@ -46,6 +46,7 @@ use infinity_txn::{Txn, TxnManager, TxnOp};
 use crate::fulltext_query::SearchDriver;
 use crate::query_builder::QueryNode;
 
+mod darts_build;
 mod deferred_catalog;
 mod scheduler;
 mod dependent;

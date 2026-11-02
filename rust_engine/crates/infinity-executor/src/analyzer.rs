@@ -1241,6 +1241,12 @@ impl DartsTrie {
     fn load(path: &Path) -> Result<Self, String> {
         let bytes = std::fs::read(path)
             .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
+        Self::from_units(bytes)
+    }
+
+    /// The same checks on a unit array that did not come from a file (the one
+    /// the builder produces).
+    fn from_units(bytes: Vec<u8>) -> Result<Self, String> {
         if bytes.len() % 4 != 0 {
             return Err(format!("invalid trie length: {}", bytes.len()));
         }
@@ -1330,15 +1336,20 @@ impl RAGAnalyzer {
                 return Err(format!("missing analyzer file: {}", path.display()));
             }
         }
+        // C++: RAGAnalyzer::Load builds the trie from the dictionary the first
+        // time and writes it next to it (rag_analyzer_impl.cpp:752-782). A
+        // failed save is ignored there and ignored here: the analyzer works
+        // from the in-memory array either way.
         let trie_path = root.join("rag/huqie.trie");
-        if !trie_path.is_file() {
-            return Err(format!(
-                "missing analyzer file: {} (building the trie is not ported)",
-                trie_path.display()
-            ));
-        }
+        let trie = if trie_path.is_file() {
+            DartsTrie::load(&trie_path)?
+        } else {
+            let units = build_trie(root)?;
+            let _ = std::fs::write(&trie_path, &units);
+            DartsTrie::from_units(units)?
+        };
         Ok(Self {
-            trie: Arc::new(DartsTrie::load(&trie_path)?),
+            trie: Arc::new(trie),
             fine_grained: false,
             enable_position: false,
             fold_diacritics: false,
@@ -2103,6 +2114,62 @@ fn noun_substitutions(form: &str) -> Vec<String> {
 
 /// C++: `MAX_DFS_DEPTH`.
 const MAX_DFS_DEPTH: usize = 10;
+/// C++: `RAGAnalyzer::Load`'s trie build (`rag_analyzer_impl.cpp:752-782`).
+///
+/// Reads `rag/huqie.txt` (word, raw frequency, POS tag), encodes each entry the
+/// way the reference does - log-scaled frequency in the low 23 bits, POS index
+/// in bits 24-31 - and adds the reversed key ("DD" + reversed word, lowered)
+/// so the backward pass can probe it. The unit array it returns is what
+/// `DartsTrie::load` reads, so a directory without `rag/huqie.trie` ends up
+/// with exactly the file the reference would have written.
+fn build_trie(root: &Path) -> Result<Vec<u8>, String> {
+    let pos_tags = load_pos_table(&root.join("rag/pos-id.def"))?;
+    let dict_path = root.join("rag/huqie.txt");
+    let dict = std::fs::read_to_string(&dict_path)
+        .map_err(|err| format!("failed to read {}: {err}", dict_path.display()))?;
+    let mut entries: Vec<(Vec<u8>, i32)> = Vec::with_capacity(1 << 21);
+    for line in dict.lines() {
+        let line = line.split('\r').next().unwrap_or("");
+        if line.is_empty() {
+            continue;
+        }
+        let fields: Vec<&str> = line
+            .split([' ', '\t'])
+            .filter(|field| !field.is_empty())
+            .collect();
+        if fields.len() != 3 {
+            return Err("Invalid dictionary format".to_string());
+        }
+        let raw: u32 = fields[1]
+            .parse()
+            .map_err(|_| format!("Invalid dictionary frequency: {}", fields[1]))?;
+        // C++: i32(std::log(float(freq) / DENOMINATOR) + 0.5). The log is taken
+        // in single precision and the result is *truncated* toward zero, not
+        // rounded: log(3/1e6) + 0.5 is -12.2 and int() gives -12.
+        let freq = (f64::from((raw as f32 / DENOMINATOR as f32).ln()) + 0.5) as i32;
+        // An unknown tag keeps the reference's -1: POSTable::GetPOSIndex misses
+        // and Encode shifts that into the top byte.
+        let pos = pos_tags
+            .iter()
+            .position(|tag| tag == fields[2])
+            .map_or(-1, |i| i as i32);
+        entries.push((fields[0].as_bytes().to_vec(), encode(freq, pos)));
+        entries.push((rkey(fields[0]).into_bytes(), encode(1, 0)));
+    }
+    Ok(crate::darts_build::build_dictionary(entries))
+}
+
+/// C++: `POSTable::Load` - the POS tags in file order, which is their index.
+fn load_pos_table(path: &Path) -> Result<Vec<String>, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
+    Ok(text
+        .lines()
+        .map(|line| line.split('\r').next().unwrap_or("").to_string())
+        .filter(|line| !line.is_empty())
+        .collect())
+}
+
 /// C++: `RAGAnalyzer::DENOMINATOR`.
 const DENOMINATOR: f64 = 1_000_000.0;
 /// C++: `RAGAnalyzer::Score`'s `B`.
@@ -5711,6 +5778,25 @@ mod analyzer_pool_tests {
             .into_iter()
             .map(|term| term.text)
             .collect()
+    }
+
+    /// The port's build has to reproduce the reference's file, not merely an
+    /// equivalent trie: the reference ships huqie.trie because building it takes
+    /// a while, and a directory without it must end up with the same bytes. The
+    /// reference's own build is byte-reproducible (verified against
+    /// third_party/darts/darts.h), so this pins the port to it.
+    #[test]
+    fn test_rag_trie_rebuild_matches_the_shipped_file() {
+        let root = Path::new(RESOURCE_DIR);
+        if !root.is_dir() {
+            panic!("Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded");
+        }
+        let built = build_trie(root).expect("build the trie");
+        let shipped_path = root.join("rag/huqie.trie");
+        let shipped = std::fs::read(&shipped_path)
+            .unwrap_or_else(|err| panic!("read {}: {err}", shipped_path.display()));
+        assert_eq!(built.len(), shipped.len(), "unit count differs");
+        assert!(built == shipped, "rebuilt trie differs from the shipped file");
     }
 
     #[test]
