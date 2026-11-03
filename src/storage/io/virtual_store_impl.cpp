@@ -229,7 +229,7 @@ Status VirtualStore::MakeDirectory(const std::string &path) {
     return Status::OK();
 }
 
-Status VirtualStore::RemoveDirectory(const std::string &path) {
+void VirtualStore::RemoveDirectory(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
@@ -239,7 +239,6 @@ Status VirtualStore::RemoveDirectory(const std::string &path) {
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
     }
-    return Status::OK();
 }
 
 Status VirtualStore::CleanupDirectory(const std::string &path) {

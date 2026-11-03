@@ -4707,10 +4707,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
 
             if (VirtualStore::Exists(import_txn_store->import_tmp_path_)) {
-                Status remove_status = VirtualStore::RemoveDirectory(import_txn_store->import_tmp_path_);
-                if (!remove_status.ok()) {
-                    LOG_WARN(fmt::format("Failed to remove import temp directory during rollback: {}", import_txn_store->import_tmp_path_));
-                }
+                VirtualStore::RemoveDirectory(import_txn_store->import_tmp_path_);
             } else {
                 Config *config = InfinityContext::instance().config();
                 std::string data_dir = config->DataDir();
@@ -4730,10 +4727,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                                               segment_info.segment_id_);
 
                         if (VirtualStore::Exists(segment_dir)) {
-                            Status remove_status = VirtualStore::RemoveDirectory(segment_dir);
-                            if (!remove_status.ok()) {
-                                LOG_WARN(fmt::format("Failed to remove segment directory during rollback: {}", segment_dir));
-                            }
+                            VirtualStore::RemoveDirectory(segment_dir);
                         }
                     }
                 }
@@ -4962,10 +4956,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                                       segment_info.segment_id_);
 
                 if (VirtualStore::Exists(segment_dir)) {
-                    Status remove_status = VirtualStore::RemoveDirectory(segment_dir);
-                    if (!remove_status.ok()) {
-                        LOG_WARN(fmt::format("Failed to remove segment directory during rollback: {}", segment_dir));
-                    }
+                    VirtualStore::RemoveDirectory(segment_dir);
                 }
             }
 
@@ -4978,10 +4969,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                                     index_cmd.index_id_);
 
                 if (VirtualStore::Exists(index_dir)) {
-                    Status remove_status = VirtualStore::RemoveDirectory(index_dir);
-                    if (!remove_status.ok()) {
-                        LOG_WARN(fmt::format("Failed to remove index directory during rollback: {}", index_dir));
-                    }
+                    VirtualStore::RemoveDirectory(index_dir);
                 }
             }
 
@@ -4990,10 +4978,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 fmt::format("{}/db_{}/tbl_{}", data_dir, restore_table_txn_store->db_id_str_, restore_table_txn_store->table_id_str_);
 
             if (VirtualStore::Exists(table_dir)) {
-                Status remove_status = VirtualStore::RemoveDirectory(table_dir);
-                if (!remove_status.ok()) {
-                    LOG_WARN(fmt::format("Failed to remove table directory during rollback: {}", table_dir));
-                }
+                VirtualStore::RemoveDirectory(table_dir);
             }
 
             // // Clean up metadata entries that were created
@@ -5050,10 +5035,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             std::string db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
 
             if (VirtualStore::Exists(db_dir)) {
-                Status remove_status = VirtualStore::RemoveDirectory(db_dir);
-                if (!remove_status.ok()) {
-                    LOG_WARN(fmt::format("Failed to remove database directory during rollback: {}", db_dir));
-                }
+                VirtualStore::RemoveDirectory(db_dir);
             }
 
             // for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
@@ -5113,10 +5095,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 std::string db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
 
                 if (VirtualStore::Exists(db_dir)) {
-                    Status remove_status = VirtualStore::RemoveDirectory(db_dir);
-                    if (!remove_status.ok()) {
-                        LOG_WARN(fmt::format("Failed to remove database directory during rollback: {}", db_dir));
-                    }
+                    VirtualStore::RemoveDirectory(db_dir);
                 }
 
                 // for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
