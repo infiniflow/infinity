@@ -60,7 +60,6 @@ public:
     static Status MakeDirectory(const std::string &path);
     static Status RemoveDirectory(const std::string &path);
     static Status CleanupDirectory(const std::string &path);
-    static void RecursiveCleanupAllEmptyDir(const std::string &path);
     static Status Rename(const std::string &old_path, const std::string &new_path);
     static Status Truncate(const std::string &file_name, size_t new_length);
     static Status Merge(const std::string &dst_file, const std::string &src_file);

@@ -5256,16 +5256,6 @@ Status NewTxn::Cleanup() {
         }
     }
 
-    if (metas.empty()) {
-        LOG_TRACE("Cleanup: No data need to clean. Try to remove all empty directories...");
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        auto data_dir_str = buffer_mgr->GetFullDataDir();
-        auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
-        // Delete empty dir
-        VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
-        return Status::OK();
-    }
-
     status = CleanupInner(metas);
     if (!status.ok()) {
         return status;
@@ -5283,6 +5273,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     SystemCache *system_cache = this->txn_mgr()->GetSystemCachePtr();
     MetaCache *meta_cache = this->txn_mgr_->storage()->meta_cache();
+    std::vector<std::string> dropped_entity_dirs{};
     for (auto &meta : metas) {
         switch (meta->type_) {
             case MetaType::kDB: {
@@ -5299,6 +5290,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                     return status;
                 }
                 system_cache->DropDbCache(std::stoull(db_meta_key->db_id_str_));
+                dropped_entity_dirs.emplace_back(fmt::format("db_{}", db_meta_key->db_id_str_));
                 break;
             }
             case MetaType::kTable: {
@@ -5324,6 +5316,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                     return status;
                 }
                 system_cache->DropTableCache(std::stoull(table_meta_key->db_id_str_), std::stoull(table_meta_key->table_id_str_));
+                dropped_entity_dirs.emplace_back(fmt::format("db_{}/tbl_{}", table_meta_key->db_id_str_, table_meta_key->table_id_str_));
                 break;
             }
             case MetaType::kTableName: {
@@ -5356,6 +5349,8 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                 if (!status.ok()) {
                     return status;
                 }
+                dropped_entity_dirs.emplace_back(
+                    fmt::format("db_{}/tbl_{}/seg_{}", segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, segment_meta_key->segment_id_));
                 break;
             }
             case MetaType::kBlock: {
@@ -5368,6 +5363,11 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                 if (!status.ok()) {
                     return status;
                 }
+                dropped_entity_dirs.emplace_back(fmt::format("db_{}/tbl_{}/seg_{}/blk_{}",
+                                                             block_meta_key->db_id_str_,
+                                                             block_meta_key->table_id_str_,
+                                                             block_meta_key->segment_id_,
+                                                             block_meta_key->block_id_));
                 break;
             }
             case MetaType::kTableColumn: {
@@ -5422,6 +5422,10 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                 system_cache->DropIndexCache(std::stoull(table_index_meta_key->db_id_str_),
                                              std::stoull(table_index_meta_key->table_id_str_),
                                              std::stoull(table_index_meta_key->index_id_str_));
+                dropped_entity_dirs.emplace_back(fmt::format("db_{}/tbl_{}/idx_{}",
+                                                             table_index_meta_key->db_id_str_,
+                                                             table_index_meta_key->table_id_str_,
+                                                             table_index_meta_key->index_id_str_));
                 break;
             }
             case MetaType::kSegmentIndex: {
@@ -5440,6 +5444,11 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                 if (!status.ok()) {
                     return status;
                 }
+                dropped_entity_dirs.emplace_back(fmt::format("db_{}/tbl_{}/idx_{}/seg_{}",
+                                                             segment_index_meta_key->db_id_str_,
+                                                             segment_index_meta_key->table_id_str_,
+                                                             segment_index_meta_key->index_id_str_,
+                                                             segment_index_meta_key->segment_id_));
                 break;
             }
             case MetaType::kChunkIndex: {
@@ -5468,13 +5477,19 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
     }
 
     Status status = buffer_mgr->RemoveClean(kv_instance_.get());
+    if (!status.ok()) {
+        return status;
+    }
 
-    auto data_dir_str = buffer_mgr->GetFullDataDir();
-    auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
-    // Delete empty dir
-    VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
+    // Remove the dirs of the dropped entities. With a persistence manager the data lives in the object store, so there is no dir to remove.
+    if (InfinityContext::instance().persistence_manager() == nullptr) {
+        std::string data_dir = *buffer_mgr->GetFullDataDir();
+        for (const auto &dir : dropped_entity_dirs) {
+            VirtualStore::RemoveDirectory(fmt::format("{}/{}", data_dir, dir));
+        }
+    }
 
-    return status;
+    return Status::OK();
 }
 
 bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == TransactionType::kReplay; }

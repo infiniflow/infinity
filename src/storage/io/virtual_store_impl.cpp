@@ -263,21 +263,6 @@ Status VirtualStore::CleanupDirectory(const std::string &path) {
     return Status::OK();
 }
 
-void VirtualStore::RecursiveCleanupAllEmptyDir(const std::string &path) {
-    if (!VirtualStore::Exists(path) || !std::filesystem::is_directory(path)) {
-        return;
-    }
-
-    for (const auto &entry : std::filesystem::directory_iterator(path)) {
-        RecursiveCleanupAllEmptyDir(entry.path());
-    }
-
-    if (std::filesystem::is_empty(path)) {
-        // std::error_code ec;
-        std::filesystem::remove(path);
-    }
-}
-
 Status VirtualStore::Rename(const std::string &old_path, const std::string &new_path) {
     if (!std::filesystem::path(old_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", old_path));
