@@ -127,6 +127,10 @@ std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const st
             fd = open(path.c_str(), O_RDWR | O_CREAT, 0666);
             break;
         }
+        case FileAccessMode::kAppend: {
+            fd = open(path.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+            break;
+        }
         case FileAccessMode::kMmapRead: {
             UnrecoverableError("Unsupported now.");
             break;
