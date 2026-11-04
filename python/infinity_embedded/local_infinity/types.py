@@ -166,8 +166,8 @@ def parse_single_array_bytes(column_data_type: WrapDataType, bytes_data, offset)
         case LogicalType.kBFloat16:
             single_pod_element_size = 2
         case LogicalType.kEmbedding:
-            embedding_dimension = column_data_type.embedding_type.dimension
-            match column_data_type.embedding_type.element_type:
+            embedding_dimension = element_data_type.embedding_type.dimension
+            match element_data_type.embedding_type.element_type:
                 case EmbeddingDataType.kElemBit:
                     single_pod_element_size = embedding_dimension // 8
                 case EmbeddingDataType.kElemUInt8:
