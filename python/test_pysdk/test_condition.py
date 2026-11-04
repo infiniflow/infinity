@@ -46,3 +46,20 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_condition_embedded_like(self, request):
+        # embedded SDK must support LIKE / NOT LIKE / ESCAPE filters; it
+        # previously raised "unknown binary expression: like/escape".
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        from infinity_embedded.local_infinity.utils import traverse_conditions as embedded_traverse
+        for cond_str, expected_func in [
+            ("c1 LIKE '%test%'", "like"),
+            ("c1 NOT LIKE '%test%'", "not_like"),
+            ("c1 LIKE '%test!%' ESCAPE '!'", "like"),
+            ("c1 NOT LIKE '%test!%' ESCAPE '!'", "not_like"),
+        ]:
+            res = embedded_traverse(condition(cond_str))
+            func_expr = res.function_expr
+            assert func_expr.func_name == expected_func, f"{cond_str}: got {func_expr.func_name}"
+            assert len(func_expr.arguments) == 3  # left, pattern, escape

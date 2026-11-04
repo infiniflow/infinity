@@ -47,6 +47,10 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
         return "%"
     elif binary_expr_key == "trunc":
         return binary_expr_key
+    elif binary_expr_key == "like":
+        return "like"
+    elif binary_expr_key == "notlike":
+        return "not_like"
     else:
         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown binary expression: {binary_expr_key}")
 
