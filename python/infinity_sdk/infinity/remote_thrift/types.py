@@ -320,8 +320,8 @@ def parse_single_array_bytes(column_data_type: ttypes.DataType, bytes_data, offs
             single_pod_element_size = 2
         case ttypes.LogicType.Embedding:
             tmp_column_type = ttypes.ColumnType.ColumnEmbedding
-            embedding_dimension = column_data_type.physical_type.embedding_type.dimension
-            match column_data_type.physical_type.embedding_type.element_type:
+            embedding_dimension = element_data_type.physical_type.embedding_type.dimension
+            match element_data_type.physical_type.embedding_type.element_type:
                 case ttypes.ElementType.ElementBit:
                     single_pod_element_size = embedding_dimension // 8
                 case ttypes.ElementType.ElementUInt8:

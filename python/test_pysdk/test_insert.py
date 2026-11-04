@@ -845,6 +845,30 @@ class TestInfinity:
         res = db_obj.drop_table("test_insert_array_varchar" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def _test_insert_array_embedding(self, suffix):
+        """
+        target: regression test - select on an array-of-embedding column must not crash
+        the thrift SDK result parser
+        method: create table with array,vector column, insert, read back
+        expected: values round-trip unchanged
+        """
+        if suffix == '_http':
+            pytest.skip("HTTP not support array type")
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_array_embedding" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_array_embedding" + suffix,
+                                        {"c1": {"type": "array,vector,4,float"}},
+                                        ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": Array([1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0])}])
+        assert res.error_code == ErrorCode.OK
+        res, extra_result = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': ([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]],)}))
+        res = db_obj.drop_table("test_insert_array_embedding" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def test_insert(self, suffix):
         # self.test_infinity_obj._test_version()
         self._test_insert_basic(suffix)
@@ -871,6 +895,7 @@ class TestInfinity:
         self._test_insert_tensor_array(suffix)
         self._test_insert_array(suffix)
         self._test_insert_array_varchar(suffix)
+        self._test_insert_array_embedding(suffix)
 
     def test_insert_rows_mismatch(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
