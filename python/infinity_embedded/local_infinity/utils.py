@@ -157,6 +157,20 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.type = ParsedExprType.kFunction
         parsed_expr.function_expr = func_expr
         return parsed_expr
+    elif isinstance(cons, exp.Unnest):
+        # UNNEST carries its columns under 'expressions' (a list); the
+        # generic Func arm would feed the raw list to parse_expr and crash.
+        arguments = []
+        for arg in cons.args['expressions']:
+            if arg is not None:
+                arguments.append(parse_expr(arg))
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = cons.key
+        func_expr.arguments = arguments
+        parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
+
     elif isinstance(cons, exp.Anonymous):
         arguments = []
         for arg in cons.args['expressions']:
