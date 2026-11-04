@@ -634,6 +634,7 @@ class table_http:
         d = self.net.set_up_data([], {"new_table_name": new_table_name})
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
+        self.table_name = new_table_name
         return database_result()
 
     def show_columns(self):

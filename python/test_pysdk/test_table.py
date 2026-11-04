@@ -728,6 +728,10 @@ class TestInfinity:
         res = table_obj.rename("test_rename_table_new" + suffix)
         assert res.error_code == ErrorCode.OK
 
+        # the handle must follow the rename
+        res = table_obj.insert([{"c1": 1}])
+        assert res.error_code == ErrorCode.OK
+
         with pytest.raises(InfinityException) as e:
             db_obj.get_table("test_rename_table" + suffix)
         assert e.type == InfinityException
