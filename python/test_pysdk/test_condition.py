@@ -46,3 +46,31 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_condition_embedded(self, request):
+        # embedded SDK filter traversal must work with current sqlglot releases
+        # (hashable_args was removed from sqlglot; using it crashed every
+        # binary/NOT/paren/negated filter with AttributeError)
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        from infinity_embedded.local_infinity.utils import traverse_conditions as embedded_traverse
+        for cond_str in [
+            "c1 = 1",
+            "c1 != 1",
+            "c1 > 1 and c2 < 2 or c3 = 3.3",
+            "-8 < c1 and c1 <= -7",
+            "(-7 < c1 or 9 <= c1) and (c1 = 3)",
+            "!(9 <= c1)",
+            "c1 IN (1,2,3)",
+            "c1 NOT IN (1,2,3)",
+        ]:
+            res = embedded_traverse(condition(cond_str))
+            print(cond_str)
+            print(res)
+            assert res
+
+        # operand order must be stable: column first, literal second
+        res = embedded_traverse(condition("c1 > 1"))
+        args = res.function_expr.arguments
+        assert getattr(args[0], "column_expr", None) is not None
+        assert getattr(args[1], "constant_expr", None) is not None
