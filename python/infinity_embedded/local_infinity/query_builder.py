@@ -221,7 +221,7 @@ class InfinityLocalQueryBuilder(ABC):
             optional_filter = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
-                value = v.lower()
+                value = str(v).lower()
                 tmp_param = InitParameter()
                 tmp_param.param_name = key
                 tmp_param.param_value = value

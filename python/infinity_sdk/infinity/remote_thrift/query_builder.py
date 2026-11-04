@@ -244,7 +244,7 @@ class InfinityThriftQueryBuilder(ABC):
             optional_filter = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
-                value = v.lower()
+                value = str(v).lower()
                 knn_opt_params.append(InitParameter(key, value))
 
         knn_expr = KnnExpr(
@@ -686,7 +686,7 @@ class InfinityThriftQueryBuilder(ABC):
             optional_filter = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
-                value = v.lower()
+                value = str(v).lower()
                 knn_opt_params.append(InitParameter(key, value))
 
         # Create KnnExpr with FDE function as query_embedding_expr
