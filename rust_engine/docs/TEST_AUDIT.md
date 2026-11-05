@@ -2,7 +2,7 @@
 
 > **子目标 S4 · 用例级覆盖不漏**｜纲领见 [`PORTING.md`](PORTING.md) §5
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 48, `exempt` 16, `not ported` 7, `ported` 941。
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 48, `exempt` 16, `not ported` 8, `ported` 940。
 
 - `ported`：Rust 有同等场景的用例，映射列给出 `crate 模块::测试名`。少数以 native 组件等价替代 C++ 第三方（例如 RocksDB 事务 KV → `txn_kv`、后台线程池 → `bg_task`），映射列直接指向替代实现，不声称字节级一致。
 - `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point`/`Line`/`Box`/`Path`/`Polygon`/`Circle`）相关用例——这些类型不移植。
@@ -12,7 +12,7 @@
 另有一类 `not ported`（7 行，存储缓冲层：`BufferObj`/`BufferHandle`/`BufferManager` 已整体去掉，块改为 mmap 直接映射），它们不是缺口，是 §3.1 的设计变更；类层面若有 `partial` 在 [`CLASS_MAP.md`](CLASS_MAP.md) §2。
 
 **最近一次核对（2026-10-28）**：脚本逐行读本表，取映射列里的 Rust 用例名，在 `rust_engine/crates` 下检查
-`fn <name>` 是否存在——941 个 `ported` 行全部命中，没有失效映射；再把每行的 `#[ignore]` 与 C++ 用例的
+`fn <name>` 是否存在——940 个 `ported` 行全部命中，没有失效映射；再把每行的 `#[ignore]` 与 C++ 用例的
 `DISABLED_` 前缀对比，唯一不同的一组是 `s3_client_minio_ut` / `virtual_store_ut` 的 5 个用例（参考需要
 MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 显式打开）。事务层（§2.1）的对应关系：
 `storage/txn/conflict_check_ut` 1/1、`new_catalog/new_txn_mgr_ut` 2/2（2 个 `DISABLED_SLOW_`）、
@@ -21,52 +21,52 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 
 | # | 文件 | Fixture | 用例 | 状态 |
 |---:|---|---|---|---|
-| 1 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_default_is_english_and_coarse` | ported | `executor` `analyzer::analyzer_pool_tests::test_rag_default_is_english_and_coarse` |
-| 2 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_fine_keeps_english_stemming` | ported | `executor` `analyzer::analyzer_pool_tests::test_rag_fine_keeps_english_stemming` |
-| 3 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_slovak_folds_and_disables_stemming` | ported | `executor` `analyzer::analyzer_pool_tests::test_rag_slovak_folds_and_disables_stemming` |
-| 4 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_czech_folds_and_disables_stemming` | ported | `executor` `analyzer::analyzer_pool_tests::test_rag_czech_folds_and_disables_stemming` |
-| 5 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_language_and_fine_in_both_orders` | ported | `executor` `analyzer::analyzer_pool_tests::test_rag_language_and_fine_in_both_orders` |
-| 6 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_unknown_segment_falls_back_to_legacy` | ported | `executor` `analyzer::analyzer_pool_tests::test_rag_unknown_segment_falls_back_to_legacy` |
-| 7 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_analyzers_are_independent` | ported | `executor` `analyzer::analyzer_pool_tests::test_rag_analyzers_are_independent` |
-| 8 | `src/unit_test/common/analyzer/chinese_analyzer_ut.cpp` | `ChineseAnalyzerTest` | `test1` | ported | `executor` `analyzer::chinese_analyzer_tests::test1` |
-| 9 | `src/unit_test/common/analyzer/ik_analyzer_ut.cpp` | `IKAnalyzerTest` | `test1` | ported | `executor` `analyzer::ik_analyzer_tests::test1` |
-| 10 | `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp` | `NGramAnalyzerTest` | `test1` | ported | `executor` `analyzer::tests::ngram_two_slides_over_words` |
-| 11 | `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp` | `NGramAnalyzerTest` | `test2` | ported | `executor` `analyzer::tests::ngram_one_emits_each_character` |
-| 12 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_analyze_enable_position` | ported | `executor` `analyzer::rag_analyzer_tests::test_analyze_enable_position` |
-| 13 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_analyze_enable_position_fine_grained` | ported | `executor` `analyzer::rag_analyzer_tests::test_analyze_enable_position_fine_grained` |
-| 14 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_tokenize_consistency_with_posiiton` | ported | `executor` `analyzer::rag_analyzer_tests::test_tokenize_consistency_with_posiiton` |
-| 15 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_tokenize_consistency_with_python` | ported | `executor` `analyzer::rag_analyzer_tests::test_tokenize_consistency_with_python` |
-| 16 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_fine_grained_tokenize_consistency_with_python` | ported | `executor` `analyzer::rag_analyzer_tests::test_fine_grained_tokenize_consistency_with_python` |
-| 17 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_set_language_dutch` | ported | `executor` `analyzer::rag_analyzer_tests::test_set_language_dutch` |
-| 18 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_set_language_slovak` | ported | `executor` `analyzer::rag_analyzer_tests::test_set_language_slovak` |
-| 19 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_set_language_czech` | ported | `executor` `analyzer::rag_analyzer_tests::test_set_language_czech` |
-| 20 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_slovak_no_stemming` | ported | `executor` `analyzer::rag_analyzer_tests::test_slovak_no_stemming` |
-| 21 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_diacritics_folding_table` | ported | `executor` `analyzer::rag_analyzer_tests::test_diacritics_folding_table` |
-| 22 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_out_of_range_diacritics_parity_with_python` | ported | `executor` `analyzer::rag_analyzer_tests::test_out_of_range_diacritics_parity_with_python` |
-| 23 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_slovak_tokenize_with_position` | ported | `executor` `analyzer::rag_analyzer_tests::test_slovak_tokenize_with_position` |
-| 24 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_chinese_stopword_filter` | ported | `executor` `analyzer::rag_analyzer_tests::test_chinese_stopword_filter` |
-| 25 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `unicode_replacement_preserves_byte_positions` | ported | `executor` `analyzer::rag_regex_tests::unicode_replacement_preserves_byte_positions` |
-| 26 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `empty_and_unmatched_input` | ported | `executor` `analyzer::rag_regex_tests::empty_and_unmatched_input` |
-| 27 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `invalid_utf8_is_checked_before_any_replacement` | ported | `executor` `analyzer::rag_regex_tests::invalid_utf8_is_checked_before_any_replacement` |
-| 28 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `non_character_offsets_remain_checked` | ported | `executor` `analyzer::rag_regex_tests::non_character_offsets_remain_checked` |
-| 29 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `large_html_replacement` | ported | `executor` `analyzer::rag_regex_tests::large_html_replacement` |
-| 30 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test1` | ported | `executor` `analyzer::tests::standard_analyzer_lowercases_without_stemming` |
-| 31 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test2` | ported | `executor` `analyzer::tests::standard_analyzer_keeps_the_source_case` |
-| 32 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test3` | ported | `executor` `analyzer::tests::standard_analyzer_emits_word_and_stem` |
-| 33 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test4` | ported | `executor` `analyzer::tests::standard_analyzer_emits_case_and_lower_forms` |
-| 34 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test5` | ported | `executor` `analyzer::tests::standard_analyzer_deduplicates_the_stem` |
-| 35 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test6` | ported | `executor` `analyzer::tests::standard_analyzer_honours_the_tokenizer_config` |
-| 36 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test7` | ported | `executor` `analyzer::tests::standard_analyzer_handles_a_large_extract` |
-| 37 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test1` | ported | `executor` `analyzer::user_defined_reference_suite::user_defined_analyzer_test1` |
-| 38 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test2` | ported | `executor` `analyzer::user_defined_reference_suite::user_defined_analyzer_test2` |
-| 39 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test3` | ported | `executor` `analyzer::user_defined_reference_suite::user_defined_analyzer_test3` |
-| 40 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test4` | ported | `executor` `analyzer::user_defined_reference_suite::user_defined_analyzer_test4` |
-| 41 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test5` | ported | `executor` `analyzer::user_defined_reference_suite::user_defined_analyzer_test5` |
-| 42 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test1` | ported | `executor` `analyzer::user_defined_reference_suite::user_defined_term_weight_test1` |
-| 43 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test2` | ported | `executor` `analyzer::user_defined_reference_suite::user_defined_term_weight_test2` |
-| 44 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test3` | ported | `executor` `analyzer::user_defined_reference_suite::user_defined_term_weight_test3` |
-| 45 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test4` | ported | `executor` `analyzer::user_defined_reference_suite::user_defined_term_weight_test4` |
-| 46 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test5` | ported | `executor` `analyzer::user_defined_reference_suite::user_defined_term_weight_test5` |
+| 1 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_default_is_english_and_coarse` | ported | `executor` `common::analyzer::analyzer_pool_tests::test_rag_default_is_english_and_coarse` |
+| 2 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_fine_keeps_english_stemming` | ported | `executor` `common::analyzer::analyzer_pool_tests::test_rag_fine_keeps_english_stemming` |
+| 3 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_slovak_folds_and_disables_stemming` | ported | `executor` `common::analyzer::analyzer_pool_tests::test_rag_slovak_folds_and_disables_stemming` |
+| 4 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_czech_folds_and_disables_stemming` | ported | `executor` `common::analyzer::analyzer_pool_tests::test_rag_czech_folds_and_disables_stemming` |
+| 5 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_language_and_fine_in_both_orders` | ported | `executor` `common::analyzer::analyzer_pool_tests::test_rag_language_and_fine_in_both_orders` |
+| 6 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_unknown_segment_falls_back_to_legacy` | ported | `executor` `common::analyzer::analyzer_pool_tests::test_rag_unknown_segment_falls_back_to_legacy` |
+| 7 | `src/unit_test/common/analyzer/analyzer_pool_ut.cpp` | `AnalyzerPoolTest` | `test_rag_analyzers_are_independent` | ported | `executor` `common::analyzer::analyzer_pool_tests::test_rag_analyzers_are_independent` |
+| 8 | `src/unit_test/common/analyzer/chinese_analyzer_ut.cpp` | `ChineseAnalyzerTest` | `test1` | ported | `executor` `common::analyzer::chinese_analyzer_tests::test1` |
+| 9 | `src/unit_test/common/analyzer/ik_analyzer_ut.cpp` | `IKAnalyzerTest` | `test1` | ported | `executor` `common::analyzer::ik_analyzer_tests::test1` |
+| 10 | `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp` | `NGramAnalyzerTest` | `test1` | ported | `executor` `common::analyzer::tests::ngram_two_slides_over_words` |
+| 11 | `src/unit_test/common/analyzer/ngram_analyzer_ut.cpp` | `NGramAnalyzerTest` | `test2` | ported | `executor` `common::analyzer::tests::ngram_one_emits_each_character` |
+| 12 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_analyze_enable_position` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_analyze_enable_position` |
+| 13 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_analyze_enable_position_fine_grained` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_analyze_enable_position_fine_grained` |
+| 14 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_tokenize_consistency_with_posiiton` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_tokenize_consistency_with_posiiton` |
+| 15 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_tokenize_consistency_with_python` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_tokenize_consistency_with_python` |
+| 16 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_fine_grained_tokenize_consistency_with_python` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_fine_grained_tokenize_consistency_with_python` |
+| 17 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_set_language_dutch` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_set_language_dutch` |
+| 18 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_set_language_slovak` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_set_language_slovak` |
+| 19 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_set_language_czech` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_set_language_czech` |
+| 20 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_slovak_no_stemming` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_slovak_no_stemming` |
+| 21 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_diacritics_folding_table` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_diacritics_folding_table` |
+| 22 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_out_of_range_diacritics_parity_with_python` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_out_of_range_diacritics_parity_with_python` |
+| 23 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_slovak_tokenize_with_position` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_slovak_tokenize_with_position` |
+| 24 | `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` | `RAGAnalyzerTest` | `test_chinese_stopword_filter` | ported | `executor` `common::analyzer::rag_analyzer_tests::test_chinese_stopword_filter` |
+| 25 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `unicode_replacement_preserves_byte_positions` | ported | `executor` `common::analyzer::rag_regex_tests::unicode_replacement_preserves_byte_positions` |
+| 26 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `empty_and_unmatched_input` | ported | `executor` `common::analyzer::rag_regex_tests::empty_and_unmatched_input` |
+| 27 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `invalid_utf8_is_checked_before_any_replacement` | ported | `executor` `common::analyzer::rag_regex_tests::invalid_utf8_is_checked_before_any_replacement` |
+| 28 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `non_character_offsets_remain_checked` | ported | `executor` `common::analyzer::rag_regex_tests::non_character_offsets_remain_checked` |
+| 29 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `large_html_replacement` | ported | `executor` `common::analyzer::rag_regex_tests::large_html_replacement` |
+| 30 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test1` | ported | `executor` `common::analyzer::tests::standard_analyzer_lowercases_without_stemming` |
+| 31 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test2` | ported | `executor` `common::analyzer::tests::standard_analyzer_keeps_the_source_case` |
+| 32 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test3` | ported | `executor` `common::analyzer::tests::standard_analyzer_emits_word_and_stem` |
+| 33 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test4` | ported | `executor` `common::analyzer::tests::standard_analyzer_emits_case_and_lower_forms` |
+| 34 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test5` | ported | `executor` `common::analyzer::tests::standard_analyzer_deduplicates_the_stem` |
+| 35 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test6` | ported | `executor` `common::analyzer::tests::standard_analyzer_honours_the_tokenizer_config` |
+| 36 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test7` | ported | `executor` `common::analyzer::tests::standard_analyzer_handles_a_large_extract` |
+| 37 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test1` | ported | `executor` `common::analyzer::user_defined_reference_suite::user_defined_analyzer_test1` |
+| 38 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test2` | ported | `executor` `common::analyzer::user_defined_reference_suite::user_defined_analyzer_test2` |
+| 39 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test3` | ported | `executor` `common::analyzer::user_defined_reference_suite::user_defined_analyzer_test3` |
+| 40 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test4` | ported | `executor` `common::analyzer::user_defined_reference_suite::user_defined_analyzer_test4` |
+| 41 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test5` | ported | `executor` `common::analyzer::user_defined_reference_suite::user_defined_analyzer_test5` |
+| 42 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test1` | ported | `executor` `common::analyzer::user_defined_reference_suite::user_defined_term_weight_test1` |
+| 43 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test2` | ported | `executor` `common::analyzer::user_defined_reference_suite::user_defined_term_weight_test2` |
+| 44 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test3` | ported | `executor` `common::analyzer::user_defined_reference_suite::user_defined_term_weight_test3` |
+| 45 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test4` | ported | `executor` `common::analyzer::user_defined_reference_suite::user_defined_term_weight_test4` |
+| 46 | `src/unit_test/common/analyzer/user_defined_term_weight_nimpl.cpp` | `UserDefinedTermWeightTest` | `test5` | ported | `executor` `common::analyzer::user_defined_reference_suite::user_defined_term_weight_test5` |
 | 47 | `src/unit_test/common/test_simd_ut.cpp` | `SimdInitTest` | `GetSupportedSimdTypesList` | ported | `common` `simd::tests::simd_supported_types_list` |
 | 48 | `src/unit_test/common/utility/exception_ut.cpp` | `ExceptionTest` | `all_exception_cases` | ported | `common` `error::tests::exception_messages_match_the_reference` |
 | 49 | `src/unit_test/common/utility/trim_ut.cpp` | `TrimTest` | `test1` | ported | `common` `utility::tests::trim_path_keeps_the_repository_relative_part` |
@@ -80,12 +80,12 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 57 | `src/unit_test/executor/operator/physical_sort_ut_nimpl.cpp` | `PhysicalSortTest` | `test1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 58 | `src/unit_test/executor/pipeline/explain_ut.cpp` | `ExplainTest` | `test1` | ported | `executor` `explain::tests::explain_align_paragraphs` |
 | 59 | `src/unit_test/executor/pipeline/fragment_ut.cpp` | `FragmentTest` | `test_build_fragment` | ported | `executor` `gate_b_executor_ut::fragment_test_build_fragment` |
-| 60 | `src/unit_test/function/aggregate/avg_functions_ut.cpp` | `AvgFunctionTest` | `avg_func` | ported | `executor` `tests::aggregate_functions_match_the_reference` |
-| 61 | `src/unit_test/function/aggregate/count_functions_ut.cpp` | `CountFunctionTest` | `quarter_func` | ported | `executor` `tests::aggregate_functions_match_the_reference` |
-| 62 | `src/unit_test/function/aggregate/first_functions_ut.cpp` | `FirstFunctionTest` | `first_func` | ported | `executor` `tests::aggregate_functions_match_the_reference` |
-| 63 | `src/unit_test/function/aggregate/max_functions_ut.cpp` | `MaxFunctionTest` | `max_func` | ported | `executor` `tests::aggregate_functions_match_the_reference` |
-| 64 | `src/unit_test/function/aggregate/min_functions_ut.cpp` | `MinFunctionTest` | `min_func` | ported | `executor` `tests::aggregate_functions_match_the_reference` |
-| 65 | `src/unit_test/function/aggregate/sum_functions_ut.cpp` | `SumFunctionTest` | `sum_func` | ported | `executor` `tests::aggregate_functions_match_the_reference` |
+| 60 | `src/unit_test/function/aggregate/avg_functions_ut.cpp` | `AvgFunctionTest` | `avg_func` | ported | `executor` `engine::tests_ut::tests::aggregate_functions_match_the_reference` |
+| 61 | `src/unit_test/function/aggregate/count_functions_ut.cpp` | `CountFunctionTest` | `quarter_func` | ported | `executor` `engine::tests_ut::tests::aggregate_functions_match_the_reference` |
+| 62 | `src/unit_test/function/aggregate/first_functions_ut.cpp` | `FirstFunctionTest` | `first_func` | ported | `executor` `engine::tests_ut::tests::aggregate_functions_match_the_reference` |
+| 63 | `src/unit_test/function/aggregate/max_functions_ut.cpp` | `MaxFunctionTest` | `max_func` | ported | `executor` `engine::tests_ut::tests::aggregate_functions_match_the_reference` |
+| 64 | `src/unit_test/function/aggregate/min_functions_ut.cpp` | `MinFunctionTest` | `min_func` | ported | `executor` `engine::tests_ut::tests::aggregate_functions_match_the_reference` |
+| 65 | `src/unit_test/function/aggregate/sum_functions_ut.cpp` | `SumFunctionTest` | `sum_func` | ported | `executor` `engine::tests_ut::tests::aggregate_functions_match_the_reference` |
 | 66 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast0` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 67 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 68 | `src/unit_test/function/cast/bool_cast_ut.cpp` | `BoolCastTest` | `bool_cast0` | ported | `common` `cast::tests::bool_cast0` |
@@ -136,23 +136,23 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 113 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 114 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast0` | ported | `common` `cast::tests::varchar_cast0` |
 | 115 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast1` | ported | `common` `cast::tests::varchar_cast1` |
-| 116 | `src/unit_test/function/scalar/abs_functions_ut.cpp` | `AbsFunctionsTest` | `abs_func` | ported | `executor` `tests::abs_function_covers_every_numeric_type` |
+| 116 | `src/unit_test/function/scalar/abs_functions_ut.cpp` | `AbsFunctionsTest` | `abs_func` | ported | `executor` `engine::tests_ut::tests::abs_function_covers_every_numeric_type` |
 | 117 | `src/unit_test/function/scalar/add_functions_ut.cpp` | `AddFunctionsTest` | `add_func` | ported | `expression` `scalar::tests::add_func` |
-| 118 | `src/unit_test/function/scalar/and_functions_ut.cpp` | `AndFunctionsTest` | `and_func` | ported | `executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
-| 119 | `src/unit_test/function/scalar/century_functions_ut.cpp` | `CenturyFunctionsTest` | `century_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
+| 118 | `src/unit_test/function/scalar/and_functions_ut.cpp` | `AndFunctionsTest` | `and_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 119 | `src/unit_test/function/scalar/century_functions_ut.cpp` | `CenturyFunctionsTest` | `century_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
 | 120 | `src/unit_test/function/scalar/current_date_functions_ut.cpp` | `CurrentDateFunctionsTest` | `current_date_func` | ported | `expression` `scalar::tests::current_date_func` |
 | 121 | `src/unit_test/function/scalar/current_time_functions_ut.cpp` | `CurrentTimeFunctionsTest` | `current_time_func` | ported | `expression` `scalar::tests::current_time_func` |
 | 122 | `src/unit_test/function/scalar/current_timestamp_functions_ut.cpp` | `CurrentTimestampFunctionsTest` | `current_timestamp_func` | ported | `expression` `scalar::tests::current_timestamp_func` |
-| 123 | `src/unit_test/function/scalar/date_part_functions_ut.cpp` | `DatePartFunctionsTest` | `datepart_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 124 | `src/unit_test/function/scalar/day_functions_ut.cpp` | `DayFunctionsTest` | `day_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 125 | `src/unit_test/function/scalar/day_of_month_functions_ut.cpp` | `DayOfMonthFunctionsTest` | `day_of_month_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 126 | `src/unit_test/function/scalar/day_of_week_ut.cpp` | `DayOfWeekFunctionsTest` | `day_of_week_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 127 | `src/unit_test/function/scalar/day_of_year_functions_ut.cpp` | `DayOfYearFunctionsTest` | `day_of_year_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 128 | `src/unit_test/function/scalar/div_functions_ut.cpp` | `DivFunctionsTest` | `div_func` | ported | `executor` `tests::arithmetic_and_equality_follow_the_reference` |
+| 123 | `src/unit_test/function/scalar/date_part_functions_ut.cpp` | `DatePartFunctionsTest` | `datepart_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 124 | `src/unit_test/function/scalar/day_functions_ut.cpp` | `DayFunctionsTest` | `day_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 125 | `src/unit_test/function/scalar/day_of_month_functions_ut.cpp` | `DayOfMonthFunctionsTest` | `day_of_month_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 126 | `src/unit_test/function/scalar/day_of_week_ut.cpp` | `DayOfWeekFunctionsTest` | `day_of_week_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 127 | `src/unit_test/function/scalar/day_of_year_functions_ut.cpp` | `DayOfYearFunctionsTest` | `day_of_year_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 128 | `src/unit_test/function/scalar/div_functions_ut.cpp` | `DivFunctionsTest` | `div_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_equality_follow_the_reference` |
 | 129 | `src/unit_test/function/scalar/epoch_functions_ut.cpp` | `EpochFunctionsTest` | `epoch_func` | ported | `expression` `scalar::tests::epoch_func` |
-| 130 | `src/unit_test/function/scalar/equals_functions_ut.cpp` | `EqualsFunctionsTest` | `equals_func` | ported | `executor` `tests::arithmetic_and_equality_follow_the_reference` |
-| 131 | `src/unit_test/function/scalar/era_functions_ut.cpp` | `EraFunctionsTest` | `era_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 132 | `src/unit_test/function/scalar/extract_function_ut.cpp` | `ExtractFunctionTest` | `extract_year_test` | ported | `executor` `tests::date_component_functions_match_the_reference` |
+| 130 | `src/unit_test/function/scalar/equals_functions_ut.cpp` | `EqualsFunctionsTest` | `equals_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_equality_follow_the_reference` |
+| 131 | `src/unit_test/function/scalar/era_functions_ut.cpp` | `EraFunctionsTest` | `era_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 132 | `src/unit_test/function/scalar/extract_function_ut.cpp` | `ExtractFunctionTest` | `extract_year_test` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
 | 133 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `config_test` | ported | `expression` `fde::tests::config_test` |
 | 134 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `tensor_test` | ported | `expression` `fde::tests::tensor_test` |
 | 135 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `random_generator_test` | ported | `expression` `fde::tests::random_generator_test` |
@@ -167,41 +167,41 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 144 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `final_projection_test` | ported | `expression` `fde::tests::final_projection_test` |
 | 145 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `multiple_repetitions_test` | ported | `expression` `fde::tests::multiple_repetitions_test` |
 | 146 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `fill_empty_partitions_test` | ported | `expression` `fde::tests::fill_empty_partitions_test` |
-| 147 | `src/unit_test/function/scalar/greater_equals_functions_ut.cpp` | `GreaterEqualsFunctionsTest` | `greater_equals_func` | ported | `executor` `tests::arithmetic_and_equality_follow_the_reference` |
-| 148 | `src/unit_test/function/scalar/greater_functions_ut.cpp` | `GreaterFunctionsTest` | `greater_func` | ported | `executor` `tests::arithmetic_and_equality_follow_the_reference` |
-| 149 | `src/unit_test/function/scalar/hour_functions_ut.cpp` | `HourFunctionsTest` | `hour_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 150 | `src/unit_test/function/scalar/inequals_functions_ut.cpp` | `InEqualsFunctionsTest` | `inequals_func` | ported | `executor` `tests::arithmetic_and_equality_follow_the_reference` |
-| 151 | `src/unit_test/function/scalar/less_equals_functions_ut.cpp` | `LessEqualsFunctionsTest` | `less_equals_func` | ported | `executor` `tests::arithmetic_and_equality_follow_the_reference` |
-| 152 | `src/unit_test/function/scalar/less_functions_ut.cpp` | `LessFunctionsTest` | `less_func` | ported | `executor` `tests::arithmetic_and_equality_follow_the_reference` |
-| 153 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `re2_quote_meta_test` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 154 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_special_regex_chars_escape` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 155 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_basic_sanity` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 156 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_percent_wildcard` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 157 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_underscore_wildcard` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 158 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_escape_character` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 159 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_custom_escape_char` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 160 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_empty_pattern` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 161 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_complex_real_world_patterns` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 162 | `src/unit_test/function/scalar/minus_functions_ut.cpp` | `MinusFunctionsTest` | `plus_func` | ported | `executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
-| 163 | `src/unit_test/function/scalar/minute_function_ut.cpp` | `MinuteFunctionsTest` | `minute_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 164 | `src/unit_test/function/scalar/modulo_functions_ut.cpp` | `ModuloFunctionsTest` | `mod_func` | ported | `executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
-| 165 | `src/unit_test/function/scalar/month_functions_ut.cpp` | `MonthFunctionsTest` | `month_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 166 | `src/unit_test/function/scalar/mul_functions_ut.cpp` | `MulFunctionsTest` | `mul_func` | ported | `executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
-| 167 | `src/unit_test/function/scalar/not_functions_ut.cpp` | `NotFunctionsTest` | `not_func` | ported | `executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
-| 168 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func` | ported | `executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
-| 169 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func_nullable_flat` | ported | `executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
-| 170 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func_nullable_constant` | ported | `executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
-| 171 | `src/unit_test/function/scalar/plus_functions_ut.cpp` | `PlusFunctionsTest` | `plus_func` | ported | `executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
-| 172 | `src/unit_test/function/scalar/pow_functions_ut.cpp` | `PowFunctionsTest` | `mul_func` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 173 | `src/unit_test/function/scalar/quarter_functions_ut.cpp` | `QuarterFunctionsTest` | `quarter_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 174 | `src/unit_test/function/scalar/reverse_functions_ut.cpp` | `ReverseFunctionsTest` | `reverse_func` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 175 | `src/unit_test/function/scalar/second_function_ut.cpp` | `SecondFunctionsTest` | `second_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 176 | `src/unit_test/function/scalar/substr_function_ut_nimpl.cpp` | `SubstrFunctionTest` | `varchar_substr` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 177 | `src/unit_test/function/scalar/subtract_functions_ut.cpp` | `SubtractFunctionsTest` | `sub_func` | ported | `executor` `tests::arithmetic_and_boolean_operators_match_the_reference` |
-| 178 | `src/unit_test/function/scalar/truncate_functions_ut.cpp` | `TruncateFunctionsTest` | `truncate_func` | ported | `executor` `tests::string_and_power_functions_match_the_reference` |
-| 179 | `src/unit_test/function/scalar/week_of_year_functions_ut.cpp` | `WeekOfYearFunctionsTest` | `week_of_year_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 180 | `src/unit_test/function/scalar/weekday_functions_ut.cpp` | `WeekdayFunctionsTest` | `weekday_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
-| 181 | `src/unit_test/function/scalar/year_functions_ut.cpp` | `YearFunctionsTest` | `year_func` | ported | `executor` `tests::date_component_functions_match_the_reference` |
+| 147 | `src/unit_test/function/scalar/greater_equals_functions_ut.cpp` | `GreaterEqualsFunctionsTest` | `greater_equals_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_equality_follow_the_reference` |
+| 148 | `src/unit_test/function/scalar/greater_functions_ut.cpp` | `GreaterFunctionsTest` | `greater_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_equality_follow_the_reference` |
+| 149 | `src/unit_test/function/scalar/hour_functions_ut.cpp` | `HourFunctionsTest` | `hour_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 150 | `src/unit_test/function/scalar/inequals_functions_ut.cpp` | `InEqualsFunctionsTest` | `inequals_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_equality_follow_the_reference` |
+| 151 | `src/unit_test/function/scalar/less_equals_functions_ut.cpp` | `LessEqualsFunctionsTest` | `less_equals_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_equality_follow_the_reference` |
+| 152 | `src/unit_test/function/scalar/less_functions_ut.cpp` | `LessFunctionsTest` | `less_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_equality_follow_the_reference` |
+| 153 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `re2_quote_meta_test` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 154 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_special_regex_chars_escape` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 155 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_basic_sanity` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 156 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_percent_wildcard` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 157 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_underscore_wildcard` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 158 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_escape_character` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 159 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_custom_escape_char` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 160 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_empty_pattern` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 161 | `src/unit_test/function/scalar/like_functions_ut.cpp` | `LikeFunctionsTest` | `like_to_regex_pattern_complex_real_world_patterns` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 162 | `src/unit_test/function/scalar/minus_functions_ut.cpp` | `MinusFunctionsTest` | `plus_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 163 | `src/unit_test/function/scalar/minute_function_ut.cpp` | `MinuteFunctionsTest` | `minute_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 164 | `src/unit_test/function/scalar/modulo_functions_ut.cpp` | `ModuloFunctionsTest` | `mod_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 165 | `src/unit_test/function/scalar/month_functions_ut.cpp` | `MonthFunctionsTest` | `month_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 166 | `src/unit_test/function/scalar/mul_functions_ut.cpp` | `MulFunctionsTest` | `mul_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 167 | `src/unit_test/function/scalar/not_functions_ut.cpp` | `NotFunctionsTest` | `not_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 168 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 169 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func_nullable_flat` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 170 | `src/unit_test/function/scalar/or_functions_ut.cpp` | `OrFunctionsTest` | `or_func_nullable_constant` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 171 | `src/unit_test/function/scalar/plus_functions_ut.cpp` | `PlusFunctionsTest` | `plus_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 172 | `src/unit_test/function/scalar/pow_functions_ut.cpp` | `PowFunctionsTest` | `mul_func` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 173 | `src/unit_test/function/scalar/quarter_functions_ut.cpp` | `QuarterFunctionsTest` | `quarter_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 174 | `src/unit_test/function/scalar/reverse_functions_ut.cpp` | `ReverseFunctionsTest` | `reverse_func` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 175 | `src/unit_test/function/scalar/second_function_ut.cpp` | `SecondFunctionsTest` | `second_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 176 | `src/unit_test/function/scalar/substr_function_ut_nimpl.cpp` | `SubstrFunctionTest` | `varchar_substr` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 177 | `src/unit_test/function/scalar/subtract_functions_ut.cpp` | `SubtractFunctionsTest` | `sub_func` | ported | `executor` `engine::tests_ut::tests::arithmetic_and_boolean_operators_match_the_reference` |
+| 178 | `src/unit_test/function/scalar/truncate_functions_ut.cpp` | `TruncateFunctionsTest` | `truncate_func` | ported | `executor` `engine::tests_ut::tests::string_and_power_functions_match_the_reference` |
+| 179 | `src/unit_test/function/scalar/week_of_year_functions_ut.cpp` | `WeekOfYearFunctionsTest` | `week_of_year_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 180 | `src/unit_test/function/scalar/weekday_functions_ut.cpp` | `WeekdayFunctionsTest` | `weekday_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
+| 181 | `src/unit_test/function/scalar/year_functions_ut.cpp` | `YearFunctionsTest` | `year_func` | ported | `executor` `engine::tests_ut::tests::date_component_functions_match_the_reference` |
 | 182 | `src/unit_test/infinity_cloud/upload_meta_to_s3_ut.cpp` | `UploadMetaToS3` | `DISABLED_MINIO_test1` | ported | `executor` `upload_meta_to_s3_ut::minio_upload_meta_to_s3` (`#[ignore]`: C++ DISABLED_MINIO_test1) |
 | 183 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `test1` | ported | `cli` `config::tests::defaults` |
 | 184 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `test2` | ported | `cli` `config::tests::full_config_file` |
@@ -209,14 +209,14 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 186 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestConfInvalidValues` | ported | `cli` `config::tests::invalid_values` |
 | 187 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestOutofRangeValues` | ported | `cli` `config::tests::out_of_range_values` |
 | 188 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestValidValues` | ported | `cli` `config::tests::valid_values` |
-| 189 | `src/unit_test/main/infinity_ut.cpp` | `InfinityTest` | `test1` | ported | `executor` `tests::catalog_lifecycle_matches_the_reference_test` |
-| 190 | `src/unit_test/main/infinity_ut.cpp` | `InfinityTest` | `test2` | ported | `executor` `tests::show_variable_covers_the_reference_names` |
+| 189 | `src/unit_test/main/infinity_ut.cpp` | `InfinityTest` | `test1` | ported | `executor` `engine::tests_ut::tests::catalog_lifecycle_matches_the_reference_test` |
+| 190 | `src/unit_test/main/infinity_ut.cpp` | `InfinityTest` | `test2` | ported | `executor` `engine::tests_ut::tests::show_variable_covers_the_reference_names` |
 | 191 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test1` | ported | `executor` `profiler::tests::query_phase_names_match_the_reference` |
 | 192 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test2` | ported | `profiler::tests::disabled_profiler_ignores_phase_transitions` + `enabled_profiler_enforces_phase_order` |
 | 193 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test3` | ported | `profiler::tests::all_phases_and_optimizer_rules_record_time` |
 | 194 | `src/unit_test/main/stats/global_resource_usage_ut.cpp` | `GlobalResourceUsageTest` | `usage_test` | ported | `executor` `global_resource_usage::reference_suite::usage_test` |
 | 195 | `src/unit_test/main/table_ut.cpp` | `InfinityTableTest` | `test1` | ported | `executor` `request_ut::infinity_facade_create_database_table_insert_select` |
-| 196 | `src/unit_test/parallel/chaos_ut.cpp` | `ParallelTest` | `DISABLED_SLOW_ChaosTest` | ported | `executor` `tests::disabled_slow_chaos_test`（`#[ignore]`，`INFINITY_CHAOS_SECONDS` 可缩短） |
+| 196 | `src/unit_test/parallel/chaos_ut.cpp` | `ParallelTest` | `DISABLED_SLOW_ChaosTest` | ported | `executor` `engine::tests_ut::tests::disabled_slow_chaos_test`（`#[ignore]`，`INFINITY_CHAOS_SECONDS` 可缩短） |
 | 197 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_precision` | ported | `parser` `parser::tests::float_serialize_test_precision` |
 | 198 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json` | ported | `expression` `json::tests::float_serialize_test_json` |
 | 199 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json_hex_float` | ported | `expression` `json::tests::float_serialize_test_json_hex_float` |
@@ -247,7 +247,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 224 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap34` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 225 | `src/unit_test/parser/type/complex/blob_type_ut_nimpl.cpp` | `BlobTypeTest` | `blob1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 226 | `src/unit_test/parser/type/complex/uuid_type_ut.cpp` | `UuidTypeTest` | `Uuid` | ported | `common` `types::tests::uuid` |
-| 227 | `src/unit_test/parser/type/complex/varchar_ut.cpp` | `VarcharTest` | `structure_check` | ported | `parser` `varchar::tests::varchar_structure_check` |
+| 227 | `src/unit_test/parser/type/complex/varchar_ut.cpp` | `VarcharTest` | `structure_check` | ported | `common` `varchar::tests::varchar_structure_check` |
 | 228 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `GetTypeName` | ported | `common` `types::tests::data_type_get_type_name` |
 | 229 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `TypeToString` | ported | `common` `types::tests::data_type_type_to_string` |
 | 230 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `Serialize` | ported | `common` `types::tests::data_type_serialize` |
@@ -255,11 +255,11 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 232 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `test1` | ported | `common` `datetime::tests::date_type_old_test1` |
 | 233 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `TestEqStdChronoForward` | ported | `common` `datetime::tests::date_type_old_test_eq_std_chrono_forward` |
 | 234 | `src/unit_test/parser/type/datetime/date_type_old_ut.cpp` | `DateTypeOldTest` | `TestEqStdChronoBackward` | ported | `common` `datetime::tests::date_type_old_test_eq_std_chrono_backward` |
-| 235 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestSameSize` | ported | `parser` `datetime::tests::date_type_same_size` |
+| 235 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestSameSize` | ported | `common` `datetime::tests::date_type_same_size` |
 | 236 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestFromString` | ported | `common` `datetime::tests::test_from_string` |
 | 237 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestAddSubstract` | ported | `common` `datetime::tests::test_add_subtract` |
 | 238 | `src/unit_test/parser/type/datetime/date_type_ut.cpp` | `DateTypeTest` | `TestNegativeYears` | ported | `common` `datetime::tests::test_negative_years` |
-| 239 | `src/unit_test/parser/type/fp16_ut.cpp` | `FP16TypeTest` | `test1` | ported | `parser` `fp16::tests::fp16_test1` |
+| 239 | `src/unit_test/parser/type/fp16_ut.cpp` | `FP16TypeTest` | `test1` | ported | `common` `fp16::tests::fp16_test1` |
 | 240 | `src/unit_test/parser/type/geo/box_type_ut.cpp` | `BoxTypeTest` | `point1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
 | 241 | `src/unit_test/parser/type/geo/path_type_ut_nimpl.cpp` | `PathTypeTest` | `path1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
 | 242 | `src/unit_test/parser/type/geo/point_type_ut.cpp` | `PointTypeTest` | `point1` | excluded | geo 类型（用户决定不移植 Box/Point/Circle 等） |
@@ -284,27 +284,27 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 261 | `src/unit_test/planner/explain_basic_ut.cpp` | `ExplainBasicTest` | `test1` | ported | `executor` `gate_b_executor_ut::explain_basic_test1` |
 | 262 | `src/unit_test/planner/logical_plan_tpch_ut.cpp` | `LogicalPlannerTpchTest` | `test1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 263 | `src/unit_test/planner/logical_planner_ut_nimpl.cpp` | `LogicalPlannerTest` | `test1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
-| 264 | `src/unit_test/planner/node/logical_aggregate_ut.cpp` | `LogicalAggregateTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 265 | `src/unit_test/planner/node/logical_check_ut.cpp` | `LogicalCheckTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 266 | `src/unit_test/planner/node/logical_command_ut.cpp` | `LogicalCommandTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 267 | `src/unit_test/planner/node/logical_compact_ut.cpp` | `LogicalCompactTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
+| 264 | `src/unit_test/planner/node/logical_aggregate_ut.cpp` | `LogicalAggregateTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 265 | `src/unit_test/planner/node/logical_check_ut.cpp` | `LogicalCheckTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 266 | `src/unit_test/planner/node/logical_command_ut.cpp` | `LogicalCommandTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 267 | `src/unit_test/planner/node/logical_compact_ut.cpp` | `LogicalCompactTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
 | 268 | `src/unit_test/planner/node/logical_create_collection_ut.cpp` | `LogicalCreateCollectionTest` | `test1` | ported | `executor` `gate_b_executor_ut::logical_create_collection_test1` |
-| 269 | `src/unit_test/planner/node/logical_create_index_ut.cpp` | `LogicalCreateIndexTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 270 | `src/unit_test/planner/node/logical_create_table_ut.cpp` | `LogicalCreateTableTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
+| 269 | `src/unit_test/planner/node/logical_create_index_ut.cpp` | `LogicalCreateIndexTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 270 | `src/unit_test/planner/node/logical_create_table_ut.cpp` | `LogicalCreateTableTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
 | 271 | `src/unit_test/planner/node/logical_drop_collection_ut.cpp` | `LogicalDropCollectionTest` | `test1` | ported | `executor` `gate_b_executor_ut::logical_drop_collection_test1` |
-| 272 | `src/unit_test/planner/node/logical_drop_index_ut.cpp` | `LogicalDropIndexTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 273 | `src/unit_test/planner/node/logical_drop_table_ut.cpp` | `LogicalDropTableTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 274 | `src/unit_test/planner/node/logical_flush_ut.cpp` | `LogicalFlushTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 275 | `src/unit_test/planner/node/logical_insert_ut.cpp` | `LogicalInsertTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 276 | `src/unit_test/planner/node/logical_limit_ut.cpp` | `LogicalLimitTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
+| 272 | `src/unit_test/planner/node/logical_drop_index_ut.cpp` | `LogicalDropIndexTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 273 | `src/unit_test/planner/node/logical_drop_table_ut.cpp` | `LogicalDropTableTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 274 | `src/unit_test/planner/node/logical_flush_ut.cpp` | `LogicalFlushTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 275 | `src/unit_test/planner/node/logical_insert_ut.cpp` | `LogicalInsertTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 276 | `src/unit_test/planner/node/logical_limit_ut.cpp` | `LogicalLimitTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
 | 277 | `src/unit_test/planner/node/logical_match_scan_base_ut.cpp` | `LogicalMatchScanTest` | `test1` | ported | `executor` `table_ut::logical_match_scan_base_test1` |
-| 278 | `src/unit_test/planner/node/logical_optimize_ut.cpp` | `LogicalOptimzieTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 279 | `src/unit_test/planner/node/logical_project_ut.cpp` | `LogicalProjectTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 280 | `src/unit_test/planner/node/logical_show_ut.cpp` | `LogicalShowTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 281 | `src/unit_test/planner/node/logical_update_ut.cpp` | `LogicalUpdateTest` | `test1` | ported | `executor` `tests::logical_planner_statements_succeed` |
-| 282 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `top_level_alternation_requires_nothing` | ported | `executor` `regex_literal::tests::extracts_only_mandatory_runs` |
-| 283 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `scoped_case_insensitive_group_keeps_its_mode` | ported | `executor` `regex_literal::tests::extracts_only_mandatory_runs` |
-| 284 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `re2_escapes` | ported | `executor` `regex_literal::tests::extracts_only_mandatory_runs` |
+| 278 | `src/unit_test/planner/node/logical_optimize_ut.cpp` | `LogicalOptimzieTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 279 | `src/unit_test/planner/node/logical_project_ut.cpp` | `LogicalProjectTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 280 | `src/unit_test/planner/node/logical_show_ut.cpp` | `LogicalShowTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 281 | `src/unit_test/planner/node/logical_update_ut.cpp` | `LogicalUpdateTest` | `test1` | ported | `executor` `engine::tests_ut::tests::logical_planner_statements_succeed` |
+| 282 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `top_level_alternation_requires_nothing` | ported | `expression` `regex_literal::tests::extracts_only_mandatory_runs` |
+| 283 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `scoped_case_insensitive_group_keeps_its_mode` | ported | `expression` `regex_literal::tests::extracts_only_mandatory_runs` |
+| 284 | `src/unit_test/planner/optimizer/regex_literal_extractor_ut.cpp` | `RegexLiteralExtractorTest` | `re2_escapes` | ported | `expression` `regex_literal::tests::extracts_only_mandatory_runs` |
 | 285 | `src/unit_test/storage/bg_task/background_process_ut.cpp` | `BGProcessTest` | `test1` | ported | `executor` `bg_task_ut::background_process_start_stop` |
 | 286 | `src/unit_test/storage/bg_task/cleanup_task_ut.cpp` | `CleanupTaskTest` | `test_delete_db_simple` | ported | `executor` `bg_task_ut::cleanup_removes_the_dropped_table_files` |
 | 287 | `src/unit_test/storage/bg_task/compact_segments_task_ut.cpp` | `CompactTaskTest` | `bg_compact` | ported | `executor` `bg_task_ut::compact_reduces_the_segment_count` |
@@ -312,7 +312,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 289 | `src/unit_test/storage/bg_task/dump_index_task_ut.cpp` | `DumpMemIndexTaskTest` | `DISABLED_SLOW_row_cnt_exceed_memindex_capacity` | ported | `executor` `bg_task_ut::dump_index_task_row_cnt_exceed_memindex_capacity` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 290 | `src/unit_test/storage/binary_fuse_filter/binary_fuse_filter_test_ut.cpp` | `BinaryFuseFilterTest` | `test_2000` | ported | `storage` `binary_fuse_filter::tests::test_2000` |
 | 291 | `src/unit_test/storage/buffer/buffer_handle_ut.cpp` | `BufferHandleTest` | `test1` | not ported | `BufferObj`/`BufferHandle` 已去掉（封存块 mmap 后共享，没有 owned buffer） |
-| 292 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerTest` | `cleanup_test` | not ported | `BufferManager` 已去掉；映射的共享与丢弃由 `block_index::tests::every_block_maps_only_its_own_files`、`cpp_blocks::tests::a_sealed_block_is_mapped_once_and_shared` 覆盖 |
+| 292 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerTest` | `cleanup_test` | not ported | `BufferManager` 已去掉；映射的共享与丢弃由 `block_index::tests::every_block_maps_only_its_own_files`、`blocks::tests::a_sealed_block_is_mapped_once_and_shared` 覆盖 |
 | 293 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerTest` | `varfile_test` | not ported | 同上（`VarBuffer`/`FileWorker` 一并去掉） |
 | 294 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerParallelTest` | `parallel_test1` | not ported | 同上 |
 | 295 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerParallelTest` | `parallel_test2` | not ported | 同上 |
@@ -408,30 +408,30 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 385 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `contant_hugeint` | ported | `storage` `data_block::reference_suite::contant_hugeint` |
 | 386 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `hugeint_column_vector_select` | ported | `storage` `data_block::reference_suite::hugeint_column_vector_select` |
 | 387 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `hugeint_column_slice_init` | ported | `storage` `data_block::reference_suite::hugeint_column_slice_init` |
-| 388 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_a` | ported | `storage` `mixed_column::mixed_integer_a` |
-| 389 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_column_vector_select` | ported | `storage` `mixed_column::mixed_integer_column_vector_select` |
-| 390 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_column_slice_init` | ported | `storage` `mixed_column::mixed_integer_column_slice_init` |
-| 391 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_a` | ported | `storage` `mixed_column::mixed_float_a` |
-| 392 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_column_vector_select` | ported | `storage` `mixed_column::mixed_float_column_vector_select` |
-| 393 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_column_slice_init` | ported | `storage` `mixed_column::mixed_float_column_slice_init` |
-| 394 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_a` | ported | `storage` `mixed_column::mixed_short_str_a` |
-| 395 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_column_vector_select` | ported | `storage` `mixed_column::mixed_short_str_column_vector_select` |
-| 396 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_column_slice_init` | ported | `storage` `mixed_column::mixed_short_str_column_slice_init` |
-| 397 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_a` | ported | `storage` `mixed_column::mixed_long_str_a` |
-| 398 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_column_vector_select` | ported | `storage` `mixed_column::mixed_long_str_column_vector_select` |
-| 399 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_column_slice_init` | ported | `storage` `mixed_column::mixed_long_str_column_slice_init` |
-| 400 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_a` | ported | `storage` `mixed_column::mixed_null_a` |
-| 401 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_column_vector_select` | ported | `storage` `mixed_column::mixed_null_column_vector_select` |
-| 402 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_column_slice_init` | ported | `storage` `mixed_column::mixed_null_column_slice_init` |
-| 403 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_a` | ported | `storage` `mixed_column::mixed_missing_a` |
-| 404 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_column_vector_select` | ported | `storage` `mixed_column::mixed_missing_column_vector_select` |
-| 405 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_column_slice_init` | ported | `storage` `mixed_column::mixed_missing_column_slice_init` |
-| 406 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_a` | ported | `storage` `mixed_column::mixed_tuple_a` |
-| 407 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_column_vector_select` | ported | `storage` `mixed_column::mixed_tuple_column_vector_select` |
-| 408 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_column_slice_init` | ported | `storage` `mixed_column::mixed_tuple_column_slice_init` |
-| 409 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_a` | ported | `storage` `mixed_column::mixed_array_a` |
-| 410 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_column_vector_select` | ported | `storage` `mixed_column::mixed_array_column_vector_select` |
-| 411 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_column_slice_init` | ported | `storage` `mixed_column::mixed_array_column_slice_init` |
+| 388 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_a` | ported | `storage` `column_vector::mixed_column::mixed_integer_a` |
+| 389 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_column_vector_select` | ported | `storage` `column_vector::mixed_column::mixed_integer_column_vector_select` |
+| 390 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_integer_column_slice_init` | ported | `storage` `column_vector::mixed_column::mixed_integer_column_slice_init` |
+| 391 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_a` | ported | `storage` `column_vector::mixed_column::mixed_float_a` |
+| 392 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_column_vector_select` | ported | `storage` `column_vector::mixed_column::mixed_float_column_vector_select` |
+| 393 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_float_column_slice_init` | ported | `storage` `column_vector::mixed_column::mixed_float_column_slice_init` |
+| 394 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_a` | ported | `storage` `column_vector::mixed_column::mixed_short_str_a` |
+| 395 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_column_vector_select` | ported | `storage` `column_vector::mixed_column::mixed_short_str_column_vector_select` |
+| 396 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_short_str_column_slice_init` | ported | `storage` `column_vector::mixed_column::mixed_short_str_column_slice_init` |
+| 397 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_a` | ported | `storage` `column_vector::mixed_column::mixed_long_str_a` |
+| 398 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_column_vector_select` | ported | `storage` `column_vector::mixed_column::mixed_long_str_column_vector_select` |
+| 399 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_long_str_column_slice_init` | ported | `storage` `column_vector::mixed_column::mixed_long_str_column_slice_init` |
+| 400 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_a` | ported | `storage` `column_vector::mixed_column::mixed_null_a` |
+| 401 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_column_vector_select` | ported | `storage` `column_vector::mixed_column::mixed_null_column_vector_select` |
+| 402 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_null_column_slice_init` | ported | `storage` `column_vector::mixed_column::mixed_null_column_slice_init` |
+| 403 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_a` | ported | `storage` `column_vector::mixed_column::mixed_missing_a` |
+| 404 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_column_vector_select` | ported | `storage` `column_vector::mixed_column::mixed_missing_column_vector_select` |
+| 405 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_missing_column_slice_init` | ported | `storage` `column_vector::mixed_column::mixed_missing_column_slice_init` |
+| 406 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_a` | ported | `storage` `column_vector::mixed_column::mixed_tuple_a` |
+| 407 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_column_vector_select` | ported | `storage` `column_vector::mixed_column::mixed_tuple_column_vector_select` |
+| 408 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_tuple_column_slice_init` | ported | `storage` `column_vector::mixed_column::mixed_tuple_column_slice_init` |
+| 409 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_a` | ported | `storage` `column_vector::mixed_column::mixed_array_a` |
+| 410 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_column_vector_select` | ported | `storage` `column_vector::mixed_column::mixed_array_column_vector_select` |
+| 411 | `src/unit_test/storage/column_vector/column_vector_mixed_ut_nimpl.cpp` | `ColumnVectorMixedTest` | `mixed_array_column_slice_init` | ported | `storage` `column_vector::mixed_column::mixed_array_column_slice_init` |
 | 412 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `flat_row` | ported | `storage` `data_block::reference_suite::row_flat` |
 | 413 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `contant_row` | ported | `storage` `data_block::reference_suite::row_constant` |
 | 414 | `src/unit_test/storage/column_vector/column_vector_row_ut.cpp` | `ColumnVectorRowTest` | `row_column_vector_select` | ported | `storage` `data_block::reference_suite::row_column_vector_select` |
@@ -456,58 +456,58 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 433 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_basic_type` | ported | `common` `json::tests::basic_type_json_round_trip` |
 | 434 | `src/unit_test/storage/column_vector/value_ut.cpp` | `ValueStringTest` | `test_tostring` | ported | `storage` `data_block::reference_suite::value_to_string_matches_the_reference`（JSON 以文本形式原样呈现） |
 | 435 | `src/unit_test/storage/column_vector/value_ut.cpp` | `ValueStringTest` | `test_stringtovalue` | ported | `storage` `data_block::reference_suite::string_to_value_roundtrips_the_scalar_types` (JSON is a parsed tree, structural equality) |
-| 436 | `src/unit_test/storage/column_vector/var_buffer_ut.cpp` | `VarBufferTest` | `test1` | ported | `storage` `var_buffer::tests::var_buffer_appends_and_roundtrips` |
+| 436 | `src/unit_test/storage/column_vector/var_buffer_ut.cpp` | `VarBufferTest` | `test1` | not ported | `VarBuffer` 随 `BufferObj` 一起去掉（`GAPS.md` §3.1）：outline 写盘由 `storage::definition::format` 直接做，没有 buffer 可测 |
 | 437 | `src/unit_test/storage/common/kv_code_ut.cpp` | `KVCodeTest` | `kv_code1` | ported | `storage` `catalog_format::tests::catalog_keys_match_the_reference` |
 | 438 | `src/unit_test/storage/common/kv_code_ut.cpp` | `KVCodeTest` | `kv_code2` | ported | `catalog_format::tests::name_keyed_catalog_keys_match_the_reference` |
 | 439 | `src/unit_test/storage/common/loser_tree_ut.cpp` | `LoserTreeTest` | `BasicMerge1` | ported | `common` `loser_tree::tests::basic_merge_1` |
 | 440 | `src/unit_test/storage/common/loser_tree_ut.cpp` | `LoserTreeTest` | `BasicMerge2` | ported | `common` `loser_tree::tests::basic_merge_2` |
 | 441 | `src/unit_test/storage/common/loser_tree_ut.cpp` | `LoserTreeTest` | `BasicMerge3` | ported | `common` `loser_tree::tests::basic_merge_3` |
 | 442 | `src/unit_test/storage/common/loser_tree_ut.cpp` | `LoserTreeTest` | `BasicMerge4` | ported | `common` `loser_tree::tests::basic_merge_4` |
-| 443 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestBasicInsertAndGet` | ported | `storage` `rcu_map::reference_suite::basic_insert_and_get` |
-| 444 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestLowercaseAliases` | ported | `storage` `rcu_map::reference_suite::lowercase_aliases` |
-| 445 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestDelete` | ported | `storage` `rcu_map::reference_suite::delete` |
-| 446 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestGetAllValuesWithRef` | ported | `storage` `rcu_map::reference_suite::get_all_values_with_ref` |
-| 447 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestGarbageCollection` | ported | `storage` `rcu_map::reference_suite::garbage_collection` |
-| 448 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestExpiredEntries` | ported | `storage` `rcu_map::reference_suite::expired_entries` |
-| 449 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestGetWithRcuTime` | ported | `storage` `rcu_map::reference_suite::get_with_rcu_time` |
-| 450 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestMultipleValuesPerKey` | ported | `storage` `rcu_map::reference_suite::multiple_values_per_key` |
-| 451 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestIntegerKeys` | ported | `storage` `rcu_map::reference_suite::integer_keys` |
-| 452 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestEmptyMap` | ported | `storage` `rcu_map::reference_suite::empty_map` |
-| 453 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestStressInsertAndRetrieve` | ported | `storage` `rcu_map::reference_suite::stress_insert_and_retrieve` |
-| 454 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestDeleteFunctionality` | ported | `storage` `rcu_map::reference_suite::delete_functionality` |
-| 455 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestDifferentValueTypes` | ported | `storage` `rcu_map::reference_suite::different_value_types` |
-| 456 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestConcurrentInsertAndRead` | ported | `storage` `rcu_map::concurrency_reference_suite::multimap_concurrent_insert_and_read` |
-| 457 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestConcurrentInsertDeleteRead` | ported | `storage` `rcu_map::concurrency_reference_suite::multimap_concurrent_insert_delete_read` |
-| 458 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestHighVolumeMultiThreading` | ported | `storage` `rcu_map::concurrency_reference_suite::multimap_high_volume_multi_threading` |
-| 459 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestRcuSwapUnderLoad` | ported | `storage` `rcu_map::concurrency_reference_suite::multimap_rcu_swap_under_load` |
-| 460 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestRcuBehavior` | ported | `storage` `rcu_map::concurrency_reference_suite::multimap_rcu_behavior` |
-| 461 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestBasicInsertAndGet` | ported | `storage` `rcu_map::map_reference_suite::basic_insert_and_get` |
-| 462 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestLowercaseAliases` | ported | `storage` `rcu_map::map_reference_suite::lowercase_aliases` |
-| 463 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestDelete` | ported | `storage` `rcu_map::map_reference_suite::delete` |
-| 464 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestGetAllValuesWithRef` | ported | `storage` `rcu_map::map_reference_suite::get_all_values_with_ref` |
-| 465 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestGetAllKeyValuePairs` | ported | `storage` `rcu_map::map_reference_suite::get_all_key_value_pairs` |
-| 466 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestGarbageCollection` | ported | `storage` `rcu_map::map_reference_suite::garbage_collection` |
-| 467 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestExpiredEntries` | ported | `storage` `rcu_map::map_reference_suite::expired_entries` |
-| 468 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestGetWithRcuTime` | ported | `storage` `rcu_map::map_reference_suite::get_with_rcu_time` |
-| 469 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestUniqueKeys` | ported | `storage` `rcu_map::map_reference_suite::unique_keys` |
-| 470 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestIntegerKeys` | ported | `storage` `rcu_map::map_reference_suite::integer_keys` |
-| 471 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestEmptyMap` | ported | `storage` `rcu_map::map_reference_suite::empty_map` |
-| 472 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestEmplace` | ported | `storage` `rcu_map::map_reference_suite::emplace` |
-| 473 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRange` | ported | `storage` `rcu_map::map_reference_suite::range` |
-| 474 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestStressInsertAndRetrieve` | ported | `storage` `rcu_map::map_reference_suite::stress_insert_and_retrieve` |
-| 475 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestConcurrentInsertAndRead` | ported | `storage` `rcu_map::concurrency_reference_suite::map_concurrent_insert_and_read` |
-| 476 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestConcurrentInsertDeleteRead` | ported | `storage` `rcu_map::concurrency_reference_suite::map_concurrent_insert_delete_read` |
-| 477 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRcuSwapUnderLoad` | ported | `storage` `rcu_map::concurrency_reference_suite::map_rcu_swap_under_load` |
-| 478 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRcuBehavior` | ported | `storage` `rcu_map::concurrency_reference_suite::map_rcu_behavior` |
-| 479 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestMapVsMultiMapBehavior` | ported | `storage` `rcu_map::map_reference_suite::map_vs_multimap_behavior` |
-| 480 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `ReadHeavyWorkload` | ported | `storage` `rcu_map::benchmark_reference_suite::read_heavy_workload` |
-| 481 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `WriteHeavyWorkload` | ported | `storage` `rcu_map::benchmark_reference_suite::write_heavy_workload` |
-| 482 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `ReadOnlyWorkload` | ported | `storage` `rcu_map::benchmark_reference_suite::read_only_workload` |
-| 483 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `HighContentionWorkload` | ported | `storage` `rcu_map::benchmark_reference_suite::high_contention_workload` |
-| 484 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `ScalabilityTest` | ported | `storage` `rcu_map::benchmark_reference_suite::scalability_test` |
-| 485 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `MemoryAndGcPerformance` | ported | `storage` `rcu_map::benchmark_reference_suite::memory_and_gc_performance` |
-| 486 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `ComprehensiveBenchmarkSummary` | ported | `storage` `rcu_map::benchmark_reference_suite::comprehensive_benchmark_summary` |
-| 487 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `QuickPerformanceVerification` | ported | `storage` `rcu_map::benchmark_reference_suite::quick_performance_verification` |
+| 443 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestBasicInsertAndGet` | ported | `storage` `common::rcu_map::reference_suite::basic_insert_and_get` |
+| 444 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestLowercaseAliases` | ported | `storage` `common::rcu_map::reference_suite::lowercase_aliases` |
+| 445 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestDelete` | ported | `storage` `common::rcu_map::reference_suite::delete` |
+| 446 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestGetAllValuesWithRef` | ported | `storage` `common::rcu_map::reference_suite::get_all_values_with_ref` |
+| 447 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestGarbageCollection` | ported | `storage` `common::rcu_map::reference_suite::garbage_collection` |
+| 448 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestExpiredEntries` | ported | `storage` `common::rcu_map::reference_suite::expired_entries` |
+| 449 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestGetWithRcuTime` | ported | `storage` `common::rcu_map::reference_suite::get_with_rcu_time` |
+| 450 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestMultipleValuesPerKey` | ported | `storage` `common::rcu_map::reference_suite::multiple_values_per_key` |
+| 451 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestIntegerKeys` | ported | `storage` `common::rcu_map::reference_suite::integer_keys` |
+| 452 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestEmptyMap` | ported | `storage` `common::rcu_map::reference_suite::empty_map` |
+| 453 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestStressInsertAndRetrieve` | ported | `storage` `common::rcu_map::reference_suite::stress_insert_and_retrieve` |
+| 454 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestDeleteFunctionality` | ported | `storage` `common::rcu_map::reference_suite::delete_functionality` |
+| 455 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestDifferentValueTypes` | ported | `storage` `common::rcu_map::reference_suite::different_value_types` |
+| 456 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestConcurrentInsertAndRead` | ported | `storage` `common::rcu_map::concurrency_reference_suite::multimap_concurrent_insert_and_read` |
+| 457 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestConcurrentInsertDeleteRead` | ported | `storage` `common::rcu_map::concurrency_reference_suite::multimap_concurrent_insert_delete_read` |
+| 458 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestHighVolumeMultiThreading` | ported | `storage` `common::rcu_map::concurrency_reference_suite::multimap_high_volume_multi_threading` |
+| 459 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestRcuSwapUnderLoad` | ported | `storage` `common::rcu_map::concurrency_reference_suite::multimap_rcu_swap_under_load` |
+| 460 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMultiMapTest` | `TestRcuBehavior` | ported | `storage` `common::rcu_map::concurrency_reference_suite::multimap_rcu_behavior` |
+| 461 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestBasicInsertAndGet` | ported | `storage` `common::rcu_map::map_reference_suite::basic_insert_and_get` |
+| 462 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestLowercaseAliases` | ported | `storage` `common::rcu_map::map_reference_suite::lowercase_aliases` |
+| 463 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestDelete` | ported | `storage` `common::rcu_map::map_reference_suite::delete` |
+| 464 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestGetAllValuesWithRef` | ported | `storage` `common::rcu_map::map_reference_suite::get_all_values_with_ref` |
+| 465 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestGetAllKeyValuePairs` | ported | `storage` `common::rcu_map::map_reference_suite::get_all_key_value_pairs` |
+| 466 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestGarbageCollection` | ported | `storage` `common::rcu_map::map_reference_suite::garbage_collection` |
+| 467 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestExpiredEntries` | ported | `storage` `common::rcu_map::map_reference_suite::expired_entries` |
+| 468 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestGetWithRcuTime` | ported | `storage` `common::rcu_map::map_reference_suite::get_with_rcu_time` |
+| 469 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestUniqueKeys` | ported | `storage` `common::rcu_map::map_reference_suite::unique_keys` |
+| 470 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestIntegerKeys` | ported | `storage` `common::rcu_map::map_reference_suite::integer_keys` |
+| 471 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestEmptyMap` | ported | `storage` `common::rcu_map::map_reference_suite::empty_map` |
+| 472 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestEmplace` | ported | `storage` `common::rcu_map::map_reference_suite::emplace` |
+| 473 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRange` | ported | `storage` `common::rcu_map::map_reference_suite::range` |
+| 474 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestStressInsertAndRetrieve` | ported | `storage` `common::rcu_map::map_reference_suite::stress_insert_and_retrieve` |
+| 475 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestConcurrentInsertAndRead` | ported | `storage` `common::rcu_map::concurrency_reference_suite::map_concurrent_insert_and_read` |
+| 476 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestConcurrentInsertDeleteRead` | ported | `storage` `common::rcu_map::concurrency_reference_suite::map_concurrent_insert_delete_read` |
+| 477 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRcuSwapUnderLoad` | ported | `storage` `common::rcu_map::concurrency_reference_suite::map_rcu_swap_under_load` |
+| 478 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestRcuBehavior` | ported | `storage` `common::rcu_map::concurrency_reference_suite::map_rcu_behavior` |
+| 479 | `src/unit_test/storage/common/test_rcu_multimap_ut.cpp` | `RcuMapTest` | `TestMapVsMultiMapBehavior` | ported | `storage` `common::rcu_map::map_reference_suite::map_vs_multimap_behavior` |
+| 480 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `ReadHeavyWorkload` | ported | `storage` `common::rcu_map::benchmark_reference_suite::read_heavy_workload` |
+| 481 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `WriteHeavyWorkload` | ported | `storage` `common::rcu_map::benchmark_reference_suite::write_heavy_workload` |
+| 482 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `ReadOnlyWorkload` | ported | `storage` `common::rcu_map::benchmark_reference_suite::read_only_workload` |
+| 483 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `HighContentionWorkload` | ported | `storage` `common::rcu_map::benchmark_reference_suite::high_contention_workload` |
+| 484 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `ScalabilityTest` | ported | `storage` `common::rcu_map::benchmark_reference_suite::scalability_test` |
+| 485 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `MemoryAndGcPerformance` | ported | `storage` `common::rcu_map::benchmark_reference_suite::memory_and_gc_performance` |
+| 486 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `ComprehensiveBenchmarkSummary` | ported | `storage` `common::rcu_map::benchmark_reference_suite::comprehensive_benchmark_summary` |
+| 487 | src/unit_test/storage/common/test_rcu_multimap_ut.cpp | `QuickPerformanceVerification` | ported | `storage` `common::rcu_map::benchmark_reference_suite::quick_performance_verification` |
 | 488 | `src/unit_test/storage/definition/column_def_ut.cpp` | `ColumnDefTest` | `test1` | ported | `catalog` `value_format::tests::column_def_to_string_renders_constraints_in_set_order` |
 | 489 | `src/unit_test/storage/definition/column_def_ut.cpp` | `ColumnDefTest` | `test2` | ported | `value_format::tests::column_def_to_string_renders_a_primary_key` |
 | 490 | `src/unit_test/storage/definition/data_block_ut.cpp` | `DataBlockTest` | `test1` | ported | `storage` `data_block::data_block_reference_suite::all_types_append_and_read_back` |
@@ -520,70 +520,70 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 497 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `test1` | ported | `catalog` `value_format::tests::table_def_reports_schema_table_comment_and_columns` |
 | 498 | `src/unit_test/storage/definition/table_def_ut.cpp` | `TableDefTest` | `ReadWrite` | ported | `value_format::tests::table_def_roundtrips_through_its_bytes` |
 | 499 | src/unit_test/storage/definition/table_ut.cpp | `test1` | ported | `executor` `new_catalog_table_ut::table_test1` |
-| 500 | `src/unit_test/storage/invertedindex/column_inverter_ut.cpp` | `ColumnInverterTest` | `Invert` | ported | `executor` `tests::memory_indexer_records_tf_positions_and_length` |
+| 500 | `src/unit_test/storage/invertedindex/column_inverter_ut.cpp` | `ColumnInverterTest` | `Invert` | ported | `executor` `engine::tests_ut::tests::memory_indexer_records_tf_positions_and_length` |
 | 501 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test1` | ported | `storage` `external_sort::tests::test1` |
 | 502 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test2` | ported | `storage` `external_sort::tests::test2` |
-| 503 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test1` | ported | `storage` `inverted_format::skiplist::tests::skiplist_test1` |
-| 504 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test2` | ported | `storage` `inverted_format::skiplist::tests::skiplist_test2` |
-| 505 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test3` | ported | `storage` `inverted_format::skiplist::tests::skiplist_test3` |
-| 506 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test1` | ported | `storage` `inverted_format::doc_list::tests::inmem_doc_list_decoder_test1` |
-| 507 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test2` | ported | `storage` `inverted_format::doc_list::tests::inmem_doc_list_decoder_test2` |
-| 508 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test3` | ported | `storage` `highlighter_ut::test3` |
-| 509 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test4` | ported | `storage` `highlighter_ut::test4` |
-| 510 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test5` | ported | `storage` `inverted_format::doc_list::tests::inmem_doc_list_decoder_test5` |
-| 511 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test6` | ported | `storage` `inverted_format::doc_list::tests::inmem_doc_list_decoder_test6` |
-| 512 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test7` | ported | `storage` `inverted_format::doc_list::tests::inmem_doc_list_decoder_test7` |
-| 513 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test8` | ported | `storage` `inverted_format::doc_list::tests::inmem_doc_list_decoder_test8` |
-| 514 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test9` | ported | `storage` `inverted_format::doc_list::tests::inmem_doc_list_decoder_test9` |
-| 515 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test10` | ported | `storage` `inverted_format::doc_list::tests::inmem_doc_list_decoder_test10` |
-| 516 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test11` | ported | `storage` `inverted_format::doc_list::tests::inmem_doc_list_decoder_test11` |
-| 517 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test12` | ported | `storage` `inverted_format::doc_list::tests::inmem_doc_list_decoder_test12` |
-| 518 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test1` | ported | `storage` `inverted_format::position_list::tests::inmem_position_list_decoder_test1` |
-| 519 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test2` | ported | `storage` `inverted_format::position_list::tests::inmem_position_list_decoder_test2` |
-| 520 | src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp | `test3` | ported | `storage` `highlighter_ut::test3` |
-| 521 | src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp | `test4` | ported | `storage` `highlighter_ut::test4` |
-| 522 | src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp | `test5` | ported | `storage` `inverted_format::position_list::tests::inmem_position_list_decoder_test5` |
-| 523 | `src/unit_test/storage/invertedindex/format/position_list_decoder_ut.cpp` | `PositionListDecoderTest` | `test1` | ported | `storage` `inverted_format::position_list::tests::position_list_decoder_test1` |
-| 524 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test1` | ported | `storage` `inverted_format::position_list::tests::position_list_encoder_test1` |
-| 525 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test2` | ported | `storage` `inverted_format::position_list::tests::position_list_encoder_test2` |
-| 526 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test1` | ported | `storage` `inverted_format::posting_slice::tests::posting_buffer_test1` |
-| 527 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test2` | ported | `storage` `inverted_format::posting_slice::tests::posting_buffer_test2` |
-| 528 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test3` | ported | `storage` `inverted_format::posting_slice::tests::posting_buffer_test3` |
-| 529 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test4` | ported | `storage` `inverted_format::posting_slice::tests::posting_buffer_test4` |
-| 530 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test5` | ported | `storage` `inverted_format::posting_slice::tests::posting_buffer_test5` |
-| 531 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test6` | ported | `storage` `inverted_format::posting_slice::tests::posting_buffer_test6` |
-| 532 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test7` | ported | `storage` `inverted_format::posting_slice::tests::posting_buffer_test7` |
-| 533 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test8` | ported | `storage` `inverted_format::posting_slice::tests::posting_buffer_test8` |
-| 534 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test1` | ported | `storage` `inverted_format::posting_slice::tests::posting_byte_slice_reader_test1` |
-| 535 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test2` | ported | `storage` `inverted_format::posting_slice::tests::posting_byte_slice_reader_test2` |
-| 536 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test3` | ported | `storage` `inverted_format::posting_slice::tests::posting_byte_slice_reader_test3` |
-| 537 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test1` | ported | `storage` `inverted_format::posting_slice::tests::posting_byte_slice_test1` |
-| 538 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test2` | ported | `storage` `inverted_format::posting_slice::tests::posting_byte_slice_test2` |
-| 539 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test3` | ported | `storage` `inverted_format::posting_slice::tests::posting_byte_slice_test3` |
-| 540 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderByteSliceTest` | ported | `storage` `inverted_format::posting_slice::tests::skiplist_reader_byte_slice` |
-| 541 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderPostingByteSliceTest` | ported | `storage` `inverted_format::posting_slice::tests::skiplist_reader_posting_byte_slice` |
-| 542 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test1` | ported | `storage` `inverted_format::posting_slice::tests::skiplist_writer_test1` |
-| 543 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test2` | ported | `storage` `inverted_format::posting_slice::tests::skiplist_writer_test2` |
-| 544 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test3` | ported | `storage` `inverted_format::posting_slice::tests::skiplist_writer_test3` |
-| 545 | `src/unit_test/storage/invertedindex/format/term_meta_ut.cpp` | `TermMetaTest` | `test1` | ported | `storage` `inverted_format::tests::term_meta_all_options_roundtrip` |
-| 546 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMemEmpty` | ported | `storage` `inverted_format::tests::fst_build_mem_empty` |
-| 547 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildFileEmpty` | ported | `storage` `inverted_format::tests::fst_build_file_empty` |
-| 548 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMem` | ported | `storage` `inverted_format::tests::fst_build_mem` |
-| 549 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildFile` | ported | `storage` `inverted_format::tests::fst_build_file` |
-| 550 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Get` | ported | `storage` `inverted_format::tests::fst_get_values` |
-| 551 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Iterate` | ported | `storage` `inverted_format::tests::fst_iterate_with_bounds` |
+| 503 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test1` | ported | `storage` `invertedindex::format::skiplist::tests::skiplist_test1` |
+| 504 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test2` | ported | `storage` `invertedindex::format::skiplist::tests::skiplist_test2` |
+| 505 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test3` | ported | `storage` `invertedindex::format::skiplist::tests::skiplist_test3` |
+| 506 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test1` | ported | `storage` `invertedindex::format::doc_list::tests::inmem_doc_list_decoder_test1` |
+| 507 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test2` | ported | `storage` `invertedindex::format::doc_list::tests::inmem_doc_list_decoder_test2` |
+| 508 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test3` | ported | `executor` `highlighter_ut::test3` |
+| 509 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test4` | ported | `executor` `highlighter_ut::test4` |
+| 510 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test5` | ported | `storage` `invertedindex::format::doc_list::tests::inmem_doc_list_decoder_test5` |
+| 511 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test6` | ported | `storage` `invertedindex::format::doc_list::tests::inmem_doc_list_decoder_test6` |
+| 512 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test7` | ported | `storage` `invertedindex::format::doc_list::tests::inmem_doc_list_decoder_test7` |
+| 513 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test8` | ported | `storage` `invertedindex::format::doc_list::tests::inmem_doc_list_decoder_test8` |
+| 514 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test9` | ported | `storage` `invertedindex::format::doc_list::tests::inmem_doc_list_decoder_test9` |
+| 515 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test10` | ported | `storage` `invertedindex::format::doc_list::tests::inmem_doc_list_decoder_test10` |
+| 516 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test11` | ported | `storage` `invertedindex::format::doc_list::tests::inmem_doc_list_decoder_test11` |
+| 517 | src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp | `test12` | ported | `storage` `invertedindex::format::doc_list::tests::inmem_doc_list_decoder_test12` |
+| 518 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test1` | ported | `storage` `invertedindex::format::position_list::tests::inmem_position_list_decoder_test1` |
+| 519 | `src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp` | `InMemPositionListDecoderTest` | `test2` | ported | `storage` `invertedindex::format::position_list::tests::inmem_position_list_decoder_test2` |
+| 520 | src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp | `test3` | ported | `executor` `highlighter_ut::test3` |
+| 521 | src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp | `test4` | ported | `executor` `highlighter_ut::test4` |
+| 522 | src/unit_test/storage/invertedindex/format/inmem_position_list_decoder_ut.cpp | `test5` | ported | `storage` `invertedindex::format::position_list::tests::inmem_position_list_decoder_test5` |
+| 523 | `src/unit_test/storage/invertedindex/format/position_list_decoder_ut.cpp` | `PositionListDecoderTest` | `test1` | ported | `storage` `invertedindex::format::position_list::tests::position_list_decoder_test1` |
+| 524 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test1` | ported | `storage` `invertedindex::format::position_list::tests::position_list_encoder_test1` |
+| 525 | `src/unit_test/storage/invertedindex/format/position_list_encoder_ut.cpp` | `PositionListEncoderTest` | `test2` | ported | `storage` `invertedindex::format::position_list::tests::position_list_encoder_test2` |
+| 526 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test1` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_buffer_test1` |
+| 527 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test2` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_buffer_test2` |
+| 528 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test3` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_buffer_test3` |
+| 529 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test4` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_buffer_test4` |
+| 530 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test5` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_buffer_test5` |
+| 531 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test6` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_buffer_test6` |
+| 532 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test7` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_buffer_test7` |
+| 533 | `src/unit_test/storage/invertedindex/format/posting_buffer_ut.cpp` | `PostingBufferTest` | `test8` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_buffer_test8` |
+| 534 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test1` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_byte_slice_reader_test1` |
+| 535 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test2` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_byte_slice_reader_test2` |
+| 536 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_reader_ut.cpp` | `PostingByteSliceReaderTest` | `test3` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_byte_slice_reader_test3` |
+| 537 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test1` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_byte_slice_test1` |
+| 538 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test2` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_byte_slice_test2` |
+| 539 | `src/unit_test/storage/invertedindex/format/posting_byte_slice_ut.cpp` | `PostingByteSliceTest` | `test3` | ported | `storage` `invertedindex::format::posting_slice::tests::posting_byte_slice_test3` |
+| 540 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderByteSliceTest` | ported | `storage` `invertedindex::format::posting_slice::tests::skiplist_reader_byte_slice` |
+| 541 | `src/unit_test/storage/invertedindex/format/skiplist_reader_ut.cpp` | `SkiplistReaderTest` | `SkipListReaderPostingByteSliceTest` | ported | `storage` `invertedindex::format::posting_slice::tests::skiplist_reader_posting_byte_slice` |
+| 542 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test1` | ported | `storage` `invertedindex::format::posting_slice::tests::skiplist_writer_test1` |
+| 543 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test2` | ported | `storage` `invertedindex::format::posting_slice::tests::skiplist_writer_test2` |
+| 544 | `src/unit_test/storage/invertedindex/format/skiplist_writer_ut.cpp` | `SkipListWriterTest` | `test3` | ported | `storage` `invertedindex::format::posting_slice::tests::skiplist_writer_test3` |
+| 545 | `src/unit_test/storage/invertedindex/format/term_meta_ut.cpp` | `TermMetaTest` | `test1` | ported | `storage` `invertedindex::format::tests::term_meta_all_options_roundtrip` |
+| 546 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMemEmpty` | ported | `storage` `invertedindex::format::tests::fst_build_mem_empty` |
+| 547 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildFileEmpty` | ported | `storage` `invertedindex::format::tests::fst_build_file_empty` |
+| 548 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildMem` | ported | `storage` `invertedindex::format::tests::fst_build_mem` |
+| 549 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `BuildFile` | ported | `storage` `invertedindex::format::tests::fst_build_file` |
+| 550 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Get` | ported | `storage` `invertedindex::format::tests::fst_get_values` |
+| 551 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Iterate` | ported | `storage` `invertedindex::format::tests::fst_iterate_with_bounds` |
 | 552 | `src/unit_test/storage/invertedindex/fst/registry_ut.cpp` | `RegistryTest` | `InsertAndFind` | ported | `storage` `fst_registry::tests::insert_and_find` |
-| 553 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `Chunk` | ported | `executor` `tests::memory_indexer_builds_the_reference_postings` |
-| 554 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_Memory` | ported | `executor` `tests::disabled_slow_memory`（`#[ignore]`） |
-| 555 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `SpillLoadTest` | ported | `executor` `memory_indexer_ut::spill_load_test` |
-| 556 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_SeekPosition` | ported | `executor` `tests::disabled_slow_seek_position`（`#[ignore]`） |
-| 557 | `src/unit_test/storage/invertedindex/posting_merger_ut.cpp` | `PostingMergerTest` | `Basic` | ported | `storage` `posting_merger_ut::basic` |
+| 553 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `Chunk` | ported | `executor` `engine::tests_ut::tests::memory_indexer_builds_the_reference_postings` |
+| 554 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_Memory` | ported | `executor` `engine::tests_ut::tests::disabled_slow_memory`（`#[ignore]`） |
+| 555 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `SpillLoadTest` | ported | `executor` `invertedindex::search::memory_indexer_ut::spill_load_test` |
+| 556 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_SeekPosition` | ported | `executor` `engine::tests_ut::tests::disabled_slow_seek_position`（`#[ignore]`） |
+| 557 | `src/unit_test/storage/invertedindex/posting_merger_ut.cpp` | `PostingMergerTest` | `Basic` | ported | `executor` `posting_merger_ut::basic` |
 | 558 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `test1` | ported | `storage` `posting_writer_ut::test1` |
-| 559 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `tf_after_skip_to_across_segments` | ported | `storage` `posting_writer_ut::tf_after_skip_to_across_segments` |
-| 560 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test1` | ported | `executor` `highlighter_ut::test1` |
-| 561 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test2` | ported | `executor` `highlighter_ut::test2` |
-| 562 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test3` | ported | `executor` `highlighter_ut::test3` |
-| 563 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test4` | ported | `executor` `highlighter_ut::test4` |
+| 559 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `tf_after_skip_to_across_segments` | ported | `executor` `posting_writer_ut::tf_after_skip_to_across_segments` |
+| 560 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test1` | ported | `executor` `invertedindex::search::highlighter_ut::test1` |
+| 561 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test2` | ported | `executor` `invertedindex::search::highlighter_ut::test2` |
+| 562 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test3` | ported | `executor` `invertedindex::search::highlighter_ut::test3` |
+| 563 | `src/unit_test/storage/invertedindex/search/highlighter_ut.cpp` | `HighlighterTest` | `test4` | ported | `executor` `invertedindex::search::highlighter_ut::test4` |
 | 564 | `src/unit_test/storage/invertedindex/search/query_builder_ut.cpp` | `QueryBuilderTest` | `test_and` | ported | `executor` `query_builder::tests::test_and` |
 | 565 | `src/unit_test/storage/invertedindex/search/query_builder_ut.cpp` | `QueryBuilderTest` | `test_or` | ported | `executor` `query_builder::tests::test_or` |
 | 566 | `src/unit_test/storage/invertedindex/search/query_builder_ut.cpp` | `QueryBuilderTest` | `test_and_not` | ported | `executor` `query_builder::tests::test_and_not` |
@@ -596,15 +596,15 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 573 | `src/unit_test/storage/invertedindex/search/query_parser_and_optimizer_ut.cpp` | `QueryParserAndOptimizerTest` | `operator_option_test_chinese` | ported | `executor` `query_parser_and_optimizer_ut::operator_option_test_chinese` |
 | 574 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test1` | ported | `storage` `io::tests::byte_slice_writer_tracks_size` |
 | 575 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test2` | ported | `storage` `io::tests::byte_slice_writer_int16_roundtrip` |
-| 576 | src/unit_test/storage/io/byte_slice_write_read_ut.cpp | `test3` | ported | `storage` `highlighter_ut::test3` |
-| 577 | src/unit_test/storage/io/byte_slice_write_read_ut.cpp | `test4` | ported | `storage` `highlighter_ut::test4` |
+| 576 | src/unit_test/storage/io/byte_slice_write_read_ut.cpp | `test3` | ported | `executor` `highlighter_ut::test3` |
+| 577 | src/unit_test/storage/io/byte_slice_write_read_ut.cpp | `test4` | ported | `executor` `highlighter_ut::test4` |
 | 578 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test5` | ported | `storage` `io::tests::byte_slice_writer_vlong_roundtrip` |
 | 579 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test6` | ported | `storage` `io::tests::byte_slice_writer_dump_and_load` |
 | 580 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `test7` | ported | `storage` `io::tests::byte_slice_writer_merge_and_partial_copy` |
 | 581 | `src/unit_test/storage/io/byte_slice_write_read_ut.cpp` | `ByteSliceReaderWriterTest` | `TestDataConsistency` | ported | `storage` `io::tests::byte_slice_reader_writer_data_consistency` |
 | 582 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `test1` | ported | `storage` `io::tests::file_writer_read_prefix` |
 | 583 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `test2` | ported | `storage` `io::tests::file_writer_vint_roundtrip` |
-| 584 | src/unit_test/storage/io/file_write_read_ut.cpp | `test3` | ported | `storage` `highlighter_ut::test3` |
+| 584 | src/unit_test/storage/io/file_write_read_ut.cpp | `test3` | ported | `executor` `highlighter_ut::test3` |
 | 585 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestExceedWriterTotalSize` | ported | `storage` `io::tests::file_writer_exceed_total_size` |
 | 586 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestFilePointerSeek` | ported | `storage` `io::tests::file_reader_file_pointer_seek` |
 | 587 | `src/unit_test/storage/io/file_write_read_ut.cpp` | `FileWriteReadTest` | `TestFileReadOverflowBuffer` | ported | `storage` `io::tests::file_reader_read_overflow_buffer` |
@@ -662,7 +662,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 639 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_rabitq_2` | ported | `index` `vector::reference_suite::rabitq_chunk_roundtrip_preserves_recall` |
 | 640 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_rabitq_3` | ported | `index` `vector::reference_suite::rabitq_parallel_insert_and_search` |
 | 641 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test_avg` | ported | `index` `lsg::tests::avg_is_at_least_the_exhaustive_topk_mean` |
-| 642 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test1` | ported | `executor` `tests::lsg_hnsw_keeps_self_query_recall` |
+| 642 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test1` | ported | `executor` `engine::tests_ut::tests::lsg_hnsw_keeps_self_query_recall` |
 | 643 | `src/unit_test/storage/knnindex/knn_hnsw/test_lvq_ut.cpp` | `HnswLVQTest` | `test1` | ported | `index` `lvq::tests::reconstruction_error_is_below_two_percent` |
 | 644 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_lvq` | ported | `index` `quantizer_perf::disabled_slow_flat_lvq` (`#[ignore]`: C++ DISABLED_SLOW_flat_lvq) |
 | 645 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_rabitq` | ported | `index` `quantizer_perf::disabled_slow_flat_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_flat_rabitq) |
@@ -685,7 +685,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 662 | `src/unit_test/storage/knnindex/knn_sparse/test_bp_reordering_ut.cpp` | `BPReorderingTest` | `test2` | ported | `index` `bp::tests::reordering_on_the_small_csr_when_present` |
 | 663 | `src/unit_test/storage/knnindex/knn_sparse/test_linscan_ut.cpp` | `LinScanAlgTest` | `accurate_scan` | ported | `index` `linscan::tests::accurate_scan` |
 | 664 | `src/unit_test/storage/knnindex/knn_sparse/test_linscan_ut.cpp` | `LinScanAlgTest` | `approximate_scan` | ported | `index` `linscan::tests::approximate_scan` |
-| 665 | `src/unit_test/storage/knnindex/merge_optimize/test_optimize_ut.cpp` | `OptimizeKnnTest` | `test_hnsw_optimize` | ported | `executor` `tests::test_hnsw_optimize` |
+| 665 | `src/unit_test/storage/knnindex/merge_optimize/test_optimize_ut.cpp` | `OptimizeKnnTest` | `test_hnsw_optimize` | ported | `executor` `engine::tests_ut::tests::test_hnsw_optimize` |
 | 666 | `src/unit_test/storage/knnindex/plaid_search/test_plaid_ut.cpp` | `PlaidQuantizerTest` | `test_train_quantize_dequantize` | ported | `index` `plaid::quantizer::tests::train_quantize_dequantize` |
 | 667 | `src/unit_test/storage/knnindex/plaid_search/test_plaid_ut.cpp` | `PlaidQuantizerTest` | `test_2bit_quantization` | ported | `index` `plaid::quantizer::tests::two_bit_quantization` |
 | 668 | `src/unit_test/storage/knnindex/plaid_search/test_plaid_ut.cpp` | `PlaidIndexTest` | `test_basic_construction` | ported | `index` `plaid::index::tests::basic_construction` |
@@ -707,8 +707,8 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 684 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `delete_test` | ported | `mvcc::tests::delete_twice_is_rejected` |
 | 685 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `check_delete_test` | ported | `mvcc::tests::check_delete_compares_timestamps` |
 | 686 | `src/unit_test/storage/meta/entry/block_version_ut.cpp` | `BlockVersionTest` | `get_delete_ts_test` | ported | `mvcc::tests::get_delete_ts_returns_the_slot_range` |
-| 687 | src/unit_test/storage/new_catalog/alter_ut.cpp | `add_column0` | ported | `storage` `alter_ut::add_column0` |
-| 688 | src/unit_test/storage/new_catalog/alter_ut.cpp | `drop_column0` | ported | `storage` `alter_ut::drop_column0` |
+| 687 | src/unit_test/storage/new_catalog/alter_ut.cpp | `add_column0` | ported | `executor` `alter_ut::add_column0` |
+| 688 | src/unit_test/storage/new_catalog/alter_ut.cpp | `drop_column0` | ported | `executor` `alter_ut::drop_column0` |
 | 689 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append0` | ported | `executor` `catalog_ut::appends_accumulate_across_commits` |
 | 690 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append1` | ported | `executor` `catalog_ut::appends_accumulate_across_commits` |
 | 691 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append2` | ported | `executor` `catalog_ut::large_appends_span_blocks` |
@@ -719,40 +719,40 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 696 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_column` | ported | `executor` `catalog_ut::append_add_column_fills_old_rows_with_null` |
 | 697 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_rename` | ported | `executor` `catalog_ut::append_uses_the_renamed_table` |
 | 698 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_append` | ported | `executor` `append_delete_ut::append_append_keeps_one_visible_block` |
-| 699 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `DISABLED_SLOW_test_append_append_concurrent` | ported | `executor` `tests::disabled_slow_test_append_append_concurrent` (`#[ignore]`: C++ DISABLED_SLOW_) |
+| 699 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `DISABLED_SLOW_test_append_append_concurrent` | ported | `executor` `engine::tests_ut::tests::disabled_slow_test_append_append_concurrent` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 700 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_create_index` | ported | `executor` `catalog_ut::append_around_secondary_index_lifecycle` |
 | 701 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_drop_index` | ported | `executor` `catalog_ut::append_around_secondary_index_lifecycle` |
 | 702 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_compact` | ported | `executor` `catalog_ut::append_then_compact_preserves_rows` |
 | 703 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_optimize_index` | ported | `executor` `append_delete_ut::append_and_optimize_index_keeps_rows_and_index` |
 | 704 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_db` | ported | `executor` `checkpoint_ut::checkpoint_and_create_db` |
 | 705 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_table` | ported | `executor` `checkpoint_ut::checkpoint_and_create_table` |
-| 706 | src/unit_test/storage/new_catalog/checkpoint_add_column_ut.cpp | `addcol_checkpoint_insert` | ported | `storage` `checkpoint_ut::addcol_checkpoint_insert` |
+| 706 | src/unit_test/storage/new_catalog/checkpoint_add_column_ut.cpp | `addcol_checkpoint_insert` | ported | `executor` `checkpoint_ut::addcol_checkpoint_insert` |
 | 707 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `test_checkpoint0` | ported | `executor` `checkpoint_ut::checkpoint_internal_test_checkpoint0` |
 | 708 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint1` | ported | `executor` `checkpoint_ut::checkpoint_internal_test_checkpoint1` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 709 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `test_checkpoint2` | ported | `executor` `checkpoint_ut::checkpoint_internal_test_checkpoint2` |
 | 710 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint3` | ported | `executor` `checkpoint_ut::checkpoint_internal_test_checkpoint3` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 711 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint4` | ported | `executor` `checkpoint_ut::checkpoint_internal_test_checkpoint4` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 712 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `test_checkpoint5` | ported | `executor` `checkpoint_ut::checkpoint_internal_test_checkpoint5` |
-| 713 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_db` | ported | `storage` `cleanup_internal_ut::test_cleanup_db` |
-| 714 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_table` | ported | `storage` `cleanup_internal_ut::test_cleanup_table` |
-| 715 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_index` | ported | `storage` `cleanup_internal_ut::test_cleanup_index` |
-| 716 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_compact` | ported | `storage` `cleanup_internal_ut::test_cleanup_compact` |
-| 717 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_optimize` | ported | `storage` `cleanup_internal_ut::test_cleanup_optimize` |
-| 718 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_drop_column` | ported | `storage` `cleanup_internal_ut::test_cleanup_drop_column` |
-| 719 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_drop_index_and_checkpoint_and_restart` | ported | `storage` `cleanup_internal_ut::test_cleanup_drop_index_and_checkpoint_and_restart` |
-| 720 | src/unit_test/storage/new_catalog/cleanup_rollback_txn.cpp | `test_import_with_index_rollback_cleanup` | ported | `storage` `cleanup_rollback_txn_ut::test_import_with_index_rollback_cleanup` |
-| 721 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_with_drop_db` | ported | `storage` `cleanup_ut::cleanup_with_drop_db` |
-| 722 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_drop_table` | ported | `storage` `cleanup_ut::cleanup_and_drop_table` |
-| 723 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_add_columns` | ported | `storage` `cleanup_ut::cleanup_and_add_columns` |
-| 724 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_drop_columns` | ported | `storage` `cleanup_ut::cleanup_and_drop_columns` |
-| 725 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_rename_table` | ported | `storage` `cleanup_ut::cleanup_and_rename_table` |
-| 726 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_compact` | ported | `storage` `cleanup_ut::cleanup_and_compact` |
-| 727 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_drop_index` | ported | `storage` `cleanup_ut::cleanup_and_drop_index` |
-| 728 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_optimize_index` | ported | `storage` `cleanup_ut::cleanup_and_optimize_index` |
-| 729 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_append` | ported | `storage` `cleanup_ut::cleanup_and_append` |
-| 730 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_delete` | ported | `storage` `cleanup_ut::cleanup_and_delete` |
-| 731 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_update` | ported | `storage` `cleanup_ut::cleanup_and_update` |
-| 732 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_dump_index` | ported | `storage` `cleanup_ut::cleanup_and_dump_index` |
+| 713 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_db` | ported | `executor` `cleanup_internal_ut::test_cleanup_db` |
+| 714 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_table` | ported | `executor` `cleanup_internal_ut::test_cleanup_table` |
+| 715 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_index` | ported | `executor` `cleanup_internal_ut::test_cleanup_index` |
+| 716 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_compact` | ported | `executor` `cleanup_internal_ut::test_cleanup_compact` |
+| 717 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_optimize` | ported | `executor` `cleanup_internal_ut::test_cleanup_optimize` |
+| 718 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_drop_column` | ported | `executor` `cleanup_internal_ut::test_cleanup_drop_column` |
+| 719 | src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp | `test_cleanup_drop_index_and_checkpoint_and_restart` | ported | `executor` `cleanup_internal_ut::test_cleanup_drop_index_and_checkpoint_and_restart` |
+| 720 | src/unit_test/storage/new_catalog/cleanup_rollback_txn.cpp | `test_import_with_index_rollback_cleanup` | ported | `executor` `cleanup_rollback_txn_ut::test_import_with_index_rollback_cleanup` |
+| 721 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_with_drop_db` | ported | `executor` `cleanup_ut::cleanup_with_drop_db` |
+| 722 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_drop_table` | ported | `executor` `cleanup_ut::cleanup_and_drop_table` |
+| 723 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_add_columns` | ported | `executor` `cleanup_ut::cleanup_and_add_columns` |
+| 724 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_drop_columns` | ported | `executor` `cleanup_ut::cleanup_and_drop_columns` |
+| 725 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_rename_table` | ported | `executor` `cleanup_ut::cleanup_and_rename_table` |
+| 726 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_compact` | ported | `executor` `cleanup_ut::cleanup_and_compact` |
+| 727 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_drop_index` | ported | `executor` `cleanup_ut::cleanup_and_drop_index` |
+| 728 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_optimize_index` | ported | `executor` `cleanup_ut::cleanup_and_optimize_index` |
+| 729 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_append` | ported | `executor` `cleanup_ut::cleanup_and_append` |
+| 730 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_delete` | ported | `executor` `cleanup_ut::cleanup_and_delete` |
+| 731 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_update` | ported | `executor` `cleanup_ut::cleanup_and_update` |
+| 732 | src/unit_test/storage/new_catalog/cleanup_ut.cpp | `cleanup_and_dump_index` | ported | `executor` `cleanup_ut::cleanup_and_dump_index` |
 | 733 | src/unit_test/storage/new_catalog/column_ut.cpp | `test_add_columns` | ported | `executor` `new_catalog_column_ut::test_add_columns` |
 | 734 | src/unit_test/storage/new_catalog/column_ut.cpp | `alter_column` | ported | `executor` `new_catalog_column_ut::alter_column` |
 | 735 | src/unit_test/storage/new_catalog/column_ut.cpp | `add_column_and_drop_db` | ported | `executor` `new_catalog_column_ut::add_column_and_drop_db` |
@@ -797,17 +797,17 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 774 | `src/unit_test/storage/new_catalog/delete_ut.cpp` | `TestTxnDelete` | `test_delete_and_optimize_index` | ported | `executor` `append_delete_ut::delete_then_optimize_index` |
 | 775 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_db` | ported | `executor` `dump_mem_index_ut::dump_and_drop_db` |
 | 776 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_table` | ported | `executor` `dump_mem_index_ut::dump_and_drop_table` |
-| 777 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `dump_and_add_column` | ported | `storage` `dump_mem_index_ut::dump_and_add_column` |
-| 778 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `dump_and_drop_column` | ported | `storage` `dump_mem_index_ut::dump_and_drop_column` |
+| 777 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `dump_and_add_column` | ported | `executor` `dump_mem_index_ut::dump_and_add_column` |
+| 778 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `dump_and_drop_column` | ported | `executor` `dump_mem_index_ut::dump_and_drop_column` |
 | 779 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_rename_table` | ported | `executor` `dump_mem_index_ut::dump_and_rename_table` |
-| 780 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `dump_and_create_index` | ported | `storage` `dump_mem_index_ut::dump_and_create_index` |
+| 780 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `dump_and_create_index` | ported | `executor` `dump_mem_index_ut::dump_and_create_index` |
 | 781 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_drop_index` | ported | `executor` `dump_mem_index_ut::dump_and_drop_index` |
 | 782 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_import` | ported | `executor` `dump_mem_index_ut::dump_and_import` |
-| 783 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `dump_and_append` | ported | `storage` `dump_mem_index_ut::dump_and_append` |
-| 784 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `dump_and_delete` | ported | `storage` `dump_mem_index_ut::dump_and_delete` |
-| 785 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `DISABLED_SLOW_dump_and_dump` | ported | `storage` `dump_mem_index_ut::dump_and_dump` |
+| 783 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `dump_and_append` | ported | `executor` `dump_mem_index_ut::dump_and_append` |
+| 784 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `dump_and_delete` | ported | `executor` `dump_mem_index_ut::dump_and_delete` |
+| 785 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `DISABLED_SLOW_dump_and_dump` | ported | `executor` `dump_mem_index_ut::dump_and_dump` |
 | 786 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_test_dump_index_and_optimize_index` | ported | `executor` `dump_mem_index_ut::dump_index_and_optimize_index` (`#[ignore]`: C++ DISABLED_SLOW_) |
-| 787 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `test_dump_index_and_compact` | ported | `storage` `dump_mem_index_ut::test_dump_index_and_compact` |
+| 787 | src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp | `test_dump_index_and_compact` | ported | `executor` `dump_mem_index_ut::test_dump_index_and_compact` |
 | 788 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import1` | ported | `executor` `update_import_ut::import1_keeps_every_block` |
 | 789 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_with_index` | ported | `executor` `update_import_ut::import_with_index` |
 | 790 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_with_index_rollback` | ported | `executor` `update_import_ut::import_with_index_rollback` |
@@ -856,16 +856,16 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 833 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `wal` | ported | `storage` `txn_kv::tests::wal_disabled_put_is_lost_without_flush` |
 | 834 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `txn_conflict_same_key_snapshot_isolation` | ported | `storage` `txn_kv::tests::txn_conflict_same_key_snapshot_isolation` |
 | 835 | `src/unit_test/storage/new_catalog/kv_utility_ut.cpp` | `KVUtilityTest` | `test1` | ported | `executor` `kv_ut::kv_utility_catalog_keys_carry_the_timestamp` |
-| 836 | src/unit_test/storage/new_catalog/meta_cache_ut.cpp | `test_db` | ported | `storage` `meta_cache_ut::test_db` |
-| 837 | src/unit_test/storage/new_catalog/meta_cache_ut.cpp | `test_table` | ported | `storage` `meta_cache_ut::test_table` |
+| 836 | src/unit_test/storage/new_catalog/meta_cache_ut.cpp | `test_db` | ported | `executor` `meta_cache_ut::test_db` |
+| 837 | src/unit_test/storage/new_catalog/meta_cache_ut.cpp | `test_table` | ported | `executor` `meta_cache_ut::test_table` |
 | 838 | `src/unit_test/storage/new_catalog/meta_cache_ut.cpp` | `MetaCacheTest` | `test_index` | ported | `executor` `meta_cache_ut::test_index` |
-| 839 | src/unit_test/storage/new_catalog/meta_cache_ut.cpp | `test_mix` | ported | `storage` `meta_cache_ut::test_mix` |
-| 840 | src/unit_test/storage/new_catalog/meta_cache_ut.cpp | `test_erase` | ported | `storage` `meta_cache_ut::test_erase` |
+| 839 | src/unit_test/storage/new_catalog/meta_cache_ut.cpp | `test_mix` | ported | `executor` `meta_cache_ut::test_mix` |
+| 840 | src/unit_test/storage/new_catalog/meta_cache_ut.cpp | `test_erase` | ported | `executor` `meta_cache_ut::test_erase` |
 | 841 | src/unit_test/storage/new_catalog/new_catalog_ut.cpp | `test_block_lock` | ported | `executor` `new_catalog_meta_ut::test_block_lock` |
 | 842 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `test_ts` | ported | `executor` `replay_misc_ut::txn_manager_timestamps` |
-| 843 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_ts` | ported | `executor` `tests::disabled_slow_test_parallel_ts` (`#[ignore]`: C++ DISABLED_SLOW_) |
+| 843 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_ts` | ported | `executor` `engine::tests_ut::tests::disabled_slow_test_parallel_ts` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 844 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `test_check_txns` | ported | `executor` `replay_misc_ut::txn_manager_check_txns` |
-| 845 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_insert_table` | ported | `executor` `tests::disabled_slow_test_parallel_insert_table` (`#[ignore]`: C++ DISABLED_SLOW_) |
+| 845 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_insert_table` | ported | `executor` `engine::tests_ut::tests::disabled_slow_test_parallel_insert_table` (`#[ignore]`: C++ DISABLED_SLOW_) |
 | 846 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_db` | ported | `executor` `replay_txn_ut::replay_create_db` |
 | 847 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_db2` | ported | `executor` `replay_txn_ut::replay_create_db2` |
 | 848 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_table` | ported | `executor` `replay_txn_ut::replay_create_table` |
@@ -893,7 +893,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 870 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_add_column` | ported | `executor` `optimize_replay_ut::optimize_index_then_add_column` |
 | 871 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_column` | ported | `executor` `optimize_replay_ut::optimize_index_then_drop_column` |
 | 872 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_rename_table` | ported | `executor` `optimize_replay_ut::optimize_index_then_rename_table` |
-| 873 | src/unit_test/storage/new_catalog/optimize_index_ut.cpp | `DISABLED_SLOW_optimize_index_and_compact_table` | ported | `executor` `optimize_replay_ut::disabled_slow_optimize_index_and_compact_table` |
+| 873 | src/unit_test/storage/new_catalog/optimize_index_ut.cpp | `DISABLED_SLOW_optimize_index_and_compact_table` | ported | `executor` `optimize_replay_ut::disabled_slow_optimize_index_and_optimize_index` |
 | 874 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_add_column` | ported | `executor` `replay_txn_ut::replay_alter_add_column` |
 | 875 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_drop_column` | ported | `executor` `replay_txn_ut::replay_alter_drop_column` |
 | 876 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_rename` | ported | `executor` `replay_txn_ut::replay_alter_rename` |
@@ -1003,31 +1003,31 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 980 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_restore_table_same_snapshot_multithreaded` | ported | `executor` `txn_ut::table_snapshot_restore_same_snapshot_multithreaded` |
 | 981 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_create_snapshot_delete_data` | ported | `executor` `txn_ut::table_snapshot_create_snapshot_delete_data` |
 | 982 | `src/unit_test/storage/txn/table_snapshot_ut.cpp` | `TableSnapshotTest` | `test_create_snapshot_insert_data` | ported | `executor` `txn_ut::table_snapshot_create_snapshot_insert_data` |
-| 983 | src/unit_test/storage/wal/recycle_log_ut.cpp | `recycle_wal_after_delta_checkpoint` | ported | `storage` `wal_replay_ut::recycle_wal_after_delta_checkpoint` |
+| 983 | src/unit_test/storage/wal/recycle_log_ut.cpp | `recycle_wal_after_delta_checkpoint` | ported | `executor` `wal_replay_ut::recycle_wal_after_delta_checkpoint` |
 | 984 | `src/unit_test/storage/wal/repeat_replay_ut.cpp` | `RepeatReplayTest` | `append` | ported | `executor` `wal_replay_ut::repeat_replay_append` |
 | 985 | `src/unit_test/storage/wal/repeat_replay_ut.cpp` | `RepeatReplayTest` | `import` | ported | `executor` `wal_replay_ut::repeat_replay_import` |
-| 986 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `ReadWriteV2` | ported | `storage` `wal_entry::tests::read_write_v2_roundtrips_every_command` |
-| 987 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `WalEntryIterator` | ported | `storage` `wal_entry::tests::wal_entry_iterator_replay_stops_at_checkpoint` |
-| 988 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `WalListIterator` | ported | `storage` `wal_entry::tests::wal_list_iterator_replay_stops_at_checkpoint` |
-| 989 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedEntryBeforeCheckpointIsIgnored` | ported | `storage` `wal_entry::tests::damaged_entry_before_checkpoint_is_ignored` |
-| 990 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedEntryTruncatesWalFile` | ported | `storage` `wal_entry::tests::damaged_entry_truncates_wal_file` |
-| 991 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedFirstEntryDropsWalFile` | ported | `storage` `wal_entry::tests::damaged_first_entry_drops_wal_file` |
-| 992 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedTailAfterCheckpointIsTruncated` | ported | `storage` `wal_entry::tests::damaged_tail_after_checkpoint_is_truncated` |
-| 993 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedOlderFileDropsNewerOnes` | ported | `storage` `wal_entry::tests::damaged_older_file_drops_newer_ones` |
-| 994 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `NoCheckpointStillPurgesDamage` | ported | `storage` `wal_entry::tests::no_checkpoint_still_purges_damage` |
-| 995 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `TornTailStopsIteration` | ported | `storage` `wal_entry::tests::torn_tail_stops_iteration` |
-| 996 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `CorruptedTrailingSizeIsRecoveredByForwardScan` | ported | `storage` `wal_entry::tests::corrupted_trailing_size_is_recovered_by_forward_scan` |
-| 997 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `EmptyWalFileIsNotAnError` | ported | `storage` `wal_entry::tests::empty_wal_file_is_not_an_error` |
-| 998 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `FileShorterThanEntrySize` | ported | `storage` `wal_entry::tests::file_shorter_than_entry_size_is_empty` |
-| 999 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `AllFilesPurgedLeavesEmptyList` | ported | `storage` `wal_entry::tests::all_files_purged_leaves_empty_list` |
-| 1000 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamageAccumulatesToCheckpointFile` | ported | `storage` `wal_entry::tests::damage_accumulates_to_checkpoint_file` |
-| 1001 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_database` | ported | `storage` `wal_replay_ut::wal_replay_database` |
-| 1002 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_tables` | ported | `storage` `wal_replay_ut::wal_replay_tables` |
-| 1003 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_append` | ported | `storage` `wal_replay_ut::wal_replay_append` |
-| 1004 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_import` | ported | `storage` `wal_replay_ut::wal_replay_import` |
-| 1005 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_compact` | ported | `storage` `wal_replay_ut::wal_replay_compact` |
-| 1006 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_create_index_IvfFlat` | ported | `storage` `wal_replay_ut::wal_replay_create_index_ivf_flat` |
-| 1007 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_create_index_hnsw` | ported | `storage` `wal_replay_ut::wal_replay_create_index_hnsw` |
+| 986 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `ReadWriteV2` | ported | `storage` `wal::wal_entry::tests::read_write_v2_roundtrips_every_command` |
+| 987 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `WalEntryIterator` | ported | `storage` `wal::wal_entry::tests::wal_entry_iterator_replay_stops_at_checkpoint` |
+| 988 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `WalListIterator` | ported | `storage` `wal::wal_entry::tests::wal_list_iterator_replay_stops_at_checkpoint` |
+| 989 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedEntryBeforeCheckpointIsIgnored` | ported | `storage` `wal::wal_entry::tests::damaged_entry_before_checkpoint_is_ignored` |
+| 990 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedEntryTruncatesWalFile` | ported | `storage` `wal::wal_entry::tests::damaged_entry_truncates_wal_file` |
+| 991 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedFirstEntryDropsWalFile` | ported | `storage` `wal::wal_entry::tests::damaged_first_entry_drops_wal_file` |
+| 992 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedTailAfterCheckpointIsTruncated` | ported | `storage` `wal::wal_entry::tests::damaged_tail_after_checkpoint_is_truncated` |
+| 993 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamagedOlderFileDropsNewerOnes` | ported | `storage` `wal::wal_entry::tests::damaged_older_file_drops_newer_ones` |
+| 994 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `NoCheckpointStillPurgesDamage` | ported | `storage` `wal::wal_entry::tests::no_checkpoint_still_purges_damage` |
+| 995 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `TornTailStopsIteration` | ported | `storage` `wal::wal_entry::tests::torn_tail_stops_iteration` |
+| 996 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `CorruptedTrailingSizeIsRecoveredByForwardScan` | ported | `storage` `wal::wal_entry::tests::corrupted_trailing_size_is_recovered_by_forward_scan` |
+| 997 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `EmptyWalFileIsNotAnError` | ported | `storage` `wal::wal_entry::tests::empty_wal_file_is_not_an_error` |
+| 998 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `FileShorterThanEntrySize` | ported | `storage` `wal::wal_entry::tests::file_shorter_than_entry_size_is_empty` |
+| 999 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `AllFilesPurgedLeavesEmptyList` | ported | `storage` `wal::wal_entry::tests::all_files_purged_leaves_empty_list` |
+| 1000 | `src/unit_test/storage/wal/wal_entry_ut.cpp` | `WalEntryTest` | `DamageAccumulatesToCheckpointFile` | ported | `storage` `wal::wal_entry::tests::damage_accumulates_to_checkpoint_file` |
+| 1001 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_database` | ported | `executor` `wal_replay_ut::wal_replay_database` |
+| 1002 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_tables` | ported | `executor` `wal_replay_ut::wal_replay_tables` |
+| 1003 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_append` | ported | `executor` `wal_replay_ut::wal_replay_append` |
+| 1004 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_import` | ported | `executor` `wal_replay_ut::wal_replay_import` |
+| 1005 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_compact` | ported | `executor` `wal_replay_ut::wal_replay_compact` |
+| 1006 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_create_index_IvfFlat` | ported | `executor` `wal_replay_ut::wal_replay_create_index_ivf_flat` |
+| 1007 | src/unit_test/storage/wal/wal_replay_ut.cpp | `wal_replay_create_index_hnsw` | ported | `executor` `wal_replay_ut::wal_replay_create_index_hnsw` |
 | 1008 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `nlohmann_test` | ported | `common` `json::tests::nlohmann_test_parses_twitter_metadata` |
 | 1009 | `src/unit_test/third_party/json_ut.cpp` | `JsonTest` | `simdjson_test` | ported | `common` `json::tests::simdjson_test_walks_documents_by_type` |
 | 1010 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test_size` | exempt | 只测 CRoaring API 本身；端口链接 `roaring` crate，与参考共用同一实现，字节一致性由 `storage` `wal::block::tests::the_null_bitmap_matches_the_reference_block` 与 `secondary_lowcard::tests::write_adv_framing_matches_cpp` 覆盖 |

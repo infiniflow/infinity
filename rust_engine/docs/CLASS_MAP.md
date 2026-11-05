@@ -9,6 +9,8 @@
 
 判定口径（承自计划书 §3.6）：承载**行为**且被其他类调用的类（HNSW/IVF/EMVB/PLAID/SMVE、全文段、事务、Buffer、BlockIndex、PDataBlock 等）逐类列出；纯数据载体、模板特化、迭代器与生成类型按区域聚合，聚合理由与归属见 §1.2。已明确决定的设计变更不要求同名一一对应，但必须出现在 §4。
 
+**落点路径以当前的目录树为准**（见 [`STRUCTURE.md`](STRUCTURE.md)）。2026-11 的结构整理之后：crate 去掉了 `infinity-` 前缀（`crates/storage` 对应 `src/storage`）；`executor/src/lib.rs` 里的引擎代码分到 `executor::engine::{state, statements, query, dml, ddl, index_build, text_index, types, admin, tasks}`；`cpp_blocks.rs` 变成 `executor::blocks::*`；`common/analyzer.rs` 变成 `executor::common::analyzer::*`（一分析器一文件）；`inverted_format` 变成 `storage::invertedindex::format`，`fulltext_segment` 变成 `storage::invertedindex::disk_segment_reader`。查到旧路径时按这张表转换。
+
 ## 1 口径
 
 ### 1.1 状态与总数
@@ -32,11 +34,11 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 
 | 区域 | 未逐类命名 | Rust 承担方式 |
 |---|---:|---|
-| `storage/*` | 553 | `invertedindex` 117：posting/position 解码与 `And/Or/Phrase` 迭代器 → `inverted_format`/`fulltext_segment`/扫描求值函数；`knn_index` 110：模板特化（`Plain*/LVQ*/Rabitq*Dist`、`*VecStoreType`、`*Cache`）→ `vector::Store` 枚举 + 距离函数，`SparseVec*` → `Vec<(u32,f32)>` 别名，`BMPHandler`/`BMPIndexInMem` → 执行器 `SparseIndex`，DiskANN 15 个按 §2.6/R14 排除，`knn_flat` 11 个为距离原语；`catalog` 76 + `new_txn` 46 + `wal` 40 → `catalog`/`value_format` + `Txn` 操作 + 字节级 `wal`；`common` 40/`buffer` 16/`io` 16/`column_vector` 15/`definition` 12 → `Vec<u8>`/`BufferObj`/`std::fs`/S3 等原语（`ColumnVector`/`DataBlock` 已单独命名）；`bg_task` 26 → 定时线程 + `Engine::{dump,optimize,cleanup}` |
+| `storage/*` | 553 | `invertedindex` 117：posting/position 解码与 `And/Or/Phrase` 迭代器 → `storage::invertedindex::format`/`disk_segment_reader`/扫描求值函数；`knn_index` 110：模板特化（`Plain*/LVQ*/Rabitq*Dist`、`*VecStoreType`、`*Cache`）→ `vector::Store` 枚举 + 距离函数，`SparseVec*` → `Vec<(u32,f32)>` 别名，`BMPHandler`/`BMPIndexInMem` → 执行器 `SparseIndex`，DiskANN 15 个按 §2.6/R14 排除，`knn_flat` 11 个为距离原语；`catalog` 76 + `new_txn` 46 + `wal` 40 → `catalog`/`value_format` + `Txn` 操作 + 字节级 `wal`；`common` 40/`buffer` 16/`io` 16/`column_vector` 15/`definition` 12 → `Vec<u8>`/`BufferObj`/`std::fs`/S3 等原语（`ColumnVector`/`DataBlock` 已单独命名）；`bg_task` 26 → 定时线程 + `Engine::{dump,optimize,cleanup}` |
 | `executor/*` | 173 | `operator` 78 + `operator_state.cppm` 74 → `PhysicalOperator` 变体与 `OperatorState`；`expression` 13 → `expression` 求值函数；其余为执行器内部管线结构 |
 | `planner/*` | 117 | `node` 52 → `Statement`/计划结构；`optimizer` 17 → 规则函数；其余为绑定/解析中间结构 |
 | `function/*` | 64 | `cast` 29 + `table` 17 + 其余 → Rust 的 cast/builtin 函数与 `AggFunc` 枚举 |
-| `common/*` | 58 | `analyzer` 39 → `tokenize_*` analyzer 函数；其余为工具结构 |
+| `common/*` | 58 | `analyzer` 39 → `executor::common::analyzer::*`（一分析器一文件）；其余为工具结构 |
 | `main/*` + `network/*` + `scheduler/*` + `admin` + `metrics` + `unit_test` | 39 + 23 + 10 + 1 + 1 + 7 | 查询选项 → 解析结构；peer/cluster → `server::peer` + `ring_buffer`；调度器按 D4 由 `run_tasklets` 的 tasklet 承担（线程与队列的对应见 `PARALLEL_MAP.md`）；admin → 语句分发；metrics → 服务端计数；`unit_test` 为 C++ 测试夹具 |
 | `expression/*` | 12 | 标量表达式求值函数（`expression`） |
 
@@ -47,7 +49,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 聚合到（Rust） | 类数 |
 |---|---:|
 | `Statement`/计划结构 + 规则函数（planner） | 115 |
-| `inverted_format`/`fulltext_segment`/`wand`/`analyzer` 函数 | 117 |
+| `storage::invertedindex` 的 format/disk_segment_reader、`executor::invertedindex::search` 的 WAND、`executor::common::analyzer` 函数 | 117 |
 | `PhysicalOperator` 变体（执行器算子） | 78 |
 | `catalog` + `value_format` | 76 |
 | `PhysicalOperator` + `OperatorState`（状态结构） | 73 |
@@ -72,7 +74,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `sparse::{BmpAlg, BMPIvt, BlockFwd, TailFwd}` + `SparseIndex` | 12 |
 | `expression`（表达式结构） | 12 |
 | Tokio（D4） | 10 |
-| 执行器管线（`lib.rs`） | 7 |
+| 执行器管线（`engine/`） | 7 |
 | `ivf::IvfIndex` + `ivf`/`ivf_mem` | 7 |
 | `merge_knn::MergeKnn` + 结果堆 | 3 |
 | 其余 8 个聚合组（每组 ≤2 个类） | 11 |
@@ -83,45 +85,45 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
 | 1 | `AdminExecutor` | `src/admin/admin_executor.cppm` | mapped | executor 的语句分发 
-| 2 | `Analyzer` | `src/common/analyzer/analyzer.cppm` | mapped | `executor::analyzer::StandardAnalyzer` 
-| 3 | `AnalyzerPool` | `src/common/analyzer/analyzer_pool.cppm` | mapped | `executor::analyzer::AnalyzerPool` 
-| 4 | `ChineseAnalyzer` | `src/common/analyzer/chinese_analyzer.cppm` | mapped | `executor::analyzer::ChineseAnalyzer` 
-| 5 | `CommonLanguageAnalyzer` | `src/common/analyzer/common_analyzer.cppm` | mapped | `executor::analyzer::StandardAnalyzer` 的选项（case/stem/stem_only） |
-| 6 | `DartsTrie` | `src/common/analyzer/darts_trie.cppm` | mapped | `executor::analyzer::DartsTrie` 
-| 7 | `DartsTuple` | `src/common/analyzer/darts_trie.cppm` | mapped | executor::analyzer 
-| 8 | `POSTable` | `src/common/analyzer/darts_trie.cppm` | mapped | executor::analyzer 
-| 9 | `AnalyzeContext` | `src/common/analyzer/ik/analyze_context.cppm` | mapped | executor::analyzer 
-| 10 | `IKArbitrator` | `src/common/analyzer/ik/arbitrator.cppm` | mapped | executor::analyzer 
-| 11 | `CharacterUtil` | `src/common/analyzer/ik/character_util.cppm` | mapped | executor::analyzer 
-| 12 | `CJKSegmenter` | `src/common/analyzer/ik/cjk_segmenter.cppm` | mapped | executor::analyzer 
-| 13 | `CNQuantifierSegmenter` | `src/common/analyzer/ik/cn_quantifier_segmenter.cppm` | mapped | executor::analyzer 
-| 14 | `Dictionary` | `src/common/analyzer/ik/dict.cppm` | mapped | executor::analyzer 
-| 15 | `DictSegment` | `src/common/analyzer/ik/dict_segment.cppm` | mapped | executor::analyzer 
-| 16 | `Hit` | `src/common/analyzer/ik/hit.cppm` | mapped | executor::analyzer 
-| 17 | `IKAnalyzer` | `src/common/analyzer/ik/ik_analyzer.cppm` | mapped | `executor::analyzer::IKAnalyzer` 
-| 18 | `LetterSegmenter` | `src/common/analyzer/ik/letter_segmenter.cppm` | mapped | executor::analyzer 
-| 19 | `Lexeme` | `src/common/analyzer/ik/lexeme.cppm` | mapped | executor::analyzer 
-| 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | mapped | executor::analyzer 
-| 21 | `QuickSortSet` | `src/common/analyzer/ik/quick_sort_set.cppm` | mapped | executor::analyzer 
-| 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | mapped | executor::analyzer 
-| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `executor::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
-| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `executor::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
+| 2 | `Analyzer` | `src/common/analyzer/analyzer.cppm` | mapped | `executor::common::analyzer::StandardAnalyzer` 
+| 3 | `AnalyzerPool` | `src/common/analyzer/analyzer_pool.cppm` | mapped | `executor::common::analyzer::AnalyzerPool` 
+| 4 | `ChineseAnalyzer` | `src/common/analyzer/chinese_analyzer.cppm` | mapped | `executor::common::analyzer::ChineseAnalyzer` 
+| 5 | `CommonLanguageAnalyzer` | `src/common/analyzer/common_analyzer.cppm` | mapped | `executor::common::analyzer::StandardAnalyzer` 的选项（case/stem/stem_only） |
+| 6 | `DartsTrie` | `src/common/analyzer/darts_trie.cppm` | mapped | `executor::common::analyzer::DartsTrie` 
+| 7 | `DartsTuple` | `src/common/analyzer/darts_trie.cppm` | mapped | executor::common::analyzer 
+| 8 | `POSTable` | `src/common/analyzer/darts_trie.cppm` | mapped | executor::common::analyzer 
+| 9 | `AnalyzeContext` | `src/common/analyzer/ik/analyze_context.cppm` | mapped | executor::common::analyzer 
+| 10 | `IKArbitrator` | `src/common/analyzer/ik/arbitrator.cppm` | mapped | executor::common::analyzer 
+| 11 | `CharacterUtil` | `src/common/analyzer/ik/character_util.cppm` | mapped | executor::common::analyzer 
+| 12 | `CJKSegmenter` | `src/common/analyzer/ik/cjk_segmenter.cppm` | mapped | executor::common::analyzer 
+| 13 | `CNQuantifierSegmenter` | `src/common/analyzer/ik/cn_quantifier_segmenter.cppm` | mapped | executor::common::analyzer 
+| 14 | `Dictionary` | `src/common/analyzer/ik/dict.cppm` | mapped | executor::common::analyzer 
+| 15 | `DictSegment` | `src/common/analyzer/ik/dict_segment.cppm` | mapped | executor::common::analyzer 
+| 16 | `Hit` | `src/common/analyzer/ik/hit.cppm` | mapped | executor::common::analyzer 
+| 17 | `IKAnalyzer` | `src/common/analyzer/ik/ik_analyzer.cppm` | mapped | `executor::common::analyzer::IKAnalyzer` 
+| 18 | `LetterSegmenter` | `src/common/analyzer/ik/letter_segmenter.cppm` | mapped | executor::common::analyzer 
+| 19 | `Lexeme` | `src/common/analyzer/ik/lexeme.cppm` | mapped | executor::common::analyzer 
+| 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | mapped | executor::common::analyzer 
+| 21 | `QuickSortSet` | `src/common/analyzer/ik/quick_sort_set.cppm` | mapped | executor::common::analyzer 
+| 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | mapped | executor::common::analyzer 
+| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `executor::common::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
+| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `executor::common::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
 | 25 | `NGramAnalyzer` | `src/common/analyzer/ngram_analyzer.cppm` | mapped | `analyzer::NGramAnalyzer`（n-gram 窗口按 UTF-8 code point 滑动） |
-| 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `executor::analyzer::RAGAnalyzer` 
-| 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | mapped | executor::analyzer 
-| 28 | `SparsegramAnalyzer` | `src/common/analyzer/sparsegram_analyzer.cppm` | mapped | executor::analyzer 
+| 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `executor::common::analyzer::RAGAnalyzer` 
+| 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | mapped | executor::common::analyzer 
+| 28 | `SparsegramAnalyzer` | `src/common/analyzer/sparsegram_analyzer.cppm` | mapped | executor::common::analyzer 
 | 29 | `StandardAnalyzer` | `src/common/analyzer/standard_analyzer.cppm` | mapped | `analyzer::StandardAnalyzer`（Analyze 的 word/stem/case 组合） |
-| 30 | `Stemmer` | `src/common/analyzer/stemmer/stemmer.cppm` | mapped | executor::analyzer 
+| 30 | `Stemmer` | `src/common/analyzer/stemmer/stemmer.cppm` | mapped | executor::common::analyzer 
 | 31 | `Term` | `src/common/analyzer/term.cppm` | mapped | `analyzer::Term` |
 | 32 | `TermList` | `src/common/analyzer/term.cppm` | mapped | `Vec<analyzer::Term>` |
-| 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | mapped | executor::analyzer 
+| 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | mapped | executor::common::analyzer 
 | 34 | `TokenizeConfig` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::TokenizeConfig`（AddAllows/AddDivides/AddUnites） |
 | 35 | `Tokenizer` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::tokenize` |
-| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `executor::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
-| 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | mapped | executor::analyzer 
-| 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | mapped | executor::analyzer 
-| 39 | `WhitespaceAnalyzer` | `src/common/analyzer/whitespace_analyzer.cppm` | mapped | executor::analyzer 
-| 40 | `WordNetLemmatizer` | `src/common/analyzer/wordnet_lemmatizer.cppm` | mapped | executor::analyzer 
+| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `executor::common::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
+| 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | mapped | executor::common::analyzer 
+| 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | mapped | executor::common::analyzer 
+| 39 | `WhitespaceAnalyzer` | `src/common/analyzer/whitespace_analyzer.cppm` | mapped | executor::common::analyzer 
+| 40 | `WordNetLemmatizer` | `src/common/analyzer/wordnet_lemmatizer.cppm` | mapped | executor::common::analyzer 
 | 41 | `BlockingQueue` | `src/common/blocking_queue.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 42 | `ByteSlice` | `src/common/memory/byte_slice.cppm` | mapped | common 的内存/资源计费 
 | 43 | `ByteSliceList` | `src/common/memory/byte_slice.cppm` | mapped | common 的内存/资源计费 
@@ -490,7 +492,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 406 | `CachedMatchScanBase` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner 
 | 407 | `CachedMatchSparseScan` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner 
 | 408 | `CachedMatchTensorScan` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner 
-| 409 | `CachedNodeBase` | `src/planner/cached_node/cached_node_base.cppm` | mapped | `storage::result_cache::CachedNode`（Hash/Eq/output_names/type） |
+| 409 | `CachedNodeBase` | `src/planner/cached_node/cached_node_base.cppm` | mapped | `storage::result_cache_manager::CachedNode`（Hash/Eq/output_names/type） |
 | 410 | `CachedScanBase` | `src/planner/cached_node/cached_scan_base.cppm` | mapped | `result_cache::CachedNode` 的 `schema_name`/`table_name` |
 | 411 | `ColumnBinding` | `src/planner/column_binding.cppm` | mapped | planner 
 | 412 | `ColumnIdentifier` | `src/planner/column_identifier.cppm` | mapped | planner 
@@ -570,7 +572,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
 | 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
 | 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | mapped | `planner::result_cache::ResultCacheGetter::rewrite` 在 `run_plan` 里最后挂上（`result_cache` 打开时生效），键是节点形状 + `begin_ts`（同参考的 `CacheKey`），命中替换成 `Values` 节点；另有语句级结果缓存（见 §4） 
+| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | mapped | `planner::cached_node::result_cache::ResultCacheGetter::rewrite` 在 `run_plan` 里最后挂上（`result_cache` 打开时生效），键是节点形状 + `begin_ts`（同参考的 `CacheKey`），命中替换成 `Values` 节点；另有语句级结果缓存（见 §4） 
 | 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
 | 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
 | 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
@@ -620,7 +622,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 536 | `BufferHandle` | `src/storage/buffer/buffer_handle.cppm` | dropped | 不移植：封存块直接 mmap（`mapped::MappedFile`），没有 owned buffer 就没有句柄 |
 | 537 | `BufferObj` | `src/storage/buffer/buffer_obj.cppm` | dropped | 同上；块/索引段的载荷只有映射，没有「加载进预算」的对象 |
 | 538 | `BufferManager` | `src/storage/buffer/buffer_manager.cppm` | dropped | 不移植：`Context::block_maps` 每块一个共享 `Arc<MappedBlock>`，解码直接读 page cache |
-| 539 | `BufferObjectInfo` | `src/storage/buffer/buffer_obj.cppm` | mapped | `storage::mapped_block::BufferObjectInfo`（`SHOW BUFFERS` 一行 = 一个映射） |
+| 539 | `BufferObjectInfo` | `src/storage/buffer/buffer_obj.cppm` | mapped | `storage::buffer::mapped_block::BufferObjectInfo`（`SHOW BUFFERS` 一行 = 一个映射） |
 | 540 | `VarBuffer` | `src/storage/buffer/buffer_obj.cppm` | dropped | 随 `BufferObj` 一起去掉（没有 outline buffer 的场景） |
 | 541 | `BMPIndexFileWorker` | `src/storage/buffer/file_worker/bmp_index_file_worker.cppm` | mapped | storage::{buffer, io} 
 | 542 | `DataFileWorker` | `src/storage/buffer/file_worker/data_file_worker.cppm` | mapped | CLASS_MAP 已显式命名 |
@@ -649,7 +651,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 565 | `KVStore` | `src/storage/catalog/kv_store.cppm` | mapped | catalog + executor::Engine 
 | 566 | `MemIndex` | `src/storage/catalog/mem_index.cppm` | mapped | catalog + executor::Engine 
 | 567 | `MemIndexID` | `src/storage/catalog/mem_index.cppm` | mapped | catalog + executor::Engine 
-| 568 | `BlockVersion` | `src/storage/catalog/meta/block_version.cppm` | mapped | `storage::mvcc::{BlockVersion, CreateField}`（Append/CommitAppend/Delete/RollbackDelete/CheckDelete/GetCreateTS/GetDeleteTS/SpillToFile/LoadFromFile） |
+| 568 | `BlockVersion` | `src/storage/catalog/meta/block_version.cppm` | mapped | `storage::new_txn::mvcc::{BlockVersion, CreateField}`（Append/CommitAppend/Delete/RollbackDelete/CheckDelete/GetCreateTS/GetDeleteTS/SpillToFile/LoadFromFile） |
 | 569 | `CatalogMeta` | `src/storage/catalog/meta/catalog_meta.cppm` | mapped | catalog + executor::Engine 
 | 570 | `ChunkIndexMetaInfo` | `src/storage/catalog/meta/chunk_index_meta.cppm` | mapped | catalog + executor::Engine 
 | 571 | `ChunkIndexSnapshotInfo` | `src/storage/catalog/meta/chunk_index_meta.cppm` | mapped | catalog + executor::Engine 
@@ -726,14 +728,14 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 642 | `NullaryOperator` | `src/storage/column_vector/operator/nullary_operation.cppm` | mapped | storage::{data_block, mixed_column} 
 | 643 | `TernaryOperator` | `src/storage/column_vector/operator/ternary_operator.cppm` | mapped | storage::{data_block, mixed_column} 
 | 644 | `UnaryOperator` | `src/storage/column_vector/operator/unary_operator.cppm` | mapped | storage::{data_block, mixed_column} 
-| 645 | `Selection` | `src/storage/column_vector/selection.cppm` | mapped | `storage::selection::{Selection, SelectionData}`（Initialize/Set/Append/Get/operator[]/Capacity/Size/Reset） |
+| 645 | `Selection` | `src/storage/column_vector/selection.cppm` | mapped | `storage::column_vector::selection::{Selection, SelectionData}`（Initialize/Set/Append/Get/operator[]/Capacity/Size/Reset） |
 | 646 | `ArrayValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column} 
 | 647 | `EmbeddingValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column} 
 | 648 | `JsonValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column} 
 | 649 | `SparseValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column} 
 | 650 | `TensorArrayValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column} 
 | 651 | `Value` | `src/storage/column_vector/value.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 652 | `VarBufferManager` | `src/storage/column_vector/var_buffer.cppm` | dropped | 不移植：随 `BufferObj` 一起去掉，outline 写盘由 `cpp_format` 直接做 |
+| 652 | `VarBufferManager` | `src/storage/column_vector/var_buffer.cppm` | dropped | 不移植：随 `BufferObj` 一起去掉，outline 写盘由 `storage::definition::format` 直接做 |
 | 653 | `VectorBuffer` | `src/storage/column_vector/vector_buffer.cppm` | mapped | storage::{data_block, mixed_column} 
 | 654 | `VectorHeapChunk` | `src/storage/column_vector/vector_heap_chunk.cppm` | mapped | storage::{data_block, mixed_column} 
 | 655 | `BlockIndex` | `src/storage/common/block_index.cppm` | mapped | CLASS_MAP 已显式命名 |
@@ -805,130 +807,130 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 721 | `InnerMinMaxDataFilterVarcharType` | `src/storage/fast_rough_filter/min_max_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径 
 | 722 | `MinMaxDataFilter` | `src/storage/fast_rough_filter/min_max_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径 
 | 723 | `ProbabilisticDataFilter` | `src/storage/fast_rough_filter/probabilistic_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径 
-| 724 | `ColumnIndexIterator` | `src/storage/invertedindex/column_index_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 725 | `ColumnIndexMerger` | `src/storage/invertedindex/column_index_merger.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 724 | `ColumnIndexIterator` | `src/storage/invertedindex/column_index_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 725 | `ColumnIndexMerger` | `src/storage/invertedindex/column_index_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 726 | `ColumnIndexReader` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 727 | `IndexReader` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 728 | `TableIndexReaderCache` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 729 | `TermDocIterator` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 730 | `ColumnInverter` | `src/storage/invertedindex/column_inverter.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 731 | `ColumnInverterJsonArray` | `src/storage/invertedindex/column_inverter_json_array.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 732 | `AhoCorasick` | `src/storage/invertedindex/common/aho_corasick.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 733 | `BufWriter` | `src/storage/invertedindex/common/buf_writer.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 734 | `DirectIO` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 735 | `SortMerger` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | `storage::external_sort::SortMerger` 
-| 736 | `TermTuple` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 737 | `TermTupleList` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 738 | `MapWithLock` | `src/storage/invertedindex/common/map_with_lock.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 739 | `MmapReader` | `src/storage/invertedindex/common/mmap.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 740 | `PriorityQueue` | `src/storage/invertedindex/common/priority_queue.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 741 | `Arena` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 742 | `KeyComparator` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 743 | `SkipList` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 744 | `SkipListNode` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 745 | `VectorWithLock` | `src/storage/invertedindex/common/vector_with_lock.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 746 | `DictionaryReader` | `src/storage/invertedindex/dict_reader.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 747 | `DiskIndexSegmentReader` | `src/storage/invertedindex/disk_segment_reader.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 748 | `DocListEncoder` | `src/storage/invertedindex/format/doc_list_encoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 749 | `DocListFormat` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 750 | `DocListFormatOption` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 751 | `DocSkipListFormat` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 752 | `FlushInfo` | `src/storage/invertedindex/format/flush_info.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 753 | `InDocPositionState` | `src/storage/invertedindex/format/in_doc_pos_state.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 754 | `IndexDecoder` | `src/storage/invertedindex/format/index_decoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 755 | `SkipIndexDecoder` | `src/storage/invertedindex/format/index_decoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 756 | `InMemDocListDecoder` | `src/storage/invertedindex/format/inmem_doc_list_decoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 757 | `InMemPositionListDecoder` | `src/storage/invertedindex/format/inmem_position_list_decoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 758 | `InMemPostingDecoder` | `src/storage/invertedindex/format/inmem_posting_decoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 759 | `NoCompressIntEncoder` | `src/storage/invertedindex/format/no_compress_encoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 760 | `PositionListDecoder` | `src/storage/invertedindex/format/position_list_decoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 761 | `PositionListEncoder` | `src/storage/invertedindex/format/position_list_encoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 762 | `PositionListFormat` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 763 | `PositionListFormatOption` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 764 | `PositionSkipListFormat` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 765 | `PostingBuffer` | `src/storage/invertedindex/format/posting_buffer.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 727 | `IndexReader` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 728 | `TableIndexReaderCache` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 729 | `TermDocIterator` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 730 | `ColumnInverter` | `src/storage/invertedindex/column_inverter.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 731 | `ColumnInverterJsonArray` | `src/storage/invertedindex/column_inverter_json_array.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 732 | `AhoCorasick` | `src/storage/invertedindex/common/aho_corasick.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 733 | `BufWriter` | `src/storage/invertedindex/common/buf_writer.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 734 | `DirectIO` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 735 | `SortMerger` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | `storage::invertedindex::common::external_sort::SortMerger` 
+| 736 | `TermTuple` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 737 | `TermTupleList` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 738 | `MapWithLock` | `src/storage/invertedindex/common/map_with_lock.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 739 | `MmapReader` | `src/storage/invertedindex/common/mmap.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 740 | `PriorityQueue` | `src/storage/invertedindex/common/priority_queue.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 741 | `Arena` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 742 | `KeyComparator` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 743 | `SkipList` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 744 | `SkipListNode` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 745 | `VectorWithLock` | `src/storage/invertedindex/common/vector_with_lock.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 746 | `DictionaryReader` | `src/storage/invertedindex/dict_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 747 | `DiskIndexSegmentReader` | `src/storage/invertedindex/disk_segment_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 748 | `DocListEncoder` | `src/storage/invertedindex/format/doc_list_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 749 | `DocListFormat` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 750 | `DocListFormatOption` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 751 | `DocSkipListFormat` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 752 | `FlushInfo` | `src/storage/invertedindex/format/flush_info.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 753 | `InDocPositionState` | `src/storage/invertedindex/format/in_doc_pos_state.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 754 | `IndexDecoder` | `src/storage/invertedindex/format/index_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 755 | `SkipIndexDecoder` | `src/storage/invertedindex/format/index_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 756 | `InMemDocListDecoder` | `src/storage/invertedindex/format/inmem_doc_list_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 757 | `InMemPositionListDecoder` | `src/storage/invertedindex/format/inmem_position_list_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 758 | `InMemPostingDecoder` | `src/storage/invertedindex/format/inmem_posting_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 759 | `NoCompressIntEncoder` | `src/storage/invertedindex/format/no_compress_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 760 | `PositionListDecoder` | `src/storage/invertedindex/format/position_list_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 761 | `PositionListEncoder` | `src/storage/invertedindex/format/position_list_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 762 | `PositionListFormat` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 763 | `PositionListFormatOption` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 764 | `PositionSkipListFormat` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 765 | `PostingBuffer` | `src/storage/invertedindex/format/posting_buffer.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 766 | `PostingByteSlice` | `src/storage/invertedindex/format/posting_byte_slice.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 767 | `PostingByteSliceReader` | `src/storage/invertedindex/format/posting_byte_slice_reader.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 768 | `PostingDecoder` | `src/storage/invertedindex/format/posting_decoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 769 | `NoCompressPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 770 | `PostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 771 | `PostingFields` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 772 | `TypedPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 773 | `VByteCompressPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 774 | `PostingFormat` | `src/storage/invertedindex/format/posting_list_format.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 775 | `PostingFormatOption` | `src/storage/invertedindex/format/posting_list_format.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 776 | `ShortListOptimizeUtil` | `src/storage/invertedindex/format/short_list_optimize_util.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 777 | `SkipListReader` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 778 | `SkipListReaderByteSlice` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 779 | `SkipListReaderPostingByteSlice` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 780 | `SkipListWriter` | `src/storage/invertedindex/format/skiplist_writer.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 781 | `TermMeta` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 782 | `TermMetaDumper` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 783 | `TermMetaLoader` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 784 | `VByteIntEncoder` | `src/storage/invertedindex/format/vbyte_compress_encoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 785 | `FstBuilder` | `src/storage/invertedindex/fst/build.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 786 | `Bound` | `src/storage/invertedindex/fst/fst.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 767 | `PostingByteSliceReader` | `src/storage/invertedindex/format/posting_byte_slice_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 768 | `PostingDecoder` | `src/storage/invertedindex/format/posting_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 769 | `NoCompressPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 770 | `PostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 771 | `PostingFields` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 772 | `TypedPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 773 | `VByteCompressPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 774 | `PostingFormat` | `src/storage/invertedindex/format/posting_list_format.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 775 | `PostingFormatOption` | `src/storage/invertedindex/format/posting_list_format.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 776 | `ShortListOptimizeUtil` | `src/storage/invertedindex/format/short_list_optimize_util.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 777 | `SkipListReader` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 778 | `SkipListReaderByteSlice` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 779 | `SkipListReaderPostingByteSlice` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 780 | `SkipListWriter` | `src/storage/invertedindex/format/skiplist_writer.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 781 | `TermMeta` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 782 | `TermMetaDumper` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 783 | `TermMetaLoader` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 784 | `VByteIntEncoder` | `src/storage/invertedindex/format/vbyte_compress_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 785 | `FstBuilder` | `src/storage/invertedindex/fst/build.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 786 | `Bound` | `src/storage/invertedindex/fst/fst.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 787 | `Fst` | `src/storage/invertedindex/fst/fst.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 788 | `FstStream` | `src/storage/invertedindex/fst/fst.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 789 | `Output` | `src/storage/invertedindex/fst/node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 790 | `Registry` | `src/storage/invertedindex/fst/registry.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 791 | `RegistryEntry` | `src/storage/invertedindex/fst/registry.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 792 | `InDocPositionIterator` | `src/storage/invertedindex/in_doc_pos_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 793 | `InDocStateKeeper` | `src/storage/invertedindex/in_doc_state_keeper.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 788 | `FstStream` | `src/storage/invertedindex/fst/fst.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 789 | `Output` | `src/storage/invertedindex/fst/node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 790 | `Registry` | `src/storage/invertedindex/fst/registry.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 791 | `RegistryEntry` | `src/storage/invertedindex/fst/registry.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 792 | `InDocPositionIterator` | `src/storage/invertedindex/in_doc_pos_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 793 | `InDocStateKeeper` | `src/storage/invertedindex/in_doc_state_keeper.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 794 | `IndexSegmentReader` | `src/storage/invertedindex/index_segment_reader.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 795 | `InMemIndexSegmentReader` | `src/storage/invertedindex/inmem_segment_reader.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 796 | `BatchInvertTask` | `src/storage/invertedindex/invert_task.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 795 | `InMemIndexSegmentReader` | `src/storage/invertedindex/inmem_segment_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 796 | `BatchInvertTask` | `src/storage/invertedindex/invert_task.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 797 | `MemoryIndexer` | `src/storage/invertedindex/memory_indexer.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 798 | `MultiPostingDecoder` | `src/storage/invertedindex/multi_posting_decoder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 799 | `PostingIterator` | `src/storage/invertedindex/posting_iterator.cppm` | mapped | `storage::fulltext_segment::PostingIterator` 
-| 800 | `PostingMerger` | `src/storage/invertedindex/posting_merger.cppm` | mapped | `storage::fulltext_segment::PostingMerger` 
-| 801 | `PostingWriter` | `src/storage/invertedindex/posting_writer.cppm` | mapped | `storage::fulltext_segment::PostingWriter` 
-| 802 | `Ring` | `src/storage/invertedindex/ring.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 798 | `MultiPostingDecoder` | `src/storage/invertedindex/multi_posting_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 799 | `PostingIterator` | `src/storage/invertedindex/posting_iterator.cppm` | mapped | `storage::invertedindex::disk_segment_reader::PostingIterator` 
+| 800 | `PostingMerger` | `src/storage/invertedindex/posting_merger.cppm` | mapped | `storage::invertedindex::disk_segment_reader::PostingMerger` 
+| 801 | `PostingWriter` | `src/storage/invertedindex/posting_writer.cppm` | mapped | `storage::invertedindex::disk_segment_reader::PostingWriter` 
+| 802 | `Ring` | `src/storage/invertedindex/ring.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 803 | `AndIterator` | `src/storage/invertedindex/search/and_iterator.cppm` | mapped | `executor::query_builder::AndIterator` 
 | 804 | `AndNotIterator` | `src/storage/invertedindex/search/and_not_iterator.cppm` | mapped | `executor::query_builder::AndNotIterator` 
-| 805 | `BatchOrIterator` | `src/storage/invertedindex/search/batch_or_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 806 | `BlockMaxLeafIterator` | `src/storage/invertedindex/search/blockmax_leaf_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 805 | `BatchOrIterator` | `src/storage/invertedindex/search/batch_or_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 806 | `BlockMaxLeafIterator` | `src/storage/invertedindex/search/blockmax_leaf_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 807 | `BlockMaxWandIterator` | `src/storage/invertedindex/search/blockmax_wand_iterator.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 808 | `BM25Ranker` | `src/storage/invertedindex/search/bm25_ranker.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 809 | `FullTextColumnLengthReader` | `src/storage/invertedindex/search/column_length_io.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 810 | `DocIterator` | `src/storage/invertedindex/search/doc_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 811 | `DocIteratorEstimateIterateCost` | `src/storage/invertedindex/search/doc_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 812 | `FilterIterator` | `src/storage/invertedindex/search/filter_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 813 | `FilterQueryNode` | `src/storage/invertedindex/search/filter_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 814 | `HighlightInfo` | `src/storage/invertedindex/search/highlighter.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 815 | `Highlighter` | `src/storage/invertedindex/search/highlighter.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 816 | `KeywordIterator` | `src/storage/invertedindex/search/keyword_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 817 | `MinimumShouldMatchIterator` | `src/storage/invertedindex/search/minimum_should_match_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 818 | `MultiDocIterator` | `src/storage/invertedindex/search/multi_doc_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 819 | `MustFirstIterator` | `src/storage/invertedindex/search/must_first_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 820 | `DocIteratorEntry` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 821 | `DocIteratorHeap` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 809 | `FullTextColumnLengthReader` | `src/storage/invertedindex/search/column_length_io.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 810 | `DocIterator` | `src/storage/invertedindex/search/doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 811 | `DocIteratorEstimateIterateCost` | `src/storage/invertedindex/search/doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 812 | `FilterIterator` | `src/storage/invertedindex/search/filter_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 813 | `FilterQueryNode` | `src/storage/invertedindex/search/filter_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 814 | `HighlightInfo` | `src/storage/invertedindex/search/highlighter.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 815 | `Highlighter` | `src/storage/invertedindex/search/highlighter.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 816 | `KeywordIterator` | `src/storage/invertedindex/search/keyword_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 817 | `MinimumShouldMatchIterator` | `src/storage/invertedindex/search/minimum_should_match_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 818 | `MultiDocIterator` | `src/storage/invertedindex/search/multi_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 819 | `MustFirstIterator` | `src/storage/invertedindex/search/must_first_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 820 | `DocIteratorEntry` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 821 | `DocIteratorHeap` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 822 | `OrIterator` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | `executor::query_builder::OrIterator` 
-| 823 | `BM25Params` | `src/storage/invertedindex/search/parse_fulltext_options.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 824 | `RankFeatureOption` | `src/storage/invertedindex/search/parse_fulltext_options.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 825 | `PhraseDocIterator` | `src/storage/invertedindex/search/phrase_doc_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 826 | `FullTextQueryContext` | `src/storage/invertedindex/search/query_builder.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 823 | `BM25Params` | `src/storage/invertedindex/search/parse_fulltext_options.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 824 | `RankFeatureOption` | `src/storage/invertedindex/search/parse_fulltext_options.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 825 | `PhraseDocIterator` | `src/storage/invertedindex/search/phrase_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 826 | `FullTextQueryContext` | `src/storage/invertedindex/search/query_builder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 827 | `QueryBuilder` | `src/storage/invertedindex/search/query_builder.cppm` | mapped | `executor::query_builder::QueryBuilder` 
-| 828 | `AndNotQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 829 | `AndQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 830 | `CreateSearchParams` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 831 | `KeywordQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 832 | `MultiQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 833 | `NotQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 834 | `OrQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 828 | `AndNotQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 829 | `AndQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 830 | `CreateSearchParams` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 831 | `KeywordQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 832 | `MultiQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 833 | `NotQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 834 | `OrQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 835 | `PhraseQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | `executor::query_builder::PhraseQueryNode` 
-| 836 | `QueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 837 | `RankFeatureQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 838 | `RankFeaturesQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 839 | `TermQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 840 | `RankFeatureDocIterator` | `src/storage/invertedindex/search/rank_feature_doc_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 841 | `RankFeaturesDocIterator` | `src/storage/invertedindex/search/rank_features_doc_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 842 | `FullTextScoreResultHeap` | `src/storage/invertedindex/search/score_result_heap.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 843 | `ScoreThresholdIterator` | `src/storage/invertedindex/search/score_threshold_iterator.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 844 | `SearchDriver` | `src/storage/invertedindex/search/search_driver.cppm` | mapped | `executor::fulltext_query::SearchDriver` 
-| 845 | `SegmentPosting` | `src/storage/invertedindex/segment_posting.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 846 | `SegmentTermPosting` | `src/storage/invertedindex/segment_term_posting.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
-| 847 | `SegmentTermPostingQueue` | `src/storage/invertedindex/segment_term_posting.cppm` | mapped | storage::inverted_format / fulltext_segment + executor::fulltext_query 
+| 836 | `QueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 837 | `RankFeatureQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 838 | `RankFeaturesQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 839 | `TermQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 840 | `RankFeatureDocIterator` | `src/storage/invertedindex/search/rank_feature_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 841 | `RankFeaturesDocIterator` | `src/storage/invertedindex/search/rank_features_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 842 | `FullTextScoreResultHeap` | `src/storage/invertedindex/search/score_result_heap.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 843 | `ScoreThresholdIterator` | `src/storage/invertedindex/search/score_threshold_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 844 | `SearchDriver` | `src/storage/invertedindex/search/search_driver.cppm` | mapped | `executor::invertedindex::search::query_builder::SearchDriver` 
+| 845 | `SegmentPosting` | `src/storage/invertedindex/segment_posting.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 846 | `SegmentTermPosting` | `src/storage/invertedindex/segment_term_posting.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 847 | `SegmentTermPostingQueue` | `src/storage/invertedindex/segment_term_posting.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
 | 848 | `ByteSliceReader` | `src/storage/io/byte_slice_reader.cppm` | mapped | `storage::io::ByteSliceReader` 
 | 849 | `ByteSliceWriter` | `src/storage/io/byte_slice_writer.cppm` | mapped | `storage::io::ByteSliceWriter` 
 | 850 | `FileReader` | `src/storage/io/file_reader.cppm` | mapped | `storage::io::FileReader` 
@@ -1146,14 +1148,14 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 1062 | `TxnImportInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn 
 | 1063 | `TxnInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn 
 | 1064 | `TxnOptimizeInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn 
-| 1065 | `ObjectStats` | `src/storage/persistence/obj_stat_accessor.cppm` | mapped | storage::persistence 
-| 1066 | `ObjStat` | `src/storage/persistence/obj_status.cppm` | mapped | storage::persistence 
-| 1067 | `Range` | `src/storage/persistence/obj_status.cppm` | mapped | storage::persistence 
-| 1068 | `PersistResultHandler` | `src/storage/persistence/persist_result_handler.cppm` | mapped | `storage::persistence::PersistResultHandler` 
-| 1069 | `ObjAddr` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence 
-| 1070 | `PersistReadResult` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence 
-| 1071 | `PersistWriteResult` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence 
-| 1072 | `PersistenceManager` | `src/storage/persistence/persistence_manager.cppm` | mapped | `storage::persistence::PersistenceManager` 
+| 1065 | `ObjectStats` | `src/storage/persistence/obj_stat_accessor.cppm` | mapped | storage::persistence::persistence_manager 
+| 1066 | `ObjStat` | `src/storage/persistence/obj_status.cppm` | mapped | storage::persistence::persistence_manager 
+| 1067 | `Range` | `src/storage/persistence/obj_status.cppm` | mapped | storage::persistence::persistence_manager 
+| 1068 | `PersistResultHandler` | `src/storage/persistence/persist_result_handler.cppm` | mapped | `storage::persistence::persistence_manager::PersistResultHandler` 
+| 1069 | `ObjAddr` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence::persistence_manager 
+| 1070 | `PersistReadResult` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence::persistence_manager 
+| 1071 | `PersistWriteResult` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence::persistence_manager 
+| 1072 | `PersistenceManager` | `src/storage/persistence/persistence_manager.cppm` | mapped | `storage::persistence::persistence_manager::PersistenceManager` 
 | 1073 | `CacheOutput` | `src/storage/result_cache_manager.cppm` | mapped | `result_cache::CacheOutput` |
 | 1074 | `ResultCacheManager` | `src/storage/result_cache_manager.cppm` | mapped | `result_cache::ResultCacheManager`（AddCache/GetCache/DropTable/ResetCacheNumCapacity/ClearCache） |
 | 1075 | `CommonQueryFilter` | `src/storage/secondary_index/common_query_filter.cppm` | mapped | storage::secondary_* 
@@ -1163,54 +1165,54 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 1079 | `SecondaryIndexInMem` | `src/storage/secondary_index/secondary_index_in_mem.cppm` | mapped | storage::secondary_* 
 | 1080 | `SecondaryPGMIndex` | `src/storage/secondary_index/secondary_index_pgm.cppm` | mapped | storage::secondary_* 
 | 1081 | `Storage` | `src/storage/storage.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 1082 | `BaseMemIndex` | `src/storage/tracer/base_memindex.cppm` | mapped | storage::memindex_tracer 
-| 1083 | `DummyIndexInMem` | `src/storage/tracer/base_memindex.cppm` | mapped | storage::memindex_tracer 
-| 1084 | `MemUsageChange` | `src/storage/tracer/mem_usage_change.cppm` | mapped | storage::memindex_tracer 
-| 1085 | `BGMemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::memindex_tracer 
-| 1086 | `MemIndexDetail` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::memindex_tracer 
-| 1087 | `MemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | mapped | `storage::memindex_tracer::MemIndexTracer` 
-| 1088 | `MemIndexTracerInfo` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::memindex_tracer 
+| 1082 | `BaseMemIndex` | `src/storage/tracer/base_memindex.cppm` | mapped | storage::bg_task::memindex_tracer 
+| 1083 | `DummyIndexInMem` | `src/storage/tracer/base_memindex.cppm` | mapped | storage::bg_task::memindex_tracer 
+| 1084 | `MemUsageChange` | `src/storage/tracer/mem_usage_change.cppm` | mapped | storage::bg_task::memindex_tracer 
+| 1085 | `BGMemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::bg_task::memindex_tracer 
+| 1086 | `MemIndexDetail` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::bg_task::memindex_tracer 
+| 1087 | `MemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | mapped | `storage::bg_task::memindex_tracer::MemIndexTracer` 
+| 1088 | `MemIndexTracerInfo` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::bg_task::memindex_tracer 
 | 1089 | `View` | `src/storage/view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植 
-| 1090 | `BottomExecutor` | `src/storage/wal/bottom_executor.cppm` | mapped | storage::wal_entry 
-| 1091 | `TempWalFileInfo` | `src/storage/wal/log_file.cppm` | mapped | storage::wal_entry 
-| 1092 | `WalFile` | `src/storage/wal/log_file.cppm` | mapped | storage::wal_entry 
-| 1093 | `WalFileInfo` | `src/storage/wal/log_file.cppm` | mapped | storage::wal_entry 
-| 1094 | `WalBlockInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1095 | `WalCmd` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1096 | `WalCmdAddColumnsV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1097 | `WalCmdAlterIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1098 | `WalCmdAppendV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1099 | `WalCmdCheckpointV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1100 | `WalCmdCleanup` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1101 | `WalCmdCompactV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1102 | `WalCmdCreateDBSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1103 | `WalCmdCreateDatabaseV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1104 | `WalCmdCreateIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1105 | `WalCmdCreateSystemSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1106 | `WalCmdCreateTableSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1107 | `WalCmdCreateTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1108 | `WalCmdDeleteV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1109 | `WalCmdDropColumnsV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1110 | `WalCmdDropDatabaseV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1111 | `WalCmdDropIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1112 | `WalCmdDropTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1113 | `WalCmdDummy` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1114 | `WalCmdDumpIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1115 | `WalCmdImportV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1116 | `WalCmdRenameTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1117 | `WalCmdRestoreDatabaseSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1118 | `WalCmdRestoreSystemSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1119 | `WalCmdRestoreTableSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1120 | `WalEntry` | `src/storage/wal/wal_entry.cppm` | mapped | `storage::wal_entry::WalEntry` 
-| 1121 | `WalEntryHeader` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1122 | `WalEntryIterator` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1123 | `WalListIterator` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1124 | `WalRestoreIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1125 | `WalSegmentIndexInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1126 | `WalSegmentInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1127 | `WalSegmentInfoV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal_entry 
-| 1128 | `ReplayWalOptions` | `src/storage/wal/wal_manager.cppm` | mapped | storage::wal_entry 
-| 1129 | `WalManager` | `src/storage/wal/wal_manager.cppm` | mapped | storage::wal_entry 
+| 1090 | `BottomExecutor` | `src/storage/wal/bottom_executor.cppm` | mapped | storage::wal::wal_entry 
+| 1091 | `TempWalFileInfo` | `src/storage/wal/log_file.cppm` | mapped | storage::wal::wal_entry 
+| 1092 | `WalFile` | `src/storage/wal/log_file.cppm` | mapped | storage::wal::wal_entry 
+| 1093 | `WalFileInfo` | `src/storage/wal/log_file.cppm` | mapped | storage::wal::wal_entry 
+| 1094 | `WalBlockInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1095 | `WalCmd` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1096 | `WalCmdAddColumnsV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1097 | `WalCmdAlterIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1098 | `WalCmdAppendV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1099 | `WalCmdCheckpointV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1100 | `WalCmdCleanup` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1101 | `WalCmdCompactV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1102 | `WalCmdCreateDBSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1103 | `WalCmdCreateDatabaseV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1104 | `WalCmdCreateIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1105 | `WalCmdCreateSystemSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1106 | `WalCmdCreateTableSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1107 | `WalCmdCreateTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1108 | `WalCmdDeleteV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1109 | `WalCmdDropColumnsV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1110 | `WalCmdDropDatabaseV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1111 | `WalCmdDropIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1112 | `WalCmdDropTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1113 | `WalCmdDummy` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1114 | `WalCmdDumpIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1115 | `WalCmdImportV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1116 | `WalCmdRenameTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1117 | `WalCmdRestoreDatabaseSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1118 | `WalCmdRestoreSystemSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1119 | `WalCmdRestoreTableSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1120 | `WalEntry` | `src/storage/wal/wal_entry.cppm` | mapped | `storage::wal::wal_entry::WalEntry` 
+| 1121 | `WalEntryHeader` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1122 | `WalEntryIterator` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1123 | `WalListIterator` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1124 | `WalRestoreIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1125 | `WalSegmentIndexInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1126 | `WalSegmentInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1127 | `WalSegmentInfoV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
+| 1128 | `ReplayWalOptions` | `src/storage/wal/wal_manager.cppm` | mapped | storage::wal::wal_entry 
+| 1129 | `WalManager` | `src/storage/wal/wal_manager.cppm` | mapped | storage::wal::wal_entry 
 | 1130 | `BaseTestNoParam` | `src/unit_test/base_test.cppm` | test | C++ 测试夹具（`src/unit_test`） |
 | 1131 | `BaseTestParamStr` | `src/unit_test/base_test.cppm` | test | C++ 测试夹具（`src/unit_test`） |
 | 1132 | `BaseTestWithParam` | `src/unit_test/base_test.cppm` | test | C++ 测试夹具（`src/unit_test`） |
@@ -1227,28 +1229,28 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 
 | C++ | Rust | 方法对应 | 状态 |
 |---|---|---|---|
-| `BufferManager` / `BufferObj` / `BufferHandle`（`storage/buffer/*.cppm`） | 不移植：`storage::mapped::{MappedFile, mapping_count, mapped_bytes}` + `mapped_block::MappedBlock` | 封存块与索引段直接 mmap，块在进程内共享一个 `Arc<MappedBlock>`（`Context::block_maps`），改写/删除按表丢弃；参考的 `Get/Put/evict`、`Load/Save/Free`、rc 与临时文件溢出都没有对应物 | — |
-| `BlockVersionFile`（`storage/buffer/block_version.cppm`） | `cpp_format::BlockVersionFile` | `Decode/Encode` | ✅ |
+| `BufferManager` / `BufferObj` / `BufferHandle`（`storage/buffer/*.cppm`） | 不移植：`storage::buffer::mapped::{MappedFile, mapping_count, mapped_bytes}` + `mapped_block::MappedBlock` | 封存块与索引段直接 mmap，块在进程内共享一个 `Arc<MappedBlock>`（`Context::block_maps`），改写/删除按表丢弃；参考的 `Get/Put/evict`、`Load/Save/Free`、rc 与临时文件溢出都没有对应物 | — |
+| `BlockVersionFile`（`storage/buffer/block_version.cppm`） | `storage::definition::format::BlockVersionFile` | `Decode/Encode` | ✅ |
 | `ColumnDef::ToString` / `ConstrainTypeToString` / `LogicalType2Str`（`parser/definition/column_def.cpp:213`、`parser/type/logical_type.cpp:28`） | `ColumnDefValue` 的 `Display` | 约束按 `std::set<ConstraintType>` 顺序、缺省默认打印 `Null`、`DataType` 的 C++ 拼写（`TinyInt`/`Varchar`/`Decimal(p,s)`…） | ✅ |
-| `KeyEncode`（`storage/common/kv_code.cppm`） | `storage::catalog_format` 的 `catalog|…` 与名称键两族函数 | `CatalogDbKey`/`CatalogDbPrefix`/`CatalogDbTagPrefix`/`CatalogTableKey`/`TableColumnKey`/`CatalogTableSegmentKey` 与 `DatabaseKey`/`TableKey`/`TableSegmentKey`/`TableSegmentBlockKey`/`TableSegmentBlockColumnKey`/`TableIndexKey`/`TableIndexSegmentKey`/`TableIndexChunkKey` 及各自 `*Prefix` | ✅ |
-| `CachedNodeBase` / `CachedScanBase` / `CacheContent` / `CacheOutput` / `ResultCacheManager`（`cached_node/*.cppm`、`logical_read_cache.cppm`、`result_cache_manager.cppm`） | `storage::result_cache::{CachedNode, CacheContent, CacheOutput, CacheResultMap, ResultCacheManager}` | `AddCache`→`add_cache`（已有条目合并新列）、`GetCache`→`get_cache`（按输出列投影，缺列即 miss）、`DropTable`→`drop_table`、`ResetCacheNumCapacity`/`ClearCache`、LRU 淘汰 | ✅ |
+| `KeyEncode`（`storage/common/kv_code.cppm`） | `storage::catalog::catalog_format` 的 `catalog|…` 与名称键两族函数 | `CatalogDbKey`/`CatalogDbPrefix`/`CatalogDbTagPrefix`/`CatalogTableKey`/`TableColumnKey`/`CatalogTableSegmentKey` 与 `DatabaseKey`/`TableKey`/`TableSegmentKey`/`TableSegmentBlockKey`/`TableSegmentBlockColumnKey`/`TableIndexKey`/`TableIndexSegmentKey`/`TableIndexChunkKey` 及各自 `*Prefix` | ✅ |
+| `CachedNodeBase` / `CachedScanBase` / `CacheContent` / `CacheOutput` / `ResultCacheManager`（`cached_node/*.cppm`、`logical_read_cache.cppm`、`result_cache_manager.cppm`） | `storage::result_cache_manager::{CachedNode, CacheContent, CacheOutput, CacheResultMap, ResultCacheManager}` | `AddCache`→`add_cache`（已有条目合并新列）、`GetCache`→`get_cache`（按输出列投影，缺列即 miss）、`DropTable`→`drop_table`、`ResetCacheNumCapacity`/`ClearCache`、LRU 淘汰 | ✅ |
 | `KnnFlatL2` / `KnnFlatIP` / `*Blas` / `*Reservoir` / `*Top1`（`knn_flat/*.cppm`） | `index::knn_flat::{top_k, top_1}` | `Search`→`top_k`（L2 升序 / IP 相似度降序、bitmask 过滤、并列取小 id）、`*Top1`→`top_1`；BLAS/reservoir 变体合并为同一实现（结构合并，行为一致） | ✅ |
-| `NGramAnalyzer`（`common/analyzer/ngram_analyzer.cppm`） | `executor::analyzer::NGramAnalyzer` | `Analyze`→`analyze`（按 code point 滑动窗口，窗口内空格结束当前词，尾部不足 n 停止） | ✅ |
-| `StandardAnalyzer` / `CommonLanguageAnalyzer` / `Tokenizer` / `TokenizeConfig` / `Term` / `TermList` / `Stemmer`（`common/analyzer/*.cppm`、`common/analyzer/stemmer/*`） | `executor::analyzer::{StandardAnalyzer, Stemmer, TokenizeConfig, Term, tokenize}` | `InitStemmer(<STEM_LANG_*>)`、`SetCaseSensitive`、`SetExtractEngStem`、`SetStemOnly`、`SetCharOffset`、`SetTokenizerConfig`、`Analyze`→`analyze`（word/stem/case 的三种输出组合、stem 与原词共享 position）；18 种语言各自同族：`STEM_LANG_PORT` 是 `porter` 模块里逐条照 `stem_UTF_8_porter.cpp` 转写的原版 Porter（不是 rust-stemmers 的 Porter2），其余 Snowball 语言用 rust-stemmers；`standard-<language>` 的索引/查询词干走 `TextTokenizer::standard`（`@#$` 分隔、`/` 连接） | ✅ |
+| `NGramAnalyzer`（`common/analyzer/ngram_analyzer.cppm`） | `executor::common::analyzer::NGramAnalyzer` | `Analyze`→`analyze`（按 code point 滑动窗口，窗口内空格结束当前词，尾部不足 n 停止） | ✅ |
+| `StandardAnalyzer` / `CommonLanguageAnalyzer` / `Tokenizer` / `TokenizeConfig` / `Term` / `TermList` / `Stemmer`（`common/analyzer/*.cppm`、`common/analyzer/stemmer/*`） | `executor::common::analyzer::{StandardAnalyzer, Stemmer, TokenizeConfig, Term, tokenize}` | `InitStemmer(<STEM_LANG_*>)`、`SetCaseSensitive`、`SetExtractEngStem`、`SetStemOnly`、`SetCharOffset`、`SetTokenizerConfig`、`Analyze`→`analyze`（word/stem/case 的三种输出组合、stem 与原词共享 position）；18 种语言各自同族：`STEM_LANG_PORT` 是 `porter` 模块里逐条照 `stem_UTF_8_porter.cpp` 转写的原版 Porter（不是 rust-stemmers 的 Porter2），其余 Snowball 语言用 rust-stemmers；`standard-<language>` 的索引/查询词干走 `TextTokenizer::standard`（`@#$` 分隔、`/` 连接） | ✅ |
 | `MixedT`（`parser/type/mixed_type.h`） | `common::types::{MixedT, MixedValue}` | `MakeInteger/MakeFloat/MakeString/MakeTuple(count)/MakeArray(count)/MakeNull/MakeMiss`、`Insert*IntoTuple/IntoArray`（重复键/越界/满容量报错）、`GetFromTuple/GetByIndex`、`type`→`value_type`、`Reset`、值访问与渲染；14 字节短串内联阈值；C++ 的 union 内存布局与移动后 `kInvalid` 由 Rust 所有权模型取代 |
 | `BaseMixedType` / `MixedValueType`（`parser/type/base_mixed_type.h`） | `common::types::MixedValueType` | `GetTypeName`→`type_name`（Invalid/Integer/Float/Short|Long String/Tuple/Array/Null/Missing/Dummy） | ✅ |
 | `TableDef`（`storage/definition/table_def.cppm`） | `catalog::value_format::TableDef` | `Make`→`make`、`column_count`、`GetColIdByName`→`get_col_id_by_name`；字段（schema/table/comment/columns）与 `ColumnDefValue` 一致 | ✅ |
-| `Selection`（`column_vector/selection.cppm`） | `storage::selection::Selection` | `Initialize/Set/Append/Get/Capacity/Size/Reset` | ✅ |
-| `BlockVersion` / `CreateField`（`catalog/meta/block_version.cppm`） | `storage::mvcc::{BlockVersion, CreateField}` | `Append`→`append`（累计行数）、`CommitAppend`→`commit_append`、`Delete`→`delete`（重复删除报 `TxnWWConflict`）、`RollbackDelete`、`CheckDelete`、`GetCreateTS`/`GetDeleteTS`、`SpillToFile`/`LoadFromFile`（复用 `BlockVersionFile` 字节布局） | ✅ |
-| `TableDef` / `ColumnDef` / `IndexBase` 系列（`table_def.cppm`、`column_def.cppm`、`index_def*.cppm`） | `catalog::{TableMeta, IndexMeta, ColumnDefValue, IndexDefValue}` + `cpp_layout` | catalog 键空间按 C++ 布局编解码；`IndexFullText/Secondary/HNSW/IVF/BMP/EMVB` 的参数存于 `IndexMeta.options` | ✅ |
+| `Selection`（`column_vector/selection.cppm`） | `storage::column_vector::selection::Selection` | `Initialize/Set/Append/Get/Capacity/Size/Reset` | ✅ |
+| `BlockVersion` / `CreateField`（`catalog/meta/block_version.cppm`） | `storage::new_txn::mvcc::{BlockVersion, CreateField}` | `Append`→`append`（累计行数）、`CommitAppend`→`commit_append`、`Delete`→`delete`（重复删除报 `TxnWWConflict`）、`RollbackDelete`、`CheckDelete`、`GetCreateTS`/`GetDeleteTS`、`SpillToFile`/`LoadFromFile`（复用 `BlockVersionFile` 字节布局） | ✅ |
+| `TableDef` / `ColumnDef` / `IndexBase` 系列（`table_def.cppm`、`column_def.cppm`、`index_def*.cppm`） | `catalog::{TableMeta, IndexMeta, ColumnDefValue, IndexDefValue}` + `catalog::layout` | catalog 键空间按 C++ 布局编解码；`IndexFullText/Secondary/HNSW/IVF/BMP/EMVB` 的参数存于 `IndexMeta.options` | ✅ |
 | `SecondaryIndexDataBase::SaveIndexInner` | `secondary_segment::write_secondary_segment` / `SecondarySegmentReader` | 保存/查找 | ✅ |
 | `SecondaryIndexDataLowCardinality` | `secondary_lowcard::LowCardWriter/Reader` | `WriteAdv` 兼容的 Roaring | ✅ |
 | `PGMIndex<T,64,4>` | `secondary_segment` 内嵌 PGM（`pgm_*`） | `SaveIndex/LoadIndex`、有界二分 | ✅ |
-| `BMPAlg::SaveToPtr` | `bmp_cpp::write_bmp_file` / `BmpCppReader` | 保存/读取/`SearchKnn` | ✅ |
+| `BMPAlg::SaveToPtr` | `knn_index::sparse::bmp::write_bmp_file` / `BmpReader` | 保存/读取/`SearchKnn` | ✅ |
 | `EMVBIndex::SaveIndexInner` / `PQ::Save` | `emvb_segment::encode_emvb_refs` / `EmvbPqIndex` | 保存/预过滤 | ✅ |
 | `HnswIndex`（图区/头部） | `knn_format::encode/decode_hnsw_chunk` | 字节布局 | ✅ |
 | `IVF_Index_Storage::SearchIndex` / `IVF_Parts_Storage_Info<kPlain|kScalarQuantization|kProductQuantization>` | `index::ivf::{IvfIndex, IvfSqIndex, IvfPqIndex}`（`IvfSegment` 统一三种存储） | 质心选择 + part 扫描；SQ = 残差码 + `dot_v_e`（a/b 按 trimmed min/max 训练），PQ = 每子空间码本 + `-0.5‖c‖²` 权重，三者都按 C++ 的 ip/cosine/l2 公式打分；`ivf_def::IndexIvf::make` 由 `CREATE INDEX` 调用做参数校验，镜像按 `storage_type` 写出对应 chunk | ✅ |
-| `Fst` 尾块/校验和 | `inverted_format` 的 FST 写入/`fst_len_from_trailer` | 保存/校验 | ✅ |
+| `Fst` 尾块/校验和 | `invertedindex::format` 的 FST 写入/`fst_len_from_trailer` | 保存/校验 | ✅ |
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | MurmurHash64A | ✅（g++ 值已 pin） |
 | `Utility`（`common/utility/utility.cppm`）/ `UnrecoverableException` / `RecoverableException` | `common::{trim_path, extract_u64_from_string_suffix, Error}` | `TrimPath`→`trim_path`、`ExtractU64FromStringSuffix`→`extract_u64_from_string_suffix`、`Error::Unrecoverable`（裸消息）/`Error::Unexpected`（`Unexpected error: …`） | ✅ |
 | `Config` / `DefaultConfig`（`main/config.cppm`） | `cli::config::Config` | `Init`→`init`（默认值 + TOML 覆盖）、`Set`→`set`、`Validate`→`validate`（版本/时区/IP/字节大小/日志级别/时间信息错误分类）、全部访问器；错误码 `InvalidConfig`/`MismatchVersion`/`InvalidTimezone`/`InvalidIpAddr`/`InvalidByteSize`/`InvalidLogLevel`/`InvalidTimeInfo` | ✅ |
@@ -1273,16 +1275,16 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `MergeKnn` + `HeapResultHandler`（`merge_knn.cppm`、`result_handler.cppm`） | `index::merge_knn::MergeKnn` | `Search/AddResult`→`search/add_result`、`Begin/End/EndWithoutSort`、`GetSize/GetIDsByIdx/GetDistancesByIdx/GetUniqueIDs`；`CompareMax/CompareMin`→`Compare::{Max,Min}` | ✅ |
 | `BlockFwd` / `TailFwd`（`bmp_fwd.cppm`，own-mem） | `index::sparse::{BlockFwd, TailFwd, BlockTerm}` | `AddDoc`→`add_doc`、`ToBlockFwd`、`GetBlockTerms`、`GetScores`/`GetScoresTail`、`Prefetch` | ✅ |
 | `BMPIvt` / `BlockData` / `BlockPostings`（`bmp_ivt.cppm`，own-mem） | `index::sparse::{BMPIvt, Postings}` | `AddBlock`→`add_block`、`GetPostings`、`Optimize`→`build`、`kth`、`block_ids`/`max_scores` | ✅ |
-| `RcuMap<Key, Value>`（`storage/common/rcu_multimap.cppm`，单值变体） | `storage::rcu_map::RcuMap` | `Get/GetValue/GetWithRcuTime/GetReadOnly`、`Insert`（替换语义）、`Delete`、`CheckGc`/`CheckExpired`、`GetAllValuesWithRef`/`GetAllKeyValuePairs`、`size`/`emplace`/`range`/`GetOrAdd`/`Clear`；`CheckSwapInLock` 的 100 条/3×miss 保守阈值一致 | ✅（全部 19 例已移植） |
-| `RcuMultiMap<Key, Value>` / `MapValue` / `DeletedMap`（`storage/common/rcu_multimap.cppm`） | `storage::rcu_map::RcuMultiMap` | `Get/GetWithRcuTime`、`Insert`、`Delete(key)`/`Delete(key,value)`、`CheckGc`、`CheckExpired`、`GetAllValuesWithRef`/`GetAllKeyValuePairs`/`GetMergedMultiMap`、`size`/`emplace`/`range`；`CheckSwapInLock` 的快照发布语义一致 | ✅（全部 18 例已移植） |
+| `RcuMap<Key, Value>`（`storage/common/rcu_multimap.cppm`，单值变体） | `storage::common::rcu_map::RcuMap` | `Get/GetValue/GetWithRcuTime/GetReadOnly`、`Insert`（替换语义）、`Delete`、`CheckGc`/`CheckExpired`、`GetAllValuesWithRef`/`GetAllKeyValuePairs`、`size`/`emplace`/`range`/`GetOrAdd`/`Clear`；`CheckSwapInLock` 的 100 条/3×miss 保守阈值一致 | ✅（全部 19 例已移植） |
+| `RcuMultiMap<Key, Value>` / `MapValue` / `DeletedMap`（`storage/common/rcu_multimap.cppm`） | `storage::common::rcu_map::RcuMultiMap` | `Get/GetWithRcuTime`、`Insert`、`Delete(key)`/`Delete(key,value)`、`CheckGc`、`CheckExpired`、`GetAllValuesWithRef`/`GetAllKeyValuePairs`/`GetMergedMultiMap`、`size`/`emplace`/`range`；`CheckSwapInLock` 的快照发布语义一致 | ✅（全部 18 例已移植） |
 | `BPReordering<IdxType, DocID>` / `BPReorderContext`（`bp_reordering.cppm`） | `index::bp::BpReordering` | `AddDoc`→`add_doc`、`operator()`→`reorder`（递归二分、`ComputeGains`/`ComputeTermGain`/`ComputeTermCost`；参考实现的线程并行只影响耗时，结果一致） | ✅ |
 | `LinScan<DataType, IdxType>`（`linscan_alg.cppm`） | `index::linscan::LinScan` | `Insert`→`insert`、`SearchBF`→`search_bf`、`SearchKnn`→`search_knn`（按 |value| 排序读 postings 至 budget，保留 top-k 候选）、`Save/Load`→`to_bytes`/`from_bytes`（含重复 doc_id/term 校验） | ✅ |
 | `BMPAlg` / `BMPAlgBase::SearchKnn`（`bmp_alg.cppm`，own-mem） | `index::sparse::{BmpAlg, BmpSearchOptions}` | `AddDoc`→`add_doc`、`SearchKnn`→`search_knn`、`GetScores`/`Calculate2`、`alpha/beta/use_tail`（`alpha`/`beta`/`threshold` 一路传到磁盘 reader，含 `beta` 截断与 k-th 阈值；`use_tail` 像参考一样被 binder 拒绝、`tail` 接受但不生效；门禁 `test_the_sparse_search_options_change_the_answer_the_same_way`） | ✅ |
-| `BMPIvt`/`BlockFwd` 的 `BMPOwnMem::kFalse`（mmap） | `storage::bmp_cpp::BmpCppReader` | 读取同一份 `SaveToPtr` 字节布局并查询 | ✅（设计变更：读路径共用磁盘格式） |
+| `BMPIvt`/`BlockFwd` 的 `BMPOwnMem::kFalse`（mmap） | `storage::knn_index::sparse::bmp::BmpReader` | 读取同一份 `SaveToPtr` 字节布局并查询 | ✅（设计变更：读路径共用磁盘格式） |
 | `KnnScanSharedData` / `KnnSearchOption`（`knn_scan_data.cppm`） | `knn_scan::KnnScanOptions` | `nprobe`/`ef`/`threshold` 从 `WITH (…)` 与 legacy 串解析（`WITH` 优先），供 IVF/HNSW/阈值共用 | ✅ |
 | `PhysicalKnnScan`（`physical_knn_scan.cppm` / `physical_knn_scan_impl.cpp`） | `knn_scan::{PhysicalKnnScan, KnnScanOperatorState}` + `Engine::knn_candidates` | `GetColumnID`→`column_index`、`IsKnnMinHeap`→`is_knn_min_heap`、`Execute`→`execute`（逐行 + 行缓存的精确评分）、`PlanWithIndex` 的索引探测→`KnnCandidateScan`/`vector_candidates`、排序/阈值/截断→`finish`（`MergeKnn` 方向语义）；bitmask 过滤由过滤谓词承担，多查询由上层逐次调用 | ✅（多 block 并行由行管线代替，见 D4） |
-| `TableMeta` / `SegmentMeta` / `BlockMeta` / `ColumnMeta`（`catalog/meta/*.cppm`） | `catalog::{TableMeta}` + `storage::block_index::BlockMeta` + `cpp_layout` | 表/段/块/列的元数据按 C++ catalog 布局持久化；`BlockMeta` 提供 `block_dir`/`row_offset`/`row_count`/`GetRowCnt1` 语义，`catalog` 提供表与列定义 | ✅ |
-| `BlockIndex`（`storage/common/block_index.cppm`） | `storage::block_index::BlockIndex` | `NewInit/LoadSet`→`open`（扫描 `version` 文件恢复块与行区间）、`BlockCount`/`SegmentCount`、`GetBlockMeta`、`GetSegmentOffset`/`GetBlockOffset`、`IsEmpty`；`get_block` 返回 `Arc<MappedBlock>`（mmap，不进预算）；checkpoint 调 `create_block` 落块，块读与全行读（`try_cpp_rows`）都走它 | ✅ |
+| `TableMeta` / `SegmentMeta` / `BlockMeta` / `ColumnMeta`（`catalog/meta/*.cppm`） | `catalog::{TableMeta}` + `storage::common::block_index::BlockMeta` + `catalog::layout` | 表/段/块/列的元数据按 C++ catalog 布局持久化；`BlockMeta` 提供 `block_dir`/`row_offset`/`row_count`/`GetRowCnt1` 语义，`catalog` 提供表与列定义 | ✅ |
+| `BlockIndex`（`storage/common/block_index.cppm`） | `storage::common::block_index::BlockIndex` | `NewInit/LoadSet`→`open`（扫描 `version` 文件恢复块与行区间）、`BlockCount`/`SegmentCount`、`GetBlockMeta`、`GetSegmentOffset`/`GetBlockOffset`、`IsEmpty`；`get_block` 返回 `Arc<MappedBlock>`（mmap，不进预算）；checkpoint 调 `create_block` 落块，块读与全行读（`try_rows`）都走它 | ✅ |
 | `Storage`（`storage.cppm`） | 执行器 `Engine::storage: Storage` + `Engine` 的 `txn`/`dir`/`context` | `new_catalog`/`kv_store`/`new_txn_manager`/`buffer_manager`/`wal_manager`/`object_storage_processor` 分别由 `Storage` 与 `Engine` 组合；后台处理器由 CLI 定时线程 + Tokio 取代（D4） | ✅ |
 | `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`block_maps`（取代 `BufferManager`）/`buffer_budget`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联；C++ 线程池由 Tokio 取代（D4） | ✅ |
 | `ColumnVector<T>` / `DataBlock`（`column_vector.cppm`、`data_block.cppm`） | `storage::data_block::{ColumnVector, Column, DataBlock, BlockValue}` | `Initialize/SetVectorType`→`initialize`/`set_vector_type`（含 constant/selection/slice）、`AppendValue/AppendWith`→`append_value`/`push`/`extend_value`、`GetValueByIndex`/`SetValueByIndex`→`get`/`set_value`、`Size/capacity`、`Finalize`、`Reset`、`ShallowCopy`、null bitmap→`validity`、`DataBlock::Make/AppendRow/AppendValue/Finalize/GetValue/Reset`→`new`/`push_slot`/`append_value`/`finalize`/`get_value`/`reset`（`BlockValue` 覆盖 bool/各整数宽度/float/double/decimal/varchar/date-time/interval/array/uuid/embedding/mixed）、`MemUsed`→`mem_used`；`VectorBuffer`/`Bitmask` 未复刻（Rust `Vec`） | ✅（integer 20 + date/time 20 + `data_block_ut` 2 例已移植；geo 列按用户决定排除） |
@@ -1298,23 +1300,23 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `PlaidIndexDiskMerger` / `PlaidMergeManifest`（`plaid_index_disk_merger.cppm`） | `index::plaid::{PlaidIndexDiskMerger, PlaidMergeManifest}` | `MergeChunk(sParallel/Incremental)`、`Finalize`→`accept_merged_data`、`CalculateMergeSize`、manifest JSON（`NeedsMerge`/`UpdateChunk`/`Load/SaveManifest`） | ✅ |
 | `SMVETransform` / `GenerateProjectionMatrix`（`smve_transform.cppm`） | `index::smve::{smve_transform, generate_projection_matrix, SmveResult}` | 随机单位列投影（固定种子）、逐 token 取 top-k、query 求和池化 / doc 非零均值池化 | ✅ |
 | `SMVEIndexInMem` / `SMVESerializedData`（`smve_index.cppm`） | `index::smve::SmveIndex` + 执行器 `MultiVectorIndex` 的 `smve`/`smve_seqs`/`SmveConfig` | `BuildFromColumn`→`build_from_column`（内部 BMP 的 `AddDocs`）、`Search`→BMP `search_knn_filtered` + 执行器按列值精确 MaxSim 重排（与 C++ `PhysicalMatchTensorScan` 一致）、`GetSizeInBytes`/行数；`SMVEBMPCollector` 由 `search_knn` 的返回值承担 | ✅ |
-| `AnalyzerPool` / `RAGAnalyzer` / `ChineseAnalyzer` / `IKAnalyzer` / `DartsTrie`（`common/analyzer/*`） | `executor::analyzer::{AnalyzerPool, AnalyzerName, parse_analyzer_name, RAGAnalyzer, ChineseAnalyzer, IKAnalyzer, DartsTrie}` | 名称解析（族名大小写敏感；`rag-<lang>[-fine]`、`chinese/traditional/ik` 的精确 `-fine`、`standard-<language>` 大小写不敏感、`keyword/whitespace-<delims>` 逐字节、`ngram-<strtol>`、`sparsegram-<min>-<max>-fold`）、trie 驱动分词、按语言折叠/停用词/词干、jieba MP-DAG+HMM 粗/细粒度、IK 词典最长匹配；`Tokenize`/`Analyze`→`tokenize`/`analyze`；`CREATE INDEX … WITH (ANALYZER = …)` 与查询共用同一个 `AnalyzerPool`（测试 `a_fulltext_index_uses_its_declared_analyzer`），DDL 校验与 `get_analyzer` 共用 `parse_analyzer_name`（单测 `analyzer_name_grammar_matches_the_reference`、`analyzer_suffixes_reach_the_constructed_analyzers`、`a_keyword_fulltext_index_takes_its_delimiters_from_the_name`、`create_index_validates_the_analyzer_name_like_the_reference`，跨引擎门禁 `test_analyzer_names_and_tokenisation_match`） | ✅（OpenCC 为等价折叠，IK 歧义仲裁未移植） |
+| `AnalyzerPool` / `RAGAnalyzer` / `ChineseAnalyzer` / `IKAnalyzer` / `DartsTrie`（`common/analyzer/*`） | `executor::common::analyzer::{AnalyzerPool, AnalyzerName, parse_analyzer_name, RAGAnalyzer, ChineseAnalyzer, IKAnalyzer, DartsTrie}` | 名称解析（族名大小写敏感；`rag-<lang>[-fine]`、`chinese/traditional/ik` 的精确 `-fine`、`standard-<language>` 大小写不敏感、`keyword/whitespace-<delims>` 逐字节、`ngram-<strtol>`、`sparsegram-<min>-<max>-fold`）、trie 驱动分词、按语言折叠/停用词/词干、jieba MP-DAG+HMM 粗/细粒度、IK 词典最长匹配；`Tokenize`/`Analyze`→`tokenize`/`analyze`；`CREATE INDEX … WITH (ANALYZER = …)` 与查询共用同一个 `AnalyzerPool`（测试 `a_fulltext_index_uses_its_declared_analyzer`），DDL 校验与 `get_analyzer` 共用 `parse_analyzer_name`（单测 `analyzer_name_grammar_matches_the_reference`、`analyzer_suffixes_reach_the_constructed_analyzers`、`a_keyword_fulltext_index_takes_its_delimiters_from_the_name`、`create_index_validates_the_analyzer_name_like_the_reference`，跨引擎门禁 `test_analyzer_names_and_tokenisation_match`） | ✅（OpenCC 为等价折叠，IK 歧义仲裁未移植） |
 | `QueryBuilder` / `TermLookup` / `AndIterator` / `OrIterator` / `AndNotIterator`（`invertedindex/search/query_builder*`） | `executor::query_builder::{QueryBuilder, TermLookup, AndIterator, OrIterator, AndNotIterator, PhraseQueryNode, BmwIterator}` | 布尔树扁平化、`NOT`→`AND_NOT`、`Next(doc_id)`/`DocID()`、短语（精确/滑窗）与 BMW/WAND | ✅ |
-| `SearchDriver` / 查询解析器（`invertedindex/search/search_driver*`、`search_lexer.l`、`search_parser.y`） | `executor::fulltext_query::{SearchDriver, MemoryColumnIndex, MemorySegment}` | 词法（引号、`~slop`、`^boost`、转义）、隐式 OR、`AND`/`NOT`、`field:term`、分析器解析 | ✅ `^boost` 进入查询树并参与 BM25 打分；无列名字段组走与具名列相同的 BM25 路径 |
-| `Highlighter` / `PostingWriter` / `PostingMerger` / `PostingIterator`（`invertedindex/*`） | `executor::highlight_with_analyzer`、`storage::fulltext_segment::{PostingWriter, PostingMerger, PostingIterator}` | postings 写入/合并/`seek_doc`/`skip_to`、tf、高亮片段 | ✅ |
-| `SortMerger` / `TermTuple`（`invertedindex/common/external_sort*`） | `storage::external_sort::{SortMerger, SortKey, TermTuple}` | 单趟 k 路归并、run 帧格式与键序 | ✅ |
-| `PersistenceManager` / `PersistResultHandler`（`storage/persistence/*`） | `storage::persistence::{PersistenceManager, PersistResultHandler}` | 128 字节对象对齐、独立/组合对象、compose footer、引用计数、区间合并清理 | ✅ |
-| `MemIndexTracer`（`storage/invertedindex/memory_indexer*`） | `storage::memindex_tracer::MemIndexTracer` | 配额/提案、dump 选择 | ✅ |
-| `BinaryFuseFilter`（`storage/binary_fuse_filter/*`） | `storage::binary_fuse_filter::BinaryFuse` | arity-3 fuse-8 allocate/populate/contain | ✅ |
+| `SearchDriver` / 查询解析器（`invertedindex/search/search_driver*`、`search_lexer.l`、`search_parser.y`） | `executor::invertedindex::search::query_builder::{SearchDriver, MemoryColumnIndex, MemorySegment}` | 词法（引号、`~slop`、`^boost`、转义）、隐式 OR、`AND`/`NOT`、`field:term`、分析器解析 | ✅ `^boost` 进入查询树并参与 BM25 打分；无列名字段组走与具名列相同的 BM25 路径 |
+| `Highlighter` / `PostingWriter` / `PostingMerger` / `PostingIterator`（`invertedindex/*`） | `executor::highlight_with_analyzer`、`storage::invertedindex::disk_segment_reader::{PostingWriter, PostingMerger, PostingIterator}` | postings 写入/合并/`seek_doc`/`skip_to`、tf、高亮片段 | ✅ |
+| `SortMerger` / `TermTuple`（`invertedindex/common/external_sort*`） | `storage::invertedindex::common::external_sort::{SortMerger, SortKey, TermTuple}` | 单趟 k 路归并、run 帧格式与键序 | ✅ |
+| `PersistenceManager` / `PersistResultHandler`（`storage/persistence/*`） | `storage::persistence::persistence_manager::{PersistenceManager, PersistResultHandler}` | 128 字节对象对齐、独立/组合对象、compose footer、引用计数、区间合并清理 | ✅ |
+| `MemIndexTracer`（`storage/invertedindex/memory_indexer*`） | `storage::bg_task::memindex_tracer::MemIndexTracer` | 配额/提案、dump 选择 | ✅ |
+| `BinaryFuseFilter`（`storage/binary_fuse_filter/*`） | `storage::fast_rough_filter::binary_fuse_filter::BinaryFuse` | arity-3 fuse-8 allocate/populate/contain | ✅ |
 | `DataTable` / `DataBlock` 行式视图（`storage/definition/table*`） | `executor::data_table::{DataTable, TableType}` + `data_block::fill_row_id_vector` | 行式读取、布尔 compact 位、`RowID(segment, offset)` | ✅ |
-| `ByteSliceWriter/Reader` / `FileWriter/Reader` / `StreamReader` / `VirtualStore`（`storage/io/*`） | `storage::io::{ByteSliceWriter, ByteSliceReader, FileWriter, FileReader, StreamReader}` + `storage::s3::S3Client` | 尺寸跟踪、vint/vlong、mmap 读写、行读取；对象存储仍走 S3 | ✅（对象存储路径见设计变更） |
+| `ByteSliceWriter/Reader` / `FileWriter/Reader` / `StreamReader` / `VirtualStore`（`storage/io/*`） | `storage::io::{ByteSliceWriter, ByteSliceReader, FileWriter, FileReader, StreamReader}` + `storage::io::s3::S3Client` | 尺寸跟踪、vint/vlong、mmap 读写、行读取；对象存储仍走 S3 | ✅（对象存储路径见设计变更） |
 | `AddFunction` 及全部标量注册（`function/scalar/*`） | `expression::scalar::{ScalarFunction, ScalarFunctionSet, TypedColumn}` | 24 个 `+(T,T)->T` 重载、按列宽 checked 求值（溢出→NULL） | ✅ |
 | JSON 值（`parser/type/*`、`storage/column_vector/json*`） | `common::json::Json` + `LogicalType::Json`/`BlockValue::Json` | 解析树、紧凑序列化、列/WAL 编解码 | ✅（以结构化 JSON 替代 BSON 字节） |
 | 多语句事务（`storage/txn/*`） | `executor::EngineTxn` + `txn::TxnManager` | `begin_txn`/`append`/`delete_row_ids`/`create_table_snapshot`/`commit`/`rollback`、begin/commit 时间戳 | ✅（rollback 不回退行号分配器） |
 | 稀疏 HNSW（`KnnHnsw<SparseIPVecStoreType>`，`knn_hnsw/*`） | `index::vector::{Store::SparseIp, HnswIndex::sparse_ip/add_sparse/search_sparse/save_sparse/load_sparse}` | 稀疏点积距离、图构建/检索/序列化 | ✅（不含 BMP 块压缩） |
 | `OptimizerRule` / `Optimizer` / `ColumnPruner` / `ColumnRemapper` / `LazyLoad` / `ApplyFastRoughFilter` / `ResultCacheGetter`（`planner/optimizer/*`、`optimizer_rule.cppm`） | `planner::{optimize, column, result_cache, index_scan}` | `OptimizerRule` trait + `Optimizer` 按序执行。生产顺序即参考的 `optimizer_impl.cpp:40-46`：执行器先用真实 catalog 跑 `ApplyFastRoughFilter` + `IndexScanBuilder`（候选要在 lowering 之前拿到），`run_plan` 接 `ColumnPruner`/`LazyLoad`/`ColumnRemapper`，`result_cache` 打开时最后挂 `ResultCacheGetter`。`ColumnRemapper::remap`、`LazyLoad::{collect,clean_scan}` 做位置化裁剪/重映射；`Limit`/`ORDER BY` 由 binder 直接摆到参考位置（`optimize::normalize`），优化器里没有额外的改写趟。 | ✅ |
 | `FilterExpressionPushDown` / `IndexFilterEvaluator` 及其 AllTrue/AllFalse/Secondary/Fulltext/LogicalChildren / `FilterExpressionPushDownHelper` / `ExpressionInfoTree` / `IndexScanBuilder`（`planner/optimizer/index_scan/*`） | `planner::index_scan` | `push_down_to_index_scan` 拆分 index/leftover 并构建求值器；`unwind_cast`、JSON term 编码、区间 merge/AND-OR 组合；`IndexScanBuilder::build` 返回 `IndexScanCandidate`；规则把它写进 `LogicalPlan::IndexScan`（对应 C++ 的 `LogicalIndexScan`），残余谓词挂在节点上；`ColumnPruner` 对 index scan 不访问其表达式（同参考的 `// do not visit node expression`） | ✅ |
-| `RegexIndexRewrite`（`planner/optimizer/regex_index_rewrite.cppm`） | `planner::regex_rewrite::RegexIndexRewrite` | 对 sparsegram 全文索引列，把 `regex` 的必含字面 run 转成 `filter_fulltext` 合取并保留原正则作为残余过滤；run 抽取复用 `expression::regex_literal` | ✅ |
+| `RegexIndexRewrite`（`planner/optimizer/regex_index_rewrite.cppm`） | `planner::optimizer::regex_index_rewrite::RegexIndexRewrite` | 对 sparsegram 全文索引列，把 `regex` 的必含字面 run 转成 `filter_fulltext` 合取并保留原正则作为残余过滤；run 抽取复用 `expression::regex_literal` | ✅ |
 | `QueryBinder`（`planner/query_binder.cppm`） | `planner::binder::QueryBinder` | `bind_select`/`bind_insert`/`bind_delete`/`bind_update`/`bind_from`/`bind_table`/`bind_expression`/`bind_predicate`；COMPACT 无 AST/绑定结构，由 `executor` 直接执行 | ✅ |
 | `Binding` / `BindContext`（`planner/binding.cppm`、`planner/bind_context.cppm`） | `planner::bind_context::{BindingType, Binding, CommonTableExpressionInfo, BindContext, ResolvedColumn}` | `make`/`add_{left,right}_child`/`get_new_logical_node_id`/`generate_{table,binding_context}_index`（委托根 context 的自增计数，初值 1）/`get_cte`+`is_cte_bound`/`is_view_bound`/`is_table_bound`/`bound_*`/`bound_search`/`add_{subquery,cte,view,table}_binding`/`add_bind_context`（重名表/重表号/重绑定名报错、列生产者追加）/`resolve_column_id`（未限定→`binding_names_by_column_`，多生产者报 Ambiguous，限定→按表绑定；`Ok(None)` 表示本层未绑定）/`add_correlated_column_expr`/`has_correlated_column`/`get_binding_from_current_or_parent_by_name`/私有 `add_binding`。`plan_select` 与 `QueryBinder::bind_select` 都先建根 context，`t.c` 限定列因此可绑定，两表同名的未限定列报 ambiguous | ✅ |
 | `PhysicalOperator` / `OperatorState` 及算子实现（`physical_operator.cppm`、`operator_state.cppm`、`operator/physical_{scan,project,filter,limit,top,aggregate,sort,hash_join}*`） | `executor::{chunk::DataChunk, operators::{PhysicalOperator, OperatorState, OperatorStates, execute_task, run_fragment, lower, scan::PhysicalSource, project::Projection, filter::Filter, aggregate::Aggregate, sort::Sort, top::Top, limit::{Limit, UnSyncCounter}}}` | **基类/状态**：`GetName`/`GetOutputNames`/`Init`/`TaskletCount`/`Execute`；每算子一个 `OperatorState`（`data_blocks`/`status`/`empty_source`/`complete`/`total_hits_count_flag`/`total_hits_count`），`prev_op_state_->data_block_array_.clear()` → `OperatorStates::take_prev`（移出并清空前驱块）。**交换单位**：`chunk::DataChunk`，列式 `Value` 单元、容量 8192（复用 `storage` 常量）；刻意不复用 `DataBlock`（其单元是 `BlockValue`，而表达式在 `Value` 上求值）。**算子集**：`PhysicalSource`（= `PhysicalScan`，`source_state_` → 源状态；Table/Values/Join 三种源，取数/`apply_index_filter`/`align_rows`/`#_row_id`/`#_score` 都在这里）、`Projection`、`Filter`、`Aggregate`（HashMap 分组 + 首见序 + 流式累加器，不再按行 clone）、`Sort`（分块 run + k 路归并，全平局取更早 run）、`Top`（Sort 与 Limit/Offset 融合）、`Limit`（`UnSyncCounter` 块级预算，耗尽即 `complete` 并停止拉取）。**驱动**：`FragmentTask::OnExecute` → `execute_task`（链按扫描在前存储，正向遍历等价于参考的 `operator_count-1 ..= 0`）+ `run_fragment`。**分工**：`lower()` 承担 `PhysicalPlanner`+`FragmentBuilder`，`run_plan` = 优化 → lower → 建源 → 跑 | ✅（残余：`Top` 非 bounded heap；扫描先物化再分块；`distinct` 仍是 LIMIT 之后的后处理；无 `MergeTop`/`MergeSort`（单 fragment）；`HashJoin` 参考侧本身为空实现（`physical_hash_join_impl.cpp:30` 直接 `return true`），Rust 的 join 走 `PhysicalSource` 的 `JoinScan` + `nested_loop_join`；`TaskScheduler`/`FragmentContext`/`BlockingQueue` 沿 D4 豁免） |
@@ -1339,18 +1341,18 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `TaskScheduler` / `FragmentContext` / `BlockingQueue` | 单线程 fragment 驱动（`operators::{execute_task, run_fragment}`） | §4.4 D4（用户已批准）。算子模型本身已按 `PhysicalOperator`/`OperatorState` 移植（见上表），缺的是并行 tasklet 与交换队列：每个 fragment 一个任务、一个 `OperatorStates`，`TaskletCount` 恒 1。**影响**：并行度与 C++ 不同，结果一致 |
 | `BGTaskProcessor` + `CompactionProcessor` + `OptimizationProcessor` + `DumpIndexProcessor`（四个 processor，各自一条线程） | 单个 `BGTaskProcessor`（工作线程池）+ `Engine::start_background_tasks` 里的 1 s tick 线程；`CleanupTask` / `OptimizeTask` / `DumpMemIndexTask` 共用同一队列 | C++ 四个 processor 各只服务一类任务（checkpoint+cleanup / compact / optimize / dump），分开是为了按类别隔离长阻塞；Rust 侧三类任务都靠 `flush_lock` / `batch_lock` 串行化落盘，独立队列没有收益。**影响**：`cleanup_interval`、`optimize_interval`、`compact_interval` 都由同一个 1 s tick 线程按各自周期触发（`Engine::start_background_tasks` → `cleanup` / `optimize_indexes` / `notify_compact`）；`checkpoint_interval` 的 checkpoint 仍由 CLI 自己的线程驱动，因为它是 `trim_allocator()`（`malloc_trim`，`executor` 禁 unsafe）的唯一调用点 |
 | VARCHAR/JSON 次级索引的范围扫描 | `hash_varchar` 哈希键，只能等值查找 | 参考侧对 `Varchar` 同样不保留有序键（`KeepOrderedSelf` 不含 `Varchar`），因此**两边一致**：字符串列的范围谓词在 C++ 也退回全表过滤。INT/UINT 已用有序键并支持范围扫描（`SecondarySegmentReader::range`），布尔走低基数位图；FLOAT/DOUBLE/DATE 的键有序，`SecondarySegmentReader::range` 支持范围扫描|
-| `Storage::SetStorageMode` 的 `InitToAdmin` / `AdminToReader(Bottom)` / `AdminToWriter` / `WriterTo*` 子系统生命周期，`AttachCatalog(ts)`，`RecoverMemIndex()` | `StorageMode` 只做**准入守卫**（`Engine::ensure_writable` / `ensure_cleanup_allowed`）；所有子系统在 `Engine::open` 一次性建好、`drop` 一次性拆除；catalog 是实时 `MetaStore` 视图，无 checkpoint-ts 快照 | C++ 的每个迁移都会重建 buffer / txn / wal / bg_task / catalog 并重放 WAL；Rust 的 `open()` 已完成等价初始化（`txn.recover` + `recover_cpp_blocks` + `rebuild_indexes`），没有可切换的独立 processor 生命周期。**影响**：切换角色只改变写入准入（非 Writable ⇒ 8007 `InvalidNodeRole`），不真正拆装子系统；单进程内切到 Reader 后已加载的内存索引不会释放 |
+| `Storage::SetStorageMode` 的 `InitToAdmin` / `AdminToReader(Bottom)` / `AdminToWriter` / `WriterTo*` 子系统生命周期，`AttachCatalog(ts)`，`RecoverMemIndex()` | `StorageMode` 只做**准入守卫**（`Engine::ensure_writable` / `ensure_cleanup_allowed`）；所有子系统在 `Engine::open` 一次性建好、`drop` 一次性拆除；catalog 是实时 `MetaStore` 视图，无 checkpoint-ts 快照 | C++ 的每个迁移都会重建 buffer / txn / wal / bg_task / catalog 并重放 WAL；Rust 的 `open()` 已完成等价初始化（`txn.recover` + `recover_blocks` + `rebuild_indexes`），没有可切换的独立 processor 生命周期。**影响**：切换角色只改变写入准入（非 Writable ⇒ 8007 `InvalidNodeRole`），不真正拆装子系统；单进程内切到 Reader 后已加载的内存索引不会释放 |
 | `ApplyFastRoughFilter` 的统计来源 | 规则在 `run_plan` 的 `Optimizer::with_catalog` 里跑，`IndexCatalog` 只回答"哪些列有索引"，所以规则只把可证明不可命中的过滤折叠成空关系（`AlwaysFalse`）；按块 min/max 的跳过发生在扫描侧，读 `blk|…|fast_rough_filter` 记录（`Engine::prune_conditions`） | C++ 在规则里就用列级 min/max + bloom 统计决定块裁剪。**影响**：跳过发生在扫描而不是规划期，计划形状可能与参考不同，结果一致 |
 | `ResultCacheGetter` 的缓存层 | 计划级 `ResultCacheGetter::rewrite`（`run_plan` 优化之后挂上，`result_cache` 打开时生效；键 = 节点形状 + `begin_ts`，命中替换成 `Values`）；另有语句级 `Engine::result_cache`（`format!("{qualified:?}")` 为键，只缓存小结果，任何写原语清空） | C++ 只有计划级缓存（begin-ts + 表键 + 列投影），命中替换成 `LogicalReadCache`。**影响**：多一层更粗的语句级缓存（不同参数不共享、写入即整体失效），结果语义一致；`Values` 替身没有参考的 read-cache 节点 |
 | `BindContext` 的 `column_types_` / `table_info_` / `block_index_` / `expression_binder_` 字段，`select_expression_`（`ParsedExpr *`），`bound_cte_set_`（`shared_ptr` 身份集），`correlated_column_exprs_`（`ColumnExpression` 指针），`parent_` 裸指针 + 根 context 计数 | 去掉前四个字段；`select_expression: Vec<SelectItem>`；`bound_cte_set: HashSet<String>`（按 alias，等价于以其为键的 CTE 对象身份）；`correlated_column_exprs: Vec<ResolvedColumn>`；`parent/left_child/right_child: Rc<BindContext>`，三个计数器与 `knn_table_index` 为 `Cell`，相关列对为 `RefCell` | Rust 侧无 `DataType`/`TableInfo`/`BlockIndex`/`ExpressionBinder`，也没有可承托绑定的 `ColumnExpression`（`Expr::Column` 只有位置）；`ExprAst` 表达不了 `*` 与聚合，故 select list 用 `SelectItem`。`&self` 下的“委托根 context 自增”只能靠 `Cell`/`RefCell`，语义（同一序列、不重号）不变 |
 | 倒排 `fst` 打包/读取 | `fst` crate 数据路径 + 自实现 C++ 尾块 CRC-32/IEEE | §4.2（已批准；校验和不兼容，数据路径复用） |
 | SIMD 距离核 / 压缩 / mmap | `simsimd`/`faer`、`lz4_flex`、`memmap2` | §3.4（仅底层原语，控制流仍自研） |
-| 倒排 `PostingByteSlice` / `SkiplistReader` / `SkiplistWriter` | `inverted_format` 的 postings/positions 编解码；`fulltext_segment` 合并段 | 磁盘字节布局已对齐；skiplist 容器仅 C++ 构建期优化，读路径按同样的 postings 列表解码，类边界不单独移植 |
+| 倒排 `PostingByteSlice` / `SkiplistReader` / `SkiplistWriter` | `invertedindex::format` 的 postings/positions 编解码；`invertedindex::disk_segment_reader` 合并段 | 磁盘字节布局已对齐；skiplist 容器仅 C++ 构建期优化，读路径按同样的 postings 列表解码，类边界不单独移植 |
 | `DataFileWorker`（`storage/buffer/file_worker*`） | `std::fs` + `memmap2`（`storage::io`） | C++ 的 file worker 线程池合并为按需读写；`VirtualStore`/`PersistenceManager` 已按类移植（见上表），对象存储仍由 `storage_type=minio` 选择 `S3Client` |
-| `TableIndexMeta` / `SegmentIndexMeta` / `ChunkIndexMeta`（`table_index_meta.cppm` 等） | `catalog` 的索引元数据 + `cpp_blocks` 的 `chunk_{n}.idx` 目录 | 持久化键空间与 chunk 目录布局已对齐；C++ 的模块类树未逐类拆分，索引生命周期由 `dump/optimize/cleanup` 方法承担 |
+| `TableIndexMeta` / `SegmentIndexMeta` / `ChunkIndexMeta`（`table_index_meta.cppm` 等） | `catalog` 的索引元数据 + `blocks` 的 `chunk_{n}.idx` 目录 | 持久化键空间与 chunk 目录布局已对齐；C++ 的模块类树未逐类拆分，索引生命周期由 `dump/optimize/cleanup` 方法承担 |
 | `TableMeta` / `SegmentMeta`（`catalog/meta/*.cppm`）+ `BlockIndex` | `executor` 的 `TableEntry`（运行时聚合） | 上游 PR #2722 删除了 `TableEntry` / `SegmentEntry` / `BlockManager`；Rust 把它们过去承担的运行时状态（写入代次、行 ID 分配、索引注册表、块快照）聚合为一个进程内结构，持久化元数据仍由 `catalog` + `BlockIndex` 按 C++ 布局承担 |
 | 整数算术的宽度语义 | `expression` 的 `scalar::TypedColumn` 按列宽 checked；SQL `eval_binary` 仍为 i64/f64 域 | C++ 的 `AddFunction`/`SubFunction`/`MulFunction` 按列宽 checked 求值（溢出→NULL）。标量函数层已按列宽实现；SQL 表达式的值域统一为 i64，未按列宽检查溢出 |
-| `TableDef` / `ColumnDef` 的 `WriteAdv`/`ReadAdv` 二进制布局 | `TableDef::to_bytes`/`from_bytes`（JSON，复用 `ColumnDefValue` 编码） | Rust 侧不需要 C++ 的内存二进制布局；持久化仍走 `cpp_layout` 的键空间。字段集合与往返语义不变 |
+| `TableDef` / `ColumnDef` 的 `WriteAdv`/`ReadAdv` 二进制布局 | `TableDef::to_bytes`/`from_bytes`（JSON，复用 `ColumnDefValue` 编码） | Rust 侧不需要 C++ 的内存二进制布局；持久化仍走 `catalog::layout` 的键空间。字段集合与往返语义不变 |
 | `PlaidIndex` 的 mmap 读取（`LoadFromPtr` / `centroid_ids` 指针模式） | `index::plaid::PlaidIndex` 的 owned `Vec<u32>` | mmap 属于已批准的原语豁免；执行器的 chunk 加载器总是解码为 owned 缓冲，语义（同一份 `SaveIndexInner` 字节布局）不变 |
 | geo 类型（`PointType`/`LineType`/`LineSegmentType`/`BoxType`/`CircleType`/`PathType`/`PolygonType`）及其 `column_vector_geo_ut`、`function/cast/geography/*` 用例 | 无 | 用户明确决定不需要 Box/Point/Circle 等 geo 类型，测试与产品代码均不移植 | 
 | DiskANN / Vamana（`knn_diskann/*`：`VamanaAlg`、`PQFlashIndex`、`FixedChunkPQTable`、`DiskAnnMemGraphStore`、`NeighborPriorityQueue` 等） | 无 | 计划 §2.6/R14 明确不纳入：C++ 的 populate 分支只 `LOG_WARN("Not implemented yet")` 后返回成功，索引不可用；Rust 不移植不可达的骨架 |
@@ -1364,9 +1366,9 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | C++ 用例 | Rust 类/方法 | Rust 测试 |
 |---|---|---|
 | `txn/conflict_check_ut.cpp::conflict_check_delete` | `TxnManager::commit` + `Txn::delete` | `txn::tests::concurrent_deletes_conflict`、`tests::delete_conflicts_follow_the_reference` |
-| `buffer/buffer_manager_ut.cpp`（容量/淘汰） | 不移植（`BufferManager` 已去掉） | 映射共享由 `block_index::tests::every_block_maps_only_its_own_files`、`cpp_blocks::tests::a_sealed_block_is_mapped_once_and_shared` 覆盖 |
+| `buffer/buffer_manager_ut.cpp`（容量/淘汰） | 不移植（`BufferManager` 已去掉） | 映射共享由 `block_index::tests::every_block_maps_only_its_own_files`、`blocks::tests::a_sealed_block_is_mapped_once_and_shared` 覆盖 |
 | `buffer/buffer_handle_ut.cpp`（预算/rc/溢出） | 不移植（`BufferObj` 已去掉） | 无对应物：封存块不再有句柄与预算 |
-| `invertedindex/format/*`（posting/position 编解码） | `inverted_format` | 该模块的往返/边界单测 |
+| `invertedindex/format/*`（posting/position 编解码） | `invertedindex::format` | 该模块的往返/边界单测 |
 | `secondary_index` 的 PGM 查找 | `SecondarySegmentReader::lookup` | `secondary_segment::tests::pgm_lookup_matches_binary_search` |
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | `varchar_hash_matches_libstdcxx` |
 | （无独立 C++ 单测） | `merge_knn::MergeKnn` | 6 例：多段合并/并列取小 RowID/阈值方向/多查询/EndWithoutSort/余弦排序 |
@@ -1388,8 +1390,8 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `column_vector/{column_vector_bool,column_vector_float,column_vector_uuid,column_vector_embedding,column_vector_decimal}_ut.cpp`（24 例） | `data_block::ColumnVector<T>` | `bool/float/double/uuid/embedding/decimal_flat_constant_select_slice`（flat/constant/selection/slice 四类场景） |
 | `column_vector/column_vector_date_time_ut.cpp`（20 例） | `data_block::ColumnVector<T>` + `DateT`/`TimeT`/`DateTimeT`/`TimestampT`/`IntervalT` | `date/time/datetime/timestamp/interval_flat_constant_select_slice`、`interval_constant_set_value_before_finalize` |
 | `function/scalar/fixed_dimensional_encoding_ut.cpp`（14 例） | `expression::fde` | `config/tensor/random_generator/hash_partitioner/sparse_projector/internal_functions/simple_encoding/invalid_input/document_encoding/simhash_partitioning/ams_projection/final_projection/multiple_repetitions/fill_empty_partitions` |
-| `storage/common/test_rcu_multimap_ut.cpp`（RcuMap 功能 15 例 + 并发 2 例） | `storage::rcu_map::RcuMap` | `basic_insert_and_get`…`map_vs_multimap_behavior`、并发 4 例（InsertAndRead/InsertDeleteRead/SwapUnderLoad/RcuBehavior） |
-| `storage/common/test_rcu_multimap_ut.cpp`（RcuMultiMap 功能 13 例 + 并发 2 例） | `storage::rcu_map::RcuMultiMap` | `basic_insert_and_get`…`different_value_types`、并发 5 例（InsertAndRead/InsertDeleteRead/HighVolume/SwapUnderLoad/RcuBehavior） |
+| `storage/common/test_rcu_multimap_ut.cpp`（RcuMap 功能 15 例 + 并发 2 例） | `storage::common::rcu_map::RcuMap` | `basic_insert_and_get`…`map_vs_multimap_behavior`、并发 4 例（InsertAndRead/InsertDeleteRead/SwapUnderLoad/RcuBehavior） |
+| `storage/common/test_rcu_multimap_ut.cpp`（RcuMultiMap 功能 13 例 + 并发 2 例） | `storage::common::rcu_map::RcuMultiMap` | `basic_insert_and_get`…`different_value_types`、并发 5 例（InsertAndRead/InsertDeleteRead/HighVolume/SwapUnderLoad/RcuBehavior） |
 | `knn/sparse/test_bp_reordering_ut.cpp`（2 例） | `index::bp::BpReordering` | `reordering_does_not_increase_cost`（1000×1000、10% 边，cost 不增）、`reordering_on_the_small_csr_when_present`（有 `base_small.csr` 时按 `SparseMatrix::Load` 布局读取并验证 cost） |
 | `knn/sparse/test_bmp_index_ut.cpp::test1` | `sparse::BmpAlg` + `bmp_cpp` | `bmp_index_accuracy_and_disk_roundtrip`（1000×1000、5% 稀疏、100 查询，block=8/64 的 top-10 hit ≥90%，以及 C++ BMP 磁盘布局写入/读回） |
 | `knn/sparse/test_bmp_index_ut.cpp::test2` | `sparse::BmpAlg` | `bmp_index_ranks_documents_across_blocks`（6 文档/block=2/topk=5 的跨块排名与分数） |
@@ -1425,7 +1427,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `column_vector/value_ut.cpp`（2 例） | `Column::value_text` | `value_to_string_matches_the_reference`（全部标量渲染）、`string_to_value_roundtrips_the_scalar_types`（标量部分） |
 | `planner/node/logical_{create_table,drop_table,create_index,drop_index,insert,update,aggregate,project,limit,optimize,compact,flush,check,command,show}_ut.cpp`（15 例） | `Engine::execute` 的语句执行 | `logical_planner_statements_succeed`（C++ 用例只断言语句执行成功并打印逻辑节点） |
 | `executor/expression/expression_executor_select_ut.cpp`（3 例） | `ColumnVector<bool>` | `expression_select_alternating_input`、`expression_select_all_true_input`、`expression_select_all_false_input`（C++ 的 selector 调用本身在 `#if 0` 内） |
-| `storage/column_vector/{selection,var_buffer}_ut.cpp`（2 例） | `selection::Selection` / `var_buffer::VarBuffer` | `selection_matches_the_reference`、`var_buffer_appends_and_roundtrips` |
+| `storage/column_vector/{selection,var_buffer}_ut.cpp`（2 例） | `selection::Selection` / `VarBuffer（已去掉）` | `selection_matches_the_reference`、`var_buffer_appends_and_roundtrips` |
 | `storage/meta/entry/block_version_ut.cpp`（5 例） | `mvcc::BlockVersion` | `save_and_load_roundtrip`、`reopen_preserves_the_slot_array`、`delete_twice_is_rejected`、`check_delete_compares_timestamps`、`get_delete_ts_returns_the_slot_range` |
 | `main/table_ut.cpp::InfinityTableTest::test1` | `Engine` + `ExplainKind` | `explain_covers_every_plan_kind`（AST/LOGICAL/OPTIMIZED/PHYSICAL/FRAGMENT/PIPELINE） |
 
@@ -1434,7 +1436,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | C++ 用例 | 对应 Rust | 缺口 |
 |---|---|---|
 | `buffer/buffer_obj_ut.cpp` | 不移植（`BufferObj` 已去掉） | 其中绑定 HNSW/导入的两个用例仍以引擎口径覆盖（`buffer_obj_ut::test_hnsw_index_buffer_obj_shutdown`、`::test_big_with_gc_and_cleanup`），生命周期类用例无对应物 |
-| `invertedindex/format/*` 其余部分 | `inverted_format` / `fulltext_segment` | posting/positions/term-meta 编解码已覆盖；`PostingByteSlice`/`Skiplist*` 为构建期容器，已登记为设计变更 |
+| `invertedindex/format/*` 其余部分 | `invertedindex::format` / `invertedindex::disk_segment_reader` | posting/positions/term-meta 编解码已覆盖；`PostingByteSlice`/`Skiplist*` 为构建期容器，已登记为设计变更 |
 | （无独立 WAND/BM25 单测） | `wand::BlockMaxWandIterator` | 已用 `ranker_matches_the_reference_formula`、`wand_matches_brute_force` 覆盖 |
 | `invertedindex/search/*`（短语/布尔组合） | `wand` 类 + 扫描路径 | WAND/BM25 已拆类；短语与布尔组合仍走扫描（由 SQL 测试覆盖） |
 | `secondary_index/*_ut.cpp` | `secondary_segment`/`secondary_lowcard` | PGM 查找/重复键/边界、VARCHAR 哈希、低基数 Roaring 往返已覆盖；跨事务集成由 SQL 测试覆盖 |

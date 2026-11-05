@@ -55,7 +55,7 @@ crate 不带 `infinity-` 前缀：`crates/storage` 对应 `src/storage`，`crate
 | `executor/operator/*` | `src/operator/{mod,scan,filter,project,aggregate,sort,top,limit,lower}.rs` |
 | `storage/invertedindex/search/blockmax_wand_iterator` + `bm25_ranker` | `src/invertedindex/search/blockmax_wand_iterator.rs` |
 | `storage/invertedindex/search/query_builder` | `src/invertedindex/search/query_builder.rs` |
-| `storage/invertedindex/search/highlighter` | `src/lib.rs` 的 `highlight_text` / `highlight_with_analyzer` |
+| `storage/invertedindex/search/highlighter` | `executor/src/engine/state.rs` 的 `highlight_text` / `highlight_with_analyzer` |
 | `common/analyzer/*` | `src/common/analyzer/`（单个文件，按分析器分节） |
 | `executor/explain_*` | `src/{explain,explain_search}.rs` |
 | `scheduler/*` | `src/scheduler.rs` |
@@ -87,7 +87,7 @@ crate 不带 `infinity-` 前缀：`crates/storage` 对应 `src/storage`，`crate
 2. **测试文件与实现同目录**（`*_ut.rs`），参考版在 `src/unit_test/<子目录>`。移动测试要改 `use super::*` 的层级，收益低于风险，未做。
 3. **catalog 与 new_txn 拆成独立 crate**（参考版都在 `storage` 里）。这是 crate 边界的设计变更，见 `PORTING.md` §3.1。
 4. **`blocks/`（块布局 + 读写）留在 executor**：它同时依赖 storage 的块格式与 executor 的表状态，放在任一 crate 都要反向依赖。参考版对应 `storage/buffer/file_worker/*` 与 `column_vector/*`。
-5. **扁平别名仍在**：每个 crate 的 `lib.rs` 保留了旧路径的 `pub use`（如 `storage::catalog_format`），所以外部调用方没有因为这次搬家而改动。别名是过渡层，新代码应直接用层级路径。
+5. **扁平别名**：每个 crate 的 `lib.rs` 保留了旧路径的 `pub use`（如 `storage::catalog::catalog_format`），所以外部调用方没有因为搬家而改动；`cpp_blocks`/`cpp_format`/`cpp_layout` 这三个别名已经删掉，现在只有层级路径。新代码一律用层级路径。
 
 ## 6 还没拆的大文件
 

@@ -114,7 +114,7 @@
 
 ### 3.1 存储形态：catalog 是参考的键空间，行只在块文件与 WAL 里
 
-**catalog 只写参考版的键**。`Catalog` 以 `with_store_cpp_only` 打开，`catalog/` 里只有
+**catalog 只写参考版的键**。`Catalog` 以 `with_store_catalog_only` 打开，`catalog/` 里只有
 `catalog|…`、`db|…`、`tbl|…`、`col|…`、`idx|…`、`seg|…`、`blk|…`、`idx_seg|…`、
 `idx_chunk|…`、`drop|…` 以及 `next_database_id` / `meta|version`。
 
@@ -129,7 +129,7 @@ drop 的数据库。
 `row:` 也没有 `del:` 键，也没有行侧车：行数据只有「块文件 + WAL」两份。
 
 **封存块与索引段都靠 mmap，参考的 `BufferManager` 不再移植**：封存块的文件不会变，读时直接
-`MappedBlock::open`（`storage::mapped_block`）把每个 `{col}.col` 映射进来，列体就是映射里的
+`MappedBlock::open`（`storage::buffer::mapped_block`）把每个 `{col}.col` 映射进来，列体就是映射里的
 一个切片，槽位解码直接在 page cache 上做；索引段（全文/BMP/二维/EMVB/多值/低基数）同样由
 `mapped::MappedFile` 映射。映射本身在进程内共享：引擎的 `Context::block_maps` 每个 `BlockId` 只留一个
 `Arc<MappedBlock>`，同一块的并发读共用它，块被重写/压缩/删除时按表丢弃（`drop_block_maps`）。因此参考
@@ -153,11 +153,11 @@ drop 的数据库。
 - 发号后未能提交（WAL/落盘失败）会留下永久空洞——参考同样如此（这类失败在参考里是 `UnrecoverableError`）；
   端口在这种情况下让 checkpoint 报错，而不是把后一行写到前一个 slot 上。
 
-**append/delete 历史从文件重建**：`restore_cpp_blocks` 用每个块的 `version`（`created` 的
+**append/delete 历史从文件重建**：`restore_blocks` 用每个块的 `version`（`created` 的
 `(ts, 累计行数)`、`deleted` 槽）重建 `appends:`/`append_ts:`/`append_copy:`/`deletes:`/
-`delete_ts:`/`import_rows:`/`import_ts:`，因此这些日志不再需要落盘；`recover_cpp_blocks`
+`delete_ts:`/`import_rows:`/`import_ts:`，因此这些日志不再需要落盘；`recover_blocks`
 同时返回文件里最新的 ts，作为 WAL 重放的起点（等价于参考的 checkpoint 记录）。
-门禁：`cpp_blocks::tests::rehydration_*` 三个测试（普通表 / 带删行 / 压缩段）断言"丢掉行侧
+门禁：`blocks::tests::rehydration_*` 三个测试（普通表 / 带删行 / 压缩段）断言"丢掉行侧
 键、重开、再写一遍"后 `data/` 下每个文件逐字节不变。
 
 **读路径已经是块**。扫描按 `visible_block_ids`（块索引 − `drop|seg|` 标出的段）逐块解码，
@@ -166,7 +166,7 @@ drop 的数据库。
 （`segment << 32 | block * capacity + slot`），一块一解码、O(1) 内存。`dirty:` 是**持久化**的
 "块落后于日志"标记（append/delete/压缩/删列置位，checkpoint 且期间没有新写入才清除），所以崩溃
 重放后读侧仍然知道该看块还是该合并日志。门禁：
-`cpp_blocks::tests::the_blocks_are_the_row_set_not_just_the_values`（丢掉 `row:` 后扫描/计数仍完整，
+`blocks::tests::the_blocks_are_the_row_set_not_just_the_values`（丢掉 `row:` 后扫描/计数仍完整，
 含重开）、`a_compaction_reads_the_rows_out_of_the_blocks`（无日志也能压缩）、
 `a_crash_after_an_append_keeps_the_row` / `a_crash_after_a_delete_keeps_the_row_hidden`。
 
@@ -182,7 +182,7 @@ drop 的数据库。
 （`catalog|seg|`、`catalog|blk|`、`blk|…|fast_rough_filter`）随同这一次写入增量发布，未触及的块保留
 原记录里的 ts 与预过滤。唯一的例外是**被这次写入封段**的段：参考的 `ExecuteOnNewSealedSegment` 要给
 段里每个块建预过滤，这条路径会重写整段。门禁
-`cpp_blocks::tests::a_commit_writes_only_the_block_it_appends_to`：两次 `INSERT` 后第一块的
+`blocks::tests::a_commit_writes_only_the_block_it_appends_to`：两次 `INSERT` 后第一块的
 `version` 逐字节不变、第二块多一条 `create`，随后一次 `DELETE` 只给第二块加墓碑。
 
 UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交给 buffer 或整表重写），没有哪条路径去 KV 取行。唯一要守住的是块的寻址方式：块按 **slot** 寻址（行 *n* 的 id 是
@@ -203,7 +203,7 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 
 - 标记的时间戳在 **value** 里（`KeyEncode::DropTableKey(…) -> to_string(commit_ts)`），
   `Catalog::restamp` 对 `drop|` 开头的键改的是 value，不是 key；
-- 布局重写（`rewrite_cpp`）必须**跳过**被标记弃用的记录，否则 `DROP TABLE t; CREATE TABLE t`
+- 布局重写（`rewrite_catalog`）必须**跳过**被标记弃用的记录，否则 `DROP TABLE t; CREATE TABLE t`
   会把旧记录提前抹掉，得到一个参考版不会有的键集（`dropped_record_prefixes`）；
 - 表 id 是**按库**计数的，`db_{id}/tbl_{id}` 与 `catalog|seg|{db}|{tbl}|` 都以两个 id 定位，
   所以段层必须按 `(db_id, table_id)` 配对，不能只看表 id（两个库可以有同 id 的表）；
@@ -239,7 +239,7 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 
 ### 3.2 第三方依赖对照
 
-参考版通过 vcpkg 与自带 third_party/ 引入 C/C++ 库；重写版只用 9 个外部 crate（Cargo.toml）。这张表按**处理方式**分组，因为「链接同一个库」和「重写需要的部分」是两件不同的事，混在一张表里会读错：
+参考版通过 vcpkg 与自带 third_party/ 引入 C/C++ 库；重写版只用 14 个外部 crate（Cargo.toml：rocksdb、thrift、roaring、rust-stemmers、crc32fast、lz4_flex、memmap2、sha2、hmac、rustls、rustls-native-certs、thiserror、tokio、tempfile）。这张表按**处理方式**分组，因为「链接同一个库」和「重写需要的部分」是两件不同的事，混在一张表里会读错：
 
 - **链接同名后端**——只有三个。它们的字节由库自己定义，重写等于重写整个库，且没有收益。
 - **重写需要的部分 + 金标准门禁**——凡是决定磁盘上「哪个字节是什么」的：编码器、词典格式、索引格式。只实现参考实际走到的那条路径，每条都对着参考的真实输出做逐字节对拍；规模是实测的生产代码行数（不含注释与测试）。
@@ -267,10 +267,10 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 | **ijma / MeCab**（third_party/ijma） | `japanese` / `korean` 分析器 | `executor/src/analyzer.rs` · 词典解析 + Viterbi + 连接矩阵（不含 lattice 未用分支与字典训练） | **860** | 参考 `japanese`/`korean` 分析器单测 |
 | **zlib**（只用于 MeCab `sys.bin`） | 解这一个文件的 DEFLATE 流 | `executor/src/analyzer.rs` · `InflateBits` / `inflate` / `zlib_decompress`（不含压缩、gzip 封装与预设字典） | **266** | 解出长度与 `sys.bin` 记录的 `total_size` 一致 |
 | **RE2**（vcpkg） | `regex(col, pattern)` 谓词、`LIKE` 转正则 | `expression/src/regex.rs`（回溯引擎）<br>`expression/src/regex_literal.rs`（必含字面量提取） | **455 + 528** | 参考 `regex_impl.cpp` / `like_impl.cpp` 的行为 |
-| **PCRE2**（vcpkg） | ① 分析器 `\W+` 替换；② 高亮器的 case-insensitive 匹配 | ① `executor/src/analyzer.rs` · `strip_non_word*`<br>② `executor/src/lib.rs` · `highlight_text` / `highlight_with_analyzer` | **14 + 60** | ① `Tokenize` 的输出与位置；② `highlighter_ut` |
+| **PCRE2**（vcpkg） | ① 分析器 `\W+` 替换；② 高亮器的 case-insensitive 匹配 | ① `executor/src/common/analyzer/rag.rs` · `strip_non_word*`<br>② `executor/src/engine/state.rs` · `highlight_text` / `highlight_with_analyzer` | **14 + 60** | ① `Tokenize` 的输出与位置；② `highlighter_ut` |
 | **simdjson**（vcpkg） | JSONL 语料、JSON 列 | `common/src/json.rs` · `Json` 解析/打印/BSON 互转 | **543** | `json::tests` 与 JSON 列往返 |
 | **nlohmann_json**（vcpkg） | 列值 / catalog 的 JSON | `catalog/src/value_format.rs` · 列定义、索引定义、类型信息的 JSON<br>`catalog/src/catalog/layout.rs` · catalog 键与值的组装 | **933 + 2131** | catalog 键值逐字节门禁（键序相同） |
-| **zsv**（third_party/zsv） | `COPY … (FORMAT CSV)` 的解析 | `executor/src/lib.rs` · `csv_fields`（引号与转义；不含参考的流式状态机） | **32** | 导入用例 |
+| **zsv**（third_party/zsv） | `COPY … (FORMAT CSV)` 的解析 | `executor/src/engine/state.rs` · `csv_fields`（引号与转义；不含参考的流式状态机） | **32** | 导入用例 |
 | **pgm-index**（third_party/pgm） | 次级/稀疏索引的分段模型 | `storage/src/secondary_segment.rs` · `Pgm` / `PgmFloat`（只做参考实例化的特化） | **1104** | chunk 尾部的 PGM 与参考同字节 |
 | **xor_singleheader**（third_party） | `fast_rough_filter` 的 fuse-8 构造 | `storage/src/binary_fuse_filter.rs` · `BinaryFuseFilter` | **322** | 假阴性为 0；130 字节记录与参考同字节 |
 | **eigen**（third_party） | `EMVBSVDSolve` 的两侧 Jacobi SVD | `index/src/emvb.rs` · `jacobi_svd` / `real_2x2_jacobi_svd` | **434** | 参考 `eigen_svd_impl` 的数值结果 |
@@ -310,7 +310,7 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 | sha2 / hmac / rustls / rustls-native-certs | S3 签名与 HTTPS | 无：只影响传输 |
 | thiserror / tokio / tempfile(dev) | 错误类型、运行时、测试目录 | 无 |
 
-最能说明问题的是编码器：**FastPFor 261 行 + newpfor 464 行**（都在 `inverted_format.rs` 一处），换来与参考逐字节相同的 posting 块，这条路径上有 C++ 输出的 hex 金标准钉着。这不是「翻译了一个重量级库」，而是「只实现了用到的那个编码路径」。FastPFor 上游还有 OptPFor、SIMDNewPFor、StreamVByte 等十几个编码器，端口一个都没有；newpfor 也只实现了 u16 的 `Compress`/`Decompress`。表中 `simdjson 543` / `nlohmann_json 933+2131` / `pgm 1088` 这个量级也是同一回事：都是「参考用到的那个方向」，不是完整库。
+最能说明问题的是编码器：**FastPFor 261 行 + newpfor 464 行**（都在 `storage::invertedindex::format` 一处），换来与参考逐字节相同的 posting 块，这条路径上有 C++ 输出的 hex 金标准钉着。这不是「翻译了一个重量级库」，而是「只实现了用到的那个编码路径」。FastPFor 上游还有 OptPFor、SIMDNewPFor、StreamVByte 等十几个编码器，端口一个都没有；newpfor 也只实现了 u16 的 `Compress`/`Decompress`。表中 `simdjson 543` / `nlohmann_json 933+2131` / `pgm 1088` 这个量级也是同一回事：都是「参考用到的那个方向」，不是完整库。
 
 ## 4 当前缺口
 

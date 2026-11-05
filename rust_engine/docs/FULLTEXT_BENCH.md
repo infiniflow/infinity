@@ -471,16 +471,16 @@ set_memindex_capacity(2) 把 20 行切成约 10 个段，断言四条查询（�
 两边的 `Flush` 都是 checkpoint：参考的 `Flush()` 走 `PhysicalFlush`
 （`src/executor/operator/physical_flush_impl.cpp:42`），即 kv store 的 `Flush()`
 再加一个 `NewCheckpointTask` 并等它结束；端口 `Engine::flush` 走 `flush_storage`
-（`crates/executor/src/lib.rs:21257`）。**在同一张空表上**，这两次 checkpoint
+（`crates/executor/src/engine/statements.rs`）。**在同一张空表上**，这两次 checkpoint
 一个是 3–5 ms（参考），一个是 9.7 ms（端口），差在各自的落盘步骤：
 
 | 端口的 checkpoint 步骤 | 耗时 | 参考有这一步吗 |
 |---|---|---|
 | RocksDB flush()（catalog，memtable → SST） | 3.6 ms | 有，就是 `KVStore::Flush()`（`kv_store_impl.cpp:390`） |
 | RocksDB flush()（persistence 行库） | 2.9 ms | 没有对应物：参考只有一份 KV，行在块文件里 |
-| flush_cpp_blocks（块镜像 + 失效索引目录清理） | 2.2 ms | 有，写数据块 |
+| flush_blocks（块镜像 + 失效索引目录清理） | 2.2 ms | 有，写数据块 |
 
-块文件与索引 chunk 写完即 fsync（对齐 `FileWorker::WriteToFile`，见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) §3）。20,000 行那次的 `flush_cpp_blocks`：2.495 s → 2.514 s（块文件，+19 ms）→ 2.584 s（再加上全文 chunk 的 `.dic`/`.pos`/`.len`，+70 ms）。
+块文件与索引 chunk 写完即 fsync（对齐 `FileWorker::WriteToFile`，见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) §3）。20,000 行那次的 `flush_blocks`：2.495 s → 2.514 s（块文件，+19 ms）→ 2.584 s（再加上全文 chunk 的 `.dic`/`.pos`/`.len`，+70 ms）。
 
 catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_store_impl.cpp:441`）；`wal.log` 只在 checkpoint 帧那一处 fsync（这是端口有意比参考多做的一步，理由见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) §3），commit 记录不 fsync（对齐 `ofs_.write` + `ofs_.flush()`）。
 提交路径同样没有同步动作，所以 `CREATE INDEX` 的 DDL 是 1.1–1.9 ms（此前每条语句都要同步一次 catalog 日志）。
@@ -499,9 +499,9 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 
 | 改动 | 内容 |
 |---|---|
-| checkpoint dump 全文内存尾段 | `flush_storage` 里新增 `seal_text_indexes()`，与 secondary / IVF / HNSW / sparse 一致（参考由后台 `DumpMemIndexTask` 做）：把 `ft_{首行:016x}.{dic,pos,len,row}` 落盘并 fsync（`fulltext_segment::write_segment_index` 走 `cpp_format::write_synced`） |
+| checkpoint dump 全文内存尾段 | `flush_storage` 里新增 `seal_text_indexes()`，与 secondary / IVF / HNSW / sparse 一致（参考由后台 `DumpMemIndexTask` 做）：把 `ft_{首行:016x}.{dic,pos,len,row}` 落盘并 fsync（`fulltext_segment::write_segment_index` 走 `storage::definition::format::write_synced`） |
 | 打开时映射已有 chunk | `TextIndex::load_sealed()` 扫 `fulltext/<key>/ft_*.dic`，逐段 `SegmentIndexReader::open`（mmap），返回第一个未被覆盖的行号；`text_index_for` 只从那一行往后建索引 |
-| 尾部只读增量 | `fetch_rows_with_ids_projected_from` → `read_cpp_blocks_including_deleted_from`：行号 `segment<<32 | block*8192` 之外的块整块跳过，不解码 |
+| 尾部只读增量 | `fetch_rows_with_ids_projected_from` → `read_blocks_including_deleted_from`：行号 `segment<<32 | block*8192` 之外的块整块跳过，不解码 |
 
 实测（20k 文档，checkpoint 后重开）：第一条查询 **2.41 s → 29 ms**，第二条 0.73 ms，
 命中行数与重启前一致。映射不成功的 chunk（崩溃时的半截写）会让 `load_sealed` 退回 0，

@@ -26,7 +26,7 @@
 
 | 内容 | 兼容情况 |
 |---|---|
-| 表数据（块镜像 `data/db_{id}/tbl_{id}/seg_{n}/blk_{m}/`） | ✅ 逐字节对齐参考布局（`cpp_format`），C++ 可读 |
+| 表数据（块镜像 `data/db_{id}/tbl_{id}/seg_{n}/blk_{m}/`） | ✅ 逐字节对齐参考布局（`storage::definition::format`），C++ 可读 |
 | catalog 的表/列/索引记录 | ✅ 键与值都对齐 `KeyEncode`/`DataType::Serialize`（`catalog/layout.rs`） |
 | 次级索引 chunk | ✅ 类型化键（`KeyKind::{U64,F32,F64,I32,I64}`），C++ 的 FLOAT/DOUBLE/DATE/TIME 块可读 |
 | WAL | ✅ `wal/wal.log` 同时承载 checkpoint 帧与事务记录（checkpoint 时整文件改名成 `wal.log.<seal_ts>`，同 `WalManager::SwapWalFile`），帧体与参考逐字节相同 |
@@ -53,7 +53,7 @@
 
 **语义**：承诺的持久化边界是 **checkpoint，不是 commit**——commit 只写页缓存，掉电可以把它丢掉。进程崩溃（页缓存还在）通常会保留到 WAL 尾部，但那不是承诺。
 
-**掉电后持久的是什么**：一个 RocksDB 的 SST（RocksDB 在 flush 里自己 fsync SST 与 MANIFEST）**加上块文件与 WAL**。块文件对齐参考的 `FileWorker::WriteToFile`（`file_worker_impl.cpp:167`）：`{id}.col` / `col_{id}_out` / `version` 每个文件写完就 fsync（`cpp_format::write_synced`），目录本身不 fsync（参考也不 fsync 目录）。行数据只有这两份：checkpoint 过的在块文件里，最后一次 checkpoint 之后的在 WAL 里，恢复时 `recover_cpp_blocks` 读块文件、`TxnManager::recover_into` 从 checkpoint 帧之上重放。索引 chunk 文件同样逐文件 fsync：`cpp_blocks` 的各类 chunk 镜像（BMP / IVF / SMVE / EMVB / HNSW / PLAID / 全文 `.dic`/`.pos`/`.len`）、`bmp_cpp`/`bmp_segment`/`emvb_segment` 的 writer、`index` 的 `save_sparse` 与 PLAID merge manifest 都走 `write_synced`（同一个 `File::create` + `write_all` + `sync_all`），对应参考 `memory_indexer_impl.cpp:535-536,762-763`、`column_index_merger_impl.cpp:151-152` 的 `FileWriter::Sync`。
+**掉电后持久的是什么**：一个 RocksDB 的 SST（RocksDB 在 flush 里自己 fsync SST 与 MANIFEST）**加上块文件与 WAL**。块文件对齐参考的 `FileWorker::WriteToFile`（`file_worker_impl.cpp:167`）：`{id}.col` / `col_{id}_out` / `version` 每个文件写完就 fsync（`storage::definition::format::write_synced`），目录本身不 fsync（参考也不 fsync 目录）。行数据只有这两份：checkpoint 过的在块文件里，最后一次 checkpoint 之后的在 WAL 里，恢复时 `recover_blocks` 读块文件、`TxnManager::recover_into` 从 checkpoint 帧之上重放。索引 chunk 文件同样逐文件 fsync：`blocks` 的各类 chunk 镜像（BMP / IVF / SMVE / EMVB / HNSW / PLAID / 全文 `.dic`/`.pos`/`.len`）、`knn_index::sparse::bmp`/`bmp_segment`/`emvb_segment` 的 writer、`index` 的 `save_sparse` 与 PLAID merge manifest 都走 `write_synced`（同一个 `File::create` + `write_all` + `sync_all`），对应参考 `memory_indexer_impl.cpp:535-536,762-763`、`column_index_merger_impl.cpp:151-152` 的 `FileWriter::Sync`。
 
 **单库**：端口与参考一样只有一份 KV（`<dir>/catalog`），catalog 记录、索引 chunk 登记、WAL 元信息都在这一个库里，丢一起丢；行数据不在 KV 里（见上）。重放下界不对应任何 KV 标记，而是 WAL 里最新的 checkpoint 帧的 `max_commit_ts`（`TxnManager::applied_ts`），与参考的 `GetReplayEntries` 同口径。
 

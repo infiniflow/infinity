@@ -207,7 +207,7 @@
 **桶传输层不移植**：重写版的 S3 客户端上传的是路径树（每文件一个对象，键为 `data/...` 等相对路径），不是参考的打包对象（裸 `obj_key` 一个对象）。因此：
 
 - 桶内布局与参考**不同**，跨引擎对象存储互读门禁不成立（参考不会用 `restore_tree` 读路径树，重写版也不会按 `obj_key` 下载）；
-- 参考的 compose 规则（128 MB 上限、独占对象、`parts > 1` 的 4 字节 footer、引用计数与 `deleted_ranges`）在**本地**已由 `storage::persistence` 实现并逐条单测与参考对照，但它们不进入桶；
+- 参考的 compose 规则（128 MB 上限、独占对象、`parts > 1` 的 4 字节 footer、引用计数与 `deleted_ranges`）在**本地**已由 `storage::persistence::persistence_manager` 实现并逐条单测与参考对照，但它们不进入桶；
 - 重写版自身的桶往返由 `test_the_port_round_trips_through_object_storage`（Python）与 `s3_minio.rs`（Rust）覆盖，需要一个 S3 端点（MinIO 平替 silo：`pgsty/silo`，默认 `minioadmin/minioadmin`，端口 9000，`silo server <data_dir>` 启动），CI 不跑。
 
 | 方面 | C++ 参考 | 重写版（现状） |
