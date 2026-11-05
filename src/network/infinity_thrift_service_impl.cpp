@@ -33,6 +33,7 @@ import :defer_op;
 import :data_table;
 import :column_vector;
 import :query_result;
+import :logical_node_type;
 import :utility;
 import :json_manager;
 
@@ -3645,6 +3646,12 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonRespon
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
         LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    } else if (result.root_operator_type_ == LogicalNodeType::kFlush || result.root_operator_type_ == LogicalNodeType::kCommand) {
+        // A skipped FLUSH DATA / CLEAN DATA carries the reason in result_msg; a normal one has none.
+        std::string *result_msg = result.result_table_->result_msg();
+        if (result_msg != nullptr) {
+            response.__set_error_msg(*result_msg);
+        }
     }
 }
 

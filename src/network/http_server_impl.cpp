@@ -3453,6 +3453,11 @@ public:
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;
+            std::string *result_msg = result.result_table_->result_msg();
+            if (result_msg != nullptr) {
+                // Successful result message (e.g. FLUSH DATA skipped while another checkpoint is in progress) returned with error_code = 0
+                json_response["error_msg"] = *result_msg;
+            }
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
