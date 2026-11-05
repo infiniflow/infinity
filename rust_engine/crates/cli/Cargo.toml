@@ -3,6 +3,8 @@ name = "cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+# Two binaries share this package: the engine CLI is the default.
+default-run = "infinity"
 
 [[bin]]
 name = "infinity"
