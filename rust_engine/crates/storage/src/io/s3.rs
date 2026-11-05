@@ -14,8 +14,8 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::sync::Arc;
 
-use hmac::{Hmac, Mac};
 use ::common::{Error, Result};
+use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 
 use crate::virtual_store::md5_hex;

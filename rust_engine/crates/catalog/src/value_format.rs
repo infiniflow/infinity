@@ -258,9 +258,7 @@ impl TableDef {
 
     /// C++: `TableDef::ReadAdv`.
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        Self::from_json(&expression::json::parse(
-            std::str::from_utf8(bytes).ok()?,
-        )?)
+        Self::from_json(&expression::json::parse(std::str::from_utf8(bytes).ok()?)?)
     }
 }
 

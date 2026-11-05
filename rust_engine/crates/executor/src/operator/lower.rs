@@ -189,12 +189,7 @@ pub fn lower(plan: &LogicalPlan) -> Result<Lowered> {
 
 /// A `Top` recognised in the plan: the sort keys, the limit, the offset and
 /// the input below the sort.
-type FusedTop<'a> = (
-    Vec<(expression::Expr, bool)>,
-    u64,
-    u64,
-    &'a LogicalPlan,
-);
+type FusedTop<'a> = (Vec<(expression::Expr, bool)>, u64, u64, &'a LogicalPlan);
 
 /// Recognises `[Limit] [Offset] Sort` and folds it into one `Top`.
 fn fuse_top(plan: &LogicalPlan) -> Option<FusedTop<'_>> {

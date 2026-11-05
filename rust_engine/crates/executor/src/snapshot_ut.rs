@@ -123,12 +123,7 @@ fn a_table_snapshot_records_the_index_chunks_the_catalog_holds() {
     e.execute("CREATE TABLE snap_i (a INT, b VARCHAR);")
         .unwrap();
     let block: Vec<Vec<parser::Literal>> = (0..8192)
-        .map(|_| {
-            vec![
-                parser::Literal::Int(1),
-                parser::Literal::Str("x".into()),
-            ]
-        })
+        .map(|_| vec![parser::Literal::Int(1), parser::Literal::Str("x".into())])
         .collect();
     e.execute("CREATE INDEX idx_a ON snap_i (a);").unwrap();
     e.import_literals("default_db.snap_i", None, block).unwrap();
@@ -162,16 +157,12 @@ fn a_table_snapshot_records_the_index_chunks_the_catalog_holds() {
             if s.starts_with("db_1/tbl_") && s.ends_with("/idx_1")
     ));
 
-    let expression::json::Json::Arr(segment_indexes) = field(index, "segment_indexes")
-    else {
+    let expression::json::Json::Arr(segment_indexes) = field(index, "segment_indexes") else {
         panic!("segment_indexes must be an array");
     };
     assert_eq!(segment_indexes.len(), 1);
     let segment = &segment_indexes[0];
-    assert_eq!(
-        field(segment, "segment_id"),
-        expression::json::Json::Int(0)
-    );
+    assert_eq!(field(segment, "segment_id"), expression::json::Json::Int(0));
     let expression::json::Json::Arr(chunks) = field(segment, "chunk_indexes") else {
         panic!("chunk_indexes must be an array");
     };
@@ -199,10 +190,7 @@ fn a_table_snapshot_records_the_index_chunks_the_catalog_holds() {
     // `SecondaryIndexInMem::GetChunkIndexMetaInfo` records 0 for a secondary
     // chunk; the types whose memory index reports its own footprint (HNSW,
     // BMP) are not covered here.
-    assert_eq!(
-        field(chunk, "index_size"),
-        expression::json::Json::Int(0)
-    );
+    assert_eq!(field(chunk, "index_size"), expression::json::Json::Int(0));
     assert!(
         !matches!(chunk, expression::json::Json::Obj(entries)
             if entries.iter().any(|(k, _)| k == "full_text_files")),

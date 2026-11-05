@@ -1037,10 +1037,8 @@ impl Catalog {
             // sweep, which is what reconciles the leftovers (a re-created name,
             // a dropped table's column records).
             let name_records = self.with_view(|store| {
-                let prefix = storage::catalog_format::catalog_table_prefix(
-                    &db_id.to_string(),
-                    &bare,
-                );
+                let prefix =
+                    storage::catalog_format::catalog_table_prefix(&db_id.to_string(), &bare);
                 store.scan_prefix(prefix.as_bytes())
             })?;
             if name_records.is_empty() && self.has_database_record(&db_name)? {
@@ -1374,11 +1372,8 @@ impl Catalog {
                         Some(id.to_string().into_bytes()),
                     ),
                     (
-                        storage::catalog_format::catalog_db_key(
-                            name,
-                            crate::DDL_TS_SENTINEL,
-                        )
-                        .into_bytes(),
+                        storage::catalog_format::catalog_db_key(name, crate::DDL_TS_SENTINEL)
+                            .into_bytes(),
                         Some(id.to_string().into_bytes()),
                     ),
                     (

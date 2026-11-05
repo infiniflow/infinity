@@ -2785,8 +2785,8 @@ pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use storage::RocksMetaStore;
     use std::sync::Arc;
+    use storage::RocksMetaStore;
 
     /// An IVF record has to survive a reload: `index_meta_of` expands the
     /// nested `ivf_option` back into the options `index_def_for` reads, so a

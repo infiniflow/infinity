@@ -60,10 +60,50 @@ crate 不带 `infinity-` 前缀：`crates/storage` 对应 `src/storage`，`crate
 | `executor/explain_*` | `src/{explain,explain_search}.rs` |
 | `scheduler/*` | `src/scheduler.rs` |
 
-## 4 有意不一致的地方
+## 4 `executor/src/engine/`
 
-1. **`executor/src/lib.rs` 仍是单文件**（约 30k 行）。参考版把这些拆成 `physical_insert/physical_select/…` 与 `fragment/*`。端口把执行流集中在一个文件里的 `impl Engine`，因为方法之间共享大量私有状态；按参考版切分要把每个方法改成 `pub(crate)` 并跨模块引用，属于纯机械但高风险的改动，**尚未做**，登记在 `GAPS.md` §2。
+原来的 `lib.rs` 是 30k 行单文件；现在 `lib.rs` 只剩模块声明与再导出（135 行），引擎本身按**语句路径**分文件：
+
+| 文件 | 内容 | 行数 |
+|---|---|---|
+| `engine/mod.rs` | 模块根：导入、再导出 | ~70 |
+| `engine/state.rs` | `Engine`/`Storage`/`TableEntry` 等状态类型与它们的方法 | 7.1k |
+| `engine/statements.rs` | 语句主路径上的 `impl Engine` 方法（扫描、执行、子查询） | 7.8k |
+| `engine/query.rs` | 查询解析/打分辅助（`query_units`、字段查询、tokenize/highlight） | 2.6k |
+| `engine/dml.rs` | insert / append / delete / update / copy / import | 2.1k |
+| `engine/index_build.rs` | 建索引、dump、seal、reload | 1.4k |
+| `engine/text_index.rs` | 内存索引器、`TermPostings`、`TextIndex` 等 | 1.2k |
+| `engine/types.rs` | 类型文本解析、fp16/bf16、张量/稀疏判定 | 0.9k |
+| `engine/admin.rs` | show / cleanup / optimize / compact | 0.6k |
+| `engine/ddl.rs` | create / drop / alter | 0.4k |
+| `engine/tasks.rs` | 三个后台任务 | 0.1k |
+| `engine/tests_ut.rs` | 原来的 `mod tests`（原样搬出） | 5.6k |
+
+拆法说明：`Engine` 的定义和它的字段留在 `state.rs`，其余文件各自写 `impl Engine { … }`；因为都在 `engine` 这棵子树里，私有字段和私有方法天然可见，只需要把跨文件调用的方法和字段放宽到 `pub(crate)`。语句路径之外还有 8 个文件、约 1 万行的辅助函数，按名字前缀归到上面的桶里；`statements.rs` 里剩下的 191 个方法就是引擎的核心语句流程，彼此交叉引用密集，没有再往下切。
+
+## 5 有意不一致的地方
+
+1. **`engine/` 的切法按语句路径，不是参考版的 `physical_*.cpp` 一对一**：参考版一个物理算子一个文件，端口的 `impl Engine` 是单体实现（一个 `execute` 分派到底），拆成一对一需要先重构成算子对象，属于行为改动而不是整理，未做。
 2. **测试文件与实现同目录**（`*_ut.rs`），参考版在 `src/unit_test/<子目录>`。移动测试要改 `use super::*` 的层级，收益低于风险，未做。
 3. **catalog 与 new_txn 拆成独立 crate**（参考版都在 `storage` 里）。这是 crate 边界的设计变更，见 `PORTING.md` §3.1。
 4. **`cpp_blocks.rs`（块布局 + 读写）留在 executor**：它同时依赖 storage 的块格式与 executor 的表状态，放在任一 crate 都要反向依赖。参考版对应 `storage/buffer/file_worker/*` 与 `column_vector/*`。
 5. **扁平别名仍在**：每个 crate 的 `lib.rs` 保留了旧路径的 `pub use`（如 `storage::catalog_format`），所以外部调用方没有因为这次搬家而改动。别名是过渡层，新代码应直接用层级路径。
+
+## 6 还没拆的大文件
+
+按行数排列（`wc -l`）。前三项是下一步的候选，切法与 `engine/` 相同：按参考版的目录/文件分，共享状态留在父模块。
+
+| 文件 | 行数 | 参考版对应 | 建议切法 |
+|---|---|---|---|
+| `executor/src/cpp_blocks.rs` | 9.9k | `storage/buffer/file_worker/*`、`column_vector/*` | `block/`（读、写、镜像、压缩）+ `column/`（各类型列的编解码） |
+| `server/src/lib.rs` | 8.7k | `network/*`、`network/http/*` | `network/{server, session, connection, thrift}`，HTTP 与 PG 各自成文件（`http.rs`/`pg.rs`/`peer.rs` 已存在） |
+| `executor/src/common/analyzer.rs` | 7.2k | `common/analyzer/*.cppm`（一分析器一文件） | `analyzer/{mod, standard, chinese, traditional, japanese, korean, ik, ngram, sparsegram, rank_features, user_defined, tokenizer, stemmer}` |
+| `engine/statements.rs` / `engine/state.rs` | 7.8k / 7.1k | `executor/physical_*.cpp` | 需要先把 `execute` 的单体分派拆成算子对象，属行为改动 |
+| `engine/tests_ut.rs` | 5.6k | `unit_test/**` | 按被测主题再分若干文件 |
+| `parser/src/parser.rs` | 4.2k | `parser/{statement, expr, type, table_reference}` | 按语句类型切 |
+| `server/src/peer.rs` / `http.rs` | 3.6k / 3.2k | `network/peer_server_thrift`、`network/http` | 按 handler 切 |
+| `storage/invertedindex/format/mod.rs` | 3.5k | `invertedindex/format/*.cppm`（约 40 个文件） | `format/{posting_field, term_meta, posting_byte_slice, doc_list_encoder, position_list_encoder, skiplist_writer, skiplist_reader, posting_decoder}` |
+| `catalog/src/cpp_layout.rs` | 3.3k | `storage/catalog/meta/*` | `catalog/meta/{key, value, tree}` |
+| `planner/src/index_scan.rs` | 3.2k | `planner/optimizer/index_scan_builder` + `function/table/*` | 建索引扫描算子与各索引类型的候选生成分开 |
+| `storage/wal/wal_entry.rs` | 3.1k | `storage/wal/wal_entry*.cppm` | 按 `WalCmd` 变体族切 |
+| `storage/data_block.rs` | 2.9k | `storage/data_block.cppm` | 与参考版一致，单文件即可 |

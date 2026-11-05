@@ -325,14 +325,13 @@ pub fn index_def_from_json(text: &str) -> Option<storage::wal::index_def::IndexD
                 2 => IvfStorageType::ProductQuantization,
                 _ => IvfStorageType::Plain,
             },
-            plain_storage_data_type:
-                storage::wal::ddl_def::EmbeddingDataType::from_discriminant(
-                    as_i64(extract(
-                        &doc,
-                        ".ivf_option.storage_option_.plain_storage_data_type_",
-                    ))
-                    .unwrap_or(10) as i8,
-                ),
+            plain_storage_data_type: storage::wal::ddl_def::EmbeddingDataType::from_discriminant(
+                as_i64(extract(
+                    &doc,
+                    ".ivf_option.storage_option_.plain_storage_data_type_",
+                ))
+                .unwrap_or(10) as i8,
+            ),
             scalar_quantization_bits: as_i64(extract(
                 &doc,
                 ".ivf_option.storage_option_.scalar_quantization_bits_",

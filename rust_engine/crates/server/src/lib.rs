@@ -30,9 +30,7 @@ use std::sync::{Arc, Mutex};
 use common::{Error, Result};
 
 use crate::peer::PeerManager;
-use executor::{
-    with_zero_dimension_sparse, Batch, ColumnData, Engine, QueryResult, Value,
-};
+use executor::{with_zero_dimension_sparse, Batch, ColumnData, Engine, QueryResult, Value};
 
 use thrift::protocol::{
     TBinaryInputProtocol, TBinaryOutputProtocol, TFieldIdentifier, TInputProtocol, TListIdentifier,
@@ -887,37 +885,24 @@ fn handle_connection(
                                         .iter()
                                         .map(|v| match v {
                                             ValueLit::Int(n) => parser::Literal::Int(*n),
-                                            ValueLit::Float(f) => {
-                                                parser::Literal::Float(*f)
-                                            }
-                                            ValueLit::Str(t) => {
-                                                parser::Literal::Str(t.clone())
-                                            }
+                                            ValueLit::Float(f) => parser::Literal::Float(*f),
+                                            ValueLit::Str(t) => parser::Literal::Str(t.clone()),
                                             ValueLit::Null => parser::Literal::Null,
                                             ValueLit::Bool(b) => {
                                                 parser::Literal::Str(b.to_string())
                                             }
-                                            ValueLit::IntArray(v) => {
-                                                parser::Literal::Vector(
-                                                    v.iter().map(|x| *x as f64).collect(),
-                                                )
-                                            }
+                                            ValueLit::IntArray(v) => parser::Literal::Vector(
+                                                v.iter().map(|x| *x as f64).collect(),
+                                            ),
                                             ValueLit::FloatArray(v) => {
                                                 parser::Literal::Vector(v.clone())
                                             }
-                                            ValueLit::IntTensor(rows) => {
-                                                parser::Literal::Vector(
-                                                    rows.iter()
-                                                        .flatten()
-                                                        .map(|x| *x as f64)
-                                                        .collect(),
-                                                )
-                                            }
-                                            ValueLit::FloatTensor(rows) => {
-                                                parser::Literal::Vector(
-                                                    rows.iter().flatten().copied().collect(),
-                                                )
-                                            }
+                                            ValueLit::IntTensor(rows) => parser::Literal::Vector(
+                                                rows.iter().flatten().map(|x| *x as f64).collect(),
+                                            ),
+                                            ValueLit::FloatTensor(rows) => parser::Literal::Vector(
+                                                rows.iter().flatten().copied().collect(),
+                                            ),
                                             ValueLit::Sparse {
                                                 indices,
                                                 ints,

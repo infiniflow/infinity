@@ -559,11 +559,7 @@ impl EmvbPqIndex {
             centroids_to_docid: &self.centroids_to_docid,
             rotation: Some(&self.rotation),
         };
-        let mut hits = view.search(
-            query,
-            k,
-            index::emvb::EmvbSearchOptions::for_topk(k),
-        );
+        let mut hits = view.search(query, k, index::emvb::EmvbSearchOptions::for_topk(k));
         hits.sort_by(|a, b| {
             b.1.partial_cmp(&a.1)
                 .unwrap_or(std::cmp::Ordering::Equal)
@@ -942,11 +938,9 @@ mod tests {
 
         // The same rotation reaches the search view.
         let query = vec![docs[5].1[1].clone()];
-        let in_memory = data.view().search(
-            &query,
-            3,
-            index::emvb::EmvbSearchOptions::for_topk(3),
-        );
+        let in_memory = data
+            .view()
+            .search(&query, 3, index::emvb::EmvbSearchOptions::for_topk(3));
         let reloaded = pq.prefilter(&query, 3);
         assert_eq!(in_memory[0].0 as usize, reloaded[0]);
     }

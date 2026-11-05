@@ -168,12 +168,7 @@ impl Engine {
         // layer (`WITH (ef = ...)`).
         let search_option = index::hnsw_handler::KnnSearchOption { ef: q.options.ef };
         let k = (q.topn * 4).max(64);
-        let mut merge = index::merge_knn::MergeKnn::new(
-            1,
-            k,
-            index::merge_knn::Compare::Max,
-            None,
-        );
+        let mut merge = index::merge_knn::MergeKnn::new(1, k, index::merge_knn::Compare::Max, None);
         merge.begin();
         for seg in &segments {
             if seg.index.dims() != q.query.len() {

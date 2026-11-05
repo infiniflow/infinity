@@ -52,10 +52,7 @@ pub fn read_jsonl_rows(path: &str) -> common::Result<Vec<[String; 3]>> {
             continue;
         }
         let kv = parse_json_object_strings(line).ok_or_else(|| {
-            common::Error::Invalid(format!(
-                "bad jsonl line: {}",
-                &line[..line.len().min(100)]
-            ))
+            common::Error::Invalid(format!("bad jsonl line: {}", &line[..line.len().min(100)]))
         })?;
         let field = |name: &str| {
             kv.iter()
@@ -239,9 +236,7 @@ pub fn run(dir: &Path, mode: &str, corpus: &str, batch: usize) -> common::Result
     let n = rows.len();
     println!("ReadJsonl {n} rows cost: {:?}", t.elapsed());
     if n == 0 {
-        return Err(common::Error::Invalid(format!(
-            "no rows in {corpus}"
-        )));
+        return Err(common::Error::Invalid(format!("no rows in {corpus}")));
     }
 
     let columns = ["id".to_string(), "title".to_string(), "text".to_string()];

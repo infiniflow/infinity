@@ -30,9 +30,7 @@ use std::sync::{Arc, Mutex};
 
 use common::{Error, Result, TxnTimeStamp};
 use storage::data_block::{BlockValue, DataBlock};
-use storage::{
-    KvBatchKind, MetaStore, WalCmd, WalEntry, WalEntryIterator, WalManager, WalRowId,
-};
+use storage::{KvBatchKind, MetaStore, WalCmd, WalEntry, WalEntryIterator, WalManager, WalRowId};
 
 /// Row record prefix of the engine's KV keys (`row:{table}:{seq:016}`).
 const ROW_PREFIX: &str = "row:";

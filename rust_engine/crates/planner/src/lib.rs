@@ -24,9 +24,7 @@ use std::collections::HashMap;
 
 use common::{Error, Result};
 use expression::{Expr, Value};
-use parser::{
-    AggFunc, BoolOp, ExprAst, JoinClause, Literal, OrderKey, Predicate, SelectItem,
-};
+use parser::{AggFunc, BoolOp, ExprAst, JoinClause, Literal, OrderKey, Predicate, SelectItem};
 
 /// The column names produced by `plan`.
 pub fn output_schema(plan: &LogicalPlan) -> Vec<String> {
@@ -1451,11 +1449,7 @@ mod tests {
             &[SelectItem::Column("c".into())],
             &tables,
             None,
-            Some(&Predicate::simple(
-                "b",
-                parser::CmpOp::Gt,
-                Literal::Int(1),
-            )),
+            Some(&Predicate::simple("b", parser::CmpOp::Gt, Literal::Int(1))),
             &[],
             None,
             &[],

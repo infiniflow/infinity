@@ -1306,9 +1306,7 @@ impl Column {
                         6 => ::common::TimeUnit::Second,
                         _ => ::common::TimeUnit::Invalid,
                     };
-                    c.push(
-                        valid(row).then_some(::common::IntervalT::with_unit(value, unit)),
-                    );
+                    c.push(valid(row).then_some(::common::IntervalT::with_unit(value, unit)));
                 }
             }
             Column::Uuid(c) => {
@@ -1472,9 +1470,7 @@ fn parse_time_text(text: &str) -> Option<::common::TimeT> {
     if !(0..=59).contains(&second) {
         return None;
     }
-    Some(::common::TimeT::new(
-        hour * 3600 + minute * 60 + second,
-    ))
+    Some(::common::TimeT::new(hour * 3600 + minute * 60 + second))
 }
 
 /// C++ `DateTimeType::FromString`: `YYYY-MM-DD HH:MM:SS`, with the time part

@@ -1084,14 +1084,8 @@ fn read_block_value(cursor: &mut Cursor<'_>) -> Option<BlockValue> {
         10 => BlockValue::Str(cursor.string()?),
         11 => BlockValue::Date(::common::DateT::new(cursor.i32()?)),
         12 => BlockValue::Time(::common::TimeT::new(cursor.i32()?)),
-        13 => BlockValue::DateTime(::common::DateTimeT::new(
-            cursor.i32()?,
-            cursor.i32()?,
-        )),
-        14 => BlockValue::Timestamp(::common::TimestampT::new(
-            cursor.i32()?,
-            cursor.i32()?,
-        )),
+        13 => BlockValue::DateTime(::common::DateTimeT::new(cursor.i32()?, cursor.i32()?)),
+        14 => BlockValue::Timestamp(::common::TimestampT::new(cursor.i32()?, cursor.i32()?)),
         15 => BlockValue::Interval(::common::IntervalT::new(cursor.i32()?)),
         16 => BlockValue::Uuid(cursor.take(16)?.try_into().ok()?),
         17 => {

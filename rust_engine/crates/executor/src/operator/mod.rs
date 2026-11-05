@@ -759,9 +759,7 @@ mod tests {
         use super::sort::Sort;
 
         let row_wise: Vec<Box<dyn PhysicalOperator>> = vec![
-            Box::new(Filter::new(expression::Expr::Literal(
-                Value::Bool(true),
-            ))),
+            Box::new(Filter::new(expression::Expr::Literal(Value::Bool(true)))),
             Box::new(Projection::new(Vec::new(), Vec::new())),
             Box::new(Limit::new(0, 5)),
             Box::new(Sort::new(Vec::new())),

@@ -10,9 +10,7 @@
 
 use std::collections::HashMap;
 
-use parser::{
-    AggFunc, BinOp, BoolOp, CmpOp, ExprAst, Literal, OrderKey, Predicate, SelectItem,
-};
+use parser::{AggFunc, BinOp, BoolOp, CmpOp, ExprAst, Literal, OrderKey, Predicate, SelectItem};
 
 use crate::regex_literal::{extract_regex_literal_runs, has_any_sparse_gram};
 

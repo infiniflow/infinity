@@ -11,10 +11,10 @@
 //! the seal path merges the runs (`SortMerger`) before writing the segment.
 
 use crate::{index_row, Engine, MemoryIndexer, QueryResult, TextIndex, TextTokenizer};
-use storage::invertedindex::disk_segment_reader::{PostingIterator, SegmentIndexReader};
-use storage::invertedindex::format::{TermMetaFlags, FULLTEXT_SPILL_SUFFIX};
 use std::collections::BTreeMap;
 use std::path::Path;
+use storage::invertedindex::disk_segment_reader::{PostingIterator, SegmentIndexReader};
+use storage::invertedindex::format::{TermMetaFlags, FULLTEXT_SPILL_SUFFIX};
 use tempfile::tempdir;
 
 /// `MemoryIndexerTest::SpillLoadTest`.

@@ -9,8 +9,8 @@
 use crate::Engine;
 use ::common::Error;
 use expression::Value;
-use txn::Txn;
 use tempfile::tempdir;
+use txn::Txn;
 
 fn expect_conflict(e: &Engine, table: &str, seqs: &[usize], txn: Txn) {
     assert!(matches!(

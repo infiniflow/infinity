@@ -5,9 +5,7 @@
 use std::io::Write;
 
 use executor::{Engine, QueryResult};
-use server::{
-    read_select_call, select_response_from, write_select_response, SelectResponseWire,
-};
+use server::{read_select_call, select_response_from, write_select_response, SelectResponseWire};
 
 fn main() {
     let dir = std::env::temp_dir().join(format!("infinity-select-{}", std::process::id()));

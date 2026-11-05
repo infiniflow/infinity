@@ -981,9 +981,9 @@ fn value_at(column: &BlockColumn, row: usize) -> Option<BlockValue> {
             }
         }
         ColumnValues::Varchar { .. } => BlockValue::Str(column.values.varchar(row)?),
-        ColumnValues::Json { .. } => BlockValue::Json(::common::json::Json::from_bson(
-            column.values.json(row)?,
-        )?),
+        ColumnValues::Json { .. } => {
+            BlockValue::Json(::common::json::Json::from_bson(column.values.json(row)?)?)
+        }
         ColumnValues::Embedding { data } => {
             let width = match &column.data_type.type_info {
                 TypeInfo::Embedding {

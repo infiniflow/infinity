@@ -118,9 +118,7 @@ pub use wal::wal_entry;
 /// RocksDB is the only substrate: it is what the C++ engine writes, so a
 /// directory either engine produced opens with the same code and the same
 /// bytes.
-pub fn open_store(
-    path: &std::path::Path,
-) -> ::common::Result<std::sync::Arc<dyn MetaStore>> {
+pub fn open_store(path: &std::path::Path) -> ::common::Result<std::sync::Arc<dyn MetaStore>> {
     let store = metastore_rocks::RocksMetaStore::open(path)?;
     Ok(std::sync::Arc::new(store))
 }

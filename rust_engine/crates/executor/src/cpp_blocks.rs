@@ -21,10 +21,10 @@ thread_local! {
 }
 
 use crate::columnar::{Batch, ColumnData};
+use ::common::{Error, Result};
 use catalog::cpp_layout::{
     CppBlock, CppIndexChunk, CppIndexSegment, CppSegment, CppSegmentSet, CPP_MIRROR_TS, UNCOMMIT_TS,
 };
-use ::common::{Error, Result};
 use expression::Value;
 use storage::WalCmd;
 use txn::{OptimizeEntry, TxnOp};
@@ -210,9 +210,7 @@ fn publish_secondary_chunks(
     segment: u32,
     single_chunk: bool,
 ) -> Vec<CppIndexChunk> {
-    use storage::secondary_segment::{
-        write_secondary_segment_typed, SecondarySegmentReader,
-    };
+    use storage::secondary_segment::{write_secondary_segment_typed, SecondarySegmentReader};
     let width = kind.key_width();
     let stride = width + 4;
     let mut by_block: std::collections::BTreeMap<u64, Vec<_>> = Default::default();
@@ -1406,9 +1404,8 @@ pub fn encode_fulltext_chunk(
         has_term_frequency: true,
         has_term_payload: true,
     };
-    let doc_option = storage::invertedindex::format::doc_list::DocListFormatOption::new(
-        OPTION_FLAG_ALL,
-    );
+    let doc_option =
+        storage::invertedindex::format::doc_list::DocListFormatOption::new(OPTION_FLAG_ALL);
     let mut pos = Vec::new();
     let mut metas = Vec::with_capacity(postings.len());
     let terms: Vec<(String, Vec<(u32, u32)>)> = postings
@@ -1460,9 +1457,7 @@ pub fn encode_fulltext_chunk(
         });
     }
     let (region, offsets) =
-        storage::invertedindex::format::encode_term_meta_region_with_offsets(
-            &metas, flags,
-        );
+        storage::invertedindex::format::encode_term_meta_region_with_offsets(&metas, flags);
     let mut fst = storage::invertedindex::format::FstBuilder::new();
     for (i, (term, _)) in terms.iter().enumerate() {
         fst.insert(term.as_bytes(), offsets[i]);
@@ -1593,9 +1588,9 @@ fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option
         // Json is stored as BSON, not text: the reference writes
         // `JsonManager::to_bson` - the value wrapped in `{"data": …}`, keys
         // sorted, small integers as `int32` (`json_manager_impl.cpp:139`).
-        _ if type_text.trim().eq_ignore_ascii_case("json") => ::common::json::parse(value)
-            .ok_or_else(bad)?
-            .to_bson(),
+        _ if type_text.trim().eq_ignore_ascii_case("json") => {
+            ::common::json::parse(value).ok_or_else(bad)?.to_bson()
+        }
         // Varchar keeps its UTF-8 bytes.
         _ => value.as_bytes().to_vec(),
     };
@@ -5221,11 +5216,7 @@ impl Engine {
         // Resolve the conditions once against the schema; a column the record
         // does not cover (vector/sparse/tensor/bool) keeps its condition and
         // `may_contain` answers `true` for it.
-        let resolved: Vec<(
-            usize,
-            crate::fast_rough_filter::PruneOp,
-            expression::Value,
-        )> = prune
+        let resolved: Vec<(usize, crate::fast_rough_filter::PruneOp, expression::Value)> = prune
             .iter()
             .filter_map(|cond| {
                 meta.columns
@@ -5540,10 +5531,8 @@ impl Engine {
                 .find(|(k, _)| k.eq_ignore_ascii_case(name))
                 .map(|(_, v)| v.clone())
         };
-        let metric =
-            index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
-        let encoding =
-            index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
+        let metric = index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
+        let encoding = index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
         let lsg = if opt("build_type")
             .map(|v| v.eq_ignore_ascii_case("lsg"))
             .unwrap_or(false)
@@ -6913,10 +6902,7 @@ impl Engine {
     }
 
     /// Decodes one product-quantized chunk into a searchable segment.
-    fn decode_ivf_pq_chunk(
-        bytes: &[u8],
-        options: &IvfOptions,
-    ) -> Option<index::ivf::IvfSegment> {
+    fn decode_ivf_pq_chunk(bytes: &[u8], options: &IvfOptions) -> Option<index::ivf::IvfSegment> {
         if bytes.len() < 20 {
             return None;
         }
@@ -6943,19 +6929,17 @@ impl Engine {
                 codes: part.codes,
             })
             .collect();
-        Some(index::ivf::IvfSegment::Product(
-            index::ivf::IvfPqIndex {
-                dims: dim,
-                centroids: chunk.centroids,
-                centroid_count,
-                subspace_num: options.pq_subspace_num,
-                real_centroid_num: chunk.codebook.real_subspace_centroid_num as usize,
-                codewords: chunk.codebook.codewords,
-                norms_neg_half: chunk.codebook.subspace_weights,
-                bits: options.pq_bits,
-                parts,
-            },
-        ))
+        Some(index::ivf::IvfSegment::Product(index::ivf::IvfPqIndex {
+            dims: dim,
+            centroids: chunk.centroids,
+            centroid_count,
+            subspace_num: options.pq_subspace_num,
+            real_centroid_num: chunk.codebook.real_subspace_centroid_num as usize,
+            codewords: chunk.codebook.codewords,
+            norms_neg_half: chunk.codebook.subspace_weights,
+            bits: options.pq_bits,
+            parts,
+        }))
     }
 
     /// Writes `table`'s index as a C++ IVF chunk file (`kPlain`) under
@@ -7013,11 +6997,7 @@ impl Engine {
 
     /// Reads back a mirror written by [`Self::write_cpp_ivf_index`], returning
     /// the IVF chunks so a query can probe them (plan #89).
-    pub fn load_ivf_indexes(
-        &self,
-        table: &str,
-        index_name: &str,
-    ) -> Vec<index::ivf::IvfSegment> {
+    pub fn load_ivf_indexes(&self, table: &str, index_name: &str) -> Vec<index::ivf::IvfSegment> {
         let Some(dir) = self.cpp_hnsw_dir(table, index_name) else {
             return Vec::new();
         };
@@ -7068,14 +7048,12 @@ impl Engine {
                         .collect()
                 })
                 .collect();
-            out.push(index::ivf::IvfSegment::Plain(
-                index::ivf::IvfIndex::new(
-                    dims,
-                    header.centroid_count as usize,
-                    flat,
-                    parts,
-                ),
-            ));
+            out.push(index::ivf::IvfSegment::Plain(index::ivf::IvfIndex::new(
+                dims,
+                header.centroid_count as usize,
+                flat,
+                parts,
+            )));
         }
         out
     }
@@ -7146,17 +7124,15 @@ impl Engine {
                 dot_v_e: part.dot_v_e,
             })
             .collect();
-        Some(index::ivf::IvfSegment::Scalar(
-            index::ivf::IvfSqIndex {
-                dims,
-                centroids: chunk.centroids,
-                centroid_count: chunk.header.centroid_count as usize,
-                a: chunk.common_vec_a,
-                b: chunk.common_vec_b,
-                sq_bits,
-                parts,
-            },
-        ))
+        Some(index::ivf::IvfSegment::Scalar(index::ivf::IvfSqIndex {
+            dims,
+            centroids: chunk.centroids,
+            centroid_count: chunk.header.centroid_count as usize,
+            a: chunk.common_vec_a,
+            b: chunk.common_vec_b,
+            sq_bits,
+            parts,
+        }))
     }
 
     /// Reads back a mirror written by [`Self::write_cpp_ivf_index`], returning
@@ -7824,10 +7800,7 @@ impl ColumnBounds {
 impl ColumnBounds {
     /// The bounds a `WHERE` predicate implies for one column, from the parsed
     /// form the DML statements carry (`UPDATE`/`DELETE` scan for their rows).
-    pub(crate) fn from_predicate(
-        schema: &[String],
-        pred: &parser::Predicate,
-    ) -> Option<Self> {
+    pub(crate) fn from_predicate(schema: &[String], pred: &parser::Predicate) -> Option<Self> {
         use parser::{BoolOp, CmpOp, ExprAst, Predicate as P};
         fn axis(p: &P) -> Option<(&str, CmpOp, &parser::Literal)> {
             match p {
@@ -8956,12 +8929,8 @@ mod tests {
 
         // An `INSERT`-filled segment that is not full has no filter at all.
         e.execute("CREATE TABLE u (id INT);").unwrap();
-        e.insert_literals(
-            "default_db.u",
-            None,
-            vec![vec![parser::Literal::Int(1)]],
-        )
-        .unwrap();
+        e.insert_literals("default_db.u", None, vec![vec![parser::Literal::Int(1)]])
+            .unwrap();
         e.flush().unwrap();
         assert!(store.get(b"seg|1|1|0|fast_rough_filter").unwrap().is_none());
     }

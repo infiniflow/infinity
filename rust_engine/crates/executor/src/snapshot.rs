@@ -17,8 +17,8 @@
 
 use std::path::{Path, PathBuf};
 
-use catalog::value_format;
 use ::common::{Error, Result, TxnTimeStamp};
+use catalog::value_format;
 use expression::json::Json;
 use storage::block_index::BlockIndex;
 use storage::wal::ddl_def::{ColumnDef, ConstantExpr, TableDef};

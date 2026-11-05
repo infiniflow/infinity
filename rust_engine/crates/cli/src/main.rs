@@ -451,8 +451,7 @@ fn run(args: &[String]) -> common::Result<()> {
                 .cloned()
                 .unwrap_or_else(|| "0.0.0.0:23817".into());
             let options = executor::EngineOptions::default();
-            let engine =
-                std::sync::Arc::new(executor::Engine::open_with_options(&dir, options)?);
+            let engine = std::sync::Arc::new(executor::Engine::open_with_options(&dir, options)?);
             let server = server::Server::bind_with_engine(&addr, engine)?;
             println!("serving on {}", server.local_addr()?);
             server.run();
@@ -570,8 +569,7 @@ fn run(args: &[String]) -> common::Result<()> {
                     "import-csv needs a file path".into(),
                 ));
             }
-            let text =
-                std::fs::read_to_string(&file).map_err(|e| common::Error::io(&file, e))?;
+            let text = std::fs::read_to_string(&file).map_err(|e| common::Error::io(&file, e))?;
             let mut lines = text.lines().filter(|l| !l.trim().is_empty());
             let header: Vec<String> = lines
                 .next()
