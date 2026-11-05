@@ -84,7 +84,7 @@ Rust 侧接受 `tensor` 列，所以两端统一用 `tensor(float,8)` 才是可�
 `n × n_centroids × dim` 工作量，却是唯一没并行的一处（约 0.28 s）。
 新增 `assign_nearest_parallel`，两处共用。
 
-### 3. 查询路径不再数块（`infinity-executor/src/lib.rs`）
+### 3. 查询路径不再数块（`executor/src/lib.rs`）
 
 `multivector_index_for` 每次调用都用 `row_count(table)` 判断已建索引是否覆盖整表，
 而 `row_count` 会走 `block_visible_row_count`——遍历每个块的 `version` 文件、每个 slot、
@@ -136,8 +136,8 @@ tools/run_index_bench.sh multivector 20000 50
 
 # 只跑索引层，绕过服务端（拆分 k-means / 量化器 / 建表）
 cd rust_engine
-cargo run --release -p infinity-index --example plaid_build_bench
-cargo run --release -p infinity-index --example plaid_query_bench
+cargo run --release -p index --example plaid_build_bench
+cargo run --release -p index --example plaid_query_bench
 ```
 
 ## 已知问题

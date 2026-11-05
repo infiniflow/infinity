@@ -57,7 +57,7 @@
 - 二级索引等值查找只解码命中的行（`read_columns_batch_for_rows`），不再整表 decode
 - block `version` 文件与解码块一起缓存，所有重写点同步失效
 
-单测：`infinity-index` 126 passed，`infinity-executor` 706 passed。
+单测：`index` 126 passed，`executor` 706 passed。
 
 ## 复现
 

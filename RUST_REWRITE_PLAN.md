@@ -94,7 +94,7 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 | 底座 | 内容 | C++ 位置 | Rust 对应 |
 |---|---|---|---|
 | **RocksDB（事务 KV）** | Catalog/元数据、ID 计数器、对象清单、rough filter、drop 墓碑 | `storage/catalog/kv_store*`、`meta/*` | `MetaStore` trait（`RocksMetaStore`） |
-| **自研 WAL** | 已提交 DDL/DML 的 redo log（CRC32 分帧） | `storage/wal/*` | `infinity-storage::wal`（格式全量移植） |
+| **自研 WAL** | 已提交 DDL/DML 的 redo log（CRC32 分帧） | `storage/wal/*` | `storage::wal`（格式全量移植） |
 | **自研块文件** | 列数据、MVCC `version`、索引 chunk | `storage/buffer/*`、`meta/*_impl.cpp` | `cpp_format` / `BufferManager` |
 
 要点：
@@ -338,18 +338,18 @@ RocksDB 只存元数据，负载为「低容量 + 事务 + 快照 + 计数器」
 
 ```
 rust_engine/crates/
-├── infinity-common/      # 基础类型、错误、配置、tracing、metrics
+├── common/      # 基础类型、错误、配置、tracing、metrics
 ├── infinity-lexer/       # logos 词法
-├── infinity-parser/      # 递归下降解析器 + AST
-├── infinity-expression/  # 表达式 AST + 求值
-├── infinity-catalog/     # 元数据模型 + C++ 键/值编码
-├── infinity-storage/     # WAL + MVCC + MetaStore + 各种磁盘格式
-├── infinity-txn/         # 事务 / 提交管线
-├── infinity-index/       # HNSW / BMP / 多向量 / 二级索引
-├── infinity-planner/     # 逻辑计划 + 绑定 + 优化器
-├── infinity-executor/    # 物理算子 + fragment + Tokio 调度
-├── infinity-server/      # Thrift / HTTP / PG 前端
-└── infinity-cli/         # 主二进制（smoke/query/bench/import-csv/conformance）
+├── parser/      # 递归下降解析器 + AST
+├── expression/  # 表达式 AST + 求值
+├── catalog/     # 元数据模型 + C++ 键/值编码
+├── storage/     # WAL + MVCC + MetaStore + 各种磁盘格式
+├── txn/         # 事务 / 提交管线
+├── index/       # HNSW / BMP / 多向量 / 二级索引
+├── planner/     # 逻辑计划 + 绑定 + 优化器
+├── executor/    # 物理算子 + fragment + Tokio 调度
+├── server/      # Thrift / HTTP / PG 前端
+└── cli/         # 主二进制（smoke/query/bench/import-csv/conformance）
 ```
 
 ### 5.2 依赖映射
@@ -414,17 +414,17 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 | crate | 内容 | 状态 |
 |---|---|---|
-| `infinity-common` | 基础类型 / 错误 / 配置 | ✅ |
-| `infinity-storage` | WAL（CRC-32/IEEE 分帧、撕裂尾容忍、checkpoint 截断、分段轮转）、MVCC、`MetaStore`（RocksDB）、C++ 格式编解码 | ✅ M1 |
-| `infinity-catalog` | 表/列/索引元数据、C++ 键与值编码、`cpp_layout` 双向 | ✅ |
-| `infinity-txn` | `WriteWAL(串行) → KV 原子写`、幂等回放、loom 模型 | ✅ |
-| `infinity-parser` | 手写 lexer + 递归下降：DDL/DML/DQL、`SEARCH MATCH`（VECTOR/SPARSE/TENSOR/TEXT + FUSION）、`COPY`/`SHOW`/`EXPLAIN`/快照 | ✅ M2 |
-| `infinity-expression` | 标量/布尔/聚合求值、JSON 函数、`minimum_should_match` | ✅ M2 |
-| `infinity-planner` | 逻辑计划 + 绑定 + 优化器（下推、常量折叠、列裁剪） | ✅ M2 |
-| `infinity-index` | 二级索引、`FlatIndex`、HNSW（参考构图）、BMP、多向量 MaxSim/PQ | ✅ M3 |
-| `infinity-executor` | `Engine`、Tokio 按边并发管线、DML、COPY、SEARCH、EXPLAIN、C++ 块镜像与索引镜像 | ✅ |
-| `infinity-server` | Thrift 全量常用 RPC、HTTP REST、PG wire、`set_nodelay` | ✅ M4 |
-| `infinity-cli` | `infinity`（smoke/query/bench/import-csv/conformance/driver）、`--config` | ✅ |
+| `common` | 基础类型 / 错误 / 配置 | ✅ |
+| `storage` | WAL（CRC-32/IEEE 分帧、撕裂尾容忍、checkpoint 截断、分段轮转）、MVCC、`MetaStore`（RocksDB）、C++ 格式编解码 | ✅ M1 |
+| `catalog` | 表/列/索引元数据、C++ 键与值编码、`cpp_layout` 双向 | ✅ |
+| `txn` | `WriteWAL(串行) → KV 原子写`、幂等回放、loom 模型 | ✅ |
+| `parser` | 手写 lexer + 递归下降：DDL/DML/DQL、`SEARCH MATCH`（VECTOR/SPARSE/TENSOR/TEXT + FUSION）、`COPY`/`SHOW`/`EXPLAIN`/快照 | ✅ M2 |
+| `expression` | 标量/布尔/聚合求值、JSON 函数、`minimum_should_match` | ✅ M2 |
+| `planner` | 逻辑计划 + 绑定 + 优化器（下推、常量折叠、列裁剪） | ✅ M2 |
+| `index` | 二级索引、`FlatIndex`、HNSW（参考构图）、BMP、多向量 MaxSim/PQ | ✅ M3 |
+| `executor` | `Engine`、Tokio 按边并发管线、DML、COPY、SEARCH、EXPLAIN、C++ 块镜像与索引镜像 | ✅ |
+| `server` | Thrift 全量常用 RPC、HTTP REST、PG wire、`set_nodelay` | ✅ M4 |
+| `cli` | `infinity`（smoke/query/bench/import-csv/conformance/driver）、`--config` | ✅ |
 
 ### 7.2 存储与格式模块
 
@@ -457,7 +457,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 ### 7.4 协议、对象存储与恢复
 
 - **Thrift**：约 46 个 RPC 的常用面全部落地；所有 `read_*_args` 显式消费外层 `_args.stop`（修掉长期存在的流错位 / `connection reset`）；错误按 C++ `ErrorCode` 回。
-- **HTTP**：`crates/infinity-server/src/http.rs` 手写路由（databases / tables / columns / indexes / docs / import / export / explain），与 Thrift 共用 `Engine`。
+- **HTTP**：`crates/server/src/http.rs` 手写路由（databases / tables / columns / indexes / docs / import / export / explain），与 Thrift 共用 `Engine`。
 - **PG wire**：startup + simple query。
 - **对象存储**：MinIO（HTTP/HTTPS）已落地，承载 C++ 格式的数据/索引文件；KV 仍在本地盘。
 - **恢复**：WAL 从 `meta:applied_ts` 起回放（避免复活已删除行）；快照 blob 的索引列表用换行分隔；`CREATE SYSTEM SNAPSHOT` 已实现。
@@ -525,7 +525,7 @@ query(sql) → parse → logical → optimize → physical → fragments
   2. ~~`test_memidx::test_optimize_from_different_database`~~：**已修**——配额检查原先在 `update_text_indexes` 里逐行触发，第一行就已超过 1 KB 配额，于是每次 dump 封的都是「一行段」；且 dump 后 pending 计数被清零，下一批未记账，3 批产生 5 个 chunk。现在 HNSW 只在 `note_index_insert` 按**批**记账（C++ `AppendMemIndex` 的粒度），后台任务只封多向量/稀疏/次级尾段，dump 后计数保留本批字节（这些行正是新段的起点）。`test_memidx` 10/10，回归测试 `the_memindex_quota_seals_one_hnsw_chunk_per_batch`。
   3. `test_fulltext::test_fulltext_realtime`：本机缓存的 `tmp/gt_res_list_10000.pkl` 与实际结果不一致（引擎返回 `[94,95,78]`，与重新生成的 ground truth 一致；用例仍断言旧的 `[354,357,384]`），需在干净工作区（无 `tmp/*.pkl`）复跑。
 - **跨引擎兼容（新增，C++ ↔ Rust）**：`python/restart_test/test_cross_engine_compat.py`（`cpp-then-rust` / `rust-then-cpp` 双向参数化）。一个引擎建表 + 4 类索引（FULLTEXT / HNSW / SECONDARY / BMP）+ 200 行并 `flush_data()`，停止后由另一个引擎打开同一数据目录：`count(*)`、filter、全文、HNSW、稀疏、次级查询结果必须逐项相等，再由第二个引擎插入 3 行并查询到它们。本机双向 **2 passed（28.4s）**，已接入 `run_gate_c.sh`（`INFINITY_CPP_BIN` 缺省指向 `cmake-build-reldeb/src/infinity`，缺失时 SKIP）。
-- 快照基线：`infinity-cli conformance ../test/sql/snapshot` = `statement ok 171/171`、`statement error 8/8`、query 0/0（snapshot 用例只含语句）。
+- 快照基线：`cli conformance ../test/sql/snapshot` = `statement ok 171/171`、`statement error 8/8`、query 0/0（snapshot 用例只含语句）。
 - 长跑导入档：`test_multiple_index_types_import` 2/5 通过。5.toml 档在 2026-10-19 20:30 的本机重跑（`-k 5.toml`，bwrap，release）：**21/50 个 insert 批**后服务端收到 **SIGTERM**（日志 `Terminated`，无 panic、无 SIGKILL、连接随后被拒），引擎 RSS 峰值 **7.8 GB**，同机 `earlyoom -M 2000000,1000000` 仍在运行，采样到 `MemAvailable` 降至 ~2 GB；批耗时从 21 s 增至 69 s。更早一轮在 `MemAvailable` 最低 **1.96 GB** 时也在 batch 31 被杀，因此是宿主看门狗杀掉了最大进程，而非引擎 panic。CI 无 earlyoom；引擎侧目标（内存不随导入无限增长）已满足，但 5.toml 的完整 50 批判定必须在 CI 机复跑。
 - 内存/写入修复：⓪`Insert` 的向量/张量/稀疏值走数值 `Literal::Vector`，不再把每个 float 先格式化成字符串再经 SQL 解析（5000 行批次 21–26 s → 19 s，峰值 ~2 GB 不变，索引状态占主导）；①HNSW 检查点不再重建全表图，而是序列化**内存段**（`HnswIndexInMem`），成本从 O(表) 降为 O(上次检查点后的行)；②`flush()` 每个检查点无条件 dump 所有 HNSW 内存段并清空，新增插入重新建立段；③索引尾部的 dump 先于块镜像执行，镜像失败不再阻塞内存回收。
 - **测量纪律（强制）**：内存/性能类用例（本档与 Gate E）必须让引擎把数据写到**磁盘目录**，不得用 `bwrap --tmpfs /var` 之类的内存盘承载 `/var/infinity`。5.toml 档数据量约 20 GB，tmpfs 放不下：C++ 参考引擎在 tmpfs 下 5 分 50 秒即失联（峰值 ~5.2 GB），换磁盘目录后可跑到 **9.47 GB / >30 分钟**；Rust 同口径峰值 12.6–15 GB。`run_gate_c.sh` 已用 `INFINITY_GATE_C_WORK`（缺省 `mktemp -d`，磁盘）绑定 `/var/infinity`，只把 `/var` 本身做成 tmpfs 作为挂载点。
@@ -702,7 +702,7 @@ codex 三轮评审，round 3 `VERDICT: APPROVE`。全部意见采纳并落到章
 
 ## 附录 D：EXPLAIN 打印器规则（已落地）
 
-实现位于 `crates/infinity-executor/src/explain.rs`（逻辑/物理/索引扫描）与 `explain_search.rs`（MATCH/FUSION），Gate A 的 EXPLAIN 记录全部通过。以下规则来自 `src/planner/explain_logical_plan_impl.cpp`，供维护参考：
+实现位于 `crates/executor/src/explain.rs`（逻辑/物理/索引扫描）与 `explain_search.rs`（MATCH/FUSION），Gate A 的 EXPLAIN 记录全部通过。以下规则来自 `src/planner/explain_logical_plan_impl.cpp`，供维护参考：
 
 - **缩进与箭头**：根节点 `intent_size = 0` → `"{NAME} ({node_id})"`（无箭头、无前导空格）；子节点 `intent_size = 父 + 2` → `"{(intent_size-2) 空格}-> {NAME} ({node_id})"`。
 - **属性行**：`"{intent_size 空格} - {attr}: {value}"`（`-` 在第 `intent_size+1` 列）。

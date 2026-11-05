@@ -28,7 +28,7 @@
 **本节没有未接线项。** 这一层的现状：
 
 - **行以列式块为存储本体**（方案 C）：`INSERT` 的行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件由 checkpoint（`flush_cpp_blocks` → `write_cpp_blocks`）写，`COPY` 例外（见下）。KV 里**没有任何行键**：`row:` 既不写也不读，`del:` 只剩事务命令流里的名字（`wal_delete_key`，用于构造 `WalCmdDeleteV2` 与行级冲突判定），不落盘；行侧车（`persistence/rowdata_*.bin`）与 `persistence/` 里的行记录一并去掉（该目录只剩参考版形状的空目录）。读全部把 buffer 盖在块上：整表 / 剪枝 / 列投影 / 点取 / 含墓碑 / 计数 / `row_is_present`；回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧。
-- **封存块与索引段都走 mmap，参考的 `BufferManager` 不移植**：`MappedBlock`（`infinity-storage::mapped_block`）把块的每个 `{col}.col` 映射进来，列体是映射里的切片，槽位解码直接读 page cache；索引段由 `mapped::MappedFile` 映射。映射在进程内共享：`Context::block_maps` 每个 `BlockId` 只留一个 `Arc<MappedBlock>`，块被重写/压缩/删除/表被 drop 时按表丢弃（`drop_block_maps`）。未封存的行本来就在 `TableEntry::pending_rows`（每表一份，所有读者共享）。`BufferObj`/`BufferHandle`/`BufferPool`/`FileWorker`/`VarBuffer` 不再存在；`[buffer] buffer_manager_size` 只剩索引缓冲的预算，`SHOW BUFFERS` 一行 = 一个映射。
+- **封存块与索引段都走 mmap，参考的 `BufferManager` 不移植**：`MappedBlock`（`storage::mapped_block`）把块的每个 `{col}.col` 映射进来，列体是映射里的切片，槽位解码直接读 page cache；索引段由 `mapped::MappedFile` 映射。映射在进程内共享：`Context::block_maps` 每个 `BlockId` 只留一个 `Arc<MappedBlock>`，块被重写/压缩/删除/表被 drop 时按表丢弃（`drop_block_maps`）。未封存的行本来就在 `TableEntry::pending_rows`（每表一份，所有读者共享）。`BufferObj`/`BufferHandle`/`BufferPool`/`FileWorker`/`VarBuffer` 不再存在；`[buffer] buffer_manager_size` 只剩索引缓冲的预算，`SHOW BUFFERS` 一行 = 一个映射。
 - **cleanup 的活段判据**是 `visible_block_ids()`（块索引，跨重启有效），不是 `segment_ids()`（分配器，重开目录后为空；用它会把每个 `idx_*/seg_{n}` 当死段删掉）。
 - **行号的次序**：冲突检查之后、写 WAL 之前按 `commit_ts` 分配（`TxnManager::begin_write` / `commit_at_deferred_with`，对应参考的 `wait_conflict_ck_` / `SubmitForAllocation`），checkpoint 的上界是 `current_ts`（已完成的 commit_ts），块的窗口按 `append_totals` + `append_ts` 裁到 `ts <= 上界`，块内 id 必须是窗口的稠密前缀。
 - **多值 / 张量表的读路径**：这类表的解码文本形式在写入与扫描两条路上不稳定，`wide_text_columns` 只用来关掉「直接读 buffer 的 `Value`」快路径，改走块解码；不再保留文本行副本。
@@ -51,7 +51,7 @@
 **本节没有待办项。** 下面是这一层现在的口径。
 
 参考的冲突检查是**按事务类型成对判定**（`NewTxn::CheckConflictTxnStore` 的二十多个重载）。端口移植了同一套矩阵：
-`infinity-txn/src/conflict.rs` 的 `TxnOp`（= 参考 `BaseTxnStore::type_` 加上规则要读的字段）与 `conflict_between`，
+`txn/src/conflict.rs` 的 `TxnOp`（= 参考 `BaseTxnStore::type_` 加上规则要读的字段）与 `conflict_between`，
 每个写语句在提交前用 `Txn::set_op` 声明自己的类型（INSERT/INSERT…SELECT/Thrift Insert → `Append`，COPY 与
 `import_literals` → `Import`，UPDATE → `Update{row_ids, segments}`，DELETE → `Delete{row_ids}`，COMPACT → `Compact`，
 DUMP → `DumpMemIndex`，OPTIMIZE → `OptimizeIndex{entries}`（一次 optimize 一个事务，逐索引段记录），DDL 各自一种，
@@ -100,7 +100,7 @@ Append/Update/快照，段级对 Compact，索引级对 DumpMemIndex/DropIndex�
 `retry_query` 的两档错误（4002 重试 / 4005 直返）、`QueryContext::QueryStatement` 的整句重试、
 IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）、`APPLIED_TS_KEY` 最后写。
 
-测试：`infinity-txn` 的 `conflict::tests::*`（矩阵逐条，含 `an_optimize_pass_conflicts_per_entry`）、
+测试：`txn` 的 `conflict::tests::*`（矩阵逐条，含 `an_optimize_pass_conflicts_per_entry`）、
 `tests::a_read_at_an_older_ts_hides_later_commits`（读按 begin_ts）、
 `tests::a_snapshot_that_saw_a_commit_does_not_conflict_with_it`（KV 提交时间戳的三段判据）、`conflict_check_ut::conflict_check_delete`（C++ `conflict_check_ut.cpp`）、
 `request_ut::conflict_*`（C++ `conflict_request_ut.cpp` 的十个用例）。
@@ -140,7 +140,7 @@ IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）
 | `CREATE TABLE … AS SELECT` | 不实现（参考也没有）：`CREATE TABLE t AS SELECT …` 返回参考的 `Status::NoColumnDefined`（`Try to define Table t without any column.`，3048）；带列定义的 `CREATE TABLE t (a INT) AS SELECT …` 在参考是解析错误（`unexpected AS, expecting end of file`），端口同样拒绝 | `select_ddl_ut::create_table_as_select_is_rejected_like_the_reference` |
 | `CREATE VIEW` / `DROP VIEW` | 不实现（参考也没有实现）：`PhysicalCreateView::Execute` 是空壳、DDL 分发没有这个分支，两侧都死在 `UnrecoverableException("Unknown DDL type")`（`query_context_impl.cpp:467`/`:489`），视图不会被登记，`FROM v` 随后报表不存在 | `select_ddl_ut::views_are_rejected_like_the_reference` |
 | `INSERT … SELECT` | 只支持 select list 全为常量：参考的 `PhysicalInsert` 把投影表达式交给 `ExpressionState::CreateState`，那里没有 `Column` 分支，任何列引用（含 `SELECT *`）都会死在该处（`expression_state_impl.cpp:68`）。端口报同一条 `Unknown expression type: Column. expression name: {col}`，常量情形与参考一样按源行数插入 | `select_ddl_ut::insert_select_is_refused_when_the_select_list_reads_a_column` |
-| `CREATE SNAPSHOT … ON TABLE <db>.<tbl>` | 参考的文法是 `IDENTIFIER`，带库名的写法是解析错误（`unexpected '.', expecting end of file`）；端口接受限定名（HTTP 层就按这个拼），无库名时用会话库 | `infinity-parser` 的 `CREATE SNAPSHOT` 分支（`parser.rs:362`） |
+| `CREATE SNAPSHOT … ON TABLE <db>.<tbl>` | 参考的文法是 `IDENTIFIER`，带库名的写法是解析错误（`unexpected '.', expecting end of file`）；端口接受限定名（HTTP 层就按这个拼），无库名时用会话库 | `parser` 的 `CREATE SNAPSHOT` 分支（`parser.rs:362`） |
 
 ### 5.1 读路径比参考慢（已收窄，未追平）
 

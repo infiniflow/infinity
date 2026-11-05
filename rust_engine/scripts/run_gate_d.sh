@@ -13,16 +13,16 @@ echo "== Gate D =="
 cd "$here/.." || exit 1
 
 # 1. loom: core scheduler/channel state machines
-RUSTFLAGS="--cfg loom" cargo test -q -p infinity-txn --lib loom || status=1
+RUSTFLAGS="--cfg loom" cargo test -q -p txn --lib loom || status=1
 
 # 2. miri on the FFI-free core (parser/expression/planner are pure Rust)
 #    miri needs a nightly toolchain; the repo pins `nightly-2025-04-04` for it.
 miri_tc="nightly-2025-04-04"
 if rustup component list --installed --toolchain "$miri_tc" 2>/dev/null | grep -q '^miri'; then
-  cargo "+$miri_tc" miri test -p infinity-expression -p infinity-planner -p infinity-parser \
+  cargo "+$miri_tc" miri test -p expression -p planner -p parser \
     || status=1
 elif rustup component list --installed 2>/dev/null | grep -q '^miri'; then
-  cargo +nightly miri test -p infinity-expression -p infinity-planner -p infinity-parser \
+  cargo +nightly miri test -p expression -p planner -p parser \
     || status=1
 else
   echo "SKIP: miri not installed (rustup component add miri --toolchain $miri_tc)"
@@ -32,13 +32,13 @@ fi
 #    Sanitizers are nightly rustc flags (`-Zsanitizer=…`) and need `-Zbuild-std`
 #    (rust-src) so std matches the instrumented build; the pinned nightly is used
 #    because the runtime must match the compiler. Only the pure-Rust crates are
-#    built here: `infinity-storage`/`infinity-catalog`/`infinity-executor` pull
+#    built here: `storage`/`catalog`/`executor` pull
 #    dependencies whose MSRV is above the pinned nightly.
 san_tc="nightly-2025-04-04"
 if rustup toolchain list 2>/dev/null | grep -q "^$san_tc"; then
   for san in address thread; do
     if RUSTFLAGS="-Zsanitizer=$san" cargo "+$san_tc" test \
-        -p infinity-expression -p infinity-parser -p infinity-planner \
+        -p expression -p parser -p planner \
         --target x86_64-unknown-linux-gnu -Zbuild-std; then
       echo "sanitizer=$san: core crates clean"
     else

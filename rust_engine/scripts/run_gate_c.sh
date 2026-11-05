@@ -13,12 +13,12 @@ echo "== Gate C =="
 
 # 1. in-repo restart / snapshot suites (work on the Rust engine today)
 cd "$here/.." && cargo test --workspace -q || status=1
-cargo run -q --release -p infinity-cli -- conformance "$root/test/sql/snapshot" \
+cargo run -q --release -p cli -- conformance "$root/test/sql/snapshot" \
   || { echo "snapshot .slt baseline not at 100%"; status=1; }
 
 # 2. python restart_test (needs a running server + the python SDK).
 #    The harness starts the engine as `<binary> --config=<toml>`; the shim maps
-#    that onto the Rust `infinity-server`. Unprivileged users get a writable
+#    that onto the Rust `server`. Unprivileged users get a writable
 #    `/var/infinity` (plus the CSV fixtures) via `bwrap` when it is available.
 if [[ -d "$root/python/restart_test" ]]; then
   py="${PYTHON:-}"
@@ -65,7 +65,7 @@ if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
   # Both engines keep their catalog in the same RocksDB key space
   # (`catalog| db| tbl| col| idx|`), so the binary Gate C runs above already
   # reads and writes what the reference does.
-  if cargo build -q --release -p infinity-cli; then
+  if cargo build -q --release -p cli; then
     cross=( "$py" -m pytest -q python/restart_test/test_cross_engine_compat.py \
             python/restart_test/test_cross_engine_bytes_*.py \
             --infinity_path="$shim" )

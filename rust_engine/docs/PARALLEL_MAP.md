@@ -13,7 +13,7 @@
 | `partial` | 机制已有，但只覆盖一部分路径——行内写清还缺哪一段 |
 | `n/a` | 参考有该结构、端口不需要（或反之），不影响等价 |
 
-并发一律建在 tokio 上（`infinity-executor::scheduler`）：常驻池是一个多线程 runtime，tasklet 是它的 `spawn_blocking` 作业，行号分配器是它的常驻阻塞消费者。唯一保留的命名线程是 `infinity-txn` 的 WAL 写线程——那个 crate 没有 scheduler，且它独占 `wal.log` 句柄直到进程结束。
+并发一律建在 tokio 上（`executor::scheduler`）：常驻池是一个多线程 runtime，tasklet 是它的 `spawn_blocking` 作业，行号分配器是它的常驻阻塞消费者。唯一保留的命名线程是 `txn` 的 WAL 写线程——那个 crate 没有 scheduler，且它独占 `wal.log` 句柄直到进程结束。
 
 ## 1 线程、队列与池
 
@@ -34,7 +34,7 @@
 | | |
 |---|---|
 | 参考 | 池：`max(2, hardware_concurrency()/2)` 条队列、`crc32(table_id) % n` 路由（`bottom_executor_impl.cpp:32-78`、`config_impl.cpp:562-567`）；每事务由**一个** worker 跑完上面全部步骤 |
-| 端口 | `infinity_storage::wal::bottom_executor::BottomExecutor` + `Engine::run_commit_bottom`（`BottomWork`：own `Arc<Engine>`、staged appends/deletes/dumps、每表 gate，跑 `run_bottom` 后 condvar 回传）；`start_background_tasks` 起池 |
+| 端口 | `storage::wal::bottom_executor::BottomExecutor` + `Engine::run_commit_bottom`（`BottomWork`：own `Arc<Engine>`、staged appends/deletes/dumps、每表 gate，跑 `run_bottom` 后 condvar 回传）；`start_background_tasks` 起池 |
 | 状态 | `aligned` |
 | 证据 | `an_insert_runs_its_bottom_half_on_the_bottom_executor`（`BOTTOM_WORKS` 计数 + 返回即可查）、字节门禁 `20_table`/`50_mutations` |
 
@@ -90,7 +90,7 @@
 | 参考 | 独立写线程 `new_flush_thread_`（`wal_manager_impl.cpp:89`、`NewFlush`），条目从 `new_wait_flush_` 取 |
 | 端口 | `WalWriter`：名为 `wal-writer` 的线程独占 `WalManager`，`append`/`flush`/`file_size`/`rotate` 各是一个作业，调用方入队后等回执。checkpoint 是**一个**作业（换文件 → 写帧；数据全部落盘后由 `sync_wal` 在 checkpoint 末尾 fsync 帧），与参考在 `Flush` 循环里遇到 checkpoint 条目才 `SwapWalFile` 一致；`rotate_wal_if_large` 也把"看大小 + 轮换"合成一个作业。`TxnManager` 析构时关队列并 join 写线程 |
 | 状态 | `aligned` |
-| 证据 | `test_cross_engine_bytes_40_wal.py`（整份 `wal.log` 逐帧相同，3 passed）、`50_mutations`（8 passed）、`cargo test -p infinity-txn`（18） |
+| 证据 | `test_cross_engine_bytes_40_wal.py`（整份 `wal.log` 逐帧相同，3 passed）、`50_mutations`（8 passed）、`cargo test -p txn`（18） |
 
 ### 1.6 执行期 tasklet
 
@@ -118,8 +118,8 @@
 
 | 等待点 | 参考做的事 | 参考 | 端口 | 状态 | 证据 |
 |---|---|---|---|---|---|
-| 上半部等自己的下半部 | 提交线程把 txn 交给池后睡在 `commit_cv_`，被 `NotifyTopHalf` 唤醒才 `PostCommit`/`SetTxnCommitted` | `new_txn_impl.cpp:2138-2141` | `commit_deferred` → 底部工作 → `finish_bottom`；`run_commit_bottom` 用 condvar 等 worker | `aligned` | `infinity-txn` 单测、`a_commit_runs_its_bottom_half_on_the_bottom_executor` |
-| 按 commit_ts 顺序发布 | `bottom_txns_` 按 ts 排序，队首完成即推进 `current_ts_`；先做完的后序 txn 不越位 | `new_txn_manager_impl.cpp:410-457` | `register_bottom`/`finish_bottom` 屏障（冲突也走同一屏障，ts 空洞保留） | `aligned` | `infinity-txn` 的发布顺序用例 |
+| 上半部等自己的下半部 | 提交线程把 txn 交给池后睡在 `commit_cv_`，被 `NotifyTopHalf` 唤醒才 `PostCommit`/`SetTxnCommitted` | `new_txn_impl.cpp:2138-2141` | `commit_deferred` → 底部工作 → `finish_bottom`；`run_commit_bottom` 用 condvar 等 worker | `aligned` | `txn` 单测、`a_commit_runs_its_bottom_half_on_the_bottom_executor` |
+| 按 commit_ts 顺序发布 | `bottom_txns_` 按 ts 排序，队首完成即推进 `current_ts_`；先做完的后序 txn 不越位 | `new_txn_manager_impl.cpp:410-457` | `register_bottom`/`finish_bottom` 屏障（冲突也走同一屏障，ts 空洞保留） | `aligned` | `txn` 的发布顺序用例 |
 | 行与索引一起可见 | 行落在块文件里、由下半部的 `AppendInBlock` 写，`SetTxnCommitted` 之后才可读；删除的墓碑在 `DeleteInBlock`，也在下半部 | `new_txn_impl.cpp:2138-2141`、`4624-4660` | 同：`INSERT` 的 `row:` 与 `DELETE` 的 `del:` 都写在下半部（行 → 墓碑 → 索引 → 块镜像），发布由 `BottomGuard` 在最后触发 | `aligned` | 679 单测、`20_table`（5）与 `50_mutations`（8）字节门禁 |
 | dump 任务完成 | `StopProcessorTask::Wait()` 等已入队任务跑完 | `background_process_impl.cpp:46-53` | `BGTaskProcessor::drain()` | `aligned` | `bg_task_ut` |
 | 只读事务 | `GetReadCommitTS`：不写 WAL、不占写 ts | `new_txn_impl.cpp:2051-2059` | `TxnManager::commit` 的 read-only 分支 | `aligned` | `txn_ut` |
@@ -151,5 +151,5 @@
 
 1. **池计数器**：`BOTTOM_WORKS`、`TEXT_APPENDS`、`bg_task_ut` 的 `drain()` 断言——证明工作真的换了线程，而不是文档里写了一句。
 2. **外部口径**：`test/sql/explain/explain_fragment.slt` 钉住 `FRAGMENT (1, <type>)` 与 sink/source，类型由计划里有无阻塞算子决定（`ParallelStream` / `ParallelMaterialize` / `SerialMaterialize`）；`EXPLAIN` 的 merge 算子（`TOP`/`AGGREGATE`）与参考一致。
-3. **可见性单测**：commit-ts 顺序发布、同表下半部顺序、索引写完才返回——都在 `infinity-txn` 与执行器单测里；语句路径的读窗口取 `begin_ts = current_ts + 1`，口径见 `GAPS.md` §2.1。
+3. **可见性单测**：commit-ts 顺序发布、同表下半部顺序、索引写完才返回——都在 `txn` 与执行器单测里；语句路径的读窗口取 `begin_ts = current_ts + 1`，口径见 `GAPS.md` §2.1。
 4. **并发门禁**：Gate D（`run_gate_d.sh`）覆盖并发本身；字节门禁保持单客户端串行（`PORTING.md` §2.2）。

@@ -93,9 +93,9 @@
 2. 与参考比对并行结构的外部口径——`EXPLAIN FRAGMENT` 的 fragment 类型与 sink/source、`EXPLAIN` 里的 merge 算子（`test/sql/explain`，期望值取自参考二进制）；
 3. 并发下的可观察顺序单独写用例（commit-ts 顺序发布、同表下半部按提交顺序）。
 
-**实现选择：并发一律走 tokio，不再手写线程池。** 参考的 `TaskScheduler` 是常驻 worker 池，端口用 tokio 多线程 runtime 承担（`infinity-executor::scheduler`）：tasklet 是 `spawn_blocking` 作业（CPU 密集且阻塞在有界交换队列上），sink 任务提交到同一个池并 `block_on` 等待；行号分配器作为常驻阻塞消费者跑在同一个池上。这样"池多大、谁来调度、任务怎么排队"由框架决定，和参考的 `TaskScheduler` 一一对应，也避免每个 fragment 起线程。
+**实现选择：并发一律走 tokio，不再手写线程池。** 参考的 `TaskScheduler` 是常驻 worker 池，端口用 tokio 多线程 runtime 承担（`executor::scheduler`）：tasklet 是 `spawn_blocking` 作业（CPU 密集且阻塞在有界交换队列上），sink 任务提交到同一个池并 `block_on` 等待；行号分配器作为常驻阻塞消费者跑在同一个池上。这样"池多大、谁来调度、任务怎么排队"由框架决定，和参考的 `TaskScheduler` 一一对应，也避免每个 fragment 起线程。
 
-只有两类例外保留命名线程，因为它们持有的是进程级阻塞资源、且所在 crate 没有 scheduler：`infinity-txn` 里的 WAL 写线程（独占 `wal.log` 句柄）。判断标准是"这个循环会不会阻塞在 I/O 或队列上、是否活到进程结束"——会，就用 tokio 的阻塞池或专用线程；能 await 的，用 async 任务。
+只有两类例外保留命名线程，因为它们持有的是进程级阻塞资源、且所在 crate 没有 scheduler：`txn` 里的 WAL 写线程（独占 `wal.log` 句柄）。判断标准是"这个循环会不会阻塞在 I/O 或队列上、是否活到进程结束"——会，就用 tokio 的阻塞池或专用线程；能 await 的，用 async 任务。
 
 字节门禁仍保持单客户端串行（§2.2），并发本身的覆盖归 Gate D。逐结构的状态、落点与证据见 [`PARALLEL_MAP.md`](PARALLEL_MAP.md)。
 
@@ -103,10 +103,10 @@
 
 ### 2.8 `unsafe` 的边界
 
-除 `infinity-storage` 与 `infinity-cli`，每个 crate 都是 `#![forbid(unsafe_code)]`。剩下两处 `unsafe` 是刻意的：
+除 `storage` 与 `cli`，每个 crate 都是 `#![forbid(unsafe_code)]`。剩下两处 `unsafe` 是刻意的：
 
-- **`memmap2::Mmap::map`**（`infinity-storage` 的 `mapped::MappedFile`：封存索引段与封存块文件都走它）：`memmap2` 的 API 是 `unsafe`，因为映射可能比 `File` 活得久。改成 `std::fs::read` 虽然能消掉它，但会把整段读进堆（RSS）、失去惰性分页与 page cache 回收——首轮实测这类改动会明显拖慢大表扫描，**不再考虑**。`infinity-storage` 因此保持 `#![deny(unsafe_code)]` + 每处 `#[allow(unsafe_code)]`，并逐处写 SAFETY 注释（段/块一旦封存不可变，映射期间文件不会被改写）。
-- **`malloc_trim` / `posix_fadvise`**（`infinity-storage` 与 CLI 的 `trim_allocator`、`drop_file_cache`）：只能 FFI。它们服务于内存观测与长导入的 page cache 边界（Gate C），作用域极小、无指针、无生命周期，属于可接受的"测试/运维向"unsafe。
+- **`memmap2::Mmap::map`**（`storage` 的 `mapped::MappedFile`：封存索引段与封存块文件都走它）：`memmap2` 的 API 是 `unsafe`，因为映射可能比 `File` 活得久。改成 `std::fs::read` 虽然能消掉它，但会把整段读进堆（RSS）、失去惰性分页与 page cache 回收——首轮实测这类改动会明显拖慢大表扫描，**不再考虑**。`storage` 因此保持 `#![deny(unsafe_code)]` + 每处 `#[allow(unsafe_code)]`，并逐处写 SAFETY 注释（段/块一旦封存不可变，映射期间文件不会被改写）。
+- **`malloc_trim` / `posix_fadvise`**（`storage` 与 CLI 的 `trim_allocator`、`drop_file_cache`）：只能 FFI。它们服务于内存观测与长导入的 page cache 边界（Gate C），作用域极小、无指针、无生命周期，属于可接受的"测试/运维向"unsafe。
 
 判断标准：**性能敏感的映射必须保留**；只有"无指针、无别名、仅调用一个系统函数"的窄 FFI 才允许，且必须写清楚为什么不能用安全 API 表达。
 
@@ -129,7 +129,7 @@ drop 的数据库。
 `row:` 也没有 `del:` 键，也没有行侧车：行数据只有「块文件 + WAL」两份。
 
 **封存块与索引段都靠 mmap，参考的 `BufferManager` 不再移植**：封存块的文件不会变，读时直接
-`MappedBlock::open`（`infinity-storage::mapped_block`）把每个 `{col}.col` 映射进来，列体就是映射里的
+`MappedBlock::open`（`storage::mapped_block`）把每个 `{col}.col` 映射进来，列体就是映射里的
 一个切片，槽位解码直接在 page cache 上做；索引段（全文/BMP/二维/EMVB/多值/低基数）同样由
 `mapped::MappedFile` 映射。映射本身在进程内共享：引擎的 `Context::block_maps` 每个 `BlockId` 只留一个
 `Arc<MappedBlock>`，同一块的并发读共用它，块被重写/压缩/删除时按表丢弃（`drop_block_maps`）。因此参考
@@ -259,7 +259,7 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 
 | 参考 | 用在哪 | 重写版（.rs 文件 · 函数） | 行数 | 怎么钉住 |
 |---|---|---|---|---|
-| **FastPFor**（vcpkg 的 libFastPFOR.a） | 倒排 u32 块：doc id / tf / skip list / 位置 | `infinity-storage/src/inverted_format.rs` · `encode_u32_block` / `decode_u32_block` | **261** | `u32_block_matches_the_cpp_bytes`：7 组 C++ 输出 hex 字面量，覆盖纯 VB、SIMD+VB、bw1/bw2 |
+| **FastPFor**（vcpkg 的 libFastPFOR.a） | 倒排 u32 块：doc id / tf / skip list / 位置 | `storage/src/inverted_format.rs` · `encode_u32_block` / `decode_u32_block` | **261** | `u32_block_matches_the_cpp_bytes`：7 组 C++ 输出 hex 字面量，覆盖纯 VB、SIMD+VB、bw1/bw2 |
 | **newpfor**（third_party/newpfor） | 倒排 u16 块：doc payload / term percentage | 同上文件 · `encode_u16_block` / `decode_u16_block` | **464** | `u16_block_decodes_the_cpp_bytes`：C++ 输出逐字节，含六种特殊帧与 S9 异常区 |
 | **darts-clone**（third_party/darts） | RAG 词典 trie | `executor/src/analyzer.rs` · `DartsTrie`（读）<br>`executor/src/darts_build.rs`（建） | **74 + 808** | 建出的 trie 与随包 `huqie.trie` 逐字节相同（1,893,632 units） |
 | **OpenCC**（third_party/opencc + marisa） | `traditional` 分析器、RAG 简繁转换 | `executor/src/analyzer.rs` · `OpenCcDict` / `OpenCcConverter` / `TraditionalChineseAnalyzer`（只重写最短路径分词，不含 marisa 构建器） | **263** | `test_opencc_converts_traditional_to_simplified` 等 + 分词一致性 |
@@ -268,14 +268,14 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 | **zlib**（只用于 MeCab `sys.bin`） | 解这一个文件的 DEFLATE 流 | `executor/src/analyzer.rs` · `InflateBits` / `inflate` / `zlib_decompress`（不含压缩、gzip 封装与预设字典） | **266** | 解出长度与 `sys.bin` 记录的 `total_size` 一致 |
 | **RE2**（vcpkg） | `regex(col, pattern)` 谓词、`LIKE` 转正则 | `expression/src/regex.rs`（回溯引擎）<br>`expression/src/regex_literal.rs`（必含字面量提取） | **455 + 528** | 参考 `regex_impl.cpp` / `like_impl.cpp` 的行为 |
 | **PCRE2**（vcpkg） | ① 分析器 `\W+` 替换；② 高亮器的 case-insensitive 匹配 | ① `executor/src/analyzer.rs` · `strip_non_word*`<br>② `executor/src/lib.rs` · `highlight_text` / `highlight_with_analyzer` | **14 + 60** | ① `Tokenize` 的输出与位置；② `highlighter_ut` |
-| **simdjson**（vcpkg） | JSONL 语料、JSON 列 | `infinity-common/src/json.rs` · `Json` 解析/打印/BSON 互转 | **543** | `json::tests` 与 JSON 列往返 |
-| **nlohmann_json**（vcpkg） | 列值 / catalog 的 JSON | `infinity-catalog/src/value_format.rs` · 列定义、索引定义、类型信息的 JSON<br>`infinity-catalog/src/cpp_layout.rs` · catalog 键与值的组装 | **933 + 2131** | catalog 键值逐字节门禁（键序相同） |
+| **simdjson**（vcpkg） | JSONL 语料、JSON 列 | `common/src/json.rs` · `Json` 解析/打印/BSON 互转 | **543** | `json::tests` 与 JSON 列往返 |
+| **nlohmann_json**（vcpkg） | 列值 / catalog 的 JSON | `catalog/src/value_format.rs` · 列定义、索引定义、类型信息的 JSON<br>`catalog/src/cpp_layout.rs` · catalog 键与值的组装 | **933 + 2131** | catalog 键值逐字节门禁（键序相同） |
 | **zsv**（third_party/zsv） | `COPY … (FORMAT CSV)` 的解析 | `executor/src/lib.rs` · `csv_fields`（引号与转义；不含参考的流式状态机） | **32** | 导入用例 |
-| **pgm-index**（third_party/pgm） | 次级/稀疏索引的分段模型 | `infinity-storage/src/secondary_segment.rs` · `Pgm` / `PgmFloat`（只做参考实例化的特化） | **1104** | chunk 尾部的 PGM 与参考同字节 |
-| **xor_singleheader**（third_party） | `fast_rough_filter` 的 fuse-8 构造 | `infinity-storage/src/binary_fuse_filter.rs` · `BinaryFuseFilter` | **322** | 假阴性为 0；130 字节记录与参考同字节 |
-| **eigen**（third_party） | `EMVBSVDSolve` 的两侧 Jacobi SVD | `infinity-index/src/emvb.rs` · `jacobi_svd` / `real_2x2_jacobi_svd` | **434** | 参考 `eigen_svd_impl` 的数值结果 |
-| **mlas**（third_party） | `SearchTopK` 的 SGEMM | `infinity-index/src/knn_flat.rs` · `top_k`（标量距离核，不做批量 SGEMM；`simd.rs` 里另有 SIMD 路径） | **53** | `l2_top_k_matches_the_reference` 等 |
-| **LZ4**（vcpkg） | `VirtualStore` 溢写临时文件 | `infinity-storage/src/virtual_store.rs` · 容器（256 字节头 + 压缩体）；压缩本身由 `lz4_flex` crate 完成 | **280** | 只影响临时文件，不进数据目录 |
+| **pgm-index**（third_party/pgm） | 次级/稀疏索引的分段模型 | `storage/src/secondary_segment.rs` · `Pgm` / `PgmFloat`（只做参考实例化的特化） | **1104** | chunk 尾部的 PGM 与参考同字节 |
+| **xor_singleheader**（third_party） | `fast_rough_filter` 的 fuse-8 构造 | `storage/src/binary_fuse_filter.rs` · `BinaryFuseFilter` | **322** | 假阴性为 0；130 字节记录与参考同字节 |
+| **eigen**（third_party） | `EMVBSVDSolve` 的两侧 Jacobi SVD | `index/src/emvb.rs` · `jacobi_svd` / `real_2x2_jacobi_svd` | **434** | 参考 `eigen_svd_impl` 的数值结果 |
+| **mlas**（third_party） | `SearchTopK` 的 SGEMM | `index/src/knn_flat.rs` · `top_k`（标量距离核，不做批量 SGEMM；`simd.rs` 里另有 SIMD 路径） | **53** | `l2_top_k_matches_the_reference` 等 |
+| **LZ4**（vcpkg） | `VirtualStore` 溢写临时文件 | `storage/src/virtual_store.rs` · 容器（256 字节头 + 压缩体）；压缩本身由 `lz4_flex` crate 完成 | **280** | 只影响临时文件，不进数据目录 |
 
 #### 不移植或换实现（不进门禁）
 
@@ -283,10 +283,10 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 |---|---|
 | **Arrow / Parquet** | 未移植，COPY ... (FORMAT PARQUET) 不支持（GAPS.md §1） |
 | **fmt / spdlog** | std 格式化 + 自写日志；日志不进任何门禁 |
-| **CLI11 / tomlplusplus / inih** | 手写参数与配置解析（infinity-cli/src/config.rs） |
-| **oatpp / Libevent / Boost.Asio** | infinity-server 手写 HTTP/1.1 + Tokio（PARALLEL_MAP.md） |
+| **CLI11 / tomlplusplus / inih** | 手写参数与配置解析（cli/src/config.rs） |
+| **oatpp / Libevent / Boost.Asio** | server 手写 HTTP/1.1 + Tokio（PARALLEL_MAP.md） |
 | **OpenSSL** | rustls + rustls-native-certs + sha2/hmac |
-| **minio-cpp / curlpp / curl** | infinity_storage 的 s3 手写签名与请求；GAPS.md §1：不对齐 obj_key 打包 |
+| **minio-cpp / curlpp / curl** | storage 的 s3 手写签名与请求；GAPS.md §1：不对齐 obj_key 打包 |
 | **GTest** | #[test] + tempfile |
 | **absl / pugixml / magic_enum** | 参考只是 find_package 了它们，代码里没有引用（grep absl:: 与 pugi:: 都为空），端口不引入 |
 | **base64**（third_party/base64） | 参考只在 `BlockTagMetaKey::ToJson` 用（`meta_key_impl.cpp:205`），而那条 JSON 只服务 `SHOW CATALOG` / `SHOW CLEAN` 的渲染；端口不实现这两个命令（`dump-catalog` 直接给原始 key/hex），所以不需要 base64，见下方说明 |
@@ -350,7 +350,7 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 格式门禁（需要参考二进制 `cmake-build-reldeb/src/infinity`）：
 
 ```bash
-cd rust_engine && cargo build --release -p infinity-cli
+cd rust_engine && cargo build --release -p cli
 cd ..
 .venv/bin/python -m pytest python/restart_test/test_cross_engine_bytes_*.py \
                               python/restart_test/test_cross_engine_compat.py -q

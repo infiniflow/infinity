@@ -73,6 +73,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "catalog"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "expression",
+ "storage",
+ "tempfile",
+]
+
+[[package]]
 name = "cc"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -107,6 +117,26 @@ checksum = "157a8ba7b480713b56f4c09fd13fc3e0a22a5dfab8097ba61cbc5feef950788a"
 dependencies = [
  "glob",
  "libc",
+]
+
+[[package]]
+name = "cli"
+version = "0.1.0"
+dependencies = [
+ "catalog",
+ "common",
+ "executor",
+ "parser",
+ "server",
+ "storage",
+ "txn",
+]
+
+[[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
 ]
 
 [[package]]
@@ -178,6 +208,31 @@ checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "executor"
+version = "0.1.0"
+dependencies = [
+ "catalog",
+ "common",
+ "expression",
+ "index",
+ "lz4_flex",
+ "parser",
+ "planner",
+ "rust-stemmers",
+ "storage",
+ "tempfile",
+ "tokio",
+ "txn",
+]
+
+[[package]]
+name = "expression"
+version = "0.1.0"
+dependencies = [
+ "parser",
 ]
 
 [[package]]
@@ -261,121 +316,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "infinity-catalog"
+name = "index"
 version = "0.1.0"
 dependencies = [
- "infinity-common",
- "infinity-expression",
- "infinity-storage",
- "tempfile",
-]
-
-[[package]]
-name = "infinity-cli"
-version = "0.1.0"
-dependencies = [
- "infinity-catalog",
- "infinity-common",
- "infinity-executor",
- "infinity-parser",
- "infinity-server",
- "infinity-storage",
- "infinity-txn",
-]
-
-[[package]]
-name = "infinity-common"
-version = "0.1.0"
-dependencies = [
- "thiserror",
-]
-
-[[package]]
-name = "infinity-executor"
-version = "0.1.0"
-dependencies = [
- "infinity-catalog",
- "infinity-common",
- "infinity-expression",
- "infinity-index",
- "infinity-parser",
- "infinity-planner",
- "infinity-storage",
- "infinity-txn",
- "lz4_flex",
- "rust-stemmers",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "infinity-expression"
-version = "0.1.0"
-dependencies = [
- "infinity-parser",
-]
-
-[[package]]
-name = "infinity-index"
-version = "0.1.0"
-dependencies = [
- "infinity-common",
- "infinity-storage",
- "tempfile",
-]
-
-[[package]]
-name = "infinity-parser"
-version = "0.1.0"
-dependencies = [
- "infinity-common",
-]
-
-[[package]]
-name = "infinity-planner"
-version = "0.1.0"
-dependencies = [
- "infinity-common",
- "infinity-expression",
- "infinity-parser",
-]
-
-[[package]]
-name = "infinity-server"
-version = "0.1.0"
-dependencies = [
- "infinity-common",
- "infinity-executor",
- "infinity-parser",
- "tempfile",
- "thrift",
-]
-
-[[package]]
-name = "infinity-storage"
-version = "0.1.0"
-dependencies = [
- "crc32fast",
- "hmac",
- "infinity-common",
- "infinity-index",
- "lz4_flex",
- "memmap2",
- "roaring",
- "rocksdb",
- "rustls",
- "rustls-native-certs",
- "sha2",
- "tempfile",
-]
-
-[[package]]
-name = "infinity-txn"
-version = "0.1.0"
-dependencies = [
- "infinity-common",
- "infinity-storage",
- "loom",
+ "common",
+ "storage",
  "tempfile",
 ]
 
@@ -565,6 +510,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "parser"
+version = "0.1.0"
+dependencies = [
+ "common",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -575,6 +527,15 @@ name = "pkg-config"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
+
+[[package]]
+name = "planner"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "expression",
+ "parser",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -818,6 +779,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "executor",
+ "parser",
+ "tempfile",
+ "thrift",
+]
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -854,6 +826,24 @@ name = "smallvec"
 version = "1.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
+
+[[package]]
+name = "storage"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "crc32fast",
+ "hmac",
+ "index",
+ "lz4_flex",
+ "memmap2",
+ "roaring",
+ "rocksdb",
+ "rustls",
+ "rustls-native-certs",
+ "sha2",
+ "tempfile",
+]
 
 [[package]]
 name = "subtle"
@@ -1010,6 +1000,16 @@ name = "twox-hash"
 version = "2.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86a801b3cea342a06d468c8710662aa29e5e05e4f5c0d62f00bbb7f2ad7941c2"
+
+[[package]]
+name = "txn"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "loom",
+ "storage",
+ "tempfile",
+]
 
 [[package]]
 name = "typenum"

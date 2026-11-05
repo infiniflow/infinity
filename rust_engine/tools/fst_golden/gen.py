@@ -5,7 +5,7 @@ The C++ full-text index stores its term dictionary as a self-owned FST
 (`src/storage/invertedindex/fst/`). Its node state machine is byte-exact and
 hard to verify from source alone, so we compile the *real* C++ sources into a
 throwaway binary and print the FST bytes for a few small key sets. Those bytes
-are pasted into `infinity-storage/src/inverted_format.rs`
+are pasted into `storage/src/inverted_format.rs`
 (`golden_fsts_from_the_cpp_builder_verify`, `fst_lookup_decodes_the_cpp_built_fsts`),
 where the Rust decoder is checked against them.
 
@@ -18,7 +18,7 @@ Usage (from anywhere):
 
     python3 rust_engine/tools/fst_golden/gen.py [--check]
 
-`--check` also runs `cargo test -p infinity-storage fst_` to confirm the Rust
+`--check` also runs `cargo test -p storage fst_` to confirm the Rust
 decoder still agrees with the freshly built fixtures.
 
 Requires: a `clang++` new enough for C++23 (tested with clang 23) and, for
@@ -175,7 +175,7 @@ def main() -> int:
     print(out, end="")
     if args.check:
         subprocess.run(
-            ["cargo", "test", "-p", "infinity-storage", "fst_", "--", "--nocapture"],
+            ["cargo", "test", "-p", "storage", "fst_", "--", "--nocapture"],
             cwd=os.path.join(ROOT, "rust_engine"),
             check=True,
         )

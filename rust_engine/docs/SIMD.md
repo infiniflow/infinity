@@ -5,10 +5,10 @@
 
 | 参考文件 | 用途 | 端口对应 | 状态 |
 |---|---|---|---|
-| `hnsw_simd_func.cppm` | `F32L2*` / `F32IP*` / `F32Cos*`（HNSW 的距离内核），以及 `I8*` / `U8*` 量化版本 | `infinity-index/src/simd.rs` | ✅ F32；I8/U8 未移植（见 §3） |
+| `hnsw_simd_func.cppm` | `F32L2*` / `F32IP*` / `F32Cos*`（HNSW 的距离内核），以及 `I8*` / `U8*` 量化版本 | `index/src/simd.rs` | ✅ F32；I8/U8 未移植（见 §3） |
 | `distance_simd_functions_impl.cpp` | 按类型的通用距离（float / int8 / uint8 / 二值） | 同上（只有 f32 稠密路径） | 部分 |
-| `simdbitpacking`（third_party fastpfor） | posting list 的 SIMD-BP128 编解码 | `infinity-storage/src/inverted_format.rs` | ✅ 见 `FULLTEXT_BENCH.md` §4.6 |
-| `maxsim_simd_funcs.cppm` | 多向量（late-interaction）的 max-sim | `infinity-index/src/multivector.rs` 的 `dot` | ✅ |
+| `simdbitpacking`（third_party fastpfor） | posting list 的 SIMD-BP128 编解码 | `storage/src/inverted_format.rs` | ✅ 见 `FULLTEXT_BENCH.md` §4.6 |
+| `maxsim_simd_funcs.cppm` | 多向量（late-interaction）的 max-sim | `index/src/multivector.rs` 的 `dot` | ✅ |
 | `batch_bm25_simd_funcs.cppm` | 批量 BM25 打分 | WAND 逐文档打分（`wand.rs`） | 结构不同，未做批量 |
 | `search_top_k*.cppm` / `emvb_simd_funcs.cppm` / `diskann_simd_func.cppm` | top-k 选择、EMVB 张量、DiskANN | `emvb.rs` / `rabitq.rs` 等 | 未做 |
 

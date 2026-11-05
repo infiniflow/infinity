@@ -117,7 +117,7 @@ print(res)
 
 ## 🔧 Deploy Infinity using binary
 
-If you wish to deploy Infinity using binary with the server and client as separate processes, see the [Deploy infinity using binary](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
+If you wish to deploy Infinity using binary with the server and client as separate processes, see the [Deploy infinity using binary](https://infiniflow.org/docs/dev/deploy_server) guide.
 
 ## 🔧 Build from Source
 

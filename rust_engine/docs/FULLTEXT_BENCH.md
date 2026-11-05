@@ -1,7 +1,7 @@
 # 全文基准：参考 `fulltext_benchmark` 的 Rust 移植与对比
 
 > 参考实现：`benchmark/local_infinity/fulltext/fulltext_benchmark.cpp`
-> 端口：`crates/infinity-cli/src/fulltext_bench.rs`（`infinity fulltext-bench …`）
+> 端口：`crates/cli/src/fulltext_bench.rs`（`infinity fulltext-bench …`）
 
 ## 1. 怎么跑
 
@@ -25,7 +25,7 @@ docker exec infinity_stable_build bash -c 'cd /infinity && \
 端口（Rust）：
 
 ```bash
-cargo build --release -p infinity-cli
+cargo build --release -p cli
 ./target/release/infinity fulltext-bench <dir> <mode> <corpus.jsonl> [batch=500]
 ```
 
@@ -471,7 +471,7 @@ set_memindex_capacity(2) 把 20 行切成约 10 个段，断言四条查询（�
 两边的 `Flush` 都是 checkpoint：参考的 `Flush()` 走 `PhysicalFlush`
 （`src/executor/operator/physical_flush_impl.cpp:42`），即 kv store 的 `Flush()`
 再加一个 `NewCheckpointTask` 并等它结束；端口 `Engine::flush` 走 `flush_storage`
-（`crates/infinity-executor/src/lib.rs:21257`）。**在同一张空表上**，这两次 checkpoint
+（`crates/executor/src/lib.rs:21257`）。**在同一张空表上**，这两次 checkpoint
 一个是 3–5 ms（参考），一个是 9.7 ms（端口），差在各自的落盘步骤：
 
 | 端口的 checkpoint 步骤 | 耗时 | 参考有这一步吗 |
@@ -528,7 +528,7 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 | INSERT 20000 行（batch=500） | 2.59 s | **2.37–2.39 s** |
 | 查询（repeat=20 取最小） | 0.27 / 0.32 / 0.25 / 0.27 / 1.36 / 2.96 / 1.36 ms | 0.28 / 0.33 / 0.26 / 0.28 / 1.41 / 3.05 / 1.37 ms（无变化） |
 
-产物不变：`cargo test -p infinity-executor`（707 + 集成）全绿，包括全文格式的字节门禁。
+产物不变：`cargo test -p executor`（707 + 集成）全绿，包括全文格式的字节门禁。
 
 ### 4.14 term 换内部 id
 
@@ -623,7 +623,7 @@ A/B 用临时开关 `INF_FT_NO_STREAM`（已移除）关掉流式：
 
 ## 5. 顺带修掉的一个格式缺陷
 
-`encode_fulltext_chunk`（`crates/infinity-executor/src/cpp_blocks.rs`）原来对
+`encode_fulltext_chunk`（`crates/executor/src/cpp_blocks.rs`）原来对
 **每个位置**调用一次 `end_document`，而参考的 `GeneratePosting`
 （`column_inverter_impl.cpp:253-257`）是**每个文档**一次：位置的累加走
 `AddPosition`。后果是：
@@ -636,7 +636,7 @@ A/B 用临时开关 `INF_FT_NO_STREAM`（已移除）关掉流式：
 既有的门禁没抓到它，是因为 Gate A 的全文用例都在 128 篇以内、且走内存索引；
 字节门禁的全文用例每篇文档的 token 都不重复。现在按文档分组后
 `df`/`total_tf` 与参考一致，回归测试见
-`crates/infinity-executor/tests/fulltext_format.rs::repeated_term_counts_one_document_and_every_occurrence`。
+`crates/executor/tests/fulltext_format.rs::repeated_term_counts_one_document_and_every_occurrence`。
 
 ## 6. 这一轮没覆盖的
 

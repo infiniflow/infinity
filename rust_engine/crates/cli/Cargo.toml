@@ -1,0 +1,24 @@
+[package]
+name = "cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "infinity"
+path = "src/main.rs"
+
+# Benchmark corpus generator (docs/FULLTEXT_BENCH.md): a build-time tool, not
+# part of the server.
+[[bin]]
+name = "gen-corpus"
+path = "src/bin/gen_corpus.rs"
+
+[dependencies]
+common.workspace = true
+storage.workspace = true
+catalog.workspace = true
+txn.workspace = true
+parser.workspace = true
+executor.workspace = true
+server.workspace = true

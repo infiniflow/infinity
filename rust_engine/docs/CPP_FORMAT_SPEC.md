@@ -37,7 +37,7 @@
 ## 2. 已验证：Catalog / Meta KV = RocksDB + 自定义 MergeOperator
 
 - 实现文件：`src/storage/catalog/kv_store.cppm`、`src/storage/catalog/kv_store_impl.cpp`；合并算子：`src/storage/common/rocksdb_merge_operator.cppm` / `_impl.cpp`。
-- 结论：Rust 侧用的是 `rust-rocksdb`（`infinity-storage/src/metastore_rocks.rs`）——与参考同一底座，目录可被参考打开，由 `python/restart_test/test_cross_engine_compat.py` 双向验证。磁盘兼容矩阵与 fsync 屏障见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md)。
+- 结论：Rust 侧用的是 `rust-rocksdb`（`storage/src/metastore_rocks.rs`）——与参考同一底座，目录可被参考打开，由 `python/restart_test/test_cross_engine_compat.py` 双向验证。磁盘兼容矩阵与 fsync 屏障见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md)。
 - 迁移前需冻结（见 §6）：RocksDB `Options`/`ColumnFamily` 集合、比较器、`MergeOperator` 的 `Merge`/`FullMergeV2` 语义、以及键前缀命名空间。
 
 ## 3. 已验证：全文倒排索引的组成模块（待逐文件冻结细节）
@@ -90,7 +90,7 @@ score     += smooth_idf * smooth_tf * weight
 
 | 子系统 | 现状 | 差距 |
 |---|---|---|
-| 表数据 | 列式块是行的存储本体：`infinity-executor::cpp_blocks` 写/读，`infinity-storage::cpp_format` 编解码（数据文件框架 / `version` 文件 / `[data_region][null_bitmap]` 列体 / outline / 块目录）。`INSERT` 先进缓冲、checkpoint 落块；`COPY` 与 `COMPACT` 在各自提交里落块 | 无（`GAPS.md` §3：NULL 定长 slot 与 `VARCHAR` 内联 padding 是参考不写的字节） |
+| 表数据 | 列式块是行的存储本体：`executor::cpp_blocks` 写/读，`storage::cpp_format` 编解码（数据文件框架 / `version` 文件 / `[data_region][null_bitmap]` 列体 / outline / 块目录）。`INSERT` 先进缓冲、checkpoint 落块；`COPY` 与 `COMPACT` 在各自提交里落块 | 无（`GAPS.md` §3：NULL 定长 slot 与 `VARCHAR` 内联 padding 是参考不写的字节） |
 | Catalog/Meta | RocksDB（与参考同一底座），键集与同键的值逐字节比对 | 无（`catalog/` 的 SST 文件字节不可比，见 §3） |
 | 向量索引 | HNSW / IVF 的 chunk 与侧车文件按参考布局写进 `idx_*` 目录 | 图区与质心随机，按内容比（`GAPS.md` §3） |
 | 全文索引 | 倒排按参考的 `.dic` / `.pos` / `.len` 三段落盘（`encode_fulltext_chunk`），打分与参考逐位一致 | 无 |
@@ -356,7 +356,7 @@ struct VertexLX { VertexListSize neighbor_n_; VertexType neighbors_[]; }
 ```
 （`LayerSize=VertexListSize=i32`，`VertexType=i32`；`graph_store.cppm:31-40`）
 
-- 步长：`level0_size_ = sizeof(VertexL0) + 4*Mmax0`、`levelx_size_ = sizeof(VertexLX) + 4*Mmax`（`graph_store.cppm:45-46`）。**已实测确认（不再是 VERIFY）**：用 g++ 按 `graph_store.cppm:32-40` 的字段顺序编译量测得到 `sizeof(VertexL0)=24`（`offsetof`：`layer_n_`=0、`layers_p_`=8、`neighbor_n_`=16、`neighbors_`=20；`layer_n_` 后 4 字节为对齐填充）、`sizeof(VertexLX)=4`。因此 `M=16`（`Mmax0=32, Mmax=16`）时 `level0_size=152`、`levelx_size=68`。Rust 侧常量见 `infinity-storage::knn_format::{VERTEX_L0_SIZE, VERTEX_LX_SIZE}`。
+- 步长：`level0_size_ = sizeof(VertexL0) + 4*Mmax0`、`levelx_size_ = sizeof(VertexLX) + 4*Mmax`（`graph_store.cppm:45-46`）。**已实测确认（不再是 VERIFY）**：用 g++ 按 `graph_store.cppm:32-40` 的字段顺序编译量测得到 `sizeof(VertexL0)=24`（`offsetof`：`layer_n_`=0、`layers_p_`=8、`neighbor_n_`=16、`neighbors_`=20；`layer_n_` 后 4 字节为对齐填充）、`sizeof(VertexLX)=4`。因此 `M=16`（`Mmax0=32, Mmax=16`）时 `level0_size=152`、`levelx_size=68`。Rust 侧常量见 `storage::knn_format::{VERTEX_L0_SIZE, VERTEX_LX_SIZE}`。
 - 顶点按 `vertex_i` 密集排列；顶点 `v` 第 `l≥1` 层邻居紧跟 `v->layers_p_`，偏移 `(l-1)*levelx_size`（`graph_store.cppm:244-256,440-446`）。
 - 写盘（`graph_store.cppm:172-219`）：先 `u64 layer_sum = Σ_v layer_n_`；再逐 chunk 写 `chunk_size*level0_size` 的 level0 区——写前把 `layer_n_>0` 的顶点的 `layers_p_` **原地替换为 u64 字节偏移**（相对 layerx 拼接区）；最后逐 chunk 追加 layerx 段。
 - 读盘（mmap 路径 `graph_store.cppm:459-471`）：`layer_start_ = ptr + cur_vertex_n*level0_size`。
@@ -437,11 +437,11 @@ parts 区（先写 base 的 `IVF_Parts_Storage_Info::Save`，再逐 part 写）�
 （`fst.cppm:64-112,134-144`；`writer.cppm:80-83`；`crc.cppm:48-50`）
 
 - 空 FST：`root_addr=0`，总长 36。
-- **Rust 侧 `.dic` 组装/读取已实现**（`infinity-storage::inverted_format`）：`encode_dic`（`[TermMeta…][FST]` 拼接）、`encode_term_meta_region_with_offsets`（同时返回每条记录的绝对偏移，即 FST 的 value）、`dic_fst_region`/`dic_fst`（由末尾 12 字节的 `root_addr` 反推 FST 区间：`root_addr==0` → 36，否则 `root_addr+21`）、`fst_header`（读 `VERSION`/`FstType`）、`decode_dic_meta_at`（按绝对偏移解析 TermMeta）。FST 的**节点状态机本身仍是不可读的**（见下），所以这些函数把 FST 当作**不透明字节**；一旦节点编解码落地即可直接接上。
+- **Rust 侧 `.dic` 组装/读取已实现**（`storage::inverted_format`）：`encode_dic`（`[TermMeta…][FST]` 拼接）、`encode_term_meta_region_with_offsets`（同时返回每条记录的绝对偏移，即 FST 的 value）、`dic_fst_region`/`dic_fst`（由末尾 12 字节的 `root_addr` 反推 FST 区间：`root_addr==0` → 36，否则 `root_addr+21`）、`fst_header`（读 `VERSION`/`FstType`）、`decode_dic_meta_at`（按绝对偏移解析 TermMeta）。FST 的**节点状态机本身仍是不可读的**（见下），所以这些函数把 FST 当作**不透明字节**；一旦节点编解码落地即可直接接上。
 - 节点编码见 `fst/node.cppm:255-814`（每 state 首字节高 2 位区分 `StateOneTransNext/StateOneTrans/StateAnyTrans`，`COMMON_INPUTS` 为固定 256 字节表 `fst/common_inputs.cppm`，转移地址用相对 delta 打包 `Pack/UnpackDelta` `:303-337`）。FST 的 `u64` value = 该 term 的 TermMeta 在 `.dic` 的**绝对字节偏移**。
-- **Rust 侧整数打包原语已实现**（`infinity-storage::inverted_format`，语义无歧义、可单测）：`fst_pack_size`/`fst_pack_uint`/`fst_pack_uint_in`/`fst_unpack_uint`（`fst/bytes.cppm:107-170` 的 `Pack*`/`UnpackUint`，均为**小端**、低位在前）与 `fst_pack_delta`/`fst_pack_delta_size`/`fst_unpack_delta`（`fst/node.cppm:303-337`，存 `node_addr - trans_addr`，`trans_addr==0` 时存哨兵 `0`；`EMPTY_ADDRESS=0`）。
+- **Rust 侧整数打包原语已实现**（`storage::inverted_format`，语义无歧义、可单测）：`fst_pack_size`/`fst_pack_uint`/`fst_pack_uint_in`/`fst_unpack_uint`（`fst/bytes.cppm:107-170` 的 `Pack*`/`UnpackUint`，均为**小端**、低位在前）与 `fst_pack_delta`/`fst_pack_delta_size`/`fst_unpack_delta`（`fst/node.cppm:303-337`，存 `node_addr - trans_addr`，`trans_addr==0` 时存哨兵 `0`；`EMPTY_ADDRESS=0`）。
 - **Rust 侧 `COMMON_INPUTS` 表已移植**（`FST_COMMON_INPUTS`/`FST_COMMON_INPUTS_INV`，逐元素取自 `fst/common_inputs.cppm:20-291`）与 `fst_common_idx`/`fst_common_input`（`fst/node.cppm:282-301`）。已验证两表都是 `0..=255` 的**排列**且 `INV[A[b]] == b` 恒成立；`CommonIdx` 的 `(rank+1)%256` 对 rank=255 的字节会回绕成 `0`（即该字节**永远按原值存**）——这点已在测试中固定。
-- **节点状态机：编解码均已实现并用 C++ 真值逐位验证**（`infinity-storage::inverted_format`）：
+- **节点状态机：编解码均已实现并用 C++ 真值逐位验证**（`storage::inverted_format`）：
   - **解码**（`fst_get`/`FstNode`）：三种 state（`0b11` OneTransNext / `0b10` OneTrans / 其它 AnyTrans）的 `end_`/`PackSizes`/`FindInput`/`OutputAt`/`TransAddr`/`FinalOutput` 全部按 `fst/node.cppm` 实现（含 `TRANS_INDEX_THRESHOLD=32` 的 256 字节索引表、`Ntrans` 的「1 表示 256」约定、输出按路径 `Cat`=求和）。
   - **编码**（`FstBuilder`/`build_fst`，复刻 `fst/build.cppm`+`build_impl.cpp`+`fst/registry.cppm`）：FNV-1a `BuilderNode::Hash`、直接映射 `Registry`（槽碰撞会**破坏性覆盖**，与 C++ 一致）、`UnfinishedNodes` 栈、`AddSuffix`/`FindCommonPrefixAndSetOutput`/`CompileFrom`/`Compile`、三种 state 的 `Compile` 与 `PackSizes` 字节。`CheckLastKey` 忠实复刻（注意 C++ 在 `last_` 为空时**直接 return 且不记录**，故这套版本里顺序校验**从不生效**）。
   - **真值来源**：`rust_engine/tools/fst_golden/gen.py` 把仓库里**真实的** C++ FST 源码摊平（用极小的 `infinity_type`/`crc`/`fmt` stub 替代 `third_party`）后用 clang++-23 编译运行，打印小键集（空;`a`;`a,b`;`app/apple/apply/banana/band/cat`;共享前缀 `aaaa/aaab/aabb/abbb/baaa`）的 FST 字节。这些字节作为固定装置写进 Rust 测试：header/trailer/掩码 CRC/`root_addr+21` 长度规则、`fst_get` 的全部 16 个键值查找、以及 `FstBuilder` 的**逐字节**输出，三者均通过。
@@ -482,8 +482,8 @@ u8[pos_list_len]
     - `{1,1,1,2,3,5,8,13,21,34,55,89}` → 4 words = `01700016 81404030 28201a15 d12d0b00`
   - **复现配方**：`clang++-23 -std=c++23 -O2 -march=native -I<fastpfor>/headers -I<repo>/third_party/newpfor main.cpp <fastpfor>/src/{bitpacking,bitpackingaligned,bitpackingunaligned,simdbitpacking,simdunalignedbitpacking,horizontalbitpacking}.cpp <repo>/third_party/newpfor/{new_pfordelta_compressor,decompress_sse4}.cpp`，其中 `main.cpp` 用 `encodeArray`（u32）/ `Compress(...,true)`（u16）并打印字节。**注意**：FastPForLib 不在仓库内（由 C++ 构建拉取），故未随仓库提交生成器；上述字节已固定在本节。同理注意 `-O2` 与 `-march` 必须与目标一致（SIMD 路径按位宽分派，但字节输出与 -O 无关——已核）。
 - **Rust 侧实现**：
-  - **u32 块编解码已实现并逐位对齐 C++**（`infinity-storage::inverted_format::{encode_u32_block, decode_u32_block, POSTING_MINI_BLOCK}`）。**布局规律已定论**（无需移植 SSE 表）：`CompositeCodec<SIMDBinaryPacking, VariableByte>`；SIMD 部件写 `u32 simd_len`，随后每 16 个 128-值 mini-block 一组，先写 **4 个 u32 的位宽头**（每个 u32 内含 4 个位宽，**大端序**：`Bs[4g]<<24|Bs[4g+1]<<16|Bs[4g+2]<<8|Bs[4g+3]`），再写各 mini-block 的 `4*w` 个字。**mini-block 内部布局 = 按 32 位 SSE lane 的位流**：128 个值按 `index % 4` 分成 4 条 lane，lane L 的值（`i≡L mod 4`，按 `i/4` 排序）以 LSB-first 连续打包成 `w` 个字的位流，lane L 的第 k 个字落在输出字 `L + 4k`。剩余 `len%128` 个值走 **VariableByte**（7 位/字节、LSB 优先、**最高位在最后一字节置 1**，最后补 0 到 32 位边界）。已用 11 个 C++ 真值用例（位宽 1/2/3/7/8/16/17、纯 VB、SIMD+VB 混合）断言**编码逐位相同**且解码往返。
-  - **u16 块（NewPForDelta）编解码均已实现并逐位对齐 C++**（`infinity-storage::inverted_format::{encode_u16_block, decode_u16_block}`），9 个真值用例全部通过（含 `increase`/`same` 特殊帧、常规帧、两块输入、以及 3 个带 S9 例外的帧）：
+  - **u32 块编解码已实现并逐位对齐 C++**（`storage::inverted_format::{encode_u32_block, decode_u32_block, POSTING_MINI_BLOCK}`）。**布局规律已定论**（无需移植 SSE 表）：`CompositeCodec<SIMDBinaryPacking, VariableByte>`；SIMD 部件写 `u32 simd_len`，随后每 16 个 128-值 mini-block 一组，先写 **4 个 u32 的位宽头**（每个 u32 内含 4 个位宽，**大端序**：`Bs[4g]<<24|Bs[4g+1]<<16|Bs[4g+2]<<8|Bs[4g+3]`），再写各 mini-block 的 `4*w` 个字。**mini-block 内部布局 = 按 32 位 SSE lane 的位流**：128 个值按 `index % 4` 分成 4 条 lane，lane L 的值（`i≡L mod 4`，按 `i/4` 排序）以 LSB-first 连续打包成 `w` 个字的位流，lane L 的第 k 个字落在输出字 `L + 4k`。剩余 `len%128` 个值走 **VariableByte**（7 位/字节、LSB 优先、**最高位在最后一字节置 1**，最后补 0 到 32 位边界）。已用 11 个 C++ 真值用例（位宽 1/2/3/7/8/16/17、纯 VB、SIMD+VB 混合）断言**编码逐位相同**且解码往返。
+  - **u16 块（NewPForDelta）编解码均已实现并逐位对齐 C++**（`storage::inverted_format::{encode_u16_block, decode_u16_block}`），9 个真值用例全部通过（含 `increase`/`same` 特殊帧、常规帧、两块输入、以及 3 个带 S9 例外的帧）：
     - **header**：`isLastBlock:1 | exceptionIntRange:11 | frameBits:5 | firstExceptionPos:8 | dataNum:7`（`dataNum` 存 `块内值数-1`；`frameBits==31` 表示 32）。
     - **特殊帧**（6 种）：全等值（inline/alone）、递增（inline/alone）、递减（inline/alone）；注释里的“min value”“value store in 4 byte after header”即为 `exceptionIntRange` 与 header 后的单独字。**递减帧的解码是 `dest[dataNum-1-i] = value + i`**（value=末尾元素），不是 `value - i`——易错点。
     - **常规帧**：`dataNum` 个值按 `frameBits` 位 **LSB-first 顺序**打包成 `ceil(dataNum*frameBits/32)` 个字（`unpack_N`/`pack_N` 的 32 值主循环 + `unaligned_*` 尾部合起来等价于整段顺序）；随后 `exceptionIntRange` 个 **S9** 字。
@@ -566,7 +566,7 @@ u8[pos_list_len]
 
 **`IndexBase::Serialize()`**（`src/storage/definition/index_base_impl.cpp:243-251`，写点 `SetIndexBase` `src/storage/catalog/meta/table_index_meta_impl.cpp:90-92`）：**五个公共字段** `index_type`（**字符串名**，取自 `IndexInfo::IndexTypeToString`：`IVF`/`HNSW`/`FULLTEXT`/`SECONDARY`/`SECONDARYFUNCTIONAL`/`BMP`/`DISKANN`/`EMVB`/`PLAID`/`SMVE`，`src/parser/statement/extra/create_index_info.cpp:25-62`）、`index_name`、`index_comment`（**无条件写出**；读侧缺失或非字符串时当空串）、`file_name`、`column_names`（字符串数组）；各索引类型再追加自己的字段（HNSW 的 `M`/`ef_construction`/`block_size`/`metric_type`/`encode_type`/可选 `build_type`,`lsg_config`；IVF 的 `ivf_option`；函数索引的 `func_return_type`/`function_expression` 等，见 `index_base_impl.cpp:267-360`）。
 
-**已冻结的子类字段与 `file_name` 规则**（Rust 侧 `infinity-catalog::value_format::{IndexDefValue, index_file_name}`）：
+**已冻结的子类字段与 `file_name` 规则**（Rust 侧 `catalog::value_format::{IndexDefValue, index_file_name}`）：
 
 - **`file_name` 生成规则**：`fmt::format("{}_{}", create_index_info->table_name_, *index_name)`（`src/planner/logical_planner_impl.cpp:859`），即 `{table}_{index}`（表名用**不带库名**的 `table_name_`）。
 - **HNSW**（`index_hnsw_impl.cpp:278-290`；默认值 `src/common/default_values.cppm:178-180`）：`build_type`（`HnswBuildTypeToString`：`plain`/`lsg`）、`ef_construction`（默认 200）、`encode_type`（`HnswEncodeTypeToString`：`plain`/`lvq`/`rabitq`）、`M`（默认 16）、`block_size`（默认 8192）、`metric_type`（`MetricTypeToString`：`cosine`/`ip`/`l2`/`Invalid`）。注意大写 `M` 在 nlohmann 的 `std::map` 里排在小写键**之前**。

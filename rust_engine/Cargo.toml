@@ -1,17 +1,17 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/infinity-common",
-    "crates/infinity-storage",
-    "crates/infinity-catalog",
-    "crates/infinity-txn",
-    "crates/infinity-parser",
-    "crates/infinity-expression",
-    "crates/infinity-planner",
-    "crates/infinity-index",
-    "crates/infinity-executor",
-    "crates/infinity-server",
-    "crates/infinity-cli",
+    "crates/common",
+    "crates/storage",
+    "crates/catalog",
+    "crates/txn",
+    "crates/parser",
+    "crates/expression",
+    "crates/planner",
+    "crates/index",
+    "crates/executor",
+    "crates/server",
+    "crates/cli",
 ]
 
 [workspace.package]
@@ -22,16 +22,16 @@ license = "Apache-2.0"
 [workspace.dependencies]
 rust-stemmers = "1.2"
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
-infinity-common = { path = "crates/infinity-common" }
-infinity-storage = { path = "crates/infinity-storage" }
-infinity-catalog = { path = "crates/infinity-catalog" }
-infinity-txn = { path = "crates/infinity-txn" }
-infinity-parser = { path = "crates/infinity-parser" }
-infinity-expression = { path = "crates/infinity-expression" }
-infinity-planner = { path = "crates/infinity-planner" }
-infinity-index = { path = "crates/infinity-index" }
-infinity-executor = { path = "crates/infinity-executor" }
-infinity-server = { path = "crates/infinity-server" }
+common = { path = "crates/common" }
+storage = { path = "crates/storage" }
+catalog = { path = "crates/catalog" }
+txn = { path = "crates/txn" }
+parser = { path = "crates/parser" }
+expression = { path = "crates/expression" }
+planner = { path = "crates/planner" }
+index = { path = "crates/index" }
+executor = { path = "crates/executor" }
+server = { path = "crates/server" }
 lz4_flex = "0.13"
 hmac = "0.12"
 sha2 = "0.10"

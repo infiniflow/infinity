@@ -9,17 +9,17 @@ remains the reference oracle. Goals, methodology and the current gap list are in
 
 | crate | role | status |
 |---|---|---|
-| `infinity-common` | base types, errors | ✅ initial |
-| `infinity-storage` | WAL + MVCC + `MetaStore`(RocksDB) | ✅ M1 kernel |
-| `infinity-catalog` | metadata over `MetaStore` | ✅ minimal |
-| `infinity-txn` | commit pipeline (WAL → KV) + recovery + concurrent-commit & crash-injection tests + **loom** model | ✅ minimal |
-| `infinity-parser` | hand-written lexer + recursive-descent SQL (`CREATE/DROP/INSERT` (**multi-row**)/`SELECT` w/ `WHERE`/`JOIN…ON`/`GROUP BY`/`ORDER BY`/`LIMIT`, projection, aggregates) | ✅ M2 |
-| `infinity-expression` | scalar `Expr`/`Value` + eval + aggregates | ✅ M2 |
-| `infinity-planner` | logical plan (`Scan`/`Join`/`Filter`/`Projection`/`Aggregate`/`Sort`/`Limit`/`Values`) + optimizer (limit/predicate push-down, const folding) | ✅ M2 |
-| `infinity-index` | secondary/low-cardinality index, vector (`Flat/HNSW/LVQ/RaBitQ/LSG/IVF/PLAID/SMVE/BMP`), full-text inverted index (BM25/phrase/BMW) and EMVB; wired into `CREATE INDEX` and the scan/fusion paths | ✅ M3 |
-| `infinity-executor` | `Engine` + **Tokio per-edge-concurrent bounded pipeline** (join/aggregate/sort blocking) + `DELETE`/`UPDATE` (tombstones; update = delete+append) | ✅ minimal |
-| `infinity-cli` | `infinity` binary (smoke/query/bench/import-csv/**conformance**/driver) | ✅ |
-| `infinity-server` | Thrift `TBinaryProtocol` front-end (dispatcher, `Connect`/`Disconnect`/`ListDatabase`/`ShowTable`, columnar `SelectResponse`, `CreateTable`/`Insert`/`Delete`/`Update`/`Select` w/ projection+`WHERE`+`ORDER BY`+`LIMIT`); stateful TCP server; HTTP seed (`POST /query`); **PG wire** (startup + simple query); cross-verified by the authoritative Python codec | ✅ M4 |
+| `common` | base types, errors | ✅ initial |
+| `storage` | WAL + MVCC + `MetaStore`(RocksDB) | ✅ M1 kernel |
+| `catalog` | metadata over `MetaStore` | ✅ minimal |
+| `txn` | commit pipeline (WAL → KV) + recovery + concurrent-commit & crash-injection tests + **loom** model | ✅ minimal |
+| `parser` | hand-written lexer + recursive-descent SQL (`CREATE/DROP/INSERT` (**multi-row**)/`SELECT` w/ `WHERE`/`JOIN…ON`/`GROUP BY`/`ORDER BY`/`LIMIT`, projection, aggregates) | ✅ M2 |
+| `expression` | scalar `Expr`/`Value` + eval + aggregates | ✅ M2 |
+| `planner` | logical plan (`Scan`/`Join`/`Filter`/`Projection`/`Aggregate`/`Sort`/`Limit`/`Values`) + optimizer (limit/predicate push-down, const folding) | ✅ M2 |
+| `index` | secondary/low-cardinality index, vector (`Flat/HNSW/LVQ/RaBitQ/LSG/IVF/PLAID/SMVE/BMP`), full-text inverted index (BM25/phrase/BMW) and EMVB; wired into `CREATE INDEX` and the scan/fusion paths | ✅ M3 |
+| `executor` | `Engine` + **Tokio per-edge-concurrent bounded pipeline** (join/aggregate/sort blocking) + `DELETE`/`UPDATE` (tombstones; update = delete+append) | ✅ minimal |
+| `cli` | `infinity` binary (smoke/query/bench/import-csv/**conformance**/driver) | ✅ |
+| `server` | Thrift `TBinaryProtocol` front-end (dispatcher, `Connect`/`Disconnect`/`ListDatabase`/`ShowTable`, columnar `SelectResponse`, `CreateTable`/`Insert`/`Delete`/`Update`/`Select` w/ projection+`WHERE`+`ORDER BY`+`LIMIT`); stateful TCP server; HTTP seed (`POST /query`); **PG wire** (startup + simple query); cross-verified by the authoritative Python codec | ✅ M4 |
 
 ## What is implemented (M0/M1)
 
@@ -35,7 +35,7 @@ remains the reference oracle. Goals, methodology and the current gap list are in
 ```bash
 cd rust_engine
 cargo test --workspace
-cargo run -p infinity-cli -- smoke /tmp/infinity-smoke
+cargo run -p cli -- smoke /tmp/infinity-smoke
 ```
 
 > The toolchain is pinned in `rust-toolchain.toml`: a dated **nightly**, because

@@ -91,7 +91,7 @@
 | `::test_the_wal_entries_match_byte_for_byte` | 建表 + 100 行 append + 20 行 delete + 10 行 update，**不** flush（WAL 不被 checkpoint 截断） | `wal.log` **整帧**完全相同（header 的 `txn_id` 与 CRC 也一致），**含**参考在空目录上写的启动 `CheckpointV2(1)`：typed DDL 命令、`AppendV2` 的整块（参考 `DataBlock` 列式编码）、`DeleteV2` 的行 id，以及 UPDATE 帧内 delete→append 的命令顺序 |
 | `test_cross_engine_compat.py` | 200 行、19 列（含 `SPARSE` 与两对 16 位浮点），4 类索引 | 双向交接：A 写 → B 读 → B 再写；`SHOW COLUMNS` 的**类型文本**逐列全等，`SPARSE` 也在内（两侧都按 catalog 记录打印 `Sparse(<elem>,<index>,<dimension>)`，例如 SDK 的 `sparse,8,float,int` → `Sparse(float,int32,8)`） |
 | `::test_analyzer_names_and_tokenisation_match` | 17 个 `ANALYZER` 名字（`standard`/`standard-PORTER`、`ngram-3`/`ngram-3x`/`ngram-0`、`sparsegram-3-12`/`-fold`/`-0`/`-100-5`/`--3`、`keyword`/`keyword-,`、`whitespace`/`whitespace-#@$`、`Chinese`、`RAG-fine`…），各建一张表并插 7 行 | 两个引擎各自独立建目录：`CREATE INDEX` 的接受/拒绝**完全一致**，且每个被接受的名字上 9 条 `MATCH TEXT` 查询命中的行 id 相同（`keyword-,` 按逗号切、`whitespace-AB` 保留大写、`ngram-3x` 等价 `ngram-3`；`skies ties` 这行的 `ski`/`ti` 查询只在原版 Porter 下命中，Porter2 会答 `sky`/`tie`） |
-| `infinity-storage/tests/s3_minio.rs` | 本地临时目录 + 桶 | `tree_sync_and_restore`（往返 + 二次同步上传 0 个文件）、`same_size_edit_is_uploaded`（同长度改写必须重传）、`put_get_list_delete_roundtrip`；需要 `INFINITY_MINIO_TEST=1` |
+| `storage/tests/s3_minio.rs` | 本地临时目录 + 桶 | `tree_sync_and_restore`（往返 + 二次同步上传 0 个文件）、`same_size_edit_is_uploaded`（同长度改写必须重传）、`put_get_list_delete_roundtrip`；需要 `INFINITY_MINIO_TEST=1` |
 
 ## 4. 覆盖矩阵
 
@@ -139,7 +139,7 @@
 
 ### 5.3 流程
 
-1. **CI**：`.github/workflows/rust_engine.yml` 的 `cross_engine` job 在 builder 镜像里编参考、编重写版（`cargo build --release -p infinity-cli`），并在 bwrap 下跑两个 pytest 文件。**对象存储不在 CI 里**：重写版不移植参考的远程对象存储（§6.5），`test_the_port_round_trips_through_object_storage` 与 `s3_minio.rs` 只覆盖重写版自身的桶往返，需要手工跑（§7）。
+1. **CI**：`.github/workflows/rust_engine.yml` 的 `cross_engine` job 在 builder 镜像里编参考、编重写版（`cargo build --release -p cli`），并在 bwrap 下跑两个 pytest 文件。**对象存储不在 CI 里**：重写版不移植参考的远程对象存储（§6.5），`test_the_port_round_trips_through_object_storage` 与 `s3_minio.rs` 只覆盖重写版自身的桶往返，需要手工跑（§7）。
 2. **重写版自身确定性**：由 `test_the_port_is_deterministic_too` 单独断言（3 次跑，`data/` 下每个文件都必须相同）。
 
 ## 6. 与 C++ 参考的差异
@@ -193,7 +193,7 @@
 
 ### 6.5 对象存储：本地布局对齐，桶传输不移植
 
-**决定：不移植参考的远程对象存储功能。** 重写版的 S3 客户端（`infinity_storage::s3`）按路径树上传播 `data/`、`catalog/`、`persistence/`，**不**复刻参考的 `obj_key` 打包对象 + VirtualStore 上传设计。本地对象目录布局（`pm|object|` + 打包对象）仍与参考对齐，并由 §3 的对象目录用例双向验证；桶内布局则不追求与参考一致。
+**决定：不移植参考的远程对象存储功能。** 重写版的 S3 客户端（`storage::s3`）按路径树上传播 `data/`、`catalog/`、`persistence/`，**不**复刻参考的 `obj_key` 打包对象 + VirtualStore 上传设计。本地对象目录布局（`pm|object|` + 打包对象）仍与参考对齐，并由 §3 的对象目录用例双向验证；桶内布局则不追求与参考一致。
 
 参考的持久化层（`PersistenceManager`，`src/storage/persistence/persistence_manager_impl.cpp`）在本地模式下把数据文件按 8 字节对齐拼进**对象**，对象文件名就是 `obj_key`，并在 catalog 里写：
 
@@ -207,7 +207,7 @@
 **桶传输层不移植**：重写版的 S3 客户端上传的是路径树（每文件一个对象，键为 `data/...` 等相对路径），不是参考的打包对象（裸 `obj_key` 一个对象）。因此：
 
 - 桶内布局与参考**不同**，跨引擎对象存储互读门禁不成立（参考不会用 `restore_tree` 读路径树，重写版也不会按 `obj_key` 下载）；
-- 参考的 compose 规则（128 MB 上限、独占对象、`parts > 1` 的 4 字节 footer、引用计数与 `deleted_ranges`）在**本地**已由 `infinity_storage::persistence` 实现并逐条单测与参考对照，但它们不进入桶；
+- 参考的 compose 规则（128 MB 上限、独占对象、`parts > 1` 的 4 字节 footer、引用计数与 `deleted_ranges`）在**本地**已由 `storage::persistence` 实现并逐条单测与参考对照，但它们不进入桶；
 - 重写版自身的桶往返由 `test_the_port_round_trips_through_object_storage`（Python）与 `s3_minio.rs`（Rust）覆盖，需要一个 S3 端点（MinIO 平替 silo：`pgsty/silo`，默认 `minioadmin/minioadmin`，端口 9000，`silo server <data_dir>` 启动），CI 不跑。
 
 | 方面 | C++ 参考 | 重写版（现状） |
@@ -270,7 +270,7 @@
 ```bash
 # 参考（容器内）与重写版
 docker exec infinity_builder cmake --build /infinity/cmake-build-reldeb --target infinity
-cd rust_engine && cargo build --release -p infinity-cli
+cd rust_engine && cargo build --release -p cli
 
 # 字节 / 全类型 / 多块 / 写序列 / 索引矩阵 / 崩溃 / 多段（需要可写的 /var/infinity）
 work=$(mktemp -d)
@@ -291,7 +291,7 @@ bwrap ... -- .venv/bin/python -m pytest -q python/restart_test/test_cross_engine
 # 重写版的 S3 测试（含"同长度改写也要上传"）
 cd rust_engine && INFINITY_MINIO_TEST=1 INFINITY_MINIO_ENDPOINT=127.0.0.1:9000 \
       INFINITY_MINIO_ACCESS_KEY=... INFINITY_MINIO_SECRET_KEY=... \
-      cargo test -p infinity-storage --test s3_minio
+      cargo test -p storage --test s3_minio
 ```
 
 环境变量：

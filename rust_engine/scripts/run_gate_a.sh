@@ -12,7 +12,7 @@ root="$(cd "$here/../.." && pwd)"
 slt="${1:-$root/test/sql}"
 
 cd "$here/.."
-out="$(cargo run -q --release -p infinity-cli -- conformance "$slt" 2>&1)"
+out="$(cargo run -q --release -p cli -- conformance "$slt" 2>&1)"
 run_status=$?
 echo "$out"
 if [ "$run_status" -ne 0 ]; then

@@ -35,8 +35,8 @@ if [[ $# -ge 1 ]]; then
   golden="$1"
   rows="${INFINITY_BENCH_ROWS:-20000}"
   data="$scratch/gate-e-data/infinity-bench"
-  cargo build -q --release -p infinity-server || exit 1
-  "$here/../target/release/infinity-server" "$data" >"$scratch/infinity-bench-server.log" 2>&1 &
+  cargo build -q --release -p server || exit 1
+  "$here/../target/release/server" "$data" >"$scratch/infinity-bench-server.log" 2>&1 &
   srv=$!
   trap 'kill "$srv" 2>/dev/null' EXIT
   sleep 4
@@ -49,7 +49,7 @@ if [[ $# -ge 1 ]]; then
 else
   # No golden: a within-machine regression detector over the CLI driver.
   run_bench() {
-    cargo run -q --release -p infinity-cli -- bench "$scratch/gate-e-self/infinity-bench" \
+    cargo run -q --release -p cli -- bench "$scratch/gate-e-self/infinity-bench" \
       "${INFINITY_BENCH_ROWS:-2000}" | tee "$1"
   }
   run_bench "$latest" || status=1
