@@ -119,7 +119,7 @@ fn minio_upload_meta_to_s3() {
     let mut block_dirs = 0;
     count_block_dirs(&dst.path().join("data"), &mut block_dirs);
     assert_eq!(block_dirs, 1, "expected exactly seg_0/blk_0");
-    assert_eq!(restored.cpp_block_row_count("db1.tb1").unwrap(), 1);
+    assert_eq!(restored.mirror_block_row_count("db1.tb1").unwrap(), 1);
 
     let mut rows = Vec::new();
     for result in restored.execute("SELECT col1, col2 FROM db1.tb1;").unwrap() {

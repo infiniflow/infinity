@@ -20,7 +20,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 use crate::secondary_lowcard::{write_lowcard_segment, LowCardReader};
 use crate::secondary_segment::{write_secondary_segment, Key, SecondarySegmentReader};
 

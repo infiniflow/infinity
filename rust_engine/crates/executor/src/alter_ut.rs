@@ -4,7 +4,7 @@
 //! The reference drives `NewTxn::AddColumns` / `DropColumns` and then walks the
 //! table's `SegmentMeta` / `BlockMeta` chain. The engine exposes the same state
 //! through `SHOW TABLE … COLUMNS`, [`Engine::segments`],
-//! [`Engine::write_cpp_blocks`] and the block helpers; every expected value
+//! [`Engine::write_blocks`] and the block helpers; every expected value
 //! (segment id, block ids, per-block row counts, visible range, and every
 //! column cell) is preserved.
 
@@ -41,7 +41,7 @@ fn append_block(engine: &Engine, table: &str, cells: Vec<Literal>, row_cnt: usiz
 /// 8192-row blocks and checks every cell of every block through the engine.
 fn assert_two_blocks(engine: &Engine, table: &str, expected_cells: &[String]) {
     assert_eq!(engine.segment_ids(table), vec![0]);
-    assert_eq!(engine.write_cpp_blocks(table).unwrap(), 2 * BLOCK_ROW_CNT);
+    assert_eq!(engine.write_blocks(table).unwrap(), 2 * BLOCK_ROW_CNT);
     assert_eq!(engine.block_ids(table, 0), vec![0, 1]);
     let all = rows(engine, &format!("SELECT * FROM {table};"));
     assert_eq!(all.len(), 2 * BLOCK_ROW_CNT);

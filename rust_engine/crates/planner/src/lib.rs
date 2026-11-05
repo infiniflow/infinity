@@ -576,7 +576,7 @@ fn compile_agg_expr(
 /// A canonical text for an expression, used to match select items against
 /// GROUP BY keys (both are parsed from the same query text).
 /// The C++ spelling of a cast target (`varchar` -> `Varchar`).
-fn cpp_type_name(t: &str) -> String {
+fn type_name(t: &str) -> String {
     match t.to_ascii_lowercase().as_str() {
         "varchar" => "Varchar".into(),
         "integer" | "int" | "int32" => "Integer".into(),
@@ -624,8 +624,8 @@ fn key_text(e: &ExprAst) -> String {
             // `CAST(x AS T)` and the REST spelling `cast(x, T)` both print as
             // the reference's `Cast(x AS T)`.
             let ty = match &args[1] {
-                ExprAst::Literal(parser::Literal::Str(s)) => cpp_type_name(s),
-                ExprAst::Column(c) => cpp_type_name(c),
+                ExprAst::Literal(parser::Literal::Str(s)) => type_name(s),
+                ExprAst::Column(c) => type_name(c),
                 _ => String::new(),
             };
             format!("Cast({} AS {ty})", key_text(&args[0]))

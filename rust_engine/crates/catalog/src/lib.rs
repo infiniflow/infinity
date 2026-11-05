@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-pub mod cpp_layout;
+pub mod layout;
 /// Versioned metadata cache (C++ `MetaCache`).
 pub mod meta_cache;
 /// C++-compatible value encoding for catalog records (spec §8.6).
@@ -325,7 +325,7 @@ pub struct Catalog {
     /// Persist **only** the C++ key space (plan §2.6.1 item ④). The native
     /// `tbl:`/`tblname:`/`db:`/`idx:` keys are then never written, so the store
     /// holds nothing but what a C++ engine can read.
-    cpp_only: bool,
+    catalog_only: bool,
     /// When a DDL captures its batch ([`Self::capture`]), newly created records
     /// are stamped with [`DDL_TS_SENTINEL`] and the caller substitutes the
     /// transaction's commit timestamp with [`Self::restamp`].
@@ -390,7 +390,7 @@ struct Capture {
 
 /// The store as the DDL in flight sees it: the captured writes overlay the
 /// committed ones. Only reads go through here; a write inside a capture is
-/// already recorded by [`Catalog::rewrite_cpp`].
+/// already recorded by [`Catalog::rewrite_catalog`].
 struct Overlay<'a> {
     inner: &'a dyn MetaStore,
     view: &'a HashMap<Vec<u8>, Option<Vec<u8>>>,
@@ -458,7 +458,7 @@ impl Catalog {
         Self {
             store,
             counter_lock: Mutex::new(()),
-            cpp_only: false,
+            catalog_only: false,
             capture: Mutex::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
@@ -468,11 +468,11 @@ impl Catalog {
 
     /// A catalog whose **sole** persisted representation is the C++ key space
     /// (plan §2.6.1 item ④).
-    pub fn with_store_cpp_only(store: Arc<dyn MetaStore>) -> Self {
+    pub fn with_store_catalog_only(store: Arc<dyn MetaStore>) -> Self {
         Self {
             store,
             counter_lock: Mutex::new(()),
-            cpp_only: true,
+            catalog_only: true,
             capture: Mutex::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
@@ -506,8 +506,8 @@ impl Catalog {
     }
 
     /// Whether this catalog persists only the C++ key space.
-    pub fn is_cpp_only(&self) -> bool {
-        self.cpp_only
+    pub fn is_catalog_only(&self) -> bool {
+        self.catalog_only
     }
 
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
@@ -517,9 +517,9 @@ impl Catalog {
 
     /// Like [`Self::open`] but with the C++ key space as the sole catalog
     /// (plan §2.6.1 item ④).
-    pub fn open_cpp_only(path: impl AsRef<std::path::Path>) -> Result<Self> {
+    pub fn open_catalog_only(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let store = RocksMetaStore::open(path)?;
-        Ok(Self::with_store_cpp_only(Arc::new(store)))
+        Ok(Self::with_store_catalog_only(Arc::new(store)))
     }
 
     pub fn store(&self) -> &Arc<dyn MetaStore> {
@@ -528,9 +528,9 @@ impl Catalog {
 
     /// Databases recorded in the C++ key space. An empty database still has a
     /// `catalog|db|{name}|{ts}` record, so the scan is authoritative.
-    fn cpp_databases(&self) -> Result<Vec<String>> {
+    fn databases(&self) -> Result<Vec<String>> {
         let mut out = vec!["default_db".to_string()];
-        for name in self.cpp_database_records()? {
+        for name in self.database_records()? {
             if !out.contains(&name) {
                 out.push(name);
             }
@@ -544,7 +544,7 @@ impl Catalog {
     /// (`Storage::CreateDefaultDB`, only when `system_start_ts == 0`), so it is
     /// not implied: a directory that never ran that transaction has no record
     /// for it, and `CREATE DATABASE` has to write one.
-    fn cpp_database_records(&self) -> Result<Vec<String>> {
+    fn database_records(&self) -> Result<Vec<String>> {
         let mut out: Vec<String> = Vec::new();
         for (k, _) in self.with_view(|store| store.scan_prefix(b"catalog|db|"))? {
             let text = String::from_utf8_lossy(&k).to_string();
@@ -579,13 +579,12 @@ impl Catalog {
         }
     }
 
-    fn cpp_tables(&self) -> Result<Vec<TableMeta>> {
+    fn tables(&self) -> Result<Vec<TableMeta>> {
         // A table hanging under a database `drop|db|…` deprecated is gone with
         // it: the reference's `CleanDB` walks the database's tables, and a
         // reader resolves the name against the live databases first.
-        let live = self.cpp_databases()?;
-        let mut tables =
-            self.with_view(|store| crate::cpp_layout::read_cpp_tables_as_meta(store))?;
+        let live = self.databases()?;
+        let mut tables = self.with_view(|store| crate::layout::read_tables_as_meta(store))?;
         tables.retain(|t| {
             let db = t.name.split('.').next().unwrap_or(&t.name).to_string();
             live.iter().any(|d| *d == db)
@@ -593,12 +592,12 @@ impl Catalog {
         Ok(tables)
     }
 
-    fn cpp_indexes(&self) -> Result<Vec<IndexMeta>> {
+    fn indexes(&self) -> Result<Vec<IndexMeta>> {
         self.with_view(|store| {
-            let tables = crate::cpp_layout::read_cpp_layout(store)?;
+            let tables = crate::layout::read_layout(store)?;
             let mut out = Vec::new();
-            for def in crate::cpp_layout::read_cpp_indexes(store)? {
-                if let Some(meta) = crate::cpp_layout::index_meta_of(&def, &tables) {
+            for def in crate::layout::read_indexes(store)? {
+                if let Some(meta) = crate::layout::index_meta_of(&def, &tables) {
                     out.push(meta);
                 }
             }
@@ -630,7 +629,7 @@ impl Catalog {
             }
             // Name-only indexes — the engine does not materialise an expression
             // target such as `c1 + 5`, so it has no C++ `IndexBase`; its name
-            // lives under a supplementary table tag (`write_cpp_layout_from`).
+            // lives under a supplementary table tag (`write_layout_from`).
             for t in &tables {
                 let tag = storage::catalog_format::catalog_table_tag_key(
                     &t.db_id.to_string(),
@@ -666,7 +665,7 @@ impl Catalog {
     /// `atomic_batch`: a crash between the sweep and the rewrite would leave a
     /// partially emptied `catalog|`/`tbl|`/`col|` layout, which is exactly the
     /// bytes the C++ engine reads on the next open.
-    fn rewrite_cpp(
+    fn rewrite_catalog(
         &self,
         dbs: &[String],
         tables: &[TableMeta],
@@ -676,7 +675,7 @@ impl Catalog {
         // block records of the block mirror: read them first so a DDL republishes
         // them unchanged instead of leaving the C++ reader with a segmentless
         // table.
-        let segments = crate::cpp_layout::read_cpp_segments(self.store.as_ref())?;
+        let segments = crate::layout::read_segments(self.store.as_ref())?;
         // While a DDL is in flight the layout is computed from what that DDL
         // has already written, not from the store: dropping a database rewrites
         // the layout once per table it holds, and each rewrite must see the
@@ -689,13 +688,13 @@ impl Catalog {
                     view: &capture.view,
                 };
                 (
-                    self.cpp_layout_sweep(&view)?,
-                    self.write_cpp_layout_batch_from(&view, dbs, tables, indexes, &segments)?,
+                    self.layout_sweep(&view)?,
+                    self.write_layout_batch_from(&view, dbs, tables, indexes, &segments)?,
                 )
             }
             None => (
-                self.cpp_layout_sweep(self.store.as_ref())?,
-                self.write_cpp_layout_batch(dbs, tables, indexes, &segments)?,
+                self.layout_sweep(self.store.as_ref())?,
+                self.write_layout_batch(dbs, tables, indexes, &segments)?,
             ),
         };
         let batch = last_op_per_key([sweep, layout].concat());
@@ -737,14 +736,14 @@ impl Catalog {
         // `tbl|col|` and `catalog|idx|`), so mirror it inside this capture.
         // C++-only mode already rewrote it inside `f`; a checkpoint mirrors it
         // too, which is what covers a directory no DDL touched.
-        if out.is_ok() && !self.cpp_only {
+        if out.is_ok() && !self.catalog_only {
             // Best effort, like the checkpoint's: a column type the C++ encoding
             // does not cover yet leaves the previous layout in place rather than
             // failing the DDL (the next checkpoint reports it).
             let _ = self
                 .list_databases()
                 .and_then(|dbs| Ok((dbs, self.list_tables()?, self.list_indexes()?)))
-                .and_then(|(dbs, tables, indexes)| self.rewrite_cpp(&dbs, &tables, &indexes));
+                .and_then(|(dbs, tables, indexes)| self.rewrite_catalog(&dbs, &tables, &indexes));
         }
         let capture = self.capture.lock().unwrap().take().unwrap_or_default();
         Ok((out?, last_op_per_key(capture.batch)))
@@ -787,19 +786,19 @@ impl Catalog {
 
     /// Republishes the whole C++ layout from the **current** native catalog,
     /// deleting every record the layout owns first. A checkpoint must call
-    /// this (not [`Self::write_cpp_layout`]) so a dropped database, table or
-    /// index cannot survive as a stale key that `import_cpp_layout` would
-    /// resurrect on the next open. Like [`Self::rewrite_cpp`], the sweep and
+    /// this (not [`Self::write_layout`]) so a dropped database, table or
+    /// index cannot survive as a stale key that `import_layout` would
+    /// resurrect on the next open. Like [`Self::rewrite_catalog`], the sweep and
     /// the rewrite are one commit.
-    pub fn rewrite_cpp_layout(&self, store: &dyn MetaStore) -> Result<usize> {
+    pub fn rewrite_layout(&self, store: &dyn MetaStore) -> Result<usize> {
         let _ddl = self.begin_ddl();
         let dbs = self.list_databases()?;
         let tables = self.list_tables()?;
         let indexes = self.list_indexes()?;
-        let segments = crate::cpp_layout::read_cpp_segments(store)?;
-        let layout = self.write_cpp_layout_batch(&dbs, &tables, &indexes, &segments)?;
+        let segments = crate::layout::read_segments(store)?;
+        let layout = self.write_layout_batch(&dbs, &tables, &indexes, &segments)?;
         let written = layout.len();
-        let mut batch = self.cpp_layout_sweep(store)?;
+        let mut batch = self.layout_sweep(store)?;
         batch.extend(layout);
         store.atomic_batch(&last_op_per_key(batch))?;
         Ok(written)
@@ -810,35 +809,35 @@ impl Catalog {
     /// `next_segment_id` / `unsealed_segment_id`).
     ///
     /// A targeted write: nothing is swept, so a checkpoint can publish blocks
-    /// after [`Self::rewrite_cpp_layout`] (or, in C++-only mode, after the DDL
+    /// after [`Self::rewrite_layout`] (or, in C++-only mode, after the DDL
     /// that created the mirror).
-    pub fn publish_cpp_segments(&self, set: &crate::cpp_layout::CppSegmentSet) -> Result<usize> {
+    pub fn publish_segments(&self, set: &crate::layout::SegmentSet) -> Result<usize> {
         let _ddl = self.begin_ddl();
-        crate::cpp_layout::write_cpp_segments(self.store.as_ref(), set)
+        crate::layout::write_segments(self.store.as_ref(), set)
     }
 
     /// Publishes the sealed-chunk layer of the table's index mirrors
     /// (`idx_seg|…`, `idx_seg|…|next_chunk_id`, `idx_chunk|…|chunk_info`), so the
     /// reference knows the segment's rows are already indexed and does not try
     /// to rebuild them into its memory index at startup.
-    pub fn publish_cpp_index_segments(
+    pub fn publish_index_segments(
         &self,
-        set: &crate::cpp_layout::CppSegmentSet,
-        indexes: &[crate::cpp_layout::CppIndexSegment],
+        set: &crate::layout::SegmentSet,
+        indexes: &[crate::layout::IndexSegment],
     ) -> Result<usize> {
-        crate::cpp_layout::write_cpp_index_segments(self.store.as_ref(), set, indexes)
+        crate::layout::write_index_segments(self.store.as_ref(), set, indexes)
     }
 
     /// Marks `segments` as deprecated at `ts` (a compaction's commit ts), for
     /// the table and for each of `index_ids`.
-    pub fn cpp_drop_segments(
+    pub fn drop_segments(
         &self,
-        set: &crate::cpp_layout::CppSegmentSet,
+        set: &crate::layout::SegmentSet,
         index_ids: &[u64],
         segments: &[u32],
         ts: u64,
     ) -> Result<usize> {
-        crate::cpp_layout::write_cpp_drops(self.store.as_ref(), set, index_ids, segments, ts)
+        crate::layout::write_drops(self.store.as_ref(), set, index_ids, segments, ts)
     }
 
     /// The segments of `db_id`.`table_id` a compaction deprecated.
@@ -848,8 +847,8 @@ impl Catalog {
     /// `Cleanup` in the same transaction, a read right after `COMPACT`) has to
     /// see its own marks, or it treats the deprecated source segments as live
     /// and reads their rows a second time next to the merged segment's.
-    pub fn cpp_dropped_segments(&self, db_id: &str, table_id: &str) -> Result<Vec<u32>> {
-        self.with_view(|store| crate::cpp_layout::cpp_dropped_segments(store, db_id, table_id))
+    pub fn dropped_segments(&self, db_id: &str, table_id: &str) -> Result<Vec<u32>> {
+        self.with_view(|store| crate::layout::dropped_segments(store, db_id, table_id))
     }
 
     /// The deletes a C++-layout rewrite performs before writing the layout.
@@ -859,9 +858,9 @@ impl Catalog {
     /// layout is what a `DROP TABLE t; CREATE TABLE t` does, and deleting the
     /// dropped table's records here would give the directory a key space the
     /// reference never has.
-    fn cpp_layout_sweep(&self, store: &dyn MetaStore) -> Result<Vec<BatchItem>> {
+    fn layout_sweep(&self, store: &dyn MetaStore) -> Result<Vec<BatchItem>> {
         let mut deletes: Vec<BatchItem> = Vec::new();
-        let keep = crate::cpp_layout::dropped_record_prefixes(store)?;
+        let keep = crate::layout::dropped_record_prefixes(store)?;
         for prefix in CPP_KEY_PREFIXES {
             for (k, _) in store.scan_prefix(prefix.as_bytes())? {
                 let key = String::from_utf8_lossy(&k);
@@ -891,7 +890,7 @@ impl Catalog {
     /// counter can never run ahead of the table record (`alloc_id` used to
     /// commit it on its own, leaving a gap if the process died right after).
     fn reserve_table_id(&self, table: &str) -> Result<(u64, u64)> {
-        if self.cpp_only {
+        if self.catalog_only {
             // Table ids are **per database** (`DBMeta::GetNextTableID` on the
             // database's own `next_table_id` tag), and the counter only ever
             // grows: a dropped table's id is never handed out again, or the new
@@ -908,7 +907,7 @@ impl Catalog {
             let next = match previous {
                 Some(previous) => previous,
                 None => self
-                    .cpp_tables()?
+                    .tables()?
                     .iter()
                     .filter(|t| t.name.split('.').next() == Some(db_name))
                     .map(|t| t.id + 1)
@@ -1028,7 +1027,7 @@ impl Catalog {
             ids: (0..columns.len() as u64).collect(),
             sparse_stores,
         };
-        if self.cpp_only {
+        if self.catalog_only {
             let db_name = name.split('.').next().unwrap_or(name).to_string();
             let bare = name.rsplit('.').next().unwrap_or(name).to_string();
             let db_id = self.database_id_of_name(&db_name)?.unwrap_or(1);
@@ -1042,13 +1041,13 @@ impl Catalog {
                 store.scan_prefix(prefix.as_bytes())
             })?;
             if name_records.is_empty() && self.has_database_record(&db_name)? {
-                let batch = crate::cpp_layout::stage_cpp_new_table(db_id, &meta, id + 1)?;
+                let batch = crate::layout::stage_new_table(db_id, &meta, id + 1)?;
                 self.stage(&batch)?;
                 return Ok(meta);
             }
-            let mut tables = self.cpp_tables()?;
+            let mut tables = self.tables()?;
             tables.push(meta.clone());
-            self.rewrite_cpp(&self.cpp_databases()?, &tables, &self.cpp_indexes()?)?;
+            self.rewrite_catalog(&self.databases()?, &tables, &self.indexes()?)?;
             return Ok(meta);
         }
         self.store.atomic_batch(&[
@@ -1136,12 +1135,12 @@ impl Catalog {
             let next_id = meta.ids.iter().copied().max().map_or(0, |v| v + 1);
             meta.ids.push(next_id);
         }
-        if self.cpp_only {
-            let mut tables = self.cpp_tables()?;
+        if self.catalog_only {
+            let mut tables = self.tables()?;
             if let Some(slot) = tables.iter_mut().find(|t| t.name == meta.name) {
                 *slot = meta.clone();
             }
-            self.rewrite_cpp(&self.cpp_databases()?, &tables, &self.cpp_indexes()?)?;
+            self.rewrite_catalog(&self.databases()?, &tables, &self.indexes()?)?;
             return Ok(meta);
         }
         self.store.put(&table_key(meta.id), &meta.encode())?;
@@ -1179,12 +1178,12 @@ impl Catalog {
         if idx < meta.ids.len() {
             meta.ids.remove(idx);
         }
-        if self.cpp_only {
-            let mut tables = self.cpp_tables()?;
+        if self.catalog_only {
+            let mut tables = self.tables()?;
             if let Some(slot) = tables.iter_mut().find(|t| t.name == meta.name) {
                 *slot = meta;
             }
-            self.rewrite_cpp(&self.cpp_databases()?, &tables, &self.cpp_indexes()?)?;
+            self.rewrite_catalog(&self.databases()?, &tables, &self.indexes()?)?;
             return Ok(idx);
         }
         self.store.put(&table_key(meta.id), &meta.encode())?;
@@ -1192,8 +1191,8 @@ impl Catalog {
     }
 
     pub fn get_table(&self, id: u64) -> Result<Option<TableMeta>> {
-        if self.cpp_only {
-            return Ok(self.cpp_tables()?.into_iter().find(|t| t.id == id));
+        if self.catalog_only {
+            return Ok(self.tables()?.into_iter().find(|t| t.id == id));
         }
         match self.store.get(&table_key(id))? {
             Some(b) => Ok(Some(TableMeta::decode(id, &b)?)),
@@ -1203,18 +1202,15 @@ impl Catalog {
 
     /// The tables of one database (a `DROP DATABASE` only needs those).
     pub fn tables_of_database(&self, db: &str) -> Result<Vec<TableMeta>> {
-        if !self.cpp_only {
+        if !self.catalog_only {
             return Ok(self
                 .list_tables()?
                 .into_iter()
                 .filter(|t| t.name.starts_with(&format!("{db}.")))
                 .collect());
         }
-        let tables = self.with_view(|store| crate::cpp_layout::read_cpp_tables_of_db(store, db))?;
-        Ok(tables
-            .iter()
-            .map(crate::cpp_layout::table_meta_of)
-            .collect())
+        let tables = self.with_view(|store| crate::layout::read_tables_of_db(store, db))?;
+        Ok(tables.iter().map(crate::layout::table_meta_of).collect())
     }
 
     pub fn get_table_by_name(&self, name: &str) -> Result<Option<TableMeta>> {
@@ -1246,16 +1242,15 @@ impl Catalog {
     }
 
     fn get_table_by_name_uncached(&self, name: &str) -> Result<Option<TableMeta>> {
-        if self.cpp_only {
+        if self.catalog_only {
             // A qualified name resolves by its own record; only a bare one has
             // to search every database (the session qualifies names before they
             // get here, so this is the rare path).
             if let Some((db, table)) = name.split_once('.') {
-                let found =
-                    self.with_view(|store| crate::cpp_layout::read_cpp_table(store, db, table))?;
-                return Ok(found.as_ref().map(crate::cpp_layout::table_meta_of));
+                let found = self.with_view(|store| crate::layout::read_table(store, db, table))?;
+                return Ok(found.as_ref().map(crate::layout::table_meta_of));
             }
-            return Ok(self.cpp_tables()?.into_iter().find(|t| t.name == name));
+            return Ok(self.tables()?.into_iter().find(|t| t.name == name));
         }
         match self.store.get(&name_key(name))? {
             Some(b) => {
@@ -1267,8 +1262,8 @@ impl Catalog {
     }
 
     pub fn list_tables(&self) -> Result<Vec<TableMeta>> {
-        if self.cpp_only {
-            return self.cpp_tables();
+        if self.catalog_only {
+            return self.tables();
         }
         let mut out = Vec::new();
         for (k, v) in self.store.scan_prefix(b"tbl:")? {
@@ -1286,7 +1281,7 @@ impl Catalog {
     /// `get_table_by_name` refuses a record with a marker.
     pub fn drop_table(&self, name: &str) -> Result<bool> {
         let _ddl = self.begin_ddl();
-        if self.cpp_only {
+        if self.catalog_only {
             // A name that already has a marker is gone: `DROP TABLE` reports it
             // as absent, exactly as `CatalogMeta::GetTableMeta` does.
             if self.get_table_by_name(name)?.is_none() {
@@ -1294,16 +1289,12 @@ impl Catalog {
             }
             let (db_id, bare) = self.db_and_bare_name(name)?;
             let Some((table_id, create_ts)) =
-                crate::cpp_layout::cpp_table_record(self.store.as_ref(), &db_id, &bare)?
+                crate::layout::table_record(self.store.as_ref(), &db_id, &bare)?
             else {
                 return Ok(false);
             };
-            let key = crate::cpp_layout::cpp_dropped_table_key(
-                &db_id,
-                &bare,
-                create_ts,
-                &table_id.to_string(),
-            );
+            let key =
+                crate::layout::dropped_table_key(&db_id, &bare, create_ts, &table_id.to_string());
             self.stage(&[(key.into_bytes(), Some(Self::drop_marker_value()))])?;
             return Ok(true);
         }
@@ -1329,16 +1320,16 @@ impl Catalog {
             .get_table_by_name(old)?
             .ok_or_else(|| Error::Catalog(format!("table '{old}' does not exist")))?;
         meta.name = new.to_string();
-        if self.cpp_only {
-            let mut tables = self.cpp_tables()?;
+        if self.catalog_only {
+            let mut tables = self.tables()?;
             if let Some(slot) = tables.iter_mut().find(|t| t.id == meta.id) {
                 *slot = meta;
             }
-            let mut indexes = self.cpp_indexes()?;
+            let mut indexes = self.indexes()?;
             for i in indexes.iter_mut().filter(|i| i.table == old) {
                 i.table = new.to_string();
             }
-            self.rewrite_cpp(&self.cpp_databases()?, &tables, &indexes)?;
+            self.rewrite_catalog(&self.databases()?, &tables, &indexes)?;
             return Ok(());
         }
         // One batch: the new name must never exist while the old one still
@@ -1354,7 +1345,7 @@ impl Catalog {
     /// Registers a database name. `if_not_exists` tolerates an existing name.
     pub fn create_database(&self, name: &str, if_not_exists: bool) -> Result<()> {
         let _ddl = self.begin_ddl();
-        if self.cpp_only {
+        if self.catalog_only {
             // `NewTxn::CreateDatabase` writes one record, one tag and the id
             // counter. A name that already has a record - a live one, a dropped
             // one the `drop|db|…` marker still holds, or the implied
@@ -1363,7 +1354,7 @@ impl Catalog {
             // the rewrite rebuilt every table and index record for nothing:
             // 1000 databases cost 43 ms per call, 10,000 over twenty minutes.
             if name != "default_db" && !self.has_database_record(name)? {
-                let id = self.next_cpp_database_id()?;
+                let id = self.next_id_from_records()?;
                 self.stage(&[
                     (
                         storage::catalog_format::NEXT_DATABASE_ID
@@ -1387,22 +1378,22 @@ impl Catalog {
                 ])?;
                 return Ok(());
             }
-            let mut dbs = self.cpp_databases()?;
-            if self.cpp_database_records()?.iter().any(|d| d == name) {
+            let mut dbs = self.databases()?;
+            if self.database_records()?.iter().any(|d| d == name) {
                 return if if_not_exists {
                     Ok(())
                 } else {
                     Err(Error::Catalog(format!("database '{name}' already exists")))
                 };
             }
-            // `cpp_databases()` already lists `default_db` (the reference
+            // `databases()` already lists `default_db` (the reference
             // implies it), so pushing it again would write the database twice
             // and hand it two ids: the layout would then emit
             // `db|1|next_table_id` *and* `db|2|next_table_id`.
             if !dbs.iter().any(|d| d == name) {
                 // `NewTxn::CreateDatabase` applies `IncrLatestID(next_database_id)`
                 // and writes the counter in the same transaction.
-                let id = self.next_cpp_database_id()?;
+                let id = self.next_id_from_records()?;
                 self.stage(&[(
                     storage::catalog_format::NEXT_DATABASE_ID
                         .as_bytes()
@@ -1411,7 +1402,7 @@ impl Catalog {
                 )])?;
                 dbs.push(name.to_string());
             }
-            self.rewrite_cpp(&dbs, &self.cpp_tables()?, &self.cpp_indexes()?)?;
+            self.rewrite_catalog(&dbs, &self.tables()?, &self.indexes()?)?;
             return Ok(());
         }
         let key = db_key(name);
@@ -1467,7 +1458,7 @@ impl Catalog {
         let (db_name, bare) = match table.split_once('.') {
             Some((db, bare)) => (db.to_string(), bare.to_string()),
             None => (
-                self.cpp_databases()?
+                self.databases()?
                     .first()
                     .cloned()
                     .unwrap_or_else(|| "default_db".into()),
@@ -1481,7 +1472,7 @@ impl Catalog {
     /// Writes the two system tags a C++-written directory always carries
     /// (`NewCatalog::Init`): the catalog version and the database counter. Both
     /// only when absent - a directory that already has them keeps its values.
-    pub fn init_cpp_key_space(&self) -> Result<()> {
+    pub fn init_key_space(&self) -> Result<()> {
         use storage::catalog_format::{CATALOG_VERSION, META_VERSION, NEXT_DATABASE_ID};
         if self.store.get(META_VERSION.as_bytes())?.is_none() {
             self.store
@@ -1511,7 +1502,7 @@ impl Catalog {
     /// The counter is the authority (`NewCatalog::Init` writes it on the first
     /// open). A directory that predates it - one this port wrote before the
     /// counter existed - starts from the highest recorded id instead.
-    fn next_cpp_database_id(&self) -> Result<u64> {
+    fn next_id_from_records(&self) -> Result<u64> {
         let counter = match self
             .store
             .get(NEXT_DATABASE_ID_KEY)?
@@ -1519,7 +1510,7 @@ impl Catalog {
         {
             Some(counter) => counter,
             // No counter (a directory this port wrote before it existed, or a
-            // catalog driven without `init_cpp_key_space`): the ids in use are
+            // catalog driven without `init_key_space`): the ids in use are
             // the recorded ones plus the id `default_db` is implied to have -
             // it is the first database, and `db_id_of` numbers it by position.
             None => self
@@ -1529,7 +1520,7 @@ impl Catalog {
                 .filter_map(|(_, v)| String::from_utf8_lossy(&v).parse::<u64>().ok())
                 .max()
                 .unwrap_or(0)
-                .max(self.cpp_databases()?.len() as u64),
+                .max(self.databases()?.len() as u64),
         };
         Ok(counter + 1)
     }
@@ -1547,14 +1538,12 @@ impl Catalog {
 
     /// The id of `name`; `None` when the database has no record.
     pub fn database_id_of_name(&self, name: &str) -> Result<Option<u64>> {
-        if self.cpp_only {
+        if self.catalog_only {
             // The C++ key space keeps the id in the record's value, and that is
             // what names the `db_{id}` directory - including for a database
             // that was dropped and created again (the dropped record is still
             // there, so the newest one is the live id).
-            return Ok(
-                crate::cpp_layout::cpp_db_record(self.store.as_ref(), name)?.map(|(id, _)| id)
-            );
+            return Ok(crate::layout::db_record(self.store.as_ref(), name)?.map(|(id, _)| id));
         }
         Ok(self
             .store
@@ -1570,15 +1559,14 @@ impl Catalog {
     /// it: startup has to write one, and `CREATE DATABASE` must not treat it as
     /// already existing.
     pub fn has_database_record(&self, name: &str) -> Result<bool> {
-        if self.cpp_only {
+        if self.catalog_only {
             // A record a `drop|db|…` marker deprecated is not a database:
             // `CatalogMeta::GetDBMeta` reports the name as gone and only
             // `Cleanup` takes the record away.
-            let Some((id, ts)) = crate::cpp_layout::cpp_db_record(self.store.as_ref(), name)?
-            else {
+            let Some((id, ts)) = crate::layout::db_record(self.store.as_ref(), name)? else {
                 return Ok(false);
             };
-            let marker = crate::cpp_layout::cpp_dropped_db_key(name, ts, &id.to_string());
+            let marker = crate::layout::dropped_db_key(name, ts, &id.to_string());
             return Ok(self.store.get(marker.as_bytes())?.is_none());
         }
         Ok(self.store.get(&db_key(name))?.is_some())
@@ -1594,7 +1582,7 @@ impl Catalog {
     /// records and files.
     pub fn drop_database(&self, name: &str, if_exists: bool) -> Result<bool> {
         let _ddl = self.begin_ddl();
-        if self.cpp_only {
+        if self.catalog_only {
             if !self.has_database_record(name)? {
                 return if if_exists {
                     Ok(false)
@@ -1602,12 +1590,11 @@ impl Catalog {
                     Err(Error::Catalog(format!("database '{name}' does not exist")))
                 };
             }
-            let Some((db_id, create_ts)) =
-                crate::cpp_layout::cpp_db_record(self.store.as_ref(), name)?
+            let Some((db_id, create_ts)) = crate::layout::db_record(self.store.as_ref(), name)?
             else {
                 return Ok(false);
             };
-            let key = crate::cpp_layout::cpp_dropped_db_key(name, create_ts, &db_id.to_string());
+            let key = crate::layout::dropped_db_key(name, create_ts, &db_id.to_string());
             self.stage(&[(key.into_bytes(), Some(Self::drop_marker_value()))])?;
             return Ok(true);
         }
@@ -1622,8 +1609,8 @@ impl Catalog {
 
     /// Names of all registered databases, plus the built-in `default_db`.
     pub fn list_databases(&self) -> Result<Vec<String>> {
-        if self.cpp_only {
-            return self.cpp_databases();
+        if self.catalog_only {
+            return self.databases();
         }
         // The records are the list; `default_db` is created at startup like any
         // other database (`Storage::Init`), so it is usually one of them. A
@@ -1655,8 +1642,8 @@ impl Catalog {
         options: &[(String, String)],
     ) -> Result<IndexMeta> {
         // Per-table index ids start at 1 and are never reused.
-        let id = if self.cpp_only {
-            self.next_cpp_index_id(table)?
+        let id = if self.catalog_only {
+            self.next_index_id(table)?
         } else {
             let short = table.split('.').next_back().unwrap_or(table);
             self.list_indexes()?
@@ -1676,10 +1663,9 @@ impl Catalog {
     /// marker and leaves the index's records in place, so deriving the next id
     /// from the *live* indexes would hand the dropped index's id to the new one -
     /// which then inherits the old record's key, and with it the drop marker.
-    fn next_cpp_index_id(&self, table: &str) -> Result<u64> {
+    fn next_index_id(&self, table: &str) -> Result<u64> {
         let (db_id, bare) = self.db_and_bare_name(table)?;
-        let Some((table_id, _)) =
-            crate::cpp_layout::cpp_table_record(self.store.as_ref(), &db_id, &bare)?
+        let Some((table_id, _)) = crate::layout::table_record(self.store.as_ref(), &db_id, &bare)?
         else {
             return Ok(1);
         };
@@ -1722,11 +1708,11 @@ impl Catalog {
             options: options.to_vec(),
             id,
         };
-        if self.cpp_only {
-            let mut indexes = self.cpp_indexes()?;
+        if self.catalog_only {
+            let mut indexes = self.indexes()?;
             indexes.retain(|i| !(i.name == name && i.table == table));
             indexes.push(meta.clone());
-            self.rewrite_cpp(&self.cpp_databases()?, &self.cpp_tables()?, &indexes)?;
+            self.rewrite_catalog(&self.databases()?, &self.tables()?, &indexes)?;
             return Ok(meta);
         }
         // The declaration and the legacy-record cleanup are one commit, so the
@@ -1745,8 +1731,8 @@ impl Catalog {
     }
 
     pub fn list_indexes(&self) -> Result<Vec<IndexMeta>> {
-        if self.cpp_only {
-            return self.cpp_indexes();
+        if self.catalog_only {
+            return self.indexes();
         }
         self.store
             .scan_prefix(INDEX_PREFIX)?
@@ -1763,9 +1749,9 @@ impl Catalog {
     /// `drop|idx|{db}/{table}/{name}/{create_ts}/{index_id}`; the reference's
     /// cleanup removes both.
     pub fn drop_index(&self, name: &str) -> Result<bool> {
-        if self.cpp_only {
+        if self.catalog_only {
             let mut staged: Vec<BatchItem> = Vec::new();
-            for def in crate::cpp_layout::read_cpp_indexes(self.store.as_ref())?
+            for def in crate::layout::read_indexes(self.store.as_ref())?
                 .iter()
                 .filter(|d| d.base.index_name == name)
             {
@@ -1773,16 +1759,12 @@ impl Catalog {
                 else {
                     continue;
                 };
-                let Some((_, create_ts)) = crate::cpp_layout::cpp_index_record(
-                    self.store.as_ref(),
-                    &db_id,
-                    &table_id,
-                    name,
-                )?
+                let Some((_, create_ts)) =
+                    crate::layout::index_record(self.store.as_ref(), &db_id, &table_id, name)?
                 else {
                     continue;
                 };
-                let key = crate::cpp_layout::cpp_dropped_index_key(
+                let key = crate::layout::dropped_index_key(
                     &db_id,
                     &table_id,
                     name,
@@ -1795,7 +1777,7 @@ impl Catalog {
             // therefore no `catalog|idx|` record to mark: its name lives in the
             // table's `rust_name_only_indexes` tag, so dropping it means taking
             // it out of that list.
-            for table in crate::cpp_layout::read_cpp_layout(self.store.as_ref())? {
+            for table in crate::layout::read_layout(self.store.as_ref())? {
                 let tag = storage::catalog_format::catalog_table_tag_key(
                     &table.db_id.to_string(),
                     &table.table_id.to_string(),
@@ -1846,14 +1828,14 @@ impl Catalog {
     /// same name, so callers that know the table must use this form.
     pub fn drop_index_on(&self, table: &str, name: &str) -> Result<bool> {
         let short = table.split('.').next_back().unwrap_or(table);
-        if self.cpp_only {
-            let mut indexes = self.cpp_indexes()?;
+        if self.catalog_only {
+            let mut indexes = self.indexes()?;
             let before = indexes.len();
             indexes.retain(|i| !(i.name == name && (i.table == table || i.table == short)));
             if indexes.len() == before {
                 return Ok(false);
             }
-            self.rewrite_cpp(&self.cpp_databases()?, &self.cpp_tables()?, &indexes)?;
+            self.rewrite_catalog(&self.databases()?, &self.tables()?, &indexes)?;
             return Ok(true);
         }
         let key = index_key(table, name);
@@ -1881,7 +1863,7 @@ impl Catalog {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cpp_layout::{CppBlock, CppSegment, CppSegmentSet, CPP_MIRROR_TS, UNCOMMIT_TS};
+    use crate::layout::{BlockRecord, SegmentRecord, SegmentSet, CPP_MIRROR_TS, UNCOMMIT_TS};
     use tempfile::tempdir;
 
     fn cols(names: &[&str]) -> Vec<String> {
@@ -1892,8 +1874,8 @@ mod tests {
     fn cpp_only_catalog_writes_only_the_cpp_key_space() {
         let dir = tempdir().unwrap();
         let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
-        let c = Catalog::with_store_cpp_only(store.clone());
-        assert!(c.is_cpp_only());
+        let c = Catalog::with_store_catalog_only(store.clone());
+        assert!(c.is_catalog_only());
         c.create_database("db2", false).unwrap();
         let t = c
             .create_table_typed(
@@ -1928,7 +1910,7 @@ mod tests {
             );
         }
         // ... and it survives a reopen.
-        let reopened = Catalog::with_store_cpp_only(store.clone());
+        let reopened = Catalog::with_store_catalog_only(store.clone());
         assert_eq!(reopened.list_tables().unwrap().len(), 1);
         assert_eq!(reopened.list_indexes().unwrap().len(), 1);
 
@@ -1961,7 +1943,7 @@ mod tests {
             .collect();
         assert!(!before.is_empty(), "the dropped records are in the store");
         reopened.create_database("db3", false).unwrap();
-        reopened.rewrite_cpp_layout(store.as_ref()).unwrap();
+        reopened.rewrite_layout(store.as_ref()).unwrap();
         for key in &before {
             assert!(
                 store.get(key).unwrap().is_some(),
@@ -2077,7 +2059,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
         {
-            let c = Catalog::with_store_cpp_only(store.clone());
+            let c = Catalog::with_store_catalog_only(store.clone());
             c.create_table_typed_with_sparse_stores(
                 "default_db.sp",
                 &cols(&["id", "v"]),
@@ -2090,7 +2072,7 @@ mod tests {
             .unwrap();
         }
         // The hint is written to the C++ `sort` field and read back from it.
-        let c = Catalog::with_store_cpp_only(store);
+        let c = Catalog::with_store_catalog_only(store);
         let t = c.get_table_by_name("default_db.sp").unwrap().unwrap();
         assert_eq!(t.types[1], "SPARSE(float,int16,30000)");
         assert_eq!(t.sparse_stores[1], Some(SparseStore::Sorted));
@@ -2184,15 +2166,15 @@ mod tests {
         }
     }
 
-    fn counting_catalog(dir: &std::path::Path, cpp_only: bool) -> (Catalog, Arc<Counts>) {
+    fn counting_catalog(dir: &std::path::Path, catalog_only: bool) -> (Catalog, Arc<Counts>) {
         let inner: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir).unwrap());
         let counts = Arc::new(Counts::default());
         let store: Arc<dyn MetaStore> = Arc::new(CountingStore {
             inner,
             counts: counts.clone(),
         });
-        let catalog = if cpp_only {
-            Catalog::with_store_cpp_only(store)
+        let catalog = if catalog_only {
+            Catalog::with_store_catalog_only(store)
         } else {
             Catalog::with_store(store)
         };
@@ -2358,19 +2340,19 @@ mod tests {
         // `default_db` is the first database, so the reference id is 1.
         let db_id = dbs.iter().position(|d| d == "db2").unwrap() as u64 + 1;
         let table_id = tables.iter().find(|t| t.name == "db2.t").unwrap().id;
-        let segments = vec![CppSegmentSet {
+        let segments = vec![SegmentSet {
             db_id: db_id.to_string(),
             table_id: table_id.to_string(),
-            segments: vec![CppSegment {
+            segments: vec![SegmentRecord {
                 segment_id: 0,
                 create_ts: CPP_MIRROR_TS,
                 first_delete_ts: UNCOMMIT_TS,
                 blocks: vec![
-                    CppBlock {
+                    BlockRecord {
                         block_id: 0,
                         commit_ts: CPP_MIRROR_TS,
                     },
-                    CppBlock {
+                    BlockRecord {
                         block_id: 1,
                         commit_ts: CPP_MIRROR_TS,
                     },
@@ -2379,7 +2361,7 @@ mod tests {
         }];
 
         let batch: std::collections::BTreeMap<Vec<u8>, Vec<u8>> = c
-            .write_cpp_layout_batch(&dbs, &tables, &indexes, &segments)
+            .write_layout_batch(&dbs, &tables, &indexes, &segments)
             .unwrap()
             .into_iter()
             .map(|(k, v)| (k, v.expect("the layout writer only writes")))
@@ -2389,9 +2371,9 @@ mod tests {
         // The direct writer preserves the segment layer already in the store, so
         // publish it first and the two paths see the same input.
         for set in &segments {
-            crate::cpp_layout::write_cpp_segments(direct.as_ref(), set).unwrap();
+            crate::layout::write_segments(direct.as_ref(), set).unwrap();
         }
-        c.write_cpp_layout(direct.as_ref()).unwrap();
+        c.write_layout(direct.as_ref()).unwrap();
         let written: std::collections::BTreeMap<Vec<u8>, Vec<u8>> =
             direct.scan_prefix(b"").unwrap().into_iter().collect();
 
@@ -2419,19 +2401,19 @@ mod tests {
         let t = c.list_tables().unwrap()[0].clone();
         let db_id = "0".to_string();
         let tbl_id = t.id.to_string();
-        let set = CppSegmentSet {
+        let set = SegmentSet {
             db_id: db_id.clone(),
             table_id: tbl_id.clone(),
-            segments: vec![CppSegment {
+            segments: vec![SegmentRecord {
                 segment_id: 0,
                 create_ts: CPP_MIRROR_TS,
                 first_delete_ts: UNCOMMIT_TS,
                 blocks: vec![
-                    CppBlock {
+                    BlockRecord {
                         block_id: 0,
                         commit_ts: CPP_MIRROR_TS,
                     },
-                    CppBlock {
+                    BlockRecord {
                         block_id: 1,
                         commit_ts: CPP_MIRROR_TS,
                     },
@@ -2439,9 +2421,9 @@ mod tests {
             }],
         };
         let store = c.store();
-        c.publish_cpp_segments(&set).unwrap();
+        c.publish_segments(&set).unwrap();
 
-        let back = crate::cpp_layout::read_cpp_segments(store.as_ref()).unwrap();
+        let back = crate::layout::read_segments(store.as_ref()).unwrap();
         assert_eq!(back, vec![set]);
         // `next_segment_id` is written as "0" and never advanced — the reference
         // does the same at `TableMeta::InitSet` (`table_meta_impl.cpp:274`) and
@@ -2462,21 +2444,21 @@ mod tests {
         assert_eq!(tag("unsealed_segment_id").as_deref(), Some("0"));
 
         // Publishing again with fewer blocks must not leave the stale record.
-        let shrunk = CppSegmentSet {
+        let shrunk = SegmentSet {
             db_id,
             table_id: tbl_id,
-            segments: vec![CppSegment {
+            segments: vec![SegmentRecord {
                 segment_id: 0,
                 create_ts: CPP_MIRROR_TS,
                 first_delete_ts: UNCOMMIT_TS,
-                blocks: vec![CppBlock {
+                blocks: vec![BlockRecord {
                     block_id: 0,
                     commit_ts: CPP_MIRROR_TS,
                 }],
             }],
         };
-        c.publish_cpp_segments(&shrunk).unwrap();
-        let back = crate::cpp_layout::read_cpp_segments(store.as_ref()).unwrap();
+        c.publish_segments(&shrunk).unwrap();
+        let back = crate::layout::read_segments(store.as_ref()).unwrap();
         assert_eq!(back, vec![shrunk]);
     }
 }

@@ -17,7 +17,7 @@ use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 
 /// `LenType` of a run record: the width and byte order of the length prefix.
 pub trait RecordLen {

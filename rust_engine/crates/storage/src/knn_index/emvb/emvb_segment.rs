@@ -37,7 +37,7 @@ use memmap2::Mmap;
 
 use index::emvb::OpqRotation;
 
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 
 const EMVB_MAGIC: u32 = 0x454D_5642;
 const EMVB_VERSION: u32 = 1;
@@ -508,7 +508,7 @@ fn write_bytes(path: &Path, bytes: Vec<u8>) -> Result<(), FormatError> {
         std::fs::create_dir_all(parent)
             .map_err(|e| FormatError::Io(format!("{}: {e}", parent.display())))?;
     }
-    crate::cpp_format::write_synced(path, &bytes)
+    crate::format::write_synced(path, &bytes)
         .map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
 }
 

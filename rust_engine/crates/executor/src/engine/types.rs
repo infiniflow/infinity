@@ -492,7 +492,7 @@ pub(crate) fn normalize_default(type_text: &str, raw: &str) -> String {
 /// Append block encoder can represent. `None` means "use the text fallback".
 pub(crate) fn port_logical_type(type_text: &str) -> Option<::common::LogicalType> {
     use ::common::LogicalType as LT;
-    let doc = catalog::cpp_layout::data_type_of_text(type_text)?;
+    let doc = catalog::layout::data_type_of_text(type_text)?;
     let code = match expression::json::extract(&doc, ".data_type")? {
         expression::json::Json::Int(v) => *v,
         _ => return None,
@@ -809,8 +809,8 @@ pub(crate) fn index_block_size(im: &catalog::IndexMeta) -> usize {
         .unwrap_or(index::sparse::BMP_BLOCK_SIZE)
 }
 
-pub(crate) fn sparse_idx_width(type_text: &str) -> storage::bmp_cpp::IdxWidth {
-    use storage::bmp_cpp::IdxWidth;
+pub(crate) fn sparse_idx_width(type_text: &str) -> storage::bmp::IdxWidth {
+    use storage::bmp::IdxWidth;
     let t = type_text.to_ascii_uppercase();
     if t.contains("INT8") || t.contains("TINYINT") {
         IdxWidth::I8

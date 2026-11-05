@@ -6,8 +6,8 @@
 use crate::data_table::{DataTable, TableType};
 use ::common::LogicalType;
 use catalog::value_format::{data_type_json, logical, ColumnDefValue, TableDef};
-use storage::cpp_format::DEFAULT_BLOCK_CAPACITY;
 use storage::data_block::{BlockValue, Column, ColumnVectorType, DataBlock, DEFAULT_VECTOR_SIZE};
+use storage::format::DEFAULT_BLOCK_CAPACITY;
 
 #[test]
 fn test1() {

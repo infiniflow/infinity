@@ -1,1 +1,1 @@
-pub mod cpp_format;
+pub mod format;

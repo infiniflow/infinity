@@ -98,7 +98,7 @@ pub use buffer::{mapped, mapped_block};
 pub use catalog::{catalog_format, metastore, metastore_rocks};
 pub use column_vector::selection;
 pub use common::{block_index, crc, rcu_map};
-pub use definition::cpp_format;
+pub use definition::format;
 pub use fast_rough_filter::binary_fuse_filter;
 pub use invertedindex::common::external_sort;
 pub use invertedindex::fst::registry as fst_registry;
@@ -106,7 +106,7 @@ pub use io::{s3, virtual_store};
 pub use knn_index::emvb::emvb_segment;
 pub use knn_index::knn_format;
 pub use knn_index::multivector::multivector_segment;
-pub use knn_index::sparse::{bmp as bmp_cpp, bmp_segment};
+pub use knn_index::sparse::{bmp, bmp_segment};
 pub use new_txn::{mvcc, txn_kv};
 pub use secondary_index::{
     secondary_index_data, secondary_lowcard, secondary_segment_pgm as secondary_segment,
@@ -123,7 +123,8 @@ pub fn open_store(path: &std::path::Path) -> ::common::Result<std::sync::Arc<dyn
     Ok(std::sync::Arc::new(store))
 }
 
-pub use cpp_format::{
+pub use crc::crc32_ieee;
+pub use format::{
     block_dir, chunk_index_file, column_file, column_layout, column_outline_file, data_file_body,
     date_to_days, datetime_to_pair, decode_data_file, element_width, embedding_column_layout,
     encode_data_file, fulltext_base_name, fulltext_files, pack_column, pack_column_with_layout,
@@ -134,7 +135,6 @@ pub use cpp_format::{
     ColumnBody, ColumnLayout, FormatError, RawBlockColumn, DATA_FILE_MAGIC, DEFAULT_BLOCK_CAPACITY,
     VERSION_FILE,
 };
-pub use crc::crc32_ieee;
 pub use invertedindex::format::{
     append_fst_trailer, decode_column_lengths, decode_term_meta, encode_column_lengths,
     encode_term_meta, encode_term_meta_region, fst_checksum, read_vint, verify_fst, write_vint,

@@ -2805,7 +2805,7 @@ mod tests {
         // The checkpoint wrote the block mirror; reading it back maps the
         // block, so the buffer/objects routes must list the mapping the test
         // itself touched.
-        engine.read_cpp_blocks("t").unwrap();
+        engine.read_blocks("t").unwrap();
         let (s, b) = route(&engine, &peer, "GET", "/instance/buffer", "");
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");

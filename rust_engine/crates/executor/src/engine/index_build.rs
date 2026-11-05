@@ -387,7 +387,7 @@ impl Engine {
             // The chunk record the reference writes in this transaction
             // (`AddChunkIndexID1`): the chunks already published for the index
             // now belong to `ts`.
-            engine.stamp_cpp_chunk_ts(&bottom_table, &index_name, ts)?;
+            engine.stamp_chunk_ts(&bottom_table, &index_name, ts)?;
             // A reader hides a chunk stamped above its `begin_ts`, which it
             // takes from the newest checkpoint frame - the dump's ts must be
             // covered.
@@ -1329,7 +1329,7 @@ impl Engine {
             if !has {
                 continue;
             }
-            if self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
+            if self.dump_hnsw_index(&im.table, &im.name).is_ok() {
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&key) {
                     e.hnsw_mem.remove(&im.column);
@@ -1382,7 +1382,7 @@ impl Engine {
             if !same_table {
                 continue;
             }
-            if self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
+            if self.dump_hnsw_index(&im.table, &im.name).is_ok() {
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.column);

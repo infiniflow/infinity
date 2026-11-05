@@ -10,7 +10,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::cpp_format::{
+use crate::format::{
     block_dir, column_file, column_outline_file, data_file_body, BlockColumns, BlockId,
     BlockVersionFile, VERSION_FILE,
 };

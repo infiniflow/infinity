@@ -714,7 +714,7 @@ pub(crate) fn pack_float(
         E::Float => out.extend_from_slice(&(value as f32).to_le_bytes()),
         E::Double => out.extend_from_slice(&value.to_le_bytes()),
         E::Float16 => {
-            out.extend_from_slice(&storage::cpp_format::f32_to_f16_bits(value as f32).to_le_bytes())
+            out.extend_from_slice(&storage::format::f32_to_f16_bits(value as f32).to_le_bytes())
         }
         E::BFloat16 => {
             out.extend_from_slice(&(((value as f32).to_bits() >> 16) as u16).to_le_bytes())
@@ -3590,7 +3590,7 @@ impl MultiVectorIndex {
 /// It survives a restart because it is re-read from the catalog
 /// (`TableMeta::sparse_stores`) when the index is rebuilt.
 pub(crate) struct SparseIndex {
-    pub(crate) width: storage::bmp_cpp::IdxWidth,
+    pub(crate) width: storage::bmp::IdxWidth,
     /// `WITH (block_size = N)`: documents per `BlockFwd` block.
     pub(crate) block_size: usize,
     /// The catalog's `SparseStoreType` for this column.
@@ -3606,7 +3606,7 @@ pub(crate) struct SparseIndex {
     /// `ROW_ID -> (term, weight)` for documents not yet dumped.
     pub(crate) tail: std::collections::BTreeMap<u64, Vec<(i32, f32)>>,
     /// One mmap reader per dumped chunk, with the `ROW_ID` segment it covers.
-    pub(crate) sealed: Vec<(u64, Arc<storage::bmp_cpp::BmpCppReader>)>,
+    pub(crate) sealed: Vec<(u64, Arc<storage::bmp::BmpReader>)>,
     /// Monotonic suffix so a later seal never overwrites an earlier spill.
     pub(crate) next_chunk: u64,
     pub(crate) tail_bytes: usize,
@@ -3670,7 +3670,7 @@ pub(crate) fn parse_bmp_search_options(
 impl SparseIndex {
     pub(crate) fn new(
         dir: PathBuf,
-        width: storage::bmp_cpp::IdxWidth,
+        width: storage::bmp::IdxWidth,
         store: CatalogSparseStore,
         block_size: usize,
     ) -> Self {
@@ -3754,12 +3754,12 @@ impl SparseIndex {
             let name = format!("seg_{segment}_{}_{}.bmp", self.next_chunk, docs.len());
             self.next_chunk += 1;
             let path = self.dir.join(name);
-            if storage::bmp_cpp::write_bmp_file(&path, self.block_size, self.width, &docs, term_num)
+            if storage::bmp::write_bmp_file(&path, self.block_size, self.width, &docs, term_num)
                 .is_err()
             {
                 continue;
             }
-            if let Ok(reader) = storage::bmp_cpp::BmpCppReader::open(&path, self.width) {
+            if let Ok(reader) = storage::bmp::BmpReader::open(&path, self.width) {
                 self.sealed.push((segment, Arc::new(reader)));
             }
         }
@@ -4008,7 +4008,7 @@ pub(crate) struct TableEntry {
     /// from the append buffer, and rows deleted since it was written are hidden
     /// by their tombstones (`TableEntry`'s block snapshot is the Rust stand-in
     /// for the reference's per-block row ranges + delete bitmap).
-    pub(crate) cpp_block_rows: Option<Arc<Vec<usize>>>,
+    pub(crate) block_rows: Option<Arc<Vec<usize>>>,
     /// Rows a commit appended that the block **files** do not have yet.
     ///
     /// The reference's `AppendInBlock` appends to the block's `BufferObject`
@@ -4032,7 +4032,7 @@ pub(crate) struct TableEntry {
     pub(crate) pending_pos: std::collections::HashMap<usize, usize>,
     /// The next mirror write must take its rows from this rewrite rather than
     /// from the block files (a column change re-encodes every cell, so the
-    /// files' cells are stale). Set by `rewrite_cpp_blocks`.
+    /// files' cells are stale). Set by `rewrite_blocks`.
     pub(crate) rewrite_rows: bool,
     /// `(segment, offset, sealed)` of the row-id allocator.
     pub(crate) row_counter: Option<(u32, u32, bool)>,
@@ -4082,7 +4082,7 @@ pub(crate) struct TableEntry {
     pub(crate) secondary: SecondaryIndexes,
     /// HNSW chunks loaded from the C++ block mirror, per column (the
     /// reference's `TableIndexMeta` chain for the index, on-disk form).
-    pub(crate) vector: HashMap<String, Vec<Arc<crate::cpp_blocks::LoadedVectorIndex>>>,
+    pub(crate) vector: HashMap<String, Vec<Arc<crate::blocks::LoadedVectorIndex>>>,
     /// IVF chunks loaded from the C++ mirror, per column.
     pub(crate) ivf: HashMap<String, Vec<Arc<index::ivf::IvfSegment>>>,
     /// IVF memory segment: rows written since the last mirror dump, merged
@@ -4217,7 +4217,7 @@ pub(crate) struct Context {
     /// cache. The entry is dropped when the block's files are rewritten or
     /// deleted (`Engine::drop_block_maps`).
     pub(crate) block_maps:
-        Mutex<std::collections::HashMap<storage::cpp_format::BlockId, Arc<MappedBlock>>>,
+        Mutex<std::collections::HashMap<storage::format::BlockId, Arc<MappedBlock>>>,
     /// `[buffer] buffer_manager_size`: the budget the index buffers are held
     /// to (`memindex_memory_quota` for the dump trigger is separate). Sealed
     /// blocks are mapped, not buffered, so they do not spend it.
@@ -4656,7 +4656,7 @@ pub(crate) fn run_bottom(
                 }
             }
         }
-        engine.refresh_cpp_block_mirror_extra(table, &published)?;
+        engine.refresh_block_mirror_extra(table, &published)?;
     }
     // The catalog is still current: perform the sealed writes now.
     for dump in dumps {

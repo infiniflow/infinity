@@ -15,9 +15,7 @@ use std::sync::Arc;
 
 use ::common::{Error, Result};
 
-use crate::cpp_format::{
-    block_dir, write_block, BlockColumn, BlockId, BlockVersionFile, VERSION_FILE,
-};
+use crate::format::{block_dir, write_block, BlockColumn, BlockId, BlockVersionFile, VERSION_FILE};
 use crate::mapped_block::MappedBlock;
 
 /// Metadata of one block: its id and row range.
@@ -262,7 +260,7 @@ impl BlockIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cpp_format::{BlockColumns, ColumnBody};
+    use crate::format::{BlockColumns, ColumnBody};
 
     fn id(segment: u32, block: u16) -> BlockId {
         BlockId {

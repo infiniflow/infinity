@@ -79,8 +79,8 @@ impl Engine {
         // The catalog **is** the reference's key space: every DDL writes the
         // C++ layout directly, and no native record exists beside it, so the
         // store holds exactly the keys a C++ engine would have written.
-        let catalog = Catalog::with_store_cpp_only(catalog_store);
-        catalog.init_cpp_key_space()?;
+        let catalog = Catalog::with_store_catalog_only(catalog_store);
+        catalog.init_key_space()?;
         // The reference keeps its data files in objects and describes them in
         // `pm|object|`; open the `data/` tree before anything reads a block.
         let persistence = match options.object_dir.as_ref() {
@@ -175,17 +175,18 @@ impl Engine {
         // walks the native tables, so with the schema still missing it would
         // find no table to recover the rows of, and the directory would open
         // with the right schema and no rows.
-        if engine.storage.catalog.list_tables()?.is_empty() && !engine.storage.catalog.is_cpp_only()
+        if engine.storage.catalog.list_tables()?.is_empty()
+            && !engine.storage.catalog.is_catalog_only()
         {
             let _ = engine
                 .storage
                 .catalog
-                .import_cpp_layout(engine.storage.catalog.store().as_ref());
+                .import_layout(engine.storage.catalog.store().as_ref());
         }
         // The blocks first, then the WAL on top: what the files carry is already
         // applied, so the replay starts above the newest timestamp they hold
         // (the reference's checkpoint record gives it the same floor).
-        let hydrated = engine.recover_cpp_blocks()?;
+        let hydrated = engine.recover_blocks()?;
         // Two floors, because the two halves of a commit reach the disk in
         // sequence: the KV batch is written first, the block in `CommitBottom`
         // after. A record above `applied` (the newest checkpoint frame) still
@@ -617,7 +618,7 @@ impl Engine {
             .flatten()
             .map(|meta| meta.id);
         if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
-            entry.cpp_block_rows = None;
+            entry.block_rows = None;
             entry.block_index = None;
             entry.live_rows = None;
             entry.mirror_dirty = true;
@@ -1435,7 +1436,7 @@ impl Engine {
                 published.push((base + k, values));
             }
         }
-        self.refresh_cpp_block_mirror_extra(table, &published)
+        self.refresh_block_mirror_extra(table, &published)
     }
 
     /// [`Self::publish_rows`] from the stored text form.
@@ -1466,7 +1467,7 @@ impl Engine {
                 }
             }
         }
-        self.refresh_cpp_block_mirror_extra(table, &published)
+        self.refresh_block_mirror_extra(table, &published)
     }
 
     /// The `(db_id, table_id, table_key)` of a table from its catalog key.
@@ -1911,7 +1912,7 @@ impl Engine {
             && !*distinct
         {
             if let Some(t) = from.as_ref() {
-                override_rows = self.try_cpp_projection(t, items)?;
+                override_rows = self.try_projection(t, items)?;
             }
         }
         // `ROW_ID()` outside a SEARCH exposes the row's sequence number
@@ -2312,18 +2313,14 @@ impl Engine {
                 } else if let Some(pred) = predicate.filter(|pred| is_equality_predicate(pred)) {
                     let predicate = remap_columns(pred, &pos);
                     let read = self
-                        .read_cpp_blocks_filtered_values(
-                            table,
-                            &needed,
-                            &prune,
-                            &|row: &[Value]| predicate.eval_predicate(row),
-                        )
+                        .read_blocks_filtered_values(table, &needed, &prune, &|row: &[Value]| {
+                            predicate.eval_predicate(row)
+                        })
                         .ok();
                     filtered = read.is_some();
                     read
                 } else {
-                    self.read_cpp_blocks_pruned_values(table, &needed, &prune)
-                        .ok()
+                    self.read_blocks_pruned_values(table, &needed, &prune).ok()
                 };
                 match narrowed {
                     Some((_, rows)) => rows.into_iter().map(|(_, cells)| cells).collect(),
@@ -2405,7 +2402,7 @@ impl Engine {
         if prune.is_empty() {
             return self.fetch_rows(table);
         }
-        if let Some(rows) = self.try_cpp_rows_pruned(table, prune)? {
+        if let Some(rows) = self.try_rows_pruned(table, prune)? {
             return Ok(rows.into_iter().map(|(_, r)| r).collect());
         }
         self.fetch_rows(table)
@@ -2496,7 +2493,7 @@ impl Engine {
     pub(crate) fn row_set_from(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
         // The block mirror is the authoritative value source once it covers every
         // live row; the buffer then only supplies the rows appended since.
-        if let Some(rows) = self.try_cpp_rows(table)? {
+        if let Some(rows) = self.try_rows(table)? {
             return Ok(rows);
         }
         let deleted = self.tombstone_set_at(table, crate::read_ts())?;
@@ -2556,7 +2553,7 @@ impl Engine {
         // adds the rows above the last checkpoint, exactly as it does for a
         // visible scan.
         let mut rows: Vec<(usize, Vec<Value>)> = self
-            .read_cpp_blocks_including_deleted_from(&name, first)
+            .read_blocks_including_deleted_from(&name, first)
             .into_iter()
             .map(|(seq, cells)| (seq, cells.iter().map(|c| parse_value(c)).collect()))
             .collect();
@@ -2580,13 +2577,13 @@ impl Engine {
     ///
     /// Returns `None` when the table has no block mirror or the mirror does not
     /// match its recorded row ids, so the caller falls back to the KV row store.
-    pub(crate) fn try_cpp_rows(&self, table: &str) -> Result<Option<TableRows>> {
-        self.try_cpp_rows_pruned(table, &[])
+    pub(crate) fn try_rows(&self, table: &str) -> Result<Option<TableRows>> {
+        self.try_rows_pruned(table, &[])
     }
 
-    /// [`Self::try_cpp_rows`] with block pruning: a block whose prefilter rules
+    /// [`Self::try_rows`] with block pruning: a block whose prefilter rules
     /// out the predicate is never decoded.
-    pub(crate) fn try_cpp_rows_pruned(
+    pub(crate) fn try_rows_pruned(
         &self,
         table: &str,
         prune: &[crate::fast_rough_filter::PruneCond],
@@ -2618,7 +2615,7 @@ impl Engine {
             .lock()
             .unwrap()
             .get(&key)
-            .and_then(|e| e.cpp_block_rows.clone());
+            .and_then(|e| e.block_rows.clone());
         let wanted: Vec<usize> = (0..schema.len()).collect();
         // All rows still buffered: read them as the `Value`s they already are
         // (see `buffered_rows_values`). The visibility rules are the ones the
@@ -2628,7 +2625,7 @@ impl Engine {
                 return Ok(Some(rows));
             }
         }
-        let Ok((_, rows)) = self.read_cpp_blocks_pruned_values(table, &wanted, prune) else {
+        let Ok((_, rows)) = self.read_blocks_pruned_values(table, &wanted, prune) else {
             return Ok(None);
         };
         // The snapshot and the scan both list the rows the mirror makes
@@ -2669,7 +2666,7 @@ impl Engine {
         Ok(Some(out))
     }
 
-    pub(crate) fn try_cpp_projection(
+    pub(crate) fn try_projection(
         &self,
         table: &str,
         items: &[SelectItem],
@@ -2721,7 +2718,7 @@ impl Engine {
             .lock()
             .unwrap()
             .get(&key)
-            .and_then(|e| e.cpp_block_rows.clone());
+            .and_then(|e| e.block_rows.clone());
         // No snapshot means nothing has written the mirror in this process (a
         // directory that was merely opened): the block files are still the row
         // set, and the guard below is only there to catch a rewrite that ran
@@ -2742,7 +2739,7 @@ impl Engine {
                 ));
             }
         }
-        let Ok((_, rows)) = self.read_cpp_blocks_pruned_values(table, &wanted, &[]) else {
+        let Ok((_, rows)) = self.read_blocks_pruned_values(table, &wanted, &[]) else {
             return Ok(None);
         };
         // The files alone hold `snapshot.len()` rows; the append buffer adds
@@ -2752,7 +2749,7 @@ impl Engine {
             return Ok(None);
         }
         // The projected read already carries the append buffer's rows over the
-        // blocks (`read_cpp_blocks_selected`), so the row set is the one the
+        // blocks (`read_blocks_selected`), so the row set is the one the
         // full scan returns; only the tombstones the files do not mark yet have
         // to be dropped here.
         let deleted = self.tombstone_set(table)?;
@@ -2924,7 +2921,7 @@ impl Engine {
         // the rows one at a time made `CREATE INDEX` a serial point-by-point
         // build.
         let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
-        for (seq, text) in self.read_cpp_block_column_including_deleted(table, ci) {
+        for (seq, text) in self.read_block_column_including_deleted(table, ci) {
             let v: Vec<f32> = parse_vec_str(&text).iter().map(|x| *x as f32).collect();
             rows.push((seq as u64, v));
         }
@@ -3343,7 +3340,7 @@ impl Engine {
         &self,
         table: &str,
         column: &str,
-        width: storage::bmp_cpp::IdxWidth,
+        width: storage::bmp::IdxWidth,
     ) -> Result<Arc<std::sync::RwLock<SparseIndex>>> {
         let key = index_key(table, column);
         let tkey = self.table_key(table);
@@ -3475,7 +3472,7 @@ impl Engine {
             out
         };
         if !self.mirror_dirty(table) {
-            if let Ok((_, rows)) = self.read_cpp_blocks_pruned(table, &[idx], &[]) {
+            if let Ok((_, rows)) = self.read_blocks_pruned(table, &[idx], &[]) {
                 return Ok(rows
                     .into_iter()
                     .map(|(seq, cells)| {
@@ -3540,7 +3537,7 @@ impl Engine {
         // `UPDATE`/`DELETE`, which materialised the whole table before).
         if let Some(bounds) = where_pred.and_then(|p| {
             let schema = self.table_schema(table).ok()?;
-            crate::cpp_blocks::ColumnBounds::from_predicate(&schema, p)
+            crate::blocks::ColumnBounds::from_predicate(&schema, p)
         }) {
             if let Some(ids) = self.row_ids_in_bounds(table, &bounds) {
                 let ids: Vec<u64> = ids.into_iter().map(|id| id as u64).collect();
@@ -3743,7 +3740,7 @@ impl Engine {
 
     /// C++ `SegmentMeta::GetBlockIDs1`: the block ids of `segment`, in order.
     /// Blocks exist once the C++-format mirror has been written
-    /// ([`Self::write_cpp_blocks`] / [`Self::flush`]).
+    /// ([`Self::write_blocks`] / [`Self::flush`]).
     ///
     /// A deprecated segment has no visible block: a compaction keeps its files
     /// until `Cleanup` and hides it with `drop|seg|…` only, so listing its
@@ -3773,17 +3770,6 @@ impl Engine {
         index
             .get_block_meta(segment, block)
             .map(|meta| meta.row_count)
-    }
-
-    /// C++ `NewCatalog::GetBlockVisibleRange`: the rows the block's `version`
-    /// makes visible, i.e. its created rows minus the slots marked deleted.
-    pub fn block_visible_range(
-        &self,
-        table: &str,
-        segment: u32,
-        block: u16,
-    ) -> Option<(usize, usize)> {
-        self.cpp_block_visible_range(table, segment, block)
     }
 
     /// Every file under the database's C++ data directory
@@ -3959,7 +3945,7 @@ impl Engine {
     /// times.
     pub(crate) fn compaction_candidates(&self, table: &str) -> Vec<u32> {
         const M: usize = 4;
-        const S: u64 = storage::cpp_format::DEFAULT_BLOCK_CAPACITY as u64;
+        const S: u64 = storage::format::DEFAULT_BLOCK_CAPACITY as u64;
         // `CompactionProcessor` drops the table's **unsealed** segment from the
         // candidate list before asking the algorithm
         // (`compaction_process_impl.cpp:176`): the reference only seals a
@@ -4017,7 +4003,7 @@ impl Engine {
         columns: usize,
         row_counts: bool,
     ) -> storage::wal_entry::WalSegmentInfo {
-        let block_capacity = storage::cpp_format::DEFAULT_BLOCK_CAPACITY;
+        let block_capacity = storage::format::DEFAULT_BLOCK_CAPACITY;
         let mut block_infos = Vec::new();
         let mut block_id = 0u16;
         let mut left = rows;
@@ -4047,7 +4033,7 @@ impl Engine {
     /// `NewTxn::Compact` only marks them (`drop|seg|…`); `NewCatalog::
     /// CleanSegment` is what removes the segment's blocks, its index chunks and
     /// the mark itself. The port therefore keeps the source directories while
-    /// the table is merely compacted (`write_cpp_blocks`) and drops them here.
+    /// the table is merely compacted (`write_blocks`) and drops them here.
     pub(crate) fn reclaim_deprecated_segments(&self) -> Result<()> {
         self.reclaim_dropped_entities()?;
         for meta in self.storage.catalog.list_tables()? {
@@ -4055,7 +4041,7 @@ impl Engine {
             let dropped = self
                 .storage
                 .catalog
-                .cpp_dropped_segments(&db_id.to_string(), &meta.id.to_string())?;
+                .dropped_segments(&db_id.to_string(), &meta.id.to_string())?;
             if dropped.is_empty() {
                 continue;
             }
@@ -4095,7 +4081,7 @@ impl Engine {
                         store.delete(&k)?;
                     }
                     store.delete(
-                        catalog::cpp_layout::cpp_dropped_index_segment_key(
+                        catalog::layout::dropped_index_segment_key(
                             &db_id.to_string(),
                             &meta.id.to_string(),
                             *index_id,
@@ -4109,7 +4095,7 @@ impl Engine {
                     )));
                 }
                 store.delete(
-                    catalog::cpp_layout::cpp_dropped_segment_key(
+                    catalog::layout::dropped_segment_key(
                         &db_id.to_string(),
                         &meta.id.to_string(),
                         *segment,
@@ -4628,7 +4614,7 @@ impl Engine {
                             "Attempt to create index on column: {column}, data type: {ty}."
                         )));
                     }
-                    let dims = crate::cpp_blocks::tensor_shape(&ty)
+                    let dims = crate::blocks::tensor_shape(&ty)
                         .map(|(_, dim, _)| dim)
                         .unwrap_or(0);
                     let mut subspaces = 1usize;
@@ -6948,7 +6934,7 @@ impl Engine {
                 // alone and gets its output rows from the block pass below.
                 Some(cands) if !cands.is_empty() => {
                     let wanted: &[usize] = if has_filter { &[] } else { &[col_idx] };
-                    let (_, got) = self.read_cpp_blocks_candidates_values(table, wanted, cands)?;
+                    let (_, got) = self.read_blocks_candidates_values(table, wanted, cands)?;
                     got
                 }
                 Some(_) => Vec::new(),
@@ -7015,7 +7001,7 @@ impl Engine {
                     .replace('/', "_"),
                 );
                 let path = dir.join(format!("seg_{segment}_{}_{version}.bmp", docs.len()));
-                if storage::bmp_cpp::write_bmp_file(
+                if storage::bmp::write_bmp_file(
                     &path,
                     index::sparse::BMP_BLOCK_SIZE,
                     width,
@@ -7026,7 +7012,7 @@ impl Engine {
                 {
                     continue;
                 }
-                let Ok(reader) = storage::bmp_cpp::BmpCppReader::open(&path, width) else {
+                let Ok(reader) = storage::bmp::BmpReader::open(&path, width) else {
                     continue;
                 };
                 for (row, score) in reader.search(&query_i32, topn.max(1), bmp_options) {
@@ -7136,7 +7122,7 @@ impl Engine {
             // point read per row: a point read took the journal/KV path and cost
             // ~3 ms per row on this table, so ten result rows spent 28 ms after
             // the query itself had finished in 0.2 ms.
-            by_id.extend(self.read_cpp_blocks_candidates_values(table, &[], &set)?.1);
+            by_id.extend(self.read_blocks_candidates_values(table, &[], &set)?.1);
         }
         let num = |f: f64| {
             if bit_sparse {
@@ -7243,7 +7229,7 @@ impl Engine {
             Ok(Some(meta)) => meta
                 .types
                 .iter()
-                .all(|t| crate::cpp_blocks::column_type_of(t).is_some()),
+                .all(|t| crate::blocks::column_type_of(t).is_some()),
             _ => false,
         }
     }
@@ -7796,7 +7782,7 @@ impl Engine {
             let _ = self.txn.drop_sealed_wal_up_to(applied);
         }
         self.reclaim_deprecated_segments()?;
-        let cleaned = self.cleanup_cpp_index_chunks();
+        let cleaned = self.cleanup_index_chunks();
         // `BGTaskProcessor` records the cleanup timestamp so the trigger can
         // skip ticks with nothing new to reclaim
         // (`background_process_impl.cpp:126-138`, `last_cleanup_ts_`).

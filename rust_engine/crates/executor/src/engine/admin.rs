@@ -167,7 +167,7 @@ impl Engine {
             entry.ivf.clear();
             entry.ivf_mem.clear();
             entry.block_index = None;
-            entry.cpp_block_rows = None;
+            entry.block_rows = None;
             entry.live_rows = Some(live_rows);
             // Every row moved to the merged segment: the files still describe
             // the source layout until the next checkpoint rewrites them.
@@ -220,8 +220,8 @@ impl Engine {
                 .filter(|im| im.table == table || im.table == self.qualified_table(table))
                 .map(|im| im.id)
                 .collect();
-            self.storage.catalog.cpp_drop_segments(
-                &catalog::cpp_layout::CppSegmentSet {
+            self.storage.catalog.drop_segments(
+                &catalog::layout::SegmentSet {
                     db_id: db_id.to_string(),
                     table_id: table_id.to_string(),
                     segments: Vec::new(),
@@ -262,7 +262,7 @@ impl Engine {
         // are durable, so every source segment was deprecated on disk while the
         // merged one had no blocks at all - the table came back empty.
         if !rows.is_empty() && self.has_block_layout(table) {
-            self.write_cpp_blocks_bounded(table, compact_ts)?;
+            self.write_blocks_bounded(table, compact_ts)?;
         }
         // The merge renumbered every row, so every index posting now points at
         // a dead row id. Rebuild the declared indexes from the merged rows.
@@ -351,7 +351,7 @@ impl Engine {
         self.dump_hnsw_segments();
         // The C++ block mirror is the storage of record; a table it cannot
         // write (a column with no block layout) keeps its rows buffered only.
-        let mirror = self.flush_cpp_blocks(checkpoint_ts);
+        let mirror = self.flush_blocks(checkpoint_ts);
         // `EngineOptions::object_dir`: publish this checkpoint's data files as
         // the reference does (`pm|object|` + packed objects).
         if let Some(pm) = self.persistence.as_ref() {
@@ -385,11 +385,11 @@ impl Engine {
           // mirror there. Best effort: a column type the C++ encoding does not
           // cover yet leaves the previous layout in place rather than failing the
           // flush.
-        if !self.storage.catalog.is_cpp_only() {
+        if !self.storage.catalog.is_catalog_only() {
             let _ = self
                 .storage
                 .catalog
-                .rewrite_cpp_layout(self.storage.catalog.store().as_ref());
+                .rewrite_layout(self.storage.catalog.store().as_ref());
         }
         mirror?;
         // The C++-layout mirror above went through the catalog store after its
@@ -568,6 +568,6 @@ impl Engine {
         // it no longer matches the index state.
         self.index_epoch
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        self.optimize_cpp_index_chunks()
+        self.optimize_index_chunks()
     }
 }

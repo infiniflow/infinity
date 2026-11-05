@@ -31,7 +31,7 @@ use memmap2::Mmap;
 use std::fs::File;
 use std::path::Path;
 
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 
 const SERIAL_COOKIE_NO_RUNCONTAINER: u32 = 12346;
 const SERIAL_COOKIE: u32 = 12347;

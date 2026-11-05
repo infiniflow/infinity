@@ -263,7 +263,7 @@ impl TableDef {
 }
 
 /// C++: `LogicalType2Str` (`src/parser/type/logical_type.cpp:28`).
-fn cpp_logical_name(code: i64) -> Option<&'static str> {
+fn logical_name(code: i64) -> Option<&'static str> {
     Some(match code {
         logical::BOOLEAN => "Boolean",
         logical::TINYINT => "TinyInt",
@@ -295,10 +295,10 @@ fn cpp_logical_name(code: i64) -> Option<&'static str> {
 
 /// `DataType::ToString()` (`src/parser/type/data_type.cpp:96`): the C++
 /// spellings, with the `type_info` text in parentheses when present.
-fn cpp_type_text(column_type: &Json) -> Option<String> {
+fn type_text(column_type: &Json) -> Option<String> {
     let code = data_type_code(column_type)?;
-    let name = cpp_logical_name(code)?;
-    let text = crate::cpp_layout::type_text_of(column_type)?;
+    let name = logical_name(code)?;
+    let text = crate::layout::type_text_of(column_type)?;
     Some(match text.split_once('(') {
         Some((_, rest)) => format!("{name}({rest}"),
         None => name.to_string(),
@@ -316,7 +316,7 @@ impl std::fmt::Display for ColumnDefValue {
             f,
             "{} {}",
             self.column_name,
-            cpp_type_text(&self.column_type).unwrap_or_default()
+            type_text(&self.column_type).unwrap_or_default()
         )?;
         let mut constraints = self.constraints.clone();
         constraints.sort_unstable();
@@ -340,7 +340,7 @@ impl std::fmt::Display for ColumnDefValue {
         let default = self
             .default
             .as_ref()
-            .and_then(crate::cpp_layout::default_text_of)
+            .and_then(crate::layout::default_text_of)
             .unwrap_or_else(|| "Null".to_string());
         write!(f, " default {default}")
     }

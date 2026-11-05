@@ -27,6 +27,7 @@ mod append_delete_ut;
 pub mod bg_task;
 #[cfg(test)]
 mod bg_task_ut;
+pub mod blocks;
 #[cfg(test)]
 mod buffer_obj_ut;
 #[cfg(test)]
@@ -46,7 +47,7 @@ pub mod common;
 mod compact_replay_ut;
 #[cfg(test)]
 mod conflict_check_ut;
-pub mod cpp_blocks;
+pub use blocks as cpp_blocks;
 mod darts_build;
 pub mod data_table;
 mod deferred_catalog;

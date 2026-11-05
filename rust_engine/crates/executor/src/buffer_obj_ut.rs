@@ -98,10 +98,7 @@ fn test_big_with_gc_and_cleanup() {
     assert_eq!(e.segment_ids("table1"), vec![0]);
 
     // Materialise the C++ block layout (the reference's flushed blocks).
-    assert_eq!(
-        e.write_cpp_blocks("table1").unwrap(),
-        INSERT_N * IMPORT_SIZE
-    );
+    assert_eq!(e.write_blocks("table1").unwrap(), INSERT_N * IMPORT_SIZE);
     let block_ids = e.block_ids("table1", 0);
     assert_eq!(
         block_ids,
@@ -129,7 +126,7 @@ fn test_big_with_gc_and_cleanup() {
     // back as `idx * 1000 + row_id`, and the pool never exceeds its budget
     // (the GC/eviction the reference exercises with 64 KiB blocks under a
     // 512 KiB budget).
-    let (columns, rows) = e.read_cpp_blocks("table1").unwrap();
+    let (columns, rows) = e.read_blocks("table1").unwrap();
     assert_eq!(columns, vec!["col1".to_string()]);
     assert_eq!(rows.len(), INSERT_N * IMPORT_SIZE);
     // Reading a block maps it instead of copying it into a budget: every

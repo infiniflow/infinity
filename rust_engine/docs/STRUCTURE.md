@@ -33,7 +33,7 @@ crate 不带 `infinity-` 前缀：`crates/storage` 对应 `src/storage`，`crate
 | `storage/buffer/{buffer_manager,buffer_obj}` | `src/buffer/{mapped,mapped_block}.rs`（没有 BufferManager，见 PORTING §3.1） |
 | `storage/column_vector/{selection,value}` | `src/column_vector/selection.rs` |
 | `storage/common/{block_index,crc,rcu_multimap}` | `src/common/{block_index,crc,rcu_map}.rs` |
-| `storage/definition/*` | `src/definition/cpp_format.rs` |
+| `storage/definition/*` | `src/definition/definition/format.rs` |
 | `storage/fast_rough_filter/binary_fuse_filter` | `src/fast_rough_filter/binary_fuse_filter.rs` |
 | `storage/io/{virtual_store,s3_client,byte_slice_*}` | `src/io/{mod,s3,virtual_store}.rs` |
 | `storage/knn_index/emvb` | `src/knn_index/emvb/emvb_segment.rs` |
@@ -56,7 +56,7 @@ crate 不带 `infinity-` 前缀：`crates/storage` 对应 `src/storage`，`crate
 | `storage/invertedindex/search/blockmax_wand_iterator` + `bm25_ranker` | `src/invertedindex/search/blockmax_wand_iterator.rs` |
 | `storage/invertedindex/search/query_builder` | `src/invertedindex/search/query_builder.rs` |
 | `storage/invertedindex/search/highlighter` | `src/lib.rs` 的 `highlight_text` / `highlight_with_analyzer` |
-| `common/analyzer/*` | `src/common/analyzer.rs`（单个文件，按分析器分节） |
+| `common/analyzer/*` | `src/common/analyzer/`（单个文件，按分析器分节） |
 | `executor/explain_*` | `src/{explain,explain_search}.rs` |
 | `scheduler/*` | `src/scheduler.rs` |
 
@@ -86,7 +86,7 @@ crate 不带 `infinity-` 前缀：`crates/storage` 对应 `src/storage`，`crate
 1. **`engine/` 的切法按语句路径，不是参考版的 `physical_*.cpp` 一对一**：参考版一个物理算子一个文件，端口的 `impl Engine` 是单体实现（一个 `execute` 分派到底），拆成一对一需要先重构成算子对象，属于行为改动而不是整理，未做。
 2. **测试文件与实现同目录**（`*_ut.rs`），参考版在 `src/unit_test/<子目录>`。移动测试要改 `use super::*` 的层级，收益低于风险，未做。
 3. **catalog 与 new_txn 拆成独立 crate**（参考版都在 `storage` 里）。这是 crate 边界的设计变更，见 `PORTING.md` §3.1。
-4. **`cpp_blocks.rs`（块布局 + 读写）留在 executor**：它同时依赖 storage 的块格式与 executor 的表状态，放在任一 crate 都要反向依赖。参考版对应 `storage/buffer/file_worker/*` 与 `column_vector/*`。
+4. **`blocks/`（块布局 + 读写）留在 executor**：它同时依赖 storage 的块格式与 executor 的表状态，放在任一 crate 都要反向依赖。参考版对应 `storage/buffer/file_worker/*` 与 `column_vector/*`。
 5. **扁平别名仍在**：每个 crate 的 `lib.rs` 保留了旧路径的 `pub use`（如 `storage::catalog_format`），所以外部调用方没有因为这次搬家而改动。别名是过渡层，新代码应直接用层级路径。
 
 ## 6 还没拆的大文件
@@ -95,15 +95,13 @@ crate 不带 `infinity-` 前缀：`crates/storage` 对应 `src/storage`，`crate
 
 | 文件 | 行数 | 参考版对应 | 建议切法 |
 |---|---|---|---|
-| `executor/src/cpp_blocks.rs` | 9.9k | `storage/buffer/file_worker/*`、`column_vector/*` | `block/`（读、写、镜像、压缩）+ `column/`（各类型列的编解码） |
-| `server/src/lib.rs` | 8.7k | `network/*`、`network/http/*` | `network/{server, session, connection, thrift}`，HTTP 与 PG 各自成文件（`http.rs`/`pg.rs`/`peer.rs` 已存在） |
-| `executor/src/common/analyzer.rs` | 7.2k | `common/analyzer/*.cppm`（一分析器一文件） | `analyzer/{mod, standard, chinese, traditional, japanese, korean, ik, ngram, sparsegram, rank_features, user_defined, tokenizer, stemmer}` |
 | `engine/statements.rs` / `engine/state.rs` | 7.8k / 7.1k | `executor/physical_*.cpp` | 需要先把 `execute` 的单体分派拆成算子对象，属行为改动 |
+| `server/src/lib.rs` | 8.7k | `network/*`、`network/http/*` | `network/{server, session, connection, thrift}`，HTTP 与 PG 各自成文件（`http.rs`/`pg.rs`/`peer.rs` 已存在） |
 | `engine/tests_ut.rs` | 5.6k | `unit_test/**` | 按被测主题再分若干文件 |
+| `blocks/engine.rs` | 5.6k | `storage/buffer/file_worker/*` | 与上面两条同理：`impl Engine` 的块读写方法，再切要按方法族拆 |
 | `parser/src/parser.rs` | 4.2k | `parser/{statement, expr, type, table_reference}` | 按语句类型切 |
 | `server/src/peer.rs` / `http.rs` | 3.6k / 3.2k | `network/peer_server_thrift`、`network/http` | 按 handler 切 |
-| `storage/invertedindex/format/mod.rs` | 3.5k | `invertedindex/format/*.cppm`（约 40 个文件） | `format/{posting_field, term_meta, posting_byte_slice, doc_list_encoder, position_list_encoder, skiplist_writer, skiplist_reader, posting_decoder}` |
-| `catalog/src/cpp_layout.rs` | 3.3k | `storage/catalog/meta/*` | `catalog/meta/{key, value, tree}` |
+| `catalog/src/layout.rs` | 3.3k | `storage/catalog/meta/*` | `catalog/meta/{key, value, tree}` |
 | `planner/src/index_scan.rs` | 3.2k | `planner/optimizer/index_scan_builder` + `function/table/*` | 建索引扫描算子与各索引类型的候选生成分开 |
 | `storage/wal/wal_entry.rs` | 3.1k | `storage/wal/wal_entry*.cppm` | 按 `WalCmd` 变体族切 |
 | `storage/data_block.rs` | 2.9k | `storage/data_block.cppm` | 与参考版一致，单文件即可 |

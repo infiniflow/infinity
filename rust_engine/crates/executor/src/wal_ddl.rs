@@ -138,7 +138,7 @@ pub fn data_type_from_json(doc: Option<&Json>) -> DataType {
 
 /// [`data_type_from_json`] from the declared type text (`VECTOR,4,FLOAT`).
 pub fn data_type_of_text(text: &str) -> Option<DataType> {
-    let doc = catalog::cpp_layout::data_type_of_text(text)?;
+    let doc = catalog::layout::data_type_of_text(text)?;
     Some(data_type_from_json(Some(&doc)))
 }
 

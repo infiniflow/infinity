@@ -4,7 +4,7 @@
 
 这份文档回答三个反复出现的问题：**Rust 侧用哪个 catalog 后端**、**它和参考实现的目录能不能互相读**、**在哪些点上真的做了 fsync**。
 
-实现位置：`crates/storage/src/metastore.rs`（`MetaStore` trait）、`crates/storage/src/metastore_rocks.rs`（RocksDB，唯一实现）、`crates/catalog/src/cpp_layout.rs`（C++ 键空间/值编码）、`crates/storage/src/wal.rs`（重做日志）。
+实现位置：`crates/storage/src/metastore.rs`（`MetaStore` trait）、`crates/storage/src/metastore_rocks.rs`（RocksDB，唯一实现）、`crates/catalog/src/catalog/layout.rs`（C++ 键空间/值编码）、`crates/storage/src/wal.rs`（重做日志）。
 
 ---
 
@@ -27,7 +27,7 @@
 | 内容 | 兼容情况 |
 |---|---|
 | 表数据（块镜像 `data/db_{id}/tbl_{id}/seg_{n}/blk_{m}/`） | ✅ 逐字节对齐参考布局（`cpp_format`），C++ 可读 |
-| catalog 的表/列/索引记录 | ✅ 键与值都对齐 `KeyEncode`/`DataType::Serialize`（`cpp_layout.rs`） |
+| catalog 的表/列/索引记录 | ✅ 键与值都对齐 `KeyEncode`/`DataType::Serialize`（`catalog/layout.rs`） |
 | 次级索引 chunk | ✅ 类型化键（`KeyKind::{U64,F32,F64,I32,I64}`），C++ 的 FLOAT/DOUBLE/DATE/TIME 块可读 |
 | WAL | ✅ `wal/wal.log` 同时承载 checkpoint 帧与事务记录（checkpoint 时整文件改名成 `wal.log.<seal_ts>`，同 `WalManager::SwapWalFile`），帧体与参考逐字节相同 |
 | HNSW / 全文 / 二级索引的索引目录 | ✅ 各自有 chunk 镜像并登记 `catalog\|idx_chunk\|…\|chunk_info` |

@@ -432,7 +432,7 @@ impl Engine {
         // (`NewTxn::CheckpointforSnapshot`), so the table's blocks exist by the
         // time the files are copied: `segments` describes them and the copies
         // carry the rows.
-        let _ = self.write_cpp_blocks(&meta.name);
+        let _ = self.write_blocks(&meta.name);
         let (db_name, _) = split_qualified(&meta.name);
         let json = self.table_snapshot_json(&db_name, db_id, meta, name, snapshot_ts)?;
         self.copy_table_files(db_id, meta.id, dir)?;
@@ -453,7 +453,7 @@ impl Engine {
         let table_name = meta.name.rsplit('.').next().unwrap_or(&meta.name);
         let mut column_definition = Vec::new();
         for (i, column) in meta.columns.iter().enumerate() {
-            let column_type = catalog::cpp_layout::data_type_of_text_with_store(
+            let column_type = catalog::layout::data_type_of_text_with_store(
                 meta.types.get(i).map(String::as_str).unwrap_or(""),
                 meta.sparse_stores.get(i).copied().flatten(),
             )
@@ -485,9 +485,7 @@ impl Engine {
         }
         let segments = self.segment_json(db_id, meta.id, &meta.ids)?;
         let mut indexes = Vec::new();
-        if let Ok(defs) =
-            catalog::cpp_layout::read_cpp_indexes(self.storage.catalog.store().as_ref())
-        {
+        if let Ok(defs) = catalog::layout::read_indexes(self.storage.catalog.store().as_ref()) {
             for def in defs {
                 let Some(index_id) = def.index_id else {
                     continue;
@@ -502,7 +500,7 @@ impl Engine {
                 // carries the row range and the index size, and the segment
                 // and chunk ids are the catalog's own. The mirror writes those
                 // records, so both engines serialize the same values.
-                let chunk_layers = catalog::cpp_layout::read_cpp_index_chunks(
+                let chunk_layers = catalog::layout::read_index_chunks(
                     self.storage.catalog.store().as_ref(),
                     &db_id.to_string(),
                     &meta.id.to_string(),
@@ -707,8 +705,8 @@ impl Engine {
         // through its row journal, so decode them back into it. The reference
         // serves the restored table straight from the files it copied.
         // The rows ride in the copied block columns; the journal is rebuilt
-        // from them (the same path a restart takes, `restore_cpp_blocks`).
-        self.restore_cpp_blocks(&name)?;
+        // from them (the same path a restart takes, `restore_blocks`).
+        self.restore_blocks(&name)?;
         // The index declarations come back too; the chunks are rebuilt, which
         // is what the reference does when a snapshot's index files are missing.
         for index in json_arr(table, "table_indexes") {

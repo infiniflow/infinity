@@ -269,7 +269,7 @@ UPDATE 重写、快照还原、压缩、回放都走同一个入口（把行交�
 | **RE2**（vcpkg） | `regex(col, pattern)` 谓词、`LIKE` 转正则 | `expression/src/regex.rs`（回溯引擎）<br>`expression/src/regex_literal.rs`（必含字面量提取） | **455 + 528** | 参考 `regex_impl.cpp` / `like_impl.cpp` 的行为 |
 | **PCRE2**（vcpkg） | ① 分析器 `\W+` 替换；② 高亮器的 case-insensitive 匹配 | ① `executor/src/analyzer.rs` · `strip_non_word*`<br>② `executor/src/lib.rs` · `highlight_text` / `highlight_with_analyzer` | **14 + 60** | ① `Tokenize` 的输出与位置；② `highlighter_ut` |
 | **simdjson**（vcpkg） | JSONL 语料、JSON 列 | `common/src/json.rs` · `Json` 解析/打印/BSON 互转 | **543** | `json::tests` 与 JSON 列往返 |
-| **nlohmann_json**（vcpkg） | 列值 / catalog 的 JSON | `catalog/src/value_format.rs` · 列定义、索引定义、类型信息的 JSON<br>`catalog/src/cpp_layout.rs` · catalog 键与值的组装 | **933 + 2131** | catalog 键值逐字节门禁（键序相同） |
+| **nlohmann_json**（vcpkg） | 列值 / catalog 的 JSON | `catalog/src/value_format.rs` · 列定义、索引定义、类型信息的 JSON<br>`catalog/src/catalog/layout.rs` · catalog 键与值的组装 | **933 + 2131** | catalog 键值逐字节门禁（键序相同） |
 | **zsv**（third_party/zsv） | `COPY … (FORMAT CSV)` 的解析 | `executor/src/lib.rs` · `csv_fields`（引号与转义；不含参考的流式状态机） | **32** | 导入用例 |
 | **pgm-index**（third_party/pgm） | 次级/稀疏索引的分段模型 | `storage/src/secondary_segment.rs` · `Pgm` / `PgmFloat`（只做参考实例化的特化） | **1104** | chunk 尾部的 PGM 与参考同字节 |
 | **xor_singleheader**（third_party） | `fast_rough_filter` 的 fuse-8 构造 | `storage/src/binary_fuse_filter.rs` · `BinaryFuseFilter` | **322** | 假阴性为 0；130 字节记录与参考同字节 |

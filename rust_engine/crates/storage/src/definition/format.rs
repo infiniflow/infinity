@@ -475,7 +475,7 @@ pub fn write_block(
 /// returning (no directory fsync — the reference does not fsync directories).
 ///
 /// Used for every file a checkpoint publishes: block columns here and the
-/// index chunks in `executor::cpp_blocks`. The reference's file workers sync
+/// index chunks in `executor::blocks`. The reference's file workers sync
 /// each file they finish (`FileWorker::WriteToFile`,
 /// `memory_indexer_impl.cpp:535-536,762-763`, `column_index_merger_impl.cpp:151-152`),
 /// so a chunk named by a catalog record is on disk, not just in the page cache.

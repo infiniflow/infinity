@@ -16,7 +16,7 @@ use super::{
     decode_u16_block, decode_u32_block_all, encode_u16_block, encode_u32_block, read_vint,
     write_vint,
 };
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 
 /// `MAX_DOC_PER_RECORD` / `MAX_POS_PER_RECORD` (`index_defines.cppm:43,46`).
 pub const MAX_DOC_PER_RECORD: usize = 128;
@@ -102,8 +102,8 @@ enum RowData {
 
 #[derive(Clone, Debug)]
 struct Row {
-    ty: FieldType,
-    slots: RowData,
+    pub(crate) ty: FieldType,
+    pub(crate) slots: RowData,
 }
 
 impl Row {
@@ -142,10 +142,10 @@ impl Row {
 /// holds values of its own width. Growth is `0 -> 2 -> 16 -> 128`.
 #[derive(Clone, Debug)]
 pub struct PostingBuffer {
-    rows: Vec<Row>,
-    fields: PostingFields,
-    capacity: u8,
-    size: u8,
+    pub(crate) rows: Vec<Row>,
+    pub(crate) fields: PostingFields,
+    pub(crate) capacity: u8,
+    pub(crate) size: u8,
 }
 
 impl Default for PostingBuffer {
@@ -543,9 +543,9 @@ impl PostingByteSlice {
 /// `posting_byte_slice_reader.cppm:16-101`).
 #[derive(Clone, Debug, Default)]
 pub struct ReaderState {
-    tell: usize,
-    location_cursor: usize,
-    posting_buffer_cursor: usize,
+    pub(crate) tell: usize,
+    pub(crate) location_cursor: usize,
+    pub(crate) posting_buffer_cursor: usize,
 }
 
 impl ReaderState {
@@ -723,9 +723,9 @@ impl SkipListFormat {
 /// `SkipListWriter` (`skiplist_writer.cppm:11-35`).
 #[derive(Clone, Debug)]
 pub struct SkipListWriter {
-    slice: PostingByteSlice,
-    last_key: u32,
-    last_value1: u32,
+    pub(crate) slice: PostingByteSlice,
+    pub(crate) last_key: u32,
+    pub(crate) last_value1: u32,
 }
 
 impl Default for SkipListWriter {
@@ -892,35 +892,35 @@ enum Source {
 
 #[derive(Default)]
 struct Loaded {
-    docs: Vec<u32>,
-    ttf: Vec<u32>,
-    block_max_tf: Vec<u32>,
-    block_max_pct: Vec<u16>,
-    offsets: Vec<u32>,
+    pub(crate) docs: Vec<u32>,
+    pub(crate) ttf: Vec<u32>,
+    pub(crate) block_max_tf: Vec<u32>,
+    pub(crate) block_max_pct: Vec<u16>,
+    pub(crate) offsets: Vec<u32>,
 }
 
 /// `SkipListReader` (`skiplist_reader.cppm:21-99`,
 /// `skiplist_reader_impl.cpp:36-92`), reading either a byte range or a
 /// `PostingByteSlice`.
 pub struct SkipListReader {
-    format: SkipListFormat,
-    source: Source,
-    skipped_item_count: i32,
-    current_doc_id: u32,
-    current_offset: u32,
-    current_ttf: u32,
-    current_block_max_tf: u32,
-    current_block_max_tf_percentage: u16,
-    prev_doc_id: u32,
-    prev_offset: u32,
-    prev_ttf: u32,
-    current_cursor: usize,
-    num_in_buffer: usize,
-    doc_id_buffer: [u32; SKIP_LIST_BUFFER_SIZE],
-    offset_buffer: [u32; SKIP_LIST_BUFFER_SIZE],
-    ttf_buffer: [u32; SKIP_LIST_BUFFER_SIZE],
-    block_max_tf_buffer: [u32; SKIP_LIST_BUFFER_SIZE],
-    block_max_tf_percentage_buffer: [u16; SKIP_LIST_BUFFER_SIZE],
+    pub(crate) format: SkipListFormat,
+    pub(crate) source: Source,
+    pub(crate) skipped_item_count: i32,
+    pub(crate) current_doc_id: u32,
+    pub(crate) current_offset: u32,
+    pub(crate) current_ttf: u32,
+    pub(crate) current_block_max_tf: u32,
+    pub(crate) current_block_max_tf_percentage: u16,
+    pub(crate) prev_doc_id: u32,
+    pub(crate) prev_offset: u32,
+    pub(crate) prev_ttf: u32,
+    pub(crate) current_cursor: usize,
+    pub(crate) num_in_buffer: usize,
+    pub(crate) doc_id_buffer: [u32; SKIP_LIST_BUFFER_SIZE],
+    pub(crate) offset_buffer: [u32; SKIP_LIST_BUFFER_SIZE],
+    pub(crate) ttf_buffer: [u32; SKIP_LIST_BUFFER_SIZE],
+    pub(crate) block_max_tf_buffer: [u32; SKIP_LIST_BUFFER_SIZE],
+    pub(crate) block_max_tf_percentage_buffer: [u16; SKIP_LIST_BUFFER_SIZE],
 }
 
 fn read_u32_field(data: &[u8], pos: &mut usize) -> Option<Vec<u32>> {

@@ -1674,7 +1674,7 @@ impl DataBlock {
     /// `(INVALID_SEGMENT_ID, block_id * DEFAULT_BLOCK_CAPACITY + offset)` id per
     /// row. The intermediate table uses these ids for its order-by result.
     pub fn fill_row_id_vector(&self, row_ids: &mut Vec<RowIdT>, block_id: u32) {
-        let start = block_id * crate::cpp_format::DEFAULT_BLOCK_CAPACITY as u32;
+        let start = block_id * crate::format::DEFAULT_BLOCK_CAPACITY as u32;
         for offset in 0..self.row_count as u32 {
             row_ids.push(RowIdT::new(u32::MAX, start + offset));
         }
@@ -1839,7 +1839,7 @@ mod data_block_reference_suite {
         for (row_id, id) in row_ids.iter().enumerate() {
             assert_eq!(
                 id.segment_offset as usize,
-                row_id + crate::cpp_format::DEFAULT_BLOCK_CAPACITY
+                row_id + crate::format::DEFAULT_BLOCK_CAPACITY
             );
             assert_eq!(id.segment_id, u32::MAX);
         }

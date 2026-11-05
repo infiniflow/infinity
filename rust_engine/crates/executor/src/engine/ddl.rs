@@ -77,7 +77,7 @@ impl Engine {
                 let _ = std::fs::remove_dir_all(dir);
             }
         }
-        if self.storage.catalog.is_cpp_only() {
+        if self.storage.catalog.is_catalog_only() {
             return Ok(existed);
         }
         // The native catalog keeps its records in the same store, so a native
@@ -241,7 +241,7 @@ impl Engine {
         // Point lookup by name: scanning every database record made a DROP
         // DATABASE O(databases) on a catalog with thousands of them.
         let Some((db_id, create_ts)) =
-            catalog::cpp_layout::cpp_db_record(self.storage.catalog.store().as_ref(), db)?
+            catalog::layout::db_record(self.storage.catalog.store().as_ref(), db)?
         else {
             return Ok(None);
         };

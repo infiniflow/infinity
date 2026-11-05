@@ -79,7 +79,7 @@ pub fn hash_varchar(text: &str) -> u64 {
     h
 }
 
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 
 const PGM_EPSILON: u64 = 64;
 const PGM_EPSILON_RECURSIVE: u64 = 4;

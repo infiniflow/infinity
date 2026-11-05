@@ -11,7 +11,7 @@
 
 use std::collections::BTreeMap;
 
-use executor::cpp_blocks::encode_fulltext_chunk;
+use executor::blocks::encode_fulltext_chunk;
 
 /// A term's postings: the document ordinal and the term's position in it.
 type Postings = BTreeMap<String, Vec<(u32, u32)>>;

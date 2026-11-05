@@ -8,7 +8,7 @@
 
 use ::common::{Error, Result, TxnTimeStamp};
 
-use crate::cpp_format::BlockVersionFile;
+use crate::format::BlockVersionFile;
 
 /// One append batch: `row_count` rows are visible in total at `create_ts`.
 ///
@@ -210,7 +210,7 @@ impl BlockVersion {
         }
         let created = self.created[..create_size]
             .iter()
-            .map(|f| crate::cpp_format::VersionCreate {
+            .map(|f| crate::format::VersionCreate {
                 create_ts: f.create_ts,
                 cumulative_row_count: f.row_count,
             })
@@ -235,7 +235,7 @@ impl BlockVersion {
         let created = self
             .created
             .iter()
-            .map(|f| crate::cpp_format::VersionCreate {
+            .map(|f| crate::format::VersionCreate {
                 create_ts: f.create_ts,
                 cumulative_row_count: f.row_count,
             })

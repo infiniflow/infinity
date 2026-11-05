@@ -8,7 +8,7 @@
 //! the two together and implements `SearchKnn`.
 //!
 //! The reference's mmap variants (`BMPOwnMem::kFalse`) are represented by
-//! `infinity-storage::bmp_cpp`, which reads the same byte layout.
+//! `infinity-storage::bmp`, which reads the same byte layout.
 //!
 //! A query:
 //!
@@ -844,7 +844,7 @@ mod bmp_reference_suite {
     //! layouts are exercised instead.
 
     use super::*;
-    use storage::bmp_cpp::{write_bmp_file, BmpCppReader, IdxWidth};
+    use storage::bmp::{write_bmp_file, BmpReader, IdxWidth};
 
     fn dataset(rows: usize, cols: usize, sparsity: f32) -> Vec<Vec<(u32, f32)>> {
         let mut state = 0x9E37_79B9_7F4A_7C15u64;
@@ -965,7 +965,7 @@ mod bmp_reference_suite {
             // every query must return the same top-k as the memory index.
             let dir = tempfile::tempdir().unwrap();
             let path = dir.path().join("bmp.idx");
-            let docs: Vec<storage::bmp_cpp::SparseDoc> = corpus
+            let docs: Vec<storage::bmp::SparseDoc> = corpus
                 .iter()
                 .enumerate()
                 .map(|(row, doc)| {
@@ -976,7 +976,7 @@ mod bmp_reference_suite {
                 })
                 .collect();
             write_bmp_file(&path, block_size, IdxWidth::I32, &docs, cols).unwrap();
-            let reader = BmpCppReader::open(&path, IdxWidth::I32).unwrap();
+            let reader = BmpReader::open(&path, IdxWidth::I32).unwrap();
             assert_eq!(reader.doc_count(), rows);
             assert!(reader.search(&[], 0, Default::default()).is_empty());
 

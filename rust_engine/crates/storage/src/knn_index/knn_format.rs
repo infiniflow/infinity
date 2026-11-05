@@ -25,7 +25,7 @@
 //!
 //! Everything is native little-endian.
 
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 
 /// `GetMmax(M)` from `hnsw_alg.cppm:69`: returns `(Mmax0, Mmax)`.
 pub const fn get_mmax(m: u64) -> (u64, u64) {

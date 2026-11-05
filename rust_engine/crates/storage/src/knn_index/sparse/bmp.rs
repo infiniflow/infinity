@@ -32,7 +32,7 @@ use std::path::Path;
 
 use index::sparse::BmpSearchOptions;
 
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 
 /// Width of the sparse index element type (`EmbeddingDataType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -293,13 +293,13 @@ pub fn write_bmp_file(
         std::fs::create_dir_all(parent)
             .map_err(|e| FormatError::Io(format!("{}: {e}", parent.display())))?;
     }
-    crate::cpp_format::write_synced(path, &bytes)
+    crate::format::write_synced(path, &bytes)
         .map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
 }
 
 /// A BMP file mapped read-only, parsed into the same tables the reference
 /// exposes (`BMPIvt` + `BlockFwd` + `doc_ids`).
-pub struct BmpCppReader {
+pub struct BmpReader {
     block_size: usize,
     widths: IdxWidth,
     /// Per term: `(block id, max score)`.
@@ -312,7 +312,7 @@ pub struct BmpCppReader {
     doc_ids: Vec<u32>,
 }
 
-impl BmpCppReader {
+impl BmpReader {
     #[allow(unsafe_code)]
     pub fn open(path: &Path, width: IdxWidth) -> Result<Self, FormatError> {
         let file =
@@ -598,7 +598,7 @@ mod tests {
             })
             .collect();
         write_bmp_file(&path, 16, IdxWidth::I32, &docs, 10).unwrap();
-        let reader = BmpCppReader::open(&path, IdxWidth::I32).unwrap();
+        let reader = BmpReader::open(&path, IdxWidth::I32).unwrap();
         assert_eq!(reader.doc_count(), 40);
         assert_eq!(reader.block_size, 16);
         let q = vec![(0i32, 1.0f32), (7, 1.0)];
@@ -630,7 +630,7 @@ mod tests {
         let path = dir.path().join("chunk_i8.bmp");
         let docs: Vec<SparseDoc> = vec![(0, vec![(3, 1.0)]), (1, vec![(3, 2.0)])];
         write_bmp_file(&path, 16, IdxWidth::I8, &docs, 8).unwrap();
-        let reader = BmpCppReader::open(&path, IdxWidth::I8).unwrap();
+        let reader = BmpReader::open(&path, IdxWidth::I8).unwrap();
         let hits = reader.search(&[(3, 1.0)], 2, BmpSearchOptions::default());
         assert_eq!(hits.len(), 2);
         assert_eq!(hits[0].0, 1);
@@ -645,7 +645,7 @@ mod tests {
         // Doc 0 matches the strong term, doc 1 the weak one.
         let docs: Vec<SparseDoc> = vec![(0, vec![(1, 1.0)]), (1, vec![(2, 1.0)])];
         write_bmp_file(&path, 16, IdxWidth::I32, &docs, 4).unwrap();
-        let reader = BmpCppReader::open(&path, IdxWidth::I32).unwrap();
+        let reader = BmpReader::open(&path, IdxWidth::I32).unwrap();
         let query = vec![(1i32, 10.0f32), (2, 1.0)];
         let all = reader.search(&query, 2, BmpSearchOptions::default());
         assert_eq!(all.iter().map(|(r, _)| *r).collect::<Vec<_>>(), vec![0, 1]);
@@ -677,7 +677,7 @@ mod tests {
         docs.push((16, vec![(2, 100.0)]));
         docs.extend((17..32).map(|i| (i, vec![(1, 1.0)])));
         write_bmp_file(&path, 16, IdxWidth::I32, &docs, 4).unwrap();
-        let reader = BmpCppReader::open(&path, IdxWidth::I32).unwrap();
+        let reader = BmpReader::open(&path, IdxWidth::I32).unwrap();
         let hits = reader.search(&[(1, 1.0), (2, 1.0)], 2, BmpSearchOptions::default());
         assert_eq!(hits.len(), 2);
         assert_eq!(hits[0].0, 16);

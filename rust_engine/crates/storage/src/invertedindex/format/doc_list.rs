@@ -86,16 +86,16 @@ impl DocListFormatOption {
 /// `DocListEncoder` (`doc_list_encoder.cppm:13-75`).
 #[derive(Clone, Debug)]
 pub struct DocListEncoder {
-    option: DocListFormatOption,
-    buffer: PostingByteSlice,
-    skiplist: SkipListWriter,
-    last_doc_id: u32,
-    last_doc_payload: u16,
-    current_tf: u32,
-    total_tf: u32,
-    block_max_tf: u32,
-    block_max_percentage: f32,
-    df: u32,
+    pub(crate) option: DocListFormatOption,
+    pub(crate) buffer: PostingByteSlice,
+    pub(crate) skiplist: SkipListWriter,
+    pub(crate) last_doc_id: u32,
+    pub(crate) last_doc_payload: u16,
+    pub(crate) current_tf: u32,
+    pub(crate) total_tf: u32,
+    pub(crate) block_max_tf: u32,
+    pub(crate) block_max_percentage: f32,
+    pub(crate) df: u32,
 }
 
 impl DocListEncoder {
@@ -262,21 +262,21 @@ pub struct SkipListDecode {
 
 /// `InMemDocListDecoder` (`inmem_doc_list_decoder.cppm:13-54`).
 pub struct InMemDocListDecoder {
-    option: DocListFormatOption,
-    skiplist_reader: Option<SkipListReader>,
-    doc_list_buffer: Option<PostingByteSlice>,
-    doc_list_reader: ReaderState,
-    df: u32,
-    finish_decoded: bool,
-    finish_copy_prepared_doc_buffer: bool,
-    doc_buffer_to_copy: Vec<u32>,
-    decode_count: usize,
-    offset: u32,
-    record_len: u32,
-    last_doc_id_in_prev_record: u32,
-    last_doc_id: u32,
-    current_ttf: u32,
-    skipped_item_count: u32,
+    pub(crate) option: DocListFormatOption,
+    pub(crate) skiplist_reader: Option<SkipListReader>,
+    pub(crate) doc_list_buffer: Option<PostingByteSlice>,
+    pub(crate) doc_list_reader: ReaderState,
+    pub(crate) df: u32,
+    pub(crate) finish_decoded: bool,
+    pub(crate) finish_copy_prepared_doc_buffer: bool,
+    pub(crate) doc_buffer_to_copy: Vec<u32>,
+    pub(crate) decode_count: usize,
+    pub(crate) offset: u32,
+    pub(crate) record_len: u32,
+    pub(crate) last_doc_id_in_prev_record: u32,
+    pub(crate) last_doc_id: u32,
+    pub(crate) current_ttf: u32,
+    pub(crate) skipped_item_count: u32,
 }
 
 impl InMemDocListDecoder {

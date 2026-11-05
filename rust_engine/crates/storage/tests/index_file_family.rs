@@ -9,7 +9,7 @@
 //! the files must carry, so a format change cannot silently break the
 //! contract.
 
-use storage::cpp_format as cf;
+use storage::format as cf;
 use storage::invertedindex::format as inv;
 
 #[test]

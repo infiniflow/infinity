@@ -9,7 +9,7 @@ use super::posting_slice::{
     FieldType, PostingByteSlice, PostingField, PostingFields, ReaderState, SkipListFormat,
     SkipListReader, SkipListWriter,
 };
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 use crate::invertedindex::format::{decode_u32_block_all, vint_len, write_vint};
 
 /// `MAX_POS_PER_RECORD` (`index_defines.cppm:46`).
@@ -53,11 +53,11 @@ impl PositionListFormatOption {
 /// `PositionListEncoder` (`position_list_encoder.cppm:19-57`).
 #[derive(Clone, Debug)]
 pub struct PositionListEncoder {
-    option: PositionListFormatOption,
-    buffer: PostingByteSlice,
-    skiplist: SkipListWriter,
-    last_pos_in_cur_doc: u32,
-    total_pos_count: u32,
+    pub(crate) option: PositionListFormatOption,
+    pub(crate) buffer: PostingByteSlice,
+    pub(crate) skiplist: SkipListWriter,
+    pub(crate) last_pos_in_cur_doc: u32,
+    pub(crate) total_pos_count: u32,
 }
 
 impl PositionListEncoder {
@@ -196,10 +196,10 @@ pub fn decode_position_list(bytes: &[u8]) -> Result<Vec<u32>, FormatError> {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct InDocPositionState {
     pub tf: u32,
-    record_offset: i32,
-    offset_in_record: i32,
-    total_position_count: u32,
-    option: PositionListFormatOption,
+    pub(crate) record_offset: i32,
+    pub(crate) offset_in_record: i32,
+    pub(crate) total_position_count: u32,
+    pub(crate) option: PositionListFormatOption,
 }
 
 impl InDocPositionState {
@@ -252,18 +252,18 @@ impl InDocPositionState {
 
 /// `InMemPositionListDecoder` (`inmem_position_list_decoder.cppm:17-40`).
 pub struct InMemPositionListDecoder {
-    option: PositionListFormatOption,
-    total_tf: i64,
-    skiplist_reader: Option<SkipListReader>,
-    skiplist_reader_real_size: u32,
-    pos_list_buffer: Option<PostingByteSlice>,
-    pos_list_reader: ReaderState,
-    decoded_pos_count: u32,
-    record_offset: u32,
-    pre_record_ttf: u32,
-    offset_in_record: i32,
-    last_decode_offset: u32,
-    need_reopen: bool,
+    pub(crate) option: PositionListFormatOption,
+    pub(crate) total_tf: i64,
+    pub(crate) skiplist_reader: Option<SkipListReader>,
+    pub(crate) skiplist_reader_real_size: u32,
+    pub(crate) pos_list_buffer: Option<PostingByteSlice>,
+    pub(crate) pos_list_reader: ReaderState,
+    pub(crate) decoded_pos_count: u32,
+    pub(crate) record_offset: u32,
+    pub(crate) pre_record_ttf: u32,
+    pub(crate) offset_in_record: i32,
+    pub(crate) last_decode_offset: u32,
+    pub(crate) need_reopen: bool,
 }
 
 impl InMemPositionListDecoder {

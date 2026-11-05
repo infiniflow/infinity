@@ -26,7 +26,7 @@ use std::path::Path;
 const MAGIC: &[u8; 8] = b"IBMP\x01\0\0\0";
 const HEADER_LEN: usize = 8 + 4 + 4 + 4 + 8 + 8;
 
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 
 /// Writes `docs` (each a sparse vector sorted by index) as one segment file.
 pub fn write_bmp_segment(
@@ -100,7 +100,7 @@ pub fn write_bmp_segment(
         std::fs::create_dir_all(parent)
             .map_err(|e| FormatError::Io(format!("{}: {e}", parent.display())))?;
     }
-    crate::cpp_format::write_synced(path, &out)
+    crate::format::write_synced(path, &out)
         .map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
 }
 

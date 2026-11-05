@@ -91,7 +91,7 @@ fn table_meta() {
     e.insert_literals("db1.tb1", None, batch).unwrap();
 
     // Materialise the C++ block layout (the reference's flushed block 0).
-    assert_eq!(e.write_cpp_blocks("db1.tb1").unwrap(), 8192);
+    assert_eq!(e.write_blocks("db1.tb1").unwrap(), 8192);
 
     // `GetSegmentIDs1` / `GetBlockIDs1` / `GetRowCnt1`.
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);

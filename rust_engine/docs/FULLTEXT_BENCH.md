@@ -623,7 +623,7 @@ A/B 用临时开关 `INF_FT_NO_STREAM`（已移除）关掉流式：
 
 ## 5. 顺带修掉的一个格式缺陷
 
-`encode_fulltext_chunk`（`crates/executor/src/cpp_blocks.rs`）原来对
+`encode_fulltext_chunk`（`crates/executor/src/blocks/`）原来对
 **每个位置**调用一次 `end_document`，而参考的 `GeneratePosting`
 （`column_inverter_impl.cpp:253-257`）是**每个文档**一次：位置的累加走
 `AddPosition`。后果是：

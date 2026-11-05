@@ -22,7 +22,7 @@ impl Engine {
         // chunk's hits into a segment-wide bitmask (`TrunkReaderT::OutPut`,
         // `index_filter_evaluators_impl.cpp:912`) - so only the split point
         // changes here, not the values.
-        let block_rows = storage::cpp_format::DEFAULT_BLOCK_CAPACITY as u64;
+        let block_rows = storage::format::DEFAULT_BLOCK_CAPACITY as u64;
         // Every call rewrites the whole spill set; the file name carries the row
         // count, so a leftover from an earlier (smaller) snapshot would publish
         // a second chunk for the same block.
@@ -282,8 +282,8 @@ impl Engine {
 
     /// Records deleted row ids **in memory** only.
     ///
-    /// The block `version` is what makes a delete durable (`write_cpp_blocks`
-    /// marks the slot at the next checkpoint), and `restore_cpp_blocks` rebuilds
+    /// The block `version` is what makes a delete durable (`write_blocks`
+    /// marks the slot at the next checkpoint), and `restore_blocks` rebuilds
     /// the log from those files, so the commit path only has to make the ids
     /// visible to the next mirror. Writing the log here would mean a KV write
     /// inside the commit's own bottom half.
@@ -795,7 +795,7 @@ impl Engine {
             // deleting transaction's commit timestamp, and the block rewrite
             // marks it - there is no tombstone key to write.
             engine.settle_delete_at(&bottom_table, first_delete, delete_count, ts);
-            engine.refresh_cpp_block_mirror_extra(&bottom_table, &bottom_rows)
+            engine.refresh_block_mirror_extra(&bottom_table, &bottom_rows)
         })
     }
 
@@ -1394,7 +1394,7 @@ impl Engine {
         // table whose columns the block format cannot express has no mirror -
         // it keeps its rows in the store.
         if self.has_block_layout(table) {
-            self.write_cpp_blocks_commit(table, ts)?;
+            self.write_blocks_commit(table, ts)?;
         }
         // `CommitBottomAppend` for the imported segments on the table's worker.
         let bottom_table = table.to_string();
@@ -1524,7 +1524,7 @@ impl Engine {
             // `AppendInBlock`: the import's block is readable as soon as the
             // statement commits, exactly like the CSV path.
             if self.has_block_layout(table) {
-                self.write_cpp_blocks_commit(table, ts)?;
+                self.write_blocks_commit(table, ts)?;
             }
             drop(_visible);
             let t_bottom = t3.elapsed();
@@ -2097,7 +2097,7 @@ impl Engine {
                     false
                 }
             };
-            if dump && self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
+            if dump && self.dump_hnsw_index(&im.table, &im.name).is_ok() {
                 // The dumped segment leaves memory; these rows start the next
                 // one, so the counter keeps this batch's bytes instead of
                 // resetting to zero (`AppendMemIndex` accounts the new segment

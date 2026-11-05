@@ -17,7 +17,7 @@ use memmap2::Mmap;
 use std::fs::File;
 use std::path::Path;
 
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 
 const MAGIC: &[u8; 8] = b"IMVEC\x01\0\0";
 const HEADER_LEN: usize = 8 + 4 + 4 + 8;

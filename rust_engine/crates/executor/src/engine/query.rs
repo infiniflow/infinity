@@ -680,7 +680,7 @@ impl Engine {
             Some(_) => None,
             None => predicate
                 .as_ref()
-                .and_then(|expr| crate::cpp_blocks::ColumnBounds::from_expr(expr)),
+                .and_then(|expr| crate::blocks::ColumnBounds::from_expr(expr)),
         };
         let batch = match &indexed_rows {
             Some(ids) => self
@@ -772,7 +772,7 @@ impl Engine {
                 a.cmp(b)
             });
             for column in &mut batch.data {
-                *column = crate::cpp_blocks::permute_column(column, &order);
+                *column = crate::blocks::permute_column(column, &order);
             }
             for v in &mut batch.valid {
                 *v = order.iter().map(|i| v[*i]).collect();
@@ -1209,7 +1209,7 @@ impl Engine {
                         new: new_name.to_string(),
                     },
                     || {
-                        // Rename **first**: under the cpp_only backend the whole
+                        // Rename **first**: under the catalog_only backend the whole
                         // index list is derived from the layout, so a rename
                         // retires the old table's index records with it — dropping
                         // and re-creating them before the rename would leave the
@@ -1311,7 +1311,7 @@ impl Engine {
                 )?;
                 // The rows are in the blocks now: there is no text copy to drop.
                 if !rewritten.is_empty() {
-                    self.rewrite_cpp_blocks(table, &rewritten)?;
+                    self.rewrite_blocks(table, &rewritten)?;
                 }
                 let tkey = self.table_key(table);
                 self.tables
@@ -1420,7 +1420,7 @@ impl Engine {
                             (seq, row)
                         })
                         .collect();
-                    self.rewrite_cpp_blocks(table, &padded)?;
+                    self.rewrite_blocks(table, &padded)?;
                 }
                 Ok(QueryResult::CreatedTable {
                     id: 0,
@@ -1483,7 +1483,7 @@ impl Engine {
                         let existed = self.storage.catalog.drop_database(name, *if_exists)?;
                         if existed || *if_exists {
                             for t in &held {
-                                if self.storage.catalog.is_cpp_only() {
+                                if self.storage.catalog.is_catalog_only() {
                                     // `DROP DATABASE` is a marker; its tables go
                                     // with it in `Cleanup` (`NewCatalog::
                                     // CleanDB`), so only the in-memory registry

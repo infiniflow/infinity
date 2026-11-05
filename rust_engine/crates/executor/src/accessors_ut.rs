@@ -78,7 +78,7 @@ fn global_variables_report_real_counts() {
     // A checkpoint writes the C++ block mirror; reading it back is what puts
     // blocks in the engine's buffer cache (`BlockIndex::get_block`).
     engine.flush().unwrap();
-    engine.read_cpp_blocks("gv").unwrap();
+    engine.read_blocks("gv").unwrap();
 
     // Reading the block mirror populates the engine's block cache, so the
     // buffer counters must see the blocks the test itself created.
@@ -324,7 +324,7 @@ fn buffer_objects_describe_the_block_cache() {
     engine.execute("CREATE TABLE bo (id INT);").unwrap();
     engine.execute("INSERT INTO bo VALUES (7);").unwrap();
     engine.flush().unwrap();
-    engine.read_cpp_blocks("bo").unwrap();
+    engine.read_blocks("bo").unwrap();
 
     let objects = engine.buffer_objects();
     assert_eq!(objects.len(), 1, "one block was written and read");

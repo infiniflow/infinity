@@ -49,7 +49,7 @@ use std::fs::{self, File};
 use crate::mapped::MappedFile;
 use memmap2::Mmap;
 
-use crate::cpp_format::FormatError;
+use crate::format::FormatError;
 use crate::invertedindex::format::position_list::{
     decode_position_list, PositionListEncoder, OF_POSITION_LIST, OF_TERM_FREQUENCY,
 };
@@ -173,7 +173,7 @@ pub fn write_segment_index(
 
     let write = |suffix: &str, bytes: &[u8]| -> Result<(), FormatError> {
         let path = fulltext_chunk_file(index_dir, base_name, suffix);
-        crate::cpp_format::write_synced(std::path::Path::new(&path), &bytes)
+        crate::format::write_synced(std::path::Path::new(&path), &bytes)
             .map_err(|e| FormatError::Io(e.to_string()))
     };
     write(FULLTEXT_DICT_SUFFIX, &dic)?;

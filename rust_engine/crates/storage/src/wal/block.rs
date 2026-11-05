@@ -700,7 +700,7 @@ pub fn from_data_block_with(
                 _ => None,
             })?),
             LogicalType::Float16 => ColumnValues::Half(collect_scalar(&cells, |v| match v {
-                BlockValue::Float(x) => Some(crate::cpp_format::f32_to_f16_bits(*x)),
+                BlockValue::Float(x) => Some(crate::format::f32_to_f16_bits(*x)),
                 _ => None,
             })?),
             LogicalType::BFloat16 => ColumnValues::Half(collect_scalar(&cells, |v| match v {
@@ -861,7 +861,7 @@ fn encode_embedding_row(value: &BlockValue, type_info: &TypeInfo) -> Option<Vec<
             }
             EmbeddingDataType::Float16 => {
                 for x in vector {
-                    out.extend_from_slice(&crate::cpp_format::f32_to_f16_bits(*x).to_le_bytes());
+                    out.extend_from_slice(&crate::format::f32_to_f16_bits(*x).to_le_bytes());
                 }
             }
             EmbeddingDataType::BFloat16 => {

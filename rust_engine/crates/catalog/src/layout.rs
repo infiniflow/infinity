@@ -3,7 +3,7 @@
 //! C++ engine's catalog expects to read (RUST_REWRITE_PLAN.md §2.6.1 item 4).
 //!
 //! This is additive: the engine's own catalog storage is untouched, and
-//! [`Catalog::write_cpp_layout`] / [`read_cpp_layout`] let us prove the layout
+//! [`Catalog::write_layout`] / [`read_layout`] let us prove the layout
 //! round-trips on a real catalog. The C++ id counters are written too: the
 //! database counter as the `next_database_id` system tag, the table counter as
 //! the **per-database** `db|{db_id}|next_table_id` tag (the reference has no
@@ -21,7 +21,7 @@ use crate::{split_sparse_store_suffix, Catalog, IndexMeta, SparseStore, TableMet
 
 /// One table as read back from a C++-layout catalog.
 #[derive(Debug, Clone, PartialEq)]
-pub struct CppTable {
+pub struct TableLayout {
     pub db_name: String,
     pub db_id: u64,
     pub table_name: String,
@@ -39,14 +39,14 @@ pub struct CppTable {
 /// it is `<= begin_ts` (`GetTableSegmentBlocks`,
 /// `src/storage/catalog/kv_utility_impl.cpp:100`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CppBlock {
+pub struct BlockRecord {
     pub block_id: u16,
     pub commit_ts: u64,
 }
 
 /// One segment of a flushed mirror: `catalog|seg|…` plus its blocks.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CppSegment {
+pub struct SegmentRecord {
     pub segment_id: u32,
     /// Value of the `catalog|seg|…` record (the reference's create timestamp).
     pub create_ts: u64,
@@ -55,21 +55,21 @@ pub struct CppSegment {
     /// A reader whose `begin_ts` is below it may skip the block's delete
     /// flags, so an unset value would resurrect deleted rows.
     pub first_delete_ts: u64,
-    pub blocks: Vec<CppBlock>,
+    pub blocks: Vec<BlockRecord>,
 }
 
 /// A table's segment layer, keyed by the **decimal** ids the C++ keys use.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CppSegmentSet {
+pub struct SegmentSet {
     pub db_id: String,
     pub table_id: String,
-    pub segments: Vec<CppSegment>,
+    pub segments: Vec<SegmentRecord>,
 }
 
 /// One sealed index chunk, as `ChunkIndexMetaInfo` records it
 /// (`src/storage/catalog/meta/chunk_index_meta_impl.cpp:47`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CppIndexChunk {
+pub struct IndexChunk {
     pub chunk_id: u32,
     /// Full-text chunks name their files after it; the other workers derive
     /// `chunk_{id}.idx` from the chunk id itself.
@@ -89,10 +89,10 @@ pub struct CppIndexChunk {
 
 /// The sealed chunks of one index over one segment.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CppIndexSegment {
+pub struct IndexSegment {
     pub index_id: u64,
     pub segment_id: u32,
-    pub chunks: Vec<CppIndexChunk>,
+    pub chunks: Vec<IndexChunk>,
 }
 
 /// The timestamp a mirror record falls back to when it has no transaction of
@@ -549,7 +549,7 @@ fn ivf_element_code(text: &str) -> i64 {
     }
 }
 
-fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
+fn index_def_for(im: &IndexMeta, table: &TableLayout) -> Option<IndexDefValue> {
     // A functional index (`CREATE INDEX … (sqrt(c1))`) names an *expression*, so
     // there is no such column; the `SECONDARY` arm below turns it into a
     // `SECONDARYFUNCTIONAL` record instead of dropping it.
@@ -732,7 +732,7 @@ fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
 /// expression text verbatim, so reading the record back restores
 /// `IndexMeta::column`. `func_return_type` is approximated from the base
 /// column's type — this engine does not type-analyse the expression here.
-fn functional_index_def(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
+fn functional_index_def(im: &IndexMeta, table: &TableLayout) -> Option<IndexDefValue> {
     let expr = im.column.trim();
     // The base column the expression references: the longest matching name first,
     // so `c1` cannot match inside `c11`.
@@ -771,50 +771,50 @@ impl Catalog {
     ///
     /// The commit timestamp is a per-database monotonic counter, which is all a
     /// C++ reader needs (it scans a name's prefix and takes the newest version).
-    pub fn write_cpp_layout(&self, store: &dyn MetaStore) -> Result<usize> {
+    pub fn write_layout(&self, store: &dyn MetaStore) -> Result<usize> {
         let dbs = self.list_databases()?;
         let tables = self.list_tables()?;
         let indexes = self.list_indexes()?;
         // The segment layer belongs to the block mirror, not to the native
         // catalog: keep whatever is already published instead of dropping it.
-        let segments = read_cpp_segments(store)?;
-        self.write_cpp_layout_from(store, &dbs, &tables, &indexes, &segments)
+        let segments = read_segments(store)?;
+        self.write_layout_from(store, &dbs, &tables, &indexes, &segments)
     }
 
-    /// Like [`Self::write_cpp_layout`] but from an explicit snapshot. The
+    /// Like [`Self::write_layout`] but from an explicit snapshot. The
     /// C++-only catalog mode needs this: it mutates the desired lists and then
     /// rewrites the whole layout, and the just-mutated state is not yet readable
     /// back from the store.
     ///
     /// `segments` carries the tables' segment/block records
-    /// ([`read_cpp_segments`] for a preserve-and-rewrite, or the mirror a
+    /// ([`read_segments`] for a preserve-and-rewrite, or the mirror a
     /// checkpoint just wrote): the layout writer owns the `catalog|` key space
     /// and its sweep, so the segment layer has to be re-emitted here or a DDL
     /// would leave the C++ reader with a table that has no segments.
-    pub fn write_cpp_layout_from(
+    pub fn write_layout_from(
         &self,
         store: &dyn MetaStore,
         dbs: &[String],
         tables: &[TableMeta],
         indexes: &[IndexMeta],
-        segments: &[CppSegmentSet],
+        segments: &[SegmentSet],
     ) -> Result<usize> {
-        self.write_cpp_layout_with_ts(store, store, dbs, tables, indexes, segments)
+        self.write_layout_with_ts(store, store, dbs, tables, indexes, segments)
     }
 
-    /// Like [`Self::write_cpp_layout_from`], but the timestamps a record keeps
+    /// Like [`Self::write_layout_from`], but the timestamps a record keeps
     /// are read from `ts_source` while the layout is written to `store`. The
     /// batch writer records into an in-memory sink that holds no catalog, so it
     /// has to name the real store the existing records live in.
     #[allow(clippy::too_many_arguments)]
-    pub fn write_cpp_layout_with_ts(
+    pub fn write_layout_with_ts(
         &self,
         store: &dyn MetaStore,
         ts_source: &dyn MetaStore,
         dbs: &[String],
         tables: &[TableMeta],
         indexes: &[IndexMeta],
-        segments: &[CppSegmentSet],
+        segments: &[SegmentSet],
     ) -> Result<usize> {
         let mut written = 0usize;
         // Every catalog record is keyed by the commit timestamp of the
@@ -879,7 +879,7 @@ impl Catalog {
                     .filter(|(ts, id)| {
                         !is_dropped(
                             store,
-                            &crate::cpp_layout::cpp_dropped_db_key(name, *ts, &id.to_string()),
+                            &crate::layout::dropped_db_key(name, *ts, &id.to_string()),
                         )
                         .unwrap_or(false)
                     })
@@ -950,7 +950,7 @@ impl Catalog {
 
         // Resolved table layout, kept so the index pass below can reach each
         // table's db id, table id and column types.
-        let mut resolved: Vec<(String, String, u64, CppTable)> = Vec::new();
+        let mut resolved: Vec<(String, String, u64, TableLayout)> = Vec::new();
 
         for t in tables {
             let db_name = db_of(&t.name);
@@ -996,7 +996,7 @@ impl Catalog {
                 // reference writes it when a segment is opened for appends and
                 // removes it when the segment is sealed
                 // (`NewTxn::SetSealedSegment`), so a table that never took a row
-                // does not have it. `write_cpp_segments` writes it below.
+                // does not have it. `write_segments` writes it below.
                 ("next_index_id", next_index_id),
             ] {
                 store.put(
@@ -1053,7 +1053,7 @@ impl Catalog {
                 db_str,
                 tbl_str,
                 ts,
-                CppTable {
+                TableLayout {
                     db_name: db_name.to_string(),
                     db_id,
                     table_name: name.to_string(),
@@ -1076,7 +1076,7 @@ impl Catalog {
             if let Some(set) = set {
                 let mut set = set.clone();
                 set.db_id = db_id.to_string();
-                written += write_cpp_segments(store, &set)?;
+                written += write_segments(store, &set)?;
             }
         }
 
@@ -1189,48 +1189,48 @@ impl Catalog {
         Ok(written)
     }
 
-    /// The `(key, value)` pairs [`Catalog::write_cpp_layout_from`] would write,
+    /// The `(key, value)` pairs [`Catalog::write_layout_from`] would write,
     /// without writing them.
     ///
-    /// A DDL publishes the whole C++ layout at once (`rewrite_cpp`), and it must
+    /// A DDL publishes the whole C++ layout at once (`rewrite_catalog`), and it must
     /// reach the store as a single `MetaStore::atomic_batch`: a crash between
     /// the prefix deletes and the rewrite is exactly the half-written catalog
     /// the C++ engine would read. Going through the same writer keeps the bytes
     /// identical to the direct path.
-    pub fn write_cpp_layout_batch(
+    pub fn write_layout_batch(
         &self,
         dbs: &[String],
         tables: &[TableMeta],
         indexes: &[IndexMeta],
-        segments: &[CppSegmentSet],
+        segments: &[SegmentSet],
     ) -> Result<Vec<crate::BatchItem>> {
         // The recorder is a sink: the timestamps the records keep have to be
         // read from the catalog this layout is being derived from.
-        self.write_cpp_layout_batch_from(self.store.as_ref(), dbs, tables, indexes, segments)
+        self.write_layout_batch_from(self.store.as_ref(), dbs, tables, indexes, segments)
     }
 
-    /// Like [`Self::write_cpp_layout_batch`], but reading the timestamps the
+    /// Like [`Self::write_layout_batch`], but reading the timestamps the
     /// records keep from `ts_source`.
     ///
     /// A DDL that is still in flight writes into a capture overlay instead of
     /// the store, so the *existing* timestamps have to be read through the same
     /// overlay: a record created by an earlier step of the same statement is
     /// part of the layout this rewrite is derived from.
-    pub fn write_cpp_layout_batch_from(
+    pub fn write_layout_batch_from(
         &self,
         ts_source: &dyn MetaStore,
         dbs: &[String],
         tables: &[TableMeta],
         indexes: &[IndexMeta],
-        segments: &[CppSegmentSet],
+        segments: &[SegmentSet],
     ) -> Result<Vec<crate::BatchItem>> {
         let recorder = LayoutBatch::new();
-        self.write_cpp_layout_with_ts(&recorder, ts_source, dbs, tables, indexes, segments)?;
+        self.write_layout_with_ts(&recorder, ts_source, dbs, tables, indexes, segments)?;
         Ok(recorder.into_items())
     }
 
     /// Materializes a **C++-layout** catalog (as written by
-    /// [`Catalog::write_cpp_layout`], or by the C++ engine itself) into this
+    /// [`Catalog::write_layout`], or by the C++ engine itself) into this
     /// native catalog, so the engine can open a directory the C++ engine wrote
     /// (§2.6.1 item 4, the read direction).
     ///
@@ -1238,13 +1238,13 @@ impl Catalog {
     /// for the scalar cases and NOT NULL) and index records are imported;
     /// returns how many tables were created. A table that already exists under
     /// the same name is skipped.
-    pub fn import_cpp_layout(&self, store: &dyn MetaStore) -> Result<usize> {
+    pub fn import_layout(&self, store: &dyn MetaStore) -> Result<usize> {
         // This writes table records directly, so it must not read through (or
         // leave behind) a cached record.
         let _ddl = self.begin_ddl();
-        let cpp_tables = read_cpp_layout(store)?;
+        let tables = read_layout(store)?;
         let mut imported = 0usize;
-        for t in &cpp_tables {
+        for t in &tables {
             let qualified = format!("{}.{}", t.db_name, t.table_name);
             if self.get_table_by_name(&qualified)?.is_some() {
                 continue;
@@ -1270,8 +1270,8 @@ impl Catalog {
             imported += 1;
         }
         // Index records, resolved against the tables just imported.
-        for def in read_cpp_indexes(store)? {
-            let Some(meta) = index_meta_of(&def, &cpp_tables) else {
+        for def in read_indexes(store)? {
+            let Some(meta) = index_meta_of(&def, &tables) else {
                 continue;
             };
             // Keep the reference's id: it names the index's directory
@@ -1297,7 +1297,7 @@ impl Catalog {
 /// another ts (a restore writes the sentinel-ts copy, the next layout rewrite a
 /// real one) must resolve to its newest record - reading every version listed
 /// the column twice.
-fn read_cpp_columns(
+fn read_columns(
     store: &dyn MetaStore,
     db_id: u64,
     table_id: u64,
@@ -1345,18 +1345,15 @@ fn read_cpp_columns(
 /// instead made every statement that touches a table (`SELECT`, `INSERT`, a DDL
 /// on another table) decode every table and every column in the catalog - O(n)
 /// work per row on a directory with many tables.
-pub fn read_cpp_table(
+pub fn read_table(
     store: &dyn MetaStore,
     db_name: &str,
     table_name: &str,
-) -> Result<Option<CppTable>> {
-    let Some((db_id, db_ts)) = cpp_db_record(store, db_name)? else {
+) -> Result<Option<TableLayout>> {
+    let Some((db_id, db_ts)) = db_record(store, db_name)? else {
         return Ok(None);
     };
-    if is_dropped(
-        store,
-        &cpp_dropped_db_key(db_name, db_ts, &db_id.to_string()),
-    )? {
+    if is_dropped(store, &dropped_db_key(db_name, db_ts, &db_id.to_string()))? {
         return Ok(None);
     }
     let prefix = key::catalog_db_table_prefix(&db_id.to_string()) + table_name + "|";
@@ -1378,12 +1375,12 @@ pub fn read_cpp_table(
     };
     if is_dropped(
         store,
-        &cpp_dropped_table_key(&db_id.to_string(), table_name, ts, &table_id.to_string()),
+        &dropped_table_key(&db_id.to_string(), table_name, ts, &table_id.to_string()),
     )? {
         return Ok(None);
     }
-    let (columns, next_column_id) = read_cpp_columns(store, db_id, table_id)?;
-    Ok(Some(CppTable {
+    let (columns, next_column_id) = read_columns(store, db_id, table_id)?;
+    Ok(Some(TableLayout {
         db_name: db_name.to_string(),
         db_id,
         table_name: table_name.to_string(),
@@ -1393,8 +1390,8 @@ pub fn read_cpp_table(
     }))
 }
 
-/// [`read_cpp_layout`]'s entry as the engine's `TableMeta`.
-pub fn table_meta_of(t: &CppTable) -> TableMeta {
+/// [`read_layout`]'s entry as the engine's `TableMeta`.
+pub fn table_meta_of(t: &TableLayout) -> TableMeta {
     // `type_text_of` carries `WITH (SORTED)` for a kSorted sparse column;
     // split it back into the bare type text plus the hint field.
     let declared: Vec<(String, Option<SparseStore>)> = t
@@ -1437,13 +1434,13 @@ pub fn table_meta_of(t: &CppTable) -> TableMeta {
 /// The records one **new** table contributes to the C++ layout, so a
 /// `CREATE TABLE` does not have to rewrite the whole catalog.
 ///
-/// The keys and values are exactly what [write_cpp_layout_with_ts] writes for a
+/// The keys and values are exactly what [write_layout_with_ts] writes for a
 /// table that has no segments and no indexes: the table record, its three
 /// creation-time tags, one column record per column, and the database's
 /// `next_table_id` counter. Callers must only take this path for a name that
 /// has no record yet - otherwise the sweep a full rewrite performs is what
 /// reconciles the leftover.
-pub fn stage_cpp_new_table(
+pub fn stage_new_table(
     db_id: u64,
     meta: &TableMeta,
     next_table_id: u64,
@@ -1511,20 +1508,17 @@ pub fn stage_cpp_new_table(
     Ok(batch)
 }
 
-/// The tables of **one** database, resolved like [`read_cpp_table`] (newest record
+/// The tables of **one** database, resolved like [`read_table`] (newest record
 /// per name, drop markers honoured).
 ///
 /// A `DROP DATABASE` has to know which tables go with it, and listing the whole
 /// catalog to filter them by name cost a prefix scan per database - 10,000
 /// databases turned one drop into a quarter of a second.
-pub fn read_cpp_tables_of_db(store: &dyn MetaStore, db_name: &str) -> Result<Vec<CppTable>> {
-    let Some((db_id, db_ts)) = cpp_db_record(store, db_name)? else {
+pub fn read_tables_of_db(store: &dyn MetaStore, db_name: &str) -> Result<Vec<TableLayout>> {
+    let Some((db_id, db_ts)) = db_record(store, db_name)? else {
         return Ok(Vec::new());
     };
-    if is_dropped(
-        store,
-        &cpp_dropped_db_key(db_name, db_ts, &db_id.to_string()),
-    )? {
+    if is_dropped(store, &dropped_db_key(db_name, db_ts, &db_id.to_string()))? {
         return Ok(Vec::new());
     }
     let prefix = key::catalog_db_table_prefix(&db_id.to_string());
@@ -1550,12 +1544,12 @@ pub fn read_cpp_tables_of_db(store: &dyn MetaStore, db_name: &str) -> Result<Vec
     for (table_name, ts, table_id) in names {
         if is_dropped(
             store,
-            &cpp_dropped_table_key(&db_id.to_string(), &table_name, ts, &table_id.to_string()),
+            &dropped_table_key(&db_id.to_string(), &table_name, ts, &table_id.to_string()),
         )? {
             continue;
         }
-        let (columns, next_column_id) = read_cpp_columns(store, db_id, table_id)?;
-        out.push(CppTable {
+        let (columns, next_column_id) = read_columns(store, db_id, table_id)?;
+        out.push(TableLayout {
             db_name: db_name.to_string(),
             db_id,
             table_name,
@@ -1575,7 +1569,7 @@ pub fn read_cpp_tables_of_db(store: &dyn MetaStore, db_name: &str) -> Result<Vec
 /// against its `drop|…` marker. Both halves matter: `DROP` leaves the record in
 /// place, so a re-created name has two records and only the marker says which
 /// one is live.
-pub fn read_cpp_layout(store: &dyn MetaStore) -> Result<Vec<CppTable>> {
+pub fn read_layout(store: &dyn MetaStore) -> Result<Vec<TableLayout>> {
     // `catalog|db|{name}|{ts}` -> the id, newest ts per name. Note
     // `catalog_db_prefix("")` would emit a doubled pipe.
     let mut newest_db: std::collections::HashMap<String, (u64, u64)> =
@@ -1595,7 +1589,7 @@ pub fn read_cpp_layout(store: &dyn MetaStore) -> Result<Vec<CppTable>> {
     }
     let mut dbs: Vec<(u64, String)> = Vec::new();
     for (name, (ts, id)) in newest_db {
-        if is_dropped(store, &cpp_dropped_db_key(&name, ts, &id.to_string()))? {
+        if is_dropped(store, &dropped_db_key(&name, ts, &id.to_string()))? {
             continue;
         }
         dbs.push((id, name));
@@ -1629,12 +1623,12 @@ pub fn read_cpp_layout(store: &dyn MetaStore) -> Result<Vec<CppTable>> {
         for (table_name, ts, table_id) in names {
             if is_dropped(
                 store,
-                &cpp_dropped_table_key(&db_id.to_string(), &table_name, ts, &table_id.to_string()),
+                &dropped_table_key(&db_id.to_string(), &table_name, ts, &table_id.to_string()),
             )? {
                 continue;
             }
-            let (columns, next_column_id) = read_cpp_columns(store, *db_id, table_id)?;
-            out.push(CppTable {
+            let (columns, next_column_id) = read_columns(store, *db_id, table_id)?;
+            out.push(TableLayout {
                 db_name: db_name.clone(),
                 db_id: *db_id,
                 table_name,
@@ -1647,13 +1641,13 @@ pub fn read_cpp_layout(store: &dyn MetaStore) -> Result<Vec<CppTable>> {
     Ok(out)
 }
 
-/// Reads back the index records written by [`Catalog::write_cpp_layout`]:
+/// Reads back the index records written by [`Catalog::write_layout`]:
 /// every `idx|…|index_base` tag, decoded.
 ///
 /// A name resolves to its newest record and is checked against its
 /// `drop|idx|…` marker, the way `DBMeta::GetIndexID` resolves it; `DROP INDEX`
 /// leaves both records in place until `Cleanup`.
-pub fn read_cpp_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
+pub fn read_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
     // `catalog|idx|{db}|{tbl}|{name}|{ts}` -> `(ts, id)`, newest per name.
     let mut newest: std::collections::HashMap<(String, String, String), (u64, String)> =
         std::collections::HashMap::new();
@@ -1686,7 +1680,7 @@ pub fn read_cpp_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
     for ((db_id, table_id, index_name), (ts, index_id)) in names {
         if is_dropped(
             store,
-            &cpp_dropped_index_key(&db_id, &table_id, &index_name, ts, &index_id),
+            &dropped_index_key(&db_id, &table_id, &index_name, ts, &index_id),
         )? {
             continue;
         }
@@ -1716,8 +1710,8 @@ pub fn read_cpp_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
 /// `src/storage/catalog/kv_utility_impl.cpp:37,100`), so these two families are
 /// exactly what makes a written mirror visible: without them a C++ engine opens
 /// the table but believes it has no data.
-pub fn read_cpp_segments(store: &dyn MetaStore) -> Result<Vec<CppSegmentSet>> {
-    let mut out: Vec<CppSegmentSet> = Vec::new();
+pub fn read_segments(store: &dyn MetaStore) -> Result<Vec<SegmentSet>> {
+    let mut out: Vec<SegmentSet> = Vec::new();
     for (k, v) in store.scan_prefix(b"catalog|seg|")? {
         let key = String::from_utf8_lossy(&k).to_string();
         // `catalog|seg|{db_id}|{table_id}|{segment_id}`
@@ -1757,7 +1751,7 @@ pub fn read_cpp_segments(store: &dyn MetaStore) -> Result<Vec<CppSegmentSet>> {
                 .get(bk.as_slice())?
                 .and_then(|v| String::from_utf8_lossy(&v).parse().ok())
                 .unwrap_or(CPP_MIRROR_TS);
-            blocks.push(CppBlock {
+            blocks.push(BlockRecord {
                 block_id,
                 commit_ts,
             });
@@ -1769,7 +1763,7 @@ pub fn read_cpp_segments(store: &dyn MetaStore) -> Result<Vec<CppSegmentSet>> {
         {
             Some(set) => set,
             None => {
-                out.push(CppSegmentSet {
+                out.push(SegmentSet {
                     db_id: db_id.clone(),
                     table_id: table_id.clone(),
                     segments: Vec::new(),
@@ -1777,7 +1771,7 @@ pub fn read_cpp_segments(store: &dyn MetaStore) -> Result<Vec<CppSegmentSet>> {
                 out.last_mut().unwrap()
             }
         };
-        set.segments.push(CppSegment {
+        set.segments.push(SegmentRecord {
             segment_id,
             create_ts,
             first_delete_ts,
@@ -1804,14 +1798,14 @@ pub fn read_cpp_segments(store: &dyn MetaStore) -> Result<Vec<CppSegmentSet>> {
 /// deprecated by a compaction (`NewTxn::Compact` -> the WAL's deprecated
 /// segment list). A reader whose `begin_ts` is at or above it ignores the
 /// segment; the files and the catalog records stay until `Cleanup`.
-pub fn cpp_dropped_segment_key(db_id: &str, table_id: &str, segment_id: u32) -> String {
+pub fn dropped_segment_key(db_id: &str, table_id: &str, segment_id: u32) -> String {
     format!("drop|seg|{db_id}/{table_id}/{segment_id}")
 }
 
 /// `drop|idx_seg|{db}/{table}/{index}/{segment}` — the same for one index's
 /// copy of a deprecated segment (`drop|idx_seg|1/0/1/0 = 32` in a probe of a
 /// four-segment table compacted at ts 32).
-pub fn cpp_dropped_index_segment_key(
+pub fn dropped_index_segment_key(
     db_id: &str,
     table_id: &str,
     index_id: u64,
@@ -1829,25 +1823,20 @@ pub fn cpp_dropped_index_segment_key(
 /// `CatalogMeta::GetDBMeta` report the database as gone. `Cleanup` deletes the
 /// marker and the records it deprecated, in that order, so a directory that
 /// crashed between the two is still readable.
-pub fn cpp_dropped_db_key(db_name: &str, create_ts: u64, db_id: &str) -> String {
+pub fn dropped_db_key(db_name: &str, create_ts: u64, db_id: &str) -> String {
     format!("drop|db|{db_name}/{create_ts}/{db_id}")
 }
 
 /// `drop|tbl|{db}/{name}/{create_ts}/{table_id}` — the same for a table
 /// (`NewTxn::PrepareCommitDropTable`; `DBMeta::GetTableID` consults it after
 /// resolving the name to its newest `catalog|tbl|…` record).
-pub fn cpp_dropped_table_key(
-    db_id: &str,
-    table_name: &str,
-    create_ts: u64,
-    table_id: &str,
-) -> String {
+pub fn dropped_table_key(db_id: &str, table_name: &str, create_ts: u64, table_id: &str) -> String {
     format!("drop|tbl|{db_id}/{table_name}/{create_ts}/{table_id}")
 }
 
 /// `drop|idx|{db}/{table}/{name}/{create_ts}/{index_id}` — the same for an
 /// index (`NewTxn::ReplayDropIndex`).
-pub fn cpp_dropped_index_key(
+pub fn dropped_index_key(
     db_id: &str,
     table_id: &str,
     index_name: &str,
@@ -1865,7 +1854,7 @@ fn is_dropped(store: &dyn MetaStore, key: &str) -> Result<bool> {
 /// The newest `catalog|tbl|{db}/{name}/{ts}` record of a table:
 /// `(table_id, create_ts)`. Ignoring the drop markers is deliberate - a `DROP`
 /// needs the record it is about to deprecate.
-pub fn cpp_table_record(
+pub fn table_record(
     store: &dyn MetaStore,
     db_id: &str,
     table_name: &str,
@@ -1887,7 +1876,7 @@ pub fn cpp_table_record(
 }
 
 /// The newest `catalog|db|{name}/{ts}` record: `(db_id, create_ts)`.
-pub fn cpp_db_record(store: &dyn MetaStore, db_name: &str) -> Result<Option<(u64, u64)>> {
+pub fn db_record(store: &dyn MetaStore, db_name: &str) -> Result<Option<(u64, u64)>> {
     let mut newest: Option<(u64, u64)> = None;
     for (k, v) in store.scan_prefix(key::catalog_db_prefix(db_name).as_bytes())? {
         let key = String::from_utf8_lossy(&k).to_string();
@@ -1906,7 +1895,7 @@ pub fn cpp_db_record(store: &dyn MetaStore, db_name: &str) -> Result<Option<(u64
 
 /// The newest `catalog|idx|{db}/{table}/{name}/{ts}` record:
 /// `(index_id, create_ts)`.
-pub fn cpp_index_record(
+pub fn index_record(
     store: &dyn MetaStore,
     db_id: &str,
     table_id: &str,
@@ -2004,7 +1993,7 @@ pub fn dropped_record_prefixes(store: &dyn MetaStore) -> Result<Vec<String>> {
                 out.push(format!("idx|{db}|{table}|{id}|"));
             }
             // `drop|seg|`/`drop|idx_seg|` deprecate a segment whose records a
-            // layout rewrite already carries over (`read_cpp_segments`); the
+            // layout rewrite already carries over (`read_segments`); the
             // other kinds are not written by this port.
             _ => {}
         }
@@ -2015,9 +2004,9 @@ pub fn dropped_record_prefixes(store: &dyn MetaStore) -> Result<Vec<String>> {
 /// Records `segments` as deprecated at `ts`, for the table and for each of its
 /// indexes. The reference writes this inside the compaction transaction and
 /// keeps the source segments' files and catalog records until `Cleanup`.
-pub fn write_cpp_drops(
+pub fn write_drops(
     store: &dyn MetaStore,
-    set: &CppSegmentSet,
+    set: &SegmentSet,
     index_ids: &[u64],
     segments: &[u32],
     ts: u64,
@@ -2026,13 +2015,13 @@ pub fn write_cpp_drops(
     let mut written = 0usize;
     for segment in segments {
         store.put(
-            cpp_dropped_segment_key(&set.db_id, &set.table_id, *segment).as_bytes(),
+            dropped_segment_key(&set.db_id, &set.table_id, *segment).as_bytes(),
             value.as_bytes(),
         )?;
         written += 1;
         for index_id in index_ids {
             store.put(
-                cpp_dropped_index_segment_key(&set.db_id, &set.table_id, *index_id, *segment)
+                dropped_index_segment_key(&set.db_id, &set.table_id, *index_id, *segment)
                     .as_bytes(),
                 value.as_bytes(),
             )?;
@@ -2058,11 +2047,7 @@ pub fn write_cpp_drops(
 
 /// The segments of `table` that a compaction deprecated (and `Cleanup` has not
 /// reclaimed yet).
-pub fn cpp_dropped_segments(
-    store: &dyn MetaStore,
-    db_id: &str,
-    table_id: &str,
-) -> Result<Vec<u32>> {
+pub fn dropped_segments(store: &dyn MetaStore, db_id: &str, table_id: &str) -> Result<Vec<u32>> {
     let prefix = format!("drop|seg|{db_id}/{table_id}/");
     let mut out = Vec::new();
     for (k, _) in store.scan_prefix(prefix.as_bytes())? {
@@ -2075,13 +2060,13 @@ pub fn cpp_dropped_segments(
     Ok(out)
 }
 
-pub fn write_cpp_segments(store: &dyn MetaStore, set: &CppSegmentSet) -> Result<usize> {
+pub fn write_segments(store: &dyn MetaStore, set: &SegmentSet) -> Result<usize> {
     let mut written = 0usize;
     // A mirror rewrite can leave fewer blocks (or segments) than the previous
     // one, so start from an empty segment layer for the table - except for the
     // segments a compaction deprecated, whose records the reference keeps until
     // `Cleanup` (the `drop|seg|` record is what makes a reader ignore them).
-    let dropped = cpp_dropped_segments(store, &set.db_id, &set.table_id)?;
+    let dropped = dropped_segments(store, &set.db_id, &set.table_id)?;
     for prefix in [
         key::catalog_segment_prefix(&set.db_id, &set.table_id),
         format!("catalog|blk|{}|{}|", set.db_id, set.table_id),
@@ -2153,10 +2138,10 @@ pub fn write_cpp_segments(store: &dyn MetaStore, set: &CppSegmentSet) -> Result<
 /// records every row is a "gap" it tries to rebuild into the memory index
 /// (`CountMemIndexGapInSegment`, `new_txn_index_impl.cpp:2768`) — which dumps a
 /// fresh chunk and, on a Rust-written mirror, aborts the startup.
-pub fn write_cpp_index_segments(
+pub fn write_index_segments(
     store: &dyn MetaStore,
-    set: &CppSegmentSet,
-    indexes: &[CppIndexSegment],
+    set: &SegmentSet,
+    indexes: &[IndexSegment],
 ) -> Result<usize> {
     let mut written = 0usize;
     for index in indexes {
@@ -2274,7 +2259,7 @@ pub fn write_cpp_index_segments(
 /// One `idx_chunk|…|chunk_info` record, i.e. `ChunkIndexMetaInfo`
 /// (`src/storage/catalog/meta/chunk_index_meta_impl.cpp:59`).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct CppChunkInfo {
+pub struct ChunkInfo {
     /// Full-text chunks name their files after it (`ft_{base_row_id:016x}`);
     /// every other index type leaves it empty.
     pub base_name: String,
@@ -2288,15 +2273,15 @@ pub struct CppChunkInfo {
     pub index_size: u64,
 }
 
-impl CppChunkInfo {
+impl ChunkInfo {
     /// Parses the record's JSON (keys sorted, as `nlohmann::json::dump`
     /// writes them).
-    pub fn parse(text: &[u8]) -> Option<CppChunkInfo> {
+    pub fn parse(text: &[u8]) -> Option<ChunkInfo> {
         let json = expression::json::parse(std::str::from_utf8(text).ok()?)?;
         let expression::json::Json::Obj(entries) = json else {
             return None;
         };
-        let mut out = CppChunkInfo::default();
+        let mut out = ChunkInfo::default();
         for (key, value) in entries {
             let uint = |v: &expression::json::Json| -> u64 {
                 match v {
@@ -2325,18 +2310,18 @@ impl CppChunkInfo {
 
 /// One segment of an index with its chunks: `(segment id, [(chunk id,
 /// chunk info)])`.
-pub type CppSegmentIndex = (u32, Vec<(u64, CppChunkInfo)>);
+pub type SegmentIndex = (u32, Vec<(u64, ChunkInfo)>);
 
 /// `TableIndexMeta::MapMetaToSnapShotInfo`'s segment layer
 /// (`table_index_meta_impl.cpp:294`): the segments this index has chunk records
 /// for — `GetTableIndexSegments`, numerically sorted — each with its chunks in
 /// chunk-id order (`SegmentIndexMeta::LoadChunkIDs1`).
-pub fn read_cpp_index_chunks(
+pub fn read_index_chunks(
     store: &dyn MetaStore,
     db_id: &str,
     table_id: &str,
     index_id: &str,
-) -> Result<Vec<CppSegmentIndex>> {
+) -> Result<Vec<SegmentIndex>> {
     let mut segment_ids: Vec<u32> = Vec::new();
     let prefix = format!("idx_seg|{db_id}|{table_id}|{index_id}|");
     for (key, _) in store.scan_prefix(prefix.as_bytes())? {
@@ -2376,7 +2361,7 @@ pub fn read_cpp_index_chunks(
             let info = store
                 .get(record.as_bytes())?
                 .as_deref()
-                .and_then(CppChunkInfo::parse)
+                .and_then(ChunkInfo::parse)
                 .unwrap_or_default();
             chunks.push((chunk_id, info));
         }
@@ -2390,7 +2375,7 @@ pub fn read_cpp_index_chunks(
 /// optimize superseded. `Cleanup` deletes the chunk file and only then the
 /// marker, so a crash in between leaves the chunk invisible instead of
 /// resurrecting it.
-pub fn drop_cpp_index_chunk_key(
+pub fn drop_index_chunk_key(
     db_id: &str,
     table_id: &str,
     index_id: &str,
@@ -2401,7 +2386,7 @@ pub fn drop_cpp_index_chunk_key(
 }
 
 /// The prefix every marker of one segment index shares.
-pub fn drop_cpp_index_chunk_prefix(
+pub fn drop_index_chunk_prefix(
     db_id: &str,
     table_id: &str,
     index_id: &str,
@@ -2415,7 +2400,7 @@ pub fn drop_cpp_index_chunk_prefix(
 /// `segment_index_meta_impl.cpp:109`) and its bytes are reclaimed by a later
 /// `Cleanup`. The marker `PrepareCommitDumpIndex`
 /// (`new_txn_index_impl.cpp:3043`) writes is what survives until then.
-pub fn deprecate_cpp_index_chunks(
+pub fn deprecate_index_chunks(
     store: &dyn MetaStore,
     db_id: &str,
     table_id: &str,
@@ -2428,7 +2413,7 @@ pub fn deprecate_cpp_index_chunks(
     let mut written = 0usize;
     for chunk_id in chunk_ids {
         store.put(
-            drop_cpp_index_chunk_key(db_id, table_id, index_id, segment_id, u64::from(*chunk_id))
+            drop_index_chunk_key(db_id, table_id, index_id, segment_id, u64::from(*chunk_id))
                 .as_bytes(),
             value.as_bytes(),
         )?;
@@ -2460,14 +2445,14 @@ pub fn deprecate_cpp_index_chunks(
 
 /// The chunk ids of one segment index that are deprecated but not reclaimed
 /// yet, read from the `drop|idx_chunk|…` markers.
-pub fn deprecated_cpp_index_chunks(
+pub fn deprecated_index_chunks(
     store: &dyn MetaStore,
     db_id: &str,
     table_id: &str,
     index_id: &str,
     segment_id: u32,
 ) -> Result<Vec<u64>> {
-    let prefix = drop_cpp_index_chunk_prefix(db_id, table_id, index_id, segment_id);
+    let prefix = drop_index_chunk_prefix(db_id, table_id, index_id, segment_id);
     let mut out = Vec::new();
     for (key, _) in store.scan_prefix(prefix.as_bytes())? {
         let text = String::from_utf8_lossy(&key).to_string();
@@ -2485,7 +2470,7 @@ pub fn deprecated_cpp_index_chunks(
 /// Drops a deprecated chunk for good: its marker, its chunk-list entry and its
 /// `chunk_info`. The caller deletes the file first - a leftover file the
 /// reference still lists would be read as a chunk.
-pub fn reclaim_cpp_index_chunks(
+pub fn reclaim_index_chunks(
     store: &dyn MetaStore,
     db_id: &str,
     table_id: &str,
@@ -2496,7 +2481,7 @@ pub fn reclaim_cpp_index_chunks(
     let mut reclaimed = 0usize;
     for chunk_id in chunk_ids {
         store.delete(
-            drop_cpp_index_chunk_key(db_id, table_id, index_id, segment_id, *chunk_id).as_bytes(),
+            drop_index_chunk_key(db_id, table_id, index_id, segment_id, *chunk_id).as_bytes(),
         )?;
         store.delete(
             key::catalog_index_chunk_key(db_id, table_id, index_id, segment_id, *chunk_id)
@@ -2572,18 +2557,18 @@ fn json_string(text: &str) -> String {
 
 /// Maps a C++ index record onto the engine's `IndexMeta`, resolving the owning
 /// table from the C++ tables (which carry db/table names and columns).
-pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<IndexMeta> {
+pub fn index_meta_of(def: &IndexDefValue, tables: &[TableLayout]) -> Option<IndexMeta> {
     // The record's key says which table the index belongs to; only a record
     // without one (a hand-written one) falls back to guessing from the
     // indexed column's name - and two tables with a column of the same name
     // would then give the index to the wrong table.
     let table = match &def.owner {
-        Some((db_id, table_id)) => cpp_tables
+        Some((db_id, table_id)) => tables
             .iter()
             .find(|t| t.db_id.to_string() == *db_id && t.table_id.to_string() == *table_id)
             .map(|t| format!("{}.{}", t.db_name, t.table_name)),
         None => def.base.column_names.first().and_then(|c| {
-            cpp_tables
+            tables
                 .iter()
                 .find(|t| t.columns.iter().any(|col| &col.column_name == c))
                 .map(|t| format!("{}.{}", t.db_name, t.table_name))
@@ -2743,7 +2728,7 @@ pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<Ind
             def.base.index_type.clone()
         },
         options,
-        // The id the reference's record carries; `Catalog::cpp_indexes` fills
+        // The id the reference's record carries; `Catalog::indexes` fills
         // in a fallback for a record that has none.
         id: def.index_id.unwrap_or(0),
     })
@@ -2778,8 +2763,8 @@ fn sparse_store_of(column_type: &Json) -> Option<SparseStore> {
     })
 }
 
-pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> {
-    Ok(read_cpp_layout(store)?.iter().map(table_meta_of).collect())
+pub fn read_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> {
+    Ok(read_layout(store)?.iter().map(table_meta_of).collect())
 }
 
 #[cfg(test)]
@@ -2795,7 +2780,7 @@ mod tests {
     /// the plain chunk layout.
     #[test]
     fn ivf_options_survive_a_reload() {
-        let table = CppTable {
+        let table = TableLayout {
             db_name: "default_db".into(),
             db_id: 1,
             table_name: "t".into(),
@@ -2899,9 +2884,9 @@ mod tests {
 
         let out = tempfile::tempdir().unwrap();
         let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(out.path()).unwrap());
-        cat.write_cpp_layout(store.as_ref()).unwrap();
+        cat.write_layout(store.as_ref()).unwrap();
 
-        let tables = read_cpp_layout(store.as_ref()).unwrap();
+        let tables = read_layout(store.as_ref()).unwrap();
         assert_eq!(tables.len(), 1);
         assert_eq!(
             tables[0].columns[1].column_type.compact(),
@@ -2913,14 +2898,14 @@ mod tests {
         );
 
         // The read direction restores the bare type text plus the hint field.
-        let metas = read_cpp_tables_as_meta(store.as_ref()).unwrap();
+        let metas = read_tables_as_meta(store.as_ref()).unwrap();
         assert_eq!(metas[0].types[1], "SPARSE(float,int16,30000)");
         assert_eq!(metas[0].sparse_stores[1], Some(crate::SparseStore::Sorted));
 
         // Importing the layout into a fresh native catalog keeps the hint.
         let dst = tempfile::tempdir().unwrap();
         let imported = Catalog::open(dst.path()).unwrap();
-        imported.import_cpp_layout(store.as_ref()).unwrap();
+        imported.import_layout(store.as_ref()).unwrap();
         let meta = imported
             .get_table_by_name("default_db.sp")
             .unwrap()
@@ -2950,15 +2935,15 @@ mod tests {
 
         let out = tempfile::tempdir().unwrap();
         let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(out.path()).unwrap());
-        cat.write_cpp_layout(store.as_ref()).unwrap();
+        cat.write_layout(store.as_ref()).unwrap();
 
-        let defs = read_cpp_indexes(store.as_ref()).unwrap();
+        let defs = read_indexes(store.as_ref()).unwrap();
         assert_eq!(defs.len(), 1, "the functional index must not be dropped");
         assert_eq!(defs[0].base.index_type, "SECONDARYFUNCTIONAL");
         assert_eq!(defs[0].base.column_names, vec!["c1".to_string()]);
 
         // Reading it back restores the expression the planner matches on.
-        let tables = read_cpp_layout(store.as_ref()).unwrap();
+        let tables = read_layout(store.as_ref()).unwrap();
         let meta = index_meta_of(&defs[0], &tables).unwrap();
         assert_eq!(meta.name, "idx1");
         assert_eq!(meta.table, "default_db.t");
@@ -2988,7 +2973,7 @@ mod tests {
         // Write into a *separate* store so the engine's own catalog is untouched.
         let out = tempfile::tempdir().unwrap();
         let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(out.path()).unwrap());
-        let written = cat.write_cpp_layout(store.as_ref()).unwrap();
+        let written = cat.write_layout(store.as_ref()).unwrap();
         assert!(written >= 4, "wrote {written} records");
 
         // The C++ keys are there. The next-table-id counter is a *per
@@ -3009,7 +2994,7 @@ mod tests {
             .unwrap()
             .is_empty());
 
-        let back = read_cpp_layout(store.as_ref()).unwrap();
+        let back = read_layout(store.as_ref()).unwrap();
         assert_eq!(back.len(), 1);
         let got = &back[0];
         assert_eq!(got.db_name, "default_db");
@@ -3108,12 +3093,12 @@ mod tests {
 
         let cpp = tempfile::tempdir().unwrap();
         let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(cpp.path()).unwrap());
-        cat.write_cpp_layout(store.as_ref()).unwrap();
+        cat.write_layout(store.as_ref()).unwrap();
 
         // A fresh, empty native catalog imports it.
         let dst = tempfile::tempdir().unwrap();
         let imported = Catalog::open(dst.path()).unwrap();
-        let n = imported.import_cpp_layout(store.as_ref()).unwrap();
+        let n = imported.import_layout(store.as_ref()).unwrap();
         assert_eq!(n, 1);
 
         assert!(imported
@@ -3144,11 +3129,11 @@ mod tests {
             .any(|(k, v)| k == "ANALYZER" && v == "standard"));
 
         // Importing again is a no-op (the tables already exist).
-        assert_eq!(imported.import_cpp_layout(store.as_ref()).unwrap(), 0);
+        assert_eq!(imported.import_layout(store.as_ref()).unwrap(), 0);
 
         // The direct reader agrees with the import: types, NOT NULL, defaults
         // and comments all survive the C++ round trip.
-        let meta = read_cpp_tables_as_meta(store.as_ref()).unwrap();
+        let meta = read_tables_as_meta(store.as_ref()).unwrap();
         assert_eq!(meta.len(), 1);
         assert_eq!(meta[0].name, "default_db.t");
         assert_eq!(
@@ -3175,7 +3160,7 @@ mod tests {
         .unwrap();
         let out = tempfile::tempdir().unwrap();
         let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(out.path()).unwrap());
-        let err = cat.write_cpp_layout(store.as_ref()).unwrap_err();
+        let err = cat.write_layout(store.as_ref()).unwrap_err();
         assert!(err.to_string().contains("does not cover"), "{err}");
     }
 
@@ -3215,7 +3200,7 @@ mod tests {
 
         let out = tempfile::tempdir().unwrap();
         let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(out.path()).unwrap());
-        cat.write_cpp_layout(store.as_ref()).unwrap();
+        cat.write_layout(store.as_ref()).unwrap();
 
         // The `next_index_id` tag counts both indexes.
         let db = cat.list_databases().unwrap();
@@ -3230,7 +3215,7 @@ mod tests {
             Some("2".to_string())
         );
 
-        let defs = read_cpp_indexes(store.as_ref()).unwrap();
+        let defs = read_indexes(store.as_ref()).unwrap();
         assert_eq!(defs.len(), 2);
         let hnsw = defs
             .iter()
@@ -3271,7 +3256,7 @@ mod empty_default_probe {
 }
 
 /// A `MetaStore` that records writes instead of applying them, so the C++ layout
-/// writer can feed a single `atomic_batch` (see [`Catalog::write_cpp_layout_batch`]).
+/// writer can feed a single `atomic_batch` (see [`Catalog::write_layout_batch`]).
 ///
 /// The writer only ever calls `put` (plus one `flush`), so the read methods are
 /// unreachable in practice; they return "absent" rather than panicking.

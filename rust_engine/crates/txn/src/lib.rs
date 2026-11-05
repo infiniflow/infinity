@@ -1846,17 +1846,17 @@ fn cell_text(value: &BlockValue) -> String {
             }
         }
         BlockValue::Str(v) => v.clone(),
-        BlockValue::Date(v) => storage::cpp_format::days_to_date(v.value),
-        BlockValue::Time(v) => storage::cpp_format::secs_to_time(v.value),
+        BlockValue::Date(v) => storage::format::days_to_date(v.value),
+        BlockValue::Time(v) => storage::format::secs_to_time(v.value),
         BlockValue::DateTime(v) => format!(
             "{} {}",
-            storage::cpp_format::days_to_date(v.date),
-            storage::cpp_format::secs_to_time(v.time)
+            storage::format::days_to_date(v.date),
+            storage::format::secs_to_time(v.time)
         ),
         BlockValue::Timestamp(v) => format!(
             "{} {}",
-            storage::cpp_format::days_to_date(v.date),
-            storage::cpp_format::secs_to_time(v.time)
+            storage::format::days_to_date(v.date),
+            storage::format::secs_to_time(v.time)
         ),
         BlockValue::Interval(v) => v.value.to_string(),
         BlockValue::Uuid(v) => v.iter().map(|b| format!("{b:02x}")).collect(),

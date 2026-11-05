@@ -38,23 +38,23 @@ impl Comparator<String> for KeyComparator {
 }
 
 struct Node<K, V> {
-    key: K,
-    value: V,
-    next: Vec<Option<usize>>,
+    pub(crate) key: K,
+    pub(crate) value: V,
+    pub(crate) next: Vec<Option<usize>>,
 }
 
 struct Inner<K, V> {
-    nodes: Vec<Node<K, V>>,
+    pub(crate) nodes: Vec<Node<K, V>>,
     /// Level links out of the head node.
-    head: Vec<Option<usize>>,
-    height: usize,
-    rng: u64,
+    pub(crate) head: Vec<Option<usize>>,
+    pub(crate) height: usize,
+    pub(crate) rng: u64,
 }
 
 /// A concurrent skip list (`SkipList<KeyType, ValueType, Comparator>`).
 pub struct SkipList<K, V, C> {
-    inner: Arc<RwLock<Inner<K, V>>>,
-    cmp: C,
+    pub(crate) inner: Arc<RwLock<Inner<K, V>>>,
+    pub(crate) cmp: C,
 }
 
 impl<K, V, C> Clone for SkipList<K, V, C>
@@ -244,8 +244,8 @@ where
 
 /// `SkipList::Iterator`: a cursor over the level-0 chain.
 pub struct SkipListIterator<K, V> {
-    inner: Arc<RwLock<Inner<K, V>>>,
-    current: Option<usize>,
+    pub(crate) inner: Arc<RwLock<Inner<K, V>>>,
+    pub(crate) current: Option<usize>,
 }
 
 impl<K, V> SkipListIterator<K, V> {

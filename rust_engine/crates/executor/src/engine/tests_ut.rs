@@ -503,12 +503,12 @@ mod tests {
         ))
         .unwrap();
         e.flush().unwrap();
-        crate::cpp_blocks::PRUNED_BLOCKS.with(|n| n.set(0));
+        crate::blocks::PRUNED_BLOCKS.with(|n| n.set(0));
         let got = rows(&e, "SELECT id FROM pf WHERE id < 10;");
         assert_eq!(got.len(), 10, "{got:?}");
         assert_eq!(got[0][0], "0");
         assert_eq!(got[9][0], "9");
-        let pruned = crate::cpp_blocks::PRUNED_BLOCKS.with(|n| n.get());
+        let pruned = crate::blocks::PRUNED_BLOCKS.with(|n| n.get());
         assert!(pruned > 0, "no block was pruned (read {pruned})");
         // A predicate that spans both blocks still returns every row.
         let got = rows(&e, "SELECT id FROM pf WHERE id >= 8190 AND id < 8200;");
@@ -1513,7 +1513,7 @@ mod tests {
         seed(&e);
         // The C++ keys the C++ engine reads sit beside the native catalog in
         // the same `<dir>/catalog` store.
-        let cpp = catalog::cpp_layout::read_cpp_layout(e.catalog().store().as_ref()).unwrap();
+        let cpp = catalog::layout::read_layout(e.catalog().store().as_ref()).unwrap();
         assert_eq!(cpp.len(), 1, "expected one C++ table record");
         assert_eq!(cpp[0].table_name, "t");
         assert_eq!(cpp[0].db_name, "default_db");
@@ -1526,7 +1526,7 @@ mod tests {
             vec!["id", "name"]
         );
         assert_eq!(
-            catalog::cpp_layout::type_text_of(&cpp[0].columns[0].column_type).unwrap(),
+            catalog::layout::type_text_of(&cpp[0].columns[0].column_type).unwrap(),
             "INTEGER"
         );
     }
@@ -1538,7 +1538,7 @@ mod tests {
         let src = tempdir().unwrap();
         let cat = Catalog::open(src.path()).unwrap();
         cat.create_table_typed(
-            "default_db.cpp_t",
+            "default_db.ts",
             &["id".to_string(), "v".to_string()],
             &[None, None],
             &[true, false],
@@ -1550,19 +1550,19 @@ mod tests {
         let dir = tempdir().unwrap();
         {
             let store = open_catalog_store(&dir.path().join("catalog"));
-            cat.write_cpp_layout(store.as_ref()).unwrap();
+            cat.write_layout(store.as_ref()).unwrap();
         } // release the store lock before the engine opens it
 
         let e = Engine::open(dir.path()).unwrap();
         assert_eq!(
-            e.table_schema("default_db.cpp_t").unwrap(),
+            e.table_schema("default_db.ts").unwrap(),
             vec!["id".to_string(), "v".to_string()]
         );
-        assert_eq!(e.column_types("default_db.cpp_t").unwrap()[0], "INTEGER");
+        assert_eq!(e.column_types("default_db.ts").unwrap()[0], "INTEGER");
         // The imported table is usable.
-        e.execute("INSERT INTO default_db.cpp_t VALUES (7, [1.0, 2.0, 3.0]);")
+        e.execute("INSERT INTO default_db.ts VALUES (7, [1.0, 2.0, 3.0]);")
             .unwrap();
-        match &e.execute("SELECT id FROM default_db.cpp_t;").unwrap()[0] {
+        match &e.execute("SELECT id FROM default_db.ts;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 1),
             other => panic!("unexpected {other:?}"),
         }
@@ -2460,7 +2460,7 @@ mod tests {
         assert_eq!(indexed[0], baseline[0]);
 
         e.flush().unwrap();
-        let loaded = e.read_cpp_plaid_index("default_db.pt", "pidx").unwrap();
+        let loaded = e.read_plaid_index("default_db.pt", "pidx").unwrap();
         assert_eq!(loaded.doc_num(), 300);
         assert_eq!(loaded.total_embedding_num(), 1200);
     }
@@ -3505,12 +3505,12 @@ mod tests {
         )
         .unwrap();
         e.flush().unwrap();
-        assert_eq!(e.cpp_block_row_count("p").unwrap(), 3);
+        assert_eq!(e.mirror_block_row_count("p").unwrap(), 3);
         let items = [
             SelectItem::Column("id".to_string()),
             SelectItem::Column("name".to_string()),
         ];
-        let projected = e.try_cpp_projection("p", &items).unwrap();
+        let projected = e.try_projection("p", &items).unwrap();
         assert!(projected.is_some());
         assert_eq!(
             rows(&e, "SELECT id, name FROM p;"),
@@ -3525,7 +3525,7 @@ mod tests {
         // visible without waiting for the next checkpoint.
         e.execute("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
             .unwrap();
-        let projected = e.try_cpp_projection("p", &items).unwrap().unwrap();
+        let projected = e.try_projection("p", &items).unwrap().unwrap();
         assert_eq!(projected.len(), 4);
         assert_eq!(projected[3][0], Value::Int(4));
         assert_eq!(projected[3][1], Value::Str("d".into()));
@@ -3582,7 +3582,7 @@ mod tests {
         // The SDK reads one column (`output([...])`), which is the projection
         // path - not the same code as a full `SELECT v`.
         let items = [SelectItem::Column("v".to_string())];
-        let projected = e.try_cpp_projection("mv", &items).unwrap();
+        let projected = e.try_projection("mv", &items).unwrap();
         assert_eq!(
             projected.map(|r| r.len()),
             Some(1),
@@ -4213,7 +4213,7 @@ mod tests {
         assert_eq!(score("topn=1"), 2.0);
         // `alpha=0` prunes block 1 (bound 0 * 2.0 < the k-th score 1.0), so the
         // exact answer is never scored evidence that the option reached
-        // `BmpAlg`/`BmpCppReader::search` instead of a hard-coded 0.9.
+        // `BmpAlg`/`BmpReader::search` instead of a hard-coded 0.9.
         assert_eq!(score("topn=1;alpha=0"), 1.0);
         // `alpha`/`beta` are parsed; out-of-range values are ignored, and the
         // binder's `tail` name does not touch `use_tail` (the reference's
@@ -4989,7 +4989,7 @@ mod tests {
         // still on disk: the reference's `RemoveChunkIDs` runs inside the
         // commit and `PrepareCommitDumpIndex` leaves one `drop|idx_chunk|…`
         // marker per id; `Cleanup` is what deletes the files.
-        let chunk_dir = e.cpp_hnsw_dir("ot", "ot_i").unwrap();
+        let chunk_dir = e.hnsw_dir("ot", "ot_i").unwrap();
         assert!(
             chunk_dir.join("chunk_0.idx").is_file() && chunk_dir.join("chunk_1.idx").is_file(),
             "the merge must not delete the chunks it superseded"
@@ -5005,11 +5005,11 @@ mod tests {
             .id
             .to_string();
         let index_id = e
-            .cpp_index_position("default_db.ot", "ot_i")
+            .index_position("default_db.ot", "ot_i")
             .unwrap()
             .to_string();
         assert_eq!(
-            catalog::cpp_layout::deprecated_cpp_index_chunks(
+            catalog::layout::deprecated_index_chunks(
                 store.as_ref(),
                 &db_id,
                 &table_id,
@@ -5068,7 +5068,7 @@ mod tests {
             !chunk_dir.join("chunk_0.idx").exists() && !chunk_dir.join("chunk_1.idx").exists(),
             "cleanup reclaims the bytes"
         );
-        assert!(catalog::cpp_layout::deprecated_cpp_index_chunks(
+        assert!(catalog::layout::deprecated_index_chunks(
             store.as_ref(),
             &db_id,
             &table_id,
@@ -5174,7 +5174,7 @@ mod tests {
         e.execute("DELETE FROM bmu WHERE id = 2;").unwrap();
         e.execute("UPDATE bmu SET name = 'u' WHERE id = 3;")
             .unwrap();
-        let rows = e.try_cpp_rows("default_db.bmu").unwrap().unwrap();
+        let rows = e.try_rows("default_db.bmu").unwrap().unwrap();
         let ids: Vec<&Value> = rows.iter().map(|(_, r)| &r[0]).collect();
         let names: Vec<&Value> = rows.iter().map(|(_, r)| &r[1]).collect();
         assert_eq!(ids, vec![&Value::Int(1), &Value::Int(3)]);

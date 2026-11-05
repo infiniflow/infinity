@@ -12,7 +12,7 @@
 use crate::new_catalog_ut as h;
 use crate::Engine;
 use parser::Literal;
-use storage::cpp_format::BlockVersionFile;
+use storage::format::BlockVersionFile;
 use tempfile::tempdir;
 
 fn create_table(e: &Engine) {
