@@ -983,7 +983,14 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
             let db = db_id.parse::<u64>().map_err(|_| {
                 common::Error::Invalid(format!("replay: bad database id '{db_id}'"))
             })?;
-            catalog::layout::stage_added_columns(db, &meta, first)?
+            let mut batch = catalog::layout::stage_added_columns(db, &meta, first)?;
+            Catalog::restamp(&mut batch, commit_ts);
+            catalog.store().atomic_batch(&batch)?;
+            // These records bypass the catalog's own writers, so drop the table
+            // cache: the next frame - and the checkpoint that publishes the
+            // layout - has to see the new columns.
+            catalog.invalidate_tables();
+            Vec::new()
         }
         _ => {
             let ((), staged) = catalog.capture(|| -> CommonResult<()> {

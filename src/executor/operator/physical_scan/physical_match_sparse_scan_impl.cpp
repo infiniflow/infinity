@@ -522,6 +522,12 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             break;
         }
 
+        if (data_segment_id == INVALID_SEGMENT_ID) {
+            // Nothing dumped yet (realtime): no chunk names a data segment, so
+            // the index segment and the data segment are still numbered alike.
+            data_segment_id = segment_id;
+        }
+
         auto segment_it = block_index->new_segment_block_index_.find(data_segment_id);
         if (segment_it == block_index->new_segment_block_index_.end()) {
             // The rows this index segment covers are still in the table's memory

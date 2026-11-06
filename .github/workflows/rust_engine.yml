@@ -414,6 +414,9 @@ jobs:
         env:
           INFINITY_CPP_BIN: ${{ github.workspace }}/bin/cpp/infinity
           INFINITY_SERVER_BIN: ${{ github.workspace }}/bin/rust/infinity
+          # Keep the shim's HTTP-port pin and allocator settings; it forwards to
+          # INFINITY_SERVER_BIN.
+          INFINITY_RUST_BIN: rust_engine/scripts/infinity_rust_shim.sh
         run: |
           args=()
           while IFS= read -r case; do

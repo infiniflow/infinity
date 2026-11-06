@@ -105,7 +105,11 @@ from infinity import index
 from infinity.common import ConflictType, NetworkAddress
 
 CPP_BIN = os.environ.get("INFINITY_CPP_BIN", "cmake-build-reldeb/src/infinity")
-RUST_BIN = os.environ.get("INFINITY_RUST_BIN", "rust_engine/scripts/infinity_rust_shim.sh")
+# The rewrite's binary, not the harness shim: the suites skip themselves when
+# the other engine is not built, and the shim exists even then (it would start
+# a binary that is not there and fail instead of skipping). CI points this at
+# `rust_engine/scripts/infinity_rust_shim.sh` once it has a binary.
+RUST_BIN = os.environ.get("INFINITY_RUST_BIN", "rust_engine/target/release/infinity")
 # The Rust CLI binary itself. `RUST_BIN` is the harness shim, which only
 # forwards `--config=…` and otherwise forces `serve`, so a subcommand has to be
 # sent to the binary directly.
