@@ -55,15 +55,23 @@ jobs:
           # rust_engine/rust-toolchain.toml is the single source of truth.
           rustup toolchain install --profile minimal
           rustup component add rustfmt clippy
-      - name: Install clang and mold
+      - name: Install clang, mold and libclang
         # rust_engine/.cargo/config.toml builds RocksDB with clang and links
-        # with mold (`-fuse-ld=mold`); without them every build script fails
-        # with "collect2: fatal error: cannot find 'ld'".
+        # with mold (`-fuse-ld=mold`), and librocksdb-sys runs bindgen, which
+        # needs libclang. Without them the build fails in its first seconds
+        # ("cannot find 'ld'", then "couldn't find any valid shared libraries
+        # matching: ['libclang.so']").
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq clang mold
+          sudo apt-get install -y -qq clang mold libclang-dev
           if ! command -v ld.mold >/dev/null 2>&1; then
             sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
+          # clang-sys (bindgen, for librocksdb-sys) needs libclang; point it at
+          # the installed LLVM when llvm-config is not on PATH.
+          if ! command -v llvm-config >/dev/null 2>&1; then
+            lib=$(ls -d /usr/lib/llvm-*/lib 2>/dev/null | head -1)
+            if [ -n "$lib" ]; then echo "LIBCLANG_PATH=$lib" >> "$GITHUB_ENV"; fi
           fi
       - uses: Swatinem/rust-cache@v2
         with:
@@ -103,15 +111,23 @@ jobs:
           submodules: recursive
       - name: Install the pinned toolchain
         run: rustup toolchain install --profile minimal
-      - name: Install clang and mold
+      - name: Install clang, mold and libclang
         # rust_engine/.cargo/config.toml builds RocksDB with clang and links
-        # with mold (`-fuse-ld=mold`); without them every build script fails
-        # with "collect2: fatal error: cannot find 'ld'".
+        # with mold (`-fuse-ld=mold`), and librocksdb-sys runs bindgen, which
+        # needs libclang. Without them the build fails in its first seconds
+        # ("cannot find 'ld'", then "couldn't find any valid shared libraries
+        # matching: ['libclang.so']").
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq clang mold
+          sudo apt-get install -y -qq clang mold libclang-dev
           if ! command -v ld.mold >/dev/null 2>&1; then
             sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
+          # clang-sys (bindgen, for librocksdb-sys) needs libclang; point it at
+          # the installed LLVM when llvm-config is not on PATH.
+          if ! command -v llvm-config >/dev/null 2>&1; then
+            lib=$(ls -d /usr/lib/llvm-*/lib 2>/dev/null | head -1)
+            if [ -n "$lib" ]; then echo "LIBCLANG_PATH=$lib" >> "$GITHUB_ENV"; fi
           fi
       - uses: Swatinem/rust-cache@v2
         with:
@@ -150,16 +166,22 @@ jobs:
       - name: Install the pinned toolchain
         if: matrix.engine == 'rust'
         run: rustup toolchain install --profile minimal
-      - name: Install clang and mold
+      - name: Install clang, mold and libclang
         if: matrix.engine == 'rust'
         # rust_engine/.cargo/config.toml builds RocksDB with clang and links
         # with mold (`-fuse-ld=mold`); without them every build script fails
         # with "collect2: fatal error: cannot find 'ld'".
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq clang mold
+          sudo apt-get install -y -qq clang mold libclang-dev
           if ! command -v ld.mold >/dev/null 2>&1; then
             sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
+          # clang-sys (bindgen, for librocksdb-sys) needs libclang; point it at
+          # the installed LLVM when llvm-config is not on PATH.
+          if ! command -v llvm-config >/dev/null 2>&1; then
+            lib=$(ls -d /usr/lib/llvm-*/lib 2>/dev/null | head -1)
+            if [ -n "$lib" ]; then echo "LIBCLANG_PATH=$lib" >> "$GITHUB_ENV"; fi
           fi
       - uses: Swatinem/rust-cache@v2
         if: matrix.engine == 'rust'
