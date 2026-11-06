@@ -215,6 +215,13 @@ impl Engine {
         // creation of `default_db`. Both spend a timestamp, and a directory the
         // reference wrote carries their commit ts in the WAL and in the catalog
         // keys, so skipping them would shift every later timestamp by two.
+        //
+        // The checkpoint is a real one: `NewTxn::Checkpoint` flushes the KV
+        // before it writes the frame, so everything the replay just put back
+        // (DDL, segment marks, chunk records) is in an SST by the time the frame
+        // claims it. Without the flush the next crash would lose those records
+        // and the frame would hide the WAL entries that recreate them.
+        engine.storage.catalog.flush()?;
         engine.txn.append_checkpoint(0)?;
         if !engine.storage.catalog.has_database_record("default_db")? {
             engine.ddl_commit_typed(
@@ -2366,23 +2373,36 @@ impl Engine {
         Some((names.clone(), out))
     }
 
-    /// Same, for rows already rendered in their stored text form.
-    /// Feeds one row into every secondary index on `table`.
+    /// Whether a rewritten row has to reach a text, vector or sparse index.
     ///
-    /// The schema comes from the caller: it is a full catalog read (the C++
-    /// key space has no name index, so `get_table_by_name` walks the table
-    /// records), and paying it per row is what once made an indexed insert an
-    /// order of magnitude slower than a plain one.
-    /// Whether the table has a full-text, multi-vector or sparse index: the
-    /// hooks those need are keyed by their own registries, so a table with only
-    /// secondary indexes can skip them (they lock the table per row).
+    /// The hooks those need are keyed by their own registries, so a table with
+    /// only secondary indexes can skip them (they lock the table per row). The
+    /// registries, though, are empty right after a restart - the HNSW/IVF memory
+    /// segment is materialised by the first insert - so a declared index of such
+    /// a kind is the other signal; without it an `UPDATE` on a restarted table
+    /// never feeds its graph.
     pub(crate) fn has_text_or_vector_index(&self, table: &str) -> bool {
         let tkey = self.table_key(table);
-        self.tables
-            .lock()
-            .unwrap()
-            .get(&tkey)
-            .map(|entry| !entry.text.is_empty() || !entry.mv.is_empty() || !entry.sparse.is_empty())
+        if let Some(entry) = self.tables.lock().unwrap().get(&tkey) {
+            if !entry.text.is_empty()
+                || !entry.mv.is_empty()
+                || !entry.sparse.is_empty()
+                || !entry.hnsw_mem.is_empty()
+                || !entry.ivf_mem.is_empty()
+            {
+                return true;
+            }
+        }
+        let short = table.split('.').next_back().unwrap_or(table);
+        self.storage
+            .catalog
+            .list_indexes()
+            .map(|all| {
+                all.iter().any(|im| {
+                    (im.table == short || im.table == table)
+                        && !crate::is_secondary_kind(&im.index_type)
+                })
+            })
             .unwrap_or(false)
     }
 
