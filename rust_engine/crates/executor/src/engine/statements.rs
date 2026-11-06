@@ -210,6 +210,35 @@ impl Engine {
         )?;
         engine.apply_replayed_rows(replayed_appends, replayed_deletes)?;
         engine.rebuild_indexes()?;
+        // `MetaTableObject::RestoreTableCache`: the allocator has no memory of
+        // its own across a restart. The segment map, and the row id to continue
+        // from, come from the catalog's segment/block layer and the blocks'
+        // `version` files (`GetSegmentRowCount` / `GetCurrentSegmentRowCount`).
+        // Without this the first checkpoint of the new process mirrors only the
+        // segments written since the restart, and the block mirror deletes the
+        // directories of the segments it did not produce - which is how a
+        // replayed import lost the rows of every earlier segment.
+        for meta in engine.storage.catalog.list_tables().unwrap_or_default() {
+            let key = engine.table_key(&meta.name);
+            let counts = engine.block_segment_row_counts(&key);
+            let next = engine.next_row_seq(&key).unwrap_or(0);
+            let mut tables = engine.tables.lock().unwrap();
+            let entry = tables.entry(key).or_default();
+            for (id, rows) in counts {
+                entry
+                    .segments
+                    .entry(id)
+                    .or_insert(SegmentEntry {
+                        id,
+                        rows: rows.min(u32::MAX as u64) as u32,
+                    });
+            }
+            if next > 0 {
+                entry.row_counter =
+                    Some(((next >> 32) as u32, (next & 0xffff_ffff) as u32, false));
+            }
+            entry.write_batches = entry.segments.len();
+        }
         // `Storage::Init` finishes with two write transactions: the startup
         // checkpoint and (on a directory that has no system timestamp yet) the
         // creation of `default_db`. Both spend a timestamp, and a directory the
