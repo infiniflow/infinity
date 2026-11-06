@@ -92,6 +92,12 @@ impl WalManager {
     /// and renames it. The directory is synced because the rename and the new
     /// file's name only survive a power loss once the directory entry does.
     pub fn rotate(&mut self, seal_ts: TxnTimeStamp) -> Result<()> {
+        // The reference syncs the handle before it renames it away
+        // (`WalManager::SwapWalFile`, #3534): a rename only makes the *name*
+        // durable, so the contents have to be on disk first. Commit entries are
+        // synced one by one, but the checkpoint frame is appended unsynced and
+        // `rotate_wal_if_large` can run before `sync_wal`.
+        self.file.sync_all().map_err(|e| Error::io(&self.path, e))?;
         let sealed = self.path.with_extension(format!("log.{seal_ts}"));
         std::fs::rename(&self.path, &sealed).map_err(|e| Error::io(&sealed, e))?;
         self.file = OpenOptions::new()
