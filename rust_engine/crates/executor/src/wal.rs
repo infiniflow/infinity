@@ -840,6 +840,34 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
             )?;
             return Ok(());
         }
+        // An import fills a segment and seals it: its block files are on disk,
+        // the catalog records that name them are not (the store is log-less).
+        WalCmd::Import {
+            db_id,
+            table_id,
+            segment_info,
+            ..
+        } => {
+            let set = catalog::layout::SegmentSet {
+                db_id: db_id.clone(),
+                table_id: table_id.clone(),
+                segments: vec![catalog::layout::SegmentRecord {
+                    segment_id: segment_info.segment_id,
+                    create_ts: commit_ts,
+                    first_delete_ts: catalog::layout::UNCOMMIT_TS,
+                    blocks: segment_info
+                        .block_infos
+                        .iter()
+                        .map(|b| catalog::layout::BlockRecord {
+                            block_id: b.block_id,
+                            commit_ts,
+                        })
+                        .collect(),
+                }],
+            };
+            publish_segments_merged(catalog, &set)?;
+            return Ok(());
+        }
         // A compaction moves the rows into a new segment and deprecates the
         // sources. Both halves are catalog records: the merged segment's
         // catalog|seg|/catalog|blk| layer (its block files are already on disk)
@@ -873,7 +901,7 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
                     .collect(),
             };
             if !set.segments.is_empty() {
-                catalog.publish_segments(&set)?;
+                publish_segments_merged(catalog, &set)?;
             }
             if !deprecated_segment_ids.is_empty() {
                 let ids: Vec<u64> = index_ids.iter().filter_map(|i| i.parse().ok()).collect();
@@ -1033,4 +1061,38 @@ fn index_options(def: &storage::wal::index_def::IndexDef) -> Vec<(String, String
         ],
         _ => Vec::new(),
     }
+}
+
+/// Publishes `incoming` on top of the table's current segment layer.
+///
+/// `layout::write_segments` rebuilds the layer from an empty state (that is what
+/// a checkpoint wants), so replaying one command's segment on its own would drop
+/// every other segment of the table. Merge first: a segment the command names
+/// replaces its record, the rest stay as they are.
+fn publish_segments_merged(
+    catalog: &Catalog,
+    incoming: &catalog::layout::SegmentSet,
+) -> CommonResult<()> {
+    let mut layer = catalog::layout::read_segments(catalog.store().as_ref())?;
+    let set = match layer
+        .iter_mut()
+        .find(|s| s.db_id == incoming.db_id && s.table_id == incoming.table_id)
+    {
+        Some(set) => set,
+        None => {
+            layer.push(incoming.clone());
+            layer.last_mut().unwrap()
+        }
+    };
+    for seg in &incoming.segments {
+        match set
+            .segments
+            .iter_mut()
+            .find(|s| s.segment_id == seg.segment_id)
+        {
+            Some(slot) => *slot = seg.clone(),
+            None => set.segments.push(seg.clone()),
+        }
+    }
+    catalog.publish_segments(set).map(|_| ())
 }
