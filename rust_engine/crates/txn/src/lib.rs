@@ -241,10 +241,6 @@ impl WalWriter {
             .map_err(|_| Error::Wal("the WAL writer stopped".into()))?
     }
 
-    fn append(&self, entry: &WalEntry) -> Result<()> {
-        let entry = entry.clone();
-        self.run(move |wal| wal.append(&entry).map(|_| ()))
-    }
 }
 
 /// Owns the WAL + KV pair and hands out transactions.
@@ -1000,7 +996,17 @@ impl TxnManager {
                 &txn.typed_commands,
             ),
         );
-        self.wal.append(&entry)?;
+        // Upstream fsyncs every flush batch (#3534): `WalManager::NewFlush`
+        // ends with `wal_handle_->Sync()` instead of the old userspace
+        // `ofs_.flush()`, so a committed transaction is on disk before the
+        // commit returns. Do the same, in one job with the append so no other
+        // commit can slip between them - the catalog store keeps RocksDB's log
+        // off, so the WAL is what makes a committed DDL or segment mark
+        // survive a crash before the next checkpoint.
+        self.wal.run(move |wal| {
+            wal.append(&entry)?;
+            wal.sync()
+        })?;
         self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
         let mut writes: Vec<(Vec<u8>, Option<Vec<u8>>)> = txn
             .writes

@@ -70,23 +70,19 @@ impl WalManager {
         self.file
             .write_all(&buf)
             .map_err(|e| Error::io(&self.path, e))?;
-        // The reference's WAL never reaches the disk on its own: `WalManager::Flush`
-        // appends with `ofs_.write` and only calls `ofs_.flush()`
-        // (`wal_manager_impl.cpp:311,329-340`), a userspace flush, and even
-        // `SwapWalFile` just closes and renames (`:511-513`). `File` is
-        // unbuffered, so `write_all` already lands where `ofs_.flush()` does.
-        // Commit records are therefore never synced — what survives a power loss
-        // is decided by the checkpoint's data files and the catalog SST. The one
-        // exception is the checkpoint frame, which `TxnManager` syncs through
-        // [`WalManager::sync`] so the marker itself cannot be lost.
+        // The write itself is not synced: `WalManager::NewFlush` owns that
+        // decision. Upstream ends every flush batch with
+        // `wal_handle_->Sync()` (#3534, replacing the old userspace
+        // `ofs_.flush()`), so `TxnManager::commit_at` calls
+        // [`WalManager::sync`] right after this append - one fsync per commit.
         Ok(offset)
     }
 
-    /// Makes everything appended so far durable.
+    /// Makes everything appended so far durable (fsync).
     ///
-    /// Only the checkpoint frame is synced (see `TxnManager::append_checkpoint`):
-    /// commit records stay in the page cache, which is the reference's
-    /// contract, but the frame is the marker every later open needs.
+    /// Called after every commit batch and after the checkpoint frame: the
+    /// reference's WAL is the durability boundary for everything the catalog
+    /// store does not flush, because the store keeps RocksDB's log off.
     pub fn sync(&mut self) -> Result<()> {
         self.file.sync_all().map_err(|e| Error::io(&self.path, e))
     }
