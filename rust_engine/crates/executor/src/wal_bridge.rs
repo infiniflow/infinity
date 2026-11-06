@@ -944,6 +944,47 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
             }
             return Ok(());
         }
+        // `ADD COLUMNS`: the statement wrote the appended columns' `tbl|col|`
+        // records inside its own transaction, and the schema a reader rebuilds
+        // comes from those records (`layout::read_columns`), not from the native
+        // table record. A replay that skipped them lost every added column the
+        // next time the directory was opened.
+        WalCmd::AddColumns {
+            db_name,
+            db_id,
+            table_name,
+            column_defs,
+            ..
+        } => {
+            let full = qualified(db_name, table_name);
+            let Some(mut meta) = catalog.get_table_by_name(&full)? else {
+                return Ok(());
+            };
+            let first = meta.columns.len();
+            for def in column_defs {
+                let Some(type_text) = data_type_text(&def.column_type) else {
+                    continue;
+                };
+                meta.ids.push(def.id as u64);
+                meta.columns.push(def.name.clone());
+                meta.types.push(type_text);
+                meta.defaults.push(constant_text(&def.default_expr));
+                meta.not_nulls.push(
+                    def.constraints
+                        .contains(&storage::wal::ddl_def::ConstraintType::NotNull),
+                );
+                meta.comments.push(if def.comment.is_empty() {
+                    None
+                } else {
+                    Some(def.comment.clone())
+                });
+                meta.sparse_stores.push(None);
+            }
+            let db = db_id
+                .parse::<u64>()
+                .map_err(|_| common::Error::Invalid(format!("replay: bad database id '{db_id}'")))?;
+            catalog::layout::stage_added_columns(db, &meta, first)?
+        }
         _ => {
             let ((), staged) = catalog.capture(|| -> CommonResult<()> {
                 match cmd {

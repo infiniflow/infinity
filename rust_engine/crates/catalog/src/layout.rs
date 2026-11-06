@@ -1467,7 +1467,25 @@ pub fn stage_new_table(
             Some(value.to_string().into_bytes()),
         ));
     }
-    for (i, col) in meta.columns.iter().enumerate() {
+    push_column_records(&mut batch, &db_str, &tbl_str, meta, 0)?;
+    batch.push((
+        key::catalog_db_tag_key(&db_str, "next_table_id").into_bytes(),
+        Some(next_table_id.to_string().into_bytes()),
+    ));
+    Ok(batch)
+}
+
+/// One `tbl|col|` record per column of `meta` from `first` on, encoded the way
+/// the C++ catalog writes a column (`ColumnDef::ToJson`).
+fn push_column_records(
+    batch: &mut Vec<(Vec<u8>, Option<Vec<u8>>)>,
+    db_str: &str,
+    tbl_str: &str,
+    meta: &TableMeta,
+    first: usize,
+) -> Result<()> {
+    let ts = crate::DDL_TS_SENTINEL;
+    for (i, col) in meta.columns.iter().enumerate().skip(first) {
         let type_text = meta.types.get(i).cloned().unwrap_or_default();
         let sparse_store = meta.sparse_stores.get(i).copied().flatten();
         let Some(data_type) = data_type_of_text_with_store(&type_text, sparse_store) else {
@@ -1497,14 +1515,40 @@ pub fn stage_new_table(
                 }),
         );
         batch.push((
-            key::table_column_key(&db_str, &tbl_str, col, ts).into_bytes(),
+            key::table_column_key(db_str, tbl_str, col, ts).into_bytes(),
             Some(value_format::column_def_bytes(&value)),
         ));
     }
-    batch.push((
-        key::catalog_db_tag_key(&db_str, "next_table_id").into_bytes(),
-        Some(next_table_id.to_string().into_bytes()),
-    ));
+    Ok(())
+}
+
+/// The records one `ADD COLUMNS` writes: the appended columns' `tbl|col|`
+/// records plus the table's `next_column_id` tag.
+///
+/// Replaying `WalCmdAddColumnsV2` has to recreate exactly these - the schema a
+/// reader rebuilds comes from `tbl|col|` (`read_columns`), not from the native
+/// table record, so a replay that only rewrote the latter lost the columns the
+/// next time the directory was opened.
+pub fn stage_added_columns(
+    db_id: u64,
+    meta: &TableMeta,
+    first: usize,
+) -> Result<Vec<(Vec<u8>, Option<Vec<u8>>)>> {
+    let db_str = db_id.to_string();
+    let tbl_str = meta.id.to_string();
+    let mut batch: Vec<(Vec<u8>, Option<Vec<u8>>)> = vec![(
+        key::catalog_table_tag_key(&db_str, &tbl_str, "next_column_id").into_bytes(),
+        Some(
+            meta.ids
+                .iter()
+                .copied()
+                .max()
+                .map_or(0, |v| v + 1)
+                .to_string()
+                .into_bytes(),
+        ),
+    )];
+    push_column_records(&mut batch, &db_str, &tbl_str, meta, first)?;
     Ok(batch)
 }
 
