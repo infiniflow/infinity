@@ -287,6 +287,15 @@ pub struct TxnManager {
     /// Highest commit timestamp whose batch has been fsynced to the KV store;
     /// only records up to this point may be dropped from the log.
     synced: AtomicU64,
+    /// Highest commit ts whose **entry** is durable in the log.
+    ///
+    /// `WalManager::NewFlush` appends a batch of transactions and then syncs
+    /// once (#3534), so this is the batch high-water mark, not one commit's.
+    /// It is not [`Self::synced`]: that one tracks the store's flush.
+    wal_synced: Arc<AtomicU64>,
+    /// Serialises the batch sync so commits that arrive together share one
+    /// `Sync()` instead of each taking its own.
+    sync_lock: Mutex<()>,
     /// `total_commit_count`: successful commits since open (the reference's
     /// `NewTxnManager::total_committed_txn_count`).
     total_committed: AtomicU64,
@@ -459,6 +468,8 @@ impl TxnManager {
             max_applied: AtomicU64::new(applied_ts),
             last_appended: AtomicU64::new(max_ts),
             synced: AtomicU64::new(applied_ts),
+            wal_synced: Arc::new(AtomicU64::new(start_ts)),
+            sync_lock: Mutex::new(()),
             total_committed: AtomicU64::new(0),
             total_rolled_back: AtomicU64::new(0),
             write_ts: Mutex::new(write_ts),
@@ -940,6 +951,27 @@ impl TxnManager {
     /// gets the transaction so it can fill in the command it is about to log.
     pub fn commit_at_deferred_with<F>(
         &self,
+        txn: Txn,
+        commit_ts: TxnTimeStamp,
+        before_wal: F,
+    ) -> Result<TxnTimeStamp>
+    where
+        F: FnOnce(&mut Txn) -> Result<()>,
+    {
+        let ts = self.commit_deferred_locked(txn, commit_ts, before_wal)?;
+        // The entry is appended inside the commit-ts turn; the fsync happens
+        // here, after the turn is released, so commits that arrive together
+        // share one `Sync()` - `WalManager::NewFlush` syncs a whole batch from
+        // its own thread for the same reason. The turn orders the append, not
+        // the durability.
+        self.sync_wal_grouped()?;
+        Ok(ts)
+    }
+
+    /// The commit proper: ordered by commit ts, holding `commit_lock` and the
+    /// turn until the entry is written and the catalog batch applied.
+    fn commit_deferred_locked<F>(
+        &self,
         mut txn: Txn,
         commit_ts: TxnTimeStamp,
         before_wal: F,
@@ -995,17 +1027,12 @@ impl TxnManager {
                 &txn.typed_commands,
             ),
         );
-        // Upstream fsyncs every flush batch (#3534): `WalManager::NewFlush`
-        // ends with `wal_handle_->Sync()` instead of the old userspace
-        // `ofs_.flush()`, so a committed transaction is on disk before the
-        // commit returns. Do the same, in one job with the append so no other
-        // commit can slip between them - the catalog store keeps RocksDB's log
-        // off, so the WAL is what makes a committed DDL or segment mark
-        // survive a crash before the next checkpoint.
-        self.wal.run(move |wal| {
-            wal.append(&entry)?;
-            wal.sync()
-        })?;
+        // `WalManager::NewFlush` appends a batch of transactions and then fsyncs
+        // once (`wal_handle_->Sync()`, #3534). The append happens here, under
+        // the commit-ts turn, so the log stays in commit order; the fsync runs
+        // in the caller, after the turn is released, so commits that arrive
+        // together share one `Sync()`.
+        self.wal.run(move |wal| wal.append(&entry).map(|_| ()))?;
         self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
         let mut writes: Vec<(Vec<u8>, Option<Vec<u8>>)> = txn
             .writes
@@ -1422,6 +1449,8 @@ impl TxnManager {
             }],
         );
         self.wal.run(move |wal| wal.append(&entry).map(|_| ()))?;
+        self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
+        self.sync_wal_grouped()?;
         self.note_standalone(TxnOp::Cleanup, commit_ts);
         self.current_ts.store(commit_ts, Ordering::SeqCst);
         Ok(())
@@ -1486,13 +1515,39 @@ impl TxnManager {
 
     /// Makes the checkpoint frame durable.
     ///
-    /// The only fsync on the log: the frame is the marker every later open (this
-    /// engine's and the reference's) needs, and a checkpoint that lost it would
-    /// reopen at an older position — or, once the older sealed segment has been
-    /// pruned, not open at all. Commit records stay unsynced, as in the
-    /// reference; the checkpoint's data is what carries them.
+    /// The fsync the checkpoint owns: the frame is the marker every later open
+    /// (this engine's and the reference's) needs, and a checkpoint that lost it
+    /// would reopen at an older position — or, once the older sealed segment
+    /// has been pruned, not open at all. Commit entries are synced in batches
+    /// by [`Self::sync_wal_grouped`], as `WalManager::NewFlush` does.
     pub fn sync_wal(&self) -> Result<()> {
-        self.wal.run(|wal| wal.sync())
+        let synced = Arc::clone(&self.wal_synced);
+        self.wal.run(move |wal| {
+            wal.sync()?;
+            // Read inside the writer's own job, after the fsync: the log is
+            // single-threaded, so this is exactly what the sync covered.
+            synced.fetch_max(wal.appended_ts(), Ordering::SeqCst);
+            Ok(())
+        })
+    }
+
+    /// The batch sync of the commit path: one fsync covers every entry
+    /// appended since the previous one (`WalManager::NewFlush`,
+    /// `wal_manager_impl.cpp:350`).
+    ///
+    /// A committer bumps `last_appended` before asking, so "everything appended
+    /// is already durable" is exactly its own entry being covered. The first
+    /// caller takes the lock and syncs through the newest appended entry; the
+    /// others re-check after it and find theirs covered by that same `Sync()`.
+    fn sync_wal_grouped(&self) -> Result<()> {
+        if self.wal_synced.load(Ordering::SeqCst) >= self.last_appended.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        let _one = self.sync_lock.lock().unwrap();
+        if self.wal_synced.load(Ordering::SeqCst) >= self.last_appended.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        self.sync_wal()
     }
 
     /// Highest commit timestamp the checkpoint has put into an SST.

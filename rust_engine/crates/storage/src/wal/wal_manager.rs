@@ -44,6 +44,9 @@ use crate::wal_entry::{WalEntry, WAL_ENTRY_HEADER_LEN};
 pub struct WalManager {
     path: PathBuf,
     file: File,
+    /// `NewFlush` appends a batch of entries and then fsyncs once, so the
+    /// commit ts of the newest entry in the file is what that `Sync()` covers.
+    appended_ts: TxnTimeStamp,
 }
 
 impl WalManager {
@@ -55,7 +58,11 @@ impl WalManager {
             .append(true)
             .open(&path)
             .map_err(|e| Error::io(&path, e))?;
-        Ok(Self { path, file })
+        Ok(Self {
+            path,
+            file,
+            appended_ts: 0,
+        })
     }
 
     pub fn path(&self) -> &Path {
@@ -70,12 +77,19 @@ impl WalManager {
         self.file
             .write_all(&buf)
             .map_err(|e| Error::io(&self.path, e))?;
+        self.appended_ts = self.appended_ts.max(entry.commit_ts);
         // The write itself is not synced: `WalManager::NewFlush` owns that
         // decision. Upstream ends every flush batch with
         // `wal_handle_->Sync()` (#3534, replacing the old userspace
         // `ofs_.flush()`), so `TxnManager::commit_at` calls
         // [`WalManager::sync`] right after this append - one fsync per commit.
         Ok(offset)
+    }
+
+    /// The commit ts of the newest entry written to the file. A sync covers
+    /// exactly this far, never an entry appended behind it.
+    pub fn appended_ts(&self) -> TxnTimeStamp {
+        self.appended_ts
     }
 
     /// Makes everything appended so far durable (fsync).

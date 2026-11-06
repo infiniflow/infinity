@@ -223,6 +223,12 @@ impl Engine {
         // and the frame would hide the WAL entries that recreate them.
         engine.storage.catalog.flush()?;
         engine.txn.append_checkpoint(0)?;
+        // The frame is appended unsynced (the commit path syncs in batches, as
+        // NewFlush does); the startup checkpoint is its own batch, so sync it
+        // here. Without this a directory whose only frame is this one would
+        // reopen at an older position - or not at all once that segment is
+        // pruned - after a power loss.
+        engine.txn.sync_wal()?;
         if !engine.storage.catalog.has_database_record("default_db")? {
             engine.ddl_commit_typed(
                 TxnOp::CreateDatabase {

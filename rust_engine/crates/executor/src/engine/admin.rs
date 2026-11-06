@@ -329,11 +329,6 @@ impl Engine {
         // the files. The frame's payload is that same `begin_ts`, frozen here
         // and written at the end.
         let checkpoint_ts = self.checkpoint_ts();
-        // Flushes the store (the engine and the txn manager share the same
-        // one) and raises `synced`, which is what makes the WAL prefix
-        // prunable. The flush that has to precede the frame is the second one,
-        // after the mirror: that is where the records the frame covers appear.
-        self.txn.flush()?;
         // Dump the index memory tails first. The caller only logs a `flush`
         // error, so a failing block mirror (e.g. an unsupported column type)
         // must not leave the memory tails unbounded — that is what pushed the
@@ -386,14 +381,14 @@ impl Engine {
                 .rewrite_layout(self.storage.catalog.store().as_ref());
         }
         mirror?;
-        // Everything the block mirror published (`catalog|seg|…`,
-        // `catalog|blk|…`, plus any layout rewrite above) landed in the catalog
-        // store *after* the flush at the top of the checkpoint. Without this
-        // second flush those records stay in the memtable, and a `kill -9` --
-        // what the restart and cross-engine tests do -- discards them: the
-        // reference then opens a directory whose block files exist but whose
-        // segment records do not, and reports `segment_count = 0`.
-        self.storage.catalog.flush()?;
+        // The checkpoint's one store flush, at the end as in
+        // `NewTxn::Checkpoint` (`kv_store()->Flush()`, `new_txn_impl.cpp:1814`).
+        // It covers everything the mirror published - `catalog|seg|…`,
+        // `catalog|blk|…`, `idx_seg|`, `idx_chunk|…` and the layout rewrite -
+        // and it raises `synced`, the marker the WAL pruning reads. Without it
+        // those records stay in the memtable and a `kill -9` discards them: the
+        // reference then sees block files whose segment records do not exist.
+        self.txn.flush()?;
         // The checkpoint's other two trees. `data/` alone is not enough for a
         // restart out of the bucket: the catalog holds the tables and the row
         // store holds their rows, so a directory restored from `data/` alone
@@ -403,11 +398,9 @@ impl Engine {
             storage::s3::sync_tree(&client, &self.dir.join("catalog"), "catalog")?;
         }
         // The frame goes last, once every file it claims is on disk: the block
-        // mirror, the index chunks and the two SSTs are all flushed above, so a
-        // power loss either keeps the frame together with its data or loses it
-        // and reopens at the previous checkpoint. This is the only fsync on
-        // `wal.log` — commit records stay in the page cache, as in the
-        // reference, which does not sync the frame either.
+        // mirror, the index chunks and the store are all written and flushed
+        // above, so a power loss either keeps the frame together with its data
+        // or loses it and reopens at the previous checkpoint.
         //
         // `NewTxn::Checkpoint` commits after the files are written: the commit
         // ts is taken now and the payload is the frozen `begin_ts`, so a
