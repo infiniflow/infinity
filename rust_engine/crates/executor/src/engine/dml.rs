@@ -1370,32 +1370,46 @@ impl Engine {
         // reference deletes the segment directory in `PostRollback`).
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
-        let ts = self.txn.commit_at_deferred(t, ts)?;
+        // `NewTxnManager::CommitTxn`: conflict check -> `PrepareCommitImport`
+        // -> WAL append+fsync -> `CommitBottom`. The prepare phase is where the
+        // reference writes the segment/block records and the block `version`
+        // (`CommitSegmentVersion`, `new_txn_data_impl.cpp:2154`), i.e. the
+        // bytes the frame names are on disk **before** the frame. The port wrote
+        // them afterwards, so a kill in between left a segment record naming
+        // blocks that never got written and that slice's rows were gone.
+        let segments_owned: Vec<u32> = segments.to_vec();
+        let batches_owned: Vec<usize> = batches.to_vec();
+        let encoded_owned: Vec<(usize, String)> = encoded_rows.to_vec();
+        let table_owned = table.to_string();
+        let ts = self.txn.commit_at_deferred_with(t, ts, |_txn| {
+            let table = table_owned.as_str();
+            // Every block the import wrote carries this transaction's ts: the
+            // reference's `CommitAppend(begin_ts, commit_ts)` writes it into
+            // each block's `version`, so all of them share it.
+            for rows in &batches_owned {
+                self.note_append(table, *rows, true, Some(ts));
+            }
+            for segment in &segments_owned {
+                // The extent is what marks the segment sealed, and a sealed
+                // segment is the only one whose blocks (and segment) get a fast
+                // rough filter - so it has to be recorded **before** the block
+                // write.
+                let rows = self.segment_rows(table, *segment as usize) as u64;
+                self.note_import_rows(table, *segment, rows);
+                self.note_import_ts(table, *segment, ts);
+            }
+            self.publish_encoded_rows(table, &encoded_owned)?;
+            // `AppendInBlock` / `CommitBottomAppend`: the reference writes each
+            // block inside the import transaction, so a `COPY` leaves readable
+            // block files (and `SHOW BLOCKS` sees them) without a checkpoint. A
+            // table whose columns the block format cannot express has no mirror
+            // - it keeps its rows in the store.
+            if self.has_block_layout(table) {
+                self.write_blocks_commit(table, ts)?;
+            }
+            Ok(())
+        })?;
         let _visible = BottomGuard::new(&self.txn, ts);
-        // Every block the import wrote carries this transaction's ts: the
-        // reference's `CommitBottomAppend` appends each block's row count to the
-        // block's `version` inside the import transaction, so all of them share
-        // it, not just the last one.
-        for rows in batches {
-            self.note_append(table, *rows, true, Some(ts));
-        }
-        for segment in segments {
-            // The extent is what marks the segment sealed, and a sealed segment
-            // is the only one whose blocks (and segment) get a fast rough
-            // filter - so it has to be recorded **before** the block write.
-            let rows = self.segment_rows(table, *segment as usize) as u64;
-            self.note_import_rows(table, *segment, rows);
-            self.note_import_ts(table, *segment, ts);
-        }
-        self.publish_encoded_rows(table, encoded_rows)?;
-        // `AppendInBlock` / `CommitBottomAppend`: the reference writes each
-        // block inside the import transaction, so a `COPY` leaves readable
-        // block files (and `SHOW BLOCKS` sees them) without a checkpoint. A
-        // table whose columns the block format cannot express has no mirror -
-        // it keeps its rows in the store.
-        if self.has_block_layout(table) {
-            self.write_blocks_commit(table, ts)?;
-        }
         // `CommitBottomAppend` for the imported segments on the table's worker.
         let bottom_table = table.to_string();
         let shard_key = bottom_table.clone();
