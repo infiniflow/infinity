@@ -26,6 +26,33 @@ impl QueryResult {
     }
 }
 
+thread_local! {
+    /// Tables whose commit bottom this thread is running right now
+    /// (see Engine::run_commit_bottom).
+    static BOTTOM_HELD: std::cell::RefCell<std::collections::HashSet<String>> =
+        std::cell::RefCell::new(std::collections::HashSet::new());
+}
+
+/// Marks one table's bottom as running on this thread for as long as it lives.
+struct HeldBottom(String);
+
+impl HeldBottom {
+    fn enter(table: &str) -> Self {
+        BOTTOM_HELD.with(|held| {
+            held.borrow_mut().insert(table.to_string());
+        });
+        Self(table.to_string())
+    }
+}
+
+impl Drop for HeldBottom {
+    fn drop(&mut self) {
+        BOTTOM_HELD.with(|held| {
+            held.borrow_mut().remove(&self.0);
+        });
+    }
+}
+
 impl Engine {
     pub fn open(dir: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_options(dir, EngineOptions::default())
@@ -502,16 +529,35 @@ impl Engine {
     where
         F: FnOnce(&Engine) -> Result<()> + Send + 'static,
     {
+        // The bottom half of one table's commit is serialised by its gate, but a
+        // step inside a bottom can run another: the memindex quota check dumps an
+        // index from the insert's own bottom half, and the dump takes the bottom
+        // of the same table. Re-entering the gate on this thread would deadlock
+        // (an engine without a bottom executor runs the bottom inline), so the
+        // inner call runs its work directly - the gate protects the table from
+        // *other* threads, and this one already holds it.
+        let key = self.table_key(table);
+        if BOTTOM_HELD.with(|held| held.borrow().contains(&key)) {
+            return work(self);
+        }
         let (Some(engine), Some(executor)) = (self.engine_handle(), self.bottom_executor()) else {
             let gate = self.bottom_gate(table);
             let _turn = gate.lock().unwrap();
+            let _held = HeldBottom::enter(&key);
             return work(self);
+        };
+        let work_key = key.clone();
+        let wrapped = move |engine: &Engine| {
+            let _held = HeldBottom::enter(&work_key);
+            work(engine)
         };
         let task = Arc::new(BottomWork {
             engine,
-            table_id: self.table_key(table),
+            table_id: key.clone(),
             gates: vec![self.bottom_gate(table)],
-            work: std::sync::Mutex::new(Some(Box::new(work))),
+            work: std::sync::Mutex::new(Some(
+                Box::new(wrapped) as Box<dyn FnOnce(&Engine) -> Result<()> + Send>
+            )),
             state: std::sync::Mutex::new(BottomState::default()),
             done: std::sync::Condvar::new(),
         });
