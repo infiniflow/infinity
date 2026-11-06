@@ -4712,10 +4712,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
 
             if (VirtualStore::Exists(import_txn_store->import_tmp_path_)) {
-                Status remove_status = VirtualStore::RemoveDirectory(import_txn_store->import_tmp_path_);
-                if (!remove_status.ok()) {
-                    LOG_WARN(fmt::format("Failed to remove import temp directory during rollback: {}", import_txn_store->import_tmp_path_));
-                }
+                VirtualStore::RemoveDirectory(import_txn_store->import_tmp_path_);
             } else {
                 Config *config = InfinityContext::instance().config();
                 std::string data_dir = config->DataDir();
@@ -4735,10 +4732,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                                               segment_info.segment_id_);
 
                         if (VirtualStore::Exists(segment_dir)) {
-                            Status remove_status = VirtualStore::RemoveDirectory(segment_dir);
-                            if (!remove_status.ok()) {
-                                LOG_WARN(fmt::format("Failed to remove segment directory during rollback: {}", segment_dir));
-                            }
+                            VirtualStore::RemoveDirectory(segment_dir);
                         }
                     }
                 }
@@ -4967,10 +4961,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                                       segment_info.segment_id_);
 
                 if (VirtualStore::Exists(segment_dir)) {
-                    Status remove_status = VirtualStore::RemoveDirectory(segment_dir);
-                    if (!remove_status.ok()) {
-                        LOG_WARN(fmt::format("Failed to remove segment directory during rollback: {}", segment_dir));
-                    }
+                    VirtualStore::RemoveDirectory(segment_dir);
                 }
             }
 
@@ -4983,10 +4974,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                                     index_cmd.index_id_);
 
                 if (VirtualStore::Exists(index_dir)) {
-                    Status remove_status = VirtualStore::RemoveDirectory(index_dir);
-                    if (!remove_status.ok()) {
-                        LOG_WARN(fmt::format("Failed to remove index directory during rollback: {}", index_dir));
-                    }
+                    VirtualStore::RemoveDirectory(index_dir);
                 }
             }
 
@@ -4995,10 +4983,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 fmt::format("{}/db_{}/tbl_{}", data_dir, restore_table_txn_store->db_id_str_, restore_table_txn_store->table_id_str_);
 
             if (VirtualStore::Exists(table_dir)) {
-                Status remove_status = VirtualStore::RemoveDirectory(table_dir);
-                if (!remove_status.ok()) {
-                    LOG_WARN(fmt::format("Failed to remove table directory during rollback: {}", table_dir));
-                }
+                VirtualStore::RemoveDirectory(table_dir);
             }
 
             // // Clean up metadata entries that were created
@@ -5055,10 +5040,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             std::string db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
 
             if (VirtualStore::Exists(db_dir)) {
-                Status remove_status = VirtualStore::RemoveDirectory(db_dir);
-                if (!remove_status.ok()) {
-                    LOG_WARN(fmt::format("Failed to remove database directory during rollback: {}", db_dir));
-                }
+                VirtualStore::RemoveDirectory(db_dir);
             }
 
             // for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
@@ -5118,10 +5100,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 std::string db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
 
                 if (VirtualStore::Exists(db_dir)) {
-                    Status remove_status = VirtualStore::RemoveDirectory(db_dir);
-                    if (!remove_status.ok()) {
-                        LOG_WARN(fmt::format("Failed to remove database directory during rollback: {}", db_dir));
-                    }
+                    VirtualStore::RemoveDirectory(db_dir);
                 }
 
                 // for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
@@ -5261,16 +5240,6 @@ Status NewTxn::Cleanup() {
         }
     }
 
-    if (metas.empty()) {
-        LOG_TRACE("Cleanup: No data need to clean. Try to remove all empty directories...");
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        auto data_dir_str = buffer_mgr->GetFullDataDir();
-        auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
-        // Delete empty dir
-        VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
-        return Status::OK();
-    }
-
     status = CleanupInner(metas);
     if (!status.ok()) {
         return status;
@@ -5288,6 +5257,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     SystemCache *system_cache = this->txn_mgr()->GetSystemCachePtr();
     MetaCache *meta_cache = this->txn_mgr_->storage()->meta_cache();
+    std::vector<std::string> dropped_entity_dirs{};
     for (auto &meta : metas) {
         switch (meta->type_) {
             case MetaType::kDB: {
@@ -5304,6 +5274,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                     return status;
                 }
                 system_cache->DropDbCache(std::stoull(db_meta_key->db_id_str_));
+                dropped_entity_dirs.emplace_back(fmt::format("db_{}", db_meta_key->db_id_str_));
                 break;
             }
             case MetaType::kTable: {
@@ -5329,6 +5300,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                     return status;
                 }
                 system_cache->DropTableCache(std::stoull(table_meta_key->db_id_str_), std::stoull(table_meta_key->table_id_str_));
+                dropped_entity_dirs.emplace_back(fmt::format("db_{}/tbl_{}", table_meta_key->db_id_str_, table_meta_key->table_id_str_));
                 break;
             }
             case MetaType::kTableName: {
@@ -5361,6 +5333,8 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                 if (!status.ok()) {
                     return status;
                 }
+                dropped_entity_dirs.emplace_back(
+                    fmt::format("db_{}/tbl_{}/seg_{}", segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, segment_meta_key->segment_id_));
                 break;
             }
             case MetaType::kBlock: {
@@ -5373,6 +5347,11 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                 if (!status.ok()) {
                     return status;
                 }
+                dropped_entity_dirs.emplace_back(fmt::format("db_{}/tbl_{}/seg_{}/blk_{}",
+                                                             block_meta_key->db_id_str_,
+                                                             block_meta_key->table_id_str_,
+                                                             block_meta_key->segment_id_,
+                                                             block_meta_key->block_id_));
                 break;
             }
             case MetaType::kTableColumn: {
@@ -5427,6 +5406,10 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                 system_cache->DropIndexCache(std::stoull(table_index_meta_key->db_id_str_),
                                              std::stoull(table_index_meta_key->table_id_str_),
                                              std::stoull(table_index_meta_key->index_id_str_));
+                dropped_entity_dirs.emplace_back(fmt::format("db_{}/tbl_{}/idx_{}",
+                                                             table_index_meta_key->db_id_str_,
+                                                             table_index_meta_key->table_id_str_,
+                                                             table_index_meta_key->index_id_str_));
                 break;
             }
             case MetaType::kSegmentIndex: {
@@ -5445,6 +5428,11 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                 if (!status.ok()) {
                     return status;
                 }
+                dropped_entity_dirs.emplace_back(fmt::format("db_{}/tbl_{}/idx_{}/seg_{}",
+                                                             segment_index_meta_key->db_id_str_,
+                                                             segment_index_meta_key->table_id_str_,
+                                                             segment_index_meta_key->index_id_str_,
+                                                             segment_index_meta_key->segment_id_));
                 break;
             }
             case MetaType::kChunkIndex: {
@@ -5473,13 +5461,19 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
     }
 
     Status status = buffer_mgr->RemoveClean(kv_instance_.get());
+    if (!status.ok()) {
+        return status;
+    }
 
-    auto data_dir_str = buffer_mgr->GetFullDataDir();
-    auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
-    // Delete empty dir
-    VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
+    // Remove the dirs of the dropped entities. With a persistence manager the data lives in the object store, so there is no dir to remove.
+    if (InfinityContext::instance().persistence_manager() == nullptr) {
+        std::string data_dir = *buffer_mgr->GetFullDataDir();
+        for (const auto &dir : dropped_entity_dirs) {
+            VirtualStore::RemoveDirectory(fmt::format("{}/{}", data_dir, dir));
+        }
+    }
 
-    return status;
+    return Status::OK();
 }
 
 bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == TransactionType::kReplay; }
