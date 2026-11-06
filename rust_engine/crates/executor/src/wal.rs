@@ -1125,7 +1125,19 @@ fn publish_segments_merged(
             .iter_mut()
             .find(|s| s.segment_id == seg.segment_id)
         {
-            Some(slot) => *slot = seg.clone(),
+            // An import appends to the segment it targets, and its command
+            // names only the blocks **it** wrote. Replacing the record
+            // dropped the earlier batches: the 100k-row import suite imports
+            // in slices into one segment, and after a replay only the last
+            // slice's rows were visible (measured: half the rows gone).
+            Some(slot) => {
+                for block in &seg.blocks {
+                    if !slot.blocks.iter().any(|b| b.block_id == block.block_id) {
+                        slot.blocks.push(block.clone());
+                    }
+                }
+                slot.blocks.sort_by_key(|b| b.block_id);
+            }
             None => set.segments.push(seg.clone()),
         }
     }
