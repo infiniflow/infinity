@@ -46,10 +46,13 @@ if [[ -d "$root/python/restart_test" ]]; then
     # foreign process matches. A private PID namespace scopes that to the run.
     # `--tmpfs /var` only provides the writable mount point; `/var/infinity`
     # itself is replaced by the disk-backed directory right after.
+    # `--unshare-net` keeps the run's ports to itself: the suites bind 23817
+    # and 5432, and a second run (or a leftover engine) on the same host would
+    # make every test talk to the wrong process.
     run=( bwrap --dev-bind / / --tmpfs /var --dir /var/infinity \
           --bind "$work" /var/infinity \
           --bind "$data" /var/infinity/test_data \
-          --unshare-pid --proc /proc \
+          --unshare-net --unshare-pid --proc /proc \
           -- "${run[@]}" )
   fi
   ( cd "$root" && "${run[@]}" ) || status=1
@@ -85,7 +88,7 @@ if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
       mkdir -p "$cross_work"
       cross=( bwrap --dev-bind / / --tmpfs /var --dir /var/infinity \
               --bind "$cross_work" /var/infinity \
-              --unshare-pid --proc /proc -- "${cross[@]}" )
+              --unshare-net --unshare-pid --proc /proc -- "${cross[@]}" )
     fi
     ( cd "$root" && INFINITY_SERVER_BIN="$root/rust_engine/target/release/infinity" \
         INFINITY_CPP_BIN="${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" \

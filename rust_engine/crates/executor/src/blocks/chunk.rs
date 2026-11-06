@@ -267,6 +267,7 @@ pub(crate) fn publish_chunk_files(
     hnsw: bool,
     segment: u32,
     deprecated: &std::collections::HashSet<u64>,
+    commit_ts: u64,
 ) -> Vec<IndexChunk> {
     let mut ids: Vec<u32> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(seg_dir) {
@@ -298,7 +299,7 @@ pub(crate) fn publish_chunk_files(
                 row_count: rows,
                 term_count: 0,
                 index_size: 0,
-                commit_ts: 0,
+                commit_ts,
             }]
         };
     }
@@ -320,7 +321,7 @@ pub(crate) fn publish_chunk_files(
             row_count,
             term_count: 0,
             index_size: 0,
-            commit_ts: 0,
+            commit_ts,
         });
         base_row_id += row_count;
     }

@@ -4269,9 +4269,6 @@ pub struct Engine {
     /// its data files through `pm|object|` instead of leaving `data/` private
     /// (`EngineOptions::object_dir`).
     pub(crate) persistence: Option<storage::persistence::PersistenceManager>,
-    /// `false` for the reference's `NEW_CONFIG_NOWAL_PATH`: catalog DDL is
-    /// durable only through a checkpoint (`flush`), not on commit.
-    pub(crate) wal_enabled: bool,
     /// Bumped when `optimize_indexes` runs: a `DumpMemIndex` staged before the
     /// optimize cannot commit after it (the reference's index meta version).
     pub(crate) index_epoch: std::sync::atomic::AtomicU64,

@@ -2227,7 +2227,16 @@ pub fn write_index_segments(
                 index.segment_id,
                 chunk.chunk_id as u64,
             );
-            store.put(id_key.as_bytes(), chunk.commit_ts.to_string().as_bytes())?;
+            // A chunk keeps the ts of the transaction that sealed it. The port's
+            // mirror re-publishes the whole chunk layer at every checkpoint, so
+            // an existing record wins over the value this publish computed - a
+            // later checkpoint must not re-stamp a chunk its dump already named
+            // (the reference only writes the record in the dump's transaction).
+            let existing = store
+                .get(id_key.as_bytes())?
+                .filter(|v| v.as_slice() != b"0" && !v.is_empty());
+            let value = existing.unwrap_or_else(|| chunk.commit_ts.to_string().into_bytes());
+            store.put(id_key.as_bytes(), &value)?;
             written += 1;
             let key = key::catalog_index_chunk_tag_key(
                 &set.db_id,

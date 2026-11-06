@@ -1525,6 +1525,16 @@ fn apply_split(
     }
     if !catalog.is_empty() {
         catalog_store.atomic_batch(&catalog)?;
+        // The catalog store keeps RocksDB's log off, exactly like the
+        // reference (`KVStore` writes with `disableWAL`). The reference gets
+        // those records back after a crash by replaying the typed WAL command
+        // and re-executing it; this port has no typed-DDL replay, so the
+        // memtable is flushed here instead - same records, same keys, same
+        // timestamps, durable at the commit. Without it a `kill -9` loses
+        // every catalog record written since the last checkpoint: a DDL, a
+        // compact's segment marks (both segments then read as visible and the
+        // rows are counted twice), a dump's chunk records.
+        catalog_store.flush()?;
     }
     Ok(())
 }

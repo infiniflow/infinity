@@ -146,7 +146,6 @@ impl Engine {
                 .clone()
                 .unwrap_or_else(|| dir_for.clone().join("snapshot")),
             persistence,
-            wal_enabled: options.wal_enabled,
             index_epoch: std::sync::atomic::AtomicU64::new(0),
             result_cache: Mutex::new(HashMap::new()),
             plan_cache: Arc::new(planner::result_cache::SharedCache::new()),
@@ -1554,23 +1553,11 @@ impl Engine {
         let committed = self.txn.commit_at(txn, commit_ts);
         self.storage.catalog.invalidate_tables();
         committed?;
-        // Durable now, not at the next checkpoint.
-        //
-        // The reference reaches the same guarantee from the other side: its
-        // catalog writes also go in with `disableWAL` (RocksDB's log stays
-        // off), and a crash before the next checkpoint loses the memtable --
-        // but `NewTxnManager` replays `WalCmdCreateTableV2`/… and re-executes
-        // the DDL, so every committed DDL survives a `kill -9` regardless of
-        // `checkpoint_interval`. Replaying a typed DDL here would mean
-        // rebuilding the catalog batch the command was derived from (ids and
-        // column records included); flushing the store's memtable produces
-        // exactly the records the DDL committed, with the same keys and
-        // timestamps, and costs one `Flush()` per statement. A directory with
-        // `checkpoint_interval = "0s"` therefore keeps its schema across a
-        // crash, as the reference's does.
-        if self.wal_enabled {
-            self.storage.catalog.flush()?;
-        }
+        // The catalog records this DDL wrote are made durable by the commit
+        // (`apply_split` flushes the store the moment it takes a batch without
+        // RocksDB's log). A directory with `checkpoint_interval = "0s"` keeps
+        // its schema across a `kill -9` for that reason, as the reference's
+        // does by replaying the typed DDL command.
         Ok(out)
     }
 

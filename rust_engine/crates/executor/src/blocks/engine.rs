@@ -411,15 +411,40 @@ impl Engine {
             // A segment that is sealed by *this* write needs the prefilter of
             // every one of its blocks (`ExecuteOnNewSealedSegment` walks the
             // whole segment), so that write falls back to rewriting the
-            // segment.
+            // segment. "Sealed by this write" is the segment-level record
+            // being absent: a segment sealed by an import may have had its
+            // first blocks mirrored by an earlier checkpoint, and if this write
+            // only touches the last one, the incremental path would leave those
+            // blocks without a `blk|…|fast_rough_filter` record the reference
+            // has.
             let last_block = block_count.saturating_sub(1) as u16;
-            let seg_partial = partial && !(sealed && touched.contains(&(segment_id, last_block)));
+            let already_recorded = self
+                .storage
+                .catalog
+                .store()
+                .get(
+                    format!("seg|{}|{}|{}|fast_rough_filter", db_id, meta.id, segment_id)
+                        .as_bytes(),
+                )?
+                .is_some();
+            let seals_now = sealed && !already_recorded;
+            let seg_partial =
+                partial && !seals_now && !(sealed && touched.contains(&(segment_id, last_block)));
             for (k, _) in self
                 .storage
                 .catalog
                 .store()
                 .scan_prefix(format!("blk|{}|{}|{}|", db_id, meta.id, segment_id).as_bytes())?
             {
+                // The prefix also covers the block's `fast_rough_filter` tag.
+                // It is not a block record (its key has no block id in the
+                // record's position, and `nth(5)` reads the record's tail), so
+                // the sweep below used to delete the filter of every block this
+                // write touched - the reference keeps them until the segment is
+                // re-sealed.
+                if k.ends_with(b"|fast_rough_filter") {
+                    continue;
+                }
                 if seg_partial {
                     let block_id = String::from_utf8_lossy(&k)
                         .split('|')
@@ -993,7 +1018,7 @@ impl Engine {
         // own directory (`secondary/…`, `sparse/…`), so copy them into
         // `idx_{id}/seg_0/chunk_0.idx`.
         for meta in self.storage.catalog.list_tables()? {
-            let _ = self.publish_index_chunks(&meta.name, meta.id);
+            let _ = self.publish_index_chunks(&meta.name, meta.id, checkpoint_ts);
         }
         Ok(())
     }
@@ -1099,7 +1124,12 @@ impl Engine {
         }
     }
 
-    pub(crate) fn publish_index_chunks(&self, table: &str, table_id: u64) -> Result<()> {
+    pub(crate) fn publish_index_chunks(
+        &self,
+        table: &str,
+        table_id: u64,
+        checkpoint_ts: u64,
+    ) -> Result<()> {
         let db_id = self.database_id_of(table);
         let root = self
             .blocks_root()
@@ -1165,7 +1195,16 @@ impl Engine {
                 // produced it. A segment filled by `COPY` was populated inside
                 // the import transaction (`PopulateIndex`), so its chunks
                 // carry the import's ts; a later explicit dump stamps its own.
-                let chunk_ts = dump_ts.max(self.import_ts(table, *segment).unwrap_or(0));
+                // A chunk that no dump and no import created is sealed by this
+                // checkpoint, so the checkpoint transaction is the one the
+                // reference records (its AddChunkIndexID1 runs inside it).
+                let chunk_ts = if dump_ts > 0 {
+                    dump_ts
+                } else {
+                    self.import_ts(table, *segment)
+                        .unwrap_or(0)
+                        .max(checkpoint_ts)
+                };
                 // A segment that still holds exactly what one `COPY` wrote gets
                 // the import's chunk layout (one per capacity for full-text, one
                 // for the whole segment for secondary and sparse).
@@ -1233,7 +1272,7 @@ impl Engine {
                         row_count: *seg_rows,
                         term_count: 0,
                         index_size: bytes.len() as u64,
-                        commit_ts: 0,
+                        commit_ts: chunk_ts,
                     }]
                 } else if im.index_type.eq_ignore_ascii_case("SMVE")
                     || im.index_type.eq_ignore_ascii_case("EMVB")
@@ -1258,7 +1297,7 @@ impl Engine {
                         row_count: *seg_rows,
                         term_count: 0,
                         index_size: bytes.len() as u64,
-                        commit_ts: 0,
+                        commit_ts: chunk_ts,
                     }]
                 } else {
                     let deprecated = self.deprecated_chunk_ids(table, &im.name, *segment);
@@ -1268,6 +1307,7 @@ impl Engine {
                         im.index_type.eq_ignore_ascii_case("HNSW"),
                         *segment,
                         &deprecated,
+                        chunk_ts,
                     )
                 };
                 if chunks.is_empty() {
