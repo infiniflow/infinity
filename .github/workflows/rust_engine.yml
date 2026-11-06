@@ -145,6 +145,9 @@ jobs:
         run: |
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r ../resource/. /usr/share/infinity/resource/
+      - uses: astral-sh/setup-uv@v7
+        # The analyzer's parity tests shell out to
+        # `uv run python/infinity_sdk/infinity/rag_tokenizer.py`.
       - name: test
         run: cargo test --workspace
       - name: smoke

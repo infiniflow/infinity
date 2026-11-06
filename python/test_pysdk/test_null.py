@@ -1,8 +1,9 @@
-import infinity
 import pandas as pd
 import pytest
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
+
+import infinity
 
 
 @pytest.fixture(scope="class")

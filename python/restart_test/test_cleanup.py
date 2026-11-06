@@ -2,9 +2,7 @@ import os
 import pathlib
 import time
 
-import infinity
 import pytest
-from infinity import index
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
@@ -14,7 +12,9 @@ from restart_util import (
     SimpleVarcharGenerator,
 )
 
+import infinity
 from common import common_values
+from infinity import index
 
 
 # Test with cleanuped data but meta data not cleanuped

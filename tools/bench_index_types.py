@@ -19,8 +19,9 @@ Usage: bench_index_types.py [host] [port] [rows] [queries]
 import sys
 import time
 
-import infinity
 from infinity.common import ConflictType, NetworkAddress, SparseVector
+
+import infinity
 from infinity import index
 
 

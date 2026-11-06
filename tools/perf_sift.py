@@ -20,7 +20,7 @@ import sys
 import time
 
 sys.path.insert(0, "python")
-from restart_test import bytes_common as bc  # noqa: E402
+from restart_test import bytes_common as bc
 
 SIFT = "/home/zhichyu/benchmark/sift1M"
 DIMS = 128

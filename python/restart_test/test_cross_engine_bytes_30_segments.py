@@ -45,8 +45,9 @@ from bytes_common import (
     _table_records,
     _under,
 )
-from infinity import index
 from infinity.common import ConflictType
+
+from infinity import index
 
 COMPACT_TABLE = "test_cross_engine_compact"
 COMPACT_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}}
@@ -452,9 +453,7 @@ def _block_seg_jsonl(path, rows):
     dense column is a plain array).
     """
     with open(path, "w", buffering=1 << 20) as handle:
-        for i in range(rows):
-            handle.write(
-                json.dumps(
+        handle.writelines(json.dumps(
                     {
                         "id": i,
                         "title": f"title-{i}",
@@ -464,8 +463,7 @@ def _block_seg_jsonl(path, rows):
                         "score": i * 0.5,
                     }
                 )
-                + "\n"
-            )
+                + "\n" for i in range(rows))
 
 
 def _block_seg_phase(conn, directory):
@@ -968,8 +966,6 @@ def test_a_table_larger_than_a_segment_starts_a_second_one():
         shutil.rmtree(directory, ignore_errors=True)
 
     full = HUGE_SEGMENTS - 1
-    tail = HUGE_SEGMENT_CAPACITY * full
-    tail_rows = HUGE_ROWS - tail
     expected_blocks = {f"seg_{i}": 1024 for i in range(full)}
     expected_blocks[f"seg_{full}"] = 1
     # `mem_index_capacity` = 65536 rows per chunk within a segment.

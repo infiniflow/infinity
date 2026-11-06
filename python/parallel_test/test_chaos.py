@@ -4,10 +4,11 @@ import time
 from threading import Lock, Thread
 
 import pandas
-from infinity import index
 from infinity.common import ConflictType
 from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
+
+from infinity import index
 
 TEST_DATA_DIR = "/test/data/"
 fulltext_file_path = os.getcwd() + TEST_DATA_DIR + "csv/enwiki_99.csv"

@@ -19,8 +19,9 @@ PLAID is an IVF-based index with residual quantization optimized for tensor sear
 
 import sys
 
-import infinity
 import numpy as np
+
+import infinity
 
 
 def generate_random_tensors(n_docs, n_tokens_per_doc, dim):

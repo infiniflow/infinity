@@ -20,8 +20,9 @@ import random
 import sys
 import time
 
-import infinity
 from infinity.common import ConflictType, NetworkAddress
+
+import infinity
 from infinity import index
 
 DIMS = 8

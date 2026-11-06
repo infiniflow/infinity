@@ -4,12 +4,13 @@ import os
 import struct
 import time
 
-import infinity
-from infinity import index
 from infinity.common import LOCAL_HOST
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.table import RemoteTable
+
+import infinity
+from infinity import index
 
 
 def fvecs_read_all(filename):

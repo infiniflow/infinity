@@ -3,12 +3,12 @@ import time
 
 import pandas as pd
 import pytest
-from infinity import index
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 
 from common import common_values
+from infinity import index
 
 
 class TestAlter:

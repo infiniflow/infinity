@@ -20,10 +20,11 @@ creating hnsw index on multivector column, and searching data with both brute fo
 import argparse
 import sys
 
-import infinity
 import numpy as np
 import polars as pl
 from polars.testing import assert_frame_equal as pl_assert_frame_equal
+
+import infinity
 
 try:
 

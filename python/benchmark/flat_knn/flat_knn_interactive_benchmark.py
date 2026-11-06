@@ -4,10 +4,11 @@ import sys
 import time
 
 import faiss
-import infinity
 import numpy as np
 from infinity.common import LOCAL_HOST, ConflictType
 from infinity.errors import ErrorCode
+
+import infinity
 
 
 def infinity_import_sift_1m_no_index(path):

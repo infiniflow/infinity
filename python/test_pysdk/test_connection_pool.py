@@ -1,10 +1,10 @@
-import infinity
 import pytest
 from infinity.common import ConflictType
 from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 
+import infinity
 from common import common_values
 
 

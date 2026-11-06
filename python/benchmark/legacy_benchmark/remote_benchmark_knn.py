@@ -20,9 +20,10 @@ import struct
 import time
 import traceback
 
-import infinity
 from infinity.common import LOCAL_HOST
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
+
+import infinity
 
 
 def fvecs_read_all(filename):

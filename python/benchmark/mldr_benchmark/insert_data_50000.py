@@ -14,8 +14,6 @@
 
 import os
 
-import infinity
-from infinity import index
 from infinity.common import LOCAL_HOST, ConflictType, SparseVector
 from infinity.errors import ErrorCode
 from mldr_common_tools import (
@@ -25,6 +23,9 @@ from mldr_common_tools import (
     read_mldr_sparse_embedding_yield,
 )
 from tqdm import tqdm
+
+import infinity
+from infinity import index
 
 
 # fulltext column, dense embedding column, sparse embedding column

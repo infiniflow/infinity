@@ -1,12 +1,12 @@
-import infinity
 import polars as pl
 import pytest
-from infinity import index
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 
+import infinity
 from common import common_values
+from infinity import index
 
 
 @pytest.fixture(scope="class")

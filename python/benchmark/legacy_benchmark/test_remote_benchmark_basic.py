@@ -17,10 +17,11 @@ import time
 import traceback
 from datetime import datetime
 
-import infinity
 import pandas as pd
-from infinity import NetworkAddress
 from infinity.errors import ErrorCode
+
+import infinity
+from infinity import NetworkAddress
 
 
 def trace_unhandled_exceptions(func):

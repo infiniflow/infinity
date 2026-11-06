@@ -18,7 +18,6 @@ import time
 from dataclasses import dataclass, field
 from itertools import chain, combinations
 
-import infinity
 import numpy as np
 from FlagEmbedding import BGEM3FlagModel
 from infinity.common import LOCAL_HOST
@@ -36,6 +35,8 @@ from mldr_common_tools import (
 )
 from tqdm import tqdm
 from transformers import HfArgumentParser
+
+import infinity
 
 
 @dataclass

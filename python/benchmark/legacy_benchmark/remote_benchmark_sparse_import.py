@@ -16,10 +16,11 @@ import argparse
 import os
 import time
 
-import infinity
-from infinity import index
 from infinity.common import LOCAL_HOST, LOCAL_INFINITY_PATH
 from infinity.errors import ErrorCode
+
+import infinity
+from infinity import index
 
 
 def import_data(

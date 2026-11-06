@@ -1,6 +1,5 @@
 import time
 
-import infinity
 import pandas as pd
 import pytest
 from common.utils import trace_expected_exceptions
@@ -8,6 +7,7 @@ from infinity.common import ConflictType, InfinityException, SparseVector
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 
+import infinity
 from common import common_values
 
 

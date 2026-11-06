@@ -36,8 +36,9 @@ from bytes_common import (
     _under,
     _wait_for_index_chunks,
 )
-from infinity import index
 from infinity.common import ConflictType
+
+from infinity import index
 
 
 @pytest.mark.skipif(

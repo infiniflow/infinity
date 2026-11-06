@@ -1,9 +1,9 @@
-import infinity
-from infinity import index
-
 # from common import common_values
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
+
+import infinity
+from infinity import index
 
 table_name = "test_alter2"
 infinity_obj = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))

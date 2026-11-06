@@ -18,8 +18,9 @@ This example is about connecting to the local infinity instance, creating table,
 
 import sys
 
-import infinity
 from infinity.table import ExplainType
+
+import infinity
 
 try:
     # Use infinity_embedded module to open a local directory

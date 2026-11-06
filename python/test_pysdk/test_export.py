@@ -1,12 +1,12 @@
 import os
 
-import infinity
 import pytest
 from common.utils import copy_data, read_fvecs_file
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 
+import infinity
 from common import common_values
 
 

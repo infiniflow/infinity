@@ -3,10 +3,11 @@ import random
 import time
 from threading import Thread
 
-from infinity import index
 from infinity.common import ConflictType
 from infinity.connection_pool import ConnectionPool
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
+
+from infinity import index
 
 kRunningTime = 30
 kNumThread = 8

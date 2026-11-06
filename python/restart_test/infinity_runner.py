@@ -3,11 +3,12 @@ import os
 import subprocess
 import time
 
-import infinity
 import psutil
 from infinity.common import InfinityException
 from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
+
+import infinity
 
 
 class InfinityRunner:

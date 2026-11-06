@@ -1,9 +1,10 @@
 import ast
 from enum import Enum
 
-from infinity import index
 from infinity.common import ConflictType
 from numpy import dtype
+
+from infinity import index
 
 default_url = "http://localhost:23820/"
 

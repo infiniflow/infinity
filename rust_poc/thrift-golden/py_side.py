@@ -15,9 +15,9 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 RPC = os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift", "infinity_thrift_rpc")
 sys.path.insert(0, RPC)
 
-from thrift.transport import TTransport  # noqa: E402
-from thrift.protocol import TBinaryProtocol  # noqa: E402
-import ttypes  # noqa: E402
+import ttypes
+from thrift.protocol import TBinaryProtocol
+from thrift.transport import TTransport
 
 
 def encode(obj):

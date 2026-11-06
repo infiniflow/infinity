@@ -100,9 +100,10 @@ import struct
 import subprocess
 import time
 
+from infinity.common import ConflictType, NetworkAddress
+
 import infinity
 from infinity import index
-from infinity.common import ConflictType, NetworkAddress
 
 CPP_BIN = os.environ.get("INFINITY_CPP_BIN", "cmake-build-reldeb/src/infinity")
 RUST_BIN = os.environ.get("INFINITY_RUST_BIN", "rust_engine/scripts/infinity_rust_shim.sh")

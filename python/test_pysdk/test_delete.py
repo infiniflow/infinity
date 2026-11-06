@@ -1,6 +1,5 @@
 import time
 
-import infinity
 import numpy as np
 import pandas as pd
 import pytest
@@ -9,6 +8,7 @@ from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 
+import infinity
 from common import common_values
 
 

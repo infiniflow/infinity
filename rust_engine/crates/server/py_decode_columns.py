@@ -9,9 +9,9 @@ import sys
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.append(os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift"))
 
-from thrift.transport import TTransport  # noqa: E402
-from thrift.protocol import TBinaryProtocol  # noqa: E402
-from infinity_thrift_rpc import ttypes  # noqa: E402
+from infinity_thrift_rpc import ttypes
+from thrift.protocol import TBinaryProtocol
+from thrift.transport import TTransport
 
 
 def main():

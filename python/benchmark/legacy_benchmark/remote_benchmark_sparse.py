@@ -18,9 +18,10 @@ import os
 import struct
 import time
 
-import infinity
 from infinity.common import LOCAL_HOST, LOCAL_INFINITY_PATH, SparseVector
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
+
+import infinity
 
 
 class SparseMatrix:
