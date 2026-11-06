@@ -825,11 +825,9 @@ impl Catalog {
         set: &crate::layout::SegmentSet,
         indexes: &[crate::layout::IndexSegment],
     ) -> Result<usize> {
-        let n = crate::layout::write_index_segments(self.store.as_ref(), set, indexes)?;
-        // Same reason as the segment marks: a dump that is not followed by a
-        // checkpoint must still describe its chunks after a crash.
-        self.store.flush()?;
-        Ok(n)
+        // Same as the segment marks: the dump's command carries the chunk
+        // records, so replay re-creates them.
+        crate::layout::write_index_segments(self.store.as_ref(), set, indexes)
     }
 
     /// Marks `segments` as deprecated at `ts` (a compaction's commit ts), for
@@ -841,14 +839,9 @@ impl Catalog {
         segments: &[u32],
         ts: u64,
     ) -> Result<usize> {
-        let n = crate::layout::write_drops(self.store.as_ref(), set, index_ids, segments, ts)?;
-        // The marks live in the same log-less store as the rest of the catalog;
-        // a compaction that is not followed by a checkpoint (the restart suites
-        // kill the process right after the statement) would otherwise leave
-        // both the source and the merged segment visible, and every row would
-        // be read twice.
-        self.store.flush()?;
-        Ok(n)
+        // No flush: the drop marks ride in the compaction's WAL command and are
+        // replayed by `wal::replay`; the store is flushed at the checkpoint.
+        crate::layout::write_drops(self.store.as_ref(), set, index_ids, segments, ts)
     }
 
     /// The segments of `db_id`.`table_id` a compaction deprecated.

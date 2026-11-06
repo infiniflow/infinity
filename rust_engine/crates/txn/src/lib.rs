@@ -240,7 +240,6 @@ impl WalWriter {
             .recv()
             .map_err(|_| Error::Wal("the WAL writer stopped".into()))?
     }
-
 }
 
 /// Owns the WAL + KV pair and hands out transactions.
@@ -1129,6 +1128,37 @@ impl TxnManager {
         self.prepare_commit_ts.load(Ordering::Relaxed)
     }
 
+    /// Hands every command above `checkpoint_ts` to `f`, in commit order.
+    ///
+    /// The engine's WAL carries catalog DDL and the segment/chunk metadata of
+    /// `IMPORT`/`COMPACT`/`DUMP` as the reference's typed commands; the catalog
+    /// store keeps RocksDB's log off, so replaying them is what makes a committed
+    /// statement survive a crash before the next checkpoint. Row commands reach
+    /// the blocks through [`Self::recover_into`] instead.
+    pub fn replay_commands(
+        &self,
+        checkpoint_ts: TxnTimeStamp,
+        mut f: impl FnMut(&WalCmd, TxnTimeStamp) -> Result<()>,
+    ) -> Result<usize> {
+        let mut n = 0;
+        for path in segment_paths(&self.wal_path)? {
+            let mut iter = WalEntryIterator::make(&path, false)?;
+            while iter.has_next() {
+                let Some(entry) = iter.next() else {
+                    break;
+                };
+                if entry.commit_ts <= checkpoint_ts {
+                    continue;
+                }
+                for cmd in &entry.cmds {
+                    f(cmd, entry.commit_ts)?;
+                    n += 1;
+                }
+            }
+        }
+        Ok(n)
+    }
+
     /// Replays the WAL into the KV store for all records after `checkpoint_ts`.
     /// Each record is decoded through [`WalEntryIterator::make`] and its typed
     /// commands are applied. Idempotent: re-applying is safe.
@@ -1530,17 +1560,11 @@ fn apply_split(
         store.atomic_batch(&rows)?;
     }
     if !catalog.is_empty() {
+        // No flush: the store keeps RocksDB's log off, as the reference's
+        // `KVStore` does, and durability comes from the WAL - the commit is
+        // fsynced by `commit_at`, and `Engine::open` replays the typed command
+        // into the catalog. The next checkpoint flushes the store.
         catalog_store.atomic_batch(&catalog)?;
-        // The catalog store keeps RocksDB's log off, exactly like the
-        // reference (`KVStore` writes with `disableWAL`). The reference gets
-        // those records back after a crash by replaying the typed WAL command
-        // and re-executing it; this port has no typed-DDL replay, so the
-        // memtable is flushed here instead - same records, same keys, same
-        // timestamps, durable at the commit. Without it a `kill -9` loses
-        // every catalog record written since the last checkpoint: a DDL, a
-        // compact's segment marks (both segments then read as visible and the
-        // rows are counted twice), a dump's chunk records.
-        catalog_store.flush()?;
     }
     Ok(())
 }

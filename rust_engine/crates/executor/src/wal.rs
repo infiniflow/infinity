@@ -29,8 +29,8 @@
 
 use expression::json::{extract, parse, Json};
 use storage::wal::ddl_def::{
-    ColumnDef, ConstantExpr, DataType, EmbeddingDataType, LogicalType, SparseStoreType, TableDef,
-    TypeInfo,
+    ColumnDef, ConstantExpr, ConstraintType, DataType, EmbeddingDataType, LogicalType,
+    SparseStoreType, TableDef, TypeInfo,
 };
 
 fn as_i64(j: Option<&Json>) -> Option<i64> {
@@ -612,5 +612,425 @@ mod tests {
             }
             other => panic!("expected Secondary, got {other:?}"),
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Replay: a recovered directory is put back the way the reference does - the
+// catalog store keeps no RocksDB log, so a committed DDL survives a crash only
+// because its typed command is replayed here.
+// ---------------------------------------------------------------------------
+
+use crate::engine::Engine;
+use catalog::{Catalog, TableMeta};
+use common::Result as CommonResult;
+
+/// EmbeddingDataType -> the element names accepted by the catalog's type parser.
+fn element_text(t: EmbeddingDataType) -> Option<&'static str> {
+    Some(match t {
+        EmbeddingDataType::Bit => "bit",
+        EmbeddingDataType::Int8 => "int8",
+        EmbeddingDataType::Int16 => "int16",
+        EmbeddingDataType::Int32 => "int32",
+        EmbeddingDataType::Int64 => "int64",
+        EmbeddingDataType::Float => "float",
+        EmbeddingDataType::Double => "double",
+        EmbeddingDataType::UInt8 => "uint8",
+        EmbeddingDataType::Float16 => "float16",
+        EmbeddingDataType::BFloat16 => "bfloat16",
+        EmbeddingDataType::Invalid => return None,
+    })
+}
+
+/// Renders a DataType as the type text the catalog stores.
+///
+/// The column record keeps the *structured* type, so the text only has to parse
+/// back to the same DataType (catalog::layout::data_type_of_text); it does not
+/// have to be the spelling the user typed.
+pub fn data_type_text(dt: &DataType) -> Option<String> {
+    use LogicalType::*;
+    let plain = |s: &str| Some(s.to_string());
+    match dt.logical_type {
+        Boolean => plain("BOOLEAN"),
+        TinyInt => plain("TINYINT"),
+        SmallInt => plain("SMALLINT"),
+        Integer => plain("INTEGER"),
+        BigInt => plain("BIGINT"),
+        HugeInt => plain("HUGEINT"),
+        Float => plain("FLOAT"),
+        Double => plain("DOUBLE"),
+        Float16 => plain("FLOAT16"),
+        BFloat16 => plain("BFLOAT16"),
+        Varchar => plain("VARCHAR"),
+        Json => plain("JSON"),
+        Date => plain("DATE"),
+        Time => plain("TIME"),
+        DateTime => plain("DATETIME"),
+        Timestamp => plain("TIMESTAMP"),
+        Uuid => plain("UUID"),
+        Decimal => match &dt.type_info {
+            TypeInfo::Decimal { precision, scale } => Some(format!("DECIMAL({precision},{scale})")),
+            _ => None,
+        },
+        Array => match &dt.type_info {
+            TypeInfo::Array(elem) => Some(format!("ARRAY({})", data_type_text(elem)?)),
+            _ => None,
+        },
+        Embedding | Tensor | TensorArray | MultiVector => {
+            let TypeInfo::Embedding {
+                element_type,
+                dimension,
+            } = &dt.type_info
+            else {
+                return None;
+            };
+            let base = match dt.logical_type {
+                Embedding => "EMBEDDING",
+                Tensor => "TENSOR",
+                TensorArray => "TENSORARRAY",
+                _ => "MULTIVECTOR",
+            };
+            Some(format!(
+                "{base}({},{dimension})",
+                element_text(*element_type)?
+            ))
+        }
+        Sparse => {
+            let TypeInfo::Sparse {
+                data_type,
+                index_type,
+                dimension,
+                store_type,
+            } = &dt.type_info
+            else {
+                return None;
+            };
+            let text = format!(
+                "SPARSE({},{},{dimension})",
+                element_text(*data_type)?,
+                element_text(*index_type)?
+            );
+            if *store_type == SparseStoreType::Sorted {
+                return Some(format!("{text} WITH (SORTED)"));
+            }
+            Some(text)
+        }
+        _ => None,
+    }
+}
+
+/// A column default, in the .slt text the catalog stores (None = no default,
+/// which is also what a NULL literal means).
+fn constant_text(c: &ConstantExpr) -> Option<String> {
+    match c {
+        ConstantExpr::Null => None,
+        ConstantExpr::Boolean(b) => Some(if *b { "true" } else { "false" }.to_string()),
+        ConstantExpr::Double(d) => Some(format!("{d}")),
+        ConstantExpr::Integer(i) => Some(i.to_string()),
+        ConstantExpr::String(s) => Some(format!("'{}'", s.replace('\'', "''"))),
+    }
+}
+
+/// Rebuilds the TableMeta a CreateTableV2 command describes.
+fn table_meta(db_name: &str, table_id: u64, td: &TableDef) -> Option<TableMeta> {
+    let mut meta = TableMeta {
+        id: table_id,
+        name: format!("{db_name}.{}", td.table_name),
+        columns: Vec::new(),
+        defaults: Vec::new(),
+        not_nulls: Vec::new(),
+        types: Vec::new(),
+        comments: Vec::new(),
+        ids: Vec::new(),
+        sparse_stores: Vec::new(),
+    };
+    for c in &td.columns {
+        meta.columns.push(c.name.clone());
+        meta.types.push(data_type_text(&c.column_type)?);
+        meta.comments
+            .push((!c.comment.is_empty()).then(|| c.comment.clone()));
+        meta.ids.push(c.id as u64);
+        meta.defaults.push(constant_text(&c.default_expr));
+        meta.not_nulls
+            .push(c.constraints.iter().any(|x| *x == ConstraintType::NotNull));
+        meta.sparse_stores
+            .push(catalog::split_sparse_store_suffix(meta.types.last()?).1);
+    }
+    Some(meta)
+}
+
+fn qualified(db_name: &str, name: &str) -> String {
+    format!("{db_name}.{name}")
+}
+
+/// Replays one WAL command into the catalog.
+///
+/// Row commands (Append/Delete) are skipped: their rows live in the block files
+/// and are applied by Engine::apply_replayed_rows in the same recovery pass.
+/// Everything else re-creates the catalog records the reference writes inside
+/// the command's own transaction - the ids come from the catalog counters, which
+/// the checkpoint flushed at the same point the command's transaction saw them,
+/// and the commit ts is stamped from the frame.
+pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()> {
+    let catalog = engine.catalog();
+    let mut batch: Vec<(Vec<u8>, Option<Vec<u8>>)> = match cmd {
+        WalCmd::CreateTable {
+            db_name,
+            db_id,
+            table_id,
+            table_def,
+        } => {
+            let Ok(id) = table_id.parse::<u64>() else {
+                return Ok(());
+            };
+            let Some(meta) = table_meta(db_name, id, table_def) else {
+                return Ok(());
+            };
+            if catalog.get_table_by_name(&meta.name)?.is_some() {
+                return Ok(());
+            }
+            let db = db_id.parse::<u64>().map_err(|_| {
+                common::Error::Invalid(format!("replay: bad database id '{db_id}'"))
+            })?;
+            catalog::layout::stage_new_table(db, &meta, id + 1)?
+        }
+        // A dump names the chunk records of one index segment; the reference
+        // writes them inside the dump transaction, so the frame's commit ts is
+        // the value of every idx_chunk|...|{chunk_id} record it creates.
+        WalCmd::DumpIndex {
+            db_name,
+            db_id,
+            table_id,
+            index_id,
+            segment_id,
+            chunk_infos,
+            ..
+        } => {
+            let Some(index_id) = index_id.parse::<u64>().ok() else {
+                return Ok(());
+            };
+            let chunks: Vec<catalog::layout::IndexChunk> = chunk_infos
+                .iter()
+                .filter(|c| c.deprecate_ts == u64::MAX)
+                .map(|c| catalog::layout::IndexChunk {
+                    chunk_id: c.chunk_id,
+                    base_name: c.base_name.clone(),
+                    base_row_id: c.base_row_id.to_u64(),
+                    row_count: u64::from(c.row_count),
+                    term_count: u64::from(c.term_count),
+                    index_size: u64::from(c.index_size),
+                    commit_ts,
+                })
+                .collect();
+            if chunks.is_empty() {
+                return Ok(());
+            }
+            let _ = db_name;
+            catalog.publish_index_segments(
+                &catalog::layout::SegmentSet {
+                    db_id: db_id.clone(),
+                    table_id: table_id.clone(),
+                    segments: Vec::new(),
+                },
+                &[catalog::layout::IndexSegment {
+                    index_id,
+                    segment_id: *segment_id,
+                    chunks,
+                }],
+            )?;
+            return Ok(());
+        }
+        // A compaction moves the rows into a new segment and deprecates the
+        // sources. Both halves are catalog records: the merged segment's
+        // catalog|seg|/catalog|blk| layer (its block files are already on disk)
+        // and one drop|seg| marker per source, whose ts is the compaction's.
+        WalCmd::Compact {
+            db_id,
+            table_id,
+            index_ids,
+            new_segment_infos,
+            deprecated_segment_ids,
+            ..
+        } => {
+            let set = catalog::layout::SegmentSet {
+                db_id: db_id.clone(),
+                table_id: table_id.clone(),
+                segments: new_segment_infos
+                    .iter()
+                    .map(|s| catalog::layout::SegmentRecord {
+                        segment_id: s.segment_id,
+                        create_ts: commit_ts,
+                        first_delete_ts: catalog::layout::UNCOMMIT_TS,
+                        blocks: s
+                            .block_infos
+                            .iter()
+                            .map(|b| catalog::layout::BlockRecord {
+                                block_id: b.block_id,
+                                commit_ts,
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            };
+            if !set.segments.is_empty() {
+                catalog.publish_segments(&set)?;
+            }
+            if !deprecated_segment_ids.is_empty() {
+                let ids: Vec<u64> = index_ids.iter().filter_map(|i| i.parse().ok()).collect();
+                catalog.drop_segments(&set, &ids, deprecated_segment_ids, commit_ts)?;
+            }
+            return Ok(());
+        }
+        _ => {
+            let ((), staged) = catalog.capture(|| -> CommonResult<()> {
+                match cmd {
+                    WalCmd::CreateDatabase { db_name, .. } => {
+                        catalog.create_database(db_name, true)?;
+                    }
+                    WalCmd::DropDatabase { db_name, .. } => {
+                        catalog.drop_database(db_name, true)?;
+                    }
+                    WalCmd::DropTable {
+                        db_name,
+                        table_name,
+                        ..
+                    } => {
+                        let _ = catalog.drop_table(&qualified(db_name, table_name))?;
+                    }
+                    WalCmd::RenameTable {
+                        db_name,
+                        table_name,
+                        new_table_name,
+                        ..
+                    } => {
+                        catalog.rename_table(
+                            &qualified(db_name, table_name),
+                            &qualified(db_name, new_table_name),
+                        )?;
+                    }
+                    WalCmd::DropColumns {
+                        db_name,
+                        table_name,
+                        column_names,
+                        ..
+                    } => {
+                        let full = qualified(db_name, table_name);
+                        for column in column_names {
+                            catalog.drop_column(&full, column)?;
+                        }
+                    }
+                    WalCmd::DropIndex {
+                        db_name,
+                        table_name,
+                        index_name,
+                        ..
+                    } => {
+                        let _ =
+                            catalog.drop_index_on(&qualified(db_name, table_name), index_name)?;
+                    }
+                    WalCmd::CreateIndex {
+                        db_name,
+                        table_name,
+                        index_base,
+                        ..
+                    } => {
+                        let full = qualified(db_name, table_name);
+                        let base = match index_base {
+                            storage::wal::index_def::IndexDef::Secondary { base, .. }
+                            | storage::wal::index_def::IndexDef::FullText { base, .. }
+                            | storage::wal::index_def::IndexDef::Bmp { base, .. }
+                            | storage::wal::index_def::IndexDef::Hnsw { base, .. }
+                            | storage::wal::index_def::IndexDef::Emvb { base, .. }
+                            | storage::wal::index_def::IndexDef::Plaid { base, .. }
+                            | storage::wal::index_def::IndexDef::Smve { base, .. }
+                            | storage::wal::index_def::IndexDef::Ivf { base, .. } => base,
+                        };
+                        if !catalog
+                            .list_indexes()?
+                            .iter()
+                            .any(|im| im.name == base.index_name && im.table == full)
+                        {
+                            let column = base.column_names.first().cloned().unwrap_or_default();
+                            catalog.create_index_typed(
+                                &base.index_name,
+                                &full,
+                                &column,
+                                index_type_text(base.index_type),
+                                &index_options(index_base),
+                            )?;
+                        }
+                    }
+                    WalCmd::Append { .. } | WalCmd::Delete { .. } => {}
+                    _ => {}
+                }
+                Ok(())
+            })?;
+            staged
+        }
+    };
+    if batch.is_empty() {
+        return Ok(());
+    }
+    Catalog::restamp(&mut batch, commit_ts);
+    catalog.store().atomic_batch(&batch)?;
+    Ok(())
+}
+
+/// The catalog's index-kind spelling for an IndexType.
+fn index_type_text(t: storage::wal::index_def::IndexType) -> &'static str {
+    use storage::wal::index_def::IndexType;
+    match t {
+        IndexType::Hnsw => "HNSW",
+        IndexType::FullText => "FULLTEXT",
+        IndexType::Bmp => "BMP",
+        IndexType::Ivf => "IVF",
+        IndexType::Emvb => "EMVB",
+        IndexType::Plaid => "PLAID",
+        IndexType::Smve => "SMVE",
+        IndexType::DiskAnn => "DISKANN",
+        IndexType::Secondary | IndexType::SecondaryFunctional | IndexType::Invalid => "SECONDARY",
+    }
+}
+
+/// The WITH options the create path passed, rebuilt from the typed definition.
+///
+/// The catalog record is derived from these (`layout::index_def_for`), so they
+/// only have to name the same values: the option lookup is case-insensitive and
+/// trims quotes.
+fn index_options(def: &storage::wal::index_def::IndexDef) -> Vec<(String, String)> {
+    use storage::wal::index_def::{IndexDef, MetricType};
+    let pair = |k: &str, v: String| (k.to_string(), v);
+    match def {
+        IndexDef::Hnsw {
+            m,
+            ef_construction,
+            block_size,
+            metric_type,
+            ..
+        } => vec![
+            pair("M", m.to_string()),
+            pair("EF_CONSTRUCTION", ef_construction.to_string()),
+            pair("BLOCK_SIZE", block_size.to_string()),
+            pair(
+                "METRIC",
+                match metric_type {
+                    MetricType::Cosine => "cosine",
+                    MetricType::InnerProduct => "ip",
+                    _ => "l2",
+                }
+                .to_string(),
+            ),
+        ],
+        IndexDef::FullText { analyzer, .. } => vec![pair("ANALYZER", analyzer.clone())],
+        IndexDef::Bmp { block_size, .. } => vec![pair("BLOCK_SIZE", block_size.to_string())],
+        IndexDef::Emvb {
+            residual_pq_subspace_num,
+            residual_pq_subspace_bits,
+            ..
+        } => vec![
+            pair("PQ_SUBSPACE_NUM", residual_pq_subspace_num.to_string()),
+            pair("PQ_SUBSPACE_BITS", residual_pq_subspace_bits.to_string()),
+        ],
+        _ => Vec::new(),
     }
 }

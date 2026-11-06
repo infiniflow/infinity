@@ -182,16 +182,24 @@ impl Engine {
                 .catalog
                 .import_layout(engine.storage.catalog.store().as_ref());
         }
-        // The blocks first, then the WAL on top: what the files carry is already
-        // applied, so the replay starts above the newest timestamp they hold
-        // (the reference's checkpoint record gives it the same floor).
+        // The catalog records first: the reference keeps its catalog store
+        // log-less and recovers every committed DDL and every segment/chunk
+        // record by replaying the typed WAL command, so a directory that was
+        // killed before its next checkpoint still has its schema. Replaying
+        // before the blocks matters - the block recovery walks the tables.
+        let applied = engine.txn.applied_ts()?;
+        engine
+            .txn
+            .replay_commands(applied, |cmd, ts| crate::wal::replay(&engine, cmd, ts))?;
+        // The blocks next, then the WAL's rows on top: what the files carry is
+        // already applied, so the replay starts above the newest timestamp they
+        // hold (the reference's checkpoint record gives it the same floor).
         let hydrated = engine.recover_blocks()?;
         // Two floors, because the two halves of a commit reach the disk in
         // sequence: the KV batch is written first, the block in `CommitBottom`
         // after. A record above `applied` (the newest checkpoint frame) still
         // has KV work to do; a record above `hydrated` still has to reach a
         // block.
-        let applied = engine.txn.applied_ts()?;
         let mut replayed_appends = Vec::new();
         let mut replayed_deletes = Vec::new();
         engine.txn.recover_into(
