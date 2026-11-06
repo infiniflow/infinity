@@ -122,148 +122,161 @@ impl Engine {
         let mut cmds = vec![self.compact_command(table, next_seg, rows.len(), &source_ids)?];
         cmds.extend(self.dump_index_commands(table, next_seg, rows.len(), "")?);
         t.set_typed_commands(cmds);
-        let compact_ts = if !rows.is_empty() {
-            self.txn.commit(t)?
-        } else {
-            0
-        };
-        // Drop every source position that no compacted row reuses. The
-        // destination positions are exactly `[base, base + rows.len())`; every
-        // other key inside a merged segment is an old copy (including rows
-        // deleted before the compaction that therefore never appear in `rows`)
-        // and must go, or a later scan would see it again. Rows of segments
-        // that were not merged stay where they are.
-        let key = self.table_key(table);
-        {
-            let mut tables = self.tables.lock().unwrap();
-            let entry = tables.entry(key).or_default();
-            entry.row_counter = Some((next_seg, rows.len() as u32, true));
-            entry.write_batches = 1;
-            // The merged rows all live in the new segment; their source segment
-            // metas are garbage collected with the old row keys, while the
-            // segments this compaction did not pick keep theirs.
-            entry.segments.retain(|id, _| !sources.contains(id));
-            if !rows.is_empty() {
-                entry.segments.insert(
-                    next_seg,
-                    SegmentEntry {
-                        id: next_seg,
-                        rows: rows.len() as u32,
-                    },
-                );
-            }
-            // Compaction renumbered every row.
-            entry.row_cache = None;
-            // Every structure keyed by a row id refers to the old ids now:
-            // block-level indexes, the in-memory secondary tails, the full-text
-            // inverted index, the sparse documents and the vector buffers.
-            entry.secondary.indexes.clear();
-            entry.secondary.disk.clear();
-            entry.text.clear();
-            entry.sparse.clear();
-            entry.mv.clear();
-            entry.hnsw_mem.clear();
-            entry.vector.clear();
-            entry.ivf.clear();
-            entry.ivf_mem.clear();
-            entry.block_index = None;
-            entry.block_rows = None;
-            entry.live_rows = Some(live_rows);
-            // Every row moved to the merged segment: the files still describe
-            // the source layout until the next checkpoint rewrites them.
-            entry.mirror_dirty = true;
-        }
-        // The merged rows are one append of the compaction transaction: the
-        // reference writes every block of the new segment with that commit ts
-        // as its single `create`. The append log keeps the boundaries of the
-        // segments this compaction did not pick - the mirror lays them out in
-        // segment-id order and reads their block `version` files from the same
-        // log - and drops the merged segments' own boundaries.
-        if !rows.is_empty() {
-            let totals =
-                self.rebase_appends(table, &layout, &sources, rows.len() as u64, compact_ts);
-            let tkey = self.table_key(table);
+        // `NewTxnManager::CommitTxn`: conflict check -> `PrepareCommitCompact`
+        // -> WAL append+fsync. The reference writes the merged rows into the
+        // new blocks while the statement runs and the block `version` +
+        // `catalog|seg|`/`catalog|blk|` + `drop|seg|` markers in the prepare
+        // phase (`new_txn_data_impl.cpp:2013`), i.e. everything the frame names
+        // is on disk before the frame. The port committed first, so a kill in
+        // between left the frame and the deprecations durable while the merged
+        // segment had no blocks at all - the table came back with those rows
+        // gone.
+        let turn = self.txn.reserve_commit_ts();
+        let compact_ts = turn.ts();
+        self.txn.commit_at_deferred_with(t, compact_ts, |_txn| {
+            // Drop every source position that no compacted row reuses. The
+            // destination positions are exactly `[base, base + rows.len())`; every
+            // other key inside a merged segment is an old copy (including rows
+            // deleted before the compaction that therefore never appear in `rows`)
+            // and must go, or a later scan would see it again. Rows of segments
+            // that were not merged stay where they are.
+            let key = self.table_key(table);
             {
                 let mut tables = self.tables.lock().unwrap();
-                let entry = tables.entry(tkey.clone()).or_default();
-                entry.append_totals = Some(totals.0.clone());
-                entry.append_ts = Some(totals.1.clone());
-                // A merge writes the new segment's blocks from the merged rows
-                // in one go, like an import: the null bitmap covers exactly
-                // those rows (tail bits of the last byte stay clear).
-                entry.append_copy = Some(totals.2.clone());
+                let entry = tables.entry(key).or_default();
+                entry.row_counter = Some((next_seg, rows.len() as u32, true));
+                entry.write_batches = 1;
+                // The merged rows all live in the new segment; their source segment
+                // metas are garbage collected with the old row keys, while the
+                // segments this compaction did not pick keep theirs.
+                entry.segments.retain(|id, _| !sources.contains(id));
+                if !rows.is_empty() {
+                    entry.segments.insert(
+                        next_seg,
+                        SegmentEntry {
+                            id: next_seg,
+                            rows: rows.len() as u32,
+                        },
+                    );
+                }
+                // Compaction renumbered every row.
+                entry.row_cache = None;
+                // Every structure keyed by a row id refers to the old ids now:
+                // block-level indexes, the in-memory secondary tails, the full-text
+                // inverted index, the sparse documents and the vector buffers.
+                entry.secondary.indexes.clear();
+                entry.secondary.disk.clear();
+                entry.text.clear();
+                entry.sparse.clear();
+                entry.mv.clear();
+                entry.hnsw_mem.clear();
+                entry.vector.clear();
+                entry.ivf.clear();
+                entry.ivf_mem.clear();
+                entry.block_index = None;
+                entry.block_rows = None;
+                entry.live_rows = Some(live_rows);
+                // Every row moved to the merged segment: the files still describe
+                // the source layout until the next checkpoint rewrites them.
+                entry.mirror_dirty = true;
             }
-            let _ = self.write_id_log(&appends_key(&tkey), &totals.0);
-            let _ = self.write_id_log(&append_ts_key(&tkey), &totals.1);
-            let _ = self.write_id_log(&append_copy_key(&tkey), &totals.2);
-            // `PopulateIndex` runs inside the compaction transaction too, so the
-            // new segment's chunks carry its ts and cover the whole segment.
-            self.note_import_ts(table, next_seg, compact_ts);
-            self.note_import_rows(table, next_seg, rows.len() as u64);
-        }
-        // `drop|seg|…` / `drop|idx_seg|…` at the compaction's ts: the source
-        // segments stay on disk until `Cleanup`, and a reader at a later ts
-        // ignores them because of these records.
-        if !source_ids.is_empty() {
-            let db_id = self.database_id_of(table);
-            let table_id = self
-                .storage
-                .catalog
-                .get_table_by_name(table)?
-                .map(|m| m.id)
-                .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-            let index_ids: Vec<u64> = self
-                .storage
-                .catalog
-                .list_indexes()?
+            // The merged rows are one append of the compaction transaction: the
+            // reference writes every block of the new segment with that commit ts
+            // as its single `create`. The append log keeps the boundaries of the
+            // segments this compaction did not pick - the mirror lays them out in
+            // segment-id order and reads their block `version` files from the same
+            // log - and drops the merged segments' own boundaries.
+            if !rows.is_empty() {
+                let totals =
+                    self.rebase_appends(table, &layout, &sources, rows.len() as u64, compact_ts);
+                let tkey = self.table_key(table);
+                {
+                    let mut tables = self.tables.lock().unwrap();
+                    let entry = tables.entry(tkey.clone()).or_default();
+                    entry.append_totals = Some(totals.0.clone());
+                    entry.append_ts = Some(totals.1.clone());
+                    // A merge writes the new segment's blocks from the merged rows
+                    // in one go, like an import: the null bitmap covers exactly
+                    // those rows (tail bits of the last byte stay clear).
+                    entry.append_copy = Some(totals.2.clone());
+                }
+                let _ = self.write_id_log(&appends_key(&tkey), &totals.0);
+                let _ = self.write_id_log(&append_ts_key(&tkey), &totals.1);
+                let _ = self.write_id_log(&append_copy_key(&tkey), &totals.2);
+                // `PopulateIndex` runs inside the compaction transaction too, so the
+                // new segment's chunks carry its ts and cover the whole segment.
+                self.note_import_ts(table, next_seg, compact_ts);
+                self.note_import_rows(table, next_seg, rows.len() as u64);
+            }
+            // `drop|seg|…` / `drop|idx_seg|…` at the compaction's ts: the source
+            // segments stay on disk until `Cleanup`, and a reader at a later ts
+            // ignores them because of these records.
+            if !source_ids.is_empty() {
+                let db_id = self.database_id_of(table);
+                let table_id = self
+                    .storage
+                    .catalog
+                    .get_table_by_name(table)?
+                    .map(|m| m.id)
+                    .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+                let index_ids: Vec<u64> = self
+                    .storage
+                    .catalog
+                    .list_indexes()?
+                    .iter()
+                    .filter(|im| im.table == table || im.table == self.qualified_table(table))
+                    .map(|im| im.id)
+                    .collect();
+                self.storage.catalog.drop_segments(
+                    &catalog::layout::SegmentSet {
+                        db_id: db_id.to_string(),
+                        table_id: table_id.to_string(),
+                        segments: Vec::new(),
+                    },
+                    &index_ids,
+                    &source_ids,
+                    compact_ts,
+                )?;
+            }
+            // The merged rows are the new segment's blocks: the compaction is the
+            // one commit whose rows move, so they are handed to the block writer
+            // after `drop|seg|…` - before it, the rewrite would delete the source
+            // segment directories the reference keeps until `Cleanup`.
+            // The merge renumbers every row: whatever the append buffer held for
+            // the source segments is gone with them.
+            // The merged segments' rows are gone with them (they are re-published
+            // under the new segment's ids below); the rows of segments this
+            // compaction did not pick stay in the buffer - clearing all of them
+            // dropped the rows of an import that had committed but whose mirror
+            // write had not run yet, and the next write then found an empty block.
+            {
+                let tkey = self.table_key(table);
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(entry) = tables.get_mut(&tkey) {
+                    entry.retain_buffered(|(seq, _)| !sources.contains(&((*seq >> 32) as u32)));
+                }
+            }
+            let merged: Vec<(usize, Vec<u8>)> = rows
                 .iter()
-                .filter(|im| im.table == table || im.table == self.qualified_table(table))
-                .map(|im| im.id)
+                .enumerate()
+                .map(|(i, (_, text))| (base + i, text.clone()))
                 .collect();
-            self.storage.catalog.drop_segments(
-                &catalog::layout::SegmentSet {
-                    db_id: db_id.to_string(),
-                    table_id: table_id.to_string(),
-                    segments: Vec::new(),
-                },
-                &index_ids,
-                &source_ids,
-                compact_ts,
-            )?;
-        }
-        // The merged rows are the new segment's blocks: the compaction is the
-        // one commit whose rows move, so they are handed to the block writer
-        // after `drop|seg|…` - before it, the rewrite would delete the source
-        // segment directories the reference keeps until `Cleanup`.
-        // The merge renumbers every row: whatever the append buffer held for
-        // the source segments is gone with them.
-        // The merged segments' rows are gone with them (they are re-published
-        // under the new segment's ids below); the rows of segments this
-        // compaction did not pick stay in the buffer - clearing all of them
-        // dropped the rows of an import that had committed but whose mirror
-        // write had not run yet, and the next write then found an empty block.
-        {
-            let tkey = self.table_key(table);
-            let mut tables = self.tables.lock().unwrap();
-            if let Some(entry) = tables.get_mut(&tkey) {
-                entry.retain_buffered(|(seq, _)| !sources.contains(&((*seq >> 32) as u32)));
+            self.publish_encoded_rows(table, &merged)?;
+            // `PrepareCommitCompact`: the merged segment's blocks and
+            // records belong to the compaction transaction; writing them here
+            // (before the frame) is what makes a kill harmless - the
+            // `drop|seg|…` markers above are in the same pre-frame phase, so
+            // a replay either sees the merged blocks or none of it.
+            if !rows.is_empty() && self.has_block_layout(table) {
+                self.write_blocks_bounded(table, compact_ts)?;
             }
-        }
-        let merged: Vec<(usize, Vec<u8>)> = rows
-            .iter()
-            .enumerate()
-            .map(|(i, (_, text))| (base + i, text.clone()))
-            .collect();
-        self.publish_encoded_rows(table, &merged)?;
-        // `CommitBottomCompact`: the merged segment's blocks and records belong
-        // to the compaction transaction, so they are written before it is
-        // acknowledged. Deferring them to the next checkpoint left the mirror
-        // inconsistent for a crash in between: the `drop|seg|…` markers above
-        // are durable, so every source segment was deprecated on disk while the
-        // merged one had no blocks at all - the table came back empty.
-        if !rows.is_empty() && self.has_block_layout(table) {
-            self.write_blocks_bounded(table, compact_ts)?;
-        }
+            Ok(())
+        })?;
+        // `CommitBottomCompact`: the merged rows are visible only once their
+        // index entries are in place, so the commit stays unpublished until the
+        // rebuild below finishes - `commit_at_deferred_with` leaves
+        // `finish_bottom` to the caller.
+        let _visible = BottomGuard::new(&self.txn, compact_ts);
         // The merge renumbered every row, so every index posting now points at
         // a dead row id. Rebuild the declared indexes from the merged rows.
         self.rebuild_indexes()?;
