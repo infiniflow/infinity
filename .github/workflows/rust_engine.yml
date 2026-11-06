@@ -55,6 +55,16 @@ jobs:
           # rust_engine/rust-toolchain.toml is the single source of truth.
           rustup toolchain install --profile minimal
           rustup component add rustfmt clippy
+      - name: Install clang and mold
+        # rust_engine/.cargo/config.toml builds RocksDB with clang and links
+        # with mold (`-fuse-ld=mold`); without them every build script fails
+        # with "collect2: fatal error: cannot find 'ld'".
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang mold
+          if ! command -v ld.mold >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust_engine
@@ -93,6 +103,16 @@ jobs:
           submodules: recursive
       - name: Install the pinned toolchain
         run: rustup toolchain install --profile minimal
+      - name: Install clang and mold
+        # rust_engine/.cargo/config.toml builds RocksDB with clang and links
+        # with mold (`-fuse-ld=mold`); without them every build script fails
+        # with "collect2: fatal error: cannot find 'ld'".
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang mold
+          if ! command -v ld.mold >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust_engine
@@ -130,6 +150,17 @@ jobs:
       - name: Install the pinned toolchain
         if: matrix.engine == 'rust'
         run: rustup toolchain install --profile minimal
+      - name: Install clang and mold
+        if: matrix.engine == 'rust'
+        # rust_engine/.cargo/config.toml builds RocksDB with clang and links
+        # with mold (`-fuse-ld=mold`); without them every build script fails
+        # with "collect2: fatal error: cannot find 'ld'".
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang mold
+          if ! command -v ld.mold >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
       - uses: Swatinem/rust-cache@v2
         if: matrix.engine == 'rust'
         with:
