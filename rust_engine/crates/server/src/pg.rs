@@ -348,18 +348,33 @@ impl<R: Read, W: Write> PGProtocolHandler<R, W> {
         match engine.execute(sql) {
             Ok(results) => {
                 let mut rows_sent = 0;
+                // Rewritten per statement, so a multi statement simple query
+                // ends with the tag of its last statement, like a real server.
+                let mut tag = String::from("SELECT 0");
                 for result in results {
-                    if let QueryResult::Rows { columns, rows } = result {
-                        out.extend_from_slice(&row_description_frame(&columns));
-                        for row in &rows {
-                            let texts: Vec<String> =
-                                row.iter().map(|v| v.to_slt_string()).collect();
-                            out.extend_from_slice(&data_row_frame(&texts));
+                    match result {
+                        QueryResult::Rows { columns, rows } => {
+                            out.extend_from_slice(&row_description_frame(&columns));
+                            for row in &rows {
+                                let texts: Vec<String> =
+                                    row.iter().map(|v| v.to_slt_string()).collect();
+                                out.extend_from_slice(&data_row_frame(&texts));
+                            }
+                            rows_sent += rows.len();
+                            tag = format!("SELECT {rows_sent}");
                         }
-                        rows_sent += rows.len();
+                        QueryResult::Inserted { count } => tag = format!("INSERT 0 {count}"),
+                        QueryResult::Deleted { count } => tag = format!("DELETE {count}"),
+                        QueryResult::Updated { count } => tag = format!("UPDATE {count}"),
+                        QueryResult::CreatedTable { .. } => tag = "CREATE TABLE".to_string(),
+                        QueryResult::CreatedDatabase { .. } => tag = "CREATE DATABASE".to_string(),
+                        QueryResult::DroppedDatabase { .. } => tag = "DROP DATABASE".to_string(),
+                        QueryResult::CreatedIndex { .. } => tag = "CREATE INDEX".to_string(),
+                        QueryResult::DroppedTable { .. } => tag = "DROP TABLE".to_string(),
+                        QueryResult::DroppedIndex { .. } => tag = "DROP INDEX".to_string(),
                     }
                 }
-                out.extend_from_slice(&command_complete_frame(&format!("SELECT {rows_sent}")));
+                out.extend_from_slice(&command_complete_frame(&tag));
             }
             Err(e) => {
                 let message = e.to_string();

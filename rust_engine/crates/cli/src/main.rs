@@ -558,6 +558,25 @@ fn run(args: &[String]) -> common::Result<()> {
             let http = server::http::HttpServer::bind(&http_addr, engine.clone())?;
             println!("http listening on {}", http.local_addr()?);
             std::thread::spawn(move || http.run());
+
+            // PostgreSQL wire front end, ported from the C++ server's
+            // `src/network/pg_protocol_handler.cppm`. Same scope as upstream:
+            // startup handshake plus the simple query protocol, so `psql` can
+            // run SQL, but no extended query protocol, no SSL, no auth.
+            //
+            // Unlike upstream, a bind failure is not fatal: the Thrift and HTTP
+            // front ends stay usable when 5432 is already taken by a local
+            // PostgreSQL instance.
+            let pg_addr =
+                std::env::var("INFINITY_PG_BIND").unwrap_or_else(|_| "0.0.0.0:5432".into());
+            match server::pg::PgServer::bind(&pg_addr, engine.clone()) {
+                Ok(pg) => {
+                    println!("pg listening on {}", pg.local_addr()?);
+                    std::thread::spawn(move || pg.run());
+                }
+                Err(e) => println!("pg disabled, cannot bind {pg_addr}: {e:?}"),
+            }
+
             let server = server::Server::bind_with_engine(&addr, engine)?;
             println!("serving on {}", server.local_addr()?);
             server.run();
