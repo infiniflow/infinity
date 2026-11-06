@@ -2650,6 +2650,22 @@ pub fn index_meta_of(def: &IndexDefValue, tables: &[TableLayout]) -> Option<Inde
     if let Some(b) = opt("block_size") {
         options.push(("BLOCK_SIZE".to_string(), b));
     }
+    // PLAID and EMVB keep their build parameters in the record too
+    // (`IndexPLAID::Serialize` / `IndexEMVB::Serialize`). Without them a record
+    // read back falls to the defaults - a PLAID index created with
+    // `n_centroids = 16` came back as "auto" and trained 32 centroids, whose
+    // chunk no longer matched the reference's.
+    for (source, target) in [
+        ("nbits", "NBITS"),
+        ("n_centroids", "N_CENTROIDS"),
+        ("colbertsar_mode", "COLBERTSAR_MODE"),
+        ("pq_subspace_num", "PQ_SUBSPACE_NUM"),
+        ("pq_subspace_bits", "PQ_SUBSPACE_BITS"),
+    ] {
+        if let Some(v) = opt(source) {
+            options.push((target.to_string(), v));
+        }
+    }
     if let Some(l) = opt("lsg_config") {
         options.push(("LSG_CONFIG".to_string(), l));
     }

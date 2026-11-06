@@ -3394,11 +3394,19 @@ impl MultiVectorIndex {
                     .zip(ids.iter())
                     .map(|(doc, seq)| ((*seq & 0xffff_ffff) as u32, doc.as_slice()))
                     .collect();
-                let _ = storage::emvb_segment::write_emvb_segment_refs(
+                let (subspace_num, subspace_bits) = match self.emvb_config {
+                    Some(cfg) => (cfg.subspace_num, cfg.subspace_bits),
+                    // No `USING EMVB` definition: the inference `build_emvb`
+                    // makes for a column without one.
+                    None => (if self.dims.is_multiple_of(8) { 8 } else { 1 }, 8),
+                };
+                let _ = storage::emvb_segment::write_emvb_segment_refs_with(
                     &path.with_extension("emvb"),
                     self.dims,
                     (segment & 0xffff_ffff) as u32,
                     &emvb,
+                    subspace_num,
+                    subspace_bits,
                 );
                 storage::emvb_segment::EmvbReader::open(&path.with_extension("emvb"))
                     .ok()

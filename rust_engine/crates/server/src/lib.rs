@@ -1262,10 +1262,15 @@ fn handle_connection(
                             } else if name == "CreateSystemSnapshot" {
                                 // `{2: snapshot_name}`
                                 eng.create_system_snapshot(&get(2))
-                            } else if get(3).eq_ignore_ascii_case("database")
-                                || get(3).eq_ignore_ascii_case("system")
-                            {
-                                // `{2: snapshot_name, 3: scope}`
+                            } else if get(3).eq_ignore_ascii_case("system") {
+                                // `{2: snapshot_name, 3: scope}`: a system
+                                // snapshot nests its tables under each database,
+                                // so it has to go through the system restore - a
+                                // database restore reads the top-level
+                                // `table_snapshots`, which a system snapshot
+                                // does not have.
+                                eng.restore_system_snapshot(&get(2))
+                            } else if get(3).eq_ignore_ascii_case("database") {
                                 eng.restore_database_snapshot(&get(2))
                             } else {
                                 eng.execute(&format!(

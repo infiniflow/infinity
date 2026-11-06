@@ -324,12 +324,26 @@ impl Engine {
     /// metadata and copies its files back, then logs
     /// `RESTORE_TABLE_SNAPSHOT`.
     pub fn restore_table_snapshot(&self, name: &str) -> Result<()> {
+        self.log_snapshot(self.apply_table_snapshot(name, false)?)
+    }
+
+    /// The restore itself, without the log entry.
+    ///
+    /// Replay re-runs it from the snapshot the command names (`wal::replay`),
+    /// where a commit would write a second transaction. `skip_existing` makes
+    /// it a no-op for a table that is already there - the restore's catalog
+    /// writes may have reached an SST before the crash.
+    pub(crate) fn apply_table_snapshot(
+        &self,
+        name: &str,
+        skip_existing: bool,
+    ) -> Result<WalCmd> {
         let json = self.read_snapshot_json(name)?;
         let table = json_table(&json, name)?;
-        let files = self.restore_table(table)?;
+        let files = self.restore_table(table, skip_existing)?;
         let db_id: u64 = json_str(&json, "db_id_str").parse().unwrap_or(0);
         let table_id: u64 = json_str(table, "table_id_str").parse().unwrap_or(0);
-        self.log_snapshot(WalCmd::RestoreTableSnapshot {
+        Ok(WalCmd::RestoreTableSnapshot {
             db_name: json_str(&json, "database_name"),
             db_id: db_id.to_string(),
             table_name: json_str(table, "table_name"),
@@ -345,12 +359,22 @@ impl Engine {
     /// `RESTORE DATABASE SNAPSHOT <name>`, logged as
     /// `RESTORE_DATABASE_SNAPSHOT` with one nested table command per table.
     pub fn restore_database_snapshot(&self, name: &str) -> Result<()> {
+        self.log_snapshot(self.apply_database_snapshot(name, false)?)
+    }
+
+    /// See [`Self::apply_table_snapshot`]: the database-level restore without
+    /// the log entry, for replay.
+    pub(crate) fn apply_database_snapshot(
+        &self,
+        name: &str,
+        skip_existing: bool,
+    ) -> Result<WalCmd> {
         let json = self.read_snapshot_json(name)?;
         let db_name = json_str(&json, "database_name");
         let db_id = json_str(&json, "db_id_str");
         let mut table_cmds = Vec::new();
         for table in json_arr(&json, "table_snapshots") {
-            let files = self.restore_table(&table)?;
+            let files = self.restore_table(&table, skip_existing)?;
             let table_id = json_str(&table, "table_id_str");
             table_cmds.push(WalCmd::RestoreTableSnapshot {
                 db_name: db_name.clone(),
@@ -364,7 +388,7 @@ impl Engine {
                 files,
             });
         }
-        self.log_snapshot(WalCmd::RestoreDatabaseSnapshot {
+        Ok(WalCmd::RestoreDatabaseSnapshot {
             db_name,
             db_id,
             db_comment: json_str(&json, "db_comment"),
@@ -376,6 +400,12 @@ impl Engine {
     /// `RESTORE SYSTEM SNAPSHOT <name>`, logged as `RESTORE_SYSTEM_SNAPSHOT`
     /// with one nested database command per database.
     pub fn restore_system_snapshot(&self, name: &str) -> Result<()> {
+        self.log_snapshot(self.apply_system_snapshot(name, false)?)
+    }
+
+    /// See [`Self::apply_table_snapshot`]: the system-level restore without the
+    /// log entry, for replay.
+    pub(crate) fn apply_system_snapshot(&self, name: &str, skip_existing: bool) -> Result<WalCmd> {
         let json = self.read_snapshot_json(name)?;
         let mut db_cmds = Vec::new();
         for db in json_arr(&json, "database_snapshots") {
@@ -383,7 +413,7 @@ impl Engine {
             let db_id = json_str(&db, "db_id_str");
             let mut table_cmds = Vec::new();
             for table in json_arr(&db, "table_snapshots") {
-                let files = self.restore_table(&table)?;
+                let files = self.restore_table(&table, skip_existing)?;
                 let table_id = json_str(&table, "table_id_str");
                 table_cmds.push(WalCmd::RestoreTableSnapshot {
                     db_name: db_name.clone(),
@@ -405,7 +435,7 @@ impl Engine {
                 table_cmds,
             });
         }
-        self.log_snapshot(WalCmd::RestoreSystemSnapshot {
+        Ok(WalCmd::RestoreSystemSnapshot {
             snapshot_name: name.to_string(),
             db_cmds,
         })
@@ -670,7 +700,7 @@ impl Engine {
     /// Recreates one table from its snapshot metadata and copies its files back
     /// into the data directory under the new table id, returning the files the
     /// restore wrote (`WalCmdRestoreTableSnapshot::files_`).
-    fn restore_table(&self, table: &Json) -> Result<Vec<String>> {
+    fn restore_table(&self, table: &Json, skip_existing: bool) -> Result<Vec<String>> {
         // Serialize against a create of the same name (and against the orphan
         // sweep), as `NewTxn::RestoreTableSnapshot` does through the catalog.
         let _ddl = self.ddl_lock.lock().unwrap();
@@ -688,6 +718,12 @@ impl Engine {
         }
         let name = format!("{db_name}.{}", json_str(table, "table_name"));
         if self.storage.catalog.get_table_by_name(&name)?.is_some() {
+            // A replay re-runs the restore it already applied (the catalog
+            // writes may have reached an SST before the crash): treat it as
+            // done instead of refusing to open the directory.
+            if skip_existing {
+                return Ok(Vec::new());
+            }
             return Err(Error::Invalid(format!("table '{name}' already exists")));
         }
         let (columns, defaults, not_nulls, types) = schema_of(table)?;

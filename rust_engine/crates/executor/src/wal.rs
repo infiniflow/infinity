@@ -786,6 +786,28 @@ fn qualified(db_name: &str, name: &str) -> String {
 /// and the commit ts is stamped from the frame.
 pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()> {
     let catalog = engine.catalog();
+    // A restore recreates a table (or a whole database) from the snapshot it
+    // names and copies its files back. Its catalog writes are in the memtable
+    // like any DDL's, so a crash before the next checkpoint leaves them to the
+    // log; re-running the restore is idempotent (a table that is already there
+    // is skipped). A snapshot that no longer exists leaves the directory
+    // readable with the restore's rows missing - refusing the whole open would
+    // be worse.
+    match cmd {
+        WalCmd::RestoreTableSnapshot { snapshot_name, .. } => {
+            let _ = engine.apply_table_snapshot(snapshot_name, true);
+            return Ok(());
+        }
+        WalCmd::RestoreDatabaseSnapshot { snapshot_name, .. } => {
+            let _ = engine.apply_database_snapshot(snapshot_name, true);
+            return Ok(());
+        }
+        WalCmd::RestoreSystemSnapshot { snapshot_name, .. } => {
+            let _ = engine.apply_system_snapshot(snapshot_name, true);
+            return Ok(());
+        }
+        _ => {}
+    }
     let mut batch: Vec<(Vec<u8>, Option<Vec<u8>>)> = match cmd {
         WalCmd::CreateTable {
             db_name,

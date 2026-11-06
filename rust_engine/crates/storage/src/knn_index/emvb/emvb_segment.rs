@@ -492,6 +492,22 @@ pub fn write_emvb_segment(
     write_bytes(path, bytes)
 }
 
+/// [`encode_emvb_refs`] with the index's `pq_subspace_num` /
+/// `pq_subspace_bits`.
+///
+/// The chunk records them in its header, and a reader that trains its own
+/// residual codes on them must see the index's values, not the inference
+/// `build_emvb` makes for a column without an `USING EMVB` definition.
+pub fn encode_emvb_refs_with(
+    dims: usize,
+    start_segment_offset: u32,
+    docs: &[(u32, &[Vec<f32>])],
+    subspace_num: usize,
+    subspace_bits: u32,
+) -> Vec<u8> {
+    build_emvb_with(dims, start_segment_offset, docs, subspace_num, subspace_bits).encode()
+}
+
 /// Like [`write_emvb_segment`] but with borrowed token rows.
 pub fn write_emvb_segment_refs(
     path: &Path,
@@ -500,6 +516,25 @@ pub fn write_emvb_segment_refs(
     docs: &[(u32, &[Vec<f32>])],
 ) -> Result<(), FormatError> {
     let bytes = encode_emvb_refs(dims, start_segment_offset, docs);
+    write_bytes(path, bytes)
+}
+
+/// [`write_emvb_segment_refs`] with the index's residual-PQ parameters.
+pub fn write_emvb_segment_refs_with(
+    path: &Path,
+    dims: usize,
+    start_segment_offset: u32,
+    docs: &[(u32, &[Vec<f32>])],
+    subspace_num: usize,
+    subspace_bits: u32,
+) -> Result<(), FormatError> {
+    let bytes = encode_emvb_refs_with(
+        dims,
+        start_segment_offset,
+        docs,
+        subspace_num,
+        subspace_bits,
+    );
     write_bytes(path, bytes)
 }
 

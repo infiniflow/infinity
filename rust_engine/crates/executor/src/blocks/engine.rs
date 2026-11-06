@@ -1077,6 +1077,7 @@ impl Engine {
         table: &str,
         column: &str,
         kind: &str,
+        segment: u32,
     ) -> Option<Vec<u8>> {
         let key = self.table_key(table);
         let index = {
@@ -1120,7 +1121,32 @@ impl Engine {
             Some(out)
         } else {
             let emvb = guard.tail_emvb.lock().ok()?;
-            Some(emvb.as_ref()?.data.encode())
+            if let Some(tail) = emvb.as_ref() {
+                return Some(tail.data.encode());
+            }
+            // The tail was sealed before this publish: `MultiVectorIndex::seal`
+            // wrote the memory index's EMVB next to the raw-token segment
+            // (`seg_{segment}_{n}_{docs}.emvb` in the index's own directory),
+            // and that file is the same layout as the C++ chunk
+            // (`EmvbData::encode`). Without it the mirror published no chunk at
+            // all for an index nothing had searched yet.
+            let prefix = format!("seg_{segment}_");
+            let mut newest: Option<(u64, std::path::PathBuf)> = None;
+            for entry in std::fs::read_dir(&guard.dir).ok()?.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if !name.starts_with(&prefix) || !name.ends_with(".emvb") {
+                    continue;
+                }
+                let ordinal = name[prefix.len()..]
+                    .split('_')
+                    .next()
+                    .and_then(|n| n.parse::<u64>().ok())
+                    .unwrap_or(0);
+                if newest.as_ref().map(|(o, _)| ordinal > *o).unwrap_or(true) {
+                    newest = Some((ordinal, entry.path()));
+                }
+            }
+            newest.and_then(|(_, path)| std::fs::read(path).ok())
         }
     }
 
@@ -1253,7 +1279,7 @@ impl Engine {
                     // worker in the reference (`smve_index_file_worker`,
                     // `emvb_index_file_worker`): one `chunk_0.idx` per
                     // segment naming the whole segment.
-                    let Some(bytes) = self.multivector_chunk(table, &im.column, &im.index_type)
+                    let Some(bytes) = self.multivector_chunk(table, &im.column, &im.index_type, *segment)
                     else {
                         continue;
                     };
@@ -1278,7 +1304,7 @@ impl Engine {
                 } else if im.index_type.eq_ignore_ascii_case("SMVE")
                     || im.index_type.eq_ignore_ascii_case("EMVB")
                 {
-                    let Some(bytes) = self.multivector_chunk(table, &im.column, &im.index_type)
+                    let Some(bytes) = self.multivector_chunk(table, &im.column, &im.index_type, *segment)
                     else {
                         continue;
                     };
