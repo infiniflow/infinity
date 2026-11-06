@@ -55,6 +55,7 @@ cd rust_engine
 | `unit` | arch | `cargo test --workspace`（含 `analyzer`/`analyzer-ffi`），amd64 另跑 `cli smoke` 与 Gate A 基线（报告） |
 | `build` | engine × arch | 参考版在仓库的 builder 镜像里编（arm64 交叉编译），重写版在对应架构的 runner 上原生编；各上传一个 `bin-<engine>-<arch>` |
 | `restart` | engine × arch | Gate C 的重启用例，二进制由矩阵决定；rust 格子经 `infinity_rust_shim.sh` 启动 |
+| `sdk` | engine × arch | Gate B：未改动的 Python SDK（`python/test_pysdk`）打两个引擎；只在 nightly / 手动触发（30 个文件，单格几十分钟） |
 | `cross_engine` | arch | 格式门禁：一次跑两个引擎（`test_cross_engine_bytes_*` + `test_cross_engine_compat`） |
 
 arm64 需要交叉编参考版，所以只在 push / nightly / 手动触发时跑；PR 只跑 amd64。

@@ -241,6 +241,50 @@ jobs:
         if: always()
         run: tail -n 500 restart_test_infinity.log.* 2>/dev/null || true
 
+  sdk:
+    # Gate B: the unmodified Python SDK driving the matrix engine. Nightly and
+    # manual runs only - the suite is ~30 files and takes tens of minutes per
+    # cell, which does not belong on every pull request.
+    name: sdk (${{ matrix.engine }}, ${{ matrix.arch }})
+    needs: build
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [cpp, rust]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/download-artifact@v8
+        with:
+          name: bin-${{ matrix.engine }}-${{ matrix.arch }}
+          path: bin
+      - name: Prepare the resources and the data directory
+        run: |
+          chmod +x bin/infinity
+          sudo mkdir -p /usr/share/infinity/resource /var/infinity
+          sudo cp -r resource/. /usr/share/infinity/resource/
+          sudo chown -R "${USER}" /usr/share/infinity /var/infinity
+      - uses: astral-sh/setup-uv@v7
+      - name: Install the SDK and the test dependencies
+        run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - name: Start the engine
+        run: |
+          # Both CLIs read the same toml (ports 23817/23820, data under
+          # /var/infinity), so the matrix cell only differs by the binary.
+          nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_infinity.sh
+      - name: Python SDK suite
+        run: .venv/bin/python -m pytest -q python/test_pysdk -m "not complex and not slow" --tb=short
+      - name: Stop the engine and show its log
+        if: always()
+        run: |
+          pkill -f "bin/infinity --config" || true
+          tail -n 200 infinity.log || true
+
   cross_engine:
     # Gate C's format half: both engines in one run, per architecture.
     name: format gate (${{ matrix.arch }})
