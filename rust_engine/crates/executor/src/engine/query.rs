@@ -1146,7 +1146,7 @@ impl Engine {
                     // the catalog, whose `ColumnDef::ToJson` omits it.
                     |batch| {
                         let bare = name.rsplit('.').next().unwrap_or(name);
-                        let cmd = crate::wal::create_table_command_from_batch(batch, bare)?;
+                        let cmd = crate::wal_bridge::create_table_command_from_batch(batch, bare)?;
                         match cmd {
                             storage::WalCmd::CreateTable {
                                 db_name,
@@ -1404,7 +1404,7 @@ impl Engine {
                     },
                     move |b| match &ac_ident {
                         Some((db_id, table_id, table_key)) => {
-                            crate::wal::add_columns_command_from_batch(
+                            crate::wal_bridge::add_columns_command_from_batch(
                                 b, db_id, table_id, &bare, table_key, base_index, &ac_names,
                             )
                         }
@@ -1449,7 +1449,7 @@ impl Engine {
                 self.ddl_commit_typed(
                     TxnOp::CreateDatabase { db: name.clone() },
                     || self.storage.catalog.create_database(name, *if_not_exists),
-                    |batch| crate::wal::create_database_command_from_batch(batch, name),
+                    |batch| crate::wal_bridge::create_database_command_from_batch(batch, name),
                 )?;
                 Ok(QueryResult::CreatedDatabase { name: name.clone() })
             }
@@ -1919,7 +1919,7 @@ impl Engine {
                             .create_index_typed(name, table, column, index_type, opts)
                     },
                     |batch| {
-                        crate::wal::create_index_command_from_batch(
+                        crate::wal_bridge::create_index_command_from_batch(
                             batch,
                             &table_name,
                             &table_key,

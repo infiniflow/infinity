@@ -4,7 +4,7 @@
 
 这份文档回答三个反复出现的问题：**Rust 侧用哪个 catalog 后端**、**它和参考实现的目录能不能互相读**、**在哪些点上真的做了 fsync**。
 
-实现位置：`crates/storage/src/metastore.rs`（`MetaStore` trait）、`crates/storage/src/metastore_rocks.rs`（RocksDB，唯一实现）、`crates/catalog/src/catalog/layout.rs`（C++ 键空间/值编码）、`crates/storage/src/wal.rs`（重做日志）。
+实现位置：`crates/storage/src/metastore.rs`（`MetaStore` trait）、`crates/storage/src/metastore_rocks.rs`（RocksDB，唯一实现）、`crates/catalog/src/catalog/layout.rs`（C++ 键空间/值编码）、`crates/storage/src/wal/`（重做日志）。
 
 ---
 

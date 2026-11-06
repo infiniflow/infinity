@@ -190,7 +190,7 @@ impl Engine {
         let applied = engine.txn.applied_ts()?;
         engine
             .txn
-            .replay_commands(applied, |cmd, ts| crate::wal::replay(&engine, cmd, ts))?;
+            .replay_commands(applied, |cmd, ts| crate::wal_bridge::replay(&engine, cmd, ts))?;
         // The blocks next, then the WAL's rows on top: what the files carry is
         // already applied, so the replay starts above the newest timestamp they
         // hold (the reference's checkpoint record gives it the same floor).
@@ -264,7 +264,7 @@ impl Engine {
                     db: "default_db".to_string(),
                 },
                 || engine.storage.catalog.create_database("default_db", false),
-                |batch| crate::wal::create_database_command_from_batch(batch, "default_db"),
+                |batch| crate::wal_bridge::create_database_command_from_batch(batch, "default_db"),
             )?;
         }
         // The reference stamps `db_id`/`table_id` into every row command; a

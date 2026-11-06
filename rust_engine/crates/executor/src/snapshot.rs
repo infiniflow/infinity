@@ -329,7 +329,7 @@ impl Engine {
 
     /// The restore itself, without the log entry.
     ///
-    /// Replay re-runs it from the snapshot the command names (`wal::replay`),
+    /// Replay re-runs it from the snapshot the command names (`wal_bridge::replay`),
     /// where a commit would write a second transaction. `skip_existing` makes
     /// it a no-op for a table that is already there - the restore's catalog
     /// writes may have reached an SST before the crash.
@@ -930,7 +930,7 @@ fn table_def_of(table: &Json) -> TableDef {
             .any(|c| json_int(c) == 2);
         columns.push(ColumnDef {
             id: json_int_of(&column, "column_id"),
-            column_type: crate::wal::data_type_from_json(json_get(&column, "column_type")),
+            column_type: crate::wal_bridge::data_type_from_json(json_get(&column, "column_type")),
             name: json_str(&column, "column_name"),
             constraints: if not_null {
                 vec![storage::wal::ddl_def::ConstraintType::NotNull]

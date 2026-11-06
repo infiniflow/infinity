@@ -116,7 +116,7 @@ mod update_import_ut;
 #[cfg(test)]
 mod upload_meta_to_s3_ut;
 mod variables;
-mod wal;
+mod wal_bridge;
 #[cfg(test)]
 mod wal_replay_ut;
 #[cfg(test)]

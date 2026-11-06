@@ -536,7 +536,7 @@ pub(crate) fn typed_append_block(
 
     let declared: Vec<_> = types
         .iter()
-        .map(|t| crate::wal::data_type_of_text(t))
+        .map(|t| crate::wal_bridge::data_type_of_text(t))
         .collect::<Option<Vec<_>>>()?;
     let direct = |i: usize| {
         matches!(
