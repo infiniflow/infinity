@@ -214,7 +214,7 @@ impl Engine {
                     db: "default_db".to_string(),
                 },
                 || engine.storage.catalog.create_database("default_db", false),
-                |batch| crate::wal_ddl::create_database_command_from_batch(batch, "default_db"),
+                |batch| crate::wal::create_database_command_from_batch(batch, "default_db"),
             )?;
         }
         // The reference stamps `db_id`/`table_id` into every row command; a

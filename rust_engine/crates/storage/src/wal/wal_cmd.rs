@@ -34,7 +34,7 @@ impl WalCmdCreateTableV2 {
     }
 
     /// C++ `WalCmdCreateTableV2::ReadAdv`. The replay path builds the command
-    /// from `wal_ddl`'s parser, so only `wal_cmd`'s round-trip test calls this
+    /// from `crate::wal`'s parser, so only `wal_cmd`'s round-trip test calls this
     /// decoder.
     #[allow(dead_code)]
     pub(crate) fn read_adv(r: &mut Reader<'_>) -> Result<Self> {

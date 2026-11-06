@@ -894,7 +894,7 @@ fn table_def_of(table: &Json) -> TableDef {
             .any(|c| json_int(c) == 2);
         columns.push(ColumnDef {
             id: json_int_of(&column, "column_id"),
-            column_type: crate::wal_ddl::data_type_from_json(json_get(&column, "column_type")),
+            column_type: crate::wal::data_type_from_json(json_get(&column, "column_type")),
             name: json_str(&column, "column_name"),
             constraints: if not_null {
                 vec![storage::wal::ddl_def::ConstraintType::NotNull]

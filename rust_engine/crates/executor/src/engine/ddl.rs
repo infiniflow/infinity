@@ -144,7 +144,7 @@ impl Engine {
             .next()
         {
             let key = String::from_utf8_lossy(&k).into_owned();
-            let id = crate::wal_ddl::ColumnRecord::from_json(&String::from_utf8_lossy(&v))
+            let id = crate::wal::ColumnRecord::from_json(&String::from_utf8_lossy(&v))
                 .map(|r| r.id() as u32)
                 .unwrap_or(0);
             return Ok(Some(storage::WalCmd::DropColumns {

@@ -1,7 +1,20 @@
-//! Builds the reference's `TableDef` from the port's per-column catalog
-//! records, so a DDL can hand a typed `WalCmdCreateTableV2` to the transaction
-//! instead of a `KvBatch`.
+//! The WAL bridge: every `WalCmd` the engine writes, and the replay that puts a
+//! recovered directory back the way the reference does.
 //!
+//! Two directions live here because they are the same mapping read backwards:
+//!
+//! * **out** - a DDL turns its catalog batch into the reference's typed command
+//!   (`create_table_command_from_batch` and friends), so the log matches the
+//!   reference frame for frame;
+//! * **in** - a replayed command re-creates the catalog records it described.
+//!
+//! Replay is not DDL-only: the log also carries DML. `Append`/`Delete` reach the
+//! blocks through `TxnManager::recover_into` + `apply_replayed_rows` (the block
+//! files keep the row data, the command names the commit ts and the slots), and
+//! `Import`/`Compact`/`DumpIndex` describe the segment and chunk metadata that
+//! the catalog store keeps log-less, so those have to be replayed here too.
+//!
+//! The build direction starts from the per-column catalog records.
 //! The per-column record (`tbl|col|{db}|{tbl}|{name}|{ts}`) is JSON:
 //! ```json
 //! {"column_id":0,"column_name":"id",
