@@ -20,13 +20,12 @@ need go      "go SDK tests"      || status=1
 
 # 1. build and start the Rust server (Thrift on $port)
 cd "$here/.." || exit 1
-cargo build -q --release -p server || exit 1
-# the server binary name follows the crate's bin target
-srv_bin="$(ls target/release/server 2>/dev/null || true)"
-if [[ -z "$srv_bin" ]]; then echo "no server binary built"; exit 1; fi
+cargo build -q --release -p cli || exit 1
+srv_bin="target/release/infinity"
+if [[ ! -x "$srv_bin" ]]; then echo "no infinity binary built"; exit 1; fi
 
 tmp="$(mktemp -d)"
-"$srv_bin" "$tmp" >"$tmp/server.log" 2>&1 &
+"$srv_bin" serve "$tmp" >"$tmp/server.log" 2>&1 &
 srv=$!
 trap 'kill $srv 2>/dev/null; rm -rf "$tmp"' EXIT
 sleep 2

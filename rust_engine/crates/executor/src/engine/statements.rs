@@ -1554,6 +1554,23 @@ impl Engine {
         let committed = self.txn.commit_at(txn, commit_ts);
         self.storage.catalog.invalidate_tables();
         committed?;
+        // Durable now, not at the next checkpoint.
+        //
+        // The reference reaches the same guarantee from the other side: its
+        // catalog writes also go in with `disableWAL` (RocksDB's log stays
+        // off), and a crash before the next checkpoint loses the memtable --
+        // but `NewTxnManager` replays `WalCmdCreateTableV2`/… and re-executes
+        // the DDL, so every committed DDL survives a `kill -9` regardless of
+        // `checkpoint_interval`. Replaying a typed DDL here would mean
+        // rebuilding the catalog batch the command was derived from (ids and
+        // column records included); flushing the store's memtable produces
+        // exactly the records the DDL committed, with the same keys and
+        // timestamps, and costs one `Flush()` per statement. A directory with
+        // `checkpoint_interval = "0s"` therefore keeps its schema across a
+        // crash, as the reference's does.
+        if self.wal_enabled {
+            self.storage.catalog.flush()?;
+        }
         Ok(out)
     }
 
@@ -4372,6 +4389,11 @@ impl Engine {
         if let Some(v) = self.context.config.lock().unwrap().get(&key) {
             return Some(v.clone());
         }
+        // `mem_index_capacity` is an `IntegerOption` in the reference and its
+        // value comes from the running engine, not from the config map.
+        if key == "mem_index_capacity" {
+            return Some(self.memindex_capacity().to_string());
+        }
         let default = match key.as_str() {
             "log_level" => "info",
             "result_cache" => "off",
@@ -4614,35 +4636,49 @@ impl Engine {
                             "Attempt to create index on column: {column}, data type: {ty}."
                         )));
                     }
-                    let dims = crate::blocks::tensor_shape(&ty)
-                        .map(|(_, dim, _)| dim)
-                        .unwrap_or(0);
-                    let mut subspaces = 1usize;
+                    // `IndexEMVB::Make` checks the parameter *names* and their
+                    // value sets only; the "dimension must divide the subspace
+                    // count" test lives in `GetEMVBOPQ` (the PQ constructor,
+                    // i.e. index-build time), so a DDL like
+                    // `TENSOR(FLOAT,4) … pq_subspace_num = 8` is accepted by the
+                    // reference and only blows up when the index is built.
+                    let mut subspaces = None;
+                    let mut bits = None;
                     for (k, v) in opts {
                         if k.eq_ignore_ascii_case("pq_subspace_num") {
-                            subspaces = v.trim().parse().unwrap_or(0);
-                            if !matches!(subspaces, 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128) {
+                            let n: usize = v.trim().parse().unwrap_or(0);
+                            if !matches!(n, 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128) {
                                 return Err(Error::Invalid(
                                     "Invalid index parameter type: pq_subspace_num".into(),
                                 ));
                             }
+                            subspaces = Some(n);
                         } else if k.eq_ignore_ascii_case("pq_subspace_bits") {
-                            let bits: u32 = v.trim().parse().unwrap_or(0);
-                            if bits != 8 && bits != 16 {
+                            let n: u32 = v.trim().parse().unwrap_or(0);
+                            if n != 8 && n != 16 {
                                 return Err(Error::Invalid(
                                     "Invalid index parameter type: pq_subspace_bits".into(),
                                 ));
                             }
+                            bits = Some(n);
                         } else {
                             return Err(Error::Invalid(format!(
                                 "Invalid index parameter type: {k}"
                             )));
                         }
                     }
-                    if dims != 0 && dims % subspaces != 0 {
-                        return Err(Error::Invalid(format!(
-                            "embedding dimension {dims} is not a multiple of subspace number {subspaces}"
-                        )));
+                    // The reference defaults both to 0 and then rejects them
+                    // (`0` is not in either acceptable set), so the two options
+                    // are effectively mandatory.
+                    if subspaces.is_none() {
+                        return Err(Error::Invalid(
+                            "Invalid index parameter type: pq_subspace_num".into(),
+                        ));
+                    }
+                    if bits.is_none() {
+                        return Err(Error::Invalid(
+                            "Invalid index parameter type: pq_subspace_bits".into(),
+                        ));
                     }
                 }
                 if index_type.eq_ignore_ascii_case("IVF") {
@@ -4689,7 +4725,7 @@ impl Engine {
                     )));
                 }
                 for (k, v) in opts {
-                    if k == "ANALYZER" {
+                    if k.eq_ignore_ascii_case("ANALYZER") {
                         // C++ `IndexFullText::Make` hands the raw parameter to
                         // `AnalyzerPool::GetAnalyzer` and fails on its status,
                         // so the name is validated case sensitively and with

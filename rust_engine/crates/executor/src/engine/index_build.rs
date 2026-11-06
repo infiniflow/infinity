@@ -1154,18 +1154,46 @@ impl Engine {
     /// `-<chars>` form splits on the listed characters, and any other analyzer
     /// uses the standard tokeniser (`None`).
     pub(crate) fn index_delims(&self, table: &str, column: &str) -> Option<Vec<char>> {
-        let key = self.table_key(table);
-        let guard = self.tables.lock().unwrap();
-        let name = guard.get(&key)?.analyzers.get(column)?;
+        let name = self.column_analyzer_name(table, column)?;
         // C++ `WhitespaceAnalyzer`: the delimiter set is everything after the
         // first '-' of a `keyword`/`whitespace` name, verbatim (so `-A` is the
         // uppercase byte), and empty means "split on whitespace".
-        match analyzer::parse_analyzer_name(name) {
+        match analyzer::parse_analyzer_name(&name) {
             Ok(analyzer::AnalyzerName::Whitespace { delimiters }) => {
                 Some(delimiters.chars().collect())
             }
             _ => None,
         }
+    }
+
+    /// The analyzer a query written against `column` is tokenised with.
+    ///
+    /// C++ `SearchDriver::GetAnalyzerName`: a query that names no `@index`
+    /// walks the column's indexes in name order and takes the first analyzer
+    /// that is *not* a sparse-gram one, so a regular analyzer wins whenever the
+    /// column has both; only a column whose indexes are all sparse-gram falls
+    /// back to one of those.
+    pub(crate) fn column_analyzer_name(&self, table: &str, column: &str) -> Option<String> {
+        let key = self.table_key(table);
+        let guard = self.tables.lock().unwrap();
+        let entry = guard.get(&key)?;
+        if let Some(by_index) = entry.column_index_analyzers.get(column) {
+            let mut sparsegram: Option<String> = None;
+            for analyzer_name in by_index.values() {
+                let is_sparsegram = matches!(
+                    analyzer::parse_analyzer_name(analyzer_name),
+                    Ok(analyzer::AnalyzerName::SparseGram { .. })
+                );
+                if !is_sparsegram {
+                    return Some(analyzer_name.clone());
+                }
+                sparsegram.get_or_insert_with(|| analyzer_name.clone());
+            }
+            if sparsegram.is_some() {
+                return sparsegram;
+            }
+        }
+        entry.analyzers.get(column).cloned()
     }
 
     /// The tokeniser a column's full-text index uses: the delimiters
@@ -1184,11 +1212,7 @@ impl Engine {
     /// something other than the English default (which `standard` itself and
     /// every unknown suffix keep, like the reference's if-chain).
     pub(crate) fn index_stemmer(&self, table: &str, column: &str) -> Option<analyzer::Stemmer> {
-        let key = self.table_key(table);
-        let name = {
-            let guard = self.tables.lock().unwrap();
-            guard.get(&key)?.analyzers.get(column)?.clone()
-        };
+        let name = self.column_analyzer_name(table, column)?;
         let analyzer::AnalyzerName::Standard { language } =
             analyzer::parse_analyzer_name(&name).ok()?
         else {
@@ -1205,9 +1229,7 @@ impl Engine {
     /// `japanese`, …). `standard` *is* the default path and `keyword` /
     /// `whitespace` are carried by the delimiters.
     pub(crate) fn index_analyzer(&self, table: &str, column: &str) -> Option<String> {
-        let key = self.table_key(table);
-        let guard = self.tables.lock().unwrap();
-        let name = guard.get(&key)?.analyzers.get(column)?.clone();
+        let name = self.column_analyzer_name(table, column)?;
         match analyzer::parse_analyzer_name(&name) {
             Ok(analyzer::AnalyzerName::Standard { .. })
             | Ok(analyzer::AnalyzerName::Whitespace { .. })

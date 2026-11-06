@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Decodes a `Select` REPLY (`SelectResponse`) from stdin using the authoritative
 generated Python codec. Run:
-    cargo run -q -p infinity-server --bin emit-select-response | python3 py_decode_select_response.py
+    cargo run -q -p server --bin emit-select-response | python3 py_decode_select_response.py
 """
 import os
 import sys

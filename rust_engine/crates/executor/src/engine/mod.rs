@@ -40,8 +40,8 @@ use crate::query_builder::QueryNode;
 pub(crate) use crate::invertedindex::search::blockmax_wand_iterator as wand;
 pub(crate) use crate::knn_scan;
 pub(crate) use crate::{
-    common::analyzer, deferred_catalog, diagnostics, hnsw_mem, profiler, variables,
-    BGTaskProcessor, Batch, BgTask, ColumnData, Scope,
+    common::analyzer, deferred_catalog, diagnostics, variables, BGTaskProcessor, Batch, BgTask,
+    ColumnData, Scope,
 };
 
 pub(crate) mod admin;
@@ -58,13 +58,7 @@ pub(crate) mod tasks;
 pub(crate) mod text_index;
 pub(crate) mod types;
 
-pub(crate) use admin::*;
-pub(crate) use ddl::*;
-pub(crate) use dml::*;
-pub(crate) use index_build::*;
-pub use query::*;
 pub use state::*;
-pub(crate) use statements::*;
 pub(crate) use tasks::*;
 pub(crate) use text_index::*;
 pub(crate) use types::*;

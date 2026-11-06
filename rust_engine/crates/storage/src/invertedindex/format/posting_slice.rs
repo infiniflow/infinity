@@ -95,13 +95,13 @@ pub fn u32_fields(rows: usize) -> PostingFields {
 }
 
 #[derive(Clone, Debug)]
-enum RowData {
+pub(crate) enum RowData {
     U32(Vec<u32>),
     U16(Vec<u16>),
 }
 
 #[derive(Clone, Debug)]
-struct Row {
+pub(crate) struct Row {
     pub(crate) ty: FieldType,
     pub(crate) slots: RowData,
 }
@@ -877,7 +877,7 @@ pub struct SkipToResult {
     pub delta: u32,
 }
 
-enum Source {
+pub(crate) enum Source {
     None,
     Bytes {
         data: Vec<u8>,

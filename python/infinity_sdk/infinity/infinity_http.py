@@ -258,6 +258,9 @@ class infinity_http:
 
     # database
     def create_database(self, db_name, opt=ConflictType.Error):
+        # The Thrift adapter validates the name client-side before sending the
+        # request; the server would otherwise only answer with a bare 404.
+        check_valid_name(db_name, "DB")
         url = f"databases/{db_name}"
         h = self.net.set_up_header(["accept", "content-type"])
         if opt in [ConflictType.Error, ConflictType.Ignore, ConflictType.Replace]:

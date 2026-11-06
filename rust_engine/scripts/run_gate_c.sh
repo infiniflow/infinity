@@ -66,8 +66,14 @@ if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
   # (`catalog| db| tbl| col| idx|`), so the binary Gate C runs above already
   # reads and writes what the reference does.
   if cargo build -q --release -p cli; then
-    cross=( "$py" -m pytest -q python/restart_test/test_cross_engine_compat.py \
-            python/restart_test/test_cross_engine_bytes_*.py \
+    # Absolute paths: the array is built while the script is still in
+    # `rust_engine` (leg 1 cds there), so a repo-relative glob would not expand
+    # and pytest would receive the literal `test_cross_engine_bytes_*.py`.
+    shopt -s nullglob
+    bytes=( "$root"/python/restart_test/test_cross_engine_bytes_*.py )
+    shopt -u nullglob
+    cross=( "$py" -m pytest -q "$root"/python/restart_test/test_cross_engine_compat.py \
+            "${bytes[@]}" \
             --infinity_path="$shim" )
     if command -v bwrap >/dev/null 2>&1; then
       # The same sandbox the restart suites get: these tests root both engines

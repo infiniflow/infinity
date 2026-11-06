@@ -561,6 +561,16 @@ impl Engine {
             return Ok(None);
         }
 
+        // `filter_text`/`filter_fulltext` are answered by a full-text index and
+        // may carry an `@index` hint. The columnar path below evaluates the
+        // predicate row by row against the column, which silently ignores the
+        // hint (a sparse-gram query then matches like the default analyzer), so
+        // hand these statements to the general path.
+        if let Some(pred) = where_pred.as_ref() {
+            if has_fulltext_call(pred) {
+                return Ok(None);
+            }
+        }
         let predicate = match where_pred.as_ref() {
             Some(pred) => Some(planner::predicate_expr(pred, &schema)?),
             None => None,
@@ -1918,7 +1928,13 @@ impl Engine {
                     },
                 )?;
                 // remember the analyzer so fulltext matching can tokenise compatibly
-                if let Some((_, a)) = opts.iter().find(|(k, _)| k == "ANALYZER") {
+                // The option name is `ANALYZER` in SQL but `analyzer` over the
+                // API (the reference lower-cases every `InitParameter` there),
+                // so match it case-insensitively.
+                if let Some((_, a)) = opts
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case("ANALYZER"))
+                {
                     // C++ keeps `InitParameter::param_value_` verbatim: the
                     // name is case sensitive and its suffix carries parameters
                     // (`whitespace-<delims>`, `ngram-<n>`, `rag-fine-<lang>`).
@@ -1927,6 +1943,11 @@ impl Engine {
                     let mut tables = self.tables.lock().unwrap();
                     let entry = tables.entry(key).or_default();
                     entry.analyzers.insert(column.clone(), a.clone());
+                    entry
+                        .column_index_analyzers
+                        .entry(column.clone())
+                        .or_default()
+                        .insert(name.clone(), a.clone());
                     entry.analyzers_by_index.insert(name.clone(), a);
                 }
                 // a functional-index target is not a plain column, so there is
@@ -2254,6 +2275,11 @@ impl Engine {
                 rows,
             } => self.insert_literals(table, columns.as_deref(), rows.clone()),
             Statement::Delete { table, where_pred } => {
+                // A WHERE clause must be a predicate: `DELETE FROM t WHERE c1` on
+                // a non-boolean column is rejected by the reference.
+                if let Some(p) = where_pred.as_ref() {
+                    self.validate_where_predicate(table, p)?;
+                }
                 // A subquery in the filter is evaluated once, before the scan.
                 let where_pred = match where_pred {
                     Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new(), &[])?),
@@ -2289,11 +2315,15 @@ impl Engine {
                 assignments,
                 where_pred,
             } => {
-                // The reference requires a filter on UPDATE.
+                // The reference requires a filter on UPDATE, and it has to be a
+                // predicate (`WHERE c1` on a non-boolean column is rejected).
                 if where_pred.is_none() {
                     return Err(Error::Invalid(
                         "syntax: UPDATE requires a WHERE clause".into(),
                     ));
+                }
+                if let Some(p) = where_pred.as_ref() {
+                    self.validate_where_predicate(table, p)?;
                 }
                 let where_pred = match where_pred {
                     Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new(), &[])?),
@@ -2606,5 +2636,41 @@ impl Engine {
         );
         source.set_unmatchable(unmatchable);
         crate::operator::run_operators(operators, names, &mut source)
+    }
+}
+
+/// True when a `filter_text`/`filter_fulltext` call appears anywhere in the
+/// predicate. Such a call is answered by a full-text index and may name one with
+/// `column@index`; the columnar fast path evaluates the predicate row by row,
+/// which drops the hint (and with it the chosen analyzer).
+fn has_fulltext_call(p: &Predicate) -> bool {
+    match p {
+        Predicate::IsTrue(e) => expr_has_fulltext_call(e),
+        Predicate::Cmp(l, _, r) => expr_has_fulltext_call(l) || expr_has_fulltext_call(r),
+        Predicate::IsNull(e, _) => expr_has_fulltext_call(e),
+        Predicate::Like(l, r, _, _) => expr_has_fulltext_call(l) || expr_has_fulltext_call(r),
+        Predicate::In(e, list, _) => {
+            expr_has_fulltext_call(e) || list.iter().any(expr_has_fulltext_call)
+        }
+        Predicate::Bool(l, _, r) => has_fulltext_call(l) || has_fulltext_call(r),
+        _ => false,
+    }
+}
+
+fn expr_has_fulltext_call(e: &ExprAst) -> bool {
+    match e {
+        ExprAst::Func { name, args } => {
+            name.eq_ignore_ascii_case("filter_text")
+                || name.eq_ignore_ascii_case("filter_fulltext")
+                || args.iter().any(expr_has_fulltext_call)
+        }
+        ExprAst::Binary(l, _, r) | ExprAst::Cmp(l, _, r) => {
+            expr_has_fulltext_call(l) || expr_has_fulltext_call(r)
+        }
+        ExprAst::And(l, r) | ExprAst::Or(l, r) => {
+            expr_has_fulltext_call(l) || expr_has_fulltext_call(r)
+        }
+        ExprAst::Not(x) => expr_has_fulltext_call(x),
+        _ => false,
     }
 }

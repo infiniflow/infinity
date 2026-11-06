@@ -1,7 +1,5 @@
 use super::*;
 
-use super::*;
-
 /// Appends `value` as an unsigned LEB128 varint (7 bits per byte, low bits
 /// first, high bit = continuation).
 pub fn write_vint(out: &mut Vec<u8>, mut value: u64) {

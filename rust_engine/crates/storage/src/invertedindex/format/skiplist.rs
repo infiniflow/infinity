@@ -37,13 +37,13 @@ impl Comparator<String> for KeyComparator {
     }
 }
 
-struct Node<K, V> {
+pub(crate) struct Node<K, V> {
     pub(crate) key: K,
     pub(crate) value: V,
     pub(crate) next: Vec<Option<usize>>,
 }
 
-struct Inner<K, V> {
+pub(crate) struct Inner<K, V> {
     pub(crate) nodes: Vec<Node<K, V>>,
     /// Level links out of the head node.
     pub(crate) head: Vec<Option<usize>>,

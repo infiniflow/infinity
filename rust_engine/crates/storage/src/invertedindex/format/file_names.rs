@@ -1,5 +1,3 @@
-use super::*;
-
 /// The full-text index file-family suffixes (`index_defines.cppm:55-58`).
 ///
 /// A chunk's files are `{index_dir}/{base_name}{suffix}`, where `index_dir` is

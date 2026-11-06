@@ -7,7 +7,7 @@ pub(crate) mod standard;
 pub(crate) mod tokenizer;
 pub(crate) mod whitespace;
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 pub(crate) mod chinese;
 pub(crate) mod core;

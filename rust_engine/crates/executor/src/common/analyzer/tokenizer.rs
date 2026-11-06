@@ -1,5 +1,3 @@
-use super::*;
-
 /// Token classes, mirroring the reference's per-byte table.
 pub(crate) const ALLOW: u8 = 0;
 

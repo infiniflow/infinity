@@ -2348,19 +2348,6 @@ impl<'a> MergeCursor<'a> {
         self.cur.map(|c| c.1).unwrap_or(0)
     }
 
-    /// The current document's length (BM25 dl).
-    pub(crate) fn len(&mut self) -> u32 {
-        if self.single {
-            return self.sources[0].len();
-        }
-        if self.concat {
-            let _ = self.doc();
-            return self.sources[self.next].len();
-        }
-        self.settle();
-        self.cur.map(|c| c.2).unwrap_or(1)
-    }
-
     /// The current document's token offsets.
     pub(crate) fn positions(&mut self) -> &[u32] {
         if self.single {
@@ -3311,6 +3298,13 @@ impl MultiVectorIndex {
     }
 
     /// C++: `EMVBIndexInMem` over the memory tail (`build_index_threshold_`).
+    ///
+    /// Not called: the tail is sealed right after it is filled, and the chunk
+    /// writer serializes the raw tokens itself — building the memory-side EMVB
+    /// first cost 1.0-1.5 s of a 20k-row create and its result was dropped by
+    /// the seal (`MultiVectorIndex::seal`). Kept as the reference's shape for
+    /// when a query path reads the tail index directly.
+    #[allow(dead_code)]
     pub(crate) fn build_emvb_tail(&self) {
         let tail_embeddings: usize = self.tail.values().map(Vec::len).sum();
         if tail_embeddings < emvb_build_threshold() {
@@ -4064,6 +4058,9 @@ pub(crate) struct TableEntry {
     pub(crate) imports: Option<Vec<(u32, u64, u64)>>,
     /// Analyzer per index name: two indexes on one column may differ.
     pub(crate) analyzers_by_index: HashMap<String, String>,
+    /// Every full-text index of a column, index name → analyzer, sorted by
+    /// index name (`SearchDriver::GetAnalyzerName` walks exactly this shape).
+    pub(crate) column_index_analyzers: HashMap<String, std::collections::BTreeMap<String, String>>,
     /// `CREATE INDEX … COMMENT '…'` per index name.
     pub(crate) comments: HashMap<String, String>,
     /// HNSW memory segment per vector column (`MemIndex::hnsw_index_`).

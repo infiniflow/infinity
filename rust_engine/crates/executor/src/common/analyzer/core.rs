@@ -592,6 +592,7 @@ impl AnalyzerPool {
     }
 }
 
+#[allow(dead_code)]
 /// C++: `PCRE2GlobalReplaceWithPosition` (`rag_analyzer_impl.cpp`).
 ///
 /// The reference compiles every pattern with `PCRE2_UCP | PCRE2_UTF` and
@@ -702,11 +703,13 @@ pub fn pcre2_global_replace_with_position(
     }
 }
 
+#[allow(dead_code)]
 /// The identity table used when the reference copies a suffix verbatim.
 pub(crate) fn identity_positions(start: usize, end: usize) -> Vec<(u32, u32)> {
     (start..end).map(|i| (i as u32, i as u32)).collect()
 }
 
+#[allow(dead_code)]
 /// Copy `text[start..end]` verbatim, mapping every byte to itself.
 pub(crate) fn copy_identity(
     text: &[u8],
@@ -1144,10 +1147,12 @@ impl IkDict {
     }
 }
 
+#[allow(dead_code)]
 /// C++: `Status::FailToRunPython`. Every failure mode of the Python-backed
 /// `UserDefinedAnalyzer` / `UserDefinedTermWeight` loaders reports this code.
 pub const FAIL_TO_RUN_PYTHON: &str = "kFailToRunPython";
 
+#[allow(dead_code)]
 /// The three failure modes the reference loaders distinguish:
 /// a missing script, a script without the requested callable, and a callable
 /// returning the wrong type.
@@ -1158,6 +1163,7 @@ pub enum UserDefinedError {
     InvalidReturn,
 }
 
+#[allow(dead_code)]
 impl UserDefinedError {
     /// C++: `Status::code()`.
     pub fn code(self) -> &'static str {
@@ -1173,28 +1179,34 @@ impl UserDefinedError {
     }
 }
 
+#[allow(dead_code)]
 impl std::fmt::Display for UserDefinedError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.code())
     }
 }
 
+#[allow(dead_code)]
 impl std::error::Error for UserDefinedError {}
 
+#[allow(dead_code)]
 /// A registered `analyze(text)` implementation.
 pub type UserDefinedAnalyzeFn =
     Arc<dyn Fn(&str) -> Result<Vec<String>, UserDefinedError> + Send + Sync>;
 
+#[allow(dead_code)]
 /// A registered `term_weight(tokens)` implementation.
 pub type UserDefinedTermWeightFn =
     Arc<dyn Fn(&[String]) -> Result<HashMap<String, f64>, UserDefinedError> + Send + Sync>;
 
+#[allow(dead_code)]
 #[derive(Default)]
 pub(crate) struct UserDefinedScript {
     pub(crate) analyze: Option<UserDefinedAnalyzeFn>,
     pub(crate) term_weight: Option<UserDefinedTermWeightFn>,
 }
 
+#[allow(dead_code)]
 /// Registration table for user-defined analyzers and term-weight functions.
 ///
 /// C++: the reference imports a Python module from a `.py` path and calls its
@@ -1208,6 +1220,7 @@ pub struct UserDefinedScripts {
     pub(crate) modules: Mutex<HashMap<String, UserDefinedScript>>,
 }
 
+#[allow(dead_code)]
 impl UserDefinedScripts {
     pub fn new() -> Self {
         Self::default()
@@ -1287,12 +1300,14 @@ impl UserDefinedScripts {
     }
 }
 
+#[allow(dead_code)]
 /// C++: `UserDefinedAnalyzer` (`src/common/analyzer/user_defined_analyzer.cppm`).
 pub struct UserDefinedAnalyzer<'a> {
     pub(crate) scripts: &'a UserDefinedScripts,
     pub(crate) analyzer_path: String,
 }
 
+#[allow(dead_code)]
 impl<'a> UserDefinedAnalyzer<'a> {
     pub fn new(scripts: &'a UserDefinedScripts, analyzer_path: impl Into<String>) -> Self {
         Self {
@@ -1315,12 +1330,14 @@ impl<'a> UserDefinedAnalyzer<'a> {
     }
 }
 
+#[allow(dead_code)]
 /// C++: `UserDefinedTermWeight` (`src/common/analyzer/user_defined_term_weight.cppm`).
 pub struct UserDefinedTermWeight<'a> {
     pub(crate) scripts: &'a UserDefinedScripts,
     pub(crate) tw_path: String,
 }
 
+#[allow(dead_code)]
 impl<'a> UserDefinedTermWeight<'a> {
     pub fn new(scripts: &'a UserDefinedScripts, tw_path: impl Into<String>) -> Self {
         Self {

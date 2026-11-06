@@ -2,7 +2,7 @@
 """Decodes a Thrift `Connect` CALL message (TBinaryProtocol) from stdin using the
 authoritative generated Python codec, proving the Rust wire bytes are readable by
 the SDK. Run:
-    cargo run -q -p infinity-server --bin emit-connect-call | python3 py_decode.py
+    cargo run -q -p server --bin emit-connect-call | python3 py_decode.py
 """
 import os
 import sys

@@ -4,7 +4,6 @@
 //! itself (column encoding), the index chunks published next to it, and the
 //! Engine methods that write and read them.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -29,7 +28,6 @@ use expression::Expr;
 use parser::{CmpOp, Literal};
 use storage::definition::format::*;
 
-pub(crate) use crate::blocks::engine::*;
 pub(crate) use crate::engine::{parse_value, Engine};
 pub(crate) use crate::{ColumnData, Value};
 pub(crate) use catalog::layout::IndexChunk;
@@ -39,7 +37,6 @@ pub(crate) use catalog::layout::{
 pub(crate) use index::hnsw_handler::HnswHandler;
 pub use index::plaid::PlaidIndex;
 pub(crate) use index::vector::HnswIndex;
-pub(crate) use index::Index;
 use storage::buffer::mapped_block::MappedBlock;
 use storage::knn_index::knn_format;
 
@@ -69,7 +66,6 @@ pub(crate) mod value_shape;
 pub use chunk::encode_fulltext_chunk;
 pub(crate) use chunk::*;
 pub(crate) use column::*;
-pub(crate) use engine::*;
 pub(crate) use index_chunk::*;
 pub(crate) use misc::*;
 pub(crate) use value_shape::*;

@@ -392,12 +392,14 @@ impl Engine {
                 .rewrite_layout(self.storage.catalog.store().as_ref());
         }
         mirror?;
-        // The C++-layout mirror above went through the catalog store after its
-        // first flush; in checkpoint-only mode that is part of this checkpoint,
-        // so publish it now (no-op for a normal store).
-        if !self.wal_enabled {
-            self.storage.catalog.flush()?;
-        }
+        // Everything the block mirror published (`catalog|seg|…`,
+        // `catalog|blk|…`, plus any layout rewrite above) landed in the catalog
+        // store *after* the flush at the top of the checkpoint. Without this
+        // second flush those records stay in the memtable, and a `kill -9` --
+        // what the restart and cross-engine tests do -- discards them: the
+        // reference then opens a directory whose block files exist but whose
+        // segment records do not, and reports `segment_count = 0`.
+        self.storage.catalog.flush()?;
         // The checkpoint's other two trees. `data/` alone is not enough for a
         // restart out of the bucket: the catalog holds the tables and the row
         // store holds their rows, so a directory restored from `data/` alone

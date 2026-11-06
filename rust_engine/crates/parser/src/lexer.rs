@@ -179,6 +179,21 @@ pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
                     }
                     i += 1;
                 }
+                // An exponent belongs to the literal: `1e-5`, `2.5E+3`. Without
+                // this the array reader saw `1`, `e`, `-`, `5`.
+                if i < chars.len() && (chars[i] == 'e' || chars[i] == 'E') {
+                    let mut j = i + 1;
+                    if j < chars.len() && (chars[j] == '+' || chars[j] == '-') {
+                        j += 1;
+                    }
+                    if j < chars.len() && chars[j].is_ascii_digit() {
+                        while j < chars.len() && chars[j].is_ascii_digit() {
+                            j += 1;
+                        }
+                        i = j;
+                        is_float = true;
+                    }
+                }
                 let text: String = chars[start..i].iter().collect();
                 if is_float {
                     out.push(Token::Float(

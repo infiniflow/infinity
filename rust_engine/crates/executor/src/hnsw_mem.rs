@@ -67,18 +67,6 @@ impl HnswIndexInMem {
         true
     }
 
-    /// `Search`: `(row id, distance)` for the nearest nodes in this segment.
-    pub fn search(&self, query: &[f32], k: usize) -> Vec<(u64, f32)> {
-        if query.len() != self.dims {
-            return Vec::new();
-        }
-        self.handler
-            .search_index(query, k, KnnSearchOption::default())
-            .into_iter()
-            .filter_map(|(node, score)| self.rows.get(node).map(|row| (*row, score)))
-            .collect()
-    }
-
     /// `Search` with `WITH (ef = ...)` honoured, as the sealed segments do.
     pub fn search_with_ef(&self, query: &[f32], k: usize, ef: Option<usize>) -> Vec<(u64, f32)> {
         if query.len() != self.dims {

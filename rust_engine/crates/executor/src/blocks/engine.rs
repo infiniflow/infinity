@@ -904,10 +904,20 @@ impl Engine {
         // is what the reference's `AppendInBlock` does to the block's
         // `BufferObject`. The block file is written by the checkpoint.
         let tkey = self.table_key(&table);
+        // The reference casts every value to its column's type when it appends
+        // it (DataBlock::AppendValue), so an out-of-range integer wraps to the
+        // column's width and a float assigned to an integer column truncates.
+        // Keeping the raw value would leave text the block writer cannot encode
+        // and, later, a read that fails its own type check.
+        let types = self.column_types(&table)?;
+        let rows: Vec<(usize, Vec<Value>)> = extra
+            .iter()
+            .map(|(seq, row)| (*seq, coerce_row(row, &types)))
+            .collect();
         {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey.clone()).or_default();
-            entry.buffer_rows(extra.iter().cloned());
+            entry.buffer_rows(rows);
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
         }
@@ -1715,42 +1725,6 @@ impl Engine {
             .collect()
     }
 
-    /// A block's `version` file alone - the row count and the tombstones,
-    /// without decoding a single column.
-    /// The ids of every live row, without decoding any column. A KNN scan only
-    /// needs the row set to verify that the index covers the table; reading the
-    /// vectors to get it made an indexed query cost a full scan.
-    pub(crate) fn live_row_ids(&self, table: &str) -> Vec<usize> {
-        let table = self.qualified_table(table);
-        let read_ts = crate::read_ts();
-        let deleted = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
-        let mut out: Vec<usize> = Vec::new();
-        for id in self.visible_block_ids(&table) {
-            let Some(version) = self.read_block_version(id) else {
-                continue;
-            };
-            let created = Self::created_at(&version, read_ts);
-            for slot in 0..created {
-                if !Self::slot_visible(&version, slot, created, read_ts) {
-                    continue;
-                }
-                let seq = ((id.segment_id as u64) << 32)
-                    | (u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64 + slot as u64);
-                if !deleted.contains(&seq) {
-                    out.push(seq as usize);
-                }
-            }
-        }
-        // Rows above the last checkpoint live in the journal only.
-        for (seq, _) in self.pending_rows_of(&table) {
-            if !deleted.contains(&(seq as u64)) {
-                out.push(seq);
-            }
-        }
-        out.sort_unstable();
-        out.dedup();
-        out
-    }
     pub(crate) fn read_block_version(&self, id: BlockId) -> Option<BlockVersionFile> {
         let dir = self
             .blocks_root()
@@ -2370,13 +2344,27 @@ impl Engine {
         let mut kept_at = 0usize;
         loop {
             let row = match &wanted_slots {
-                Some(slots) => match slots.get(kept_at) {
-                    Some(slot) => {
+                Some(slots) => {
+                    // The index may name a row this block does not hold: a row
+                    // committed after the block was written lives in the append
+                    // buffer, and a recovered engine merges it from there. Slots
+                    // are sorted ascending, so the first one at or past the
+                    // block's row count ends the walk -- decoding it anyway read
+                    // past the column bodies and produced zeroed values (a
+                    // recovered row came back as `c1 = 0`).
+                    let mut found = None;
+                    while let Some(slot) = slots.get(kept_at) {
                         kept_at += 1;
-                        *slot
+                        if *slot < row_count {
+                            found = Some(*slot);
+                            break;
+                        }
                     }
-                    None => break,
-                },
+                    match found {
+                        Some(slot) => slot,
+                        None => break,
+                    }
+                }
                 None => {
                     if all_at >= row_count {
                         break;
@@ -5642,4 +5630,91 @@ impl Engine {
             _ => Self::merge_plaid_chunk_indexes(&indexes),
         }
     }
+}
+
+/// Casts a row's values to their columns' types, the way the reference's
+/// DataBlock::AppendValue does on append: an integer column truncates a float
+/// and wraps a value that does not fit its width.
+/// Rounds every element of an embedding text ("[1.1,2.2]") to the half it can
+/// represent, in place.
+fn round_half_elements(text: &str, bf16: bool) -> String {
+    let t = text.trim();
+    let inner = t
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or("");
+    if inner.trim().is_empty() {
+        return text.to_string();
+    }
+    let parts: Vec<String> = inner
+        .split(',')
+        .map(|p| {
+            let v: f32 = p.trim().parse().unwrap_or(0.0);
+            let r = if bf16 {
+                f32::from_bits((v.to_bits() >> 16) << 16)
+            } else {
+                f16_bits_to_f32(::common::fp16::f32_to_f16_bits(v))
+            };
+            format!("{r}")
+        })
+        .collect();
+    format!("[{}]", parts.join(","))
+}
+
+/// IEEE half -> f32 (the inverse of `common::fp16::f32_to_f16_bits`).
+fn f16_bits_to_f32(bits: u16) -> f32 {
+    let sign = u32::from(bits >> 15) << 31;
+    let exp = u32::from((bits >> 10) & 0x1f);
+    let frac = u32::from(bits & 0x3ff);
+    if exp == 0 {
+        // Subnormal (or zero): value = frac * 2^-24
+        let v = frac as f32 * (2f32.powi(-24));
+        return if sign != 0 { -v } else { v };
+    }
+    if exp == 31 {
+        return f32::from_bits(sign | 0x7f80_0000 | (frac << 13));
+    }
+    f32::from_bits(sign | ((exp + 112) << 23) | (frac << 13))
+}
+
+fn coerce_row(row: &[Value], types: &[String]) -> Vec<Value> {
+    let mut out = row.to_vec();
+    for (i, v) in out.iter_mut().enumerate() {
+        let Some(ty) = types.get(i) else { continue };
+        let upper = ty.trim().to_ascii_uppercase();
+        let head = upper
+            .split('(')
+            .next()
+            .unwrap_or("")
+            .split(',')
+            .next()
+            .unwrap_or("")
+            .trim();
+        let widened = match v {
+            Value::Int(n) => Some(*n),
+            Value::Float(f) => Some(*f as i64),
+            Value::Str(s) => s.trim().parse::<f64>().ok().map(|f| f as i64),
+            _ => None,
+        };
+        // A 16-bit float column rounds every element to the half it can
+        // represent; the block writer does that on encode, so the append buffer
+        // has to as well or a read before the next checkpoint shows more
+        // precision than the column can hold.
+        if head == "EMBEDDING" && (upper.contains("FLOAT16") || upper.contains("BFLOAT16")) {
+            if let Value::Str(text) = v {
+                let bf16 = upper.contains("BFLOAT16");
+                *v = Value::Str(round_half_elements(text, bf16));
+            }
+            continue;
+        }
+        let Some(n) = widened else { continue };
+        *v = match head {
+            "TINYINT" | "INT8" => Value::Int((n as i8) as i64),
+            "SMALLINT" | "INT16" => Value::Int((n as i16) as i64),
+            "INT" | "INTEGER" | "INT32" => Value::Int((n as i32) as i64),
+            "BIGINT" | "INT64" => Value::Int(n),
+            _ => continue,
+        };
+    }
+    out
 }

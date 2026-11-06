@@ -6,7 +6,9 @@
 # to serve Thrift on 127.0.0.1:23817 with data under `/var/infinity`. The Rust
 # CLI accepts the same `--config=` form: it reads `persistence_dir`,
 # `memindex_memory_quota`, `checkpoint_interval`, `optimize_interval` and the
-# MinIO settings, then serves Thrift. Without a config it serves `$INFINITY_DATA`.
+# MinIO settings, then serves Thrift and HTTP (the HTTP port is pinned to an
+# ephemeral one below so it cannot clash with a server already running).
+# Without a config it serves `$INFINITY_DATA`.
 #
 #   ./scripts/infinity_rust_shim.sh --config=/any/path
 #

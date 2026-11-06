@@ -154,7 +154,9 @@ fn extract_sql(body: &str) -> Option<String> {
 pub enum Json {
     Null,
     Bool(bool),
-    Num(f64),
+    /// A JSON number, kept as its source text: a 64-bit integer has to keep
+    /// every digit (the reference reads `raw_json()`), which `f64` cannot.
+    Num(String),
     Str(String),
     Arr(Vec<Json>),
     Obj(Vec<(String, Json)>),
@@ -175,7 +177,7 @@ impl Json {
     }
     fn as_f64(&self) -> Option<f64> {
         match self {
-            Json::Num(n) => Some(*n),
+            Json::Num(n) => n.parse().ok(),
             _ => None,
         }
     }
@@ -282,11 +284,9 @@ fn parse_json(text: &str) -> Option<Json> {
                 {
                     *i += 1;
                 }
-                std::str::from_utf8(&s[start..*i])
-                    .ok()?
-                    .parse::<f64>()
-                    .ok()
-                    .map(Json::Num)
+                let text = std::str::from_utf8(&s[start..*i]).ok()?;
+                text.parse::<f64>().ok()?;
+                Some(Json::Num(text.to_string()))
             }
         }
     }
@@ -361,6 +361,77 @@ fn ident(name: &str) -> Option<String> {
     safe_ident(name).map(|n| n.to_ascii_lowercase())
 }
 
+/// The reference's `ParseColumnType` (`http_server_impl.cpp`) maps the REST
+/// spelling onto a `DataType` and rejects what it cannot represent; the SQL
+/// grammar is laxer (it accepts `EMBEDDING(bool,3)`), so the check has to run
+/// here, on the API boundary, exactly where the reference has it.
+fn column_type_error(ty: &str) -> Option<(i64, String)> {
+    let parts: Vec<&str> = ty.split(',').map(|s| s.trim()).collect();
+    let head = parts.first().copied().unwrap_or("").to_ascii_lowercase();
+    match head.as_str() {
+        "vector" | "multivector" | "tensor" | "tensorarray" => {
+            if parts.len() != 3 {
+                return Some((
+                    3013,
+                    "vector / multivector / tensor / tensorarray type syntax error".into(),
+                ));
+            }
+            let etype = parts[2].to_ascii_lowercase();
+            let ok = matches!(
+                etype.as_str(),
+                "int"
+                    | "integer"
+                    | "int32"
+                    | "uint8"
+                    | "int8"
+                    | "tinyint"
+                    | "float"
+                    | "float32"
+                    | "double"
+                    | "float64"
+                    | "float16"
+                    | "bfloat16"
+                    | "bit"
+            );
+            if !ok {
+                return Some((3057, format!("Invalid embedding data type: {}.", parts[2])));
+            }
+        }
+        "sparse" => {
+            if parts.len() != 4 {
+                return Some((3013, "sparse type syntax error".into()));
+            }
+            let dtype = parts[2].to_ascii_lowercase();
+            let d_ok = matches!(
+                dtype.as_str(),
+                "integer" | "int" | "int32" | "float" | "float32" | "double" | "float64"
+            );
+            let itype = parts[3].to_ascii_lowercase();
+            let i_ok = matches!(
+                itype.as_str(),
+                "tinyint"
+                    | "int8"
+                    | "smallint"
+                    | "int16"
+                    | "integer"
+                    | "int"
+                    | "int32"
+                    | "bigint"
+                    | "int64"
+            );
+            if !d_ok {
+                return Some((3057, format!("Invalid embedding data type: {}.", parts[2])));
+            }
+            if !i_ok {
+                return Some((3057, format!("Invalid embedding data type: {}.", parts[3])));
+            }
+        }
+        "array" => return column_type_error(&parts[1..].join(",")),
+        _ => {}
+    }
+    None
+}
+
 /// `vector,4,float` (the REST spelling) -> `Embedding(float,4)`.
 fn type_to_sql(ty: &str) -> String {
     let parts: Vec<&str> = ty.split(',').map(|s| s.trim()).collect();
@@ -416,13 +487,7 @@ fn sql_value(v: &Json, ty: &str) -> String {
     match v {
         Json::Null => "NULL".into(),
         Json::Bool(b) => (if *b { "true" } else { "false" }).into(),
-        Json::Num(n) => {
-            if n.fract() == 0.0 && n.abs() < 9e15 {
-                format!("{}", *n as i64)
-            } else {
-                format!("{n}")
-            }
-        }
+        Json::Num(n) => n.clone(),
         Json::Str(s) => quote_sql(s),
         Json::Arr(items) => {
             if up.starts_with("JSON") {
@@ -459,7 +524,7 @@ fn render_json(v: &Json) -> String {
     match v {
         Json::Null => "null".into(),
         Json::Bool(b) => b.to_string(),
-        Json::Num(n) => format!("{n}"),
+        Json::Num(n) => n.clone(),
         Json::Str(s) => format!("\"{}\"", json_escape(s)),
         Json::Arr(a) => format!(
             "[{}]",
@@ -513,6 +578,32 @@ const CONFIG_KEYS: [&str; 5] = [
 ];
 
 /// `ShowConfigsHandler`: `{"<config>": "<value>", …, "error_code": 0}`.
+/// The reference's `IntegerOption`s are rendered as JSON numbers (the SDK
+/// hands `config_value` to the caller as an `int`), everything else as strings.
+pub(crate) fn config_is_numeric(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "cleanup_interval"
+            | "checkpoint_interval"
+            | "cache_result_capacity"
+            | "mem_index_capacity"
+            | "buffer_manager_size"
+            | "memindex_memory_quota"
+            | "lru_num"
+            | "wal_compact_threshold"
+            | "log_file_max_size"
+            | "log_file_rotate_count"
+    )
+}
+
+fn config_value_json(name: &str, value: &str) -> String {
+    if config_is_numeric(name) {
+        value.trim().to_string()
+    } else {
+        format!("\"{}\"", json_escape(value))
+    }
+}
+
 fn configs_json(engine: &Engine) -> String {
     let mut pairs: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
     for key in CONFIG_KEYS {
@@ -525,7 +616,7 @@ fn configs_json(engine: &Engine) -> String {
     }
     let body = pairs
         .iter()
-        .map(|(k, v)| format!("\"{}\":\"{}\"", json_escape(k), json_escape(v)))
+        .map(|(k, v)| format!("\"{}\":{}", json_escape(k), config_value_json(k, v)))
         .collect::<Vec<_>>()
         .join(",");
     if body.is_empty() {
@@ -545,8 +636,7 @@ fn single_field(doc: &Json) -> Option<(String, String)> {
     let (name, value) = &obj[0];
     let literal = match value {
         Json::Str(s) => quote_sql(s),
-        Json::Num(n) if n.fract() == 0.0 => format!("{}", *n as i64),
-        Json::Num(n) => format!("{n}"),
+        Json::Num(n) => n.clone(),
         Json::Bool(b) => b.to_string(),
         _ => return None,
     };
@@ -775,6 +865,10 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
         })
         .unwrap_or_else(|| vec!["*".to_string()]);
     let named: Vec<String> = output.iter().map(|o| named_output(o)).collect();
+    // `SELECT … AS c2_sub … WHERE c2_sub = …`: the Thrift path substitutes the
+    // projection aliases into WHERE/HAVING (`SelectReq::to_sql`), so mirror it
+    // here — the engine itself resolves WHERE against table columns only.
+    let aliases: Vec<(String, String)> = named.iter().filter_map(|n| split_alias(n)).collect();
     let mut sql = format!("SELECT {} FROM {db}.{table}", named.join(", "));
 
     if let Some(h) = body.get("highlight").and_then(Json::as_arr) {
@@ -797,7 +891,10 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
             // reports the reference's invalid-topn error.
             let topn: i64 = match e.get("topn") {
                 None => 10,
-                Some(Json::Num(n)) if n.fract() == 0.0 && *n >= 1.0 => *n as i64,
+                Some(Json::Num(n)) => match n.parse::<f64>() {
+                    Ok(v) if v.fract() == 0.0 && v >= 1.0 => v as i64,
+                    _ => -1,
+                },
                 Some(_) => -1,
             };
             // `params` is a dict in the SDK, but tests also send the raw
@@ -918,7 +1015,8 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
 
     if let Some(f) = body.get("filter").and_then(Json::as_str) {
         if !f.is_empty() {
-            sql.push_str(&format!(" WHERE {}", rewrite_pseudo(f)));
+            let f = crate::substitute_aliases(&rewrite_pseudo(f), &aliases);
+            sql.push_str(&format!(" WHERE {f}"));
         }
     }
     if let Some(g) = body.get("group_by") {
@@ -931,7 +1029,10 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
     if let Some(h) = body.get("having") {
         let preds = str_list(h);
         if !preds.is_empty() {
-            let preds: Vec<String> = preds.iter().map(|p| rewrite_pseudo(p)).collect();
+            let preds: Vec<String> = preds
+                .iter()
+                .map(|p| crate::substitute_aliases(&rewrite_pseudo(p), &aliases))
+                .collect();
             sql.push_str(&format!(" HAVING {}", preds.join(" AND ")));
         }
     }
@@ -970,23 +1071,27 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
             sql.push_str(&format!(" ORDER BY {}", keys.join(", ")));
         }
     }
-    if let Some(l) = body.get("limit") {
-        let n = l
-            .as_f64()
+    let limit = body.get("limit").and_then(|l| {
+        l.as_f64()
             .map(|n| n as i64)
-            .or_else(|| l.as_str().and_then(|s| s.parse().ok()));
-        if let Some(n) = n {
-            sql.push_str(&format!(" LIMIT {n}"));
-        }
+            .or_else(|| l.as_str().and_then(|s| s.parse().ok()))
+    });
+    let offset = body.get("offset").and_then(|o| {
+        o.as_f64()
+            .map(|n| n as i64)
+            .or_else(|| o.as_str().and_then(|s| s.parse().ok()))
+    });
+    if let Some(n) = limit {
+        sql.push_str(&format!(" LIMIT {n}"));
+    } else if offset.is_some() {
+        // The reference's planner takes LIMIT and OFFSET as two independent
+        // fields of the request object, so `Offset(n)` without a limit means
+        // "every row after n". The SQL grammar insists on a LIMIT first, so an
+        // unbounded one is spelled out here.
+        sql.push_str(" LIMIT 9223372036854775807");
     }
-    if let Some(o) = body.get("offset") {
-        let n = o
-            .as_f64()
-            .map(|n| n as i64)
-            .or_else(|| o.as_str().and_then(|s| s.parse().ok()));
-        if let Some(n) = n {
-            sql.push_str(&format!(" OFFSET {n}"));
-        }
+    if let Some(n) = offset {
+        sql.push_str(&format!(" OFFSET {n}"));
     }
     sql.push(';');
     sql
@@ -1048,6 +1153,22 @@ fn named_output(o: &str) -> String {
     }
 }
 
+/// `expr AS alias` -> `(expr, alias)`; `None` when the projection has no
+/// trailing alias.
+fn split_alias(projection: &str) -> Option<(String, String)> {
+    let lower = projection.to_ascii_lowercase();
+    let at = lower.rfind(" as ")?;
+    let expr = projection[..at].trim();
+    let alias = projection[at + 4..].trim();
+    if expr.is_empty() || alias.is_empty() {
+        return None;
+    }
+    if !alias.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return None;
+    }
+    Some((alias.to_string(), expr.to_string()))
+}
+
 fn sql_value_arr(v: &Json) -> String {
     match v {
         Json::Arr(items) => format!(
@@ -1055,7 +1176,7 @@ fn sql_value_arr(v: &Json) -> String {
             items
                 .iter()
                 .map(|x| match x {
-                    Json::Num(n) => format!("{n}"),
+                    Json::Num(n) => n.clone(),
                     Json::Str(s) => format!("'{}'", s.replace('\'', "''")),
                     // A tensor query is a list of sub-vectors; recurse so the
                     // nesting survives (a flat `[0,0]` scores every row 0).
@@ -1237,8 +1358,14 @@ pub fn route(
                 if safe_ident(name).is_none() {
                     return err_response(3005, &format!("invalid column name '{name}'"));
                 }
+                if let Some((code, msg)) = column_type_error(ty) {
+                    return err_response(code, &msg);
+                }
                 let name = name.to_ascii_lowercase();
                 let mut col = format!("{name} {}", type_to_sql(ty));
+                if let Some(c) = f.get("comment").and_then(Json::as_str) {
+                    col.push_str(&format!(" COMMENT {}", quote_sql(c)));
+                }
                 if let Some(default) = f.get("default") {
                     let d = match default {
                         Json::Str(s) => quote_sql(s),
@@ -1343,10 +1470,13 @@ pub fn route(
             match engine.catalog().get_table_by_name(&full) {
                 Ok(Some(meta)) => {
                     let rows = engine.row_count(&full).unwrap_or(0);
+                    // A table that has not been written to has no segment yet
+                    // (the reference reports 0 here too).
+                    let segments = crate::show_segments_rows(engine, &full).len();
                     (
                         200,
                         format!(
-                            "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\",\"table_name\":\"{}\",\"storage_directory\":\"\",\"column_count\":{},\"segment_count\":1,\"row_count\":{rows}}}",
+                            "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\",\"table_name\":\"{}\",\"storage_directory\":\"\",\"column_count\":{},\"segment_count\":{segments},\"row_count\":{rows}}}",
                             json_escape(&db),
                             json_escape(&table),
                             meta.columns.len()
@@ -1370,6 +1500,9 @@ pub fn route(
                 let ty = f.get("type").and_then(Json::as_str).unwrap_or("varchar");
                 if safe_ident(name).is_none() {
                     return err_response(3013, "syntax: invalid column name");
+                }
+                if let Some((code, msg)) = column_type_error(ty) {
+                    return err_response(code, &msg);
                 }
                 let mut def = format!("{name} {}", type_to_sql(ty));
                 // `constraints: ["not null"]` is part of the column definition.
@@ -1443,11 +1576,13 @@ pub fn route(
                                 json_escape(r.first().map(String::as_str).unwrap_or("")),
                                 json_escape(r.get(1).map(String::as_str).unwrap_or("")),
                                 match r.get(2).map(String::as_str).unwrap_or("") {
-                                    "" | "null" => "null".to_string(),
+                                    "" | "null" | "(empty)" => "null".to_string(),
                                     d => format!("\"{}\"", json_escape(d)),
                                 },
+                                // SHOW renders an absent comment as "(empty)";
+                                // the SDK expects an empty string.
                                 match r.get(3).map(String::as_str).unwrap_or("") {
-                                    "" => "null".to_string(),
+                                    "" | "(empty)" => "\"\"".to_string(),
                                     c => format!("\"{}\"", json_escape(c)),
                                 }
                             )
@@ -1467,6 +1602,19 @@ pub fn route(
             let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
+            // Identifiers are case-insensitive; the catalog keeps the
+            // canonical lower-case spelling (as the Thrift `CreateIndex` does).
+            let index = index.to_ascii_lowercase();
+            let full = format!("{db}.{table}");
+            let (ignore, _) = match create_option_sql(&doc) {
+                Ok(v) => v,
+                Err(e) => return e,
+            };
+            let comment = doc
+                .get("comment")
+                .and_then(Json::as_str)
+                .unwrap_or("")
+                .to_string();
             // The REST body is `{fields: [target], index: {type, …params}}`.
             let column = doc
                 .get("fields")
@@ -1476,14 +1624,16 @@ pub fn route(
                 .or_else(|| doc.get("column_name").and_then(Json::as_str))
                 .unwrap_or("");
             let info = doc.get("index").cloned().unwrap_or(Json::Null);
-            let kind = info.get("type").and_then(Json::as_str).unwrap_or("");
+            // A functional secondary index shares the SECONDARY kind (the Thrift
+            // `IndexType` enum maps 5 onto 4 as well); the expression in
+            // `fields` is what makes it functional.
+            let kind = match info.get("type").and_then(Json::as_str).unwrap_or("") {
+                k if k.eq_ignore_ascii_case("SECONDARYFUNCTIONAL") => "SECONDARY",
+                k => k,
+            };
             let mut sql = format!(
-                "CREATE INDEX {} {index} ON {db}.{table} ({column})",
-                if create_option_sql(&doc).map(|v| v.0).unwrap_or(false) {
-                    "IF NOT EXISTS"
-                } else {
-                    ""
-                }
+                "CREATE INDEX {}{index} ON {db}.{table} ({column})",
+                if ignore { "IF NOT EXISTS " } else { "" }
             );
             if !kind.is_empty() {
                 sql.push_str(&format!(" USING {kind}"));
@@ -1494,11 +1644,19 @@ pub fn route(
                     if k.eq_ignore_ascii_case("type") {
                         continue;
                     }
+                    // The reference lower-cases parameter names *and* values at
+                    // the API boundary (`Infinity::CreateIndex`), so over REST
+                    // `ANALYZER='STANDARD'` means `analyzer='standard'` too.
                     let value = v
                         .as_str()
                         .map(|s| s.to_string())
-                        .unwrap_or_else(|| render_json(v));
-                    opts.push(format!("{k}='{}'", value.replace('\'', "''")));
+                        .unwrap_or_else(|| render_json(v))
+                        .to_lowercase();
+                    opts.push(format!(
+                        "{}='{}'",
+                        k.to_lowercase(),
+                        value.replace('\'', "''")
+                    ));
                 }
             }
             if !opts.is_empty() {
@@ -1506,7 +1664,11 @@ pub fn route(
             }
             sql.push(';');
             match run(&sql) {
-                Ok(_) => (200, ok_json()),
+                Ok(_) => {
+                    // `SHOW INDEX` reports this back, as in the reference.
+                    engine.set_index_comment(&full, &index, &comment);
+                    (200, ok_json())
+                }
                 Err(e) => e,
             }
         }
@@ -1529,11 +1691,15 @@ pub fn route(
             (200, ok_json())
         }
         ("DELETE", ["databases", db, "tables", table, "indexes", index]) => {
-            let (Some(table), Some(index)) = (ident(table), ident(index)) else {
+            let (Some(db), Some(table), Some(index)) = (ident(db), ident(table), ident(index))
+            else {
                 return (404, String::new());
             };
+            let drop_ignore = match drop_option_sql(&doc) {
+                Ok(v) => v,
+                Err(e) => return e,
+            };
             let _ = (db, table);
-            let drop_ignore = drop_option_sql(&doc).unwrap_or(false);
             let sql = format!(
                 "DROP INDEX {}{index};",
                 if drop_ignore { "IF EXISTS " } else { "" }
@@ -1541,6 +1707,19 @@ pub fn route(
             match run(&sql) {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
+            }
+        }
+        // `DumpIndex` flushes the memory index into on-disk chunks; the Thrift
+        // request of the same name calls the very same entry point.
+        ("PUT", ["databases", db, "tables", table, "indexes", index, "dump"]) => {
+            let (Some(db), Some(table), Some(index)) = (ident(db), ident(table), ident(index))
+            else {
+                return (404, String::new());
+            };
+            let full = format!("{db}.{table}");
+            match engine.dump_index_transaction(&full, &index) {
+                Ok(()) => (200, ok_json()),
+                Err(e) => engine_err(&e),
             }
         }
         ("GET", ["databases", db, "tables", table, "indexes"]) => {
@@ -1561,9 +1740,19 @@ pub fn route(
                 .map(|n| format!("\"{}\"", json_escape(n)))
                 .collect::<Vec<_>>()
                 .join(",");
+            // The reference's `ListTableIndexesHandler` answers
+            // `{"indexes": [{"index_name": …}]}`; `index_names` is the flat
+            // form the older clients read.
+            let objs = names
+                .iter()
+                .map(|n| format!("{{\"index_name\":\"{}\"}}", json_escape(n)))
+                .collect::<Vec<_>>()
+                .join(",");
             (
                 200,
-                format!("{{\"error_code\":0,\"error_msg\":\"OK\",\"index_names\":[{list}]}}"),
+                format!(
+                    "{{\"error_code\":0,\"error_msg\":\"OK\",\"indexes\":[{objs}],\"index_names\":[{list}]}}"
+                ),
             )
         }
         ("GET", ["databases", db, "tables", table, "indexes", index]) => {
@@ -1581,10 +1770,11 @@ pub fn route(
                 Some(i) => (
                     200,
                     format!(
-                        "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\",\"table_name\":\"{}\",\"index_name\":\"{}\",\"index_comment\":\"\",\"index_type\":\"{}\",\"index_column_names\":\"{}\",\"index_column_ids\":\"\",\"index_function_info\":\"\",\"other_parameters\":\"\",\"store_dir\":\"\",\"segment_index_count\":\"\"}}",
+                        "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\",\"table_name\":\"{}\",\"index_name\":\"{}\",\"index_comment\":\"{}\",\"index_type\":\"{}\",\"index_column_names\":\"{}\",\"index_column_ids\":\"\",\"index_function_info\":\"\",\"other_parameters\":\"\",\"store_dir\":\"\",\"segment_index_count\":\"\"}}",
                         json_escape(&db),
                         json_escape(&table),
                         json_escape(&i.name),
+                        json_escape(&engine.index_comment(&full, &i.name).unwrap_or_default()),
                         json_escape(&i.index_type),
                         json_escape(&i.column)
                     ),
@@ -1654,12 +1844,22 @@ pub fn route(
                 return (404, String::new());
             };
             let path = quote_sql(doc.get("file_path").and_then(Json::as_str).unwrap_or(""));
-            let format = doc
+            // `ImportHandler` lower-cases the type and accepts only the four it
+            // knows about; anything else is `kNotSupported` before the engine is
+            // even reached (the Thrift adapter rejects the same set client-side).
+            let file_type = doc
                 .get("file_type")
                 .and_then(Json::as_str)
                 .unwrap_or("csv")
-                .to_ascii_uppercase();
+                .to_ascii_lowercase();
+            let format = match file_type.as_str() {
+                "csv" | "json" | "jsonl" | "fvecs" => file_type.to_ascii_uppercase(),
+                _ => return err_response(3032, &format!("Not supported file type {file_type}")),
+            };
             let delim = doc.get("delimiter").and_then(Json::as_str).unwrap_or(",");
+            if format == "CSV" && delim.chars().count() != 1 {
+                return err_response(3032, &format!("Not supported delimiter: {delim}"));
+            }
             let header = doc
                 .get("header")
                 .and_then(|v| match v {
@@ -1680,7 +1880,11 @@ pub fn route(
             let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
-            let path = quote_sql(doc.get("file_path").and_then(Json::as_str).unwrap_or(""));
+            let file = doc
+                .get("file_path")
+                .and_then(Json::as_str)
+                .unwrap_or("")
+                .to_string();
             let format = doc
                 .get("file_type")
                 .and_then(Json::as_str)
@@ -1694,14 +1898,59 @@ pub fn route(
                     _ => None,
                 })
                 .unwrap_or(false);
-            let sql = format!(
-                "COPY {db}.{table} TO {path} WITH (DELIMITER '{}', FORMAT {format}, HEADER {header});",
-                delim.replace('\'', "''")
-            );
-            match run(&sql) {
-                Ok(_) => (200, ok_json()),
-                Err(e) => e,
+            let num = |key: &str| -> i64 { doc.get(key).and_then(Json::as_f64).unwrap_or(0.0) as i64 };
+            let offset = num("offset");
+            // `limit` is the total number of rows, `row_limit` the size of one
+            // part: the reference writes the first `row_limit` rows to the file
+            // and the rest to `<file>.part1`, `.part2`, …
+            let total = (num("limit") > 0).then(|| num("limit"));
+            let part = (num("row_limit") > 0).then(|| num("row_limit"));
+            let mut written = 0i64;
+            let mut index = 0i64;
+            loop {
+                let remaining = total.map(|t| t - written);
+                if remaining.is_some_and(|r| r <= 0) {
+                    break;
+                }
+                let take = match (part, remaining) {
+                    (Some(p), Some(r)) => p.min(r),
+                    (Some(p), None) => p,
+                    (None, Some(r)) => r,
+                    (None, None) => 0,
+                };
+                let path = if index == 0 {
+                    file.clone()
+                } else {
+                    format!("{file}.part{index}")
+                };
+                let mut sql = format!(
+                    "COPY {db}.{table} TO {} WITH (DELIMITER '{}', FORMAT {format}, HEADER {header}, OFFSET {}",
+                    quote_sql(&path),
+                    delim.replace('\'', "''"),
+                    offset + written
+                );
+                if take > 0 {
+                    sql.push_str(&format!(", LIMIT {take}"));
+                }
+                sql.push_str(" )");
+                let n = match run(&sql) {
+                    Ok(results) => results
+                        .into_iter()
+                        .map(|r| match r {
+                            QueryResult::Inserted { count } => count as i64,
+                            _ => 0,
+                        })
+                        .max()
+                        .unwrap_or(0),
+                    Err(e) => return e,
+                };
+                written += n;
+                if n == 0 || part.is_none() {
+                    break;
+                }
+                index += 1;
             }
+            (200, ok_json())
         }
         ("POST", ["databases", db, "tables", table, "rename"]) => {
             let (Some(db), Some(table)) = (ident(db), ident(table)) else {
@@ -1723,18 +1972,22 @@ pub fn route(
             let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
-            match run(&format!("COMPACT TABLE {db}.{table};")) {
-                Ok(_) => (200, ok_json()),
-                Err(e) => e,
+            // `COMPACT TABLE …` parses to the no-op `Statement::Utility`; the
+            // Thrift `Compact` request calls the engine entry point instead, and
+            // the REST front end has to do the same.
+            match engine.compact_table(&format!("{db}.{table}")) {
+                Ok(()) => (200, ok_json()),
+                Err(e) => engine_err(&e),
             }
         }
         ("PUT", ["databases", db, "tables", table, "optimize"]) => {
             let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
-            match run(&format!("COMPACT TABLE {db}.{table};")) {
-                Ok(_) => (200, ok_json()),
-                Err(e) => e,
+            let _ = (db, table);
+            match engine.optimize_indexes() {
+                Ok(()) => (200, ok_json()),
+                Err(e) => engine_err(&e),
             }
         }
         ("GET", ["databases", db, "tables", table, "segments"]) => {
@@ -1828,13 +2081,20 @@ pub fn route(
             if rows.is_empty() {
                 return err_response(3013, "insert without values");
             }
+            // The reference rejects one INSERT batch above a block's worth of
+            // rows (the Thrift handler reports the same text).
+            if rows.len() > 8192 {
+                return err_response(3014, "Insert batch row limit shouldn't more than 8193");
+            }
             let mut n = 0i64;
             for row in rows {
                 let Some(fields) = row.as_obj() else {
                     return err_response(3013, "insert row must be an object");
                 };
+                // An empty row object is a syntax error in the reference, not a
+                // no-op: the SDK's `insert([{}])` must raise (3013).
                 if fields.is_empty() {
-                    continue;
+                    return err_response(3013, "insert row must not be empty");
                 }
                 let cols: Vec<String> = fields.iter().map(|(k, _)| k.clone()).collect();
                 let vals: Vec<String> = fields
@@ -1948,12 +2208,25 @@ pub fn route(
                             })
                             .unwrap_or(false)
                         {
-                            // count the same query without LIMIT/OFFSET
-                            let mut count_sql = sql.clone();
+                            // Count the rows the query would return without
+                            // LIMIT/OFFSET: the projection is replaced by
+                            // `count(*)` (prepending it to the select list, as
+                            // this used to, produced `SELECT count(*) AS n c1,
+                            // c2 …`, which the engine rejects and the count then
+                            // silently read as 0).
+                            let mut count_sql = sql.trim_end_matches(';').to_string();
                             if let Some(pos) = count_sql.rfind(" LIMIT ") {
                                 count_sql.truncate(pos);
                             }
-                            count_sql = count_sql.replace("SELECT ", "SELECT count(*) AS n ");
+                            if let Some(pos) = count_sql.to_ascii_lowercase().rfind(" order by ") {
+                                count_sql.truncate(pos);
+                            }
+                            if let (Some(a), Some(b)) =
+                                (count_sql.find("SELECT "), count_sql.rfind(" FROM "))
+                            {
+                                count_sql.replace_range(a + 7..b, "count(*) AS n");
+                            }
+                            count_sql.push(';');
                             let total = match engine.execute(&count_sql) {
                                 Ok(rs) => {
                                     let (_, rows) = rows_of(rs);
@@ -1985,9 +2258,9 @@ pub fn route(
             Some(value) => (
                 200,
                 format!(
-                    "{{\"{}\":\"{}\",\"error_code\":0}}",
+                    "{{\"{}\":{},\"error_code\":0}}",
                     json_escape(name),
-                    json_escape(&value)
+                    config_value_json(name, &value)
                 ),
             ),
             None => err_response(1008, &format!("Option: {name} doesn't exist.")),
@@ -1996,7 +2269,20 @@ pub fn route(
             let Some((name, literal)) = single_field(&doc) else {
                 return err_response(3076, "No config will be set");
             };
-            let sql = format!("SET CONFIG {} {literal};", name.to_ascii_lowercase());
+            let lower = name.to_ascii_lowercase();
+            // The Thrift handler's checks, which the reference applies to both
+            // front ends: a read-only knob rejects any assignment, and
+            // `log_level` takes a string only.
+            if lower == "mem_index_capacity" {
+                return err_response(
+                    3076,
+                    "Invalid command: Config mem_index_capacity is read-only",
+                );
+            }
+            if lower == "log_level" && !matches!(doc.get(&name), Some(Json::Str(_))) {
+                return err_response(3010, "data type mismatch for config 'log_level'");
+            }
+            let sql = format!("SET CONFIG {lower} {literal};");
             match run(&sql) {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
@@ -2041,7 +2327,17 @@ pub fn route(
                         ),
                     )
                 }
-                Err(e) => engine_err(&e),
+                Err(e) => {
+                    // The engine reports an unknown variable as a plain
+                    // invalid-argument error; the reference's code is
+                    // `NO_SUCH_SYSTEM_VAR` (3027).
+                    let msg = e.to_string();
+                    if msg.contains("No system variable") {
+                        err_response(3027, msg.trim_start_matches("invalid argument: "))
+                    } else {
+                        engine_err(&e)
+                    }
+                }
             }
         }
         // `SetVariableOrConfig` with a one-field body; the reference answers
@@ -2430,8 +2726,7 @@ fn single_variable(doc: &Json) -> Option<(String, String)> {
     let (name, value) = &obj[0];
     let value = match value {
         Json::Str(s) => s.clone(),
-        Json::Num(n) if n.fract() == 0.0 => format!("{}", *n as i64),
-        Json::Num(n) => format!("{n}"),
+        Json::Num(n) => n.clone(),
         Json::Bool(b) => b.to_string(),
         _ => return None,
     };

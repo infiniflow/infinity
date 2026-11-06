@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Decodes a `list<ColumnField>` (TBinaryProtocol) from stdin using the
 authoritative generated Python codec. Run:
-    cargo run -q -p infinity-server --bin emit-select-columns | python3 py_decode_columns.py
+    cargo run -q -p server --bin emit-select-columns | python3 py_decode_columns.py
 """
 import os
 import sys

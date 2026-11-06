@@ -737,7 +737,7 @@ pub(crate) fn sort_by_key<K: Ord + Clone, V: Clone>(a: &mut [(K, V)]) {
 
 fn introsort_loop<K: Ord + Clone, V: Clone>(
     a: &mut [(K, V)],
-    mut first: usize,
+    first: usize,
     mut last: usize,
     mut depth: usize,
 ) {

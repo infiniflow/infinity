@@ -644,7 +644,7 @@ def _cleanup_phase(conn):
 
     Both engines expose the same Thrift `Cleanup` RPC (the reference at
     `infinity_thrift_service_impl.cpp:1226`, the port at
-    `infinity-server/src/lib.rs:1156`), which runs the equivalent of
+    `rust_engine/crates/server/src/lib.rs:1156`), which runs the equivalent of
     `NewTxn::Cleanup()` / `Engine::cleanup()`: it reclaims every segment marked
     deprecated by a prior `Compact`, removing the source segment's data files,
     its catalog records and its index chunks. This phase is the second process

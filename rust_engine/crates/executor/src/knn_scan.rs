@@ -163,6 +163,22 @@ impl Engine {
         // and merges the results through the reference's `MergeKnn`
         // (`src/storage/knn_index/merge_knn.cppm`). The union of their
         // labels must cover the live q.rows, else the exact scan runs.
+        // The in-memory segment: rows written after the last dump. The
+        // reference searches every segment and merges the results.
+        let mem = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .and_then(|e| e.hnsw_mem.get(q.column).cloned());
+        // No graph at all: this column is answered by the exact scan. Returning
+        // `Some(empty)` here would be read as "the index covers nothing", and
+        // the caller (which defers decoding the rows) would then score none of
+        // them - that is what made every KNN query on a non-float embedding
+        // column return no rows.
+        if segments.is_empty() && mem.is_none() {
+            return None;
+        }
         let mut labelled = 0usize;
         // `KnnSearchOption.ef_`: the candidate list size for the bottom
         // layer (`WITH (ef = ...)`).
@@ -184,14 +200,6 @@ impl Engine {
                 .collect();
             merge.search(0, &hits);
         }
-        // The in-memory segment: rows written after the last dump. The
-        // reference searches every segment and merges the results.
-        let mem = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&tkey)
-            .and_then(|e| e.hnsw_mem.get(q.column).cloned());
         if let Some(mem) = mem {
             if let Ok(mem) = mem.lock() {
                 // Coverage is what the segment *holds*, not what it returned: a

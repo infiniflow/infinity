@@ -1,13 +1,16 @@
-//! `infinity` CLI — a thin driver over the storage kernel, used for smoke tests
-//! and manual verification of the rewrite.
+//! `infinity` — the engine's single binary.
 //!
-//! Usage:
-//!   infinity create-table <dir> <name> <columns>
-//!   infinity list-tables <dir>
-//!   infinity put <dir> <key> <value>
-//!   infinity get <dir> <key>
-//!   infinity recover <dir>
-//!   infinity smoke <dir>          # create table + commit kv + reopen + verify
+//! The reference's surface is reproduced as-is: with no subcommand,
+//! `infinity [-f <config>] [-m]` starts the Thrift, HTTP and PostgreSQL front
+//! ends on one engine (C++ `src/bin/infinity_main.cpp`). Everything below is the rewrite's
+//! extension — drivers used for byte-alignment and benchmarks — and is not part
+//! of the reference CLI.
+//!
+//! Extensions (`infinity <command> <dir> [args...]`):
+//!   serve            Thrift + HTTP front ends on <dir>
+//!   query            run SQL against <dir>
+//!   create-table, list-tables, put, get, recover, dump-catalog, smoke
+//!   import-csv, bench, knn-bench, fulltext-bench, conformance
 
 mod config;
 mod fulltext_bench;
@@ -43,11 +46,34 @@ fn open_txn(dir: &Path) -> common::Result<(TxnManager, Arc<dyn MetaStore>)> {
     Ok((m, store))
 }
 
+/// The rewrite's extensions. Anything else on the command line is the
+/// reference's own surface (`[-f <config>] [-m]`) and starts the servers.
+const SUBCOMMANDS: &[&str] = &[
+    "serve",
+    "query",
+    "create-table",
+    "list-tables",
+    "put",
+    "get",
+    "recover",
+    "dump-catalog",
+    "smoke",
+    "import-csv",
+    "bench",
+    "knn-bench",
+    "fulltext-bench",
+    "conformance",
+];
+
+fn usage_text() -> String {
+    format!(
+        "usage: infinity [-f <config>] [-m]\n       infinity <{}> <dir> [args...]",
+        SUBCOMMANDS.join("|")
+    )
+}
+
 fn usage() -> ! {
-    eprintln!(
-        "usage: infinity <create-table|list-tables|put|get|dump-catalog|recover|query|bench|fulltext-bench|serve|import-csv|conformance|smoke> <dir> [args...]
-"
-    );
+    eprintln!("{}", usage_text());
     std::process::exit(2);
 }
 
@@ -60,13 +86,17 @@ fn toml_value(text: &str, key: &str) -> Option<String> {
         .map(|(_, v)| v.trim().trim_matches('"').to_string())
 }
 
-/// `infinity --config=<file>` — the C++ server's invocation, used by
-/// `python/restart_test`. The data root is the parent of `persistence_dir`.
-fn serve_from_config(path: &str) -> common::Result<()> {
-    let text = std::fs::read_to_string(path).map_err(|e| common::Error::Io {
-        path: PathBuf::from(path),
-        source: e,
-    })?;
+/// The reference's default invocation: `infinity [-f <config>] [-m]` starts the
+/// Thrift and HTTP front ends on one engine. The data root is the parent of
+/// `persistence_dir`; with no config the reference's built-in defaults apply.
+fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()> {
+    let text = match path {
+        Some(path) => std::fs::read_to_string(path).map_err(|e| common::Error::Io {
+            path: PathBuf::from(path),
+            source: e,
+        })?,
+        None => String::new(),
+    };
     let persistence =
         toml_value(&text, "persistence_dir").unwrap_or_else(|| "/var/infinity/persistence".into());
     let root = Path::new(&persistence)
@@ -79,7 +109,12 @@ fn serve_from_config(path: &str) -> common::Result<()> {
             source: e,
         })?;
     }
-    let addr = std::env::var("INFINITY_BIND").unwrap_or_else(|_| "0.0.0.0:23817".into());
+    let host = toml_value(&text, "server_address").unwrap_or_else(|| "0.0.0.0".into());
+    let client_port = toml_value(&text, "client_port").unwrap_or_else(|| "23817".into());
+    let http_port = toml_value(&text, "http_port").unwrap_or_else(|| "23820".into());
+    let addr = std::env::var("INFINITY_BIND").unwrap_or_else(|_| format!("{host}:{client_port}"));
+    let http_addr =
+        std::env::var("INFINITY_HTTP_BIND").unwrap_or_else(|_| format!("{host}:{http_port}"));
     // `storage_type = "minio"`: the C++-format data files live in the bucket and
     // are downloaded before recovery, then kept in sync at every checkpoint.
     let storage_type = toml_value(&text, "storage_type").unwrap_or_default();
@@ -177,7 +212,10 @@ fn serve_from_config(path: &str) -> common::Result<()> {
     // The reference checkpoints periodically (`[wal] checkpoint_interval`), which
     // is what dumps the memory blocks into the on-disk C++ layout.
     let secs = parse_interval_secs(&toml_value(&text, "checkpoint_interval").unwrap_or_default());
-    if secs > 0 {
+    // `-m/--maintenance` (the reference's admin mode) leaves the periodic
+    // triggers off: maintenance is about inspecting and repairing a stopped
+    // node, not about letting cleanup/compact/checkpoint mutate it.
+    if secs > 0 && !maintenance {
         // The checkpoint itself (WAL rotation + block flush) runs on the
         // engine's periodic trigger thread, next to cleanup/compact/optimize
         // (`PeriodicTriggerThread`); only the page release below stays here,
@@ -203,12 +241,32 @@ fn serve_from_config(path: &str) -> common::Result<()> {
     let cleanup = parse_interval_secs(&toml_value(&text, "cleanup_interval").unwrap_or_default());
     let compact = parse_interval_secs(&toml_value(&text, "compact_interval").unwrap_or_default());
     let optimize = parse_interval_secs(&toml_value(&text, "optimize_interval").unwrap_or_default());
-    engine.start_background_tasks(
-        std::time::Duration::from_secs(secs),
-        std::time::Duration::from_secs(cleanup),
-        std::time::Duration::from_secs(compact),
-        std::time::Duration::from_secs(optimize),
-    );
+    if !maintenance {
+        engine.start_background_tasks(
+            std::time::Duration::from_secs(secs),
+            std::time::Duration::from_secs(cleanup),
+            std::time::Duration::from_secs(compact),
+            std::time::Duration::from_secs(optimize),
+        );
+    }
+    // The reference starts both front ends on the same storage
+    // (`infinity_main.cpp`: `http_server.Start(...)` next to `StartThriftServer()`).
+    let http = server::http::HttpServer::bind(&http_addr, engine.clone())?;
+    println!("http listening on {}", http.local_addr()?);
+    std::thread::spawn(move || http.run());
+    // The reference serves the PostgreSQL wire protocol too
+    // (`pg_server.Run()` on `[network] postgres_port`). A port already taken by
+    // a real PostgreSQL must not take the engine down, so a failed bind only
+    // disables this front end.
+    let pg_port = toml_value(&text, "postgres_port").unwrap_or_else(|| "5432".into());
+    let pg_addr = std::env::var("INFINITY_PG_BIND").unwrap_or_else(|_| format!("{host}:{pg_port}"));
+    match server::pg::PgServer::bind(&pg_addr, engine.clone()) {
+        Ok(pg) => {
+            println!("postgres listening on {}", pg.local_addr()?);
+            std::thread::spawn(move || pg.run());
+        }
+        Err(e) => eprintln!("postgres front end disabled: {e}"),
+    }
     let server = server::Server::bind_with_engine(&addr, engine)?;
     println!("serving on {}", server.local_addr()?);
     server.run();
@@ -330,20 +388,61 @@ fn parse_size_bytes(text: &str) -> u64 {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if let Some(cfg) = args.iter().find_map(|a| a.strip_prefix("--config=")) {
-        if let Err(e) = serve_from_config(cfg) {
-            eprintln!("error: {e}");
-            std::process::exit(1);
+    // `infinity [-f <config>] [-m]` is the reference's surface: no subcommand,
+    // the servers start. A known subcommand selects the rewrite's extension.
+    match args.first().map(String::as_str) {
+        Some(first) if SUBCOMMANDS.contains(&first) => {
+            if let Err(e) = run(&args) {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
         }
-        return;
+        Some(first) if !first.starts_with('-') => usage(),
+        _ => {
+            let (config, maintenance) = match parse_serve_args(&args) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    usage();
+                }
+            };
+            if let Err(e) = serve_from_config(config.as_deref(), maintenance) {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        }
     }
-    if args.len() < 2 {
-        usage();
+}
+
+/// `-f/--config <path>`, `--config=<path>`, `-m/--maintenance`, `-h/--help` —
+/// the options `infinity_main.cpp` declares through CLI11.
+fn parse_serve_args(args: &[String]) -> Result<(Option<String>, bool), String> {
+    let mut config = None;
+    let mut maintenance = false;
+    let mut i = 0;
+    while i < args.len() {
+        let a = args[i].as_str();
+        match a {
+            "-f" | "--config" => {
+                i += 1;
+                let path = args
+                    .get(i)
+                    .ok_or_else(|| format!("{a} needs a config file path"))?;
+                config = Some(path.clone());
+            }
+            "-m" | "--maintenance" => maintenance = true,
+            "-h" | "--help" => {
+                println!("{}", usage_text());
+                std::process::exit(0);
+            }
+            _ if a.starts_with("--config=") => {
+                config = Some(a["--config=".len()..].to_string());
+            }
+            _ => return Err(format!("unrecognised argument: {a}")),
+        }
+        i += 1;
     }
-    if let Err(e) = run(&args) {
-        eprintln!("error: {e}");
-        std::process::exit(1);
-    }
+    Ok((config, maintenance))
 }
 
 fn run(args: &[String]) -> common::Result<()> {
@@ -445,13 +544,20 @@ fn run(args: &[String]) -> common::Result<()> {
             Ok(())
         }
         "serve" => {
-            // `infinity serve <dir> [host:port]` — Thrift/Thrift-over-TCP frontend.
+            // Extension: `infinity serve <dir> [host:port]` — the engine opened
+            // with default options plus both front ends (what the old
+            // `infinity-server` binary did).
             let addr = args
                 .get(2)
                 .cloned()
                 .unwrap_or_else(|| "0.0.0.0:23817".into());
+            let http_addr =
+                std::env::var("INFINITY_HTTP_BIND").unwrap_or_else(|_| "0.0.0.0:23820".into());
             let options = executor::EngineOptions::default();
             let engine = std::sync::Arc::new(executor::Engine::open_with_options(&dir, options)?);
+            let http = server::http::HttpServer::bind(&http_addr, engine.clone())?;
+            println!("http listening on {}", http.local_addr()?);
+            std::thread::spawn(move || http.run());
             let server = server::Server::bind_with_engine(&addr, engine)?;
             println!("serving on {}", server.local_addr()?);
             server.run();
@@ -459,6 +565,10 @@ fn run(args: &[String]) -> common::Result<()> {
         "bench" => {
             let n: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(2000);
             let e = Engine::open(&dir)?;
+            // Gate E runs the driver twice over the same directory and compares
+            // the two runs, so each one must start from an empty table: without
+            // the drop, the second run selects twice as many rows.
+            let _ = e.execute("DROP TABLE IF EXISTS t;");
             let _ = e.execute("CREATE TABLE t (id INT, name VARCHAR);");
             let t0 = Instant::now();
             let mut i = 0;

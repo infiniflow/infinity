@@ -35,8 +35,8 @@ if [[ $# -ge 1 ]]; then
   golden="$1"
   rows="${INFINITY_BENCH_ROWS:-20000}"
   data="$scratch/gate-e-data/infinity-bench"
-  cargo build -q --release -p server || exit 1
-  "$here/../target/release/server" "$data" >"$scratch/infinity-bench-server.log" 2>&1 &
+  cargo build -q --release -p cli || exit 1
+  "$here/../target/release/infinity" serve "$data" >"$scratch/infinity-bench-server.log" 2>&1 &
   srv=$!
   trap 'kill "$srv" 2>/dev/null' EXIT
   sleep 4

@@ -925,16 +925,23 @@ mod tests {
         for sql in [
             // a multi-vector column is not a tensor column
             "CREATE INDEX a ON em (m) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
-            // 4 does not divide 2
-            "CREATE INDEX b ON em (v) USING EMVB WITH (pq_subspace_num = 4, pq_subspace_bits = 8);",
             // bits must be 8 or 16
             "CREATE INDEX c ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 4);",
             // unknown option
             "CREATE INDEX d ON em (v) USING EMVB WITH (nbits = 4);",
+            // the reference defaults both options to 0 and rejects that, so
+            // omitting one is an error
+            "CREATE INDEX e ON em (v) USING EMVB WITH (pq_subspace_bits = 8);",
+            "CREATE INDEX f ON em (v) USING EMVB WITH (pq_subspace_num = 2);",
         ] {
             assert!(e.execute(sql).is_err(), "{sql} should be rejected");
         }
         e.execute("CREATE INDEX ok_i ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
+            .unwrap();
+        // "dimension % subspace_num != 0" is only checked by `GetEMVBOPQ`
+        // when the index is built, so the DDL itself succeeds (the reference
+        // accepts it too; `parallel_test` relies on that).
+        e.execute("CREATE INDEX ok_odd ON em (v) USING EMVB WITH (pq_subspace_num = 8, pq_subspace_bits = 8);")
             .unwrap();
     }
 
@@ -2818,7 +2825,12 @@ mod tests {
         e.execute("CREATE TABLE q (id INT, m TENSOR(FLOAT,2), s SPARSE(FLOAT,10), c INT);")
             .unwrap();
         e.execute("CREATE INDEX qi ON q (c);").unwrap();
-        e.execute("CREATE INDEX qm ON q (m) USING EMVB;").unwrap();
+        // Both PQ options are mandatory in the reference (`IndexEMVB::Make`
+        // starts them at 0 and 0 is not an acceptable value).
+        e.execute(
+            "CREATE INDEX qm ON q (m) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
+        )
+        .unwrap();
         e.execute("CREATE INDEX qs ON q (s) USING BMP;").unwrap();
         e.execute(
             "INSERT INTO q VALUES (1, [1.0,0.0], [0:1.0, 1:2.0], 7), \

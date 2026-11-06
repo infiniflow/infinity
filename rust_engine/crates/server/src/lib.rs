@@ -592,11 +592,7 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_show_table_args(&mut ip)?
                     };
-                    let full = if db.is_empty() || table.contains('.') {
-                        table.clone()
-                    } else {
-                        format!("{db}.{table}")
-                    };
+                    let full = full_table_name(&db, &table);
                     let found = engine.as_ref().and_then(|eng| {
                         eng.catalog()
                             .get_table_by_name(&full)
@@ -638,11 +634,7 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_show_index_args(&mut ip)?
                     };
-                    let full = if db.is_empty() || table.contains('.') {
-                        table.clone()
-                    } else {
-                        format!("{db}.{table}")
-                    };
+                    let full = full_table_name(&db, &table);
                     let found = engine.as_ref().and_then(|eng| {
                         eng.catalog().list_indexes().ok()?.into_iter().find(|im| {
                             im.table == full && im.name.eq_ignore_ascii_case(&index_name)
@@ -1231,11 +1223,7 @@ fn handle_connection(
                         fields.get(&2).cloned().unwrap_or_default(),
                         fields.get(&3).cloned().unwrap_or_default(),
                     );
-                    let full = if db.is_empty() {
-                        table
-                    } else {
-                        format!("{db}.{table}")
-                    };
+                    let full = full_table_name(&db, &table);
                     let resp = match engine.as_ref() {
                         Some(eng) => match eng.compact_table(&full) {
                             Ok(()) => CommonResponse {
@@ -1324,11 +1312,7 @@ fn handle_connection(
                     let get = |id: i16| fields.get(&id).cloned().unwrap_or_default();
                     let resp = if name == "RenameTable" {
                         let (db, table, new_name) = (get(1), get(2), get(3));
-                        let full = if db.is_empty() {
-                            table
-                        } else {
-                            format!("{db}.{table}")
-                        };
+                        let full = full_table_name(&db, &table);
                         run_common(
                             engine.as_ref(),
                             &format!("ALTER TABLE {full} RENAME TO {new_name};"),
@@ -1337,11 +1321,7 @@ fn handle_connection(
                     } else if name == "CreateTableSnapshot" {
                         // {1: session_id, 2: db, 3: table, 4: snapshot}
                         let (db, table, snap) = (get(2), get(3), get(4));
-                        let full = if db.is_empty() {
-                            table
-                        } else {
-                            format!("{db}.{table}")
-                        };
+                        let full = full_table_name(&db, &table);
                         run_common(
                             engine.as_ref(),
                             &format!("CREATE SNAPSHOT {} ON TABLE {full};", sql_name(&snap)),
@@ -1360,11 +1340,7 @@ fn handle_connection(
                         // comes last: {1: db, 2: table, 3: index, 4: session_id}
                         // (`thrift/infinity.thrift:685`).
                         let (db, table, index_name) = (get(1), get(2), get(3));
-                        let full = if db.is_empty() {
-                            table
-                        } else {
-                            format!("{db}.{table}")
-                        };
+                        let full = full_table_name(&db, &table);
                         match engine.as_ref() {
                             Some(eng) => match eng.dump_index_transaction(&full, &index_name) {
                                 Ok(()) => CommonResponse {
@@ -1460,11 +1436,7 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_alter_add_args(&mut ip)?
                     };
-                    let full = if db.is_empty() {
-                        table
-                    } else {
-                        format!("{db}.{table}")
-                    };
+                    let full = full_table_name(&db, &table);
                     let defs: Vec<String> = cols
                         .iter()
                         .map(|c| {
@@ -1487,11 +1459,7 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_alter_drop_args(&mut ip)?
                     };
-                    let full = if db.is_empty() {
-                        table
-                    } else {
-                        format!("{db}.{table}")
-                    };
+                    let full = full_table_name(&db, &table);
                     let mut resp = CommonResponse {
                         error_code: OK,
                         error_msg: "OK".into(),
@@ -1514,11 +1482,7 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_export_args(&mut ip)?
                     };
-                    let full = if req.db.is_empty() {
-                        req.table.clone()
-                    } else {
-                        format!("{}.{}", req.db, req.table)
-                    };
+                    let full = full_table_name(&req.db, &req.table);
                     let format = match req.file_type {
                         1 => "JSON",
                         2 => "JSONL",
@@ -1752,11 +1716,7 @@ fn handle_connection(
                     };
                     let db = fields.get(&1).cloned().unwrap_or_default();
                     let table = fields.get(&2).cloned().unwrap_or_default();
-                    let full = if db.is_empty() {
-                        table
-                    } else {
-                        format!("{db}.{table}")
-                    };
+                    let full = full_table_name(&db, &table);
                     let resp = match &engine {
                         Some(eng) => match eng.execute(&format!("SHOW TABLE {full} COLUMNS;")) {
                             Ok(rs) => {
@@ -1901,11 +1861,7 @@ fn handle_connection(
                         }
                         r
                     };
-                    let full = if req.db_name.is_empty() {
-                        req.table_name.clone()
-                    } else {
-                        format!("{}.{}", req.db_name, req.table_name)
-                    };
+                    let full = full_table_name(&req.db_name, &req.table_name);
                     let target = req.function.clone().unwrap_or_else(|| req.column.clone());
                     let resp = if target.is_empty() {
                         CommonResponse {
@@ -4168,6 +4124,11 @@ impl SelectReq {
         }
         if let Some(n) = self.limit {
             sql.push_str(&format!(" LIMIT {n}"));
+        } else if self.offset.is_some() {
+            // The reference's planner keeps LIMIT and OFFSET as independent
+            // fields, so an OFFSET without a limit means "every row after n".
+            // The SQL grammar requires a LIMIT first, so name an unbounded one.
+            sql.push_str(" LIMIT 9223372036854775807");
         }
         if let Some(n) = self.offset {
             sql.push_str(&format!(" OFFSET {n}"));
@@ -4568,7 +4529,7 @@ fn logic_type_name(logic: i32) -> String {
 
 /// Replaces bare identifiers that name a projection alias with the aliased
 /// expression text, leaving string literals untouched.
-fn substitute_aliases(text: &str, aliases: &[(String, String)]) -> String {
+pub(crate) fn substitute_aliases(text: &str, aliases: &[(String, String)]) -> String {
     if aliases.is_empty() {
         return text.to_string();
     }
@@ -6712,6 +6673,19 @@ pub fn read_create_index_args(
     Ok(r)
 }
 
+/// The reference lower-cases every identifier at its API boundary
+/// (`infinity_impl.cpp`), so a Thrift request may name `db.Table` in any case
+/// while the engine keeps lower-case names.
+fn full_table_name(db: &str, table: &str) -> String {
+    let db = db.trim().to_ascii_lowercase();
+    let table = table.trim().to_ascii_lowercase();
+    if db.is_empty() || table.contains('.') {
+        table
+    } else {
+        format!("{db}.{table}")
+    }
+}
+
 fn run_common(engine: Option<&Arc<Engine>>, sql: &str, session_id: i64) -> CommonResponse {
     match engine {
         Some(eng) => match eng.execute(sql) {
@@ -7703,10 +7677,9 @@ fn write_show_config_response(
     o.write_field_end().map_err(tw)?;
     if let Some(v) = value {
         // Numeric knobs answer with the `int_value` arm, the rest with a string.
-        let numeric = matches!(
-            name.to_ascii_lowercase().as_str(),
-            "cleanup_interval" | "checkpoint_interval" | "cache_result_capacity"
-        );
+        // The reference's `IntegerOption`s answer with `int_value`; everything
+        // else carries a string.
+        let numeric = crate::http::config_is_numeric(name);
         o.write_field_begin(&TFieldIdentifier::new("config_value", TType::Struct, 4i16))
             .map_err(tw)?;
         o.write_struct_begin(&TStructIdentifier::new("ConfigValue"))

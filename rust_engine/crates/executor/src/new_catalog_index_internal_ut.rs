@@ -211,7 +211,7 @@ fn test_index() {
         .unwrap();
     e.execute("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
         .unwrap();
-    e.execute("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB;")
+    e.execute("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
         .unwrap();
 
     e.insert_literals("db1.tb1", None, five_column_rows(0, 8192))
@@ -315,7 +315,7 @@ fn disabled_slow_test_populate_index() {
         .unwrap();
     e.execute("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
         .unwrap();
-    e.execute("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB;")
+    e.execute("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
         .unwrap();
 
     // The second block is indexed incrementally.

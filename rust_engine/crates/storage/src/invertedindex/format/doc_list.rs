@@ -12,8 +12,10 @@ use super::posting_slice::{
 pub const OF_NONE: u8 = 0;
 pub const OF_TERM_PAYLOAD: u8 = 1;
 pub const OF_DOC_PAYLOAD: u8 = 2;
-pub const OF_POSITION_LIST: u8 = 4;
-pub const OF_TERM_FREQUENCY: u8 = 8;
+// Both flags belong to the shared option byte; `position_list` is where they
+// are declared (the reference keeps them in `index_defines`), so re-exporting
+// them from here as well made the two glob re-exports in `format::mod` ambiguous.
+use super::position_list::OF_TERM_FREQUENCY;
 pub const OF_BLOCK_MAX: u8 = 16;
 pub const OPTION_FLAG_NONE: u8 = OF_NONE;
 
