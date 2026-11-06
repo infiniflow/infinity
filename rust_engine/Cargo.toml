@@ -7,6 +7,7 @@ members = [
     "crates/txn",
     "crates/parser",
     "crates/expression",
+    "crates/analyzer",
     "crates/planner",
     "crates/index",
     "crates/executor",
@@ -28,6 +29,7 @@ catalog = { path = "crates/catalog" }
 txn = { path = "crates/txn" }
 parser = { path = "crates/parser" }
 expression = { path = "crates/expression" }
+analyzer = { path = "crates/analyzer" }
 planner = { path = "crates/planner" }
 index = { path = "crates/index" }
 executor = { path = "crates/executor" }

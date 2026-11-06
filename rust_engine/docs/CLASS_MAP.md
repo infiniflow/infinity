@@ -9,7 +9,7 @@
 
 判定口径（承自计划书 §3.6）：承载**行为**且被其他类调用的类（HNSW/IVF/EMVB/PLAID/SMVE、全文段、事务、Buffer、BlockIndex、PDataBlock 等）逐类列出；纯数据载体、模板特化、迭代器与生成类型按区域聚合，聚合理由与归属见 §1.2。已明确决定的设计变更不要求同名一一对应，但必须出现在 §4。
 
-**落点路径以当前的目录树为准**（见 [`STRUCTURE.md`](STRUCTURE.md)）。2026-11 的结构整理之后：crate 去掉了 `infinity-` 前缀（`crates/storage` 对应 `src/storage`）；`executor/src/lib.rs` 里的引擎代码分到 `executor::engine::{state, statements, query, dml, ddl, index_build, text_index, types, admin, tasks}`；`cpp_blocks.rs` 变成 `executor::blocks::*`；`common/analyzer.rs` 变成 `executor::common::analyzer::*`（一分析器一文件）；`inverted_format` 变成 `storage::invertedindex::format`，`fulltext_segment` 变成 `storage::invertedindex::disk_segment_reader`。查到旧路径时按这张表转换。
+**落点路径以当前的目录树为准**（见 [`STRUCTURE.md`](STRUCTURE.md)）。2026-11 的结构整理之后：crate 去掉了 `infinity-` 前缀（`crates/storage` 对应 `src/storage`）；`executor/src/lib.rs` 里的引擎代码分到 `executor::engine::{state, statements, query, dml, ddl, index_build, text_index, types, admin, tasks}`；`cpp_blocks.rs` 变成 `executor::blocks::*`；`common/analyzer.rs` 抽成独立 crate `analyzer`（`analyzer::*`，一分析器一文件）；`inverted_format` 变成 `storage::invertedindex::format`，`fulltext_segment` 变成 `storage::invertedindex::disk_segment_reader`。查到旧路径时按这张表转换。
 
 ## 1 口径
 
@@ -38,7 +38,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `executor/*` | 173 | `operator` 78 + `operator_state.cppm` 74 → `PhysicalOperator` 变体与 `OperatorState`；`expression` 13 → `expression` 求值函数；其余为执行器内部管线结构 |
 | `planner/*` | 117 | `node` 52 → `Statement`/计划结构；`optimizer` 17 → 规则函数；其余为绑定/解析中间结构 |
 | `function/*` | 64 | `cast` 29 + `table` 17 + 其余 → Rust 的 cast/builtin 函数与 `AggFunc` 枚举 |
-| `common/*` | 58 | `analyzer` 39 → `executor::common::analyzer::*`（一分析器一文件）；其余为工具结构 |
+| `common/*` | 58 | `analyzer` 39 → `analyzer` crate（`analyzer::*`，一分析器一文件）；其余为工具结构 |
 | `main/*` + `network/*` + `scheduler/*` + `admin` + `metrics` + `unit_test` | 39 + 23 + 10 + 1 + 1 + 7 | 查询选项 → 解析结构；peer/cluster → `server::peer` + `ring_buffer`；调度器按 D4 由 `run_tasklets` 的 tasklet 承担（线程与队列的对应见 `PARALLEL_MAP.md`）；admin → 语句分发；metrics → 服务端计数；`unit_test` 为 C++ 测试夹具 |
 | `expression/*` | 12 | 标量表达式求值函数（`expression`） |
 
@@ -49,7 +49,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 聚合到（Rust） | 类数 |
 |---|---:|
 | `Statement`/计划结构 + 规则函数（planner） | 115 |
-| `storage::invertedindex` 的 format/disk_segment_reader、`executor::invertedindex::search` 的 WAND、`executor::common::analyzer` 函数 | 117 |
+| `storage::invertedindex` 的 format/disk_segment_reader、`executor::invertedindex::search` 的 WAND、`analyzer` 函数 | 117 |
 | `PhysicalOperator` 变体（执行器算子） | 78 |
 | `catalog` + `value_format` | 76 |
 | `PhysicalOperator` + `OperatorState`（状态结构） | 73 |
@@ -85,45 +85,45 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
 | 1 | `AdminExecutor` | `src/admin/admin_executor.cppm` | mapped | executor 的语句分发 
-| 2 | `Analyzer` | `src/common/analyzer/analyzer.cppm` | mapped | `executor::common::analyzer::StandardAnalyzer` 
-| 3 | `AnalyzerPool` | `src/common/analyzer/analyzer_pool.cppm` | mapped | `executor::common::analyzer::AnalyzerPool` 
-| 4 | `ChineseAnalyzer` | `src/common/analyzer/chinese_analyzer.cppm` | mapped | `executor::common::analyzer::ChineseAnalyzer` 
-| 5 | `CommonLanguageAnalyzer` | `src/common/analyzer/common_analyzer.cppm` | mapped | `executor::common::analyzer::StandardAnalyzer` 的选项（case/stem/stem_only） |
-| 6 | `DartsTrie` | `src/common/analyzer/darts_trie.cppm` | mapped | `executor::common::analyzer::DartsTrie` 
-| 7 | `DartsTuple` | `src/common/analyzer/darts_trie.cppm` | mapped | executor::common::analyzer 
-| 8 | `POSTable` | `src/common/analyzer/darts_trie.cppm` | mapped | executor::common::analyzer 
-| 9 | `AnalyzeContext` | `src/common/analyzer/ik/analyze_context.cppm` | mapped | executor::common::analyzer 
-| 10 | `IKArbitrator` | `src/common/analyzer/ik/arbitrator.cppm` | mapped | executor::common::analyzer 
-| 11 | `CharacterUtil` | `src/common/analyzer/ik/character_util.cppm` | mapped | executor::common::analyzer 
-| 12 | `CJKSegmenter` | `src/common/analyzer/ik/cjk_segmenter.cppm` | mapped | executor::common::analyzer 
-| 13 | `CNQuantifierSegmenter` | `src/common/analyzer/ik/cn_quantifier_segmenter.cppm` | mapped | executor::common::analyzer 
-| 14 | `Dictionary` | `src/common/analyzer/ik/dict.cppm` | mapped | executor::common::analyzer 
-| 15 | `DictSegment` | `src/common/analyzer/ik/dict_segment.cppm` | mapped | executor::common::analyzer 
-| 16 | `Hit` | `src/common/analyzer/ik/hit.cppm` | mapped | executor::common::analyzer 
-| 17 | `IKAnalyzer` | `src/common/analyzer/ik/ik_analyzer.cppm` | mapped | `executor::common::analyzer::IKAnalyzer` 
-| 18 | `LetterSegmenter` | `src/common/analyzer/ik/letter_segmenter.cppm` | mapped | executor::common::analyzer 
-| 19 | `Lexeme` | `src/common/analyzer/ik/lexeme.cppm` | mapped | executor::common::analyzer 
-| 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | mapped | executor::common::analyzer 
-| 21 | `QuickSortSet` | `src/common/analyzer/ik/quick_sort_set.cppm` | mapped | executor::common::analyzer 
-| 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | mapped | executor::common::analyzer 
-| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `executor::common::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
-| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `executor::common::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
+| 2 | `Analyzer` | `src/common/analyzer/analyzer.cppm` | mapped | `analyzer::StandardAnalyzer` 
+| 3 | `AnalyzerPool` | `src/common/analyzer/analyzer_pool.cppm` | mapped | `analyzer::AnalyzerPool` 
+| 4 | `ChineseAnalyzer` | `src/common/analyzer/chinese_analyzer.cppm` | mapped | `analyzer::ChineseAnalyzer` 
+| 5 | `CommonLanguageAnalyzer` | `src/common/analyzer/common_analyzer.cppm` | mapped | `analyzer::StandardAnalyzer` 的选项（case/stem/stem_only） |
+| 6 | `DartsTrie` | `src/common/analyzer/darts_trie.cppm` | mapped | `analyzer::DartsTrie` 
+| 7 | `DartsTuple` | `src/common/analyzer/darts_trie.cppm` | mapped | analyzer 
+| 8 | `POSTable` | `src/common/analyzer/darts_trie.cppm` | mapped | analyzer 
+| 9 | `AnalyzeContext` | `src/common/analyzer/ik/analyze_context.cppm` | mapped | analyzer 
+| 10 | `IKArbitrator` | `src/common/analyzer/ik/arbitrator.cppm` | mapped | analyzer 
+| 11 | `CharacterUtil` | `src/common/analyzer/ik/character_util.cppm` | mapped | analyzer 
+| 12 | `CJKSegmenter` | `src/common/analyzer/ik/cjk_segmenter.cppm` | mapped | analyzer 
+| 13 | `CNQuantifierSegmenter` | `src/common/analyzer/ik/cn_quantifier_segmenter.cppm` | mapped | analyzer 
+| 14 | `Dictionary` | `src/common/analyzer/ik/dict.cppm` | mapped | analyzer 
+| 15 | `DictSegment` | `src/common/analyzer/ik/dict_segment.cppm` | mapped | analyzer 
+| 16 | `Hit` | `src/common/analyzer/ik/hit.cppm` | mapped | analyzer 
+| 17 | `IKAnalyzer` | `src/common/analyzer/ik/ik_analyzer.cppm` | mapped | `analyzer::IKAnalyzer` 
+| 18 | `LetterSegmenter` | `src/common/analyzer/ik/letter_segmenter.cppm` | mapped | analyzer 
+| 19 | `Lexeme` | `src/common/analyzer/ik/lexeme.cppm` | mapped | analyzer 
+| 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | mapped | analyzer 
+| 21 | `QuickSortSet` | `src/common/analyzer/ik/quick_sort_set.cppm` | mapped | analyzer 
+| 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | mapped | analyzer 
+| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
+| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
 | 25 | `NGramAnalyzer` | `src/common/analyzer/ngram_analyzer.cppm` | mapped | `analyzer::NGramAnalyzer`（n-gram 窗口按 UTF-8 code point 滑动） |
-| 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `executor::common::analyzer::RAGAnalyzer` 
-| 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | mapped | executor::common::analyzer 
-| 28 | `SparsegramAnalyzer` | `src/common/analyzer/sparsegram_analyzer.cppm` | mapped | executor::common::analyzer 
+| 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `analyzer::RAGAnalyzer` 
+| 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | mapped | analyzer 
+| 28 | `SparsegramAnalyzer` | `src/common/analyzer/sparsegram_analyzer.cppm` | mapped | analyzer 
 | 29 | `StandardAnalyzer` | `src/common/analyzer/standard_analyzer.cppm` | mapped | `analyzer::StandardAnalyzer`（Analyze 的 word/stem/case 组合） |
-| 30 | `Stemmer` | `src/common/analyzer/stemmer/stemmer.cppm` | mapped | executor::common::analyzer 
+| 30 | `Stemmer` | `src/common/analyzer/stemmer/stemmer.cppm` | mapped | analyzer 
 | 31 | `Term` | `src/common/analyzer/term.cppm` | mapped | `analyzer::Term` |
 | 32 | `TermList` | `src/common/analyzer/term.cppm` | mapped | `Vec<analyzer::Term>` |
-| 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | mapped | executor::common::analyzer 
+| 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | mapped | analyzer 
 | 34 | `TokenizeConfig` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::TokenizeConfig`（AddAllows/AddDivides/AddUnites） |
 | 35 | `Tokenizer` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::tokenize` |
-| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `executor::common::analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
-| 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | mapped | executor::common::analyzer 
-| 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | mapped | executor::common::analyzer 
-| 39 | `WhitespaceAnalyzer` | `src/common/analyzer/whitespace_analyzer.cppm` | mapped | executor::common::analyzer 
-| 40 | `WordNetLemmatizer` | `src/common/analyzer/wordnet_lemmatizer.cppm` | mapped | executor::common::analyzer 
+| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
+| 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | mapped | analyzer 
+| 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | mapped | analyzer 
+| 39 | `WhitespaceAnalyzer` | `src/common/analyzer/whitespace_analyzer.cppm` | mapped | analyzer 
+| 40 | `WordNetLemmatizer` | `src/common/analyzer/wordnet_lemmatizer.cppm` | mapped | analyzer 
 | 41 | `BlockingQueue` | `src/common/blocking_queue.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 42 | `ByteSlice` | `src/common/memory/byte_slice.cppm` | mapped | common 的内存/资源计费 
 | 43 | `ByteSliceList` | `src/common/memory/byte_slice.cppm` | mapped | common 的内存/资源计费 
@@ -1235,8 +1235,8 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `KeyEncode`（`storage/common/kv_code.cppm`） | `storage::catalog::catalog_format` 的 `catalog|…` 与名称键两族函数 | `CatalogDbKey`/`CatalogDbPrefix`/`CatalogDbTagPrefix`/`CatalogTableKey`/`TableColumnKey`/`CatalogTableSegmentKey` 与 `DatabaseKey`/`TableKey`/`TableSegmentKey`/`TableSegmentBlockKey`/`TableSegmentBlockColumnKey`/`TableIndexKey`/`TableIndexSegmentKey`/`TableIndexChunkKey` 及各自 `*Prefix` | ✅ |
 | `CachedNodeBase` / `CachedScanBase` / `CacheContent` / `CacheOutput` / `ResultCacheManager`（`cached_node/*.cppm`、`logical_read_cache.cppm`、`result_cache_manager.cppm`） | `storage::result_cache_manager::{CachedNode, CacheContent, CacheOutput, CacheResultMap, ResultCacheManager}` | `AddCache`→`add_cache`（已有条目合并新列）、`GetCache`→`get_cache`（按输出列投影，缺列即 miss）、`DropTable`→`drop_table`、`ResetCacheNumCapacity`/`ClearCache`、LRU 淘汰 | ✅ |
 | `KnnFlatL2` / `KnnFlatIP` / `*Blas` / `*Reservoir` / `*Top1`（`knn_flat/*.cppm`） | `index::knn_flat::{top_k, top_1}` | `Search`→`top_k`（L2 升序 / IP 相似度降序、bitmask 过滤、并列取小 id）、`*Top1`→`top_1`；BLAS/reservoir 变体合并为同一实现（结构合并，行为一致） | ✅ |
-| `NGramAnalyzer`（`common/analyzer/ngram_analyzer.cppm`） | `executor::common::analyzer::NGramAnalyzer` | `Analyze`→`analyze`（按 code point 滑动窗口，窗口内空格结束当前词，尾部不足 n 停止） | ✅ |
-| `StandardAnalyzer` / `CommonLanguageAnalyzer` / `Tokenizer` / `TokenizeConfig` / `Term` / `TermList` / `Stemmer`（`common/analyzer/*.cppm`、`common/analyzer/stemmer/*`） | `executor::common::analyzer::{StandardAnalyzer, Stemmer, TokenizeConfig, Term, tokenize}` | `InitStemmer(<STEM_LANG_*>)`、`SetCaseSensitive`、`SetExtractEngStem`、`SetStemOnly`、`SetCharOffset`、`SetTokenizerConfig`、`Analyze`→`analyze`（word/stem/case 的三种输出组合、stem 与原词共享 position）；18 种语言各自同族：`STEM_LANG_PORT` 是 `porter` 模块里逐条照 `stem_UTF_8_porter.cpp` 转写的原版 Porter（不是 rust-stemmers 的 Porter2），其余 Snowball 语言用 rust-stemmers；`standard-<language>` 的索引/查询词干走 `TextTokenizer::standard`（`@#$` 分隔、`/` 连接） | ✅ |
+| `NGramAnalyzer`（`common/analyzer/ngram_analyzer.cppm`） | `analyzer::NGramAnalyzer` | `Analyze`→`analyze`（按 code point 滑动窗口，窗口内空格结束当前词，尾部不足 n 停止） | ✅ |
+| `StandardAnalyzer` / `CommonLanguageAnalyzer` / `Tokenizer` / `TokenizeConfig` / `Term` / `TermList` / `Stemmer`（`common/analyzer/*.cppm`、`common/analyzer/stemmer/*`） | `analyzer::{StandardAnalyzer, Stemmer, TokenizeConfig, Term, tokenize}` | `InitStemmer(<STEM_LANG_*>)`、`SetCaseSensitive`、`SetExtractEngStem`、`SetStemOnly`、`SetCharOffset`、`SetTokenizerConfig`、`Analyze`→`analyze`（word/stem/case 的三种输出组合、stem 与原词共享 position）；18 种语言各自同族：`STEM_LANG_PORT` 是 `porter` 模块里逐条照 `stem_UTF_8_porter.cpp` 转写的原版 Porter（不是 rust-stemmers 的 Porter2），其余 Snowball 语言用 rust-stemmers；`standard-<language>` 的索引/查询词干走 `TextTokenizer::standard`（`@#$` 分隔、`/` 连接） | ✅ |
 | `MixedT`（`parser/type/mixed_type.h`） | `common::types::{MixedT, MixedValue}` | `MakeInteger/MakeFloat/MakeString/MakeTuple(count)/MakeArray(count)/MakeNull/MakeMiss`、`Insert*IntoTuple/IntoArray`（重复键/越界/满容量报错）、`GetFromTuple/GetByIndex`、`type`→`value_type`、`Reset`、值访问与渲染；14 字节短串内联阈值；C++ 的 union 内存布局与移动后 `kInvalid` 由 Rust 所有权模型取代 |
 | `BaseMixedType` / `MixedValueType`（`parser/type/base_mixed_type.h`） | `common::types::MixedValueType` | `GetTypeName`→`type_name`（Invalid/Integer/Float/Short|Long String/Tuple/Array/Null/Missing/Dummy） | ✅ |
 | `TableDef`（`storage/definition/table_def.cppm`） | `catalog::value_format::TableDef` | `Make`→`make`、`column_count`、`GetColIdByName`→`get_col_id_by_name`；字段（schema/table/comment/columns）与 `ColumnDefValue` 一致 | ✅ |
@@ -1300,7 +1300,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | `PlaidIndexDiskMerger` / `PlaidMergeManifest`（`plaid_index_disk_merger.cppm`） | `index::plaid::{PlaidIndexDiskMerger, PlaidMergeManifest}` | `MergeChunk(sParallel/Incremental)`、`Finalize`→`accept_merged_data`、`CalculateMergeSize`、manifest JSON（`NeedsMerge`/`UpdateChunk`/`Load/SaveManifest`） | ✅ |
 | `SMVETransform` / `GenerateProjectionMatrix`（`smve_transform.cppm`） | `index::smve::{smve_transform, generate_projection_matrix, SmveResult}` | 随机单位列投影（固定种子）、逐 token 取 top-k、query 求和池化 / doc 非零均值池化 | ✅ |
 | `SMVEIndexInMem` / `SMVESerializedData`（`smve_index.cppm`） | `index::smve::SmveIndex` + 执行器 `MultiVectorIndex` 的 `smve`/`smve_seqs`/`SmveConfig` | `BuildFromColumn`→`build_from_column`（内部 BMP 的 `AddDocs`）、`Search`→BMP `search_knn_filtered` + 执行器按列值精确 MaxSim 重排（与 C++ `PhysicalMatchTensorScan` 一致）、`GetSizeInBytes`/行数；`SMVEBMPCollector` 由 `search_knn` 的返回值承担 | ✅ |
-| `AnalyzerPool` / `RAGAnalyzer` / `ChineseAnalyzer` / `IKAnalyzer` / `DartsTrie`（`common/analyzer/*`） | `executor::common::analyzer::{AnalyzerPool, AnalyzerName, parse_analyzer_name, RAGAnalyzer, ChineseAnalyzer, IKAnalyzer, DartsTrie}` | 名称解析（族名大小写敏感；`rag-<lang>[-fine]`、`chinese/traditional/ik` 的精确 `-fine`、`standard-<language>` 大小写不敏感、`keyword/whitespace-<delims>` 逐字节、`ngram-<strtol>`、`sparsegram-<min>-<max>-fold`）、trie 驱动分词、按语言折叠/停用词/词干、jieba MP-DAG+HMM 粗/细粒度、IK 词典最长匹配；`Tokenize`/`Analyze`→`tokenize`/`analyze`；`CREATE INDEX … WITH (ANALYZER = …)` 与查询共用同一个 `AnalyzerPool`（测试 `a_fulltext_index_uses_its_declared_analyzer`），DDL 校验与 `get_analyzer` 共用 `parse_analyzer_name`（单测 `analyzer_name_grammar_matches_the_reference`、`analyzer_suffixes_reach_the_constructed_analyzers`、`a_keyword_fulltext_index_takes_its_delimiters_from_the_name`、`create_index_validates_the_analyzer_name_like_the_reference`，跨引擎门禁 `test_analyzer_names_and_tokenisation_match`） | ✅（OpenCC 为等价折叠，IK 歧义仲裁未移植） |
+| `AnalyzerPool` / `RAGAnalyzer` / `ChineseAnalyzer` / `IKAnalyzer` / `DartsTrie`（`common/analyzer/*`） | `analyzer::{AnalyzerPool, AnalyzerName, parse_analyzer_name, RAGAnalyzer, ChineseAnalyzer, IKAnalyzer, DartsTrie}` | 名称解析（族名大小写敏感；`rag-<lang>[-fine]`、`chinese/traditional/ik` 的精确 `-fine`、`standard-<language>` 大小写不敏感、`keyword/whitespace-<delims>` 逐字节、`ngram-<strtol>`、`sparsegram-<min>-<max>-fold`）、trie 驱动分词、按语言折叠/停用词/词干、jieba MP-DAG+HMM 粗/细粒度、IK 词典最长匹配；`Tokenize`/`Analyze`→`tokenize`/`analyze`；`CREATE INDEX … WITH (ANALYZER = …)` 与查询共用同一个 `AnalyzerPool`（测试 `a_fulltext_index_uses_its_declared_analyzer`），DDL 校验与 `get_analyzer` 共用 `parse_analyzer_name`（单测 `analyzer_name_grammar_matches_the_reference`、`analyzer_suffixes_reach_the_constructed_analyzers`、`a_keyword_fulltext_index_takes_its_delimiters_from_the_name`、`create_index_validates_the_analyzer_name_like_the_reference`，跨引擎门禁 `test_analyzer_names_and_tokenisation_match`） | ✅（OpenCC 为等价折叠，IK 歧义仲裁未移植） |
 | `QueryBuilder` / `TermLookup` / `AndIterator` / `OrIterator` / `AndNotIterator`（`invertedindex/search/query_builder*`） | `executor::query_builder::{QueryBuilder, TermLookup, AndIterator, OrIterator, AndNotIterator, PhraseQueryNode, BmwIterator}` | 布尔树扁平化、`NOT`→`AND_NOT`、`Next(doc_id)`/`DocID()`、短语（精确/滑窗）与 BMW/WAND | ✅ |
 | `SearchDriver` / 查询解析器（`invertedindex/search/search_driver*`、`search_lexer.l`、`search_parser.y`） | `executor::invertedindex::search::query_builder::{SearchDriver, MemoryColumnIndex, MemorySegment}` | 词法（引号、`~slop`、`^boost`、转义）、隐式 OR、`AND`/`NOT`、`field:term`、分析器解析 | ✅ `^boost` 进入查询树并参与 BM25 打分；无列名字段组走与具名列相同的 BM25 路径 |
 | `Highlighter` / `PostingWriter` / `PostingMerger` / `PostingIterator`（`invertedindex/*`） | `executor::highlight_with_analyzer`、`storage::invertedindex::disk_segment_reader::{PostingWriter, PostingMerger, PostingIterator}` | postings 写入/合并/`seek_doc`/`skip_to`、tf、高亮片段 | ✅ |

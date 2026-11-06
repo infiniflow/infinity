@@ -21,7 +21,7 @@
 
 use std::collections::HashMap;
 
-use crate::common::analyzer::{Analyzer, AnalyzerPool, WhitespaceAnalyzer};
+use analyzer::{Analyzer, AnalyzerPool, WhitespaceAnalyzer};
 use crate::query_builder::{
     DocIterator, PhraseDocIterator, PhraseQueryNode, QueryNode, TermDocIterator, TermLookup,
     TermQueryNode,

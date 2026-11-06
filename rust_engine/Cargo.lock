@@ -12,6 +12,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "analyzer"
+version = "0.1.0"
+dependencies = [
+ "expression",
+ "rust-stemmers",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -214,6 +222,7 @@ dependencies = [
 name = "executor"
 version = "0.1.0"
 dependencies = [
+ "analyzer",
  "catalog",
  "common",
  "expression",

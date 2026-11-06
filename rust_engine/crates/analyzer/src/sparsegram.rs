@@ -12,11 +12,8 @@ pub struct SparseGramAnalyzer {
 impl SparseGramAnalyzer {
     /// C++: `ParseSparseGramAnalyzerName`.
     pub fn from_name(name: &str) -> Option<Self> {
-        crate::regex_literal::parse_sparsegram_analyzer(name).map(|(min_n, max_n, fold)| Self {
-            min_n,
-            max_n,
-            fold,
-        })
+        expression::regex_literal::parse_sparsegram_analyzer(name)
+            .map(|(min_n, max_n, fold)| Self { min_n, max_n, fold })
     }
 
     /// Streams the grams: `for_each_sparse_gram` already produces them by
@@ -76,7 +73,7 @@ pub(crate) fn for_each_sparse_gram(
     fold: bool,
     mut emit: impl FnMut(&str),
 ) {
-    use crate::regex_literal::is_dense_code_point;
+    use expression::regex_literal::is_dense_code_point;
 
     if min_n == 0 || max_n < min_n || text.is_empty() {
         return;

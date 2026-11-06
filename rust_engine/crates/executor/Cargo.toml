@@ -12,6 +12,7 @@ catalog.workspace = true
 txn.workspace = true
 parser.workspace = true
 expression.workspace = true
+analyzer.workspace = true
 planner.workspace = true
 index.workspace = true
 lz4_flex.workspace = true

@@ -42,13 +42,11 @@ mod cleanup_rollback_txn_ut;
 #[cfg(test)]
 mod cleanup_ut;
 pub mod columnar;
-pub mod common;
 #[cfg(test)]
 mod compact_replay_ut;
 #[cfg(test)]
 mod conflict_check_ut;
 pub use blocks as cpp_blocks;
-mod darts_build;
 pub mod data_table;
 mod deferred_catalog;
 mod dependent;
@@ -84,7 +82,6 @@ mod new_catalog_ut;
 pub mod operator;
 #[cfg(test)]
 mod optimize_replay_ut;
-mod porter;
 mod profiler;
 pub mod query_builder;
 #[cfg(test)]

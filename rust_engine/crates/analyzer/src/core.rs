@@ -283,7 +283,7 @@ pub(crate) const STANDARD_LANGUAGES: &[(&str, Stemmer)] = &[
 
 /// The stemmer C++ selects for `standard-<language>`; unknown suffixes keep the
 /// English default, exactly like the reference's if-chain.
-pub(crate) fn standard_stemmer(language: &str) -> Stemmer {
+pub fn standard_stemmer(language: &str) -> Stemmer {
     STANDARD_LANGUAGES
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case(language))

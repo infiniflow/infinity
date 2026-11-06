@@ -11,6 +11,7 @@ crate 不带 `infinity-` 前缀：`crates/storage` 对应 `src/storage`，`crate
 | 参考 | 重写版 crate | 说明 |
 |---|---|---|
 | `src/common` | `common` | 基础类型、JSON、SIMD、utility、datetime、varchar |
+| `src/common/analyzer` | `analyzer` | 分词器独立成 crate（一分析器一文件），`executor` 依赖它；FFI/客户端可直接链接 |
 | `src/storage` | `storage` | 见 §2 |
 | `src/storage/catalog` + catalog 部分的 `new_txn` | `catalog` | catalog 的键空间与值编码单独成 crate（参考版在 storage 里） |
 | `src/storage/new_txn` 的事务部分 | `txn` | |
