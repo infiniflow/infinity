@@ -3,11 +3,10 @@ import json
 import os
 import time
 
-from infinity.common import LOCAL_HOST, ConflictType
-from infinity.errors import ErrorCode
-
 import infinity
 from infinity import index
+from infinity.common import LOCAL_HOST, ConflictType
+from infinity.errors import ErrorCode
 
 
 def import_data(path):

@@ -4,6 +4,7 @@ import threading
 import time
 
 import pytest
+from infinity import index
 from infinity.common import ConflictType
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 from restart_util import (
@@ -17,7 +18,6 @@ from restart_util import (
 from util import RtnThread
 
 from common import common_values
-from infinity import index
 
 
 class TestInsertImport:

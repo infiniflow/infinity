@@ -19,9 +19,8 @@ This example is to connect local infinity instance, create table, insert data, s
 # from infinity.table import ExplainType
 import sys
 
-import polars as pl
-
 import infinity
+import polars as pl
 
 pl.Config.set_tbl_rows(1000)
 pl.Config.set_tbl_cols(100)

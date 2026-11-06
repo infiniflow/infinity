@@ -14,12 +14,12 @@
 import logging
 import os
 
+import infinity
 import pytest
 from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
 
-import infinity
 from common import common_values
 
 

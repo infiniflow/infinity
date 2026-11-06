@@ -7,13 +7,12 @@ from threading import Thread
 
 import pandas
 import pytest
+from infinity import index
 from infinity.common import ConflictType, SparseVector
 from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
 from test_sdkbase import TestSdk
 from util import RtnThread
-
-from infinity import index
 
 TEST_DATA_DIR = "/test/data/"
 kInsertThreadNum = 4

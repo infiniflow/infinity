@@ -1,15 +1,15 @@
 import os
 
+import infinity
 import pandas as pd
 import pytest
 from common.utils import copy_data
+from infinity import index
 from infinity.common import ConflictType, SortType
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 
-import infinity
 from common import common_values
-from infinity import index
 
 
 @pytest.fixture(scope="class")

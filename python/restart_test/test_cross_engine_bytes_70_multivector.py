@@ -32,9 +32,8 @@ from bytes_common import (
     _run_engine,
     _under,
 )
-from infinity.common import ConflictType
-
 from infinity import index
+from infinity.common import ConflictType
 
 EMVB_TABLE = "test_cross_engine_emvb"
 PLAID_TABLE = "test_cross_engine_plaid"

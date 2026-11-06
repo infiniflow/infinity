@@ -146,8 +146,12 @@ jobs:
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r ../resource/. /usr/share/infinity/resource/
       - uses: astral-sh/setup-uv@v7
+      - name: Install the NLTK data the Python tokenizer needs
         # The analyzer's parity tests shell out to
-        # `uv run python/infinity_sdk/infinity/rag_tokenizer.py`.
+        # `uv run python/infinity_sdk/infinity/rag_tokenizer.py`, which
+        # sentence-splits with NLTK's punkt_tab; a missing model makes the
+        # script print an error and every comparison fails.
+        run: uv run python -m nltk.downloader punkt_tab
       - name: test
         run: cargo test --workspace
       - name: smoke

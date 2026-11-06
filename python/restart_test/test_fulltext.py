@@ -5,6 +5,7 @@ import queue
 import time
 
 import pytest
+from infinity import index
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity_runner import (
@@ -16,7 +17,6 @@ from restart_util import EnwikiGenerator
 from util import RtnThread
 
 from common import common_values
-from infinity import index
 
 
 class TestFullText:

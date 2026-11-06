@@ -980,9 +980,9 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
                 });
                 meta.sparse_stores.push(None);
             }
-            let db = db_id
-                .parse::<u64>()
-                .map_err(|_| common::Error::Invalid(format!("replay: bad database id '{db_id}'")))?;
+            let db = db_id.parse::<u64>().map_err(|_| {
+                common::Error::Invalid(format!("replay: bad database id '{db_id}'"))
+            })?;
             catalog::layout::stage_added_columns(db, &meta, first)?
         }
         _ => {

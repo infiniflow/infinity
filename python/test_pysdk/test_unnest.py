@@ -1,9 +1,9 @@
+import infinity
 import pandas as pd
 import pytest
 from infinity.common import Array, ConflictType
 from infinity.infinity_http import infinity_http
 
-import infinity
 from common import common_values
 
 

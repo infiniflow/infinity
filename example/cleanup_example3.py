@@ -2,12 +2,12 @@ import os
 import pathlib
 import time
 
+import infinity
+from infinity import index
+
 # from common import common_values
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
-
-import infinity
-from infinity import index
 
 table_name = "test_invalid_fulltext_cache2"
 index_name = "body_index"

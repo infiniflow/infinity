@@ -4,12 +4,11 @@ import os
 from typing import Any
 
 import h5py
+import infinity
+from infinity import NetworkAddress, index
 from infinity.common import SparseVector
 from infinity.infinity_http import infinity_http
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
-
-import infinity
-from infinity import NetworkAddress, index
 
 from .base_client import BaseClient
 

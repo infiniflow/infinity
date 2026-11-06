@@ -1,10 +1,10 @@
 import pathlib
 
-# from common import common_values
-from infinity.common import ConflictType
-
 import infinity
 from infinity import index
+
+# from common import common_values
+from infinity.common import ConflictType
 
 
 class SimpleEmbeddingGenerator:

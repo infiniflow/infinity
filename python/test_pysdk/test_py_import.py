@@ -1,5 +1,6 @@
 import os
 
+import infinity
 import pytest
 from common.utils import (
     copy_data,
@@ -12,7 +13,6 @@ from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 
-import infinity
 from common import common_values
 
 

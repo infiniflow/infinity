@@ -1,3 +1,4 @@
+import infinity
 import polars as pl
 import pytest
 from infinity.common import ConflictType
@@ -5,7 +6,6 @@ from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 from infinity.table import ExplainType
 
-import infinity
 from common import common_values
 
 

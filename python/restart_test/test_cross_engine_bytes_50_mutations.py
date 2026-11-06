@@ -38,9 +38,8 @@ from bytes_common import (
     _wait_for_index_chunks,
     _write_config,
 )
-from infinity.common import ConflictType
-
 from infinity import index
+from infinity.common import ConflictType
 
 MUTATE_TABLE = "test_cross_engine_mutations"
 MUTATE_COLUMNS = {

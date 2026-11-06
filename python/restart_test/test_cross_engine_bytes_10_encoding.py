@@ -37,9 +37,8 @@ from bytes_common import (
     _under,
     _wait_for_index_chunks,
 )
-from infinity.common import ConflictType
-
 from infinity import index
+from infinity.common import ConflictType
 
 BMP_OPT_TABLE = "test_cross_engine_bmp_options"
 BMP_OPT_COLUMNS = {"id": {"type": "int"}, "sp": {"type": "sparse,512,float,int"}}

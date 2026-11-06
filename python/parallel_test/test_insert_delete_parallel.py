@@ -2,11 +2,10 @@
 import random
 from threading import Lock, Thread
 
+from infinity import index
 from infinity.common import ConflictType
 from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
-
-from infinity import index
 
 batch_size = 500
 max_count = batch_size * 200

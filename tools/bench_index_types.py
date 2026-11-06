@@ -19,10 +19,9 @@ Usage: bench_index_types.py [host] [port] [rows] [queries]
 import sys
 import time
 
-from infinity.common import ConflictType, NetworkAddress, SparseVector
-
 import infinity
 from infinity import index
+from infinity.common import ConflictType, NetworkAddress, SparseVector
 
 
 def connect_deadline(host, port, seconds=180):

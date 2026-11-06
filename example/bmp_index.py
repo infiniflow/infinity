@@ -18,9 +18,8 @@ This example is about connecting to the local infinity instance, creating table,
 
 import sys
 
-from infinity.common import SparseVector
-
 import infinity
+from infinity.common import SparseVector
 
 try:
     # Use infinity_embedded module to open a local directory

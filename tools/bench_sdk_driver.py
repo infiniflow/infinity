@@ -13,9 +13,8 @@ Usage: bench_sdk_driver.py <host> <port> [rows]
 import sys
 import time
 
-from infinity.common import ConflictType, NetworkAddress
-
 import infinity
+from infinity.common import ConflictType, NetworkAddress
 
 
 def main() -> int:

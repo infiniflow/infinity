@@ -16,11 +16,10 @@ import argparse
 import os
 import time
 
-from infinity.common import LOCAL_HOST, ConflictType
-from infinity.errors import ErrorCode
-
 import infinity
 from infinity import index
+from infinity.common import LOCAL_HOST, ConflictType
+from infinity.errors import ErrorCode
 
 
 def import_data(path, dataset: str, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str):

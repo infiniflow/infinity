@@ -21,9 +21,8 @@ from bytes_common import (
     _run_engine,
     _run_phases,
 )
-from infinity.common import ConflictType
-
 from infinity import index
+from infinity.common import ConflictType
 
 WAL_TABLE = "test_cross_engine_wal"
 WAL_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}}

@@ -45,9 +45,8 @@ from bytes_common import (
     _table_records,
     _under,
 )
-from infinity.common import ConflictType
-
 from infinity import index
+from infinity.common import ConflictType
 
 COMPACT_TABLE = "test_cross_engine_compact"
 COMPACT_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}}

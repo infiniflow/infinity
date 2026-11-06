@@ -27,9 +27,8 @@ from bytes_common import (
     _spawn_and_run,
     _wait_port_free,
 )
-from infinity.common import ConflictType
-
 from infinity import index
+from infinity.common import ConflictType
 
 OBJECT_TABLE = "test_cross_engine_objects"
 OBJECT_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}, "score": {"type": "float"}}

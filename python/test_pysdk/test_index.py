@@ -1,15 +1,15 @@
 import os
 import time
 
+import infinity
 import pandas as pd
 import pytest
+from infinity import index
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 
-import infinity
 from common import common_index, common_values
-from infinity import index
 
 TEST_DATA_DIR = "/test/data/"
 

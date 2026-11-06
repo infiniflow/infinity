@@ -1,11 +1,11 @@
 import random
 
+import infinity
+from infinity import index
 from infinity.common import ConflictType, SparseVector
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 
-import infinity
 from common import common_values
-from infinity import index
 
 
 class TestSystemSnapshotRestart:

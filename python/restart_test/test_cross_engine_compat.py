@@ -4,10 +4,9 @@ import socket
 import time
 
 import pytest
+from infinity import index
 from infinity.common import ConflictType, NetworkAddress
 from infinity_runner import InfinityRunner
-
-from infinity import index
 
 # Cross-engine compatibility (plan §3.1 disk-format compatibility + Gate C):
 # one engine creates the table, several index types and a batch of rows, stops,

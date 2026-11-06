@@ -1,16 +1,16 @@
+import infinity
 import pandas as pd
 import polars as pl
 import pytest
 from common.utils import copy_data, generate_commas_enwiki
+from infinity import index
 from infinity.common import ConflictType, InfinityException, SparseVector
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 from polars.testing import assert_frame_equal as pl_assert_frame_equal
 from polars.testing import assert_frame_not_equal as pl_assert_frame_not_equal
 
-import infinity
 from common import common_index, common_values
-from infinity import index
 
 
 @pytest.fixture(scope="class")

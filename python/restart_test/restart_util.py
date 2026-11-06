@@ -4,9 +4,8 @@ import os
 import random
 
 import numpy as np
-from infinity.common import SparseVector
-
 from infinity import index
+from infinity.common import SparseVector
 
 
 class SimpleEmbeddingGenerator:

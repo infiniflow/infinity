@@ -28,11 +28,10 @@ Usage:
 import argparse
 import time
 
+import infinity
 import infinity.common
 import infinity.index
 import numpy as np
-
-import infinity
 
 
 class PlaidBenchmark:

@@ -1,9 +1,9 @@
+import infinity
 import pytest
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 from infinity.remote_thrift.client import ThriftInfinityClient
 
-import infinity
 from common import common_values
 
 

@@ -20,10 +20,9 @@ import random
 import sys
 import time
 
-from infinity.common import ConflictType, NetworkAddress
-
 import infinity
 from infinity import index
+from infinity.common import ConflictType, NetworkAddress
 
 DIMS = 8
 VECTORS_PER_ROW = 4
