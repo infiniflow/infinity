@@ -2563,6 +2563,21 @@ impl Engine {
         rows
     }
 
+    /// How many rows sit in the append buffer - the rows written since the
+    /// last checkpoint, which the block files do not hold yet.
+    ///
+    /// Cheap enough for a gate that runs on a timer (the rows themselves are
+    /// not copied), unlike [`Self::pending_rows_of`].
+    pub(crate) fn buffered_row_count(&self, table: &str) -> usize {
+        let key = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| e.pending_rows.len())
+            .unwrap_or(0)
+    }
+
     /// The rows the commits since the last checkpoint appended, by row id
     /// (the reference's `BufferObject` for the blocks they land in).
     pub(crate) fn pending_rows_of(&self, table: &str) -> Vec<(usize, Vec<Value>)> {
@@ -4000,9 +4015,14 @@ impl Engine {
             if self.multivector_column(&im.table, &im.column) {
                 continue;
             }
+            // The rows an optimize would merge are the *live* ones: a table
+            // whose writes have not been checkpointed (or whose rows were just
+            // replayed from the WAL) keeps them in the append buffer, and the
+            // block files hold none of them yet.
             let Ok(rows) = self.row_count(&im.table) else {
                 continue;
             };
+            let rows = rows + self.buffered_row_count(&im.table);
             let Some(dir) = self.hnsw_dir(&im.table, &im.name) else {
                 continue;
             };

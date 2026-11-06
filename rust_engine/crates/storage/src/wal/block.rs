@@ -1053,8 +1053,11 @@ fn tensor_text(column: &BlockColumn, slot: u64, heap: &[u8]) -> Option<String> {
     let count = (slot & 0xffff) as usize;
     let offset = (slot >> 16) as usize;
     let dim = usize::try_from(*dimension).ok()?;
+    // `width` is already one vector's bytes (`dim * element_width`); the slot's
+    // `count` is how many such vectors the row holds (`tensor_column`,
+    // `TensorType{embedding_num, file_offset}`).
     let width = embedding_width(*element_type, *dimension)?;
-    let raw = heap.get(offset..offset + count * dim * width)?;
+    let raw = heap.get(offset..offset + count * width)?;
     let values = decode_embedding(raw, &column.data_type.type_info)?;
     let groups: Vec<String> = values
         .chunks(dim.max(1))

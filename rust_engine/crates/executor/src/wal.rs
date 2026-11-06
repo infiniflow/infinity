@@ -447,8 +447,21 @@ pub fn create_index_command_from_batch(
         }
     }
     let index_base = index_base?;
+    // The database's **name**, which the reference's command carries for the
+    // replay to resolve the table by name. The layout rewrite in this batch has
+    // the `catalog|db|{name}|{ts}` records, whose value is the id the index's
+    // key names.
+    let db_name = batch
+        .iter()
+        .find_map(|(k, v)| {
+            let key = std::str::from_utf8(k).ok()?;
+            let name = key.strip_prefix("catalog|db|")?.split('|').next()?;
+            let value = std::str::from_utf8(v.as_ref()?).ok()?;
+            (value == db_id).then(|| name.to_string())
+        })
+        .unwrap_or_else(|| "default_db".to_string());
     Some(WalCmd::CreateIndex {
-        db_name: "default_db".to_string(),
+        db_name,
         db_id,
         table_name: table_name.to_string(),
         table_id,
