@@ -1578,6 +1578,15 @@ impl Engine {
         let mut order: Vec<String> = Vec::new();
         let mut rows: std::collections::HashMap<String, Vec<(usize, Vec<Value>)>> =
             Default::default();
+        // The block files do not change while this replay runs (it only fills
+        // the append buffer), so the ids they already hold are computed once
+        // per table. Re-reading them per frame made a directory with a few
+        // hundred import frames quadratic: the 100k-row insert suite never got
+        // past its restart.
+        let mut on_disk_by_table: std::collections::HashMap<
+            String,
+            std::collections::HashSet<usize>,
+        > = Default::default();
         for append in &appends {
             let table = self.qualified_table(&append.table);
             // The frame names the table **id** it was written for. A snapshot
@@ -1594,11 +1603,12 @@ impl Engine {
             // may describe a commit that reached the blocks before the crash
             // (a DDL rewrite logs its rows and then writes them), and buffering
             // it again would show the row twice.
-            let on_disk: std::collections::HashSet<usize> = self
-                .read_blocks_including_deleted(&table)
-                .into_iter()
-                .map(|(seq, _)| seq)
-                .collect();
+            let on_disk = on_disk_by_table.entry(table.clone()).or_insert_with(|| {
+                self.read_blocks_including_deleted(&table)
+                    .into_iter()
+                    .map(|(seq, _)| seq)
+                    .collect()
+            });
             let mut batch = Vec::with_capacity(append.rows.len());
             for (seq, text) in &append.rows {
                 if on_disk.contains(&(*seq as usize)) {
