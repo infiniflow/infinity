@@ -138,6 +138,7 @@ FRAGMENT (1, ParallelStream)
    - table index: #1
    - output_columns: [a, b, c, __rowid]
 -> SOURCE (7) Table
+(empty)
 
 query I
 explain fragment SELECT a FROM t WHERE b = 'x';
@@ -155,6 +156,7 @@ FRAGMENT (1, ParallelStream)
    - table index: #1
    - output_columns: [b, __rowid]
 -> SOURCE (8) Table
+(empty)
 
 query I
 explain fragment SELECT a FROM t ORDER BY a LIMIT 3;
@@ -173,6 +175,7 @@ FRAGMENT (1, ParallelMaterialize)
    - table index: #1
    - output_columns: [a, __rowid]
 -> SOURCE (8) Table
+(empty)
 
 query I
 explain fragment SELECT count(*) FROM t;
@@ -190,6 +193,7 @@ FRAGMENT (1, ParallelMaterialize)
    - table index: #1
    - output_columns: [__rowid]
 -> SOURCE (8) Table
+(empty)
 
 query I
 explain fragment SELECT b, count(*) FROM t GROUP BY b;
@@ -209,6 +213,7 @@ FRAGMENT (1, ParallelMaterialize)
    - table index: #1
    - output_columns: [b, __rowid]
 -> SOURCE (8) Table
+(empty)
 
 query I
 explain fragment SELECT DISTINCT b FROM t;
@@ -228,4 +233,5 @@ FRAGMENT (1, ParallelMaterialize)
    - table index: #1
    - output_columns: [b, __rowid]
 -> SOURCE (8) Table
+(empty)
 
