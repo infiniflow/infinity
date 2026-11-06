@@ -76,12 +76,14 @@ jobs:
     # The workspace's own tests on both architectures. The analyzer tests load
     # /usr/share/infinity/resource, so the submodule is installed first.
     name: unit (${{ matrix.arch }})
-    if: ${{ matrix.arch == 'amd64' || github.event_name != 'pull_request' }}
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        # arm64 needs the cross-built reference / arm runners, so PRs stay on
+        # amd64; push, nightly and manual runs cover both. A job-level if cannot
+        # read matrix, so the axis itself is computed from the event.
+        arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
     defaults:
       run:
         working-directory: rust_engine
@@ -113,13 +115,12 @@ jobs:
     # ones it needs. The reference is built in the repo's builder images, the
     # rewrite natively on a runner of its own architecture.
     name: build (${{ matrix.engine }}, ${{ matrix.arch }})
-    if: ${{ matrix.arch == 'amd64' || github.event_name != 'pull_request' }}
     runs-on: ${{ matrix.engine == 'cpp' && 'ubuntu-latest' || (matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest') }}
     strategy:
       fail-fast: false
       matrix:
         engine: [cpp, rust]
-        arch: [amd64, arm64]
+        arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -195,13 +196,12 @@ jobs:
     # Gate C: the restart / recovery suite, one definition, one binary per cell.
     name: restart (${{ matrix.engine }}, ${{ matrix.arch }})
     needs: build
-    if: ${{ matrix.arch == 'amd64' || github.event_name != 'pull_request' }}
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
         engine: [cpp, rust]
-        arch: [amd64, arm64]
+        arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -289,12 +289,11 @@ jobs:
     # Gate C's format half: both engines in one run, per architecture.
     name: format gate (${{ matrix.arch }})
     needs: build
-    if: ${{ matrix.arch == 'amd64' || github.event_name != 'pull_request' }}
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
     steps:
       - uses: actions/checkout@v6
         with:
