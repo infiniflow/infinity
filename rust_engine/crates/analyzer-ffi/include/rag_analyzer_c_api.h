@@ -24,15 +24,10 @@ extern "C" {
 #include <stdint.h>
 
 /* Opaque pointer to an analyzer. */
-typedef void* RAGAnalyzerHandle;
+typedef void *RAGAnalyzerHandle;
 
 /* Callback receiving one token. */
-typedef void (*RAGTokenCallback)(
-    const char* text,
-    uint32_t len,
-    uint32_t offset,
-    uint32_t end_offset
-);
+typedef void (*RAGTokenCallback)(const char *text, uint32_t len, uint32_t offset, uint32_t end_offset);
 
 /* ------------------------------------------------------------------ */
 /* Lifecycle                                                          */
@@ -41,12 +36,12 @@ typedef void (*RAGTokenCallback)(
 /* Create an analyzer rooted at the given path (the directory holding rag/,
  * wordnet/ and opencc/). Dictionaries are not loaded until RAGAnalyzer_Load.
  * Returns NULL on failure (see RAGAnalyzer_LastError). */
-RAGAnalyzerHandle RAGAnalyzer_Create(const char* path);
+RAGAnalyzerHandle RAGAnalyzer_Create(const char *path);
 
 /* Open the analyzer an index name selects - rag-coarse, rag-fine,
  * whitespace-#, rankfeatures, standard-en, ngram-3, ... - loading its
  * dictionaries from resource_dir. Returns NULL on failure. */
-RAGAnalyzerHandle RAGAnalyzer_Open(const char* name, const char* resource_dir);
+RAGAnalyzerHandle RAGAnalyzer_Open(const char *name, const char *resource_dir);
 
 /* Copy a handle: the dictionaries are shared, the settings are the copy's own.
  * Only handles created by RAGAnalyzer_Create can be copied. */
@@ -67,7 +62,7 @@ void RAGAnalyzer_SetEnablePosition(RAGAnalyzerHandle handle, bool enable_positio
 
 /* Set the stemming language ("English", "Dutch", "German", ...). Unknown
  * languages keep the current stemmer, like the reference. */
-void RAGAnalyzer_SetLanguage(RAGAnalyzerHandle handle, const char* language);
+void RAGAnalyzer_SetLanguage(RAGAnalyzerHandle handle, const char *language);
 
 /* ------------------------------------------------------------------ */
 /* Tokenizing                                                         */
@@ -75,49 +70,45 @@ void RAGAnalyzer_SetLanguage(RAGAnalyzerHandle handle, const char* language);
 
 /* Invoke the callback once per token. Returns 0 on success, negative on
  * failure. */
-int RAGAnalyzer_Analyze(
-    RAGAnalyzerHandle handle,
-    const char* text,
-    RAGTokenCallback callback
-);
+int RAGAnalyzer_Analyze(RAGAnalyzerHandle handle, const char *text, RAGTokenCallback callback);
 
 /* Space-joined token stream (coarse; use RAGAnalyzer_FineGrainedTokenize for
  * the fine-grained variant). Returns a malloc'd string, or NULL. */
-char* RAGAnalyzer_Tokenize(RAGAnalyzerHandle handle, const char* text);
+char *RAGAnalyzer_Tokenize(RAGAnalyzerHandle handle, const char *text);
 
 typedef struct {
-    char* text;          /* malloc'd token text */
+    char *text;          /* malloc'd token text */
     uint32_t offset;     /* byte offset in the input */
     uint32_t end_offset; /* byte end offset in the input */
 } RAGTokenWithPosition;
 
 typedef struct {
-    RAGTokenWithPosition* tokens;
+    RAGTokenWithPosition *tokens;
     uint32_t count;
 } RAGTokenList;
 
 /* Tokens with byte offsets. When fine-grained mode is on the tokens are
  * already split finer. Returns a malloc'd list, or NULL. */
-RAGTokenList* RAGAnalyzer_TokenizeWithPosition(RAGAnalyzerHandle handle, const char* text);
+RAGTokenList *RAGAnalyzer_TokenizeWithPosition(RAGAnalyzerHandle handle, const char *text);
 
-void RAGAnalyzer_FreeTokenList(RAGTokenList* token_list);
+void RAGAnalyzer_FreeTokenList(RAGTokenList *token_list);
 
 /* Field accessors for CGO (Go cannot index a C struct field of a void*). */
-const char* RAGToken_GetText(void* token);
-uint32_t RAGToken_GetOffset(void* token);
-uint32_t RAGToken_GetEndOffset(void* token);
+const char *RAGToken_GetText(void *token);
+uint32_t RAGToken_GetOffset(void *token);
+uint32_t RAGToken_GetEndOffset(void *token);
 
 /* Fine-grained tokenize: space-separated tokens in, space-separated tokens out.
  * Only the rag family implements this; NULL otherwise. */
-char* RAGAnalyzer_FineGrainedTokenize(RAGAnalyzerHandle handle, const char* tokens);
+char *RAGAnalyzer_FineGrainedTokenize(RAGAnalyzerHandle handle, const char *tokens);
 
 /* Dictionary frequency of the term (Python rag_tokenizer.freq); 0 when
  * unknown. */
-int32_t RAGAnalyzer_GetTermFreq(RAGAnalyzerHandle handle, const char* term);
+int32_t RAGAnalyzer_GetTermFreq(RAGAnalyzerHandle handle, const char *term);
 
 /* POS tag of the term (Python rag_tokenizer.tag); NULL when unknown or
  * untagged. */
-char* RAGAnalyzer_GetTermTag(RAGAnalyzerHandle handle, const char* term);
+char *RAGAnalyzer_GetTermTag(RAGAnalyzerHandle handle, const char *term);
 
 /* ------------------------------------------------------------------ */
 /* Diagnostics (extensions over the C++ header)                       */
@@ -127,10 +118,10 @@ char* RAGAnalyzer_GetTermTag(RAGAnalyzerHandle handle, const char* term);
 uint32_t RAGAnalyzer_AbiVersion(void);
 
 /* The error of the last failed call on this thread, or "". */
-const char* RAGAnalyzer_LastError(void);
+const char *RAGAnalyzer_LastError(void);
 
 /* Free a string this library returned. */
-void RAGAnalyzer_FreeString(char* text);
+void RAGAnalyzer_FreeString(char *text);
 
 #ifdef __cplusplus
 }

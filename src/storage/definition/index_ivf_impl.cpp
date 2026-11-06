@@ -33,7 +33,6 @@ import statement_common;
 
 namespace infinity {
 
-
 bool IndexIVF::operator==(const IndexIVF &other) const {
     return (*static_cast<const IndexBase *>(this) == static_cast<const IndexBase &>(other)) && (ivf_option_ == other.ivf_option_);
 }

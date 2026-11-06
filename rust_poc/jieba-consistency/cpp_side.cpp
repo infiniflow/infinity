@@ -16,8 +16,11 @@ int main(int argc, char **argv) {
     std::string dict_dir = argc > 1 ? argv[1] : "/usr/share/infinity/resource/jieba/dict";
     std::string sf = argc > 2 ? argv[2] : "sentences.txt";
 
-    cppjieba::Jieba jieba(dict_dir + "/jieba.dict.utf8", dict_dir + "/hmm_model.utf8", dict_dir + "/user.dict.utf8",
-                         dict_dir + "/idf.utf8", dict_dir + "/stop_words.utf8");
+    cppjieba::Jieba jieba(dict_dir + "/jieba.dict.utf8",
+                          dict_dir + "/hmm_model.utf8",
+                          dict_dir + "/user.dict.utf8",
+                          dict_dir + "/idf.utf8",
+                          dict_dir + "/stop_words.utf8");
 
     std::ifstream in(sf);
     std::string line;

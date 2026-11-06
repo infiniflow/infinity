@@ -102,6 +102,10 @@ jobs:
     # /usr/share/infinity/resource, so the submodule is installed first.
     name: unit (${{ matrix.arch }})
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    env:
+      # The analyzer's parity tests compare against the Python tokenizer; the
+      # repo pins 3.11 (uv.lock) and its output differs on newer interpreters.
+      UV_PYTHON: "3.11"
     strategy:
       fail-fast: false
       matrix:
@@ -312,8 +316,14 @@ jobs:
           else
             binary="${PWD}/bin/infinity"
           fi
-          .venv/bin/python -m pytest -q -m "not slow" -k "not cross_engine" \
-            python/restart_test --infinity_path="${binary}" --tb=short "${args[@]}"
+          # The harness kills every process named `infinity` between phases and
+          # binds fixed ports, so give the run its own PID namespace and a
+          # disk-backed /var/infinity (same shape as scripts/run_gate_c.sh).
+          work="$(mktemp -d)"
+          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
+                --unshare-pid --proc /proc -- \
+                .venv/bin/python -m pytest -q -m "not slow" -k "not cross_engine" \
+                python/restart_test --infinity_path="${binary}" --tb=short "${args[@]}"
       - name: Engine log
         if: always()
         run: tail -n 500 restart_test_infinity.log.* 2>/dev/null || true
