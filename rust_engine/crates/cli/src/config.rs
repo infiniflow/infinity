@@ -100,7 +100,7 @@ impl Default for Config {
     /// C++: `Config` defaults (`config_ut.cpp::test1`).
     fn default() -> Self {
         Self {
-            version: "0.7.4".into(),
+            version: "0.7.5".into(),
             time_zone: "UTC".into(),
             time_zone_bias: 8,
             cpu_limit: std::thread::available_parallelism()
@@ -276,7 +276,9 @@ impl Config {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
-        if self.version != "0.7.4" {
+        // The reference compares against its build-time VERSION constant; the
+        // merged tree carries 0.7.5 (upstream's release bump).
+        if self.version != "0.7.5" {
             return Err(ConfigError::MismatchVersion);
         }
         if self.server_address.parse::<IpAddr>().is_err() {
@@ -516,7 +518,7 @@ mod tests {
     fn defaults() {
         let mut config = Config::default();
         config.init(None).unwrap();
-        assert_eq!(config.version(), "0.7.4");
+        assert_eq!(config.version(), "0.7.5");
         assert_eq!(config.time_zone(), "UTC");
         assert_eq!(config.time_zone_bias(), 8);
         assert_eq!(
@@ -555,7 +557,7 @@ mod tests {
     fn full_config_file() {
         let mut config = Config::default();
         config.init(Some(&fixture("infinity_conf.toml"))).unwrap();
-        assert_eq!(config.version(), "0.7.4");
+        assert_eq!(config.version(), "0.7.5");
         assert_eq!(config.time_zone(), "UTC");
         assert_eq!(config.time_zone_bias(), -8);
         assert_eq!(config.cpu_limit(), 2);
@@ -653,7 +655,7 @@ mod tests {
         config
             .init(Some(&fixture("test_conf_valid_value.toml")))
             .unwrap();
-        assert_eq!(config.version(), "0.7.4");
+        assert_eq!(config.version(), "0.7.5");
         assert_eq!(config.time_zone(), "UTC");
         assert_eq!(config.time_zone_bias(), -8);
         assert_eq!(config.cpu_limit(), 2);
