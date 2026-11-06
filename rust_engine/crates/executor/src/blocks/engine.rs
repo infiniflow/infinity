@@ -1018,7 +1018,7 @@ impl Engine {
         // own directory (`secondary/…`, `sparse/…`), so copy them into
         // `idx_{id}/seg_0/chunk_0.idx`.
         for meta in self.storage.catalog.list_tables()? {
-            let _ = self.publish_index_chunks(&meta.name, meta.id, checkpoint_ts);
+            let _ = self.publish_index_chunks(&meta.name, meta.id);
         }
         Ok(())
     }
@@ -1124,12 +1124,7 @@ impl Engine {
         }
     }
 
-    pub(crate) fn publish_index_chunks(
-        &self,
-        table: &str,
-        table_id: u64,
-        checkpoint_ts: u64,
-    ) -> Result<()> {
+    pub(crate) fn publish_index_chunks(&self, table: &str, table_id: u64) -> Result<()> {
         let db_id = self.database_id_of(table);
         let root = self
             .blocks_root()
@@ -1195,16 +1190,7 @@ impl Engine {
                 // produced it. A segment filled by `COPY` was populated inside
                 // the import transaction (`PopulateIndex`), so its chunks
                 // carry the import's ts; a later explicit dump stamps its own.
-                // A chunk that no dump and no import created is sealed by this
-                // checkpoint, so the checkpoint transaction is the one the
-                // reference records (its AddChunkIndexID1 runs inside it).
-                let chunk_ts = if dump_ts > 0 {
-                    dump_ts
-                } else {
-                    self.import_ts(table, *segment)
-                        .unwrap_or(0)
-                        .max(checkpoint_ts)
-                };
+                let chunk_ts = dump_ts.max(self.import_ts(table, *segment).unwrap_or(0));
                 // A segment that still holds exactly what one `COPY` wrote gets
                 // the import's chunk layout (one per capacity for full-text, one
                 // for the whole segment for secondary and sparse).
@@ -1307,7 +1293,6 @@ impl Engine {
                         im.index_type.eq_ignore_ascii_case("HNSW"),
                         *segment,
                         &deprecated,
-                        chunk_ts,
                     )
                 };
                 if chunks.is_empty() {
