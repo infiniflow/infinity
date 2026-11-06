@@ -8,6 +8,7 @@ members = [
     "crates/parser",
     "crates/expression",
     "crates/analyzer",
+    "crates/analyzer-ffi",
     "crates/planner",
     "crates/index",
     "crates/executor",

@@ -20,6 +20,9 @@ pub const DEFAULT_RESOURCE_PATH: &str = "/usr/share/infinity/resource";
 /// including the dictionary-driven CJK families: `japanese` and `korean`
 /// (MeCab over `ipadic`/`ko-dic`) and `traditional` (OpenCC + jieba).
 pub struct AnalyzerPool {
+    /// Root the dictionary-driven families load from
+    /// (`<resource>/rag`, `<resource>/jieba`, `<resource>/opencc`, …).
+    pub(crate) resource: std::path::PathBuf,
     pub(crate) rag_prototype: Mutex<Option<Arc<RAGAnalyzer>>>,
     pub(crate) chinese_prototype: Mutex<Option<Arc<ChineseAnalyzer>>>,
     pub(crate) ik_prototype: Mutex<Option<Arc<IKAnalyzer>>>,
@@ -432,16 +435,25 @@ pub fn is_constructible_analyzer_name(name: &str) -> bool {
 
 impl AnalyzerPool {
     /// C++: `Singleton<AnalyzerPool>::instance()`.
+    ///
+    /// Loads from the shipped resource root; a host that keeps the dictionaries
+    /// elsewhere builds its own with [`Self::with_resource_path`].
     pub fn instance() -> &'static AnalyzerPool {
         static INSTANCE: OnceLock<AnalyzerPool> = OnceLock::new();
-        INSTANCE.get_or_init(|| AnalyzerPool {
+        INSTANCE.get_or_init(|| Self::with_resource_path(DEFAULT_RESOURCE_PATH))
+    }
+
+    /// A pool whose dictionary-driven families load from `dir`.
+    pub fn with_resource_path(dir: impl Into<std::path::PathBuf>) -> AnalyzerPool {
+        AnalyzerPool {
+            resource: dir.into(),
             rag_prototype: Mutex::new(None),
             chinese_prototype: Mutex::new(None),
             ik_prototype: Mutex::new(None),
             japanese_prototype: Mutex::new(None),
             korean_prototype: Mutex::new(None),
             opencc_prototype: Mutex::new(None),
-        })
+        }
     }
 
     /// C++: `AnalyzerPool::GetAnalyzer`.
@@ -506,7 +518,7 @@ impl AnalyzerPool {
             .lock()
             .map_err(|_| "analyzer pool was poisoned".to_string())?;
         if prototype.is_none() {
-            *prototype = Some(Arc::new(JapaneseAnalyzer::load(DEFAULT_RESOURCE_PATH)?));
+            *prototype = Some(Arc::new(JapaneseAnalyzer::load(&self.resource)?));
         }
         Ok(Arc::clone(prototype.as_ref().expect("just initialized")))
     }
@@ -517,7 +529,7 @@ impl AnalyzerPool {
             .lock()
             .map_err(|_| "analyzer pool was poisoned".to_string())?;
         if prototype.is_none() {
-            *prototype = Some(Arc::new(KoreanAnalyzer::load(DEFAULT_RESOURCE_PATH)?));
+            *prototype = Some(Arc::new(KoreanAnalyzer::load(&self.resource)?));
         }
         Ok(Arc::clone(prototype.as_ref().expect("just initialized")))
     }
@@ -528,7 +540,7 @@ impl AnalyzerPool {
             .lock()
             .map_err(|_| "analyzer pool was poisoned".to_string())?;
         if prototype.is_none() {
-            *prototype = Some(Arc::new(OpenCcConverter::load(DEFAULT_RESOURCE_PATH)?));
+            *prototype = Some(Arc::new(OpenCcConverter::load(&self.resource)?));
         }
         Ok(Arc::clone(prototype.as_ref().expect("just initialized")))
     }
@@ -539,7 +551,7 @@ impl AnalyzerPool {
             .lock()
             .map_err(|_| "analyzer pool was poisoned".to_string())?;
         if prototype.is_none() {
-            *prototype = Some(Arc::new(ChineseAnalyzer::load(DEFAULT_RESOURCE_PATH)?));
+            *prototype = Some(Arc::new(ChineseAnalyzer::load(&self.resource)?));
         }
         Ok(Arc::clone(prototype.as_ref().expect("just initialized")))
     }
@@ -550,7 +562,7 @@ impl AnalyzerPool {
             .lock()
             .map_err(|_| "analyzer pool was poisoned".to_string())?;
         if prototype.is_none() {
-            *prototype = Some(Arc::new(IKAnalyzer::load(DEFAULT_RESOURCE_PATH)?));
+            *prototype = Some(Arc::new(IKAnalyzer::load(&self.resource)?));
         }
         Ok(Arc::clone(prototype.as_ref().expect("just initialized")))
     }
@@ -564,7 +576,7 @@ impl AnalyzerPool {
             .lock()
             .map_err(|_| "analyzer pool was poisoned".to_string())?;
         if prototype.is_none() {
-            *prototype = Some(Arc::new(RAGAnalyzer::load(DEFAULT_RESOURCE_PATH)?));
+            *prototype = Some(Arc::new(RAGAnalyzer::load(&self.resource)?));
         }
         // Every call copies the cached prototype, so per-name settings never
         // leak into the next analyzer handed out.

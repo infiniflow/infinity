@@ -98,6 +98,9 @@ pub struct RAGAnalyzer {
     pub(crate) stem_algorithm: Option<rust_stemmers::Algorithm>,
     pub(crate) lemmatizer: Option<Arc<WordNetLemmatizer>>,
     pub(crate) use_lemmatizer: bool,
+    /// C++: `RAGAnalyzer::pos_table_` — the POS tags of `rag/pos-id.def`, in
+    /// the index order the trie values encode.
+    pub(crate) pos_table: Arc<Vec<String>>,
 }
 
 impl RAGAnalyzer {
@@ -133,6 +136,7 @@ impl RAGAnalyzer {
                 .ok()
                 .map(Arc::new),
             use_lemmatizer: true,
+            pos_table: Arc::new(load_pos_table(&root.join("rag/pos-id.def"))?),
         })
     }
 
@@ -158,6 +162,16 @@ impl RAGAnalyzer {
     /// C++: `RAGAnalyzer::SetFineGrained`.
     pub fn set_fine_grained(&mut self, fine_grained: bool) {
         self.fine_grained = fine_grained;
+    }
+
+    /// C++: `RAGAnalyzer::fine_grained_`.
+    pub fn fine_grained(&self) -> bool {
+        self.fine_grained
+    }
+
+    /// C++: `RAGAnalyzer::enable_position_`.
+    pub fn enable_position(&self) -> bool {
+        self.enable_position
     }
 
     /// C++: `RAGAnalyzer::SetEnablePosition`.
@@ -426,7 +440,7 @@ impl RAGAnalyzer {
     }
 
     /// C++: `RAGAnalyzer::FineGrainedTokenizeWithPosition`.
-    pub(crate) fn fine_grained_tokenize_with_position(
+    pub fn fine_grained_tokenize_with_position(
         &self,
         tokens_str: &str,
         positions: &[(u32, u32)],
@@ -792,10 +806,26 @@ impl RAGAnalyzer {
     }
 
     /// C++: `RAGAnalyzer::Freq`.
-    pub(crate) fn freq(&self, key: &str) -> i32 {
+    pub fn freq(&self, key: &str) -> i32 {
         let value = self.trie.exact_match(key.as_bytes());
         let freq = decode_freq(value);
         (freq as f64).exp().mul_add(DENOMINATOR, 0.5) as i32
+    }
+
+    /// C++: `RAGAnalyzer::Tag` — the POS tag the dictionary recorded for
+    /// `key` (ASCII-lowercased first, like `Key()`), or `None` when the word is
+    /// not in the trie or carries no tag.
+    pub fn tag(&self, key: &str) -> Option<String> {
+        let lower = key.to_ascii_lowercase();
+        let value = self.trie.exact_match(lower.as_bytes());
+        if value == -1 {
+            return None;
+        }
+        let pos_idx = ((value as u32) >> 24) & 0xFF;
+        if pos_idx == 0 {
+            return None;
+        }
+        self.pos_table.get(pos_idx as usize).cloned()
     }
 }
 
@@ -945,15 +975,19 @@ pub(crate) fn build_trie(root: &Path) -> Result<Vec<u8>, String> {
     Ok(crate::darts_build::build_dictionary(entries))
 }
 
-/// C++: `POSTable::Load` - the POS tags in file order, which is their index.
+/// C++: `POSTable::Load` - the POS tags in the order their index encodes.
+///
+/// The reference collects the names into a `std::map` and then walks it, so
+/// the table is sorted and de-duplicated rather than in file order.
 pub(crate) fn load_pos_table(path: &Path) -> Result<Vec<String>, String> {
     let text = std::fs::read_to_string(path)
         .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
-    Ok(text
+    let tags: std::collections::BTreeSet<String> = text
         .lines()
         .map(|line| line.split('\r').next().unwrap_or("").to_string())
         .filter(|line| !line.is_empty())
-        .collect())
+        .collect();
+    Ok(tags.into_iter().collect())
 }
 
 /// C++: `RAGAnalyzer::DENOMINATOR`.

@@ -20,6 +20,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "analyzer-ffi"
+version = "0.1.0"
+dependencies = [
+ "analyzer",
+ "libc",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,14 @@
+[package]
+name = "analyzer-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+# The C ABI the Go side links; `rlib` lets the crate's own tests call it.
+name = "rag_analyzer"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+analyzer.workspace = true
+libc = "0.2"
