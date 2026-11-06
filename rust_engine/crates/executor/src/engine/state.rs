@@ -7098,11 +7098,9 @@ impl BgTask for DumpMemIndexTask {
 
     fn run(self: Box<Self>) {
         if let Some(engine) = self.engine.upgrade() {
-            // A dump sees a whole write batch, never the rows of a batch that
-            // is still being indexed (the reference's dump transaction
-            // conflicts with the append and retries).
-            let gates = engine.all_batch_gates();
-            let _batch: Vec<_> = gates.iter().map(|gate| gate.lock().unwrap()).collect();
+            // A dump sees a whole write batch: the dump transaction conflicts
+            // with an append or update that already took its commit ts on the
+            // same segment and is retried, as the reference's `DoDump` is.
             engine.dump_all_memory_indexes();
         }
         self.pending.store(0, std::sync::atomic::Ordering::Relaxed);

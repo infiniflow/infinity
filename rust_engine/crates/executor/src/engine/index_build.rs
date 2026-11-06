@@ -360,8 +360,20 @@ impl Engine {
     /// checkpoint time - but all of them still spend the timestamp.
     pub fn dump_index_transaction(&self, table: &str, index: &str) -> Result<()> {
         let version = self.dump_version(table, index)?;
+        let table = self.qualified_table(table);
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
+        // The reference writes the chunk files and their catalog records inside
+        // the dump transaction. The port's mirror builds the chunk files, so
+        // run it for this index first; the command below then names what it
+        // published, and replay re-creates exactly those records with this ts.
+        // The checkpoint mirrors the same files, so it takes the same lock.
+        {
+            let _serial = self.storage.flush_lock.lock().unwrap();
+            if let Some(meta) = self.storage.catalog.get_table_by_name(&table)? {
+                let _ = self.publish_index_chunks(&table, meta.id, Some((index, ts)));
+            }
+        }
         let mut dump_txn = self.txn.begin();
         // `NewTxn::DumpMemIndex`: two dumps never run together (the reference
         // calls it unrecoverable), and an update on the same segment conflicts
@@ -369,34 +381,104 @@ impl Engine {
         dump_txn.set_op(TxnOp::DumpMemIndex {
             table: table.to_string(),
             index: index.to_string(),
-            segments: self.segment_ids(table),
+            segments: self.segment_ids(&table),
         });
+        // `DumpMemIndexTxnStore::ToWalEntry`: the chunks this dump seals ride in
+        // the transaction's own `DumpIndex` command, so replay re-creates their
+        // `idx_chunk|…` records with this frame's commit ts
+        // (`LoadFlushedChunkIndex1`). Without the command a directory killed
+        // after the dump reopens with the value the last checkpoint published.
+        let commands = self.dump_index_commands_for(&table, index)?;
+        if !commands.is_empty() {
+            dump_txn.set_typed_commands(commands);
+        }
         self.txn.commit_at(dump_txn, ts)?;
-        // Remember the ts: the `idx_chunk|…|{chunk_id}` record names the
-        // transaction whose dump sealed the chunk, and it is this one.
         // `CommitBottom` of the dump transaction, on the table's worker: the
-        // ts record, the chunk stamps, the checkpoint cover and the sealed
-        // chunk write.
-        let bottom_table = self.table_key(table);
+        // dump ts record, the chunk stamps, the checkpoint cover and the
+        // sealed chunk write.
+        let bottom_table = self.table_key(&table);
         let shard_key = bottom_table.clone();
         let index_name = index.to_string();
         let secondary = is_secondary_kind(&version.index.index_type);
         self.run_commit_bottom(&shard_key, move |engine| {
-            // (The dump ts lives in the `idx_chunk` records the chunk stamp
-            // below writes; there is no per-index sidecar to keep.)
+            // A checkpoint mirrors the chunk layer again and would compute the
+            // ts of every chunk from this value (`publish_index_chunks`).
+            engine
+                .storage
+                .catalog
+                .store()
+                .put(&crate::dump_ts_key(&bottom_table, &index_name), &ts.to_le_bytes())?;
             // The chunk record the reference writes in this transaction
             // (`AddChunkIndexID1`): the chunks already published for the index
             // now belong to `ts`.
             engine.stamp_chunk_ts(&bottom_table, &index_name, ts)?;
-            // A reader hides a chunk stamped above its `begin_ts`, which it
-            // takes from the newest checkpoint frame - the dump's ts must be
-            // covered.
-            engine.txn.cover_with_checkpoint(ts)?;
             if secondary {
                 engine.dump_index(&bottom_table, &index_name)?;
             }
             Ok(())
         })
+    }
+
+    /// The `DumpIndex` payload of an explicit dump
+    /// (`DumpMemIndexTxnStore::ToWalEntry`): one command per segment with the
+    /// chunks it seals.
+    ///
+    /// The reference writes the chunk records inside the dump transaction, so
+    /// the frame's commit ts is the value they carry. The port mirrors the
+    /// chunk layer, so the caller publishes this index just before the commit
+    /// and the command names the records that publish wrote; replay rewrites
+    /// exactly those with this transaction's ts. A segment with no chunk files
+    /// to publish has nothing to name either, so it contributes nothing.
+    ///
+    /// Nothing is deprecated: the dump re-publishes the chunks a checkpoint
+    /// already mirrored instead of replacing them, and a `deprecate_ids` entry
+    /// would leave a `drop|idx_chunk` marker the reference never has.
+    fn dump_index_commands_for(&self, table: &str, index: &str) -> Result<Vec<storage::WalCmd>> {
+        let table = self.qualified_table(table);
+        let Some(meta) = self.storage.catalog.get_table_by_name(&table)? else {
+            return Ok(Vec::new());
+        };
+        let index_id = self.index_position(&table, index)?;
+        let db_id = self.database_id_of(&table).to_string();
+        let table_id = meta.id.to_string();
+        let (db_name, table_name) = split_table_name(&table);
+        let table_key = self.table_key(&table);
+        let mut out = Vec::new();
+        for (segment, chunks) in catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id,
+            &table_id,
+            &index_id.to_string(),
+        )? {
+            if chunks.is_empty() {
+                continue;
+            }
+            let chunk_infos: Vec<storage::wal_entry::WalChunkIndexInfo> = chunks
+                .iter()
+                .map(|(chunk_id, info)| storage::wal_entry::WalChunkIndexInfo {
+                    chunk_id: *chunk_id as u32,
+                    base_name: info.base_name.clone(),
+                    base_row_id: storage::wal_entry::WalRowId::from_u64(info.base_row_id),
+                    row_count: info.row_count as u32,
+                    term_count: info.term_count as u32,
+                    index_size: info.index_size as u32,
+                    deprecate_ts: u64::MAX,
+                })
+                .collect();
+            out.push(storage::WalCmd::DumpIndex {
+                db_name: db_name.clone(),
+                db_id: db_id.clone(),
+                table_name: table_name.clone(),
+                table_id: table_id.clone(),
+                index_name: index.to_string(),
+                index_id: index_id.to_string(),
+                segment_id: segment,
+                chunk_infos,
+                deprecate_ids: Vec::new(),
+                table_key: table_key.clone(),
+            });
+        }
+        Ok(out)
     }
 
     /// Applies one `DumpMemIndex`: seals the target index's memory tail.
@@ -1316,13 +1398,24 @@ impl Engine {
     /// (the dump task holds the former, the checkpoint the latter), so the two
     /// cannot deadlock.
     pub(crate) fn dump_all_memory_indexes(&self) {
-        let _serial = self.storage.flush_lock.lock().unwrap();
-        self.seal_multivector_indexes();
-        self.seal_sparse_indexes();
-        self.seal_secondary_indexes();
-        // HNSW memory segments are sealed per write batch
-        // ([`Self::note_index_insert`], the reference's `AppendMemIndex`).
-        // Sealing them here too produced one chunk per buffered row group.
+        {
+            let _serial = self.storage.flush_lock.lock().unwrap();
+            self.seal_multivector_indexes();
+            self.seal_sparse_indexes();
+            self.seal_secondary_indexes();
+            // HNSW memory segments are sealed per write batch
+            // ([`Self::note_index_insert`], the reference's `AppendMemIndex`).
+            // Sealing them here too produced one chunk per buffered row group.
+        }
+        // The reference dumps each index inside a transaction of its own
+        // (`DumpIndexProcessor::DoDump` -> `kDumpMemIndex`), so the chunk it
+        // seals names that transaction's commit ts and rides in its WAL entry.
+        // The port's memory tails are sealed above; each index is then dumped
+        // the same way an explicit `DumpIndex` dumps it.
+        let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
+        for im in indexes {
+            let _ = self.dump_index_transaction(&im.table, &im.name);
+        }
     }
 
     pub(crate) fn memindex_capacity(&self) -> usize {

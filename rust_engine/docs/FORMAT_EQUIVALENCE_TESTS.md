@@ -246,7 +246,7 @@
          20=Append 22=checkpoint(flush) 24/26/28/30/32=DumpIndex
 ```
 
-（文件级读数会误导：`wal.log` 里可能有多条 checkpoint 帧（`cover_with_checkpoint` 为 dump 的 chunk 追加的覆盖帧），参考也会在 checkpoint 时整文件换新；最新一条 checkpoint 记录的是它自己的覆盖范围，不是最后一个事务。逐值比较看的是两边实际消耗的提交 ts。）
+（文件级读数会误导：参考在 checkpoint 时整文件换新，`wal.log` 里能读到的最新一条 checkpoint 帧记录的是它自己的覆盖范围，不是最后一个事务；逐值比较看的是两边实际消耗的提交 ts。）
 
 第二个进程接着写同一目录（append 100 / delete 20 / update 10 / flush / dump ×2）：
 
@@ -259,7 +259,7 @@
 
 前提是**没有"什么时候跑"的写事务**，所以对齐配置把异步任务全关掉（§2）：`optimize/cleanup/compact_interval` 与 `checkpoint_interval` 都是 `0s`，`memindex_memory_quota` 取内存索引达不到的值。剩下的 dump 只有脚本显式的 `DumpIndex` 与行数越过 `mem_index_capacity` 的那次，两者都由脚本决定，因此 `idx_chunk|…|{chunk_id}` 也落在同一批事务上，和其它记录一样逐字节比。
 
-`idx_chunk` 的值由重写版在 `DumpIndex` 时记下（`dump_ts:{表}:{索引}`），盖到已发布的 id 记录上，并把 `wal.log` 的 checkpoint 帧推进到覆盖它——参考读目录时按 `chunk_ts > begin_ts` 隐藏 chunk（`LoadChunkIDs1`），帧不覆盖就会被藏起来。
+`idx_chunk` 的值是 `DumpIndex` 事务的 commit ts。重写版在这个事务里发布该索引的 chunk 记录（值 = 本事务 ts），WAL 帧带 `DumpIndex` 命令（`chunk_infos` 即刚发布的那些记录），重放时按帧的 commit ts 重建（`LoadFlushedChunkIndex1`）；`checkpoint` 不写没有事务认领的 chunk 记录，只在下次把 `dump_ts:{表}:{索引}` 记下的 ts 带到新发布的 chunk 上。配额触发的内存 dump 走的是同一种事务（`DumpIndexProcessor::DoDump` 开 `kDumpMemIndex`），所以它 seal 的 chunk 也有一个由排期决定的 ts；把 `memindex_memory_quota` 设到够不到，这条就不参与比对。参考读目录时按 `chunk_ts > begin_ts` 隐藏 chunk（`LoadChunkIDs1`），而重放会把时钟推到该 ts（`CommitReplayTxn`），所以不需要为 dump 追加覆盖帧。
 
 `IMPORT` 的段是另一种情况：参考在导入事务里就把索引写进 chunk（`PopulateIndex` → `AddNewChunkIndex1`），所以那个段的 chunk 记录带的是**导入事务**的提交 ts（多段用例里两段分别是 22 与 24）。重写版为此记下每段被导入时的 ts（`import_ts:{表}:{段}`），发布 chunk 时取它与 `dump_ts` 的较大者——用 `INSERT` 建的表没有这条记录，行为不变。
 

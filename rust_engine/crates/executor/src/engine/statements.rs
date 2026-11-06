@@ -1258,14 +1258,6 @@ impl Engine {
         )
     }
 
-    /// Every table's write gate, in key order so two dumps cannot deadlock.
-    pub(crate) fn all_batch_gates(&self) -> Vec<Arc<Mutex<()>>> {
-        let gates = self.batch_locks.lock().unwrap();
-        let mut keys: Vec<&String> = gates.keys().collect();
-        keys.sort();
-        keys.into_iter().map(|k| Arc::clone(&gates[k])).collect()
-    }
-
     /// Records a write batch (`COPY`/`INSERT`) against `table`.
     pub(crate) fn bump_writes(&self, table: &str) {
         let key = self.table_key(table);

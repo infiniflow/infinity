@@ -1018,7 +1018,7 @@ impl Engine {
         // own directory (`secondary/…`, `sparse/…`), so copy them into
         // `idx_{id}/seg_0/chunk_0.idx`.
         for meta in self.storage.catalog.list_tables()? {
-            let _ = self.publish_index_chunks(&meta.name, meta.id);
+            let _ = self.publish_index_chunks(&meta.name, meta.id, None);
         }
         Ok(())
     }
@@ -1124,7 +1124,16 @@ impl Engine {
         }
     }
 
-    pub(crate) fn publish_index_chunks(&self, table: &str, table_id: u64) -> Result<()> {
+    /// `only` publishes a single index's chunks for the dump transaction that
+    /// seals it: every record it writes carries that transaction's commit ts.
+    /// The checkpoint passes `None` and mirrors the whole table with the ts the
+    /// last dump recorded.
+    pub(crate) fn publish_index_chunks(
+        &self,
+        table: &str,
+        table_id: u64,
+        only: Option<(&str, u64)>,
+    ) -> Result<()> {
         let db_id = self.database_id_of(table);
         let root = self
             .blocks_root()
@@ -1140,6 +1149,9 @@ impl Engine {
         let mut published = Vec::new();
         for im in self.storage.catalog.list_indexes()? {
             if im.table != table && im.table != self.qualified_table(table) {
+                continue;
+            }
+            if only.is_some_and(|(name, _)| name != im.name) {
                 continue;
             }
             let Ok(index_id) = self.index_position(table, &im.name) else {
@@ -1190,7 +1202,10 @@ impl Engine {
                 // produced it. A segment filled by `COPY` was populated inside
                 // the import transaction (`PopulateIndex`), so its chunks
                 // carry the import's ts; a later explicit dump stamps its own.
-                let chunk_ts = dump_ts.max(self.import_ts(table, *segment).unwrap_or(0));
+                let chunk_ts = match only {
+                    Some((_, ts)) => ts,
+                    None => dump_ts.max(self.import_ts(table, *segment).unwrap_or(0)),
+                };
                 // A segment that still holds exactly what one `COPY` wrote gets
                 // the import's chunk layout (one per capacity for full-text, one
                 // for the whole segment for secondary and sparse).

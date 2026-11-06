@@ -1307,44 +1307,6 @@ impl TxnManager {
         Ok(0)
     }
 
-    /// Re-publishes the checkpoint frame so it covers `max_commit_ts`, without
-    /// spending a timestamp.
-    ///
-    /// A reader derives its `begin_ts` from the newest checkpoint frame and
-    /// hides a catalog record stamped above it (`SegmentIndexMeta::LoadChunkIDs1`
-    /// skips a chunk whose ts is greater). A `DumpIndex` commits after the last
-    /// checkpoint and stamps the chunk records it sealed, so the frame has to be
-    /// advanced for those chunks to stay readable. This writes no transaction of
-    /// its own - the sequence of allocated timestamps must not move.
-    pub fn cover_with_checkpoint(&self, max_commit_ts: TxnTimeStamp) -> Result<()> {
-        let _commit = self.commit_lock.lock().unwrap();
-        let current = self.current_ts.load(Ordering::SeqCst);
-        if max_commit_ts < current {
-            return Ok(());
-        }
-        // The frame's own commit ts is the clock's current position: this is not
-        // a transaction of its own, so it must not move the clock (a frame
-        // stamped ahead of it would make the next open start past the WAL).
-        self.write_checkpoint_frame(max_commit_ts, max_commit_ts + 1)
-    }
-
-    /// Writes a `kNewCheckpoint` frame without rotating the log.
-    ///
-    /// Used by the dump-index path, which only needs the frame's ts to cover the
-    /// chunks it sealed. Appending (rather than creating the file) keeps the
-    /// records after the last real checkpoint intact.
-    fn write_checkpoint_frame(
-        &self,
-        commit_ts: TxnTimeStamp,
-        max_commit_ts: TxnTimeStamp,
-    ) -> Result<()> {
-        let entry = WalEntry::new(-1, commit_ts, vec![WalCmd::Checkpoint { max_commit_ts }]);
-        // One job, so no commit can slip in between the append and the return.
-        // The frame itself is written, not synced: the caller syncs it with
-        // [`Self::sync_wal`] once the data it claims is on disk.
-        self.wal.run(move |wal| wal.append(&entry).map(|_| ()))
-    }
-
     /// C++ `NewCheckpoint`: append the checkpoint entry the reference keeps.
     ///
     /// `GetReplayEntries` derives `last_commit_ts`/`max_checkpoint_ts` from the

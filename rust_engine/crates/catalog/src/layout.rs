@@ -2150,7 +2150,13 @@ pub fn write_index_segments(
             "idx_chunk|{}|{}|{}|{}|",
             set.db_id, set.table_id, idx_str, index.segment_id
         );
-        for (k, _) in store.scan_prefix(seg_prefix.as_bytes())? {
+        // The records this publish replaces. A chunk record's value is the
+        // commit ts of the transaction whose dump sealed it, and a checkpoint
+        // computes no such ts - so the value an earlier publish (or the dump
+        // itself) wrote is what the record keeps.
+        let mut previous = std::collections::HashMap::new();
+        for (k, v) in store.scan_prefix(seg_prefix.as_bytes())? {
+            previous.insert(k.clone(), v);
             store.delete(&k)?;
         }
         let seg_key =
@@ -2177,24 +2183,7 @@ pub fn write_index_segments(
         };
         store.put(seg_key.as_bytes(), paired_ts.to_string().as_bytes())?;
         written += 1;
-        let next_chunk = index
-            .chunks
-            .iter()
-            .map(|c| c.chunk_id + 1)
-            .max()
-            .unwrap_or(0);
-        store.put(
-            key::catalog_index_segment_tag_key(
-                &set.db_id,
-                &set.table_id,
-                &idx_str,
-                index.segment_id,
-                "next_chunk_id",
-            )
-            .as_bytes(),
-            next_chunk.to_string().as_bytes(),
-        )?;
-        written += 1;
+        let mut recorded: Vec<u32> = Vec::new();
         for chunk in &index.chunks {
             // The chunk **id** key (`idx_chunk|…|{chunk_id}`, value = the
             // commit ts) is what the reference enumerates to learn a
@@ -2215,11 +2204,7 @@ pub fn write_index_segments(
             // dump produced the chunk (`SegmentIndexMeta::AddChunkIndexID1`,
             // `segment_index_meta_impl.cpp:129`). `chunk.commit_ts` carries it:
             // the executor records the ts of the `DumpIndex` that sealed the
-            // index and hands it to the mirror. The mirror writes the record at
-            // every checkpoint, and a dump that happens afterwards stamps the
-            // records it already published (the value is preserved here). A
-            // chunk with no dump behind it keeps 0 — a reader sees it from any
-            // `begin_ts`.
+            // index and hands it to the mirror.
             let id_key = key::catalog_index_chunk_key(
                 &set.db_id,
                 &set.table_id,
@@ -2227,15 +2212,21 @@ pub fn write_index_segments(
                 index.segment_id,
                 chunk.chunk_id as u64,
             );
-            // A chunk keeps the ts of the transaction that sealed it. The port's
-            // mirror re-publishes the whole chunk layer at every checkpoint, so
-            // an existing record wins over the value this publish computed - a
-            // later checkpoint must not re-stamp a chunk its dump already named
-            // (the reference only writes the record in the dump's transaction).
-            let existing = store
-                .get(id_key.as_bytes())?
-                .filter(|v| v.as_slice() != b"0" && !v.is_empty());
-            let value = existing.unwrap_or_else(|| chunk.commit_ts.to_string().into_bytes());
+            // A chunk keeps the ts of the transaction that sealed it, and only
+            // a dump can name one. With neither a dump of its own nor a record
+            // from an earlier publish the reference has no key here at all - its
+            // checkpoint writes only blocks - and a stray "0" would make the
+            // reference's replay skip the dump that later names the chunk
+            // (`LoadFlushedChunkIndex1` adds only an absent id).
+            let Some(value) = previous
+                .get(id_key.as_bytes())
+                .filter(|v| v.as_slice() != b"0" && !v.is_empty())
+                .cloned()
+                .or_else(|| (chunk.commit_ts != 0).then(|| chunk.commit_ts.to_string().into_bytes()))
+            else {
+                continue;
+            };
+            recorded.push(chunk.chunk_id);
             store.put(id_key.as_bytes(), &value)?;
             written += 1;
             let key = key::catalog_index_chunk_tag_key(
@@ -2259,6 +2250,23 @@ pub fn write_index_segments(
                 chunk.term_count
             );
             store.put(key.as_bytes(), value.as_bytes())?;
+            written += 1;
+        }
+        // `next_chunk_id` is written by the first transaction that seals a
+        // chunk (`SegmentIndexMeta::InitSet1` leaves it unset), so a segment
+        // nothing has dumped has no tag.
+        if let Some(next_chunk) = recorded.iter().max().map(|id| id + 1) {
+            store.put(
+                key::catalog_index_segment_tag_key(
+                    &set.db_id,
+                    &set.table_id,
+                    &idx_str,
+                    index.segment_id,
+                    "next_chunk_id",
+                )
+                .as_bytes(),
+                next_chunk.to_string().as_bytes(),
+            )?;
             written += 1;
         }
     }
