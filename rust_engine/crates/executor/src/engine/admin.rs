@@ -324,22 +324,13 @@ impl Engine {
     pub(crate) fn flush_storage(&self) -> Result<()> {
         // One checkpoint at a time: the block mirror is rewritten in place.
         let _serial = self.storage.flush_lock.lock().unwrap();
-        // Snapshot the applied timestamp *before* the fsync: everything up to
-        // it is then durable, so the log prefix can be dropped afterwards.
-        let applied = self.txn.applied_ts()?;
         // `NewTxn::Checkpoint`: the blocks are written at this transaction's
         // `begin_ts`, so only rows of transactions that already finished reach
-        // the files.
+        // the files. The frame's payload is that same `begin_ts`, frozen here
+        // and written at the end.
         let checkpoint_ts = self.checkpoint_ts();
         self.storage.catalog.flush()?;
         self.txn.flush()?;
-        // The reference's checkpoint writes a `kNewCheckpoint` entry and keeps
-        // it: `GetReplayEntries` derives `max_checkpoint_ts` from that entry and
-        // refuses to open a writable directory that has data but no checkpoint.
-        // Appending it before the truncation means the truncation can drop the
-        // prefix while the entry itself survives, and the log is never empty.
-        let _ = self.txn.append_checkpoint(applied);
-        let _ = self.txn.rotate_wal_if_large();
         // Dump the index memory tails first. The caller only logs a `flush`
         // error, so a failing block mirror (e.g. an unsupported column type)
         // must not leave the memory tails unbounded — that is what pushed the
@@ -409,11 +400,19 @@ impl Engine {
             storage::s3::sync_tree(&client, &self.dir.join("catalog"), "catalog")?;
         }
         // The frame goes last, once every file it claims is on disk: the block
-        // mirror, the index chunks and the two SSTs are all fsynced above, so a
+        // mirror, the index chunks and the two SSTs are all flushed above, so a
         // power loss either keeps the frame together with its data or loses it
         // and reopens at the previous checkpoint. This is the only fsync on
         // `wal.log` — commit records stay in the page cache, as in the
         // reference, which does not sync the frame either.
+        //
+        // `NewTxn::Checkpoint` commits after the files are written: the commit
+        // ts is taken now and the payload is the frozen `begin_ts`, so a
+        // record written while the mirror ran stays above the floor and is
+        // replayed. Writing the frame before the flush would let a `kill -9`
+        // keep a frame that claims records the SSTs do not hold.
+        let _ = self.txn.append_checkpoint_at(checkpoint_ts + 1);
+        let _ = self.txn.rotate_wal_if_large();
         self.txn.sync_wal()?;
         Ok(())
     }

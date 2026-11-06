@@ -1315,11 +1315,33 @@ impl TxnManager {
     /// wal", `wal_manager_impl.cpp:670`). The entry therefore has to survive the
     /// truncation that follows it, and the log must never be left empty.
     pub fn append_checkpoint(&self, max_commit_ts: TxnTimeStamp) -> Result<()> {
+        let begin_ts = self.current_ts.load(Ordering::SeqCst) + 1;
+        self.write_checkpoint(begin_ts, max_commit_ts)
+    }
+
+    /// [`Self::append_checkpoint`] with the checkpoint transaction's **begin**
+    /// ts handed in.
+    ///
+    /// `NewTxn::Checkpoint` freezes `begin_ts` when the transaction starts
+    /// (`txn_context_ptr_->begin_ts_`, before any file is written) and takes the
+    /// commit ts only at the end (`CommitTxn` -> `GetWriteCommitTS`). A caller
+    /// that writes the files in between - the real checkpoint - freezes the
+    /// begin ts first and commits here, so the frame's payload never claims a
+    /// record the flush has not covered.
+    pub fn append_checkpoint_at(&self, begin_ts: TxnTimeStamp) -> Result<()> {
+        self.write_checkpoint(begin_ts, begin_ts.saturating_sub(1))
+    }
+
+    fn write_checkpoint(
+        &self,
+        begin_ts: TxnTimeStamp,
+        floor_hint: TxnTimeStamp,
+    ) -> Result<()> {
         let _commit = self.commit_lock.lock().unwrap();
         // The caller usually passes the KV's applied marker, which stays 0
         // until a recovery runs; the manager's own high-water marks are always
         // current.
-        let floor = max_commit_ts
+        let floor = floor_hint
             .max(self.max_applied.load(Ordering::SeqCst))
             .max(self.last_appended.load(Ordering::SeqCst))
             .max(self.current_ts.load(Ordering::SeqCst))
@@ -1340,7 +1362,6 @@ impl TxnManager {
         // `new_txn_impl.cpp:1754`); a directory whose checkpoint frame names an
         // even ts makes the reference abort on startup. The frame's own commit
         // ts is the even value one above it.
-        let begin_ts = self.current_ts.load(Ordering::SeqCst) + 1;
         let commit_ts = self.prepare_commit_ts.fetch_add(2, Ordering::SeqCst) + 2;
         // The reference swaps the file first (`kNewCheckpoint` commit path,
         // `wal_manager_impl.cpp:288`), then writes the frame into the new
