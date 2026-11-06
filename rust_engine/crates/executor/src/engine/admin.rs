@@ -329,7 +329,10 @@ impl Engine {
         // the files. The frame's payload is that same `begin_ts`, frozen here
         // and written at the end.
         let checkpoint_ts = self.checkpoint_ts();
-        self.storage.catalog.flush()?;
+        // Flushes the store (the engine and the txn manager share the same
+        // one) and raises `synced`, which is what makes the WAL prefix
+        // prunable. The flush that has to precede the frame is the second one,
+        // after the mirror: that is where the records the frame covers appear.
         self.txn.flush()?;
         // Dump the index memory tails first. The caller only logs a `flush`
         // error, so a failing block mirror (e.g. an unsupported column type)
