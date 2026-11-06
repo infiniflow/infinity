@@ -6,8 +6,8 @@
 //! behaviour they imply (the hit sentences survive, the misses are dropped,
 //! and the matched spans are wrapped in `<em>`).
 
-use analyzer::{Analyzer, AnalyzerPool};
 use crate::highlight_with_analyzer;
+use analyzer::{Analyzer, AnalyzerPool};
 
 /// `HighlighterTest::SetUp`: `RAGAnalyzer` with `SetEnablePosition(true)` and
 /// `SetFineGrained(false)`.

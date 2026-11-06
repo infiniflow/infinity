@@ -1359,11 +1359,7 @@ impl TxnManager {
         self.write_checkpoint(begin_ts, begin_ts.saturating_sub(1))
     }
 
-    fn write_checkpoint(
-        &self,
-        begin_ts: TxnTimeStamp,
-        floor_hint: TxnTimeStamp,
-    ) -> Result<()> {
+    fn write_checkpoint(&self, begin_ts: TxnTimeStamp, floor_hint: TxnTimeStamp) -> Result<()> {
         let _commit = self.commit_lock.lock().unwrap();
         // The caller usually passes the KV's applied marker, which stays 0
         // until a recovery runs; the manager's own high-water marks are always

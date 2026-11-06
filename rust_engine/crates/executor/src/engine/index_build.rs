@@ -403,11 +403,10 @@ impl Engine {
         self.run_commit_bottom(&shard_key, move |engine| {
             // A checkpoint mirrors the chunk layer again and would compute the
             // ts of every chunk from this value (`publish_index_chunks`).
-            engine
-                .storage
-                .catalog
-                .store()
-                .put(&crate::dump_ts_key(&bottom_table, &index_name), &ts.to_le_bytes())?;
+            engine.storage.catalog.store().put(
+                &crate::dump_ts_key(&bottom_table, &index_name),
+                &ts.to_le_bytes(),
+            )?;
             // The chunk record the reference writes in this transaction
             // (`AddChunkIndexID1`): the chunks already published for the index
             // now belong to `ts`.

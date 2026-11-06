@@ -21,13 +21,13 @@
 
 use std::collections::HashMap;
 
-use analyzer::{Analyzer, AnalyzerPool, WhitespaceAnalyzer};
 use crate::query_builder::{
     DocIterator, PhraseDocIterator, PhraseQueryNode, QueryNode, TermDocIterator, TermLookup,
     TermQueryNode,
 };
 use crate::tokenize_index_positions;
 use crate::TextTokenizer;
+use analyzer::{Analyzer, AnalyzerPool, WhitespaceAnalyzer};
 
 /// The reference's `FulltextQueryOperatorOption`. `InfinitySyntax` runs the
 /// query-string grammar; `Or`/`And` analyze the whole query text and combine

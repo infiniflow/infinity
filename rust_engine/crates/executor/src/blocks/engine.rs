@@ -1279,7 +1279,8 @@ impl Engine {
                     // worker in the reference (`smve_index_file_worker`,
                     // `emvb_index_file_worker`): one `chunk_0.idx` per
                     // segment naming the whole segment.
-                    let Some(bytes) = self.multivector_chunk(table, &im.column, &im.index_type, *segment)
+                    let Some(bytes) =
+                        self.multivector_chunk(table, &im.column, &im.index_type, *segment)
                     else {
                         continue;
                     };
@@ -1304,7 +1305,8 @@ impl Engine {
                 } else if im.index_type.eq_ignore_ascii_case("SMVE")
                     || im.index_type.eq_ignore_ascii_case("EMVB")
                 {
-                    let Some(bytes) = self.multivector_chunk(table, &im.column, &im.index_type, *segment)
+                    let Some(bytes) =
+                        self.multivector_chunk(table, &im.column, &im.index_type, *segment)
                     else {
                         continue;
                     };

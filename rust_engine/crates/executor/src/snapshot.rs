@@ -333,11 +333,7 @@ impl Engine {
     /// where a commit would write a second transaction. `skip_existing` makes
     /// it a no-op for a table that is already there - the restore's catalog
     /// writes may have reached an SST before the crash.
-    pub(crate) fn apply_table_snapshot(
-        &self,
-        name: &str,
-        skip_existing: bool,
-    ) -> Result<WalCmd> {
+    pub(crate) fn apply_table_snapshot(&self, name: &str, skip_existing: bool) -> Result<WalCmd> {
         let json = self.read_snapshot_json(name)?;
         let table = json_table(&json, name)?;
         let files = self.restore_table(table, skip_existing)?;

@@ -2222,7 +2222,9 @@ pub fn write_index_segments(
                 .get(id_key.as_bytes())
                 .filter(|v| v.as_slice() != b"0" && !v.is_empty())
                 .cloned()
-                .or_else(|| (chunk.commit_ts != 0).then(|| chunk.commit_ts.to_string().into_bytes()))
+                .or_else(|| {
+                    (chunk.commit_ts != 0).then(|| chunk.commit_ts.to_string().into_bytes())
+                })
             else {
                 continue;
             };

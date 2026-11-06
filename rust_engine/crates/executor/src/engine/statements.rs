@@ -188,9 +188,9 @@ impl Engine {
         // killed before its next checkpoint still has its schema. Replaying
         // before the blocks matters - the block recovery walks the tables.
         let applied = engine.txn.applied_ts()?;
-        engine
-            .txn
-            .replay_commands(applied, |cmd, ts| crate::wal_bridge::replay(&engine, cmd, ts))?;
+        engine.txn.replay_commands(applied, |cmd, ts| {
+            crate::wal_bridge::replay(&engine, cmd, ts)
+        })?;
         // The blocks next, then the WAL's rows on top: what the files carry is
         // already applied, so the replay starts above the newest timestamp they
         // hold (the reference's checkpoint record gives it the same floor).
@@ -225,17 +225,13 @@ impl Engine {
             let mut tables = engine.tables.lock().unwrap();
             let entry = tables.entry(key).or_default();
             for (id, rows) in counts {
-                entry
-                    .segments
-                    .entry(id)
-                    .or_insert(SegmentEntry {
-                        id,
-                        rows: rows.min(u32::MAX as u64) as u32,
-                    });
+                entry.segments.entry(id).or_insert(SegmentEntry {
+                    id,
+                    rows: rows.min(u32::MAX as u64) as u32,
+                });
             }
             if next > 0 {
-                entry.row_counter =
-                    Some(((next >> 32) as u32, (next & 0xffff_ffff) as u32, false));
+                entry.row_counter = Some(((next >> 32) as u32, (next & 0xffff_ffff) as u32, false));
             }
             entry.write_batches = entry.segments.len();
         }

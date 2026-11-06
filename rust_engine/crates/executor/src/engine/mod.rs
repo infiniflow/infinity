@@ -40,8 +40,7 @@ use crate::query_builder::QueryNode;
 pub(crate) use crate::invertedindex::search::blockmax_wand_iterator as wand;
 pub(crate) use crate::knn_scan;
 pub(crate) use crate::{
-    deferred_catalog, diagnostics, variables, BGTaskProcessor, Batch, BgTask,
-    ColumnData, Scope,
+    deferred_catalog, diagnostics, variables, BGTaskProcessor, Batch, BgTask, ColumnData, Scope,
 };
 
 pub(crate) mod admin;

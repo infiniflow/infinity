@@ -505,7 +505,14 @@ pub fn encode_emvb_refs_with(
     subspace_num: usize,
     subspace_bits: u32,
 ) -> Vec<u8> {
-    build_emvb_with(dims, start_segment_offset, docs, subspace_num, subspace_bits).encode()
+    build_emvb_with(
+        dims,
+        start_segment_offset,
+        docs,
+        subspace_num,
+        subspace_bits,
+    )
+    .encode()
 }
 
 /// Like [`write_emvb_segment`] but with borrowed token rows.

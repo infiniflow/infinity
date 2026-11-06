@@ -44,3 +44,28 @@ cd rust_engine
 > 结论口径：Gate A 要求 **全部 `.slt` 通过**（现 1555/1560）；Gate B 的 pysdk 全量仍是 2026-10-17 的数字，
 > 需按本轮记录的调用口径（`.venv/bin/python` + 递归夹具）复跑；Gate C/D 的门禁脚本都已产出证据；
 > Gate E 首次有了同机 C++ golden，**当前 +8.44% 未达标**，瓶颈是扫描路径（见上表）。
+
+## CI（`.github/workflows/rust_engine.yml`）
+
+一套用例，四个格子：`python/restart_test` 只写一次，矩阵按 **引擎（`cpp` 参考版 / `rust` 重写版）× 架构（`amd64` / `arm64`）** 各跑一遍。引擎相关的失败因此是一个红格子，而不是第二份测试文件。
+
+| job | 矩阵 | 内容 |
+|---|---|---|
+| `quality` | — | `cargo fmt --all -- --check`（门禁）、`cargo clippy`（仅报告，工作区尚有存量 warning）、`cargo deny check` |
+| `unit` | arch | `cargo test --workspace`（含 `analyzer`/`analyzer-ffi`），amd64 另跑 `cli smoke` 与 Gate A 基线（报告） |
+| `build` | engine × arch | 参考版在仓库的 builder 镜像里编（arm64 交叉编译），重写版在对应架构的 runner 上原生编；各上传一个 `bin-<engine>-<arch>` |
+| `restart` | engine × arch | Gate C 的重启用例，二进制由矩阵决定；rust 格子经 `infinity_rust_shim.sh` 启动 |
+| `cross_engine` | arch | 格式门禁：一次跑两个引擎（`test_cross_engine_bytes_*` + `test_cross_engine_compat`） |
+
+arm64 需要交叉编参考版，所以只在 push / nightly / 手动触发时跑；PR 只跑 amd64。
+
+**重写版不支持的用例**在 workflow 的 `RUST_DESELECT` 里按 pytest node id 逐行列出，只对 `rust` 格子加 `--deselect`（参考版仍是全量对照）。当前一项：对象存储往返（`test_cross_engine_bytes_60_storage.py::test_the_port_round_trips_through_object_storage`，见 `docs/GAPS.md` §1）。补齐一个缺口就把对应行删掉。
+
+本地复现某格：
+
+```bash
+# 重写版跑 Gate C 的重启集合（同一份 --deselect 列表可从 workflow 抄）
+INFINITY_SERVER_BIN=$PWD/rust_engine/target/release/infinity \
+  .venv/bin/python -m pytest -q -m "not slow" -k "not cross_engine" \
+  python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh
+```
