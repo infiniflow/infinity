@@ -245,14 +245,16 @@ fn a_panicking_task_does_not_wedge_drain() {
     assert!(processor.submit(Box::new(PanickingTask)));
 
     // Bound the wait: a wedged `drain()` would otherwise hang the test run
-    // instead of failing it.
+    // instead of failing it. A real wedge never returns, so the budget only has
+    // to outlast a busy machine - `cargo test --workspace` runs this binary
+    // beside a dozen others and 5 s is not enough there.
     let (tx, rx) = std::sync::mpsc::channel();
     let draining = Arc::clone(&processor);
     std::thread::spawn(move || {
         draining.drain();
         let _ = tx.send(());
     });
-    rx.recv_timeout(std::time::Duration::from_secs(5))
+    rx.recv_timeout(std::time::Duration::from_secs(60))
         .expect("drain() wedged on a panicking task");
     assert_eq!(processor.running_task_count(), 0);
 
