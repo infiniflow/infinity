@@ -315,16 +315,40 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: Install the SDK and the test dependencies
         run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - name: Install the test data
+        # The Go and HTTP suites read `/var/infinity/test_data/*`; this is the
+        # same generate-and-copy step the reference's jobs run (`-jc` copies
+        # without running the .slt suite).
+        run: uv run python3 tools/sqllogictest.py -jc=1
       - name: Start the engine
         run: |
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
       - name: Python SDK suite
         run: .venv/bin/python -m pytest -q python/test_pysdk -m "not complex and not slow" --tb=short
+      - name: Restart the engine on an empty directory
+        # Each suite counts what it created - the Go one asserts exactly 1000
+        # tables with its prefix - so it has to start from a clean server, as
+        # it does in the reference's own jobs. `test_data` stays.
+        run: |
+          pkill -f "bin/infinity --config" || true
+          for _ in $(seq 1 30); do pgrep -f "bin/infinity --config" >/dev/null || break; sleep 1; done
+          rm -rf /var/infinity/catalog /var/infinity/data /var/infinity/wal \
+                 /var/infinity/log /var/infinity/persistence
+          nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_infinity.sh
       - name: Go SDK suite
         # The same server, driven through the unmodified Go SDK.
         working-directory: go
         run: go test ./tests/... -count=1
+      - name: Restart the engine on an empty directory
+        run: |
+          pkill -f "bin/infinity --config" || true
+          for _ in $(seq 1 30); do pgrep -f "bin/infinity --config" >/dev/null || break; sleep 1; done
+          rm -rf /var/infinity/catalog /var/infinity/data /var/infinity/wal \
+                 /var/infinity/log /var/infinity/persistence
+          nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_infinity.sh
       - name: HTTP API suite
         # The same SDK tests over the HTTP API (pytest --http).
         run: .venv/bin/python tools/run_http_api.py
