@@ -638,7 +638,7 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         parsed_expr.type = parser_expr_type
         return parsed_expr
     else:
-        return traverse_conditions(cons[1])
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {cons}")
 
 
 def parse_expr(expr) -> ttypes.ParsedExpr:

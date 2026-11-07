@@ -1,5 +1,6 @@
 import infinity
 import pytest
+from infinity.common import InfinityException
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 from infinity.remote_thrift.table import traverse_conditions
@@ -46,3 +47,19 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_condition_unsupported_expression(self):
+        # Unsupported predicates must fail with a clean InfinityException.
+        # The fallback arm of traverse_conditions used to recurse on
+        # cons[1], a same-class sqlglot copy, so filters like these crashed
+        # the client with RecursionError instead.
+        for cond_str in [
+            "c1 = (select 1)",
+            "(c1, c2) = (1, 2)",
+            "c1 = interval 1 day",
+            "c1[1] = 5",
+            "c1 = any (1)",
+        ]:
+            with pytest.raises(InfinityException, match="unknown expression type") as exc_info:
+                traverse_conditions(condition(cond_str))
+            assert exc_info.value.error_code == ErrorCode.INVALID_EXPRESSION
