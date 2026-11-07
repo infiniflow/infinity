@@ -6,8 +6,8 @@ name: rust_engine
 # cross-engine format gate and the C++ suites belong to the reference's own
 # workflows (tests.yml / slow_tests.yml), so nothing here builds C++.
 #
-# Each suite is written once and run per architecture: pull requests stay on
-# amd64, while push / nightly / manual runs cover amd64 and arm64.
+# Each suite is written once and run per architecture; every trigger covers
+# both amd64 and arm64.
 
 on:
   push:
@@ -21,6 +21,8 @@ on:
     paths:
       - 'rust_engine/**'
       - 'python/restart_test/**'
+      - 'python/test_pysdk/**'
+      - 'go/**'
       - 'tools/run_restart_test.py'
       - '.github/workflows/rust_engine.yml'
   schedule:
@@ -108,10 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # arm64 machines queue longer, so pull requests stay on amd64; push,
-        # nightly and manual runs cover both. A job-level if cannot read the
-        # matrix, so the axis itself is computed from the event.
-        arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
+        arch: [amd64, arm64]
     defaults:
       run:
         working-directory: rust_engine
@@ -158,17 +157,14 @@ jobs:
       - name: test
         run: cargo test --workspace
       - name: smoke
-        if: matrix.arch == 'amd64'
         run: cargo run -q -p cli -- smoke /tmp/infinity-smoke
       - name: Gate A (slt conformance)
         # The port is at 1754/1754 statements, 129/129 errors and 1560/1560
         # queries on the reference's 175-file suite, so this gates.
-        if: matrix.arch == 'amd64'
         run: cargo run -q --release -p cli -- conformance ../test/sql
       - name: Gate C (snapshot .slt)
         # The snapshot part of Gate C: a restored table must read back, and the
         # reference's own cases are the expectation. Seconds, so it gates here.
-        if: matrix.arch == 'amd64'
         run: cargo run -q --release -p cli -- conformance ../test/sql/snapshot
 
   build:
@@ -178,7 +174,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
+        arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -231,7 +227,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
+        arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -289,11 +285,10 @@ jobs:
 
   sdk:
     # Gate B: the unmodified Python SDK, Go SDK and HTTP API. The suite is ~30
-    # files and takes tens of minutes per cell, so a pull request skips it;
-    # every push, the nightly run and a manual dispatch cover it.
+    # files and takes tens of minutes per cell; every trigger runs it, on both
+    # architectures.
     name: sdk (${{ matrix.arch }})
     needs: build
-    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
