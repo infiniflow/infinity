@@ -11,7 +11,7 @@
 
 格式层面的逐文件细节在 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §5；逐类/逐用例的映射状态在
 [`CLASS_MAP.md`](CLASS_MAP.md) §2（`mapped` / `partial` / `excluded` 行）与 [`TEST_AUDIT.md`](TEST_AUDIT.md)（`excluded` 行，对应本文 §1 的不移植决定）。
-**已接受的设计变更**（不是待办）登记在 [`CLASS_MAP.md`](CLASS_MAP.md)「有意的设计变更」，本文不重复。
+**已接受的设计变更**（不是待办）登记在 [`CLASS_MAP.md`](CLASS_MAP.md)「有意的设计变更」；与持久化边界有关的那一条同时记在本文 §1.1，因为它是一个「有意不移植」的决定。
 
 ---
 
@@ -22,6 +22,24 @@
 | 远程对象存储（`obj_key` 打包 + VirtualStore 上传、catalog 的 `meta/` 路径树同步） | 不移植；本地对象目录（`pm\|object\|` 记录 + 打包对象）仍按参考布局写 | 桶内布局与参考不同，跨引擎"同一桶互读"不成立 | `FORMAT_EQUIVALENCE_TESTS.md` §6.5 |
 | DiskANN | 不移植 | 该索引类型不可用 | 计划书 §2.6/R14 |
 | geo 类型（`Point`/`Line`/`LineSeg`/`Box`/`Circle`） | 不移植；`GeographyTryCastToVarlen` 随 cast 保留 | 这些列类型不可用 | `TEST_AUDIT.md` 的 `excluded` 行 |
+
+### 1.1 mem index 的 flush 持久化（有意的设计偏离）
+
+**重写版在 flush 时不持久化任何一类 mem index，重启时在 `recover_mem_index` 里恢复**。checkpoint（`flush_storage`）只写块，
+**不**封存任何一类内存索引（secondary / fulltext / HNSW / IVF / BMP / 多值）。索引尾巴只由 `DumpMemIndex` 事务封存：
+它先按 kind 把尾巴写成 chunk/段文件，再在同一个事务里写 `idx_chunk|…` 记录（值 = 该事务的 commit ts）；尾巴为空且没有
+未发布的 chunk 文件时直接返回，不花 commit ts、不写 WAL entry（对应参考的 "skipped dumping MemIndex"）。
+
+重启后 `Engine::open` 末尾调用 `recover_mem_index`：用 catalog 的 chunk 覆盖（`base_row_id`/`row_count` 合并成
+升序区间）与块内行求差，只把没被 chunk 覆盖的行喂回内存索引。各 kind 的恢复路径：HNSW / IVF 直接插回内存段；fulltext
+走 `text_index_for`（`load_sealed` 映射已有 chunk，再从第一个未覆盖行重建）；二级索引由 `rebuild_indexes` 的
+`build_index` 全量重建；多值与稀疏没有独立的 chunk 映射，在首次查询时整表重建。
+
+**影响**：flush 之后索引尾巴仍在内存里（只由配额、按批容量或显式 `DumpIndex` 落盘），崩溃不丢行（行在块和 WAL 里），
+代价是重启时多做一次 gap 重建。checkpoint 的索引镜像（`flush_blocks`）会写 chunk 文件却没有 ts 可写，这类「有文件、
+无记录」的 chunk 由下一次 dump 赋 ts（`dump_index_transaction` 的 `index_has_unpublished_chunks` 判据）。
+门禁：`test_cross_engine_bytes_20_table`（各索引 chunk 数）、`_30_segments`（配额驱动的 dump 与 tiling）、
+`_45_ddl`（9 阶段，含 create/drop index）、`_50_mutations`（重启/崩溃后的索引覆盖）。
 
 ## 2 未实现 / 未接线
 
