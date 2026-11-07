@@ -158,11 +158,11 @@ def _append_blocks(wal_dir):
     same names the reference does.
     """
     sealed = sorted(
-        
+
             (int(name.rsplit(".", 1)[1]), os.path.join(wal_dir, name))
             for name in os.listdir(wal_dir)
             if name.startswith("wal.log.") and name.rsplit(".", 1)[1].isdigit()
-        
+
     )
     files = [path for _, path in sealed] + [os.path.join(wal_dir, "wal.log")]
     out = []

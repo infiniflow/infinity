@@ -1,10 +1,10 @@
 # Infinity Rust 重写计划书
 
-> 版本：v1.1（2026-10-18 迁移策略修订：D1 由「洁净室重写」改为「结构对齐的类级移植」）  
-> 日期：2026-10-18  
-> 基准代码：infinity `main` @ `5d27942c0`（v0.7.4 线，2026-10-19 rebase；含 regex literal extractor 上游更新）  
-> 实现代码：`rust_engine/`（Cargo workspace），C++ 引擎作为参考实现（oracle）  
-> 评审：codex 三轮评审（round 3 `VERDICT: APPROVE`，见附录 C）  
+> 版本：v1.1（2026-10-18 迁移策略修订：D1 由「洁净室重写」改为「结构对齐的类级移植」）
+> 日期：2026-10-18
+> 基准代码：infinity `main` @ `5d27942c0`（v0.7.4 线，2026-10-19 rebase；含 regex literal extractor 上游更新）
+> 实现代码：`rust_engine/`（Cargo workspace），C++ 引擎作为参考实现（oracle）
+> 评审：codex 三轮评审（round 3 `VERDICT: APPROVE`，见附录 C）
 > 状态：**计划已定稿；实现进入收尾** —— Gate A/B/D/E/F/G 达标；Gate C 常规全绿，重档在无 `earlyoom` 的 CI 机复跑（见 §8）
 
 本文件是**唯一**的计划与状态来源。历史进展叙述已合并进 §7/§8；已实现项不再保留「待做」表述。
@@ -164,8 +164,8 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 | 性能基准 | `benchmark/`、`python/benchmark/` | KNN / 全文 / 稀疏 | `check_benchmark_result.py`（`<7%`） |
 | HTTP API | 复用 pysdk + `--http` | 独立执行模式 | `tools/run_http_api.py` |
 
-> 注 1：`AGENTS.md` 里的 `python/test/cases/...` 路径已过时，实际为 `python/test_pysdk`。  
-> 注 2：313 / 34 是**子串**匹配的原始计数，各含 5 处注释定义；有效值为 **308 / 29**，且都不等于 pytest 参数化后的收集数。验收须冻结**收集到的 test ID 清单 + marker/skip + 数据集 + `.slt` manifest**（§8）。  
+> 注 1：`AGENTS.md` 里的 `python/test/cases/...` 路径已过时，实际为 `python/test_pysdk`。
+> 注 2：313 / 34 是**子串**匹配的原始计数，各含 5 处注释定义；有效值为 **308 / 29**，且都不等于 pytest 参数化后的收集数。验收须冻结**收集到的 test ID 清单 + marker/skip + 数据集 + `.slt` manifest**（§8）。
 > 注 3：`.slt` 与部分数据由 `tools/generate_*.py` 在运行前生成（`tools/sqllogictest.py:137`），需一并版本化。
 
 ---
@@ -297,8 +297,8 @@ RocksDB 只存元数据，负载为「低容量 + 事务 + 快照 + 计数器」
 | 阻塞算子 | `rayon::par_iter` / `spawn_blocking` |
 | WAL flush / compaction / bg task | `tokio::spawn` + `interval`；WAL 单写者保留 |
 
-> ⚠️ **死锁规则（codex BLOCKER B4）**：并发判定在「**边/生产者**」，不在「父 fragment 类型」。  
-> C++ 在**子（生产者）一侧**判定：`fragment_type_ == kParallelStream` 且已产出数据时，**在其结束前**调度父 fragment（`fragment_context_impl.cpp:592,604,610`）。而 merge 父为 `kSerialMaterialize`（`fragment_builder_impl.cpp:235`），其 scan 子仍可能是 stream（`:307`）。  
+> ⚠️ **死锁规则（codex BLOCKER B4）**：并发判定在「**边/生产者**」，不在「父 fragment 类型」。
+> C++ 在**子（生产者）一侧**判定：`fragment_type_ == kParallelStream` 且已产出数据时，**在其结束前**调度父 fragment（`fragment_context_impl.cpp:592,604,610`）。而 merge 父为 `kSerialMaterialize`（`fragment_builder_impl.cpp:235`），其 scan 子仍可能是 stream（`:307`）。
 > **规则**：凡经有界队列交接的边，消费者必须与生产者并发排空；只有**生产者自物化**（无有界交接 / 有 spill）时才允许「完成后再启动」。
 
 **资源与取消**：

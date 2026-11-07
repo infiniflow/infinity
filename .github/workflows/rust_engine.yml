@@ -119,6 +119,7 @@ jobs:
             echo "has_cpp=0" >> "${GITHUB_OUTPUT}"
           fi
           echo "files=${files}" >> "${GITHUB_OUTPUT}"
+          echo "base=${base}" >> "${GITHUB_OUTPUT}"
 
       - name: Install uv (ruff runs through `uvx`)
         uses: astral-sh/setup-uv@v7
@@ -157,8 +158,11 @@ jobs:
       - name: lefthook
         # The same jobs `git commit` runs (`lefthook.yml`), over the files this
         # push or pull request touched, in check-only mode: nothing is
-        # rewritten and a finding fails the job.
+        # rewritten and a finding fails the job. CHECK_FILES_BASE scopes the
+        # whitespace/newline checks to the lines this change adds.
         working-directory: ${{ github.workspace }}
+        env:
+          CHECK_FILES_BASE: ${{ steps.changed.outputs.base }}
         run: |
           if [ "${HAVE_CLANG_FORMAT:-}" != "1" ]; then
             export LEFTHOOK_EXCLUDE=clang-format

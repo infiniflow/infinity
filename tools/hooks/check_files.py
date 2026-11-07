@@ -3,7 +3,7 @@
 
 Modelled on RAGFlow's tools/hooks/check_files.py: one process per check, the
 files to inspect come from the command line (lefthook passes the staged files)
-or, when none are given, from `git diff --cached`.
+or, when none are given, from "git diff --cached".
 
     check_files.py eof [--fix] [FILE ...]
     check_files.py trailing-whitespace [--fix] [FILE ...]
@@ -11,9 +11,15 @@ or, when none are given, from `git diff --cached`.
     check_files.py merge-conflict [FILE ...]
     check_files.py yaml|json|case-conflict [FILE ...]
 
-`--fix` rewrites the file (lefthook then stages it); without it the check only
-reports and exits non-zero. Binary files (a NUL byte) and files larger than
-MAX_FIX_BYTES are skipped by the rewriting checks: a fixture must never be
+--fix rewrites the file (lefthook then stages it); without it the check only
+reports and exits non-zero.
+
+In check mode the line-level checks look at the lines the change **adds**, not
+the whole file: a repository that already carries trailing whitespace must not
+make every commit that touches such a file fail. The base is CHECK_FILES_BASE
+when set (CI passes the pull request's base commit) and HEAD otherwise (a local
+--all-files run then checks the uncommitted changes). Binary files (a NUL byte)
+and files larger than MAX_FIX_BYTES are skipped: a fixture must never be
 normalised byte for byte.
 """
 
@@ -36,7 +42,7 @@ MERGE_START = "<<<<<<< "
 MERGE_SEP = "======="
 MERGE_END = ">>>>>>> "
 
-_TRAILING_WS = re.compile(r"[ \t]+(?=\r?\n|$)")
+_TRAILING_WS = re.compile(r"[ \t]+$")
 
 
 def _git_paths(*args: str) -> list[Path]:
@@ -59,13 +65,61 @@ def _read(path: Path) -> bytes | None:
     return None if b"\0" in data else data
 
 
+def _added_lines(paths: list[Path]) -> dict[str, list[str]] | None:
+    """The lines this change adds, per file, or None when there is no base.
+
+    One "git diff" for the whole run: a pull request can touch hundreds of
+    files, and a process per file dominates the check.
+    """
+    base = os.environ.get("CHECK_FILES_BASE", "HEAD")
+    if not base:
+        return None
+    proc = subprocess.run(
+        ["git", "diff", "-U0", "--no-color", base, "--", *[str(p) for p in paths]],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return None
+    added: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in proc.stdout.split("\n"):
+        if line.startswith("+++ b/"):
+            current = line[len("+++ b/") :]
+            added.setdefault(current, [])
+        elif line.startswith(("+++ ", "--- ")):
+            current = None
+        elif line.startswith("+") and current is not None:
+            added[current].append(line[1:])
+    return added
+
+
 def _report(errors: list[str]) -> int:
     for error in errors:
         print(error, file=sys.stderr)
     return 1 if errors else 0
 
 
-def check_eof(paths: list[Path], fix: bool) -> int:
+def _fragment(line: str) -> str:
+    """A diff line without the CR a CRLF file carries."""
+    return line.removesuffix("\r")
+
+
+def _base_bytes(path: Path) -> bytes | None:
+    """The base revision's copy of "path", or None for a new file."""
+    base = os.environ.get("CHECK_FILES_BASE", "HEAD")
+    if not base:
+        return None
+    proc = subprocess.run(
+        ["git", "show", f"{base}:{path}"],
+        check=False,
+        capture_output=True,
+    )
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def check_eof(paths: list[Path], fix: bool, added: dict[str, list[str]] | None) -> int:
     errors: list[str] = []
     for path in paths:
         data = _read(path)
@@ -74,12 +128,23 @@ def check_eof(paths: list[Path], fix: bool) -> int:
         if fix:
             with path.open("ab") as handle:
                 handle.write(b"\n")
-        else:
-            errors.append(f"missing trailing newline: {path}")
+            continue
+        if added is not None:
+            if not added.get(str(path)):
+                continue
+            # A new file must be well formed, and a change must not drop the
+            # newline a file already had. A file that never had one keeps its
+            # pre-existing state, like trailing whitespace on untouched lines.
+            base = _base_bytes(path)
+            if base is not None and not base.endswith(b"\n"):
+                continue
+        errors.append(f"missing trailing newline: {path}")
     return _report(errors)
 
 
-def check_trailing_whitespace(paths: list[Path], fix: bool) -> int:
+def check_trailing_whitespace(
+    paths: list[Path], fix: bool, added: dict[str, list[str]] | None
+) -> int:
     errors: list[str] = []
     for path in paths:
         data = _read(path)
@@ -89,40 +154,60 @@ def check_trailing_whitespace(paths: list[Path], fix: bool) -> int:
             text = data.decode("utf-8")
         except UnicodeDecodeError:
             continue
-        fixed = _TRAILING_WS.sub("", text)
-        if fixed != text:
-            if fix:
+        if fix:
+            fixed = "\n".join(_TRAILING_WS.sub("", line) for line in text.split("\n"))
+            if fixed != text:
                 path.write_text(fixed, encoding="utf-8")
-            else:
+            continue
+        if added is not None:
+            lines = added.get(str(path))
+            if not lines:
+                continue
+            if any(_TRAILING_WS.search(_fragment(line)) for line in lines):
                 errors.append(f"trailing whitespace: {path}")
+            continue
+        if any(_TRAILING_WS.search(line) for line in text.split("\n")):
+            errors.append(f"trailing whitespace: {path}")
     return _report(errors)
 
 
-def check_mixed_line_ending(paths: list[Path], fix: bool) -> int:
+def check_mixed_line_ending(
+    paths: list[Path], fix: bool, added: dict[str, list[str]] | None
+) -> int:
     errors: list[str] = []
     for path in paths:
         data = _read(path)
-        if data is None or b"\r\n" not in data:
+        if data is None:
             continue
         if fix:
-            path.write_bytes(data.replace(b"\r\n", b"\n"))
-        else:
+            if b"\r\n" in data:
+                path.write_bytes(data.replace(b"\r\n", b"\n"))
+            continue
+        if added is not None:
+            lines = added.get(str(path))
+            if not lines:
+                continue
+            if any(line.endswith("\r") for line in lines):
+                errors.append(f"CRLF line ending: {path}")
+            continue
+        if b"\r\n" in data:
             errors.append(f"CRLF line ending: {path}")
     return _report(errors)
 
 
-def check_merge_conflict(paths: list[Path], fix: bool) -> int:
-    del fix
+def check_merge_conflict(
+    paths: list[Path], fix: bool, added: dict[str, list[str]] | None
+) -> int:
+    del fix, added
     errors: list[str] = []
     for path in paths:
         data = _read(path)
         if data is None:
             continue
         try:
-            text = data.decode("utf-8")
+            lines = data.decode("utf-8").splitlines()
         except UnicodeDecodeError:
             continue
-        lines = text.splitlines()
         start = any(line.startswith(MERGE_START) for line in lines)
         sep = any(line.rstrip() == MERGE_SEP for line in lines)
         end = any(line.startswith(MERGE_END) for line in lines)
@@ -131,14 +216,13 @@ def check_merge_conflict(paths: list[Path], fix: bool) -> int:
     return _report(errors)
 
 
-def check_yaml(paths: list[Path], fix: bool) -> int:
-    del fix
+def check_yaml(paths: list[Path], fix: bool, added: dict[str, list[str]] | None) -> int:
+    del fix, added
     try:
         import yaml
     except ImportError:
         print(
-            "check-yaml: PyYAML is not installed; run `uv tool install pyyaml` "
-            "to enable this check (skipped)",
+            "check-yaml: PyYAML is not installed (python3-yaml); skipped",
             file=sys.stderr,
         )
         return 0
@@ -153,8 +237,8 @@ def check_yaml(paths: list[Path], fix: bool) -> int:
     return _report(errors)
 
 
-def check_json(paths: list[Path], fix: bool) -> int:
-    del fix
+def check_json(paths: list[Path], fix: bool, added: dict[str, list[str]] | None) -> int:
+    del fix, added
     errors: list[str] = []
     for path in paths:
         if path.suffix != ".json" or not path.is_file():
@@ -166,9 +250,11 @@ def check_json(paths: list[Path], fix: bool) -> int:
     return _report(errors)
 
 
-def check_case_conflict(paths: list[Path], fix: bool) -> int:
+def check_case_conflict(
+    paths: list[Path], fix: bool, added: dict[str, list[str]] | None
+) -> int:
     """Two paths that differ only in case cannot coexist on macOS/Windows."""
-    del fix
+    del fix, added
     seen: dict[str, Path] = {}
     errors: list[str] = []
     for path in paths:
@@ -194,15 +280,18 @@ CHECKS = {
 
 def main(argv: list[str]) -> int:
     if not argv or argv[0] not in CHECKS:
+        checks = "|".join(CHECKS)
         print(
-            f"usage: {Path(__file__).name} <{'|'.join(CHECKS)}> [--fix] [FILE ...]",
+            f"usage: {Path(__file__).name} <{checks}> [--fix] [FILE ...]",
             file=sys.stderr,
         )
         return 2
     check = argv[0]
     fix = "--fix" in argv[1:]
     files = [Path(arg) for arg in argv[1:] if arg != "--fix"]
-    return CHECKS[check](files or _staged_paths(), fix)
+    files = files or _staged_paths()
+    added = None if fix else _added_lines(files)
+    return CHECKS[check](files, fix, added)
 
 
 if __name__ == "__main__":

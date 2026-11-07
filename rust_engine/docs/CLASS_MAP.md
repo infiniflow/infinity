@@ -84,877 +84,877 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
-| 1 | `AdminExecutor` | `src/admin/admin_executor.cppm` | mapped | executor 的语句分发 
-| 2 | `Analyzer` | `src/common/analyzer/analyzer.cppm` | mapped | `analyzer::StandardAnalyzer` 
-| 3 | `AnalyzerPool` | `src/common/analyzer/analyzer_pool.cppm` | mapped | `analyzer::AnalyzerPool` 
-| 4 | `ChineseAnalyzer` | `src/common/analyzer/chinese_analyzer.cppm` | mapped | `analyzer::ChineseAnalyzer` 
+| 1 | `AdminExecutor` | `src/admin/admin_executor.cppm` | mapped | executor 的语句分发
+| 2 | `Analyzer` | `src/common/analyzer/analyzer.cppm` | mapped | `analyzer::StandardAnalyzer`
+| 3 | `AnalyzerPool` | `src/common/analyzer/analyzer_pool.cppm` | mapped | `analyzer::AnalyzerPool`
+| 4 | `ChineseAnalyzer` | `src/common/analyzer/chinese_analyzer.cppm` | mapped | `analyzer::ChineseAnalyzer`
 | 5 | `CommonLanguageAnalyzer` | `src/common/analyzer/common_analyzer.cppm` | mapped | `analyzer::StandardAnalyzer` 的选项（case/stem/stem_only） |
-| 6 | `DartsTrie` | `src/common/analyzer/darts_trie.cppm` | mapped | `analyzer::DartsTrie` 
-| 7 | `DartsTuple` | `src/common/analyzer/darts_trie.cppm` | mapped | analyzer 
-| 8 | `POSTable` | `src/common/analyzer/darts_trie.cppm` | mapped | analyzer 
-| 9 | `AnalyzeContext` | `src/common/analyzer/ik/analyze_context.cppm` | mapped | analyzer 
-| 10 | `IKArbitrator` | `src/common/analyzer/ik/arbitrator.cppm` | mapped | analyzer 
-| 11 | `CharacterUtil` | `src/common/analyzer/ik/character_util.cppm` | mapped | analyzer 
-| 12 | `CJKSegmenter` | `src/common/analyzer/ik/cjk_segmenter.cppm` | mapped | analyzer 
-| 13 | `CNQuantifierSegmenter` | `src/common/analyzer/ik/cn_quantifier_segmenter.cppm` | mapped | analyzer 
-| 14 | `Dictionary` | `src/common/analyzer/ik/dict.cppm` | mapped | analyzer 
-| 15 | `DictSegment` | `src/common/analyzer/ik/dict_segment.cppm` | mapped | analyzer 
-| 16 | `Hit` | `src/common/analyzer/ik/hit.cppm` | mapped | analyzer 
-| 17 | `IKAnalyzer` | `src/common/analyzer/ik/ik_analyzer.cppm` | mapped | `analyzer::IKAnalyzer` 
-| 18 | `LetterSegmenter` | `src/common/analyzer/ik/letter_segmenter.cppm` | mapped | analyzer 
-| 19 | `Lexeme` | `src/common/analyzer/ik/lexeme.cppm` | mapped | analyzer 
-| 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | mapped | analyzer 
-| 21 | `QuickSortSet` | `src/common/analyzer/ik/quick_sort_set.cppm` | mapped | analyzer 
-| 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | mapped | analyzer 
-| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
-| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
+| 6 | `DartsTrie` | `src/common/analyzer/darts_trie.cppm` | mapped | `analyzer::DartsTrie`
+| 7 | `DartsTuple` | `src/common/analyzer/darts_trie.cppm` | mapped | analyzer
+| 8 | `POSTable` | `src/common/analyzer/darts_trie.cppm` | mapped | analyzer
+| 9 | `AnalyzeContext` | `src/common/analyzer/ik/analyze_context.cppm` | mapped | analyzer
+| 10 | `IKArbitrator` | `src/common/analyzer/ik/arbitrator.cppm` | mapped | analyzer
+| 11 | `CharacterUtil` | `src/common/analyzer/ik/character_util.cppm` | mapped | analyzer
+| 12 | `CJKSegmenter` | `src/common/analyzer/ik/cjk_segmenter.cppm` | mapped | analyzer
+| 13 | `CNQuantifierSegmenter` | `src/common/analyzer/ik/cn_quantifier_segmenter.cppm` | mapped | analyzer
+| 14 | `Dictionary` | `src/common/analyzer/ik/dict.cppm` | mapped | analyzer
+| 15 | `DictSegment` | `src/common/analyzer/ik/dict_segment.cppm` | mapped | analyzer
+| 16 | `Hit` | `src/common/analyzer/ik/hit.cppm` | mapped | analyzer
+| 17 | `IKAnalyzer` | `src/common/analyzer/ik/ik_analyzer.cppm` | mapped | `analyzer::IKAnalyzer`
+| 18 | `LetterSegmenter` | `src/common/analyzer/ik/letter_segmenter.cppm` | mapped | analyzer
+| 19 | `Lexeme` | `src/common/analyzer/ik/lexeme.cppm` | mapped | analyzer
+| 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | mapped | analyzer
+| 21 | `QuickSortSet` | `src/common/analyzer/ik/quick_sort_set.cppm` | mapped | analyzer
+| 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | mapped | analyzer
+| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | `analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436）
+| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | `analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436）
 | 25 | `NGramAnalyzer` | `src/common/analyzer/ngram_analyzer.cppm` | mapped | `analyzer::NGramAnalyzer`（n-gram 窗口按 UTF-8 code point 滑动） |
-| 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `analyzer::RAGAnalyzer` 
-| 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | mapped | analyzer 
-| 28 | `SparsegramAnalyzer` | `src/common/analyzer/sparsegram_analyzer.cppm` | mapped | analyzer 
+| 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `analyzer::RAGAnalyzer`
+| 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | mapped | analyzer
+| 28 | `SparsegramAnalyzer` | `src/common/analyzer/sparsegram_analyzer.cppm` | mapped | analyzer
 | 29 | `StandardAnalyzer` | `src/common/analyzer/standard_analyzer.cppm` | mapped | `analyzer::StandardAnalyzer`（Analyze 的 word/stem/case 组合） |
-| 30 | `Stemmer` | `src/common/analyzer/stemmer/stemmer.cppm` | mapped | analyzer 
+| 30 | `Stemmer` | `src/common/analyzer/stemmer/stemmer.cppm` | mapped | analyzer
 | 31 | `Term` | `src/common/analyzer/term.cppm` | mapped | `analyzer::Term` |
 | 32 | `TermList` | `src/common/analyzer/term.cppm` | mapped | `Vec<analyzer::Term>` |
-| 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | mapped | analyzer 
+| 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | mapped | analyzer
 | 34 | `TokenizeConfig` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::TokenizeConfig`（AddAllows/AddDivides/AddUnites） |
 | 35 | `Tokenizer` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::tokenize` |
-| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436） 
-| 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | mapped | analyzer 
-| 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | mapped | analyzer 
-| 39 | `WhitespaceAnalyzer` | `src/common/analyzer/whitespace_analyzer.cppm` | mapped | analyzer 
-| 40 | `WordNetLemmatizer` | `src/common/analyzer/wordnet_lemmatizer.cppm` | mapped | analyzer 
+| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | `analyzer::{JapaneseAnalyzer, KoreanAnalyzer, TraditionalChineseAnalyzer}`（MeCab/OpenCC 端口，cc1843436）
+| 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | mapped | analyzer
+| 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | mapped | analyzer
+| 39 | `WhitespaceAnalyzer` | `src/common/analyzer/whitespace_analyzer.cppm` | mapped | analyzer
+| 40 | `WordNetLemmatizer` | `src/common/analyzer/wordnet_lemmatizer.cppm` | mapped | analyzer
 | 41 | `BlockingQueue` | `src/common/blocking_queue.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 42 | `ByteSlice` | `src/common/memory/byte_slice.cppm` | mapped | common 的内存/资源计费 
-| 43 | `ByteSliceList` | `src/common/memory/byte_slice.cppm` | mapped | common 的内存/资源计费 
-| 44 | `ByteSliceListIterator` | `src/common/memory/byte_slice.cppm` | mapped | common 的内存/资源计费 
-| 45 | `ChainedMemoryChunk` | `src/common/memory/memory_chunk.cppm` | mapped | common 的内存/资源计费 
-| 46 | `ChunkAllocator` | `src/common/memory/memory_chunk.cppm` | mapped | common 的内存/资源计费 
-| 47 | `MemoryChunk` | `src/common/memory/memory_chunk.cppm` | mapped | common 的内存/资源计费 
-| 48 | `PythonInstance` | `src/common/python.cppm` | exempt | 无内嵌 Python 解释器；用户自定义分析器改为注册表 
-| 49 | `SIMD_FUNCTIONS` | `src/common/simd/simd_functions.cppm` | mapped | common::simd 
-| 50 | `Singleton` | `src/common/singleton.cppm` | mapped | 进程内 OnceLock/静态状态 
-| 51 | `Status` | `src/common/status.cppm` | mapped | common::Error 
-| 52 | `DeferFn` | `src/common/utility/defer_op.cppm` | mapped | common 
+| 42 | `ByteSlice` | `src/common/memory/byte_slice.cppm` | mapped | common 的内存/资源计费
+| 43 | `ByteSliceList` | `src/common/memory/byte_slice.cppm` | mapped | common 的内存/资源计费
+| 44 | `ByteSliceListIterator` | `src/common/memory/byte_slice.cppm` | mapped | common 的内存/资源计费
+| 45 | `ChainedMemoryChunk` | `src/common/memory/memory_chunk.cppm` | mapped | common 的内存/资源计费
+| 46 | `ChunkAllocator` | `src/common/memory/memory_chunk.cppm` | mapped | common 的内存/资源计费
+| 47 | `MemoryChunk` | `src/common/memory/memory_chunk.cppm` | mapped | common 的内存/资源计费
+| 48 | `PythonInstance` | `src/common/python.cppm` | exempt | 无内嵌 Python 解释器；用户自定义分析器改为注册表
+| 49 | `SIMD_FUNCTIONS` | `src/common/simd/simd_functions.cppm` | mapped | common::simd
+| 50 | `Singleton` | `src/common/singleton.cppm` | mapped | 进程内 OnceLock/静态状态
+| 51 | `Status` | `src/common/status.cppm` | mapped | common::Error
+| 52 | `DeferFn` | `src/common/utility/defer_op.cppm` | mapped | common
 | 53 | `RecoverableException` | `src/common/utility/exception.cppm` | mapped | `common::Error::Unexpected`（`Unexpected error: {msg}`） |
 | 54 | `UnrecoverableException` | `src/common/utility/exception.cppm` | mapped | `common::Error::Unrecoverable`（裸消息） |
-| 55 | `SmallFloat` | `src/common/utility/smallfloat.cppm` | mapped | common 
-| 56 | `ScopedSpinLock` | `src/common/utility/spinlock.cppm` | mapped | common 
-| 57 | `ScopedTryLock` | `src/common/utility/spinlock.cppm` | mapped | common 
-| 58 | `SpinLock` | `src/common/utility/spinlock.cppm` | mapped | common 
-| 59 | `ThreadUtil` | `src/common/utility/threadutil.cppm` | mapped | common 
-| 60 | `ZsvParser` | `src/common/zsv.cppm` | exempt | CSV 读取改为 Rust csv 路径 
-| 61 | `ExplainFragment` | `src/executor/explain_fragment.cppm` | mapped | executor 的物理算子/管线 
-| 62 | `ExplainPhysicalPlan` | `src/executor/explain_physical_plan.cppm` | mapped | executor 的物理算子/管线 
-| 63 | `AggregateExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 64 | `BaseExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 65 | `CaseExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 66 | `CastExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 67 | `ColumnExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 68 | `ExpressionEvaluator` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 69 | `ExpressionState` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 70 | `FilterFulltextExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 71 | `FunctionExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 72 | `InExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 73 | `ReferenceExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 74 | `ValueExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线 
-| 75 | `ExpressionSelector` | `src/executor/expression/expression_selector.cppm` | mapped | executor 的物理算子/管线 
+| 55 | `SmallFloat` | `src/common/utility/smallfloat.cppm` | mapped | common
+| 56 | `ScopedSpinLock` | `src/common/utility/spinlock.cppm` | mapped | common
+| 57 | `ScopedTryLock` | `src/common/utility/spinlock.cppm` | mapped | common
+| 58 | `SpinLock` | `src/common/utility/spinlock.cppm` | mapped | common
+| 59 | `ThreadUtil` | `src/common/utility/threadutil.cppm` | mapped | common
+| 60 | `ZsvParser` | `src/common/zsv.cppm` | exempt | CSV 读取改为 Rust csv 路径
+| 61 | `ExplainFragment` | `src/executor/explain_fragment.cppm` | mapped | executor 的物理算子/管线
+| 62 | `ExplainPhysicalPlan` | `src/executor/explain_physical_plan.cppm` | mapped | executor 的物理算子/管线
+| 63 | `AggregateExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 64 | `BaseExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 65 | `CaseExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 66 | `CastExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 67 | `ColumnExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 68 | `ExpressionEvaluator` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 69 | `ExpressionState` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 70 | `FilterFulltextExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 71 | `FunctionExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 72 | `InExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 73 | `ReferenceExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 74 | `ValueExpression` | `src/executor/expression/expression_evaluator.cppm` | mapped | executor 的物理算子/管线
+| 75 | `ExpressionSelector` | `src/executor/expression/expression_selector.cppm` | mapped | executor 的物理算子/管线
 | 76 | `ColumnVector` | `src/executor/expression/expression_state.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 77 | `PlanFragment` | `src/executor/fragment/plan_fragment.cppm` | mapped | executor 的物理算子/管线 
-| 78 | `FragmentBuilder` | `src/executor/fragment_builder.cppm` | mapped | executor 的物理算子/管线 
-| 79 | `HashRange` | `src/executor/operator/physical_aggregate.cppm` | mapped | executor 的物理算子/管线 
-| 80 | `PhysicalAggregate` | `src/executor/operator/physical_aggregate.cppm` | mapped | executor 的物理算子/管线 
-| 81 | `PhysicalAddColumns` | `src/executor/operator/physical_alter.cppm` | mapped | executor 的物理算子/管线 
-| 82 | `PhysicalAlter` | `src/executor/operator/physical_alter.cppm` | mapped | executor 的物理算子/管线 
-| 83 | `PhysicalAlterIndex` | `src/executor/operator/physical_alter.cppm` | mapped | executor 的物理算子/管线 
-| 84 | `PhysicalDropColumns` | `src/executor/operator/physical_alter.cppm` | mapped | executor 的物理算子/管线 
-| 85 | `PhysicalRenameTable` | `src/executor/operator/physical_alter.cppm` | mapped | executor 的物理算子/管线 
-| 86 | `PhysicalCheck` | `src/executor/operator/physical_check/physical_check.cppm` | mapped | executor 的物理算子/管线 
-| 87 | `PhysicalCommand` | `src/executor/operator/physical_command.cppm` | mapped | executor 的物理算子/管线 
-| 88 | `PhysicalCompact` | `src/executor/operator/physical_compact.cppm` | mapped | executor 的物理算子/管线 
-| 89 | `PhysicalCreateCollection` | `src/executor/operator/physical_create_collection.cppm` | mapped | executor 的物理算子/管线 
-| 90 | `PhysicalCreateIndexPrepare` | `src/executor/operator/physical_create_index_prepare.cppm` | mapped | executor 的物理算子/管线 
-| 91 | `PhysicalCreateSchema` | `src/executor/operator/physical_create_schema.cppm` | mapped | executor 的物理算子/管线 
-| 92 | `PhysicalCreateTable` | `src/executor/operator/physical_create_table.cppm` | mapped | executor 的物理算子/管线 
-| 93 | `PhysicalCreateView` | `src/executor/operator/physical_create_view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植 
-| 94 | `PhysicalCrossProduct` | `src/executor/operator/physical_cross_product.cppm` | mapped | executor 的物理算子/管线 
-| 95 | `PhysicalDelete` | `src/executor/operator/physical_delete.cppm` | mapped | executor 的物理算子/管线 
-| 96 | `PhysicalDropCollection` | `src/executor/operator/physical_drop_collection.cppm` | mapped | executor 的物理算子/管线 
-| 97 | `PhysicalDropIndex` | `src/executor/operator/physical_drop_index.cppm` | mapped | executor 的物理算子/管线 
-| 98 | `PhysicalDropSchema` | `src/executor/operator/physical_drop_schema.cppm` | mapped | executor 的物理算子/管线 
-| 99 | `PhysicalDropTable` | `src/executor/operator/physical_drop_table.cppm` | mapped | executor 的物理算子/管线 
-| 100 | `PhysicalDropView` | `src/executor/operator/physical_drop_view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植 
-| 101 | `PhysicalDummyOperator` | `src/executor/operator/physical_dummy_operator.cppm` | mapped | executor 的物理算子/管线 
-| 102 | `PhysicalDummyScan` | `src/executor/operator/physical_dummy_scan.cppm` | mapped | executor 的物理算子/管线 
-| 103 | `PhysicalExcept` | `src/executor/operator/physical_except.cppm` | mapped | executor 的物理算子/管线 
-| 104 | `PhysicalExplain` | `src/executor/operator/physical_explain.cppm` | mapped | executor 的物理算子/管线 
-| 105 | `PhysicalExport` | `src/executor/operator/physical_export.cppm` | mapped | executor 的物理算子/管线 
-| 106 | `PhysicalFilter` | `src/executor/operator/physical_filter.cppm` | mapped | executor 的物理算子/管线 
-| 107 | `PhysicalFlush` | `src/executor/operator/physical_flush.cppm` | mapped | executor 的物理算子/管线 
-| 108 | `MatchTensorRerankDoc` | `src/executor/operator/physical_fusion.cppm` | mapped | executor 的物理算子/管线 
-| 109 | `PhysicalFusion` | `src/executor/operator/physical_fusion.cppm` | mapped | executor 的物理算子/管线 
-| 110 | `PhysicalHash` | `src/executor/operator/physical_hash.cppm` | mapped | executor 的物理算子/管线 
-| 111 | `PhysicalHashAggregate` | `src/executor/operator/physical_hash_aggregate.cppm` | mapped | executor 的物理算子/管线 
-| 112 | `PhysicalHashJoin` | `src/executor/operator/physical_hash_join.cppm` | mapped | executor 的物理算子/管线 
-| 113 | `PhysicalImport` | `src/executor/operator/physical_import.cppm` | mapped | executor 的物理算子/管线 
-| 114 | `PhysicalIndexJoin` | `src/executor/operator/physical_index_join.cppm` | mapped | executor 的物理算子/管线 
-| 115 | `PhysicalInsert` | `src/executor/operator/physical_insert.cppm` | mapped | executor 的物理算子/管线 
-| 116 | `PhysicalIntersect` | `src/executor/operator/physical_intersect.cppm` | mapped | executor 的物理算子/管线 
-| 117 | `AtomicCounter` | `src/executor/operator/physical_limit.cppm` | mapped | executor 的物理算子/管线 
-| 118 | `LimitCounter` | `src/executor/operator/physical_limit.cppm` | mapped | executor 的物理算子/管线 
-| 119 | `PhysicalLimit` | `src/executor/operator/physical_limit.cppm` | mapped | executor 的物理算子/管线 
-| 120 | `UnSyncCounter` | `src/executor/operator/physical_limit.cppm` | mapped | executor 的物理算子/管线 
-| 121 | `PhysicalMatch` | `src/executor/operator/physical_match.cppm` | mapped | executor 的物理算子/管线 
-| 122 | `PhysicalMergeAggregate` | `src/executor/operator/physical_merge_aggregate.cppm` | mapped | executor 的物理算子/管线 
-| 123 | `PhysicalMergeHash` | `src/executor/operator/physical_merge_hash.cppm` | mapped | executor 的物理算子/管线 
-| 124 | `PhysicalMergeHashAggregate` | `src/executor/operator/physical_merge_hash_aggregate.cppm` | mapped | executor 的物理算子/管线 
-| 125 | `PhysicalMergeLimit` | `src/executor/operator/physical_merge_limit.cppm` | mapped | executor 的物理算子/管线 
-| 126 | `PhysicalMergeParallelAggregate` | `src/executor/operator/physical_merge_parallel_aggregate.cppm` | mapped | executor 的物理算子/管线 
-| 127 | `PhysicalMergeSort` | `src/executor/operator/physical_merge_sort.cppm` | mapped | executor 的物理算子/管线 
-| 128 | `PhysicalMergeTop` | `src/executor/operator/physical_merge_top.cppm` | mapped | executor 的物理算子/管线 
-| 129 | `PhysicalNestedLoopJoin` | `src/executor/operator/physical_nested_loop_join.cppm` | mapped | executor 的物理算子/管线 
-| 130 | `PhysicalOptimize` | `src/executor/operator/physical_optimize.cppm` | mapped | executor 的物理算子/管线 
-| 131 | `PhysicalParallelAggregate` | `src/executor/operator/physical_parallel_aggregate.cppm` | mapped | executor 的物理算子/管线 
-| 132 | `PhysicalPreparedPlan` | `src/executor/operator/physical_prepared_plan.cppm` | mapped | executor 的物理算子/管线 
-| 133 | `PhysicalProject` | `src/executor/operator/physical_project.cppm` | mapped | executor 的物理算子/管线 
-| 134 | `PhysicalReadCache` | `src/executor/operator/physical_read_cache.cppm` | mapped | executor 的物理算子/管线 
-| 135 | `PhysicalFilterScanBase` | `src/executor/operator/physical_scan/physical_filter_scan_base.cppm` | mapped | executor 的物理算子/管线 
-| 136 | `PhysicalIndexScan` | `src/executor/operator/physical_scan/physical_index_scan.cppm` | mapped | executor 的物理算子/管线 
+| 77 | `PlanFragment` | `src/executor/fragment/plan_fragment.cppm` | mapped | executor 的物理算子/管线
+| 78 | `FragmentBuilder` | `src/executor/fragment_builder.cppm` | mapped | executor 的物理算子/管线
+| 79 | `HashRange` | `src/executor/operator/physical_aggregate.cppm` | mapped | executor 的物理算子/管线
+| 80 | `PhysicalAggregate` | `src/executor/operator/physical_aggregate.cppm` | mapped | executor 的物理算子/管线
+| 81 | `PhysicalAddColumns` | `src/executor/operator/physical_alter.cppm` | mapped | executor 的物理算子/管线
+| 82 | `PhysicalAlter` | `src/executor/operator/physical_alter.cppm` | mapped | executor 的物理算子/管线
+| 83 | `PhysicalAlterIndex` | `src/executor/operator/physical_alter.cppm` | mapped | executor 的物理算子/管线
+| 84 | `PhysicalDropColumns` | `src/executor/operator/physical_alter.cppm` | mapped | executor 的物理算子/管线
+| 85 | `PhysicalRenameTable` | `src/executor/operator/physical_alter.cppm` | mapped | executor 的物理算子/管线
+| 86 | `PhysicalCheck` | `src/executor/operator/physical_check/physical_check.cppm` | mapped | executor 的物理算子/管线
+| 87 | `PhysicalCommand` | `src/executor/operator/physical_command.cppm` | mapped | executor 的物理算子/管线
+| 88 | `PhysicalCompact` | `src/executor/operator/physical_compact.cppm` | mapped | executor 的物理算子/管线
+| 89 | `PhysicalCreateCollection` | `src/executor/operator/physical_create_collection.cppm` | mapped | executor 的物理算子/管线
+| 90 | `PhysicalCreateIndexPrepare` | `src/executor/operator/physical_create_index_prepare.cppm` | mapped | executor 的物理算子/管线
+| 91 | `PhysicalCreateSchema` | `src/executor/operator/physical_create_schema.cppm` | mapped | executor 的物理算子/管线
+| 92 | `PhysicalCreateTable` | `src/executor/operator/physical_create_table.cppm` | mapped | executor 的物理算子/管线
+| 93 | `PhysicalCreateView` | `src/executor/operator/physical_create_view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植
+| 94 | `PhysicalCrossProduct` | `src/executor/operator/physical_cross_product.cppm` | mapped | executor 的物理算子/管线
+| 95 | `PhysicalDelete` | `src/executor/operator/physical_delete.cppm` | mapped | executor 的物理算子/管线
+| 96 | `PhysicalDropCollection` | `src/executor/operator/physical_drop_collection.cppm` | mapped | executor 的物理算子/管线
+| 97 | `PhysicalDropIndex` | `src/executor/operator/physical_drop_index.cppm` | mapped | executor 的物理算子/管线
+| 98 | `PhysicalDropSchema` | `src/executor/operator/physical_drop_schema.cppm` | mapped | executor 的物理算子/管线
+| 99 | `PhysicalDropTable` | `src/executor/operator/physical_drop_table.cppm` | mapped | executor 的物理算子/管线
+| 100 | `PhysicalDropView` | `src/executor/operator/physical_drop_view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植
+| 101 | `PhysicalDummyOperator` | `src/executor/operator/physical_dummy_operator.cppm` | mapped | executor 的物理算子/管线
+| 102 | `PhysicalDummyScan` | `src/executor/operator/physical_dummy_scan.cppm` | mapped | executor 的物理算子/管线
+| 103 | `PhysicalExcept` | `src/executor/operator/physical_except.cppm` | mapped | executor 的物理算子/管线
+| 104 | `PhysicalExplain` | `src/executor/operator/physical_explain.cppm` | mapped | executor 的物理算子/管线
+| 105 | `PhysicalExport` | `src/executor/operator/physical_export.cppm` | mapped | executor 的物理算子/管线
+| 106 | `PhysicalFilter` | `src/executor/operator/physical_filter.cppm` | mapped | executor 的物理算子/管线
+| 107 | `PhysicalFlush` | `src/executor/operator/physical_flush.cppm` | mapped | executor 的物理算子/管线
+| 108 | `MatchTensorRerankDoc` | `src/executor/operator/physical_fusion.cppm` | mapped | executor 的物理算子/管线
+| 109 | `PhysicalFusion` | `src/executor/operator/physical_fusion.cppm` | mapped | executor 的物理算子/管线
+| 110 | `PhysicalHash` | `src/executor/operator/physical_hash.cppm` | mapped | executor 的物理算子/管线
+| 111 | `PhysicalHashAggregate` | `src/executor/operator/physical_hash_aggregate.cppm` | mapped | executor 的物理算子/管线
+| 112 | `PhysicalHashJoin` | `src/executor/operator/physical_hash_join.cppm` | mapped | executor 的物理算子/管线
+| 113 | `PhysicalImport` | `src/executor/operator/physical_import.cppm` | mapped | executor 的物理算子/管线
+| 114 | `PhysicalIndexJoin` | `src/executor/operator/physical_index_join.cppm` | mapped | executor 的物理算子/管线
+| 115 | `PhysicalInsert` | `src/executor/operator/physical_insert.cppm` | mapped | executor 的物理算子/管线
+| 116 | `PhysicalIntersect` | `src/executor/operator/physical_intersect.cppm` | mapped | executor 的物理算子/管线
+| 117 | `AtomicCounter` | `src/executor/operator/physical_limit.cppm` | mapped | executor 的物理算子/管线
+| 118 | `LimitCounter` | `src/executor/operator/physical_limit.cppm` | mapped | executor 的物理算子/管线
+| 119 | `PhysicalLimit` | `src/executor/operator/physical_limit.cppm` | mapped | executor 的物理算子/管线
+| 120 | `UnSyncCounter` | `src/executor/operator/physical_limit.cppm` | mapped | executor 的物理算子/管线
+| 121 | `PhysicalMatch` | `src/executor/operator/physical_match.cppm` | mapped | executor 的物理算子/管线
+| 122 | `PhysicalMergeAggregate` | `src/executor/operator/physical_merge_aggregate.cppm` | mapped | executor 的物理算子/管线
+| 123 | `PhysicalMergeHash` | `src/executor/operator/physical_merge_hash.cppm` | mapped | executor 的物理算子/管线
+| 124 | `PhysicalMergeHashAggregate` | `src/executor/operator/physical_merge_hash_aggregate.cppm` | mapped | executor 的物理算子/管线
+| 125 | `PhysicalMergeLimit` | `src/executor/operator/physical_merge_limit.cppm` | mapped | executor 的物理算子/管线
+| 126 | `PhysicalMergeParallelAggregate` | `src/executor/operator/physical_merge_parallel_aggregate.cppm` | mapped | executor 的物理算子/管线
+| 127 | `PhysicalMergeSort` | `src/executor/operator/physical_merge_sort.cppm` | mapped | executor 的物理算子/管线
+| 128 | `PhysicalMergeTop` | `src/executor/operator/physical_merge_top.cppm` | mapped | executor 的物理算子/管线
+| 129 | `PhysicalNestedLoopJoin` | `src/executor/operator/physical_nested_loop_join.cppm` | mapped | executor 的物理算子/管线
+| 130 | `PhysicalOptimize` | `src/executor/operator/physical_optimize.cppm` | mapped | executor 的物理算子/管线
+| 131 | `PhysicalParallelAggregate` | `src/executor/operator/physical_parallel_aggregate.cppm` | mapped | executor 的物理算子/管线
+| 132 | `PhysicalPreparedPlan` | `src/executor/operator/physical_prepared_plan.cppm` | mapped | executor 的物理算子/管线
+| 133 | `PhysicalProject` | `src/executor/operator/physical_project.cppm` | mapped | executor 的物理算子/管线
+| 134 | `PhysicalReadCache` | `src/executor/operator/physical_read_cache.cppm` | mapped | executor 的物理算子/管线
+| 135 | `PhysicalFilterScanBase` | `src/executor/operator/physical_scan/physical_filter_scan_base.cppm` | mapped | executor 的物理算子/管线
+| 136 | `PhysicalIndexScan` | `src/executor/operator/physical_scan/physical_index_scan.cppm` | mapped | executor 的物理算子/管线
 | 137 | `PhysicalKnnScan` | `src/executor/operator/physical_scan/physical_knn_scan.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 138 | `PhysicalMatchSparseScan` | `src/executor/operator/physical_scan/physical_match_sparse_scan.cppm` | mapped | executor 的物理算子/管线 
+| 138 | `PhysicalMatchSparseScan` | `src/executor/operator/physical_scan/physical_match_sparse_scan.cppm` | mapped | executor 的物理算子/管线
 | 139 | `PhysicalMatchTensorScan` | `src/executor/operator/physical_scan/physical_match_tensor_scan.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 140 | `PhysicalMergeKnn` | `src/executor/operator/physical_scan/physical_merge_knn.cppm` | mapped | executor 的物理算子/管线 
-| 141 | `PhysicalMergeMatchSparse` | `src/executor/operator/physical_scan/physical_merge_match_sparse.cppm` | mapped | executor 的物理算子/管线 
-| 142 | `PhysicalMergeMatchTensor` | `src/executor/operator/physical_scan/physical_merge_match_tensor.cppm` | mapped | executor 的物理算子/管线 
-| 143 | `PhysicalScanBase` | `src/executor/operator/physical_scan/physical_scan_base.cppm` | mapped | executor 的物理算子/管线 
-| 144 | `PhysicalTableScan` | `src/executor/operator/physical_scan/physical_table_scan.cppm` | mapped | executor 的物理算子/管线 
-| 145 | `PhysicalShow` | `src/executor/operator/physical_show/physical_show.cppm` | mapped | executor 的物理算子/管线 
-| 146 | `PhysicalSink` | `src/executor/operator/physical_sink.cppm` | mapped | executor 的物理算子/管线 
-| 147 | `PhysicalSort` | `src/executor/operator/physical_sort.cppm` | mapped | executor 的物理算子/管线 
-| 148 | `PhysicalSortMergeJoin` | `src/executor/operator/physical_sort_merge_join.cppm` | mapped | executor 的物理算子/管线 
-| 149 | `PhysicalSource` | `src/executor/operator/physical_source.cppm` | mapped | executor 的物理算子/管线 
-| 150 | `CompareTwoRowAndPreferLeft` | `src/executor/operator/physical_top.cppm` | mapped | executor 的物理算子/管线 
-| 151 | `PhysicalTop` | `src/executor/operator/physical_top.cppm` | mapped | executor 的物理算子/管线 
-| 152 | `TopSolver` | `src/executor/operator/physical_top.cppm` | mapped | executor 的物理算子/管线 
-| 153 | `PhysicalUnionAll` | `src/executor/operator/physical_union_all.cppm` | mapped | executor 的物理算子/管线 
-| 154 | `PhysicalUnnest` | `src/executor/operator/physical_unnest.cppm` | mapped | executor 的物理算子/管线 
-| 155 | `PhysicalUnnestAggregate` | `src/executor/operator/physical_unnest_aggregate.cppm` | mapped | executor 的物理算子/管线 
-| 156 | `PhysicalUpdate` | `src/executor/operator/physical_update.cppm` | mapped | executor 的物理算子/管线 
-| 157 | `Snapshot` | `src/executor/operator/snapshot/snapshot.cppm` | mapped | executor 的物理算子/管线 
-| 158 | `SnapshotBrief` | `src/executor/operator/snapshot/snapshot_brief.cppm` | mapped | executor 的物理算子/管线 
-| 159 | `AggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 160 | `AggregateSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 161 | `AlterOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 162 | `CheckOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 163 | `CommandOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 164 | `CompactOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 165 | `CompactSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 166 | `CreateCollectionOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 167 | `CreateDatabaseOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 168 | `CreateIndexPrepareOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 169 | `CreateTableOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 170 | `CreateViewOperatorState` | `src/executor/operator_state.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植 
-| 171 | `CrossProductOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 172 | `DeleteOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 173 | `DropCollectionOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 174 | `DropDatabaseOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 175 | `DropIndexOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 176 | `DropTableOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 177 | `DropViewOperatorState` | `src/executor/operator_state.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植 
-| 178 | `EmptySourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 179 | `ExplainOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 180 | `ExportOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 181 | `FilterOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 182 | `FlushOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 183 | `FusionOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 184 | `HashAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 185 | `HashJoinOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 186 | `HashOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 187 | `ImportOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 188 | `IndexJoinOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 189 | `IndexScanOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 190 | `IndexScanSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 191 | `InsertOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
+| 140 | `PhysicalMergeKnn` | `src/executor/operator/physical_scan/physical_merge_knn.cppm` | mapped | executor 的物理算子/管线
+| 141 | `PhysicalMergeMatchSparse` | `src/executor/operator/physical_scan/physical_merge_match_sparse.cppm` | mapped | executor 的物理算子/管线
+| 142 | `PhysicalMergeMatchTensor` | `src/executor/operator/physical_scan/physical_merge_match_tensor.cppm` | mapped | executor 的物理算子/管线
+| 143 | `PhysicalScanBase` | `src/executor/operator/physical_scan/physical_scan_base.cppm` | mapped | executor 的物理算子/管线
+| 144 | `PhysicalTableScan` | `src/executor/operator/physical_scan/physical_table_scan.cppm` | mapped | executor 的物理算子/管线
+| 145 | `PhysicalShow` | `src/executor/operator/physical_show/physical_show.cppm` | mapped | executor 的物理算子/管线
+| 146 | `PhysicalSink` | `src/executor/operator/physical_sink.cppm` | mapped | executor 的物理算子/管线
+| 147 | `PhysicalSort` | `src/executor/operator/physical_sort.cppm` | mapped | executor 的物理算子/管线
+| 148 | `PhysicalSortMergeJoin` | `src/executor/operator/physical_sort_merge_join.cppm` | mapped | executor 的物理算子/管线
+| 149 | `PhysicalSource` | `src/executor/operator/physical_source.cppm` | mapped | executor 的物理算子/管线
+| 150 | `CompareTwoRowAndPreferLeft` | `src/executor/operator/physical_top.cppm` | mapped | executor 的物理算子/管线
+| 151 | `PhysicalTop` | `src/executor/operator/physical_top.cppm` | mapped | executor 的物理算子/管线
+| 152 | `TopSolver` | `src/executor/operator/physical_top.cppm` | mapped | executor 的物理算子/管线
+| 153 | `PhysicalUnionAll` | `src/executor/operator/physical_union_all.cppm` | mapped | executor 的物理算子/管线
+| 154 | `PhysicalUnnest` | `src/executor/operator/physical_unnest.cppm` | mapped | executor 的物理算子/管线
+| 155 | `PhysicalUnnestAggregate` | `src/executor/operator/physical_unnest_aggregate.cppm` | mapped | executor 的物理算子/管线
+| 156 | `PhysicalUpdate` | `src/executor/operator/physical_update.cppm` | mapped | executor 的物理算子/管线
+| 157 | `Snapshot` | `src/executor/operator/snapshot/snapshot.cppm` | mapped | executor 的物理算子/管线
+| 158 | `SnapshotBrief` | `src/executor/operator/snapshot/snapshot_brief.cppm` | mapped | executor 的物理算子/管线
+| 159 | `AggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 160 | `AggregateSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 161 | `AlterOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 162 | `CheckOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 163 | `CommandOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 164 | `CompactOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 165 | `CompactSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 166 | `CreateCollectionOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 167 | `CreateDatabaseOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 168 | `CreateIndexPrepareOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 169 | `CreateTableOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 170 | `CreateViewOperatorState` | `src/executor/operator_state.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植
+| 171 | `CrossProductOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 172 | `DeleteOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 173 | `DropCollectionOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 174 | `DropDatabaseOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 175 | `DropIndexOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 176 | `DropTableOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 177 | `DropViewOperatorState` | `src/executor/operator_state.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植
+| 178 | `EmptySourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 179 | `ExplainOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 180 | `ExportOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 181 | `FilterOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 182 | `FlushOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 183 | `FusionOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 184 | `HashAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 185 | `HashJoinOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 186 | `HashOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 187 | `ImportOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 188 | `IndexJoinOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 189 | `IndexScanOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 190 | `IndexScanSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 191 | `InsertOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
 | 192 | `KnnScanOperatorState` | `src/executor/operator_state.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 193 | `KnnScanSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 194 | `LimitOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 195 | `MatchOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 196 | `MatchSparseScanOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 197 | `MatchSparseScanSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 198 | `MatchTensorScanOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 199 | `MatchTensorScanSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 200 | `MaterializeSinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 201 | `MergeAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 202 | `MergeHashAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 203 | `MergeHashOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 204 | `MergeJoinOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 205 | `MergeKnnOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 206 | `MergeLimitOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 207 | `MergeMatchSparseOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 208 | `MergeMatchTensorOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 209 | `MergeParallelAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 210 | `MergeSortOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 211 | `MergeTopOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 212 | `MessageSinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 213 | `NestedLoopOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
+| 193 | `KnnScanSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 194 | `LimitOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 195 | `MatchOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 196 | `MatchSparseScanOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 197 | `MatchSparseScanSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 198 | `MatchTensorScanOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 199 | `MatchTensorScanSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 200 | `MaterializeSinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 201 | `MergeAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 202 | `MergeHashAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 203 | `MergeHashOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 204 | `MergeJoinOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 205 | `MergeKnnOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 206 | `MergeLimitOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 207 | `MergeMatchSparseOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 208 | `MergeMatchTensorOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 209 | `MergeParallelAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 210 | `MergeSortOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 211 | `MergeTopOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 212 | `MessageSinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 213 | `NestedLoopOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
 | 214 | `OperatorState` | `src/executor/operator_state.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 215 | `OptimizeOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 216 | `ParallelAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 217 | `ProjectionOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 218 | `QueueSinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 219 | `QueueSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 220 | `ReadCacheState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 221 | `ResultSinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 222 | `ShowOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 223 | `SinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 224 | `SortOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 225 | `SourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 226 | `SummarySinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 227 | `TableScanOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 228 | `TableScanSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 229 | `TopOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 230 | `UnionAllOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 231 | `UnnestAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 232 | `UnnestOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 233 | `UpdateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线 
-| 234 | `OutputToDataBlockHelper` | `src/executor/physical_operator.cppm` | mapped | executor 的物理算子/管线 
-| 235 | `PhysicalCommonFunctionUsingLoadMeta` | `src/executor/physical_operator.cppm` | mapped | executor 的物理算子/管线 
+| 215 | `OptimizeOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 216 | `ParallelAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 217 | `ProjectionOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 218 | `QueueSinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 219 | `QueueSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 220 | `ReadCacheState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 221 | `ResultSinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 222 | `ShowOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 223 | `SinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 224 | `SortOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 225 | `SourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 226 | `SummarySinkState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 227 | `TableScanOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 228 | `TableScanSourceState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 229 | `TopOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 230 | `UnionAllOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 231 | `UnnestAggregateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 232 | `UnnestOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 233 | `UpdateOperatorState` | `src/executor/operator_state.cppm` | mapped | executor 的物理算子/管线
+| 234 | `OutputToDataBlockHelper` | `src/executor/physical_operator.cppm` | mapped | executor 的物理算子/管线
+| 235 | `PhysicalCommonFunctionUsingLoadMeta` | `src/executor/physical_operator.cppm` | mapped | executor 的物理算子/管线
 | 236 | `PhysicalOperator` | `src/executor/physical_operator.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 237 | `PhysicalPlanner` | `src/executor/physical_planner.cppm` | mapped | executor 的物理算子/管线 
-| 238 | `SourcePosition` | `src/expression/base_expression.cppm` | mapped | expression 
-| 239 | `BetweenExpression` | `src/expression/between_expression.cppm` | mapped | expression 
-| 240 | `CaseCheck` | `src/expression/case_expression.cppm` | mapped | expression 
-| 241 | `ConjunctionExpression` | `src/expression/conjunction_expression.cppm` | mapped | expression 
-| 242 | `FusionExpression` | `src/expression/fusion_expression.cppm` | mapped | expression 
-| 243 | `KnnExpression` | `src/expression/knn_expression.cppm` | mapped | expression 
-| 244 | `MatchExpression` | `src/expression/match_expression.cppm` | mapped | expression 
-| 245 | `MatchSparseExpression` | `src/expression/match_sparse_expression.cppm` | mapped | expression 
-| 246 | `MatchTensorExpression` | `src/expression/match_tensor_expression.cppm` | mapped | expression 
-| 247 | `SearchExpression` | `src/expression/search_expression.cppm` | mapped | expression 
-| 248 | `SubqueryExpression` | `src/expression/subquery_expression.cppm` | mapped | expression 
-| 249 | `UnnestExpression` | `src/expression/unnest_expression.cppm` | mapped | expression 
-| 250 | `AggregateFunction` | `src/function/aggregate_function.cppm` | mapped | expression 
-| 251 | `AggregateFunctionSet` | `src/function/aggregate_function_set.cppm` | mapped | expression 
-| 252 | `BuiltinFunctions` | `src/function/builtin_functions.cppm` | mapped | expression 
-| 253 | `BitmapTryCastToVarlen` | `src/function/cast/bitmap_cast.cppm` | mapped | expression 
-| 254 | `TryCastBoolean` | `src/function/cast/bool_cast.cppm` | mapped | expression 
-| 255 | `BoundCastFunc` | `src/function/cast/bound_cast_func.cppm` | mapped | expression 
-| 256 | `CastParameters` | `src/function/cast/bound_cast_func.cppm` | mapped | expression 
-| 257 | `CastFunction` | `src/function/cast/cast_function.cppm` | mapped | expression 
-| 258 | `CastTable` | `src/function/cast/cast_table.cppm` | mapped | expression 
-| 259 | `ColumnVectorCast` | `src/function/cast/column_vector_cast.cppm` | mapped | expression 
-| 260 | `DateTryCastToFixlen` | `src/function/cast/date_cast.cppm` | mapped | expression 
-| 261 | `DateTryCastToVarlen` | `src/function/cast/date_cast.cppm` | mapped | expression 
-| 262 | `DateTimeTryCastToFixlen` | `src/function/cast/datetime_cast.cppm` | mapped | expression 
-| 263 | `DateTimeTryCastToVarlen` | `src/function/cast/datetime_cast.cppm` | mapped | expression 
-| 264 | `DecimalTryCastToFixlen` | `src/function/cast/decimal_cast.cppm` | mapped | expression 
-| 265 | `DecimalTryCastToVarlen` | `src/function/cast/decimal_cast.cppm` | mapped | expression 
-| 266 | `EmbeddingTryCastToFixlen` | `src/function/cast/embedding_cast.cppm` | mapped | expression 
-| 267 | `FloatTryCastToFixlen` | `src/function/cast/float_cast.cppm` | mapped | expression 
-| 268 | `FloatTryCastToVarlen` | `src/function/cast/float_cast.cppm` | mapped | expression 
-| 269 | `GeographyTryCastToVarlen` | `src/function/cast/geography_cast.cppm` | mapped | expression 
-| 270 | `IntegerTryCastToFixlen` | `src/function/cast/integer_cast.cppm` | mapped | expression 
-| 271 | `IntegerTryCastToVarlen` | `src/function/cast/integer_cast.cppm` | mapped | expression 
-| 272 | `IntervalTryCastToVarlen` | `src/function/cast/interval_cast.cppm` | mapped | expression 
-| 273 | `TimeTryCastToVarlen` | `src/function/cast/time_cast.cppm` | mapped | expression 
-| 274 | `TimestampTryCastToFixlen` | `src/function/cast/timestamp_cast.cppm` | mapped | expression 
-| 275 | `TimestampTryCastToVarlen` | `src/function/cast/timestamp_cast.cppm` | mapped | expression 
-| 276 | `UuidTryCastToVarlen` | `src/function/cast/uuid_cast.cppm` | mapped | expression 
-| 277 | `TryCastVarchar` | `src/function/cast/varchar_cast.cppm` | mapped | expression 
-| 278 | `TryCastVarcharToChar` | `src/function/cast/varchar_cast.cppm` | mapped | expression 
-| 279 | `TryCastVarcharToVarchar` | `src/function/cast/varchar_cast.cppm` | mapped | expression 
-| 280 | `TryCastVarcharVector` | `src/function/cast/varchar_cast.cppm` | mapped | expression 
-| 281 | `TryCastVarcharVectorToJson` | `src/function/cast/varchar_cast.cppm` | mapped | expression 
-| 282 | `Function` | `src/function/function.cppm` | mapped | expression 
-| 283 | `FunctionData` | `src/function/function_data.cppm` | mapped | expression 
-| 284 | `FunctionSet` | `src/function/function_set.cppm` | mapped | expression 
-| 285 | `EncodingAccumulator` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression 
-| 286 | `EncodingPipeline` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression 
-| 287 | `FixedDimensionalEncodingConfig` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression 
-| 288 | `HashPartitioner` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression 
-| 289 | `RandomGenerator` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression 
-| 290 | `SparseProjector` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression 
-| 291 | `Tensor` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression 
-| 292 | `NewCatalog` | `src/function/scalar/modulo.cppm` | mapped | expression 
-| 293 | `ScalarFunction` | `src/function/scalar_function.cppm` | mapped | `expression::scalar::ScalarFunction` 
-| 294 | `ScalarFunctionSet` | `src/function/scalar_function_set.cppm` | mapped | `expression::scalar::ScalarFunctionSet` 
-| 295 | `SpecialFunction` | `src/function/special_function.cppm` | mapped | expression 
-| 296 | `CompactSegmentData` | `src/function/table/compact_state_data.cppm` | mapped | expression 
-| 297 | `CompactStateData` | `src/function/table/compact_state_data.cppm` | mapped | expression 
-| 298 | `RowIDRemap` | `src/function/table/compact_state_data.cppm` | mapped | expression 
-| 299 | `CreateIndexSharedData` | `src/function/table/create_index_data.cppm` | mapped | expression 
-| 300 | `AppendFilter` | `src/function/table/knn_filter.cppm` | mapped | expression 
-| 301 | `BitmaskFilter` | `src/function/table/knn_filter.cppm` | mapped | expression 
-| 302 | `KnnDistance1` | `src/function/table/knn_scan_data.cppm` | mapped | expression 
-| 303 | `KnnDistanceBase1` | `src/function/table/knn_scan_data.cppm` | mapped | expression 
-| 304 | `KnnScanFunctionData` | `src/function/table/knn_scan_data.cppm` | mapped | expression 
+| 237 | `PhysicalPlanner` | `src/executor/physical_planner.cppm` | mapped | executor 的物理算子/管线
+| 238 | `SourcePosition` | `src/expression/base_expression.cppm` | mapped | expression
+| 239 | `BetweenExpression` | `src/expression/between_expression.cppm` | mapped | expression
+| 240 | `CaseCheck` | `src/expression/case_expression.cppm` | mapped | expression
+| 241 | `ConjunctionExpression` | `src/expression/conjunction_expression.cppm` | mapped | expression
+| 242 | `FusionExpression` | `src/expression/fusion_expression.cppm` | mapped | expression
+| 243 | `KnnExpression` | `src/expression/knn_expression.cppm` | mapped | expression
+| 244 | `MatchExpression` | `src/expression/match_expression.cppm` | mapped | expression
+| 245 | `MatchSparseExpression` | `src/expression/match_sparse_expression.cppm` | mapped | expression
+| 246 | `MatchTensorExpression` | `src/expression/match_tensor_expression.cppm` | mapped | expression
+| 247 | `SearchExpression` | `src/expression/search_expression.cppm` | mapped | expression
+| 248 | `SubqueryExpression` | `src/expression/subquery_expression.cppm` | mapped | expression
+| 249 | `UnnestExpression` | `src/expression/unnest_expression.cppm` | mapped | expression
+| 250 | `AggregateFunction` | `src/function/aggregate_function.cppm` | mapped | expression
+| 251 | `AggregateFunctionSet` | `src/function/aggregate_function_set.cppm` | mapped | expression
+| 252 | `BuiltinFunctions` | `src/function/builtin_functions.cppm` | mapped | expression
+| 253 | `BitmapTryCastToVarlen` | `src/function/cast/bitmap_cast.cppm` | mapped | expression
+| 254 | `TryCastBoolean` | `src/function/cast/bool_cast.cppm` | mapped | expression
+| 255 | `BoundCastFunc` | `src/function/cast/bound_cast_func.cppm` | mapped | expression
+| 256 | `CastParameters` | `src/function/cast/bound_cast_func.cppm` | mapped | expression
+| 257 | `CastFunction` | `src/function/cast/cast_function.cppm` | mapped | expression
+| 258 | `CastTable` | `src/function/cast/cast_table.cppm` | mapped | expression
+| 259 | `ColumnVectorCast` | `src/function/cast/column_vector_cast.cppm` | mapped | expression
+| 260 | `DateTryCastToFixlen` | `src/function/cast/date_cast.cppm` | mapped | expression
+| 261 | `DateTryCastToVarlen` | `src/function/cast/date_cast.cppm` | mapped | expression
+| 262 | `DateTimeTryCastToFixlen` | `src/function/cast/datetime_cast.cppm` | mapped | expression
+| 263 | `DateTimeTryCastToVarlen` | `src/function/cast/datetime_cast.cppm` | mapped | expression
+| 264 | `DecimalTryCastToFixlen` | `src/function/cast/decimal_cast.cppm` | mapped | expression
+| 265 | `DecimalTryCastToVarlen` | `src/function/cast/decimal_cast.cppm` | mapped | expression
+| 266 | `EmbeddingTryCastToFixlen` | `src/function/cast/embedding_cast.cppm` | mapped | expression
+| 267 | `FloatTryCastToFixlen` | `src/function/cast/float_cast.cppm` | mapped | expression
+| 268 | `FloatTryCastToVarlen` | `src/function/cast/float_cast.cppm` | mapped | expression
+| 269 | `GeographyTryCastToVarlen` | `src/function/cast/geography_cast.cppm` | mapped | expression
+| 270 | `IntegerTryCastToFixlen` | `src/function/cast/integer_cast.cppm` | mapped | expression
+| 271 | `IntegerTryCastToVarlen` | `src/function/cast/integer_cast.cppm` | mapped | expression
+| 272 | `IntervalTryCastToVarlen` | `src/function/cast/interval_cast.cppm` | mapped | expression
+| 273 | `TimeTryCastToVarlen` | `src/function/cast/time_cast.cppm` | mapped | expression
+| 274 | `TimestampTryCastToFixlen` | `src/function/cast/timestamp_cast.cppm` | mapped | expression
+| 275 | `TimestampTryCastToVarlen` | `src/function/cast/timestamp_cast.cppm` | mapped | expression
+| 276 | `UuidTryCastToVarlen` | `src/function/cast/uuid_cast.cppm` | mapped | expression
+| 277 | `TryCastVarchar` | `src/function/cast/varchar_cast.cppm` | mapped | expression
+| 278 | `TryCastVarcharToChar` | `src/function/cast/varchar_cast.cppm` | mapped | expression
+| 279 | `TryCastVarcharToVarchar` | `src/function/cast/varchar_cast.cppm` | mapped | expression
+| 280 | `TryCastVarcharVector` | `src/function/cast/varchar_cast.cppm` | mapped | expression
+| 281 | `TryCastVarcharVectorToJson` | `src/function/cast/varchar_cast.cppm` | mapped | expression
+| 282 | `Function` | `src/function/function.cppm` | mapped | expression
+| 283 | `FunctionData` | `src/function/function_data.cppm` | mapped | expression
+| 284 | `FunctionSet` | `src/function/function_set.cppm` | mapped | expression
+| 285 | `EncodingAccumulator` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression
+| 286 | `EncodingPipeline` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression
+| 287 | `FixedDimensionalEncodingConfig` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression
+| 288 | `HashPartitioner` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression
+| 289 | `RandomGenerator` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression
+| 290 | `SparseProjector` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression
+| 291 | `Tensor` | `src/function/scalar/fixed_dimensional_encoding.cppm` | mapped | expression
+| 292 | `NewCatalog` | `src/function/scalar/modulo.cppm` | mapped | expression
+| 293 | `ScalarFunction` | `src/function/scalar_function.cppm` | mapped | `expression::scalar::ScalarFunction`
+| 294 | `ScalarFunctionSet` | `src/function/scalar_function_set.cppm` | mapped | `expression::scalar::ScalarFunctionSet`
+| 295 | `SpecialFunction` | `src/function/special_function.cppm` | mapped | expression
+| 296 | `CompactSegmentData` | `src/function/table/compact_state_data.cppm` | mapped | expression
+| 297 | `CompactStateData` | `src/function/table/compact_state_data.cppm` | mapped | expression
+| 298 | `RowIDRemap` | `src/function/table/compact_state_data.cppm` | mapped | expression
+| 299 | `CreateIndexSharedData` | `src/function/table/create_index_data.cppm` | mapped | expression
+| 300 | `AppendFilter` | `src/function/table/knn_filter.cppm` | mapped | expression
+| 301 | `BitmaskFilter` | `src/function/table/knn_filter.cppm` | mapped | expression
+| 302 | `KnnDistance1` | `src/function/table/knn_scan_data.cppm` | mapped | expression
+| 303 | `KnnDistanceBase1` | `src/function/table/knn_scan_data.cppm` | mapped | expression
+| 304 | `KnnScanFunctionData` | `src/function/table/knn_scan_data.cppm` | mapped | expression
 | 305 | `KnnScanSharedData` | `src/function/table/knn_scan_data.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 306 | `MatchSparseScanFunctionData` | `src/function/table/match_sparse_scan_data.cppm` | mapped | expression 
-| 307 | `MergeSparseFunctionData` | `src/function/table/match_sparse_scan_data.cppm` | mapped | expression 
-| 308 | `SparseBitDistance` | `src/function/table/match_sparse_scan_data.cppm` | mapped | expression 
-| 309 | `SparseDistance` | `src/function/table/match_sparse_scan_data.cppm` | mapped | expression 
-| 310 | `SparseDistanceBase` | `src/function/table/match_sparse_scan_data.cppm` | mapped | expression 
-| 311 | `MatchTensorScanFunctionData` | `src/function/table/match_tensor_scan_data.cppm` | mapped | expression 
-| 312 | `MergeKnnFunctionData` | `src/function/table/merge_knn_data.cppm` | mapped | expression 
-| 313 | `TableScanFunctionData` | `src/function/table/table_scan_data.cppm` | mapped | expression 
-| 314 | `TableFunctionData` | `src/function/table_function.cppm` | mapped | expression 
-| 315 | `ClusterManager` | `src/main/cluster_manager.cppm` | mapped | server 的集群/成员管理 
+| 306 | `MatchSparseScanFunctionData` | `src/function/table/match_sparse_scan_data.cppm` | mapped | expression
+| 307 | `MergeSparseFunctionData` | `src/function/table/match_sparse_scan_data.cppm` | mapped | expression
+| 308 | `SparseBitDistance` | `src/function/table/match_sparse_scan_data.cppm` | mapped | expression
+| 309 | `SparseDistance` | `src/function/table/match_sparse_scan_data.cppm` | mapped | expression
+| 310 | `SparseDistanceBase` | `src/function/table/match_sparse_scan_data.cppm` | mapped | expression
+| 311 | `MatchTensorScanFunctionData` | `src/function/table/match_tensor_scan_data.cppm` | mapped | expression
+| 312 | `MergeKnnFunctionData` | `src/function/table/merge_knn_data.cppm` | mapped | expression
+| 313 | `TableScanFunctionData` | `src/function/table/table_scan_data.cppm` | mapped | expression
+| 314 | `TableFunctionData` | `src/function/table_function.cppm` | mapped | expression
+| 315 | `ClusterManager` | `src/main/cluster_manager.cppm` | mapped | server 的集群/成员管理
 | 316 | `Config` | `src/main/config.cppm` | mapped | `cli::config::Config`（`Init`/`Set`/访问器/校验） |
 | 317 | `DefaultConfig` | `src/main/config.cppm` | mapped | `cli::config::Config::default` + `init(None)` |
-| 318 | `Infinity` | `src/main/infinity.cppm` | mapped | server / cli 启动汇编 
+| 318 | `Infinity` | `src/main/infinity.cppm` | mapped | server / cli 启动汇编
 | 319 | `InfinityContext` | `src/main/infinity_context.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 320 | `Logger` | `src/main/logger.cppm` | mapped | tracing 
-| 321 | `LoggerConfig` | `src/main/logger.cppm` | mapped | tracing 
-| 322 | `BaseOption` | `src/main/options.cppm` | mapped | cli::config 
-| 323 | `BooleanOption` | `src/main/options.cppm` | mapped | cli::config 
-| 324 | `FloatOption` | `src/main/options.cppm` | mapped | cli::config 
-| 325 | `FlushOption` | `src/main/options.cppm` | mapped | cli::config 
-| 326 | `GlobalOptions` | `src/main/options.cppm` | mapped | cli::config 
-| 327 | `IntegerOption` | `src/main/options.cppm` | mapped | cli::config 
-| 328 | `LogLevelOption` | `src/main/options.cppm` | mapped | cli::config 
-| 329 | `StringOption` | `src/main/options.cppm` | mapped | cli::config 
+| 320 | `Logger` | `src/main/logger.cppm` | mapped | tracing
+| 321 | `LoggerConfig` | `src/main/logger.cppm` | mapped | tracing
+| 322 | `BaseOption` | `src/main/options.cppm` | mapped | cli::config
+| 323 | `BooleanOption` | `src/main/options.cppm` | mapped | cli::config
+| 324 | `FloatOption` | `src/main/options.cppm` | mapped | cli::config
+| 325 | `FlushOption` | `src/main/options.cppm` | mapped | cli::config
+| 326 | `GlobalOptions` | `src/main/options.cppm` | mapped | cli::config
+| 327 | `IntegerOption` | `src/main/options.cppm` | mapped | cli::config
+| 328 | `LogLevelOption` | `src/main/options.cppm` | mapped | cli::config
+| 329 | `StringOption` | `src/main/options.cppm` | mapped | cli::config
 | 330 | `BaseProfiler` | `src/main/profiler.cppm` | mapped | `executor::profiler::BaseProfiler`（Begin/End/Elapsed/ElapsedToString/BeginTime/EndTime） |
 | 331 | `OptimizerProfiler` | `src/main/profiler.cppm` | mapped | `profiler::OptimizerProfiler`（StartRule/StopRule/ToString） |
 | 332 | `ProfileHistory` | `src/main/profiler.cppm` | mapped | `profiler::ProfileHistory`（Resize/Enqueue/GetElement/GetElements） |
 | 333 | `QueryProfiler` | `src/main/profiler.cppm` | mapped | `profiler::QueryProfiler`（StartPhase/StopPhase/Stop/Flush/ToString/QueryPhaseToString/GetTaskProfile） |
 | 334 | `TaskBinding` | `src/main/profiler.cppm` | mapped | `profiler::TaskBinding` |
 | 335 | `TaskProfiler` | `src/main/profiler.cppm` | mapped | `profiler::TaskProfiler`（Begin/End/StartOperator/StopOperator） |
-| 336 | `QueryContext` | `src/main/query_context.cppm` | mapped | server 的会话上下文 
-| 337 | `AlterIndexOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions 
-| 338 | `CreateDatabaseOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions 
-| 339 | `CreateIndexOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions 
-| 340 | `CreateTableOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions 
-| 341 | `DropDatabaseOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions 
-| 342 | `DropIndexOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions 
-| 343 | `DropTableOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions 
-| 344 | `ExportOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions 
-| 345 | `ImportOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions 
-| 346 | `BaseResult` | `src/main/query_result.cppm` | mapped | executor::QueryResult 
-| 347 | `QueryResult` | `src/main/query_result.cppm` | mapped | executor::QueryResult 
-| 348 | `ResourceManager` | `src/main/resource_manager.cppm` | mapped | common 资源计费 + executor 
-| 349 | `BaseSession` | `src/main/session.cppm` | mapped | server 的会话 
-| 350 | `LocalSession` | `src/main/session.cppm` | mapped | server 的会话 
-| 351 | `RemoteSession` | `src/main/session.cppm` | mapped | server 的会话 
-| 352 | `QueryInfo` | `src/main/session_manager.cppm` | mapped | server 的会话 
-| 353 | `SessionManager` | `src/main/session_manager.cppm` | mapped | server 的会话 
+| 336 | `QueryContext` | `src/main/query_context.cppm` | mapped | server 的会话上下文
+| 337 | `AlterIndexOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions
+| 338 | `CreateDatabaseOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions
+| 339 | `CreateIndexOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions
+| 340 | `CreateTableOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions
+| 341 | `DropDatabaseOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions
+| 342 | `DropIndexOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions
+| 343 | `DropTableOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions
+| 344 | `ExportOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions
+| 345 | `ImportOptions` | `src/main/query_options.cppm` | mapped | parser 的 SearchOptions
+| 346 | `BaseResult` | `src/main/query_result.cppm` | mapped | executor::QueryResult
+| 347 | `QueryResult` | `src/main/query_result.cppm` | mapped | executor::QueryResult
+| 348 | `ResourceManager` | `src/main/resource_manager.cppm` | mapped | common 资源计费 + executor
+| 349 | `BaseSession` | `src/main/session.cppm` | mapped | server 的会话
+| 350 | `LocalSession` | `src/main/session.cppm` | mapped | server 的会话
+| 351 | `RemoteSession` | `src/main/session.cppm` | mapped | server 的会话
+| 352 | `QueryInfo` | `src/main/session_manager.cppm` | mapped | server 的会话
+| 353 | `SessionManager` | `src/main/session_manager.cppm` | mapped | server 的会话
 | 354 | `VarUtil` | `src/main/variables.cppm` | mapped | `executor::variables::{GlobalVariable, SessionVariable}::from_name` |
-| 355 | `SystemInfo` | `src/metrics/system_info.cppm` | mapped | server 的 metrics 
-| 356 | `BufferReader` | `src/network/buffer_reader.cppm` | mapped | server 
-| 357 | `BufferWriter` | `src/network/buffer_writer.cppm` | mapped | server 
-| 358 | `Connection` | `src/network/connection.cppm` | mapped | server 
-| 359 | `HTTPSearch` | `src/network/http/http_search.cppm` | mapped | server 
-| 360 | `HTTPServer` | `src/network/http_server.cppm` | mapped | server 
-| 361 | `InfinityThriftService` | `src/network/infinity_thrift_service.cppm` | mapped | server 
-| 362 | `NodeInfo` | `src/network/node_info.cppm` | mapped | server 
-| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 366 | `PeerTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | mapped | `server::pg::PGProtocolHandler` / `PgServer`（有启动/命令/响应帧单测） 
-| 374 | `PGServer` | `src/network/pg_server.cppm` | mapped | `server::pg::PGProtocolHandler` / `PgServer`（有启动/命令/响应帧单测） 
-| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明） 
-| 376 | `NonBlockPoolThriftServer` | `src/network/thrift_server.cppm` | mapped | server 
-| 377 | `PoolThriftServer` | `src/network/thrift_server.cppm` | mapped | server 
-| 378 | `ThreadedThriftServer` | `src/network/thrift_server.cppm` | mapped | server 
-| 379 | `BindContext` | `src/planner/bind_context.cppm` | mapped | planner 
-| 380 | `CommonTableExpressionInfo` | `src/planner/bind_context.cppm` | mapped | planner 
-| 381 | `ExpressionBinder` | `src/planner/bind_context.cppm` | mapped | planner 
-| 382 | `BindAliasProxy` | `src/planner/binder/bind_alias_proxy.cppm` | mapped | planner 
-| 383 | `GroupBinder` | `src/planner/binder/group_binder.cppm` | mapped | planner 
-| 384 | `HavingBinder` | `src/planner/binder/having_binder.cppm` | mapped | planner 
-| 385 | `InsertBinder` | `src/planner/binder/insert_binder.cppm` | mapped | planner 
-| 386 | `JoinBinder` | `src/planner/binder/join_binder.cppm` | mapped | planner 
-| 387 | `LimitBinder` | `src/planner/binder/limit_binder.cppm` | mapped | planner 
-| 388 | `OrderBinder` | `src/planner/binder/order_binder.cppm` | mapped | planner 
-| 389 | `ProjectBinder` | `src/planner/binder/project_binder.cppm` | mapped | planner 
-| 390 | `WhereBinder` | `src/planner/binder/where_binder.cppm` | mapped | planner 
-| 391 | `Binding` | `src/planner/binding.cppm` | mapped | planner 
-| 392 | `BaseTableRef` | `src/planner/bound/base_table_ref.cppm` | mapped | planner 
-| 393 | `CrossProductTableRef` | `src/planner/bound/cross_product_table_ref.cppm` | mapped | planner 
-| 394 | `JoinTableRef` | `src/planner/bound/join_table_ref.cppm` | mapped | planner 
-| 395 | `SubqueryTableRef` | `src/planner/bound/subquery_table_ref.cppm` | mapped | planner 
-| 396 | `TableRef` | `src/planner/bound/table_ref.cppm` | mapped | planner 
-| 397 | `BoundCompactStatement` | `src/planner/bound_compact_statement.cppm` | mapped | planner 
-| 398 | `BoundDeleteStatement` | `src/planner/bound_delete_statement.cppm` | mapped | planner 
-| 399 | `BoundInsertStatement` | `src/planner/bound_insert_statement.cppm` | mapped | planner 
-| 400 | `BoundSelectStatement` | `src/planner/bound_select_statement.cppm` | mapped | planner 
-| 401 | `BoundStatement` | `src/planner/bound_statement.cppm` | mapped | planner 
-| 402 | `BoundUpdateStatement` | `src/planner/bound_update_statement.cppm` | mapped | planner 
-| 403 | `CachedIndexScan` | `src/planner/cached_node/cached_index_scan.cppm` | mapped | planner 
-| 404 | `CachedMatch` | `src/planner/cached_node/cached_match.cppm` | mapped | planner 
-| 405 | `CachedKnnScan` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner 
-| 406 | `CachedMatchScanBase` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner 
-| 407 | `CachedMatchSparseScan` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner 
-| 408 | `CachedMatchTensorScan` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner 
+| 355 | `SystemInfo` | `src/metrics/system_info.cppm` | mapped | server 的 metrics
+| 356 | `BufferReader` | `src/network/buffer_reader.cppm` | mapped | server
+| 357 | `BufferWriter` | `src/network/buffer_writer.cppm` | mapped | server
+| 358 | `Connection` | `src/network/connection.cppm` | mapped | server
+| 359 | `HTTPSearch` | `src/network/http/http_search.cppm` | mapped | server
+| 360 | `HTTPServer` | `src/network/http_server.cppm` | mapped | server
+| 361 | `InfinityThriftService` | `src/network/infinity_thrift_service.cppm` | mapped | server
+| 362 | `NodeInfo` | `src/network/node_info.cppm` | mapped | server
+| 363 | `PeerServerThriftService` | `src/network/peer_server_thrift_service.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 364 | `ChangeRoleTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 365 | `HeartBeatPeerTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 366 | `PeerTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 367 | `RegisterPeerTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 368 | `SyncLogTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 369 | `TerminatePeerTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 370 | `UnregisterPeerTask` | `src/network/peer_task.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 371 | `PeerClient` | `src/network/peer_thrift_client.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 372 | `PoolPeerThriftServer` | `src/network/peer_thrift_server.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 373 | `PGProtocolHandler` | `src/network/pg_protocol_handler.cppm` | mapped | `server::pg::PGProtocolHandler` / `PgServer`（有启动/命令/响应帧单测）
+| 374 | `PGServer` | `src/network/pg_server.cppm` | mapped | `server::pg::PGProtocolHandler` / `PgServer`（有启动/命令/响应帧单测）
+| 375 | `RingBufferIterator` | `src/network/ring_buffer_iterator.cppm` | mapped | `server::{peer,ring_buffer}`，经 `PeerManager` 挂到 `Server`；传输为进程内模拟（无 Thrift/TCP 线路，已注明）
+| 376 | `NonBlockPoolThriftServer` | `src/network/thrift_server.cppm` | mapped | server
+| 377 | `PoolThriftServer` | `src/network/thrift_server.cppm` | mapped | server
+| 378 | `ThreadedThriftServer` | `src/network/thrift_server.cppm` | mapped | server
+| 379 | `BindContext` | `src/planner/bind_context.cppm` | mapped | planner
+| 380 | `CommonTableExpressionInfo` | `src/planner/bind_context.cppm` | mapped | planner
+| 381 | `ExpressionBinder` | `src/planner/bind_context.cppm` | mapped | planner
+| 382 | `BindAliasProxy` | `src/planner/binder/bind_alias_proxy.cppm` | mapped | planner
+| 383 | `GroupBinder` | `src/planner/binder/group_binder.cppm` | mapped | planner
+| 384 | `HavingBinder` | `src/planner/binder/having_binder.cppm` | mapped | planner
+| 385 | `InsertBinder` | `src/planner/binder/insert_binder.cppm` | mapped | planner
+| 386 | `JoinBinder` | `src/planner/binder/join_binder.cppm` | mapped | planner
+| 387 | `LimitBinder` | `src/planner/binder/limit_binder.cppm` | mapped | planner
+| 388 | `OrderBinder` | `src/planner/binder/order_binder.cppm` | mapped | planner
+| 389 | `ProjectBinder` | `src/planner/binder/project_binder.cppm` | mapped | planner
+| 390 | `WhereBinder` | `src/planner/binder/where_binder.cppm` | mapped | planner
+| 391 | `Binding` | `src/planner/binding.cppm` | mapped | planner
+| 392 | `BaseTableRef` | `src/planner/bound/base_table_ref.cppm` | mapped | planner
+| 393 | `CrossProductTableRef` | `src/planner/bound/cross_product_table_ref.cppm` | mapped | planner
+| 394 | `JoinTableRef` | `src/planner/bound/join_table_ref.cppm` | mapped | planner
+| 395 | `SubqueryTableRef` | `src/planner/bound/subquery_table_ref.cppm` | mapped | planner
+| 396 | `TableRef` | `src/planner/bound/table_ref.cppm` | mapped | planner
+| 397 | `BoundCompactStatement` | `src/planner/bound_compact_statement.cppm` | mapped | planner
+| 398 | `BoundDeleteStatement` | `src/planner/bound_delete_statement.cppm` | mapped | planner
+| 399 | `BoundInsertStatement` | `src/planner/bound_insert_statement.cppm` | mapped | planner
+| 400 | `BoundSelectStatement` | `src/planner/bound_select_statement.cppm` | mapped | planner
+| 401 | `BoundStatement` | `src/planner/bound_statement.cppm` | mapped | planner
+| 402 | `BoundUpdateStatement` | `src/planner/bound_update_statement.cppm` | mapped | planner
+| 403 | `CachedIndexScan` | `src/planner/cached_node/cached_index_scan.cppm` | mapped | planner
+| 404 | `CachedMatch` | `src/planner/cached_node/cached_match.cppm` | mapped | planner
+| 405 | `CachedKnnScan` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner
+| 406 | `CachedMatchScanBase` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner
+| 407 | `CachedMatchSparseScan` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner
+| 408 | `CachedMatchTensorScan` | `src/planner/cached_node/cached_match_scan.cppm` | mapped | planner
 | 409 | `CachedNodeBase` | `src/planner/cached_node/cached_node_base.cppm` | mapped | `storage::result_cache_manager::CachedNode`（Hash/Eq/output_names/type） |
 | 410 | `CachedScanBase` | `src/planner/cached_node/cached_scan_base.cppm` | mapped | `result_cache::CachedNode` 的 `schema_name`/`table_name` |
-| 411 | `ColumnBinding` | `src/planner/column_binding.cppm` | mapped | planner 
-| 412 | `ColumnIdentifier` | `src/planner/column_identifier.cppm` | mapped | planner 
-| 413 | `ExplainAST` | `src/planner/explain_ast.cppm` | mapped | planner 
-| 414 | `ExplainLogicalPlan` | `src/planner/explain_logical_plan.cppm` | mapped | planner 
-| 415 | `LoadMeta` | `src/planner/load_meta.cppm` | mapped | planner 
-| 416 | `LogicalCommonFunctionUsingLoadMeta` | `src/planner/logical_node.cppm` | mapped | planner 
-| 417 | `LogicalNode` | `src/planner/logical_node.cppm` | mapped | planner 
-| 418 | `LogicalNodeVisitor` | `src/planner/logical_node_visitor.cppm` | mapped | planner 
-| 419 | `LogicalPlanner` | `src/planner/logical_planner.cppm` | mapped | planner 
-| 420 | `LogicalAggregate` | `src/planner/node/logical_aggregate.cppm` | mapped | planner 
-| 421 | `LogicalAddColumns` | `src/planner/node/logical_alter.cppm` | mapped | planner 
-| 422 | `LogicalAlter` | `src/planner/node/logical_alter.cppm` | mapped | planner 
-| 423 | `LogicalAlterIndex` | `src/planner/node/logical_alter.cppm` | mapped | planner 
-| 424 | `LogicalDropColumns` | `src/planner/node/logical_alter.cppm` | mapped | planner 
-| 425 | `LogicalRenameTable` | `src/planner/node/logical_alter.cppm` | mapped | planner 
-| 426 | `LogicalCheck` | `src/planner/node/logical_check.cppm` | mapped | planner 
-| 427 | `LogicalCommand` | `src/planner/node/logical_command.cppm` | mapped | planner 
-| 428 | `LogicalCompact` | `src/planner/node/logical_compact.cppm` | mapped | planner 
-| 429 | `LogicalCreateCollection` | `src/planner/node/logical_create_collection.cppm` | mapped | planner 
-| 430 | `LogicalCreateIndex` | `src/planner/node/logical_create_index.cppm` | mapped | planner 
-| 431 | `LogicalCreateSchema` | `src/planner/node/logical_create_schema.cppm` | mapped | planner 
-| 432 | `LogicalCreateTable` | `src/planner/node/logical_create_table.cppm` | mapped | planner 
-| 433 | `LogicalCreateView` | `src/planner/node/logical_create_view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植 
-| 434 | `LogicalCrossProduct` | `src/planner/node/logical_cross_product.cppm` | mapped | planner 
-| 435 | `LogicalDelete` | `src/planner/node/logical_delete.cppm` | mapped | planner 
-| 436 | `LogicalDropCollection` | `src/planner/node/logical_drop_collection.cppm` | mapped | planner 
-| 437 | `LogicalDropIndex` | `src/planner/node/logical_drop_index.cppm` | mapped | planner 
-| 438 | `LogicalDropSchema` | `src/planner/node/logical_drop_schema.cppm` | mapped | planner 
-| 439 | `LogicalDropTable` | `src/planner/node/logical_drop_table.cppm` | mapped | planner 
-| 440 | `LogicalDropView` | `src/planner/node/logical_drop_view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植 
-| 441 | `LogicalDummyScan` | `src/planner/node/logical_dummy_scan.cppm` | mapped | planner 
-| 442 | `LogicalExplain` | `src/planner/node/logical_explain.cppm` | mapped | planner 
-| 443 | `LogicalExport` | `src/planner/node/logical_export.cppm` | mapped | planner 
-| 444 | `LogicalFilter` | `src/planner/node/logical_filter.cppm` | mapped | planner 
-| 445 | `LogicalFlush` | `src/planner/node/logical_flush.cppm` | mapped | planner 
-| 446 | `LogicalFusion` | `src/planner/node/logical_fusion.cppm` | mapped | planner 
-| 447 | `LogicalHashAggregate` | `src/planner/node/logical_hash_aggregate.cppm` | mapped | planner 
-| 448 | `LogicalImport` | `src/planner/node/logical_import.cppm` | mapped | planner 
-| 449 | `LogicalIndexScan` | `src/planner/node/logical_index_scan.cppm` | mapped | planner 
-| 450 | `LogicalInsert` | `src/planner/node/logical_insert.cppm` | mapped | planner 
-| 451 | `LogicalJoin` | `src/planner/node/logical_join.cppm` | mapped | planner 
-| 452 | `LogicalLimit` | `src/planner/node/logical_limit.cppm` | mapped | planner 
-| 453 | `LogicalMatch` | `src/planner/node/logical_match.cppm` | mapped | planner 
-| 454 | `LogicalKnnScan` | `src/planner/node/logical_match_scan/logical_knn_scan.cppm` | mapped | planner 
-| 455 | `LogicalMatchScanBase` | `src/planner/node/logical_match_scan/logical_match_scan_base.cppm` | mapped | planner 
-| 456 | `LogicalMatchSparseScan` | `src/planner/node/logical_match_scan/logical_match_sparse_scan.cppm` | mapped | planner 
-| 457 | `LogicalMatchTensorScan` | `src/planner/node/logical_match_scan/logical_match_tensor_scan.cppm` | mapped | planner 
-| 458 | `MatchTensorScanIndexOptions` | `src/planner/node/logical_match_scan/logical_match_tensor_scan.cppm` | mapped | planner 
-| 459 | `LogicalMergeHashAggregate` | `src/planner/node/logical_merge_hash_aggregate.cppm` | mapped | planner 
-| 460 | `LogicalOptimize` | `src/planner/node/logical_optimize.cppm` | mapped | planner 
-| 461 | `LogicalProject` | `src/planner/node/logical_project.cppm` | mapped | planner 
+| 411 | `ColumnBinding` | `src/planner/column_binding.cppm` | mapped | planner
+| 412 | `ColumnIdentifier` | `src/planner/column_identifier.cppm` | mapped | planner
+| 413 | `ExplainAST` | `src/planner/explain_ast.cppm` | mapped | planner
+| 414 | `ExplainLogicalPlan` | `src/planner/explain_logical_plan.cppm` | mapped | planner
+| 415 | `LoadMeta` | `src/planner/load_meta.cppm` | mapped | planner
+| 416 | `LogicalCommonFunctionUsingLoadMeta` | `src/planner/logical_node.cppm` | mapped | planner
+| 417 | `LogicalNode` | `src/planner/logical_node.cppm` | mapped | planner
+| 418 | `LogicalNodeVisitor` | `src/planner/logical_node_visitor.cppm` | mapped | planner
+| 419 | `LogicalPlanner` | `src/planner/logical_planner.cppm` | mapped | planner
+| 420 | `LogicalAggregate` | `src/planner/node/logical_aggregate.cppm` | mapped | planner
+| 421 | `LogicalAddColumns` | `src/planner/node/logical_alter.cppm` | mapped | planner
+| 422 | `LogicalAlter` | `src/planner/node/logical_alter.cppm` | mapped | planner
+| 423 | `LogicalAlterIndex` | `src/planner/node/logical_alter.cppm` | mapped | planner
+| 424 | `LogicalDropColumns` | `src/planner/node/logical_alter.cppm` | mapped | planner
+| 425 | `LogicalRenameTable` | `src/planner/node/logical_alter.cppm` | mapped | planner
+| 426 | `LogicalCheck` | `src/planner/node/logical_check.cppm` | mapped | planner
+| 427 | `LogicalCommand` | `src/planner/node/logical_command.cppm` | mapped | planner
+| 428 | `LogicalCompact` | `src/planner/node/logical_compact.cppm` | mapped | planner
+| 429 | `LogicalCreateCollection` | `src/planner/node/logical_create_collection.cppm` | mapped | planner
+| 430 | `LogicalCreateIndex` | `src/planner/node/logical_create_index.cppm` | mapped | planner
+| 431 | `LogicalCreateSchema` | `src/planner/node/logical_create_schema.cppm` | mapped | planner
+| 432 | `LogicalCreateTable` | `src/planner/node/logical_create_table.cppm` | mapped | planner
+| 433 | `LogicalCreateView` | `src/planner/node/logical_create_view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植
+| 434 | `LogicalCrossProduct` | `src/planner/node/logical_cross_product.cppm` | mapped | planner
+| 435 | `LogicalDelete` | `src/planner/node/logical_delete.cppm` | mapped | planner
+| 436 | `LogicalDropCollection` | `src/planner/node/logical_drop_collection.cppm` | mapped | planner
+| 437 | `LogicalDropIndex` | `src/planner/node/logical_drop_index.cppm` | mapped | planner
+| 438 | `LogicalDropSchema` | `src/planner/node/logical_drop_schema.cppm` | mapped | planner
+| 439 | `LogicalDropTable` | `src/planner/node/logical_drop_table.cppm` | mapped | planner
+| 440 | `LogicalDropView` | `src/planner/node/logical_drop_view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植
+| 441 | `LogicalDummyScan` | `src/planner/node/logical_dummy_scan.cppm` | mapped | planner
+| 442 | `LogicalExplain` | `src/planner/node/logical_explain.cppm` | mapped | planner
+| 443 | `LogicalExport` | `src/planner/node/logical_export.cppm` | mapped | planner
+| 444 | `LogicalFilter` | `src/planner/node/logical_filter.cppm` | mapped | planner
+| 445 | `LogicalFlush` | `src/planner/node/logical_flush.cppm` | mapped | planner
+| 446 | `LogicalFusion` | `src/planner/node/logical_fusion.cppm` | mapped | planner
+| 447 | `LogicalHashAggregate` | `src/planner/node/logical_hash_aggregate.cppm` | mapped | planner
+| 448 | `LogicalImport` | `src/planner/node/logical_import.cppm` | mapped | planner
+| 449 | `LogicalIndexScan` | `src/planner/node/logical_index_scan.cppm` | mapped | planner
+| 450 | `LogicalInsert` | `src/planner/node/logical_insert.cppm` | mapped | planner
+| 451 | `LogicalJoin` | `src/planner/node/logical_join.cppm` | mapped | planner
+| 452 | `LogicalLimit` | `src/planner/node/logical_limit.cppm` | mapped | planner
+| 453 | `LogicalMatch` | `src/planner/node/logical_match.cppm` | mapped | planner
+| 454 | `LogicalKnnScan` | `src/planner/node/logical_match_scan/logical_knn_scan.cppm` | mapped | planner
+| 455 | `LogicalMatchScanBase` | `src/planner/node/logical_match_scan/logical_match_scan_base.cppm` | mapped | planner
+| 456 | `LogicalMatchSparseScan` | `src/planner/node/logical_match_scan/logical_match_sparse_scan.cppm` | mapped | planner
+| 457 | `LogicalMatchTensorScan` | `src/planner/node/logical_match_scan/logical_match_tensor_scan.cppm` | mapped | planner
+| 458 | `MatchTensorScanIndexOptions` | `src/planner/node/logical_match_scan/logical_match_tensor_scan.cppm` | mapped | planner
+| 459 | `LogicalMergeHashAggregate` | `src/planner/node/logical_merge_hash_aggregate.cppm` | mapped | planner
+| 460 | `LogicalOptimize` | `src/planner/node/logical_optimize.cppm` | mapped | planner
+| 461 | `LogicalProject` | `src/planner/node/logical_project.cppm` | mapped | planner
 | 462 | `CacheContent` | `src/planner/node/logical_read_cache.cppm` | mapped | `result_cache::CacheContent`（AppendColumns/Clone） |
-| 463 | `LogicalReadCache` | `src/planner/node/logical_read_cache.cppm` | mapped | planner 
-| 464 | `LogicalShow` | `src/planner/node/logical_show.cppm` | mapped | planner 
-| 465 | `LogicalSort` | `src/planner/node/logical_sort.cppm` | mapped | planner 
-| 466 | `LogicalTableScan` | `src/planner/node/logical_table_scan.cppm` | mapped | planner 
-| 467 | `LogicalTop` | `src/planner/node/logical_top.cppm` | mapped | planner 
-| 468 | `LogicalUnnest` | `src/planner/node/logical_unnest.cppm` | mapped | planner 
-| 469 | `LogicalUnnestAggregate` | `src/planner/node/logical_unnest_aggregate.cppm` | mapped | planner 
-| 470 | `LogicalUpdate` | `src/planner/node/logical_update.cppm` | mapped | planner 
-| 471 | `LogicalViewScan` | `src/planner/node/logical_view_scan.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植 
-| 472 | `Optimizer` | `src/planner/optimizer.cppm` | mapped | planner 
-| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | mapped | `planner::cached_node::result_cache::ResultCacheGetter::rewrite` 在 `run_plan` 里最后挂上（`result_cache` 打开时生效），键是节点形状 + `begin_ts`（同参考的 `CacheKey`），命中替换成 `Values` 节点；另有语句级结果缓存（见 §4） 
-| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过 
-| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | mapped | 计划侧保留并单测；执行侧由 `executor/src/dependent.rs` 按同一模型执行（相关列 = join key，内层按 distinct key 求值一次后拼回外层行）。参考自身没有执行算子（`JoinType::kMark` 只出现在 planner，`src/executor` 无对应实现，实测 C++ 直接 abort），因此这里的“mapped”指模型一致、执行由端口实现 
-| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | mapped | 同上：把 depth-1 列改写成可下推的列引用，端口对应“把嵌套查询改写成隐藏扫描列 `#_corr_n`” 
-| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | mapped | 同上：标量/IN/EXISTS 的 unnest 语义（mark 列 + 相关列 join）由 `dependent.rs` 执行；测试 `a_correlated_subquery_works_outside_the_where_clause`、`a_correlated_subquery_runs_once_per_distinct_key`、`a_correlated_subquery_reads_a_cte_or_joined_relation` 
+| 463 | `LogicalReadCache` | `src/planner/node/logical_read_cache.cppm` | mapped | planner
+| 464 | `LogicalShow` | `src/planner/node/logical_show.cppm` | mapped | planner
+| 465 | `LogicalSort` | `src/planner/node/logical_sort.cppm` | mapped | planner
+| 466 | `LogicalTableScan` | `src/planner/node/logical_table_scan.cppm` | mapped | planner
+| 467 | `LogicalTop` | `src/planner/node/logical_top.cppm` | mapped | planner
+| 468 | `LogicalUnnest` | `src/planner/node/logical_unnest.cppm` | mapped | planner
+| 469 | `LogicalUnnestAggregate` | `src/planner/node/logical_unnest_aggregate.cppm` | mapped | planner
+| 470 | `LogicalUpdate` | `src/planner/node/logical_update.cppm` | mapped | planner
+| 471 | `LogicalViewScan` | `src/planner/node/logical_view_scan.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植
+| 472 | `Optimizer` | `src/planner/optimizer.cppm` | mapped | planner
+| 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 475 | `ColumnRemapper` | `src/planner/optimizer/column_remapper.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 476 | `FilterExpressionPushDown` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 477 | `IndexFilterEvaluator` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 478 | `IndexScanFilterExpressionPushDownResult` | `src/planner/optimizer/index_scan/filter_expression_push_down.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 479 | `FilterExpressionPushDownHelper` | `src/planner/optimizer/index_scan/filter_expression_push_down_helper.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 480 | `IndexFilterEvaluatorAllFalse` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 481 | `IndexFilterEvaluatorAllTrue` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 482 | `IndexFilterEvaluatorFulltext` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 483 | `IndexFilterEvaluatorLogicalChildren` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 484 | `IndexFilterEvaluatorSecondary` | `src/planner/optimizer/index_scan/index_filter_evaluators.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 485 | `ExpressionInfoTree` | `src/planner/optimizer/index_scan/index_filter_expression_info_tree.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 486 | `IndexScanBuilder` | `src/planner/optimizer/index_scan_builder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 487 | `LazyLoad` | `src/planner/optimizer/lazy_load.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 488 | `RegexIndexRewrite` | `src/planner/optimizer/regex_index_rewrite.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 489 | `ResultCacheGetter` | `src/planner/optimizer/result_cache_getter.cppm` | mapped | `planner::cached_node::result_cache::ResultCacheGetter::rewrite` 在 `run_plan` 里最后挂上（`result_cache` 打开时生效），键是节点形状 + `begin_ts`（同参考的 `CacheKey`），命中替换成 `Values` 节点；另有语句级结果缓存（见 §4）
+| 490 | `OptimizerRule` | `src/planner/optimizer_rule.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 491 | `QueryBinder` | `src/planner/query_binder.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 492 | `CorrelatedExpressionsDetector` | `src/planner/subquery/correlated_expressions_detector.cppm` | mapped | 已接入 `Engine::run_select`/`plan_select`，有 plan-shape 测试；residual 谓词挂在 base scan 上，Gate A 全量通过
+| 493 | `DependentJoinFlattener` | `src/planner/subquery/dependent_join_flattener.cppm` | mapped | 计划侧保留并单测；执行侧由 `executor/src/dependent.rs` 按同一模型执行（相关列 = join key，内层按 distinct key 求值一次后拼回外层行）。参考自身没有执行算子（`JoinType::kMark` 只出现在 planner，`src/executor` 无对应实现，实测 C++ 直接 abort），因此这里的“mapped”指模型一致、执行由端口实现
+| 494 | `RewriteCorrelatedExpressions` | `src/planner/subquery/rewrite_correlated_expressions.cppm` | mapped | 同上：把 depth-1 列改写成可下推的列引用，端口对应“把嵌套查询改写成隐藏扫描列 `#_corr_n`”
+| 495 | `SubqueryUnnest` | `src/planner/subquery/subquery_unnest.cppm` | mapped | 同上：标量/IN/EXISTS 的 unnest 语义（mark 列 + 相关列 join）由 `dependent.rs` 执行；测试 `a_correlated_subquery_works_outside_the_where_clause`、`a_correlated_subquery_runs_once_per_distinct_key`、`a_correlated_subquery_reads_a_cte_or_joined_relation`
 | 496 | `FragmentContext` | `src/scheduler/fragment_context.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
-| 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
-| 499 | `ParallelStreamFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
-| 500 | `SerialMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
-| 501 | `FragmentData` | `src/scheduler/fragment_data.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
-| 502 | `FragmentDataBase` | `src/scheduler/fragment_data.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
-| 503 | `FragmentError` | `src/scheduler/fragment_data.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
-| 504 | `FragmentNone` | `src/scheduler/fragment_data.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
-| 505 | `FragmentTask` | `src/scheduler/fragment_task.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
-| 506 | `TaskResult` | `src/scheduler/task_result.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更） 
+| 497 | `Notifier` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更）
+| 498 | `ParallelMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更）
+| 499 | `ParallelStreamFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更）
+| 500 | `SerialMaterializedFragmentCtx` | `src/scheduler/fragment_context.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更）
+| 501 | `FragmentData` | `src/scheduler/fragment_data.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更）
+| 502 | `FragmentDataBase` | `src/scheduler/fragment_data.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更）
+| 503 | `FragmentError` | `src/scheduler/fragment_data.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更）
+| 504 | `FragmentNone` | `src/scheduler/fragment_data.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更）
+| 505 | `FragmentTask` | `src/scheduler/fragment_task.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更）
+| 506 | `TaskResult` | `src/scheduler/task_result.cppm` | exempt | Tokio mpsc/JoinSet 调度器（§4.4 D4 设计变更）
 | 507 | `TaskScheduler` | `src/scheduler/task_scheduler.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 508 | `BaseTable` | `src/storage/base_table.cppm` | mapped | executor 的 Engine 表 
-| 509 | `BGTaskProcessor` | `src/storage/bg_task/background_process.cppm` | mapped | executor::bg_task 
-| 510 | `AppendMemIndexBatch` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 511 | `AppendMemIndexTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 512 | `BGTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 513 | `BGTaskInfo` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 514 | `CheckpointTaskBase` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 515 | `CleanupTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
+| 508 | `BaseTable` | `src/storage/base_table.cppm` | mapped | executor 的 Engine 表
+| 509 | `BGTaskProcessor` | `src/storage/bg_task/background_process.cppm` | mapped | executor::bg_task
+| 510 | `AppendMemIndexBatch` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 511 | `AppendMemIndexTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 512 | `BGTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 513 | `BGTaskInfo` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 514 | `CheckpointTaskBase` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 515 | `CleanupTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
 | 516 | `DumpMemIndexTask` | `src/storage/bg_task/bg_task.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 517 | `ManualCompactTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 518 | `ManualOptimizeTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 519 | `NewCheckpointTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 520 | `NotifyCompactTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 521 | `NotifyOptimizeTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 522 | `StopProcessorTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 523 | `TestCommandTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task 
-| 524 | `CompactionProcessor` | `src/storage/bg_task/compaction_process.cppm` | mapped | executor::bg_task 
-| 525 | `DumpIndexProcessor` | `src/storage/bg_task/dump_index_process.cppm` | mapped | executor::bg_task 
-| 526 | `MemIndexAppender` | `src/storage/bg_task/mem_index_appender.cppm` | mapped | executor::bg_task 
-| 527 | `OptimizationProcessor` | `src/storage/bg_task/optimization_process.cppm` | mapped | executor::bg_task 
-| 528 | `CheckpointPeriodicTrigger` | `src/storage/bg_task/periodic_trigger.cppm` | mapped | executor::bg_task 
-| 529 | `CleanupPeriodicTrigger` | `src/storage/bg_task/periodic_trigger.cppm` | mapped | executor::bg_task 
-| 530 | `CompactPeriodicTrigger` | `src/storage/bg_task/periodic_trigger.cppm` | mapped | executor::bg_task 
-| 531 | `OptimizeIndexPeriodicTrigger` | `src/storage/bg_task/periodic_trigger.cppm` | mapped | executor::bg_task 
-| 532 | `PeriodicTrigger` | `src/storage/bg_task/periodic_trigger.cppm` | mapped | executor::bg_task 
-| 533 | `PeriodicTriggerThread` | `src/storage/bg_task/periodic_trigger_thread.cppm` | mapped | executor::bg_task 
-| 534 | `BuildFastRoughFilterTask` | `src/storage/bg_task/segment_sealing_tasks/build_fast_rough_filter_task.cppm` | mapped | executor::bg_task 
-| 535 | `BuildingSegmentFastFilters` | `src/storage/bg_task/segment_sealing_tasks/build_fast_rough_filter_task.cppm` | mapped | executor::bg_task 
+| 517 | `ManualCompactTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 518 | `ManualOptimizeTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 519 | `NewCheckpointTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 520 | `NotifyCompactTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 521 | `NotifyOptimizeTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 522 | `StopProcessorTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 523 | `TestCommandTask` | `src/storage/bg_task/bg_task.cppm` | mapped | executor::bg_task
+| 524 | `CompactionProcessor` | `src/storage/bg_task/compaction_process.cppm` | mapped | executor::bg_task
+| 525 | `DumpIndexProcessor` | `src/storage/bg_task/dump_index_process.cppm` | mapped | executor::bg_task
+| 526 | `MemIndexAppender` | `src/storage/bg_task/mem_index_appender.cppm` | mapped | executor::bg_task
+| 527 | `OptimizationProcessor` | `src/storage/bg_task/optimization_process.cppm` | mapped | executor::bg_task
+| 528 | `CheckpointPeriodicTrigger` | `src/storage/bg_task/periodic_trigger.cppm` | mapped | executor::bg_task
+| 529 | `CleanupPeriodicTrigger` | `src/storage/bg_task/periodic_trigger.cppm` | mapped | executor::bg_task
+| 530 | `CompactPeriodicTrigger` | `src/storage/bg_task/periodic_trigger.cppm` | mapped | executor::bg_task
+| 531 | `OptimizeIndexPeriodicTrigger` | `src/storage/bg_task/periodic_trigger.cppm` | mapped | executor::bg_task
+| 532 | `PeriodicTrigger` | `src/storage/bg_task/periodic_trigger.cppm` | mapped | executor::bg_task
+| 533 | `PeriodicTriggerThread` | `src/storage/bg_task/periodic_trigger_thread.cppm` | mapped | executor::bg_task
+| 534 | `BuildFastRoughFilterTask` | `src/storage/bg_task/segment_sealing_tasks/build_fast_rough_filter_task.cppm` | mapped | executor::bg_task
+| 535 | `BuildingSegmentFastFilters` | `src/storage/bg_task/segment_sealing_tasks/build_fast_rough_filter_task.cppm` | mapped | executor::bg_task
 | 536 | `BufferHandle` | `src/storage/buffer/buffer_handle.cppm` | dropped | 不移植：封存块直接 mmap（`mapped::MappedFile`），没有 owned buffer 就没有句柄 |
 | 537 | `BufferObj` | `src/storage/buffer/buffer_obj.cppm` | dropped | 同上；块/索引段的载荷只有映射，没有「加载进预算」的对象 |
 | 538 | `BufferManager` | `src/storage/buffer/buffer_manager.cppm` | dropped | 不移植：`Context::block_maps` 每块一个共享 `Arc<MappedBlock>`，解码直接读 page cache |
 | 539 | `BufferObjectInfo` | `src/storage/buffer/buffer_obj.cppm` | mapped | `storage::buffer::mapped_block::BufferObjectInfo`（`SHOW BUFFERS` 一行 = 一个映射） |
 | 540 | `VarBuffer` | `src/storage/buffer/buffer_obj.cppm` | dropped | 随 `BufferObj` 一起去掉（没有 outline buffer 的场景） |
-| 541 | `BMPIndexFileWorker` | `src/storage/buffer/file_worker/bmp_index_file_worker.cppm` | mapped | storage::{buffer, io} 
+| 541 | `BMPIndexFileWorker` | `src/storage/buffer/file_worker/bmp_index_file_worker.cppm` | mapped | storage::{buffer, io}
 | 542 | `DataFileWorker` | `src/storage/buffer/file_worker/data_file_worker.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 543 | `EMVBIndexFileWorker` | `src/storage/buffer/file_worker/emvb_index_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 544 | `FileWorker` | `src/storage/buffer/file_worker/file_worker.cppm` | mapped | storage::{buffer, io} 
-| 545 | `FileWorkerSaveCtx` | `src/storage/buffer/file_worker/file_worker.cppm` | mapped | storage::{buffer, io} 
-| 546 | `HnswFileWorker` | `src/storage/buffer/file_worker/hnsw_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 547 | `IndexFileWorker` | `src/storage/buffer/file_worker/index_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 548 | `IVFIndexFileWorker` | `src/storage/buffer/file_worker/ivf_index_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 549 | `PlaidIndexFileWorker` | `src/storage/buffer/file_worker/plaid_index_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 550 | `RawFileWorker` | `src/storage/buffer/file_worker/raw_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 551 | `SecondaryIndexFileWorker` | `src/storage/buffer/file_worker/secondary_index_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 552 | `SMVEIndexFileWorker` | `src/storage/buffer/file_worker/smve_index_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 553 | `VarFileWorker` | `src/storage/buffer/file_worker/var_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 554 | `VersionFileWorker` | `src/storage/buffer/file_worker/version_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 555 | `VersionFileWorkerSaveCtx` | `src/storage/buffer/file_worker/version_file_worker.cppm` | mapped | storage::{buffer, io} 
-| 556 | `AppendPrepareInfo` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine 
-| 557 | `DbCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine 
-| 558 | `SegmentCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine 
-| 559 | `SegmentIndexCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine 
-| 560 | `SystemCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine 
-| 561 | `TableCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine 
-| 562 | `TableIndexCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine 
-| 563 | `KVInstance` | `src/storage/catalog/kv_store.cppm` | mapped | catalog + executor::Engine 
-| 564 | `KVIterator` | `src/storage/catalog/kv_store.cppm` | mapped | catalog + executor::Engine 
-| 565 | `KVStore` | `src/storage/catalog/kv_store.cppm` | mapped | catalog + executor::Engine 
-| 566 | `MemIndex` | `src/storage/catalog/mem_index.cppm` | mapped | catalog + executor::Engine 
-| 567 | `MemIndexID` | `src/storage/catalog/mem_index.cppm` | mapped | catalog + executor::Engine 
+| 543 | `EMVBIndexFileWorker` | `src/storage/buffer/file_worker/emvb_index_file_worker.cppm` | mapped | storage::{buffer, io}
+| 544 | `FileWorker` | `src/storage/buffer/file_worker/file_worker.cppm` | mapped | storage::{buffer, io}
+| 545 | `FileWorkerSaveCtx` | `src/storage/buffer/file_worker/file_worker.cppm` | mapped | storage::{buffer, io}
+| 546 | `HnswFileWorker` | `src/storage/buffer/file_worker/hnsw_file_worker.cppm` | mapped | storage::{buffer, io}
+| 547 | `IndexFileWorker` | `src/storage/buffer/file_worker/index_file_worker.cppm` | mapped | storage::{buffer, io}
+| 548 | `IVFIndexFileWorker` | `src/storage/buffer/file_worker/ivf_index_file_worker.cppm` | mapped | storage::{buffer, io}
+| 549 | `PlaidIndexFileWorker` | `src/storage/buffer/file_worker/plaid_index_file_worker.cppm` | mapped | storage::{buffer, io}
+| 550 | `RawFileWorker` | `src/storage/buffer/file_worker/raw_file_worker.cppm` | mapped | storage::{buffer, io}
+| 551 | `SecondaryIndexFileWorker` | `src/storage/buffer/file_worker/secondary_index_file_worker.cppm` | mapped | storage::{buffer, io}
+| 552 | `SMVEIndexFileWorker` | `src/storage/buffer/file_worker/smve_index_file_worker.cppm` | mapped | storage::{buffer, io}
+| 553 | `VarFileWorker` | `src/storage/buffer/file_worker/var_file_worker.cppm` | mapped | storage::{buffer, io}
+| 554 | `VersionFileWorker` | `src/storage/buffer/file_worker/version_file_worker.cppm` | mapped | storage::{buffer, io}
+| 555 | `VersionFileWorkerSaveCtx` | `src/storage/buffer/file_worker/version_file_worker.cppm` | mapped | storage::{buffer, io}
+| 556 | `AppendPrepareInfo` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine
+| 557 | `DbCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine
+| 558 | `SegmentCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine
+| 559 | `SegmentIndexCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine
+| 560 | `SystemCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine
+| 561 | `TableCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine
+| 562 | `TableIndexCache` | `src/storage/catalog/catalog_cache.cppm` | mapped | catalog + executor::Engine
+| 563 | `KVInstance` | `src/storage/catalog/kv_store.cppm` | mapped | catalog + executor::Engine
+| 564 | `KVIterator` | `src/storage/catalog/kv_store.cppm` | mapped | catalog + executor::Engine
+| 565 | `KVStore` | `src/storage/catalog/kv_store.cppm` | mapped | catalog + executor::Engine
+| 566 | `MemIndex` | `src/storage/catalog/mem_index.cppm` | mapped | catalog + executor::Engine
+| 567 | `MemIndexID` | `src/storage/catalog/mem_index.cppm` | mapped | catalog + executor::Engine
 | 568 | `BlockVersion` | `src/storage/catalog/meta/block_version.cppm` | mapped | `storage::new_txn::mvcc::{BlockVersion, CreateField}`（Append/CommitAppend/Delete/RollbackDelete/CheckDelete/GetCreateTS/GetDeleteTS/SpillToFile/LoadFromFile） |
-| 569 | `CatalogMeta` | `src/storage/catalog/meta/catalog_meta.cppm` | mapped | catalog + executor::Engine 
-| 570 | `ChunkIndexMetaInfo` | `src/storage/catalog/meta/chunk_index_meta.cppm` | mapped | catalog + executor::Engine 
-| 571 | `ChunkIndexSnapshotInfo` | `src/storage/catalog/meta/chunk_index_meta.cppm` | mapped | catalog + executor::Engine 
-| 572 | `BlockMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 573 | `BlockTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 574 | `ChunkIndexMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 575 | `ChunkIndexTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 576 | `ColumnMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 577 | `DBMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 578 | `DBTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 579 | `DropMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 580 | `MetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 581 | `PmObjectMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 582 | `PmStatMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 583 | `SegmentIndexMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 584 | `SegmentIndexTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 585 | `SegmentMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 586 | `SegmentTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 587 | `SystemTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 588 | `TableColumnMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 589 | `TableIndexMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 590 | `TableIndexTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 591 | `TableMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 592 | `TableNameMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 593 | `TableTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine 
-| 594 | `MetaBlockColumnObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 595 | `MetaBlockObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 596 | `MetaChunkIndexObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 597 | `MetaDBObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 598 | `MetaObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 599 | `MetaPmObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 600 | `MetaSegmentIndexObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 601 | `MetaSegmentObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 602 | `MetaTableIndexObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 603 | `MetaTableObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 604 | `MetaTree` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine 
-| 605 | `SegmentInfo` | `src/storage/catalog/meta/segment_meta.cppm` | mapped | catalog + executor::Engine 
-| 606 | `CacheInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 607 | `CacheStatus` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 608 | `DBCacheCommentInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 609 | `DBCacheInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 610 | `EraseBaseCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 611 | `IndexCacheIndexDefInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 612 | `IndexCacheInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 613 | `MetaCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 614 | `MetaDbCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 615 | `MetaEraseDbCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 616 | `MetaEraseIndexCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 617 | `MetaEraseTableCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 618 | `MetaIndexCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 619 | `MetaTableCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 620 | `TableCacheColumnInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 621 | `TableCacheIndexInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 622 | `TableCacheInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 623 | `TableCacheSegmentInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 624 | `TableCacheSegmentTagInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine 
-| 625 | `BlockLock` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine 
+| 569 | `CatalogMeta` | `src/storage/catalog/meta/catalog_meta.cppm` | mapped | catalog + executor::Engine
+| 570 | `ChunkIndexMetaInfo` | `src/storage/catalog/meta/chunk_index_meta.cppm` | mapped | catalog + executor::Engine
+| 571 | `ChunkIndexSnapshotInfo` | `src/storage/catalog/meta/chunk_index_meta.cppm` | mapped | catalog + executor::Engine
+| 572 | `BlockMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 573 | `BlockTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 574 | `ChunkIndexMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 575 | `ChunkIndexTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 576 | `ColumnMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 577 | `DBMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 578 | `DBTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 579 | `DropMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 580 | `MetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 581 | `PmObjectMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 582 | `PmStatMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 583 | `SegmentIndexMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 584 | `SegmentIndexTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 585 | `SegmentMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 586 | `SegmentTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 587 | `SystemTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 588 | `TableColumnMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 589 | `TableIndexMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 590 | `TableIndexTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 591 | `TableMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 592 | `TableNameMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 593 | `TableTagMetaKey` | `src/storage/catalog/meta/meta_key.cppm` | mapped | catalog + executor::Engine
+| 594 | `MetaBlockColumnObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 595 | `MetaBlockObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 596 | `MetaChunkIndexObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 597 | `MetaDBObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 598 | `MetaObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 599 | `MetaPmObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 600 | `MetaSegmentIndexObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 601 | `MetaSegmentObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 602 | `MetaTableIndexObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 603 | `MetaTableObject` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 604 | `MetaTree` | `src/storage/catalog/meta/meta_tree.cppm` | mapped | catalog + executor::Engine
+| 605 | `SegmentInfo` | `src/storage/catalog/meta/segment_meta.cppm` | mapped | catalog + executor::Engine
+| 606 | `CacheInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 607 | `CacheStatus` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 608 | `DBCacheCommentInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 609 | `DBCacheInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 610 | `EraseBaseCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 611 | `IndexCacheIndexDefInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 612 | `IndexCacheInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 613 | `MetaCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 614 | `MetaDbCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 615 | `MetaEraseDbCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 616 | `MetaEraseIndexCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 617 | `MetaEraseTableCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 618 | `MetaIndexCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 619 | `MetaTableCache` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 620 | `TableCacheColumnInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 621 | `TableCacheIndexInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 622 | `TableCacheInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 623 | `TableCacheSegmentInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 624 | `TableCacheSegmentTagInfo` | `src/storage/catalog/meta_cache.cppm` | mapped | catalog + executor::Engine
+| 625 | `BlockLock` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine
 | 626 | `BlockMeta` | `src/storage/catalog/new_catalog.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 627 | `ChunkIndexMeta` | `src/storage/catalog/new_catalog.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 628 | `ColumnMeta` | `src/storage/catalog/new_catalog.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 629 | `DBMeta` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine 
-| 630 | `NewTxnBlockVisitor` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine 
-| 631 | `NewTxnGetVisibleRangeState` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine 
-| 632 | `SegmentIndexFtInfo` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine 
+| 629 | `DBMeta` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine
+| 630 | `NewTxnBlockVisitor` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine
+| 631 | `NewTxnGetVisibleRangeState` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine
+| 632 | `SegmentIndexFtInfo` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine
 | 633 | `SegmentIndexMeta` | `src/storage/catalog/new_catalog.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 634 | `SegmentMeta` | `src/storage/catalog/new_catalog.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 635 | `SegmentUpdateTS` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine 
+| 635 | `SegmentUpdateTS` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine
 | 636 | `TableIndexMeta` | `src/storage/catalog/new_catalog.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 637 | `TableLockForMemIndex` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine 
+| 637 | `TableLockForMemIndex` | `src/storage/catalog/new_catalog.cppm` | mapped | catalog + executor::Engine
 | 638 | `TableMeta` | `src/storage/catalog/new_catalog.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 639 | `Allocator` | `src/storage/column_vector/allocator.cppm` | mapped | storage::{data_block, mixed_column} 
-| 640 | `BinaryOperator` | `src/storage/column_vector/operator/binary_operator.cppm` | mapped | storage::{data_block, mixed_column} 
-| 641 | `EmbeddingUnaryOperator` | `src/storage/column_vector/operator/embedding_unary_operator.cppm` | mapped | storage::{data_block, mixed_column} 
-| 642 | `NullaryOperator` | `src/storage/column_vector/operator/nullary_operation.cppm` | mapped | storage::{data_block, mixed_column} 
-| 643 | `TernaryOperator` | `src/storage/column_vector/operator/ternary_operator.cppm` | mapped | storage::{data_block, mixed_column} 
-| 644 | `UnaryOperator` | `src/storage/column_vector/operator/unary_operator.cppm` | mapped | storage::{data_block, mixed_column} 
+| 639 | `Allocator` | `src/storage/column_vector/allocator.cppm` | mapped | storage::{data_block, mixed_column}
+| 640 | `BinaryOperator` | `src/storage/column_vector/operator/binary_operator.cppm` | mapped | storage::{data_block, mixed_column}
+| 641 | `EmbeddingUnaryOperator` | `src/storage/column_vector/operator/embedding_unary_operator.cppm` | mapped | storage::{data_block, mixed_column}
+| 642 | `NullaryOperator` | `src/storage/column_vector/operator/nullary_operation.cppm` | mapped | storage::{data_block, mixed_column}
+| 643 | `TernaryOperator` | `src/storage/column_vector/operator/ternary_operator.cppm` | mapped | storage::{data_block, mixed_column}
+| 644 | `UnaryOperator` | `src/storage/column_vector/operator/unary_operator.cppm` | mapped | storage::{data_block, mixed_column}
 | 645 | `Selection` | `src/storage/column_vector/selection.cppm` | mapped | `storage::column_vector::selection::{Selection, SelectionData}`（Initialize/Set/Append/Get/operator[]/Capacity/Size/Reset） |
-| 646 | `ArrayValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column} 
-| 647 | `EmbeddingValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column} 
-| 648 | `JsonValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column} 
-| 649 | `SparseValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column} 
-| 650 | `TensorArrayValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column} 
+| 646 | `ArrayValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column}
+| 647 | `EmbeddingValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column}
+| 648 | `JsonValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column}
+| 649 | `SparseValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column}
+| 650 | `TensorArrayValueInfo` | `src/storage/column_vector/value.cppm` | mapped | storage::{data_block, mixed_column}
 | 651 | `Value` | `src/storage/column_vector/value.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 652 | `VarBufferManager` | `src/storage/column_vector/var_buffer.cppm` | dropped | 不移植：随 `BufferObj` 一起去掉，outline 写盘由 `storage::definition::format` 直接做 |
-| 653 | `VectorBuffer` | `src/storage/column_vector/vector_buffer.cppm` | mapped | storage::{data_block, mixed_column} 
-| 654 | `VectorHeapChunk` | `src/storage/column_vector/vector_heap_chunk.cppm` | mapped | storage::{data_block, mixed_column} 
+| 653 | `VectorBuffer` | `src/storage/column_vector/vector_buffer.cppm` | mapped | storage::{data_block, mixed_column}
+| 654 | `VectorHeapChunk` | `src/storage/column_vector/vector_heap_chunk.cppm` | mapped | storage::{data_block, mixed_column}
 | 655 | `BlockIndex` | `src/storage/common/block_index.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 656 | `IndexIndex` | `src/storage/common/block_index.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 657 | `NewIndexSnapshot` | `src/storage/common/block_index.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 658 | `NewSegmentSnapshot` | `src/storage/common/block_index.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 659 | `DatabaseDetail` | `src/storage/common/database_detail.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 660 | `FastPForWrapper` | `src/storage/common/fastpfor.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 661 | `GlobalBlockID` | `src/storage/common/global_block_id.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 662 | `GlobalBlockIDHash` | `src/storage/common/global_block_id.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 663 | `IntEncoder` | `src/storage/common/int_encoder.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 664 | `JsonManager` | `src/storage/common/json_manager.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 665 | `KeyBase` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 666 | `KeyDb` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 667 | `KeyDbTag` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 668 | `KeyEncode` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 669 | `KeyIndex` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 670 | `KeyIndexTag` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 671 | `KeyTable` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 672 | `KeyTableTag` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 673 | `BlockColumnInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 674 | `BlockInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 675 | `DatabaseInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 676 | `SegmentIndexInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 677 | `TableDetail` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 678 | `TableIndexInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 679 | `TableInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 680 | `ViewDetail` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 681 | `WalChunkIndexInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 682 | `RcuMap` | `src/storage/common/rcu_multimap.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 683 | `RcuMultiMap` | `src/storage/common/rcu_multimap.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 684 | `String2UInt64AddOperator` | `src/storage/common/rocksdb_merge_operator.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 685 | `BlockColumnSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 686 | `BlockSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 687 | `DatabaseSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 688 | `OutlineSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 689 | `SegmentIndexSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 690 | `SegmentSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 691 | `SnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 692 | `SystemSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 693 | `TableIndexSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 694 | `TableSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 695 | `VByteCompressor` | `src/storage/common/vbyte_compressor.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog 
-| 696 | `NewCompactionAlg` | `src/storage/compaction/new_compaction_alg.cppm` | mapped | executor::compact_table 
+| 656 | `IndexIndex` | `src/storage/common/block_index.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 657 | `NewIndexSnapshot` | `src/storage/common/block_index.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 658 | `NewSegmentSnapshot` | `src/storage/common/block_index.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 659 | `DatabaseDetail` | `src/storage/common/database_detail.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 660 | `FastPForWrapper` | `src/storage/common/fastpfor.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 661 | `GlobalBlockID` | `src/storage/common/global_block_id.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 662 | `GlobalBlockIDHash` | `src/storage/common/global_block_id.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 663 | `IntEncoder` | `src/storage/common/int_encoder.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 664 | `JsonManager` | `src/storage/common/json_manager.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 665 | `KeyBase` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 666 | `KeyDb` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 667 | `KeyDbTag` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 668 | `KeyEncode` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 669 | `KeyIndex` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 670 | `KeyIndexTag` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 671 | `KeyTable` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 672 | `KeyTableTag` | `src/storage/common/kv_code.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 673 | `BlockColumnInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 674 | `BlockInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 675 | `DatabaseInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 676 | `SegmentIndexInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 677 | `TableDetail` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 678 | `TableIndexInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 679 | `TableInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 680 | `ViewDetail` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 681 | `WalChunkIndexInfo` | `src/storage/common/meta_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 682 | `RcuMap` | `src/storage/common/rcu_multimap.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 683 | `RcuMultiMap` | `src/storage/common/rcu_multimap.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 684 | `String2UInt64AddOperator` | `src/storage/common/rocksdb_merge_operator.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 685 | `BlockColumnSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 686 | `BlockSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 687 | `DatabaseSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 688 | `OutlineSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 689 | `SegmentIndexSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 690 | `SegmentSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 691 | `SnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 692 | `SystemSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 693 | `TableIndexSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 694 | `TableSnapshotInfo` | `src/storage/common/snapshot_info.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 695 | `VByteCompressor` | `src/storage/common/vbyte_compressor.cppm` | mapped | storage::{catalog_format, wal_entry} + catalog
+| 696 | `NewCompactionAlg` | `src/storage/compaction/new_compaction_alg.cppm` | mapped | executor::compact_table
 | 697 | `DataBlock` | `src/storage/data_block.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 698 | `DataTable` | `src/storage/data_table.cppm` | mapped | `executor::data_table::DataTable` 
+| 698 | `DataTable` | `src/storage/data_table.cppm` | mapped | `executor::data_table::DataTable`
 | 699 | `IndexBase` | `src/storage/definition/index_base.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 700 | `IndexBMP` | `src/storage/definition/index_bmp.cppm` | mapped | executor::data_table + storage::data_block 
-| 701 | `IndexDiskAnn` | `src/storage/definition/index_diskann.cppm` | mapped | executor::data_table + storage::data_block 
-| 702 | `IndexEMVB` | `src/storage/definition/index_emvb.cppm` | mapped | executor::data_table + storage::data_block 
+| 700 | `IndexBMP` | `src/storage/definition/index_bmp.cppm` | mapped | executor::data_table + storage::data_block
+| 701 | `IndexDiskAnn` | `src/storage/definition/index_diskann.cppm` | mapped | executor::data_table + storage::data_block
+| 702 | `IndexEMVB` | `src/storage/definition/index_emvb.cppm` | mapped | executor::data_table + storage::data_block
 | 703 | `IndexFullText` | `src/storage/definition/index_full_text.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 704 | `IndexHnsw` | `src/storage/definition/index_hnsw.cppm` | mapped | executor::data_table + storage::data_block 
+| 704 | `IndexHnsw` | `src/storage/definition/index_hnsw.cppm` | mapped | executor::data_table + storage::data_block
 | 705 | `LSGConfig` | `src/storage/definition/index_hnsw.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 706 | `IndexIVF` | `src/storage/definition/index_ivf.cppm` | mapped | `index::ivf_def::IndexIvf::{make,validate_column}`，由 `Engine::validate_index` 调用 
-| 707 | `IndexIVFCentroidOption` | `src/storage/definition/index_ivf.cppm` | mapped | `index::ivf_def::CentroidOption`；质心数按 `min(sqrt(n)·ratio, n/min_points)` 在镜像时取 
-| 708 | `IndexIVFOption` | `src/storage/definition/index_ivf.cppm` | mapped | `index::ivf_def::IvfOption`；`CREATE INDEX ... USING IVF` 的参数即经它解析。WAL 里它是 32 字节整块，参考把两段 padding 写成显式字段（`padding_after_metric_[3]`、`padding_after_storage_enums_[2]`），端口按同一布局写 0，见 `storage::wal::index_def::IndexDef::Ivf` 
-| 709 | `IndexIVFStorageOption` | `src/storage/definition/index_ivf.cppm` | mapped | `index::ivf_def::StorageOption`；镜像按 `storage_type` 写 plain/SQ/PQ，检索见 `ivf::{IvfIndex,IvfSqIndex,IvfPqIndex}` 
-| 710 | `IndexPLAID` | `src/storage/definition/index_plaid.cppm` | mapped | executor::data_table + storage::data_block 
-| 711 | `IndexSecondary` | `src/storage/definition/index_secondary.cppm` | mapped | executor::data_table + storage::data_block 
-| 712 | `IndexSecondaryFunctional` | `src/storage/definition/index_secondary_functional.cppm` | mapped | executor::data_table + storage::data_block 
-| 713 | `IndexSMVE` | `src/storage/definition/index_smve.cppm` | mapped | executor::data_table + storage::data_block 
+| 706 | `IndexIVF` | `src/storage/definition/index_ivf.cppm` | mapped | `index::ivf_def::IndexIvf::{make,validate_column}`，由 `Engine::validate_index` 调用
+| 707 | `IndexIVFCentroidOption` | `src/storage/definition/index_ivf.cppm` | mapped | `index::ivf_def::CentroidOption`；质心数按 `min(sqrt(n)·ratio, n/min_points)` 在镜像时取
+| 708 | `IndexIVFOption` | `src/storage/definition/index_ivf.cppm` | mapped | `index::ivf_def::IvfOption`；`CREATE INDEX ... USING IVF` 的参数即经它解析。WAL 里它是 32 字节整块，参考把两段 padding 写成显式字段（`padding_after_metric_[3]`、`padding_after_storage_enums_[2]`），端口按同一布局写 0，见 `storage::wal::index_def::IndexDef::Ivf`
+| 709 | `IndexIVFStorageOption` | `src/storage/definition/index_ivf.cppm` | mapped | `index::ivf_def::StorageOption`；镜像按 `storage_type` 写 plain/SQ/PQ，检索见 `ivf::{IvfIndex,IvfSqIndex,IvfPqIndex}`
+| 710 | `IndexPLAID` | `src/storage/definition/index_plaid.cppm` | mapped | executor::data_table + storage::data_block
+| 711 | `IndexSecondary` | `src/storage/definition/index_secondary.cppm` | mapped | executor::data_table + storage::data_block
+| 712 | `IndexSecondaryFunctional` | `src/storage/definition/index_secondary_functional.cppm` | mapped | executor::data_table + storage::data_block
+| 713 | `IndexSMVE` | `src/storage/definition/index_smve.cppm` | mapped | executor::data_table + storage::data_block
 | 714 | `TableDef` | `src/storage/definition/table_def.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 715 | `BinaryFuse` | `src/storage/fast_rough_filter/binary_fuse_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径 
-| 716 | `FastRoughFilter` | `src/storage/fast_rough_filter/fast_rough_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径 
-| 717 | `FastRoughFilterEvaluator` | `src/storage/fast_rough_filter/fast_rough_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径 
-| 718 | `Overload` | `src/storage/fast_rough_filter/filter_value_type_classification.cppm` | mapped | storage 的 bloom/rough-filter 路径 
-| 719 | `TypeList` | `src/storage/fast_rough_filter/filter_value_type_classification.cppm` | mapped | storage 的 bloom/rough-filter 路径 
-| 720 | `InnerMinMaxDataFilterInfo` | `src/storage/fast_rough_filter/min_max_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径 
-| 721 | `InnerMinMaxDataFilterVarcharType` | `src/storage/fast_rough_filter/min_max_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径 
-| 722 | `MinMaxDataFilter` | `src/storage/fast_rough_filter/min_max_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径 
-| 723 | `ProbabilisticDataFilter` | `src/storage/fast_rough_filter/probabilistic_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径 
-| 724 | `ColumnIndexIterator` | `src/storage/invertedindex/column_index_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 725 | `ColumnIndexMerger` | `src/storage/invertedindex/column_index_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 715 | `BinaryFuse` | `src/storage/fast_rough_filter/binary_fuse_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径
+| 716 | `FastRoughFilter` | `src/storage/fast_rough_filter/fast_rough_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径
+| 717 | `FastRoughFilterEvaluator` | `src/storage/fast_rough_filter/fast_rough_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径
+| 718 | `Overload` | `src/storage/fast_rough_filter/filter_value_type_classification.cppm` | mapped | storage 的 bloom/rough-filter 路径
+| 719 | `TypeList` | `src/storage/fast_rough_filter/filter_value_type_classification.cppm` | mapped | storage 的 bloom/rough-filter 路径
+| 720 | `InnerMinMaxDataFilterInfo` | `src/storage/fast_rough_filter/min_max_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径
+| 721 | `InnerMinMaxDataFilterVarcharType` | `src/storage/fast_rough_filter/min_max_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径
+| 722 | `MinMaxDataFilter` | `src/storage/fast_rough_filter/min_max_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径
+| 723 | `ProbabilisticDataFilter` | `src/storage/fast_rough_filter/probabilistic_data_filter.cppm` | mapped | storage 的 bloom/rough-filter 路径
+| 724 | `ColumnIndexIterator` | `src/storage/invertedindex/column_index_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 725 | `ColumnIndexMerger` | `src/storage/invertedindex/column_index_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
 | 726 | `ColumnIndexReader` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 727 | `IndexReader` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 728 | `TableIndexReaderCache` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 729 | `TermDocIterator` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 730 | `ColumnInverter` | `src/storage/invertedindex/column_inverter.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 731 | `ColumnInverterJsonArray` | `src/storage/invertedindex/column_inverter_json_array.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 732 | `AhoCorasick` | `src/storage/invertedindex/common/aho_corasick.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 733 | `BufWriter` | `src/storage/invertedindex/common/buf_writer.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 734 | `DirectIO` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 735 | `SortMerger` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | `storage::invertedindex::common::external_sort::SortMerger` 
-| 736 | `TermTuple` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 737 | `TermTupleList` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 738 | `MapWithLock` | `src/storage/invertedindex/common/map_with_lock.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 739 | `MmapReader` | `src/storage/invertedindex/common/mmap.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 740 | `PriorityQueue` | `src/storage/invertedindex/common/priority_queue.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 741 | `Arena` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 742 | `KeyComparator` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 743 | `SkipList` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 744 | `SkipListNode` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 745 | `VectorWithLock` | `src/storage/invertedindex/common/vector_with_lock.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 746 | `DictionaryReader` | `src/storage/invertedindex/dict_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 747 | `DiskIndexSegmentReader` | `src/storage/invertedindex/disk_segment_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 748 | `DocListEncoder` | `src/storage/invertedindex/format/doc_list_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 749 | `DocListFormat` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 750 | `DocListFormatOption` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 751 | `DocSkipListFormat` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 752 | `FlushInfo` | `src/storage/invertedindex/format/flush_info.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 753 | `InDocPositionState` | `src/storage/invertedindex/format/in_doc_pos_state.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 754 | `IndexDecoder` | `src/storage/invertedindex/format/index_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 755 | `SkipIndexDecoder` | `src/storage/invertedindex/format/index_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 756 | `InMemDocListDecoder` | `src/storage/invertedindex/format/inmem_doc_list_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 757 | `InMemPositionListDecoder` | `src/storage/invertedindex/format/inmem_position_list_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 758 | `InMemPostingDecoder` | `src/storage/invertedindex/format/inmem_posting_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 759 | `NoCompressIntEncoder` | `src/storage/invertedindex/format/no_compress_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 760 | `PositionListDecoder` | `src/storage/invertedindex/format/position_list_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 761 | `PositionListEncoder` | `src/storage/invertedindex/format/position_list_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 762 | `PositionListFormat` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 763 | `PositionListFormatOption` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 764 | `PositionSkipListFormat` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 765 | `PostingBuffer` | `src/storage/invertedindex/format/posting_buffer.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 727 | `IndexReader` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 728 | `TableIndexReaderCache` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 729 | `TermDocIterator` | `src/storage/invertedindex/column_index_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 730 | `ColumnInverter` | `src/storage/invertedindex/column_inverter.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 731 | `ColumnInverterJsonArray` | `src/storage/invertedindex/column_inverter_json_array.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 732 | `AhoCorasick` | `src/storage/invertedindex/common/aho_corasick.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 733 | `BufWriter` | `src/storage/invertedindex/common/buf_writer.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 734 | `DirectIO` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 735 | `SortMerger` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | `storage::invertedindex::common::external_sort::SortMerger`
+| 736 | `TermTuple` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 737 | `TermTupleList` | `src/storage/invertedindex/common/external_sort_merger.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 738 | `MapWithLock` | `src/storage/invertedindex/common/map_with_lock.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 739 | `MmapReader` | `src/storage/invertedindex/common/mmap.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 740 | `PriorityQueue` | `src/storage/invertedindex/common/priority_queue.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 741 | `Arena` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 742 | `KeyComparator` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 743 | `SkipList` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 744 | `SkipListNode` | `src/storage/invertedindex/common/skiplist.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 745 | `VectorWithLock` | `src/storage/invertedindex/common/vector_with_lock.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 746 | `DictionaryReader` | `src/storage/invertedindex/dict_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 747 | `DiskIndexSegmentReader` | `src/storage/invertedindex/disk_segment_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 748 | `DocListEncoder` | `src/storage/invertedindex/format/doc_list_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 749 | `DocListFormat` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 750 | `DocListFormatOption` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 751 | `DocSkipListFormat` | `src/storage/invertedindex/format/doc_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 752 | `FlushInfo` | `src/storage/invertedindex/format/flush_info.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 753 | `InDocPositionState` | `src/storage/invertedindex/format/in_doc_pos_state.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 754 | `IndexDecoder` | `src/storage/invertedindex/format/index_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 755 | `SkipIndexDecoder` | `src/storage/invertedindex/format/index_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 756 | `InMemDocListDecoder` | `src/storage/invertedindex/format/inmem_doc_list_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 757 | `InMemPositionListDecoder` | `src/storage/invertedindex/format/inmem_position_list_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 758 | `InMemPostingDecoder` | `src/storage/invertedindex/format/inmem_posting_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 759 | `NoCompressIntEncoder` | `src/storage/invertedindex/format/no_compress_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 760 | `PositionListDecoder` | `src/storage/invertedindex/format/position_list_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 761 | `PositionListEncoder` | `src/storage/invertedindex/format/position_list_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 762 | `PositionListFormat` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 763 | `PositionListFormatOption` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 764 | `PositionSkipListFormat` | `src/storage/invertedindex/format/position_list_format_option.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 765 | `PostingBuffer` | `src/storage/invertedindex/format/posting_buffer.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
 | 766 | `PostingByteSlice` | `src/storage/invertedindex/format/posting_byte_slice.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 767 | `PostingByteSliceReader` | `src/storage/invertedindex/format/posting_byte_slice_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 768 | `PostingDecoder` | `src/storage/invertedindex/format/posting_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 769 | `NoCompressPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 770 | `PostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 771 | `PostingFields` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 772 | `TypedPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 773 | `VByteCompressPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 774 | `PostingFormat` | `src/storage/invertedindex/format/posting_list_format.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 775 | `PostingFormatOption` | `src/storage/invertedindex/format/posting_list_format.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 776 | `ShortListOptimizeUtil` | `src/storage/invertedindex/format/short_list_optimize_util.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 777 | `SkipListReader` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 778 | `SkipListReaderByteSlice` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 779 | `SkipListReaderPostingByteSlice` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 780 | `SkipListWriter` | `src/storage/invertedindex/format/skiplist_writer.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 781 | `TermMeta` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 782 | `TermMetaDumper` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 783 | `TermMetaLoader` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 784 | `VByteIntEncoder` | `src/storage/invertedindex/format/vbyte_compress_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 785 | `FstBuilder` | `src/storage/invertedindex/fst/build.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 786 | `Bound` | `src/storage/invertedindex/fst/fst.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 767 | `PostingByteSliceReader` | `src/storage/invertedindex/format/posting_byte_slice_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 768 | `PostingDecoder` | `src/storage/invertedindex/format/posting_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 769 | `NoCompressPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 770 | `PostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 771 | `PostingFields` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 772 | `TypedPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 773 | `VByteCompressPostingField` | `src/storage/invertedindex/format/posting_field.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 774 | `PostingFormat` | `src/storage/invertedindex/format/posting_list_format.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 775 | `PostingFormatOption` | `src/storage/invertedindex/format/posting_list_format.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 776 | `ShortListOptimizeUtil` | `src/storage/invertedindex/format/short_list_optimize_util.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 777 | `SkipListReader` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 778 | `SkipListReaderByteSlice` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 779 | `SkipListReaderPostingByteSlice` | `src/storage/invertedindex/format/skiplist_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 780 | `SkipListWriter` | `src/storage/invertedindex/format/skiplist_writer.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 781 | `TermMeta` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 782 | `TermMetaDumper` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 783 | `TermMetaLoader` | `src/storage/invertedindex/format/term_meta.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 784 | `VByteIntEncoder` | `src/storage/invertedindex/format/vbyte_compress_encoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 785 | `FstBuilder` | `src/storage/invertedindex/fst/build.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 786 | `Bound` | `src/storage/invertedindex/fst/fst.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
 | 787 | `Fst` | `src/storage/invertedindex/fst/fst.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 788 | `FstStream` | `src/storage/invertedindex/fst/fst.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 789 | `Output` | `src/storage/invertedindex/fst/node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 790 | `Registry` | `src/storage/invertedindex/fst/registry.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 791 | `RegistryEntry` | `src/storage/invertedindex/fst/registry.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 792 | `InDocPositionIterator` | `src/storage/invertedindex/in_doc_pos_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 793 | `InDocStateKeeper` | `src/storage/invertedindex/in_doc_state_keeper.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 788 | `FstStream` | `src/storage/invertedindex/fst/fst.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 789 | `Output` | `src/storage/invertedindex/fst/node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 790 | `Registry` | `src/storage/invertedindex/fst/registry.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 791 | `RegistryEntry` | `src/storage/invertedindex/fst/registry.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 792 | `InDocPositionIterator` | `src/storage/invertedindex/in_doc_pos_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 793 | `InDocStateKeeper` | `src/storage/invertedindex/in_doc_state_keeper.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
 | 794 | `IndexSegmentReader` | `src/storage/invertedindex/index_segment_reader.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 795 | `InMemIndexSegmentReader` | `src/storage/invertedindex/inmem_segment_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 796 | `BatchInvertTask` | `src/storage/invertedindex/invert_task.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 795 | `InMemIndexSegmentReader` | `src/storage/invertedindex/inmem_segment_reader.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 796 | `BatchInvertTask` | `src/storage/invertedindex/invert_task.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
 | 797 | `MemoryIndexer` | `src/storage/invertedindex/memory_indexer.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 798 | `MultiPostingDecoder` | `src/storage/invertedindex/multi_posting_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 799 | `PostingIterator` | `src/storage/invertedindex/posting_iterator.cppm` | mapped | `storage::invertedindex::disk_segment_reader::PostingIterator` 
-| 800 | `PostingMerger` | `src/storage/invertedindex/posting_merger.cppm` | mapped | `storage::invertedindex::disk_segment_reader::PostingMerger` 
-| 801 | `PostingWriter` | `src/storage/invertedindex/posting_writer.cppm` | mapped | `storage::invertedindex::disk_segment_reader::PostingWriter` 
-| 802 | `Ring` | `src/storage/invertedindex/ring.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 803 | `AndIterator` | `src/storage/invertedindex/search/and_iterator.cppm` | mapped | `executor::query_builder::AndIterator` 
-| 804 | `AndNotIterator` | `src/storage/invertedindex/search/and_not_iterator.cppm` | mapped | `executor::query_builder::AndNotIterator` 
-| 805 | `BatchOrIterator` | `src/storage/invertedindex/search/batch_or_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 806 | `BlockMaxLeafIterator` | `src/storage/invertedindex/search/blockmax_leaf_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
+| 798 | `MultiPostingDecoder` | `src/storage/invertedindex/multi_posting_decoder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 799 | `PostingIterator` | `src/storage/invertedindex/posting_iterator.cppm` | mapped | `storage::invertedindex::disk_segment_reader::PostingIterator`
+| 800 | `PostingMerger` | `src/storage/invertedindex/posting_merger.cppm` | mapped | `storage::invertedindex::disk_segment_reader::PostingMerger`
+| 801 | `PostingWriter` | `src/storage/invertedindex/posting_writer.cppm` | mapped | `storage::invertedindex::disk_segment_reader::PostingWriter`
+| 802 | `Ring` | `src/storage/invertedindex/ring.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 803 | `AndIterator` | `src/storage/invertedindex/search/and_iterator.cppm` | mapped | `executor::query_builder::AndIterator`
+| 804 | `AndNotIterator` | `src/storage/invertedindex/search/and_not_iterator.cppm` | mapped | `executor::query_builder::AndNotIterator`
+| 805 | `BatchOrIterator` | `src/storage/invertedindex/search/batch_or_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 806 | `BlockMaxLeafIterator` | `src/storage/invertedindex/search/blockmax_leaf_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
 | 807 | `BlockMaxWandIterator` | `src/storage/invertedindex/search/blockmax_wand_iterator.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 808 | `BM25Ranker` | `src/storage/invertedindex/search/bm25_ranker.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 809 | `FullTextColumnLengthReader` | `src/storage/invertedindex/search/column_length_io.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 810 | `DocIterator` | `src/storage/invertedindex/search/doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 811 | `DocIteratorEstimateIterateCost` | `src/storage/invertedindex/search/doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 812 | `FilterIterator` | `src/storage/invertedindex/search/filter_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 813 | `FilterQueryNode` | `src/storage/invertedindex/search/filter_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 814 | `HighlightInfo` | `src/storage/invertedindex/search/highlighter.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 815 | `Highlighter` | `src/storage/invertedindex/search/highlighter.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 816 | `KeywordIterator` | `src/storage/invertedindex/search/keyword_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 817 | `MinimumShouldMatchIterator` | `src/storage/invertedindex/search/minimum_should_match_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 818 | `MultiDocIterator` | `src/storage/invertedindex/search/multi_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 819 | `MustFirstIterator` | `src/storage/invertedindex/search/must_first_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 820 | `DocIteratorEntry` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 821 | `DocIteratorHeap` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 822 | `OrIterator` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | `executor::query_builder::OrIterator` 
-| 823 | `BM25Params` | `src/storage/invertedindex/search/parse_fulltext_options.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 824 | `RankFeatureOption` | `src/storage/invertedindex/search/parse_fulltext_options.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 825 | `PhraseDocIterator` | `src/storage/invertedindex/search/phrase_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 826 | `FullTextQueryContext` | `src/storage/invertedindex/search/query_builder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 827 | `QueryBuilder` | `src/storage/invertedindex/search/query_builder.cppm` | mapped | `executor::query_builder::QueryBuilder` 
-| 828 | `AndNotQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 829 | `AndQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 830 | `CreateSearchParams` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 831 | `KeywordQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 832 | `MultiQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 833 | `NotQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 834 | `OrQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 835 | `PhraseQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | `executor::query_builder::PhraseQueryNode` 
-| 836 | `QueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 837 | `RankFeatureQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 838 | `RankFeaturesQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 839 | `TermQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 840 | `RankFeatureDocIterator` | `src/storage/invertedindex/search/rank_feature_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 841 | `RankFeaturesDocIterator` | `src/storage/invertedindex/search/rank_features_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 842 | `FullTextScoreResultHeap` | `src/storage/invertedindex/search/score_result_heap.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 843 | `ScoreThresholdIterator` | `src/storage/invertedindex/search/score_threshold_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 844 | `SearchDriver` | `src/storage/invertedindex/search/search_driver.cppm` | mapped | `executor::invertedindex::search::query_builder::SearchDriver` 
-| 845 | `SegmentPosting` | `src/storage/invertedindex/segment_posting.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 846 | `SegmentTermPosting` | `src/storage/invertedindex/segment_term_posting.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 847 | `SegmentTermPostingQueue` | `src/storage/invertedindex/segment_term_posting.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder 
-| 848 | `ByteSliceReader` | `src/storage/io/byte_slice_reader.cppm` | mapped | `storage::io::ByteSliceReader` 
-| 849 | `ByteSliceWriter` | `src/storage/io/byte_slice_writer.cppm` | mapped | `storage::io::ByteSliceWriter` 
-| 850 | `FileReader` | `src/storage/io/file_reader.cppm` | mapped | `storage::io::FileReader` 
-| 851 | `FileWriter` | `src/storage/io/file_writer.cppm` | mapped | `storage::io::FileWriter` 
-| 852 | `LocalFileHandle` | `src/storage/io/local_file_handle.cppm` | mapped | storage::{io, s3} 
-| 853 | `ObjectStorageProcess` | `src/storage/io/object_storage_process.cppm` | mapped | storage::{io, s3} 
-| 854 | `BaseObjectStorageTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3} 
-| 855 | `CopyTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3} 
-| 856 | `DownloadTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3} 
-| 857 | `LocalDropTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3} 
-| 858 | `RemoveTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3} 
-| 859 | `StopObjectStorageProcessTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3} 
-| 860 | `UploadTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3} 
+| 809 | `FullTextColumnLengthReader` | `src/storage/invertedindex/search/column_length_io.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 810 | `DocIterator` | `src/storage/invertedindex/search/doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 811 | `DocIteratorEstimateIterateCost` | `src/storage/invertedindex/search/doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 812 | `FilterIterator` | `src/storage/invertedindex/search/filter_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 813 | `FilterQueryNode` | `src/storage/invertedindex/search/filter_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 814 | `HighlightInfo` | `src/storage/invertedindex/search/highlighter.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 815 | `Highlighter` | `src/storage/invertedindex/search/highlighter.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 816 | `KeywordIterator` | `src/storage/invertedindex/search/keyword_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 817 | `MinimumShouldMatchIterator` | `src/storage/invertedindex/search/minimum_should_match_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 818 | `MultiDocIterator` | `src/storage/invertedindex/search/multi_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 819 | `MustFirstIterator` | `src/storage/invertedindex/search/must_first_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 820 | `DocIteratorEntry` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 821 | `DocIteratorHeap` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 822 | `OrIterator` | `src/storage/invertedindex/search/or_iterator.cppm` | mapped | `executor::query_builder::OrIterator`
+| 823 | `BM25Params` | `src/storage/invertedindex/search/parse_fulltext_options.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 824 | `RankFeatureOption` | `src/storage/invertedindex/search/parse_fulltext_options.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 825 | `PhraseDocIterator` | `src/storage/invertedindex/search/phrase_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 826 | `FullTextQueryContext` | `src/storage/invertedindex/search/query_builder.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 827 | `QueryBuilder` | `src/storage/invertedindex/search/query_builder.cppm` | mapped | `executor::query_builder::QueryBuilder`
+| 828 | `AndNotQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 829 | `AndQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 830 | `CreateSearchParams` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 831 | `KeywordQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 832 | `MultiQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 833 | `NotQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 834 | `OrQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 835 | `PhraseQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | `executor::query_builder::PhraseQueryNode`
+| 836 | `QueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 837 | `RankFeatureQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 838 | `RankFeaturesQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 839 | `TermQueryNode` | `src/storage/invertedindex/search/query_node.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 840 | `RankFeatureDocIterator` | `src/storage/invertedindex/search/rank_feature_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 841 | `RankFeaturesDocIterator` | `src/storage/invertedindex/search/rank_features_doc_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 842 | `FullTextScoreResultHeap` | `src/storage/invertedindex/search/score_result_heap.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 843 | `ScoreThresholdIterator` | `src/storage/invertedindex/search/score_threshold_iterator.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 844 | `SearchDriver` | `src/storage/invertedindex/search/search_driver.cppm` | mapped | `executor::invertedindex::search::query_builder::SearchDriver`
+| 845 | `SegmentPosting` | `src/storage/invertedindex/segment_posting.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 846 | `SegmentTermPosting` | `src/storage/invertedindex/segment_term_posting.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 847 | `SegmentTermPostingQueue` | `src/storage/invertedindex/segment_term_posting.cppm` | mapped | storage::invertedindex::format / disk_segment_reader + executor::invertedindex::search::query_builder
+| 848 | `ByteSliceReader` | `src/storage/io/byte_slice_reader.cppm` | mapped | `storage::io::ByteSliceReader`
+| 849 | `ByteSliceWriter` | `src/storage/io/byte_slice_writer.cppm` | mapped | `storage::io::ByteSliceWriter`
+| 850 | `FileReader` | `src/storage/io/file_reader.cppm` | mapped | `storage::io::FileReader`
+| 851 | `FileWriter` | `src/storage/io/file_writer.cppm` | mapped | `storage::io::FileWriter`
+| 852 | `LocalFileHandle` | `src/storage/io/local_file_handle.cppm` | mapped | storage::{io, s3}
+| 853 | `ObjectStorageProcess` | `src/storage/io/object_storage_process.cppm` | mapped | storage::{io, s3}
+| 854 | `BaseObjectStorageTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3}
+| 855 | `CopyTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3}
+| 856 | `DownloadTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3}
+| 857 | `LocalDropTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3}
+| 858 | `RemoveTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3}
+| 859 | `StopObjectStorageProcessTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3}
+| 860 | `UploadTask` | `src/storage/io/object_storage_task.cppm` | mapped | storage::{io, s3}
 | 861 | `S3Client` | `src/storage/io/s3_client.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 862 | `S3ClientMinio` | `src/storage/io/s3_client_minio.cppm` | mapped | storage::{io, s3} 
-| 863 | `StreamReader` | `src/storage/io/stream_reader.cppm` | mapped | `storage::io::StreamReader` 
-| 864 | `MmapInfo` | `src/storage/io/virtual_store.cppm` | mapped | storage::{io, s3} 
+| 862 | `S3ClientMinio` | `src/storage/io/s3_client_minio.cppm` | mapped | storage::{io, s3}
+| 863 | `StreamReader` | `src/storage/io/stream_reader.cppm` | mapped | `storage::io::StreamReader`
+| 864 | `MmapInfo` | `src/storage/io/virtual_store.cppm` | mapped | storage::{io, s3}
 | 865 | `VirtualStore` | `src/storage/io/virtual_store.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 866 | `FlattenedTerm` | `src/storage/json_index/json_flattener.cppm` | mapped | storage::json_index 路径 
-| 867 | `JsonFlattener` | `src/storage/json_index/json_flattener.cppm` | mapped | storage::json_index 路径 
+| 866 | `FlattenedTerm` | `src/storage/json_index/json_flattener.cppm` | mapped | storage::json_index 路径
+| 867 | `JsonFlattener` | `src/storage/json_index/json_flattener.cppm` | mapped | storage::json_index 路径
 | 868 | `EMVBIndex` | `src/storage/knn_index/emvb/emvb_index.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 869 | `EMVBIndexInMem` | `src/storage/knn_index/emvb/emvb_index_in_mem.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 870 | `EMVBSearch` | `src/storage/knn_index/emvb/emvb_search.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 871 | `EMVBSharedVec` | `src/storage/knn_index/emvb/emvb_shared_vec.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 871 | `EMVBSharedVec` | `src/storage/knn_index/emvb/emvb_shared_vec.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 872 | `EMVBProductQuantizer` | `src/storage/knn_index/emvb/product_quantizer.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 873 | `OPQ` | `src/storage/knn_index/emvb/product_quantizer.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 874 | `PQ` | `src/storage/knn_index/emvb/product_quantizer.cppm` | mapped | CLASS_MAP 已显式命名 |
@@ -976,8 +976,8 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 890 | `KnnDiskAnn` | `src/storage/knn_index/knn_diskann/knn_diskann.cppm` | excluded | 无：计划 §2.6/R14 排除（C++ populate 为 stub） |
 | 891 | `PqFlashIndex` | `src/storage/knn_index/knn_diskann/pq_flash_index.cppm` | excluded | 无：计划 §2.6/R14 排除（C++ populate 为 stub） |
 | 892 | `MemVamana` | `src/storage/knn_index/knn_diskann/vamana_alg.cppm` | excluded | 无：计划 §2.6/R14 排除（C++ populate 为 stub） |
-| 893 | `KnnDistance` | `src/storage/knn_index/knn_distance.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 894 | `KnnDistanceBase` | `src/storage/knn_index/knn_distance.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 893 | `KnnDistance` | `src/storage/knn_index/knn_distance.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 894 | `KnnDistanceBase` | `src/storage/knn_index/knn_distance.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 895 | `KnnFlatCOS` | `src/storage/knn_index/knn_flat/knn_flat_cos.cppm` | mapped | `index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
 | 896 | `KnnFlatIP` | `src/storage/knn_index/knn_flat/knn_flat_ip.cppm` | mapped | `index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
 | 897 | `KnnFlatIPBlas` | `src/storage/knn_index/knn_flat/knn_flat_ip_blas.cppm` | mapped | `index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
@@ -989,230 +989,230 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 903 | `KnnFlatL2Reservoir` | `src/storage/knn_index/knn_flat/knn_flat_l2_reservoir.cppm` | mapped | `index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
 | 904 | `KnnFlatL2Top1` | `src/storage/knn_index/knn_flat/knn_flat_l2_top1.cppm` | mapped | `index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
 | 905 | `KnnFlatL2Top1Blas` | `src/storage/knn_index/knn_flat/knn_flat_l2_top1_blas.cppm` | mapped | `index::knn_flat::{top_k, top_1}`（按 metric 排序，mask 过滤） |
-| 906 | `DataStore` | `src/storage/knn_index/knn_hnsw/data_store/data_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 907 | `DataStoreBase` | `src/storage/knn_index/knn_hnsw/data_store/data_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 908 | `DataStoreChunkIter` | `src/storage/knn_index/knn_hnsw/data_store/data_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 909 | `ArrayPtr` | `src/storage/knn_index/knn_hnsw/data_store/data_store_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 910 | `PPtr` | `src/storage/knn_index/knn_hnsw/data_store/data_store_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 911 | `GraphStoreInner` | `src/storage/knn_index/knn_hnsw/data_store/graph_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 912 | `GraphStoreMeta` | `src/storage/knn_index/knn_hnsw/data_store/graph_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 913 | `LVQData` | `src/storage/knn_index/knn_hnsw/data_store/lvq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 906 | `DataStore` | `src/storage/knn_index/knn_hnsw/data_store/data_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 907 | `DataStoreBase` | `src/storage/knn_index/knn_hnsw/data_store/data_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 908 | `DataStoreChunkIter` | `src/storage/knn_index/knn_hnsw/data_store/data_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 909 | `ArrayPtr` | `src/storage/knn_index/knn_hnsw/data_store/data_store_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 910 | `PPtr` | `src/storage/knn_index/knn_hnsw/data_store/data_store_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 911 | `GraphStoreInner` | `src/storage/knn_index/knn_hnsw/data_store/graph_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 912 | `GraphStoreMeta` | `src/storage/knn_index/knn_hnsw/data_store/graph_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 913 | `LVQData` | `src/storage/knn_index/knn_hnsw/data_store/lvq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 914 | `LVQVecStoreInner` | `src/storage/knn_index/knn_hnsw/data_store/lvq_vec_store.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 915 | `LVQVecStoreMeta` | `src/storage/knn_index/knn_hnsw/data_store/lvq_vec_store.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 916 | `LVQVecStoreMetaType` | `src/storage/knn_index/knn_hnsw/data_store/lvq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 917 | `PlainVecStoreInner` | `src/storage/knn_index/knn_hnsw/data_store/plain_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 918 | `PlainVecStoreMeta` | `src/storage/knn_index/knn_hnsw/data_store/plain_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 919 | `RabitqQueryData` | `src/storage/knn_index/knn_hnsw/data_store/rabitq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 920 | `RabitqStoreData` | `src/storage/knn_index/knn_hnsw/data_store/rabitq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 921 | `RabitqVecStoreInner` | `src/storage/knn_index/knn_hnsw/data_store/rabitq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 916 | `LVQVecStoreMetaType` | `src/storage/knn_index/knn_hnsw/data_store/lvq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 917 | `PlainVecStoreInner` | `src/storage/knn_index/knn_hnsw/data_store/plain_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 918 | `PlainVecStoreMeta` | `src/storage/knn_index/knn_hnsw/data_store/plain_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 919 | `RabitqQueryData` | `src/storage/knn_index/knn_hnsw/data_store/rabitq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 920 | `RabitqStoreData` | `src/storage/knn_index/knn_hnsw/data_store/rabitq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 921 | `RabitqVecStoreInner` | `src/storage/knn_index/knn_hnsw/data_store/rabitq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 922 | `RabitqVecStoreMeta` | `src/storage/knn_index/knn_hnsw/data_store/rabitq_vec_store.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 923 | `RabitqVecStoreMetaType` | `src/storage/knn_index/knn_hnsw/data_store/rabitq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 924 | `SparseVecStoreInner` | `src/storage/knn_index/knn_hnsw/data_store/sparse_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 925 | `SparseVecStoreMeta` | `src/storage/knn_index/knn_hnsw/data_store/sparse_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 926 | `LVQCosVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 927 | `LVQIPVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 928 | `LVQL2VecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 929 | `PlainCosVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 930 | `PlainIPVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 931 | `PlainL2VecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 932 | `RabitqCosVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 933 | `RabitqIPVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 934 | `RabitqL2VecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 935 | `SparseIPVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 936 | `LVQCosCache` | `src/storage/knn_index/knn_hnsw/dist_func_cos.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 937 | `LVQCosDist` | `src/storage/knn_index/knn_hnsw/dist_func_cos.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 938 | `PlainCosDist` | `src/storage/knn_index/knn_hnsw/dist_func_cos.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 939 | `RabitqCosDist` | `src/storage/knn_index/knn_hnsw/dist_func_cos.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 940 | `LVQIPCache` | `src/storage/knn_index/knn_hnsw/dist_func_ip.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 941 | `LVQIPDist` | `src/storage/knn_index/knn_hnsw/dist_func_ip.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 942 | `PlainIPDist` | `src/storage/knn_index/knn_hnsw/dist_func_ip.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 943 | `RabitqIPDist` | `src/storage/knn_index/knn_hnsw/dist_func_ip.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 944 | `LVQL2Cache` | `src/storage/knn_index/knn_hnsw/dist_func_l2.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 945 | `LVQL2Dist` | `src/storage/knn_index/knn_hnsw/dist_func_l2.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 946 | `PlainL2Dist` | `src/storage/knn_index/knn_hnsw/dist_func_l2.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 947 | `PlainLSL2Dist` | `src/storage/knn_index/knn_hnsw/dist_func_l2.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 948 | `RabitqL2Dist` | `src/storage/knn_index/knn_hnsw/dist_func_l2.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 923 | `RabitqVecStoreMetaType` | `src/storage/knn_index/knn_hnsw/data_store/rabitq_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 924 | `SparseVecStoreInner` | `src/storage/knn_index/knn_hnsw/data_store/sparse_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 925 | `SparseVecStoreMeta` | `src/storage/knn_index/knn_hnsw/data_store/sparse_vec_store.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 926 | `LVQCosVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 927 | `LVQIPVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 928 | `LVQL2VecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 929 | `PlainCosVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 930 | `PlainIPVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 931 | `PlainL2VecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 932 | `RabitqCosVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 933 | `RabitqIPVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 934 | `RabitqL2VecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 935 | `SparseIPVecStoreType` | `src/storage/knn_index/knn_hnsw/data_store/vec_store_type.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 936 | `LVQCosCache` | `src/storage/knn_index/knn_hnsw/dist_func_cos.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 937 | `LVQCosDist` | `src/storage/knn_index/knn_hnsw/dist_func_cos.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 938 | `PlainCosDist` | `src/storage/knn_index/knn_hnsw/dist_func_cos.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 939 | `RabitqCosDist` | `src/storage/knn_index/knn_hnsw/dist_func_cos.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 940 | `LVQIPCache` | `src/storage/knn_index/knn_hnsw/dist_func_ip.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 941 | `LVQIPDist` | `src/storage/knn_index/knn_hnsw/dist_func_ip.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 942 | `PlainIPDist` | `src/storage/knn_index/knn_hnsw/dist_func_ip.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 943 | `RabitqIPDist` | `src/storage/knn_index/knn_hnsw/dist_func_ip.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 944 | `LVQL2Cache` | `src/storage/knn_index/knn_hnsw/dist_func_l2.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 945 | `LVQL2Dist` | `src/storage/knn_index/knn_hnsw/dist_func_l2.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 946 | `PlainL2Dist` | `src/storage/knn_index/knn_hnsw/dist_func_l2.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 947 | `PlainLSL2Dist` | `src/storage/knn_index/knn_hnsw/dist_func_l2.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 948 | `RabitqL2Dist` | `src/storage/knn_index/knn_hnsw/dist_func_l2.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 949 | `LSGDistWrapper` | `src/storage/knn_index/knn_hnsw/dist_func_lsg_wrapper.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 950 | `SparseIPDist` | `src/storage/knn_index/knn_hnsw/dist_func_sparse_ip.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 951 | `KnnHnsw` | `src/storage/knn_index/knn_hnsw/hnsw_alg.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 952 | `KnnHnswBase` | `src/storage/knn_index/knn_hnsw/hnsw_alg.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 950 | `SparseIPDist` | `src/storage/knn_index/knn_hnsw/dist_func_sparse_ip.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 951 | `KnnHnsw` | `src/storage/knn_index/knn_hnsw/hnsw_alg.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 952 | `KnnHnswBase` | `src/storage/knn_index/knn_hnsw/hnsw_alg.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 953 | `KnnSearchOption` | `src/storage/knn_index/knn_hnsw/hnsw_alg.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 954 | `DenseVectorIter` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 955 | `FilterBase` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 956 | `HnswConfig` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 957 | `HnswInsertConfig` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 958 | `SparseVectorIter` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 959 | `HnswHandler` | `src/storage/knn_index/knn_hnsw/hnsw_handler.cppm` | mapped | `index::hnsw_handler::HnswHandler` 
+| 954 | `DenseVectorIter` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 955 | `FilterBase` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 956 | `HnswConfig` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 957 | `HnswInsertConfig` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 958 | `SparseVectorIter` | `src/storage/knn_index/knn_hnsw/hnsw_common.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 959 | `HnswHandler` | `src/storage/knn_index/knn_hnsw/hnsw_handler.cppm` | mapped | `index::hnsw_handler::HnswHandler`
 | 960 | `HnswIndexInMem` | `src/storage/knn_index/knn_hnsw/hnsw_handler.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 961 | `HnswLSGBuilder` | `src/storage/knn_index/knn_hnsw/hnsw_lsg_builder.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 962 | `HnswOptimizeOptions` | `src/storage/knn_index/knn_hnsw/hnsw_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 963 | `HnswUtil` | `src/storage/knn_index/knn_hnsw/hnsw_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 964 | `heap_twin` | `src/storage/knn_index/knn_ivf/heap_twin_operation.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 965 | `heap_twin_multiple` | `src/storage/knn_index/knn_ivf/heap_twin_operation.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 966 | `IVFDataAccessorBase` | `src/storage/knn_index/knn_ivf/ivf_index_data.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 967 | `IVFIndexInChunk` | `src/storage/knn_index/knn_ivf/ivf_index_data.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 968 | `IVFIndexInMem` | `src/storage/knn_index/knn_ivf/ivf_index_data_in_mem.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 969 | `IVF_Search_Handler` | `src/storage/knn_index/knn_ivf/ivf_index_search.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 970 | `IVF_Search_Params` | `src/storage/knn_index/knn_ivf/ivf_index_search.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 962 | `HnswOptimizeOptions` | `src/storage/knn_index/knn_hnsw/hnsw_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 963 | `HnswUtil` | `src/storage/knn_index/knn_hnsw/hnsw_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 964 | `heap_twin` | `src/storage/knn_index/knn_ivf/heap_twin_operation.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 965 | `heap_twin_multiple` | `src/storage/knn_index/knn_ivf/heap_twin_operation.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 966 | `IVFDataAccessorBase` | `src/storage/knn_index/knn_ivf/ivf_index_data.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 967 | `IVFIndexInChunk` | `src/storage/knn_index/knn_ivf/ivf_index_data.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 968 | `IVFIndexInMem` | `src/storage/knn_index/knn_ivf/ivf_index_data_in_mem.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 969 | `IVF_Search_Handler` | `src/storage/knn_index/knn_ivf/ivf_index_search.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 970 | `IVF_Search_Params` | `src/storage/knn_index/knn_ivf/ivf_index_search.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 971 | `IVF_Index_Storage` | `src/storage/knn_index/knn_ivf/ivf_index_storage.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 972 | `MergeKnnBase` | `src/storage/knn_index/merge_knn.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 973 | `MergeKnnResultHandler` | `src/storage/knn_index/merge_knn.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 974 | `MultiVectorResultHandler` | `src/storage/knn_index/multivector/multivector_result_handler.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 975 | `MultiVectorRef` | `src/storage/knn_index/multivector/multivector_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 972 | `MergeKnnBase` | `src/storage/knn_index/merge_knn.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 973 | `MergeKnnResultHandler` | `src/storage/knn_index/merge_knn.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 974 | `MultiVectorResultHandler` | `src/storage/knn_index/multivector/multivector_result_handler.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 975 | `MultiVectorRef` | `src/storage/knn_index/multivector/multivector_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 976 | `PlaidGlobalCentroids` | `src/storage/knn_index/plaid/plaid_global_centroids.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 977 | `PlaidIndex` | `src/storage/knn_index/plaid/plaid_index.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 978 | `PlaidIndexDiskMerger` | `src/storage/knn_index/plaid/plaid_index_disk_merger.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 979 | `PlaidMergeManifest` | `src/storage/knn_index/plaid/plaid_index_disk_merger.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 980 | `PlaidMergeManifestChunk` | `src/storage/knn_index/plaid/plaid_index_disk_merger.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 981 | `PlaidMergeSizeInfo` | `src/storage/knn_index/plaid/plaid_index_disk_merger.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 980 | `PlaidMergeManifestChunk` | `src/storage/knn_index/plaid/plaid_index_disk_merger.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 981 | `PlaidMergeSizeInfo` | `src/storage/knn_index/plaid/plaid_index_disk_merger.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 982 | `PlaidIndexInMem` | `src/storage/knn_index/plaid/plaid_index_in_mem.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 983 | `PlaidQuantizer` | `src/storage/knn_index/plaid/plaid_quantizer.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 984 | `CompareMax` | `src/storage/knn_index/result_handler.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 985 | `CompareMin` | `src/storage/knn_index/result_handler.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 986 | `HeapResultHandler` | `src/storage/knn_index/result_handler.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 987 | `ReservoirResultHandler` | `src/storage/knn_index/result_handler.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 988 | `SingleBestResultHandler` | `src/storage/knn_index/result_handler.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 987 | `ReservoirResultHandler` | `src/storage/knn_index/result_handler.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 988 | `SingleBestResultHandler` | `src/storage/knn_index/result_handler.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 989 | `SMVEBMPCollector` | `src/storage/knn_index/smve/smve_index.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 990 | `SMVEIndexInMem` | `src/storage/knn_index/smve/smve_index.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 991 | `SMVESerializedData` | `src/storage/knn_index/smve/smve_index.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 992 | `SMVEResult` | `src/storage/knn_index/smve/smve_transform.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 992 | `SMVEResult` | `src/storage/knn_index/smve/smve_transform.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 993 | `BMPAlg` | `src/storage/knn_index/sparse/bmp_alg.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 994 | `BMPAlgBase` | `src/storage/knn_index/sparse/bmp_alg.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 995 | `BlockFwd` | `src/storage/knn_index/sparse/bmp_fwd.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 996 | `BlockTerms` | `src/storage/knn_index/sparse/bmp_fwd.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 996 | `BlockTerms` | `src/storage/knn_index/sparse/bmp_fwd.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 997 | `TailFwd` | `src/storage/knn_index/sparse/bmp_fwd.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 998 | `BMPHandler` | `src/storage/knn_index/sparse/bmp_handler.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 999 | `BMPIndexInMem` | `src/storage/knn_index/sparse/bmp_handler.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 1000 | `BMPIvt` | `src/storage/knn_index/sparse/bmp_ivt.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 1001 | `BlockData` | `src/storage/knn_index/sparse/bmp_ivt.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 1002 | `BMPOptimizeOptions` | `src/storage/knn_index/sparse/bmp_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 1003 | `BMPUtil` | `src/storage/knn_index/sparse/bmp_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 1002 | `BMPOptimizeOptions` | `src/storage/knn_index/sparse/bmp_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 1003 | `BMPUtil` | `src/storage/knn_index/sparse/bmp_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 1004 | `BmpSearchOptions` | `src/storage/knn_index/sparse/bmp_util.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 1005 | `VecPtr` | `src/storage/knn_index/sparse/bmp_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 1006 | `BPReordering` | `src/storage/knn_index/sparse/bp_reordering.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 1007 | `LinScan` | `src/storage/knn_index/sparse/linscan_alg.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 1008 | `SparseTestUtil` | `src/storage/knn_index/sparse/sparse_test_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 1009 | `SparseMatrix` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 1010 | `SparseMatrixIter` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
+| 1005 | `VecPtr` | `src/storage/knn_index/sparse/bmp_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 1006 | `BPReordering` | `src/storage/knn_index/sparse/bp_reordering.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 1007 | `LinScan` | `src/storage/knn_index/sparse/linscan_alg.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 1008 | `SparseTestUtil` | `src/storage/knn_index/sparse/sparse_test_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 1009 | `SparseMatrix` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 1010 | `SparseMatrixIter` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
 | 1011 | `SparseVec` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 1012 | `SparseVecEle` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 1013 | `SparseVecRef` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 1014 | `SparseVecUtil` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat} 
-| 1015 | `AccessState` | `src/storage/meta/entry/data_access_state.cppm` | mapped | catalog 
-| 1016 | `DeleteState` | `src/storage/meta/entry/data_access_state.cppm` | mapped | catalog 
-| 1017 | `MemIndexInserterIter1` | `src/storage/meta/iter/block_column_iter.cppm` | mapped | catalog 
-| 1018 | `AddColumnsTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1019 | `AlterIndexTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1020 | `AppendTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1021 | `BaseTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1022 | `CheckpointTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1023 | `CleanupTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1024 | `CompactTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1025 | `CreateDBSnapshotTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1026 | `CreateDBTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1027 | `CreateIndexTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1028 | `CreateSystemSnapshotTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1029 | `CreateTableSnapshotTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1030 | `CreateTableTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1031 | `DeleteTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1032 | `DropColumnsTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1033 | `DropDBTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1034 | `DropIndexTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1035 | `DropTableTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1036 | `DummyTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1037 | `DumpMemIndexTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1038 | `FlushDataEntry` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1039 | `ImportTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1040 | `MemIndexRange` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1041 | `OptimizeIndexStoreEntry` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1042 | `OptimizeIndexTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1043 | `RenameTableTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1044 | `RestoreDatabaseTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1045 | `RestoreSystemTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1046 | `RestoreTableTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1047 | `UpdateAppendBlock` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1048 | `UpdateTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1049 | `CheckpointOption` | `src/storage/new_txn/new_txn.cppm` | mapped | txn + executor::EngineTxn 
-| 1050 | `ChunkInfoForCreateIndex` | `src/storage/new_txn/new_txn.cppm` | mapped | txn + executor::EngineTxn 
+| 1012 | `SparseVecEle` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 1013 | `SparseVecRef` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 1014 | `SparseVecUtil` | `src/storage/knn_index/sparse/sparse_util.cppm` | mapped | index::{vector, hnsw_handler, sparse, plaid, smve, ivf_def, knn_flat}
+| 1015 | `AccessState` | `src/storage/meta/entry/data_access_state.cppm` | mapped | catalog
+| 1016 | `DeleteState` | `src/storage/meta/entry/data_access_state.cppm` | mapped | catalog
+| 1017 | `MemIndexInserterIter1` | `src/storage/meta/iter/block_column_iter.cppm` | mapped | catalog
+| 1018 | `AddColumnsTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1019 | `AlterIndexTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1020 | `AppendTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1021 | `BaseTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1022 | `CheckpointTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1023 | `CleanupTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1024 | `CompactTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1025 | `CreateDBSnapshotTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1026 | `CreateDBTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1027 | `CreateIndexTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1028 | `CreateSystemSnapshotTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1029 | `CreateTableSnapshotTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1030 | `CreateTableTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1031 | `DeleteTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1032 | `DropColumnsTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1033 | `DropDBTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1034 | `DropIndexTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1035 | `DropTableTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1036 | `DummyTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1037 | `DumpMemIndexTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1038 | `FlushDataEntry` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1039 | `ImportTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1040 | `MemIndexRange` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1041 | `OptimizeIndexStoreEntry` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1042 | `OptimizeIndexTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1043 | `RenameTableTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1044 | `RestoreDatabaseTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1045 | `RestoreSystemTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1046 | `RestoreTableTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1047 | `UpdateAppendBlock` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1048 | `UpdateTxnStore` | `src/storage/new_txn/base_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1049 | `CheckpointOption` | `src/storage/new_txn/new_txn.cppm` | mapped | txn + executor::EngineTxn
+| 1050 | `ChunkInfoForCreateIndex` | `src/storage/new_txn/new_txn.cppm` | mapped | txn + executor::EngineTxn
 | 1051 | `NewTxn` | `src/storage/new_txn/new_txn.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 1052 | `SnapshotOption` | `src/storage/new_txn/new_txn.cppm` | mapped | txn + executor::EngineTxn 
-| 1053 | `NewTxnManager` | `src/storage/new_txn/new_txn_manager.cppm` | mapped | txn + executor::EngineTxn 
-| 1054 | `NewTxnStore` | `src/storage/new_txn/new_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1055 | `NewTxnTableStore1` | `src/storage/new_txn/new_txn_store.cppm` | mapped | txn + executor::EngineTxn 
-| 1056 | `TxnAllocator` | `src/storage/new_txn/txn_allocator.cppm` | mapped | txn + executor::EngineTxn 
-| 1057 | `TxnAllocatorTask` | `src/storage/new_txn/txn_allocator_task.cppm` | mapped | txn + executor::EngineTxn 
-| 1058 | `TxnContext` | `src/storage/new_txn/txn_context.cppm` | mapped | txn + executor::EngineTxn 
-| 1059 | `TxnCheckpointInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn 
-| 1060 | `TxnCleanInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn 
-| 1061 | `TxnCompactInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn 
-| 1062 | `TxnImportInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn 
-| 1063 | `TxnInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn 
-| 1064 | `TxnOptimizeInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn 
-| 1065 | `ObjectStats` | `src/storage/persistence/obj_stat_accessor.cppm` | mapped | storage::persistence::persistence_manager 
-| 1066 | `ObjStat` | `src/storage/persistence/obj_status.cppm` | mapped | storage::persistence::persistence_manager 
-| 1067 | `Range` | `src/storage/persistence/obj_status.cppm` | mapped | storage::persistence::persistence_manager 
-| 1068 | `PersistResultHandler` | `src/storage/persistence/persist_result_handler.cppm` | mapped | `storage::persistence::persistence_manager::PersistResultHandler` 
-| 1069 | `ObjAddr` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence::persistence_manager 
-| 1070 | `PersistReadResult` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence::persistence_manager 
-| 1071 | `PersistWriteResult` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence::persistence_manager 
-| 1072 | `PersistenceManager` | `src/storage/persistence/persistence_manager.cppm` | mapped | `storage::persistence::persistence_manager::PersistenceManager` 
+| 1052 | `SnapshotOption` | `src/storage/new_txn/new_txn.cppm` | mapped | txn + executor::EngineTxn
+| 1053 | `NewTxnManager` | `src/storage/new_txn/new_txn_manager.cppm` | mapped | txn + executor::EngineTxn
+| 1054 | `NewTxnStore` | `src/storage/new_txn/new_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1055 | `NewTxnTableStore1` | `src/storage/new_txn/new_txn_store.cppm` | mapped | txn + executor::EngineTxn
+| 1056 | `TxnAllocator` | `src/storage/new_txn/txn_allocator.cppm` | mapped | txn + executor::EngineTxn
+| 1057 | `TxnAllocatorTask` | `src/storage/new_txn/txn_allocator_task.cppm` | mapped | txn + executor::EngineTxn
+| 1058 | `TxnContext` | `src/storage/new_txn/txn_context.cppm` | mapped | txn + executor::EngineTxn
+| 1059 | `TxnCheckpointInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn
+| 1060 | `TxnCleanInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn
+| 1061 | `TxnCompactInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn
+| 1062 | `TxnImportInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn
+| 1063 | `TxnInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn
+| 1064 | `TxnOptimizeInfo` | `src/storage/new_txn/txn_info.cppm` | mapped | txn + executor::EngineTxn
+| 1065 | `ObjectStats` | `src/storage/persistence/obj_stat_accessor.cppm` | mapped | storage::persistence::persistence_manager
+| 1066 | `ObjStat` | `src/storage/persistence/obj_status.cppm` | mapped | storage::persistence::persistence_manager
+| 1067 | `Range` | `src/storage/persistence/obj_status.cppm` | mapped | storage::persistence::persistence_manager
+| 1068 | `PersistResultHandler` | `src/storage/persistence/persist_result_handler.cppm` | mapped | `storage::persistence::persistence_manager::PersistResultHandler`
+| 1069 | `ObjAddr` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence::persistence_manager
+| 1070 | `PersistReadResult` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence::persistence_manager
+| 1071 | `PersistWriteResult` | `src/storage/persistence/persistence_manager.cppm` | mapped | storage::persistence::persistence_manager
+| 1072 | `PersistenceManager` | `src/storage/persistence/persistence_manager.cppm` | mapped | `storage::persistence::persistence_manager::PersistenceManager`
 | 1073 | `CacheOutput` | `src/storage/result_cache_manager.cppm` | mapped | `result_cache::CacheOutput` |
 | 1074 | `ResultCacheManager` | `src/storage/result_cache_manager.cppm` | mapped | `result_cache::ResultCacheManager`（AddCache/GetCache/DropTable/ResetCacheNumCapacity/ClearCache） |
-| 1075 | `CommonQueryFilter` | `src/storage/secondary_index/common_query_filter.cppm` | mapped | storage::secondary_* 
-| 1076 | `HighCardinalityTag` | `src/storage/secondary_index/secondary_index_data.cppm` | mapped | storage::secondary_* 
-| 1077 | `LowCardinalityTag` | `src/storage/secondary_index/secondary_index_data.cppm` | mapped | storage::secondary_* 
+| 1075 | `CommonQueryFilter` | `src/storage/secondary_index/common_query_filter.cppm` | mapped | storage::secondary_*
+| 1076 | `HighCardinalityTag` | `src/storage/secondary_index/secondary_index_data.cppm` | mapped | storage::secondary_*
+| 1077 | `LowCardinalityTag` | `src/storage/secondary_index/secondary_index_data.cppm` | mapped | storage::secondary_*
 | 1078 | `SecondaryIndexDataBase` | `src/storage/secondary_index/secondary_index_data.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 1079 | `SecondaryIndexInMem` | `src/storage/secondary_index/secondary_index_in_mem.cppm` | mapped | storage::secondary_* 
-| 1080 | `SecondaryPGMIndex` | `src/storage/secondary_index/secondary_index_pgm.cppm` | mapped | storage::secondary_* 
+| 1079 | `SecondaryIndexInMem` | `src/storage/secondary_index/secondary_index_in_mem.cppm` | mapped | storage::secondary_*
+| 1080 | `SecondaryPGMIndex` | `src/storage/secondary_index/secondary_index_pgm.cppm` | mapped | storage::secondary_*
 | 1081 | `Storage` | `src/storage/storage.cppm` | mapped | CLASS_MAP 已显式命名 |
-| 1082 | `BaseMemIndex` | `src/storage/tracer/base_memindex.cppm` | mapped | storage::bg_task::memindex_tracer 
-| 1083 | `DummyIndexInMem` | `src/storage/tracer/base_memindex.cppm` | mapped | storage::bg_task::memindex_tracer 
-| 1084 | `MemUsageChange` | `src/storage/tracer/mem_usage_change.cppm` | mapped | storage::bg_task::memindex_tracer 
-| 1085 | `BGMemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::bg_task::memindex_tracer 
-| 1086 | `MemIndexDetail` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::bg_task::memindex_tracer 
-| 1087 | `MemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | mapped | `storage::bg_task::memindex_tracer::MemIndexTracer` 
-| 1088 | `MemIndexTracerInfo` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::bg_task::memindex_tracer 
-| 1089 | `View` | `src/storage/view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植 
-| 1090 | `BottomExecutor` | `src/storage/wal/bottom_executor.cppm` | mapped | storage::wal::wal_entry 
-| 1091 | `TempWalFileInfo` | `src/storage/wal/log_file.cppm` | mapped | storage::wal::wal_entry 
-| 1092 | `WalFile` | `src/storage/wal/log_file.cppm` | mapped | storage::wal::wal_entry 
-| 1093 | `WalFileInfo` | `src/storage/wal/log_file.cppm` | mapped | storage::wal::wal_entry 
-| 1094 | `WalBlockInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1095 | `WalCmd` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1096 | `WalCmdAddColumnsV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1097 | `WalCmdAlterIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1098 | `WalCmdAppendV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1099 | `WalCmdCheckpointV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1100 | `WalCmdCleanup` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1101 | `WalCmdCompactV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1102 | `WalCmdCreateDBSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1103 | `WalCmdCreateDatabaseV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1104 | `WalCmdCreateIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1105 | `WalCmdCreateSystemSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1106 | `WalCmdCreateTableSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1107 | `WalCmdCreateTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1108 | `WalCmdDeleteV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1109 | `WalCmdDropColumnsV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1110 | `WalCmdDropDatabaseV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1111 | `WalCmdDropIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1112 | `WalCmdDropTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1113 | `WalCmdDummy` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1114 | `WalCmdDumpIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1115 | `WalCmdImportV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1116 | `WalCmdRenameTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1117 | `WalCmdRestoreDatabaseSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1118 | `WalCmdRestoreSystemSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1119 | `WalCmdRestoreTableSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1120 | `WalEntry` | `src/storage/wal/wal_entry.cppm` | mapped | `storage::wal::wal_entry::WalEntry` 
-| 1121 | `WalEntryHeader` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1122 | `WalEntryIterator` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1123 | `WalListIterator` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1124 | `WalRestoreIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1125 | `WalSegmentIndexInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1126 | `WalSegmentInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1127 | `WalSegmentInfoV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry 
-| 1128 | `ReplayWalOptions` | `src/storage/wal/wal_manager.cppm` | mapped | storage::wal::wal_entry 
-| 1129 | `WalManager` | `src/storage/wal/wal_manager.cppm` | mapped | storage::wal::wal_entry 
+| 1082 | `BaseMemIndex` | `src/storage/tracer/base_memindex.cppm` | mapped | storage::bg_task::memindex_tracer
+| 1083 | `DummyIndexInMem` | `src/storage/tracer/base_memindex.cppm` | mapped | storage::bg_task::memindex_tracer
+| 1084 | `MemUsageChange` | `src/storage/tracer/mem_usage_change.cppm` | mapped | storage::bg_task::memindex_tracer
+| 1085 | `BGMemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::bg_task::memindex_tracer
+| 1086 | `MemIndexDetail` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::bg_task::memindex_tracer
+| 1087 | `MemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | mapped | `storage::bg_task::memindex_tracer::MemIndexTracer`
+| 1088 | `MemIndexTracerInfo` | `src/storage/tracer/memindex_tracer.cppm` | mapped | storage::bg_task::memindex_tracer
+| 1089 | `View` | `src/storage/view.cppm` | exempt | C++ 侧 `PhysicalCreateView` 是空壳、DDL 分发没有 view 分支；端口同样以 `Unknown DDL type` 拒绝，不计入逐类移植
+| 1090 | `BottomExecutor` | `src/storage/wal/bottom_executor.cppm` | mapped | storage::wal::wal_entry
+| 1091 | `TempWalFileInfo` | `src/storage/wal/log_file.cppm` | mapped | storage::wal::wal_entry
+| 1092 | `WalFile` | `src/storage/wal/log_file.cppm` | mapped | storage::wal::wal_entry
+| 1093 | `WalFileInfo` | `src/storage/wal/log_file.cppm` | mapped | storage::wal::wal_entry
+| 1094 | `WalBlockInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1095 | `WalCmd` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1096 | `WalCmdAddColumnsV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1097 | `WalCmdAlterIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1098 | `WalCmdAppendV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1099 | `WalCmdCheckpointV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1100 | `WalCmdCleanup` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1101 | `WalCmdCompactV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1102 | `WalCmdCreateDBSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1103 | `WalCmdCreateDatabaseV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1104 | `WalCmdCreateIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1105 | `WalCmdCreateSystemSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1106 | `WalCmdCreateTableSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1107 | `WalCmdCreateTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1108 | `WalCmdDeleteV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1109 | `WalCmdDropColumnsV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1110 | `WalCmdDropDatabaseV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1111 | `WalCmdDropIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1112 | `WalCmdDropTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1113 | `WalCmdDummy` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1114 | `WalCmdDumpIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1115 | `WalCmdImportV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1116 | `WalCmdRenameTableV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1117 | `WalCmdRestoreDatabaseSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1118 | `WalCmdRestoreSystemSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1119 | `WalCmdRestoreTableSnapshot` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1120 | `WalEntry` | `src/storage/wal/wal_entry.cppm` | mapped | `storage::wal::wal_entry::WalEntry`
+| 1121 | `WalEntryHeader` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1122 | `WalEntryIterator` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1123 | `WalListIterator` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1124 | `WalRestoreIndexV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1125 | `WalSegmentIndexInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1126 | `WalSegmentInfo` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1127 | `WalSegmentInfoV2` | `src/storage/wal/wal_entry.cppm` | mapped | storage::wal::wal_entry
+| 1128 | `ReplayWalOptions` | `src/storage/wal/wal_manager.cppm` | mapped | storage::wal::wal_entry
+| 1129 | `WalManager` | `src/storage/wal/wal_manager.cppm` | mapped | storage::wal::wal_entry
 | 1130 | `BaseTestNoParam` | `src/unit_test/base_test.cppm` | test | C++ 测试夹具（`src/unit_test`） |
 | 1131 | `BaseTestParamStr` | `src/unit_test/base_test.cppm` | test | C++ 测试夹具（`src/unit_test`） |
 | 1132 | `BaseTestWithParam` | `src/unit_test/base_test.cppm` | test | C++ 测试夹具（`src/unit_test`） |
@@ -1354,7 +1354,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | 整数算术的宽度语义 | `expression` 的 `scalar::TypedColumn` 按列宽 checked；SQL `eval_binary` 仍为 i64/f64 域 | C++ 的 `AddFunction`/`SubFunction`/`MulFunction` 按列宽 checked 求值（溢出→NULL）。标量函数层已按列宽实现；SQL 表达式的值域统一为 i64，未按列宽检查溢出 |
 | `TableDef` / `ColumnDef` 的 `WriteAdv`/`ReadAdv` 二进制布局 | `TableDef::to_bytes`/`from_bytes`（JSON，复用 `ColumnDefValue` 编码） | Rust 侧不需要 C++ 的内存二进制布局；持久化仍走 `catalog::layout` 的键空间。字段集合与往返语义不变 |
 | `PlaidIndex` 的 mmap 读取（`LoadFromPtr` / `centroid_ids` 指针模式） | `index::plaid::PlaidIndex` 的 owned `Vec<u32>` | mmap 属于已批准的原语豁免；执行器的 chunk 加载器总是解码为 owned 缓冲，语义（同一份 `SaveIndexInner` 字节布局）不变 |
-| geo 类型（`PointType`/`LineType`/`LineSegmentType`/`BoxType`/`CircleType`/`PathType`/`PolygonType`）及其 `column_vector_geo_ut`、`function/cast/geography/*` 用例 | 无 | 用户明确决定不需要 Box/Point/Circle 等 geo 类型，测试与产品代码均不移植 | 
+| geo 类型（`PointType`/`LineType`/`LineSegmentType`/`BoxType`/`CircleType`/`PathType`/`PolygonType`）及其 `column_vector_geo_ut`、`function/cast/geography/*` 用例 | 无 | 用户明确决定不需要 Box/Point/Circle 等 geo 类型，测试与产品代码均不移植 |
 | DiskANN / Vamana（`knn_diskann/*`：`VamanaAlg`、`PQFlashIndex`、`FixedChunkPQTable`、`DiskAnnMemGraphStore`、`NeighborPriorityQueue` 等） | 无 | 计划 §2.6/R14 明确不纳入：C++ 的 populate 分支只 `LOG_WARN("Not implemented yet")` 后返回成功，索引不可用；Rust 不移植不可达的骨架 |
 
 ## 5 C++ 单元测试对应

@@ -950,7 +950,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 927 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_append` | ported | `executor` `request_ut::conflict_drop_column_append` |
 | 928 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_import` | ported | `executor` `request_ut::conflict_drop_column_import` |
 | 929 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_compact` | ported | `executor` `request_ut::conflict_drop_column_compact` |
-| 930 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_create_index` | exempt | 该用例所在的 `#if 0` 块（691-767 行）被关闭，无编译后可执行行为 
+| 930 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `drop_column_create_index` | exempt | 该用例所在的 `#if 0` 块（691-767 行）被关闭，无编译后可执行行为
 | 931 | `src/unit_test/storage/new_request/conflict_request_ut.cpp` | `TestConflictRequestTest` | `delete_append` | ported | `executor` `request_ut::conflict_delete_append` |
 | 932 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_append` | ported | `executor` `request_ut::append_into_missing_table_fails` |
 | 933 | `src/unit_test/storage/new_request/data_request_ut.cpp` | `TestDataRequest` | `test_select` | ported | `executor` `request_ut::select_returns_inserted_row` |
