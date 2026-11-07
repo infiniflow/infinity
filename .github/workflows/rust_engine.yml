@@ -2,14 +2,13 @@ name: rust_engine
 
 # CI for the Rust rewrite (RUST_REWRITE_PLAN.md M0/M6).
 #
-# One test definition, four cells. The suites under python/restart_test are
-# written once and run against both binaries (reference / rewrite) on both
-# architectures (amd64 / arm64), so an engine-specific failure is a single red
-# cell instead of a second copy of the test file. The format gate (both engines
-# in one run) is a separate job per architecture.
+# This workflow tests the rewrite alone: the reference engine, the
+# cross-engine format gate and the C++ suites belong to the reference's own
+# workflows (tests.yml / slow_tests.yml), so nothing here builds C++.
 #
-# arm64 needs a cross-built reference, so those cells run on push / schedule /
-# manual runs; pull requests stay on amd64.
+# Each suite is written once and run per architecture: pull requests stay on
+# amd64, while push / nightly / manual runs cover amd64 and arm64.
+
 on:
   push:
     paths:
@@ -33,10 +32,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Cases the rewrite cannot run yet, one pytest node id per line. Deselected
-  # only on the rust cells - the reference run stays the control. Source of
-  # truth: rust_engine/docs/GAPS.md section 1 (intentionally not ported);
-  # delete a line here when the gap closes.
+  # Cases the rewrite cannot run yet, one pytest node id per line. There is no
+  # reference cell to leave untouched here, so they are deselected from every
+  # cell; a line goes away when the gap closes. Source of truth:
+  # rust_engine/docs/GAPS.md section 1.
   RUST_DESELECT: |
     python/restart_test/test_cross_engine_bytes_60_storage.py::test_the_port_round_trips_through_object_storage
 
@@ -109,9 +108,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # arm64 needs the cross-built reference / arm runners, so PRs stay on
-        # amd64; push, nightly and manual runs cover both. A job-level if cannot
-        # read matrix, so the axis itself is computed from the event.
+        # arm64 machines queue longer, so pull requests stay on amd64; push,
+        # nightly and manual runs cover both. A job-level if cannot read the
+        # matrix, so the axis itself is computed from the event.
         arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
     defaults:
       run:
@@ -167,33 +166,25 @@ jobs:
         run: cargo run -q --release -p cli -- conformance ../test/sql
 
   build:
-    # One binary per engine and architecture; every later job downloads the
-    # ones it needs. The reference is built in the repo's builder images, the
-    # rewrite natively on a runner of its own architecture.
-    name: build (${{ matrix.engine }}, ${{ matrix.arch }})
-    runs-on: ${{ matrix.engine == 'cpp' && 'ubuntu-latest' || (matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest') }}
+    # One binary per architecture; the later jobs download the one they need.
+    name: build (${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        # The reference build is 40-60 minutes in a builder image and depends
-        # on vcpkg's downloads, so pull requests run the rewrite alone; push,
-        # nightly and manual runs build both engines.
-        engine: ${{ github.event_name == 'pull_request' && fromJSON('["rust"]') || fromJSON('["cpp","rust"]') }}
         arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-
-      # ---- rewrite -----------------------------------------------------
       - name: Install the pinned toolchain
-        if: matrix.engine == 'rust'
         run: rustup toolchain install --profile minimal
       - name: Install clang, mold and libclang
-        if: matrix.engine == 'rust'
         # rust_engine/.cargo/config.toml builds RocksDB with clang and links
-        # with mold (`-fuse-ld=mold`); without them every build script fails
-        # with "collect2: fatal error: cannot find 'ld'".
+        # with mold (`-fuse-ld=mold`), and librocksdb-sys runs bindgen, which
+        # needs libclang. Without them the build fails in its first seconds
+        # ("cannot find 'ld'", then "couldn't find any valid shared libraries
+        # matching: ['libclang.so']").
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq clang mold libclang-dev
@@ -209,79 +200,31 @@ jobs:
             echo "LIBCLANG_PATH=$(dirname "$so")" >> "$GITHUB_ENV"
           fi
       - uses: Swatinem/rust-cache@v2
-        if: matrix.engine == 'rust'
         with:
           workspaces: rust_engine
       - name: Build the rewrite
-        if: matrix.engine == 'rust'
         working-directory: rust_engine
         run: cargo build --release -p cli
-
-      # ---- reference ---------------------------------------------------
-      - name: Build the reference (amd64)
-        if: matrix.engine == 'cpp' && matrix.arch == 'amd64'
-        run: |
-          docker run --cap-add=NET_ADMIN -d --name infinity_builder \
-            -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource \
-            infiniflow/infinity-x64-x64-v2-builder:latest
-          docker exec infinity_builder cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json \
-            /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json
-          docker exec infinity_builder cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_MAKE_PROGRAM=/usr/local/bin/ninja \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -S /infinity -B /infinity/cmake-build-reldeb
-          docker exec infinity_builder cmake --build /infinity/cmake-build-reldeb --target infinity -j 8
-      - name: Build the reference (arm64, cross-compiled)
-        if: matrix.engine == 'cpp' && matrix.arch == 'arm64'
-        run: |
-          docker run -d --name infinity_builder \
-            -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource \
-            infiniflow/infinity-x64-arm64-builder:latest
-          docker exec infinity_builder cp /infinity/.github/workflows/x64-arm64-libstdc++.modules.json \
-            /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json
-          docker exec infinity_builder bash -c "\
-            git config --global safe.directory '*' && cd /infinity && \
-            rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && \
-            SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ \
-            GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/ \
-            cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
-              -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
-              -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/arm64-linux.cmake \
-              -DVCPKG_OVERLAY_TRIPLETS=\$PWD/cmake/triplets -DVCPKG_TARGET_TRIPLET=arm64-linux \
-              -DCMAKE_CXX_STDLIB_MODULES_JSON=/x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json \
-              -DCMAKE_BUILD_TYPE=Release -S /infinity -B /infinity/cmake-build-reldeb && \
-            cmake --build /infinity/cmake-build-reldeb --target infinity -j 8"
-
       - name: Collect the binary
         run: |
           mkdir -p bin
-          if [ "${{ matrix.engine }}" = "rust" ]; then
-            cp rust_engine/target/release/infinity bin/infinity
-          else
-            cp cmake-build-reldeb/src/infinity bin/infinity
-          fi
+          cp rust_engine/target/release/infinity bin/infinity
           chmod +x bin/infinity
           file bin/infinity
-      - name: Stop the builder
-        if: always() && matrix.engine == 'cpp'
-        run: docker rm -f infinity_builder || true
       - uses: actions/upload-artifact@v7
         with:
-          name: bin-${{ matrix.engine }}-${{ matrix.arch }}
+          name: bin-${{ matrix.arch }}
           path: bin/infinity
           retention-days: 3
 
   restart:
-    # Gate C: the restart / recovery suite, one definition, one binary per cell.
-    name: restart (${{ matrix.engine }}, ${{ matrix.arch }})
+    # Gate C: the restart / recovery suite.
+    name: restart (${{ matrix.arch }})
     needs: build
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        # The reference build is 40-60 minutes in a builder image and depends
-        # on vcpkg's downloads, so pull requests run the rewrite alone; push,
-        # nightly and manual runs build both engines.
-        engine: ${{ github.event_name == 'pull_request' && fromJSON('["rust"]') || fromJSON('["cpp","rust"]') }}
         arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
     steps:
       - uses: actions/checkout@v6
@@ -289,7 +232,7 @@ jobs:
           submodules: recursive
       - uses: actions/download-artifact@v8
         with:
-          name: bin-${{ matrix.engine }}-${{ matrix.arch }}
+          name: bin-${{ matrix.arch }}
           path: bin
       - name: Prepare the resources and the data directory
         run: |
@@ -301,21 +244,14 @@ jobs:
       - name: Install the SDK and the test dependencies
         run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
       - name: Restart suite
-        env:
-          ENGINE: ${{ matrix.engine }}
         run: |
+          # The harness starts the engine as '<binary> --config=<toml>'; the
+          # shim maps that onto the rewrite's CLI.
+          export INFINITY_SERVER_BIN="${PWD}/bin/infinity"
           args=()
-          if [ "${ENGINE}" = "rust" ]; then
-            # The harness starts the engine as '<binary> --config=<toml>'; the
-            # shim maps that onto the rewrite's CLI.
-            export INFINITY_SERVER_BIN="${PWD}/bin/infinity"
-            binary="rust_engine/scripts/infinity_rust_shim.sh"
-            while IFS= read -r case; do
-              if [ -n "${case}" ]; then args+=("--deselect=${case}"); fi
-            done <<< "${RUST_DESELECT}"
-          else
-            binary="${PWD}/bin/infinity"
-          fi
+          while IFS= read -r case; do
+            if [ -n "${case}" ]; then args+=("--deselect=${case}"); fi
+          done <<< "${RUST_DESELECT}"
           # The harness kills every process named `infinity` between phases and
           # binds fixed ports, so give the run its own PID namespace and a
           # disk-backed /var/infinity (same shape as scripts/run_gate_c.sh).
@@ -323,23 +259,23 @@ jobs:
           bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
                 --unshare-pid --proc /proc -- \
                 .venv/bin/python -m pytest -q -m "not slow" -k "not cross_engine" \
-                python/restart_test --infinity_path="${binary}" --tb=short "${args[@]}"
+                python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
+                --tb=short "${args[@]}"
       - name: Engine log
         if: always()
         run: tail -n 500 restart_test_infinity.log.* 2>/dev/null || true
 
   sdk:
-    # Gate B: the unmodified Python SDK driving the matrix engine. Nightly and
-    # manual runs only - the suite is ~30 files and takes tens of minutes per
-    # cell, which does not belong on every pull request.
-    name: sdk (${{ matrix.engine }}, ${{ matrix.arch }})
+    # Gate B: the unmodified Python SDK. Nightly and manual runs only - the
+    # suite is ~30 files and takes tens of minutes per cell, which does not
+    # belong on every pull request.
+    name: sdk (${{ matrix.arch }})
     needs: build
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        engine: [cpp, rust]
         arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v6
@@ -347,7 +283,7 @@ jobs:
           submodules: recursive
       - uses: actions/download-artifact@v8
         with:
-          name: bin-${{ matrix.engine }}-${{ matrix.arch }}
+          name: bin-${{ matrix.arch }}
           path: bin
       - name: Prepare the resources and the data directory
         run: |
@@ -360,8 +296,6 @@ jobs:
         run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
       - name: Start the engine
         run: |
-          # Both CLIs read the same toml (ports 23817/23820, data under
-          # /var/infinity), so the matrix cell only differs by the binary.
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
       - name: Python SDK suite
@@ -371,68 +305,6 @@ jobs:
         run: |
           pkill -f "bin/infinity --config" || true
           tail -n 200 infinity.log || true
-
-  cross_engine:
-    # Gate C's format half: both engines in one run, per architecture.
-    name: format gate (${{ matrix.arch }})
-    needs: build
-    # The byte gate needs both engines, so it follows the reference build:
-    # not on pull requests, where only the rewrite is built.
-    if: github.event_name != 'pull_request'
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: ${{ github.event_name == 'pull_request' && fromJSON('["amd64"]') || fromJSON('["amd64","arm64"]') }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-      - uses: actions/download-artifact@v8
-        with:
-          name: bin-cpp-${{ matrix.arch }}
-          path: bin/cpp
-      - uses: actions/download-artifact@v8
-        with:
-          name: bin-rust-${{ matrix.arch }}
-          path: bin/rust
-      - name: Prepare
-        run: |
-          chmod +x bin/cpp/infinity bin/rust/infinity
-          sudo mkdir -p /usr/share/infinity/resource /var/infinity
-          sudo cp -r resource/. /usr/share/infinity/resource/
-          sudo chown -R "${USER}" /usr/share/infinity /var/infinity
-          # bubblewrap gives the run its own PID namespace and a disk-backed
-          # /var/infinity; install it on images that do not ship it.
-          command -v bwrap >/dev/null 2>&1 || {
-            sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap
-          }
-      - uses: astral-sh/setup-uv@v7
-      - name: Install the SDK and the test dependencies
-        run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
-      - name: Byte and cross-read suites
-        env:
-          INFINITY_CPP_BIN: ${{ github.workspace }}/bin/cpp/infinity
-          INFINITY_SERVER_BIN: ${{ github.workspace }}/bin/rust/infinity
-          # Keep the shim's HTTP-port pin and allocator settings; it forwards to
-          # INFINITY_SERVER_BIN.
-          INFINITY_RUST_BIN: rust_engine/scripts/infinity_rust_shim.sh
-        run: |
-          args=()
-          while IFS= read -r case; do
-            if [ -n "${case}" ]; then args+=("--deselect=${case}"); fi
-          done <<< "${RUST_DESELECT}"
-          work="$(mktemp -d)"
-          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
-                --unshare-pid --proc /proc -- \
-                .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_bytes_*.py \
-                -rx "${args[@]}"
-          work="$(mktemp -d)"
-          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
-                --unshare-pid --proc /proc -- \
-                .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_compat.py \
-                --infinity_path=rust_engine/scripts/infinity_rust_shim.sh
-
 
   slow:
     # slow_tests.yml runs, nightly, what a pull request never pays for:
