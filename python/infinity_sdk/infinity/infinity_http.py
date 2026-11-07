@@ -44,14 +44,14 @@ from .http_utils import (
 def is_json_function(col_name: str) -> bool:
     """Check if column name is a JSON extraction function"""
     json_functions = [
-        'json_extract',
-        'json_extract_string',
-        'json_extract_int',
-        'json_extract_double',
-        'json_extract_bool',
-        'json_extract_isnull',
-        'json_exists_path',
-        'json_contains'
+        "json_extract",
+        "json_extract_string",
+        "json_extract_int",
+        "json_extract_double",
+        "json_extract_bool",
+        "json_extract_isnull",
+        "json_exists_path",
+        "json_contains",
     ]
     col_name_lower = col_name.lower()
     return any(col_name_lower.startswith(func) for func in json_functions)
@@ -61,7 +61,7 @@ def _parse_cast_target_type(cast_expr: str) -> str | None:
     if not cast_expr.lower().startswith("cast("):
         return None
 
-    match = re.search(r'\)\s*AS\s+(\w+)\s*\)$', cast_expr, re.IGNORECASE)
+    match = re.search(r"\)\s*AS\s+(\w+)\s*\)$", cast_expr, re.IGNORECASE)
     if not match:
         return None
 
@@ -69,21 +69,22 @@ def _parse_cast_target_type(cast_expr: str) -> str | None:
 
     # Map SQL types to pandas dtypes
     type_mapping = {
-        'VARCHAR': 'string',
-        'INTEGER': 'Int32',
-        'INT': 'Int32',
-        'BIGINT': 'Int64',
-        'TINYINT': 'Int8',
-        'SMALLINT': 'Int16',
-        'FLOAT': 'Float32',
-        'FLOAT32': 'Float32',
-        'FLOAT64': 'Float64',
-        'DOUBLE': 'Float64',
-        'BOOLEAN': 'boolean',
-        'BOOL': 'boolean',
+        "VARCHAR": "string",
+        "INTEGER": "Int32",
+        "INT": "Int32",
+        "BIGINT": "Int64",
+        "TINYINT": "Int8",
+        "SMALLINT": "Int16",
+        "FLOAT": "Float32",
+        "FLOAT32": "Float32",
+        "FLOAT64": "Float64",
+        "DOUBLE": "Float64",
+        "BOOLEAN": "boolean",
+        "BOOL": "boolean",
     }
 
     return type_mapping.get(target_type, None)
+
 
 class http_network_util:
     header_dict = baseHeader
@@ -96,7 +97,7 @@ class http_network_util:
 
     def set_retry(self, retry: bool = True):
         self.retry = retry
-        if (self.retry):
+        if self.retry:
             self.retry_time = 100
             self.retry_sleep = 0.5
 
@@ -151,7 +152,9 @@ class http_network_util:
                 logging.debug(f"retry {i} times")
                 time.sleep(self.retry_sleep)
             else:
-                raise Exception(f"Cannot connect to {url} after {self.retry_time} retries")
+                raise Exception(
+                    f"Cannot connect to {url} after {self.retry_time} retries"
+                )
             return response
         return self.request_inner(url, method, header, data)
 
@@ -181,7 +184,9 @@ class http_network_util:
                     resp_json = resp.json()
                     if "error_msg" in resp_json:
                         print(500, resp_json["error_code"], resp_json["error_msg"])
-                        raise InfinityException(resp_json["error_code"], resp_json["error_msg"])
+                        raise InfinityException(
+                            resp_json["error_code"], resp_json["error_msg"]
+                        )
                     else:
                         print(500, resp_json["error_code"])
                         raise InfinityException(resp_json["error_code"], "")
@@ -243,7 +248,9 @@ class infinity_http:
     def set_role_follower(self, node_name, leader_addr):
         url = "admin/node/current"
         h = self.net.set_up_header(["accept", "content-type"])
-        d = self.net.set_up_data([], {"role": "follower", "name": node_name, "address": leader_addr})
+        d = self.net.set_up_data(
+            [], {"role": "follower", "name": node_name, "address": leader_addr}
+        )
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
         return database_result()
@@ -251,7 +258,9 @@ class infinity_http:
     def set_role_learner(self, node_name, leader_addr):
         url = "admin/node/current"
         h = self.net.set_up_header(["accept", "content-type"])
-        d = self.net.set_up_data([], {"role": "learner", "name": node_name, "address": leader_addr})
+        d = self.net.set_up_data(
+            [], {"role": "learner", "name": node_name, "address": leader_addr}
+        )
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
         return database_result()
@@ -345,8 +354,11 @@ class infinity_http:
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
         # print(r.json())
-        return database_result(node_name=r.json()["node"]["name"], node_role=r.json()["node"]["role"],
-                               node_status=r.json()["node"]["status"])
+        return database_result(
+            node_name=r.json()["node"]["name"],
+            node_role=r.json()["node"]["role"],
+            node_status=r.json()["node"]["status"],
+        )
 
     def show_current_node(self):
         url = "admin/node/current"
@@ -354,7 +366,9 @@ class infinity_http:
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
         # print(r.json())
-        return database_result(node_role=r.json()["node"]["role"], node_status=r.json()["node"]["status"])
+        return database_result(
+            node_role=r.json()["node"]["role"], node_status=r.json()["node"]["status"]
+        )
 
     def show_global_variables(self):
         url = "variables/global"
@@ -500,6 +514,7 @@ class infinity_http:
 
 ####################3####################3####################3####################3####################3####################3####################3####################3
 
+
 class database_http:
     def __init__(self, net: http_network_util, database_name: str):
         self.net = net
@@ -508,10 +523,10 @@ class database_http:
 
     # table
     def create_table(
-            self,
-            table_name,
-            columns_definition={},
-            conflict_type=ConflictType.Error,
+        self,
+        table_name,
+        columns_definition={},
+        conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
         if not isinstance(conflict_type, (list, dict, tuple)):
@@ -528,7 +543,9 @@ class database_http:
                     tmp[param_name.lower()] = columns_definition[col][param_name]
                 fields.append(tmp)
         except Exception:
-            raise InfinityException(ErrorCode.SYNTAX_ERROR, "http adapter create table parse error")
+            raise InfinityException(
+                ErrorCode.SYNTAX_ERROR, "http adapter create table parse error"
+            )
         # print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
@@ -546,9 +563,9 @@ class database_http:
         return table_http(self.net, self.database_name, table_name)
 
     def drop_table(
-            self,
-            table_name,
-            conflict_type=ConflictType.Error,
+        self,
+        table_name,
+        conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
         if not isinstance(conflict_type, (list, dict, tuple)):
@@ -673,11 +690,11 @@ class table_http:
 
     # index
     def create_index(
-            self,
-            index_name,
-            index_info,
-            conflict_type=ConflictType.Error,
-            index_comment: str = ""
+        self,
+        index_name,
+        index_info,
+        conflict_type=ConflictType.Error,
+        index_comment: str = "",
     ):
         copt = conflict_type
         if not isinstance(conflict_type, (list, dict, tuple)):
@@ -692,7 +709,10 @@ class table_http:
         if index_info.params is not None:
             for key, value in index_info.params.items():
                 if not isinstance(value, str):
-                    raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"parameter value: {value} isn't string")
+                    raise InfinityException(
+                        ErrorCode.INVALID_INDEX_PARAM,
+                        f"parameter value: {value} isn't string",
+                    )
                 create_index_info[key] = value
         # print(fields)
         # print(create_index_info)
@@ -703,16 +723,21 @@ class table_http:
         )
         d = self.net.set_up_data(
             ["create_option"],
-            {"comment": index_comment, "fields": fields, "index": create_index_info, "create_option": copt}
+            {
+                "comment": index_comment,
+                "fields": fields,
+                "index": create_index_info,
+                "create_option": copt,
+            },
         )
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
         return database_result()
 
     def drop_index(
-            self,
-            index_name,
-            conflict_type=ConflictType.Error,
+        self,
+        index_name,
+        conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
         if not isinstance(conflict_type, (list, dict, tuple)):
@@ -788,16 +813,20 @@ class table_http:
                         value[key] = {
                             "function": "fde",
                             "tensor_data": fde_obj.tensor_data,
-                            "target_dimension": fde_obj.target_dimension
+                            "target_dimension": fde_obj.target_dimension,
                         }
-                    elif isinstance(value[key],
-                                    np.ndarray):  # trans np array to list since http api can not parse np array
+                    elif isinstance(
+                        value[key], np.ndarray
+                    ):  # trans np array to list since http api can not parse np array
                         value[key] = value[key].tolist()
                     elif isinstance(value[key], list):
                         for idx in range(len(value[key])):
                             if isinstance(value[key][idx], np.ndarray):
                                 value[key][idx] = value[key][idx].tolist()
-                            elif isinstance(value[key][idx], (np.integer, np.floating, np.longdouble)):
+                            elif isinstance(
+                                value[key][idx],
+                                (np.integer, np.floating, np.longdouble),
+                            ):
                                 value[key][idx] = value[key][idx].item()
                     elif isinstance(value[key], SparseVector):
                         value[key] = value[key].to_dict()
@@ -808,8 +837,11 @@ class table_http:
         self.net.raise_exception(r)
         return database_result()
 
-    def import_data(self, data_path="/home/infiniflow/Documents/development/infinity/test/data/csv/pysdk_test.csv",
-                    import_options={}):
+    def import_data(
+        self,
+        data_path="/home/infiniflow/Documents/development/infinity/test/data/csv/pysdk_test.csv",
+        import_options={},
+    ):
         data = {}
         data["file_path"] = data_path
         data["file_type"] = "csv"
@@ -881,8 +913,8 @@ class table_http:
         return self.net.get_database_result(r)
 
     def output(
-            self,
-            output=[],
+        self,
+        output=[],
     ):
         return table_http_result(output, self)
 
@@ -893,8 +925,8 @@ class table_http:
         r = self.net.request(url, "delete", h, d)
         self.net.raise_exception(r)
         json_res = r.json()
-        error_code = json_res['error_code']
-        delete_rows = json_res['deleted_rows']
+        error_code = json_res["error_code"]
+        delete_rows = json_res["deleted_rows"]
         return database_result(error_code=error_code, deleted_rows=delete_rows)
 
     def update(self, filter_str: str, update: dict[str, Any]):
@@ -910,14 +942,14 @@ class table_http:
         h = self.net.set_up_header(["accept", "content-type"])
         r = self.net.request(url, "get", h)
         self.net.raise_exception(r)
-        return pd.DataFrame(r.json()['segments'])
+        return pd.DataFrame(r.json()["segments"])
 
     def show_blocks(self, segment_id: int):
         url = f"databases/{self.database_name}/tables/{self.table_name}/segments/{segment_id}/blocks"
         h = self.net.set_up_header(["accept", "content-type"])
         r = self.net.request(url, "get", h)
         self.net.raise_exception(r)
-        return pd.DataFrame(r.json()['blocks'])
+        return pd.DataFrame(r.json()["blocks"])
 
 
 class table_http_result:
@@ -989,10 +1021,13 @@ class table_http_result:
         # Print timing information for large responses
         if response_size > 100000:  # Only print for responses > 100KB
             print(
-                f"HTTP Timing - Network: {network_time:.2f}ms, Parse: {parse_time:.2f}ms, Size: {response_size:,} bytes")
+                f"HTTP Timing - Network: {network_time:.2f}ms, Parse: {parse_time:.2f}ms, Size: {response_size:,} bytes"
+            )
             if "output" in result_json:
                 row_count = len(result_json["output"])
-                print(f"  Rows: {row_count:,}, Avg row size: {response_size / row_count:.1f} bytes")
+                print(
+                    f"  Rows: {row_count:,}, Avg row size: {response_size / row_count:.1f} bytes"
+                )
 
         self.table_http.net.raise_exception(r)
         # print(r.json())
@@ -1059,8 +1094,8 @@ class table_http_result:
         return message
 
     def highlight(
-            self,
-            highlight=[],
+        self,
+        highlight=[],
     ):
         self._highlight = highlight
         return self
@@ -1069,10 +1104,15 @@ class table_http_result:
         for order_by_expr in order_by_expr_list:
             tmp = {}
             if len(order_by_expr) != 2:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER,
-                                        "order_by_expr_list must be a list of [column_name, sort_type]")
+                raise InfinityException(
+                    ErrorCode.INVALID_PARAMETER,
+                    "order_by_expr_list must be a list of [column_name, sort_type]",
+                )
             if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, "sort_type must be SortType.Asc or SortType.Desc")
+                raise InfinityException(
+                    ErrorCode.INVALID_PARAMETER,
+                    "sort_type must be SortType.Asc or SortType.Desc",
+                )
             if order_by_expr[1] == SortType.Asc:
                 tmp[order_by_expr[0]] = "asc"
             else:
@@ -1105,8 +1145,15 @@ class table_http_result:
         self._option = option
         return self
 
-    def match_text(self, fields: str, query: str, topn: int, opt_params: dict | None = None):
-        tmp_match_expr = {"match_method": "text", "fields": fields, "matching_text": query, "topn": topn}
+    def match_text(
+        self, fields: str, query: str, topn: int, opt_params: dict | None = None
+    ):
+        tmp_match_expr = {
+            "match_method": "text",
+            "fields": fields,
+            "matching_text": query,
+            "topn": topn,
+        }
         if opt_params is not None:
             tmp_match_expr["params"] = opt_params
         self._search_exprs.append(tmp_match_expr)
@@ -1116,19 +1163,41 @@ class table_http_result:
         deprecated_api("match is deprecated, please use match_text instead")
         return self.match_text(*args, **kwargs)
 
-    def match_tensor(self, column_name: str, query_data, query_data_type: str, topn: int,
-                     extra_option: dict | None = None):
-        tmp_match_tensor = {"match_method": "tensor", "field": column_name, "query_tensor": query_data,
-                            "element_type": query_data_type, "topn": topn}
+    def match_tensor(
+        self,
+        column_name: str,
+        query_data,
+        query_data_type: str,
+        topn: int,
+        extra_option: dict | None = None,
+    ):
+        tmp_match_tensor = {
+            "match_method": "tensor",
+            "field": column_name,
+            "query_tensor": query_data,
+            "element_type": query_data_type,
+            "topn": topn,
+        }
         if extra_option is not None:
             tmp_match_tensor["params"] = extra_option
         self._search_exprs.append(tmp_match_tensor)
         return self
 
-    def match_sparse(self, vector_column_name: str, sparse_data: SparseVector | dict, distance_type: str, topn: int,
-                     opt_params: dict | None = None):
-        tmp_match_sparse = {"match_method": "sparse", "fields": vector_column_name,
-                            "query_vector": sparse_data.to_dict(), "metric_type": distance_type, "topn": topn}
+    def match_sparse(
+        self,
+        vector_column_name: str,
+        sparse_data: SparseVector | dict,
+        distance_type: str,
+        topn: int,
+        opt_params: dict | None = None,
+    ):
+        tmp_match_sparse = {
+            "match_method": "sparse",
+            "fields": vector_column_name,
+            "query_vector": sparse_data.to_dict(),
+            "metric_type": distance_type,
+            "topn": topn,
+        }
         if opt_params is not None:
             tmp_match_sparse["params"] = opt_params
         self._search_exprs.append(tmp_match_sparse)
@@ -1138,10 +1207,23 @@ class table_http_result:
         self._filter = filter_expr
         return self
 
-    def match_dense(self, fields: str, query_vector: list, element_type: str, metric_type: str, top_k: int,
-                    opt_params: dict | None = None):
-        tmp_match_dense = {"match_method": "dense", "fields": fields, "query_vector": query_vector,
-                           "element_type": element_type, "metric_type": metric_type, "topn": top_k}
+    def match_dense(
+        self,
+        fields: str,
+        query_vector: list,
+        element_type: str,
+        metric_type: str,
+        top_k: int,
+        opt_params: dict | None = None,
+    ):
+        tmp_match_dense = {
+            "match_method": "dense",
+            "fields": fields,
+            "query_vector": query_vector,
+            "element_type": element_type,
+            "metric_type": metric_type,
+            "topn": top_k,
+        }
         if opt_params is not None:
             tmp_match_dense["params"] = opt_params
         self._search_exprs.append(tmp_match_dense)
@@ -1154,8 +1236,11 @@ class table_http_result:
     def fusion(self, method: str, topn: int, fusion_params: dict | None = None):
         tmp_fusion_expr = {"fusion_method": method, "topn": topn}
         if method == "match_tensor":
-            tmp_new_params = {"field": fusion_params["field"], "query_tensor": fusion_params["query_tensor"],
-                              "element_type": fusion_params["element_type"]}
+            tmp_new_params = {
+                "field": fusion_params["field"],
+                "query_tensor": fusion_params["query_tensor"],
+                "element_type": fusion_params["element_type"],
+            }
             # handle left params
             fusion_params.pop("field")
             fusion_params.pop("query_tensor")
@@ -1194,7 +1279,7 @@ class table_http_result:
                 col_name = next(iter(col))
                 v = col[col_name]
 
-                bitmap = col_name + '_bitmap'
+                bitmap = col_name + "_bitmap"
                 bitmap_value = col.get(bitmap)
                 if bitmap_value is not None and not bitmap_value:
                     v = None
@@ -1216,11 +1301,11 @@ class table_http_result:
                     sparse_vec = str2sparse(v)
                     new_tup = tup + (sparse_vec,)
                 else:
-                    if v.lower() == 'true':
+                    if v.lower() == "true":
                         v = True
-                    elif v.lower() == 'false':
+                    elif v.lower() == "false":
                         v = False
-                    elif v.lower() == 'none':  # Convert string "None" to Python None
+                    elif v.lower() == "none":  # Convert string "None" to Python None
                         v = None
                     new_tup = tup + (v,)
                 df_dict[col_name] = new_tup
@@ -1243,7 +1328,7 @@ class table_http_result:
             if k in col_types:  # might be object
                 df_type[k] = type_to_dtype(col_types[k])
             if k in ["DISTANCE", "SCORE", "SIMILARITY"]:
-                df_type[k] = 'Float32'
+                df_type[k] = "Float32"
             # "(c1 + c2)", "sqrt(c1), round(c1)"
             k1 = k.replace("(", " ")
             k1 = k1.replace(")", " ")
@@ -1258,21 +1343,21 @@ class table_http_result:
                 if col.strip() in col_types:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
                     df_type[k] = function_return_type(function_name, df_type[k])
-                elif col.strip().isdigit() and df_type.get(k) != 'Float64':
-                    df_type[k] = 'Int32'
+                elif col.strip().isdigit() and df_type.get(k) != "Float64":
+                    df_type[k] = "Int32"
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif is_float(col.strip()):
-                    df_type[k] = 'Float64'
+                    df_type[k] = "Float64"
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif col == "/":
-                    df_type[k] = 'Float64'
+                    df_type[k] = "Float64"
                     break
                 else:
                     function_name = col.strip().lower()
-                    if (function_name in functions):
+                    if function_name in functions:
                         df_type[k] = function_return_type(function_name, None)
-                    if (function_name in bool_functions):
-                        df_type[k] = 'boolean'
+                    if function_name in bool_functions:
+                        df_type[k] = "boolean"
                         break
 
         end_process = time.perf_counter()
@@ -1280,7 +1365,9 @@ class table_http_result:
 
         # Print timing for large datasets
         if len(self.output_res) > 1000:  # Only print for datasets with > 1000 rows
-            print(f"HTTP Data Processing - Time: {process_time:.2f}ms, Rows: {len(self.output_res):,}")
+            print(
+                f"HTTP Data Processing - Time: {process_time:.2f}ms, Rows: {len(self.output_res):,}"
+            )
 
         return df_dict, df_type, extra_result
 
@@ -1304,7 +1391,7 @@ class table_http_result:
         # Convert Unicode string dtype to object to preserve None values
         df_type_fixed = {}
         for k, v in df_type.items():
-            if isinstance(v, dtype) and v.kind == 'U':  # Unicode string type
+            if isinstance(v, dtype) and v.kind == "U":  # Unicode string type
                 df_type_fixed[k] = object  # Use object to preserve None
             else:
                 df_type_fixed[k] = v
@@ -1317,7 +1404,8 @@ class table_http_result:
         # Print timing for large DataFrames
         if len(df) > 1000:  # Only print for DataFrames with > 1000 rows
             print(
-                f"HTTP DataFrame Timing - Processing: {result_time:.2f}ms, Construction: {df_time:.2f}ms, Rows: {len(df):,}")
+                f"HTTP DataFrame Timing - Processing: {result_time:.2f}ms, Construction: {df_time:.2f}ms, Rows: {len(df):,}"
+            )
 
         return df, extra_result
 
@@ -1328,9 +1416,25 @@ class table_http_result:
 
 @dataclass
 class database_result:
-    def __init__(self, list=[], database_name: str = "", error_code=ErrorCode.OK, columns=[], index_names=[],
-                 node_name="", node_role="", node_status="", index_type=None, index_comment=None, deleted_rows=0,
-                 data={}, nodes=[], error_msg="", snapshots=[], config_value: Any = None):
+    def __init__(
+        self,
+        list=[],
+        database_name: str = "",
+        error_code=ErrorCode.OK,
+        columns=[],
+        index_names=[],
+        node_name="",
+        node_role="",
+        node_status="",
+        index_type=None,
+        index_comment=None,
+        deleted_rows=0,
+        data={},
+        nodes=[],
+        error_msg="",
+        snapshots=[],
+        config_value: Any = None,
+    ):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
@@ -1349,41 +1453,47 @@ class database_result:
         self.config_value = config_value
 
 
-list_tables_result = namedtuple('list_tables_result', [
-    'error_code',
-    'error_msg',
-    'table_names',
-])
+list_tables_result = namedtuple(
+    "list_tables_result",
+    [
+        "error_code",
+        "error_msg",
+        "table_names",
+    ],
+)
 
 
 def convert_to_list_tables_result(data_dict):
     return list_tables_result(
-        error_code=data_dict.get('error_code'),
-        error_msg=data_dict.get('error_msg'),
-        table_names=data_dict.get('table_names'),
+        error_code=data_dict.get("error_code"),
+        error_msg=data_dict.get("error_msg"),
+        table_names=data_dict.get("table_names"),
     )
 
 
-show_table_result = namedtuple('show_table_result', [
-    'error_code',
-    'error_msg',
-    'database_name',
-    'table_name',
-    'store_dir',
-    'column_count',
-    'segment_count'
-])
+show_table_result = namedtuple(
+    "show_table_result",
+    [
+        "error_code",
+        "error_msg",
+        "database_name",
+        "table_name",
+        "store_dir",
+        "column_count",
+        "segment_count",
+    ],
+)
 
 
 def convert_to_show_table_result(data_dict):
     return show_table_result(
-        error_code=data_dict.get('error_code'),
-        error_msg=data_dict.get('error_msg'),
-        database_name=data_dict.get('database_name'),
-        table_name=data_dict.get('table_name'),
-        store_dir=data_dict.get('storage_directory'),
-        column_count=int(data_dict.get('column_count')),
-        segment_count=int(data_dict.get('segment_count')),
+        error_code=data_dict.get("error_code"),
+        error_msg=data_dict.get("error_msg"),
+        database_name=data_dict.get("database_name"),
+        table_name=data_dict.get("table_name"),
+        store_dir=data_dict.get("storage_directory"),
+        column_count=int(data_dict.get("column_count")),
+        segment_count=int(data_dict.get("segment_count")),
     )
 
 
@@ -1392,22 +1502,38 @@ identifier_limit = 65536
 
 def check_valid_name(name, name_type: str = "Table"):
     if not isinstance(name, str):
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name must be a string, got {type(name)}")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME,
+            f"{name_type} name must be a string, got {type(name)}",
+        )
     if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME,
+            f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores",
+        )
     if len(name) > identifier_limit:
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name '{name}' is not of appropriate length")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME,
+            f"{name_type} name '{name}' is not of appropriate length",
+        )
     if name is None:
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}"
+        )
     if name.isspace():
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name cannot be composed of whitespace characters only")
-    if name == '':
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
-    if name == ' ':
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME,
+            f"{name_type} name cannot be composed of whitespace characters only",
+        )
+    if name == "":
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}"
+        )
+    if name == " ":
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}"
+        )
     if name.isdigit():
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}"
+        )

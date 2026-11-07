@@ -31,13 +31,17 @@ from restart_test import bytes_common as bc
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASETS = {
     "sift": {
-        "dir": os.environ.get("SIFT_DIR", os.path.join(REPO_ROOT, "test/data/benchmark/sift_1m")),
+        "dir": os.environ.get(
+            "SIFT_DIR", os.path.join(REPO_ROOT, "test/data/benchmark/sift_1m")
+        ),
         "dim": 128,
         "table": "sift",
         "prefix": "sift",
     },
     "gist": {
-        "dir": os.environ.get("GIST_DIR", os.path.join(REPO_ROOT, "test/data/benchmark/gist_1m")),
+        "dir": os.environ.get(
+            "GIST_DIR", os.path.join(REPO_ROOT, "test/data/benchmark/gist_1m")
+        ),
         "dim": 960,
         "table": "gist",
         "prefix": "gist",
@@ -85,7 +89,11 @@ def read_ivecs(path, limit=None):
 
 def subset_fvecs(src, dst, rows, dims):
     """The first `rows` records of `src` as a standalone fvecs file."""
-    if rows <= 0 or os.path.exists(dst) and os.path.getsize(dst) == rows * (4 + 4 * dims):
+    if (
+        rows <= 0
+        or os.path.exists(dst)
+        and os.path.getsize(dst) == rows * (4 + 4 * dims)
+    ):
         return dst
     with open(src, "rb") as f, open(dst, "wb") as g:
         for _ in range(rows):
@@ -99,8 +107,19 @@ def subset_fvecs(src, dst, rows, dims):
 def sql(port, stmt, timeout=None):
     return subprocess.run(
         [
-            "psql", "-h", "127.0.0.1", "-p", str(port), "-U", "admin",
-            "-d", "default_db", "-A", "-t", "-c", stmt,
+            "psql",
+            "-h",
+            "127.0.0.1",
+            "-p",
+            str(port),
+            "-U",
+            "admin",
+            "-d",
+            "default_db",
+            "-A",
+            "-t",
+            "-c",
+            stmt,
         ],
         capture_output=True,
         text=True,
@@ -133,7 +152,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("engine", choices=["cpp", "rust"])
     ap.add_argument("--dataset", choices=["sift", "gist"], default="sift")
-    ap.add_argument("--no-index", action="store_true", help="brute force: skip CREATE INDEX")
+    ap.add_argument(
+        "--no-index", action="store_true", help="brute force: skip CREATE INDEX"
+    )
     ap.add_argument("--build-type", choices=["plain", "lsg"], default="plain")
     ap.add_argument("--data-dir", default="", help="override the dataset directory")
     ap.add_argument("--rows", type=int, default=0, help="0 = the whole base")
@@ -163,7 +184,11 @@ def main():
     shutil.rmtree(root, ignore_errors=True)
     os.makedirs(root, exist_ok=True)
     bc._write_config(args.engine, root, port)
-    binary = bc.CPP_BIN if args.engine == "cpp" else "rust_engine/scripts/infinity_rust_shim.sh"
+    binary = (
+        bc.CPP_BIN
+        if args.engine == "cpp"
+        else "rust_engine/scripts/infinity_rust_shim.sh"
+    )
     log = os.path.join(root, "engine.log")
     proc = subprocess.Popen(
         [binary, f"--config={root}/engine.toml"],
@@ -202,11 +227,17 @@ def main():
             raise SystemExit(f"create table: {r.stderr}")
 
         t0 = time.time()
-        r = sql(port, f"COPY {table} FROM '{base}' WITH (DELIMITER ',', FORMAT fvecs);", timeout=3600)
+        r = sql(
+            port,
+            f"COPY {table} FROM '{base}' WITH (DELIMITER ',', FORMAT fvecs);",
+            timeout=3600,
+        )
         result["import_s"] = round(time.time() - t0, 3)
         if r.returncode != 0:
             raise SystemExit(f"copy: {r.stderr[-2000:]}")
-        result["imported_rows"] = sql(port, f"SELECT count(*) FROM {table};").stdout.strip().splitlines()[-1]
+        result["imported_rows"] = (
+            sql(port, f"SELECT count(*) FROM {table};").stdout.strip().splitlines()[-1]
+        )
 
         if args.no_index:
             result["index_s"] = 0.0
@@ -256,8 +287,12 @@ def main():
 
         latencies.sort()
         result["qps"] = round(len(latencies) / sum(latencies), 2) if latencies else 0
-        result["lat_p50_ms"] = round(latencies[len(latencies) // 2] * 1000, 3) if latencies else 0
-        result["lat_p95_ms"] = round(latencies[int(len(latencies) * 0.95)] * 1000, 3) if latencies else 0
+        result["lat_p50_ms"] = (
+            round(latencies[len(latencies) // 2] * 1000, 3) if latencies else 0
+        )
+        result["lat_p95_ms"] = (
+            round(latencies[int(len(latencies) * 0.95)] * 1000, 3) if latencies else 0
+        )
         result["recall_at_100"] = round(hits / total, 4) if total else 0
     finally:
         try:

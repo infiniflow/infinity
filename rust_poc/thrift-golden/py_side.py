@@ -7,12 +7,15 @@ Encodes CommonResponse / ColumnField with the SDK's generated `ttypes`, writes
 Run after the Rust program has produced rust_*.bin:
     python3 py_side.py <workdir>
 """
+
 import json
 import os
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-RPC = os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift", "infinity_thrift_rpc")
+RPC = os.path.join(
+    REPO, "python", "infinity_sdk", "infinity", "remote_thrift", "infinity_thrift_rpc"
+)
 sys.path.insert(0, RPC)
 
 import ttypes
@@ -50,31 +53,52 @@ def main():
     vec0 = bytearray()
     for v in (7, 8):
         vec0 += int(v).to_bytes(4, "little", signed=True)
-    cf = ttypes.ColumnField(column_type=1, column_vectors=[bytes(vec0)], column_name="score", bitmasks=[True, False])
+    cf = ttypes.ColumnField(
+        column_type=1,
+        column_vectors=[bytes(vec0)],
+        column_name="score",
+        bitmasks=[True, False],
+    )
     cf_bytes = encode(cf)
     with open(os.path.join(workdir, "py_column_field.bin"), "wb") as f:
         f.write(cf_bytes)
 
-    print(f"python encoded: common_response={len(cr_bytes)} bytes, column_field={len(cf_bytes)} bytes")
+    print(
+        f"python encoded: common_response={len(cr_bytes)} bytes, column_field={len(cf_bytes)} bytes"
+    )
 
     # --- decode Rust-produced bytes ---
     p = os.path.join(workdir, "rust_common_response.bin")
     if os.path.exists(p):
         o = decode(ttypes.CommonResponse, open(p, "rb").read())
-        print("PY_DECODED py_common_response.bin " + dump(
-            {"error_code": o.error_code, "error_msg": o.error_msg, "session_id": o.session_id}
-        ))
+        print(
+            "PY_DECODED py_common_response.bin "
+            + dump(
+                {
+                    "error_code": o.error_code,
+                    "error_msg": o.error_msg,
+                    "session_id": o.session_id,
+                }
+            )
+        )
     p = os.path.join(workdir, "rust_column_field.bin")
     if os.path.exists(p):
         o = decode(ttypes.ColumnField, open(p, "rb").read())
         ints = []
         for chunk in o.column_vectors:
             for i in range(0, len(chunk), 4):
-                ints.append(int.from_bytes(chunk[i:i + 4], "little", signed=True))
-        print("PY_DECODED py_column_field.bin " + dump(
-            {"column_type": o.column_type, "column_name": o.column_name, "ints": ints,
-             "bitmasks": [bool(b) for b in o.bitmasks]}
-        ))
+                ints.append(int.from_bytes(chunk[i : i + 4], "little", signed=True))
+        print(
+            "PY_DECODED py_column_field.bin "
+            + dump(
+                {
+                    "column_type": o.column_type,
+                    "column_name": o.column_name,
+                    "ints": ints,
+                    "bitmasks": [bool(b) for b in o.bitmasks],
+                }
+            )
+        )
 
 
 if __name__ == "__main__":

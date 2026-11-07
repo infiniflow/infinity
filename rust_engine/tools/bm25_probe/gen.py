@@ -85,7 +85,9 @@ int main(int argc, char **argv) {
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--grid", action="store_true", help="print a (N, df, avg, len) grid")
+    ap.add_argument(
+        "--grid", action="store_true", help="print a (N, df, avg, len) grid"
+    )
     ap.add_argument("--cxx", default=os.environ.get("CXX", "clang++"))
     args = ap.parse_args()
     with tempfile.TemporaryDirectory() as td:
@@ -95,7 +97,10 @@ def main() -> int:
             f.write(SRC)
         subprocess.run([args.cxx, "-std=c++23", "-O2", "-o", exe, src], check=True)
         out = subprocess.run(
-            [exe] + (["--grid"] if args.grid else []), check=True, capture_output=True, text=True
+            [exe] + (["--grid"] if args.grid else []),
+            check=True,
+            capture_output=True,
+            text=True,
         )
     print(out.stdout, end="")
     return 0

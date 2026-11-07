@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """SDK→engine→SDK `Update` round-trip. Run after `cargo build`:
-    python3 py_call_update.py
+python3 py_call_update.py
 """
+
 import os
 import subprocess
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-sys.path.append(os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift"))
+sys.path.append(
+    os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift")
+)
 
 from infinity_thrift_rpc import InfinityService as S
 from infinity_thrift_rpc import ttypes as T
@@ -17,15 +20,25 @@ from thrift.transport import TTransport
 
 
 def col(name):
-    return T.ParsedExpr(type=T.ParsedExprType(column_expr=T.ColumnExpr(column_name=[name])))
+    return T.ParsedExpr(
+        type=T.ParsedExprType(column_expr=T.ColumnExpr(column_name=[name]))
+    )
 
 
 def i64(v):
-    return T.ParsedExpr(type=T.ParsedExprType(constant_expr=T.ConstantExpr(literal_type=T.LiteralType.Int64, i64_value=v)))
+    return T.ParsedExpr(
+        type=T.ParsedExprType(
+            constant_expr=T.ConstantExpr(literal_type=T.LiteralType.Int64, i64_value=v)
+        )
+    )
 
 
 def strv(v):
-    return T.ParsedExpr(type=T.ParsedExprType(constant_expr=T.ConstantExpr(literal_type=T.LiteralType.String, str_value=v)))
+    return T.ParsedExpr(
+        type=T.ParsedExprType(
+            constant_expr=T.ConstantExpr(literal_type=T.LiteralType.String, str_value=v)
+        )
+    )
 
 
 def encode():
@@ -33,12 +46,20 @@ def encode():
     proto = TBinaryProtocol.TBinaryProtocol(buf)
     proto.writeMessageBegin("Update", TMessageType.CALL, 1)
     where = T.ParsedExpr(
-        type=T.ParsedExprType(function_expr=T.FunctionExpr(function_name=">=", arguments=[col("id"), i64(2)]))
+        type=T.ParsedExprType(
+            function_expr=T.FunctionExpr(
+                function_name=">=", arguments=[col("id"), i64(2)]
+            )
+        )
     )
     upd = T.UpdateExpr(column_name="name", value=strv("X"))
     args = S.Update_args()
     args.request = T.UpdateRequest(
-        db_name="default_db", table_name="t", where_expr=where, update_expr_array=[upd], session_id=1
+        db_name="default_db",
+        table_name="t",
+        where_expr=where,
+        update_expr_array=[upd],
+        session_id=1,
     )
     args.write(proto)
     proto.writeMessageEnd()

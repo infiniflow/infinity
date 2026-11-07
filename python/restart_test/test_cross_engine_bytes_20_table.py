@@ -92,9 +92,7 @@ def test_the_two_engines_write_the_same_bytes():
     # the directory holds no schema, so the check is skipped rather than
     # failed.
     zero_size_indexes = {
-        index_id
-        for index_id, kind in INDEX_KINDS.items()
-        if kind in ("hnsw", "bmp")
+        index_id for index_id, kind in INDEX_KINDS.items() if kind in ("hnsw", "bmp")
     }
     cpp_catalog = _normalize_catalog(
         _table_records(_catalog_pairs(cpp_root, cpp_pg), cpp_dir, TABLE),
@@ -159,9 +157,7 @@ def test_the_reference_is_deterministic_where_the_test_assumes_it():
     digests = [_files(root) for root in roots]
     names = sorted(set().union(*[set(d) for d in digests]))
     varying = [
-        name
-        for name in names
-        if len({digest.get(name) for digest in digests}) > 1
+        name for name in names if len({digest.get(name) for digest in digests}) > 1
     ]
     # Only the HNSW chunk may vary. Everything else - the block columns, the
     # outline, the full-text chunk, the secondary and the sparse chunks - is
@@ -171,9 +167,9 @@ def test_the_reference_is_deterministic_where_the_test_assumes_it():
     # test's own scale: at a few thousand rows the reference's HNSW build
     # spreads over several threads and the graph varies between runs, which is
     # exactly why the byte test compares the HNSW chunk by content.
-    assert all(
-        name.endswith("idx_2/seg_0/chunk_0.idx") for name in varying
-    ), f"the reference is not deterministic here: {varying}"
+    assert all(name.endswith("idx_2/seg_0/chunk_0.idx") for name in varying), (
+        f"the reference is not deterministic here: {varying}"
+    )
 
 
 BLOCK_TABLE = "test_cross_engine_blocks"
@@ -262,17 +258,23 @@ def _seed_kinds(conn):
     db = conn.get_database("default_db")
     db.drop_table(KIND_TABLE, ConflictType.Ignore)
     t = db.create_table(KIND_TABLE, KIND_COLUMNS, ConflictType.Error)
-    t.create_index("ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index(
+        "ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"})
+    )
     t.create_index(
         "cos_idx",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "cosine"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "cosine"},
         ),
     )
     t.create_index(
         "ip_idx",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "ip"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "ip"},
         ),
     )
     t.create_index(

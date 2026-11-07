@@ -41,7 +41,10 @@ def timed(label, fn):
     start = time.perf_counter()
     fn()
     elapsed = time.perf_counter() - start
-    print(f"MAINT {label} {elapsed:.6f}  # {elapsed / ROWS_PER_STEP * 1e6:.1f} us/row", flush=True)
+    print(
+        f"MAINT {label} {elapsed:.6f}  # {elapsed / ROWS_PER_STEP * 1e6:.1f} us/row",
+        flush=True,
+    )
 
 
 def main():
@@ -60,7 +63,10 @@ def main():
     for base in range(0, ROWS, BATCH):
         end = min(base + BATCH, ROWS)
         t.insert(
-            [{"id": i, "name": f"n-{i}", "score": float(i % 1000)} for i in range(base, end)]
+            [
+                {"id": i, "name": f"n-{i}", "score": float(i % 1000)}
+                for i in range(base, end)
+            ]
         )
     obj.flush_data()
     time.sleep(1)

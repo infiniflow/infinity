@@ -13,7 +13,9 @@ from infinity_runner import InfinityRunner
 # and the *other* engine has to read the same data directory: the queries must
 # return the same rows and new inserts must keep working.
 CPP_BIN = os.environ.get("INFINITY_CPP_BIN", "cmake-build-reldeb/src/infinity")
-RUST_BIN = os.environ.get("INFINITY_RUST_BIN", "rust_engine/scripts/infinity_rust_shim.sh")
+RUST_BIN = os.environ.get(
+    "INFINITY_RUST_BIN", "rust_engine/scripts/infinity_rust_shim.sh"
+)
 CONFIG = "test/data/config/restart_test/test_memidx/1.toml"
 URI = NetworkAddress("127.0.0.1", 23817)
 
@@ -152,9 +154,7 @@ def _snapshot(conn):
     )
     out["double_eq"] = _ids(t.output(["id"]).filter("d = 2.5").to_result())
     out["bool_eq"] = _ids(t.output(["id"]).filter("b = true").to_result())
-    out["date_eq"] = _ids(
-        t.output(["id"]).filter("dt = '2024-01-05'").to_result()
-    )
+    out["date_eq"] = _ids(t.output(["id"]).filter("dt = '2024-01-05'").to_result())
     out["date_range"] = _ids(
         t.output(["id"]).filter("dt >= '2024-01-03' and dt <= '2024-01-07'").to_result()
     )
@@ -358,7 +358,45 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
     assert before["bigint_range"] == [1, 2, 3], before["bigint_range"]
     assert before["double_eq"] == [10], before["double_eq"]
     assert before["date_eq"] == [4, 32, 60, 88, 116, 144, 172], before["date_eq"]
-    assert before["date_range"] == [2, 3, 4, 5, 6, 30, 31, 32, 33, 34, 58, 59, 60, 61, 62, 86, 87, 88, 89, 90, 114, 115, 116, 117, 118, 142, 143, 144, 145, 146, 170, 171, 172, 173, 174, 198, 199], before["date_range"]
+    assert before["date_range"] == [
+        2,
+        3,
+        4,
+        5,
+        6,
+        30,
+        31,
+        32,
+        33,
+        34,
+        58,
+        59,
+        60,
+        61,
+        62,
+        86,
+        87,
+        88,
+        89,
+        90,
+        114,
+        115,
+        116,
+        117,
+        118,
+        142,
+        143,
+        144,
+        145,
+        146,
+        170,
+        171,
+        172,
+        173,
+        174,
+        198,
+        199,
+    ], before["date_range"]
     # The 16-bit floats: the values are exact (a half holds every integer
     # below 2048), so the two engines must agree on them, and the filters
     # prove the columns are usable in predicates.
@@ -370,14 +408,16 @@ def test_indices_and_rows_survive_the_other_engine(first, second):
     assert before["i8"] == [0, 1, 2, 3, 4], before["i8"]
     assert before["i16"] == [0, 1, 2, 3, 4], before["i16"]
     assert before["tm"] == ["00:00:00", "01:01:00", "02:02:00"], before["tm"]
-    assert (
-        before["dtm"]
-        == ["2024-01-01 00:00:00", "2024-01-02 01:01:00", "2024-01-03 02:02:00"]
-    ), before["dtm"]
-    assert (
-        before["ts"]
-        == ["2024-01-01 00:00:00", "2024-01-02 01:01:00", "2024-01-03 02:02:00"]
-    ), before["ts"]
+    assert before["dtm"] == [
+        "2024-01-01 00:00:00",
+        "2024-01-02 01:01:00",
+        "2024-01-03 02:02:00",
+    ], before["dtm"]
+    assert before["ts"] == [
+        "2024-01-01 00:00:00",
+        "2024-01-02 01:01:00",
+        "2024-01-03 02:02:00",
+    ], before["ts"]
     # The second pair of 16-bit floats carries the same values.
     assert before["f16b"] == [0.0, 1.0, 2.0, 3.0, 4.0], before["f16b"]
     assert before["bf16b"] == [0.0, 1.0, 2.0, 3.0, 4.0], before["bf16b"]
@@ -523,7 +563,17 @@ ANALYZER_ROWS = [
     "2023-01-01",
     "skies ties",
 ]
-ANALYZER_QUERIES = ["a", "b", "alpha", "beta", "quick", "a,b", "2023-01-01", "ski", "ti"]
+ANALYZER_QUERIES = [
+    "a",
+    "b",
+    "alpha",
+    "beta",
+    "quick",
+    "a,b",
+    "2023-01-01",
+    "ski",
+    "ti",
+]
 
 
 def _analyzer_probe(conn):

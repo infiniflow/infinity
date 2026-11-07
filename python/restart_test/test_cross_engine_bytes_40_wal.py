@@ -158,11 +158,9 @@ def _append_blocks(wal_dir):
     same names the reference does.
     """
     sealed = sorted(
-
-            (int(name.rsplit(".", 1)[1]), os.path.join(wal_dir, name))
-            for name in os.listdir(wal_dir)
-            if name.startswith("wal.log.") and name.rsplit(".", 1)[1].isdigit()
-
+        (int(name.rsplit(".", 1)[1]), os.path.join(wal_dir, name))
+        for name in os.listdir(wal_dir)
+        if name.startswith("wal.log.") and name.rsplit(".", 1)[1].isdigit()
     )
     files = [path for _, path in sealed] + [os.path.join(wal_dir, "wal.log")]
     out = []
@@ -222,7 +220,9 @@ def test_the_append_block_matches_for_every_type():
     cpp = _append_blocks(os.path.join(roots["cpp"], "wal"))
     rust = _append_blocks(os.path.join(roots["rust"], "wal"))
     names = [name for name, _, _ in WAL_TYPE_TABLES]
-    assert len(cpp) == len(names), f"{len(cpp)} reference appends for {len(names)} tables"
+    assert len(cpp) == len(names), (
+        f"{len(cpp)} reference appends for {len(names)} tables"
+    )
     assert len(rust) == len(names), f"{len(rust)} port appends for {len(names)} tables"
     for name, a, b in zip(names, cpp, rust):
         assert a == b, f"{name} block differs:\n  cpp  {a.hex()}\n  rust {b.hex()}"
@@ -268,7 +268,11 @@ def _phase_ddl_wal(conn):
     t.create_index("ft", index.IndexInfo("body", index.IndexType.FullText))
     t.create_index(
         "hn",
-        index.IndexInfo("v", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}),
+        index.IndexInfo(
+            "v",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "l2"},
+        ),
     )
     t.create_index("bm", index.IndexInfo("sp", index.IndexType.BMP))
     # IVF's option is a POD blob: the plain variant pins the centroid defaults,

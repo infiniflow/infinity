@@ -35,9 +35,7 @@ def main() -> int:
                 raise
             time.sleep(1)
     db.drop_table("bench_t", ConflictType.Ignore)
-    t = db.create_table(
-        "bench_t", {"id": {"type": "int"}, "name": {"type": "varchar"}}
-    )
+    t = db.create_table("bench_t", {"id": {"type": "int"}, "name": {"type": "varchar"}})
 
     batch = 1000
     batches = [

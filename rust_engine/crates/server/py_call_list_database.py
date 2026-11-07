@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """SDK→server `ListDatabase` round-trip. Run after `cargo build`:
-    python3 py_call_list_database.py
+python3 py_call_list_database.py
 """
+
 import os
 import subprocess
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-sys.path.append(os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift"))
+sys.path.append(
+    os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift")
+)
 
 from infinity_thrift_rpc import InfinityService as S
 from infinity_thrift_rpc import ttypes as T
@@ -28,7 +31,9 @@ def encode():
 
 
 def main():
-    binary = os.path.join(REPO, "rust_engine", "target", "debug", "handle-list-database")
+    binary = os.path.join(
+        REPO, "rust_engine", "target", "debug", "handle-list-database"
+    )
     proc = subprocess.run([binary], input=encode(), capture_output=True)
     if proc.returncode != 0:
         print("binary failed:", proc.stderr.decode(errors="replace"))

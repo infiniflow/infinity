@@ -4,12 +4,15 @@
 `cargo build`:
     python3 py_call_select_proj.py
 """
+
 import os
 import subprocess
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-sys.path.append(os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift"))
+sys.path.append(
+    os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift")
+)
 
 from infinity_thrift_rpc import InfinityService as S
 from infinity_thrift_rpc import ttypes as T
@@ -22,8 +25,12 @@ def encode_select():
     buf = TTransport.TMemoryBuffer()
     proto = TBinaryProtocol.TBinaryProtocol(buf)
     proto.writeMessageBegin("Select", TMessageType.CALL, 1)
-    proj = T.ParsedExpr(type=T.ParsedExprType(column_expr=T.ColumnExpr(column_name=["name"])))
-    req = T.SelectRequest(session_id=1, db_name="default_db", table_name="t", select_list=[proj])
+    proj = T.ParsedExpr(
+        type=T.ParsedExprType(column_expr=T.ColumnExpr(column_name=["name"]))
+    )
+    req = T.SelectRequest(
+        session_id=1, db_name="default_db", table_name="t", select_list=[proj]
+    )
     args = S.Select_args()
     args.request = req
     args.write(proto)
@@ -44,7 +51,9 @@ def main():
     proto.readMessageEnd()
     r = res.success
     defs = [d.name for d in r.column_defs]
-    cols = {f.column_name: [bytes(v) for v in f.column_vectors] for f in r.column_fields}
+    cols = {
+        f.column_name: [bytes(v) for v in f.column_vectors] for f in r.column_fields
+    }
     print(f"defs={defs} name={cols.get('name')}")
     ok = r.error_code == 0 and defs == ["name"] and cols.get("name") == [b"a", b"b"]
     print("PY_SELECT_PROJ_OK" if ok else "PY_SELECT_PROJ_FAIL")

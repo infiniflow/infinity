@@ -82,9 +82,7 @@ def main():
     def range_q():
         for i in range(RANGES):
             lo = float(i % 900)
-            t.output(["id"]).filter(
-                f"score >= {lo} and score < {lo + 10}"
-            ).to_result()
+            t.output(["id"]).filter(f"score >= {lo} and score < {lo + 10}").to_result()
 
     def varchar_point():
         for i in range(POINTS):
@@ -111,7 +109,9 @@ def main():
     )
     timeit(
         "build_id",
-        lambda: t.create_index("idx_id", index.IndexInfo("id", index.IndexType.Secondary)),
+        lambda: t.create_index(
+            "idx_id", index.IndexInfo("id", index.IndexType.Secondary)
+        ),
     )
 
     def unique_point():

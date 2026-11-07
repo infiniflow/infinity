@@ -56,7 +56,9 @@ INDEXES = [
         "hnsw",
         "vec",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "200", "metric": "l2"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "200", "metric": "l2"},
         ),
     ),
     ("secondary", "title", index.IndexInfo("title", index.IndexType.Secondary)),
@@ -68,13 +70,21 @@ def query(t, kind, i):
     if kind == "fulltext":
         return t.output(["id"]).match_text("body", "alpha", 10).to_result()
     if kind == "hnsw":
-        return t.output(["id"]).match_dense("vec", [0.5, 0.5, 0.25, 0.75], "float", "l2", 10).to_result()
+        return (
+            t.output(["id"])
+            .match_dense("vec", [0.5, 0.5, 0.25, 0.75], "float", "l2", 10)
+            .to_result()
+        )
     if kind == "secondary":
         return t.output(["id"]).filter(f"title = 'doc-{i}'").to_result()
     if kind == "sparse":
-        return t.output(["id"]).match_sparse(
-            "sp", SparseVector(indices=[0, 1], values=[0.5, 1.0]), "ip", 10
-        ).to_result()
+        return (
+            t.output(["id"])
+            .match_sparse(
+                "sp", SparseVector(indices=[0, 1], values=[0.5, 1.0]), "ip", 10
+            )
+            .to_result()
+        )
     raise AssertionError(kind)
 
 

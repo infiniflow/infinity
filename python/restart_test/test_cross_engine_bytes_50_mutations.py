@@ -175,7 +175,7 @@ IDX_INDEXES = {
     1: "secondary-u32",  # id
     2: "secondary-f32",  # score
     3: "secondary-f64",  # amount: a DOUBLE key (`LargeSigned<double>`)
-    4: "bmp",            # sp
+    4: "bmp",  # sp
 }
 
 
@@ -281,13 +281,13 @@ def test_the_secondary_and_sparse_indexes_survive_deletes_updates_and_a_restart(
     # difference the byte comparison of a *different* chunk boundary cannot see.
     queries = {
         "id_eq": lambda t: t.output(["id"]).filter("id = 42").to_result(),
-        "score_range": lambda t: t.output(["id"])
-        .filter("score >= 10.0 and score <= 12.0")
-        .to_result(),
+        "score_range": lambda t: (
+            t.output(["id"]).filter("score >= 10.0 and score <= 12.0").to_result()
+        ),
         "amount_eq": lambda t: t.output(["id"]).filter("amount = 52.5").to_result(),
-        "sparse": lambda t: t.output(["id"])
-        .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
-        .to_result(),
+        "sparse": lambda t: (
+            t.output(["id"]).match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5).to_result()
+        ),
     }
     cpp_answers = _answers(roots["cpp"], 5432, IDX_TABLE, queries)
     rust_answers = _answers(roots["rust"], 5433, IDX_TABLE, queries)
@@ -335,9 +335,11 @@ def _phase_sparse_options(conn, root):
     time.sleep(1)
     answers = {}
     for name, opts, topn in SPARSE_OPT_QUERIES:
-        data, _types, _extra = t.output(["id"]).match_sparse(
-            "sp", {0: 0.9, 1: 0.5, 2: 0.1}, "ip", topn, opts
-        ).to_result()
+        data, _types, _extra = (
+            t.output(["id"])
+            .match_sparse("sp", {0: 0.9, 1: 0.5, 2: 0.1}, "ip", topn, opts)
+            .to_result()
+        )
         # A variant that filters everything out answers no columns at all.
         answers[name] = (
             {name: [str(v) for v in values] for name, values in data.items()}
@@ -446,10 +448,14 @@ def _phase_vec_initial(conn):
     t.create_index(
         "vec_hnsw",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "l2"},
         ),
     )
-    t.create_index("vec_ivf", index.IndexInfo("vec2", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index(
+        "vec_ivf", index.IndexInfo("vec2", index.IndexType.IVF, {"metric": "l2"})
+    )
     t.insert(_vec_rows(0, 100))
     conn.flush_data()
     _dump_indexes(t, ["vec_hnsw", "vec_ivf"])
@@ -519,12 +525,18 @@ def test_the_vector_indexes_survive_deletes_updates_and_a_restart():
     queries = {
         # The query vector is one of the rewritten rows, so an index that still
         # holds the pre-update vectors answers a different id.
-        "hnsw": lambda t: t.output(["id"])
-        .match_dense("vec", [0.9, 0.9, 0.9, 0.9], "float", "l2", 5)
-        .to_result(),
-        "ivf": lambda t: t.output(["id"])
-        .match_dense("vec2", [0.8, 0.8, 0.8, 0.8], "float", "l2", 5, {"nprobe": "16"})
-        .to_result(),
+        "hnsw": lambda t: (
+            t.output(["id"])
+            .match_dense("vec", [0.9, 0.9, 0.9, 0.9], "float", "l2", 5)
+            .to_result()
+        ),
+        "ivf": lambda t: (
+            t.output(["id"])
+            .match_dense(
+                "vec2", [0.8, 0.8, 0.8, 0.8], "float", "l2", 5, {"nprobe": "16"}
+            )
+            .to_result()
+        ),
         "count": lambda t: t.output(["count(*)"]).to_result(),
     }
     cpp_answers = _answers(roots["cpp"], 5432, VEC_TABLE, queries)
@@ -688,12 +700,16 @@ def test_the_quantized_ivf_indexes_mirror_and_answer():
 
     probe = [0.5] * 8
     queries = {
-        "sq": lambda t: t.output(["id"])
-        .match_dense("sq", probe, "float", "l2", 10, {"nprobe": "16"})
-        .to_result(),
-        "pq": lambda t: t.output(["id"])
-        .match_dense("pq", probe, "float", "l2", 10, {"nprobe": "16"})
-        .to_result(),
+        "sq": lambda t: (
+            t.output(["id"])
+            .match_dense("sq", probe, "float", "l2", 10, {"nprobe": "16"})
+            .to_result()
+        ),
+        "pq": lambda t: (
+            t.output(["id"])
+            .match_dense("pq", probe, "float", "l2", 10, {"nprobe": "16"})
+            .to_result()
+        ),
         "count": lambda t: t.output(["count(*)"]).to_result(),
     }
     for engine, port in (("cpp", 5432), ("rust", 5433)):
@@ -734,13 +750,17 @@ def test_the_quantized_ivf_indexes_survive_a_crash():
         probe = [0.5] * 8
         queries = {
             "count": lambda t: t.output(["count(*)"]).to_result(),
-            "sq": lambda t: t.output(["id"])
-            .match_dense("sq", probe, "float", "l2", 10, {"nprobe": "16"})
-            .to_result(),
+            "sq": lambda t: (
+                t.output(["id"])
+                .match_dense("sq", probe, "float", "l2", 10, {"nprobe": "16"})
+                .to_result()
+            ),
         }
-        queries["pq"] = lambda t: t.output(["id"]).match_dense(
-            "pq", probe, "float", "l2", 10, {"nprobe": "16"}
-        ).to_result()
+        queries["pq"] = lambda t: (
+            t.output(["id"])
+            .match_dense("pq", probe, "float", "l2", 10, {"nprobe": "16"})
+            .to_result()
+        )
         answers = _answers(root, port, QUANT_TABLE, queries)
         # 200 flushed − 10 deleted + 30 appended.
         assert answers["count"] == [220], (
@@ -799,10 +819,14 @@ def _phase_crash_idx_base(conn):
     t.create_index(
         "vec_idx",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "l2"},
         ),
     )
-    t.create_index("ivf_idx", index.IndexInfo("vec2", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index(
+        "ivf_idx", index.IndexInfo("vec2", index.IndexType.IVF, {"metric": "l2"})
+    )
     t.create_index("ft_idx", index.IndexInfo("body", index.IndexType.FullText))
     t.insert(_crash_idx_rows(0, 100))
     conn.flush_data()
@@ -851,16 +875,26 @@ def test_the_indexes_survive_a_crash():
         queries = {
             "count": lambda t: t.output(["count(*)"]).to_result(),
             "id_eq": lambda t: t.output(["id"]).filter("id = 42").to_result(),
-            "sparse": lambda t: t.output(["id"])
-            .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
-            .to_result(),
-            "hnsw": lambda t: t.output(["id"])
-            .match_dense("vec", [0.1, 0.1, 0.2, 0.3], "float", "l2", 5)
-            .to_result(),
-            "ivf": lambda t: t.output(["id"])
-            .match_dense("vec2", [0.25, 0.25, 0.5, 0.75], "float", "l2", 5, {"nprobe": "16"})
-            .to_result(),
-            "fulltext": lambda t: t.output(["id"]).match_text("body", "alpha", 5).to_result(),
+            "sparse": lambda t: (
+                t.output(["id"])
+                .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
+                .to_result()
+            ),
+            "hnsw": lambda t: (
+                t.output(["id"])
+                .match_dense("vec", [0.1, 0.1, 0.2, 0.3], "float", "l2", 5)
+                .to_result()
+            ),
+            "ivf": lambda t: (
+                t.output(["id"])
+                .match_dense(
+                    "vec2", [0.25, 0.25, 0.5, 0.75], "float", "l2", 5, {"nprobe": "16"}
+                )
+                .to_result()
+            ),
+            "fulltext": lambda t: (
+                t.output(["id"]).match_text("body", "alpha", 5).to_result()
+            ),
         }
         answers = _answers(root, port, CRASH_IDX_TABLE, queries)
         assert answers["count"] == [140], (
@@ -873,6 +907,8 @@ def test_the_indexes_survive_a_crash():
 
 
 CRASH_TABLE = "test_cross_engine_crash"
+
+
 def _phase_crash_base(conn):
     db = conn.get_database("default_db")
     db.drop_table(CRASH_TABLE, ConflictType.Ignore)

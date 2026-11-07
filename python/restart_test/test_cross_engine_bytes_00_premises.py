@@ -43,8 +43,6 @@ def test_the_port_is_deterministic_too():
     digests = [_files(root) for root in roots]
     names = sorted(set().union(*[set(d) for d in digests]))
     varying = [
-        name
-        for name in names
-        if len({digest.get(name) for digest in digests}) > 1
+        name for name in names if len({digest.get(name) for digest in digests}) > 1
     ]
     assert not varying, f"the port is not deterministic here: {varying}"

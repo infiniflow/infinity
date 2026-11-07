@@ -4,12 +4,15 @@ authoritative Python codec, run it through the Rust `handle-create-table` binary
 and decode the `CommonResponse` REPLY. Run (after `cargo build`):
     python3 py_call_create_table.py
 """
+
 import os
 import subprocess
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-sys.path.append(os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift"))
+sys.path.append(
+    os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift")
+)
 
 from infinity_thrift_rpc import InfinityService as S
 from infinity_thrift_rpc import ttypes as T
@@ -51,9 +54,15 @@ def main():
     res = S.CreateTable_result()
     res.read(proto)
     proto.readMessageEnd()
-    ok = name == "CreateTable" and res.success is not None and res.success.error_code == 0
+    ok = (
+        name == "CreateTable"
+        and res.success is not None
+        and res.success.error_code == 0
+    )
     if res.success is not None:
-        print(f"reply method={name} error_code={res.success.error_code} msg={res.success.error_msg}")
+        print(
+            f"reply method={name} error_code={res.success.error_code} msg={res.success.error_msg}"
+        )
     print("PY_CREATE_TABLE_OK" if ok else "PY_CREATE_TABLE_FAIL")
     sys.exit(0 if ok else 1)
 

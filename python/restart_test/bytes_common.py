@@ -280,7 +280,9 @@ def _seed(conn, row_count=ROWS):
     t.create_index(
         "vec_idx",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "l2"},
         ),
     )
     t.create_index("sec", index.IndexInfo("title", index.IndexType.Secondary))
@@ -966,7 +968,6 @@ def _mask_null_slots(blob):
     return bytes(out)
 
 
-
 def _reader_config(root, pg_port):
     """A config for *reading* an engine's directory with the reference.
 
@@ -1136,7 +1137,9 @@ def _index_answers(root, pg_port):
 
         return {
             # The full-text index.
-            "fulltext": ids(table.output(["id"]).match_text("body", "alpha", 10).to_result()),
+            "fulltext": ids(
+                table.output(["id"]).match_text("body", "alpha", 10).to_result()
+            ),
             # The HNSW index: the graph is built, so only the *answer* is
             # comparable - and it must be the same one.
             "hnsw": ids(
@@ -1146,11 +1149,15 @@ def _index_answers(root, pg_port):
             ),
             # The sparse (BMP) index.
             "sparse": ids(
-                table.output(["id"]).match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5).to_result()
+                table.output(["id"])
+                .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
+                .to_result()
             ),
             # The secondary index on a varchar column (an equality) and on a
             # float column (an equality and a range).
-            "secondary_eq": ids(table.output(["id"]).filter("title = 'doc-7'").to_result()),
+            "secondary_eq": ids(
+                table.output(["id"]).filter("title = 'doc-7'").to_result()
+            ),
             "secondary_float_eq": ids(
                 table.output(["id"]).filter("score = 2.5").to_result()
             ),
@@ -1223,7 +1230,11 @@ def _table_records(pairs, table_dir, table):
             # `drop|seg|{db}/{table}/{segment}` and
             # `drop|idx_seg|{db}/{table}/{index}/{segment}`: a compaction's
             # deprecation marks, keyed by ids rather than by name.
-            if len(parts) > 2 and parts[2].startswith(f"{db_id}/{table_id}/") or table in key:
+            if (
+                len(parts) > 2
+                and parts[2].startswith(f"{db_id}/{table_id}/")
+                or table in key
+            ):
                 out[key] = value
     return out
 
@@ -1274,7 +1285,9 @@ def _normalize_catalog(pairs, zero_size_indexes=(), drop_chunk_info=False):
                         record = None
                     if record is not None and "index_size" in record:
                         record["index_size"] = 0
-                        value = json.dumps(record, sort_keys=True, separators=(",", ":"))
+                        value = json.dumps(
+                            record, sort_keys=True, separators=(",", ":")
+                        )
         out[key] = value
     return out
 
@@ -1305,7 +1318,9 @@ def _assert_chunk_tiling(pairs, index_ids, expected_rows, engine):
         spans.sort()
         covered = 0
         for base, rows in spans:
-            assert base == covered, f"{engine} idx_{index_id}: gap at {covered}: {spans}"
+            assert base == covered, (
+                f"{engine} idx_{index_id}: gap at {covered}: {spans}"
+            )
             covered += rows
         assert covered == expected_rows, (
             f"{engine} idx_{index_id}: covers {covered} of {expected_rows} rows"
@@ -1381,6 +1396,8 @@ CRASH_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}}
 SEG_TABLE = "test_cross_engine_segments"
 SEG_ROWS = (100, 60, 40)
 SEG_STARTS = tuple(sum(SEG_ROWS[:i]) for i in range(len(SEG_ROWS)))
+
+
 def _seg_words(k):
     """Repeated short English words: a tiny term dictionary at two segments.
 
@@ -1425,10 +1442,14 @@ def _seg_phase(conn, directory):
     t.create_index(
         "vec_idx",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "l2"},
         ),
     )
-    t.create_index("ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index(
+        "ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"})
+    )
     t.create_index("sec", index.IndexInfo("title", index.IndexType.Secondary))
     t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
     t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))

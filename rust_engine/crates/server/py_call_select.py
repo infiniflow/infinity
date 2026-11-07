@@ -5,12 +5,15 @@
 `cargo build`:
     python3 py_call_select.py
 """
+
 import os
 import subprocess
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-sys.path.append(os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift"))
+sys.path.append(
+    os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift")
+)
 
 from infinity_thrift_rpc import InfinityService as S
 from infinity_thrift_rpc import ttypes as T
@@ -48,7 +51,9 @@ def main():
     cols = {}
     for f in r.column_fields:
         cols[f.column_name] = [bytes(v) for v in f.column_vectors]
-    print(f"method={name} err={r.error_code} defs={defs} id={cols.get('id')} name={cols.get('name')}")
+    print(
+        f"method={name} err={r.error_code} defs={defs} id={cols.get('id')} name={cols.get('name')}"
+    )
     ok = (
         name == "Select"
         and r.error_code == 0

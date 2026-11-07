@@ -3,11 +3,14 @@
 generated Python codec. Run:
     cargo run -q -p server --bin emit-select-response | python3 py_decode_select_response.py
 """
+
 import os
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-sys.path.append(os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift"))
+sys.path.append(
+    os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift")
+)
 
 from infinity_thrift_rpc import InfinityService as S
 from thrift.protocol import TBinaryProtocol

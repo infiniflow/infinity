@@ -78,8 +78,8 @@ def _emvb_structure(chunk):
     many tokens each row holds, which is exactly what a reader uses to decide
     the chunk is the same segment of the same table.
     """
-    magic, version, start_offset, dims, subspaces, bits, n_centroids = struct.unpack_from(
-        "<7I", chunk, 0
+    magic, version, start_offset, dims, subspaces, bits, n_centroids = (
+        struct.unpack_from("<7I", chunk, 0)
     )
     # One token per row in this fixture, so the token counts are all 1 and the
     # two offset arrays are `0..ROWS`.

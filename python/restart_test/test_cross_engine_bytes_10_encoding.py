@@ -240,7 +240,6 @@ def test_the_columns_match_for_every_type():
     )
 
 
-
 def _raw_catalog_hex(root):
     """Every catalog value as `key -> hex`, read straight out of the store.
 
@@ -433,7 +432,9 @@ def test_the_catalog_key_set_and_values_match_exactly():
 
     only_cpp = sorted(set(cpp) - set(rust))
     only_rust = sorted(set(rust) - set(cpp))
-    assert not only_rust, f"keys the port writes and the reference does not: {only_rust}"
+    assert not only_rust, (
+        f"keys the port writes and the reference does not: {only_rust}"
+    )
     assert not only_cpp, f"keys the reference writes and the port does not: {only_cpp}"
 
     differing = sorted(k for k in cpp if cpp[k] != rust[k])

@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """SDK→engine→SDK `Select` with ORDER BY + LIMIT. Run after `cargo build`:
-    python3 py_call_select_order_limit.py
+python3 py_call_select_order_limit.py
 """
+
 import os
 import subprocess
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-sys.path.append(os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift"))
+sys.path.append(
+    os.path.join(REPO, "python", "infinity_sdk", "infinity", "remote_thrift")
+)
 
 from infinity_thrift_rpc import InfinityService as S
 from infinity_thrift_rpc import ttypes as T
@@ -17,11 +20,17 @@ from thrift.transport import TTransport
 
 
 def col(name):
-    return T.ParsedExpr(type=T.ParsedExprType(column_expr=T.ColumnExpr(column_name=[name])))
+    return T.ParsedExpr(
+        type=T.ParsedExprType(column_expr=T.ColumnExpr(column_name=[name]))
+    )
 
 
 def i64(v):
-    return T.ParsedExpr(type=T.ParsedExprType(constant_expr=T.ConstantExpr(literal_type=T.LiteralType.Int64, i64_value=v)))
+    return T.ParsedExpr(
+        type=T.ParsedExprType(
+            constant_expr=T.ConstantExpr(literal_type=T.LiteralType.Int64, i64_value=v)
+        )
+    )
 
 
 def encode_select():
@@ -54,7 +63,9 @@ def main():
     res.read(proto)
     proto.readMessageEnd()
     r = res.success
-    cols = {f.column_name: [bytes(v) for v in f.column_vectors] for f in r.column_fields}
+    cols = {
+        f.column_name: [bytes(v) for v in f.column_vectors] for f in r.column_fields
+    }
     print(f"id={cols.get('id')} name={cols.get('name')}")
     ok = r.error_code == 0 and cols.get("id") == [b"2"] and cols.get("name") == [b"b"]
     print("PY_SELECT_ORDER_LIMIT_OK" if ok else "PY_SELECT_ORDER_LIMIT_FAIL")

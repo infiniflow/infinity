@@ -31,7 +31,11 @@ from infinity import index
 from infinity.common import ConflictType
 
 OBJECT_TABLE = "test_cross_engine_objects"
-OBJECT_COLUMNS = {"id": {"type": "int"}, "title": {"type": "varchar"}, "score": {"type": "float"}}
+OBJECT_COLUMNS = {
+    "id": {"type": "int"},
+    "title": {"type": "varchar"},
+    "score": {"type": "float"},
+}
 OBJECT_ROWS = 100
 
 
@@ -60,10 +64,7 @@ def _phase_object_seed(conn):
     t = db.create_table(OBJECT_TABLE, OBJECT_COLUMNS, ConflictType.Error)
     t.create_index("score_sec", index.IndexInfo("score", index.IndexType.Secondary))
     t.insert(
-        [
-            {"id": i, "title": f"doc-{i}", "score": i * 0.5}
-            for i in range(OBJECT_ROWS)
-        ]
+        [{"id": i, "title": f"doc-{i}", "score": i * 0.5} for i in range(OBJECT_ROWS)]
     )
     conn.flush_data()
     time.sleep(2)
@@ -141,7 +142,9 @@ def test_the_object_directory_is_shared_with_the_reference():
         seen = []
         _spawn_and_run(reader, root, lambda conn: seen.append(_object_answers(conn)))
         count, by_id, by_score = seen[0]
-        assert count == str(OBJECT_ROWS), f"{reader} read {count} rows from {writer}'s objects"
+        assert count == str(OBJECT_ROWS), (
+            f"{reader} read {count} rows from {writer}'s objects"
+        )
         assert by_id == [("7", "doc-7")], f"{reader}: {by_id}"
         assert by_score == ["20", "21", "22", "23", "24"], f"{reader}: {by_score}"
         expected[writer] = (count, by_id, by_score)
@@ -156,7 +159,9 @@ def _object_config(root, engine, pg_port, bucket):
     base = _config(root, engine, pg_port).replace(
         "[storage]", '[storage]\nstorage_type = "minio"'
     )
-    return base + f"""
+    return (
+        base
+        + f"""
 [storage.object_storage]
 url = "{MINIO_URL}"
 bucket_name = "{bucket}"
@@ -164,6 +169,7 @@ access_key = "{MINIO_ACCESS_KEY}"
 secret_key = "{MINIO_SECRET_KEY}"
 enable_https = false
 """
+    )
 
 
 def _write_object_config(root, engine, pg_port, bucket):

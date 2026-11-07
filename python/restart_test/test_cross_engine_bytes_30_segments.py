@@ -62,9 +62,7 @@ def _phase_compact(conn):
     db = conn.get_database("default_db")
     db.drop_table(COMPACT_TABLE, ConflictType.Ignore)
     t = db.create_table(COMPACT_TABLE, COMPACT_COLUMNS, ConflictType.Error)
-    t.insert(
-        [{"id": i, "title": f"doc-{i}"} for i in range(COMPACT_ROWS)]
-    )
+    t.insert([{"id": i, "title": f"doc-{i}"} for i in range(COMPACT_ROWS)])
     conn.flush_data()
     time.sleep(1)
     # The reference only has one segment here and its compaction algorithm
@@ -73,10 +71,7 @@ def _phase_compact(conn):
     t.compact()
     time.sleep(2)
     t.insert(
-        [
-            {"id": COMPACT_ROWS + i, "title": f"tail-{i}"}
-            for i in range(COMPACT_TAIL)
-        ]
+        [{"id": COMPACT_ROWS + i, "title": f"tail-{i}"} for i in range(COMPACT_TAIL)]
     )
     conn.flush_data()
     time.sleep(1)
@@ -146,8 +141,6 @@ def test_a_compaction_with_one_segment_is_a_no_op():
     )
 
 
-
-
 GRANULARITY_TABLE = "test_cross_engine_granularity"
 GRANULARITY_COLUMNS = {
     "id": {"type": "int"},
@@ -167,7 +160,9 @@ def _seed_granularity(conn):
     t.create_index(
         "vec_idx",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "l2"},
         ),
     )
     t.create_index("sec", index.IndexInfo("score", index.IndexType.Secondary))
@@ -217,9 +212,7 @@ def test_the_chunk_boundaries_are_timing_dependent():
         files = _files(root)
         table_dir = _own_table_dir(files, len(GRANULARITY_COLUMNS))
         assert table_dir, f"{engine} wrote no table"
-        pairs = _table_records(
-            _catalog_pairs(root, port), table_dir, GRANULARITY_TABLE
-        )
+        pairs = _table_records(_catalog_pairs(root, port), table_dir, GRANULARITY_TABLE)
         shapes = {}
         for key, value in pairs.items():
             if key.startswith("idx_chunk|") and key.endswith("|chunk_info"):
@@ -234,7 +227,9 @@ def test_the_chunk_boundaries_are_timing_dependent():
             spans.sort()
             covered = 0
             for base, rows in spans:
-                assert base == covered, f"{engine} idx_{index_id}: gap at {covered}: {spans}"
+                assert base == covered, (
+                    f"{engine} idx_{index_id}: gap at {covered}: {spans}"
+                )
                 covered += rows
             assert covered == 200, f"{engine} idx_{index_id}: covers {covered} rows"
 
@@ -264,11 +259,7 @@ def _segment_dirs(files, index_id):
     """The segment directories `idx_{id}` holds, for one table's files."""
     marker = f"idx_{index_id}/seg_"
     return sorted(
-        {
-            name.split(marker, 1)[1].split("/")[0]
-            for name in files
-            if marker in name
-        }
+        {name.split(marker, 1)[1].split("/")[0] for name in files if marker in name}
     )
 
 
@@ -293,29 +284,29 @@ def _wait_for_segment_chunks(root, indexes, segments, timeout=60.0):
 SEG_QUERIES = {
     # One term in both segments: the answer is the merge of the two segments'
     # postings, so a reader that only opens `seg_0` returns half of it.
-    "fulltext_merged": lambda t: t.output(["id"])
-    .match_text("body", "quick", 200)
-    .to_result(),
+    "fulltext_merged": lambda t: (
+        t.output(["id"]).match_text("body", "quick", 200).to_result()
+    ),
     # A term that exists only in the second segment.
-    "fulltext_second_segment": lambda t: t.output(["id"])
-    .match_text("body", f"doc{SEG_STARTS[1] + 50}", 20)
-    .to_result(),
+    "fulltext_second_segment": lambda t: (
+        t.output(["id"]).match_text("body", f"doc{SEG_STARTS[1] + 50}", 20).to_result()
+    ),
     # ... and one that exists only in the third.
-    "fulltext_third_segment": lambda t: t.output(["id"])
-    .match_text("body", f"doc{SEG_STARTS[2] + 30}", 20)
-    .to_result(),
-    "secondary_eq": lambda t: t.output(["id"])
-    .filter(f"title = 'title-{SEG_STARTS[1] + 50}'")
-    .to_result(),
-    "secondary_eq_third": lambda t: t.output(["id"])
-    .filter(f"title = 'title-{SEG_STARTS[2] + 30}'")
-    .to_result(),
-    "secondary_range": lambda t: t.output(["id"])
-    .filter("score >= 74.5 and score <= 76.0")
-    .to_result(),
-    "sparse": lambda t: t.output(["id"])
-    .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
-    .to_result(),
+    "fulltext_third_segment": lambda t: (
+        t.output(["id"]).match_text("body", f"doc{SEG_STARTS[2] + 30}", 20).to_result()
+    ),
+    "secondary_eq": lambda t: (
+        t.output(["id"]).filter(f"title = 'title-{SEG_STARTS[1] + 50}'").to_result()
+    ),
+    "secondary_eq_third": lambda t: (
+        t.output(["id"]).filter(f"title = 'title-{SEG_STARTS[2] + 30}'").to_result()
+    ),
+    "secondary_range": lambda t: (
+        t.output(["id"]).filter("score >= 74.5 and score <= 76.0").to_result()
+    ),
+    "sparse": lambda t: (
+        t.output(["id"]).match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5).to_result()
+    ),
 }
 
 
@@ -452,17 +443,20 @@ def _block_seg_jsonl(path, rows):
     dense column is a plain array).
     """
     with open(path, "w", buffering=1 << 20) as handle:
-        handle.writelines(json.dumps(
-                    {
-                        "id": i,
-                        "title": f"title-{i}",
-                        "body": f"doc{i} alpha",
-                        "vec": [0.1, 0.2, 0.3, 0.4],
-                        "sp": {"0": 0.5, "1": 1.0},
-                        "score": i * 0.5,
-                    }
-                )
-                + "\n" for i in range(rows))
+        handle.writelines(
+            json.dumps(
+                {
+                    "id": i,
+                    "title": f"title-{i}",
+                    "body": f"doc{i} alpha",
+                    "vec": [0.1, 0.2, 0.3, 0.4],
+                    "sp": {"0": 0.5, "1": 1.0},
+                    "score": i * 0.5,
+                }
+            )
+            + "\n"
+            for i in range(rows)
+        )
 
 
 def _block_seg_phase(conn, directory):
@@ -484,10 +478,14 @@ def _block_seg_phase(conn, directory):
     t.create_index(
         "vec_idx",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "l2"},
         ),
     )
-    t.create_index("ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index(
+        "ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"})
+    )
     t.create_index("sec", index.IndexInfo("title", index.IndexType.Secondary))
     t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
     t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
@@ -573,18 +571,20 @@ def test_a_segment_with_many_blocks_keeps_one_chunk_per_index():
     # same, including a row from the last (partial) block.
     queries = {
         "count": lambda t: t.output(["count(*)"]).to_result(),
-        "last_block": lambda t: t.output(["id"])
-        .match_text("body", f"doc{BLOCK_SEG_ROWS - 1}", 20)
-        .to_result(),
-        "first_block": lambda t: t.output(["id"])
-        .match_text("body", "doc7", 20)
-        .to_result(),
-        "secondary_range": lambda t: t.output(["id"])
-        .filter(f"id >= {BLOCK_SEG_ROWS - 5}")
-        .to_result(),
-        "sparse": lambda t: t.output(["id"])
-        .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
-        .to_result(),
+        "last_block": lambda t: (
+            t.output(["id"])
+            .match_text("body", f"doc{BLOCK_SEG_ROWS - 1}", 20)
+            .to_result()
+        ),
+        "first_block": lambda t: (
+            t.output(["id"]).match_text("body", "doc7", 20).to_result()
+        ),
+        "secondary_range": lambda t: (
+            t.output(["id"]).filter(f"id >= {BLOCK_SEG_ROWS - 5}").to_result()
+        ),
+        "sparse": lambda t: (
+            t.output(["id"]).match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5).to_result()
+        ),
     }
     cpp_answers = _answers(cpp_root, 5432, BLOCK_SEG_TABLE, queries)
     rust_answers = _answers(rust_root, 5433, BLOCK_SEG_TABLE, queries)
@@ -619,10 +619,14 @@ def _merged_phase(conn, directory):
     t.create_index(
         "vec_idx",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "l2"},
         ),
     )
-    t.create_index("ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"}))
+    t.create_index(
+        "ivf_idx", index.IndexInfo("vec", index.IndexType.IVF, {"metric": "l2"})
+    )
     t.create_index("sec", index.IndexInfo("title", index.IndexType.Secondary))
     t.create_index("score_idx", index.IndexInfo("score", index.IndexType.Secondary))
     t.create_index("sp_idx", index.IndexInfo("sp", index.IndexType.BMP))
@@ -745,7 +749,9 @@ def test_a_compacted_table_matches_and_keeps_its_sources():
             parts = key.split("|")
             if parts[4] == "4":
                 merged.setdefault(int(parts[3]), []).append(json.loads(value))
-    assert set(merged) == set(SEG_INDEXES), f"indexes with a merged chunk: {sorted(merged)}"
+    assert set(merged) == set(SEG_INDEXES), (
+        f"indexes with a merged chunk: {sorted(merged)}"
+    )
     for index_id, spans in merged.items():
         assert [(s["base_row_id"], s["row_count"]) for s in spans] == [
             (4 << 32, sum(MERGED_ROWS))
@@ -753,18 +759,24 @@ def test_a_compacted_table_matches_and_keeps_its_sources():
 
     queries = {
         "count": lambda t: t.output(["count(*)"]).to_result(),
-        "fulltext_second": lambda t: t.output(["id"])
-        .match_text("body", f"doc{MERGED_STARTS[1] + 50}", 20)
-        .to_result(),
-        "fulltext_last": lambda t: t.output(["id"])
-        .match_text("body", f"doc{MERGED_STARTS[3] + 20}", 20)
-        .to_result(),
-        "secondary": lambda t: t.output(["id"])
-        .filter(f"title = 'title-{MERGED_STARTS[2] + 10}'")
-        .to_result(),
-        "sparse": lambda t: t.output(["id"])
-        .match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5)
-        .to_result(),
+        "fulltext_second": lambda t: (
+            t.output(["id"])
+            .match_text("body", f"doc{MERGED_STARTS[1] + 50}", 20)
+            .to_result()
+        ),
+        "fulltext_last": lambda t: (
+            t.output(["id"])
+            .match_text("body", f"doc{MERGED_STARTS[3] + 20}", 20)
+            .to_result()
+        ),
+        "secondary": lambda t: (
+            t.output(["id"])
+            .filter(f"title = 'title-{MERGED_STARTS[2] + 10}'")
+            .to_result()
+        ),
+        "sparse": lambda t: (
+            t.output(["id"]).match_sparse("sp", {0: 0.5, 1: 1.0}, "ip", 5).to_result()
+        ),
     }
     cpp_answers = _answers(cpp_root, 5432, MERGED_TABLE, queries)
     rust_answers = _answers(rust_root, 5433, MERGED_TABLE, queries)
@@ -833,9 +845,7 @@ def test_a_cleanup_reclaims_the_deprecated_sources():
         assert segs == {"4"}, f"{label}: surviving segments {sorted(segs)}"
         for index_id in SEG_INDEXES:
             got = _segment_dirs(files, index_id)
-            assert got == ["4"], (
-                f"{label} idx_{index_id}: surviving segments {got}"
-            )
+            assert got == ["4"], f"{label} idx_{index_id}: surviving segments {got}"
 
     # The merged segment's files are untouched by cleanup: byte identical to
     # the pre-cleanup state.
@@ -845,8 +855,8 @@ def test_a_cleanup_reclaims_the_deprecated_sources():
     failures = _compare_data_files(
         _under(cpp_files, cpp_dir), _under(rust_files, rust_dir), SEG_INDEXES
     )
-    assert not failures, "the merged segment's bytes changed after cleanup:\n  " + "\n  ".join(
-        failures
+    assert not failures, (
+        "the merged segment's bytes changed after cleanup:\n  " + "\n  ".join(failures)
     )
 
     # The catalog's surviving records are the same: the source segments'
@@ -879,12 +889,16 @@ def test_a_cleanup_reclaims_the_deprecated_sources():
     # The surviving merged segment answers the same queries.
     queries = {
         "count": lambda t: t.output(["count(*)"]).to_result(),
-        "fulltext_second": lambda t: t.output(["id"])
-        .match_text("body", f"doc{MERGED_STARTS[1] + 50}", 20)
-        .to_result(),
-        "secondary": lambda t: t.output(["id"])
-        .filter(f"title = 'title-{MERGED_STARTS[2] + 10}'")
-        .to_result(),
+        "fulltext_second": lambda t: (
+            t.output(["id"])
+            .match_text("body", f"doc{MERGED_STARTS[1] + 50}", 20)
+            .to_result()
+        ),
+        "secondary": lambda t: (
+            t.output(["id"])
+            .filter(f"title = 'title-{MERGED_STARTS[2] + 10}'")
+            .to_result()
+        ),
     }
     cpp_answers = _answers(cpp_root, 5432, MERGED_TABLE, queries)
     rust_answers = _answers(rust_root, 5433, MERGED_TABLE, queries)
@@ -991,7 +1005,11 @@ def test_a_table_larger_than_a_segment_starts_a_second_one():
         chunks = {}
         for name in files:
             parts = name.split("/")
-            if len(parts) >= 5 and parts[2].startswith("idx_") and name.endswith(".dic"):
+            if (
+                len(parts) >= 5
+                and parts[2].startswith("idx_")
+                and name.endswith(".dic")
+            ):
                 chunks[parts[3]] = chunks.get(parts[3], 0) + 1
         assert chunks == expected_chunks, f"{label}: chunks per segment {chunks}"
 
@@ -1042,9 +1060,7 @@ def _big_csv(path, rows):
         for i in range(rows):
             vec = f"[{i % 7 / 7.0},0.25,0.5,0.75]"
             sp = f"[0:{i % 5 + 1},1:0.5]"
-            handle.writelines(
-                f"{i}\tdoc-{i % 1000}\t{vec}\t{i}\t{sp}\n"
-            )
+            handle.writelines(f"{i}\tdoc-{i % 1000}\t{vec}\t{i}\t{sp}\n")
 
 
 def _big_phase(conn, directory):
@@ -1055,7 +1071,9 @@ def _big_phase(conn, directory):
     t.create_index(
         "vec_idx",
         index.IndexInfo(
-            "vec", index.IndexType.Hnsw, {"M": "16", "ef_construction": "20", "metric": "l2"}
+            "vec",
+            index.IndexType.Hnsw,
+            {"M": "16", "ef_construction": "20", "metric": "l2"},
         ),
     )
     t.create_index("score_sec", index.IndexInfo("score", index.IndexType.Secondary))
@@ -1103,7 +1121,11 @@ def test_a_big_import_populates_every_index_kind():
         seen = {}
         for name in files:
             parts = name.split("/")
-            if len(parts) >= 5 and parts[2].startswith("idx_") and name.endswith(".dic"):
+            if (
+                len(parts) >= 5
+                and parts[2].startswith("idx_")
+                and name.endswith(".dic")
+            ):
                 seen[(parts[2], parts[3])] = seen.get((parts[2], parts[3]), 0) + 1
         counts[label] = seen
         assert seen, f"{label}: no full-text chunks"
@@ -1125,7 +1147,9 @@ def test_a_big_import_populates_every_index_kind():
     queries = {
         "count": lambda t: t.output(["count(*)"]).to_result(),
         "secondary": lambda t: t.output(["id"]).filter("score = 149999").to_result(),
-        "fulltext": lambda t: t.output(["id"]).match_text("title", "doc-7", 3).to_result(),
+        "fulltext": lambda t: (
+            t.output(["id"]).match_text("title", "doc-7", 3).to_result()
+        ),
     }
     cpp_answers = _answers(cpp_root, 5432, BIG_TABLE, queries)
     rust_answers = _answers(rust_root, 5433, BIG_TABLE, queries)

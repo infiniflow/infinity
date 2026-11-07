@@ -4,6 +4,7 @@ authoritative generated Python codec, proving the Rust wire bytes are readable b
 the SDK. Run:
     cargo run -q -p server --bin emit-connect-call | python3 py_decode.py
 """
+
 import os
 import sys
 

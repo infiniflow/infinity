@@ -161,7 +161,9 @@ def build_source() -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--check", action="store_true", help="run the Rust FST tests after building")
+    ap.add_argument(
+        "--check", action="store_true", help="run the Rust FST tests after building"
+    )
     ap.add_argument("--cxx", default=os.environ.get("CXX", "clang++"))
     args = ap.parse_args()
 
