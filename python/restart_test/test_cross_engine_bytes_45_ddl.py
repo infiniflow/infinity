@@ -139,19 +139,7 @@ STAGES = {
 # DDL below matches the reference byte for byte. A stage added here must name
 # exactly what the comparison flagged, so the marker is a record of the gap
 # rather than a way to silence it.
-KNOWN_DIFFERENCES = {
-    "drop_index": (
-        "keys, ids and files match; the drop marker's ts is 4 higher than the "
-        "reference's (drop|idx|… = 52 vs 56). An explicit dump_index with "
-        "nothing left to seal commits **read-only** in the reference (no ts, no "
-        "WAL entry); the port seals the index tail at the checkpoint and its "
-        "dump then spends a write ts and writes an entry, which also stops the "
-        "next open from skipping its startup checkpoint - 4 in total"
-    ),
-}
-# The stages after `drop_index` compare the same marker.
-for _stage in ("drop_table", "drop_database"):
-    KNOWN_DIFFERENCES[_stage] = KNOWN_DIFFERENCES["drop_index"]
+KNOWN_DIFFERENCES = {}
 
 
 def _catalog(root):

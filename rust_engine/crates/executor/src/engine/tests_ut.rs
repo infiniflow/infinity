@@ -1923,7 +1923,12 @@ mod tests {
                     "round {round}: oracle disagrees for {predicate}"
                 );
             }
-            e.flush().unwrap();
+            // A checkpoint does not dump the memory indexes; one dump
+            // transaction per index seals the rows written since the last one.
+            for column in ["id", "f", "d", "tag"] {
+                e.dump_index_transaction("t_indexed", &format!("idx_{column}"))
+                    .unwrap();
+            }
         }
         // VARCHAR keys are hashes: the range cannot use the index, but the rows
         // still have to be right (lexicographic, so `tag8`/`tag9` are above
@@ -2023,7 +2028,11 @@ mod tests {
                     "round {round}: oracle disagrees for {predicate}"
                 );
             }
-            e.flush().unwrap();
+            // One dump transaction per index; a checkpoint keeps the tails.
+            for column in ["id", "d", "tm", "ts"] {
+                e.dump_index_transaction("t_indexed", &format!("idx_{column}"))
+                    .unwrap();
+            }
         }
         // Equality on a date column rides the same ordered key.
         assert_eq!(ids_of(&e, "t_indexed", "d = '1969-12-31'"), vec![2]);
@@ -2573,8 +2582,9 @@ mod tests {
             ]
         );
 
-        // `flush()` dumps the tail as a second chunk; the query still agrees.
-        e.flush().unwrap();
+        // A dump transaction seals the tail as a second chunk; the query still
+        // agrees. A checkpoint keeps the tail in memory.
+        e.dump_all_memory_indexes();
         assert_eq!(count("mvec"), 2);
         assert_eq!(count("emvb"), 2);
         assert_eq!(
@@ -2637,8 +2647,9 @@ mod tests {
             ]
         );
 
-        // `flush()` seals the tail as a second chunk and the ranking holds.
-        e.flush().unwrap();
+        // A dump transaction seals the tail as a second chunk and the ranking
+        // holds.
+        e.dump_all_memory_indexes();
         assert_eq!(count("bmp"), 2);
         assert_eq!(
             rows(&e, q),
@@ -2735,8 +2746,9 @@ mod tests {
         assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
     }
 
-    /// A secondary index keeps only post-dump rows in memory; `flush()` seals
-    /// the tail into a chunk and lookups merge chunks with the tail.
+    /// A secondary index keeps only post-dump rows in memory; a dump
+    /// transaction seals the tail into a chunk and lookups merge chunks with
+    /// the tail. A checkpoint does not seal it.
     #[test]
     fn secondary_index_seals_its_memory_tail() {
         let dir = tempdir().unwrap();
@@ -2762,8 +2774,18 @@ mod tests {
         assert!(idx.key_count() > 0);
         drop(tables);
 
-        // The dump drains the tail; the answer comes from the chunk + new tail.
+        // The checkpoint keeps the tail...
         e.flush().unwrap();
+        let tables = e.tables.lock().unwrap();
+        let idx = tables
+            .values()
+            .find_map(|t| t.secondary.indexes.values().next())
+            .unwrap();
+        assert!(idx.key_count() > 0);
+        drop(tables);
+
+        // ...and the dump drains it; the answer comes from the chunk + new tail.
+        e.dump_index_transaction("sec", "idx_v").unwrap();
         let tables = e.tables.lock().unwrap();
         let idx = tables
             .values()
@@ -3218,8 +3240,8 @@ mod tests {
 
     /// `memindex_memory_quota` seals one HNSW chunk per *write batch*, not per
     /// row: the per-row check sealed a one-row segment (the first row already
-    /// exceeded a 1 KB quota), and the post-dump counter reset left the next
-    /// batch unaccounted, so a 3-batch import produced 3+ chunks instead of 2.
+    /// exceeded a 1 KB quota). The check runs once per batch, after the rows
+    /// are in, so the three batches below leave three segments behind.
     #[test]
     fn the_memindex_quota_seals_one_hnsw_chunk_per_batch() {
         let dir = tempdir().unwrap();
@@ -3243,8 +3265,9 @@ mod tests {
             ))
             .unwrap();
         }
-        // Batch 1 buffers, batch 2 and 3 seal the previous segment.
-        assert_eq!(e.hnsw_chunk_ids("hc", "hx").len(), 2);
+        // One chunk per batch: the quota crossing after each batch seals the
+        // segment that batch left in memory.
+        assert_eq!(e.hnsw_chunk_ids("hc", "hx").len(), 3);
     }
 
     /// A write that reaches the engine through the Thrift/import primitives
@@ -3364,7 +3387,7 @@ mod tests {
         }
         sql.push(';');
         e.execute(&sql).unwrap();
-        e.flush().unwrap();
+        e.dump_all_memory_indexes();
         let mv = e
             .tables
             .lock()
@@ -3683,7 +3706,8 @@ mod tests {
             .unwrap();
         assert!(idx.key_count() > 0);
         drop(tables);
-        e.flush().unwrap();
+        // A dump transaction drains the tail; a checkpoint keeps it.
+        e.dump_index_transaction("ss", "ss_n").unwrap();
         let tables = e.tables.lock().unwrap();
         let idx = tables
             .values()
@@ -4838,11 +4862,11 @@ mod tests {
         assert_eq!(mem.postings_of("alpha").unwrap().list.len(), 1);
     }
 
-    /// A checkpoint dumps only the memory segment; new rows form the next
-    /// segment and every row is indexed exactly once (Gate C: rebuilding the
-    /// whole graph per checkpoint caused the OOM).
+    /// A dump writes only the memory segment; new rows form the next segment
+    /// and every row is indexed exactly once (Gate C: rebuilding the whole
+    /// graph on every write caused the OOM). A checkpoint does not dump it.
     #[test]
-    fn hnsw_checkpoint_dumps_only_the_memory_segment() {
+    fn hnsw_dump_writes_only_the_memory_segment() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,4));")
@@ -4869,20 +4893,20 @@ mod tests {
         };
         assert_eq!(indexed(&e), 10);
 
-        e.flush().unwrap();
+        e.dump_index_transaction("hv", "hv_i").unwrap();
         assert!(
             e.tables.lock().unwrap().values().all(|t| t
                 .hnsw_mem
                 .values()
                 .all(|m| m.lock().map(|m| m.is_empty()).unwrap_or(true))),
-            "the checkpoint empties the HNSW memory segment"
+            "the dump empties the HNSW memory segment"
         );
 
         e.execute("INSERT INTO hv VALUES (10, [10.0,0.0,0.0,0.0]), (11, [11.0,0.0,0.0,0.0]);")
             .unwrap();
         assert_eq!(indexed(&e), 2);
 
-        e.flush().unwrap();
+        e.dump_index_transaction("hv", "hv_i").unwrap();
         let indexed: usize = e
             .load_vector_indexes("default_db.hv", "hv_i")
             .iter()
@@ -4982,10 +5006,10 @@ mod tests {
             .unwrap();
         e.execute("INSERT INTO ot VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
             .unwrap();
-        e.flush().unwrap();
+        e.dump_index_transaction("ot", "ot_i").unwrap();
         e.execute("INSERT INTO ot VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
             .unwrap();
-        e.flush().unwrap();
+        e.dump_index_transaction("ot", "ot_i").unwrap();
         assert_eq!(e.hnsw_chunk_ids("ot", "ot_i"), vec![0, 1]);
 
         e.optimize_indexes().unwrap();
@@ -5114,7 +5138,7 @@ mod tests {
                 .unwrap();
             }
             // DumpMemIndex: one chunk per iteration's memory segment.
-            e.flush().unwrap();
+            e.dump_index_transaction("tb1", "idx1").unwrap();
         }
         assert_eq!(
             e.hnsw_chunk_ids("default_db.tb1", "idx1"),

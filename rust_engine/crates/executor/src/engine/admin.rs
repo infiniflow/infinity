@@ -343,15 +343,16 @@ impl Engine {
         // is this same bound plus anything that committed while the mirror ran
         // (see the frame at the end of this function).
         let checkpoint_ts = self.checkpoint_ts();
-        // Dump the index memory tails first. The caller only logs a `flush`
-        // error, so a failing block mirror (e.g. an unsupported column type)
-        // must not leave the memory tails unbounded — that is what pushed the
-        // heavy import into the OOM killer (Gate C).
-        self.seal_text_indexes();
-        self.seal_multivector_indexes();
-        self.seal_sparse_indexes();
-        self.seal_secondary_indexes();
-        self.dump_hnsw_segments();
+        // The checkpoint **does not** dump the memory indexes: C++
+        // `NewTxn::CheckpointTable` only flushes blocks, and a memory index
+        // keeps its rows until a `DumpMemIndex` transaction seals them. The
+        // tail is therefore still in memory after a checkpoint and is
+        // reconstructed from the chunk gap on the next open
+        // (`recover_mem_index`).
+        //
+        // The memory indexes still need a bound on a long import; that is the
+        // quota (`enforce_memindex_quota`) and the per-batch capacity dumps, not
+        // this function.
         // The C++ block mirror is the storage of record; a table it cannot
         // write (a column with no block layout) keeps its rows buffered only.
         let mirror = self.flush_blocks(checkpoint_ts);

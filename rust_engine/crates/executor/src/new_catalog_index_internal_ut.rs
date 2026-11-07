@@ -12,8 +12,9 @@
 //! - the sealed secondary chunks (base row id + row count), and
 //! - `hnsw_chunk_ids` for HNSW.
 //!
-//! `flush()` is the engine's `DumpMemIndex`; `optimize_indexes()` is
-//! `OptimizeIndex`. The merged-chunk id/count assertions have no generic
+//! `dump()` is the engine's `DumpMemIndex` (a checkpoint does not dump a
+//! memory index); `optimize_indexes()` is `OptimizeIndex`. The merged-chunk
+//! id/count assertions have no generic
 //! accessor for non-HNSW kinds; the reachable chunk metadata is asserted and
 //! the merge difference is called out in the affected test.
 
@@ -28,6 +29,11 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
         }
     }
     Vec::new()
+}
+
+/// One `DumpMemIndex` transaction, the reference's dump.
+fn dump(engine: &Engine, index: &str) {
+    engine.dump_index_transaction("db1.tb1", index).unwrap();
 }
 
 impl Engine {
@@ -149,7 +155,7 @@ fn test_index0() {
             .collect(),
     )
     .unwrap();
-    e.flush().unwrap();
+    dump(&e, "index1");
     e.insert_literals(
         "db1.tb1",
         None,
@@ -168,7 +174,7 @@ fn test_index0() {
 
     // Second dump + third block, then OptimizeIndex (a no-op for secondary in
     // the Rust engine; the reference merges the chunks into chunk 2).
-    e.flush().unwrap();
+    dump(&e, "index1");
     e.insert_literals(
         "db1.tb1",
         None,
@@ -216,6 +222,11 @@ fn test_index() {
 
     e.insert_literals("db1.tb1", None, five_column_rows(0, 8192))
         .unwrap();
+    // The dump seals each index's memory tail; the checkpoint then mirrors the
+    // block columns and the full-text chunk (it does not dump a memory tail).
+    for index in ["index1", "index2", "index3", "index4", "index5", "index6"] {
+        e.dump_index_transaction("db1.tb1", index).unwrap();
+    }
     e.flush().unwrap();
     e.insert_literals("db1.tb1", None, five_column_rows(8192, 8192))
         .unwrap();
@@ -230,10 +241,9 @@ fn test_index() {
     );
 
     // Every memory index restarts at row id 8192 and holds one block: the
-    // checkpoint dumps each index's memory tail, and the full-text index is
-    // dumped with the rest (the reference's `DumpMemIndexTask` does that in the
-    // background; the port folds it into the checkpoint). Before the dump the
-    // full-text tail was rebuilt from row 0 on first use.
+    // dump transactions above sealed the first block, and the checkpoint
+    // mirrored the full-text chunk. Before the dump the full-text tail was
+    // rebuilt from row 0 on first use.
     assert_eq!(e.secondary_tail("db1.tb1", "col1"), Some((8192, 8192)));
     assert_eq!(e.fulltext_tail("db1.tb1", "col2"), Some((8192, 8192)));
     assert_eq!(e.ivf_tail("db1.tb1", "col3"), Some((8192, 8192)));
@@ -270,6 +280,7 @@ fn test_populate_index0() {
         .unwrap();
     e.insert_literals("db1.tb1", None, two_block_rows(8192, 8192))
         .unwrap();
+    e.dump_all_memory_indexes();
     e.flush().unwrap();
 
     // Trigger the lazily built full-text index.
@@ -321,6 +332,7 @@ fn disabled_slow_test_populate_index() {
     // The second block is indexed incrementally.
     e.insert_literals("db1.tb1", None, five_column_rows(8192, 8192))
         .unwrap();
+    e.dump_all_memory_indexes();
     e.flush().unwrap();
 
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);

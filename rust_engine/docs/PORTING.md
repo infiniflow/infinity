@@ -158,6 +158,13 @@ drop 的数据库。
   写不开 WAL），行只在块缓冲区里，帧若声明时钟位置，`kill -9` 后重放会跳过这些记录而我们盘上没有。
   flush 在镜像之后进行，所以帧也在那之后取值：在镜像开始时就冻结时间戳会让镜像期间提交的事务落在下界
   之下（已落盘却被重放一次，`DROP COLUMN` 重放已删的列会让 open 直接失败）。
+- **内存索引的尾巴只在 dump 事务里封存**：checkpoint 只 flush 块（`NewTxn::CheckpointTable`），
+  不 dump 内存索引——二级 / 全文 / 向量 / 多值 / 稀疏索引的尾巴都留在内存里，由 `DumpMemIndex` 事务写盘。
+  一个 dump 事务先封存**该索引**的尾巴，再在同一个事务里发布 chunk，chunk 因此带这条语句的 commit ts；
+  尾巴为空时（`NewTxn::DumpMemIndex` 的 "skipped dumping MemIndex"）直接返回，不花 commit ts、不写 WAL entry。
+  重启后 `recover_mem_index` 用 chunk 覆盖（`idx_chunk|…|chunk_info` 的 `base_row_id`/`row_count`）与块内行
+  求 gap，只把没被 chunk 覆盖的行重新喂进内存索引（`CountMemIndexGapInSegment` / `AppendIndex` 的等价物）；
+  二级索引由 `build_index` 全量重建，多值与稀疏索引在首次查询时重建（两者没有独立的 chunk 映射）。
 - 块/索引文件一律"写临时文件再 rename"（`write_synced`）：块被整表重写时是同一路径覆盖写，而读侧持有
   `mmap`（`MappedFile`），原地 truncate 会让映射 SIGBUS。
 - 列文件名是**列 id**（`{column_id}.col` / `col_{column_id}_out`），id 只增不复用，所以改列时不重编码、不重编号：

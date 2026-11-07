@@ -984,7 +984,22 @@ impl Engine {
         // index whose column is not an embedding column simply has no mirror.
         for im in self.storage.catalog.list_indexes()? {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
-                let _ = self.write_hnsw_index(&im.table, &im.name);
+                // A chunk written here covers every row (the mirror builds it
+                // from the blocks when the index has no chunk yet), so the
+                // memory segment it was built from is released: keeping it
+                // would make the next dump seal the same rows a second time.
+                if matches!(
+                    self.write_hnsw_index(&im.table, &im.name),
+                    Ok(written) if written > 0
+                ) {
+                    let key = self.table_key(&im.table);
+                    let mut tables = self.tables.lock().unwrap();
+                    if let Some(e) = tables.get_mut(&key) {
+                        e.hnsw_mem.remove(&im.column);
+                        e.index_pending_bytes.insert(im.column.clone(), 0);
+                        e.hnsw_probed = false;
+                    }
+                }
             } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                 let _ = self.write_fulltext_index(&im.table, &im.name);
             } else if im.index_type.eq_ignore_ascii_case("PLAID") {

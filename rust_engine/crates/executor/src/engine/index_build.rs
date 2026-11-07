@@ -1,4 +1,5 @@
 use super::*;
+use catalog::IndexMeta;
 
 impl Engine {
     /// Rebuilds all declared indexes from stored rows (called on open).
@@ -52,6 +53,133 @@ impl Engine {
                         segments.into_iter().map(Arc::new).collect(),
                     );
                 }
+            }
+        }
+        Ok(())
+    }
+
+    /// `NewTxn::RecoverMemIndex`: rebuilds an index's memory tail from the rows
+    /// its sealed chunks do not cover.
+    ///
+    /// A checkpoint only flushes blocks (`NewTxn::CheckpointTable`); a memory
+    /// index keeps its rows until a dump transaction seals them
+    /// (`DumpMemIndex`). After a restart the reference walks every segment's
+    /// blocks against the chunk coverage (`CountMemIndexGapInSegment`) and
+    /// appends only the rows no chunk covers (`AppendIndex`), so the tail comes
+    /// back without re-indexing the table.
+    ///
+    /// The multi-vector and sparse indexes have no chunk mapping of their own:
+    /// `multivector_index_for` / `sparse_index_for` rebuild them from the rows
+    /// on first use, which closes their gap there. A secondary index is rebuilt
+    /// from every row by `rebuild_indexes`, which already covers the gap.
+    pub(crate) fn recover_mem_index(&self) -> Result<()> {
+        let indexes = self.storage.catalog.list_indexes()?;
+        if indexes.is_empty() {
+            return Ok(());
+        }
+        // The rows of a table are shared by every index on it.
+        let mut rows: HashMap<String, Vec<(usize, Vec<Value>)>> = HashMap::new();
+        for meta in indexes {
+            let kind = meta.index_type.trim();
+            // A secondary index is rebuilt from the rows by `rebuild_indexes`
+            // (`build_index`), which rewrites its chunk files; adding the
+            // chunk-gap rows to the tail here as well would count them twice.
+            let handled = !is_secondary_kind(kind)
+                && (kind.eq_ignore_ascii_case("HNSW")
+                    || kind.eq_ignore_ascii_case("IVF")
+                    || kind.eq_ignore_ascii_case("FULLTEXT"));
+            if !handled {
+                continue;
+            }
+            let table = self.qualified_table(&meta.table);
+            let Some(table_meta) = self.storage.catalog.get_table_by_name(&table)? else {
+                continue;
+            };
+            let Ok(schema) = self.table_schema(&table) else {
+                continue;
+            };
+            let Some(ci) = schema.iter().position(|c| c == &meta.column) else {
+                continue;
+            };
+            let chunks = catalog::layout::read_index_chunks(
+                self.storage.catalog.store().as_ref(),
+                &self.database_id_of(&table).to_string(),
+                &table_meta.id.to_string(),
+                &meta.id.to_string(),
+            )?;
+            let covered = merge_covered_ranges(&chunks);
+            let covered_rows: u64 = covered.iter().map(|(begin, end)| end - begin).sum();
+            // Every row is sealed: nothing for this index to recover.
+            let total_rows: u64 = self
+                .segment_row_counts(&table)
+                .iter()
+                .map(|(_, rows)| *rows)
+                .sum();
+            if covered_rows >= total_rows {
+                continue;
+            }
+            if !rows.contains_key(&table) {
+                let fetched = self.fetch_rows_including_deleted_from(&table, 0)?;
+                rows.insert(table.clone(), fetched);
+            }
+            let table_rows = rows.get(&table).unwrap();
+            let gap: Vec<&(usize, Vec<Value>)> = table_rows
+                .iter()
+                .filter(|(seq, _)| {
+                    let seq = *seq as u64;
+                    !covered
+                        .iter()
+                        .any(|(begin, end)| seq >= *begin && seq < *end)
+                })
+                .collect();
+            if gap.is_empty() {
+                continue;
+            }
+            if kind.eq_ignore_ascii_case("HNSW") {
+                let segments = self.hnsw_mem_segments(&table, &meta.column)?;
+                for mem in segments {
+                    let Ok(mut mem) = mem.lock() else { continue };
+                    for (seq, cells) in &gap {
+                        let Some(value) = cells.get(ci) else { continue };
+                        let text = value.to_slt_string();
+                        let vector: Vec<f32> =
+                            parse_vec_str(&text).iter().map(|x| *x as f32).collect();
+                        if vector.len() == mem.dims {
+                            mem.insert(*seq as u64, &vector);
+                        }
+                    }
+                }
+            } else if kind.eq_ignore_ascii_case("IVF") {
+                let dims = self
+                    .column_types(&table)
+                    .ok()
+                    .and_then(|types| types.get(ci).and_then(|ty| type_dim(ty)))
+                    .unwrap_or(0);
+                let mut recovered: Vec<(u64, Vec<f32>)> = Vec::new();
+                for (seq, cells) in &gap {
+                    let Some(value) = cells.get(ci) else { continue };
+                    let text = value.to_slt_string();
+                    let vector: Vec<f32> = parse_vec_str(&text).iter().map(|x| *x as f32).collect();
+                    if !vector.is_empty() && (dims == 0 || vector.len() == dims) {
+                        recovered.push((*seq as u64, vector));
+                    }
+                }
+                if !recovered.is_empty() {
+                    self.tables
+                        .lock()
+                        .unwrap()
+                        .entry(self.table_key(&table))
+                        .or_default()
+                        .ivf_mem
+                        .entry(meta.column.clone())
+                        .or_default()
+                        .extend(recovered);
+                }
+            } else if kind.eq_ignore_ascii_case("FULLTEXT") {
+                // Maps the chunks already on disk and indexes from the first row
+                // they do not cover (TextIndex::load_sealed).
+                let tokenizer = self.index_tokenizer(&table, &meta.column);
+                let _ = self.text_index_for(&table, &meta.column, tokenizer);
             }
         }
         Ok(())
@@ -350,49 +478,153 @@ impl Engine {
 
     /// Whether `index` still holds rows in its memory tail.
     ///
-    /// A kind whose tail is not modelled here reports `true`, so the dump
-    /// behaves exactly as before for it.
-    fn index_has_memory_tail(&self, table: &str, index: &str) -> bool {
-        let Ok(indexes) = self.storage.catalog.list_indexes() else {
-            return true;
-        };
-        let Some(meta) = indexes.iter().find(|i| i.name == index && i.table == *table) else {
-            return true;
-        };
-        if !is_secondary_kind(&meta.index_type) {
-            return true;
-        }
+    /// `NewTxn::DumpMemIndex` skips before it opens a transaction when the
+    /// memory index is empty, so an explicit dump of an index whose checkpoint
+    /// already published everything spends no commit ts and writes no WAL
+    /// entry. A kind whose tail is not modelled here reports `true`, so the
+    /// dump keeps its old behaviour.
+    fn index_has_memory_tail(&self, table: &str, meta: &IndexMeta) -> bool {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        tables
-            .get(&key)
-            .and_then(|e| e.secondary.indexes.get(&meta.column))
-            .map(|i| i.approx_bytes() > 0)
-            .unwrap_or(false)
+        let Some(entry) = tables.get(&key) else {
+            return false;
+        };
+        let kind = meta.index_type.trim();
+        if is_secondary_kind(kind) {
+            return entry
+                .secondary
+                .indexes
+                .get(&meta.column)
+                .map(|i| i.approx_bytes() > 0)
+                .unwrap_or(false);
+        }
+        if kind.eq_ignore_ascii_case("HNSW") {
+            return entry
+                .hnsw_mem
+                .get(&meta.column)
+                .and_then(|m| m.lock().ok().map(|g| !g.is_empty()))
+                .unwrap_or(false);
+        }
+        if kind.eq_ignore_ascii_case("IVF") {
+            return entry
+                .ivf_mem
+                .get(&meta.column)
+                .map(|rows| !rows.is_empty())
+                .unwrap_or(false);
+        }
+        if kind.eq_ignore_ascii_case("FULLTEXT") {
+            return entry
+                .text
+                .get(&meta.column)
+                .and_then(|t| t.read().ok().map(|g| g.mem.pending_docs() > 0))
+                .unwrap_or(false);
+        }
+        if kind.eq_ignore_ascii_case("BMP") {
+            return entry
+                .sparse
+                .get(&meta.column)
+                .and_then(|s| s.read().ok().map(|g| !g.tail.is_empty()))
+                .unwrap_or(false);
+        }
+        if kind.eq_ignore_ascii_case("PLAID")
+            || kind.eq_ignore_ascii_case("SMVE")
+            || kind.eq_ignore_ascii_case("EMVB")
+            || kind.eq_ignore_ascii_case("MULTIVECTOR")
+        {
+            return entry
+                .mv
+                .get(&meta.column)
+                .and_then(|m| m.read().ok().map(|g| !g.tail.is_empty()))
+                .unwrap_or(false);
+        }
+        true
+    }
+
+    /// Whether the index has chunk files the catalog does not record yet.
+    ///
+    /// The checkpoint mirrors an index's chunk files but has no commit ts to
+    /// name them with (`write_index_segments` drops a record whose ts is
+    /// unknown), so a chunk the mirror wrote stays unpublished until a dump
+    /// publishes it. A dump must not be skipped in that state even when the
+    /// memory tail is empty - it is the transaction that gives the chunk its ts.
+    fn index_has_unpublished_chunks(&self, table: &str, meta: &IndexMeta) -> bool {
+        let Ok(Some(table_meta)) = self.storage.catalog.get_table_by_name(table) else {
+            return false;
+        };
+        let db_id = self.database_id_of(table).to_string();
+        let table_id = table_meta.id.to_string();
+        let index_id = meta.id.to_string();
+        let Ok(records) = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id,
+            &table_id,
+            &index_id,
+        ) else {
+            return false;
+        };
+        let recorded: usize = records.iter().map(|(_, chunks)| chunks.len()).sum();
+        let fulltext = meta.index_type.eq_ignore_ascii_case("FULLTEXT");
+        let root = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{table_id}/idx_{index_id}"));
+        let Ok(segments) = std::fs::read_dir(&root) else {
+            return false;
+        };
+        let mut files = 0usize;
+        for segment in segments.flatten() {
+            let Ok(entries) = std::fs::read_dir(segment.path()) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                let chunk = if fulltext {
+                    name.starts_with("ft_") && name.ends_with(".dic")
+                } else {
+                    name.starts_with("chunk_") && name.ends_with(".idx")
+                };
+                if chunk {
+                    files += 1;
+                }
+            }
+        }
+        files > recorded
     }
 
     /// The `DumpIndex` RPC: C++ `NewTxn::DumpMemIndex` inside a transaction of
     /// its own (`DumpIndexProcessor::DoDump` opens one with
     /// `BeginTxnShared(…, kDumpMemIndex)`).
     ///
-    /// That transaction is a **write** transaction whether or not the index
-    /// has a memory tail to seal, so the statement spends a commit ts either
-    /// way; the reference's WAL keeps the `DumpIndex` entry and the ts is what
-    /// every later statement is numbered from. Only a secondary index has a
-    /// tail the port seals here - the other kinds are mirrored in full at
-    /// checkpoint time - but all of them still spend the timestamp.
+    /// `NewTxn::DumpMemIndex` returns before it opens that transaction when the
+    /// memory index has nothing new ("skipped dumping MemIndex … since it
+    /// doesn't exist"), so an empty dump spends no commit ts and writes no WAL
+    /// entry. Otherwise the tail is sealed **inside** the transaction, so the
+    /// chunk it writes carries this statement's ts, exactly like the
+    /// reference's `DumpMemIndexTxnStore`.
     pub fn dump_index_transaction(&self, table: &str, index: &str) -> Result<()> {
         let version = self.dump_version(table, index)?;
         let table = self.qualified_table(table);
+        // The reference skips a dump when the memory index has nothing new.
+        //
+        // The port's checkpoint also mirrors an index's chunk **files** without
+        // a commit ts to name them with, so a dump is still required while one
+        // of those is unpublished: it is the transaction that gives the chunk
+        // its ts.
+        if !self.index_has_memory_tail(&table, &version.index)
+            && !self.index_has_unpublished_chunks(&table, &version.index)
+        {
+            return Ok(());
+        }
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
         // The reference writes the chunk files and their catalog records inside
-        // the dump transaction. The port's mirror builds the chunk files, so
-        // run it for this index first; the command below then names what it
-        // published, and replay re-creates exactly those records with this ts.
-        // The checkpoint mirrors the same files, so it takes the same lock.
+        // the dump transaction. The port seals this index's tail into its spill
+        // files and then mirrors them into the C++ chunk layout, so the command
+        // below names what it published and replay re-creates exactly those
+        // records with this ts. The checkpoint publishes the same files, so it
+        // takes the same lock.
         {
             let _serial = self.storage.flush_lock.lock().unwrap();
+            self.seal_index_tail(&table, &version.index);
             if let Some(meta) = self.storage.catalog.get_table_by_name(&table)? {
                 let _ = self.publish_index_chunks(&table, meta.id, Some((index, ts)));
             }
@@ -516,24 +748,63 @@ impl Engine {
         )))
     }
 
-    /// Dumps the memory tail of every disk-backed secondary index into new
-    /// chunks, so memory stays bounded by the rows written since the last dump.
-    /// Dumps every full-text memory tail into its segment files
-    /// (`ft_{first_row:016x}.{dic,pos,len,row}`).
+    /// Seals one index's memory tail into its spill/chunk files, in the form
+    /// its kind dumps it: a secondary tail becomes `seg_{s}_tail{n}.idx`, a
+    /// full-text tail `ft_{first_row:016x}.*`, a BMP tail its `.bmp` chunk, a
+    /// multi-vector tail its `.mvec` chunk, an HNSW memory graph a
+    /// `chunk_{id}.idx`, and IVF rewrites its per-segment `chunk_0.idx`.
     ///
-    /// The reference's checkpoint dumps each index's mem index
-    /// (`NewTxn::CheckpointTable` -> `DumpMemIndex`). Doing it here also leaves
-    /// a reopened engine with chunks to map instead of the whole table to
-    /// re-index (`TextIndex::load_sealed`).
-    pub(crate) fn seal_text_indexes(&self) {
-        let indexes: Vec<SharedTextIndex> = {
-            let tables = self.tables.lock().unwrap();
-            tables
-                .values()
-                .flat_map(|entry| entry.text.values().cloned())
-                .collect()
-        };
-        for shared in indexes {
+    /// The dump transaction calls this before `publish_index_chunks`, so the
+    /// chunks it publishes are the ones this statement sealed and carry its
+    /// commit ts.
+    fn seal_index_tail(&self, table: &str, meta: &IndexMeta) {
+        let table = self.qualified_table(table);
+        if is_secondary_kind(&meta.index_type) {
+            self.seal_secondary_index(&table, &meta.column);
+        } else if meta.index_type.eq_ignore_ascii_case("FULLTEXT") {
+            self.seal_text_index(&table, &meta.column);
+        } else if meta.index_type.eq_ignore_ascii_case("BMP") {
+            self.seal_sparse_index(&table, &meta.column);
+        } else if meta.index_type.eq_ignore_ascii_case("HNSW") {
+            if self.dump_hnsw_index(&table, &meta.name).is_ok() {
+                let key = self.table_key(&table);
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(e) = tables.get_mut(&key) {
+                    e.hnsw_mem.remove(&meta.column);
+                    e.index_pending_bytes.insert(meta.column.clone(), 0);
+                    e.hnsw_probed = false;
+                }
+            }
+        } else if meta.index_type.eq_ignore_ascii_case("IVF") {
+            let _ = self.write_ivf_index(&table, &meta.name);
+            let key = self.table_key(&table);
+            let mut tables = self.tables.lock().unwrap();
+            if let Some(rows) = tables
+                .get_mut(&key)
+                .and_then(|e| e.ivf_mem.get_mut(&meta.column))
+            {
+                rows.clear();
+            }
+        } else if meta.index_type.eq_ignore_ascii_case("PLAID")
+            || meta.index_type.eq_ignore_ascii_case("SMVE")
+            || meta.index_type.eq_ignore_ascii_case("EMVB")
+            || meta.index_type.eq_ignore_ascii_case("MULTIVECTOR")
+        {
+            self.seal_multivector_index(&table, &meta.column);
+        }
+    }
+
+    /// Seals the full-text memory tail of one column into its segment files
+    /// (`ft_{first_row:016x}.{dic,pos,len,row}`).
+    pub(crate) fn seal_text_index(&self, table: &str, column: &str) {
+        let key = self.table_key(table);
+        let shared = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|entry| entry.text.get(column).cloned());
+        if let Some(shared) = shared {
             if let Ok(mut index) = shared.write() {
                 index.seal();
             }
@@ -1188,31 +1459,30 @@ impl Engine {
             .collect())
     }
 
-    /// Dumbs every multi-vector memory tail to its segment files. Called by
-    /// `flush()` / checkpoint, mirroring the reference's memindex dump.
-    pub(crate) fn seal_multivector_indexes(&self) {
-        let indexes: Vec<Arc<std::sync::RwLock<MultiVectorIndex>>> = self
+    /// Dumps the sparse memory tail of one column.
+    pub(crate) fn seal_sparse_index(&self, table: &str, column: &str) {
+        let key = self.table_key(table);
+        let shared = self
             .tables
             .lock()
             .unwrap()
-            .values()
-            .flat_map(|e| e.mv.values().cloned())
-            .collect();
-        for shared in indexes {
+            .get(&key)
+            .and_then(|e| e.sparse.get(column).cloned());
+        if let Some(shared) = shared {
             shared.write().unwrap().seal();
         }
     }
 
-    /// Dumps every sparse memory tail into its BMP chunks (called by `flush`).
-    pub(crate) fn seal_sparse_indexes(&self) {
-        let indexes: Vec<Arc<std::sync::RwLock<SparseIndex>>> = self
+    /// Dumps the multi-vector memory tail of one column.
+    pub(crate) fn seal_multivector_index(&self, table: &str, column: &str) {
+        let key = self.table_key(table);
+        let shared = self
             .tables
             .lock()
             .unwrap()
-            .values()
-            .flat_map(|e| e.sparse.values().cloned())
-            .collect();
-        for shared in indexes {
+            .get(&key)
+            .and_then(|e| e.mv.get(column).cloned());
+        if let Some(shared) = shared {
             shared.write().unwrap().seal();
         }
     }
@@ -1412,31 +1682,67 @@ impl Engine {
 
     /// Dumps every in-memory index (the body of the reference's dump task).
     ///
-    /// Takes `flush_lock` as well as the caller's `batch_lock`: a checkpoint
-    /// ([`Self::flush_storage`]) seals the same memory tails and rewrites the
-    /// same chunk files under that lock, so without it a background dump and a
-    /// checkpoint could seal concurrently and produce duplicate chunk names or
-    /// a lost tail. The lock order is always `batch_lock` then `flush_lock`
-    /// (the dump task holds the former, the checkpoint the latter), so the two
-    /// cannot deadlock.
+    /// The reference dumps each index inside a transaction of its own
+    /// (`DumpIndexProcessor::DoDump` -> `kDumpMemIndex`), so the chunk it
+    /// seals names that transaction's commit ts and rides in its WAL entry.
+    /// Each dump seals its own tail ([`Self::seal_index_tail`]) under
+    /// `flush_lock`, and an index with an empty tail is skipped without
+    /// spending a timestamp.
     pub(crate) fn dump_all_memory_indexes(&self) {
-        {
-            let _serial = self.storage.flush_lock.lock().unwrap();
-            self.seal_multivector_indexes();
-            self.seal_sparse_indexes();
-            self.seal_secondary_indexes();
-            // HNSW memory segments are sealed per write batch
-            // ([`Self::note_index_insert`], the reference's `AppendMemIndex`).
-            // Sealing them here too produced one chunk per buffered row group.
-        }
-        // The reference dumps each index inside a transaction of its own
-        // (`DumpIndexProcessor::DoDump` -> `kDumpMemIndex`), so the chunk it
-        // seals names that transaction's commit ts and rides in its WAL entry.
-        // The port's memory tails are sealed above; each index is then dumped
-        // the same way an explicit `DumpIndex` dumps it.
         let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
         for im in indexes {
             let _ = self.dump_index_transaction(&im.table, &im.name);
+        }
+        self.seal_orphan_memory_tails();
+    }
+
+    /// Seals the memory tails the catalog has no index record for.
+    ///
+    /// A plain `MULTIVECTOR` or `SPARSE` column gets an in-memory index for
+    /// queries (`multivector_index_for` / `sparse_index_for`) without a
+    /// `CREATE INDEX`, so no `DumpMemIndex` transaction can name it. Sealing
+    /// them here keeps their footprint bounded; the checkpoint publishes the
+    /// files with the rest of the mirror.
+    fn seal_orphan_memory_tails(&self) {
+        let known: std::collections::HashSet<(String, String)> = self
+            .storage
+            .catalog
+            .list_indexes()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|im| (self.table_key(&im.table), im.column))
+            .collect();
+        let mut text = Vec::new();
+        let mut sparse = Vec::new();
+        let mut mv = Vec::new();
+        {
+            let tables = self.tables.lock().unwrap();
+            for (table, entry) in tables.iter() {
+                for column in entry.text.keys() {
+                    if !known.contains(&(table.clone(), column.clone())) {
+                        text.push((table.clone(), column.clone()));
+                    }
+                }
+                for column in entry.sparse.keys() {
+                    if !known.contains(&(table.clone(), column.clone())) {
+                        sparse.push((table.clone(), column.clone()));
+                    }
+                }
+                for column in entry.mv.keys() {
+                    if !known.contains(&(table.clone(), column.clone())) {
+                        mv.push((table.clone(), column.clone()));
+                    }
+                }
+            }
+        }
+        for (table, column) in text {
+            self.seal_text_index(&table, &column);
+        }
+        for (table, column) in sparse {
+            self.seal_sparse_index(&table, &column);
+        }
+        for (table, column) in mv {
+            self.seal_multivector_index(&table, &column);
         }
     }
 
@@ -1444,40 +1750,6 @@ impl Engine {
         self.context
             .memindex_capacity
             .load(std::sync::atomic::Ordering::Relaxed)
-    }
-
-    /// Dumps every HNSW memory segment at a checkpoint (the reference's
-    /// memindex dump). Each dump writes only the rows buffered since the last
-    /// one; the segment is then emptied and the next insert starts a new one.
-    pub(crate) fn dump_hnsw_segments(&self) {
-        let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
-        for im in indexes {
-            if !im.index_type.eq_ignore_ascii_case("HNSW") {
-                continue;
-            }
-            let key = self.table_key(&im.table);
-            let has = self
-                .tables
-                .lock()
-                .unwrap()
-                .get(&key)
-                .map(|e| e.hnsw_mem.contains_key(&im.column))
-                .unwrap_or(false);
-            if !has {
-                continue;
-            }
-            if self.dump_hnsw_index(&im.table, &im.name).is_ok() {
-                let mut tables = self.tables.lock().unwrap();
-                if let Some(e) = tables.get_mut(&key) {
-                    e.hnsw_mem.remove(&im.column);
-                    e.index_pending_bytes.insert(im.column.clone(), 0);
-                }
-            }
-        }
-        // New rows after this checkpoint must form fresh memory segments.
-        for e in self.tables.lock().unwrap().values_mut() {
-            e.hnsw_probed = false;
-        }
     }
 
     /// C++ `AppendMemIndex`: after a write batch, dump every HNSW memory
@@ -1557,4 +1829,31 @@ impl Engine {
             self.seal_secondary_indexes();
         }
     }
+}
+
+/// The row ranges an index's sealed chunks cover, sorted and merged into
+/// disjoint ascending intervals.
+///
+/// C++ `ComputeMemIndexGapRanges` merges the chunk ranges the same way before
+/// it compares them with the blocks; a chunk's range is
+/// `[base_row_id, base_row_id + row_count)`.
+fn merge_covered_ranges(chunks: &[catalog::layout::SegmentIndex]) -> Vec<(u64, u64)> {
+    let mut ranges: Vec<(u64, u64)> = chunks
+        .iter()
+        .flat_map(|(_, chunks)| {
+            chunks
+                .iter()
+                .map(|(_, info)| (info.base_row_id, info.base_row_id + info.row_count))
+        })
+        .filter(|(begin, end)| end > begin)
+        .collect();
+    ranges.sort_unstable();
+    let mut merged: Vec<(u64, u64)> = Vec::with_capacity(ranges.len());
+    for (begin, end) in ranges {
+        match merged.last_mut() {
+            Some(last) if begin <= last.1 => last.1 = last.1.max(end),
+            _ => merged.push((begin, end)),
+        }
+    }
+    merged
 }

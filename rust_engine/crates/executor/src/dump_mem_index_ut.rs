@@ -2,8 +2,8 @@
 //! (`TestTxnDumpMemIndex`).
 //!
 //! The reference drives `kDumpMemIndex` transactions concurrently with DDL and
-//! reads `SegmentIndexMeta` / `ChunkIndexMeta`; `Engine::flush()` is the
-//! checkpoint dump (it seals every memory index into the C++-format chunks),
+//! reads `SegmentIndexMeta` / `ChunkIndexMeta`; a `DumpMemIndex` transaction
+//! seals the memory index into the C++-format chunks (a checkpoint does not),
 //! `EngineTxn::dump_index` is a staged `DumpMemIndex` transaction, and
 //! `secondary_tail` / `secondary_chunks` read the same state the reference
 //! inspects.
@@ -110,6 +110,13 @@ fn append_block(engine: &Engine) {
     engine.insert_literals("db1.tb1", None, block()).unwrap();
 }
 
+/// One `DumpMemIndex` transaction for `index1` — the reference's dump. A
+/// checkpoint does not seal the memory tail, so every "dump" in this file goes
+/// through the dump transaction, exactly like `NewTxn::DumpMemIndex`.
+fn dump(engine: &Engine) {
+    engine.dump_index_transaction("db1.tb1", "index1").unwrap();
+}
+
 /// `NewTxn::Import` for one 8192-row block: always opens a new segment.
 fn import_block(engine: &Engine) {
     engine.import_literals("db1.tb1", None, block()).unwrap();
@@ -163,7 +170,7 @@ fn dump_and_add_column() {
         let e = Engine::open(dir.path()).unwrap();
         fixture(&e);
         append_block(&e);
-        e.flush().unwrap();
+        dump(&e);
         assert_dumped(&e);
         append_block(&e);
         assert_second_block_in_tail(&e);
@@ -184,7 +191,7 @@ fn dump_and_add_column() {
         e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col5 VARCHAR DEFAULT 'default');")
             .unwrap();
         append_block(&e);
-        e.flush().unwrap();
+        dump(&e);
         // Both blocks were in the memory tail, so one chunk covers them.
         assert_eq!(
             e.dumped_secondary_chunks("db1.tb1", "col1"),
@@ -205,7 +212,7 @@ fn dump_and_drop_column() {
     let e = Engine::open(dir.path()).unwrap();
     fixture(&e);
     append_block(&e);
-    e.flush().unwrap();
+    dump(&e);
     assert_dumped(&e);
     append_block(&e);
     assert_second_block_in_tail(&e);
@@ -243,7 +250,7 @@ fn dump_and_create_index() {
     let e = Engine::open(dir.path()).unwrap();
     fixture(&e);
     append_block(&e);
-    e.flush().unwrap();
+    dump(&e);
     assert_dumped(&e);
 
     // Duplicate create without IF NOT EXISTS is `ConflictType::kError`.
@@ -266,7 +273,7 @@ fn dump_and_append() {
         let e = Engine::open(dir.path()).unwrap();
         fixture(&e);
         append_block(&e);
-        e.flush().unwrap();
+        dump(&e);
         assert_dumped(&e);
         append_block(&e);
         assert_second_block_in_tail(&e);
@@ -278,7 +285,7 @@ fn dump_and_append() {
         fixture(&e);
         append_block(&e);
         append_block(&e);
-        e.flush().unwrap();
+        dump(&e);
         assert_eq!(
             e.dumped_secondary_chunks("db1.tb1", "col1"),
             vec![(0, 16384)]
@@ -298,7 +305,7 @@ fn dump_and_delete() {
     let e = Engine::open(dir.path()).unwrap();
     fixture(&e);
     append_block(&e);
-    e.flush().unwrap();
+    dump(&e);
     assert_dumped(&e);
 
     // `RowID(0, row_id)` for every odd row id.
@@ -334,11 +341,11 @@ fn dump_and_dump() {
     fixture(&e);
 
     append_block(&e);
-    e.flush().unwrap();
+    dump(&e);
     assert_dumped(&e);
 
     append_block(&e);
-    e.flush().unwrap();
+    dump(&e);
     assert_eq!(
         e.dumped_secondary_chunks("db1.tb1", "col1"),
         vec![(0, 8192), (0, 8192)]
@@ -672,7 +679,7 @@ fn dump_index_and_optimize_index() {
                 })
                 .collect();
             e.insert_literals("db1.tb1", None, batch).unwrap();
-            e.flush().unwrap();
+            dump(&e);
         }
         let batch: Vec<Vec<Literal>> = (0..8192)
             .map(|_| {
@@ -720,7 +727,7 @@ fn test_dump_index_and_compact() {
     let e = Engine::open(dir.path()).unwrap();
     fixture(&e);
     append_block(&e);
-    e.flush().unwrap();
+    dump(&e);
     assert_dumped(&e);
 
     e.compact_all_segments("db1.tb1").unwrap();

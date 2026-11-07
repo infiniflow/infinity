@@ -311,6 +311,10 @@ impl Engine {
         for meta in engine.storage.catalog.list_tables().unwrap_or_default() {
             engine.register_table_ids(&meta);
         }
+        // `NewTxn::RecoverMemIndex`: a checkpoint does not dump a memory index,
+        // so the rows its chunks do not cover are re-indexed into the tail
+        // here, once the blocks, the WAL and the segment map are all in place.
+        engine.recover_mem_index()?;
         Ok(engine)
     }
 
