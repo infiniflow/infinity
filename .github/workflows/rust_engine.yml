@@ -165,6 +165,11 @@ jobs:
         # queries on the reference's 175-file suite, so this gates.
         if: matrix.arch == 'amd64'
         run: cargo run -q --release -p cli -- conformance ../test/sql
+      - name: Gate C (snapshot .slt)
+        # The snapshot part of Gate C: a restored table must read back, and the
+        # reference's own cases are the expectation. Seconds, so it gates here.
+        if: matrix.arch == 'amd64'
+        run: cargo run -q --release -p cli -- conformance ../test/sql/snapshot
 
   build:
     # One binary per architecture; the later jobs download the one they need.
@@ -399,19 +404,45 @@ jobs:
         env:
           UV_PYTHON: "3.11"
         run: cargo test --workspace -- --ignored
+      - name: Build the server
+        run: (cd rust_engine && cargo build --release -p cli)
+      - name: Start the engine
+        run: |
+          nohup ./rust_engine/target/release/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_infinity.sh
+      - name: Parallel suite (Gate D)
+        # python/parallel_test drives a live server from python/ (its conftest
+        # reads 127.0.0.1:23817), so it runs against the engine started above.
+        continue-on-error: true
+        run: (cd python && ../.venv/bin/python -m pytest -q parallel_test --tb=short)
+      - name: Stop the engine
+        if: always()
+        run: |
+          pkill -f "target/release/infinity --config" || true
+          tail -n 100 infinity.log || true
+      - name: Repeated kill -9 cycles (Gate C)
+        # Gate C's crash half: the harness kills the engine between phases, so
+        # looping an insert suite interleaves crashes with recovery.
+        continue-on-error: true
+        run: |
+          export INFINITY_SERVER_BIN="${PWD}/rust_engine/target/release/infinity"
+          work="$(mktemp -d)"
+          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \\
+                --unshare-pid --proc /proc -- \\
+                .venv/bin/python tools/run_restart_test.py \\
+                --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \\
+                --test_case test_insert.py --loop 3
       - name: Slow restart cases (long imports, repeated kills)
         # The reference runs these nightly (slow_tests.yml); they include the
         # heavy 5.toml import profile, which is the case the port has never
-        # closed on a developer machine (GAPS.md / RUST_REWRITE_PLAN §8). Report
-        # first: a lane that is red from the start gets ignored.
+        # closed on a developer machine (GAPS.md / RUST_REWRITE_PLAN section 8).
+        # Report first: a lane that is red from the start gets ignored.
         continue-on-error: true
         run: |
-          (cd rust_engine && cargo build -q --release -p cli)
           export INFINITY_SERVER_BIN="${PWD}/rust_engine/target/release/infinity"
           work="$(mktemp -d)"
-          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
-                --unshare-pid --proc /proc -- \
-                .venv/bin/python -m pytest -q -m slow -k "not cross_engine" \
-                python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
+          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \\
+                --unshare-pid --proc /proc -- \\
+                .venv/bin/python -m pytest -q -m slow -k "not cross_engine" \\
+                python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \\
                 --tb=short
-
