@@ -86,8 +86,9 @@ If you have deployed Infinity as a separate server and installed the Infinity cl
 
 ```python
 import infinity
+
 # If Infinity is deployed on the local machine, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
-infinity_object = infinity.connect(infinity.NetworkAddress("192.168.1.101", 23817)) 
+infinity_object = infinity.connect(infinity.NetworkAddress("192.168.1.101", 23817))
 ```
 
 ---
@@ -121,7 +122,7 @@ infinity_object.disconnect()
 ### create_database
 
 ```python
-infinity_object.create_database(db_name, conflict_type = ConflictType.Error, comment = None)
+infinity_object.create_database(db_name, conflict_type=ConflictType.Error, comment=None)
 ```
 
 Creates a database with a specified name.
@@ -172,21 +173,26 @@ Additional comment for the database to create.
 
 ```python
 # Create a database named 'my_database':
-# If the specified database already exists, raise an error. 
+# If the specified database already exists, raise an error.
 infinity_object.create_database("my_database")
 ```
 
 ```python
 # Create a database named 'my_database':
-# If the specified database already exists, raise an error (same as above). 
-infinity_object.create_database("my_database", infinity.common.ConflictType.Error, comment="Database One")
+# If the specified database already exists, raise an error (same as above).
+infinity_object.create_database(
+    "my_database", infinity.common.ConflictType.Error, comment="Database One"
+)
 ```
 
 ```python
 from infinity.common import ConflictType
+
 # Create a database named 'my_database':
-# If the specified database already exists, silently ignore the operation and proceed. 
-infinity_object.create_database("my_database", ConflictType.Ignore, comment="Database One")
+# If the specified database already exists, silently ignore the operation and proceed.
+infinity_object.create_database(
+    "my_database", ConflictType.Ignore, comment="Database One"
+)
 ```
 
 ---
@@ -194,7 +200,7 @@ infinity_object.create_database("my_database", ConflictType.Ignore, comment="Dat
 ### drop_database
 
 ```python
-infinity_object.drop_database(db_name, conflict_type = ConflictType.Error)
+infinity_object.drop_database(db_name, conflict_type=ConflictType.Error)
 ```
 
 Deletes a database by its name.
@@ -237,18 +243,19 @@ A structure containing the following attributes:
 
 ```python
 # Delete a database named 'my_database':
-# If the specified database does not exist, raise an error. 
+# If the specified database does not exist, raise an error.
 infinity_object.drop_database("my_database")
 ```
 
 ```python
 # Delete a database named 'my_database':
-# If the specified database does not exist, raise an error (same as above). 
+# If the specified database does not exist, raise an error (same as above).
 infinity_object.drop_database("my_database", infinity.common.ConflictType.Error)
 ```
 
 ```python
 from infinity.common import ConflictType
+
 # Delete a database named 'my_database':
 # If the specified database does not exist, silently ignore the operation and proceed.
 infinity_object.drop_database("my_database", ConflictType.Ignore)
@@ -278,8 +285,8 @@ A structure containing the following attributes:
 #### Examples
 
 ```python
-res = infinity_object.list_databases() 
-print(res.db_names) # ['my_database', 'database_1']
+res = infinity_object.list_databases()
+print(res.db_names)  # ['my_database', 'database_1']
 ```
 
 ---
@@ -305,7 +312,7 @@ A structure containing the following attributes:
 #### Examples
 
 ```python
-res = infinity_object.show_database('my_database')
+res = infinity_object.show_database("my_database")
 ```
 
 ---
@@ -342,7 +349,7 @@ db_object = infinity_object.get_database("my_database")
 ### create_table
 
 ```python
-db_object.create_table(table_name, columns_definition, conflict_type = ConflictType.Error)
+db_object.create_table(table_name, columns_definition, conflict_type=ConflictType.Error)
 ```
 
 Creates a table with a specified name and defined columns.
@@ -521,12 +528,11 @@ You can build a HNSW index on the vector column to speed up the match_dense sear
 :::
 
 ```python
-# Create a table with a vector column only:  
+# Create a table with a vector column only:
 # - `vector`: The column is a vector column
 # - `128`: The vector dimension
 # - `float`: The primitive data type of the vectors. Can be `float`/`float32`, `float16`, `bfloat16`, `uint8` or `int8`
 db_object.create_table("my_table", {"c1": {"type": "vector,128,float"}})
-
 ```
 
 ##### Create a table with a multi-vector column only
@@ -536,12 +542,11 @@ You can build an HNSW index on the multi-vector column to accelerate match_dense
 :::
 
 ```python
-# Create a table with a multi-vector column only:  
+# Create a table with a multi-vector column only:
 # - `multivector`: The column is a multi-vector column
 # - `128`: The basic vector dimension
 # - `float`: The primitive data type of the basic vectors. Can be `float`/`float32`, `float16`, `bfloat16`, `uint8` or `int8`
 db_object.create_table("my_table", {"c1": {"type": "multivector,128,float"}})
-
 ```
 
 ##### Create a table with a sparse vector column only
@@ -552,34 +557,43 @@ You can build a BMP index on the sparse vector column to speed up the match_spar
 
 ```python
 from infinity.common import ConflictType
-# Create a table with a vector column only:  
+
+# Create a table with a vector column only:
 # - `sparse`: The column is a sparse vector column
 # - `128`: The sparse vector dimension
 # - `float`: The primitive data type of the sparse vectors. Can be `float`/`float32` or `double`/`float64`
 # - `int`: The data type of the sparse vector indices. Can be `int8`, `int16`, `int`/`int32`/`integer`, or `int64`
-db_object.create_table("my_table", {"c1": {"type": "sparse,128,float,int"}}, ConflictType.Error)
+db_object.create_table(
+    "my_table", {"c1": {"type": "sparse,128,float,int"}}, ConflictType.Error
+)
 ```
 
 ##### Create a table with a tensor column only
 
 ```python
 from infinity.common import ConflictType
-# Create a table with a tensor column only:  
+
+# Create a table with a tensor column only:
 # - `tensor`: The column is a tensor column
 # - `4`: Dimension of each vector unit in the tensor
 # - `float`: The primitive data type of the tensors. Can be `float`/`float32`, `float16`, `bfloat16` or `bit`
-db_object.create_table("my_table", {"c1": {"type": "tensor,4,float"}}, ConflictType.Ignore)
+db_object.create_table(
+    "my_table", {"c1": {"type": "tensor,4,float"}}, ConflictType.Ignore
+)
 ```
 
 ##### Create a table with a tensor array column only
 
 ```python
 from infinity.common import ConflictType
-# Create a table with a tensor array column only:  
+
+# Create a table with a tensor array column only:
 # - `tensorarray`: The column is a tensor array column
 # - `6`: Dimension of each vector unit in the tensor arrays
 # - `float`: The primitive data type of the tensor arrays. Can be `float`/`float32`, `float16`, `bfloat16` or `bit`
-db_object.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Ignore)
+db_object.create_table(
+    "my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Ignore
+)
 ```
 
 ---
@@ -587,7 +601,7 @@ db_object.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, Conf
 ### drop_table
 
 ```python
-db_object.drop_table(table_name, conflict_type = ConflictType.Error)
+db_object.drop_table(table_name, conflict_type=ConflictType.Error)
 ```
 
 Deletes a table from the database by its name.
@@ -630,18 +644,19 @@ A structure containing the following attributes:
 
 ```python
 # Delete a table named 'my_table':
-# If the specified table does not exist, raise an error. 
+# If the specified table does not exist, raise an error.
 db_object.drop_table("my_table")
 ```
 
 ```python
 # Delete a table named 'my_table':
-# If the specified table does not exist, raise an error (same as above). 
+# If the specified table does not exist, raise an error (same as above).
 db_object.drop_table("my_table", infinity.common.ConflictType.Error)
 ```
 
 ```python
 from infinity.common import ConflictType
+
 # Delete a table named 'my_table':
 # If the specified table does not exist, silently ignore the operation and proceed.
 db_object.drop_table("my_table", ConflictType.Ignore)
@@ -910,38 +925,75 @@ You must specify a default value each time you add a column.
 ##### Add an Integer column, a float column, and a varchar/string column at once
 
 ```python
-table_obj.add_columns({"column_name1": {"type": "integer", "default": 0}, "column_name2": {"type": "float", "default": 0.0}, "column_name3": {"type": "varchar", "default": ""}})
+table_obj.add_columns(
+    {
+        "column_name1": {"type": "integer", "default": 0},
+        "column_name2": {"type": "float", "default": 0.0},
+        "column_name3": {"type": "varchar", "default": ""},
+    }
+)
 ```
 
 ##### Add a dense vector column
 
 ```python
-table_obj.add_columns({"column_name1": {"type": "vector,4,float", "default": [1.0, 1.2, 2.4, 4.6]}})
+table_obj.add_columns(
+    {"column_name1": {"type": "vector,4,float", "default": [1.0, 1.2, 2.4, 4.6]}}
+)
 ```
 
 ##### Add a multivector column
 
 ```python
-table_obj.add_columns({"column_name1": {"type": "multivector,4,float", "default": [[1.0, 0.0, 0.0, 0.0], [1.2, 0.0, 0.0, 0.0]]}})
+table_obj.add_columns(
+    {
+        "column_name1": {
+            "type": "multivector,4,float",
+            "default": [[1.0, 0.0, 0.0, 0.0], [1.2, 0.0, 0.0, 0.0]],
+        }
+    }
+)
 ```
 
 ##### Add a tensor column
 
 ```python
-table_obj.add_columns({"column_name1": {"type": "tensor,4,float", "default": [[1.0, 0.0, 0.0, 0.0], [1.2, 0.0, 0.0, 0.0]]}})
+table_obj.add_columns(
+    {
+        "column_name1": {
+            "type": "tensor,4,float",
+            "default": [[1.0, 0.0, 0.0, 0.0], [1.2, 0.0, 0.0, 0.0]],
+        }
+    }
+)
 ```
 
 ##### Add a sparse column
 
 ```python
 from infinity.common import SparseVector
-table_obj.add_columns({"column_name1": {"type": "sparse,128,float,int", "default": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])}})
+
+table_obj.add_columns(
+    {
+        "column_name1": {
+            "type": "sparse,128,float,int",
+            "default": SparseVector([10, 20, 30], [1.1, 2.2, 3.3]),
+        }
+    }
+)
 ```
 
 Or, you can set the default value in a different format:
 
 ```python
-table_obj.add_columns({"column_name1": {"type": "sparse,128,float,int", "default": {"10":1.1, "20":2.2, "30": 3.3}}})
+table_obj.add_columns(
+    {
+        "column_name1": {
+            "type": "sparse,128,float,int",
+            "default": {"10": 1.1, "20": 2.2, "30": 3.3},
+        }
+    }
+)
 ```
 
 ---
@@ -1051,7 +1103,7 @@ A structure containing the following attributes:
 
 ```python
 res = db_object.list_tables()
-res.table_names # ['my_table, 'tensor_table', 'sparse_table']
+res.table_names  # ['my_table, 'tensor_table', 'sparse_table']
 ```
 
 ---
@@ -1077,7 +1129,7 @@ A structure containing the following attributes:
 #### Examples
 
 ```python
-res = db_object.show_table('my_table')
+res = db_object.show_table("my_table")
 ```
 
 ---
@@ -1085,7 +1137,9 @@ res = db_object.show_table('my_table')
 ### create_index
 
 ```python
-table_object.create_index(index_name, index_info, conflict_type = ConflictType.Error, comment = None)
+table_object.create_index(
+    index_name, index_info, conflict_type=ConflictType.Error, comment=None
+)
 ```
 
 Creates an index on a specified column.
@@ -1188,10 +1242,17 @@ from infinity.filter_utils import regex_filter
 # A full-text index only sees the rows that exist when it is built, so insert
 # first. A regular analyzer serves keyword search, the sparse gram one `regex()`.
 table_object.insert([{"id": 1, "doc": "harmful chemical reaction"}])
-table_object.create_index("idx_doc", index.IndexInfo("doc", index.IndexType.FullText, {"analyzer": "standard"}))
-table_object.create_index("idx_doc_sg", index.IndexInfo.sparsegram("doc", fold_case=True))
+table_object.create_index(
+    "idx_doc",
+    index.IndexInfo("doc", index.IndexType.FullText, {"analyzer": "standard"}),
+)
+table_object.create_index(
+    "idx_doc_sg", index.IndexInfo.sparsegram("doc", fold_case=True)
+)
 
-table_object.filter(regex_filter("doc", r"(?i)colou?r of the (sky|sea)")).output(["id", "doc"]).to_pl()
+table_object.filter(regex_filter("doc", r"(?i)colou?r of the (sky|sea)")).output(
+    ["id", "doc"]
+).to_pl()
 ```
 
 A column without such an index keeps a plain scan, and a pattern that requires no literal (for example `[0-9]+`) does too. `fold_case=True` is what lets a pattern such as `(?i)nobel prize` use the index; a case sensitive pattern works either way.
@@ -1248,35 +1309,38 @@ A structure containing these attributes:
 
 ```python {1}
 from infinity.index import IndexInfo, IndexType
+
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
-table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}})
+table_object = db_object.create_table(
+    "test_index_hnsw", {"c1": {"type": "vector,1024,float"}}
+)
 # Create an HNSW index named "my_index" on column "c1" with default parameter settings:
-# - "M": "16", 
+# - "M": "16",
 # - "ef_construction": "50",
 # - "encode": "plain"
-# Only the "metric" parameter (required) is explicitly set to L2 distance. 
-table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}), comment="Index One")
+# Only the "metric" parameter (required) is explicitly set to L2 distance.
+table_object.create_index(
+    "my_index", IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}), comment="Index One"
+)
 ```
 
 ```python {1}
 from infinity.index import IndexInfo, IndexType
+
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
-table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}})
+table_object = db_object.create_table(
+    "test_index_hnsw", {"c1": {"type": "vector,1024,float"}}
+)
 # Create an HNSW index named "my_index" on column "c1"
 # Settings for "M", "ef_construction", and "metric" are the same as above, except:
-# "encoding" is set to "lvq" 
+# "encoding" is set to "lvq"
 table_object.create_index(
     "my_index",
-        IndexInfo(
-            "c1",
-            IndexType.Hnsw,
-            {
-              "M": "16",
-              "ef_construction": "50",
-              "metric": "l2",
-              "encode": "lvq"
-            }
-        )
+    IndexInfo(
+        "c1",
+        IndexType.Hnsw,
+        {"M": "16", "ef_construction": "50", "metric": "l2", "encode": "lvq"},
+    ),
 )
 ```
 
@@ -1284,13 +1348,16 @@ table_object.create_index(
 
 ```python
 from infinity.index import IndexInfo, IndexType
+
 # Create a table named "test_index_hnsw" with a 4-dimensional float multivector column "c1"
-table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "multivector,4,float"}})
+table_object = db_object.create_table(
+    "test_index_hnsw", {"c1": {"type": "multivector,4,float"}}
+)
 # Create an HNSW index named "my_index" on column "c1" with default parameter settings:
-# - "M": "16", 
+# - "M": "16",
 # - "ef_construction": "50",
 # - "encode": "plain"
-# Only the "metric" parameter (required) is explicitly set to L2 distance. 
+# Only the "metric" parameter (required) is explicitly set to L2 distance.
 table_object.create_index("my_index", IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}))
 ```
 
@@ -1298,34 +1365,33 @@ table_object.create_index("my_index", IndexInfo("c1", IndexType.Hnsw, {"metric":
 
 ```python
 from infinity.index import IndexInfo, IndexType
+
 # Create a table named "test_index_fulltext" with a varchar column "body"
-table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}})
+table_object = db_object.create_table(
+    "test_index_fulltext", {"body": {"type": "varchar"}}
+)
 # Create a full-text index named "my_index" on column "body" with default parameter settings:
 # - "ANALYZER": "standard"
 table_object.create_index(
     "my_index",
-        IndexInfo(
-            "body", 
-            IndexType.FullText, 
-        )
+    IndexInfo(
+        "body",
+        IndexType.FullText,
+    ),
 )
 ```
 
 ```python
 from infinity.index import IndexInfo, IndexType
+
 # Create a table named "test_index_fulltext" with a varchar column "body"
-table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}})
+table_object = db_object.create_table(
+    "test_index_fulltext", {"body": {"type": "varchar"}}
+)
 # Create a full-text index named "my_index" on column "body"
 # Setting "ANALYZER" to "standard" (same as the above)
 table_object.create_index(
-    "my_index",
-        IndexInfo(
-            "body", 
-            IndexType.FullText, 
-            {
-                "ANALYZER": "standard"
-            }
-        )
+    "my_index", IndexInfo("body", IndexType.FullText, {"ANALYZER": "standard"})
 )
 ```
 
@@ -1333,52 +1399,42 @@ table_object.create_index(
 
 ```python
 from infinity.index import IndexInfo, IndexType
+
 # Create a table named "test_index_secondary" with a varchar column "body"
-table_object = db_object.create_table("test_index_secondary", {"c1": {"type": "varchar"}})
-# Create a secondary index named "my_index" on column "c1"
-table_object.create_index(
-    "my_index",
-        IndexInfo(
-            "c1", 
-            IndexType.Secondary 
-        )
+table_object = db_object.create_table(
+    "test_index_secondary", {"c1": {"type": "varchar"}}
 )
+# Create a secondary index named "my_index" on column "c1"
+table_object.create_index("my_index", IndexInfo("c1", IndexType.Secondary))
 ```
 
 ##### Create a BMP index
 
 ```python
 from infinity.index import IndexInfo, IndexType
+
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
-table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}})
+table_object = db_object.create_table(
+    "test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}
+)
 # Create a BMP index named "my_index" on column "c1" with default parameter settings:
 # - "block_size": "16"
 # - "compress_type": "compress"
-table_object.create_index(
-    "my_index",
-        IndexInfo(
-            "c1",
-            IndexType.BMP
-        )
-)
+table_object.create_index("my_index", IndexInfo("c1", IndexType.BMP))
 ```
 
 ```python
 from infinity.index import IndexInfo, IndexType
+
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
-table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}})
+table_object = db_object.create_table(
+    "test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}
+)
 # Create a BMP index named "my_index" on column "c1"
 # Settings for "block_size" and "compress_type" are the same as above
 table_object.create_index(
     "my_index",
-        IndexInfo(
-            "c1",
-            IndexType.BMP,
-            {
-              "block_size": "16",
-              "compress_type": "compress"
-            }
-        )
+    IndexInfo("c1", IndexType.BMP, {"block_size": "16", "compress_type": "compress"}),
 )
 ```
 
@@ -1453,7 +1509,7 @@ A structure containing the following attributes:
 
 ```python
 # Alter BMP index my_index
-res = table_object.alter_index("my_index", {"topk": "3", "bp_reorder" : ""})
+res = table_object.alter_index("my_index", {"topk": "3", "bp_reorder": ""})
 ```
 ---
 
@@ -1462,7 +1518,7 @@ res = table_object.alter_index("my_index", {"topk": "3", "bp_reorder" : ""})
 ### drop_index
 
 ```python
-table_object.drop_index(index_name, conflict_type = ConflictType.Error)
+table_object.drop_index(index_name, conflict_type=ConflictType.Error)
 ```
 
 Deletes an index by its name.
@@ -1531,7 +1587,7 @@ A structure containing the following attributes:
 
 ```python
 res = table_object.list_indexes()
-res.index_names # ['my_index', 'tensor_index', 'sparse_index']
+res.index_names  # ['my_index', 'tensor_index', 'sparse_index']
 ```
 
 ---
@@ -1557,7 +1613,7 @@ A structure containing the following attributes:
 #### Examples
 
 ```python
-res = table_object.show_index('my_index')
+res = table_object.show_index("my_index")
 ```
 
 ---
@@ -1638,20 +1694,23 @@ A structure containing the following attributes:
 
 ```python
 # Create a table with four primitive columns:
-table_instance = db_instance.create_table("primitive_table", {
-    "c1": {"type": "int8", "default": 0},
-    "c2": {"type": "int16", "default": 0},
-    "c3": {"type": "int", "default": 0},
-    "c4": {"type": "int32", "default": 0},   # Same as int
-    "c5": {"type": "integer", "default": 0}, # Same as int
-    "c6": {"type": "int64", "default": 0},
-    "c7": {"type": "varchar"},
-    "c8": {"type": "float", "default": 1.0},
-    "c9": {"type": "float32", "default": 1.0}, # Same as float
-    "c10": {"type": "double", "default": 1.0},
-    "c11": {"type": "float64", "default": 1.0}, # Same as double
-    "c12": {"type": "bool", "default": False},
-})
+table_instance = db_instance.create_table(
+    "primitive_table",
+    {
+        "c1": {"type": "int8", "default": 0},
+        "c2": {"type": "int16", "default": 0},
+        "c3": {"type": "int", "default": 0},
+        "c4": {"type": "int32", "default": 0},  # Same as int
+        "c5": {"type": "integer", "default": 0},  # Same as int
+        "c6": {"type": "int64", "default": 0},
+        "c7": {"type": "varchar"},
+        "c8": {"type": "float", "default": 1.0},
+        "c9": {"type": "float32", "default": 1.0},  # Same as float
+        "c10": {"type": "double", "default": 1.0},
+        "c11": {"type": "float64", "default": 1.0},  # Same as double
+        "c12": {"type": "bool", "default": False},
+    },
+)
 
 # Insert an incomplete row, with remaining cells defaulting to their column defaults:
 table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
@@ -1661,7 +1720,13 @@ table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
 
 ```python
 # Create a table with an integer column and a 3-d vector column:
-table_object = db_object.create_table("vector_table", {"c1": {"type": "integer", "default": 2024}, "vector_column": {"type": "vector,3,float"}})
+table_object = db_object.create_table(
+    "vector_table",
+    {
+        "c1": {"type": "integer", "default": 2024},
+        "vector_column": {"type": "vector,3,float"},
+    },
+)
 
 # Insert one incomplete row into the table:
 # Note that the 'c1' cell defaults to 0.
@@ -1669,7 +1734,9 @@ table_object.insert({"vector_column": [1.1, 2.2, 3.3]})
 
 # Insert two incomplete rows into the table:
 # Note that the 'c1' cells default to 0.
-table_object.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.5, 6.6]}])
+table_object.insert(
+    [{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.5, 6.6]}]
+)
 ```
 
 ##### Insert vectors using FDE (Feature Dimension Expansion)
@@ -1678,34 +1745,39 @@ table_object.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4,
 from infinity.common import FDE
 
 # Create a table with a 64-dimensional vector column:
-table_object = db_object.create_table("fde_table", {"id": {"type": "integer"}, "embedding_col": {"type": "vector,64,float"}})
+table_object = db_object.create_table(
+    "fde_table",
+    {"id": {"type": "integer"}, "embedding_col": {"type": "vector,64,float"}},
+)
 
 # Insert data using FDE function to generate embeddings from 2D tensor data:
-table_object.insert([
-    {
-        "id": 1,
-        "embedding_col": FDE(
-            tensor_data=[
-                [1.0, 2.0, 3.0, 4.0],      # Feature vector 1
-                [0.5, 1.5, 2.5, 3.5],      # Feature vector 2
-                [2.0, 1.0, 4.0, 3.0]       # Feature vector 3
-            ],
-            target_dimension=64  # Output embedding dimension
-        )
-    },
-    {
-        "id": 2,
-        "vector_col": FDE(
-            tensor_data=[
-                [2.5, 1.5, 3.5, 2.5],
-                [1.0, 3.0, 2.0, 4.0],
-                [0.8, 1.2, 2.8, 3.2],
-                [1.5, 2.5, 1.5, 2.5]
-            ],
-            target_dimension=64
-        )
-    }
-])
+table_object.insert(
+    [
+        {
+            "id": 1,
+            "embedding_col": FDE(
+                tensor_data=[
+                    [1.0, 2.0, 3.0, 4.0],  # Feature vector 1
+                    [0.5, 1.5, 2.5, 3.5],  # Feature vector 2
+                    [2.0, 1.0, 4.0, 3.0],  # Feature vector 3
+                ],
+                target_dimension=64,  # Output embedding dimension
+            ),
+        },
+        {
+            "id": 2,
+            "vector_col": FDE(
+                tensor_data=[
+                    [2.5, 1.5, 3.5, 2.5],
+                    [1.0, 3.0, 2.0, 4.0],
+                    [0.8, 1.2, 2.8, 3.2],
+                    [1.5, 2.5, 1.5, 2.5],
+                ],
+                target_dimension=64,
+            ),
+        },
+    ]
+)
 ```
 
 **FDE Parameters:**
@@ -1722,20 +1794,35 @@ table_object.insert([
 
 ```python
 from infinity.common import SparseVector
+
 # Create a table with an integer column and a 100-d sparse vector column:
-table_object = db_object.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
+table_object = db_object.create_table(
+    "sparse_vector_table",
+    {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}},
+)
 
 # Insert one row into the table:
 # `indices` specifies the corresponding indices to the values in `values`.
-# Note that the second row sets "c1" as 2024 by default. 
-table_object.insert([{"c1": 2022, "sparse_column": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])}, {"sparse_column": SparseVector([70, 80, 90], [7.7, 8.8, 9.9])}])
+# Note that the second row sets "c1" as 2024 by default.
+table_object.insert(
+    [
+        {"c1": 2022, "sparse_column": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])},
+        {"sparse_column": SparseVector([70, 80, 90], [7.7, 8.8, 9.9])},
+    ]
+)
 ```
 
 ##### Insert tensors
 
 ```python
-# Create a table with a tensor column: 
-table_object = db_object.create_table("tensor_table", {"c1": {"type": "integer", "default": 2024}, "tensor_column": {"type": "tensor,4,float"}})
+# Create a table with a tensor column:
+table_object = db_object.create_table(
+    "tensor_table",
+    {
+        "c1": {"type": "integer", "default": 2024},
+        "tensor_column": {"type": "tensor,4,float"},
+    },
+)
 
 # Insert one row into the table:
 table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}])
@@ -1745,7 +1832,9 @@ table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 
 
 ```python
 # Creat a table with only one tensor array column:
-table_object = db_object.create_table("tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}})
+table_object = db_object.create_table(
+    "tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}}
+)
 table_object.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
 ```
 
@@ -1753,11 +1842,22 @@ table_object.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6
 
 ```python
 from infinity.common import Array
+
 # Creat a table with only one varchar array array column:
-table_object = db_object.create_table("varchar_array_array_table",
-                                      {"varchar_array_array_column": {"type": "array,array,varchar"}})
+table_object = db_object.create_table(
+    "varchar_array_array_table",
+    {"varchar_array_array_column": {"type": "array,array,varchar"}},
+)
 # Insert one row into the table:
-table_object.insert([{"varchar_array_array_column": Array(Array("hello", "world"), Array("!"), Array())}])
+table_object.insert(
+    [
+        {
+            "varchar_array_array_column": Array(
+                Array("hello", "world"), Array("!"), Array()
+            )
+        }
+    ]
+)
 ```
 
 ---
@@ -1810,7 +1910,10 @@ A structure containing the following attributes:
 ##### Import a csv file
 
 ```python
-table_object.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file_type": "csv", "delimiter": "\t"})
+table_object.import_data(
+    os.getcwd() + "/your_file.csv",
+    {"header": False, "file_type": "csv", "delimiter": "\t"},
+)
 ```
 
 ##### Import a jsonl file
@@ -1830,7 +1933,7 @@ table_object.import_data(os.getcwd() + "/your_file.parquet", {"file_type": "parq
 ### export_data
 
 ```python
-table_object.export_data(filepath, export_options, columns = None)
+table_object.export_data(filepath, export_options, columns=None)
 ```
 
 Exports data in the current table to a specified file.
@@ -1887,13 +1990,28 @@ A structure containing the following attributes:
 ##### Export your table to a csv file
 
 ```python
-table_object.export_data(os.getcwd() + "/export_data.csv", {"header": True, "file_type": "csv", "delimiter": ",", "offset": 2, "limit": 7, "row_limit": 3}, ["num", "name", "score"])
+table_object.export_data(
+    os.getcwd() + "/export_data.csv",
+    {
+        "header": True,
+        "file_type": "csv",
+        "delimiter": ",",
+        "offset": 2,
+        "limit": 7,
+        "row_limit": 3,
+    },
+    ["num", "name", "score"],
+)
 ```
 
 ##### Export your table to a jsonl file
 
 ```python
-table_object.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
+table_object.export_data(
+    os.getcwd() + "/export_data.jsonl",
+    {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2},
+    ["num", "name", "score"],
+)
 ```
 
 ##### Export your table to a parquet file
@@ -1907,7 +2025,7 @@ table_object.export_data(os.getcwd() + "/export_data.parquet", {"file_type": "pa
 ### delete
 
 ```python
-table_object.delete(cond = None)
+table_object.delete(cond=None)
 ```
 
 Deletes rows from the table based on the specified condition.
@@ -1948,7 +2066,6 @@ table_object.delete()
 ```python
 # Clear all data in the current table
 table_object.delete(None)
-
 ```
 
 ##### Conditional row deletion
@@ -1957,9 +2074,26 @@ table_object.delete(None)
 # Create a table named "my_table" with two columns:
 # - Integer column "c1"
 # - Vector column "vec"
-table_object = db_instance.create_table("my_table", {"c1": {"type": "integer"}, "vec": {"type": "vector,4,float"},})
+table_object = db_instance.create_table(
+    "my_table",
+    {
+        "c1": {"type": "integer"},
+        "vec": {"type": "vector,4,float"},
+    },
+)
 # Insert two rows of data into the "my_table"
-table_object.insert([{"c1": 90, "vec": [1.0, 1.2, 0.8, 0.9],}, {"c1": 80, "vec": [4.0, 4.2, 4.3, 4.5],},])
+table_object.insert(
+    [
+        {
+            "c1": 90,
+            "vec": [1.0, 1.2, 0.8, 0.9],
+        },
+        {
+            "c1": 80,
+            "vec": [4.0, 4.2, 4.3, 4.5],
+        },
+    ]
+)
 # Delete rows where "c1" equals 1
 table_object.delete("c1 = 90")
 ```
@@ -2124,7 +2258,7 @@ table_object.output(["abs(num)"]).to_pl()
 ```python
 # Specify that the output should display the result of three multiplied by five
 # Note that no columns are involved in this example!
-# Either of the following works: 
+# Either of the following works:
 table_object.output(["3 * 5"]).to_pl()
 ```
 
@@ -2196,19 +2330,26 @@ table_object.output(["*"]).filter("c2 = 3").to_pl()
 ```
 
 ```python
-table_object.output(["*"]).filter("c1 not in (1, 2, 3) and (c2 + 1) in (1, 2, 3)").to_df()
+table_object.output(["*"]).filter(
+    "c1 not in (1, 2, 3) and (c2 + 1) in (1, 2, 3)"
+).to_df()
 ```
 
 ```python
-table_object.output(["*"]).filter("filter_fulltext('doc', 'first second', 'minimum_should_match=99%') and not num = 2").to_pl()
+table_object.output(["*"]).filter(
+    "filter_fulltext('doc', 'first second', 'minimum_should_match=99%') and not num = 2"
+).to_pl()
 ```
 
 ```python
 from infinity.filter_utils import regex_filter
+
 # `filter_fulltext` above and `regex` below may use different indexes of the
 # same column: an unqualified full-text filter uses the regular analyzer index,
 # and the narrowing `regex` adds uses the sparse gram one.
-table_object.output(["*"]).filter(regex_filter("doc", r"(?i)colou?r of the (sky|sea)")).to_pl()
+table_object.output(["*"]).filter(
+    regex_filter("doc", r"(?i)colou?r of the (sky|sea)")
+).to_pl()
 ```
 
 ---
@@ -2238,7 +2379,9 @@ An expression list defining how to sort the results.
 
 ```python
 # Output results sorted by the `c2` expression in ascending order and the `c1` expression in descending order
-table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Desc]]).to_df()
+table_obj.output(["c1", "c2"]).sort(
+    [["c2", SortType.Asc], ["c1", SortType.Desc]]
+).to_df()
 ```
 
 ---
@@ -2268,7 +2411,9 @@ A list of strings specifying the expression to group by. Each string in the list
 
 ```python
 table_obj.output(["c1", "sum(c2)"]).group_by(["c1"]).to_df()
-table_obj.output(["c1", "avg(c1)", "count(c2)", "min(c3)", "max(c4)"]).group_by(["c1", "c1+c2"]).to_df()
+table_obj.output(["c1", "avg(c1)", "count(c2)", "min(c3)", "max(c4)"]).group_by(
+    ["c1", "c1+c2"]
+).to_df()
 ```
 
 ---
@@ -2388,7 +2533,9 @@ A dictionary specifying the following search options:
 
 ```python
 # Limit the output row count not more than 2, start from position 1, output an extra result to indicate total hits row count
-table_instance.output(["num", "vec"]).limit(2).offset(1).option({"total_hits_count": True}).to_pl()
+table_instance.output(["num", "vec"]).limit(2).offset(1).option(
+    {"total_hits_count": True}
+).to_pl()
 ```
 
 ---
@@ -2396,7 +2543,14 @@ table_instance.output(["num", "vec"]).limit(2).offset(1).option({"total_hits_cou
 ### match_dense
 
 ```python
-table_object.match_dense(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
+table_object.match_dense(
+    vector_column_name,
+    embedding_data,
+    embedding_data_type,
+    distance_type,
+    topn,
+    knn_params=None,
+)
 ```
 
 Creates a dense vector search expression to identify the closest top n rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).
@@ -2462,7 +2616,9 @@ A dictionary representing additional KNN or ANN search parameters.
 # Find the 100 nearest neighbors using Euclidean distance
 # If no vector index is created on the column being queried, then the vector search defaults to a brute-force search.
 # In such case, set `knn_params` to `None` or leave it blank.
-table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "l2", 100).to_pl()
+table_object.output(["*"]).match_dense(
+    "vec", [0.1, 0.2, 0.3], "float", "l2", 100
+).to_pl()
 ```
 
 :::caution NOTE
@@ -2476,7 +2632,10 @@ table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "l2", 100)
 
 ```python
 from infinity.index import IndexInfo, IndexType
-table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, {"ef_construction": "50"}))
+
+table_object.create_index(
+    "my_index", IndexInfo("vec", IndexType.Hnsw, {"ef_construction": "50"})
+)
 # Find the 2 nearest neighbors using cosine distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
@@ -2486,11 +2645,16 @@ table_object.output(["*"]).match_dense("vec", [1, 2, 3], "uint8", "cosine", 2).t
 
 ```python
 from infinity.index import IndexInfo, IndexType
-table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, {"ef_construction": "50"}))
+
+table_object.create_index(
+    "my_index", IndexInfo("vec", IndexType.Hnsw, {"ef_construction": "50"})
+)
 # Find the 2 nearest neighbors using inner product distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
-table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"}).to_pl()
+table_object.output(["*"]).match_dense(
+    "vec", [0.1, 0.2, 0.3], "float", "ip", 2, {"ef": "100"}
+).to_pl()
 ```
 
 :::tip NOTE
@@ -2510,7 +2674,9 @@ from infinity.common import FDE
 fde_query = FDE(tensor_data, target_dimension)
 
 # Use the FDE object in match_dense
-table_object.match_dense(vector_column_name, fde_query, embedding_data_type, distance_type, topn, knn_params)
+table_object.match_dense(
+    vector_column_name, fde_query, embedding_data_type, distance_type, topn, knn_params
+)
 ```
 
 Creates a dense vector search expression using FDE (Feature Dimension Expansion) function to identify the closest top n rows. The FDE function takes a 2D tensor as input and expands it to the target dimension for a vector search.
@@ -2578,24 +2744,25 @@ Additional parameters for the KNN search. Defaults to `None`.
 ```python
 # Perform FDE-based vector search with a 2D tensor input
 query_tensor = [
-    [1.0, 2.0, 3.0, 4.0],      # Feature vector 1
-    [0.5, 1.5, 2.5, 3.5],      # Feature vector 2
-    [2.0, 1.0, 4.0, 3.0],      # Feature vector 3
+    [1.0, 2.0, 3.0, 4.0],  # Feature vector 1
+    [0.5, 1.5, 2.5, 3.5],  # Feature vector 2
+    [2.0, 1.0, 4.0, 3.0],  # Feature vector 3
 ]
 
-table_object.output(["id", "name", "_similarity"]).match_dense("embedding_col", query_tensor, 64, "float", "cosine", 5).to_pl()
+table_object.output(["id", "name", "_similarity"]).match_dense(
+    "embedding_col", query_tensor, 64, "float", "cosine", 5
+).to_pl()
 ```
 
 ##### FDE search with different configurations
 
 ```python
 # Small tensor with different target dimension
-small_tensor = [
-    [1.0, 0.5],
-    [0.8, 1.2]
-]
+small_tensor = [[1.0, 0.5], [0.8, 1.2]]
 
-table_object.output(["*"]).match_dense("vec_col", small_tensor, 128, "float", "ip", 10).to_pl()
+table_object.output(["*"]).match_dense(
+    "vec_col", small_tensor, 128, "float", "ip", 10
+).to_pl()
 ```
 
 ##### FDE search with additional parameters
@@ -2604,7 +2771,9 @@ table_object.output(["*"]).match_dense("vec_col", small_tensor, 128, "float", "i
 # FDE search with HNSW parameters
 query_tensor = [[1.0, 2.0], [3.0, 4.0]]
 
-table_object.output(["*"]).match_dense("vec_col", query_tensor, 64, "float", "cosine", 5, {"ef": "50"}).to_pl()
+table_object.output(["*"]).match_dense(
+    "vec_col", query_tensor, 64, "float", "cosine", 5, {"ef": "50"}
+).to_pl()
 ```
 
 :::tip NOTE
@@ -2619,7 +2788,9 @@ table_object.output(["*"]).match_dense("vec_col", query_tensor, 64, "float", "co
 ### match_sparse
 
 ```python
-table_object.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
+table_object.match_sparse(
+    vector_column_name, sparse_data, distance_type, topn, opt_params
+)
 ```
 
 Creates a sparse vector search expression to identify the top n closest rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
@@ -2646,6 +2817,7 @@ If you have a dictionary of indices and values, you can create a SparseVector ob
 
 ```python
 from infinity.common import SparseVector
+
 dic_sparse_vector = {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}
 sparse_vector = SparseVector(**dic_sparse_vector)
 ```
@@ -2691,7 +2863,10 @@ A dictionary representing additional parameters for the sparse vector search. Fo
 # If no sparse vector index is created on the column being queried, then the search defaults to a brute-force search.
 # In such case, set `opt_params` to `None` or leave it blank.
 from infinity.common import SparseVector
-table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100).to_df()
+
+table_object.output(["*"]).match_sparse(
+    "sparse_column", SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), "ip", 100
+).to_df()
 ```
 
 :::caution NOTE
@@ -2702,24 +2877,40 @@ table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20
 
 ```python
 from infinity.index import IndexInfo, IndexType
+
 table_object.create_index("my_index", [IndexInfo("sparse_column", IndexType.BMP)])
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
 # If you leave `opt_params` blank, the search takes the default settings for `"alpha"` and `"beta"`.
 from infinity.common import SparseVector
-table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
+
+table_object.output(["*"]).match_sparse(
+    "sparse_column",
+    SparseVector([0, 10, 20], [0.1, 0.2, 0.3]),
+    "ip",
+    100,
+    {"alpha": "1.0", "beta": "1.0"},
+).to_df()
 ```
 
 ```python
 from infinity.index import IndexInfo, IndexType
+
 table_object.create_index("my_index", IndexInfo("sparse_column", IndexType.BMP))
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
 # You can set the values of `"alpha"` or `"beta"` in `opt_params`, which overrides the default settings.
 from infinity.common import SparseVector
-table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20], [8, 10, 66]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
+
+table_object.output(["*"]).match_sparse(
+    "sparse_column",
+    SparseVector([0, 10, 20], [8, 10, 66]),
+    "ip",
+    100,
+    {"alpha": "1.0", "beta": "1.0"},
+).to_df()
 ```
 
 ---
@@ -2803,7 +2994,6 @@ An optional dictionary specifying the following search options:
 #### Examples
 
 ```python
-
 questions = [
     r"blooms",  # single term
     r"Bloom filter",  # OR multiple terms
@@ -2812,11 +3002,13 @@ questions = [
     r"space\-efficient",  # Escape reserved character '-', equivalent to: `space efficient`
     r'"space\-efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
     r'"harmful chemical"~10',  # sloppy phrase, refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
-    r'title:(quick OR brown) AND body:foobar', # search `(quick OR brown)` in the `title` field. keep fields empty.
+    r"title:(quick OR brown) AND body:foobar",  # search `(quick OR brown)` in the `title` field. keep fields empty.
 ]
 for question in questions:
-    table_object.output(["*"]).match_text('body', question, 2).to_df()
-    table_object.output(["*"]).match_text('', question, 2, {'default_field': 'body'}).to_df()
+    table_object.output(["*"]).match_text("body", question, 2).to_df()
+    table_object.output(["*"]).match_text(
+        "", question, 2, {"default_field": "body"}
+    ).to_df()
 ```
 
 ---
@@ -2854,7 +3046,9 @@ This method specifies the projection columns for the current table but does not 
 ##### Highlight the matched column to display
 
 ```python
-table_obj.output(["doctitle", "docdate", "body"]).highlight(["body"]).match_text("body^5", "harmful chemical", 3).to_pl()
+table_obj.output(["doctitle", "docdate", "body"]).highlight(["body"]).match_text(
+    "body^5", "harmful chemical", 3
+).to_pl()
 # The matched words will be enclosed in <em> and </em>
 ```
 
@@ -2863,7 +3057,7 @@ table_obj.output(["doctitle", "docdate", "body"]).highlight(["body"]).match_text
 ### fusion
 
 ```python
-table_object.fusion(method, topn, fusion_params = None)
+table_object.fusion(method, topn, fusion_params=None)
 ```
 
 Creates a reranking expression for multiple retrieval ways to identify the top n closest rows.
@@ -2886,7 +3080,7 @@ A non-empty string indicating the reranking methods to use:
   score = 0.0
   for q in queries:
       if d in result(q):
-          score += 1.0 / ( k + rank( result(q), d ) )
+          score += 1.0 / (k + rank(result(q), d))
   return score
 
   # Where
@@ -3058,8 +3252,12 @@ A `tuple[polas.DataFrame, {}]` object.
 #### Examples
 
 ```python
-# Format a vector search result into a Polars DataFrame. 
-res, extra_res = table_object.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10).to_pl()
+# Format a vector search result into a Polars DataFrame.
+res, extra_res = (
+    table_object.output(["*"])
+    .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10)
+    .to_pl()
+)
 ```
 
 ### to_arrow
@@ -3081,7 +3279,7 @@ A `tuple[pyarrow.Table, {}]` object.
 #### Examples
 
 ```python
-# Format the current table object into an Apache Arrow Table. 
+# Format the current table object into an Apache Arrow Table.
 res, extra_result = table_object.output(["*"]).filter("score >= 90").to_arrow()
 ```
 
