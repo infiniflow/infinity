@@ -1201,6 +1201,37 @@ pub fn replay(
     }
     Catalog::restamp(&mut batch, commit_ts);
     catalog.store().atomic_batch(&batch)?;
+    // `PrepareCommitCreateIndex` publishes the first chunk of a populated
+    // table inside the create-index transaction (`PopulateIndex`), so the
+    // replay has to publish it too - with this frame's commit ts, which is the
+    // one that transaction had.
+    if let WalCmd::CreateIndex {
+        db_name,
+        table_name,
+        index_base,
+        ..
+    } = cmd
+    {
+        let full = qualified(db_name, table_name);
+        let name = match index_base {
+            storage::wal::index_def::IndexDef::Secondary { base, .. }
+            | storage::wal::index_def::IndexDef::FullText { base, .. }
+            | storage::wal::index_def::IndexDef::Bmp { base, .. }
+            | storage::wal::index_def::IndexDef::Hnsw { base, .. }
+            | storage::wal::index_def::IndexDef::Emvb { base, .. }
+            | storage::wal::index_def::IndexDef::Plaid { base, .. }
+            | storage::wal::index_def::IndexDef::Smve { base, .. }
+            | storage::wal::index_def::IndexDef::Ivf { base, .. } => base.index_name.clone(),
+        };
+        if !engine
+            .block_segment_row_counts(&engine.table_key(&full))
+            .is_empty()
+        {
+            if let Ok(Some(meta)) = catalog.get_table_by_name(&full) {
+                let _ = engine.publish_index_chunks(&full, meta.id, Some((name.as_str(), commit_ts)));
+            }
+        }
+    }
     Ok(())
 }
 

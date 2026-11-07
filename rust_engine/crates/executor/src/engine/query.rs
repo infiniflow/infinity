@@ -1994,6 +1994,34 @@ impl Engine {
                         .entry(column.clone())
                         .or_default();
                 }
+                // `PrepareCommitCreateIndex` -> `PopulateIndex` over every
+                // segment the table already has: the first chunk of a
+                // `CREATE INDEX` on a populated table is built and published
+                // **inside the create-index transaction**, so its record carries
+                // that transaction's ts and the later explicit `DumpMemIndex`
+                // has nothing left to seal. The index is built above; this
+                // publishes what it produced, stamped with the DDL's ts (read
+                // back from the index's own record, whose key names it).
+                if !self
+                    .block_segment_row_counts(&self.table_key(table))
+                    .is_empty()
+                {
+                    if let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(table) {
+                        let record = catalog::layout::index_record(
+                            self.storage.catalog.store().as_ref(),
+                            &self.database_id_of(table).to_string(),
+                            &meta.id.to_string(),
+                            name,
+                        );
+                        if let Ok(Some((_, create_ts))) = record {
+                            self.publish_index_chunks(
+                                table,
+                                meta.id,
+                                Some((name.as_str(), create_ts)),
+                            )?;
+                        }
+                    }
+                }
                 Ok(QueryResult::CreatedIndex {
                     name: name.clone(),
                     table: table.clone(),

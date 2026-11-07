@@ -139,20 +139,16 @@ STAGES = {
 # narrowing the gate: each one is a real deviation, with what the comparison
 # flagged. The gate turns green for a stage as soon as its marker is removed.
 KNOWN_DIFFERENCES = {
-    "create_index": (
-        "CREATE INDEX still rewrites the whole catalog (every tbl|col| record "
-        "is restamped with the index DDL's ts) before the targeted write below: "
-        "the dump then has no idx_seg| row to build on"
-    ),
     "drop_index": (
-        "the ids, keys and files match; the commit ts the dump and the drop "
-        "record differ from the reference's by 4-10 (idx_chunk|…|0 = 46 vs 56, "
-        "drop|idx|… = 52 vs 56), so the port spends a different number of "
-        "timestamps around dump_index"
+        "keys, ids and files match; the drop marker's ts is 4 higher than the "
+        "reference's (drop|idx|… = 52 vs 56). An explicit dump_index with "
+        "nothing left to seal commits **read-only** in the reference (no ts, no "
+        "WAL entry); the port spends a write ts and writes an entry, and the "
+        "reopen then stops skipping its startup checkpoint, so the clock is 4 "
+        "ahead from there on"
     ),
 }
-# The two stages after `drop_index` carry the same difference (the index's
-# records are part of what they compare).
+# The stages after `drop_index` compare the same marker.
 for _stage in ("drop_table", "drop_database"):
     KNOWN_DIFFERENCES[_stage] = KNOWN_DIFFERENCES["drop_index"]
 
