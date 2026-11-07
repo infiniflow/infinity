@@ -241,7 +241,7 @@ class InfinityThriftQueryBuilder(ABC):
         knn_opt_params = []
         optional_filter = None
         if knn_params is not None:
-            optional_filter = get_search_optional_filter_from_opt_params(knn_params)
+            optional_filter, knn_params = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
                 value = v.lower()
@@ -272,7 +272,9 @@ class InfinityThriftQueryBuilder(ABC):
             self._search = SearchExpr()
             self._search.match_exprs = list()
 
-        optional_filter = None if opt_params is None else get_search_optional_filter_from_opt_params(opt_params)
+        optional_filter = None
+        if opt_params is not None:
+            optional_filter, opt_params = get_search_optional_filter_from_opt_params(opt_params)
         match_sparse_expr = make_match_sparse_expr(
             vector_column_name, sparse_data, metric_type, topn, opt_params, optional_filter
         )
@@ -291,7 +293,7 @@ class InfinityThriftQueryBuilder(ABC):
         match_expr.matching_text = matching_text
         options_text = f"topn={topn}"
         if extra_options is not None:
-            match_expr.filter_expr = get_search_optional_filter_from_opt_params(extra_options)
+            match_expr.filter_expr, extra_options = get_search_optional_filter_from_opt_params(extra_options)
             for k, v in extra_options.items():
                 options_text += f";{k}={v}"
         match_expr.options_text = options_text
@@ -313,7 +315,7 @@ class InfinityThriftQueryBuilder(ABC):
         option_str = f"topn={topn}"
         optional_filter = None
         if extra_option is not None:
-            optional_filter = get_search_optional_filter_from_opt_params(extra_option)
+            optional_filter, extra_option = get_search_optional_filter_from_opt_params(extra_option)
             for k, v in extra_option.items():
                 option_str += f";{k}={v}"
         match_tensor_expr = make_match_tensor_expr(
@@ -683,7 +685,7 @@ class InfinityThriftQueryBuilder(ABC):
         knn_opt_params = []
         optional_filter = None
         if knn_params is not None:
-            optional_filter = get_search_optional_filter_from_opt_params(knn_params)
+            optional_filter, knn_params = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
                 value = v.lower()
