@@ -284,6 +284,12 @@ pub struct TxnManager {
     max_applied: AtomicU64,
     /// Highest commit timestamp appended to the active log (rotation seal).
     last_appended: AtomicU64,
+    /// Payload of the newest checkpoint frame on disk (the replay floor). The
+    /// reference reads it from the WAL as `last_ckp_ts` and **skips** a
+    /// checkpoint that would land within 2 of it (`NewTxn::Checkpoint`,
+    /// `new_txn_impl.cpp:1769`); the skip spends no write timestamp, so
+    /// writing the frame anyway shifted every later record by 2.
+    last_frame: AtomicU64,
     /// Highest commit timestamp the last store flush covers
     /// ([`Self::flush`]): the completed-commit clock as it stood when the SST
     /// was written. This is the replay floor a checkpoint frame may claim, and
@@ -470,6 +476,7 @@ impl TxnManager {
             max_applied: AtomicU64::new(applied_ts),
             last_appended: AtomicU64::new(max_ts),
             synced: AtomicU64::new(applied_ts),
+            last_frame: AtomicU64::new(applied_ts),
             wal_synced: Arc::new(AtomicU64::new(start_ts)),
             sync_lock: Mutex::new(()),
             total_committed: AtomicU64::new(0),
@@ -1366,7 +1373,18 @@ impl TxnManager {
     /// caller that only rotates the WAL needs no mirror because it writes no
     /// store either - the frame then simply repeats the last flush's floor.
     pub fn append_checkpoint_flushed(&self) -> Result<()> {
-        self.write_checkpoint(self.synced_ts() | 1)
+        let frame_ts = self.synced_ts() | 1;
+        let last = self.last_frame.load(Ordering::SeqCst);
+        // `NewTxn::Checkpoint`: "last checkpoint ts: last checkpoint txn begin
+        // ts" - a checkpoint whose begin ts is within 2 of the previous frame's
+        // becomes `kSkippedCheckpoint`, which commits read-only, writes no entry
+        // and spends no write timestamp (`new_txn_impl.cpp:1769`). Writing it
+        // anyway made a restart spend 2 extra ts, so every record after it was
+        // stamped 2 higher than the reference's.
+        if last > 0 && last + 2 >= frame_ts {
+            return Ok(());
+        }
+        self.write_checkpoint(frame_ts)
     }
 
     fn write_checkpoint(&self, frame_ts: TxnTimeStamp) -> Result<()> {
@@ -1426,6 +1444,7 @@ impl TxnManager {
         if rotate {
             self.last_swap.store(seal, Ordering::SeqCst);
         }
+        self.last_frame.store(frame_ts, Ordering::SeqCst);
         self.note_standalone(TxnOp::Checkpoint, commit_ts);
         // The checkpoint transaction is committed, so its commit ts becomes the
         // clock's new position - through `CommitBottom`'s ordered publication,
