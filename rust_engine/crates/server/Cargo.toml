@@ -52,3 +52,6 @@ path = "src/bin/handle_show_table.rs"
 
 [dev-dependencies]
 tempfile = "3"
+
+[lints]
+workspace = true

@@ -7,3 +7,6 @@ license.workspace = true
 [dependencies]
 expression.workspace = true
 rust-stemmers.workspace = true
+
+[lints]
+workspace = true

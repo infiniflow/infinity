@@ -10,3 +10,6 @@ common.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 storage.workspace = true
+
+[lints]
+workspace = true

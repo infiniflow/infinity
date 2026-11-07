@@ -21,6 +21,14 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 
+# A compiler warning is a defect: every crate inherits this with
+# `[lints] workspace = true`, so `cargo build` / `cargo test` (and every CI
+# job that compiles the workspace) fails on one. A warning a crate genuinely
+# cannot fix is allowed at the site with `#[allow(..., reason = "...")]`, never
+# silently in the manifest.
+[workspace.lints.rust]
+warnings = "deny"
+
 [workspace.dependencies]
 rust-stemmers = "1.2"
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }

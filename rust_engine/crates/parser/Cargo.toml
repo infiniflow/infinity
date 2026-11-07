@@ -6,3 +6,6 @@ license.workspace = true
 
 [dependencies]
 common.workspace = true
+
+[lints]
+workspace = true

@@ -8,3 +8,6 @@ license.workspace = true
 parser.workspace = true
 
 [dev-dependencies]
+
+[lints]
+workspace = true

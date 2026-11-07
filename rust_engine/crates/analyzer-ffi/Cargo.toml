@@ -12,3 +12,6 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 [dependencies]
 analyzer.workspace = true
 libc = "0.2"
+
+[lints]
+workspace = true

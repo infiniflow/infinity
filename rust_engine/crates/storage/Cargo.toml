@@ -21,3 +21,6 @@ rocksdb = { version = "0.25", default-features = false }
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[lints]
+workspace = true
