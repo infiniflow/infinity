@@ -623,9 +623,10 @@ fn run(args: &[String]) -> common::Result<()> {
             println!("Total cost : {:.6} s", sel.as_secs_f64());
             Ok(())
         }
-        // `infinity knn-bench <dir> <query.fvecs> <groundtruth.ivecs> <ef> [topk]`:
+        // `infinity knn-bench <dir> <query.fvecs> <groundtruth.ivecs> <ef> [topk] [table]`:
         // the query half of the CI benchmark (`knn_query_benchmark`), run in
-        // process so the numbers are the engine's and not the wire's.
+        // process so the numbers are the engine's and not the wire's. The table
+        // defaults to `sift`; pass `gist` for the 960-dimension GIST table.
         "knn-bench" => {
             let query_path = args
                 .get(2)
@@ -634,7 +635,7 @@ fn run(args: &[String]) -> common::Result<()> {
             let truth_path = args.get(3).cloned().unwrap_or_default();
             let ef: u64 = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(200);
             let topk: usize = args.get(5).and_then(|s| s.parse().ok()).unwrap_or(100);
-            let table = "sift";
+            let table = args.get(6).map(String::as_str).unwrap_or("sift");
             let queries = read_fvecs(&query_path)?;
             let truth = if truth_path.is_empty() {
                 Vec::new()

@@ -58,3 +58,4 @@
 * **新增一个基准时**：驱动放 `tools/bench_<x>.py`（只吃 `host/port/rows/queries`），在 `tools/run_index_bench.sh` 里加一个
   `case` 分支，报告放 `rust_engine/docs/<X>_BENCH.md` 并在本文件的 §1 表里登记。
 * **不要把起停脚本放 `.scratch`**：那是一次性的，别人复现不了（`bench_multivector.py` 早期就是这样，本文件落地时并进了 runner）。
+* **大数据量手工验收**（enwiki 全文 33M、SIFT HNSW 1M、峰值内存、8.39M 全文逐字节与跨引擎互读）见 [`MANUAL_ACCEPTANCE.md`](MANUAL_ACCEPTANCE.md)。

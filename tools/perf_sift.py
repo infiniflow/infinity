@@ -1,12 +1,18 @@
 """CI benchmark (tests.yml: reldeb_amd64_benchmark) reproduced over SQL.
 
 The CI job runs `knn_import_benchmark` / `knn_query_benchmark` against the SIFT
-1M dataset with an HNSW index (`M=16`, `ef_construction=200`, `metric=l2`,
-`encode=lvq`), then queries with `ef=200`, `topk=100`. This driver issues the
-same statements to an engine over the PG wire so the reference and the rewrite
-can be compared on the same machine.
+or GIST 1M dataset with an HNSW index (`M=16`, `ef_construction=200`,
+`metric=l2`, `encode=lvq`), then queries with `ef=200`, `topk=100`. This
+driver issues the same statements to an engine over the PG wire so the
+reference and the rewrite can be compared on the same machine.
 
-Usage: perf.py <cpp|rust> [--rows N] [--queries N] [--ef N] [--times N]
+`--dataset gist` switches to the 960-dimension GIST files;
+`--no-index` skips `CREATE INDEX` and measures the exact full scan (brute
+force); `--build-type lsg` builds the current LSP/LSG HNSW variant.
+
+Usage: perf_sift.py <cpp|rust> [--dataset sift|gist] [--no-index]
+                    [--build-type plain|lsg] [--rows N] [--queries N]
+                    [--ef N] [--times N] [--port N] [--data-dir DIR]
 """
 
 import argparse
@@ -22,12 +28,25 @@ import time
 sys.path.insert(0, "python")
 from restart_test import bytes_common as bc
 
-SIFT = "/home/zhichyu/benchmark/sift1M"
-DIMS = 128
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATASETS = {
+    "sift": {
+        "dir": os.environ.get("SIFT_DIR", os.path.join(REPO_ROOT, "test/data/benchmark/sift_1m")),
+        "dim": 128,
+        "table": "sift",
+        "prefix": "sift",
+    },
+    "gist": {
+        "dir": os.environ.get("GIST_DIR", os.path.join(REPO_ROOT, "test/data/benchmark/gist_1m")),
+        "dim": 960,
+        "table": "gist",
+        "prefix": "gist",
+    },
+}
 
 # Everything this driver writes stays inside the checkout (`.scratch/`), so a
 # run is reproducible from the tree alone and no state hides in /tmp.
-SCRATCH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".scratch")
+SCRATCH = os.path.join(REPO_ROOT, ".scratch")
 
 
 def read_fvecs(path, limit=None):
@@ -64,14 +83,14 @@ def read_ivecs(path, limit=None):
     return out
 
 
-def subset_fvecs(src, dst, rows):
+def subset_fvecs(src, dst, rows, dims):
     """The first `rows` records of `src` as a standalone fvecs file."""
-    if rows <= 0 or os.path.exists(dst) and os.path.getsize(dst) == rows * (4 + 4 * DIMS):
+    if rows <= 0 or os.path.exists(dst) and os.path.getsize(dst) == rows * (4 + 4 * dims):
         return dst
     with open(src, "rb") as f, open(dst, "wb") as g:
         for _ in range(rows):
-            rec = f.read(4 + 4 * DIMS)
-            if len(rec) < 4 + 4 * DIMS:
+            rec = f.read(4 + 4 * dims)
+            if len(rec) < 4 + 4 * dims:
                 break
             g.write(rec)
     return dst
@@ -100,15 +119,44 @@ def wait_ready(port, proc, log, seconds=300):
     raise SystemExit("engine did not come up")
 
 
+def knn_sql(table, vec, topk, ef, use_index):
+    stmt = (
+        f"SELECT ROW_ID() FROM {table} SEARCH MATCH VECTOR "
+        f"(col1, {vec}, 'float', 'l2', {topk})"
+    )
+    if use_index:
+        stmt += f" WITH (ef = {ef})"
+    return stmt + ";"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("engine", choices=["cpp", "rust"])
+    ap.add_argument("--dataset", choices=["sift", "gist"], default="sift")
+    ap.add_argument("--no-index", action="store_true", help="brute force: skip CREATE INDEX")
+    ap.add_argument("--build-type", choices=["plain", "lsg"], default="plain")
+    ap.add_argument("--data-dir", default="", help="override the dataset directory")
     ap.add_argument("--rows", type=int, default=0, help="0 = the whole base")
     ap.add_argument("--queries", type=int, default=100)
     ap.add_argument("--ef", type=int, default=200)
     ap.add_argument("--times", type=int, default=1)
     ap.add_argument("--port", type=int, default=0)
     args = ap.parse_args()
+
+    spec = DATASETS[args.dataset]
+    dims = spec["dim"]
+    table = spec["table"]
+    prefix = spec["prefix"]
+    data_dir = args.data_dir or spec["dir"]
+    base_path = os.path.join(data_dir, f"{prefix}_base.fvecs")
+    query_path = os.path.join(data_dir, f"{prefix}_query.fvecs")
+    truth_path = os.path.join(data_dir, f"{prefix}_groundtruth.ivecs")
+    for path in (base_path, query_path, truth_path):
+        if not os.path.exists(path):
+            raise SystemExit(
+                f"missing {os.path.basename(path)}: {path} "
+                f"(set {args.dataset.upper()}_DIR or --data-dir)"
+            )
 
     port = args.port or (5432 if args.engine == "cpp" else 23817)
     root = os.path.join(SCRATCH, f"perf-{args.engine}")
@@ -125,66 +173,73 @@ def main():
         start_new_session=True,
     )
 
-    base = os.path.join(SIFT, "sift_base.fvecs")
+    base = base_path
     if args.rows:
         base = subset_fvecs(
-            os.path.join(SIFT, "sift_base.fvecs"),
-            os.path.join(SCRATCH, f"sift_base_{args.rows}.fvecs"),
+            base_path,
+            os.path.join(SCRATCH, f"{prefix}_base_{args.rows}.fvecs"),
             args.rows,
+            dims,
         )
 
-    result = {"engine": args.engine, "rows": args.rows or 1_000_000, "ef": args.ef,
-              "queries": args.queries, "times": args.times}
+    result = {
+        "engine": args.engine,
+        "dataset": args.dataset,
+        "index": "none" if args.no_index else "hnsw",
+        "build_type": None if args.no_index else args.build_type,
+        "rows": args.rows or 1_000_000,
+        "ef": args.ef,
+        "queries": args.queries,
+        "times": args.times,
+    }
     try:
         wait_ready(port, proc, log)
         time.sleep(1)
 
-        sql(port, "DROP TABLE IF EXISTS sift;")
-        r = sql(port, "CREATE TABLE sift (col1 EMBEDDING(FLOAT,128));")
+        sql(port, f"DROP TABLE IF EXISTS {table};")
+        r = sql(port, f"CREATE TABLE {table} (col1 EMBEDDING(FLOAT,{dims}));")
         if r.returncode != 0:
             raise SystemExit(f"create table: {r.stderr}")
 
         t0 = time.time()
-        r = sql(port, f"COPY sift FROM '{base}' WITH (DELIMITER ',', FORMAT fvecs);", timeout=3600)
+        r = sql(port, f"COPY {table} FROM '{base}' WITH (DELIMITER ',', FORMAT fvecs);", timeout=3600)
         result["import_s"] = round(time.time() - t0, 3)
         if r.returncode != 0:
             raise SystemExit(f"copy: {r.stderr[-2000:]}")
-        result["imported_rows"] = sql(port, "SELECT count(*) FROM sift;").stdout.strip().splitlines()[-1]
+        result["imported_rows"] = sql(port, f"SELECT count(*) FROM {table};").stdout.strip().splitlines()[-1]
 
-        t0 = time.time()
-        r = sql(
-            port,
-            "CREATE INDEX hnsw_index ON sift (col1) USING Hnsw "
-            "WITH (M = 16, ef_construction = 200, metric = l2, encode = lvq);",
-            timeout=7200,
-        )
-        result["index_s"] = round(time.time() - t0, 3)
-        if r.returncode != 0:
-            raise SystemExit(f"create index: {r.stderr[-2000:]}")
+        if args.no_index:
+            result["index_s"] = 0.0
+        else:
+            params = "M = 16, ef_construction = 200, metric = l2, encode = lvq"
+            if args.build_type == "lsg":
+                params += ", build_type = 'lsg'"
+            t0 = time.time()
+            r = sql(
+                port,
+                f"CREATE INDEX hnsw_index ON {table} (col1) USING Hnsw WITH ({params});",
+                timeout=7200,
+            )
+            result["index_s"] = round(time.time() - t0, 3)
+            if r.returncode != 0:
+                raise SystemExit(f"create index: {r.stderr[-2000:]}")
 
-        queries = read_fvecs(os.path.join(SIFT, "sift_query.fvecs"), args.queries)
-        truth = read_ivecs(os.path.join(SIFT, "sift_groundtruth.ivecs"), args.queries)
+        queries = read_fvecs(query_path, args.queries)
+        truth = read_ivecs(truth_path, args.queries)
 
         latencies = []
         hits = 0
         total = 0
         warmup = queries[: min(5, len(queries))]
+        use_index = not args.no_index
         for q in warmup:
             vec = "[" + ",".join(f"{x:.6f}" for x in q) + "]"
-            sql(
-                port,
-                f"SELECT ROW_ID() FROM sift SEARCH MATCH VECTOR (col1, {vec}, 'float', 'l2', 100) "
-                f"WITH (ef = {args.ef});",
-            )
+            sql(port, knn_sql(table, vec, 100, args.ef, use_index))
         for _ in range(args.times):
             for qi, q in enumerate(queries):
                 vec = "[" + ",".join(f"{x:.6f}" for x in q) + "]"
                 t0 = time.time()
-                r = sql(
-                    port,
-                    f"SELECT ROW_ID() FROM sift SEARCH MATCH VECTOR (col1, {vec}, 'float', 'l2', 100) "
-                    f"WITH (ef = {args.ef});",
-                )
+                r = sql(port, knn_sql(table, vec, 100, args.ef, use_index))
                 latencies.append(time.time() - t0)
                 if r.returncode != 0:
                     raise SystemExit(f"query: {r.stderr[-1000:]}")
