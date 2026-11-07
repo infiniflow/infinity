@@ -1,5 +1,33 @@
 use super::*;
 
+/// Applies the schema changes an append predates to its stored row text.
+///
+/// The cells are tab-separated and positional, so a column added after the
+/// append is inserted where the schema has it and a dropped one is removed;
+/// the result is the same row in the schema the replay ends with.
+fn reshape_row_text(text: &str, changes: &[&crate::wal_bridge::RowShapeChange]) -> String {
+    if changes.is_empty() {
+        return text.to_string();
+    }
+    let mut cells: Vec<String> = text.split('\t').map(str::to_string).collect();
+    for change in changes {
+        match change {
+            crate::wal_bridge::RowShapeChange::Added { first, texts } => {
+                for (k, cell) in texts.iter().enumerate() {
+                    let at = (*first + k).min(cells.len());
+                    cells.insert(at, cell.clone());
+                }
+            }
+            crate::wal_bridge::RowShapeChange::Dropped { position } => {
+                if *position < cells.len() {
+                    cells.remove(*position);
+                }
+            }
+        }
+    }
+    cells.join("\t")
+}
+
 impl Engine {
     /// Root of the C++-format block mirror. The C++ engine keeps the table
     /// data under `<data_dir>/data/db_{db}/…`, next to `<data_dir>/catalog`.
@@ -57,21 +85,9 @@ impl Engine {
             block_id: block_index,
         };
         let root = self.blocks_root();
-        // A rewrite (a column change) replaces every cell, so the files must
-        // not win for the ids it carries.
-        let rewriting = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&self.table_key(table))
-            .map(|e| e.rewrite_rows)
-            .unwrap_or(false);
-        let held = if rewriting {
-            Vec::new()
-        } else {
-            self.decode_block_cells(table, &root, meta, types, id, None)
-                .unwrap_or_default()
-        };
+        let held = self
+            .decode_block_cells(table, &root, meta, types, id, None)
+            .unwrap_or_default();
         let mut out = Vec::with_capacity(held.len().max(journal.len()));
         for (seq, cells) in held {
             journal.remove(&seq);
@@ -119,23 +135,6 @@ impl Engine {
     /// few rows into a growing segment touches one block, not the table.
     pub(crate) fn write_blocks_commit(&self, table: &str, ts: u64) -> Result<usize> {
         self.write_blocks_mode(table, &[], false, ts)
-    }
-
-    /// [`Self::write_blocks`] with the rows a commit is publishing.
-    ///
-    /// `extra` is `(row id, values)` for the rows of the transaction that just
-    /// committed: the reference's `AppendInBlock` writes them into the block as
-    /// part of the commit. With no rows to publish this is a whole-table
-    /// rewrite (a checkpoint, a restore).
-    pub(crate) fn write_blocks_extra(
-        &self,
-        table: &str,
-        extra: &[(usize, Vec<Value>)],
-    ) -> Result<usize> {
-        // An explicit rewrite carries the rows the caller wants written (a
-        // column change re-encodes every cell), so nothing is clipped and every
-        // block is written: the rows are the table, not an append to it.
-        self.write_blocks_mode(table, extra, true, u64::MAX)
     }
 
     /// `full` rewrites every block; otherwise only the blocks this commit
@@ -1580,6 +1579,7 @@ impl Engine {
         &self,
         appends: Vec<txn::ReplayedAppend>,
         deletes: Vec<txn::ReplayedDelete>,
+        shapes: &[(u64, String, crate::wal_bridge::RowShapeChange)],
     ) -> Result<()> {
         if appends.is_empty() && deletes.is_empty() {
             return Ok(());
@@ -1619,10 +1619,18 @@ impl Engine {
                     .collect()
             });
             let mut batch = Vec::with_capacity(append.rows.len());
+            // The schema changes this append predates: its text still has the
+            // cells of the schema it was written with.
+            let later: Vec<&crate::wal_bridge::RowShapeChange> = shapes
+                .iter()
+                .filter(|(ts, shape_table, _)| *ts > append.commit_ts && *shape_table == table)
+                .map(|(_, _, change)| change)
+                .collect();
             for (seq, text) in &append.rows {
                 if on_disk.contains(&(*seq as usize)) {
                     continue;
                 }
+                let text = reshape_row_text(text, &later);
                 // A row whose text form the row parser cannot rebuild is not
                 // buffered: the append buffer is the only place a row the block
                 // files do not hold can live, and the port keeps no row journal
@@ -1662,41 +1670,221 @@ impl Engine {
         Ok(())
     }
 
-    /// A whole-table rewrite whose rows are given: `ALTER TABLE … DROP COLUMN`
-    /// keeps every row id and only removes a column, so the blocks have to be
-    /// re-encoded from the new values rather than merged with what they hold.
-    pub(crate) fn rewrite_blocks(&self, table: &str, rows: &[(usize, Vec<Value>)]) -> Result<()> {
+    /// `NewTxn::AddColumnsData` (`new_txn_data_impl.cpp:1195`): every block the
+    /// table already has gains one file per added column, filled with that
+    /// column's default for the rows the block holds.
+    ///
+    /// The reference writes **only** the added columns' files
+    /// (`AddColumnsDataInBlock` -> `NewCatalog::AddNewBlockColumn` plus the
+    /// default fill) and leaves every other column file and the block's
+    /// `version` untouched: `{column_id}.col` names the column **id**, ids are
+    /// never recycled, so adding a column needs no rewrite and no renumbering.
+    /// Re-encoding the whole block instead (what the port did) rewrote every
+    /// existing column of every block, which is O(rows) work for an O(blocks)
+    /// change and left the block's `version` different from the reference's.
+    pub(crate) fn add_column_blocks(&self, table: &str) -> Vec<(u32, u16, usize, Option<usize>)> {
+        let table = self.qualified_table(table);
+        let mut out = Vec::new();
+        let mut global_pos = 0usize;
+        for (segment_id, seg_rows_total) in self.block_segment_row_counts(&self.table_key(&table)) {
+            let block_count = (seg_rows_total as usize).div_ceil(DEFAULT_BLOCK_CAPACITY);
+            for block_index in 0..block_count {
+                let start = block_index * DEFAULT_BLOCK_CAPACITY;
+                let end = (start + DEFAULT_BLOCK_CAPACITY).min(seg_rows_total as usize);
+                // The bitmap coverage a rewrite of this block would use, so an
+                // imported block keeps its import bitmap. It comes from the
+                // append journal, which is derived from the block files under
+                // the **current** schema: this read has to happen before the
+                // DDL stages the new column.
+                let bitmap_bits = self.block_bitmap_bits(&table, global_pos + start, end - start);
+                out.push((segment_id, block_index as u16, end - start, bitmap_bits));
+            }
+            global_pos += seg_rows_total as usize;
+        }
+        out
+    }
+
+    pub(crate) fn add_column_files(
+        &self,
+        table: &str,
+        first: usize,
+        blocks: &[(u32, u16, usize, Option<usize>)],
+    ) -> Result<()> {
         let table = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
             return Ok(());
         };
-        let tkey = self.table_key(&table);
-        {
-            // The rows this rewrite carries are authoritative for the cells:
-            // the files hold the schema before the change. Marking the entry is
-            // what lets the writer skip them - deleting the directories instead
-            // would open a window in which a concurrent write finds no file.
-            let mut tables = self.tables.lock().unwrap();
-            tables.entry(tkey.clone()).or_default().rewrite_rows = true;
+        if first >= meta.types.len() {
+            return Ok(());
         }
-        self.drop_block_maps(meta.id);
-        self.invalidate_block_mirror(&table);
-        // Drop the buffered copies of the slots this rewrite carries (it holds
-        // the authoritative cells for them) and keep everything the buffer took
-        // after the snapshot - those ids are not in `rows`, and dropping them
-        // would lose a commit that landed while the rewrite prepared.
-        {
-            let ids: std::collections::HashSet<usize> = rows.iter().map(|(seq, _)| *seq).collect();
-            let mut tables = self.tables.lock().unwrap();
-            if let Some(entry) = tables.get_mut(&tkey) {
-                entry.retain_buffered(|(seq, _)| !ids.contains(seq));
+        let types: Vec<i32> = meta
+            .types
+            .iter()
+            .map(|t| {
+                column_type_of(t).ok_or_else(|| {
+                    Error::Invalid(format!(
+                        "column type '{t}' is not supported by the C++ block writer"
+                    ))
+                })
+            })
+            .collect::<Result<_>>()?;
+        let layouts: Vec<ColumnLayout> = meta
+            .types
+            .iter()
+            .zip(&types)
+            .map(|(t, ct)| {
+                layout_of(t, *ct)
+                    .ok_or_else(|| Error::Invalid(format!("no .col layout for column type '{t}'")))
+            })
+            .collect::<Result<_>>()?;
+        let defaults = self.table_defaults(&table)?;
+        // The cell text the mirror would write for the default: the same
+        // `Value` -> text round trip a rewrite used, so the bytes match.
+        let cells: Vec<String> = (first..meta.types.len())
+            .map(|i| match defaults.get(i).and_then(|d| d.as_deref()) {
+                Some(d) => mirror_cell_text(&Value::from_literal(&default_literal(d))),
+                None => mirror_cell_text(&Value::Null),
+            })
+            .collect();
+        if blocks.is_empty() {
+            // No segment: the column's catalog record is all there is to write
+            // (`AddColumnsData` returns early on the same condition).
+            return Ok(());
+        }
+        let db_id = self.database_id_of(&table);
+        let root = self.blocks_root();
+        for (segment_id, block_index, rows, bitmap_bits) in blocks {
+            {
+                let id = BlockId {
+                    db_id,
+                    table_id: meta.id,
+                    segment_id: *segment_id,
+                    block_id: *block_index,
+                };
+                self.drop_block_maps(meta.id);
+                for (k, i) in (first..meta.types.len()).enumerate() {
+                    let chunk: Vec<Vec<String>> =
+                        (0..*rows).map(|_| vec![cells[k].clone()]).collect();
+                    let columns = self.encode_block_columns(
+                        &meta.types[i..i + 1],
+                        &meta.ids[i..i + 1],
+                        &types[i..i + 1],
+                        &layouts[i..i + 1],
+                        &chunk,
+                        *bitmap_bits,
+                    )?;
+                    let dir =
+                        storage::definition::format::write_block_column(&root, id, &columns[0])
+                            .map_err(|e| Error::Io {
+                                path: root.clone(),
+                                source: e,
+                            })?;
+                    // The reference opens an outline file for every
+                    // variable-length column and aborts the read when it is
+                    // missing, even when the file is empty.
+                    if is_var_buffer_type(types[i]) {
+                        let path = dir.join(storage::definition::format::column_outline_file(
+                            meta.ids[i],
+                        ));
+                        if !path.exists() {
+                            let _ = storage::definition::format::write_synced(&path, b"");
+                        }
+                    }
+                }
             }
         }
-        let written = self.write_blocks_extra(&table, rows);
-        let mut tables = self.tables.lock().unwrap();
-        tables.entry(tkey).or_default().rewrite_rows = false;
-        written?;
+        self.invalidate_block_mirror(&table);
         Ok(())
+    }
+
+    /// The rows still in the append buffer have no block file yet, so
+    /// `AddColumnsData` never reaches them (it walks the table's segments);
+    /// the reference's block **buffer** gains the column instead. Append the
+    /// default cell to each buffered row, so the mirror writes it with the
+    /// block.
+    pub(crate) fn patch_buffered_add_columns(&self, table: &str, first: usize, defaults: &[Value]) {
+        let key = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&key) else {
+            return;
+        };
+        for (_, cells) in entry.pending_rows.iter_mut() {
+            cells.truncate(first);
+            cells.extend(defaults.iter().cloned());
+        }
+    }
+
+    /// The buffer half of `DropColumnsData`: a buffered row loses the cell the
+    /// schema no longer has (`position` is where the column was).
+    pub(crate) fn patch_buffered_drop_column(&self, table: &str, position: usize) {
+        let key = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&key) else {
+            return;
+        };
+        for (_, cells) in entry.pending_rows.iter_mut() {
+            if position < cells.len() {
+                cells.remove(position);
+            }
+        }
+    }
+
+    /// `Cleanup` for an `ALTER TABLE … DROP COLUMN`: removes the block column
+    /// files the `drop|blk_col|` markers name.
+    ///
+    /// `DropColumnsData` writes one marker per block and leaves the file
+    /// (`new_txn_data_impl.cpp:1403`); the reference never deletes the marker,
+    /// only the file, and neither does this. The marker carries the column def
+    /// the block had, so the id of the file to remove is in its key.
+    pub(crate) fn reclaim_dropped_block_columns(&self) -> Result<usize> {
+        let store = self.storage.catalog.store();
+        let root = self.blocks_root();
+        let mut removed = 0usize;
+        let mut touched: Vec<u64> = Vec::new();
+        for (k, _) in store.scan_prefix(b"drop|blk_col|")? {
+            let key = String::from_utf8_lossy(&k).to_string();
+            let Some(rest) = key.strip_prefix("drop|blk_col|") else {
+                continue;
+            };
+            // `{db_id}/{table_id}/{segment_id}/{block_id}/{column_def}`
+            let mut parts = rest.splitn(5, '/');
+            let (Some(db), Some(table), Some(seg), Some(block), Some(def)) = (
+                parts.next(),
+                parts.next(),
+                parts.next(),
+                parts.next(),
+                parts.next(),
+            ) else {
+                continue;
+            };
+            // `{"column_id":N,"column_name":…}`
+            let Some(id) = def
+                .split("\"column_id\":")
+                .nth(1)
+                .and_then(|s| s.split(|c: char| !c.is_ascii_digit()).next())
+                .and_then(|s| s.parse::<u64>().ok())
+            else {
+                continue;
+            };
+            let dir = root.join(format!("db_{db}/tbl_{table}/seg_{seg}/blk_{block}"));
+            for name in [
+                storage::definition::format::column_file(id),
+                storage::definition::format::column_outline_file(id),
+            ] {
+                if std::fs::remove_file(dir.join(name)).is_ok() {
+                    removed += 1;
+                }
+            }
+            if let Ok(table_id) = table.parse::<u64>() {
+                touched.push(table_id);
+            }
+        }
+        touched.sort_unstable();
+        touched.dedup();
+        for table_id in touched {
+            self.drop_block_maps(table_id);
+        }
+        Ok(removed)
     }
 
     /// Whether `seq` names a row a delete may hide: a live slot of a visible

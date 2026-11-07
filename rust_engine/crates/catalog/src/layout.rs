@@ -1291,19 +1291,23 @@ impl Catalog {
 }
 
 /// The column records of one table (`tbl|col|{db_id}|{table_id}|…|{ts}`),
-/// newest version per **column id**, plus the table's `next_column_id` tag.
+/// newest version per **column name**, plus the table's `next_column_id` tag.
 ///
-/// A column is versioned like the table records, so a key restaged under
-/// another ts (a restore writes the sentinel-ts copy, the next layout rewrite a
-/// real one) must resolve to its newest record - reading every version listed
-/// the column twice.
+/// `TableMeta::LoadColumnDefs` (`table_meta_impl.cpp:590`) groups by name -
+/// the drop is a marker keyed by the create ts, so a column of the same name
+/// that is created again is a *new* record with a *new* ts, and the old
+/// marker cannot hide it. Reading by id listed a re-created column twice.
+///
+/// A record the `drop|tbl_col|{db}/{table}/{name}/{ts}` marker names is not
+/// live: the C++ key space never removes it, so this filter is the only thing
+/// that keeps a dropped column out of the schema.
 fn read_columns(
     store: &dyn MetaStore,
     db_id: u64,
     table_id: u64,
 ) -> Result<(Vec<ColumnDefValue>, u64)> {
     let col_prefix = key::table_column_prefix(&db_id.to_string(), &table_id.to_string());
-    let mut newest_column: std::collections::HashMap<i64, (u64, ColumnDefValue)> =
+    let mut newest_column: std::collections::HashMap<String, (u64, ColumnDefValue)> =
         std::collections::HashMap::new();
     for (k, cv) in store.scan_prefix(col_prefix.as_bytes())? {
         let key = String::from_utf8_lossy(&k).to_string();
@@ -1315,7 +1319,7 @@ fn read_columns(
         let Some(col) = value_format::column_def_from_bytes(&cv) else {
             continue;
         };
-        match newest_column.entry(col.column_id) {
+        match newest_column.entry(col.column_name.clone()) {
             std::collections::hash_map::Entry::Occupied(mut slot) if ts >= slot.get().0 => {
                 slot.insert((ts, col));
             }
@@ -1325,8 +1329,14 @@ fn read_columns(
             _ => {}
         }
     }
-    let mut columns: Vec<ColumnDefValue> =
-        newest_column.into_iter().map(|(_, (_, col))| col).collect();
+    let mut columns: Vec<ColumnDefValue> = Vec::with_capacity(newest_column.len());
+    for (_name, (ts, col)) in newest_column {
+        let dropped = format!("drop|tbl_col|{db_id}/{table_id}/{}/{ts}", col.column_name);
+        if store.get(dropped.as_bytes())?.is_some() {
+            continue;
+        }
+        columns.push(col);
+    }
     columns.sort_by_key(|c| c.column_id);
     let next_column_id = store
         .get(

@@ -458,16 +458,31 @@ pub fn write_block(
     let dir = root.join(block_dir(id.db_id, id.table_id, id.segment_id, id.block_id));
     std::fs::create_dir_all(&dir)?;
     for col in columns {
-        write_synced(
-            &dir.join(column_file(col.column_id)),
-            &encode_data_file(&col.body.encode()),
-        )?;
-        if !col.outline.is_empty() {
-            // The outline file is raw: no header, no trailer.
-            write_synced(&dir.join(column_outline_file(col.column_id)), &col.outline)?;
-        }
+        write_block_column(root, id, col)?;
     }
     write_synced(&dir.join(VERSION_FILE), &version.encode())?;
+    Ok(dir)
+}
+
+/// One column's files of a block: `{column_id}.col` and, when the column has
+/// an outline, `col_{column_id}_out`.
+///
+/// This is what `AddColumnsDataInBlock` writes for a block that did not have
+/// the column yet (`NewCatalog::AddNewBlockColumn` + the default fill,
+/// `new_txn_data_impl.cpp:1294`): the file names carry the **column id**, which
+/// is never recycled, so an added or dropped column needs neither a rename nor
+/// a rewrite of the columns beside it.
+pub fn write_block_column(root: &Path, id: BlockId, col: &BlockColumn) -> std::io::Result<PathBuf> {
+    let dir = root.join(block_dir(id.db_id, id.table_id, id.segment_id, id.block_id));
+    std::fs::create_dir_all(&dir)?;
+    write_synced(
+        &dir.join(column_file(col.column_id)),
+        &encode_data_file(&col.body.encode()),
+    )?;
+    if !col.outline.is_empty() {
+        // The outline file is raw: no header, no trailer.
+        write_synced(&dir.join(column_outline_file(col.column_id)), &col.outline)?;
+    }
     Ok(dir)
 }
 

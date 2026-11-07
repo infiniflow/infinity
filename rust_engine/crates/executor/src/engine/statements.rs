@@ -220,9 +220,13 @@ impl Engine {
         // reference replays only records up to its last checkpoint ts).
         let wal_enabled = options.wal_enabled;
         let applied = engine.txn.applied_ts()?;
+        // The schema changes the replay applies, in commit-ts order: a row the
+        // log carries from *before* one of them has to be reshaped when it is
+        // parsed (`wal_bridge::RowShapeChange`).
+        let mut shapes: Vec<(u64, String, crate::wal_bridge::RowShapeChange)> = Vec::new();
         if wal_enabled {
             engine.txn.replay_commands(applied, |cmd, ts| {
-                crate::wal_bridge::replay(&engine, cmd, ts)
+                crate::wal_bridge::replay(&engine, cmd, ts, &mut shapes)
             })?;
         }
         // The blocks next, then the WAL's rows on top: what the files carry is
@@ -243,7 +247,7 @@ impl Engine {
                 &mut replayed_appends,
                 &mut replayed_deletes,
             )?;
-            engine.apply_replayed_rows(replayed_appends, replayed_deletes)?;
+            engine.apply_replayed_rows(replayed_appends, replayed_deletes, &shapes)?;
         }
         engine.rebuild_indexes()?;
         // `MetaTableObject::RestoreTableCache`: the allocator has no memory of
@@ -7914,6 +7918,10 @@ impl Engine {
             let _ = self.txn.drop_sealed_wal_up_to(applied);
         }
         self.reclaim_deprecated_segments()?;
+        // The column files an `ALTER TABLE … DROP COLUMN` left behind: the
+        // drop writes a marker per block and `Cleanup` removes the file, the
+        // way the reference does (its marker stays).
+        let _ = self.reclaim_dropped_block_columns();
         let cleaned = self.cleanup_index_chunks();
         // `BGTaskProcessor` records the cleanup timestamp so the trigger can
         // skip ticks with nothing new to reclaim

@@ -1272,40 +1272,40 @@ impl Engine {
                         "column '{column}' is used by an index"
                     )));
                 }
-                let rows = self.fetch_rows_including_deleted(table)?;
-                let idx = match self
-                    .storage
-                    .catalog
-                    .get_table_by_name(table)?
-                    .and_then(|m| m.columns.iter().position(|c| c == column))
-                {
-                    Some(i) => i,
-                    None => return Err(Error::Invalid(format!("unknown column '{column}'"))),
-                };
-                // Rewrite the rows without the dropped column. The row ids stay
-                // unchanged - dropping a column only removes its values, it does
-                // not move the rows to a new segment (the reference's
-                // `cleanup_and_drop_columns` keeps segment {2}). The cells are
-                // re-encoded into the blocks; there is no row record to update.
-                let mut rewritten: Vec<(usize, Vec<Value>)> = Vec::with_capacity(rows.len());
-                for (seq, row) in &rows {
-                    let mut nr = row.clone();
-                    if idx < nr.len() {
-                        nr.remove(idx);
-                    }
-                    rewritten.push((*seq, nr));
-                }
-                // The rewrite changed the stored layout but not the ids.
+                // The stored layout does not change at all: `DropColumnsData`
+                // writes a marker per block and leaves every `{column_id}.col`
+                // where it is (`Cleanup` removes it later), so the rows are not
+                // re-encoded and the ids do not move.
                 self.invalidate_row_cache(table);
                 self.invalidate_block_mirror(table);
                 let dc_cmd = self.drop_columns_command(table, column)?;
+                // `GetBlockIDs1`: the blocks the column files live in. Read
+                // before the DDL, because the marker set is part of its batch.
+                // The column's position is read here too: after the DDL the
+                // schema no longer has it.
+                let drop_position = self
+                    .storage
+                    .catalog
+                    .get_table_by_name(table)?
+                    .and_then(|m| m.columns.iter().position(|c| c == column));
+                let blocks: Vec<(u32, u16)> = self
+                    .visible_block_ids(table)
+                    .into_iter()
+                    .map(|b| (b.segment_id, b.block_id))
+                    .collect();
                 self.ddl_commit_typed(
                     TxnOp::DropColumn {
                         table: table.to_string(),
                         columns: vec![column.to_string()],
                     },
                     || {
-                        self.storage.catalog.drop_column(table, column)?;
+                        self.storage.catalog.drop_column(table, column, &blocks)?;
+                        // A buffered row has no block file to leave alone: it
+                        // loses the cell at the column's position, exactly as
+                        // the reference's block buffer does.
+                        if let Some(position) = drop_position {
+                            self.patch_buffered_drop_column(table, position);
+                        }
                         if let Some(im) = self
                             .storage
                             .catalog
@@ -1319,10 +1319,6 @@ impl Engine {
                     },
                     |_| dc_cmd,
                 )?;
-                // The rows are in the blocks now: there is no text copy to drop.
-                if !rewritten.is_empty() {
-                    self.rewrite_blocks(table, &rewritten)?;
-                }
                 let tkey = self.table_key(table);
                 self.tables
                     .lock()
@@ -1383,10 +1379,11 @@ impl Engine {
                 let base_index = self.table_schema(table)?.len() as u32;
                 let ac_ident = self.table_ident(table)?;
                 let ac_names = names.clone();
-                // Read every slot - tombstoned ones included - while the blocks
-                // still match the schema: a block is addressed by slot, so a
-                // rewrite that dropped its tombstones would renumber its rows.
-                let before_columns = self.fetch_rows_including_deleted(table)?;
+                // The blocks and their bitmap coverage, read **before** the DDL:
+                // the coverage comes from the append journal, which is derived
+                // from the block files under the current schema, and the added
+                // column has no file yet.
+                let ac_blocks = self.add_column_blocks(table);
                 self.ddl_commit_typed(
                     TxnOp::AddColumn {
                         table: table.to_string(),
@@ -1400,7 +1397,20 @@ impl Engine {
                             &types,
                             &vec![None; names.len()],
                             &sparse_stores,
-                        )
+                        )?;
+                        // Rows still in the append buffer have no block file
+                        // yet (`AddColumnsData` walks the segments and would
+                        // skip them): the reference's block *buffer* gains the
+                        // column, so they get the default cell here.
+                        let added: Vec<Value> = (base_index as usize
+                            ..base_index as usize + names.len())
+                            .map(|i| match defaults.get(i - base_index as usize) {
+                                Some(Some(d)) => Value::from_literal(&default_literal(d)),
+                                _ => Value::Null,
+                            })
+                            .collect();
+                        self.patch_buffered_add_columns(table, base_index as usize, &added);
+                        Ok(())
                     },
                     move |b| match &ac_ident {
                         Some((db_id, table_id, table_key)) => {
@@ -1411,27 +1421,11 @@ impl Engine {
                         None => None,
                     },
                 )?;
-                // The new column has no file in the blocks that already exist;
-                // the reference fills it with its default, so the segments are
-                // re-encoded with the wider schema.
-                let rows = before_columns;
-                if !rows.is_empty() {
-                    let defaults = self.table_defaults(table).unwrap_or_default();
-                    let padded: Vec<(usize, Vec<Value>)> = rows
-                        .into_iter()
-                        .map(|(seq, mut row)| {
-                            while row.len() < defaults.len() {
-                                let i = row.len();
-                                row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
-                                    Some(d) => Value::from_literal(&default_literal(d)),
-                                    None => Value::Null,
-                                });
-                            }
-                            (seq, row)
-                        })
-                        .collect();
-                    self.rewrite_blocks(table, &padded)?;
-                }
+                // The blocks that already exist get one file for each new
+                // column, filled with its default (`AddColumnsData`); nothing
+                // else is rewritten - the file names carry the column id, so a
+                // new id is simply a new file.
+                self.add_column_files(table, base_index as usize, &ac_blocks)?;
                 Ok(QueryResult::CreatedTable {
                     id: 0,
                     name: table.clone(),

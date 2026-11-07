@@ -4032,10 +4032,6 @@ pub(crate) struct TableEntry {
     /// 20k-row buffer (34% of the statement). Kept in step by
     /// [`Self::buffer_rows`] / [`Self::retain_buffered`].
     pub(crate) pending_pos: std::collections::HashMap<usize, usize>,
-    /// The next mirror write must take its rows from this rewrite rather than
-    /// from the block files (a column change re-encodes every cell, so the
-    /// files' cells are stale). Set by `rewrite_blocks`.
-    pub(crate) rewrite_rows: bool,
     /// `(segment, offset, sealed)` of the row-id allocator.
     pub(crate) row_counter: Option<(u32, u32, bool)>,
     /// Cumulative row count after every append transaction of this table

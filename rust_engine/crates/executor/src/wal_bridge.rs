@@ -27,6 +27,8 @@
 //! Uses the crate's own JSON (`expression::json`) — the workspace
 //! does not depend on `serde_json`.
 
+use crate::engine::state::default_literal;
+use crate::Value;
 use expression::json::{extract, parse, Json};
 use storage::wal::ddl_def::{
     ColumnDef, ConstantExpr, ConstraintType, DataType, EmbeddingDataType, LogicalType,
@@ -740,7 +742,12 @@ fn constant_text(c: &ConstantExpr) -> Option<String> {
         ConstantExpr::Boolean(b) => Some(if *b { "true" } else { "false" }.to_string()),
         ConstantExpr::Double(d) => Some(format!("{d}")),
         ConstantExpr::Integer(i) => Some(i.to_string()),
-        ConstantExpr::String(s) => Some(format!("'{}'", s.replace('\'', "''"))),
+        // The stored form is the bare text, not an SQL literal: `TableMeta::
+        // defaults` is what `ALTER`/`INSERT` fill a missing cell with, and the
+        // live path (the AST's `to_slt_string`) writes it bare. Quoting it here
+        // made a replayed directory pad cells with `'default'` (and store that
+        // in the column's catalog record).
+        ConstantExpr::String(s) => Some(s.clone()),
     }
 }
 
@@ -784,7 +791,30 @@ fn qualified(db_name: &str, name: &str) -> String {
 /// the command's own transaction - the ids come from the catalog counters, which
 /// the checkpoint flushed at the same point the command's transaction saw them,
 /// and the commit ts is stamped from the frame.
-pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()> {
+/// How a schema change reshapes the rows an **earlier** append wrote.
+///
+/// The replay buffers every row that is not in a block yet and parses it
+/// against the schema the replay ends with, so a row written before an
+/// ADD/DROP COLUMN has to be reshaped first. The reference gets this for free:
+/// its replay writes each append straight into a block, and the later DDL's
+/// replay patches that block.
+pub enum RowShapeChange {
+    /// The added columns' stored cell texts, the first at `first`.
+    Added { first: usize, texts: Vec<String> },
+    /// The cell at `position` is gone.
+    Dropped { position: usize },
+}
+
+/// Replays one WAL command into the catalog and the block layer.
+///
+/// `shapes` collects the schema changes a row still in the log may have to
+/// follow (`(commit ts, qualified table, change)`); see [`RowShapeChange`].
+pub fn replay(
+    engine: &Engine,
+    cmd: &WalCmd,
+    commit_ts: u64,
+    shapes: &mut Vec<(u64, String, RowShapeChange)>,
+) -> CommonResult<()> {
     let catalog = engine.catalog();
     // A restore recreates a table (or a whole database) from the snapshot it
     // names and copies its files back. Its catalog writes are in the memtable
@@ -960,7 +990,7 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
             let Some(mut meta) = catalog.get_table_by_name(&full)? else {
                 return Ok(());
             };
-            let first = meta.columns.len();
+            let mut first: Option<usize> = None;
             for def in column_defs {
                 // Already replayed once: the entry sits above the frame's floor
                 // but its records are in the SST (see the drop arms below).
@@ -970,6 +1000,7 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
                 let Some(type_text) = data_type_text(&def.column_type) else {
                     continue;
                 };
+                first.get_or_insert(meta.columns.len());
                 meta.ids.push(def.id as u64);
                 meta.columns.push(def.name.clone());
                 meta.types.push(type_text);
@@ -988,6 +1019,13 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
             let db = db_id.parse::<u64>().map_err(|_| {
                 common::Error::Invalid(format!("replay: bad database id '{db_id}'"))
             })?;
+            let Some(first) = first else {
+                return Ok(()); // every column is already there
+            };
+            // Read before the records land: the bitmap coverage comes from the
+            // append journal, derived from the block files under the schema
+            // they still have.
+            let blocks = engine.add_column_blocks(&full);
             let mut batch = catalog::layout::stage_added_columns(db, &meta, first)?;
             Catalog::restamp(&mut batch, commit_ts);
             catalog.store().atomic_batch(&batch)?;
@@ -995,6 +1033,39 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
             // cache: the next frame - and the checkpoint that publishes the
             // layout - has to see the new columns.
             catalog.invalidate_tables();
+            // `PrepareCommitAddColumns` also fills the new column in every
+            // existing block (`AddColumnsData`), so a crash between the
+            // catalog commit and the file write is repaired by the replay.
+            engine.add_column_files(&full, first, &blocks)?;
+            // Rows the replay put in the append buffer are not in a block yet;
+            // they get the default cell the schema now has (the mirror writes
+            // it when the block is).
+            let added: Vec<Value> = (first..meta.columns.len())
+                .map(|i| match meta.defaults.get(i).and_then(|d| d.as_deref()) {
+                    Some(d) => Value::from_literal(&default_literal(d)),
+                    None => Value::Null,
+                })
+                .collect();
+            engine.patch_buffered_add_columns(&full, first, &added);
+            // Rows the replay has *not* buffered yet (an append earlier in the
+            // log) are reshaped when they are parsed.
+            // The cell text a default renders to: the catalog's text form is
+            // already the stored form (a string is stored bare, not as an SQL
+            // literal), and `parse_value` reads it back.
+            let texts: Vec<String> = (first..meta.columns.len())
+                .map(|i| {
+                    meta.defaults
+                        .get(i)
+                        .cloned()
+                        .flatten()
+                        .unwrap_or_else(|| "null".to_string())
+                })
+                .collect();
+            shapes.push((
+                commit_ts,
+                full.clone(),
+                RowShapeChange::Added { first, texts },
+            ));
             Vec::new()
         }
         _ => {
@@ -1049,14 +1120,31 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
                         ..
                     } => {
                         let full = qualified(db_name, table_name);
+                        let blocks: Vec<(u32, u16)> = engine
+                            .visible_block_ids(&full)
+                            .into_iter()
+                            .map(|b| (b.segment_id, b.block_id))
+                            .collect();
                         for column in column_names {
                             let Some(meta) = catalog.get_table_by_name(&full)? else {
                                 return Ok(());
                             };
-                            if !meta.columns.iter().any(|c| c == column) {
+                            let position = meta.columns.iter().position(|c| c == column);
+                            if position.is_none() {
                                 continue; // dropped already
                             }
-                            catalog.drop_column(&full, column)?;
+                            catalog.drop_column(&full, column, &blocks)?;
+                            // A replayed row has no block file to leave alone:
+                            // the buffer loses the cell the schema had, and a row
+                            // still in the log is reshaped when it is parsed.
+                            engine.patch_buffered_drop_column(&full, position.unwrap());
+                            shapes.push((
+                                commit_ts,
+                                full.clone(),
+                                RowShapeChange::Dropped {
+                                    position: position.unwrap(),
+                                },
+                            ));
                         }
                     }
                     WalCmd::DropIndex {

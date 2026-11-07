@@ -1124,6 +1124,7 @@ impl Catalog {
             .get_table_by_name(name)?
             .ok_or_else(|| Error::Catalog(format!("table '{name}' does not exist")))?;
         let (types, sparse_stores) = normalize_types(types, sparse_stores, columns.len());
+        let first = meta.columns.len();
         for (i, c) in columns.iter().enumerate() {
             if meta.columns.iter().any(|x| x == c) {
                 return Err(Error::Catalog(format!("column '{c}' already exists")));
@@ -1140,11 +1141,15 @@ impl Catalog {
             meta.ids.push(next_id);
         }
         if self.catalog_only {
-            let mut tables = self.tables()?;
-            if let Some(slot) = tables.iter_mut().find(|t| t.name == meta.name) {
-                *slot = meta.clone();
-            }
-            self.rewrite_catalog(&self.databases()?, &tables, &self.indexes()?)?;
+            // `NewTxn::AddColumns` writes the added columns' records and the
+            // table's `next_column_id` tag, nothing else: each record carries
+            // **this DDL's** commit ts (`AddColumnsV2` -> the record is created
+            // in that transaction), which a whole-layout rewrite would replace
+            // with the table's create ts.
+            let db_name = name.split('.').next().unwrap_or(name);
+            let db_id = self.database_id_of_name(db_name)?.unwrap_or(1);
+            let batch = crate::layout::stage_added_columns(db_id, &meta, first)?;
+            self.stage(&batch)?;
             return Ok(meta);
         }
         self.store.put(&table_key(meta.id), &meta.encode())?;
@@ -1152,9 +1157,19 @@ impl Catalog {
     }
 
     /// Removes a column from an existing table.
-    pub fn drop_column(&self, name: &str, column: &str) -> Result<usize> {
+    /// C++ `NewTxn::DropColumns` (`new_txn_impl.cpp:762`).
+    ///
+    /// The C++ key space is append-only: the column's `tbl|col|` record stays
+    /// and the drop is a **marker**. `DropColumnsData` writes
+    /// `drop|tbl_col|{db}/{table}/{name}/{create_ts}` - which
+    /// `TableMeta::LoadColumnDefs` reads to decide whether the column is live -
+    /// and one `drop|blk_col|{db}/{table}/{seg}/{block}/{column_def}` per block.
+    /// No record is removed and no block is rewritten: `{column_id}.col` names
+    /// the column **id**, ids are never recycled, so the file stays where it is
+    /// until `Cleanup` removes it and the columns beside it do not move.
+    pub fn drop_column(&self, name: &str, column: &str, blocks: &[(u32, u16)]) -> Result<usize> {
         let _ddl = self.begin_ddl();
-        let mut meta = self
+        let meta = self
             .get_table_by_name(name)?
             .ok_or_else(|| Error::Catalog(format!("table '{name}' does not exist")))?;
         let idx = meta
@@ -1162,35 +1177,73 @@ impl Catalog {
             .iter()
             .position(|c| c == column)
             .ok_or_else(|| Error::Catalog(format!("column '{column}' does not exist")))?;
-        meta.columns.remove(idx);
-        if idx < meta.defaults.len() {
-            meta.defaults.remove(idx);
-        }
-        if idx < meta.not_nulls.len() {
-            meta.not_nulls.remove(idx);
-        }
-        if idx < meta.types.len() {
-            meta.types.remove(idx);
-        }
-        if idx < meta.comments.len() {
-            meta.comments.remove(idx);
-        }
-        if idx < meta.sparse_stores.len() {
-            meta.sparse_stores.remove(idx);
-        }
-        // The id is retired with the column; later columns keep theirs.
-        if idx < meta.ids.len() {
-            meta.ids.remove(idx);
-        }
-        if self.catalog_only {
-            let mut tables = self.tables()?;
-            if let Some(slot) = tables.iter_mut().find(|t| t.name == meta.name) {
-                *slot = meta;
+        if !self.catalog_only {
+            let mut meta = meta;
+            meta.columns.remove(idx);
+            if idx < meta.defaults.len() {
+                meta.defaults.remove(idx);
             }
-            self.rewrite_catalog(&self.databases()?, &tables, &self.indexes()?)?;
+            if idx < meta.not_nulls.len() {
+                meta.not_nulls.remove(idx);
+            }
+            if idx < meta.types.len() {
+                meta.types.remove(idx);
+            }
+            if idx < meta.comments.len() {
+                meta.comments.remove(idx);
+            }
+            if idx < meta.sparse_stores.len() {
+                meta.sparse_stores.remove(idx);
+            }
+            // The id is retired with the column; later columns keep theirs.
+            if idx < meta.ids.len() {
+                meta.ids.remove(idx);
+            }
+            self.store.put(&table_key(meta.id), &meta.encode())?;
             return Ok(idx);
         }
-        self.store.put(&table_key(meta.id), &meta.encode())?;
+        let (db_str, _) = self.db_and_bare_name(name)?;
+        let table_id = meta.id.to_string();
+        // The marker is keyed by the ts the column was **created** with, so a
+        // column of the same name that is created again later (a new record, a
+        // new id) is not hidden by it.
+        let prefix = format!("tbl|col|{db_str}|{table_id}|{column}|");
+        let newest = self.with_view(|store| {
+            let mut newest: Option<(u64, Vec<u8>)> = None;
+            for (k, v) in store.scan_prefix(prefix.as_bytes())? {
+                let text = String::from_utf8_lossy(&k).to_string();
+                let Some(ts) = text.rsplit('|').next().and_then(|t| t.parse::<u64>().ok()) else {
+                    continue;
+                };
+                if newest.as_ref().is_none_or(|(seen, _)| ts >= *seen) {
+                    newest = Some((ts, v));
+                }
+            }
+            Ok(newest)
+        })?;
+        let Some((create_ts, def_json)) = newest else {
+            return Err(Error::Catalog(format!("column '{column}' does not exist")));
+        };
+        let keep = String::from_utf8_lossy(&def_json).to_string();
+        let sentinel = Some(DDL_TS_SENTINEL.to_string().into_bytes());
+        let mut batch: Vec<BatchItem> = vec![(
+            format!("drop|tbl_col|{db_str}/{table_id}/{column}/{create_ts}").into_bytes(),
+            sentinel.clone(),
+        )];
+        // The blocks come from the caller: the catalog keeps no record of them
+        // until a checkpoint publishes the segment layer (`read_segments`), and
+        // the reference enumerates them from the catalog it maintains eagerly.
+        // The executor's block files are the authority here.
+        for (seg, blk) in blocks {
+            batch.push((
+                format!("drop|blk_col|{db_str}/{table_id}/{seg}/{blk}/{keep}").into_bytes(),
+                sentinel.clone(),
+            ));
+        }
+        // The value is the commit ts; `restamp` fills it in when the DDL
+        // commit takes its timestamp (`KeyEncode::DropTableColumnKey` carries
+        // the ts in the value, the key names the object's create ts).
+        self.stage(&batch)?;
         Ok(idx)
     }
 

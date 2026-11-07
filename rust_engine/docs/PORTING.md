@@ -160,6 +160,12 @@ drop 的数据库。
   之下（已落盘却被重放一次，`DROP COLUMN` 重放已删的列会让 open 直接失败）。
 - 块/索引文件一律"写临时文件再 rename"（`write_synced`）：块被整表重写时是同一路径覆盖写，而读侧持有
   `mmap`（`MappedFile`），原地 truncate 会让映射 SIGBUS。
+- 列文件名是**列 id**（`{column_id}.col` / `col_{column_id}_out`），id 只增不复用，所以改列时不重编码、不重编号：
+  `ADD COLUMN` 只给每个已有块写新列的文件（按块行数填默认值，`AddColumnsDataInBlock`），其余列文件和
+  `version` 一个字节都不动；`DROP COLUMN` 只写 `drop|tbl_col|{db}/{table}/{name}/{create_ts}` 和每块一条
+  `drop|blk_col|…`，列记录与 `.col` 文件都留着，读取端按 marker 过滤（`TableMeta::LoadColumnDefs` 的规则），
+  `Cleanup` 才删文件（marker 不删）。还在 append buffer 里、尚未落块的行由内存补丁同步（`patch_buffered_*`）；
+  重启重放时同一条日志里的 DDL 晚于某些 append，按 `(commit ts, 表, 变更)` 记录形状变化，解析这些行时先套用。
 
 **append/delete 历史从文件重建**：`restore_blocks` 用每个块的 `version`（`created` 的
 `(ts, 累计行数)`、`deleted` 槽）重建 `appends:`/`append_ts:`/`append_copy:`/`deletes:`/
