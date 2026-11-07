@@ -160,9 +160,10 @@ jobs:
       - name: smoke
         if: matrix.arch == 'amd64'
         run: cargo run -q -p cli -- smoke /tmp/infinity-smoke
-      - name: Gate A baseline (informational)
+      - name: Gate A (slt conformance)
+        # The port is at 1754/1754 statements, 129/129 errors and 1560/1560
+        # queries on the reference's 175-file suite, so this gates.
         if: matrix.arch == 'amd64'
-        continue-on-error: true
         run: cargo run -q --release -p cli -- conformance ../test/sql
 
   build:
@@ -291,6 +292,10 @@ jobs:
           sudo mkdir -p /usr/share/infinity/resource /var/infinity
           sudo cp -r resource/. /usr/share/infinity/resource/
           sudo chown -R "${USER}" /usr/share/infinity /var/infinity
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
       - uses: astral-sh/setup-uv@v7
       - name: Install the SDK and the test dependencies
         run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
@@ -300,6 +305,13 @@ jobs:
           ./scripts/wait_for_infinity.sh
       - name: Python SDK suite
         run: .venv/bin/python -m pytest -q python/test_pysdk -m "not complex and not slow" --tb=short
+      - name: Go SDK suite
+        # The same server, driven through the unmodified Go SDK.
+        working-directory: go
+        run: go test ./tests/... -count=1
+      - name: HTTP API suite
+        # The same SDK tests over the HTTP API (pytest --http).
+        run: .venv/bin/python tools/run_http_api.py
       - name: Stop the engine and show its log
         if: always()
         run: |
