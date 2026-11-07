@@ -266,9 +266,13 @@ jobs:
                python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
                --tb=short "${args[@]}")
           # A PID namespace keeps the harness's "kill every process named infinity"
-          # local to the run. ubuntu-24.04-arm forbids unprivileged user namespaces
-          # (AppArmor), where bwrap cannot even map the uid, so fall back to a plain
-          # run - the machine is otherwise idle.
+          # local to the run. ubuntu-24.04-arm restricts unprivileged user
+          # namespaces through AppArmor ("bwrap: setting up uid map: Permission
+          # denied"); the runner allows lifting that, so try before falling back
+          # to a plain run.
+          if ! bwrap --dev-bind / / --unshare-pid --proc /proc -- true 2>/dev/null; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          fi
           if bwrap --dev-bind / / --unshare-pid --proc /proc -- true 2>/dev/null; then
             work="$(mktemp -d)"
             bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
@@ -278,7 +282,10 @@ jobs:
           fi
       - name: Engine log
         if: always()
-        run: tail -n 500 restart_test_infinity.log.* 2>/dev/null || true
+        run: |
+          ls -la restart_test_infinity.log.* 2>/dev/null || echo "no engine log in $PWD"
+          tail -n 500 restart_test_infinity.log.* 2>/dev/null || true
+          tail -n 200 /var/infinity/log/*.log 2>/dev/null || true
 
   sdk:
     # Gate B: the unmodified Python SDK, Go SDK and HTTP API. The suite is ~30
