@@ -433,3 +433,86 @@ jobs:
                 .venv/bin/python -m pytest -q python/restart_test/test_cross_engine_compat.py \
                 --infinity_path=rust_engine/scripts/infinity_rust_shim.sh
 
+
+  slow:
+    # slow_tests.yml runs, nightly, what a pull request never pays for:
+    # SLOW_-marked gtests, repeated kill -9 loops, sanitizer builds, MinIO.
+    # The port's equivalents live here.
+    #
+    # The sanitizer surface is deliberately narrow: nine crates are
+    # #![forbid(unsafe_code)], there is no `unsafe impl`, and the only unsafe
+    # code is the mmap set in `storage` - so ASan runs there and nowhere else.
+    # TSan is left out on purpose: shared state is Mutex/Atomic (checked by the
+    # compiler), RocksDB is not instrumented (so it would only report false
+    # positives), and the ordering model that does need checking is loom's.
+    name: slow
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install the pinned toolchain
+        run: |
+          rustup toolchain install --profile minimal
+          rustup component add miri
+      - name: Install clang, mold and libclang
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang mold libclang-dev
+          if ! command -v ld.mold >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
+          so=$(ls /usr/lib/llvm-*/lib/libclang.so* 2>/dev/null | sort -V | tail -1)
+          if [ -n "$so" ]; then
+            echo "LIBCLANG_PATH=$(dirname "$so")" >> "$GITHUB_ENV"
+          fi
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust_engine
+      - name: Prepare the resources and the data directory
+        run: |
+          sudo mkdir -p /usr/share/infinity/resource /var/infinity
+          sudo cp -r resource/. /usr/share/infinity/resource/
+          sudo chown -R "${USER}" /usr/share/infinity /var/infinity
+      - uses: astral-sh/setup-uv@v7
+      - name: Install the SDK and the NLTK data
+        env:
+          UV_PYTHON: "3.11"
+        run: |
+          uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+          uv run python -m nltk.downloader punkt_tab
+      - name: loom (commit-ts ordering model)
+        working-directory: rust_engine
+        run: RUSTFLAGS="--cfg loom" cargo test -p txn --lib
+      - name: Miri (pure-Rust front end)
+        working-directory: rust_engine
+        run: |
+          # The corpus tests read SQL files from the checkout, which miri's
+          # isolation blocks; corpora_ut is skipped separately because it feeds
+          # megabytes through the parser and miri runs ~100x slower.
+          MIRIFLAGS="-Zmiri-disable-isolation" cargo miri test -p parser -p planner \
+            --lib -- --skip corpora_ut
+      - name: AddressSanitizer (the mmap set in storage)
+        working-directory: rust_engine
+        run: |
+          # --target keeps proc-macro and build-script crates out of the
+          # sanitizer build (rustc rejects sanitizers for proc macros).
+          RUSTFLAGS="-Zsanitizer=address" cargo test --target x86_64-unknown-linux-gnu \
+            -p storage --lib
+      - name: Ignored tests (perf probes, long replay loops)
+        working-directory: rust_engine
+        env:
+          UV_PYTHON: "3.11"
+        run: cargo test --workspace -- --ignored
+      - name: Slow restart cases (long imports, repeated kills)
+        run: |
+          (cd rust_engine && cargo build -q --release -p cli)
+          export INFINITY_SERVER_BIN="${PWD}/rust_engine/target/release/infinity"
+          work="$(mktemp -d)"
+          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
+                --unshare-pid --proc /proc -- \
+                .venv/bin/python -m pytest -q -m slow -k "not cross_engine" \
+                python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
+                --tb=short
+
