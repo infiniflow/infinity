@@ -2491,3 +2491,24 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_unnest_json_nested" + suffix)
         assert res.error_code == ErrorCode.OK
+
+    def test_select_bit_embedding(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_bit_embedding" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "test_select_bit_embedding" + suffix,
+            {"id": {"type": "int"}, "c": {"type": "vector,8,bit"}},
+            ConflictType.Error,
+        )
+        table_obj.insert([
+            {"id": 0, "c": [1, 0, 0, 0, 0, 0, 0, 1]},
+            {"id": 1, "c": [0, 1, 0, 0, 0, 0, 0, 0]},
+        ])
+
+        res, _ = table_obj.output(["id", "c"]).sort([["id", SortType.Asc]]).to_df()
+        assert res["c"].tolist() == [["10000001"], ["01000000"]]
+        res, _ = table_obj.output(["id", "c"]).sort([["id", SortType.Asc]]).to_pl()
+        assert res["c"].to_list() == [["10000001"], ["01000000"]]
+
+        res = db_obj.drop_table("test_select_bit_embedding" + suffix)
+        assert res.error_code == ErrorCode.OK

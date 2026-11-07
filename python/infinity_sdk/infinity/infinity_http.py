@@ -28,6 +28,7 @@ from .http_utils import (
     bool_functions,
     default_url,
     function_return_type,
+    is_bit_embedding_type,
     functions,
     index_type_transfrom,
     is_date,
@@ -1204,6 +1205,9 @@ class table_http_result:
 
                 if v is None or isinstance(v, (int, float)):
                     new_tup = tup + (v,)
+                elif is_bit_embedding_type(col_types.get(col_name)) and v.startswith("[") and v.endswith("]"):
+                    # "[01000000]" is a bit string, not a number; keep it like the thrift client does
+                    new_tup = tup + ([v[1:-1]],)
                 elif is_list(v) and not is_json_function(col_name):
                     # Don't parse lists for JSON extraction functions - keep them as strings
                     new_tup = tup + (ast.literal_eval(v),)
