@@ -479,11 +479,39 @@ pub fn write_block(
 /// each file they finish (`FileWorker::WriteToFile`,
 /// `memory_indexer_impl.cpp:535-536,762-763`, `column_index_merger_impl.cpp:151-152`),
 /// so a chunk named by a catalog record is on disk, not just in the page cache.
+///
+/// The bytes go to a sibling temp file that is renamed over `path`. A block is
+/// rewritten **in place** when a commit re-publishes its rows (`ALTER TABLE
+/// ADD/DROP COLUMN`, an update), while readers hold an `mmap` of it
+/// (`buffer::MappedFile` maps block columns and index chunks, and the mapping
+/// outlives the catalog's map cache); truncating the file under a live mapping
+/// raises SIGBUS. The rename swaps the directory entry, so whoever mapped the
+/// old file keeps a valid inode (measured: the periodic checkpoint died with
+/// SIGBUS inside `MappedBlock::column` while a client's `ADD COLUMN` rewrite
+/// truncated `blk_0/0.col`).
 pub fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
-    let mut file = std::fs::File::create(path)?;
-    file.write_all(bytes)?;
-    file.sync_all()
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    // A dotted, non-`.col` name: `read_block` and the directory scans ignore it,
+    // and it sits next to the target so the rename stays within one filesystem.
+    let tmp = path.with_file_name(format!(
+        ".{}.tmp{}-{}",
+        path.file_name().unwrap_or_default().to_string_lossy(),
+        std::process::id(),
+        SEQ.fetch_add(1, Ordering::Relaxed)
+    ));
+    let write = || -> std::io::Result<()> {
+        let mut file = std::fs::File::create(&tmp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        std::fs::rename(&tmp, path)
+    };
+    let out = write();
+    if out.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    out
 }
 
 /// Reads a block directory written by [`write_block`] (or by the C++ engine).
@@ -1119,6 +1147,29 @@ mod tests {
         assert_eq!(&file[16..21], &body[..]);
         assert_eq!(&file[21..29], &0u64.to_le_bytes());
         assert_eq!(decode_data_file(&file).unwrap(), body);
+    }
+
+    /// A block's files are rewritten in place when a commit re-publishes its
+    /// rows, and a reader may hold an `mmap` of one (`MappedFile`). Writing
+    /// through a temp file and a rename keeps the old inode alive for that
+    /// mapping; truncating in place would fault it with SIGBUS (measured: the
+    /// checkpoint died inside `MappedBlock::column` while a client's
+    /// `ADD COLUMN` rewrote the block).
+    #[test]
+    fn a_rewrite_keeps_a_live_mapping_valid() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("0.col");
+        write_synced(&path, b"first").unwrap();
+        let mapped = crate::buffer::mapped::MappedFile::open(&path).unwrap();
+        write_synced(&path, b"second-and-longer").unwrap();
+        assert_eq!(&*mapped, b"first");
+        assert_eq!(std::fs::read(&path).unwrap(), b"second-and-longer");
+        // The temp file is gone, not left next to the block.
+        let names: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, vec!["0.col".to_string()]);
     }
 
     #[test]

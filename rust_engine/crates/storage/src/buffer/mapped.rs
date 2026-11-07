@@ -32,11 +32,11 @@ pub struct MappedFile {
 impl MappedFile {
     /// Maps `path` read-only.
     ///
-    /// The caller guarantees the file does not change while the mapping is
-    /// alive: a block whose `version` file exists is sealed (a rewrite writes a
-    /// new block directory, and the executor drops the old mapping before the
-    /// new one is opened), and an index chunk is superseded by a new base name
-    /// rather than overwritten.
+    /// The mapping stays valid even when the file is rewritten while it is
+    /// alive: every publisher writes a sibling temp file and renames it over the
+    /// target (`definition::format::write_synced`), which swaps the directory
+    /// entry and leaves the inode this mapping refers to untouched. Truncating
+    /// in place instead would make the mapping fault with SIGBUS.
     #[allow(unsafe_code)]
     pub fn open(path: impl AsRef<Path>) -> std::io::Result<Self> {
         let file = std::fs::File::open(path)?;
