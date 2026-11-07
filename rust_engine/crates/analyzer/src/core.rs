@@ -1,9 +1,11 @@
 use super::*;
 
+/// `algorithm -> (word -> stem)`, one map per algorithm seen on this thread.
+type StemMemo = Vec<(rust_stemmers::Algorithm, HashMap<Box<str>, Box<str>>)>;
+
 thread_local! {
-    /// `algorithm -> (word -> stem)`, one map per algorithm seen on this thread.
-    pub(crate) static STEM_MEMO: std::cell::RefCell<Vec<(rust_stemmers::Algorithm, HashMap<Box<str>, Box<str>>)>>
-        = std::cell::RefCell::new(Vec::new());
+    pub(crate) static STEM_MEMO: std::cell::RefCell<StemMemo> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 thread_local! {

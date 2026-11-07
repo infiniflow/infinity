@@ -690,7 +690,7 @@ impl Engine {
             Some(_) => None,
             None => predicate
                 .as_ref()
-                .and_then(|expr| crate::blocks::ColumnBounds::from_expr(expr)),
+                .and_then(crate::blocks::ColumnBounds::from_expr),
         };
         let batch = match &indexed_rows {
             Some(ids) => self
@@ -2442,9 +2442,12 @@ impl Engine {
                         &new_rows,
                         t,
                         move |txn, base| {
-                            match table_ident {
-                                Some((_, table_id, _)) => match block {
-                                    Some(block) => txn.set_typed_commands(vec![
+                            if let Some((_, table_id, _)) = table_ident {
+                                // A row the WAL encoder cannot express keeps
+                                // its `DeleteV2` only: the new cells reach the
+                                // block buffer, and no row record is kept.
+                                if let Some(block) = block {
+                                    txn.set_typed_commands(vec![
                                         self.delete_command(&table_name, &table_id, &delete_ids),
                                         self.append_command(
                                             &table_name,
@@ -2453,13 +2456,8 @@ impl Engine {
                                             row_count,
                                             block,
                                         ),
-                                    ]),
-                                    // A row the WAL encoder cannot express keeps
-                                    // its `DeleteV2` only: the new cells reach the
-                                    // block buffer, and no row record is kept.
-                                    None => {}
-                                },
-                                None => {}
+                                    ]);
+                                }
                             }
                             Ok(())
                         },
@@ -2505,6 +2503,7 @@ impl Engine {
     /// rows from (C++ keeps that binding in the scan and remaps down to the
     /// pruned list); `candidate` is the index scan the planner selected for this
     /// scan, which the scan operator applies before handing rows to the chain.
+    #[allow(clippy::too_many_arguments)] // one argument per planner hint the plan carries
     pub(crate) fn run_plan(
         &self,
         plan: LogicalPlan,

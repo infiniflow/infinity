@@ -36,9 +36,9 @@ use ::common::{Error, Result, TxnTimeStamp};
 
 use crate::wal_entry::{WalEntry, WAL_ENTRY_HEADER_LEN};
 
-/// Port of the reference's `storage/wal` subsystem, one module per source
-/// unit. `log_file` and `bottom_executor` are done; `wal_manager` and
-/// `wal_entry` follow.
+// Port of the reference's `storage/wal` subsystem, one module per source
+// unit. `log_file` and `bottom_executor` are done; `wal_manager` and
+// `wal_entry` follow.
 
 /// Append-only WAL writer for a single file.
 pub struct WalManager {
@@ -245,10 +245,7 @@ impl WalManager {
 /// `WalEntryIterator::Next`. A rejected record ends the walk.
 pub(crate) fn decode_entries(mut buf: &[u8]) -> Vec<WalEntry> {
     let mut out = Vec::new();
-    loop {
-        let Some((entry, size)) = WalEntry::read_adv(buf) else {
-            break;
-        };
+    while let Some((entry, size)) = WalEntry::read_adv(buf) {
         out.push(entry);
         buf = &buf[size..];
     }

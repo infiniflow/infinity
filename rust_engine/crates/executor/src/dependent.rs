@@ -89,7 +89,7 @@ impl DependentJoin {
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
         outer_table: &str,
         schema: &[String],
-        rows: &mut Vec<Vec<Value>>,
+        rows: &mut [Vec<Value>],
     ) -> Result<()> {
         let mut caches: Vec<HashMap<String, Result<Vec<Vec<Value>>>>> =
             (0..self.columns.len()).map(|_| HashMap::new()).collect();

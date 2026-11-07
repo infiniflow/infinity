@@ -106,8 +106,8 @@ impl<T: BottomTask> BottomExecutor<T> {
                 loop {
                     queue.dequeue_bulk(&mut txns);
                     let txns_size = txns.len();
-                    for txn_idx in 0..txns_size {
-                        match &txns[txn_idx] {
+                    for txn in txns.iter().take(txns_size) {
+                        match txn {
                             None => {
                                 // Stop signal: this worker exits.
                                 return;

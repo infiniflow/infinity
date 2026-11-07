@@ -10,6 +10,9 @@ use common::{Error, Result};
 
 use crate::sparse::{BmpAlg, BmpSearchOptions};
 
+/// One document's sparse code: the `(term, value)` pairs of its top-k tokens.
+type EncodedDoc = Result<Vec<(u32, f32)>>;
+
 /// C++: `SMVEResult`.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SmveResult {
@@ -265,17 +268,16 @@ impl SmveIndex {
         let threads = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(1);
-        let encoded: Vec<Result<Vec<(u32, f32)>>> = if threads <= 1 || docs.len() < 4096 {
+        let encoded: Vec<EncodedDoc> = if threads <= 1 || docs.len() < 4096 {
             docs.iter()
                 .map(|(_, tokens)| self.encode_tokens(tokens))
                 .collect()
         } else {
             let chunk = docs.len().div_ceil(threads);
             let index = &*self;
-            let mut slots: Vec<Option<Result<Vec<(u32, f32)>>>> =
-                (0..docs.len()).map(|_| None).collect();
+            let mut slots: Vec<Option<EncodedDoc>> = (0..docs.len()).map(|_| None).collect();
             std::thread::scope(|scope| {
-                let mut rest: &mut [Option<Result<Vec<(u32, f32)>>>] = &mut slots;
+                let mut rest: &mut [Option<EncodedDoc>] = &mut slots;
                 let mut start = 0usize;
                 let mut handles = Vec::new();
                 while start < docs.len() {
@@ -516,14 +518,14 @@ mod tests {
     fn the_projection_matrix_matches_the_reference_sequence() {
         let matrix = generate_projection_matrix(4, 2048);
         let expected = [
-            0.701173961f32,
-            -0.296649039,
-            0.499022365,
-            0.413921654,
-            0.618849814,
-            0.630404711,
-            -0.0728976876,
-            -0.462926388,
+            0.701_173_96_f32,
+            -0.296_649_04,
+            0.499_022_36,
+            0.413_921_65,
+            0.618_849_8,
+            0.630_404_7,
+            -0.072_897_69,
+            -0.462_926_4,
         ];
         for (i, want) in expected.iter().enumerate() {
             assert_eq!(matrix[i], *want, "element {i}");

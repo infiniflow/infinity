@@ -644,8 +644,8 @@ fn run(args: &[String]) -> common::Result<()> {
             };
             let e = Engine::open(&dir)?;
             // `knn_query_benchmark` runs two warm-up loops before it times.
-            let mut warm = queries.iter().take(5);
-            while let Some(q) = warm.next() {
+            let warm = queries.iter().take(5);
+            for q in warm {
                 let _ = e.execute(&knn_sql(table, q, topk, ef))?;
             }
             let mut latencies = Vec::with_capacity(queries.len());
@@ -1037,10 +1037,10 @@ fn run_conformance(slt_dir: &str) -> common::Result<()> {
     println!("statement error: {stmt_err_pass}/{stmt_err}");
     println!("query          : {query_pass}/{queries}");
     let mut ranked: Vec<_> = fail_reasons.iter().collect();
-    ranked.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+    ranked.sort_by_key(|(_, samples)| std::cmp::Reverse(samples.len()));
     println!("-- top statement-ok failure reasons --");
     let mut sranked: Vec<_> = stmt_fail.iter().collect();
-    sranked.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+    sranked.sort_by_key(|(_, samples)| std::cmp::Reverse(samples.len()));
     for (reason, samples) in sranked.iter().take(15) {
         println!("{:>5}  {}", samples.len(), reason);
         for s in samples.iter().take(2) {
@@ -1049,7 +1049,7 @@ fn run_conformance(slt_dir: &str) -> common::Result<()> {
     }
     println!("-- statements that should error but did not --");
     let mut eranked: Vec<_> = stmt_err_missing.iter().collect();
-    eranked.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+    eranked.sort_by_key(|(_, samples)| std::cmp::Reverse(samples.len()));
     for (word, samples) in eranked.iter().take(15) {
         println!("{:>5}  {}", samples.len(), word);
         for s in samples.iter().take(6) {

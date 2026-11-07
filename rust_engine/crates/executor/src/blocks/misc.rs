@@ -411,7 +411,7 @@ mod tests {
             .map(|i| {
                 vec![
                     parser::Literal::Int(i),
-                    parser::Literal::Int(i as i64 * 1_000_003),
+                    parser::Literal::Int(i * 1_000_003),
                     parser::Literal::Float(i as f64 / 7.0),
                     parser::Literal::Float((i as f64) * 0.1 + 1.0 / 3.0),
                     parser::Literal::Str(format!("doc-{i}")),

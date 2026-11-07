@@ -142,7 +142,7 @@ impl<'a> Builder<'a> {
     /// `Build(vertex_i)`: the vertex is already stored and levelled.
     fn build(&self, node: usize, scratch: &mut SearchScratch, select: &mut SelectScratch) {
         let q_layer = self.levels[node];
-        let query = QueryRef::for_node(&self.store, node);
+        let query = QueryRef::for_node(self.store, node);
         let mut ep = self.entry;
         let mut cur = self.max_level as i64;
         while cur > q_layer as i64 {
@@ -167,8 +167,10 @@ impl<'a> Builder<'a> {
                 own.extend_from_slice(neighbors);
             }
             // A reverse-link prune runs the heuristic again, which reuses
-            // `select`'s buffers, so the loop walks its own copy of the list.
-            for nb in neighbors.to_vec() {
+            // `select`'s buffers, so the loop walks its own copy of the list
+            // (the slice borrows `select` and cannot outlive that call).
+            let neighbors = neighbors.to_vec();
+            for nb in neighbors {
                 self.connect_neighbors(nb, node, layer, select);
             }
             l -= 1;

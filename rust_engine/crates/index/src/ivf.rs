@@ -98,148 +98,6 @@ impl IvfIndex {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sample() -> IvfIndex {
-        // Two centroids; the first owns vectors near [1, 0], the second [0, 1].
-        IvfIndex::new(
-            2,
-            2,
-            vec![1.0, 0.0, 0.0, 1.0],
-            vec![
-                vec![(10, vec![1.0, 0.0]), (11, vec![0.9, 0.1])],
-                vec![(20, vec![0.0, 1.0]), (21, vec![0.1, 0.9])],
-            ],
-        )
-    }
-
-    #[test]
-    fn picks_the_nearest_part() {
-        let index = sample();
-        let hits = index.candidates(&[0.0, 1.0], 1, 1, "l2");
-        assert_eq!(hits[0], 20);
-        let hits = index.candidates(&[1.0, 0.0], 2, 1, "ip");
-        assert_eq!(hits, vec![10, 11]);
-    }
-
-    #[test]
-    fn nprobe_covers_every_part() {
-        let index = sample();
-        let hits = index.candidates(&[1.0, 0.0], 4, 2, "l2");
-        assert_eq!(hits.len(), 4);
-    }
-
-    /// Training on residuals then encoding recovers each dimension to within
-    /// one quantization step (`range / 2^bits`).
-    #[test]
-    fn scalar_quantization_error_stays_within_one_step() {
-        let dims = 4;
-        let mut residuals = Vec::new();
-        for i in 0..200 {
-            residuals.push(vec![
-                (i as f32) * 0.01 - 1.0,
-                (i as f32) * 0.02 - 2.0,
-                0.5 - (i as f32) * 0.005,
-                (i as f32 % 7.0) * 0.1,
-            ]);
-        }
-        for bits in [4u8, 8] {
-            let (a, b) = train_scalar_quantization(&residuals, dims, bits);
-            for r in residuals.iter().skip(20).take(140) {
-                let (codes, _) = encode_scalar_quantized(r, r, &a, &b, bits);
-                let stride = sq_bytes_for(dims, bits);
-                assert_eq!(codes.len(), stride);
-                for d in 0..dims {
-                    let n = sq_decode(&codes, 0, d, bits);
-                    let step = if a[d] > 0.0 { a[d] } else { 1.0 };
-                    let error = (r[d] - (a[d] * n + b[d])).abs();
-                    assert!(
-                        error <= step * 0.75,
-                        "bits {bits} dim {d}: {error} > {step}"
-                    );
-                }
-            }
-        }
-    }
-
-    /// `AppendCodes`/`ExtractCodes` round-trip for every code width, including
-    /// the odd subspace counts where a vector starts mid-byte.
-    #[test]
-    fn product_quantization_codes_roundtrip_across_a_part() {
-        for bits in [4u8, 8, 12, 16] {
-            for subspace_num in [1usize, 2, 3] {
-                let max = (1u32 << bits) - 1;
-                let mut stream = Vec::new();
-                let mut stored: Vec<Vec<u32>> = Vec::new();
-                for v in 0..5u32 {
-                    let codes: Vec<u32> = (0..subspace_num as u32)
-                        .map(|j| (v * 7 + j * 13) % max.min(4000))
-                        .collect();
-                    pq_append_codes(&mut stream, stored.len() * subspace_num, &codes, bits);
-                    stored.push(codes);
-                }
-                for (v, codes) in stored.iter().enumerate() {
-                    for (j, want) in codes.iter().enumerate() {
-                        assert_eq!(
-                            pq_code(&stream, v, j, subspace_num, bits),
-                            *want,
-                            "bits {bits} subspace_num {subspace_num} vector {v} subspace {j}"
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    /// A scalar-quantized chunk ranks the vector its codes describe first, for
-    /// both the inner-product and the L2 metric.
-    #[test]
-    fn scalar_quantized_chunk_ranks_the_nearest_vector() {
-        let dims = 2;
-        let centroids = vec![1.0, 0.0, 0.0, 1.0];
-        let vectors = [
-            (10u32, vec![1.0f32, 0.0]),
-            (11, vec![0.9, 0.1]),
-            (20, vec![0.0, 1.0]),
-            (21, vec![0.1, 0.9]),
-        ];
-        let assign = [0usize, 0, 1, 1];
-        let mut residuals: Vec<Vec<f32>> = Vec::new();
-        for (i, (_, v)) in vectors.iter().enumerate() {
-            let c = assign[i] * dims;
-            residuals.push(
-                v.iter()
-                    .zip(&centroids[c..c + dims])
-                    .map(|(x, c)| x - c)
-                    .collect(),
-            );
-        }
-        let (a, b) = train_scalar_quantization(&residuals, dims, 8);
-        let mut parts = vec![IvfSqPartData::default(); 2];
-        for (i, (offset, v)) in vectors.iter().enumerate() {
-            let (codes, dot_v_e) = encode_scalar_quantized(v, &residuals[i], &a, &b, 8);
-            let part = &mut parts[assign[i]];
-            part.offsets.push(*offset);
-            part.codes.extend_from_slice(&codes);
-            part.dot_v_e.push(dot_v_e);
-        }
-        let index = IvfSqIndex {
-            dims,
-            centroids,
-            centroid_count: 2,
-            a,
-            b,
-            sq_bits: 8,
-            parts,
-        };
-        assert_eq!(index.candidates(&[0.0, 1.0], 1, 1, "l2")[0], 20);
-        assert_eq!(index.candidates(&[1.0, 0.0], 1, 1, "ip")[0], 10);
-        assert_eq!(index.offsets().count(), 4);
-    }
-}
-
 /// Scalar-quantized IVF chunk (`IndexIVFStorageOption::Type::kScalarQuantization`).
 ///
 /// Each vector is stored as per-dimension codes of its **residual**
@@ -839,5 +697,147 @@ impl IvfPqIndex {
     /// Every row offset the chunk covers.
     pub fn offsets(&self) -> impl Iterator<Item = u32> + '_ {
         self.parts.iter().flat_map(|p| p.offsets.iter().copied())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample() -> IvfIndex {
+        // Two centroids; the first owns vectors near [1, 0], the second [0, 1].
+        IvfIndex::new(
+            2,
+            2,
+            vec![1.0, 0.0, 0.0, 1.0],
+            vec![
+                vec![(10, vec![1.0, 0.0]), (11, vec![0.9, 0.1])],
+                vec![(20, vec![0.0, 1.0]), (21, vec![0.1, 0.9])],
+            ],
+        )
+    }
+
+    #[test]
+    fn picks_the_nearest_part() {
+        let index = sample();
+        let hits = index.candidates(&[0.0, 1.0], 1, 1, "l2");
+        assert_eq!(hits[0], 20);
+        let hits = index.candidates(&[1.0, 0.0], 2, 1, "ip");
+        assert_eq!(hits, vec![10, 11]);
+    }
+
+    #[test]
+    fn nprobe_covers_every_part() {
+        let index = sample();
+        let hits = index.candidates(&[1.0, 0.0], 4, 2, "l2");
+        assert_eq!(hits.len(), 4);
+    }
+
+    /// Training on residuals then encoding recovers each dimension to within
+    /// one quantization step (`range / 2^bits`).
+    #[test]
+    fn scalar_quantization_error_stays_within_one_step() {
+        let dims = 4;
+        let mut residuals = Vec::new();
+        for i in 0..200 {
+            residuals.push(vec![
+                (i as f32) * 0.01 - 1.0,
+                (i as f32) * 0.02 - 2.0,
+                0.5 - (i as f32) * 0.005,
+                (i as f32 % 7.0) * 0.1,
+            ]);
+        }
+        for bits in [4u8, 8] {
+            let (a, b) = train_scalar_quantization(&residuals, dims, bits);
+            for r in residuals.iter().skip(20).take(140) {
+                let (codes, _) = encode_scalar_quantized(r, r, &a, &b, bits);
+                let stride = sq_bytes_for(dims, bits);
+                assert_eq!(codes.len(), stride);
+                for d in 0..dims {
+                    let n = sq_decode(&codes, 0, d, bits);
+                    let step = if a[d] > 0.0 { a[d] } else { 1.0 };
+                    let error = (r[d] - (a[d] * n + b[d])).abs();
+                    assert!(
+                        error <= step * 0.75,
+                        "bits {bits} dim {d}: {error} > {step}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// `AppendCodes`/`ExtractCodes` round-trip for every code width, including
+    /// the odd subspace counts where a vector starts mid-byte.
+    #[test]
+    fn product_quantization_codes_roundtrip_across_a_part() {
+        for bits in [4u8, 8, 12, 16] {
+            for subspace_num in [1usize, 2, 3] {
+                let max = (1u32 << bits) - 1;
+                let mut stream = Vec::new();
+                let mut stored: Vec<Vec<u32>> = Vec::new();
+                for v in 0..5u32 {
+                    let codes: Vec<u32> = (0..subspace_num as u32)
+                        .map(|j| (v * 7 + j * 13) % max.min(4000))
+                        .collect();
+                    pq_append_codes(&mut stream, stored.len() * subspace_num, &codes, bits);
+                    stored.push(codes);
+                }
+                for (v, codes) in stored.iter().enumerate() {
+                    for (j, want) in codes.iter().enumerate() {
+                        assert_eq!(
+                            pq_code(&stream, v, j, subspace_num, bits),
+                            *want,
+                            "bits {bits} subspace_num {subspace_num} vector {v} subspace {j}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// A scalar-quantized chunk ranks the vector its codes describe first, for
+    /// both the inner-product and the L2 metric.
+    #[test]
+    fn scalar_quantized_chunk_ranks_the_nearest_vector() {
+        let dims = 2;
+        let centroids = vec![1.0, 0.0, 0.0, 1.0];
+        let vectors = [
+            (10u32, vec![1.0f32, 0.0]),
+            (11, vec![0.9, 0.1]),
+            (20, vec![0.0, 1.0]),
+            (21, vec![0.1, 0.9]),
+        ];
+        let assign = [0usize, 0, 1, 1];
+        let mut residuals: Vec<Vec<f32>> = Vec::new();
+        for (i, (_, v)) in vectors.iter().enumerate() {
+            let c = assign[i] * dims;
+            residuals.push(
+                v.iter()
+                    .zip(&centroids[c..c + dims])
+                    .map(|(x, c)| x - c)
+                    .collect(),
+            );
+        }
+        let (a, b) = train_scalar_quantization(&residuals, dims, 8);
+        let mut parts = vec![IvfSqPartData::default(); 2];
+        for (i, (offset, v)) in vectors.iter().enumerate() {
+            let (codes, dot_v_e) = encode_scalar_quantized(v, &residuals[i], &a, &b, 8);
+            let part = &mut parts[assign[i]];
+            part.offsets.push(*offset);
+            part.codes.extend_from_slice(&codes);
+            part.dot_v_e.push(dot_v_e);
+        }
+        let index = IvfSqIndex {
+            dims,
+            centroids,
+            centroid_count: 2,
+            a,
+            b,
+            sq_bits: 8,
+            parts,
+        };
+        assert_eq!(index.candidates(&[0.0, 1.0], 1, 1, "l2")[0], 20);
+        assert_eq!(index.candidates(&[1.0, 0.0], 1, 1, "ip")[0], 10);
+        assert_eq!(index.offsets().count(), 4);
     }
 }

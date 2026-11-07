@@ -289,10 +289,10 @@ mod tests {
         );
     }
 
-    /// A full-text index is built and queried with the analyzer it declared,
-    /// not with the standard one: an `ngram-3` index turns `quick` into
-    /// `qui`/`uic`/`ick`, so a literal `qui` is a token there and not in a
-    /// `standard` index.
+    // A full-text index is built and queried with the analyzer it declared,
+    // not with the standard one: an `ngram-3` index turns `quick` into
+    // `qui`/`uic`/`ick`, so a literal `qui` is a token there and not in a
+    // `standard` index.
 
     /// A reopened engine maps the chunks the previous process sealed instead of
     /// re-indexing the table, so its memory tail holds no document and the

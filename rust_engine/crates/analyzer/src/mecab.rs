@@ -262,7 +262,7 @@ impl MecabDict {
         let units = &bytes[da_start..token_start];
         let mut base = Vec::with_capacity(units.len() / 8);
         let mut check = Vec::with_capacity(units.len() / 8);
-        for unit in units.chunks_exact(8) {
+        for unit in units.as_chunks::<8>().0 {
             base.push(i32::from_le_bytes([unit[0], unit[1], unit[2], unit[3]]));
             check.push(u32::from_le_bytes([unit[4], unit[5], unit[6], unit[7]]));
         }
@@ -376,7 +376,7 @@ impl MecabCharProperty {
         }
         let table = &bytes[4 + 32 * size..];
         let mut map = Vec::with_capacity(0xffff);
-        for entry in table.chunks_exact(4) {
+        for entry in table.as_chunks::<4>().0 {
             // `unsigned int type:18; default_type:8; length:4; group:1; invoke:1`
             let word = u32::from_le_bytes([entry[0], entry[1], entry[2], entry[3]]);
             map.push(MecabCharInfo {
@@ -438,8 +438,10 @@ impl MecabEngine {
             return Err("broken MeCab matrix.bin".to_string());
         }
         let matrix = matrix[4..]
-            .chunks_exact(2)
-            .map(|b| i16::from_le_bytes([b[0], b[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|b| i16::from_le_bytes(*b))
             .collect();
         let mut unk_tokens = Vec::with_capacity(property.names.len());
         for name in &property.names {

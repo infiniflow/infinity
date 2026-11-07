@@ -173,7 +173,7 @@ pub fn write_segment_index(
 
     let write = |suffix: &str, bytes: &[u8]| -> Result<(), FormatError> {
         let path = fulltext_chunk_file(index_dir, base_name, suffix);
-        crate::format::write_synced(std::path::Path::new(&path), &bytes)
+        crate::format::write_synced(std::path::Path::new(&path), bytes)
             .map_err(|e| FormatError::Io(e.to_string()))
     };
     write(FULLTEXT_DICT_SUFFIX, &dic)?;
@@ -220,8 +220,10 @@ impl SegmentIndexReader {
         };
         let rows_map = map(FULLTEXT_ROW_SUFFIX)?;
         let rows: Vec<u64> = rows_map
-            .chunks_exact(8)
-            .map(|b| u64::from_le_bytes(b.try_into().unwrap()))
+            .as_chunks::<8>()
+            .0
+            .iter()
+            .map(|b| u64::from_le_bytes(*b))
             .collect();
         Ok(Self {
             dic: map(FULLTEXT_DICT_SUFFIX)?,
@@ -577,6 +579,7 @@ impl<'a> TermDocCursor<'a> {
 
     /// The current document's length (BM25 `dl`), read straight from `.len`
     /// through the ordinal the cursor already carries.
+    #[allow(clippy::len_without_is_empty)] // this is BM25's `dl`, not a container size
     pub fn len(&mut self) -> u32 {
         let ordinal = self.ordinal();
         self.reader.doc_len(ordinal).unwrap_or(1)

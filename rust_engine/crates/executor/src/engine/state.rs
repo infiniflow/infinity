@@ -1909,17 +1909,14 @@ impl std::hash::Hasher for FxHasher {
 
     #[inline]
     fn write(&mut self, bytes: &[u8]) {
-        let mut chunks = bytes.chunks_exact(8);
-        for chunk in &mut chunks {
-            self.add(u64::from_le_bytes(
-                chunk.try_into().expect("eight bytes per chunk"),
-            ));
+        let (chunks, tail) = bytes.as_chunks::<8>();
+        for chunk in chunks {
+            self.add(u64::from_le_bytes(*chunk));
         }
-        let rest = chunks.remainder();
-        if !rest.is_empty() {
-            let mut tail = [0u8; 8];
-            tail[..rest.len()].copy_from_slice(rest);
-            self.add(u64::from_le_bytes(tail));
+        if !tail.is_empty() {
+            let mut last = [0u8; 8];
+            last[..tail.len()].copy_from_slice(tail);
+            self.add(u64::from_le_bytes(last));
         }
     }
 
@@ -2397,6 +2394,7 @@ impl<'a> MergeCursor<'a> {
 /// The interface BlockMaxWandIterator drives: a unit is a term or a phrase, and
 /// either way it can say which block it is on and what that block's largest
 /// tf / tf-length ratio is.
+#[allow(clippy::large_enum_variant)] // one per query term, built once and kept on the stack
 pub(crate) enum WandStream<'a> {
     Term(TermStream<'a>),
     Phrase(PhraseCursor<'a>),
@@ -4734,6 +4732,9 @@ pub(crate) struct BottomState {
     pub(crate) result: Option<Result<()>>,
 }
 
+/// The job a table's worker runs for one statement's bottom half.
+pub(crate) type BottomJob = Box<dyn FnOnce(&Engine) -> Result<()> + Send>;
+
 /// The post-commit work of one statement, handed to a [`BottomExecutor`]
 /// worker (`NewTxnManager::CommitBottom` for a single-table statement).
 pub(crate) struct BottomWork {
@@ -4742,7 +4743,7 @@ pub(crate) struct BottomWork {
     /// The tables' gates, locked on the worker: bottom halves of one table take
     /// their turn in submission (= commit) order.
     pub(crate) gates: Vec<Arc<std::sync::Mutex<()>>>,
-    pub(crate) work: std::sync::Mutex<Option<Box<dyn FnOnce(&Engine) -> Result<()> + Send>>>,
+    pub(crate) work: std::sync::Mutex<Option<BottomJob>>,
     pub(crate) state: std::sync::Mutex<BottomState>,
     pub(crate) done: std::sync::Condvar,
 }
@@ -5243,7 +5244,7 @@ impl Default for EngineOptions {
     }
 }
 
-pub(crate) type AllocJob = Box<dyn FnOnce(&Engine) -> () + Send>;
+pub(crate) type AllocJob = Box<dyn FnOnce(&Engine) + Send>;
 
 /// A reserved run of row ids and the append record that describes it.
 ///

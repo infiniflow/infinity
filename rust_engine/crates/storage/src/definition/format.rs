@@ -1480,8 +1480,10 @@ mod tests {
         );
         assert_eq!(body.len(), 24); // 2 vectors * dim 3 * 4 bytes
         let vals: Vec<f32> = body
-            .chunks_exact(4)
-            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| f32::from_le_bytes(*c))
             .collect();
         // The short vector is zero-padded to the declared dimension.
         assert_eq!(vals, vec![1.0, 2.0, 0.0, 3.0, 0.0, 0.0]);

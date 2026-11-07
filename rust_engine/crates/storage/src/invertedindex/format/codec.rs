@@ -57,8 +57,10 @@ pub fn decode_column_lengths(buf: &[u8]) -> Result<Vec<u32>, FormatError> {
         });
     }
     Ok(buf
-        .chunks_exact(4)
-        .map(|c| u32::from_le_bytes(c.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| u32::from_le_bytes(*c))
         .collect())
 }
 

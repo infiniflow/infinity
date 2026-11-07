@@ -1457,12 +1457,12 @@ pub fn stage_new_table(
     db_id: u64,
     meta: &TableMeta,
     next_table_id: u64,
-) -> Result<Vec<(Vec<u8>, Option<Vec<u8>>)>> {
+) -> Result<Vec<crate::BatchItem>> {
     let db_str = db_id.to_string();
     let tbl_str = meta.id.to_string();
     let name = meta.name.rsplit('.').next().unwrap_or(&meta.name);
     let ts = crate::DDL_TS_SENTINEL;
-    let mut batch: Vec<(Vec<u8>, Option<Vec<u8>>)> = Vec::new();
+    let mut batch: Vec<crate::BatchItem> = Vec::new();
     batch.push((
         key::catalog_table_key(&db_str, name, ts).into_bytes(),
         Some(tbl_str.clone().into_bytes()),
@@ -1546,10 +1546,10 @@ pub fn stage_added_columns(
     db_id: u64,
     meta: &TableMeta,
     first: usize,
-) -> Result<Vec<(Vec<u8>, Option<Vec<u8>>)>> {
+) -> Result<Vec<crate::BatchItem>> {
     let db_str = db_id.to_string();
     let tbl_str = meta.id.to_string();
-    let mut batch: Vec<(Vec<u8>, Option<Vec<u8>>)> = vec![(
+    let mut batch: Vec<crate::BatchItem> = vec![(
         key::catalog_table_tag_key(&db_str, &tbl_str, "next_column_id").into_bytes(),
         Some(
             meta.ids
@@ -1701,6 +1701,10 @@ pub fn read_layout(store: &dyn MetaStore) -> Result<Vec<TableLayout>> {
     Ok(out)
 }
 
+/// One index record as `read_indexes` collects it before sorting:
+/// `((db_id, table_id, index_name), (create_ts, index_id))`.
+type IndexSlot = ((String, String, String), (u64, String));
+
 /// Reads back the index records written by [`Catalog::write_layout`]:
 /// every `idx|…|index_base` tag, decoded.
 ///
@@ -1734,7 +1738,7 @@ pub fn read_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
             *slot = (ts, index_id);
         }
     }
-    let mut names: Vec<((String, String, String), (u64, String))> = newest.into_iter().collect();
+    let mut names: Vec<IndexSlot> = newest.into_iter().collect();
     names.sort();
     let mut out = Vec::new();
     for ((db_id, table_id, index_name), (ts, index_id)) in names {

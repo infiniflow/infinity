@@ -526,7 +526,7 @@ impl EmvbView<'_> {
         if self.dims == 0 {
             0
         } else {
-            self.centroids.len() / self.dims
+            self.centroids.len().checked_div(self.dims).unwrap_or(0)
         }
     }
 

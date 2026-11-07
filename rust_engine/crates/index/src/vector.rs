@@ -309,7 +309,7 @@ impl PlainVecs {
         if self.dims == 0 {
             0
         } else {
-            self.data.len() / self.dims
+            self.data.len().checked_div(self.dims).unwrap_or(0)
         }
     }
 
@@ -1111,10 +1111,7 @@ impl HnswIndex {
                 }
                 let mut flat: Vec<f32> = Vec::with_capacity(dims * n);
                 for c in records.chunks_exact(dims * 4).take(n) {
-                    flat.extend(
-                        c.chunks_exact(4)
-                            .map(|b| f32::from_le_bytes(b.try_into().unwrap())),
-                    );
+                    flat.extend(c.as_chunks::<4>().0.iter().map(|b| f32::from_le_bytes(*b)));
                 }
                 Store::Plain {
                     metric,

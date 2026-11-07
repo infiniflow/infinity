@@ -1082,8 +1082,12 @@ fn snapshot_files(json: &Json) -> Vec<String> {
     out
 }
 
+/// A snapshot table's column definitions as the catalog wants them:
+/// names, defaults, nullability and declared types.
+type ColumnSchema = (Vec<String>, Vec<Option<String>>, Vec<bool>, Vec<String>);
+
 /// The `column_definition` of a snapshot table as the catalog wants it.
-fn schema_of(table: &Json) -> Result<(Vec<String>, Vec<Option<String>>, Vec<bool>, Vec<String>)> {
+fn schema_of(table: &Json) -> Result<ColumnSchema> {
     let mut columns = Vec::new();
     let mut defaults = Vec::new();
     let mut not_nulls = Vec::new();

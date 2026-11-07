@@ -148,7 +148,7 @@ impl TxnOp {
 
     /// Whether the operation touches `table`.
     fn covers_table(&self, table: &str) -> bool {
-        self.tables().iter().any(|mine| *mine == table)
+        self.tables().contains(&table)
     }
 
     fn same_table(&self, other: &Self) -> bool {

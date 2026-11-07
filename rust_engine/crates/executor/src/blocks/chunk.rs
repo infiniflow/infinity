@@ -342,7 +342,7 @@ pub(crate) fn fulltext_chunk_counts(len_path: &Path) -> Option<(u64, u64)> {
     }
     let mut doc_count = 0u64;
     let mut term_count = 0u64;
-    for chunk in bytes.chunks_exact(4) {
+    for chunk in bytes.as_chunks::<4>().0 {
         doc_count += 1;
         term_count += u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) as u64;
     }

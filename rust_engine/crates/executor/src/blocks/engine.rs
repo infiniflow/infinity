@@ -1,5 +1,18 @@
 use super::*;
 
+/// A block's rows as the mirror stores them: the column texts, then
+/// `(row id, cells)` per row.
+pub(crate) type BlockRows = (Vec<String>, Vec<(usize, Vec<String>)>);
+
+/// A block's visible rows with the cells already decoded: `(row id, cells)`.
+pub(crate) type DecodedRows = Vec<(usize, Vec<Value>)>;
+
+/// Same as [`BlockRows`], with the cells already decoded to `Value`.
+pub(crate) type BlockValueRows = (Vec<String>, DecodedRows);
+
+/// A row predicate: `true` keeps the row.
+pub(crate) type RowFilter<'a> = Option<&'a dyn Fn(&[Value]) -> bool>;
+
 /// Applies the schema changes an append predates to its stored row text.
 ///
 /// The cells are tab-separated and positional, so a column added after the
@@ -60,6 +73,7 @@ impl Engine {
     /// reference's block covers. Reading it this way is what bounds the mirror's
     /// memory: a table is mirrored block by block, the way the reference streams
     /// the rows through its buffer manager.
+    #[allow(clippy::too_many_arguments)] // one argument per piece of the block layout it mirrors
     pub(crate) fn mirror_block_rows(
         &self,
         table: &str,
@@ -2013,8 +2027,7 @@ impl Engine {
         version
             .created
             .iter()
-            .filter(|c| c.create_ts <= read_ts)
-            .last()
+            .rfind(|c| c.create_ts <= read_ts)
             .map(|c| c.cumulative_row_count.max(0) as usize)
             .unwrap_or(0)
     }
@@ -2135,7 +2148,7 @@ impl Engine {
             // rename racing it - leaves them there, and counting both sides
             // reported twice the table.
             let base = ((id.segment_id as u64) << 32)
-                | u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64;
+                | (u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64);
             for slot in 0..created as u64 {
                 have.insert((base + slot) as usize);
             }
@@ -2148,9 +2161,7 @@ impl Engine {
             .filter(|(seq, _)| {
                 !have.contains(seq)
                     && !deleted.contains(&(*seq as u64))
-                    && view
-                        .as_ref()
-                        .map_or(true, |view| view.covers(*seq, read_ts))
+                    && view.as_ref().is_none_or(|view| view.covers(*seq, read_ts))
             })
             .count()
     }
@@ -2360,7 +2371,7 @@ impl Engine {
         table: &str,
         wanted: &[usize],
         prune: &[crate::fast_rough_filter::PruneCond],
-    ) -> Result<(Vec<String>, Vec<(usize, Vec<String>)>)> {
+    ) -> Result<BlockRows> {
         self.read_blocks_wanted(table, Some(wanted), prune)
     }
 
@@ -2371,7 +2382,7 @@ impl Engine {
         table: &str,
         wanted: &[usize],
         prune: &[crate::fast_rough_filter::PruneCond],
-    ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
+    ) -> Result<BlockValueRows> {
         self.read_blocks_values(table, Some(wanted), prune, None, None)
     }
 
@@ -2383,7 +2394,7 @@ impl Engine {
         wanted: &[usize],
         prune: &[crate::fast_rough_filter::PruneCond],
         keep: &dyn Fn(&[Value]) -> bool,
-    ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
+    ) -> Result<BlockValueRows> {
         self.read_blocks_values(table, Some(wanted), prune, Some(keep), None)
     }
 
@@ -2395,7 +2406,7 @@ impl Engine {
         table: &str,
         wanted: &[usize],
         rows: &std::collections::HashSet<usize>,
-    ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
+    ) -> Result<BlockValueRows> {
         // `None` = every column: a result row carries all of them, and asking for
         // a column subset here would pad the rest with NULL.
         let wanted = (!wanted.is_empty()).then_some(wanted);
@@ -2527,6 +2538,7 @@ impl Engine {
     /// `format!` and a re-parse per cell; the types that only exist as text
     /// (varchar, json, date, tensor, sparse, ...) keep the text form, and its
     /// parse, because that is also what a rewrite writes.
+    #[allow(clippy::too_many_arguments)] // one argument per piece of the decoded row
     pub(crate) fn decode_rows_of_values(
         ids: &[u64],
         type_text: &[String],
@@ -2535,9 +2547,9 @@ impl Engine {
         version: &storage::definition::format::BlockVersionFile,
         columns: &dyn BlockColumns,
         wanted: Option<&[usize]>,
-        keep: Option<&dyn Fn(&[Value]) -> bool>,
+        keep: RowFilter<'_>,
         rows_wanted: Option<&std::collections::HashSet<usize>>,
-    ) -> Option<Vec<(usize, Vec<Value>)>> {
+    ) -> Option<DecodedRows> {
         let row_count: usize = version
             .created
             .last()
@@ -2886,7 +2898,7 @@ impl Engine {
         &self,
         table: &str,
         wanted: Option<&[usize]>,
-    ) -> Option<Vec<(usize, Vec<Value>)>> {
+    ) -> Option<DecodedRows> {
         let table = self.qualified_table(table);
         if !self.visible_block_ids(&table).is_empty() {
             return None;
@@ -3091,7 +3103,7 @@ impl Engine {
                 .last()
                 .map(|c| c.cumulative_row_count as usize)
                 .unwrap_or(0);
-            let created_at = Self::created_at(&version, read_ts);
+            let created_at = Self::created_at(version, read_ts);
             // A predicate on a fixed-width column is applied here, on the
             // mapped bytes: decoding every row into `Value`s and comparing
             // afterwards is what made a filtered scan cost more than an
@@ -3101,7 +3113,7 @@ impl Engine {
             // version decides them and every column decodes just those.
             shown_slots.clear();
             for slot in 0..row_count {
-                if Self::slot_visible(&version, slot, created_at, read_ts) {
+                if Self::slot_visible(version, slot, created_at, read_ts) {
                     if let Some(scan) = &scan {
                         if !scan.matches(slot) {
                             continue;
@@ -3299,9 +3311,7 @@ impl Engine {
                 end += 1;
             }
             let slots: Vec<usize> = (at..end)
-                .map(|k| {
-                    ((rows[order[k]] as u64 & 0xffff_ffff) % DEFAULT_BLOCK_CAPACITY as u64) as usize
-                })
+                .map(|k| ((rows[order[k]] & 0xffff_ffff) % DEFAULT_BLOCK_CAPACITY as u64) as usize)
                 .collect();
             let decoded = blocks
                 .iter()
@@ -3459,7 +3469,7 @@ impl Engine {
                 let ColumnData::Text(text) = out else {
                     unreachable!()
                 };
-                match decode_text_cell(
+                let ok = decode_text_cell(
                     &type_text[pos],
                     *column_type,
                     layout,
@@ -3467,13 +3477,9 @@ impl Engine {
                     row,
                     raw_outline,
                     text,
-                ) {
-                    Some(ok) => {
-                        valid.push(ok);
-                        continue;
-                    }
-                    None => return None,
-                }
+                )?;
+                valid.push(ok);
+                continue;
             }
             let value = match kind {
                 OutlineKind::None => match layout {
@@ -3528,9 +3534,9 @@ impl Engine {
         table: &str,
         wanted: Option<&[usize]>,
         prune: &[crate::fast_rough_filter::PruneCond],
-        keep: Option<&dyn Fn(&[Value]) -> bool>,
+        keep: RowFilter<'_>,
         rows_wanted: Option<&std::collections::HashSet<usize>>,
-    ) -> Result<(Vec<String>, Vec<(usize, Vec<Value>)>)> {
+    ) -> Result<BlockValueRows> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -3646,13 +3652,13 @@ impl Engine {
                     // (`BlockVersion::GetRowCount(begin_ts)`): a slot created
                     // after it does not exist yet, and one deleted after it is
                     // still there.
-                    let created_at = Self::created_at(&version, read_ts);
+                    let created_at = Self::created_at(version, read_ts);
                     rows.extend(
                         cells
                             .into_iter()
                             .enumerate()
                             .filter(|(slot, _)| {
-                                Self::slot_visible(&version, *slot, created_at, read_ts)
+                                Self::slot_visible(version, *slot, created_at, read_ts)
                             })
                             .map(|(_, row)| row),
                     );
@@ -3707,7 +3713,7 @@ impl Engine {
         table: &str,
         wanted: Option<&[usize]>,
         prune: &[crate::fast_rough_filter::PruneCond],
-    ) -> Result<(Vec<String>, Vec<(usize, Vec<String>)>)> {
+    ) -> Result<BlockRows> {
         let (columns, rows) = self.read_blocks_values(table, wanted, prune, None, None)?;
         Ok((
             columns,
@@ -5528,8 +5534,10 @@ impl Engine {
             for (i, label) in part.segment_offsets.iter().enumerate() {
                 let at = i * dim * 4;
                 let v = part.vectors[at..at + dim * 4]
-                    .chunks_exact(4)
-                    .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|c| f32::from_le_bytes(*c))
                     .collect();
                 out.push((*label, v));
             }
@@ -5789,7 +5797,7 @@ impl Engine {
         Ok(Some(ChunkRewrite {
             segment: 0,
             chunk_id: next as u32,
-            row_count: merged.doc_num() as u32,
+            row_count: merged.doc_num(),
             deprecate_ids,
         }))
     }

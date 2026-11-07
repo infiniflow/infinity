@@ -927,7 +927,7 @@ impl Engine {
                     }
                 }
                 let dir = self.dir.join("secondary").join(key.replace('/', "_"));
-                let mut chunk = std::fs::read_dir(&dir)
+                let start = std::fs::read_dir(&dir)
                     .map(|d| {
                         d.filter_map(|e| e.ok())
                             .filter(|e| e.path().extension().is_some_and(|x| x == "idx"))
@@ -935,10 +935,9 @@ impl Engine {
                     })
                     .unwrap_or(0);
                 let mut readers = Vec::new();
-                for (segment, mut entries) in by_segment {
+                for (offset, (segment, mut entries)) in by_segment.into_iter().enumerate() {
                     entries.sort_by(|a, b| a.0.order(&b.0));
-                    let path = dir.join(format!("seg_{segment}_tail{chunk}.idx"));
-                    chunk += 1;
+                    let path = dir.join(format!("seg_{segment}_tail{}.idx", start + offset));
                     if storage::secondary_segment::write_secondary_segment_typed(
                         &path, tail_kind, &entries,
                     )
@@ -981,7 +980,7 @@ impl Engine {
                     }
                 }
                 let dir = self.dir.join("secondary_low").join(key.replace('/', "_"));
-                let mut chunk = std::fs::read_dir(&dir)
+                let start = std::fs::read_dir(&dir)
                     .map(|d| {
                         d.filter_map(|e| e.ok())
                             .filter(|e| e.path().extension().is_some_and(|x| x == "idx"))
@@ -989,7 +988,7 @@ impl Engine {
                     })
                     .unwrap_or(0);
                 let mut readers = Vec::new();
-                for (segment, lists) in by_segment {
+                for (offset, (segment, lists)) in by_segment.into_iter().enumerate() {
                     let mut entries: Vec<(u64, Vec<u32>)> = Vec::new();
                     for (bit, list) in lists.iter().enumerate() {
                         if !list.is_empty() {
@@ -997,8 +996,7 @@ impl Engine {
                         }
                     }
                     entries.sort_by_key(|(k, _)| *k);
-                    let path = dir.join(format!("seg_{segment}_tail{chunk}.idx"));
-                    chunk += 1;
+                    let path = dir.join(format!("seg_{segment}_tail{}.idx", start + offset));
                     if storage::secondary_lowcard::write_lowcard_segment(&path, &entries).is_err() {
                         continue;
                     }

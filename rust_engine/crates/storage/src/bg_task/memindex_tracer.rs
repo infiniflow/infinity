@@ -237,7 +237,7 @@ mod tests {
             let memindexes = self.memindexes.lock().unwrap();
             let mut details: Vec<MemIndexDetail> =
                 memindexes.values().map(DummyIndexInMem::detail).collect();
-            details.sort_by(|lhs, rhs| rhs.mem_used.cmp(&lhs.mem_used));
+            details.sort_by_key(|detail| std::cmp::Reverse(detail.mem_used));
             details
         }
 

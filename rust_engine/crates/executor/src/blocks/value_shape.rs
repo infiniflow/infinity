@@ -28,10 +28,9 @@ pub fn tensor_shape(type_text: &str) -> Option<(i32, usize, i32)> {
     let up = type_text.trim().to_ascii_uppercase();
     let (column_type, rest) = if let Some(r) = up.strip_prefix("MULTIVECTOR(") {
         (14, r)
-    } else if let Some(r) = up.strip_prefix("TENSOR(") {
-        (11, r)
     } else {
-        return None;
+        let r = up.strip_prefix("TENSOR(")?;
+        (11, r)
     };
     let inner = rest.trim_end_matches(')');
     let parts: Vec<&str> = inner.split(',').map(str::trim).collect();

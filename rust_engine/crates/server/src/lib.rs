@@ -2431,10 +2431,9 @@ fn tensor_info(type_text: &str) -> Option<(i32, i32, i32)> {
         (12, r)
     } else if let Some(r) = up.strip_prefix("MULTIVECTOR(") {
         (14, r)
-    } else if let Some(r) = up.strip_prefix("TENSOR(") {
-        (11, r)
     } else {
-        return None;
+        let r = up.strip_prefix("TENSOR(")?;
+        (11, r)
     };
     let inner = rest.trim_end_matches(')');
     let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
@@ -8491,8 +8490,10 @@ mod tests {
     fn decode_column(column_type: i32, chunk: &[u8]) -> Vec<String> {
         match column_type {
             4 => chunk
-                .chunks_exact(8)
-                .map(|b| i64::from_le_bytes(b.try_into().unwrap()).to_string())
+                .as_chunks::<8>()
+                .0
+                .iter()
+                .map(|b| i64::from_le_bytes(*b).to_string())
                 .collect(),
             9 => {
                 let mut out = Vec::new();

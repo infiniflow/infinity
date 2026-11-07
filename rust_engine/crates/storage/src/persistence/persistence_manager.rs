@@ -327,7 +327,6 @@ impl PersistenceManager {
     }
 
     /// C++ `Persist`: store `tmp_file_path` under the key `file_path`.
-    #[must_use]
     pub fn persist(
         &self,
         file_path: &Path,
@@ -447,7 +446,6 @@ impl PersistenceManager {
     }
 
     /// C++ `PutObjCache`: release the reference taken by [`Self::get_obj_cache`].
-    #[must_use]
     pub fn put_obj_cache(&self, file_path: &Path) -> Result<PersistWriteResult> {
         let local_path = self.remove_prefix(file_path);
         if local_path.is_empty() {
@@ -486,7 +484,6 @@ impl PersistenceManager {
     }
 
     /// C++ `Cleanup`: forget a local path and record the part as deleted.
-    #[must_use]
     pub fn cleanup(&self, file_path: &Path) -> Result<PersistWriteResult> {
         let local_path = self.remove_prefix(file_path);
         if local_path.is_empty() {
@@ -512,7 +509,6 @@ impl PersistenceManager {
     }
 
     /// C++ `GetFileSize`.
-    #[must_use]
     pub fn get_file_size(&self, file_path: &Path) -> Result<usize> {
         let local_path = self.remove_prefix(file_path);
         if local_path.is_empty() {
@@ -1123,7 +1119,7 @@ mod tests {
         // part, not at the next aligned offset (`CurrentObjFinalizeNoLock`).
         assert_eq!(
             bytes.len(),
-            (result.obj_addr.part_offset + result.obj_addr.part_size) as usize + 4
+            (result.obj_addr.part_offset + result.obj_addr.part_size) + 4
         );
     }
 

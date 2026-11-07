@@ -587,7 +587,7 @@ impl Catalog {
         let mut tables = self.with_view(|store| crate::layout::read_tables_as_meta(store))?;
         tables.retain(|t| {
             let db = t.name.split('.').next().unwrap_or(&t.name).to_string();
-            live.iter().any(|d| *d == db)
+            live.contains(&db)
         });
         Ok(tables)
     }

@@ -170,10 +170,9 @@ jobs:
           LEFTHOOK_CHECK_ONLY=1 lefthook run pre-commit --files-from-stdin --no-auto-install \
             < "${{ steps.changed.outputs.files }}"
       - name: clippy
-        # Informational: the workspace has pre-existing warnings, so this is
-        # reported rather than gating. Turn it into a gate once the workspace
-        # is warning-free.
-        continue-on-error: true
+        # A hard gate, like the compiler's own warnings (every crate denies
+        # them through Cargo.toml's [workspace.lints]): a clippy finding fails
+        # the job.
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: deny
         # Informational: the action runs in its own container, where the pinned

@@ -103,73 +103,6 @@ fn dot(a: &[f32], b: &[f32]) -> f32 {
     crate::simd::ip(a, b)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn maxsim_matches_definition() {
-        let mut index = MultiVectorIndex::new(2);
-        let d0 = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
-        let d1 = vec![vec![0.5, 0.5]];
-        index.add(d0.clone());
-        index.add(d1.clone());
-        let q = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
-        // d0: 1 + 1 = 2; d1: 0.5 + 0.5 = 1.
-        assert!((index.maxsim(&q, 0, 0) - 2.0).abs() < 1e-6);
-        assert!((index.maxsim(&q, 1, 0) - 1.0).abs() < 1e-6);
-        let hits = index.search(&q, 2, 0);
-        assert_eq!(hits[0].0, 0);
-        assert_eq!(hits[1].0, 1);
-    }
-
-    #[test]
-    fn pq_prefilter_keeps_the_true_topk() {
-        let dims = 16usize;
-        let mut state = 7u64;
-        let mut next = || {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            state
-        };
-        let docs: Vec<Vec<Vec<f32>>> = (0..300)
-            .map(|_| {
-                (0..4)
-                    .map(|_| {
-                        (0..dims)
-                            .map(|_| ((next() % 1000) as f32) / 500.0 - 1.0)
-                            .collect()
-                    })
-                    .collect()
-            })
-            .collect();
-        let all: Vec<&[f32]> = docs.iter().flatten().map(|t| t.as_slice()).collect();
-        let pq = PqCodebook::train(dims, 4, 8, &all);
-        let mut index = MultiVectorIndex::new(dims);
-        for d in &docs {
-            index.add(d.clone());
-        }
-        let query = vec![(0..dims)
-            .map(|i| (i as f32) / 16.0 - 0.5)
-            .collect::<Vec<f32>>()];
-        let exact: Vec<usize> = index
-            .search(&query, 5, 0)
-            .into_iter()
-            .map(|(d, _)| d)
-            .collect();
-        let cands = pq.prefilter(&query, &docs, 40);
-        let hits = exact.iter().filter(|d| cands.contains(d)).count();
-        assert!(hits >= 4, "recall {hits}/5, candidates {cands:?}");
-    }
-
-    #[test]
-    fn merge_keeps_best_per_row() {
-        let merged = merge_topk(vec![vec![(7, 0.5), (9, 0.2)], vec![(7, 0.9), (3, 0.4)]], 2);
-        assert_eq!(merged, vec![(7, 0.9), (3, 0.4)]);
-    }
-}
-
 /// Product-quantization codebook for the first search stage of the reference's
 /// EMVB index (`emvb_index.cppm`: residual PQ with `subspace_num` / `subspace_bits`).
 ///
@@ -316,5 +249,72 @@ impl PqCodebook {
         });
         scored.truncate(n_candidates);
         scored.into_iter().map(|(d, _)| d).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maxsim_matches_definition() {
+        let mut index = MultiVectorIndex::new(2);
+        let d0 = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let d1 = vec![vec![0.5, 0.5]];
+        index.add(d0.clone());
+        index.add(d1.clone());
+        let q = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        // d0: 1 + 1 = 2; d1: 0.5 + 0.5 = 1.
+        assert!((index.maxsim(&q, 0, 0) - 2.0).abs() < 1e-6);
+        assert!((index.maxsim(&q, 1, 0) - 1.0).abs() < 1e-6);
+        let hits = index.search(&q, 2, 0);
+        assert_eq!(hits[0].0, 0);
+        assert_eq!(hits[1].0, 1);
+    }
+
+    #[test]
+    fn pq_prefilter_keeps_the_true_topk() {
+        let dims = 16usize;
+        let mut state = 7u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let docs: Vec<Vec<Vec<f32>>> = (0..300)
+            .map(|_| {
+                (0..4)
+                    .map(|_| {
+                        (0..dims)
+                            .map(|_| ((next() % 1000) as f32) / 500.0 - 1.0)
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
+        let all: Vec<&[f32]> = docs.iter().flatten().map(|t| t.as_slice()).collect();
+        let pq = PqCodebook::train(dims, 4, 8, &all);
+        let mut index = MultiVectorIndex::new(dims);
+        for d in &docs {
+            index.add(d.clone());
+        }
+        let query = vec![(0..dims)
+            .map(|i| (i as f32) / 16.0 - 0.5)
+            .collect::<Vec<f32>>()];
+        let exact: Vec<usize> = index
+            .search(&query, 5, 0)
+            .into_iter()
+            .map(|(d, _)| d)
+            .collect();
+        let cands = pq.prefilter(&query, &docs, 40);
+        let hits = exact.iter().filter(|d| cands.contains(d)).count();
+        assert!(hits >= 4, "recall {hits}/5, candidates {cands:?}");
+    }
+
+    #[test]
+    fn merge_keeps_best_per_row() {
+        let merged = merge_topk(vec![vec![(7, 0.5), (9, 0.2)], vec![(7, 0.9), (3, 0.4)]], 2);
+        assert_eq!(merged, vec![(7, 0.9), (3, 0.4)]);
     }
 }

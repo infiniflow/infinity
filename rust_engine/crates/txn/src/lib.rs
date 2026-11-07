@@ -819,7 +819,7 @@ impl TxnManager {
         if let Some(done) = bottom.get_mut(&commit_ts) {
             *done = true;
         }
-        while bottom.iter().next().map_or(false, |(_, done)| *done) {
+        while bottom.iter().next().is_some_and(|(_, done)| *done) {
             let front = *bottom.keys().next().unwrap();
             bottom.remove(&front);
             self.current_ts.fetch_max(front, Ordering::SeqCst);
@@ -936,9 +936,8 @@ impl TxnManager {
     }
 
     pub fn commit_at(&self, txn: Txn, commit_ts: TxnTimeStamp) -> Result<TxnTimeStamp> {
-        self.commit_at_deferred(txn, commit_ts).map(|ts| {
+        self.commit_at_deferred(txn, commit_ts).inspect(|&ts| {
             self.finish_bottom(ts);
-            ts
         })
     }
 

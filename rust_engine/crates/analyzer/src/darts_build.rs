@@ -139,8 +139,10 @@ fn dawg_hash(mut key: u32) -> u32 {
 
 impl DawgBuilder {
     fn new() -> Self {
-        let mut b = Self::default();
-        b.table = vec![0; 1 << 10];
+        let mut b = Self {
+            table: vec![0; 1 << 10],
+            ..Self::default()
+        };
         b.append_node();
         b.append_unit();
         b.num_states = 1;
@@ -979,8 +981,10 @@ mod tests {
         }
         let bytes = build_dictionary(entries);
         let units: Vec<u32> = bytes
-            .chunks_exact(4)
-            .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| u32::from_le_bytes(*c))
             .collect();
         assert_eq!(units.len(), 256);
         assert_eq!(units[0], 0x0001_1400);

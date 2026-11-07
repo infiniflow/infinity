@@ -138,8 +138,10 @@ pub fn decode_labels(buf: &[u8]) -> Result<Vec<u32>, FormatError> {
         });
     }
     Ok(buf
-        .chunks_exact(4)
-        .map(|c| u32::from_le_bytes(c.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| u32::from_le_bytes(*c))
         .collect())
 }
 
@@ -1266,6 +1268,7 @@ mod tests {
     /// graph region is `GraphStoreInner::SaveToPtr`
     /// (`graph_store.cppm:172`): `layer_sum`, the level-0 block, then the
     /// upper-layer records **in vertex order**.
+    #[allow(clippy::too_many_arguments)] // mirrors the C++ `SaveToPtr` layout, one field per argument
     fn reference_chunk_bytes(
         m: u64,
         ef_construction: u64,

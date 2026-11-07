@@ -26,8 +26,10 @@ impl OpenCcDict {
         let lexicon = bytes
             .get(offset..offset + lexicon_length * 4)
             .ok_or_else(|| "truncated OpenCC lexicon".to_string())?
-            .chunks_exact(4)
-            .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| u32::from_le_bytes(*c))
             .collect::<Vec<_>>();
         offset += lexicon_length * 4;
         let index_length = mecab_u32(bytes, offset)? as usize;
@@ -35,8 +37,10 @@ impl OpenCcDict {
         let lexicon_index = bytes
             .get(offset..offset + index_length * 4)
             .ok_or_else(|| "truncated OpenCC lexicon index".to_string())?
-            .chunks_exact(4)
-            .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| u32::from_le_bytes(*c))
             .collect::<Vec<_>>();
         offset += index_length * 4;
         let lexicon_count = mecab_u32(bytes, offset)? as usize;
@@ -46,7 +50,9 @@ impl OpenCcDict {
         let items = bytes
             .get(offset..offset + item_count * 12)
             .ok_or_else(|| "truncated OpenCC DATRIE".to_string())?
-            .chunks_exact(12)
+            .as_chunks::<12>()
+            .0
+            .iter()
             .map(|c| OpenCcItem {
                 base: i32::from_le_bytes([c[0], c[1], c[2], c[3]]),
                 parent: i32::from_le_bytes([c[4], c[5], c[6], c[7]]),

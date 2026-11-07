@@ -1130,8 +1130,8 @@ impl Engine {
         }
         let mut log = self.delete_ts(table);
         log.resize(n, 0);
-        for slot in first..(first + count).min(n) {
-            log[slot] = ts;
+        for value in &mut log[first..(first + count).min(n)] {
+            *value = ts;
         }
         let tkey = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
@@ -2354,9 +2354,7 @@ impl Engine {
             },
             _ => None,
         };
-        let Some(scan_columns) = scan_columns else {
-            return None;
-        };
+        let scan_columns = scan_columns?;
         if indices.iter().any(|i| *i >= scan_columns.len()) {
             return None;
         }
@@ -7294,7 +7292,7 @@ impl Engine {
     /// The underlying row/meta store (exposed for tests and tooling that need to
     /// inspect the on-disk key space).
     pub fn store(&self) -> &std::sync::Arc<dyn MetaStore> {
-        &self.storage.catalog.store()
+        self.storage.catalog.store()
     }
 
     /// TRUE when `table` exists (the name is qualified with the session's

@@ -679,7 +679,7 @@ fn dump_index_and_optimize_index() {
                 })
                 .collect();
             e.insert_literals("db1.tb1", None, batch).unwrap();
-            dump(&e);
+            dump(e);
         }
         let batch: Vec<Vec<Literal>> = (0..8192)
             .map(|_| {

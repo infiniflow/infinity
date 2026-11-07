@@ -57,16 +57,15 @@ pub fn hash_varchar(text: &str) -> u64 {
     const R: u32 = 47;
     let data = text.as_bytes();
     let mut h = SEED ^ (data.len() as u64).wrapping_mul(M);
-    let mut chunks = data.chunks_exact(8);
-    for chunk in &mut chunks {
-        let mut k = u64::from_le_bytes(chunk.try_into().unwrap());
+    let (chunks, tail) = data.as_chunks::<8>();
+    for chunk in chunks {
+        let mut k = u64::from_le_bytes(*chunk);
         k = k.wrapping_mul(M);
         k ^= k >> R;
         k = k.wrapping_mul(M);
         h ^= k;
         h = h.wrapping_mul(M);
     }
-    let tail = chunks.remainder();
     for (i, byte) in tail.iter().enumerate() {
         h ^= u64::from(*byte) << (8 * i);
     }
@@ -739,8 +738,8 @@ impl<K: FloatKey> FloatModel<K> {
             // Find extreme slope.
             let mut min = float_point_diff(self.lower[self.lower_start], p1);
             let mut min_i = self.lower_start;
-            for i in self.lower_start + 1..self.lower.len() {
-                let val = float_point_diff(self.lower[i], p1);
+            for (i, point) in self.lower.iter().enumerate().skip(self.lower_start + 1) {
+                let val = float_point_diff(*point, p1);
                 if val.gt(&min) {
                     break;
                 }
@@ -767,8 +766,8 @@ impl<K: FloatKey> FloatModel<K> {
             // Find extreme slope.
             let mut max = float_point_diff(self.upper[self.upper_start], p2);
             let mut max_i = self.upper_start;
-            for i in self.upper_start + 1..self.upper.len() {
-                let val = float_point_diff(self.upper[i], p2);
+            for (i, point) in self.upper.iter().enumerate().skip(self.upper_start + 1) {
+                let val = float_point_diff(*point, p2);
                 if val.lt(&max) {
                     break;
                 }
@@ -1234,8 +1233,8 @@ impl<X: IntegralKey> OptimalModel<X> {
             // Find extreme slope.
             let mut min = point_diff(self.lower[self.lower_start], p1);
             let mut min_i = self.lower_start;
-            for i in self.lower_start + 1..self.lower.len() {
-                let val = point_diff(self.lower[i], p1);
+            for (i, point) in self.lower.iter().enumerate().skip(self.lower_start + 1) {
+                let val = point_diff(*point, p1);
                 if val.gt(&min) {
                     break;
                 }
@@ -1262,8 +1261,8 @@ impl<X: IntegralKey> OptimalModel<X> {
             // Find extreme slope.
             let mut max = point_diff(self.upper[self.upper_start], p2);
             let mut max_i = self.upper_start;
-            for i in self.upper_start + 1..self.upper.len() {
-                let val = point_diff(self.upper[i], p2);
+            for (i, point) in self.upper.iter().enumerate().skip(self.upper_start + 1) {
+                let val = point_diff(*point, p2);
                 if val.lt(&max) {
                     break;
                 }

@@ -174,10 +174,7 @@ impl Porter {
 
     /// Step 1a (a_0): sses -> ss, ies -> i, ss stays, s is dropped.
     fn step1a(&mut self) {
-        if self.ends_with(b"sses") {
-            let n = self.b.len();
-            self.b.truncate(n - 2);
-        } else if self.ends_with(b"ies") {
+        if self.ends_with(b"sses") || self.ends_with(b"ies") {
             let n = self.b.len();
             self.b.truncate(n - 2);
         } else if self.ends_with(b"ss") {
@@ -321,7 +318,7 @@ impl Porter {
     fn match_and_replace(&mut self, table: &[(&[u8], &[u8])], region: usize) {
         let mut best: Option<(&[u8], &[u8])> = None;
         for (from, to) in table {
-            if self.ends_with(from) && best.map_or(true, |(b, _)| b.len() < from.len()) {
+            if self.ends_with(from) && best.is_none_or(|(b, _)| b.len() < from.len()) {
                 best = Some((from, to));
             }
         }
@@ -351,7 +348,7 @@ impl Porter {
     /// Step 5b: ll -> l behind R2.
     fn step5b(&mut self) {
         let n = self.b.len();
-        if n >= 2 && self.b[n - 1] == b'l' && self.b[n - 2] == b'l' && n - 1 >= self.r2 {
+        if n >= 2 && self.b[n - 1] == b'l' && self.b[n - 2] == b'l' && n > self.r2 {
             self.b.truncate(n - 1);
         }
     }

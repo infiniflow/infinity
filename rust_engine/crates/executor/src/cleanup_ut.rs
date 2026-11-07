@@ -90,7 +90,7 @@ fn run_plans(pre: impl Fn(&Engine), op: impl Fn(&Engine), check: impl Fn(&Engine
                     op(&e);
                     ran = true;
                 }
-                'a' | 'b' | 'c' => e.cleanup().unwrap(),
+                'a'..='c' => e.cleanup().unwrap(),
                 // `A` (begin) and `C` (commit) have no visible state.
                 _ => {}
             }

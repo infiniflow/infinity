@@ -339,18 +339,18 @@ impl PostingBuffer {
                         for (slot, chunk) in v
                             .iter_mut()
                             .take(usize::from(self.size))
-                            .zip(bytes.chunks_exact(4))
+                            .zip(bytes.as_chunks::<4>().0)
                         {
-                            *slot = u32::from_le_bytes(chunk.try_into().unwrap());
+                            *slot = u32::from_le_bytes(*chunk);
                         }
                     }
                     RowData::U16(v) => {
                         for (slot, chunk) in v
                             .iter_mut()
                             .take(usize::from(self.size))
-                            .zip(bytes.chunks_exact(2))
+                            .zip(bytes.as_chunks::<2>().0)
                         {
-                            *slot = u16::from_le_bytes(chunk.try_into().unwrap());
+                            *slot = u16::from_le_bytes(*chunk);
                         }
                     }
                 }
@@ -1170,16 +1170,16 @@ impl SkipListReader {
 
     pub fn get_last_value_in_buffer(&self) -> u32 {
         let mut last = self.current_offset;
-        for cursor in self.current_cursor..self.num_in_buffer {
-            last = last.wrapping_add(self.offset_buffer[cursor]);
+        for value in &self.offset_buffer[self.current_cursor..self.num_in_buffer] {
+            last = last.wrapping_add(*value);
         }
         last
     }
 
     pub fn get_last_key_in_buffer(&self) -> u32 {
         let mut last = self.current_doc_id;
-        for cursor in self.current_cursor..self.num_in_buffer {
-            last = last.wrapping_add(self.doc_id_buffer[cursor]);
+        for value in &self.doc_id_buffer[self.current_cursor..self.num_in_buffer] {
+            last = last.wrapping_add(*value);
         }
         last
     }

@@ -288,9 +288,9 @@ impl Jieba {
                 weight[now] = MIN_DOUBLE;
                 path[now] = 1; // HMMModel::E, the reference's fallback
                 let emit = self.hmm.emit_prob(state, c);
-                for previous in 0..4 {
+                for (previous, transitions) in self.hmm.trans.iter().enumerate() {
                     let old = position - 1 + previous * len;
-                    let candidate = weight[old] + self.hmm.trans[previous][state] + emit;
+                    let candidate = weight[old] + transitions[state] + emit;
                     if candidate > weight[now] {
                         weight[now] = candidate;
                         path[now] = previous;

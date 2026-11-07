@@ -64,6 +64,10 @@ fn embedding_width(elem: EmbeddingDataType, dimension: i32) -> Option<usize> {
     })
 }
 
+/// `(nnz, indices, values)` of one sparse cell: the triples
+/// [`ColumnValues::sparses`] turns into slots plus a heap.
+type SparseInput = Option<(i64, Vec<u8>, Vec<u8>)>;
+
 /// A column's values, in the representation the reference writes.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColumnValues {
@@ -192,7 +196,7 @@ impl ColumnValues {
     }
 
     /// Builds `Sparse` values from `(nnz, indices, values)` triples.
-    pub fn sparses(values: &[Option<(i64, Vec<u8>, Vec<u8>)>]) -> Self {
+    pub fn sparses(values: &[SparseInput]) -> Self {
         let mut slots = Vec::with_capacity(values.len());
         let mut heap = Vec::new();
         for value in values {
@@ -290,11 +294,7 @@ impl BlockColumn {
                     } => embedding_width(*element_type, *dimension).unwrap_or(0),
                     _ => 0,
                 };
-                if width == 0 {
-                    0
-                } else {
-                    data.len() / width
-                }
+                data.len().checked_div(width).unwrap_or(0)
             }
             other => other.len(),
         }
@@ -776,7 +776,7 @@ pub fn from_data_block_with(
                 let mut data = Vec::with_capacity(rows * width);
                 for cell in &cells {
                     match cell {
-                        None => data.extend(std::iter::repeat(0u8).take(width)),
+                        None => data.extend(std::iter::repeat_n(0u8, width)),
                         Some(value) => data
                             .extend_from_slice(&encode_embedding_row(value, &data_type.type_info)?),
                     }
@@ -1154,18 +1154,18 @@ fn decode_embedding(raw: &[u8], type_info: &TypeInfo) -> Option<Vec<f32>> {
             }
         }
         EmbeddingDataType::Float => {
-            for chunk in raw.chunks_exact(4) {
-                out.push(f32::from_le_bytes(chunk.try_into().ok()?));
+            for chunk in raw.as_chunks::<4>().0 {
+                out.push(f32::from_le_bytes(*chunk));
             }
         }
         EmbeddingDataType::Double => {
-            for chunk in raw.chunks_exact(8) {
-                out.push(f64::from_le_bytes(chunk.try_into().ok()?) as f32);
+            for chunk in raw.as_chunks::<8>().0 {
+                out.push(f64::from_le_bytes(*chunk) as f32);
             }
         }
         EmbeddingDataType::Float16 | EmbeddingDataType::BFloat16 => {
-            for chunk in raw.chunks_exact(2) {
-                let bits = u16::from_le_bytes(chunk.try_into().ok()?);
+            for chunk in raw.as_chunks::<2>().0 {
+                let bits = u16::from_le_bytes(*chunk);
                 out.push(if *element_type == EmbeddingDataType::Float16 {
                     f16_to_f32(bits)
                 } else {
@@ -1393,7 +1393,7 @@ mod tests {
         ];
         for (expected, column) in cases {
             assert_eq!(
-                encode_block(&[column.clone()]),
+                encode_block(std::slice::from_ref(&column)),
                 hex(expected),
                 "{} column",
                 column.data_type.logical_type as i8

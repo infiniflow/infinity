@@ -1,6 +1,7 @@
 use super::*;
 
 #[cfg(test)]
+#[allow(clippy::module_inception)] // the file is `tests.rs`; keep the conventional name
 mod tests {
     use super::*;
 

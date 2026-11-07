@@ -556,80 +556,6 @@ pub fn add_columns_command_from_batch(
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // The exact JSON the port writes for `tt(id int, name varchar, v
-    // vector,4,float, sp sparse,8,float,int, sc float, b bool)`.
-    const RECORDS: &[&str] = &[
-        r#"{"column_id":0,"column_name":"id","column_type":{"data_type":3},"default":{"type":4}}"#,
-        r#"{"column_id":1,"column_name":"name","column_type":{"data_type":9},"default":{"type":4}}"#,
-        r#"{"column_id":2,"column_name":"v","column_type":{"data_type":23,"type_info":{"dimension":4,"embedding_type":5}},"default":{"type":4}}"#,
-        r#"{"column_id":3,"column_name":"sp","column_type":{"data_type":30,"type_info":{"data_type":5,"dimension":8,"index_type":3,"sort":0}},"default":{"type":4}}"#,
-        r#"{"column_id":4,"column_name":"sc","column_type":{"data_type":7},"default":{"type":4}}"#,
-        r#"{"column_id":5,"column_name":"b","column_type":{"data_type":0},"default":{"type":4}}"#,
-    ];
-
-    #[test]
-    fn maps_the_port_catalog_records_to_a_table_def() {
-        let cols: Vec<ColumnRecord> = RECORDS
-            .iter()
-            .map(|s| ColumnRecord::from_json(s).unwrap())
-            .collect();
-        let td = table_def_from_columns("default_db", "tt", &cols);
-        assert_eq!(td.table_name, "tt");
-        let kinds: Vec<_> = td
-            .columns
-            .iter()
-            .map(|c| c.column_type.logical_type)
-            .collect();
-        assert_eq!(
-            kinds,
-            vec![
-                LogicalType::Integer,
-                LogicalType::Varchar,
-                LogicalType::Embedding,
-                LogicalType::Sparse,
-                LogicalType::Float,
-                LogicalType::Boolean,
-            ]
-        );
-        assert_eq!(
-            td.columns[2].column_type.type_info,
-            TypeInfo::Embedding {
-                element_type: EmbeddingDataType::Float,
-                dimension: 4
-            }
-        );
-        assert_eq!(
-            td.columns[3].column_type.type_info,
-            TypeInfo::Sparse {
-                data_type: EmbeddingDataType::Float,
-                index_type: EmbeddingDataType::Int32,
-                dimension: 8,
-                store_type: SparseStoreType::Sort
-            }
-        );
-    }
-
-    #[test]
-    fn maps_the_port_index_record_to_an_index_base() {
-        use storage::wal::index_def::IndexType;
-        let text = r#"{"cardinality":"high","column_names":["name"],"file_name":"ix_sec","index_comment":"","index_name":"sec","index_type":"SECONDARY","is_json_index":false}"#;
-        let d = index_def_from_json(text).unwrap();
-        match d {
-            storage::wal::index_def::IndexDef::Secondary { base, .. } => {
-                assert_eq!(base.index_type, IndexType::Secondary);
-                assert_eq!(base.index_name, "sec");
-                assert_eq!(base.file_name, "ix_sec");
-                assert_eq!(base.column_names, vec!["name".to_string()]);
-            }
-            other => panic!("expected Secondary, got {other:?}"),
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Replay: a recovered directory is put back the way the reference does - the
 // catalog store keeps no RocksDB log, so a committed DDL survives a crash only
@@ -772,7 +698,7 @@ fn table_meta(db_name: &str, table_id: u64, td: &TableDef) -> Option<TableMeta> 
         meta.ids.push(c.id as u64);
         meta.defaults.push(constant_text(&c.default_expr));
         meta.not_nulls
-            .push(c.constraints.iter().any(|x| *x == ConstraintType::NotNull));
+            .push(c.constraints.contains(&ConstraintType::NotNull));
         meta.sparse_stores
             .push(catalog::split_sparse_store_suffix(meta.types.last()?).1);
     }
@@ -1339,4 +1265,78 @@ fn publish_segments_merged(
         }
     }
     catalog.publish_segments(set).map(|_| ())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The exact JSON the port writes for `tt(id int, name varchar, v
+    // vector,4,float, sp sparse,8,float,int, sc float, b bool)`.
+    const RECORDS: &[&str] = &[
+        r#"{"column_id":0,"column_name":"id","column_type":{"data_type":3},"default":{"type":4}}"#,
+        r#"{"column_id":1,"column_name":"name","column_type":{"data_type":9},"default":{"type":4}}"#,
+        r#"{"column_id":2,"column_name":"v","column_type":{"data_type":23,"type_info":{"dimension":4,"embedding_type":5}},"default":{"type":4}}"#,
+        r#"{"column_id":3,"column_name":"sp","column_type":{"data_type":30,"type_info":{"data_type":5,"dimension":8,"index_type":3,"sort":0}},"default":{"type":4}}"#,
+        r#"{"column_id":4,"column_name":"sc","column_type":{"data_type":7},"default":{"type":4}}"#,
+        r#"{"column_id":5,"column_name":"b","column_type":{"data_type":0},"default":{"type":4}}"#,
+    ];
+
+    #[test]
+    fn maps_the_port_catalog_records_to_a_table_def() {
+        let cols: Vec<ColumnRecord> = RECORDS
+            .iter()
+            .map(|s| ColumnRecord::from_json(s).unwrap())
+            .collect();
+        let td = table_def_from_columns("default_db", "tt", &cols);
+        assert_eq!(td.table_name, "tt");
+        let kinds: Vec<_> = td
+            .columns
+            .iter()
+            .map(|c| c.column_type.logical_type)
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![
+                LogicalType::Integer,
+                LogicalType::Varchar,
+                LogicalType::Embedding,
+                LogicalType::Sparse,
+                LogicalType::Float,
+                LogicalType::Boolean,
+            ]
+        );
+        assert_eq!(
+            td.columns[2].column_type.type_info,
+            TypeInfo::Embedding {
+                element_type: EmbeddingDataType::Float,
+                dimension: 4
+            }
+        );
+        assert_eq!(
+            td.columns[3].column_type.type_info,
+            TypeInfo::Sparse {
+                data_type: EmbeddingDataType::Float,
+                index_type: EmbeddingDataType::Int32,
+                dimension: 8,
+                store_type: SparseStoreType::Sort
+            }
+        );
+    }
+
+    #[test]
+    fn maps_the_port_index_record_to_an_index_base() {
+        use storage::wal::index_def::IndexType;
+        let text = r#"{"cardinality":"high","column_names":["name"],"file_name":"ix_sec","index_comment":"","index_name":"sec","index_type":"SECONDARY","is_json_index":false}"#;
+        let d = index_def_from_json(text).unwrap();
+        match d {
+            storage::wal::index_def::IndexDef::Secondary { base, .. } => {
+                assert_eq!(base.index_type, IndexType::Secondary);
+                assert_eq!(base.index_name, "sec");
+                assert_eq!(base.file_name, "ix_sec");
+                assert_eq!(base.column_names, vec!["name".to_string()]);
+            }
+            other => panic!("expected Secondary, got {other:?}"),
+        }
+    }
 }
