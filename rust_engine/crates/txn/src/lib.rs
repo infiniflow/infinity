@@ -1374,6 +1374,12 @@ impl TxnManager {
     /// store either - the frame then simply repeats the last flush's floor.
     pub fn append_checkpoint_flushed(&self) -> Result<()> {
         let frame_ts = self.synced_ts() | 1;
+        // The skip is decided on the **clock**, not on the payload: the
+        // reference compares against `BeginTxnShared`'s begin ts
+        // (`current_ts_ + 1`). Comparing payloads made every WAL-only
+        // checkpoint after the first a no-op - the payload only moves when the
+        // store is flushed - so the log never rotated.
+        let begin_ts = self.current_ts.load(Ordering::SeqCst) + 1;
         let last = self.last_frame.load(Ordering::SeqCst);
         // `NewTxn::Checkpoint`: "last checkpoint ts: last checkpoint txn begin
         // ts" - a checkpoint whose begin ts is within 2 of the previous frame's
@@ -1381,7 +1387,7 @@ impl TxnManager {
         // and spends no write timestamp (`new_txn_impl.cpp:1769`). Writing it
         // anyway made a restart spend 2 extra ts, so every record after it was
         // stamped 2 higher than the reference's.
-        if last > 0 && last + 2 >= frame_ts {
+        if last > 0 && last + 2 >= begin_ts {
             return Ok(());
         }
         self.write_checkpoint(frame_ts)
