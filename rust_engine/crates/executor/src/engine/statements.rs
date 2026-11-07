@@ -7905,13 +7905,18 @@ impl Engine {
         self.queries.lock().unwrap().profiles()
     }
 
-    /// `Cleanup`: flush, then drop the chunks that a previous optimize merged
-    /// away, matching what the reference's cleanup thread removes.
+    /// `Cleanup`: drops the files a previous drop or optimize made garbage,
+    /// matching what the reference's cleanup command removes.
+    ///
+    /// **No checkpoint.** `PhysicalCommand::Execute` for `kCleanup` runs
+    /// `new_txn->Cleanup()` and nothing else (`physical_command_impl.cpp:390`),
+    /// so a cleanup is one transaction - one commit ts, one `CLEANUP` entry.
+    /// Flushing here made it two (a checkpoint frame plus the cleanup entry),
+    /// which shifted every later statement's ts by one checkpoint.
     pub fn cleanup(&self) -> Result<()> {
         // The cleanup task runs in `kWritable` and `kReadable`
         // (`background_process_impl.cpp:109`); only `kAdmin` is rejected.
         self.ensure_cleanup_allowed()?;
-        self.flush_storage()?;
         // `WalManager::Cleanup`: the sealed `wal.log.<ts>` segments whose
         // records the KV store holds are reclaimed here, not at a checkpoint.
         if let Ok(applied) = self.txn.applied_ts() {
