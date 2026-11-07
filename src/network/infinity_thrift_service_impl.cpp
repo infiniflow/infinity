@@ -778,9 +778,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     }
     auto __t_serialize_done = std::chrono::steady_clock::now();
     if (getenv("INF_SERVER_TIMER") != nullptr) {
-        auto __ms = [](auto a, auto b) {
-            return std::chrono::duration<double, std::milli>(b - a).count();
-        };
+        auto __ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
         fmt::print(stderr,
                    "[SRV] plan_ms {:.3f} search_ms {:.3f} ser_ms {:.3f} total_ms {:.3f}\n",
                    __ms(__t_rpc_begin, __t_search_begin),

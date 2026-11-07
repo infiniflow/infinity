@@ -1,7 +1,7 @@
+#include "rag_analyzer_c_api.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "rag_analyzer_c_api.h"
 
 static const char *TEXTS[] = {
     "The Quick Brown Foxes are Running!",
@@ -9,7 +9,11 @@ static const char *TEXTS[] = {
     "\xe6\x88\x91\xe4\xbb\xac\xe9\x83\xbd\xe6\x9c\x89\xe4\xb8\x80\xe4\xb8\xaa\xe5\xae\xb6",
     "\xe4\xb8\xad\xe6\x96\x87 English \xe6\xb7\xb7\xe5\x90\x88\xe7\x9a\x84 text 123",
     "\xe7\xb9\x81\xe9\xab\x94\xe5\xad\x97\xe8\xbd\x89\xe6\x8f\x9b\xe6\xb8\xac\xe8\xa9\xa6",
-    "H\xc3\xa4user Stra" "\xc3\x9f" "e und Gr\xc3\xb6" "\xc3\x9f" "e",
+    "H\xc3\xa4user Stra"
+    "\xc3\x9f"
+    "e und Gr\xc3\xb6"
+    "\xc3\x9f"
+    "e",
     "a/b/c and x_y-z",
     "Hello, World! \xe4\xbd\xa0\xe5\xa5\xbd\xe3\x80\x82",
     "2024\xe5\xb9\xb4 3 \xe6\x9c\x88 15 \xe6\x97\xa5",
@@ -18,7 +22,12 @@ static const char *TEXTS[] = {
 static const int TEXT_COUNT = sizeof(TEXTS) / sizeof(TEXTS[0]);
 
 static const char *WORDS[] = {
-    "\xe6\x88\x91\xe4\xbb\xac", "fox", "the", "H\xc3\xa4user", "zzzzzzzz", "\xe4\xb8\xad\xe5\x9b\xbd",
+    "\xe6\x88\x91\xe4\xbb\xac",
+    "fox",
+    "the",
+    "H\xc3\xa4user",
+    "zzzzzzzz",
+    "\xe4\xb8\xad\xe5\x9b\xbd",
 };
 static const int WORD_COUNT = sizeof(WORDS) / sizeof(WORDS[0]);
 
@@ -32,8 +41,7 @@ static void dump(RAGAnalyzerHandle h, const char *tag, const char *text) {
     if (list) {
         for (uint32_t i = 0; i < list->count; ++i) {
             void *slot = (void *)&list->tokens[i];
-            printf(" %s@%u-%u", RAGToken_GetText(slot), RAGToken_GetOffset(slot),
-                   RAGToken_GetEndOffset(slot));
+            printf(" %s@%u-%u", RAGToken_GetText(slot), RAGToken_GetOffset(slot), RAGToken_GetEndOffset(slot));
         }
     }
     RAGAnalyzer_FreeTokenList(list);
@@ -41,10 +49,17 @@ static void dump(RAGAnalyzerHandle h, const char *tag, const char *text) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) return 2;
+    if (argc < 2)
+        return 2;
     RAGAnalyzerHandle h = RAGAnalyzer_Create(argv[1]);
-    if (!h) { printf("R create failed\n"); return 3; }
-    if (RAGAnalyzer_Load(h) != 0) { printf("R load failed\n"); return 4; }
+    if (!h) {
+        printf("R create failed\n");
+        return 3;
+    }
+    if (RAGAnalyzer_Load(h) != 0) {
+        printf("R load failed\n");
+        return 4;
+    }
 
     for (int i = 0; i < TEXT_COUNT; ++i) {
         char tag[32];
@@ -89,8 +104,7 @@ int main(int argc, char **argv) {
 
     for (int i = 0; i < WORD_COUNT; ++i) {
         char *tag = RAGAnalyzer_GetTermTag(h, WORDS[i]);
-        printf("R word %d | freq=%d tag=%s\n", i, RAGAnalyzer_GetTermFreq(h, WORDS[i]),
-               tag ? tag : "(null)");
+        printf("R word %d | freq=%d tag=%s\n", i, RAGAnalyzer_GetTermFreq(h, WORDS[i]), tag ? tag : "(null)");
         free(tag);
     }
 

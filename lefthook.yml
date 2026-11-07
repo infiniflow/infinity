@@ -104,3 +104,18 @@ pre-commit:
         else
           uvx ruff format {staged_files}
         fi
+
+# CI-only hook: the checks that cost a workspace compile and therefore do not
+# belong on a commit (the same split RAGFlow uses for its web toolchain, which
+# is only run by CI on the files a pull request changed). The rust_engine
+# workflow's quality job runs it over the changed files after the pre-commit
+# hook; formatting is already covered there by the rustfmt job.
+rust-checks:
+  jobs:
+    - name: clippy
+      # clippy takes no file list, so this is whole-workspace; the workflow
+      # only invokes the hook when the change touched Rust. `root` puts cargo
+      # where rust_engine/rust-toolchain.toml (nightly, the index crate uses a
+      # feature) applies.
+      root: "rust_engine/"
+      run: cargo clippy --workspace --all-targets -- -D warnings

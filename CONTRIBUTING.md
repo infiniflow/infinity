@@ -61,6 +61,15 @@ fails the run. Run them by hand with:
 LEFTHOOK_CHECK_ONLY=1 lefthook run pre-commit --all-files
 ```
 
+CI runs a **second** hook after that one, the same split RAGFlow uses
+(`pre-commit`, then `web-checks`): `rust-checks` holds `cargo clippy
+--workspace --all-targets -- -D warnings`. It is not part of a commit because
+it needs a workspace compile; run it by hand when the commit touched Rust:
+
+```bash
+lefthook run rust-checks
+```
+
 ### Before filing a PR
 
 - Consider splitting a large PR into multiple smaller, standalone PRs to keep a traceable development history.

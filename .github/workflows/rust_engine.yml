@@ -84,11 +84,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust_engine
-      - name: fmt
-        # The workspace-wide invariant, independent of what a pull request
-        # touched. The lefthook `rustfmt` job below checks the same thing (plus
-        # the other hooks) for a commit.
-        run: cargo fmt --all -- --check
       - name: Collect the changed files
         id: changed
         working-directory: ${{ github.workspace }}
@@ -169,11 +164,15 @@ jobs:
           fi
           LEFTHOOK_CHECK_ONLY=1 lefthook run pre-commit --files-from-stdin --no-auto-install \
             < "${{ steps.changed.outputs.files }}"
-      - name: clippy
-        # A hard gate, like the compiler's own warnings (every crate denies
-        # them through Cargo.toml's [workspace.lints]): a clippy finding fails
-        # the job.
-        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: lefthook (rust-checks)
+        # The second hook, the way RAGFlow's CI runs `pre-commit` and then
+        # `web-checks`: clippy needs a workspace compile, so it never runs on a
+        # commit. It is whole-workspace (clippy cannot be scoped to the files a
+        # pull request touched), and formatting is already covered above.
+        working-directory: ${{ github.workspace }}
+        run: lefthook run rust-checks --no-auto-install
+
       - name: deny
         # Informational: the action runs in its own container, where the pinned
         # nightly in rust_engine/rust-toolchain.toml is not installed (it is a

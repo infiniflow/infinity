@@ -10,7 +10,8 @@
 int main(void) {
     char line[256];
     while (fgets(line, sizeof(line), stdin)) {
-        if (line[0] == '\n' || line[0] == '\0') continue;
+        if (line[0] == '\n' || line[0] == '\0')
+            continue;
         double v = strtod(line, NULL);
         printf("%f\n", v); /* glibc printf "%f" == std::to_string(double) */
     }
