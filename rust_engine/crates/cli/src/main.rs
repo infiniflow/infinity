@@ -861,31 +861,72 @@ fn walk_slt(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-fn split_records(text: &str) -> Vec<Vec<String>> {
-    let mut records = Vec::new();
-    let mut cur: Vec<String> = Vec::new();
-    for line in text.lines() {
-        // `#`-comments are ignored wherever they appear.
-        if line.trim_start().starts_with('#') {
-            continue;
-        }
-        if line.trim().is_empty() {
-            if !cur.is_empty() {
-                records.push(std::mem::take(&mut cur));
-            }
-        } else {
-            cur.push(line.to_string());
-        }
+/// One connection (the default one) for the crate's runner.
+struct OneConnection(Option<SltDb>);
+
+impl sqllogictest::MakeConnection for OneConnection {
+    type Conn = SltDb;
+    type MakeFuture = std::future::Ready<Result<SltDb, common::Error>>;
+
+    fn make(&mut self) -> Self::MakeFuture {
+        std::future::ready(Ok(self
+            .0
+            .take()
+            .expect("the suite opens exactly one connection")))
     }
-    if !cur.is_empty() {
-        records.push(cur);
-    }
-    records
 }
 
-/// Runs the existing `.slt` suite against the Rust engine and prints a baseline.
+/// The database side of the suite: the crate parses and validates, this runs
+/// the SQL.
+struct SltDb {
+    engine: Engine,
+}
+
+impl sqllogictest::DB for SltDb {
+    type Error = common::Error;
+    type ColumnType = sqllogictest::DefaultColumnType;
+
+    fn run(
+        &mut self,
+        sql: &str,
+    ) -> Result<sqllogictest::DBOutput<Self::ColumnType>, common::Error> {
+        let results = self.engine.execute(sql)?;
+        let Some(last) = results.into_iter().last() else {
+            return Ok(sqllogictest::DBOutput::StatementComplete(0));
+        };
+        Ok(match last {
+            QueryResult::Rows { columns, rows } => sqllogictest::DBOutput::Rows {
+                // The crate's default column validator does not compare kinds;
+                // text is what the wire renders anyway.
+                types: vec![sqllogictest::DefaultColumnType::Text; columns.len().max(1)],
+                rows: rows
+                    .iter()
+                    .map(|row| row.iter().map(|v| v.to_slt_string()).collect())
+                    .collect(),
+            },
+            QueryResult::Inserted { count }
+            | QueryResult::Deleted { count }
+            | QueryResult::Updated { count } => {
+                sqllogictest::DBOutput::StatementComplete(count as u64)
+            }
+            _ => sqllogictest::DBOutput::StatementComplete(0),
+        })
+    }
+
+    fn engine_name(&self) -> &str {
+        "infinity"
+    }
+}
+
+/// Runs the reference's .slt suite against the Rust engine.
+///
+/// The parser, the record semantics (statement ok/error, query <types>
+/// [rowsort], the directives) and the validator all come from
+/// sqllogictest-rs, the crate the reference's own runner is built from, so
+/// there is one implementation of the format. Each file gets a fresh engine in
+/// its own temporary directory; any failure makes the command exit non-zero.
 fn run_conformance(slt_dir: &str) -> common::Result<()> {
-    // Fixture data (`/var/infinity/test_data/…`) resolves under `test/data`.
+    // Fixture data (/var/infinity/test_data/...) resolves under test/data.
     // Walk parent directories so a single-file run still finds the fixtures.
     let mut probe = Path::new(slt_dir).parent();
     while let Some(p) = probe {
@@ -898,209 +939,38 @@ fn run_conformance(slt_dir: &str) -> common::Result<()> {
     }
     let mut files = Vec::new();
     walk_slt(Path::new(slt_dir), &mut files);
-    let (mut stmt_ok, mut stmt_ok_pass) = (0usize, 0usize);
-    let (mut stmt_err, mut stmt_err_pass) = (0usize, 0usize);
-    let (mut queries, mut query_pass) = (0usize, 0usize);
-    let mut fail_reasons: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
-    let mut stmt_fail: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
-    let mut file_fail: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-    let mut stmt_err_missing: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
-    for (idx, f) in files.iter().enumerate() {
-        let d = std::env::temp_dir().join(format!("infconf-{}-{idx}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&d);
-        let e = match Engine::open(&d) {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-        let fname = f
-            .strip_prefix(slt_dir)
-            .unwrap_or(f)
-            .to_string_lossy()
-            .trim_start_matches('/')
-            .to_string();
-        let mut this_file_fails = 0usize;
-        let text = std::fs::read_to_string(f).unwrap_or_default();
-        for rec in split_records(&text) {
-            let head = rec[0].trim();
-            if head.starts_with('#') {
+    if files.is_empty() {
+        return Err(common::Error::Invalid(format!(
+            "no .slt file under {slt_dir}"
+        )));
+    }
+    let mut failures = Vec::new();
+    for (index, file) in files.iter().enumerate() {
+        let dir = std::env::temp_dir().join(format!("infconf-{}-{index}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let engine = match Engine::open(&dir) {
+            Ok(engine) => engine,
+            Err(e) => {
+                failures.push(format!("{}: open failed: {e}", file.display()));
                 continue;
             }
-            let sql: String = rec
-                .iter()
-                .take_while(|l| l.trim() != "----")
-                .skip(1)
-                .cloned()
-                .collect::<Vec<_>>()
-                .join("\n");
-            let expected: Vec<String> = rec
-                .iter()
-                .skip_while(|l| l.trim() != "----")
-                .skip(1)
-                // Only trailing whitespace is insignificant; a leading space can
-                // be part of a VARCHAR value, so it is preserved.
-                .map(|s| s.trim_end().to_string())
-                .collect();
-            if let Some(kind) = head.strip_prefix("statement ") {
-                let kind = kind.split_whitespace().next().unwrap_or("");
-                let res = e.execute(&sql);
-                let ok = res.is_ok();
-                match kind {
-                    "ok" => {
-                        stmt_ok += 1;
-                        if ok {
-                            stmt_ok_pass += 1;
-                        } else {
-                            this_file_fails += 1;
-                            stmt_fail
-                                .entry(format!("{:?} ({})", res.unwrap_err(), first_word(&sql)))
-                                .or_default()
-                                .push(sql.clone());
-                        }
-                    }
-                    "error" => {
-                        stmt_err += 1;
-                        if !ok {
-                            stmt_err_pass += 1;
-                        } else {
-                            // the engine accepted a statement the suite expects to fail
-                            stmt_err_missing
-                                .entry(first_word(&sql))
-                                .or_default()
-                                .push(sql.clone());
-                        }
-                    }
-                    _ => {}
-                }
-            } else if head.starts_with("query ") {
-                queries += 1;
-                // `query <types> [<sort-mode>] [<label>]` — default `nosort`.
-                let rowsort = head.split_whitespace().nth(2) == Some("rowsort");
-                match e.execute(&sql) {
-                    Ok(rs) => {
-                        let mut rows: Vec<String> = Vec::new();
-                        if let Some(QueryResult::Rows { rows: r, .. }) = rs.into_iter().next() {
-                            for row in r {
-                                // normalize each column, then join — matches
-                                // `default_validator` in sqllogictest-rs.
-                                let cols: Vec<String> =
-                                    row.iter().map(|c| norm(&c.to_slt_string())).collect();
-                                rows.push(cols.join(" "));
-                            }
-                        }
-                        let mut got = rows;
-                        // sqllogictest writes `(empty)` for an empty value.
-                        let mut exp: Vec<String> = expected
-                            .iter()
-                            .map(|s| {
-                                if s == "(empty)" {
-                                    String::new()
-                                } else {
-                                    norm(s)
-                                }
-                            })
-                            .collect();
-                        if rowsort {
-                            got.sort();
-                            exp.sort();
-                        }
-                        if got == exp {
-                            query_pass += 1;
-                        } else {
-                            this_file_fails += 1;
-                            fail_reasons
-                                .entry(format!("MISMATCH ({})", mismatch_key(&sql)))
-                                .or_default()
-                                .push(format!("{sql}  ==> got {got:?} want {exp:?}"));
-                        }
-                    }
-                    Err(err) => {
-                        this_file_fails += 1;
-                        fail_reasons
-                            .entry(format!("{err} ({})", first_word(&sql)))
-                            .or_default()
-                            .push(sql.clone());
-                    }
-                }
-            }
+        };
+        let mut runner = sqllogictest::Runner::new(OneConnection(Some(SltDb { engine })));
+        if let Err(e) = runner.run_file(file) {
+            failures.push(format!("{}: {e}", file.display()));
         }
-        let _ = std::fs::remove_dir_all(&d);
-        if this_file_fails > 0 {
-            file_fail.insert(fname, this_file_fails);
-        }
+        runner.shutdown();
+        let _ = std::fs::remove_dir_all(&dir);
     }
-    println!("== Rust conformance baseline (SQL Logic Test) ==");
-    println!("files          : {}", files.len());
-    println!("statement ok   : {stmt_ok_pass}/{stmt_ok}");
-    println!("statement error: {stmt_err_pass}/{stmt_err}");
-    println!("query          : {query_pass}/{queries}");
-    let mut ranked: Vec<_> = fail_reasons.iter().collect();
-    ranked.sort_by_key(|(_, samples)| std::cmp::Reverse(samples.len()));
-    println!("-- top statement-ok failure reasons --");
-    let mut sranked: Vec<_> = stmt_fail.iter().collect();
-    sranked.sort_by_key(|(_, samples)| std::cmp::Reverse(samples.len()));
-    for (reason, samples) in sranked.iter().take(15) {
-        println!("{:>5}  {}", samples.len(), reason);
-        for s in samples.iter().take(2) {
-            println!("        {}", s.replace('\n', " "));
-        }
+    println!("{} file(s), {} failed", files.len(), failures.len());
+    if failures.is_empty() {
+        return Ok(());
     }
-    println!("-- statements that should error but did not --");
-    let mut eranked: Vec<_> = stmt_err_missing.iter().collect();
-    eranked.sort_by_key(|(_, samples)| std::cmp::Reverse(samples.len()));
-    for (word, samples) in eranked.iter().take(15) {
-        println!("{:>5}  {}", samples.len(), word);
-        for s in samples.iter().take(6) {
-            println!("        {}", s.replace('\n', " "));
-        }
+    for failure in &failures {
+        eprintln!("{failure}");
     }
-    println!("-- top query failure reasons --");
-    println!("-- top files by failed records --");
-    let mut franked: Vec<_> = file_fail.iter().collect();
-    franked.sort_by(|a, b| b.1.cmp(a.1));
-    for (file, n) in franked.iter().take(200) {
-        println!("{n:>5}  {file}");
-    }
-    for (reason, samples) in ranked.iter().take(25) {
-        println!("{:>5}  {}", samples.len(), reason);
-        for s in samples.iter().take(3) {
-            println!("        {}", s.replace('\n', " "));
-        }
-    }
-    Ok(())
-}
-
-/// A failure key: the leading keywords plus (when present) the FROM table.
-fn mismatch_key(sql: &str) -> String {
-    let head = first_word(sql);
-    let up = sql.to_uppercase();
-    let table = up
-        .find(" FROM ")
-        .map(|i| sql[i + 6..].trim_start())
-        .and_then(|rest| rest.split_whitespace().next())
-        .unwrap_or("");
-    if table.is_empty() {
-        head
-    } else {
-        format!("{head} {}:{}", table, "")
-            .trim_end_matches(':')
-            .to_string()
-    }
-}
-
-fn first_word(sql: &str) -> String {
-    sql.split_whitespace()
-        .take(3)
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_uppercase()
-}
-
-/// The `sqllogictest-rs` `default_normalizer`: trim and collapse runs of ASCII
-/// whitespace to a single space. This makes the comparison insensitive to the
-/// indentation of multi-line results such as `EXPLAIN` output.
-fn norm(s: &str) -> String {
-    s.split_ascii_whitespace().collect::<Vec<_>>().join(" ")
+    Err(common::Error::Invalid(format!(
+        "{} .slt file(s) failed",
+        failures.len()
+    )))
 }

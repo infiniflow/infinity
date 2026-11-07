@@ -62,7 +62,14 @@
 
 **DDL 是增量写，不重写整份目录**：`create_database` / `drop_database` 只写库级记录；`create_table` 走 `stage_new_table`（表记录 + 三个建表 tag + 每列一条 column 记录 + 库的 `next_table_id`），只有「这个名字已经有记录」时才回退到整份 `rewrite_catalog` 的 sweep。名字解析是点查（`read_cpp_table` 扫 `catalog|tbl|{db_id}|{name}|`），不再为取一张表把全目录每张表的每一列都解码；`DROP DATABASE` 取「这个库有哪些表」也只扫这个库的前缀。提交期没有任何持久化动作：DDL 的 catalog 记录带 `disableWAL` 写进 RocksDB memtable，durability 由 checkpoint 负责（见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) §3）。一次 DDL 既不做 memtable flush，也不 fsync，所以 10,000 条 DDL 不会堆出成千上万个小 L0 文件，每次提交的成本与库数无关。
 
-**Gate A 现在是 1540/1560（语句 1754/1754、错误 129/129）。** 剩下的 20 条都是 `test_knn_hnsw_i8/u8`：端口的稠密 store 只有 `f32`，`EMBEDDING(TINYINT)` 的查询走不到 I8/U8 距离内核（`SIMD.md` §3），与快照恢复无关——重构前的二进制同样 1/11。恢复快照时列文件要跟着新表的列 id 改名：`DROP COLUMN` 之后幸存列保留原 id（`1.col`、`2.col`），而 `create_table_typed` 把重建表的列从 0 编号，读侧按 `meta.ids` 找不到 `0.col` 就整块解码失败、表读成空（`substitute_column_id`）。
+**Gate A 由 `sqllogictest-rs` 执行**（参考 runner 用的同一个 crate，v0.29.1）：`cli conformance test/sql` 每个文件开一个新引擎，解析、record 语义和校验全交给这个 crate，任一文件失败就退出非零。当前 208 个文件里 15 个失败：
+
+- **9 个导入格式没有实现**：`FORMAT PARQUET`（7 个用例）以及 `bvecs` / `csr`；端口没有 parquet/arrow 读取，落到文本路径后报 `stream did not contain valid UTF-8`；
+- **3 个大数据量结果不一致**：`dml/compact/test_compact_big`（`WHERE c2 = False` 返回了行）、`dql/aggregate/test_simple_agg_big`、`dml/import/test_fvecs`；
+- **2 个 EXPLAIN FRAGMENT 的计划文本不同**：`explain/explain_fragment`、`dql/knn/tensor/fusion_rerank_maxsim`；
+- **1 个搜索选项未识别**：`dql/knn/tensor/test_emvb_index_big` 的 `emvb_threshold_first`。
+
+其余 193 个文件通过。恢复快照时列文件要跟着新表的列 id 改名：`DROP COLUMN` 之后幸存列保留原 id（`1.col`、`2.col`），而 `create_table_typed` 把重建表的列从 0 编号，读侧按 `meta.ids` 找不到 `0.col` 就整块解码失败、表读成空（`substitute_column_id`）。
 
 ### 2.1 事务冲突检查 / 回滚
 

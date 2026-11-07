@@ -11,10 +11,9 @@ status=0
 
 echo "== Gate C =="
 
-# 1. in-repo restart / snapshot suites (work on the Rust engine today)
+# 1. in-repo restart / snapshot suites (work on the Rust engine today).
+#    The snapshot .slt cases live under test/sql and are Gate A's job.
 cd "$here/.." && cargo test --workspace -q || status=1
-cargo run -q --release -p cli -- conformance "$root/test/sql/snapshot" \
-  || { echo "snapshot .slt baseline not at 100%"; status=1; }
 
 # 2. python restart_test (needs a running server + the python SDK).
 #    The harness starts the engine as `<binary> --config=<toml>`; the shim maps

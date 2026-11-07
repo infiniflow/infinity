@@ -1,52 +1,20 @@
 #!/usr/bin/env bash
-# Gate A — SQL conformance over the real `.slt` suite (plan §6 Gate A).
+# Gate A — SQL conformance over the reference's .slt suite (plan §6 Gate A).
 #
-#   ./scripts/run_gate_a.sh [slt_dir]      # default: <repo>/test/sql
+#   ./scripts/run_gate_a.sh [slt_dir|file]   # default: <repo>/test/sql
 #
-# Gate A requires 100% of `test/sql/**/*.slt`; this script prints the current
-# baseline. It exits non-zero while the baseline is short of 100% so it can be
-# used as a gate once the engine is complete.
+# The suite is parsed, executed and validated by sqllogictest-rs, the crate the
+# reference's own runner is built from, so the format has one implementation.
+# conformance prints the failing files and exits non-zero; the gate is that
+# exit status (any failing file fails Gate A).
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 slt="${1:-$root/test/sql}"
 
 cd "$here/.."
-out="$(cargo run -q --release -p cli -- conformance "$slt" 2>&1)"
-run_status=$?
-echo "$out"
-if [ "$run_status" -ne 0 ]; then
-    # The counters can still look complete when the CLI dies after printing
-    # them (or before printing anything); the exit status is the tie-breaker.
-    echo "Gate A: conformance run failed (exit $run_status)"
-    exit 1
-fi
+cargo run -q --release -p cli -- conformance "$slt"
+status=$?
 
-python3 - "$out" <<'PY'
-import re, sys
-text = sys.argv[1]
-def frac(label):
-    m = re.search(rf"^{re.escape(label)}\s*:\s*(\d+)/(\d+)\s*$", text, re.M)
-    return (int(m.group(1)), int(m.group(2))) if m else None
-counters = ["statement ok", "statement error", "query"]
-missing = [c for c in counters if frac(c) is None]
-if missing:
-    # A missing counter must fail the gate: defaulting it to 0/0 would make
-    # the comparison below vacuously true.
-    print(f"Gate A: missing counter line(s): {', '.join(missing)}")
-    sys.exit(1)
-ok_p, ok_t = frac("statement ok")
-e_p, e_t = frac("statement error")
-q_p, q_t = frac("query")
-print(f"Gate A: statement ok {ok_p}/{ok_t}, statement error {e_p}/{e_t}, query {q_p}/{q_t}")
-sys.exit(
-    0
-    if ok_t > 0
-    and e_t > 0
-    and q_t > 0
-    and ok_p == ok_t
-    and e_p == e_t
-    and q_p == q_t
-    else 1
-)
-PY
+echo "== Gate A: $([[ $status -eq 0 ]] && echo PASS || echo FAIL) =="
+exit $status

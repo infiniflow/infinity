@@ -4,8 +4,9 @@
 //! `MATCH`, `KNN SCAN`, `MatchTensorScan`, `MatchSparseScan`, `FUSION` and an
 //! optional `LIMIT`, under a final `PROJECT`.
 //!
-//! The conformance harness normalizes whitespace (like `sqllogictest-rs`), so
-//! only the token stream — node names, attributes and their order — matters.
+//! The suite's validator (`sqllogictest-rs`'s default normalizer) collapses
+//! whitespace, so only the token stream — node names, attributes and their
+//! order — matters.
 
 use std::collections::HashMap;
 

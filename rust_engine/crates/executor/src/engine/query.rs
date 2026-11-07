@@ -1815,13 +1815,30 @@ impl Engine {
                         _ => None,
                     }
                 };
+                // The reference names the single output column after the
+                // plan kind (PhysicalExplain::Init,
+                // physical_explain_impl.cpp:57-90); a client reads it from the
+                // RowDescription, and PG rejects a DataRow whose field count
+                // does not match it.
+                let column = match kind {
+                    parser::ExplainKind::Ast => "Abstract Syntax Tree",
+                    parser::ExplainKind::UnOpt | parser::ExplainKind::Raw => {
+                        "Unoptimized Logical Plan"
+                    }
+                    parser::ExplainKind::Opt | parser::ExplainKind::Logical => {
+                        "Optimized Logical Plan"
+                    }
+                    parser::ExplainKind::Fragment => "Fragment",
+                    parser::ExplainKind::Pipeline | parser::ExplainKind::Analyze => "Pipeline",
+                    parser::ExplainKind::Physical => "Physical Plan",
+                };
                 match text {
                     Some(mut lines) => {
                         if matches!(kind, parser::ExplainKind::Fragment) {
                             lines = fragment_text(lines);
                         }
                         Ok(QueryResult::Rows {
-                            columns: vec![],
+                            columns: vec![column.to_string()],
                             rows: lines.into_iter().map(|l| vec![Value::Str(l)]).collect(),
                         })
                     }
@@ -1830,7 +1847,7 @@ impl Engine {
                             self.table_schema(t)?;
                         }
                         Ok(QueryResult::Rows {
-                            columns: vec![],
+                            columns: vec![column.to_string()],
                             rows: vec![],
                         })
                     }

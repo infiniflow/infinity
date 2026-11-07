@@ -24,6 +24,10 @@ txn.workspace = true
 parser.workspace = true
 executor.workspace = true
 server.workspace = true
+# The `.slt` parser and validator the reference's own runner is built from; the
+# conformance command drives the engine through it, so there is one
+# implementation of the format, not two.
+sqllogictest = "0.29.1"
 
 [lints]
 workspace = true
