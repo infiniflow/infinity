@@ -1378,15 +1378,53 @@ impl Catalog {
             .ok_or_else(|| Error::Catalog(format!("table '{old}' does not exist")))?;
         meta.name = new.to_string();
         if self.catalog_only {
-            let mut tables = self.tables()?;
-            if let Some(slot) = tables.iter_mut().find(|t| t.id == meta.id) {
-                *slot = meta;
+            // `PrepareCommitRenameTable` writes two records and nothing else:
+            //   drop|tbl_name|{db}/{old}/{create_ts}/{table_id} = <commit ts>
+            //   catalog|tbl|{db}|{new}|{commit_ts}            = {table_id}
+            // The table keeps its id, so the column, segment, block and index
+            // records - all keyed by it - are untouched: no restamp, no
+            // renumbering, no copy. The old name stops resolving through the
+            // marker (`DBMeta::GetTableID` checks it next to `drop|tbl|`).
+            let (db_str, bare_old) = self.db_and_bare_name(old)?;
+            let bare_new = new.rsplit('.').next().unwrap_or(new);
+            if bare_old == bare_new {
+                return Ok(());
             }
-            let mut indexes = self.indexes()?;
-            for i in indexes.iter_mut().filter(|i| i.table == old) {
-                i.table = new.to_string();
-            }
-            self.rewrite_catalog(&self.databases()?, &tables, &indexes)?;
+            let prefix = format!(
+                "{}{bare_old}|",
+                storage::catalog_format::catalog_db_table_prefix(&db_str)
+            );
+            let create_ts = self.with_view(|store| {
+                let mut newest = 0u64;
+                for (k, _) in store.scan_prefix(prefix.as_bytes())? {
+                    let text = String::from_utf8_lossy(&k).to_string();
+                    if let Some(ts) = text.rsplit('|').next().and_then(|t| t.parse::<u64>().ok()) {
+                        newest = newest.max(ts);
+                    }
+                }
+                Ok(newest)
+            })?;
+            let sentinel = Some(DDL_TS_SENTINEL.to_string().into_bytes());
+            self.stage(&[
+                (
+                    crate::layout::renamed_table_key(
+                        &db_str,
+                        &bare_old,
+                        create_ts,
+                        &meta.id.to_string(),
+                    )
+                    .into_bytes(),
+                    sentinel,
+                ),
+                (
+                    format!(
+                        "{}{bare_new}|{DDL_TS_SENTINEL}",
+                        storage::catalog_format::catalog_db_table_prefix(&db_str)
+                    )
+                    .into_bytes(),
+                    Some(meta.id.to_string().into_bytes()),
+                ),
+            ])?;
             return Ok(());
         }
         // One batch: the new name must never exist while the old one still
@@ -1766,10 +1804,68 @@ impl Catalog {
             id,
         };
         if self.catalog_only {
-            let mut indexes = self.indexes()?;
-            indexes.retain(|i| !(i.name == name && i.table == table));
-            indexes.push(meta.clone());
-            self.rewrite_catalog(&self.databases()?, &self.tables()?, &indexes)?;
+            // `NewTxn::CreateIndex` writes the index's own records and nothing
+            // else: `catalog|idx|{db}|{table_id}|{name}|{commit_ts}` = the id
+            // and `idx|{db}|{table_id}|{id}|index_base` = the reference's
+            // `IndexBase` JSON. A whole-catalog rewrite restamped every table,
+            // column and segment record with this DDL's ts (measured: the
+            // column records moved from their create ts to the index's) and
+            // swept records the layout does not emit.
+            let db_name = table.split('.').next().unwrap_or(table);
+            let bare = table.rsplit('.').next().unwrap_or(table);
+            let (db_str, _) = self.db_and_bare_name(table)?;
+            let Some(layout) = crate::layout::read_table(self.store.as_ref(), db_name, bare)?
+            else {
+                return Err(Error::Catalog(format!("table '{table}' does not exist")));
+            };
+            let table_id = layout.table_id.to_string();
+            let mut batch: Vec<BatchItem> = Vec::new();
+            if meta.column.is_empty() {
+                // An expression index has no `IndexBase`; the reference keeps
+                // it in a table tag (see `write_layout_batch`).
+                let tag = storage::catalog_format::catalog_table_tag_key(
+                    &db_str,
+                    &table_id,
+                    "rust_name_only_indexes",
+                );
+                let mut names: Vec<String> = self
+                    .with_view(|store| store.get(tag.as_bytes()))?
+                    .map(|v| {
+                        String::from_utf8_lossy(&v)
+                            .split(',')
+                            .filter(|s| !s.is_empty())
+                            .map(str::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                names.push(name.to_string());
+                batch.push((tag.into_bytes(), Some(names.join(",").into_bytes())));
+            } else {
+                let def = crate::layout::index_def_for(&meta, &layout).ok_or_else(|| {
+                    Error::Catalog(format!("index '{name}' has no C++ record"))
+                })?;
+                batch.push((
+                    storage::catalog_format::catalog_index_key(
+                        &db_str,
+                        &table_id,
+                        name,
+                        DDL_TS_SENTINEL,
+                    )
+                    .into_bytes(),
+                    Some(id.to_string().into_bytes()),
+                ));
+                batch.push((
+                    storage::catalog_format::catalog_index_tag_key(
+                        &db_str,
+                        &table_id,
+                        &id.to_string(),
+                        "index_base",
+                    )
+                    .into_bytes(),
+                    Some(value_format::index_def_bytes(&def)),
+                ));
+            }
+            self.stage(&batch)?;
             return Ok(meta);
         }
         // The declaration and the legacy-record cleanup are one commit, so the

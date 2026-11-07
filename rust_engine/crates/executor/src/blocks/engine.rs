@@ -974,34 +974,11 @@ impl Engine {
                     rows.clear();
                 }
             }
-            // A dropped index must not leave its `idx_{id}` mirror behind.
-            let db_id = self.database_id_of(&meta.name);
-            let tbl_dir = self
-                .blocks_root()
-                .join(format!("db_{db_id}/tbl_{}", meta.id));
-            // `idx_{id}` is keyed by the catalog's index id, so take it from
-            // the record: going through a name lookup made the whole directory
-            // look stale whenever that lookup failed (a reopened directory
-            // whose index record was spelled differently), and the flush then
-            // deleted a mirror it could not rebuild.
-            let short = meta.name.rsplit('.').next().unwrap_or(&meta.name);
-            let live: Vec<String> = self
-                .storage
-                .catalog
-                .list_indexes()?
-                .iter()
-                .filter(|im| im.table == meta.name || im.table == short)
-                .filter(|im| im.id > 0)
-                .map(|im| format!("idx_{}", im.id))
-                .collect();
-            if let Ok(entries) = std::fs::read_dir(&tbl_dir) {
-                for e in entries.flatten() {
-                    let name = e.file_name().to_string_lossy().to_string();
-                    if name.starts_with("idx_") && !live.contains(&name) {
-                        let _ = std::fs::remove_dir_all(e.path());
-                    }
-                }
-            }
+            // A dropped index keeps its `idx_{id}` mirror until `Cleanup`:
+            // `NewTxn::DropIndexByName` writes a `drop|idx|` marker and leaves
+            // the chunk files alone (`CleanupInner` reclaims them), so deleting
+            // the directory here made a directory that had dropped an index
+            // differ from the reference's by that one file.
         }
         // Vector indexes mirror alongside the rows. This is best-effort: an
         // index whose column is not an embedding column simply has no mirror.

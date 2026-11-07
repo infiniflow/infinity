@@ -1208,9 +1208,6 @@ impl Engine {
                     .get(&new_tkey)
                     .map(|e| e.secondary.indexes.keys().cloned().collect())
                     .unwrap_or_default();
-                // Keep the index ids: the layout writer keys an index record by
-                // its table id, and the reference keeps the id across a rename.
-                let keep: Vec<catalog::IndexMeta> = self.storage.catalog.list_indexes()?;
                 let rename_cmd = self.rename_table_command(table, new_name)?;
                 self.ddl_commit_typed(
                     TxnOp::RenameTable {
@@ -1219,25 +1216,12 @@ impl Engine {
                         new: new_name.to_string(),
                     },
                     || {
-                        // Rename **first**: under the catalog_only backend the whole
-                        // index list is derived from the layout, so a rename
-                        // retires the old table's index records with it — dropping
-                        // and re-creating them before the rename would leave the
-                        // re-created records to be swept by the rename's rewrite.
+                        // The reference's rename writes the new name's record
+                        // and the old name's marker only: an index record is
+                        // keyed by the **table id**, which a rename keeps, so it
+                        // needs neither a drop nor a re-create (doing that
+                        // stamped it with a new ts and made the catalog differ).
                         self.storage.catalog.rename_table(table, new_name)?;
-                        for im in &keep {
-                            if im.table == *table {
-                                let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
-                                self.storage.catalog.create_index_typed_with_id(
-                                    &im.name,
-                                    new_name,
-                                    &im.column,
-                                    &im.index_type,
-                                    &im.options,
-                                    im.id,
-                                )?;
-                            }
-                        }
                         for column in &pairs {
                             let _ = self.build_index(new_name, column);
                         }

@@ -549,7 +549,7 @@ fn ivf_element_code(text: &str) -> i64 {
     }
 }
 
-fn index_def_for(im: &IndexMeta, table: &TableLayout) -> Option<IndexDefValue> {
+pub(crate) fn index_def_for(im: &IndexMeta, table: &TableLayout) -> Option<IndexDefValue> {
     // A functional index (`CREATE INDEX … (sqrt(c1))`) names an *expression*, so
     // there is no such column; the `SECONDARY` arm below turns it into a
     // `SECONDARYFUNCTIONAL` record instead of dropping it.
@@ -1386,6 +1386,9 @@ pub fn read_table(
     if is_dropped(
         store,
         &dropped_table_key(&db_id.to_string(), table_name, ts, &table_id.to_string()),
+    )? || is_dropped(
+        store,
+        &renamed_table_key(&db_id.to_string(), table_name, ts, &table_id.to_string()),
     )? {
         return Ok(None);
     }
@@ -1678,6 +1681,9 @@ pub fn read_layout(store: &dyn MetaStore) -> Result<Vec<TableLayout>> {
             if is_dropped(
                 store,
                 &dropped_table_key(&db_id.to_string(), &table_name, ts, &table_id.to_string()),
+            )? || is_dropped(
+                store,
+                &renamed_table_key(&db_id.to_string(), &table_name, ts, &table_id.to_string()),
             )? {
                 continue;
             }
@@ -1886,6 +1892,18 @@ pub fn dropped_db_key(db_name: &str, create_ts: u64, db_id: &str) -> String {
 /// resolving the name to its newest `catalog|tbl|…` record).
 pub fn dropped_table_key(db_id: &str, table_name: &str, create_ts: u64, table_id: &str) -> String {
     format!("drop|tbl|{db_id}/{table_name}/{create_ts}/{table_id}")
+}
+
+/// `drop|tbl_name|{db}/{name}/{create_ts}/{table_id}` — the marker an
+/// `ALTER TABLE … RENAME TO` leaves on the **old** name
+/// (`KeyEncode::RenameTableKey`, `PrepareCommitRenameTable`).
+///
+/// The rename writes no new table id and touches no column, segment or index
+/// record: it adds the new name's `catalog|tbl|` record (same id) and this
+/// marker, which is what makes the old name stop resolving
+/// (`DBMeta::GetTableID` checks it next to `drop|tbl|`).
+pub fn renamed_table_key(db_id: &str, table_name: &str, create_ts: u64, table_id: &str) -> String {
+    format!("drop|tbl_name|{db_id}/{table_name}/{create_ts}/{table_id}")
 }
 
 /// `drop|idx|{db}/{table}/{name}/{create_ts}/{index_id}` — the same for an
