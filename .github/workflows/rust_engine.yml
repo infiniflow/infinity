@@ -278,12 +278,12 @@ jobs:
         run: tail -n 500 restart_test_infinity.log.* 2>/dev/null || true
 
   sdk:
-    # Gate B: the unmodified Python SDK. Nightly and manual runs only - the
-    # suite is ~30 files and takes tens of minutes per cell, which does not
-    # belong on every pull request.
+    # Gate B: the unmodified Python SDK, Go SDK and HTTP API. The suite is ~30
+    # files and takes tens of minutes per cell, so a pull request skips it;
+    # every push, the nightly run and a manual dispatch cover it.
     name: sdk (${{ matrix.arch }})
     needs: build
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
