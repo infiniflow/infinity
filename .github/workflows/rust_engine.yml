@@ -257,22 +257,25 @@ jobs:
             { sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap; }
       - name: Restart suite
         run: |
-          # The harness starts the engine as '<binary> --config=<toml>'; the
-          # shim maps that onto the rewrite's CLI.
           export INFINITY_SERVER_BIN="${PWD}/bin/infinity"
           args=()
           while IFS= read -r case; do
             if [ -n "${case}" ]; then args+=("--deselect=${case}"); fi
           done <<< "${RUST_DESELECT}"
-          # The harness kills every process named `infinity` between phases and
-          # binds fixed ports, so give the run its own PID namespace and a
-          # disk-backed /var/infinity (same shape as scripts/run_gate_c.sh).
-          work="$(mktemp -d)"
-          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
-                --unshare-pid --proc /proc -- \
-                .venv/bin/python -m pytest -q -m "not slow" -k "not cross_engine" \
-                python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
-                --tb=short "${args[@]}"
+          cmd=(.venv/bin/python -m pytest -q -m "not slow" -k "not cross_engine" \
+               python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
+               --tb=short "${args[@]}")
+          # A PID namespace keeps the harness's "kill every process named infinity"
+          # local to the run. ubuntu-24.04-arm forbids unprivileged user namespaces
+          # (AppArmor), where bwrap cannot even map the uid, so fall back to a plain
+          # run - the machine is otherwise idle.
+          if bwrap --dev-bind / / --unshare-pid --proc /proc -- true 2>/dev/null; then
+            work="$(mktemp -d)"
+            bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
+                  --unshare-pid --proc /proc -- "${cmd[@]}"
+          else
+            "${cmd[@]}"
+          fi
       - name: Engine log
         if: always()
         run: tail -n 500 restart_test_infinity.log.* 2>/dev/null || true
@@ -440,10 +443,10 @@ jobs:
         run: |
           export INFINITY_SERVER_BIN="${PWD}/rust_engine/target/release/infinity"
           work="$(mktemp -d)"
-          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \\
-                --unshare-pid --proc /proc -- \\
-                .venv/bin/python tools/run_restart_test.py \\
-                --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \\
+          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
+                --unshare-pid --proc /proc -- \
+                .venv/bin/python tools/run_restart_test.py \
+                --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
                 --test_case test_insert.py --loop 3
       - name: Slow restart cases (long imports, repeated kills)
         # The reference runs these nightly (slow_tests.yml); they include the
@@ -454,8 +457,8 @@ jobs:
         run: |
           export INFINITY_SERVER_BIN="${PWD}/rust_engine/target/release/infinity"
           work="$(mktemp -d)"
-          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \\
-                --unshare-pid --proc /proc -- \\
-                .venv/bin/python -m pytest -q -m slow -k "not cross_engine" \\
-                python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \\
+          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
+                --unshare-pid --proc /proc -- \
+                .venv/bin/python -m pytest -q -m slow -k "not cross_engine" \
+                python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
                 --tb=short

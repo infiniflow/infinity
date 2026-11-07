@@ -519,12 +519,19 @@ impl Engine {
                 // anything else means the row buffer lost a row, which must not
                 // be written to disk as a shifted block.
                 let first_id = ((segment_id as usize) << 32) | start;
-                let contiguous = chunk.len() == end - start
-                    && chunk
-                        .iter()
-                        .enumerate()
-                        .all(|(slot, (seq, _))| *seq == first_id + slot);
-                if !contiguous {
+                // Every id from `first_id` on has to be the next slot - a hole
+                // means the row buffer lost a row, which must not reach disk as
+                // a shifted block. A *short tail* is allowed only for the
+                // whole-table rewrite (a column change): it carries the rows of
+                // its own snapshot, and a commit that allocated ids after that
+                // snapshot writes them itself. With a bounded checkpoint ts a
+                // short block is a lost row and still an error.
+                let contiguous = chunk
+                    .iter()
+                    .enumerate()
+                    .all(|(slot, (seq, _))| *seq == first_id + slot);
+                let short_tail_is_a_race = checkpoint_ts == u64::MAX;
+                if !contiguous || (chunk.len() != end - start && !short_tail_is_a_race) {
                     return Err(Error::Invalid(format!(
                         "table '{table}': block {segment_id}.{block_index} holds {} of the {} rows \
                          committed at ts {checkpoint_ts} (ids {}..{}, window {first_id}..{})",
