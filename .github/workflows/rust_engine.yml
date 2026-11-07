@@ -51,6 +51,11 @@ jobs:
         working-directory: rust_engine
     steps:
       - uses: actions/checkout@v6
+        with:
+          # The lefthook step below diffs the base of the push/PR, so the
+          # history has to be there (the default depth-1 fetch has neither the
+          # base commit nor HEAD's parent).
+          fetch-depth: 0
       - name: Install the pinned toolchain
         run: |
           # rust_engine/rust-toolchain.toml is the single source of truth.
@@ -80,7 +85,86 @@ jobs:
         with:
           workspaces: rust_engine
       - name: fmt
+        # The workspace-wide invariant, independent of what a pull request
+        # touched. The lefthook `rustfmt` job below checks the same thing (plus
+        # the other hooks) for a commit.
         run: cargo fmt --all -- --check
+      - name: Collect the changed files
+        id: changed
+        working-directory: ${{ github.workspace }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${GITHUB_SHA}"
+          fi
+          # A new branch (or a base that a force-push moved away) has no common
+          # ancestor: check the last commit instead.
+          if [ -z "${base}" ] || [ "${base}" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base=$(git rev-parse "${head}^" 2>/dev/null || git rev-parse "${head}")
+          fi
+          files="${RUNNER_TEMP}/lefthook-files"
+          : > "${files}"
+          git diff --name-only -z "${base}"..."${head}" | while IFS= read -r -d '' file; do
+            if [ -f "${file}" ]; then printf '%s\0' "${file}"; fi
+          done > "${files}"
+          echo "Changed files:"
+          if [ -s "${files}" ]; then tr '\0' '\n' < "${files}"; else echo "  (none)"; fi
+          if tr '\0' '\n' < "${files}" | grep -qE '\.(c|h|hpp|cpp|cppm)$'; then
+            echo "has_cpp=1" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has_cpp=0" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "files=${files}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install uv (ruff runs through `uvx`)
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install clang-format-20
+        if: steps.changed.outputs.has_cpp == '1'
+        working-directory: ${{ github.workspace }}
+        run: |
+          # The Ubuntu archive does not carry clang-format-20 on every image;
+          # apt.llvm.org publishes it. When neither works the C++ job is
+          # skipped (code_static_check still runs clang-format-20 in the
+          # builder container).
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang-format-20 || true
+          if ! command -v clang-format-20 >/dev/null 2>&1; then
+            curl -fsSL https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
+            sudo bash /tmp/llvm.sh 20 || true
+          fi
+          if command -v clang-format-20 >/dev/null 2>&1; then
+            echo "HAVE_CLANG_FORMAT=1" >> "${GITHUB_ENV}"
+            clang-format-20 --version
+          else
+            echo "::warning::clang-format-20 is unavailable; the C++ hook is skipped"
+          fi
+
+      - name: Install PyYAML and lefthook
+        working-directory: ${{ github.workspace }}
+        run: |
+          # python3-yaml puts the module where the system python3 sees it (the
+          # Ubuntu python is externally managed, so `pip install --user` refuses).
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-yaml
+          npm install -g lefthook@2 || sudo npm install -g lefthook@2
+          lefthook version
+
+      - name: lefthook
+        # The same jobs `git commit` runs (`lefthook.yml`), over the files this
+        # push or pull request touched, in check-only mode: nothing is
+        # rewritten and a finding fails the job.
+        working-directory: ${{ github.workspace }}
+        run: |
+          if [ "${HAVE_CLANG_FORMAT:-}" != "1" ]; then
+            export LEFTHOOK_EXCLUDE=clang-format
+          fi
+          LEFTHOOK_CHECK_ONLY=1 lefthook run pre-commit --files-from-stdin --no-auto-install \
+            < "${{ steps.changed.outputs.files }}"
       - name: clippy
         # Informational: the workspace has pre-existing warnings, so this is
         # reported rather than gating. Turn it into a gate once the workspace
