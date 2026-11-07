@@ -1,0 +1,47 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/common",
+    "crates/storage",
+    "crates/catalog",
+    "crates/txn",
+    "crates/parser",
+    "crates/expression",
+    "crates/analyzer",
+    "crates/analyzer-ffi",
+    "crates/planner",
+    "crates/index",
+    "crates/executor",
+    "crates/server",
+    "crates/cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+rust-stemmers = "1.2"
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
+common = { path = "crates/common" }
+storage = { path = "crates/storage" }
+catalog = { path = "crates/catalog" }
+txn = { path = "crates/txn" }
+parser = { path = "crates/parser" }
+expression = { path = "crates/expression" }
+analyzer = { path = "crates/analyzer" }
+planner = { path = "crates/planner" }
+index = { path = "crates/index" }
+executor = { path = "crates/executor" }
+server = { path = "crates/server" }
+lz4_flex = "0.13"
+hmac = "0.12"
+sha2 = "0.10"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "0.8"
+crc32fast = "1"
+memmap2 = "0.9"
+thiserror = "1"
+tempfile = "3"
+roaring = "0.11"

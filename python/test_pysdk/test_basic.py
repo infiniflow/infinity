@@ -36,23 +36,23 @@ class TestInfinity:
 
     # def test_version(self):
     #     self.test_infinity_obj._test_version()
-    def test_connection(self):
+    def test_connection(self, http):
         """
         target: test connect and disconnect server ok
         method: connect server
         expect: connect and disconnect successfully
         """
-        infinity_obj = infinity.connect(self.uri)
+        infinity_obj = infinity_http() if http else infinity.connect(self.uri)
         assert infinity_obj
         assert infinity_obj.disconnect()
 
-    def test_create_db_with_invalid_name(self):
+    def test_create_db_with_invalid_name(self, http):
         """
         target: test db name limitation
         method: create db with empty name
         expect: create db fail with error message
         """
-        infinity_obj = infinity.connect(self.uri)
+        infinity_obj = infinity_http() if http else infinity.connect(self.uri)
         assert infinity_obj
 
         db_name = ""

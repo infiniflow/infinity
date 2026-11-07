@@ -1448,6 +1448,9 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSna
         if (!status.ok()) {
             return {nullptr, status};
         }
+        // Every table of one database snapshot is taken at the same ts; the
+        // database record carries it too (`max_commit_ts`).
+        table_snapshot_info->max_commit_ts_ = txn_context_ptr_->begin_ts_;
         database_snapshot_info->table_snapshots_.push_back(table_snapshot_info);
     }
     return {std::move(database_snapshot_info), Status::OK()};
@@ -1471,6 +1474,8 @@ std::tuple<std::shared_ptr<SystemSnapshotInfo>, Status> NewTxn::GetSystemSnapsho
         if (!status.ok()) {
             return {nullptr, status};
         }
+        // One ts for the whole system snapshot, carried by every nested record.
+        database_snapshot->max_commit_ts_ = txn_context_ptr_->begin_ts_;
         system_snapshot_info->database_snapshots_.push_back(database_snapshot);
     }
 
@@ -6107,6 +6112,9 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
                 return status;
             }
             table_snapshot_info->snapshot_name_ = snapshot_name;
+            // The ts the snapshot is taken at; the metadata carries it so
+            // `SHOW SNAPSHOTS` can report it (`SnapshotBrief::commit_ts_`).
+            table_snapshot_info->max_commit_ts_ = checkpoint_ts;
 
             // Create table snapshot files
             status = CreateTableSnapshotFile(table_snapshot_info, option);
@@ -6134,6 +6142,7 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
                 RecoverableError(status);
             }
             database_snapshot_info->snapshot_name_ = snapshot_name;
+            database_snapshot_info->max_commit_ts_ = checkpoint_ts;
 
             // Create database snapshot files
             status = CreateDBSnapshotFile(database_snapshot_info, option);
@@ -6160,6 +6169,7 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
                 RecoverableError(status);
             }
             system_snapshot_info->snapshot_name_ = snapshot_name;
+            system_snapshot_info->max_commit_ts_ = checkpoint_ts;
 
             // Create system snapshot files
             status = CreateSystemSnapshotFile(system_snapshot_info, option);

@@ -1,0 +1,10 @@
+[package]
+name = "expression"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+parser.workspace = true
+
+[dev-dependencies]

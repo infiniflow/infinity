@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Gate C — persistence & recovery (plan §6 Gate C).
+#   python/restart_test, test/sql/snapshot, WAL crash recovery, MinIO/object
+#   storage (CI `minio` job), compaction-after-recovery, crash-during-recovery.
+#
+#   ./scripts/run_gate_c.sh
+set -uo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root="$(cd "$here/../.." && pwd)"
+status=0
+
+echo "== Gate C =="
+
+# 1. in-repo restart / snapshot suites (work on the Rust engine today)
+cd "$here/.." && cargo test --workspace -q || status=1
+cargo run -q --release -p cli -- conformance "$root/test/sql/snapshot" \
+  || { echo "snapshot .slt baseline not at 100%"; status=1; }
+
+# 2. python restart_test (needs a running server + the python SDK).
+#    The harness starts the engine as `<binary> --config=<toml>`; the shim maps
+#    that onto the Rust `server`. Unprivileged users get a writable
+#    `/var/infinity` (plus the CSV fixtures) via `bwrap` when it is available.
+if [[ -d "$root/python/restart_test" ]]; then
+  py="${PYTHON:-}"
+  if [[ -z "$py" ]]; then
+    if [[ -x "$root/.venv/bin/python" ]]; then py="$root/.venv/bin/python"; else py="python3"; fi
+  fi
+  shim="$here/infinity_rust_shim.sh"
+  # cwd is the repository root: the suites address fixtures as
+  # `test/data/...`, so running from `python/` silently imports nothing.
+  run=( "$py" -m pytest -q python/restart_test --infinity_path="$shim" )
+  work=""
+  if command -v bwrap >/dev/null 2>&1; then
+    data="${INFINITY_GATE_C_DATA:-$(mktemp -d)}"
+    mkdir -p "$data/tmp"
+    cp "$root"/test/data/csv/* "$data/" 2>/dev/null || true
+    # `/var/infinity` must live on disk, not on a tmpfs: these suites import
+    # tens of thousands of rows and several indexes, and a RAM-backed data dir
+    # both reports ENOSPC and competes with the engine for memory (the memidx
+    # and import cases are sized for the reference's on-disk layout).
+    work="${INFINITY_GATE_C_WORK:-$(mktemp -d)}"
+    mkdir -p "$work/test_data" "$work/log"
+    echo "restart_test: bwrap sandbox, fixtures at $data, data dir $work"
+    # `--unshare-pid` is required: the harness kills *every* process named
+    # `infinity` before each start, which fails on an unprivileged user when a
+    # foreign process matches. A private PID namespace scopes that to the run.
+    # `--tmpfs /var` only provides the writable mount point; `/var/infinity`
+    # itself is replaced by the disk-backed directory right after.
+    # `--unshare-net` keeps the run's ports to itself: the suites bind 23817
+    # and 5432, and a second run (or a leftover engine) on the same host would
+    # make every test talk to the wrong process.
+    run=( bwrap --dev-bind / / --tmpfs /var --dir /var/infinity \
+          --bind "$work" /var/infinity \
+          --bind "$data" /var/infinity/test_data \
+          --unshare-net --unshare-pid --proc /proc \
+          -- "${run[@]}" )
+  fi
+  ( cd "$root" && "${run[@]}" ) || status=1
+else
+  echo "SKIP: python/restart_test not present"
+fi
+
+# 2b. cross-engine compatibility: the same data directory opened by the other
+#     engine (C++ <-> Rust), with several index types and new inserts; plus the
+#     byte-level check, where the two engines write the same data and their
+#     files are compared byte for byte.
+if [[ -x "${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" ]]; then
+  # Both engines keep their catalog in the same RocksDB key space
+  # (`catalog| db| tbl| col| idx|`), so the binary Gate C runs above already
+  # reads and writes what the reference does.
+  if cargo build -q --release -p cli; then
+    # Absolute paths: the array is built while the script is still in
+    # `rust_engine` (leg 1 cds there), so a repo-relative glob would not expand
+    # and pytest would receive the literal `test_cross_engine_bytes_*.py`.
+    shopt -s nullglob
+    bytes=( "$root"/python/restart_test/test_cross_engine_bytes_*.py )
+    shopt -u nullglob
+    cross=( "$py" -m pytest -q "$root"/python/restart_test/test_cross_engine_compat.py \
+            "${bytes[@]}" \
+            --infinity_path="$shim" )
+    if command -v bwrap >/dev/null 2>&1; then
+      # The same sandbox the restart suites get: these tests root both engines
+      # at `/var/infinity/bytes` and start the reference again to read the
+      # result back, so an unprivileged run needs that directory writable and
+      # on disk. Reuse the directory leg 2 created when there is one.
+      cross_work="${work:-}"
+      [[ -n "$cross_work" ]] || cross_work="$(mktemp -d)"
+      mkdir -p "$cross_work"
+      cross=( bwrap --dev-bind / / --tmpfs /var --dir /var/infinity \
+              --bind "$cross_work" /var/infinity \
+              --unshare-net --unshare-pid --proc /proc -- "${cross[@]}" )
+    fi
+    ( cd "$root" && INFINITY_SERVER_BIN="$root/rust_engine/target/release/infinity" \
+        INFINITY_CPP_BIN="${INFINITY_CPP_BIN:-$root/cmake-build-reldeb/src/infinity}" \
+        "${cross[@]}" ) || status=1
+  else
+    echo "FAIL: could not build the port binary the cross-engine leg needs"
+    status=1
+  fi
+else
+  echo "SKIP: no C++ binary at INFINITY_CPP_BIN (cross-engine compatibility)"
+fi
+
+# 3. object storage (MinIO): requires the CI minio service
+if [[ -n "${INFINITY_MINIO_ENDPOINT:-}" ]]; then
+  echo "minio endpoint: $INFINITY_MINIO_ENDPOINT"
+  ( cd "$root/python" && python3 -m pytest -q test_minio ) || status=1
+else
+  echo "SKIP: INFINITY_MINIO_ENDPOINT not set (MinIO job runs in CI)"
+fi
+
+echo "== Gate C result: $([[ $status -eq 0 ]] && echo PASS || echo FAIL) =="
+exit $status

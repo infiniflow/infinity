@@ -1,0 +1,490 @@
+name: rust_engine
+
+# CI for the Rust rewrite (RUST_REWRITE_PLAN.md M0/M6).
+#
+# This workflow tests the rewrite alone: the reference engine, the
+# cross-engine format gate and the C++ suites belong to the reference's own
+# workflows (tests.yml / slow_tests.yml), so nothing here builds C++.
+#
+# Each suite is written once and run per architecture; every trigger covers
+# both amd64 and arm64.
+
+on:
+  push:
+    paths:
+      - 'rust_engine/**'
+      - 'python/restart_test/**'
+      - 'python/test_pysdk/**'
+      - 'tools/run_restart_test.py'
+      - '.github/workflows/rust_engine.yml'
+  pull_request:
+    paths:
+      - 'rust_engine/**'
+      - 'python/restart_test/**'
+      - 'python/test_pysdk/**'
+      - 'go/**'
+      - 'tools/run_restart_test.py'
+      - '.github/workflows/rust_engine.yml'
+  schedule:
+    - cron: '0 18 * * *' # nightly: the arm64 lane
+  workflow_dispatch:
+
+concurrency:
+  group: rust-engine-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Cases the rewrite cannot run yet, one pytest node id per line. There is no
+  # reference cell to leave untouched here, so they are deselected from every
+  # cell; a line goes away when the gap closes. Source of truth:
+  # rust_engine/docs/GAPS.md section 1.
+  RUST_DESELECT: |
+    python/restart_test/test_cross_engine_bytes_60_storage.py::test_the_port_round_trips_through_object_storage
+
+jobs:
+  quality:
+    # Gate F: formatting, lints, licenses / advisories.
+    name: quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust_engine
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install the pinned toolchain
+        run: |
+          # rust_engine/rust-toolchain.toml is the single source of truth.
+          rustup toolchain install --profile minimal
+          rustup component add rustfmt clippy
+      - name: Install clang, mold and libclang
+        # rust_engine/.cargo/config.toml builds RocksDB with clang and links
+        # with mold (`-fuse-ld=mold`), and librocksdb-sys runs bindgen, which
+        # needs libclang. Without them the build fails in its first seconds
+        # ("cannot find 'ld'", then "couldn't find any valid shared libraries
+        # matching: ['libclang.so']").
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang mold libclang-dev
+          if ! command -v ld.mold >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
+          # clang-sys (bindgen, for librocksdb-sys) needs libclang, and
+          # LIBCLANG_PATH overrides its search - so point it at the LLVM that
+          # actually ships libclang.so* (the image also carries an LLVM
+          # without the dev package, and a wrong directory is fatal).
+          so=$(ls /usr/lib/llvm-*/lib/libclang.so* 2>/dev/null | sort -V | tail -1)
+          if [ -n "$so" ]; then
+            echo "LIBCLANG_PATH=$(dirname "$so")" >> "$GITHUB_ENV"
+          fi
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust_engine
+      - name: fmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        # Informational: the workspace has pre-existing warnings, so this is
+        # reported rather than gating. Turn it into a gate once the workspace
+        # is warning-free.
+        continue-on-error: true
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: deny
+        # Informational: the action runs in its own container, where the pinned
+        # nightly in rust_engine/rust-toolchain.toml is not installed (it is a
+        # musl image), and advisories move with the advisory DB. The licenses /
+        # bans / sources result is recorded in docs/PORTING.md (Gate F).
+        continue-on-error: true
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: rust_engine/Cargo.toml
+          command: check --allow advisories
+
+  unit:
+    # The workspace's own tests on both architectures. The analyzer tests load
+    # /usr/share/infinity/resource, so the submodule is installed first.
+    name: unit (${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    env:
+      # The analyzer's parity tests compare against the Python tokenizer; the
+      # repo pins 3.11 (uv.lock) and its output differs on newer interpreters.
+      UV_PYTHON: "3.11"
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    defaults:
+      run:
+        working-directory: rust_engine
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install the pinned toolchain
+        run: rustup toolchain install --profile minimal
+      - name: Install clang, mold and libclang
+        # rust_engine/.cargo/config.toml builds RocksDB with clang and links
+        # with mold (`-fuse-ld=mold`), and librocksdb-sys runs bindgen, which
+        # needs libclang. Without them the build fails in its first seconds
+        # ("cannot find 'ld'", then "couldn't find any valid shared libraries
+        # matching: ['libclang.so']").
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang mold libclang-dev
+          if ! command -v ld.mold >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
+          # clang-sys (bindgen, for librocksdb-sys) needs libclang, and
+          # LIBCLANG_PATH overrides its search - so point it at the LLVM that
+          # actually ships libclang.so* (the image also carries an LLVM
+          # without the dev package, and a wrong directory is fatal).
+          so=$(ls /usr/lib/llvm-*/lib/libclang.so* 2>/dev/null | sort -V | tail -1)
+          if [ -n "$so" ]; then
+            echo "LIBCLANG_PATH=$(dirname "$so")" >> "$GITHUB_ENV"
+          fi
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust_engine
+      - name: Install the analyzer resources
+        run: |
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r ../resource/. /usr/share/infinity/resource/
+      - uses: astral-sh/setup-uv@v7
+      - name: Install the NLTK data the Python tokenizer needs
+        # The analyzer's parity tests shell out to
+        # `uv run python/infinity_sdk/infinity/rag_tokenizer.py`, which
+        # sentence-splits with NLTK's punkt_tab; a missing model makes the
+        # script print an error and every comparison fails.
+        run: uv run python -m nltk.downloader punkt_tab
+      - name: test
+        run: cargo test --workspace
+      - name: smoke
+        run: cargo run -q -p cli -- smoke /tmp/infinity-smoke
+      - name: Gate A (slt conformance)
+        # The port is at 1754/1754 statements, 129/129 errors and 1560/1560
+        # queries on the reference's 175-file suite, so this gates.
+        run: cargo run -q --release -p cli -- conformance ../test/sql
+      - name: Gate C (snapshot .slt)
+        # The snapshot part of Gate C: a restored table must read back, and the
+        # reference's own cases are the expectation. Seconds, so it gates here.
+        run: cargo run -q --release -p cli -- conformance ../test/sql/snapshot
+
+  build:
+    # One binary per architecture; the later jobs download the one they need.
+    name: build (${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install the pinned toolchain
+        run: rustup toolchain install --profile minimal
+      - name: Install clang, mold and libclang
+        # rust_engine/.cargo/config.toml builds RocksDB with clang and links
+        # with mold (`-fuse-ld=mold`), and librocksdb-sys runs bindgen, which
+        # needs libclang. Without them the build fails in its first seconds
+        # ("cannot find 'ld'", then "couldn't find any valid shared libraries
+        # matching: ['libclang.so']").
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang mold libclang-dev
+          if ! command -v ld.mold >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
+          # clang-sys (bindgen, for librocksdb-sys) needs libclang, and
+          # LIBCLANG_PATH overrides its search - so point it at the LLVM that
+          # actually ships libclang.so* (the image also carries an LLVM
+          # without the dev package, and a wrong directory is fatal).
+          so=$(ls /usr/lib/llvm-*/lib/libclang.so* 2>/dev/null | sort -V | tail -1)
+          if [ -n "$so" ]; then
+            echo "LIBCLANG_PATH=$(dirname "$so")" >> "$GITHUB_ENV"
+          fi
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust_engine
+      - name: Build the rewrite
+        working-directory: rust_engine
+        run: cargo build --release -p cli
+      - name: Collect the binary
+        run: |
+          mkdir -p bin
+          cp rust_engine/target/release/infinity bin/infinity
+          chmod +x bin/infinity
+          file bin/infinity
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bin-${{ matrix.arch }}
+          path: bin/infinity
+          retention-days: 3
+
+  restart:
+    # Gate C: the restart / recovery suite.
+    name: restart (${{ matrix.arch }})
+    needs: build
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/download-artifact@v8
+        with:
+          name: bin-${{ matrix.arch }}
+          path: bin
+      - name: Prepare the resources and the data directory
+        run: |
+          chmod +x bin/infinity
+          sudo mkdir -p /usr/share/infinity/resource /var/infinity
+          sudo cp -r resource/. /usr/share/infinity/resource/
+          sudo chown -R "${USER}" /usr/share/infinity /var/infinity
+      - uses: astral-sh/setup-uv@v7
+      - name: Install the SDK and the test dependencies
+        run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - name: Install bubblewrap
+        # The amd64 image ships it; ubuntu-24.04-arm does not, and the suite
+        # needs a PID namespace.
+        run: |
+          command -v bwrap >/dev/null 2>&1 ||
+            { sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap; }
+      - name: Restart suite
+        run: |
+          export INFINITY_SERVER_BIN="${PWD}/bin/infinity"
+          args=()
+          while IFS= read -r case; do
+            if [ -n "${case}" ]; then args+=("--deselect=${case}"); fi
+          done <<< "${RUST_DESELECT}"
+          cmd=(.venv/bin/python -m pytest -q -m "not slow" -k "not cross_engine" \
+               python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
+               --tb=short "${args[@]}")
+          # A PID namespace keeps the harness's "kill every process named infinity"
+          # local to the run. ubuntu-24.04-arm restricts unprivileged user
+          # namespaces through AppArmor ("bwrap: setting up uid map: Permission
+          # denied"); the runner allows lifting that, so try before falling back
+          # to a plain run.
+          if ! bwrap --dev-bind / / --unshare-pid --proc /proc -- true 2>/dev/null; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          fi
+          if bwrap --dev-bind / / --unshare-pid --proc /proc -- true 2>/dev/null; then
+            work="$(mktemp -d)"
+            bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
+                  --unshare-pid --proc /proc -- "${cmd[@]}"
+          else
+            "${cmd[@]}"
+          fi
+      - name: Engine log
+        if: always()
+        run: |
+          ls -la restart_test_infinity.log.* 2>/dev/null || echo "no engine log in $PWD"
+          tail -n 500 restart_test_infinity.log.* 2>/dev/null || true
+          tail -n 200 /var/infinity/log/*.log 2>/dev/null || true
+
+  sdk:
+    # Gate B: the unmodified Python SDK, Go SDK and HTTP API. The suite is ~30
+    # files and takes tens of minutes per cell; every trigger runs it, on both
+    # architectures.
+    name: sdk (${{ matrix.arch }})
+    needs: build
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/download-artifact@v8
+        with:
+          name: bin-${{ matrix.arch }}
+          path: bin
+      - name: Prepare the resources and the data directory
+        run: |
+          chmod +x bin/infinity
+          sudo mkdir -p /usr/share/infinity/resource /var/infinity
+          sudo cp -r resource/. /usr/share/infinity/resource/
+          sudo chown -R "${USER}" /usr/share/infinity /var/infinity
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - uses: astral-sh/setup-uv@v7
+      - name: Install the SDK and the test dependencies
+        run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - name: Install the test data
+        # The Go and HTTP suites read `/var/infinity/test_data/*`; this is the
+        # same generate-and-copy step the reference's jobs run (`-jc` copies
+        # without running the .slt suite).
+        run: uv run python3 tools/sqllogictest.py -jc=1
+      - name: Start the engine
+        run: |
+          nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_infinity.sh
+      - name: Python SDK suite
+        run: .venv/bin/python -m pytest -q python/test_pysdk -m "not complex and not slow" --tb=short
+      - name: Restart the engine on an empty directory
+        # Each suite counts what it created - the Go one asserts exactly 1000
+        # tables with its prefix - so it has to start from a clean server, as
+        # it does in the reference's own jobs. `test_data` stays.
+        run: |
+          pkill -f "bin/infinity --config" || true
+          for _ in $(seq 1 30); do pgrep -f "bin/infinity --config" >/dev/null || break; sleep 1; done
+          rm -rf /var/infinity/catalog /var/infinity/data /var/infinity/wal \
+                 /var/infinity/log /var/infinity/persistence
+          nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_infinity.sh
+      - name: Go SDK suite
+        # The same server, driven through the unmodified Go SDK.
+        working-directory: go
+        run: go test ./tests/... -count=1
+      - name: Restart the engine on an empty directory
+        run: |
+          pkill -f "bin/infinity --config" || true
+          for _ in $(seq 1 30); do pgrep -f "bin/infinity --config" >/dev/null || break; sleep 1; done
+          rm -rf /var/infinity/catalog /var/infinity/data /var/infinity/wal \
+                 /var/infinity/log /var/infinity/persistence
+          nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_infinity.sh
+      - name: HTTP API suite
+        # The same SDK tests over the HTTP API (pytest --http).
+        run: .venv/bin/python tools/run_http_api.py
+      - name: Stop the engine and show its log
+        if: always()
+        run: |
+          pkill -f "bin/infinity --config" || true
+          tail -n 200 infinity.log || true
+
+  slow:
+    # slow_tests.yml runs, nightly, what a pull request never pays for:
+    # SLOW_-marked gtests, repeated kill -9 loops, sanitizer builds, MinIO.
+    # The port's equivalents live here.
+    #
+    # The sanitizer surface is deliberately narrow: nine crates are
+    # #![forbid(unsafe_code)], there is no `unsafe impl`, and the only unsafe
+    # code is the mmap set in `storage` - so ASan runs there and nowhere else.
+    # TSan is left out on purpose: shared state is Mutex/Atomic (checked by the
+    # compiler), RocksDB is not instrumented (so it would only report false
+    # positives), and the ordering model that does need checking is loom's.
+    name: slow
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install the pinned toolchain
+        # rust-toolchain.toml lives in rust_engine; from the repo root rustup
+        # picks the runner's default (stable), where miri does not exist.
+        working-directory: rust_engine
+        run: |
+          rustup toolchain install --profile minimal
+          rustup component add miri
+      - name: Install clang, mold and libclang
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang mold libclang-dev
+          if ! command -v ld.mold >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
+          so=$(ls /usr/lib/llvm-*/lib/libclang.so* 2>/dev/null | sort -V | tail -1)
+          if [ -n "$so" ]; then
+            echo "LIBCLANG_PATH=$(dirname "$so")" >> "$GITHUB_ENV"
+          fi
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust_engine
+      - name: Prepare the resources and the data directory
+        run: |
+          sudo mkdir -p /usr/share/infinity/resource /var/infinity
+          sudo cp -r resource/. /usr/share/infinity/resource/
+          sudo chown -R "${USER}" /usr/share/infinity /var/infinity
+      - uses: astral-sh/setup-uv@v7
+      - name: Install the SDK and the NLTK data
+        env:
+          UV_PYTHON: "3.11"
+        run: |
+          uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+          uv run python -m nltk.downloader punkt_tab
+      - name: Install bubblewrap
+        # The amd64 image ships it; ubuntu-24.04-arm does not, and the suite
+        # needs a PID namespace.
+        run: |
+          command -v bwrap >/dev/null 2>&1 ||
+            { sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap; }
+
+      - name: loom (commit-ts ordering model)
+        working-directory: rust_engine
+        run: RUSTFLAGS="--cfg loom" cargo test -p txn --lib
+      - name: Miri (pure-Rust front end)
+        working-directory: rust_engine
+        run: |
+          # The corpus tests read SQL files from the checkout, which miri's
+          # isolation blocks; corpora_ut is skipped separately because it feeds
+          # megabytes through the parser and miri runs ~100x slower.
+          MIRIFLAGS="-Zmiri-disable-isolation" cargo miri test -p parser -p planner \
+            --lib -- --skip corpora_ut
+      - name: AddressSanitizer (the mmap set in storage)
+        working-directory: rust_engine
+        run: |
+          # --target keeps proc-macro and build-script crates out of the
+          # sanitizer build (rustc rejects sanitizers for proc macros).
+          RUSTFLAGS="-Zsanitizer=address" cargo test --target x86_64-unknown-linux-gnu \
+            -p storage --lib
+      - name: Ignored tests (perf probes, long replay loops)
+        # These mirror the reference's DISABLED_/SLOW_ gtests, which
+        # slow_tests.yml runs nightly. They are reported rather than gated for
+        # now: at least `new_catalog_index_internal_ut::disabled_slow_test_populate_index`
+        # fails on the port (fulltext_tail is None where the case expects
+        # (0, 16384)), and that predates the current work. Flip this to a gate
+        # once the set is triaged.
+        continue-on-error: true
+        working-directory: rust_engine
+        env:
+          UV_PYTHON: "3.11"
+        run: cargo test --workspace -- --ignored
+      - name: Build the server
+        run: (cd rust_engine && cargo build --release -p cli)
+      - name: Start the engine
+        run: |
+          nohup ./rust_engine/target/release/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_infinity.sh
+      - name: Parallel suite (Gate D)
+        # python/parallel_test drives a live server from python/ (its conftest
+        # reads 127.0.0.1:23817), so it runs against the engine started above.
+        continue-on-error: true
+        run: (cd python && ../.venv/bin/python -m pytest -q parallel_test --tb=short)
+      - name: Stop the engine
+        if: always()
+        run: |
+          pkill -f "target/release/infinity --config" || true
+          tail -n 100 infinity.log || true
+      - name: Repeated kill -9 cycles (Gate C)
+        # Gate C's crash half: the harness kills the engine between phases, so
+        # looping an insert suite interleaves crashes with recovery.
+        continue-on-error: true
+        run: |
+          export INFINITY_SERVER_BIN="${PWD}/rust_engine/target/release/infinity"
+          work="$(mktemp -d)"
+          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
+                --unshare-pid --proc /proc -- \
+                .venv/bin/python tools/run_restart_test.py \
+                --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
+                --test_case test_insert.py --loop 3
+      - name: Slow restart cases (long imports, repeated kills)
+        # The reference runs these nightly (slow_tests.yml); they include the
+        # heavy 5.toml import profile, which is the case the port has never
+        # closed on a developer machine (GAPS.md / RUST_REWRITE_PLAN section 8).
+        # Report first: a lane that is red from the start gets ignored.
+        continue-on-error: true
+        run: |
+          export INFINITY_SERVER_BIN="${PWD}/rust_engine/target/release/infinity"
+          work="$(mktemp -d)"
+          bwrap --dev-bind / / --tmpfs /var --dir /var/infinity --bind "${work}" /var/infinity \
+                --unshare-pid --proc /proc -- \
+                .venv/bin/python -m pytest -q -m slow -k "not cross_engine" \
+                python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh \
+                --tb=short
