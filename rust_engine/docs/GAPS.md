@@ -62,14 +62,21 @@
 
 **DDL 是增量写，不重写整份目录**：`create_database` / `drop_database` 只写库级记录；`create_table` 走 `stage_new_table`（表记录 + 三个建表 tag + 每列一条 column 记录 + 库的 `next_table_id`），只有「这个名字已经有记录」时才回退到整份 `rewrite_catalog` 的 sweep。名字解析是点查（`read_cpp_table` 扫 `catalog|tbl|{db_id}|{name}|`），不再为取一张表把全目录每张表的每一列都解码；`DROP DATABASE` 取「这个库有哪些表」也只扫这个库的前缀。提交期没有任何持久化动作：DDL 的 catalog 记录带 `disableWAL` 写进 RocksDB memtable，durability 由 checkpoint 负责（见 [`CATALOG_BACKEND_FAQ.md`](CATALOG_BACKEND_FAQ.md) §3）。一次 DDL 既不做 memtable flush，也不 fsync，所以 10,000 条 DDL 不会堆出成千上万个小 L0 文件，每次提交的成本与库数无关。
 
-**Gate A 由 `sqllogictest-rs` 执行**（参考 runner 用的同一个 crate，v0.29.1）：`cli conformance test/sql` 每个文件开一个新引擎，解析、record 语义和校验全交给这个 crate，任一文件失败就退出非零。当前 208 个文件里 15 个失败：
+**Gate A 由 `sqllogictest-rs` 执行**（参考 runner 用的同一个 crate，v0.29.1）：`cli conformance test/sql` 每个文件开一个新引擎，解析、record 语义和校验全交给这个 crate，任一文件失败就退出非零。当前 208 个文件里 199 个通过、9 个跳过、0 个失败。
 
-- **9 个导入格式没有实现**：`FORMAT PARQUET`（7 个用例）以及 `bvecs` / `csr`；端口没有 parquet/arrow 读取，落到文本路径后报 `stream did not contain valid UTF-8`；
-- **3 个大数据量结果不一致**：`dml/compact/test_compact_big`（`WHERE c2 = False` 返回了行）、`dql/aggregate/test_simple_agg_big`、`dml/import/test_fvecs`；
-- **2 个 EXPLAIN FRAGMENT 的计划文本不同**：`explain/explain_fragment`、`dql/knn/tensor/fusion_rerank_maxsim`；
-- **1 个搜索选项未识别**：`dql/knn/tensor/test_emvb_index_big` 的 `emvb_threshold_first`。
+跳过的 9 个文件需要重写版没有实现的导入格式，名单写在 `cli/src/main.rs` 的 `UNIMPLEMENTED_FORMATS` 常量里（每次运行都会打印），其余文件失败就会让门禁变红：
 
-其余 193 个文件通过。恢复快照时列文件要跟着新表的列 id 改名：`DROP COLUMN` 之后幸存列保留原 id（`1.col`、`2.col`），而 `create_table_typed` 把重建表的列从 0 编号，读侧按 `meta.ids` 找不到 `0.col` 就整块解码失败、表读成空（`substitute_column_id`）。
+| 格式 | 文件 | 现状 |
+| --- | --- | --- |
+| `FORMAT PARQUET` | `dml/import/test_import_gen_parquet{,_embedding,_multivector,_sparse,_tensor,_tensor_array,_varchar}.slt` | 没有 parquet/arrow 读取，落到文本路径后报 `stream did not contain valid UTF-8` |
+| `bvecs` | `dml/import/test_bvecs.slt` | 二进制向量文件未实现 |
+| `csr` | `dml/import/test_csr.slt` | 稀疏矩阵文件未实现 |
+
+三处与参考不一致的地方已经按参考口径对齐，不再需要跳过：
+
+- **CSV 导入的整数溢出**：参考的 `ColumnVector::AppendByStringView` 用 `std::from_chars` 把单元格读进列自己的宽度，越界时目标保持初始 0 且 `ptr == end`（不报错），所以 `TINYINT` 列里的 `5000` 存成 0；重写版按同样口径处理（`zero_out_of_range_int`），`dql/aggregate/test_simple_agg_big` 通过。
+- **浮点单元格的文本**：embedding/tensor 元素按 C++ `std::format("{}")` 渲染——指数小于 -4 或大于等于有效位数时用科学计数法（`fmt_f32_cpp` / `fmt_f64_cpp`），`dml/import/test_fvecs` 通过。
+- **谓词扫描的墓碑**：`direct_projection` 的等值过滤分支自己读块，不经过 `try_rows` 的删除过滤；现在它同样丢掉删除日志里的行，`dml/compact/test_compact_big` 通过。恢复快照时列文件要跟着新表的列 id 改名：`DROP COLUMN` 之后幸存列保留原 id（`1.col`、`2.col`），而 `create_table_typed` 把重建表的列从 0 编号，读侧按 `meta.ids` 找不到 `0.col` 就整块解码失败、表读成空（`substitute_column_id`）。
 
 ### 2.1 事务冲突检查 / 回滚
 

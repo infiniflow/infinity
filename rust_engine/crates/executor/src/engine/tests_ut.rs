@@ -1021,8 +1021,16 @@ mod tests {
         // The plan follows the envelope: the root operator gains an arrow, the
         // rest is the physical text.
         assert_eq!(fragment[2][0], format!("->{}", physical[0][0]));
-        assert_eq!(&fragment[3..fragment.len() - 1], &physical[1..]);
-        assert!(fragment.last().unwrap()[0].starts_with("-> SOURCE ("));
+        // `ExplainFragment::Explain` appends a blank element after each
+        // fragment, so the plan text is followed by the source line and then
+        // one empty line.
+        assert!(
+            fragment.last().unwrap()[0].is_empty(),
+            "{:?}",
+            fragment.last()
+        );
+        assert_eq!(&fragment[3..fragment.len() - 2], &physical[1..]);
+        assert!(fragment[fragment.len() - 2][0].starts_with("-> SOURCE ("));
     }
 
     /// A blocking operator turns the fragment into a parallel materialize, as

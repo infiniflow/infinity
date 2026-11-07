@@ -950,6 +950,28 @@ pub(crate) fn encode_row(row: &[Literal], types: &[String]) -> String {
         .join("\t")
 }
 
+/// The reference's CSV cell parser for integer columns:
+/// `ColumnVector::AppendByStringView` → `DataType::StringToValue<TinyIntT>`.
+///
+/// `std::from_chars` into the column's own width leaves the destination at its
+/// initial 0 when the digits are out of range, and - because it still consumed
+/// every digit - the reference's `ptr != end` check does not fire. So an
+/// out-of-range cell is stored as 0, not wrapped and not rejected. Returns the
+/// replacement cell when it applies.
+pub(crate) fn zero_out_of_range_int(type_text: &str, cell: &str) -> Option<String> {
+    let upper = type_text.trim().to_ascii_uppercase();
+    let head = upper.split(['(', ',', ' ']).next().unwrap_or("").trim();
+    let (min, max) = match head {
+        "TINYINT" | "INT8" => (i64::from(i8::MIN), i64::from(i8::MAX)),
+        "SMALLINT" | "INT16" => (i64::from(i16::MIN), i64::from(i16::MAX)),
+        "INT" | "INTEGER" | "INT32" => (i64::from(i32::MIN), i64::from(i32::MAX)),
+        // BIGINT is the widest: nothing can overflow it.
+        _ => return None,
+    };
+    let n: i64 = cell.trim().parse().ok()?;
+    (n < min || n > max).then(|| "0".to_string())
+}
+
 /// Renders a column default for `SHOW TABLE … COLUMNS`, mirroring the C++
 /// `default_expr_->ToString()`. An absent default prints as `Null`; a sparse
 /// default reproduces the C++ renderer, which (for float sparses) prints the
@@ -5142,6 +5164,10 @@ pub(crate) fn fragment_text(lines: Vec<String>) -> Vec<String> {
         }
     }
     out.push(format!("-> SOURCE ({source}) Table"));
+    // `ExplainFragment::Explain` appends a blank element after each fragment
+    // ("Insert blank elements after each Fragment for alignment",
+    // `explain_fragment_impl.cpp:67`); a client sees it as an empty row.
+    out.push(String::new());
     out
 }
 
@@ -5953,6 +5979,95 @@ pub(crate) fn decode_delimiter(v: &str) -> char {
 }
 
 /// Shortest float rendering (`1.0` → `1`, `0.40` → `0.4`).
+/// C++ `std::format("{}", float)`: the shortest round-trip form, in scientific
+/// notation when the decimal exponent is below -4 or at least the digit count
+/// (`std::to_chars`'s general format). Rust's own `Display` never switches to an
+/// exponent, which made a small fvecs element read `0.000052582283` where the
+/// reference writes `5.2582283e-05`.
+pub(crate) fn fmt_f32_cpp(v: f32) -> String {
+    if v == 0.0 {
+        return if v.is_sign_negative() { "-0" } else { "0" }.to_string();
+    }
+    if !v.is_finite() {
+        return if v.is_nan() {
+            "nan"
+        } else if v > 0.0 {
+            "inf"
+        } else {
+            "-inf"
+        }
+        .to_string();
+    }
+    fmt_cpp_float(&format!("{v:e}"), v.is_sign_negative())
+}
+
+/// The same for a `double` cell or a half-precision element widened to `f64`.
+pub(crate) fn fmt_f64_cpp(v: f64) -> String {
+    if v == 0.0 {
+        return if v.is_sign_negative() { "-0" } else { "0" }.to_string();
+    }
+    if !v.is_finite() {
+        return if v.is_nan() {
+            "nan"
+        } else if v > 0.0 {
+            "inf"
+        } else {
+            "-inf"
+        }
+        .to_string();
+    }
+    fmt_cpp_float(&format!("{v:e}"), v.is_sign_negative())
+}
+
+/// Formats the shortest scientific spelling Rust produced (`1.5e-5`) the way
+/// `std::to_chars`'s general format does: fixed notation unless the exponent is
+/// below -4 or at least the number of significant digits.
+fn fmt_cpp_float(sci: &str, negative: bool) -> String {
+    let (mantissa, exponent) = sci.split_once('e').expect("exponent");
+    let exponent: i32 = exponent.parse().expect("exponent");
+    let digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
+    let count = digits.len() as i32;
+    if exponent < -4 || exponent >= count {
+        let mut out = String::new();
+        if negative {
+            out.push('-');
+        }
+        out.push_str(&digits[..1]);
+        if count > 1 {
+            out.push('.');
+            out.push_str(&digits[1..]);
+        }
+        out.push('e');
+        out.push(if exponent < 0 { '-' } else { '+' });
+        out.push_str(&format!("{:02}", exponent.abs()));
+        return out;
+    }
+    let mut out = String::new();
+    if negative {
+        out.push('-');
+    }
+    if exponent >= 0 {
+        let integer = (exponent + 1) as usize;
+        if digits.len() <= integer {
+            out.push_str(&digits);
+            for _ in digits.len()..integer {
+                out.push('0');
+            }
+        } else {
+            out.push_str(&digits[..integer]);
+            out.push('.');
+            out.push_str(&digits[integer..]);
+        }
+    } else {
+        out.push_str("0.");
+        for _ in 0..(-exponent - 1) {
+            out.push('0');
+        }
+        out.push_str(&digits);
+    }
+    out
+}
+
 pub(crate) fn fmt_num(f: f64) -> String {
     if f.fract() == 0.0 && f.abs() < 1e15 {
         format!("{}", f as i64)

@@ -538,7 +538,8 @@ pub(crate) fn tensor_row_text(outline: &[u8], at: usize, dim: usize, elem: i32) 
 }
 
 /// Renders one embedding element the way the reference's `ToString` does:
-/// integers exactly, floats with the shortest `f32`/`f64` spelling.
+/// integers exactly, floats with `std::format("{}")` (which switches to an
+/// exponent for small magnitudes; Rust's `Display` does not).
 pub(crate) fn embedding_element_text(bytes: &[u8], element_type: i32) -> Option<String> {
     Some(match element_type {
         1 => bytes.first().copied()?.to_string(),
@@ -546,11 +547,12 @@ pub(crate) fn embedding_element_text(bytes: &[u8], element_type: i32) -> Option<
         3 => i16::from_le_bytes(bytes.try_into().ok()?).to_string(),
         4 => i32::from_le_bytes(bytes.try_into().ok()?).to_string(),
         5 => i64::from_le_bytes(bytes.try_into().ok()?).to_string(),
-        6 => f32::from_le_bytes(bytes.try_into().ok()?).to_string(),
-        7 => f64::from_le_bytes(bytes.try_into().ok()?).to_string(),
-        8 | 9 => {
-            storage::definition::format::read_embedding_element(bytes, element_type)?.to_string()
-        }
+        6 => crate::engine::state::fmt_f32_cpp(f32::from_le_bytes(bytes.try_into().ok()?)),
+        7 => crate::engine::state::fmt_f64_cpp(f64::from_le_bytes(bytes.try_into().ok()?)),
+        // `float16_t` / `bfloat16_t` are printed through their `f32` value.
+        8 | 9 => crate::engine::state::fmt_f32_cpp(
+            storage::definition::format::read_embedding_element(bytes, element_type)? as f32,
+        ),
         _ => return None,
     })
 }

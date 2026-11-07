@@ -1493,7 +1493,9 @@ impl Engine {
                 let vals: Vec<String> = (0..dim)
                     .map(|i| {
                         let b = &bytes[pos + i * 4..pos + i * 4 + 4];
-                        format!("{}", f32::from_le_bytes(b.try_into().unwrap()))
+                        // C++ writes the element with `std::format("{}")`, whose
+                        // general format switches to an exponent for tiny values.
+                        fmt_f32_cpp(f32::from_le_bytes(b.try_into().unwrap()))
                     })
                     .collect();
                 pos += dim * 4;
@@ -1634,12 +1636,21 @@ impl Engine {
                         }
                     }
                 }
-                for (i, c) in cells.iter().enumerate() {
+                for (i, c) in cells.iter_mut().enumerate() {
                     if let Some(t) = types_for_scan.get(i) {
                         validate_insert_value(t, c.trim()).map_err(|e| match e {
                             Error::Invalid(m) if m.starts_with("parser:") => Error::Invalid(m),
                             other => Error::Invalid(format!("import: {other}")),
                         })?;
+                        // `AppendByStringView` reads an integer cell with
+                        // `std::from_chars` into the column's own type. An
+                        // out-of-range cell consumes every digit, so the
+                        // reference's `ptr != end` check passes and the value
+                        // keeps its initial 0 - it is neither an error nor a
+                        // wrapped value.
+                        if let Some(zeroed) = zero_out_of_range_int(t, c) {
+                            *c = zeroed;
+                        }
                     }
                 }
                 batch.push(cells.into_iter().map(Literal::Str).collect());

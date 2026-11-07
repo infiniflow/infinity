@@ -401,6 +401,13 @@ fn agg_label(func: AggFunc, args: &[String]) -> String {
     format!("{}({})", func.as_str(), args.join(","))
 }
 
+/// The registry key of one aggregate: its label plus DISTINCT. `sum(c1)` and
+/// `sum(DISTINCT c1)` are different accumulators that share the label a client
+/// sees, so the dedupe key has to carry the flag.
+fn agg_key(func: AggFunc, args: &[String], distinct: bool) -> String {
+    format!("{}|{distinct}", agg_label(func, args))
+}
+
 /// True if `e` contains an aggregate call.
 fn expr_has_agg(e: &ExprAst) -> bool {
     match e {
@@ -434,12 +441,13 @@ fn gather_agg(
                     })
                     .collect();
                 let label = agg_label(f, &arg_vec);
-                if !index.contains_key(&label) {
+                let key = agg_key(f, &arg_vec, false);
+                if let std::collections::hash_map::Entry::Vacant(slot) = index.entry(key) {
                     let idxs: Vec<usize> = arg_vec
                         .iter()
                         .map(|c| scope.resolve(c).map(|(idx, _)| idx))
                         .collect::<Result<Vec<_>>>()?;
-                    index.insert(label.clone(), base + aggs.len());
+                    slot.insert(base + aggs.len());
                     aggs.push((f, idxs, false, label));
                 }
             } else {
@@ -556,8 +564,9 @@ fn compile_agg_expr(
                     })
                     .collect();
                 let label = agg_label(f, &arg_vec);
+                let key = agg_key(f, &arg_vec, false);
                 let idx = *agg_index
-                    .get(&label)
+                    .get(&key)
                     .ok_or_else(|| Error::Invalid(format!("aggregate '{label}' not collected")))?;
                 Expr::Column(idx)
             } else {
@@ -712,8 +721,9 @@ fn item_agg_expr(
     match it {
         SelectItem::Aggregate(a) => {
             let label = agg_label(a.func, &a.args);
+            let key = agg_key(a.func, &a.args, a.distinct);
             let idx = *agg_index
-                .get(&label)
+                .get(&key)
                 .ok_or_else(|| Error::Invalid(format!("aggregate '{label}' not collected")))?;
             Ok(Expr::Column(idx))
         }
@@ -961,7 +971,8 @@ pub(crate) fn plan_select_bound(
             match it {
                 SelectItem::Aggregate(a) => {
                     let label = agg_label(a.func, &a.args);
-                    if !agg_index.contains_key(&label) {
+                    let key = agg_key(a.func, &a.args, a.distinct);
+                    if let std::collections::hash_map::Entry::Vacant(slot) = agg_index.entry(key) {
                         let idxs: Vec<usize> = a
                             .args
                             .iter()
@@ -971,7 +982,7 @@ pub(crate) fn plan_select_bound(
                                 None => agg_scope.resolve(c).map(|(idx, _)| idx),
                             })
                             .collect::<Result<Vec<_>>>()?;
-                        agg_index.insert(label.clone(), base + aggs.len());
+                        slot.insert(base + aggs.len());
                         aggs.push((a.func, idxs, a.distinct, label));
                     }
                 }

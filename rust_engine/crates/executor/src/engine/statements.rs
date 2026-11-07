@@ -2429,7 +2429,21 @@ impl Engine {
                     self.read_blocks_pruned_values(table, &needed, &prune).ok()
                 };
                 match narrowed {
-                    Some((_, rows)) => rows.into_iter().map(|(_, cells)| cells).collect(),
+                    Some((_, rows)) => {
+                        // A delete reaches the block's `version` at the next
+                        // checkpoint; until then it lives in the table's delete
+                        // log. The block reader returns the tombstoned rows
+                        // (the count guards in `try_rows` expect them), so this
+                        // path - which does not run the row set through
+                        // `try_rows` - drops them here.
+                        let dead = self
+                            .tombstone_set_at(table, crate::read_ts())
+                            .unwrap_or_default();
+                        rows.into_iter()
+                            .filter(|(seq, _)| !dead.contains(&(*seq as u64)))
+                            .map(|(_, cells)| cells)
+                            .collect()
+                    }
                     None => self.fetch_rows_pruned(table, &prune).ok()?,
                 }
             }
@@ -6754,6 +6768,11 @@ impl Engine {
                         | "index_type"
                         // `MATCH TEXT`/`MATCH SPARSE` carry a per-search filter.
                         | "filter"
+                        // `ParseMatchTensorExpr`'s EMVB pruning thresholds; the
+                        // port's EMVB search scores candidates exactly and does
+                        // not prune on them yet.
+                        | "emvb_threshold_first"
+                        | "emvb_threshold_final"
                 );
                 if !known {
                     return Err(Error::Invalid(format!(

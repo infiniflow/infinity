@@ -3653,15 +3653,15 @@ impl Engine {
                     // after it does not exist yet, and one deleted after it is
                     // still there.
                     let created_at = Self::created_at(version, read_ts);
-                    rows.extend(
-                        cells
-                            .into_iter()
-                            .enumerate()
-                            .filter(|(slot, _)| {
-                                Self::slot_visible(version, *slot, created_at, read_ts)
-                            })
-                            .map(|(_, row)| row),
-                    );
+                    // The slot comes from the row id, not from the position in
+                    // `cells`: a `keep` predicate drops rejected rows during
+                    // the decode, so the k-th surviving row is not the k-th slot
+                    // and enumerating the survivors let a deleted row through
+                    // whenever some live low slot took its place.
+                    rows.extend(cells.into_iter().filter(|(seq, _)| {
+                        let slot = (*seq as u64 & 0xffff_ffff) as usize % DEFAULT_BLOCK_CAPACITY;
+                        Self::slot_visible(version, slot, created_at, read_ts)
+                    }));
                 }
                 Err(_) if at == 0 => {
                     return Err(Error::NotFound(format!("no blocks for table '{table}'")))
