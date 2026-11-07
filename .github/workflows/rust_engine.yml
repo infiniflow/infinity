@@ -453,6 +453,9 @@ jobs:
         with:
           submodules: recursive
       - name: Install the pinned toolchain
+        # rust-toolchain.toml lives in rust_engine; from the repo root rustup
+        # picks the runner's default (stable), where miri does not exist.
+        working-directory: rust_engine
         run: |
           rustup toolchain install --profile minimal
           rustup component add miri
