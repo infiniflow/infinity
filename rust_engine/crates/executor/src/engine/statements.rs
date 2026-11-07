@@ -214,10 +214,17 @@ impl Engine {
         // record by replaying the typed WAL command, so a directory that was
         // killed before its next checkpoint still has its schema. Replaying
         // before the blocks matters - the block recovery walks the tables.
+        // A no-WAL engine's durable state is the last checkpoint: the catalog
+        // journal above already undid everything written after it, and letting
+        // the log put those DDLs and rows back would contradict the mode (the
+        // reference replays only records up to its last checkpoint ts).
+        let wal_enabled = options.wal_enabled;
         let applied = engine.txn.applied_ts()?;
-        engine.txn.replay_commands(applied, |cmd, ts| {
-            crate::wal_bridge::replay(&engine, cmd, ts)
-        })?;
+        if wal_enabled {
+            engine.txn.replay_commands(applied, |cmd, ts| {
+                crate::wal_bridge::replay(&engine, cmd, ts)
+            })?;
+        }
         // The blocks next, then the WAL's rows on top: what the files carry is
         // already applied, so the replay starts above the newest timestamp they
         // hold (the reference's checkpoint record gives it the same floor).
@@ -227,15 +234,17 @@ impl Engine {
         // after. A record above `applied` (the newest checkpoint frame) still
         // has KV work to do; a record above `hydrated` still has to reach a
         // block.
-        let mut replayed_appends = Vec::new();
-        let mut replayed_deletes = Vec::new();
-        engine.txn.recover_into(
-            applied,
-            hydrated,
-            &mut replayed_appends,
-            &mut replayed_deletes,
-        )?;
-        engine.apply_replayed_rows(replayed_appends, replayed_deletes)?;
+        if wal_enabled {
+            let mut replayed_appends = Vec::new();
+            let mut replayed_deletes = Vec::new();
+            engine.txn.recover_into(
+                applied,
+                hydrated,
+                &mut replayed_appends,
+                &mut replayed_deletes,
+            )?;
+            engine.apply_replayed_rows(replayed_appends, replayed_deletes)?;
+        }
         engine.rebuild_indexes()?;
         // `MetaTableObject::RestoreTableCache`: the allocator has no memory of
         // its own across a restart. The segment map, and the row id to continue
