@@ -135,17 +135,18 @@ STAGES = {
     "drop_database": 0,
 }
 
-# Stages the port still writes differently. Listed here rather than silently
-# narrowing the gate: each one is a real deviation, with what the comparison
-# flagged. The gate turns green for a stage as soon as its marker is removed.
+# Stages the port still writes differently: stage -> why. Empty means every
+# DDL below matches the reference byte for byte. A stage added here must name
+# exactly what the comparison flagged, so the marker is a record of the gap
+# rather than a way to silence it.
 KNOWN_DIFFERENCES = {
     "drop_index": (
         "keys, ids and files match; the drop marker's ts is 4 higher than the "
         "reference's (drop|idx|… = 52 vs 56). An explicit dump_index with "
         "nothing left to seal commits **read-only** in the reference (no ts, no "
-        "WAL entry); the port spends a write ts and writes an entry, and the "
-        "reopen then stops skipping its startup checkpoint, so the clock is 4 "
-        "ahead from there on"
+        "WAL entry); the port seals the index tail at the checkpoint and its "
+        "dump then spends a write ts and writes an entry, which also stops the "
+        "next open from skipping its startup checkpoint - 4 in total"
     ),
 }
 # The stages after `drop_index` compare the same marker.

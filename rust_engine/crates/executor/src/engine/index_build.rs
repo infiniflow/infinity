@@ -348,6 +348,29 @@ impl Engine {
         })
     }
 
+    /// Whether `index` still holds rows in its memory tail.
+    ///
+    /// A kind whose tail is not modelled here reports `true`, so the dump
+    /// behaves exactly as before for it.
+    fn index_has_memory_tail(&self, table: &str, index: &str) -> bool {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+            return true;
+        };
+        let Some(meta) = indexes.iter().find(|i| i.name == index && i.table == *table) else {
+            return true;
+        };
+        if !is_secondary_kind(&meta.index_type) {
+            return true;
+        }
+        let key = self.table_key(table);
+        let tables = self.tables.lock().unwrap();
+        tables
+            .get(&key)
+            .and_then(|e| e.secondary.indexes.get(&meta.column))
+            .map(|i| i.approx_bytes() > 0)
+            .unwrap_or(false)
+    }
+
     /// The `DumpIndex` RPC: C++ `NewTxn::DumpMemIndex` inside a transaction of
     /// its own (`DumpIndexProcessor::DoDump` opens one with
     /// `BeginTxnShared(…, kDumpMemIndex)`).
