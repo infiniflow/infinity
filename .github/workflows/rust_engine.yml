@@ -249,6 +249,12 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: Install the SDK and the test dependencies
         run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - name: Install bubblewrap
+        # The amd64 image ships it; ubuntu-24.04-arm does not, and the suite
+        # needs a PID namespace.
+        run: |
+          command -v bwrap >/dev/null 2>&1 ||
+            { sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap; }
       - name: Restart suite
         run: |
           # The harness starts the engine as '<binary> --config=<toml>'; the
@@ -374,6 +380,13 @@ jobs:
         run: |
           uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
           uv run python -m nltk.downloader punkt_tab
+      - name: Install bubblewrap
+        # The amd64 image ships it; ubuntu-24.04-arm does not, and the suite
+        # needs a PID namespace.
+        run: |
+          command -v bwrap >/dev/null 2>&1 ||
+            { sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap; }
+
       - name: loom (commit-ts ordering model)
         working-directory: rust_engine
         run: RUSTFLAGS="--cfg loom" cargo test -p txn --lib
