@@ -1228,7 +1228,8 @@ pub fn replay(
             .is_empty()
         {
             if let Ok(Some(meta)) = catalog.get_table_by_name(&full) {
-                let _ = engine.publish_index_chunks(&full, meta.id, Some((name.as_str(), commit_ts)));
+                let _ =
+                    engine.publish_index_chunks(&full, meta.id, Some((name.as_str(), commit_ts)));
             }
         }
     }

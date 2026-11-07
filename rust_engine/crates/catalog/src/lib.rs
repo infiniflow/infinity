@@ -1841,9 +1841,8 @@ impl Catalog {
                 names.push(name.to_string());
                 batch.push((tag.into_bytes(), Some(names.join(",").into_bytes())));
             } else {
-                let def = crate::layout::index_def_for(&meta, &layout).ok_or_else(|| {
-                    Error::Catalog(format!("index '{name}' has no C++ record"))
-                })?;
+                let def = crate::layout::index_def_for(&meta, &layout)
+                    .ok_or_else(|| Error::Catalog(format!("index '{name}' has no C++ record")))?;
                 batch.push((
                     storage::catalog_format::catalog_index_key(
                         &db_str,
