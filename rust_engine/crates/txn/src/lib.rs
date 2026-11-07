@@ -278,14 +278,16 @@ pub struct TxnManager {
     /// reader's snapshot can never land between a write transaction's begin and
     /// its commit.
     prepare_commit_ts: AtomicU64,
-    /// Monotonic high-water mark of commit timestamps applied to the KV. The
-    /// marker written into each batch must never regress, or a concurrent
-    /// checkpoint would keep a much longer WAL than necessary.
+    /// Monotonic high-water mark of commit timestamps whose batch has reached
+    /// the store. Set **after** the write lands, so a reader never sees a commit
+    /// whose keys are still in flight.
     max_applied: AtomicU64,
     /// Highest commit timestamp appended to the active log (rotation seal).
     last_appended: AtomicU64,
-    /// Highest commit timestamp whose batch has been fsynced to the KV store;
-    /// only records up to this point may be dropped from the log.
+    /// Highest commit timestamp the last store flush covers
+    /// ([`Self::flush`]): the completed-commit clock as it stood when the SST
+    /// was written. This is the replay floor a checkpoint frame may claim, and
+    /// only records up to it may be dropped from the log.
     synced: AtomicU64,
     /// Highest commit ts whose **entry** is durable in the log.
     ///
@@ -1064,8 +1066,12 @@ impl TxnManager {
         // No applied marker: the replay floor comes from the WAL's checkpoint
         // frame (`TxnManager::last_checkpoint_ts`), exactly as the reference
         // derives it, so the KV holds nothing but the keys themselves.
-        self.max_applied.fetch_max(commit_ts, Ordering::SeqCst);
         apply_split(self.store.as_ref(), self.catalog_store.as_ref(), writes)?;
+        // Only now is the batch in the store. The marker is what a flush reports
+        // as durable (`synced`), so it may not run ahead of the write: a
+        // checkpoint frame built from a marker set before the batch landed
+        // would claim a commit the SST does not hold.
+        self.max_applied.fetch_max(commit_ts, Ordering::SeqCst);
         {
             let mut seen = self.write_ts.lock().unwrap();
             for (key, _) in &txn.writes {
@@ -1341,30 +1347,33 @@ impl TxnManager {
     /// that has data but no checkpoint ("WAL replay: No checkpoint found in
     /// wal", `wal_manager_impl.cpp:670`). The entry therefore has to survive the
     /// truncation that follows it, and the log must never be left empty.
-    pub fn append_checkpoint(&self, max_commit_ts: TxnTimeStamp) -> Result<()> {
-        let begin_ts = self.current_ts.load(Ordering::SeqCst) + 1;
-        self.write_checkpoint(begin_ts, max_commit_ts)
-    }
-
-    /// [`Self::append_checkpoint`] with the checkpoint transaction's **begin**
-    /// ts handed in.
     ///
-    /// `NewTxn::Checkpoint` freezes `begin_ts` when the transaction starts
-    /// (`txn_context_ptr_->begin_ts_`, before any file is written) and takes the
-    /// commit ts only at the end (`CommitTxn` -> `GetWriteCommitTS`). A caller
-    /// that writes the files in between - the real checkpoint - freezes the
-    /// begin ts first and commits here, so the frame's payload never claims a
-    /// record the flush has not covered.
-    pub fn append_checkpoint_at(&self, begin_ts: TxnTimeStamp) -> Result<()> {
-        self.write_checkpoint(begin_ts, begin_ts.saturating_sub(1))
+    /// The frame is the replay floor: every record at or below it is skipped
+    /// because the checkpoint's files hold it. So the payload is exactly what
+    /// the last store flush covered ([`Self::synced_ts`]) - not the clock,
+    /// which also names commits that are still only in the memtable, and not a
+    /// ts frozen when the checkpoint started, which under-claims whatever
+    /// committed while the mirror ran (the SST is written at the *end*, so it
+    /// holds those too and the replay then redoes them).
+    ///
+    /// The payload stays odd, as the reference requires (it aborts on an even
+    /// `last_ckp_ts`, `new_txn_impl.cpp:1759`). `synced` is a commit ts
+    /// (even) after a flush and a frame payload (odd) straight after a replay,
+    /// so it is rounded **up** to the next odd value; the frame then covers
+    /// every commit the SST holds.
+    ///
+    /// The caller must have written the block mirror for the same range; a
+    /// caller that only rotates the WAL needs no mirror because it writes no
+    /// store either - the frame then simply repeats the last flush's floor.
+    pub fn append_checkpoint_flushed(&self) -> Result<()> {
+        self.write_checkpoint(self.synced_ts() | 1)
     }
 
-    fn write_checkpoint(&self, begin_ts: TxnTimeStamp, floor_hint: TxnTimeStamp) -> Result<()> {
+    fn write_checkpoint(&self, frame_ts: TxnTimeStamp) -> Result<()> {
         let _commit = self.commit_lock.lock().unwrap();
-        // The caller usually passes the KV's applied marker, which stays 0
-        // until a recovery runs; the manager's own high-water marks are always
-        // current.
-        let floor = floor_hint
+        // The manager's high-water marks are always current; a directory that
+        // holds nothing yet has none of them set.
+        let floor = frame_ts
             .max(self.max_applied.load(Ordering::SeqCst))
             .max(self.last_appended.load(Ordering::SeqCst))
             .max(self.current_ts.load(Ordering::SeqCst))
@@ -1379,12 +1388,13 @@ impl TxnManager {
         // (`NewTxn::Checkpoint`, `TransactionType::kNewCheckpoint`), so it
         // spends a timestamp like any other: `BeginTxnShared` sets the begin ts
         // to `current_ts_ + 1` and the commit takes `prepare_commit_ts_ += 2`.
-        // The command carries the **begin** ts (`checkpoint_ts =
-        // txn_context_ptr_->begin_ts_`), which is odd, and `NewTxn::Checkpoint`
-        // rejects an even one outright ("last checkpoint ts isn't correct",
-        // `new_txn_impl.cpp:1754`); a directory whose checkpoint frame names an
-        // even ts makes the reference abort on startup. The frame's own commit
-        // ts is the even value one above it.
+        // The command carries an odd ts (`checkpoint_ts =
+        // txn_context_ptr_->begin_ts_`, which is `current_ts_ + 1` in the
+        // reference because every write's bottom half is done by then), and
+        // `NewTxn::Checkpoint` rejects an even one outright ("last checkpoint
+        // ts isn't correct", `new_txn_impl.cpp:1754`); a directory whose
+        // checkpoint frame names an even ts makes the reference abort on
+        // startup. The frame's own commit ts is the even value one above it.
         let commit_ts = self.prepare_commit_ts.fetch_add(2, Ordering::SeqCst) + 2;
         // The reference swaps the file first (`kNewCheckpoint` commit path,
         // `wal_manager_impl.cpp:288`), then writes the frame into the new
@@ -1398,7 +1408,7 @@ impl TxnManager {
             self.next_txn_id.fetch_add(1, Ordering::SeqCst) as i64,
             commit_ts,
             vec![WalCmd::Checkpoint {
-                max_commit_ts: begin_ts,
+                max_commit_ts: frame_ts,
             }],
         );
         // One job for the whole step, the way `WalManager::Flush` swaps inside
@@ -1417,9 +1427,14 @@ impl TxnManager {
             self.last_swap.store(seal, Ordering::SeqCst);
         }
         self.note_standalone(TxnOp::Checkpoint, commit_ts);
-        // The checkpoint transaction is committed: its commit ts is the clock's
-        // new position, exactly as `CommitBottom` leaves `current_ts_`.
-        self.current_ts.store(commit_ts, Ordering::SeqCst);
+        // The checkpoint transaction is committed, so its commit ts becomes the
+        // clock's new position - through `CommitBottom`'s ordered publication,
+        // not a store: a commit that reserved a smaller ts may still be in
+        // flight (it is on its way to `commit_lock`, which this checkpoint
+        // holds), and moving `current_ts` past it would make the *next*
+        // checkpoint's frame claim a commit whose records are not in the SST.
+        self.register_bottom(commit_ts);
+        self.finish_bottom(commit_ts);
         Ok(())
     }
 
@@ -1448,7 +1463,10 @@ impl TxnManager {
         self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
         self.sync_wal_grouped()?;
         self.note_standalone(TxnOp::Cleanup, commit_ts);
-        self.current_ts.store(commit_ts, Ordering::SeqCst);
+        // Published in commit-ts order, like any other commit: see
+        // [`Self::write_checkpoint`].
+        self.register_bottom(commit_ts);
+        self.finish_bottom(commit_ts);
         Ok(())
     }
 
@@ -1497,15 +1515,23 @@ impl TxnManager {
     /// The checkpoint's store step: everything applied so far becomes an SST.
     ///
     /// This does not sync the log (only the checkpoint frame in
-    /// [`Self::append_checkpoint`] is synced) — the SST is what carries the
+    /// [`Self::append_checkpoint_flushed`] is synced) — the SST is what carries the
     /// checkpoint. The checkpoint entry itself is appended by the caller that
     /// owns the checkpoint (`flush_storage`, `checkpoint_wal`): a checkpoint is
     /// a write transaction in the reference and therefore spends a timestamp, so
     /// it must not be appended twice for one flush.
+    ///
+    /// [`Self::synced_ts`] moves to the **completed-commit** clock, not to
+    /// `max_applied`: the clock only passes a commit once its bottom half (the
+    /// block mirror, the index entries) is in place, so `synced` names a ts
+    /// whose writes of every kind the flush covered.
     pub fn flush(&self) -> Result<()> {
+        // Read the clock *before* the flush: a commit that lands while RocksDB
+        // writes the SST is in the next one, so `synced` never names a batch
+        // this flush did not cover.
+        let covered = self.current_ts.load(Ordering::SeqCst);
         self.store.flush()?;
-        let applied = self.max_applied.load(Ordering::SeqCst);
-        self.synced.fetch_max(applied, Ordering::SeqCst);
+        self.synced.fetch_max(covered, Ordering::SeqCst);
         Ok(())
     }
 

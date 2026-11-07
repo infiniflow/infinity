@@ -962,6 +962,11 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
             };
             let first = meta.columns.len();
             for def in column_defs {
+                // Already replayed once: the entry sits above the frame's floor
+                // but its records are in the SST (see the drop arms below).
+                if meta.ids.contains(&(def.id as u64)) {
+                    continue;
+                }
                 let Some(type_text) = data_type_text(&def.column_type) else {
                     continue;
                 };
@@ -1001,12 +1006,23 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
                     WalCmd::DropDatabase { db_name, .. } => {
                         catalog.drop_database(db_name, true)?;
                     }
+                    // A DDL that is already in the store must not fail the open.
+                    // The frame's floor is the *completed-commit* clock, while the
+                    // checkpoint flushes the store at the end, so a commit that
+                    // landed while the mirror ran is durable but sits above the
+                    // floor and is replayed once more. The reference re-applies
+                    // the recorded KV batch and is idempotent for that reason;
+                    // these arms recompute the layout, so they have to tolerate
+                    // the change they are about to make already being there.
                     WalCmd::DropTable {
                         db_name,
                         table_name,
                         ..
                     } => {
-                        let _ = catalog.drop_table(&qualified(db_name, table_name))?;
+                        let full = qualified(db_name, table_name);
+                        if catalog.get_table_by_name(&full)?.is_some() {
+                            let _ = catalog.drop_table(&full)?;
+                        }
                     }
                     WalCmd::RenameTable {
                         db_name,
@@ -1014,10 +1030,17 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
                         new_table_name,
                         ..
                     } => {
-                        catalog.rename_table(
-                            &qualified(db_name, table_name),
-                            &qualified(db_name, new_table_name),
-                        )?;
+                        let (from, to) = (
+                            qualified(db_name, table_name),
+                            qualified(db_name, new_table_name),
+                        );
+                        // Renamed already: the source is gone and the target
+                        // holds the table.
+                        if catalog.get_table_by_name(&from)?.is_some()
+                            && catalog.get_table_by_name(&to)?.is_none()
+                        {
+                            catalog.rename_table(&from, &to)?;
+                        }
                     }
                     WalCmd::DropColumns {
                         db_name,
@@ -1027,6 +1050,12 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
                     } => {
                         let full = qualified(db_name, table_name);
                         for column in column_names {
+                            let Some(meta) = catalog.get_table_by_name(&full)? else {
+                                return Ok(());
+                            };
+                            if !meta.columns.iter().any(|c| c == column) {
+                                continue; // dropped already
+                            }
                             catalog.drop_column(&full, column)?;
                         }
                     }

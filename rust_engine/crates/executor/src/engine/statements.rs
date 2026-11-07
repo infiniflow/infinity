@@ -282,8 +282,11 @@ impl Engine {
         // (DDL, segment marks, chunk records) is in an SST by the time the frame
         // claims it. Without the flush the next crash would lose those records
         // and the frame would hide the WAL entries that recreate them.
-        engine.storage.catalog.flush()?;
-        engine.txn.append_checkpoint(0)?;
+        // Through the transaction manager, not the store alone: the flush also
+        // records how far the SST goes (`synced`), which is what a WAL-only
+        // checkpoint frame is allowed to claim.
+        engine.txn.flush()?;
+        engine.txn.append_checkpoint_flushed()?;
         // The frame is appended unsynced (the commit path syncs in batches, as
         // NewFlush does); the startup checkpoint is its own batch, so sync it
         // here. Without this a directory whose only frame is this one would

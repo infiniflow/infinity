@@ -522,6 +522,59 @@ fn checkpoint_ts_skips_already_applied_records() {
     assert_eq!(rows, 2);
 }
 
+/// A checkpoint frame is the replay floor: every record at or below it is
+/// skipped because the checkpoint's files hold it. A frame written by a
+/// WAL-only rotation therefore may not name the clock - the commits since the
+/// last flush are in the RocksDB memtable (catalog writes carry no log) and in
+/// the block buffer, so naming them hides the entries that recreate them.
+///
+/// Measured on `test_alter_simple`: the periodic trigger appended such a frame
+/// between the DDLs and the flush that follows it, the harness killed the
+/// server in that window, and the restart found an empty catalog with a frame
+/// claiming ts 17.
+#[test]
+fn a_wal_only_checkpoint_claims_only_the_flushed_commits() {
+    let dir = tempdir().unwrap();
+    let m = manager(dir.path());
+    let mut t = m.begin();
+    t.put(row("default_db.t", 0), b"v".to_vec());
+    let committed = m.commit(t).unwrap();
+    assert_eq!(m.synced_ts(), 0, "no store flush has happened yet");
+    m.append_checkpoint_flushed().unwrap();
+    let floor = m.applied_ts().unwrap();
+    assert!(
+        floor <= committed,
+        "the frame names ts {floor}, which hides the commit at {committed} from the replay"
+    );
+    // Once the store is flushed the frame may claim it.
+    m.flush().unwrap();
+    m.append_checkpoint_flushed().unwrap();
+    assert!(m.applied_ts().unwrap() > committed);
+}
+
+/// The clock only moves past a commit ts once that commit's bottom is done
+/// (`NewTxnManager::CommitBottom` walks `bottom_txns_` in order), or a reader
+/// would see rows before their block and index writes. A checkpoint spends a
+/// commit ts of its own, so it has to take the same ordered path: jumping the
+/// clock to it also lets the *next* checkpoint's frame claim a commit whose
+/// records never reached an SST.
+#[test]
+fn a_checkpoint_does_not_publish_an_in_flight_commit() {
+    let dir = tempdir().unwrap();
+    let m = manager(dir.path());
+    let mut t = m.begin();
+    t.put(row("default_db.t", 0), b"v".to_vec());
+    // The KV half is in the store; the bottom (the block and index writes) is
+    // still open, as it is for every append until `BottomGuard` drops.
+    let pending = m.commit_deferred(t).unwrap();
+    assert!(m.current_ts() < pending);
+    m.append_checkpoint_flushed().unwrap();
+    assert!(
+        m.current_ts() < pending,
+        "the checkpoint published ts {pending} before its bottom ran"
+    );
+}
+
 /// `WalManager::Flush` swaps the file inside its own loop when it reaches a
 /// checkpoint entry (`wal_manager_impl.cpp:288-294`), so the swap and the frame
 /// are one step on the writer thread. As two jobs a commit could be written
@@ -548,15 +601,13 @@ fn a_checkpoint_frame_starts_its_fresh_log() {
         let m = Arc::clone(&m);
         std::thread::spawn(move || {
             for _ in 0..100 {
-                let seal = m.last_appended.load(Ordering::SeqCst);
-                let _ = m.append_checkpoint(seal);
+                let _ = m.append_checkpoint_flushed();
             }
         })
     };
     commits.join().unwrap();
     checkpoints.join().unwrap();
-    let seal = m.last_appended.load(Ordering::SeqCst);
-    m.append_checkpoint(seal).unwrap();
+    m.append_checkpoint_flushed().unwrap();
 
     let is_checkpoint = |entry: &WalEntry| {
         entry
@@ -597,8 +648,7 @@ fn a_checkpoint_is_one_job_on_the_writer() {
     m.commit(t).unwrap();
 
     let before = m.wal.ran.load(Ordering::SeqCst);
-    m.append_checkpoint(m.last_appended.load(Ordering::SeqCst))
-        .unwrap();
+    m.append_checkpoint_flushed().unwrap();
     assert_eq!(
         m.wal.ran.load(Ordering::SeqCst) - before,
         1,

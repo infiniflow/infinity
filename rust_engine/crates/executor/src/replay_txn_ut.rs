@@ -445,6 +445,33 @@ fn replay_alter_drop_column() {
     assert_eq!(e.row_count("default_db.tb1").unwrap(), 8192);
 }
 
+/// A DDL whose effect is already in the store must survive being replayed.
+///
+/// The frame's floor is the **completed-commit** clock, and a checkpoint
+/// writes the SST at its end, so a commit that lands while the checkpoint runs
+/// is durable yet above the floor. The reference replays it too - harmlessly,
+/// because its replay re-applies a recorded KV batch. The port recomputes the
+/// layout instead, so each arm has to tolerate the change being there already
+/// (measured: a replayed `DROP COLUMN` of an already dropped column made
+/// `Engine::open` fail, which is how `test_alter_cleanup_simple` lost its
+/// server on restart).
+#[test]
+fn a_replayed_ddl_whose_effect_is_already_applied_does_not_fail_the_open() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    h::ok(
+        &e,
+        "CREATE TABLE default_db.tb1 (col1 INT, col2 VARCHAR, col3 INT);",
+    );
+    h::ok(&e, "ALTER TABLE default_db.tb1 DROP COLUMN (col2);");
+    // A clean close writes the memtable out without a checkpoint frame - the
+    // state a checkpoint leaves when a DDL commits while its mirror runs.
+    drop(e);
+
+    let e = Engine::open(dir.path()).unwrap();
+    assert_eq!(h::rows(&e, "SHOW TABLE default_db.tb1 COLUMNS;").len(), 2);
+}
+
 /// C++ `src/unit_test/storage/new_catalog/replay_alter_ut.cpp:246`
 /// (`TestTxnReplayAlter.test_rename`): two renames split by a checkpoint leave
 /// the final name after the restart.

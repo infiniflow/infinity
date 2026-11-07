@@ -339,8 +339,9 @@ impl Engine {
         let _serial = self.storage.flush_lock.lock().unwrap();
         // `NewTxn::Checkpoint`: the blocks are written at this transaction's
         // `begin_ts`, so only rows of transactions that already finished reach
-        // the files. The frame's payload is that same `begin_ts`, frozen here
-        // and written at the end.
+        // the files. The frame's payload is what the store flush covers, which
+        // is this same bound plus anything that committed while the mirror ran
+        // (see the frame at the end of this function).
         let checkpoint_ts = self.checkpoint_ts();
         // Dump the index memory tails first. The caller only logs a `flush`
         // error, so a failing block mirror (e.g. an unsupported column type)
@@ -415,12 +416,15 @@ impl Engine {
         // above, so a power loss either keeps the frame together with its data
         // or loses it and reopens at the previous checkpoint.
         //
-        // `NewTxn::Checkpoint` commits after the files are written: the commit
-        // ts is taken now and the payload is the frozen `begin_ts`, so a
-        // record written while the mirror ran stays above the floor and is
-        // replayed. Writing the frame before the flush would let a `kill -9`
-        // keep a frame that claims records the SSTs do not hold.
-        let _ = self.txn.append_checkpoint_at(checkpoint_ts + 1);
+        // `NewTxn::Checkpoint` commits after the files are written, and the
+        // frame names what the files hold. Writing the frame before the flush
+        // would let a `kill -9` keep a frame claiming records the SSTs do not
+        // have; naming the ts frozen at the *start* of the checkpoint would
+        // under-claim - the SST is written at the end, so it also holds a
+        // commit that landed while the mirror ran, and the replay would then
+        // redo it (measured: a replayed `DROP COLUMN` of an already dropped
+        // column aborted the open).
+        let _ = self.txn.append_checkpoint_flushed();
         let _ = self.txn.rotate_wal_if_large();
         self.txn.sync_wal()?;
         Ok(())
@@ -558,13 +562,21 @@ impl Engine {
         // readable by the reference (`GetReplayEntries` takes
         // `max_checkpoint_ts` from it and refuses a writable directory without
         // one); truncating alone leaves an empty log, which it also rejects.
-        let ts = self.txn.synced_ts();
-        let _ = self.txn.append_checkpoint(ts);
+        //
+        // The frame may only claim what a store flush has already made durable.
+        // Nothing here writes blocks or an SST: a DDL committed since the last
+        // `flush` lives in the RocksDB memtable (catalog writes carry no log)
+        // and a row lives in the block buffer, so a frame that named the clock
+        // would hide both from the next replay - the entries that recreate them
+        // sit below the floor. Measured: `test_alter_simple` lost its table
+        // after a restart that killed the process between this frame and the
+        // `flush` that follows it.
+        let _ = self.txn.append_checkpoint_flushed();
         // A checkpoint keeps its sealed segment; `Cleanup` reclaims it, as in
         // `WalManager::Cleanup`.
         let _ = self.txn.rotate_wal_if_large();
-        // The data this frame claims is already durable (`synced_ts`), so the
-        // frame may be synced on its own.
+        // The frame claims only records a flush covered, so it may be synced on
+        // its own.
         let _ = self.txn.sync_wal();
     }
 

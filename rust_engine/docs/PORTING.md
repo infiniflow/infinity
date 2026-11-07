@@ -152,6 +152,14 @@ drop 的数据库。
   `NewTxn::Checkpoint` 取 `begin_ts`、块行数取 `GetRowCount(begin_ts)`。
 - 发号后未能提交（WAL/落盘失败）会留下永久空洞——参考同样如此（这类失败在参考里是 `UnrecoverableError`）；
   端口在这种情况下让 checkpoint 报错，而不是把后一行写到前一个 slot 上。
+- 检查点帧（`WalCmd::Checkpoint` 的 payload）只声明 flush 到的位置：`synced` 是"某次 store flush 时的
+  `current_ts`"，帧取它的下一个奇数值。没有 flush 的 WAL 轮转（`checkpoint_interval` 触发的
+  `checkpoint_wal`）只能重复上一次 flush 的下界——DDL 的 catalog 记录写在 RocksDB memtable 里（catalog
+  写不开 WAL），行只在块缓冲区里，帧若声明时钟位置，`kill -9` 后重放会跳过这些记录而我们盘上没有。
+  flush 在镜像之后进行，所以帧也在那之后取值：在镜像开始时就冻结时间戳会让镜像期间提交的事务落在下界
+  之下（已落盘却被重放一次，`DROP COLUMN` 重放已删的列会让 open 直接失败）。
+- 块/索引文件一律"写临时文件再 rename"（`write_synced`）：块被整表重写时是同一路径覆盖写，而读侧持有
+  `mmap`（`MappedFile`），原地 truncate 会让映射 SIGBUS。
 
 **append/delete 历史从文件重建**：`restore_blocks` 用每个块的 `version`（`created` 的
 `(ts, 累计行数)`、`deleted` 槽）重建 `appends:`/`append_ts:`/`append_copy:`/`deletes:`/
