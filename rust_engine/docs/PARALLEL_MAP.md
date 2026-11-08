@@ -134,6 +134,24 @@
 | DDL 串行 | DDL 事务串行，避免两次布局重写交错 | catalog 的 DDL 锁 | `ddl_lock` | `aligned` | `test/sql/ddl` |
 | WAL / checkpoint | 写 WAL 与整表 checkpoint 互斥 | `WalManager` 的 flush/checkpoint 串行 | `flush_lock` | `aligned` | `test_cross_engine_bytes_40_wal.py` |
 | 批量写 vs 后台 dump | dump 事务与 append 争用段，靠重试而不是全局锁 | `DumpIndexProcessor::DoDump` 的重试 | 写批次持该表的闸；`DumpMemIndexTask` 按 key 顺序取全部表的闸，从而看到完整批次（顺序取锁不会互相死锁） | `aligned` | `dump_mem_index_ut` |
+| 列变更 vs checkpoint | 参考的 checkpoint 也是一次事务（`CHECKPOINT_V2`），与 DDL 共享 commit 顺序 | `NewTxn::Checkpoint` 走 txn manager | `schema_gate`：列变更独占、`write_blocks_mode` 共享（见 §3.1） | `aligned` | `a_checkpoint_through_a_column_change_keeps_the_block_readable`、`test_alter.py` |
+| 块文件单写者 | 每块 `BlockLock` + 列式追加，不存在两个「整块重写」 | `new_txn_data_impl.cpp:930-958` | `mirror_lock`：一次一个块写入者（见 §3.1） | `aligned` | 同上 |
+
+### 3.1 事务之外的三把锁
+
+冲突检查（`TxnOp` 矩阵，`txn/src/conflict.rs`）与下半部串行（`BottomExecutor` + `bottom_gates`）覆盖的都是**事务之间**：参与方要有 `TxnOp`、有 `begin_ts`，且只有「同表事务的下半部」被排序。下面三件事不在那个模型里，各自有一把显式锁。
+
+| 锁 | 挡住的对手 | 保住的不变量 | 冲突检查 / 下半部为什么不管 |
+|---|---|---|---|
+| `ddl_lock` | 另一个 DDL（含快照恢复） | 同一时刻只有一个 `catalog.capture`，两次布局重写不交错 | 冲突检查在 `commit_at_deferred_with` 里、**mutation 之后**（`ddl_commit_typed` 先 `catalog.capture(f)` 攒 batch，再 `reserve_commit_ts`），重试撤销不了已写进 capture 槽的改动 |
+| `schema_gate` | checkpoint（`PeriodicTriggerThread` 的 `checkpoint_wal()` + `flush()`） | 列变更的「catalog 记录 → buffer 补丁 → `{id}.col` 物化」对块写入原子：writer 只看到属于同一时刻的 schema 与行 | checkpoint 不是事务（没有 `TxnOp`），只与其它 checkpoint 争 `flush_lock`；参考里的 checkpoint 本身是一次 `CHECKPOINT_V2` 事务，天然按 commit 顺序与 DDL 排开 |
+| `mirror_lock` | 另一个块写入者（checkpoint ↔ `COPY`/compaction 的提交侧） | 一次只有一个人重写一个块，提交侧「按上次写完 N 行续写」的前提成立 | 两边都不是彼此的冲突对象（checkpoint 一侧没有事务）；`bottom_gates` 只对同表事务排序，而 `INSERT` 的下半部只填 append buffer、不写块文件 |
+
+`ddl_lock` 与 `schema_gate` 分开：只有列变更需要排斥块写入，而 `write_blocks_mode` 的读锁贯穿整表重写；合成一把会让 `CREATE` / `DROP` / `RENAME` / `CREATE INDEX` 都排在整表重写后面。加锁顺序固定为 `ddl_lock → schema_gate → mirror_lock`：`ALTER` 的闭包在 `ddl_lock` 内取 `schema_gate` 写锁，`add_column_files` 在该写锁内取 `mirror_lock`；`write_blocks_mode` 取读锁后取 `mirror_lock`。快照恢复持 `ddl_lock` 但只**读**块（`restore_blocks`），快照创建写块但不持 `ddl_lock`，因此不存在「持写锁再取读锁」的自锁。
+
+块里缺少当前列的 `{id}.col` 时，写路径先按默认值补文件（`ensure_block_columns`，只写缺失文件、不覆盖已有值），读路径把「块存在但解不出来」当错误而不是空块——否则整块重写会把块里的行丢掉。
+
+验证：`a_checkpoint_through_a_column_change_keeps_the_block_readable`（把 checkpoint 放到另一线程跑完整 `INSERT / ADD / DROP / ADD / INSERT` 序列，50 轮）、`test_alter.py` 的重启用例、`test_cross_engine_bytes_40_wal.py`。
 
 ## 4 分片、尺寸与回退
 
