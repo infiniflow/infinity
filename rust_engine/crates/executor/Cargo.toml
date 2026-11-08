@@ -16,6 +16,10 @@ analyzer.workspace = true
 planner.workspace = true
 index.workspace = true
 lz4_flex.workspace = true
+arrow-array.workspace = true
+arrow-buffer.workspace = true
+arrow-schema.workspace = true
+parquet.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]

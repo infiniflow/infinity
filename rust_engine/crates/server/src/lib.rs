@@ -480,6 +480,7 @@ fn handle_connection(
                 eng.begin_statement();
             }
         }
+        let rpc_started = std::time::Instant::now();
         let handled: Result<()> = (|| {
             match name.as_str() {
                 "Connect" => {
@@ -1969,6 +1970,9 @@ fn handle_connection(
             }
             Ok(())
         })();
+        if std::env::var_os("INFINITY_PROFILE_RPC").is_some() {
+            eprintln!("[RPC] {name} {}us", rpc_started.elapsed().as_micros());
+        }
         if let Some(eng) = engine.as_ref() {
             eng.end_statement();
         }

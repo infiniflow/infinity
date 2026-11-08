@@ -957,29 +957,6 @@ fn run_conformance(slt_dir: &str) -> common::Result<()> {
             "no .slt file under {slt_dir}"
         )));
     }
-    // Files whose fixtures need an import format the rewrite does not read.
-    // They are named here instead of being silently tolerated: every other
-    // file must pass, and this list is the one place the gap is visible
-    // (docs/GAPS.md §1 has the same list with the reason).
-    const UNIMPLEMENTED_FORMATS: &[&str] = &[
-        "test_bvecs.slt",
-        "test_csr.slt",
-        "test_import_gen_parquet.slt",
-        "test_import_gen_parquet_embedding.slt",
-        "test_import_gen_parquet_multivector.slt",
-        "test_import_gen_parquet_sparse.slt",
-        "test_import_gen_parquet_tensor.slt",
-        "test_import_gen_parquet_tensor_array.slt",
-        "test_import_gen_parquet_varchar.slt",
-    ];
-    let (skipped, files): (Vec<_>, Vec<_>) = files.into_iter().partition(|file| {
-        file.file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| UNIMPLEMENTED_FORMATS.contains(&name))
-    });
-    for file in &skipped {
-        println!("skipped (unimplemented import format): {}", file.display());
-    }
     let mut failures = Vec::new();
     for (index, file) in files.iter().enumerate() {
         let dir = std::env::temp_dir().join(format!("infconf-{}-{index}", std::process::id()));
@@ -998,12 +975,7 @@ fn run_conformance(slt_dir: &str) -> common::Result<()> {
         runner.shutdown();
         let _ = std::fs::remove_dir_all(&dir);
     }
-    println!(
-        "{} file(s), {} skipped, {} failed",
-        files.len(),
-        skipped.len(),
-        failures.len()
-    );
+    println!("{} file(s), {} failed", files.len(), failures.len());
     if failures.is_empty() {
         return Ok(());
     }

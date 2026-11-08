@@ -44,6 +44,10 @@ index = { path = "crates/index" }
 executor = { path = "crates/executor" }
 server = { path = "crates/server" }
 lz4_flex = "0.13"
+arrow-array = "56"
+arrow-buffer = "56"
+arrow-schema = "56"
+parquet = { version = "56", default-features = false, features = ["arrow", "snap", "flate2-rust_backened", "zstd", "lz4", "brotli"] }
 hmac = "0.12"
 sha2 = "0.10"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

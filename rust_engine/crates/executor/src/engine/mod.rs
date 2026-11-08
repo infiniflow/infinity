@@ -50,6 +50,8 @@ pub(crate) mod statements;
 #[cfg(test)]
 mod tests_ut;
 
+pub(crate) mod export;
+pub(crate) mod import;
 pub(crate) mod index_build;
 pub(crate) mod query;
 pub(crate) mod state;
