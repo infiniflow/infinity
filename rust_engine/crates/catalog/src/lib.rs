@@ -108,6 +108,45 @@ pub struct TableMeta {
     pub sparse_stores: Vec<Option<SparseStore>>,
 }
 
+impl TableMeta {
+    /// This table pinned to the columns whose ids are `ids`, in the given order.
+    ///
+    /// The checkpoint writes the schema **as of its bound** (`NewTxn::Checkpoint`
+    /// reads `GetColumnDefs` at its begin ts), so a column a later transaction
+    /// added must not take part in that write: its cells do not exist yet.
+    pub fn at_ids(&self, ids: &[u64]) -> TableMeta {
+        let mut pinned = self.clone();
+        pinned.columns.clear();
+        pinned.defaults.clear();
+        pinned.not_nulls.clear();
+        pinned.types.clear();
+        pinned.comments.clear();
+        pinned.sparse_stores.clear();
+        pinned.ids.clear();
+        for id in ids {
+            let Some(at) = self.ids.iter().position(|current| current == id) else {
+                continue;
+            };
+            pinned.columns.push(self.columns[at].clone());
+            pinned
+                .defaults
+                .push(self.defaults.get(at).cloned().flatten());
+            pinned
+                .not_nulls
+                .push(self.not_nulls.get(at).copied().unwrap_or(false));
+            pinned.types.push(self.types[at].clone());
+            pinned
+                .comments
+                .push(self.comments.get(at).cloned().flatten());
+            pinned
+                .sparse_stores
+                .push(self.sparse_stores.get(at).cloned().flatten());
+            pinned.ids.push(*id);
+        }
+        pinned
+    }
+}
+
 /// Field/record separators for the encoded table metadata.
 const FSEP: char = '\u{1f}';
 const RSEP: char = '\u{1e}';
@@ -1254,6 +1293,30 @@ impl Catalog {
     /// drop markers), so it also covers the changes a checkpoint already
     /// published, whose frames the log no longer has. A replayed row uses it to
     /// learn which ids its cells belong to.
+    /// The column ids that were live at `ts`, in schema order.
+    ///
+    /// The checkpoint writes blocks with the schema of its own commit ts (the
+    /// reference reads `GetColumnDefs` there), so a column added later must not
+    /// take part in that write.
+    pub fn schema_ids_at(&self, table: &str, ts: u64) -> Result<Vec<u64>> {
+        let timeline = self.column_timeline(table)?;
+        if let Some((_, ids)) = timeline
+            .iter()
+            .rev()
+            .find(|(change_ts, _)| *change_ts <= ts)
+        {
+            return Ok(ids.clone());
+        }
+        Ok(self
+            .get_table_by_name(table)?
+            .map(|meta| {
+                let mut ids = meta.ids;
+                ids.sort_unstable();
+                ids
+            })
+            .unwrap_or_default())
+    }
+
     pub fn column_timeline(&self, table: &str) -> Result<Vec<(u64, Vec<u64>)>> {
         let (db_id, bare) = self.db_and_bare_name(table)?;
         let Ok(db_id) = db_id.parse::<u64>() else {

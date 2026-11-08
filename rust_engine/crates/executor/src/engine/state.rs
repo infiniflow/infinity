@@ -4318,20 +4318,6 @@ pub struct Engine {
     /// `row:` keys of a name with no catalog entry, so a create that races a
     /// snapshot restore of the same table must not run it concurrently.
     pub(crate) ddl_lock: Mutex<()>,
-    /// Serialises a *schema change* against the block writer.
-    ///
-    /// `ALTER TABLE … ADD/DROP COLUMN` writes the catalog record, patches the
-    /// append buffer and adds the new column files in several steps, while the
-    /// block writer reads the schema and the rows separately. A checkpoint that
-    /// cut between them encoded the block with the new column ids and the row
-    /// text the table had before the change, shifting every cell
-    /// (`test_alter_complex` read the old `c2` out of `c3`).
-    ///
-    /// Separate from `ddl_lock` on purpose: only a column change has to exclude
-    /// the writer, and `write_blocks_mode` holds it for a whole table rewrite.
-    /// Folding the two together made every `CREATE`/`DROP`/`RENAME` queue
-    /// behind a checkpoint, for no gain.
-    pub(crate) schema_gate: std::sync::RwLock<()>,
     /// One block writer at a time.
     ///
     /// A block is rewritten whole (`write_blocks_mode`), and the commit that

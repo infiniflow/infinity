@@ -225,11 +225,8 @@ impl Engine {
         full: bool,
         checkpoint_ts: u64,
     ) -> Result<usize> {
-        // One writer at a time (`Engine::mirror_lock`), and no schema change
-        // in flight (`Engine::schema_gate`): the rows and the schema have to
-        // belong to the same instant, and to the row count the previous write
-        // left behind.
-        let _schema = self.schema_gate.read().unwrap();
+        // One writer at a time (`Engine::mirror_lock`): the row count the
+        // previous write left behind is the input of this one.
         let _mirror = self.mirror_lock.lock().unwrap();
         let table = self.qualified_table(table);
         let meta = self
@@ -237,7 +234,18 @@ impl Engine {
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        let types: Vec<i32> = meta
+        // The checkpoint writes the schema **as of its bound** (`NewTxn::Checkpoint`
+        // reads `GetColumnDefs` at its begin ts): a column a transaction
+        // committed after that bound has no cells in these rows and no place in
+        // their files. The sweep below still uses the live schema, so the
+        // `{id}.col` of such a column stays where the ALTER put it.
+        let snapshot_ids = self
+            .storage
+            .catalog
+            .schema_ids_at(&table, checkpoint_ts)
+            .unwrap_or_else(|_| meta.ids.clone());
+        let encode_meta = meta.at_ids(&snapshot_ids);
+        let types: Vec<i32> = encode_meta
             .types
             .iter()
             .map(|t| {
@@ -248,7 +256,7 @@ impl Engine {
                 })
             })
             .collect::<Result<_>>()?;
-        let layouts: Vec<ColumnLayout> = meta
+        let layouts: Vec<ColumnLayout> = encode_meta
             .types
             .iter()
             .zip(&types)
@@ -540,7 +548,7 @@ impl Engine {
                 }
                 self.storage.catalog.store().delete(&k)?;
             }
-            let mut seg_filters = crate::fast_rough_filter::Filters::new(&meta.types);
+            let mut seg_filters = crate::fast_rough_filter::Filters::new(&encode_meta.types);
             // Drain the segment block by block so each block's values are freed
             // once it is encoded: holding the whole table's decoded rows while
             // the texts are rendered doubled the transient on a long import.
@@ -586,7 +594,7 @@ impl Engine {
                 self.drop_block_maps(meta.id);
                 let chunk = self.mirror_block_rows(
                     &table,
-                    &meta,
+                    &encode_meta,
                     &types,
                     segment_id,
                     block_index as u16,
@@ -640,8 +648,8 @@ impl Engine {
                 // bitmap coverage (see `ColumnBody::build_with`).
                 let bitmap_bits = self.block_bitmap_bits(&table, slot_base, chunk.len());
                 let block_columns = self.encode_block_columns(
-                    &meta.types,
-                    &meta.ids,
+                    &encode_meta.types,
+                    &encode_meta.ids,
                     &types,
                     &layouts,
                     &texts,
@@ -679,12 +687,17 @@ impl Engine {
                 // a column the catalog does not know.
                 let mut keep: Vec<String> =
                     vec![storage::definition::format::VERSION_FILE.to_string()];
-                for (i, ty) in types.iter().enumerate() {
-                    keep.push(storage::definition::format::column_file(meta.ids[i]));
-                    if is_var_buffer_type(*ty) {
-                        keep.push(storage::definition::format::column_outline_file(
-                            meta.ids[i],
-                        ));
+                // The live schema, not the snapshot: a column added after the
+                // bound has a file here that this write does not produce.
+                for (i, id) in meta.ids.iter().enumerate() {
+                    keep.push(storage::definition::format::column_file(*id));
+                    if meta
+                        .types
+                        .get(i)
+                        .and_then(|t| column_type_of(t))
+                        .is_some_and(is_var_buffer_type)
+                    {
+                        keep.push(storage::definition::format::column_outline_file(*id));
                     }
                 }
                 if let Ok(entries) = std::fs::read_dir(root.join(&block_dir)) {
@@ -715,7 +728,8 @@ impl Engine {
                     }
                 }
                 if sealed {
-                    let mut block_filters = crate::fast_rough_filter::Filters::new(&meta.types);
+                    let mut block_filters =
+                        crate::fast_rough_filter::Filters::new(&encode_meta.types);
                     for (_, cells) in &chunk {
                         block_filters.add_row(cells);
                     }
@@ -1890,10 +1904,11 @@ impl Engine {
         first: usize,
         blocks: &[(u32, u16, usize, Option<usize>)],
     ) -> Result<()> {
-        // This writes a new column file into block directories a checkpoint
-        // may be rewriting: one block writer at a time. The caller holds
-        // `schema_gate` exclusively, so no checkpoint can be at the point where
-        // the catalog has the column and this file does not exist yet.
+        // This writes a new column file into block directories a checkpoint may
+        // be rewriting: one block writer at a time. A checkpoint whose bound
+        // predates the ALTER does not write that column at all (its schema is
+        // pinned to its own ts), so the two do not have to exclude each other
+        // beyond this lock.
         let _mirror = self.mirror_lock.lock().unwrap();
         let table = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
