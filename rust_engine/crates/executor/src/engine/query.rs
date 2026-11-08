@@ -1284,6 +1284,10 @@ impl Engine {
                         columns: vec![column.to_string()],
                     },
                     || {
+                        // See `Engine::schema_gate`: a checkpoint may not write
+                        // the block between this catalog write and the buffer
+                        // patch. Taken under `ddl_lock` for the lock order.
+                        let _schema = self.schema_gate.write().unwrap();
                         self.storage.catalog.drop_column(table, column, &blocks)?;
                         // A buffered row has no block file to leave alone: it
                         // loses the cell at the column's position, exactly as
@@ -1374,6 +1378,12 @@ impl Engine {
                         table: table.to_string(),
                     },
                     || {
+                        // The catalog record and the buffer cells below must
+                        // reach a checkpoint together (see
+                        // `Engine::schema_gate`); the guard is taken here so
+                        // the order is `ddl_lock` then `schema_gate`, like the
+                        // snapshot paths.
+                        let _schema = self.schema_gate.write().unwrap();
                         self.storage.catalog.add_columns_typed_with_sparse_stores(
                             table,
                             &names,

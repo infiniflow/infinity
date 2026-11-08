@@ -190,6 +190,10 @@ impl Engine {
         full: bool,
         checkpoint_ts: u64,
     ) -> Result<usize> {
+        // A schema change holds the write side of this: the rows and the schema
+        // have to belong to the same instant, or the block is encoded with one
+        // schema and the other's cells (see `Engine::schema_gate`).
+        let _schema = self.schema_gate.read().unwrap();
         let table = self.qualified_table(table);
         let meta = self
             .storage

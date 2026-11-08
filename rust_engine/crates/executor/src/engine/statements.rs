@@ -180,6 +180,7 @@ impl Engine {
             current_db: Mutex::new("default_db".to_string()),
             tables: Arc::new(Mutex::new(HashMap::new())),
             ddl_lock: Mutex::new(()),
+            schema_gate: std::sync::RwLock::new(()),
             bg_processor: Mutex::new(None),
             self_weak: Mutex::new(std::sync::Weak::new()),
             batch_locks: Mutex::new(HashMap::new()),
