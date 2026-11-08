@@ -7293,4 +7293,3 @@ mod float_format_ut {
         assert_eq!(fmt_f32_cpp(0.470703125), "0.47070312");
     }
 }
-
