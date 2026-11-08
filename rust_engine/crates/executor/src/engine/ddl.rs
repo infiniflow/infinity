@@ -301,24 +301,29 @@ impl Engine {
     /// from the cache; called when the table or its index is dropped.
     pub(crate) fn drop_multivector_storage(&self, table: &str, column: Option<&str>) {
         let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let Some(entry) = tables.get_mut(&tkey) else {
-            return;
+        // The `Arc`s leave the map under `tables`; their read guards are taken
+        // after it is unlocked. A scan holds one of those guards while it waits
+        // for `tables` (see `Engine::text_index_for`), so locking an index
+        // under `tables` closes a cycle whenever a writer is pending.
+        let removed: Vec<Arc<std::sync::RwLock<MultiVectorIndex>>> = {
+            let mut tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get_mut(&tkey) else {
+                return;
+            };
+            let columns: Vec<String> = match column {
+                Some(c) => vec![c.to_string()],
+                None => entry.mv.keys().cloned().collect(),
+            };
+            columns.iter().filter_map(|c| entry.mv.remove(c)).collect()
         };
-        let columns: Vec<String> = match column {
-            Some(c) => vec![c.to_string()],
-            None => entry.mv.keys().cloned().collect(),
-        };
-        for c in columns {
-            if let Some(idx) = entry.mv.remove(&c) {
-                let dir = idx.read().map(|g| g.dir.clone()).ok();
-                if let Some(dir) = dir {
-                    if let Ok(entries) = std::fs::read_dir(&dir) {
-                        for entry in entries.flatten() {
-                            let p = entry.path();
-                            if p.extension().is_some_and(|x| x == "mvec" || x == "emvb") {
-                                let _ = std::fs::remove_file(p);
-                            }
+        for idx in removed {
+            let dir = idx.read().map(|g| g.dir.clone()).ok();
+            if let Some(dir) = dir {
+                if let Ok(entries) = std::fs::read_dir(&dir) {
+                    for entry in entries.flatten() {
+                        let p = entry.path();
+                        if p.extension().is_some_and(|x| x == "mvec" || x == "emvb") {
+                            let _ = std::fs::remove_file(p);
                         }
                     }
                 }
@@ -329,19 +334,25 @@ impl Engine {
     /// Removes the sparse chunks of `table` (or one column) from disk and cache.
     pub(crate) fn drop_sparse_storage(&self, table: &str, column: Option<&str>) {
         let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let Some(entry) = tables.get_mut(&tkey) else {
-            return;
+        // See `drop_multivector_storage`: the map is unlocked before the index
+        // is read.
+        let removed: Vec<Arc<std::sync::RwLock<SparseIndex>>> = {
+            let mut tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get_mut(&tkey) else {
+                return;
+            };
+            let columns: Vec<String> = match column {
+                Some(c) => vec![c.to_string()],
+                None => entry.sparse.keys().cloned().collect(),
+            };
+            columns
+                .iter()
+                .filter_map(|c| entry.sparse.remove(c))
+                .collect()
         };
-        let columns: Vec<String> = match column {
-            Some(c) => vec![c.to_string()],
-            None => entry.sparse.keys().cloned().collect(),
-        };
-        for c in columns {
-            if let Some(idx) = entry.sparse.remove(&c) {
-                if let Ok(dir) = idx.read().map(|g| g.dir.clone()) {
-                    let _ = std::fs::remove_dir_all(dir);
-                }
+        for idx in removed {
+            if let Ok(dir) = idx.read().map(|g| g.dir.clone()) {
+                let _ = std::fs::remove_dir_all(dir);
             }
         }
     }
@@ -351,25 +362,25 @@ impl Engine {
     /// is dropped, so segments never outlive the catalog entry.
     pub(crate) fn drop_text_index_storage(&self, table: &str, column: Option<&str>) {
         let tkey = self.table_key(table);
-        let mut removed: Vec<String> = Vec::new();
-        {
-            let mut tables = self.tables.lock().unwrap();
-            if let Some(entry) = tables.get_mut(&tkey) {
+        // See `drop_multivector_storage`: the map is unlocked before the
+        // indexes are read.
+        let indexes: Vec<SharedTextIndex> = match self.tables.lock().unwrap().get_mut(&tkey) {
+            Some(entry) => {
                 let columns: Vec<String> = match column {
                     Some(c) => vec![c.to_string()],
                     None => entry.text.keys().cloned().collect(),
                 };
-                for c in columns {
-                    if let Some(idx) = entry.text.remove(&c) {
-                        if let Ok(g) = idx.read() {
-                            removed.push(g.dir.clone());
-                        }
-                    }
-                }
+                columns
+                    .iter()
+                    .filter_map(|c| entry.text.remove(c))
+                    .collect()
             }
-        }
-        for dir in removed {
-            let _ = std::fs::remove_dir_all(dir);
+            None => Vec::new(),
+        };
+        for idx in indexes {
+            if let Ok(g) = idx.read() {
+                let _ = std::fs::remove_dir_all(g.dir.clone());
+            }
         }
         self.drop_multivector_storage(table, column);
         self.drop_sparse_storage(table, column);

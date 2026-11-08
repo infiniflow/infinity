@@ -3187,13 +3187,21 @@ impl Engine {
                 }
             }
         };
-        {
+        // Clone the `Arc` and let go of `tables` before the index is locked.
+        // A query holds the index's *read* guard while it fetches rows
+        // (`search_text_terms`), and that fetch needs `tables`
+        // (`visible_block_ids` -> `block_index_for`); taking the index lock
+        // under `tables` here closes a cycle as soon as a writer (the appender)
+        // is pending: nobody can make progress, and every later statement
+        // queues behind the frozen `tables`.
+        let cached = {
             let tables = self.tables.lock().unwrap();
-            if let Some(idx) = tables.get(&tkey).and_then(|e| e.text.get(column)) {
-                let complete = idx.read().map(|g| g.total_docs()).unwrap_or(0);
-                if complete >= reserved {
-                    return Ok(idx.clone());
-                }
+            tables.get(&tkey).and_then(|e| e.text.get(column)).cloned()
+        };
+        if let Some(idx) = cached {
+            let complete = idx.read().map(|g| g.total_docs()).unwrap_or(0);
+            if complete >= reserved {
+                return Ok(idx);
             }
         }
         let schema = self.table_schema(table)?;
@@ -3257,13 +3265,15 @@ impl Engine {
                 }
             }
         };
-        {
+        // See `text_index_for`: `tables` is released before the index lock.
+        let cached = {
             let tables = self.tables.lock().unwrap();
-            if let Some(idx) = tables.get(&tkey).and_then(|e| e.mv.get(column)) {
-                let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
-                if complete >= reserved {
-                    return Ok(idx.clone());
-                }
+            tables.get(&tkey).and_then(|e| e.mv.get(column)).cloned()
+        };
+        if let Some(idx) = cached {
+            let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
+            if complete >= reserved {
+                return Ok(idx);
             }
         }
         let schema = self.table_schema(table)?;
@@ -3474,17 +3484,21 @@ impl Engine {
     /// before `kind` existed, so the caller rebuilds it with that config.
     pub(crate) fn forget_multivector_index(&self, table: &str, column: &str, kind: &str) {
         let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let Some(entry) = tables.get_mut(&tkey) else {
-            return;
+        // The cached index is probed outside `tables` for the same reason as
+        // `text_index_for`: a scan can hold its read guard while it waits for
+        // `tables`, and a writer pending under `tables` would then close the
+        // cycle.
+        let cached = {
+            let tables = self.tables.lock().unwrap();
+            tables.get(&tkey).and_then(|e| e.mv.get(column)).cloned()
         };
-        let rebuild = entry
-            .mv
-            .get(column)
+        let rebuild = cached
             .map(|idx| !idx.read().map(|g| g.knows_kind(kind)).unwrap_or(false))
             .unwrap_or(false);
         if rebuild {
-            entry.mv.remove(column);
+            if let Some(entry) = self.tables.lock().unwrap().get_mut(&tkey) {
+                entry.mv.remove(column);
+            }
         }
     }
 
@@ -3511,18 +3525,23 @@ impl Engine {
             .get_table_by_name(table)?
             .and_then(|m| m.sparse_stores.get(ci).copied().flatten())
             .unwrap_or(CatalogSparseStore::Sort);
-        {
+        // See `text_index_for`: `tables` is released before the index lock.
+        let cached = {
             let tables = self.tables.lock().unwrap();
-            if let Some(idx) = tables.get(&tkey).and_then(|e| e.sparse.get(column)) {
-                // A changed catalog hint invalidates the cached index even
-                // though the BMP bytes are identical.
-                let reusable = idx
-                    .read()
-                    .map(|g| g.doc_count() >= reserved && g.store == store)
-                    .unwrap_or(false);
-                if reusable {
-                    return Ok(idx.clone());
-                }
+            tables
+                .get(&tkey)
+                .and_then(|e| e.sparse.get(column))
+                .cloned()
+        };
+        if let Some(idx) = cached {
+            // A changed catalog hint invalidates the cached index even though
+            // the BMP bytes are identical.
+            let reusable = idx
+                .read()
+                .map(|g| g.doc_count() >= reserved && g.store == store)
+                .unwrap_or(false);
+            if reusable {
+                return Ok(idx);
             }
         }
         let dir = self.dir.join("sparse").join(key.replace('/', "_"));
@@ -7843,54 +7862,66 @@ impl Engine {
         let Ok(indexes) = self.storage.catalog.list_indexes() else {
             return Vec::new();
         };
-        let tables = self.tables.lock().unwrap();
+        /// The cached index of one column, cloned out of `tables` so it can be
+        /// read once the table lock is released (a scan holds one of these
+        /// guards while it waits for `tables`).
+        enum Handle {
+            Hnsw(Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>),
+            Text(SharedTextIndex),
+            Sparse(Arc<std::sync::RwLock<SparseIndex>>),
+            Mv(Arc<std::sync::RwLock<MultiVectorIndex>>),
+            Ivf(usize),
+        }
         let mut out = Vec::new();
         for meta in indexes {
-            let Some(entry) = tables.get(&meta.table) else {
-                continue;
-            };
             let kind = meta.index_type.to_ascii_uppercase();
-            let (row_count, mem_used) = match kind.as_str() {
-                "HNSW" => entry
-                    .hnsw_mem
-                    .get(&meta.column)
-                    .map(|h| {
-                        let h = h.lock().unwrap();
-                        (h.len(), h.mem_usage())
-                    })
-                    .unwrap_or((0, 0)),
-                "FULLTEXT" => entry
-                    .text
-                    .get(&meta.column)
-                    .map(|t| {
-                        let t = t.read().unwrap();
-                        // `mem_used` is the segment's byte estimate; the token
-                        // count is the corpus length BM25 scores against.
-                        (t.mem.doc_count(), t.mem.mem_used())
-                    })
-                    .unwrap_or((0, 0)),
-                "SPARSE" | "BMP" => entry
-                    .sparse
-                    .get(&meta.column)
-                    .map(|s| {
-                        let s = s.read().unwrap();
-                        (s.doc_count(), 0)
-                    })
-                    .unwrap_or((0, 0)),
-                "MULTIVECTOR" => entry
-                    .mv
-                    .get(&meta.column)
-                    .map(|m| {
-                        let m = m.read().unwrap();
-                        (m.doc_count(), 0)
-                    })
-                    .unwrap_or((0, 0)),
-                "IVF" => entry
-                    .ivf_mem
-                    .get(&meta.column)
-                    .map(|rows| (rows.len(), 0))
-                    .unwrap_or((0, 0)),
-                _ => (0, 0),
+            let handle = {
+                let tables = self.tables.lock().unwrap();
+                let Some(entry) = tables.get(&meta.table) else {
+                    continue;
+                };
+                match kind.as_str() {
+                    "HNSW" => entry
+                        .hnsw_mem
+                        .get(&meta.column)
+                        .map(|h| Handle::Hnsw(h.clone())),
+                    "FULLTEXT" => entry
+                        .text
+                        .get(&meta.column)
+                        .map(|t| Handle::Text(t.clone())),
+                    "SPARSE" | "BMP" => entry
+                        .sparse
+                        .get(&meta.column)
+                        .map(|s| Handle::Sparse(s.clone())),
+                    "MULTIVECTOR" => entry.mv.get(&meta.column).map(|m| Handle::Mv(m.clone())),
+                    "IVF" => entry
+                        .ivf_mem
+                        .get(&meta.column)
+                        .map(|rows| Handle::Ivf(rows.len())),
+                    _ => None,
+                }
+            };
+            let (row_count, mem_used) = match handle {
+                Some(Handle::Hnsw(h)) => {
+                    let h = h.lock().unwrap();
+                    (h.len(), h.mem_usage())
+                }
+                Some(Handle::Text(t)) => {
+                    let t = t.read().unwrap();
+                    // `mem_used` is the segment's byte estimate; the token
+                    // count is the corpus length BM25 scores against.
+                    (t.mem.doc_count(), t.mem.mem_used())
+                }
+                Some(Handle::Sparse(s)) => {
+                    let s = s.read().unwrap();
+                    (s.doc_count(), 0)
+                }
+                Some(Handle::Mv(m)) => {
+                    let m = m.read().unwrap();
+                    (m.doc_count(), 0)
+                }
+                Some(Handle::Ivf(n)) => (n, 0),
+                None => (0, 0),
             };
             // A secondary index keeps no in-memory rows in this port: its rows
             // are written straight into the sealed chunk.

@@ -412,7 +412,10 @@ jobs:
         # engine started above. It resolves its fixtures as
         # `os.getcwd() + "/test/data/"`, so it runs from the repository root -
         # the way the reference's `tools/run_parallel_test.py` does.
-        run: .venv/bin/python -m pytest -q python/parallel_test --tb=short
+        # `--durations` keeps the suite's cost visible: the concurrency tests
+        # run fixed 30 s windows, so a regression shows up as one test growing
+        # while the rest stay flat.
+        run: .venv/bin/python -m pytest -q python/parallel_test --tb=short --durations=20
       - name: Stop the engine and show its log
         if: always()
         run: |

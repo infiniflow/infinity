@@ -1028,26 +1028,36 @@ impl Engine {
     /// Total bytes buffered by every in-memory index form. The unified budget
     /// covers full-text, HNSW, sparse, multi-vector and secondary tails.
     pub(crate) fn memindex_bytes(&self) -> usize {
+        // The `Arc`s are cloned out of `tables` before any index is locked: a
+        // scan holds one of these read guards while it fetches rows, and that
+        // fetch needs `tables`, so locking an index under `tables` closes the
+        // cycle `Engine::text_index_for` documents.
+        let (text, sparse, mv) = {
+            let tables = self.tables.lock().unwrap();
+            let mut text = Vec::new();
+            let mut sparse = Vec::new();
+            let mut mv = Vec::new();
+            for e in tables.values() {
+                text.extend(e.text.values().cloned());
+                sparse.extend(e.sparse.values().cloned());
+                mv.extend(e.mv.values().cloned());
+            }
+            (text, sparse, mv)
+        };
         let mut total = 0usize;
-        for e in self.tables.lock().unwrap().values() {
-            for idx in e.text.values() {
-                if let Ok(g) = idx.read() {
-                    total += g.mem.mem_used();
-                }
+        for idx in text {
+            if let Ok(g) = idx.read() {
+                total += g.mem.mem_used();
             }
         }
-        for e in self.tables.lock().unwrap().values() {
-            for idx in e.sparse.values() {
-                if let Ok(g) = idx.read() {
-                    total += g.tail_bytes;
-                }
+        for idx in sparse {
+            if let Ok(g) = idx.read() {
+                total += g.tail_bytes;
             }
         }
-        for e in self.tables.lock().unwrap().values() {
-            for idx in e.mv.values() {
-                if let Ok(g) = idx.read() {
-                    total += g.tail_bytes;
-                }
+        for idx in mv {
+            if let Ok(g) = idx.read() {
+                total += g.tail_bytes;
             }
         }
         // HNSW is not counted here: `note_index_insert` owns its budget (the
