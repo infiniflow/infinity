@@ -127,9 +127,44 @@ impl Engine {
             block_id: block_index,
         };
         let root = self.blocks_root();
-        let held = self
-            .decode_block_cells(table, &root, meta, types, id, None)
-            .unwrap_or_default();
+        // A column the block never got a file for is repaired before it is read:
+        // the decode below treats a current column without data as unreadable,
+        // not as empty.
+        self.ensure_block_columns(table, meta, id)?;
+        // A block that is not on disk yet is empty; a block that *is* there and
+        // cannot be decoded is an error. Treating the second as the first made a
+        // rewrite drop every row the block held, and the next write then failed
+        // its "the chunk tiles the committed window" check.
+        let version_file = root
+            .join(storage::definition::format::block_dir(
+                id.db_id,
+                id.table_id,
+                id.segment_id,
+                id.block_id,
+            ))
+            .join(storage::definition::format::VERSION_FILE);
+        let held = match self.block_map(table, &root, id) {
+            Ok(block) => Self::decode_rows_of(
+                &meta.ids,
+                &meta.types,
+                types,
+                id,
+                block.version(),
+                block.as_ref(),
+                None,
+            )
+            .ok_or_else(|| {
+                Error::Invalid(format!(
+                    "table '{table}': block {segment_id}.{block_index} could not be decoded"
+                ))
+            })?,
+            Err(error) if version_file.exists() => {
+                return Err(Error::Storage(format!(
+                    "table '{table}': block {segment_id}.{block_index} exists but cannot be opened: {error}"
+                )));
+            }
+            Err(_) => Vec::new(),
+        };
         let mut out = Vec::with_capacity(held.len().max(journal.len()));
         for (seq, cells) in held {
             journal.remove(&seq);
@@ -190,10 +225,12 @@ impl Engine {
         full: bool,
         checkpoint_ts: u64,
     ) -> Result<usize> {
-        // A schema change holds the write side of this: the rows and the schema
-        // have to belong to the same instant, or the block is encoded with one
-        // schema and the other's cells (see `Engine::schema_gate`).
+        // One writer at a time (`Engine::mirror_lock`), and no schema change
+        // in flight (`Engine::schema_gate`): the rows and the schema have to
+        // belong to the same instant, and to the row count the previous write
+        // left behind.
         let _schema = self.schema_gate.read().unwrap();
+        let _mirror = self.mirror_lock.lock().unwrap();
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -1754,12 +1791,110 @@ impl Engine {
         out
     }
 
+    /// Materialises a column the block does not have yet, with its default.
+    ///
+    /// `AddColumnsData` does this for every block that exists when the `ALTER`
+    /// runs. A block the checkpoint writes afterwards, or one the block index
+    /// did not know at the time, can still miss a column - and then every decode
+    /// of it fails, because a current column without a file is not "empty", it
+    /// is unreadable. Repairing it here (only files that are *absent*, never an
+    /// existing value) is the same statement applied late.
+    fn ensure_block_columns(
+        &self,
+        table: &str,
+        meta: &catalog::TableMeta,
+        id: BlockId,
+    ) -> Result<()> {
+        let root = self.blocks_root();
+        let Some(version) = self.read_block_version(id) else {
+            return Ok(());
+        };
+        let rows = version
+            .created
+            .last()
+            .map(|c| c.cumulative_row_count as usize)
+            .unwrap_or(0);
+        if rows == 0 {
+            return Ok(());
+        }
+        let dir = root.join(storage::definition::format::block_dir(
+            id.db_id,
+            id.table_id,
+            id.segment_id,
+            id.block_id,
+        ));
+        let missing: Vec<usize> = (0..meta.ids.len())
+            .filter(|i| {
+                !dir.join(storage::definition::format::column_file(meta.ids[*i]))
+                    .exists()
+            })
+            .collect();
+        if missing.is_empty() {
+            return Ok(());
+        }
+        let types: Vec<i32> = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| {
+                Error::Invalid(format!(
+                    "table '{table}': a column the block format cannot express"
+                ))
+            })?;
+        let layouts: Vec<ColumnLayout> = meta
+            .types
+            .iter()
+            .zip(&types)
+            .map(|(t, ct)| {
+                layout_of(t, *ct)
+                    .ok_or_else(|| Error::Invalid(format!("no .col layout for column type '{t}'")))
+            })
+            .collect::<Result<_>>()?;
+        let defaults = self.table_defaults(table)?;
+        let columns = self.encode_block_columns(
+            &missing
+                .iter()
+                .map(|i| meta.types[*i].clone())
+                .collect::<Vec<_>>(),
+            &missing.iter().map(|i| meta.ids[*i]).collect::<Vec<_>>(),
+            &missing.iter().map(|i| types[*i]).collect::<Vec<_>>(),
+            &missing.iter().map(|i| layouts[*i]).collect::<Vec<_>>(),
+            &vec![
+                missing
+                    .iter()
+                    .map(|i| match defaults.get(*i).and_then(|d| d.as_deref()) {
+                        Some(d) => mirror_cell_text(&Value::from_literal(&default_literal(d))),
+                        None => mirror_cell_text(&Value::Null),
+                    })
+                    .collect::<Vec<String>>();
+                rows
+            ],
+            None,
+        )?;
+        self.drop_block_maps(meta.id);
+        for column in &columns {
+            storage::definition::format::write_block_column(&root, id, column).map_err(|e| {
+                Error::Io {
+                    path: root.clone(),
+                    source: e,
+                }
+            })?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn add_column_files(
         &self,
         table: &str,
         first: usize,
         blocks: &[(u32, u16, usize, Option<usize>)],
     ) -> Result<()> {
+        // This writes a new column file into block directories a checkpoint
+        // may be rewriting: one block writer at a time. The caller holds
+        // `schema_gate` exclusively, so no checkpoint can be at the point where
+        // the catalog has the column and this file does not exist yet.
+        let _mirror = self.mirror_lock.lock().unwrap();
         let table = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
             return Ok(());
@@ -1796,14 +1931,70 @@ impl Engine {
                 None => mirror_cell_text(&Value::Null),
             })
             .collect();
-        if blocks.is_empty() {
+        let db_id = self.database_id_of(&table);
+        let root = self.blocks_root();
+        // The caller's list comes from the block index, which does not know a
+        // block the checkpoint wrote but has not published yet. Such a block
+        // would never get the new column file, and every later decode of it
+        // fails (`{id}.col` missing is an error, not "the column is empty").
+        // Take the union with what the directory holds.
+        let mut work: Vec<(u32, u16, usize, Option<usize>)> = blocks.to_vec();
+        let table_root = root
+            .join(format!("db_{db_id}"))
+            .join(format!("tbl_{}", meta.id));
+        if let Ok(segments) = std::fs::read_dir(&table_root) {
+            for segment in segments.flatten() {
+                let name = segment.file_name().to_string_lossy().to_string();
+                let Some(segment_id) = name
+                    .strip_prefix("seg_")
+                    .and_then(|s| s.parse::<u32>().ok())
+                else {
+                    continue;
+                };
+                let Ok(block_dirs) = std::fs::read_dir(segment.path()) else {
+                    continue;
+                };
+                for block_dir in block_dirs.flatten() {
+                    let name = block_dir.file_name().to_string_lossy().to_string();
+                    let Some(block_id) = name
+                        .strip_prefix("blk_")
+                        .and_then(|s| s.parse::<u16>().ok())
+                    else {
+                        continue;
+                    };
+                    if work
+                        .iter()
+                        .any(|(s, b, _, _)| *s == segment_id && *b == block_id)
+                    {
+                        continue;
+                    }
+                    let id = BlockId {
+                        db_id,
+                        table_id: meta.id,
+                        segment_id,
+                        block_id,
+                    };
+                    let Some(version) = self.read_block_version(id) else {
+                        continue;
+                    };
+                    let rows = version
+                        .created
+                        .last()
+                        .map(|c| c.cumulative_row_count as usize)
+                        .unwrap_or(0);
+                    if rows == 0 {
+                        continue;
+                    }
+                    work.push((segment_id, block_id, rows, None));
+                }
+            }
+        }
+        if work.is_empty() {
             // No segment: the column's catalog record is all there is to write
             // (`AddColumnsData` returns early on the same condition).
             return Ok(());
         }
-        let db_id = self.database_id_of(&table);
-        let root = self.blocks_root();
-        for (segment_id, block_index, rows, bitmap_bits) in blocks {
+        for (segment_id, block_index, rows, bitmap_bits) in &work {
             {
                 let id = BlockId {
                     db_id,

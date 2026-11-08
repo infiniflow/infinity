@@ -4320,17 +4320,27 @@ pub struct Engine {
     pub(crate) ddl_lock: Mutex<()>,
     /// Serialises a *schema change* against the block writer.
     ///
-    /// `ALTER TABLE … ADD/DROP COLUMN` writes the catalog record and then
-    /// patches the append buffer in two steps. A checkpoint that cut between
-    /// them encoded the block with the new column ids and the row text the
-    /// table had before the change, which shifted every cell of the block
-    /// (`test_alter_complex` read the old `c2` out of `c3`). The statement
-    /// takes this exclusively and `write_blocks_mode` shares it, so the writer
-    /// only ever sees a schema and a buffer that belong together.
+    /// `ALTER TABLE … ADD/DROP COLUMN` writes the catalog record, patches the
+    /// append buffer and adds the new column files in several steps, while the
+    /// block writer reads the schema and the rows separately. A checkpoint that
+    /// cut between them encoded the block with the new column ids and the row
+    /// text the table had before the change, shifting every cell
+    /// (`test_alter_complex` read the old `c2` out of `c3`).
     ///
-    /// Not `ddl_lock`: a snapshot restore and a compact hold that one and do
-    /// write blocks, which would make the two lock each other out.
+    /// Separate from `ddl_lock` on purpose: only a column change has to exclude
+    /// the writer, and `write_blocks_mode` holds it for a whole table rewrite.
+    /// Folding the two together made every `CREATE`/`DROP`/`RENAME` queue
+    /// behind a checkpoint, for no gain.
     pub(crate) schema_gate: std::sync::RwLock<()>,
+    /// One block writer at a time.
+    ///
+    /// A block is rewritten whole (`write_blocks_mode`), and the commit that
+    /// appends to it decides what to write from the row count the previous
+    /// write left behind. A checkpoint that rewrote the block in between made
+    /// the appender believe a row was already on disk, so its chunk held only
+    /// the new row. `flush_storage` serialises checkpoints with each other
+    /// (`flush_lock`) but not against a commit.
+    pub(crate) mirror_lock: Mutex<()>,
     pub(crate) bg_processor: Mutex<Option<Arc<BGTaskProcessor>>>,
     /// Weak self handle handed to background tasks (avoids a cycle through
     /// `bg_processor`).

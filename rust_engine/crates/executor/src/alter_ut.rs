@@ -400,6 +400,57 @@ fn replay_of_the_test_alter_complex_sequence_around_a_checkpoint() {
     }
 }
 
+/// A checkpoint running through a column change and the commit that follows
+/// must not leave the block half written.
+///
+/// `PeriodicTriggerThread` runs `checkpoint_wal()` + `flush()` on its own
+/// thread; the column change writes one file per block (`AddColumnsData`)
+/// while the checkpoint rewrites the whole block. Two writers on one block
+/// directory produced a `version` that did not match the column files, and the
+/// next commit failed its own "the chunk tiles the committed window" check.
+#[test]
+fn a_checkpoint_through_a_column_change_keeps_the_block_readable() {
+    for _ in 0..50 {
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+            .unwrap();
+        e.execute("INSERT INTO tb1 VALUES (1, 2, 'test');").unwrap();
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flusher = {
+            let e = std::sync::Arc::clone(&e);
+            let stop = std::sync::Arc::clone(&stop);
+            std::thread::spawn(move || {
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    // What `PeriodicTriggerThread::Run` does each tick.
+                    e.checkpoint_wal();
+                    let _ = e.flush();
+                }
+            })
+        };
+        e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
+            .unwrap();
+        e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
+        e.execute("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+            .unwrap();
+        e.execute("INSERT INTO tb1 VALUES (2, 'test2', 'tttt2', 1.0);")
+            .unwrap();
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        flusher.join().unwrap();
+        e.flush().unwrap();
+
+        // The block is the only copy after a restart.
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            rows(&e, "SELECT c1, c3, c4 FROM tb1 ORDER BY c1;"),
+            vec![
+                vec!["1".to_string(), "test".to_string(), "tttt".to_string()],
+                vec!["2".to_string(), "test2".to_string(), "tttt2".to_string()],
+            ]
+        );
+    }
+}
 /// A column change touches **one file per block**, not the block.
 ///
 /// NewTxn::AddColumnsData writes the new column's {id}.col for every block

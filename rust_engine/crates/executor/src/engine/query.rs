@@ -1284,9 +1284,9 @@ impl Engine {
                         columns: vec![column.to_string()],
                     },
                     || {
-                        // See `Engine::schema_gate`: a checkpoint may not write
-                        // the block between this catalog write and the buffer
-                        // patch. Taken under `ddl_lock` for the lock order.
+                        // See `Engine::schema_gate`: no checkpoint may write the
+                        // block between this catalog write and the buffer patch.
+                        // Taken under `ddl_lock`, so the order is fixed.
                         let _schema = self.schema_gate.write().unwrap();
                         self.storage.catalog.drop_column(table, column, &blocks)?;
                         // A buffered row has no block file to leave alone: it
@@ -1378,11 +1378,9 @@ impl Engine {
                         table: table.to_string(),
                     },
                     || {
-                        // The catalog record and the buffer cells below must
-                        // reach a checkpoint together (see
-                        // `Engine::schema_gate`); the guard is taken here so
-                        // the order is `ddl_lock` then `schema_gate`, like the
-                        // snapshot paths.
+                        // See `Engine::schema_gate`: the catalog record, the
+                        // buffer cells and the new column files below reach a
+                        // checkpoint together.
                         let _schema = self.schema_gate.write().unwrap();
                         self.storage.catalog.add_columns_typed_with_sparse_stores(
                             table,
@@ -1405,6 +1403,12 @@ impl Engine {
                             })
                             .collect();
                         self.patch_buffered_add_columns(table, base_index as usize, &added);
+                        // Materialise the new columns into the blocks that
+                        // already exist, inside the same step: a checkpoint
+                        // that saw the column in the catalog but not its
+                        // `{id}.col` files decoded the block to nothing and
+                        // rewrote it with only the buffered rows.
+                        self.add_column_files(table, base_index as usize, &ac_blocks)?;
                         Ok(())
                     },
                     move |b| match &ac_ident {
@@ -1417,11 +1421,6 @@ impl Engine {
                         None => None,
                     },
                 )?;
-                // The blocks that already exist get one file for each new
-                // column, filled with its default (`AddColumnsData`); nothing
-                // else is rewritten - the file names carry the column id, so a
-                // new id is simply a new file.
-                self.add_column_files(table, base_index as usize, &ac_blocks)?;
                 Ok(QueryResult::CreatedTable {
                     id: 0,
                     name: table.clone(),
