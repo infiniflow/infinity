@@ -225,9 +225,15 @@ impl Engine {
         full: bool,
         checkpoint_ts: u64,
     ) -> Result<usize> {
-        // One writer at a time (`Engine::mirror_lock`): the row count the
-        // previous write left behind is the input of this one.
-        let _mirror = self.mirror_lock.lock().unwrap();
+        // The block writer runs under the **table's bottom gate**: the reference
+        // writes a block's rows inside the table's bottom half (`AppendInBlock`),
+        // so a checkpoint and an append of one table never write at the same
+        // time while different tables proceed in parallel. A caller that is
+        // already the table's bottom (the import path does its block write in
+        // `CommitBottomAppend`) must not re-enter the gate.
+        let bottom_gate = self.bottom_gate(table);
+        let _bottom = (!crate::engine::statements::HeldBottom::holds(&self.table_key(table)))
+            .then(|| bottom_gate.lock().unwrap());
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -1904,12 +1910,11 @@ impl Engine {
         first: usize,
         blocks: &[(u32, u16, usize, Option<usize>)],
     ) -> Result<()> {
-        // This writes a new column file into block directories a checkpoint may
-        // be rewriting: one block writer at a time. A checkpoint whose bound
-        // predates the ALTER does not write that column at all (its schema is
-        // pinned to its own ts), so the two do not have to exclude each other
-        // beyond this lock.
-        let _mirror = self.mirror_lock.lock().unwrap();
+        // This writes a new column file into block directories the table's block
+        // writer may be rewriting, so it takes the same table bottom gate.
+        let bottom_gate = self.bottom_gate(table);
+        let _bottom = (!crate::engine::statements::HeldBottom::holds(&self.table_key(table)))
+            .then(|| bottom_gate.lock().unwrap());
         let table = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
             return Ok(());

@@ -135,7 +135,7 @@
 | WAL / checkpoint | 写 WAL 与整表 checkpoint 互斥 | `WalManager` 的 flush/checkpoint 串行 | `flush_lock` | `aligned` | `test_cross_engine_bytes_40_wal.py` |
 | 批量写 vs 后台 dump | dump 事务与 append 争用段，靠重试而不是全局锁 | `DumpIndexProcessor::DoDump` 的重试 | 写批次持该表的闸；`DumpMemIndexTask` 按 key 顺序取全部表的闸，从而看到完整批次（顺序取锁不会互相死锁） | `aligned` | `dump_mem_index_ut` |
 | 列变更 vs checkpoint | 参考的 checkpoint 是一次事务（`CHECKPOINT_V2`），块按它自己的 ts 写，之后的 DDL 与它无关 | `NewTxn::Checkpoint` 走 txn manager | `flush` 在开始处取定 T，块/schema/行/删除都按 T 裁：schema 用 `Catalog::schema_ids_at(T)` 钉住（见 §3.1） | `aligned` | `a_checkpoint_through_a_column_change_keeps_the_block_readable`、`test_alter.py` |
-| 块文件单写者 | 每块 `BlockLock` + 列式追加，不存在两个「整块重写」 | `new_txn_data_impl.cpp:930-958` | `mirror_lock`：一次一个块写入者（见 §3.1） | `aligned` | 同上 |
+| 块文件单写者 | 每块 `BlockLock` + 列式追加，不存在两个「整块重写」 | `new_txn_data_impl.cpp:930-958` | 块写跑在同一张表的 **bottom gate** 下（`write_blocks_mode`/`add_column_files` 取 `bottom_gate(table)`，已在 bottom 里的调用方靠 `HeldBottom` 跳过）；同表串行、跨表并行（见 §3.1） | `aligned`（参考到块、端口到表） | 同上 |
 
 ### 3.1 事务之外的两把锁，与 checkpoint 的切面
 
@@ -144,11 +144,11 @@
 | 锁 | 挡住的对手 | 保住的不变量 | 冲突检查 / 下半部为什么不管 |
 |---|---|---|---|
 | `ddl_lock` | 另一个 DDL 的 **capture**（含快照恢复） | 同一时刻只有一个 `catalog.capture`（overlay 只有一份）；列变更的数据副作用不在里面 | 冲突检查在 `commit_at_deferred_with` 里，而 capture 只攒 catalog batch、不产生可见副作用；列变更的 `patch_buffered_*` / `add_column_files` 放在 `commit_at_deferred`（已过冲突检查、已写 WAL）与 `finish_bottom`（发布）之间，输掉冲突的事务什么都不留下，同表 DDL 由冲突矩阵（`AddColumn`/`DropColumn` 同表规则）定序 |
-| `mirror_lock` | 另一个块写入者（checkpoint ↔ `COPY`/compaction 的提交侧） | 一次只有一个人重写一个块，提交侧「按上次写完 N 行续写」的前提成立 | 两边都不是彼此的冲突对象（checkpoint 一侧没有事务）；`bottom_gates` 只对同表事务排序，而 `INSERT` 的下半部只填 append buffer、不写块文件 |
+| 表 bottom gate（块写） | 另一个块写入者（checkpoint ↔ `COPY`/compaction 的提交侧） | 同一张表一次只有一个块写入者，提交侧「按上次写完 N 行续写」的前提成立；不同表并行 | 两边都不是彼此的冲突对象（checkpoint 一侧没有事务）；但参考把块写放在该表的 bottom 里（`AppendInBlock`），端口让块写取同一把 `bottom_gate` 即得同样的排除 |
 
 checkpoint 的切面由它自己的 ts 决定，不需要与 DDL 互斥：`flush_storage` 在开始处取定 `T = current_ts()`，`write_blocks_mode` 用 `Catalog::schema_ids_at(T)` 取该时刻的列（`NewTxn::Checkpoint` 的 `GetColumnDefs` 读的也是它的 begin ts），行由 `committed_rows(T)` 裁、删除由 `delete_ts <= T` 裁。T 之后提交的 DDL 与追加对本次 checkpoint 不可见，它们的 `{id}.col` 与行留在文件之外，等下一次 checkpoint 覆盖。
 
-加锁顺序固定为 `ddl_lock → mirror_lock`：`ddl_lock` 只圈住 capture，`add_column_files` 在提交阶段（capture 之外）取 `mirror_lock`，`write_blocks_mode` 只取 `mirror_lock`。快照恢复持 `ddl_lock` 且只**读**块（`restore_blocks`），快照创建写块但不持 `ddl_lock`，两者都不成环。
+加锁顺序固定为 `ddl_lock → bottom_gate(table)`：`ddl_lock` 只圈住 capture，`add_column_files` 在提交阶段（capture 之外）取该表的 bottom gate，`write_blocks_mode` 取同一把（已在 bottom 里则跳过）。快照恢复持 `ddl_lock` 且只**读**块（`restore_blocks`），快照创建写块但不持 `ddl_lock`，两者都不成环。
 
 块里缺少当前列的 `{id}.col` 时，写路径先按默认值补文件（`ensure_block_columns`，只写缺失文件、不覆盖已有值），读路径把「块存在但解不出来」当错误而不是空块——否则整块重写会把块里的行丢掉。
 

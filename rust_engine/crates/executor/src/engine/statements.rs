@@ -34,9 +34,14 @@ thread_local! {
 }
 
 /// Marks one table's bottom as running on this thread for as long as it lives.
-struct HeldBottom(String);
+pub(crate) struct HeldBottom(String);
 
 impl HeldBottom {
+    /// Whether this thread already runs the table's bottom half.
+    pub(crate) fn holds(table: &str) -> bool {
+        BOTTOM_HELD.with(|held| held.borrow().contains(table))
+    }
+
     fn enter(table: &str) -> Self {
         BOTTOM_HELD.with(|held| {
             held.borrow_mut().insert(table.to_string());
@@ -180,7 +185,6 @@ impl Engine {
             current_db: Mutex::new("default_db".to_string()),
             tables: Arc::new(Mutex::new(HashMap::new())),
             ddl_lock: Mutex::new(()),
-            mirror_lock: Mutex::new(()),
             bg_processor: Mutex::new(None),
             self_weak: Mutex::new(std::sync::Weak::new()),
             batch_locks: Mutex::new(HashMap::new()),

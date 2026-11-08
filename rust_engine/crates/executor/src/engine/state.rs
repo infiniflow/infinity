@@ -4318,15 +4318,6 @@ pub struct Engine {
     /// `row:` keys of a name with no catalog entry, so a create that races a
     /// snapshot restore of the same table must not run it concurrently.
     pub(crate) ddl_lock: Mutex<()>,
-    /// One block writer at a time.
-    ///
-    /// A block is rewritten whole (`write_blocks_mode`), and the commit that
-    /// appends to it decides what to write from the row count the previous
-    /// write left behind. A checkpoint that rewrote the block in between made
-    /// the appender believe a row was already on disk, so its chunk held only
-    /// the new row. `flush_storage` serialises checkpoints with each other
-    /// (`flush_lock`) but not against a commit.
-    pub(crate) mirror_lock: Mutex<()>,
     pub(crate) bg_processor: Mutex<Option<Arc<BGTaskProcessor>>>,
     /// Weak self handle handed to background tasks (avoids a cycle through
     /// `bg_processor`).
