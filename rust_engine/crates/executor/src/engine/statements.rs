@@ -152,6 +152,7 @@ impl Engine {
                 memindex_quota: std::sync::atomic::AtomicU64::new(0),
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
                 memindex_pending: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+                last_quota_check_ms: std::sync::atomic::AtomicU64::new(0),
                 object_store: Mutex::new(None),
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
                 scan_gate: ScanGate::new(
@@ -367,7 +368,28 @@ impl Engine {
             .context
             .memindex_quota
             .load(std::sync::atomic::Ordering::Relaxed) as usize;
-        if quota == 0 || self.memindex_bytes() <= quota {
+        if quota == 0 {
+            return;
+        }
+        // `memindex_bytes` walks every table and every index, and this runs per
+        // row: at 20k rows through eight threads it was the insert path's
+        // hottest lock. The reference's tracer checks on its own thread, so a
+        // 10 ms gate here is finer than the reference's own granularity.
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        let last = self
+            .context
+            .last_quota_check_ms
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if now.saturating_sub(last) < 10 {
+            return;
+        }
+        self.context
+            .last_quota_check_ms
+            .store(now, std::sync::atomic::Ordering::Relaxed);
+        if self.memindex_bytes() <= quota {
             return;
         }
         if let Some(processor) = self.bg_processor.lock().unwrap().clone() {

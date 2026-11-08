@@ -282,6 +282,15 @@ pub struct TxnManager {
     /// the store. Set **after** the write lands, so a reader never sees a commit
     /// whose keys are still in flight.
     max_applied: AtomicU64,
+    /// `[wal] wal_flush`: when a commit's entry reaches the disk.
+    ///
+    /// `flush_at_once` syncs inside the commit; `only_write` (the reference's
+    /// default) only appends and lets the OS flush; `flush_per_second` syncs at
+    /// most once a second. The reference's `NewFlush` applies the same three
+    /// modes (`wal_manager_impl.cpp:258`).
+    wal_flush: AtomicU64,
+    /// Milliseconds of the last `flush_per_second` sync.
+    last_wal_sync_ms: AtomicU64,
     /// Highest commit timestamp appended to the active log (rotation seal).
     last_appended: AtomicU64,
     /// Payload of the newest checkpoint frame on disk (the replay floor). The
@@ -479,6 +488,8 @@ impl TxnManager {
             last_frame: AtomicU64::new(applied_ts),
             wal_synced: Arc::new(AtomicU64::new(start_ts)),
             sync_lock: Mutex::new(()),
+            wal_flush: AtomicU64::new(WalFlush::OnlyWrite as u64),
+            last_wal_sync_ms: AtomicU64::new(0),
             total_committed: AtomicU64::new(0),
             total_rolled_back: AtomicU64::new(0),
             write_ts: Mutex::new(write_ts),
@@ -972,7 +983,7 @@ impl TxnManager {
         // share one `Sync()` - `WalManager::NewFlush` syncs a whole batch from
         // its own thread for the same reason. The turn orders the append, not
         // the durability.
-        self.sync_wal_grouped()?;
+        self.flush_after_commit()?;
         Ok(ts)
     }
 
@@ -1577,6 +1588,49 @@ impl TxnManager {
         })
     }
 
+    /// `[wal] wal_flush`: how a commit's entry is made durable.
+    pub fn set_wal_flush(&self, mode: WalFlush) {
+        self.wal_flush
+            .store(mode as u64, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// The commit path's durability step, per `[wal] wal_flush`.
+    fn flush_after_commit(&self) -> Result<()> {
+        match self.wal_flush() {
+            // `flush_at_once`: the entry is on disk when the commit returns.
+            WalFlush::FlushAtOnce => self.sync_wal_grouped(),
+            // `only_write` (the reference's default): the append reaches the
+            // kernel and the OS flushes when it wants. A crash of this process
+            // does not lose it; the checkpoint is the durability boundary.
+            WalFlush::OnlyWrite => Ok(()),
+            // `flush_per_second`: at most one sync a second, shared by every
+            // commit in that window.
+            WalFlush::FlushPerSecond => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0);
+                let last = self
+                    .last_wal_sync_ms
+                    .load(std::sync::atomic::Ordering::Relaxed);
+                if now.saturating_sub(last) < 1000 {
+                    return Ok(());
+                }
+                self.last_wal_sync_ms
+                    .store(now, std::sync::atomic::Ordering::Relaxed);
+                self.sync_wal_grouped()
+            }
+        }
+    }
+
+    fn wal_flush(&self) -> WalFlush {
+        match self.wal_flush.load(std::sync::atomic::Ordering::Relaxed) {
+            1 => WalFlush::FlushAtOnce,
+            2 => WalFlush::FlushPerSecond,
+            _ => WalFlush::OnlyWrite,
+        }
+    }
+
     /// The batch sync of the commit path: one fsync covers every entry
     /// appended since the previous one (`WalManager::NewFlush`,
     /// `wal_manager_impl.cpp:350`).
@@ -2135,5 +2189,26 @@ mod loom_model {
             all.sort_unstable();
             assert_eq!(all, vec![0, 1, 2, 3], "commit timestamps must be unique");
         });
+    }
+}
+
+/// `[wal] wal_flush` (`wal_manager_impl.cpp`, `WalManager::NewFlush`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum WalFlush {
+    /// Append only; the OS decides when the page cache reaches the disk.
+    OnlyWrite = 0,
+    /// Write and fsync inside the commit.
+    FlushAtOnce = 1,
+    /// Write every commit, sync at most once a second.
+    FlushPerSecond = 2,
+}
+
+impl WalFlush {
+    pub fn parse(mode: &str) -> Self {
+        match mode.trim().to_ascii_lowercase().as_str() {
+            "flush_at_once" => WalFlush::FlushAtOnce,
+            "flush_per_second" => WalFlush::FlushPerSecond,
+            _ => WalFlush::OnlyWrite,
+        }
     }
 }

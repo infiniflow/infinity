@@ -4260,6 +4260,9 @@ pub(crate) struct Context {
     /// queued or running (C++ `MemIndexTracer::proposed_dump_`). Prevents the
     /// per-row quota check from queueing one task per row.
     pub(crate) memindex_pending: Arc<std::sync::atomic::AtomicUsize>,
+    /// Milliseconds of the last `memindex_bytes` check (see
+    /// `Engine::enforce_memindex_quota`).
+    pub(crate) last_quota_check_ms: std::sync::atomic::AtomicU64,
     /// Object store backing the C++-format data files (`storage_type =
     /// "minio"`). `None` keeps everything on the local disk.
     pub(crate) object_store: Mutex<Option<Arc<storage::s3::S3Client>>>,

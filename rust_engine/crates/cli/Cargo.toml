@@ -27,6 +27,10 @@ server.workspace = true
 # The `.slt` parser and validator the reference's own runner is built from; the
 # conformance command drives the engine through it, so there is one
 # implementation of the format, not two.
+# The reference links jemalloc by default (`ENABLE_JEMALLOC=ON`): glibc's
+# malloc serialises the concurrent insert path on its arena locks, and the
+# parallel suite measured 2-3x slower without it.
+tikv-jemallocator.workspace = true
 sqllogictest = "0.29.1"
 
 [lints]

@@ -501,7 +501,10 @@ impl Engine {
         // A memory index that already exceeds its quota is dumped
         // before these rows join it.
         let gate = self.batch_gate(table);
+        let gate_wait = std::time::Instant::now();
         let _batch = gate.lock().unwrap();
+        let gate_waited = gate_wait.elapsed();
+        let phase = std::time::Instant::now();
         self.note_index_insert(table, rows.len());
         // A scalar table's first batch in this process starts an empty decoded
         // row cache; the batch is appended after the commit.
@@ -569,6 +572,8 @@ impl Engine {
             }
             Ok(())
         })?;
+        let committed = phase.elapsed();
+        let bottom_started = std::time::Instant::now();
         let range = allocated.get();
         let base = range.base;
         // Deferred publish: the commit becomes visible when the bottom half
@@ -661,6 +666,14 @@ impl Engine {
             self.batches_since_trim
                 .store(0, std::sync::atomic::Ordering::Relaxed);
             storage::trim_allocator();
+        }
+        if std::env::var_os("INFINITY_PROFILE_INSERT").is_some() {
+            eprintln!(
+                "[INS] rows={row_count} gate={:?} commit={:?} bottom={:?}",
+                gate_waited,
+                committed,
+                bottom_started.elapsed()
+            );
         }
         Ok(QueryResult::Inserted { count: row_count })
     }
@@ -1442,6 +1455,12 @@ impl Engine {
     /// in-memory index buffers, as the reference spends it on the index side.
     pub fn set_buffer_manager_size(&self, bytes: usize) {
         self.set_buffer_memory_limit(bytes);
+    }
+
+    /// Sets `[wal] wal_flush`: when a commit's WAL entry reaches the disk
+    /// (`flush_at_once` / `only_write` / `flush_per_second`).
+    pub fn set_wal_flush(&self, mode: txn::WalFlush) {
+        self.txn.set_wal_flush(mode);
     }
 
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped

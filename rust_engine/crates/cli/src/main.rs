@@ -15,6 +15,13 @@
 mod config;
 mod fulltext_bench;
 
+/// The reference links jemalloc (`CMakeLists.txt`'s `ENABLE_JEMALLOC`, on
+/// outside Debug builds) because glibc's malloc serialises its arena locks
+/// under concurrent writes. The parallel suite (eight inserters on one table)
+/// spends most of its time in the allocator without it.
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -185,6 +192,10 @@ fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()
     if let Some(client) = object_store {
         engine.set_object_store(client);
     }
+    // `[wal] wal_flush` — `only_write` (the reference's default) appends the
+    // entry and lets the OS flush; the checkpoint is the durability boundary.
+    let wal_flush = toml_value(&text, "wal_flush").unwrap_or_default();
+    engine.set_wal_flush(txn::WalFlush::parse(&wal_flush));
     // `[buffer] memindex_memory_quota` — a memory index is dumped into a C++
     // chunk once it reaches this size. The reference defaults to 4 GiB.
     let quota = toml_value(&text, "memindex_memory_quota").unwrap_or_default();
