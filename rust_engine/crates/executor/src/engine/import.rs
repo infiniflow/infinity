@@ -414,12 +414,23 @@ impl Engine {
         let imported = self.segment_rows(table, segment as usize) as u64;
         self.note_import_rows(table, segment, imported);
         self.note_import_ts(table, segment, ts);
+        // The published rows and the block they land in are one step: a
+        // checkpoint that ran between them would compute the block's bitmap
+        // coverage from a journal that already had these rows but wrote the
+        // block from the buffer before it - one row off. Take the table's
+        // bottom gate (and mark the thread as its bottom, so the block writer
+        // does not re-enter it).
+        let gate = self.bottom_gate(table);
+        let _turn = gate.lock().unwrap();
+        let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
         self.publish_rows(table, base, &rows)?;
         // `AppendInBlock`: the import's block is readable as soon as the
         // statement commits, exactly like the CSV path.
         if self.has_block_layout(table) {
             self.write_blocks_commit(table, ts)?;
         }
+        drop(_held);
+        drop(_turn);
         drop(_visible);
         let t_bottom = t3.elapsed();
         if profile {

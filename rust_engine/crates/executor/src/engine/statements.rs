@@ -42,7 +42,7 @@ impl HeldBottom {
         BOTTOM_HELD.with(|held| held.borrow().contains(table))
     }
 
-    fn enter(table: &str) -> Self {
+    pub(crate) fn enter(table: &str) -> Self {
         BOTTOM_HELD.with(|held| {
             held.borrow_mut().insert(table.to_string());
         });
