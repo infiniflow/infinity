@@ -1247,6 +1247,28 @@ impl Catalog {
         Ok(idx)
     }
 
+    /// Every schema change of `table` with the column ids that were live at
+    /// it: `(commit ts, ids in schema order)`, ascending.
+    ///
+    /// Read from the catalog itself (the versioned column records and the
+    /// drop markers), so it also covers the changes a checkpoint already
+    /// published, whose frames the log no longer has. A replayed row uses it to
+    /// learn which ids its cells belong to.
+    pub fn column_timeline(&self, table: &str) -> Result<Vec<(u64, Vec<u64>)>> {
+        let (db_id, bare) = self.db_and_bare_name(table)?;
+        let Ok(db_id) = db_id.parse::<u64>() else {
+            return Ok(Vec::new());
+        };
+        self.with_view(|store| {
+            let Some((table_id, _)) =
+                crate::layout::table_record(store, &db_id.to_string(), &bare)?
+            else {
+                return Ok(Vec::new());
+            };
+            crate::layout::column_timeline(store, db_id, table_id)
+        })
+    }
+
     pub fn get_table(&self, id: u64) -> Result<Option<TableMeta>> {
         if self.catalog_only {
             return Ok(self.tables()?.into_iter().find(|t| t.id == id));

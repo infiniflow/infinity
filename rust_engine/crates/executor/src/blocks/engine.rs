@@ -13,32 +13,60 @@ pub(crate) type BlockValueRows = (Vec<String>, DecodedRows);
 /// A row predicate: `true` keeps the row.
 pub(crate) type RowFilter<'a> = Option<&'a dyn Fn(&[Value]) -> bool>;
 
-/// Applies the schema changes an append predates to its stored row text.
+/// The column ids a row with `ts` was written with, in schema order.
 ///
-/// The cells are tab-separated and positional, so a column added after the
-/// append is inserted where the schema has it and a dropped one is removed;
-/// the result is the same row in the schema the replay ends with.
-fn reshape_row_text(text: &str, changes: &[&crate::wal_bridge::RowShapeChange]) -> String {
-    if changes.is_empty() {
+/// `timeline` is the table's schema history (`Catalog::column_timeline`),
+/// ascending; `current` is what a row newer than every recorded change was
+/// written with, and the fallback when the history does not reach back far
+/// enough.
+fn ids_at(timeline: &[(u64, Vec<u64>)], ts: u64, current: &[u64]) -> Vec<u64> {
+    match timeline
+        .iter()
+        .rev()
+        .find(|(change_ts, _)| *change_ts <= ts)
+    {
+        Some((_, ids)) => ids.clone(),
+        None => current.to_vec(),
+    }
+}
+
+/// Rewrites one replayed row onto the table's current columns.
+///
+/// The frame's cells follow `frame_ids` - the column ids that were live when
+/// the row was written - while the append buffer (and every block) is
+/// positional against the current schema. Matching by id is what makes a row
+/// survive a schema change: a cell whose column was dropped is discarded, and
+/// a column the row predates takes the default it was added with. Counting
+/// positions instead put a dropped column's value into its neighbour.
+fn reorder_row_text(
+    text: &str,
+    frame_ids: &[u64],
+    current_ids: &[u64],
+    defaults: &[Option<String>],
+) -> String {
+    if frame_ids == current_ids {
         return text.to_string();
     }
-    let mut cells: Vec<String> = text.split('\t').map(str::to_string).collect();
-    for change in changes {
-        match change {
-            crate::wal_bridge::RowShapeChange::Added { first, texts } => {
-                for (k, cell) in texts.iter().enumerate() {
-                    let at = (*first + k).min(cells.len());
-                    cells.insert(at, cell.clone());
-                }
-            }
-            crate::wal_bridge::RowShapeChange::Dropped { position } => {
-                if *position < cells.len() {
-                    cells.remove(*position);
-                }
-            }
+    let cells: Vec<&str> = text.split('\t').collect();
+    let mut out: Vec<String> = Vec::with_capacity(current_ids.len());
+    for (position, id) in current_ids.iter().enumerate() {
+        match frame_ids.iter().position(|frame| frame == id) {
+            Some(at) => out.push(cells.get(at).copied().unwrap_or_default().to_string()),
+            None => out.push(default_cell_text(
+                defaults.get(position).cloned().flatten().as_deref(),
+            )),
         }
     }
-    cells.join("\t")
+    out.join("\t")
+}
+
+/// The stored text form of a column default: the same value `AddColumnsData`
+/// writes into the block, so the buffered row and the block agree.
+fn default_cell_text(default: Option<&str>) -> String {
+    match default {
+        Some(text) => mirror_cell_text(&Value::from_literal(&default_literal(text))),
+        None => mirror_cell_text(&Value::Null),
+    }
 }
 
 impl Engine {
@@ -1585,7 +1613,6 @@ impl Engine {
         &self,
         appends: Vec<txn::ReplayedAppend>,
         deletes: Vec<txn::ReplayedDelete>,
-        shapes: &[(u64, String, crate::wal_bridge::RowShapeChange)],
     ) -> Result<()> {
         if appends.is_empty() && deletes.is_empty() {
             return Ok(());
@@ -1602,6 +1629,10 @@ impl Engine {
             String,
             std::collections::HashSet<usize>,
         > = Default::default();
+        // The schema each table went through, read once per table from the
+        // catalog (see `Catalog::column_timeline`).
+        let mut timelines: std::collections::HashMap<String, Vec<(u64, Vec<u64>)>> =
+            Default::default();
         for append in &appends {
             let table = self.qualified_table(&append.table);
             // The frame names the table **id** it was written for. A snapshot
@@ -1609,10 +1640,23 @@ impl Engine {
             // can come back the same way), so rows of a frame that names an
             // older id belong to a table that no longer exists - replaying them
             // appended the pre-restore rows on top of the restored ones.
-            match self.storage.catalog.get_table_by_name(&table) {
-                Ok(Some(meta)) if append.table_id == u64::MAX || append.table_id == meta.id => {}
-                _ => continue,
+            let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+                continue;
+            };
+            if append.table_id != u64::MAX && append.table_id != meta.id {
+                continue;
             }
+            // The ids the frame's cells belong to, and the ones the buffer
+            // is positional against.
+            let mut current_ids = meta.ids.clone();
+            current_ids.sort_unstable();
+            let timeline = timelines.entry(table.clone()).or_insert_with(|| {
+                self.storage
+                    .catalog
+                    .column_timeline(&table)
+                    .unwrap_or_default()
+            });
+            let frame_ids = ids_at(timeline, append.commit_ts, &current_ids);
             let defaults = self.table_defaults(&table).unwrap_or_default();
             // A row the block files already hold is not re-appended: the frame
             // may describe a commit that reached the blocks before the crash
@@ -1625,18 +1669,14 @@ impl Engine {
                     .collect()
             });
             let mut batch = Vec::with_capacity(append.rows.len());
-            // The schema changes this append predates: its text still has the
-            // cells of the schema it was written with.
-            let later: Vec<&crate::wal_bridge::RowShapeChange> = shapes
-                .iter()
-                .filter(|(ts, shape_table, _)| *ts > append.commit_ts && *shape_table == table)
-                .map(|(_, _, change)| change)
-                .collect();
             for (seq, text) in &append.rows {
                 if on_disk.contains(&(*seq as usize)) {
                     continue;
                 }
-                let text = reshape_row_text(text, &later);
+                // The row is placed on the ids its frame was written with;
+                // `None` means a snapshot restore hides them, and the text is
+                // already in the schema the restore left behind.
+                let text = reorder_row_text(text, &frame_ids, &current_ids, &defaults);
                 // A row whose text form the row parser cannot rebuild is not
                 // buffered: the append buffer is the only place a row the block
                 // files do not hold can live, and the port keeps no row journal

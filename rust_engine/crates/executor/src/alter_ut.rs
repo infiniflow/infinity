@@ -132,6 +132,274 @@ fn drop_column0() {
     e.execute("DROP TABLE tb1;").unwrap();
 }
 
+/// A row that only the WAL holds, replayed after the catalog already carries
+/// the `ADD`/`DROP COLUMN`, still lands in the right cells.
+///
+/// A DDL's catalog record is written when the statement commits, while rows
+/// stay in the append buffer until a checkpoint. A restart in between therefore
+/// replays rows written **before** the schema change against a catalog that
+/// already has it. In `test_alter_complex` that state made the old `c2` read
+/// back out of `c3`: the replay skipped the row's reordering because the column
+/// was already gone from the catalog.
+///
+/// This is the deterministic form of that flake - no checkpoint, no kill, just
+/// the two commit boundaries the reference has.
+#[test]
+fn replay_of_rows_that_predate_a_committed_column_change() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+        .unwrap();
+    e.execute("INSERT INTO tb1 VALUES (1, 2, 'before');")
+        .unwrap();
+    // Both DDLs are in the catalog now; the row above is still only in the WAL.
+    e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'default');")
+        .unwrap();
+    e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
+    // A row written after the changes: the replayed table has to converge on
+    // one schema for both rows.
+    e.execute("INSERT INTO tb1 VALUES (2, 'after', 'x');")
+        .unwrap();
+
+    // `RestartTxnMgr`: drop the engine (no flush, so the rows are replayed from
+    // the WAL) and open the same directory again.
+    drop(e);
+    let e = Engine::open(dir.path()).unwrap();
+
+    // id 0 keeps 1, c2 (id 1) is gone, c3 (id 2) keeps its own value and c4
+    // (id 3) holds the default it was added with.
+    assert_eq!(
+        rows(&e, "SELECT * FROM tb1 ORDER BY c1;"),
+        vec![
+            vec!["1".to_string(), "before".to_string(), "default".to_string()],
+            vec!["2".to_string(), "after".to_string(), "x".to_string()],
+        ]
+    );
+}
+
+/// Minimal form of the same bug: only the `DROP` is committed, so a replayed
+/// three-cell row is read against a two-column schema and `c3` takes the old
+/// `c2`.
+#[test]
+fn replay_of_a_row_that_predates_a_committed_drop_column() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+        .unwrap();
+    e.execute("INSERT INTO tb1 VALUES (1, 2, 'keep');").unwrap();
+    e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
+
+    drop(e);
+    let e = Engine::open(dir.path()).unwrap();
+
+    assert_eq!(
+        rows(&e, "SELECT * FROM tb1;"),
+        vec![vec!["1".to_string(), "keep".to_string()]]
+    );
+}
+
+/// The complementary case: `ADD` alone. The replayed frame is short by one
+/// cell, which the append path pads with the new column's default, so this
+/// shape has always been benign - it is here to keep it that way.
+#[test]
+fn replay_of_a_row_that_predates_a_committed_add_column() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    e.execute("CREATE TABLE tb1 (c1 INT, c2 INT);").unwrap();
+    e.execute("INSERT INTO tb1 VALUES (1, 2);").unwrap();
+    e.execute("ALTER TABLE tb1 ADD COLUMN (c3 VARCHAR DEFAULT 'added');")
+        .unwrap();
+
+    drop(e);
+    let e = Engine::open(dir.path()).unwrap();
+
+    assert_eq!(
+        rows(&e, "SELECT * FROM tb1;"),
+        vec![vec!["1".to_string(), "2".to_string(), "added".to_string()]]
+    );
+}
+
+/// The `test_alter_complex` sequence: `c2` is dropped and added again under a
+/// new id, which the timeline has to undo in the right order.
+#[test]
+fn replay_of_drop_then_readd_a_column() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+        .unwrap();
+    e.execute("INSERT INTO tb1 VALUES (1, 2, 'test');").unwrap();
+    e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
+        .unwrap();
+    e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
+    e.execute("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+        .unwrap();
+    e.execute("INSERT INTO tb1 VALUES (2, 'test2', 'x', 1.5);")
+        .unwrap();
+
+    drop(e);
+    let e = Engine::open(dir.path()).unwrap();
+
+    assert_eq!(
+        rows(&e, "SELECT c1, c3, c4 FROM tb1 ORDER BY c1;"),
+        vec![
+            vec!["1".to_string(), "test".to_string(), "tttt".to_string()],
+            vec!["2".to_string(), "test2".to_string(), "x".to_string()],
+        ]
+    );
+    // The re-added column keeps its own values: the float default for the row
+    // that predates it, and the inserted one.
+    assert_eq!(
+        rows(&e, "SELECT count(*) FROM tb1 WHERE c2 = 0.0;"),
+        vec![vec!["1".to_string()]]
+    );
+    assert_eq!(
+        rows(&e, "SELECT count(*) FROM tb1 WHERE c2 = 1.5;"),
+        vec![vec!["1".to_string()]]
+    );
+}
+
+/// The same sequence with the checkpoint on the other side of the DDLs: the
+/// rows are in a block and the catalog is ahead of it, which is the state the
+/// restart suite hits when the periodic checkpoint fires.
+#[test]
+fn replay_of_drop_then_readd_a_column_around_a_checkpoint() {
+    for checkpoint_after_ddl in [true, false] {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+            .unwrap();
+        e.execute("INSERT INTO tb1 VALUES (1, 2, 'test');").unwrap();
+        if !checkpoint_after_ddl {
+            e.flush().unwrap();
+        }
+        e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
+            .unwrap();
+        e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
+        e.execute("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+            .unwrap();
+        e.execute("INSERT INTO tb1 VALUES (2, 'test2', 'x', 1.5);")
+            .unwrap();
+        if checkpoint_after_ddl {
+            e.flush().unwrap();
+        }
+
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+
+        assert_eq!(
+            rows(&e, "SELECT c1, c3, c4 FROM tb1 ORDER BY c1;"),
+            vec![
+                vec!["1".to_string(), "test".to_string(), "tttt".to_string()],
+                vec!["2".to_string(), "test2".to_string(), "x".to_string()],
+            ],
+            "checkpoint after ddl: {checkpoint_after_ddl}"
+        );
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM tb1 WHERE c2 = 0.0;"),
+            vec![vec!["1".to_string()]],
+            "checkpoint after ddl: {checkpoint_after_ddl}"
+        );
+    }
+}
+
+/// Exactly `test_alter_complex[False-False]`: a full-text index, a column
+/// dropped and added again, then one more column after the second insert.
+#[test]
+fn replay_of_the_test_alter_complex_sequence() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+        .unwrap();
+    e.execute("CREATE INDEX idx1 ON tb1 (c3) USING FULLTEXT;")
+        .unwrap();
+    e.execute("INSERT INTO tb1 VALUES (1, 2, 'test');").unwrap();
+    e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
+        .unwrap();
+    e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
+    e.execute("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+        .unwrap();
+    e.execute("INSERT INTO tb1 VALUES (2, 'test2', 'tttt2', 1.0);")
+        .unwrap();
+    e.execute("ALTER TABLE tb1 ADD COLUMN (c5 INT DEFAULT 0);")
+        .unwrap();
+
+    drop(e);
+    let e = Engine::open(dir.path()).unwrap();
+
+    assert_eq!(
+        rows(&e, "SELECT c1, c3, c4 FROM tb1 ORDER BY c1;"),
+        vec![
+            vec!["1".to_string(), "test".to_string(), "tttt".to_string()],
+            vec!["2".to_string(), "test2".to_string(), "tttt2".to_string()],
+        ]
+    );
+    assert_eq!(
+        rows(&e, "SELECT count(*) FROM tb1 WHERE c2 = 1.0;"),
+        vec![vec!["1".to_string()]]
+    );
+    assert_eq!(
+        rows(&e, "SELECT count(*) FROM tb1 WHERE c5 = 0;"),
+        vec![vec!["2".to_string()]]
+    );
+}
+
+/// The same sequence with a checkpoint after each step in turn: the periodic
+/// checkpoint (`checkpoint_interval = 1s`) lands wherever it likes, so the
+/// rows and the catalog can be on either side of it.
+#[test]
+fn replay_of_the_test_alter_complex_sequence_around_a_checkpoint() {
+    for checkpoint_after in 0..=5 {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+            .unwrap();
+        e.execute("CREATE INDEX idx1 ON tb1 (c3) USING FULLTEXT;")
+            .unwrap();
+        e.execute("INSERT INTO tb1 VALUES (1, 2, 'test');").unwrap();
+        if checkpoint_after == 1 {
+            e.flush().unwrap();
+        }
+        e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
+            .unwrap();
+        if checkpoint_after == 2 {
+            e.flush().unwrap();
+        }
+        e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
+        if checkpoint_after == 3 {
+            e.flush().unwrap();
+        }
+        e.execute("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+            .unwrap();
+        if checkpoint_after == 4 {
+            e.flush().unwrap();
+        }
+        e.execute("INSERT INTO tb1 VALUES (2, 'test2', 'tttt2', 1.0);")
+            .unwrap();
+        if checkpoint_after == 5 {
+            e.flush().unwrap();
+        }
+        e.execute("ALTER TABLE tb1 ADD COLUMN (c5 INT DEFAULT 0);")
+            .unwrap();
+
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+
+        assert_eq!(
+            rows(&e, "SELECT c1, c3, c4 FROM tb1 ORDER BY c1;"),
+            vec![
+                vec!["1".to_string(), "test".to_string(), "tttt".to_string()],
+                vec!["2".to_string(), "test2".to_string(), "tttt2".to_string()],
+            ],
+            "checkpoint after step {checkpoint_after}"
+        );
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM tb1 WHERE c2 = 1.0;"),
+            vec![vec!["1".to_string()]],
+            "checkpoint after step {checkpoint_after}"
+        );
+    }
+}
+
 /// A column change touches **one file per block**, not the block.
 ///
 /// NewTxn::AddColumnsData writes the new column's {id}.col for every block

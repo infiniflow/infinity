@@ -1348,6 +1348,93 @@ fn read_columns(
     Ok((columns, next_column_id))
 }
 
+/// The column ids that were live at every schema change of one table,
+/// `(commit ts of the change, ids in schema order)`, ascending.
+///
+/// A column record lives from its create ts (the key carries it) and its
+/// `drop|tbl_col|…` marker - whose *value* is the commit ts of the DROP - ends
+/// it. Walking both is what `read_columns` does pinned to "now"; keeping every
+/// window is what lets a replayed row be placed on the ids it was written
+/// with, which matters when a column is dropped and added again: the two
+/// incarnations have different ids and only their ts tells them apart.
+pub fn column_timeline(
+    store: &dyn MetaStore,
+    db_id: u64,
+    table_id: u64,
+) -> Result<Vec<(u64, Vec<u64>)>> {
+    let db = db_id.to_string();
+    let table = table_id.to_string();
+    let prefix = key::table_column_prefix(&db, &table);
+    // `(name, create ts, id)` per incarnation.
+    let mut records: Vec<(String, u64, u64)> = Vec::new();
+    let mut boundaries: Vec<u64> = Vec::new();
+    for (k, v) in store.scan_prefix(prefix.as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let create_ts = key
+            .rsplit('|')
+            .next()
+            .and_then(|t| t.parse::<u64>().ok())
+            .unwrap_or(0);
+        let Some(col) = value_format::column_def_from_bytes(&v) else {
+            continue;
+        };
+        boundaries.push(create_ts);
+        records.push((col.column_name.clone(), create_ts, col.column_id as u64));
+    }
+    let drop_prefix = format!("drop|tbl_col|{db}/{table}/");
+    let mut drops: Vec<(String, u64, u64)> = Vec::new();
+    for (k, v) in store.scan_prefix(drop_prefix.as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let Some(tail) = key.strip_prefix(&drop_prefix) else {
+            continue;
+        };
+        let Some((name, create)) = tail.rsplit_once('/') else {
+            continue;
+        };
+        let (Ok(create_ts), Ok(drop_ts)) = (
+            create.parse::<u64>(),
+            String::from_utf8_lossy(&v).parse::<u64>(),
+        ) else {
+            continue;
+        };
+        if drop_ts == crate::DDL_TS_SENTINEL {
+            continue; // the DROP never committed
+        }
+        boundaries.push(drop_ts);
+        drops.push((name.to_string(), create_ts, drop_ts));
+    }
+    boundaries.sort_unstable();
+    boundaries.dedup();
+    let mut out: Vec<(u64, Vec<u64>)> = Vec::with_capacity(boundaries.len());
+    for ts in boundaries {
+        let mut ids: Vec<u64> = Vec::new();
+        for (name, create_ts, id) in &records {
+            if *create_ts > ts {
+                continue;
+            }
+            // The newest incarnation of the name at `ts` wins; a later record
+            // (or a drop of this one) means this incarnation is not the live
+            // one any more.
+            if records
+                .iter()
+                .any(|(other, c, _)| other == name && *c > *create_ts && *c <= ts)
+            {
+                continue;
+            }
+            if drops
+                .iter()
+                .any(|(other, c, d)| other == name && *c == *create_ts && *d <= ts)
+            {
+                continue;
+            }
+            ids.push(*id);
+        }
+        ids.sort_unstable();
+        out.push((ts, ids));
+    }
+    Ok(out)
+}
+
 /// One table, resolved **by name**: its newest `catalog|tbl|` record and that
 /// record's columns.
 ///
