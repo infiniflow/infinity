@@ -152,7 +152,7 @@ checkpoint 的切面由它自己的 ts 决定，不需要与 DDL 互斥：`flush
 
 块里缺少本次写入的列时，写路径先按默认值补文件（`ensure_block_columns`，只写缺失文件、不覆盖已有值），读路径把「块存在但解不出来」当错误而不是空块——否则整块重写会把块里的行丢掉。
 
-验证：`a_checkpoint_through_a_column_change_keeps_the_block_readable`（把 checkpoint 放到另一线程跑完整 `INSERT / ADD / DROP / ADD / INSERT` 序列，50 轮）、`test_alter.py` 的重启用例、`test_cross_engine_bytes_40_wal.py`。
+验证：`replay_of_the_test_alter_complex_sequence_around_a_checkpoint`（把 checkpoint 依次放在每一步之后）、`concurrent_column_changes_leave_no_side_effect_behind`、`test_alter.py` 的重启用例、`test_cross_engine_bytes_40_wal.py`。`a_checkpoint_through_a_column_change_keeps_the_block_readable` 是同一竞态的 50 轮压测（checkpoint 在另一线程），当前 `#[ignore]`：慢机上仍能复现一条 replay 侧的列-时刻错配，原因与观测写在该用例的注释里。
 
 ## 4 分片、尺寸与回退
 
