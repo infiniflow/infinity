@@ -613,6 +613,7 @@ dependencies = [
  "parser",
  "planner",
  "rust-stemmers",
+ "ryu",
  "storage",
  "tempfile",
  "tokio",

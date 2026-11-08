@@ -21,6 +21,7 @@ arrow-buffer.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 tokio.workspace = true
+ryu = "1.0"
 
 [dev-dependencies]
 tempfile.workspace = true

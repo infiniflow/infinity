@@ -5961,7 +5961,7 @@ pub(crate) fn fmt_f32_cpp(v: f32) -> String {
         }
         .to_string();
     }
-    fmt_cpp_float(&format!("{v:e}"), v.is_sign_negative())
+    fmt_cpp_float(&shortest_sci_f32(v), v.is_sign_negative())
 }
 
 /// The same for a `double` cell or a half-precision element widened to `f64`.
@@ -5979,7 +5979,52 @@ pub(crate) fn fmt_f64_cpp(v: f64) -> String {
         }
         .to_string();
     }
-    fmt_cpp_float(&format!("{v:e}"), v.is_sign_negative())
+    fmt_cpp_float(&shortest_sci_f64(v), v.is_sign_negative())
+}
+
+/// Rewrites a shortest round-trip decimal (`0.47070312`, `5.2582283e-05`) as
+/// `d.ddde<exp>` so [`fmt_cpp_float`] can lay it out like `std::to_chars`.
+fn sci_from_decimal(text: &str) -> String {
+    let text = text.strip_prefix('-').unwrap_or(text);
+    let (mantissa, exponent) = match text.split_once(['e', 'E']) {
+        Some((m, e)) => (m, e.parse::<i32>().unwrap_or(0)),
+        None => (text, 0),
+    };
+    let (int_part, frac_part) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let mut digits = String::with_capacity(int_part.len() + frac_part.len());
+    digits.push_str(int_part);
+    digits.push_str(frac_part);
+    let mut exponent = exponent + int_part.len() as i32 - 1;
+    let leading = digits.chars().take_while(|c| *c == '0').count();
+    if leading == digits.len() {
+        return "0e0".to_string();
+    }
+    digits.drain(..leading);
+    exponent -= leading as i32;
+    while digits.len() > 1 && digits.ends_with('0') {
+        digits.pop();
+    }
+    if digits.len() == 1 {
+        format!("{digits}e{exponent}")
+    } else {
+        format!("{}.{}e{}", &digits[..1], &digits[1..], exponent)
+    }
+}
+
+/// The shortest `f32` spelling as `d.ddde<exp>`.
+///
+/// Rust's own shortest form breaks a decimal tie upward (`0.470703125` →
+/// `0.47070313`); `std::to_chars` uses Ryu, which rounds half to even and
+/// writes `0.47070312`. The digits come from `ryu` so the two agree.
+fn shortest_sci_f32(v: f32) -> String {
+    let mut buffer = ryu::Buffer::new();
+    sci_from_decimal(buffer.format_finite(v))
+}
+
+/// The same for a `double` (and for halves widened to `f64`).
+fn shortest_sci_f64(v: f64) -> String {
+    let mut buffer = ryu::Buffer::new();
+    sci_from_decimal(buffer.format_finite(v))
 }
 
 /// Formats the shortest scientific spelling Rust produced (`1.5e-5`) the way
@@ -7217,3 +7262,35 @@ impl BgTask for OptimizeTask {
         }
     }
 }
+
+#[cfg(test)]
+mod float_format_ut {
+    use super::{fmt_f32_cpp, fmt_f64_cpp};
+
+    /// `std::to_chars` (`std::format("{}")`) spells these; the fvecs fixture
+    /// in `test/sql/dml/import` compares against the engine byte for byte.
+    #[test]
+    fn the_shortest_form_matches_std_to_chars() {
+        assert_eq!(fmt_f32_cpp(1.0), "1");
+        assert_eq!(fmt_f32_cpp(0.0), "0");
+        assert_eq!(fmt_f32_cpp(-0.0), "-0");
+        assert_eq!(fmt_f32_cpp(0.5), "0.5");
+        assert_eq!(fmt_f32_cpp(5.2582283e-05), "5.2582283e-05");
+        assert_eq!(fmt_f32_cpp(1234567.0), "1234567");
+        assert_eq!(fmt_f32_cpp(1.5e9), "1.5e+09");
+        assert_eq!(fmt_f64_cpp(0.470703125), "0.470703125");
+    }
+
+    /// `0.470703125` is exactly between `0.47070312` and `0.47070313`.
+    /// Ryu (what `std::to_chars` uses) rounds the tie to even; Rust's own
+    /// shortest form rounds it up, which made the fvecs gate disagree with the
+    /// reference on that one element.
+    #[test]
+    // The literal is exact (`241 / 512`); clippy compares it with Rust's own
+    // shortest form and thinks the extra digits are redundant.
+    #[allow(clippy::excessive_precision)]
+    fn a_decimal_tie_rounds_like_ryu() {
+        assert_eq!(fmt_f32_cpp(0.470703125), "0.47070312");
+    }
+}
+
