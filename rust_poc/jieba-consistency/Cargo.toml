@@ -1,0 +1,7 @@
+[package]
+name = "jieba-consistency"
+version.workspace = true
+edition = "2021"
+
+[dependencies]
+jieba-rs = "0.7"

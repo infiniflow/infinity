@@ -1,0 +1,13 @@
+# The bundled RocksDB in `librocksdb-sys` is old enough that the local GCC 16
+# cannot compile it, so build it with clang (23), which can.
+# (`ROCKSDB_LIB_DIR`/`ROCKSDB_INCLUDE_DIR` would link the system RocksDB 10.2
+# instead, but its headers no longer match the crate's FFI - see the plan.)
+[env]
+CC = "clang"
+CXX = "clang++"
+
+# Link with mold. A full link of this workspace is dominated by the ~40 MB
+# binary plus the static RocksDB, and mold does that several times faster than
+# the system `ld` without changing the output.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]

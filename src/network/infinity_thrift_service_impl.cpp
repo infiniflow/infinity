@@ -14,6 +14,7 @@
 
 module;
 
+#include <cstdio>
 #include <cstring>
 
 module infinity_core:infinity_thrift_service.impl;
@@ -469,6 +470,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     // ++count_;
     // auto start1 = std::chrono::steady_clock::now();
 
+    auto __t_rpc_begin = std::chrono::steady_clock::now();
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
     if (!infinity_status.ok()) {
         ProcessStatus(response, infinity_status);
@@ -732,6 +734,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         }
     }
 
+    auto __t_search_begin = std::chrono::steady_clock::now();
     // auto end2 = std::chrono::steady_clock::now();
     // phase_2_duration_ += end2 - start2;
     //
@@ -764,12 +767,24 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     //
     // auto start4 = std::chrono::steady_clock::now();
 
+    auto __t_search_done = std::chrono::steady_clock::now();
+
     if (result.IsOk()) {
         auto &columns = response.column_fields;
         columns.resize(result.result_table_->ColumnCount());
         ProcessDataBlocks(result, response, columns);
     } else {
         ProcessQueryResult(response, result);
+    }
+    auto __t_serialize_done = std::chrono::steady_clock::now();
+    if (getenv("INF_SERVER_TIMER") != nullptr) {
+        auto __ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
+        fmt::print(stderr,
+                   "[SRV] plan_ms {:.3f} search_ms {:.3f} ser_ms {:.3f} total_ms {:.3f}\n",
+                   __ms(__t_rpc_begin, __t_search_begin),
+                   __ms(__t_search_begin, __t_search_done),
+                   __ms(__t_search_done, __t_serialize_done),
+                   __ms(__t_rpc_begin, __t_serialize_done));
     }
 
     // auto end4 = std::chrono::steady_clock::now();

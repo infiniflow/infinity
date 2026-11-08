@@ -89,6 +89,12 @@ HeapBlockMaxWandIterator::HeapBlockMaxWandIterator(std::vector<std::unique_ptr<D
 }
 
 void HeapBlockMaxWandIterator::Init() {
+    // A/B for the benchmark: INFINITY_WAND_PLAIN_SEEK moves the children with
+    // NextNoSkip (positioning only) instead of Next (the leaf skips docs by its
+    // own local threshold), which is what a port without leaf skipping does.
+    if (getenv("INFINITY_WAND_PLAIN_SEEK") != nullptr) {
+        SetAdvanceMode(AdvanceMode::kPlainSeek);
+    }
     head_.clear();
     prefix_.clear();
     std::fill(retired_.begin(), retired_.end(), 0);
@@ -107,6 +113,19 @@ void HeapBlockMaxWandIterator::Init() {
 }
 
 bool HeapBlockMaxWandIterator::Finish() {
+    // Diagnostics for a benchmark run: the counters are otherwise only read by
+    // the unit tests.
+    if (getenv("INFINITY_WAND_STATS") != nullptr) {
+        fmt::print(stderr,
+                   "[WAND-CPP] scored={} iterations={} child_advances={} block_seeks={} heap_ops={} "
+                   "retired={}\n",
+                   stats_.docs_scored_,
+                   stats_.iterations_,
+                   stats_.child_advances_,
+                   stats_.block_seeks_,
+                   stats_.heap_ops_,
+                   stats_.retired_children_);
+    }
     doc_id_ = INVALID_ROWID;
     prefix_.clear();
     score_cached_ = false;
