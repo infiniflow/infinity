@@ -2098,10 +2098,11 @@ impl Engine {
                 continue;
             };
             let dim = types.get(col).and_then(|t| type_dim(t)).unwrap_or(0);
-            // A vector node carries its payload plus graph bookkeeping; the
-            // constant term keeps small dimensions over the quota in the same
-            // number of rows as the reference.
-            let bytes = (dim * 4 + 256) * count;
+            // One node costs its vector plus the level-0 neighbour list
+            // (`Mmax0 = 2M`, four bytes per id) and a little bookkeeping:
+            // the reference charges 168 bytes per row for `dim = 4, M = 16`
+            // (`IncreaseMemoryUsage mem_inc 1008` for six rows).
+            let bytes = (dim * 4 + 152) * count;
             let tkey = self.table_key(&im.table);
             let dump = {
                 let mut tables = self.tables.lock().unwrap();
@@ -2110,27 +2111,25 @@ impl Engine {
                     .index_pending_bytes
                     .entry(im.column.clone())
                     .or_insert(0);
-                if quota > 0 && *cur >= quota {
-                    // The dump empties the memory index; this batch is the
-                    // first thing in the next one.
-                    *cur = bytes;
+                *cur += bytes;
+                // The reference dumps when the memory passes the quota and
+                // subtracts only what the dump released, so the rows above
+                // the limit stay accounted and the *next* batch is what
+                // crosses again (`MemIndexTracer::IncreaseMemoryUsage`).
+                if quota > 0 && *cur > quota {
+                    *cur -= quota;
                     true
                 } else {
-                    if quota > 0 {
-                        *cur += bytes;
-                    }
                     false
                 }
             };
             if dump && self.dump_hnsw_index(&im.table, &im.name).is_ok() {
-                // The dumped segment leaves memory; these rows start the next
-                // one, so the counter keeps this batch's bytes instead of
-                // resetting to zero (`AppendMemIndex` accounts the new segment
-                // from the first row it receives).
+                // The dumped segment leaves memory. The bytes above the
+                // quota were already left in the counter, so nothing else to
+                // do here but drop the graph the dump just sealed.
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.column);
-                    e.index_pending_bytes.insert(im.column.clone(), bytes);
                     e.hnsw_probed = false;
                 }
             }

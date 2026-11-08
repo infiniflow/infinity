@@ -1050,16 +1050,10 @@ impl Engine {
                 }
             }
         }
-        // The HNSW memory segment (`HnswIndexInMem`) owns a graph per column;
-        // the reference charges it against the same memindex budget.
-        for e in self.tables.lock().unwrap().values() {
-            for idx in e.hnsw_mem.values() {
-                if let Ok(idx) = idx.lock() {
-                    total += idx.mem_usage();
-                }
-            }
-            total += e.index_pending_bytes.values().sum::<usize>();
-        }
+        // HNSW is not counted here: `note_index_insert` owns its budget (the
+        // reference charges the tracer per appended block, and this counter
+        // would double it), so the per-row check below is about the text,
+        // sparse, multivector and secondary tails only.
         total
             + self
                 .tables

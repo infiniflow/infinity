@@ -1145,8 +1145,9 @@ impl Engine {
                     // (`TableDef::WriteAdv` -> `ColumnDef::WriteAdv`), not into
                     // the catalog, whose `ColumnDef::ToJson` omits it.
                     |batch| {
-                        let bare = name.rsplit('.').next().unwrap_or(name);
-                        let cmd = crate::wal_bridge::create_table_command_from_batch(batch, bare)?;
+                        let (db, bare) = split_table_name(name);
+                        let cmd =
+                            crate::wal_bridge::create_table_command_from_batch(batch, &db, &bare)?;
                         match cmd {
                             storage::WalCmd::CreateTable {
                                 db_name,
@@ -1398,8 +1399,9 @@ impl Engine {
                     },
                     move |b| match &ac_ident {
                         Some((db_id, table_id, table_key)) => {
+                            let (db, _) = split_table_name(table);
                             crate::wal_bridge::add_columns_command_from_batch(
-                                b, db_id, table_id, &bare, table_key, base_index, &ac_names,
+                                b, &db, db_id, table_id, &bare, table_key, base_index, &ac_names,
                             )
                         }
                         None => None,
@@ -1914,8 +1916,10 @@ impl Engine {
                             .create_index_typed(name, table, column, index_type, opts)
                     },
                     |batch| {
+                        let (db, _) = split_table_name(table);
                         crate::wal_bridge::create_index_command_from_batch(
                             batch,
+                            &db,
                             &table_name,
                             &table_key,
                             name,

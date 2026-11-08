@@ -399,8 +399,10 @@ jobs:
           ./scripts/wait_for_infinity.sh
       - name: Parallel suite (Gate D)
         # The suite's conftest reads 127.0.0.1:23817, so it runs against the
-        # engine started above.
-        run: (cd python && ../.venv/bin/python -m pytest -q parallel_test --tb=short)
+        # engine started above. It resolves its fixtures as
+        # `os.getcwd() + "/test/data/"`, so it runs from the repository root -
+        # the way the reference's `tools/run_parallel_test.py` does.
+        run: .venv/bin/python -m pytest -q python/parallel_test --tb=short
       - name: Stop the engine and show its log
         if: always()
         run: |

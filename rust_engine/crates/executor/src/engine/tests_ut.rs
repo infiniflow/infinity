@@ -3246,10 +3246,11 @@ mod tests {
         assert_eq!(mem.rows().len(), 3, "HNSW memory segment must be seeded");
     }
 
-    /// `memindex_memory_quota` seals one HNSW chunk per *write batch*, not per
-    /// row: the per-row check sealed a one-row segment (the first row already
-    /// exceeded a 1 KB quota). The check runs once per batch, after the rows
-    /// are in, so the three batches below leave three segments behind.
+    /// `memindex_memory_quota` accounts one batch at a time and subtracts only
+    /// the quota when it dumps, exactly like `MemIndexTracer`: six rows of a
+    /// four-dimensional vector cost 1008 bytes, so the first batch stays under
+    /// 1 KB, the second crosses (and dumps), the third crosses again.
+    /// Measured against the reference: three batches leave two segments.
     #[test]
     fn the_memindex_quota_seals_one_hnsw_chunk_per_batch() {
         let dir = tempdir().unwrap();
@@ -3273,9 +3274,10 @@ mod tests {
             ))
             .unwrap();
         }
-        // One chunk per batch: the quota crossing after each batch seals the
-        // segment that batch left in memory.
-        assert_eq!(e.hnsw_chunk_ids("hc", "hx").len(), 3);
+        // Two chunks for three batches: the first batch fits, the second
+        // crosses the quota, and the bytes above the quota stay accounted so
+        // the third crosses again.
+        assert_eq!(e.hnsw_chunk_ids("hc", "hx").len(), 2);
     }
 
     /// A write that reaches the engine through the Thrift/import primitives

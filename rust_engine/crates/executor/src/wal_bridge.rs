@@ -169,6 +169,7 @@ pub fn data_type_of_text(text: &str) -> Option<DataType> {
 /// record" is not the new one as soon as the catalog has more than one.
 pub fn create_table_command_from_batch(
     batch: &[(Vec<u8>, Option<Vec<u8>>)],
+    db_name: &str,
     table_name: &str,
 ) -> Option<WalCmd> {
     // catalog|tbl|{db_id}|{name}|{ts}; the table id is the value.
@@ -220,9 +221,13 @@ pub fn create_table_command_from_batch(
     let table_name = table_name.to_string();
     cols.sort_by_key(|(id, _)| *id);
     let ordered: Vec<ColumnRecord> = cols.into_iter().map(|(_, r)| r).collect();
-    let td = table_def_from_columns("default_db", &table_name, &ordered);
+    // The database name comes from the statement, not from the batch: the
+    // DDL's catalog writes are incremental and carry no db record, so a
+    // table created outside default_db used to be logged under default_db
+    // and the replay then looked for it there.
+    let td = table_def_from_columns(db_name, &table_name, &ordered);
     Some(WalCmd::CreateTable {
-        db_name: "default_db".to_string(),
+        db_name: db_name.to_string(),
         db_id,
         table_id,
         table_def: td,
@@ -402,6 +407,7 @@ pub fn index_def_from_json(text: &str) -> Option<storage::wal::index_def::IndexD
 /// C++ layout, so the last `catalog|idx|` record is any index, not this one.
 pub fn create_index_command_from_batch(
     batch: &[(Vec<u8>, Option<Vec<u8>>)],
+    db_name: &str,
     table_name: &str,
     table_key: &str,
     index_name: &str,
@@ -449,21 +455,12 @@ pub fn create_index_command_from_batch(
         }
     }
     let index_base = index_base?;
-    // The database's **name**, which the reference's command carries for the
-    // replay to resolve the table by name. The layout rewrite in this batch has
-    // the `catalog|db|{name}|{ts}` records, whose value is the id the index's
-    // key names.
-    let db_name = batch
-        .iter()
-        .find_map(|(k, v)| {
-            let key = std::str::from_utf8(k).ok()?;
-            let name = key.strip_prefix("catalog|db|")?.split('|').next()?;
-            let value = std::str::from_utf8(v.as_ref()?).ok()?;
-            (value == db_id).then(|| name.to_string())
-        })
-        .unwrap_or_else(|| "default_db".to_string());
+    // The database's name, which the reference's command carries so the replay
+    // can resolve the table by name. It comes from the statement: the DDL's
+    // catalog writes are incremental, so the batch has no db record and the
+    // old lookup here fell back to default_db for every other database.
     Some(WalCmd::CreateIndex {
-        db_name,
+        db_name: db_name.to_string(),
         db_id,
         table_name: table_name.to_string(),
         table_id,
@@ -508,8 +505,10 @@ pub fn create_database_command_from_batch(
 /// Detects an `ADD COLUMNS` batch (its new `tbl|col|…` records) and builds the
 /// reference's `WalCmdAddColumnsV2`. `base_index` is the table's column count
 /// before the ADD, so the appended columns' positions are `base_index..`.
+#[allow(clippy::too_many_arguments)] // one argument per piece of the WAL command
 pub fn add_columns_command_from_batch(
     batch: &[(Vec<u8>, Option<Vec<u8>>)],
+    db_name: &str,
     db_id: &str,
     table_id: &str,
     table_name: &str,
@@ -546,7 +545,7 @@ pub fn add_columns_command_from_batch(
     // (one existing column -> the first added column is index 2).
     let column_idx_list: Vec<u32> = (0..defs.len() as u32).map(|i| base_index + i + 1).collect();
     Some(WalCmd::AddColumns {
-        db_name: "default_db".to_string(),
+        db_name: db_name.to_string(),
         db_id: db_id.to_string(),
         table_name: table_name.to_string(),
         table_id: table_id.to_string(),
@@ -1073,14 +1072,13 @@ pub fn replay(
                             ));
                         }
                     }
-                    WalCmd::DropIndex {
-                        db_name,
-                        table_name,
-                        index_name,
-                        ..
-                    } => {
-                        let _ =
-                            catalog.drop_index_on(&qualified(db_name, table_name), index_name)?;
+                    WalCmd::DropIndex { index_name, .. } => {
+                        // The same call the statement makes: a marker, not a
+                        // delete. Dropping the record outright left the
+                        // index directory with nothing for Cleanup to find it
+                        // by after a crash (the marker had not reached an
+                        // SST), so the files stayed for ever.
+                        let _ = catalog.drop_index(index_name)?;
                     }
                     WalCmd::CreateIndex {
                         db_name,
