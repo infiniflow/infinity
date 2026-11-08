@@ -485,44 +485,57 @@ impl Engine {
     /// dump keeps its old behaviour.
     fn index_has_memory_tail(&self, table: &str, meta: &IndexMeta) -> bool {
         let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let Some(entry) = tables.get(&key) else {
-            return false;
-        };
         let kind = meta.index_type.trim();
+        // Every branch clones the handle out of `tables` and locks it only
+        // after the map is released: a scan holds one of these guards while it
+        // waits for `tables` (see `Engine::text_index_for`), so locking an
+        // index under `tables` would close that cycle.
         if is_secondary_kind(kind) {
-            return entry
-                .secondary
-                .indexes
-                .get(&meta.column)
+            let tables = self.tables.lock().unwrap();
+            return tables
+                .get(&key)
+                .and_then(|e| e.secondary.indexes.get(&meta.column))
                 .map(|i| i.approx_bytes() > 0)
                 .unwrap_or(false);
         }
         if kind.eq_ignore_ascii_case("HNSW") {
-            return entry
-                .hnsw_mem
-                .get(&meta.column)
+            let mem = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&key)
+                    .and_then(|e| e.hnsw_mem.get(&meta.column).cloned())
+            };
+            return mem
                 .and_then(|m| m.lock().ok().map(|g| !g.is_empty()))
                 .unwrap_or(false);
         }
         if kind.eq_ignore_ascii_case("IVF") {
-            return entry
-                .ivf_mem
-                .get(&meta.column)
+            let tables = self.tables.lock().unwrap();
+            return tables
+                .get(&key)
+                .and_then(|e| e.ivf_mem.get(&meta.column))
                 .map(|rows| !rows.is_empty())
                 .unwrap_or(false);
         }
         if kind.eq_ignore_ascii_case("FULLTEXT") {
-            return entry
-                .text
-                .get(&meta.column)
+            let text = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&key)
+                    .and_then(|e| e.text.get(&meta.column).cloned())
+            };
+            return text
                 .and_then(|t| t.read().ok().map(|g| g.mem.pending_docs() > 0))
                 .unwrap_or(false);
         }
         if kind.eq_ignore_ascii_case("BMP") {
-            return entry
-                .sparse
-                .get(&meta.column)
+            let sparse = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&key)
+                    .and_then(|e| e.sparse.get(&meta.column).cloned())
+            };
+            return sparse
                 .and_then(|s| s.read().ok().map(|g| !g.tail.is_empty()))
                 .unwrap_or(false);
         }
@@ -531,9 +544,13 @@ impl Engine {
             || kind.eq_ignore_ascii_case("EMVB")
             || kind.eq_ignore_ascii_case("MULTIVECTOR")
         {
-            return entry
-                .mv
-                .get(&meta.column)
+            let mv = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&key)
+                    .and_then(|e| e.mv.get(&meta.column).cloned())
+            };
+            return mv
                 .and_then(|m| m.read().ok().map(|g| !g.tail.is_empty()))
                 .unwrap_or(false);
         }

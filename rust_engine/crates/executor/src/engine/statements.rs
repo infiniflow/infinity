@@ -4006,8 +4006,12 @@ impl Engine {
     /// (C++ `SegmentIndexMeta::GetMemIndex() != nullptr` plus its size).
     pub fn mem_index_len(&self, table: &str, column: &str) -> Option<usize> {
         let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let mem = tables.get(&key)?.hnsw_mem.get(column)?;
+        // The handle is cloned and `tables` released before it is locked (see
+        // `text_index_for`).
+        let mem = {
+            let tables = self.tables.lock().unwrap();
+            tables.get(&key)?.hnsw_mem.get(column)?.clone()
+        };
         let len = mem.lock().unwrap().len();
         Some(len)
     }
