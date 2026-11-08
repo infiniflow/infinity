@@ -34,8 +34,8 @@
 | | |
 |---|---|
 | 参考 | 池：`max(2, hardware_concurrency()/2)` 条队列、`crc32(table_id) % n` 路由（`bottom_executor_impl.cpp:32-78`、`config_impl.cpp:562-567`）；每事务由**一个** worker 跑完上面全部步骤 |
-| 端口 | `storage::wal::bottom_executor::BottomExecutor` + `Engine::run_commit_bottom`（`BottomWork`：own `Arc<Engine>`、staged appends/deletes/dumps、每表 gate，跑 `run_bottom` 后 condvar 回传）；`start_background_tasks` 起池 |
-| 状态 | `aligned` |
+| 端口 | 每表一条 **FIFO 队列** + 共享 blocking 池（`Engine::submit_bottom` / `bottom_queues`）：同表同一时刻只有一个作业在飞，队列空了线程即归还；跨表并行度 = 活跃表数，不受哈希碰撞限制（10 万+ 表的场景），作业仍是 `BottomWork`（own `Arc<Engine>`、staged appends/deletes/dumps、每表 gate） |
+| 状态 | `different`（有意偏离）：参考的定长池按 `crc32(table_id) % n` 分片，撞桶的两表互相排队；端口用每表 FIFO 换掉分片，同表顺序由队列保证 |
 | 证据 | `an_insert_runs_its_bottom_half_on_the_bottom_executor`（`BOTTOM_WORKS` 计数 + 返回即可查）、字节门禁 `20_table`/`50_mutations` |
 
 ### 1.2 索引追加（`MemIndexAppender`）

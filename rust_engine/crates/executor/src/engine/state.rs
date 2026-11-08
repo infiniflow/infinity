@@ -4347,14 +4347,14 @@ pub struct Engine {
     /// `crc32(table_id) % n` queues give the reference
     /// (`bottom_executor_impl.cpp:32-78`).
     pub(crate) bottom_gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
-    /// The reference's `BottomExecutor` (`Storage`'s `bottom_executor_`): when
-    /// one is attached, a transaction's bottom half runs on its sharded worker
-    /// instead of the committing thread. `None` keeps the inline path, which is
-    /// what an engine without a thread pool (most tests) uses.
-    pub(crate) bottom_executor:
-        Mutex<Option<Arc<storage::wal::bottom_executor::BottomExecutor<BottomWork>>>>,
-    /// The full-text inverted-index appender (`MemIndexAppender`).
-    pub(crate) mem_index_appender: Mutex<Option<Arc<MemIndexAppender>>>,
+    /// One FIFO of bottom-half jobs **per table**, drained on the shared pool.
+    ///
+    /// The reference routes a transaction to `crc32(table_id) % pool_size`, so
+    /// two tables that hash alike wait for each other; with a directory of a
+    /// hundred thousand tables that collision is what limits cross-table
+    /// parallelism. Here every table has its own queue and one job in flight,
+    /// so the in-flight tables are bounded by the pool, not by a hash.
+    pub(crate) bottom_queues: Mutex<BottomQueues>,
     /// `Storage::txn_allocator_` (`txn_allocator_impl.cpp:56`): one thread
     /// hands out every append's row ids, so they are contiguous in submission
     /// order. Started lazily; an engine without a stable `Arc` handle (most
@@ -4697,71 +4697,22 @@ pub(crate) fn run_bottom(
 }
 
 /// Jobs the appender thread has run, for tests.
-#[cfg(test)]
-pub(crate) static TEXT_APPENDS: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
-
-/// Jobs the appender thread has run, for tests.
-#[cfg(test)]
-pub(crate) fn text_append_count() -> usize {
-    TEXT_APPENDS.load(std::sync::atomic::Ordering::SeqCst)
-}
-
-/// `MemIndexAppender` (`bg_task/mem_index_appender_impl.cpp:58`): one
-/// background thread that takes the inverted-index inserts of a commit off the
-/// committing path. The reference submits an `AppendMemIndexTask` per block
-/// (`new_txn_index_impl.cpp:891-894`) and `PostCommit` acquires its semaphore
-/// before the transaction completes; [`Engine::run_text_append`] is that
-/// submit-and-wait.
-pub(crate) struct MemIndexAppender {
-    pub(crate) tx: std::sync::Mutex<std::sync::mpsc::SyncSender<Box<dyn FnOnce() + Send>>>,
-    pub(crate) handle: std::sync::Mutex<Option<std::thread::JoinHandle<()>>>,
-}
-
-impl MemIndexAppender {
-    pub(crate) fn start() -> Self {
-        // C++ `DEFAULT_BLOCKING_QUEUE_SIZE`: a bounded queue, so the appender
-        // applies back-pressure instead of growing without limit.
-        let (tx, rx) = std::sync::mpsc::sync_channel::<Box<dyn FnOnce() + Send>>(1024);
-        let handle = std::thread::Builder::new()
-            .name("infinity-mem-index-appender".to_string())
-            .spawn(move || {
-                while let Ok(work) = rx.recv() {
-                    #[cfg(test)]
-                    TEXT_APPENDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    work();
-                }
-            })
-            .expect("failed to spawn the mem index appender");
-        Self {
-            tx: std::sync::Mutex::new(tx),
-            handle: std::sync::Mutex::new(Some(handle)),
-        }
-    }
-
-    pub(crate) fn submit(&self, work: Box<dyn FnOnce() + Send>) -> bool {
-        self.tx.lock().unwrap().send(work).is_ok()
-    }
-}
-
-impl Drop for MemIndexAppender {
-    fn drop(&mut self) {
-        // Closing the sender (dropping it) ends the worker's loop.
-        let (dead_tx, _) = std::sync::mpsc::sync_channel(1);
-        {
-            let mut tx = self.tx.lock().unwrap();
-            *tx = dead_tx;
-        }
-        if let Some(handle) = self.handle.lock().unwrap().take() {
-            let _ = handle.join();
-        }
-    }
-}
-
 #[derive(Default)]
 pub(crate) struct BottomState {
     pub(crate) finished: bool,
     pub(crate) result: Option<Result<()>>,
+}
+
+/// The per-table FIFO of bottom-half jobs (`Engine::bottom_queues`).
+#[derive(Default)]
+pub(crate) struct BottomQueues {
+    /// Queued jobs, oldest first, per table key.
+    pub(crate) pending:
+        std::collections::HashMap<String, std::collections::VecDeque<Arc<BottomWork>>>,
+    /// Tables with a job running: at most one of theirs is on the pool.
+    pub(crate) running: std::collections::HashSet<String>,
+    /// Whether a pool is attached; without one the caller runs the job inline.
+    pub(crate) attached: bool,
 }
 
 /// The job a table's worker runs for one statement's bottom half.
@@ -5070,8 +5021,11 @@ impl<'a> EngineTxn<'a> {
         // waits for the worker to call `CommitBottom`; without a pool (or
         // without an owned engine handle for a `'static` job) the bottom half
         // runs here.
-        if let (Some(engine), Some(executor)) = (self.handle.clone(), self.engine.bottom_executor())
-        {
+        let pool = self
+            .handle
+            .clone()
+            .filter(|_| self.engine.bottom_pool_attached());
+        if let Some(engine) = pool {
             let table_id = appends
                 .first()
                 .map(|append| append.table.clone())
@@ -5088,7 +5042,7 @@ impl<'a> EngineTxn<'a> {
                 state: std::sync::Mutex::new(BottomState::default()),
                 done: std::sync::Condvar::new(),
             });
-            executor.submit(task.clone());
+            self.engine.submit_bottom(task.clone());
             return task.wait();
         }
         let _gates: Vec<std::sync::MutexGuard<'_, ()>> =

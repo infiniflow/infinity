@@ -622,19 +622,22 @@ impl Engine {
                     .enumerate()
                     .map(|(k, row)| (base + k, row.iter().map(|v| v.to_slt_string()).collect()))
                     .collect();
-                engine.run_text_append(move |engine| {
-                    let schema = engine.table_schema(&index_table).unwrap_or_default();
-                    for (seq, texts) in &index_rows {
-                        engine.update_indexes_on_insert_text(&index_table, *seq, texts, &schema)?;
-                        engine.update_text_indexes(&index_table, *seq, texts, &schema);
-                        engine.update_vector_caches(&index_table, *seq, texts);
-                    }
-                    // C++ `AppendMemIndex`: a segment that reached
-                    // `mem_index_capacity` rows is dumped right after the batch.
-                    engine.dump_hnsw_over_capacity(&index_table);
-                    engine.dump_secondary_over_capacity(&index_table);
-                    Ok(())
-                })?;
+                // The index work runs on **this table's** bottom worker: every
+                // index has its own lock and two tables share none, so a
+                // directory with a hundred thousand tables keeps its index
+                // updates in parallel instead of queueing behind one appender
+                // thread (the reference's `MemIndexAppender` is a single
+                // thread, which is the one structural deviation here).
+                let schema = engine.table_schema(&index_table).unwrap_or_default();
+                for (seq, texts) in &index_rows {
+                    engine.update_indexes_on_insert_text(&index_table, *seq, texts, &schema)?;
+                    engine.update_text_indexes(&index_table, *seq, texts, &schema);
+                    engine.update_vector_caches(&index_table, *seq, texts);
+                }
+                // C++ `AppendMemIndex`: a segment that reached
+                // `mem_index_capacity` rows is dumped right after the batch.
+                engine.dump_hnsw_over_capacity(&index_table);
+                engine.dump_secondary_over_capacity(&index_table);
             }
             engine.bump_writes(&bottom_table);
             engine.note_live_rows(&bottom_table, bottom_rows.len() as isize);

@@ -856,9 +856,7 @@ mod tests {
     fn an_insert_runs_its_bottom_half_on_the_bottom_executor() {
         let dir = tempdir().unwrap();
         let e = Arc::new(Engine::open(dir.path()).unwrap());
-        let mut executor = storage::wal::bottom_executor::BottomExecutor::new();
-        executor.start(2);
-        e.attach_bottom_executor(Arc::new(executor));
+        e.attach_bottom_pool();
         e.execute("CREATE TABLE be (a INT, b VARCHAR);").unwrap();
         e.execute("CREATE INDEX be_b ON be (b);").unwrap();
 
@@ -883,39 +881,6 @@ mod tests {
         assert!(dir.path().join("data").exists());
     }
 
-    /// With an appender attached, a full-text INSERT does its inverted-index
-    /// work on the appender thread and waits for it: the index answers right
-    /// after the statement returns.
-    #[test]
-    fn a_fulltext_insert_runs_on_the_mem_index_appender() {
-        let dir = tempdir().unwrap();
-        let e = Arc::new(Engine::open(dir.path()).unwrap());
-        e.attach_mem_index_appender(Arc::new(MemIndexAppender::start()));
-        e.execute("CREATE TABLE ft (id INT, body VARCHAR);")
-            .unwrap();
-        e.execute("CREATE INDEX ft_body ON ft (body) WITH (analyzer = 'standard');")
-            .unwrap();
-
-        let before = text_append_count();
-        e.execute("INSERT INTO ft VALUES (1, 'hello world'), (2, 'goodbye world');")
-            .unwrap();
-        assert_eq!(
-            text_append_count(),
-            before + 1,
-            "the inversion ran on the appender"
-        );
-        assert_eq!(
-            rows(
-                &e,
-                "SELECT count(*) FROM ft WHERE filter_fulltext('body', 'hello');"
-            ),
-            vec![vec!["1".to_string()]]
-        );
-    }
-
-    /// `CREATE INDEX … USING EMVB`: the reference takes a tensor-of-float
-    /// column only, both PQ options, a subspace count that divides the
-    /// dimension and bits of 8 or 16 (`IndexEMVB::Make`, `GetEMVBOPQ`).
     #[test]
     fn emvb_index_options_are_validated_like_the_reference() {
         let dir = tempdir().unwrap();

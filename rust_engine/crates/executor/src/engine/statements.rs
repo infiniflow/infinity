@@ -189,8 +189,7 @@ impl Engine {
             self_weak: Mutex::new(std::sync::Weak::new()),
             batch_locks: Mutex::new(HashMap::new()),
             bottom_gates: Mutex::new(HashMap::new()),
-            bottom_executor: Mutex::new(None),
-            mem_index_appender: Mutex::new(None),
+            bottom_queues: Mutex::new(BottomQueues::default()),
             allocator: Mutex::new(None),
             allocator_jobs: std::sync::atomic::AtomicUsize::new(0),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
@@ -546,23 +545,65 @@ impl Engine {
         *self.self_weak.lock().unwrap() = Arc::downgrade(self);
     }
 
-    /// Attaches the `BottomExecutor` the reference keeps in `Storage`
-    /// (`wal_manager_impl.cpp:92`): commits then run their bottom half on a
-    /// worker, sharded by table id.
-    pub(crate) fn attach_bottom_executor(
-        self: &Arc<Self>,
-        executor: Arc<storage::wal::bottom_executor::BottomExecutor<BottomWork>>,
-    ) {
-        // The queued job owns an `Arc<Engine>`, so the engine has to know its
-        // own handle (`EngineTxn::handle` upgrades this).
+    /// Runs bottom halves on the shared blocking pool (`Engine::submit_bottom`).
+    pub(crate) fn attach_bottom_pool(self: &Arc<Self>) {
         self.install_engine_handle();
-        *self.bottom_executor.lock().unwrap() = Some(executor);
+        self.bottom_queues.lock().unwrap().attached = true;
     }
 
-    pub(crate) fn bottom_executor(
-        &self,
-    ) -> Option<Arc<storage::wal::bottom_executor::BottomExecutor<BottomWork>>> {
-        self.bottom_executor.lock().unwrap().clone()
+    /// Whether bottoms run on the shared pool rather than inline.
+    pub(crate) fn bottom_pool_attached(&self) -> bool {
+        self.bottom_queues.lock().unwrap().attached
+    }
+
+    /// Queues a bottom-half job on its table's FIFO.
+    ///
+    /// Returns `false` when no pool is attached (the caller then runs the job
+    /// inline). One job per table is in flight; the drain loop runs the next
+    /// queued job when the previous one finishes, so a table's bottoms keep
+    /// their commit order without bounding the *number* of tables that can be
+    /// in flight (the reference's `crc32(table_id) % n` routing does).
+    pub(crate) fn submit_bottom(&self, task: Arc<BottomWork>) -> bool {
+        let Some(engine) = self.engine_handle() else {
+            return false;
+        };
+        let table = task.table_id.clone();
+        {
+            let mut queues = self.bottom_queues.lock().unwrap();
+            if !queues.attached {
+                return false;
+            }
+            queues
+                .pending
+                .entry(table.clone())
+                .or_default()
+                .push_back(task);
+            if !queues.running.insert(table.clone()) {
+                return true; // a job of this table is already draining
+            }
+        }
+        // One task on the pool per burst: it drains this table's queue and
+        // returns, so an idle table holds no thread.
+        crate::scheduler::scheduler().submit(Box::new(move || loop {
+            let next = {
+                let mut queues = engine.bottom_queues.lock().unwrap();
+                match queues
+                    .pending
+                    .get_mut(&table)
+                    .and_then(|queue| queue.pop_front())
+                {
+                    Some(task) => task,
+                    None => {
+                        queues.running.remove(&table);
+                        return;
+                    }
+                }
+            };
+            if storage::wal::bottom_executor::BottomTask::is_committing(&*next) {
+                storage::wal::bottom_executor::BottomTask::commit_bottom(&*next);
+            }
+        }));
+        true
     }
 
     /// Runs one statement's post-commit work the way `NewTxnManager::
@@ -583,12 +624,13 @@ impl Engine {
         if BOTTOM_HELD.with(|held| held.borrow().contains(&key)) {
             return work(self);
         }
-        let (Some(engine), Some(executor)) = (self.engine_handle(), self.bottom_executor()) else {
+        if self.engine_handle().is_none() || !self.bottom_pool_attached() {
             let gate = self.bottom_gate(table);
             let _turn = gate.lock().unwrap();
             let _held = HeldBottom::enter(&key);
             return work(self);
-        };
+        }
+        let engine = self.engine_handle().expect("checked above");
         let work_key = key.clone();
         let wrapped = move |engine: &Engine| {
             let _held = HeldBottom::enter(&work_key);
@@ -604,7 +646,7 @@ impl Engine {
             state: std::sync::Mutex::new(BottomState::default()),
             done: std::sync::Condvar::new(),
         });
-        executor.submit(task.clone());
+        self.submit_bottom(task.clone());
         task.wait()
     }
 
@@ -643,57 +685,6 @@ impl Engine {
         let allocator = Arc::new(Allocator { jobs });
         *self.allocator.lock().unwrap() = Some(allocator.clone());
         Some(allocator)
-    }
-
-    /// Attaches the full-text appender (`Storage::mem_index_appender`).
-    pub(crate) fn attach_mem_index_appender(self: &Arc<Self>, appender: Arc<MemIndexAppender>) {
-        self.install_engine_handle();
-        *self.mem_index_appender.lock().unwrap() = Some(appender);
-    }
-
-    pub(crate) fn mem_index_appender(&self) -> Option<Arc<MemIndexAppender>> {
-        self.mem_index_appender.lock().unwrap().clone()
-    }
-
-    /// `MemoryIndexer::AsyncInsertTop` + `MemIndexAppender::Submit` followed by
-    /// `PostCommit`'s semaphore wait: the inverted-index work runs on the
-    /// appender thread and this call returns once it is done.
-    pub(crate) fn run_text_append<F>(&self, work: F) -> Result<()>
-    where
-        F: FnOnce(&Engine) -> Result<()> + Send + 'static,
-    {
-        let (Some(engine), Some(appender)) = (self.engine_handle(), self.mem_index_appender())
-        else {
-            return work(self);
-        };
-        type Job = Box<dyn FnOnce(&Engine) -> Result<()> + Send>;
-        let (done_tx, done_rx) =
-            std::sync::mpsc::sync_channel::<std::result::Result<(), String>>(1);
-        // `submit` only fails when the worker is gone; the job is dropped then,
-        // so run it here instead of losing it.
-        let pending: std::sync::Arc<std::sync::Mutex<Option<Job>>> =
-            std::sync::Arc::new(std::sync::Mutex::new(Some(Box::new(work))));
-        let job = std::sync::Arc::clone(&pending);
-        let submitted = appender.submit(Box::new(move || {
-            let work = job.lock().unwrap().take();
-            let result = match work {
-                Some(work) => work(&engine),
-                None => Ok(()),
-            };
-            let _ = done_tx.send(result.map_err(|error| error.to_string()));
-        }));
-        if submitted {
-            return match done_rx.recv() {
-                Ok(Ok(())) => Ok(()),
-                Ok(Err(message)) => Err(Error::Invalid(message)),
-                Err(_) => Ok(()),
-            };
-        }
-        let work = pending.lock().unwrap().take();
-        match work {
-            Some(work) => work(self),
-            None => Ok(()),
-        }
     }
 
     /// The gate a transaction's bottom half holds for `table`.
@@ -7607,19 +7598,13 @@ impl Engine {
         let processor = Arc::new(BGTaskProcessor::new(1));
         processor.start();
         self.attach_bg_task_processor(processor);
-        // `WalManager::Start` starts the bottom executor next to the WAL
-        // thread (`wal_manager_impl.cpp:92-93`) with
-        // `max(2, hardware_concurrency() / 2)` workers (`config_impl.cpp:562`).
-        let workers = std::thread::available_parallelism()
-            .map(|count| count.get() / 2)
-            .unwrap_or(1)
-            .max(2);
-        let mut bottom_executor = storage::wal::bottom_executor::BottomExecutor::new();
-        bottom_executor.start(workers);
-        self.attach_bottom_executor(Arc::new(bottom_executor));
+        self.attach_bottom_pool();
+        // The bottom halves run on the shared blocking pool, one job per table
+        // at a time (`Engine::submit_bottom`): the reference's fixed pool with
+        // `crc32(table_id) % n` routing serialises any two tables that hash
+        // alike, which is the wrong limit for a directory of 100k tables.
         // `Storage::Start` also starts the memory-index appender
         // (`storage_impl.cpp` / `mem_index_appender_impl.cpp:52`).
-        self.attach_mem_index_appender(Arc::new(MemIndexAppender::start()));
         let engine = Arc::downgrade(self);
         let spawned = std::thread::Builder::new()
             .name("infinity-trigger".to_string())
