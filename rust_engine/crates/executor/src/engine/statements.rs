@@ -2575,39 +2575,6 @@ impl Engine {
         Some((names.clone(), out))
     }
 
-    /// Whether a rewritten row has to reach a text, vector or sparse index.
-    ///
-    /// The hooks those need are keyed by their own registries, so a table with
-    /// only secondary indexes can skip them (they lock the table per row). The
-    /// registries, though, are empty right after a restart - the HNSW/IVF memory
-    /// segment is materialised by the first insert - so a declared index of such
-    /// a kind is the other signal; without it an `UPDATE` on a restarted table
-    /// never feeds its graph.
-    pub(crate) fn has_text_or_vector_index(&self, table: &str) -> bool {
-        let tkey = self.table_key(table);
-        if let Some(entry) = self.tables.lock().unwrap().get(&tkey) {
-            if !entry.text.is_empty()
-                || !entry.mv.is_empty()
-                || !entry.sparse.is_empty()
-                || !entry.hnsw_mem.is_empty()
-                || !entry.ivf_mem.is_empty()
-            {
-                return true;
-            }
-        }
-        let short = table.split('.').next_back().unwrap_or(table);
-        self.storage
-            .catalog
-            .list_indexes()
-            .map(|all| {
-                all.iter().any(|im| {
-                    (im.table == short || im.table == table)
-                        && !crate::is_secondary_kind(&im.index_type)
-                })
-            })
-            .unwrap_or(false)
-    }
-
     pub(crate) fn fetch_rows(&self, table: &str) -> Result<Vec<Vec<Value>>> {
         Ok(self
             .fetch_rows_with_ids(table)?

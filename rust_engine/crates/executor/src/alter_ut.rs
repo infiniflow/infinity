@@ -457,6 +457,46 @@ fn a_checkpoint_through_a_column_change_keeps_the_block_readable() {
         );
     }
 }
+/// An UPDATE rewrites a row (delete + append in the reference), so every index
+/// kind has to follow it: the secondary tail gets the new value, loses the old
+/// one, and the full-text index does the same.
+#[test]
+fn an_update_keeps_every_index_kind() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    e.execute("CREATE TABLE t (id INT, a INT, b VARCHAR);")
+        .unwrap();
+    e.execute("CREATE INDEX t_a ON t (a);").unwrap();
+    e.execute("CREATE INDEX t_b ON t (b) USING FULLTEXT;")
+        .unwrap();
+    e.execute("INSERT INTO t VALUES (1, 10, 'alpha'), (2, 20, 'beta');")
+        .unwrap();
+    e.execute("UPDATE t SET a = 11, b = 'gamma' WHERE id = 1;")
+        .unwrap();
+
+    assert_eq!(
+        rows(&e, "SELECT id FROM t WHERE a = 11;"),
+        vec![vec!["1".to_string()]],
+        "the secondary tail has the new value"
+    );
+    assert_eq!(
+        rows(&e, "SELECT count(*) FROM t WHERE a = 10;"),
+        vec![vec!["0".to_string()]],
+        "and not the old one"
+    );
+    assert_eq!(
+        rows(&e, "SELECT id FROM t WHERE filter_fulltext('b', 'gamma');"),
+        vec![vec!["1".to_string()]]
+    );
+    assert_eq!(
+        rows(
+            &e,
+            "SELECT count(*) FROM t WHERE filter_fulltext('b', 'alpha');"
+        ),
+        vec![vec!["0".to_string()]]
+    );
+}
+
 /// Two column changes racing on one table: whoever loses the conflict must
 /// leave nothing behind (no catalog record, no buffer cell, no column file),
 /// and the directory must reopen to exactly the table the winner produced.

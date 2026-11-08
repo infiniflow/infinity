@@ -214,6 +214,34 @@ impl SecondaryIndex {
     }
 }
 
+impl SecondaryIndex {
+    /// Drops one row from every posting list, and the keys that become empty.
+    ///
+    /// `DeleteInBlock`'s index half: an updated or deleted row leaves the value
+    /// it used to have. The caller knows the row ids, not the old values, so
+    /// this walks the map - the same shape as the full-text tail's
+    /// `index_delete_row`.
+    pub fn delete_row(&mut self, row_id: RowID) {
+        let mut emptied: Vec<Vec<u8>> = Vec::new();
+        for (key, ids) in self.map.iter_mut() {
+            let before = ids.len();
+            ids.retain(|id| *id != row_id);
+            if ids.len() != before {
+                self.bytes = self
+                    .bytes
+                    .saturating_sub((before - ids.len()) * std::mem::size_of::<RowID>());
+                if ids.is_empty() {
+                    emptied.push(key.clone());
+                }
+            }
+        }
+        for key in emptied {
+            self.map.remove(&key);
+            self.bytes = self.bytes.saturating_sub(key.len() + 16 + 24);
+        }
+    }
+}
+
 impl Index for SecondaryIndex {
     fn insert(&mut self, key: &[u8], row_id: RowID) {
         match self.map.get_mut(key) {

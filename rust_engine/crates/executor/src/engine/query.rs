@@ -2495,16 +2495,23 @@ impl Engine {
                     if self.has_index_declaration(table) || self.any_in_memory_index() {
                         let schema = self.table_schema(table).unwrap_or_default();
                         self.update_secondary_indexes_batch(table, base, &new_rows, &schema);
-                        // The text/vector hooks key off their own registries; a
-                        // table with only secondary indexes must not pay a lock
-                        // per row for them.
-                        if self.has_text_or_vector_index(table) {
+                        // `PrepareCommitUpdate` commits delete + append, so every
+                        // index kind follows the rewritten rows - the secondary
+                        // tail included (`AppendIndex` dispatches over them all).
+                        if self.table_has_memory_index(table) || self.has_index_declaration(table) {
                             for (k, nr) in new_rows.iter().enumerate() {
                                 let row_texts: Vec<String> =
                                     nr.iter().map(|v| v.to_slt_string()).collect();
+                                self.update_indexes_on_insert_text(
+                                    table,
+                                    base + k,
+                                    &row_texts,
+                                    &schema,
+                                )?;
                                 self.update_text_indexes(table, base + k, &row_texts, &schema);
                                 self.update_vector_caches(table, base + k, &row_texts);
                             }
+                            self.drop_secondary_rows(table, &to_del);
                             self.drop_text_index_rows(table, &to_del);
                             self.drop_vector_cache_rows(table, &to_del);
                         }

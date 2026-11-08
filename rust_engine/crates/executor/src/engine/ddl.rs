@@ -386,6 +386,20 @@ impl Engine {
         self.drop_sparse_storage(table, column);
     }
 
+    /// Drops updated/deleted rows from every secondary index tail of `table`.
+    pub(crate) fn drop_secondary_rows(&self, table: &str, seqs: &[usize]) {
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&tkey) else {
+            return;
+        };
+        for idx in entry.secondary.indexes.values_mut() {
+            for seq in seqs {
+                idx.delete_row(*seq as u64);
+            }
+        }
+    }
+
     /// Drops deleted rows from every inverted index of `table`.
     pub(crate) fn drop_text_index_rows(&self, table: &str, seqs: &[usize]) {
         let tkey = self.table_key(table);
