@@ -1278,19 +1278,13 @@ impl Engine {
                     .into_iter()
                     .map(|b| (b.segment_id, b.block_id))
                     .collect();
-                self.ddl_commit_typed(
+                self.ddl_commit_with_effects(
                     TxnOp::DropColumn {
                         table: table.to_string(),
                         columns: vec![column.to_string()],
                     },
                     || {
                         self.storage.catalog.drop_column(table, column, &blocks)?;
-                        // A buffered row has no block file to leave alone: it
-                        // loses the cell at the column's position, exactly as
-                        // the reference's block buffer does.
-                        if let Some(position) = drop_position {
-                            self.patch_buffered_drop_column(table, position);
-                        }
                         if let Some(im) = self
                             .storage
                             .catalog
@@ -1299,6 +1293,16 @@ impl Engine {
                             .find(|i| i.table == *table && i.column == *column)
                         {
                             let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
+                        }
+                        Ok(((), drop_position))
+                    },
+                    |position| {
+                        // A buffered row has no block file to leave alone: it
+                        // loses the cell at the column's position, exactly as
+                        // the reference's block buffer does. Applied only once
+                        // the transaction has won.
+                        if let Some(position) = position {
+                            self.patch_buffered_drop_column(table, position);
                         }
                         Ok(())
                     },
@@ -1369,7 +1373,16 @@ impl Engine {
                 // from the block files under the current schema, and the added
                 // column has no file yet.
                 let ac_blocks = self.add_column_blocks(table);
-                self.ddl_commit_typed(
+                // The cells the new columns take in the rows that are still
+                // buffered, and the block files they need: computed here,
+                // applied only once the transaction has won its conflicts.
+                let added: Vec<Value> = (0..names.len())
+                    .map(|k| match defaults.get(k) {
+                        Some(Some(d)) => Value::from_literal(&default_literal(d)),
+                        _ => Value::Null,
+                    })
+                    .collect();
+                self.ddl_commit_with_effects(
                     TxnOp::AddColumn {
                         table: table.to_string(),
                     },
@@ -1383,25 +1396,17 @@ impl Engine {
                             &vec![None; names.len()],
                             &sparse_stores,
                         )?;
+                        Ok(((), ac_blocks))
+                    },
+                    |blocks| {
                         // Rows still in the append buffer have no block file
                         // yet (`AddColumnsData` walks the segments and would
                         // skip them): the reference's block *buffer* gains the
                         // column, so they get the default cell here.
-                        let added: Vec<Value> = (base_index as usize
-                            ..base_index as usize + names.len())
-                            .map(|i| match defaults.get(i - base_index as usize) {
-                                Some(Some(d)) => Value::from_literal(&default_literal(d)),
-                                _ => Value::Null,
-                            })
-                            .collect();
                         self.patch_buffered_add_columns(table, base_index as usize, &added);
-                        // Materialise the new columns into the blocks that
-                        // already exist, inside the same step: a checkpoint
-                        // that saw the column in the catalog but not its
-                        // `{id}.col` files decoded the block to nothing and
-                        // rewrote it with only the buffered rows.
-                        self.add_column_files(table, base_index as usize, &ac_blocks)?;
-                        Ok(())
+                        // And the blocks that already exist get one file for
+                        // each new column, before the commit is visible.
+                        self.add_column_files(table, base_index as usize, &blocks)
                     },
                     move |b| match &ac_ident {
                         Some((db_id, table_id, table_key)) => {

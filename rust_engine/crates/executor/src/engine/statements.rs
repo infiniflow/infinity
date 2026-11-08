@@ -1684,6 +1684,58 @@ impl Engine {
         Ok(out)
     }
 
+    /// [`Self::ddl_commit_typed`] for a statement whose data side effects must
+    /// not exist before its transaction is published.
+    ///
+    /// `stage` computes the catalog batch **and** the plan for the effects; it
+    /// runs inside the capture, so it sees the schema the statement is
+    /// creating. `effects` runs after the conflict check and the WAL write, and
+    /// before `finish_bottom` makes the commit visible: a statement that loses
+    /// a conflict leaves no buffer cell and no `{id}.col` behind, which is what
+    /// lets two DDLs commit without serialising their whole commit phase.
+    pub(crate) fn ddl_commit_with_effects<T, E>(
+        &self,
+        op: TxnOp,
+        stage: impl FnOnce() -> Result<(T, E)>,
+        effects: impl FnOnce(E) -> Result<()>,
+        typed_builder: impl FnOnce(&[(Vec<u8>, Option<Vec<u8>>)]) -> Option<storage::WalCmd>,
+    ) -> Result<T> {
+        // Only the capture is serialised (`catalog.capture` has one overlay and
+        // one slot); the commit phase is ordered by the transaction manager.
+        let ((out, plan), mut batch) = {
+            let _ddl = self.ddl_lock.lock().unwrap();
+            self.storage.catalog.capture(stage)?
+        };
+        if batch.is_empty() || self.batch_is_noop(&batch)? {
+            return Ok(out);
+        }
+        let turn = self.txn.reserve_commit_ts();
+        let commit_ts = turn.ts();
+        Catalog::restamp(&mut batch, commit_ts);
+        let typed = typed_builder(&batch);
+        let mut txn = self.txn.begin();
+        txn.set_op(op);
+        for (key, value) in batch {
+            match value {
+                Some(value) => txn.put(key, value),
+                None => txn.delete(key),
+            }
+        }
+        if let Some(cmd) = typed {
+            txn.set_typed_commands(vec![cmd]);
+        }
+        let committed = self.txn.commit_at_deferred(txn, commit_ts);
+        self.storage.catalog.invalidate_tables();
+        let ts = committed?;
+        // The commit stays invisible until its data is in place; the publish
+        // runs even when the effects fail, or the commit barrier would wait for
+        // a transaction that already owns a timestamp.
+        let effect_result = effects(plan);
+        self.txn.finish_bottom(ts);
+        effect_result?;
+        Ok(out)
+    }
+
     /// Registers a statement with the query registry and returns the guard that
     /// deregisters it. C++ `SessionManager::AddQueryRecord` + `RemoveQueryRecord`.
     pub(crate) fn begin_query<'a>(&'a self, stmt: &Statement, sql: &str) -> QueryGuard<'a> {

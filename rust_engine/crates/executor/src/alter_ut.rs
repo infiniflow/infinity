@@ -451,6 +451,44 @@ fn a_checkpoint_through_a_column_change_keeps_the_block_readable() {
         );
     }
 }
+/// Two column changes racing on one table: whoever loses the conflict must
+/// leave nothing behind (no catalog record, no buffer cell, no column file),
+/// and the directory must reopen to exactly the table the winner produced.
+#[test]
+fn concurrent_column_changes_leave_no_side_effect_behind() {
+    for _ in 0..20 {
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute("CREATE TABLE tb1 (c1 INT, c2 VARCHAR);").unwrap();
+        e.execute("INSERT INTO tb1 VALUES (1, 'a');").unwrap();
+        let mut handles = Vec::new();
+        for k in 0..2 {
+            let e = std::sync::Arc::clone(&e);
+            handles.push(std::thread::spawn(move || {
+                e.execute(&format!(
+                    "ALTER TABLE tb1 ADD COLUMN (c{k} INT DEFAULT {k});"
+                ))
+                .is_ok()
+            }));
+        }
+        let added = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .filter(|ok| *ok)
+            .count();
+        let schema = columns(&e, "default_db.tb1");
+        assert_eq!(schema.len(), 2 + added);
+        // Every cell of the surviving schema reads back, and a reopen (WAL
+        // replay) produces the same table.
+        let before = rows(&e, "SELECT * FROM tb1;");
+        assert_eq!(before.len(), 1);
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(columns(&e, "default_db.tb1"), schema);
+        assert_eq!(rows(&e, "SELECT * FROM tb1;"), before);
+    }
+}
+
 /// A column change touches **one file per block**, not the block.
 ///
 /// NewTxn::AddColumnsData writes the new column's {id}.col for every block
