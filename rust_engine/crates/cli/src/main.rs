@@ -19,6 +19,7 @@ mod fulltext_bench;
 /// outside Debug builds) because glibc's malloc serialises its arena locks
 /// under concurrent writes. The parallel suite (eight inserters on one table)
 /// spends most of its time in the allocator without it.
+#[cfg(not(target_env = "msvc"))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 

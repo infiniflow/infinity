@@ -12,6 +12,11 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 [dependencies]
 analyzer.workspace = true
 libc = "0.2"
+# The host process tokenizes on many goroutines at once; glibc's arena locks
+# serialise those allocations the way they did the engine's insert path. The
+# reference's C++ analyzer is built with jemalloc (`ENABLE_JEMALLOC`), so the
+# C ABI keeps the same allocator on both sides.
+tikv-jemallocator.workspace = true
 
 [lints]
 workspace = true

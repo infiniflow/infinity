@@ -30,6 +30,20 @@ use std::ptr;
 
 use analyzer::{Analyzer, AnalyzerPool, RAGAnalyzer};
 
+/// The tokenizer runs inside a host process (RAGFlow's Go analyzer pool) that
+/// tokenizes on many goroutines at once, and glibc's malloc serialises those
+/// allocations on its arena locks. The reference's C++ analyzer is linked with
+/// jemalloc (`ENABLE_JEMALLOC`), so the ABI keeps the same allocator on the
+/// server and on the client.
+///
+/// Only Rust's own allocations move: every pointer handed across this ABI is
+/// still `libc::malloc`'d and released by the caller with `free()`, so the
+/// ownership rules - and a caller swapping this library for the C++ one - are
+/// unchanged.
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 /// Bumped whenever a struct layout or an ownership rule changes.
 pub const ABI_VERSION: u32 = 1;
 

@@ -60,6 +60,7 @@ version = "0.1.0"
 dependencies = [
  "analyzer",
  "libc",
+ "tikv-jemallocator",
 ]
 
 [[package]]
