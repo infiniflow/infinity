@@ -2496,8 +2496,12 @@ impl Engine {
                         let schema = self.table_schema(table).unwrap_or_default();
                         self.update_secondary_indexes_batch(table, base, &new_rows, &schema);
                         // `PrepareCommitUpdate` commits delete + append, so every
-                        // index kind follows the rewritten rows - the secondary
-                        // tail included (`AppendIndex` dispatches over them all).
+                        // index kind takes the rewritten rows - the secondary tail
+                        // included (`AppendIndex` dispatches over them all). Nothing
+                        // removes a posting: a delete is a mark in the block's
+                        // `version`, and a reader drops the slot
+                        // (`BlockCursor::rows` / `row`), which is the reference's
+                        // `CheckSegmentRowsVisible`.
                         if self.table_has_memory_index(table) || self.has_index_declaration(table) {
                             for (k, nr) in new_rows.iter().enumerate() {
                                 let row_texts: Vec<String> =
@@ -2511,7 +2515,6 @@ impl Engine {
                                 self.update_text_indexes(table, base + k, &row_texts, &schema);
                                 self.update_vector_caches(table, base + k, &row_texts);
                             }
-                            self.drop_secondary_rows(table, &to_del);
                             self.drop_text_index_rows(table, &to_del);
                             self.drop_vector_cache_rows(table, &to_del);
                         }
