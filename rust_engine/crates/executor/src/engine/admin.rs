@@ -261,6 +261,12 @@ impl Engine {
                 .enumerate()
                 .map(|(i, (_, text))| (base + i, text.clone()))
                 .collect();
+            // Same rule as an import: the published rows and the block they
+            // land in are one step, or a checkpoint between them writes a block
+            // whose bitmap coverage came from a journal without these rows.
+            let gate = self.bottom_gate(table);
+            let _turn = gate.lock().unwrap();
+            let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
             self.publish_encoded_rows(table, &merged)?;
             // `PrepareCommitCompact`: the merged segment's blocks and
             // records belong to the compaction transaction; writing them here
@@ -270,6 +276,8 @@ impl Engine {
             if !rows.is_empty() && self.has_block_layout(table) {
                 self.write_blocks_bounded(table, compact_ts)?;
             }
+            drop(_held);
+            drop(_turn);
             Ok(())
         })?;
         // `CommitBottomCompact`: the merged rows are visible only once their

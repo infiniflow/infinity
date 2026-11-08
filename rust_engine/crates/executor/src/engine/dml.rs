@@ -1411,6 +1411,14 @@ impl Engine {
                 self.note_import_rows(table, *segment, rows);
                 self.note_import_ts(table, *segment, ts);
             }
+            // The published rows and the block they land in are one step: the
+            // block's bitmap coverage comes from the append journal, so a
+            // checkpoint between them would see a journal that already had these
+            // rows while writing a block from the buffer before them (one row
+            // off). Same gate as the binary import path.
+            let gate = self.bottom_gate(table);
+            let _turn = gate.lock().unwrap();
+            let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
             self.publish_encoded_rows(table, &encoded_owned)?;
             // `AppendInBlock` / `CommitBottomAppend`: the reference writes each
             // block inside the import transaction, so a `COPY` leaves readable
@@ -1420,6 +1428,8 @@ impl Engine {
             if self.has_block_layout(table) {
                 self.write_blocks_commit(table, ts)?;
             }
+            drop(_held);
+            drop(_turn);
             Ok(())
         })?;
         let _visible = BottomGuard::new(&self.txn, ts);
