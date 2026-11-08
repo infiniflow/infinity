@@ -131,7 +131,7 @@
 | 写锁粒度 | 每块一把 `shared_mutex`，列文件写入 + `version.Append` 在同一临界区，不同表（以及同表不同块）可同时写 | `new_txn_data_impl.cpp:930-958`（`BlockLock`） | 每表一把写闸（`batch_locks`）：写批次持有该表的闸，不同表并行；块文件由整表镜像重写，没有"单块"可加锁，所以同表不同块不能并行（参考可以） | `aligned`（跨表并行与参考一致；同表不同块是参考多出的并行度，属性能差异，见 GAPS §5） | `write_gates_are_per_table`、`test_cross_engine_bytes_20_table.py` |
 | 表元数据 | 元数据缓存按条目加锁，读多写少 | `new_catalog` 的 meta 缓存锁 | `tables: Mutex<HashMap<..>>` 只在查表/改计数这种短临界区里持有，语句执行期间不持锁 | `aligned` | `write_gates_are_per_table`、`test/sql` |
 | 同表下半部顺序 | 同表事务落同一个 worker，天然串行；跨表并行 | `BottomExecutor::Submit` | `bottom_gates`：`Engine::bottom_gate(table)`，worker 内取该表 gate | `aligned` | 提交 `b624fd4a2` 的单测 |
-| DDL 串行 | DDL 事务串行，避免两次布局重写交错 | catalog 的 DDL 锁 | `ddl_lock` | `aligned` | `test/sql/ddl` |
+| DDL 串行 | DDL 事务按 commit 序执行，同一时刻只做一次布局重写 | catalog 的 DDL 锁 | `ddl_lock` 只串行 `catalog.capture`；列变更的提交阶段由冲突矩阵定序，其余 DDL 仍整段持有（见 §3.1） | `aligned` | `test/sql/ddl`、`concurrent_column_changes_leave_no_side_effect_behind` |
 | WAL / checkpoint | 写 WAL 与整表 checkpoint 互斥 | `WalManager` 的 flush/checkpoint 串行 | `flush_lock` | `aligned` | `test_cross_engine_bytes_40_wal.py` |
 | 批量写 vs 后台 dump | dump 事务与 append 争用段，靠重试而不是全局锁 | `DumpIndexProcessor::DoDump` 的重试 | 写批次持该表的闸；`DumpMemIndexTask` 按 key 顺序取全部表的闸，从而看到完整批次（顺序取锁不会互相死锁） | `aligned` | `dump_mem_index_ut` |
 | 列变更 vs checkpoint | 参考的 checkpoint 是一次事务（`CHECKPOINT_V2`），块按它自己的 ts 写，之后的 DDL 与它无关 | `NewTxn::Checkpoint` 走 txn manager | `flush` 在开始处取定 T，块/schema/行/删除都按 T 裁：schema 用 `Catalog::schema_ids_at(T)` 钉住（见 §3.1） | `aligned` | `a_checkpoint_through_a_column_change_keeps_the_block_readable`、`test_alter.py` |

@@ -4311,13 +4311,20 @@ pub struct Engine {
     /// Per-table write bookkeeping (C++ `TableEntry`), keyed by the
     /// fully-qualified lower-case table name.
     pub(crate) tables: Arc<Mutex<HashMap<String, TableEntry>>>,
+    /// Serialises the schema work a DDL does before its transaction commits.
+    ///
+    /// `catalog.capture` has a single overlay slot, so two statements staging
+    /// a layout rewrite at once would interleave, and the capture has to see a
+    /// consistent catalog (a create also races the orphan sweep a snapshot
+    /// restore triggers). A DDL whose effects are catalog writes only holds it
+    /// for its whole commit; `ALTER … ADD/DROP COLUMN` holds it for the
+    /// capture and applies its cells and column files after the conflict
+    /// check (`ddl_commit_with_effects`), so those commit phases are ordered by
+    /// the transaction manager's conflict matrix instead of this lock.
+    pub(crate) ddl_lock: Mutex<()>,
     /// Optional background task processor (`BGTaskProcessor`). When attached,
     /// the memindex quota queues a real `DumpMemIndexTask`; otherwise the
     /// quota is enforced synchronously.
-    /// Serializes table creation against the orphan sweep: the sweep deletes
-    /// `row:` keys of a name with no catalog entry, so a create that races a
-    /// snapshot restore of the same table must not run it concurrently.
-    pub(crate) ddl_lock: Mutex<()>,
     pub(crate) bg_processor: Mutex<Option<Arc<BGTaskProcessor>>>,
     /// Weak self handle handed to background tasks (avoids a cycle through
     /// `bg_processor`).
