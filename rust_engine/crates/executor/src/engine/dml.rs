@@ -610,12 +610,9 @@ impl Engine {
             // skipping the per-row hook avoids a catalog lookup + string render
             // for every inserted row (the reference's insert path has the same
             // guard).
-            if engine.any_in_memory_index() || engine.has_index_declaration(&bottom_table) {
-                // Every index kind is maintained by the appender thread, the
-                // way `AppendIndex` hands each index meta to its own
-                // `AppendMemIndex`: the bottom half only waits for it
-                // (`PostCommit`'s semaphores), it does not walk the batch
-                // itself.
+            if engine.table_has_memory_index(&bottom_table)
+                || engine.has_index_declaration(&bottom_table)
+            {
                 let index_table = bottom_table.clone();
                 let index_rows: Vec<(usize, Vec<String>)> = bottom_rows
                     .iter()

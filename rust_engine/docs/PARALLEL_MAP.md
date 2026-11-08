@@ -38,22 +38,19 @@
 | 状态 | `different`（有意偏离）：参考的定长池按 `crc32(table_id) % n` 分片，撞桶的两表互相排队；端口用每表 FIFO 换掉分片，同表顺序由队列保证 |
 | 证据 | `an_insert_runs_its_bottom_half_on_the_bottom_executor`（`BOTTOM_WORKS` 计数 + 返回即可查）、字节门禁 `20_table`/`50_mutations` |
 
-### 1.2 索引追加（`MemIndexAppender`）
+### 1.2 索引追加（参考 `MemIndexAppender`，端口放在该表的下半部）
 
-**做什么**——把一次提交里的倒排写入搬离提交线程（`mem_index_appender_impl.cpp:70-135`，`Process()` 在 :70）：
+**做什么**——把一次提交的倒排写入做掉，然后事务才可见：
 
-1. `DequeueBulk` 取出一批 `AppendMemIndexTask`；
-2. 按 `MemoryIndexer` 分组，同一个全文索引的多个块合成一个 `AppendMemIndexBatch`；
-3. `AsyncInsertBottom`：把列向量倒排进该段的内存索引器（分词、位置、行号）；
-4. 批末 `WaitForCompletion` + `CommitSync`；
-5. 逐个 task `Complete()`，释放上半部在 `PostCommit` 里等的 sema。
+1. 参考：`DequeueBulk` 取出一批 `AppendMemIndexTask`，按 `MemoryIndexer` 分组，`AsyncInsertBottom` 倒排进该段的内存索引器，批末 `WaitForCompletion` + `CommitSync`，逐个 `Complete()` 释放上半部在 `PostCommit` 里等的 sema（`mem_index_appender_impl.cpp:70-135`）。
+2. 端口：同一步工作（`update_indexes_on_insert_text` / `update_text_indexes` / `update_vector_caches`，以及批末的 `dump_*_over_capacity`）直接在**该表的 bottom 作业里**执行，错误由语句上抛，没有额外的派发线程与等待。
 
 | | |
 |---|---|
-| 参考 | **单线程**队列（`mem_index_appender_impl.cpp:58`），提交点 `new_txn_index_impl.cpp:891-894`，等待点 `new_txn_impl.cpp:4624-4660` |
-| 端口 | `MemIndexAppender`（单 worker + channel）+ `Engine::run_text_append`：插入路径的二级/全文/向量缓存整体投递，等 job 完成（失败上抛） |
-| 状态 | `aligned` |
-| 证据 | `a_fulltext_insert_runs_on_the_mem_index_appender`（`TEXT_APPENDS` 计数 + 立刻可检索）、`a_tasklet_error_fails_the_statement` |
+| 参考 | **单线程**队列（`mem_index_appender_impl.cpp:58`）：所有表的倒排写入排在这一条线程上，提交线程等它的 sema |
+| 端口 | 内联在该表的 bottom 作业（§1.1 的每表 FIFO）：每个索引自带写锁（`text`/`sparse`/`mv` 的 `RwLock`），不同表不共享索引，所以索引更新随表并行；同表顺序由该表的队列保证。进入该路径的守卫也是**按表**判断（`Engine::table_has_memory_index`），不再是“只要目录里有任一索引就走” |
+| 状态 | `different`（有意偏离）：目标场景是 10 万+ 表，一条 appender 线程会把所有表的倒排更新串起来；Infinity 没有跨表事务，所以按表并行不丢任何顺序 |
+| 证据 | `concurrent_inserts_on_different_tables_keep_each_index`（8 表并发插入，各自索引只答自己的行）、`test_insert_parallel`（8 线程同表带全文索引）、Gate A 的全文用例、`test_cross_engine_bytes_20_table.py` |
 
 ### 1.3 后台任务处理器（`BGTaskProcessor` / `DumpIndexProcessor`）
 

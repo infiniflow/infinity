@@ -517,6 +517,33 @@ impl Engine {
         })
     }
 
+    /// Whether **this table** holds an index the insert hook maintains.
+    ///
+    /// The hook used to ask whether *any* table had one, so a table with no
+    /// index took the indexed path too and - while that path was one appender
+    /// thread - queued behind every other table.
+    pub(crate) fn table_has_memory_index(&self, table: &str) -> bool {
+        let key = self.table_key(table);
+        let prefix = format!("{key}.");
+        if self
+            .vector_cache
+            .lock()
+            .unwrap()
+            .keys()
+            .any(|cache| cache.starts_with(&prefix))
+        {
+            return true;
+        }
+        self.tables.lock().unwrap().get(&key).is_some_and(|entry| {
+            !entry.text.is_empty()
+                || !entry.hnsw_mem.is_empty()
+                || !entry.secondary.indexes.is_empty()
+                || !entry.ivf_mem.is_empty()
+                || !entry.mv.is_empty()
+                || !entry.sparse.is_empty()
+        })
+    }
+
     /// True when `table` has an index declaration. Consulted together with
     /// [`Self::any_in_memory_index`] so the per-row hook runs whenever any
     /// index state could need it.

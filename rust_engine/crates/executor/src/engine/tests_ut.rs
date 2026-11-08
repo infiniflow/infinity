@@ -847,6 +847,58 @@ mod tests {
         );
     }
 
+    /// Eight tables inserting at once: every table's index answers for its own
+    /// rows, and the index work runs on that table's own bottom job (there is no
+    /// appender thread to queue behind).
+    #[test]
+    fn concurrent_inserts_on_different_tables_keep_each_index() {
+        let dir = tempdir().unwrap();
+        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        e.attach_bottom_pool();
+        for t in 0..8 {
+            e.execute(&format!("CREATE TABLE ct{t} (id INT, body VARCHAR);"))
+                .unwrap();
+            e.execute(&format!(
+                "CREATE INDEX ct{t}_body ON ct{t} (body) WITH (analyzer = 'standard');"
+            ))
+            .unwrap();
+        }
+        let before = bottom_work_count();
+        let mut handles = Vec::new();
+        for t in 0..8 {
+            let e = Arc::clone(&e);
+            handles.push(std::thread::spawn(move || {
+                for i in 0..20 {
+                    e.execute(&format!(
+                        "INSERT INTO ct{t} VALUES ({i}, 'word{i} of t{t}');"
+                    ))
+                    .unwrap();
+                }
+            }));
+        }
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        assert!(
+            bottom_work_count() >= before + 8,
+            "every table's insert ran its own bottom"
+        );
+        for t in 0..8 {
+            assert_eq!(
+                rows(&e, &format!("SELECT count(*) FROM ct{t};")),
+                vec![vec!["20".to_string()]]
+            );
+            assert_eq!(
+                rows(
+                    &e,
+                    &format!("SELECT count(*) FROM ct{t} WHERE filter_fulltext('body', 'word3');")
+                ),
+                vec![vec!["1".to_string()]],
+                "table {t} finds its own row"
+            );
+        }
+    }
+
     /// GROUP BY and global aggregates run through the aggregate operator, keep
     /// first-seen group order, and still produce one row over an empty relation.
     /// An `INSERT` on a pooled engine runs its bottom half on the table's
