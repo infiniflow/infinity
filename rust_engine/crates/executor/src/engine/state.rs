@@ -4649,10 +4649,9 @@ pub(crate) fn run_bottom(
         engine.note_live_rows(table, append.rows.len() as isize);
         engine.append_row_cache(table, append.base, &append.encoded);
     }
-    for (table, seq) in deletes {
-        engine.drop_text_index_rows(table, &[*seq]);
-        engine.drop_vector_cache_rows(table, &[*seq]);
-    }
+    // A delete is a mark in the block version (`DeleteInBlock`): the rows keep
+    // their index entries, which a reader drops by the version (or the delete
+    // journal before the checkpoint) - the reference never unlinks a posting.
     // Keep the C++ block mirror current at commit, as the reference does
     // (`AppendInBlock`), so a crash never leaves a block the catalog
     // mentions without its files - the reference refuses to open such a

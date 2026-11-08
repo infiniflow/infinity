@@ -2336,8 +2336,6 @@ impl Engine {
                 if !to_del.is_empty() {
                     let t = self.txn.begin();
                     self.commit_with_deletes(table, &to_del, 0, &[], t)?;
-                    self.drop_text_index_rows(table, &to_del);
-                    self.drop_vector_cache_rows(table, &to_del);
                 }
                 Ok(QueryResult::Deleted {
                     count: to_del.len(),
@@ -2515,8 +2513,6 @@ impl Engine {
                                 self.update_text_indexes(table, base + k, &row_texts, &schema);
                                 self.update_vector_caches(table, base + k, &row_texts);
                             }
-                            self.drop_text_index_rows(table, &to_del);
-                            self.drop_vector_cache_rows(table, &to_del);
                         }
                     }
                 }

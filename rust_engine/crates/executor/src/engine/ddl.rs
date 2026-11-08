@@ -285,18 +285,6 @@ impl Engine {
         Ok(None)
     }
 
-    pub(crate) fn drop_vector_cache_rows(&self, table: &str, seqs: &[usize]) {
-        let prefix = format!("{table}.");
-        for (key, shared) in self.vector_cache.lock().unwrap().iter() {
-            if key.starts_with(&prefix) {
-                let mut cache = shared.write().unwrap();
-                for seq in seqs {
-                    cache.live.remove(seq);
-                }
-            }
-        }
-    }
-
     /// Removes the multi-vector chunks of `table` (or one column) from disk and
     /// from the cache; called when the table or its index is dropped.
     pub(crate) fn drop_multivector_storage(&self, table: &str, column: Option<&str>) {
@@ -384,23 +372,5 @@ impl Engine {
         }
         self.drop_multivector_storage(table, column);
         self.drop_sparse_storage(table, column);
-    }
-
-    /// Drops deleted rows from every inverted index of `table`.
-    pub(crate) fn drop_text_index_rows(&self, table: &str, seqs: &[usize]) {
-        let tkey = self.table_key(table);
-        let indexes: Vec<SharedTextIndex> = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&tkey)
-            .map(|e| e.text.values().cloned().collect())
-            .unwrap_or_default();
-        for shared in indexes {
-            let mut index = shared.write().unwrap();
-            for seq in seqs {
-                index_delete_row(&mut index, *seq as u64);
-            }
-        }
     }
 }
