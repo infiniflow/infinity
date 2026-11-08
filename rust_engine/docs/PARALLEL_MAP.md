@@ -137,9 +137,9 @@
 | 列变更 vs checkpoint | 参考的 checkpoint 是一次事务（`CHECKPOINT_V2`），块按它自己的 ts 写，之后的 DDL 与它无关 | `NewTxn::Checkpoint` 走 txn manager | `flush` 在开始处取定 T，块/schema/行/删除都按 T 裁：schema 用 `Catalog::schema_ids_at(T)` 钉住（见 §3.1） | `aligned` | `a_checkpoint_through_a_column_change_keeps_the_block_readable`、`test_alter.py` |
 | 块文件单写者 | 每块 `BlockLock` + 列式追加，不存在两个「整块重写」 | `new_txn_data_impl.cpp:930-958` | 块写跑在同一张表的 **bottom gate** 下（`write_blocks_mode`/`add_column_files` 取 `bottom_gate(table)`，已在 bottom 里的调用方靠 `HeldBottom` 跳过）；同表串行、跨表并行（见 §3.1） | `aligned`（参考到块、端口到表） | 同上 |
 
-### 3.1 事务之外的两把锁，与 checkpoint 的切面
+### 3.1 事务之外的排除，与 checkpoint 的切面
 
-冲突检查（`TxnOp` 矩阵，`txn/src/conflict.rs`）与下半部串行（`BottomExecutor` + `bottom_gates`）覆盖的都是**事务之间**：参与方要有 `TxnOp`、有 `begin_ts`，且只有「同表事务的下半部」被排序。下面两件事不在那个模型里，各有一把锁；checkpoint 的切面单独说。
+冲突检查（`TxnOp` 矩阵，`txn/src/conflict.rs`）与下半部串行（`BottomExecutor` + `bottom_gates`）覆盖的都是**事务之间**：参与方要有 `TxnOp`、有 `begin_ts`，且只有「同表事务的下半部」被排序。下面两件事不在那个模型里：一个用 `ddl_lock`，另一个把块写挂到已有的 `bottom_gate` 上；checkpoint 的切面单独说。
 
 | 锁 | 挡住的对手 | 保住的不变量 | 冲突检查 / 下半部为什么不管 |
 |---|---|---|---|
@@ -150,7 +150,7 @@ checkpoint 的切面由它自己的 ts 决定，不需要与 DDL 互斥：`flush
 
 加锁顺序固定为 `ddl_lock → bottom_gate(table)`：`ddl_lock` 只圈住 capture，`add_column_files` 在提交阶段（capture 之外）取该表的 bottom gate，`write_blocks_mode` 取同一把（已在 bottom 里则跳过）。快照恢复持 `ddl_lock` 且只**读**块（`restore_blocks`），快照创建写块但不持 `ddl_lock`，两者都不成环。
 
-块里缺少当前列的 `{id}.col` 时，写路径先按默认值补文件（`ensure_block_columns`，只写缺失文件、不覆盖已有值），读路径把「块存在但解不出来」当错误而不是空块——否则整块重写会把块里的行丢掉。
+块里缺少本次写入的列时，写路径先按默认值补文件（`ensure_block_columns`，只写缺失文件、不覆盖已有值），读路径把「块存在但解不出来」当错误而不是空块——否则整块重写会把块里的行丢掉。
 
 验证：`a_checkpoint_through_a_column_change_keeps_the_block_readable`（把 checkpoint 放到另一线程跑完整 `INSERT / ADD / DROP / ADD / INSERT` 序列，50 轮）、`test_alter.py` 的重启用例、`test_cross_engine_bytes_40_wal.py`。
 
