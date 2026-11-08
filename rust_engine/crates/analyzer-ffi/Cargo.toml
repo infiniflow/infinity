@@ -14,9 +14,9 @@ analyzer.workspace = true
 libc = "0.2"
 # The host process tokenizes on many goroutines at once; glibc's arena locks
 # serialise those allocations the way they did the engine's insert path. The
-# reference's C++ analyzer is built with jemalloc (`ENABLE_JEMALLOC`), so the
-# C ABI keeps the same allocator on both sides.
-tikv-jemallocator.workspace = true
+# reference's C++ analyzer is built with jemalloc (`ENABLE_JEMALLOC`); this port
+# keeps mimalloc on both sides instead.
+mimalloc.workspace = true
 
 [lints]
 workspace = true

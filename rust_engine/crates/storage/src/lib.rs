@@ -24,11 +24,10 @@
 /// Long imports allocate per-batch buffers; without this the allocator retains
 /// them and RSS looks like a leak (Gate C).
 ///
-/// Only glibc's heap is trimmed: the shipping binary makes jemalloc the global
-/// allocator (`tikv-jemallocator`), whose pages `malloc_trim` cannot see. That
-/// is the reference's arrangement too (`ENABLE_JEMALLOC`), and jemalloc
-/// returns its dirty pages to the OS on its own decay timer, so this call is
-/// simply a no-op there.
+/// Only glibc's heap is trimmed: the shipping binary makes mimalloc the global
+/// allocator (`mimalloc::MiMalloc`), whose pages `malloc_trim` cannot see.
+/// mimalloc hands freed segments back to the OS on its own purge timer, so
+/// this call is simply a no-op there.
 #[allow(unsafe_code)]
 pub fn trim_allocator() {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]

@@ -15,13 +15,16 @@
 mod config;
 mod fulltext_bench;
 
-/// The reference links jemalloc (`CMakeLists.txt`'s `ENABLE_JEMALLOC`, on
-/// outside Debug builds) because glibc's malloc serialises its arena locks
-/// under concurrent writes. The parallel suite (eight inserters on one table)
-/// spends most of its time in the allocator without it.
-#[cfg(not(target_env = "msvc"))]
+/// glibc's malloc serialises its arena locks under concurrent writes, which is
+/// what the parallel suite (eight inserters on one table) spends most of its
+/// time in; the C++ engine links jemalloc for the same reason
+/// (`CMakeLists.txt`'s `ENABLE_JEMALLOC`). This port uses mimalloc: it keeps
+/// the same kind of per-thread free lists, and its Rust binding builds on every
+/// target the workspace ships (jemalloc's does not - on this machine
+/// `tikv-jemalloc-sys` 0.7 looks for the static library in `<out>/lib` while
+/// jemalloc installs it into `<out>/lib64`, so the link fails).
 #[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
