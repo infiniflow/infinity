@@ -244,6 +244,16 @@ jobs:
         run: cargo test --workspace
       - name: smoke
         run: cargo run -q -p cli -- smoke /tmp/infinity-smoke
+      - name: Generate the .slt fixtures
+        # Half of test/sql and of test/data is generated and gitignored (the
+        # 20k-row index-scan CSVs, the 10M-row compaction file, the generated
+        # .slt files themselves). The reference's jobs run this same script
+        # before their suite; `-jc=1` generates and copies, and runs nothing.
+        working-directory: .
+        run: |
+          sudo mkdir -p /var/infinity/test_data
+          sudo chown -R "${USER}" /var/infinity
+          uv run python3 tools/sqllogictest.py -jc=1
       - name: Gate A (slt conformance)
         # The reference suite (test/sql, snapshots included), parsed and
         # validated by sqllogictest-rs - the crate the reference's own runner is
