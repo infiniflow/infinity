@@ -210,12 +210,37 @@ pub fn write_segment_index_streaming(
         )));
     }
     let last_row = docs[docs.len() - 1].0;
+    // A chunk is one `base_row_id` plus one `.len` for `base_row_id..=last_row`,
+    // so a set that mixes two `ROW_ID` segments (2^32 apart) is not a wide chunk
+    // but a hole: it would allocate and write up to 4 G padding entries where no
+    // row exists. The caller splits at the boundary (`TextIndex::claim_seal`
+    // seals a tail before a row of the next segment arrives) - refuse instead of
+    // padding across the gap.
+    if (base_row_id >> 32) != (last_row >> 32) {
+        return Err(FormatError::Invalid(format!(
+            "a segment cannot span two ROW_ID segments: it starts at row {base_row_id} \
+             (segment {}) and holds row {last_row} (segment {})",
+            base_row_id >> 32,
+            last_row >> 32
+        )));
+    }
     let doc_count = u32::try_from(last_row - base_row_id + 1).map_err(|_| {
         FormatError::Invalid(format!(
             "the segment at {base_row_id} spans more than u32::MAX rows"
         ))
     })?;
-    let mut lengths = vec![0u32; doc_count as usize];
+    // `doc_count` is the span, holes included, so a sparse segment can ask for a
+    // large padding buffer. `try_reserve` turns "the span is absurd" into a
+    // format error the caller can report, instead of an abort from `vec![0; n]`.
+    let mut lengths: Vec<u32> = Vec::new();
+    lengths
+        .try_reserve_exact(doc_count as usize)
+        .map_err(|error| {
+            FormatError::Invalid(format!(
+                "the segment at {base_row_id} would need {doc_count} length entries: {error}"
+            ))
+        })?;
+    lengths.resize(doc_count as usize, 0);
     let mut doc_len: std::collections::HashMap<u64, u32> =
         std::collections::HashMap::with_capacity(docs.len());
     for (row, len) in docs {
@@ -366,6 +391,27 @@ impl SegmentIndexReader {
     pub fn ordinal(&self, row: u64) -> Option<u32> {
         let doc = row.checked_sub(self.base_row_id)?;
         (doc < self.doc_count() as u64).then_some(doc as u32)
+    }
+
+    /// Ordinal (`docid_t`) of the first row the segment holds at or after
+    /// `row`, `None` when it holds nothing that far out.
+    ///
+    /// This is the mapping a seek needs: the skip list is keyed by ordinal, and
+    /// an ordinal is `row - base_row_id` **only while the segment is dense**.
+    /// Deriving it from the stored rows keeps a segment that skips row ids
+    /// addressable - a target inside a hole seeks to the next stored row instead
+    /// of to a doc id that carries no posting.
+    pub fn ordinal_at_or_after(&self, row: u64) -> Option<u32> {
+        let span = self.doc_count() as u64;
+        if span == 0 {
+            return None;
+        }
+        Some(match row.checked_sub(self.base_row_id) {
+            // Before the segment: its first row is the first one at or after.
+            None => 0,
+            Some(offset) if offset < span => offset as u32,
+            Some(_) => return None,
+        })
     }
 
     /// The document length of `row` (BM25 `dl`), addressed by its segment
@@ -1003,16 +1049,13 @@ impl<'a> TermDocCursor<'a> {
             return self.fill();
         }
         // The skip list is keyed by the segment's own doc id (`docid_t`), so the
-        // target row id has to be rebased; a target before the segment seeks to
-        // its first block and one past it exhausts the cursor.
-        let base = self.reader.base_row_id();
-        let query = match target.checked_sub(base) {
-            None => 0,
-            Some(doc) if doc < self.reader.doc_count() as u64 => doc as u32,
-            Some(_) => {
-                self.exhaust();
-                return false;
-            }
+        // target row id has to be mapped to the ordinal it occupies among the
+        // segment's rows - not subtracted from `base_row_id`, which only holds
+        // while the segment is dense. A target before the segment seeks to its
+        // first block; one past its last row exhausts the cursor.
+        let Some(query) = self.reader.ordinal_at_or_after(target) else {
+            self.exhaust();
+            return false;
         };
         // `SkipListReader::SkipTo` only moves forward: a target at or before the
         // block it already points at is walked through `fill`, which is the
@@ -1717,6 +1760,38 @@ mod tests {
         assert_eq!(reader.postings("a").unwrap(), vec![(0, 1), (1, 1)]);
     }
 
+    /// A chunk is one `base_row_id` plus one `.len` for `base_row_id..=last_row`.
+    /// A set that mixes two `ROW_ID` segments would therefore pad ~4 G entries of
+    /// a hole that holds no row: the caller has to split at the boundary, and the
+    /// writer refuses instead of allocating it.
+    #[test]
+    fn a_writer_refuses_rows_from_two_row_id_segments() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().to_str().unwrap();
+        let docs = vec![(0u64, 1u32), ((1u64 << 32) + 5, 1u32)];
+        let mut postings: BTreeMap<String, Vec<PostingEntry>> = BTreeMap::new();
+        postings.insert(
+            "alpha".into(),
+            vec![(0, 1, vec![0]), ((1 << 32) + 5, 1, vec![0])],
+        );
+        let error = write_segment_index(
+            path,
+            "ft_mixed",
+            0,
+            &docs,
+            &postings,
+            crate::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .unwrap_err();
+        let message = format!("{error}");
+        assert!(
+            message.contains("ROW_ID"),
+            "the error must name the segment boundary: {message}"
+        );
+        // Nothing was written: a refused chunk must not leave files behind.
+        assert!(!std::path::Path::new(&format!("{path}/ft_mixed.dic")).exists());
+    }
+
     // -----------------------------------------------------------------------
     // The doc skip list on the seek path (`SkipListReader::SkipTo`)
     // -----------------------------------------------------------------------
@@ -1757,6 +1832,49 @@ mod tests {
         .unwrap()
     }
 
+    /// A term that occurs once in every `stride`-th row of `n` stored rows, so
+    /// the segment covers `base..base + (n - 1) * stride` while its postings
+    /// only name some of those row ids.
+    #[allow(clippy::type_complexity)]
+    fn every_strided_document(
+        base: u64,
+        n: u64,
+        stride: u64,
+    ) -> (Vec<(u64, u32)>, BTreeMap<String, Vec<PostingEntry>>) {
+        let docs: Vec<(u64, u32)> = (0..n).map(|i| (base + i * stride, 8)).collect();
+        let list: Vec<PostingEntry> = (0..n)
+            .map(|i| (base + i * stride, 1, vec![(i % 5) as u32]))
+            .collect();
+        let mut postings: BTreeMap<String, Vec<PostingEntry>> = BTreeMap::new();
+        postings.insert("alpha".into(), list);
+        (docs, postings)
+    }
+
+    fn open_strided_document(
+        index_dir: &str,
+        base: u64,
+        n: u64,
+        stride: u64,
+    ) -> SegmentIndexReader {
+        let (docs, postings) = every_strided_document(base, n, stride);
+        write_segment_index(
+            index_dir,
+            "ft_gap",
+            base,
+            &docs,
+            &postings,
+            crate::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .unwrap();
+        SegmentIndexReader::open(
+            index_dir,
+            "ft_gap",
+            base,
+            crate::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .unwrap()
+    }
+
     /// `advance` past the loaded block hops through the skip list instead of
     /// decoding every block in between: five blocks, two decodes.
     #[test]
@@ -1772,6 +1890,58 @@ mod tests {
             cursor.blocks_decoded, 2,
             "the seek decoded the blocks it jumped over"
         );
+    }
+
+    /// A segment whose postings name only every other row id (a document that
+    /// carries no text is a hole, not a posting) still has to land a seek on the
+    /// **first stored row at or after** the target, across block boundaries.
+    ///
+    /// The ordinal the skip list is keyed by is not `row - base_row_id` in
+    /// general; deriving it from the stored rows is what keeps the cursor from
+    /// hopping past a posting that the target precedes.
+    #[test]
+    fn advance_lands_on_the_next_stored_row_in_a_gapped_segment() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = 1000u64;
+        // 600 stored rows, every second row id: 1000, 1002, ... 2198.
+        let reader = open_strided_document(dir.path().to_str().unwrap(), base, 600, 2);
+        assert_eq!(reader.doc_count(), 1199, "the span, holes included");
+        assert_eq!(reader.ordinal_at_or_after(base), Some(0));
+        // Inside a hole the ordinal is the hole's own offset - the cursor then
+        // steps to the stored row that follows.
+        assert_eq!(reader.ordinal_at_or_after(base + 999), Some(999));
+        assert_eq!(reader.ordinal_at_or_after(base + 1199), None);
+        assert_eq!(reader.ordinal_at_or_after(0), Some(0), "before the segment");
+
+        // Seek across several blocks, landing inside a hole.
+        let mut cursor = reader.term_doc_cursor("alpha").unwrap().unwrap();
+        assert_eq!(cursor.doc(), Some(base));
+        cursor.advance(base + 999);
+        assert_eq!(
+            cursor.doc(),
+            Some(base + 1000),
+            "a target inside a hole lands on the next stored row"
+        );
+        // The posting the seek landed on is the one a linear walk reaches too:
+        // nothing between the old position and the target was skipped.
+        let mut stepwise = reader.term_doc_cursor("alpha").unwrap().unwrap();
+        while let Some(doc) = stepwise.doc() {
+            if doc >= base + 999 {
+                break;
+            }
+            stepwise.skip(1);
+        }
+        assert_eq!(stepwise.doc(), Some(base + 1000));
+
+        // An exact stored row is not skipped either.
+        cursor.advance(base + 1000);
+        assert_eq!(cursor.doc(), Some(base + 1000));
+        cursor.advance(base + 1100);
+        assert_eq!(cursor.doc(), Some(base + 1100));
+        // Past the segment's last row the cursor is exhausted, not clamped onto
+        // the last posting.
+        cursor.advance(base + 5000);
+        assert_eq!(cursor.doc(), None);
     }
 
     /// The skip list is keyed by the segment's own doc id, so a segment whose

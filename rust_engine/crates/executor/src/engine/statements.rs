@@ -952,6 +952,9 @@ impl Engine {
         entry.append_ts = Some(append_ts);
         entry.append_copy = Some(append_copy);
         entry.deleted_ids = Some(deletes);
+        // The journal was just rebuilt: a set built from the old one no longer
+        // describes it.
+        entry.deleted_set = None;
         entry.delete_ts = Some(delete_ts);
         entry.imports = Some(imports);
         Journals {
@@ -1148,6 +1151,43 @@ impl Engine {
         self.load_deletes(table).0
     }
 
+    /// [`Self::deleted_ids`] as a set, built once per journal load.
+    ///
+    /// A bulk `DELETE`/`UPDATE` asks whether each of its rows is already gone
+    /// (`row_is_present` -> `is_deleted`), and scanning the journal for every
+    /// one of them made the statement quadratic in the journal's length. The
+    /// set is built on the first lookup, shared (`Arc`) by every later reader,
+    /// and dropped when `ensure_journals` rebuilds the journal from the blocks.
+    pub(crate) fn deleted_set(&self, table: &str) -> Arc<std::collections::HashSet<u64>> {
+        let key = self.table_key(table);
+        {
+            let tables = self.tables.lock().unwrap();
+            if let Some(set) = tables
+                .get(&key)
+                .and_then(|entry| entry.deleted_set.as_ref())
+            {
+                return Arc::clone(set);
+            }
+        }
+        // Loading the journal takes the table lock itself, so it runs outside
+        // it (`ensure_journals` re-reads the block `version` files).
+        let set = Arc::new(
+            self.deleted_ids(table)
+                .into_iter()
+                .collect::<std::collections::HashSet<u64>>(),
+        );
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(key).or_default();
+        match entry.deleted_set {
+            // Another thread built it while this one loaded: keep the first.
+            Some(ref existing) => Arc::clone(existing),
+            None => {
+                entry.deleted_set = Some(Arc::clone(&set));
+                set
+            }
+        }
+    }
+
     /// The deleted row ids and their delete timestamps, both loaded together.
     ///
     /// The block `version` files say which rows are gone and when
@@ -1165,11 +1205,13 @@ impl Engine {
         if count == 0 || first == usize::MAX {
             return;
         }
-        let n = self.deleted_ids(table).len();
+        // One journal load for both halves: a second call would clone the
+        // whole cached journal again.
+        let (ids, mut log) = self.load_deletes(table);
+        let n = ids.len();
         if first >= n {
             return;
         }
-        let mut log = self.delete_ts(table);
         log.resize(n, 0);
         for value in &mut log[first..(first + count).min(n)] {
             *value = ts;
@@ -1182,11 +1224,11 @@ impl Engine {
     /// Stamps the last `count` deletes with the commit timestamp their
     /// transaction got (`BlockVersion::Delete(row_id, commit_ts)`).
     pub(crate) fn settle_delete_ts(&self, table: &str, count: usize, ts: u64) {
-        let n = self.deleted_ids(table).len();
+        let (ids, mut log) = self.load_deletes(table);
+        let n = ids.len();
         if count == 0 || n == 0 {
             return;
         }
-        let mut log = self.delete_ts(table);
         log.resize(n - count.min(n), 0);
         log.resize(n, ts);
         let tkey = self.table_key(table);
@@ -3633,12 +3675,11 @@ impl Engine {
 
     /// Tombstoned sequence ids of a table; index hits are validated against it.
     pub(crate) fn tombstone_set(&self, table: &str) -> Result<std::collections::HashSet<u64>> {
-        let mut dead: std::collections::HashSet<u64> = Default::default();
         // A delete the checkpoint has not written yet is in the table's delete
         // log (`note_deleted_ids`, `DeleteInBlock`); the block's `version`
-        // carries it after the flush.
-        dead.extend(self.deleted_ids(table));
-        Ok(dead)
+        // carries it after the flush. The set is the one the journal keeps for
+        // single-row lookups, so building it is not repeated per query.
+        Ok((*self.deleted_set(table)).clone())
     }
 
     /// [`Self::tombstone_set`] as of `read_ts`: a delete that committed after
@@ -3651,8 +3692,9 @@ impl Engine {
         if read_ts == u64::MAX {
             return self.tombstone_set(table);
         }
-        let ids = self.deleted_ids(table);
-        let ts = self.delete_ts(table);
+        // Both journal halves in one load: each `deleted_ids`/`delete_ts` call
+        // clones the whole journal, and this is the read path of every query.
+        let (ids, ts) = self.load_deletes(table);
         let mut dead: std::collections::HashSet<u64> = Default::default();
         for (at, id) in ids.iter().enumerate() {
             let deleted = ts.get(at).copied().unwrap_or(0);
@@ -8235,9 +8277,15 @@ impl Engine {
                 }
                 Some(Handle::Text(t)) => {
                     let t = t.read().unwrap();
-                    // `mem_used` is the segment's byte estimate; the token
-                    // count is the corpus length BM25 scores against.
-                    (t.mem.doc_count(), t.mem.mem_used())
+                    // The rows still unsealed: the resident tail plus the one a
+                    // seal is writing right now (it keeps answering from memory,
+                    // so it must not disappear from the report mid-seal).
+                    let inflight = t
+                        .inflight
+                        .as_ref()
+                        .map(|inflight| inflight.mem.doc_count())
+                        .unwrap_or(0);
+                    (t.mem.doc_count() + inflight, t.mem.mem_used())
                 }
                 Some(Handle::Sparse(s)) => {
                     let s = s.read().unwrap();
@@ -8264,6 +8312,59 @@ impl Engine {
             });
         }
         out.sort_by(|a, b| (&a.table, &a.index).cmp(&(&b.table, &b.index)));
+        out
+    }
+
+    /// Health of the full-text indexes of `table`: chunk count, unsealed tail,
+    /// spill runs, rows a seal is writing right now, stale copies, and the last
+    /// seal's duration ([`diagnostics::FulltextStats`]).
+    ///
+    /// This is the data a slow full-text query is diagnosed with. It reads the
+    /// column under its **read** guard, which a seal never holds while writing,
+    /// so asking for stats cannot be blocked behind an fsync.
+    pub fn fulltext_stats(&self, table: &str) -> Vec<diagnostics::FulltextStats> {
+        let key = self.table_key(table);
+        // Clone the handles out of `tables`, then drop the guard: the index lock
+        // is taken after it everywhere (see `dml::batch_gate`).
+        let handles: Vec<(String, SharedTextIndex)> = {
+            let tables = self.tables.lock().unwrap();
+            match tables.get(&key) {
+                Some(entry) => entry
+                    .text
+                    .iter()
+                    .map(|(column, shared)| (column.clone(), shared.clone()))
+                    .collect(),
+                None => Vec::new(),
+            }
+        };
+        let mut out: Vec<diagnostics::FulltextStats> = handles
+            .into_iter()
+            .map(|(column, shared)| {
+                let index = shared.read().unwrap();
+                diagnostics::FulltextStats {
+                    table: table.to_string(),
+                    index: column,
+                    chunks: index.reader.segments.len(),
+                    chunk_rows: index
+                        .reader
+                        .segments
+                        .iter()
+                        .map(|segment| segment.docs as usize)
+                        .sum(),
+                    tail_rows: index.mem.pending_docs(),
+                    spill_runs: index.mem.runs.len(),
+                    inflight_rows: index
+                        .inflight
+                        .as_ref()
+                        .map(|inflight| inflight.mem.pending_docs())
+                        .unwrap_or(0),
+                    overridden_rows: index.overridden.len(),
+                    tail_bytes: index.mem.mem_used(),
+                    last_seal_us: index.last_seal_us,
+                }
+            })
+            .collect();
+        out.sort_by(|a, b| a.index.cmp(&b.index));
         out
     }
 

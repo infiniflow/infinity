@@ -1,5 +1,70 @@
 use super::*;
 
+/// One document's tokenised terms and the byte cost of its postings, as produced
+/// by [`prepare_doc`] before the table's write gate is taken.
+pub(crate) type PreparedTerms = (Vec<(String, u32, u16)>, usize);
+
+/// Full-text terms of one batch, tokenised before the table's gate is taken.
+///
+/// Keyed by column and by position in the batch (`base + position` is the row
+/// id, which the commit only hands out later). The terms are **taken** when the
+/// batch is inserted, so the type is built once and dropped.
+pub(crate) struct PreparedText {
+    base: usize,
+    columns: Vec<(String, Vec<Option<PreparedTerms>>)>,
+}
+
+impl PreparedText {
+    /// Points the batch at the row range the commit allocated.
+    pub(crate) fn set_base(&mut self, base: usize) {
+        self.base = base;
+    }
+
+    /// The terms for `seq`, taken out of the batch. `None` when the position is
+    /// outside the batch or another pass already took it.
+    fn take(&mut self, column: &str, seq: usize) -> Option<PreparedTerms> {
+        let position = seq.checked_sub(self.base)?;
+        let (_, rows) = self.columns.iter_mut().find(|(name, _)| name == column)?;
+        rows.get_mut(position)?.take()
+    }
+}
+
+/// One run's claim on the text index: taken before its documents are tokenised,
+/// released once they are published into the tail.
+///
+/// The seal picks the rows it writes from the tail, and a chunk's `.len` covers
+/// every row of its span. Without this claim, a writer that publishes row 9000
+/// and seals while row 8000 is still being tokenised would write 8000 with
+/// length 0, and the chunk that later publishes 8000 would start before the end
+/// of that one - two chunks over one row.
+///
+/// `Drop` releases the claim, so a panic in the write path cannot leave the
+/// barrier stuck forever.
+struct PublishTicket<'a> {
+    index: &'a std::sync::RwLock<crate::engine::text_index::TextIndex>,
+    from_row: u64,
+}
+
+impl<'a> PublishTicket<'a> {
+    fn announce(
+        index: &'a std::sync::RwLock<crate::engine::text_index::TextIndex>,
+        from_row: u64,
+    ) -> Self {
+        if let Ok(mut guard) = index.write() {
+            guard.announce_publish(from_row);
+        }
+        Self { index, from_row }
+    }
+}
+
+impl Drop for PublishTicket<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut guard) = self.index.write() {
+            guard.finish_publish(self.from_row);
+        }
+    }
+}
+
 impl Engine {
     /// Writes one `keys + offsets + PGM` chunk per `ROW_ID` segment and installs
     /// the readers (the reference's high-cardinality `SaveIndexInner`).
@@ -103,6 +168,14 @@ impl Engine {
         let Some(cache) = entry.row_cache.as_mut() else {
             return;
         };
+        // The cache is a `Vec` readers binary-search by row id, so it only takes
+        // a batch that starts after everything it already holds. Two commits
+        // whose bottoms finished out of order would otherwise leave it unsorted;
+        // dropping it costs one cache miss, not a wrong answer.
+        if cache.rows.last().is_some_and(|(last, _)| *last >= base) {
+            entry.row_cache = None;
+            return;
+        }
         for (k, values) in decoded.into_iter().enumerate() {
             cache.push(base + k, values);
         }
@@ -301,6 +374,12 @@ impl Engine {
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey).or_default();
         entry.deleted_ids = Some(log);
+        // Keep the lazily built lookup in step with the journal it mirrors, or
+        // the rows this commit just deleted would read as live until the next
+        // journal rebuild.
+        if let Some(set) = entry.deleted_set.as_mut() {
+            Arc::make_mut(set).extend(ids.iter().map(|s| *s as u64));
+        }
         entry.mirror_dirty = true;
         entry.mirror_epoch += 1;
         first
@@ -312,6 +391,16 @@ impl Engine {
     }
 
     /// The write gate of `table` (see [`Self::batch_locks`]).
+    ///
+    /// **Lock order.** A writer takes `batch_gate(table)` → `tables` → the
+    /// column's index lock. A query takes the index's *read* guard first and
+    /// then `tables` (it fetches its hit rows while that guard is alive, see
+    /// `text_index_for`), i.e. the opposite pair. The two cannot cycle because
+    /// **no site acquires an index lock while it holds `tables`**: every one
+    /// clones the `Arc` out of the map and drops the guard before locking the
+    /// index. Keep that invariant when touching any `tables.lock()` block;
+    /// `concurrent_insert_query_seal_and_optimize_do_not_deadlock` fails instead
+    /// of hanging when it is broken.
     pub(crate) fn batch_gate(&self, table: &str) -> Arc<Mutex<()>> {
         let key = self.table_key(table);
         let mut gates = self.batch_locks.lock().unwrap();
@@ -498,12 +587,25 @@ impl Engine {
         // otherwise keep serving a stale `count(*)`.
         self.result_cache.lock().unwrap().clear();
         self.plan_cache.clear();
+        // The analyzer is the most expensive CPU step of a write and takes no
+        // shared state, so it runs **before** the table's write gate: a second
+        // writer to the same table then tokenises while the gate's holder is
+        // committing and appending its block, instead of queueing behind the
+        // whole statement. The batch is capped at `TEXT_BATCH_ROWS` so a big
+        // `COPY` keeps the bounded shape (it tokenises a chunk at a time inside
+        // the gate).
+        let (mut prepared_text, prepared_cells) = if rows.len() <= Self::TEXT_BATCH_ROWS {
+            let cells: Vec<Vec<String>> = rows
+                .iter()
+                .map(|row| row.iter().map(|cell| cell.to_slt_string()).collect())
+                .collect();
+            (self.prepare_text_terms(table, &cells), Some(cells))
+        } else {
+            (None, None)
+        };
         // A memory index that already exceeds its quota is dumped
         // before these rows join it.
         let gate = self.batch_gate(table);
-        let gate_wait = std::time::Instant::now();
-        let _batch = gate.lock().unwrap();
-        let gate_waited = gate_wait.elapsed();
         let phase = std::time::Instant::now();
         self.note_index_insert(table, rows.len());
         // A scalar table's first batch in this process starts an empty decoded
@@ -588,6 +690,16 @@ impl Engine {
         let row_count = rows.len();
         let bottom_rows = rows;
         let bottom_encoded = encoded_rows;
+        // The gate now covers the **critical section only**: the index entries
+        // and the block append of this commit. Everything above it - validation,
+        // encoding, the WAL write and the row-range allocation - runs
+        // concurrently, and the rows of two commits may reach the bottom in
+        // either order (the block buffer keeps row order, `buffer_rows` explains
+        // how). Optimize/compact still exclude this section, which is what the
+        // gate guarantees for them.
+        let gate_wait = std::time::Instant::now();
+        let _batch = gate.lock().unwrap();
+        let gate_waited = gate_wait.elapsed();
         self.run_commit_bottom(&shard_key, move |engine| {
             // `AppendInBlock`: the rows land in the block before the index
             // entries and the commit publishes after all of it. The block
@@ -614,11 +726,19 @@ impl Engine {
                 || engine.has_index_declaration(&bottom_table)
             {
                 let index_table = bottom_table.clone();
-                let index_rows: Vec<(usize, Vec<String>)> = bottom_rows
-                    .iter()
-                    .enumerate()
-                    .map(|(k, row)| (base + k, row.iter().map(|v| v.to_slt_string()).collect()))
-                    .collect();
+                let index_rows: Vec<(usize, Vec<String>)> = match prepared_cells {
+                    // Reuse the cells the pre-gate tokeniser already rendered.
+                    Some(cells) => cells
+                        .into_iter()
+                        .enumerate()
+                        .map(|(k, cells)| (base + k, cells))
+                        .collect(),
+                    None => bottom_rows
+                        .iter()
+                        .enumerate()
+                        .map(|(k, row)| (base + k, row.iter().map(|v| v.to_slt_string()).collect()))
+                        .collect(),
+                };
                 // The index work runs on **this table's** bottom worker: every
                 // index has its own lock and two tables share none, so a
                 // directory with a hundred thousand tables keeps its index
@@ -635,7 +755,18 @@ impl Engine {
                     .iter()
                     .map(|(seq, texts)| (*seq, texts.as_slice()))
                     .collect();
-                engine.update_text_indexes_batch(&index_table, &batch, &schema);
+                // The row ids are known now: point the pre-tokenised batch at
+                // the allocated range. A column that gained an index after the
+                // batch was tokenised is not covered and is tokenised here.
+                if let Some(prepared) = prepared_text.as_mut() {
+                    prepared.set_base(base);
+                }
+                engine.update_text_indexes_batch(
+                    &index_table,
+                    &batch,
+                    &schema,
+                    prepared_text.as_mut(),
+                );
                 for (seq, texts) in &index_rows {
                     engine.update_vector_caches(&index_table, *seq, texts);
                 }
@@ -1310,6 +1441,64 @@ impl Engine {
     /// so one lock acquisition only covers a chunk's worth of work.
     const TEXT_BATCH_ROWS: usize = 4096;
 
+    /// Tokenises a batch for every full-text column **before** the table's write
+    /// gate is taken. The analyzer needs no shared state (only a snapshot of the
+    /// column's tokenizer), so two writers to one table can overlap it while the
+    /// gate's holder commits and appends its block; without this they queue for
+    /// the whole statement and the analysis runs serialised.
+    ///
+    /// `None` when no column has a full-text index. The caller passes the batch
+    /// back to [`Self::update_text_indexes_batch`], which uses it while every
+    /// row id still matches (`base + position`) and falls back to tokenising for
+    /// a column that gained an index in between (the set is re-read under the
+    /// gate).
+    pub(crate) fn prepare_text_terms(
+        &self,
+        table: &str,
+        cells: &[Vec<String>],
+    ) -> Option<PreparedText> {
+        if cells.is_empty() {
+            return None;
+        }
+        let tkey = self.table_key(table);
+        // Clone the handles, then drop `tables`: an index lock is only ever taken
+        // after it (see `batch_gate`'s lock-order note).
+        let indexes: Vec<(String, SharedTextIndex)> = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .map(|e| e.text.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .unwrap_or_default();
+        if indexes.is_empty() {
+            return None;
+        }
+        let schema = self.table_schema(table).unwrap_or_default();
+        let mut columns: Vec<(String, Vec<Option<PreparedTerms>>)> = Vec::new();
+        for (column, shared) in indexes {
+            let Some(ci) = schema.iter().position(|c| c == &column) else {
+                continue;
+            };
+            let tokenizer = {
+                let index = shared.read().unwrap();
+                index.tokenizer.clone()
+            };
+            let rows = cells
+                .iter()
+                .map(|cells| {
+                    let text = cells.get(ci)?;
+                    let doc = prepare_doc(0, text, &tokenizer);
+                    Some((doc.terms, doc.cost))
+                })
+                .collect();
+            columns.push((column, rows));
+        }
+        if columns.is_empty() {
+            return None;
+        }
+        Some(PreparedText { base: 0, columns })
+    }
+
     /// Keeps existing inverted indexes in step with a batch of inserted or
     /// rewritten rows.
     ///
@@ -1324,6 +1513,7 @@ impl Engine {
         table: &str,
         rows: &[(usize, &[String])],
         schema: &[String],
+        mut prepared: Option<&mut PreparedText>,
     ) {
         if rows.is_empty() {
             return;
@@ -1360,40 +1550,76 @@ impl Engine {
             // inverter ring gives (a full ring is its backpressure), without the
             // ring's handshake.
             for chunk in rows.chunks(Self::TEXT_BATCH_ROWS) {
-                let prepared: Vec<PreparedDoc> = chunk
-                    .iter()
-                    .filter_map(|(seq, cells)| {
-                        let text = cells.get(ci)?;
-                        Some(prepare_doc(*seq as u64, text, &tokenizer))
-                    })
-                    .collect();
-                if prepared.is_empty() {
-                    continue;
-                }
-                // Phase 2, one lock acquisition for the chunk.
-                let capacity = self.memindex_capacity();
-                let job = {
+                // A chunk is written under one `base_row_id` and its `.len` spans
+                // `base_row_id..=last_row`, so an unsealed segment may only hold
+                // rows of a single `ROW_ID` segment (`row >> 32`). A `COPY` that
+                // rolled over into a new segment hands this loop rows of the next
+                // one: the previous tail is sealed before they are inserted, and
+                // each segment run is handled on its own.
+                let segment_of = |seq: usize| (seq as u64) >> 32;
+                let mut at = 0usize;
+                while at < chunk.len() {
+                    let segment = segment_of(chunk[at].0);
+                    let mut end = at + 1;
+                    while end < chunk.len() && segment_of(chunk[end].0) == segment {
+                        end += 1;
+                    }
+                    let run = &chunk[at..end];
+                    at = end;
+                    // Publication barrier: from here until the seal below, this
+                    // run's rows are "text pending". A seal that ran meanwhile
+                    // must not span them - it would write length 0 for a row
+                    // whose text arrives a moment later, and the chunk that
+                    // publishes it would then overlap this one.
+                    let first_row = run[0].0 as u64;
+                    let ticket = PublishTicket::announce(shared.as_ref(), first_row);
+                    let prepared: Vec<PreparedDoc> = run
+                        .iter()
+                        .filter_map(|(seq, cells)| {
+                            // Terms tokenised before the table's gate was taken.
+                            if let Some(pre) = prepared.as_mut() {
+                                if let Some((terms, cost)) = pre.take(&column, *seq) {
+                                    return Some(PreparedDoc {
+                                        seq: *seq as u64,
+                                        terms,
+                                        cost,
+                                    });
+                                }
+                            }
+                            let text = cells.get(ci)?;
+                            Some(prepare_doc(*seq as u64, text, &tokenizer))
+                        })
+                        .collect();
+                    if prepared.is_empty() {
+                        continue;
+                    }
+                    // Phase 2, one lock acquisition for the run.
+                    let capacity = self.memindex_capacity();
                     let mut index = shared.write().unwrap();
+                    if index.unsealed_segment().is_some_and(|held| held != segment) {
+                        // Crossed into the next `ROW_ID` segment: seal the old
+                        // rows in place. This happens once per 2^32 rows, so the
+                        // lock-held write costs nothing measurable.
+                        index.seal();
+                    }
                     for doc in &prepared {
                         index_delete_row(&mut index, doc.seq);
                     }
                     index_rows_prepared(&mut index, &prepared);
-                    if index.should_seal(capacity) {
-                        index.detach_seal()
-                    } else {
-                        None
+                    // The rows are in the tail: the barrier can lift before the
+                    // seal below, which is this writer's own and covers exactly
+                    // the rows it just published. (Through the same guard - the
+                    // ticket's `Drop` would re-enter the lock.)
+                    index.finish_publish(first_row);
+                    let seal = index.should_seal(capacity);
+                    drop(index);
+                    if seal {
+                        // The segment is written with the lock released: the
+                        // tail moves to `TextIndex::inflight`, where queries keep
+                        // reading it, so nobody waits for the fsync.
+                        crate::engine::state::seal_text_index_unlocked(&shared);
                     }
-                };
-                // Phase 3, no lock held: serialise the segment. Only the swap in
-                // and out of the tail touches the column, so a reader is never
-                // blocked behind a segment write.
-                if let Some(mut job) = job {
-                    let segment = job.write();
-                    let mut index = shared.write().unwrap();
-                    match segment {
-                        Some(segment) => index.attach_sealed(job, segment),
-                        None => index.restore_unsealed(job),
-                    }
+                    drop(ticket);
                 }
             }
         }

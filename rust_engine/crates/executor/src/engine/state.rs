@@ -3096,6 +3096,24 @@ pub(crate) struct WandUnit<'a> {
 /// indexes over 250k wide rows; without a cap the postings alone reached ~20 GB.
 pub(crate) const TEXT_INDEX_BUDGET_BYTES: usize = 512 * 1024 * 1024;
 
+/// The in-memory budget of one column's inverted index, overridable for tests.
+///
+/// Past this budget the resident tail is spilled to a sorted run (the
+/// reference's `CommitOffline`) and indexing continues, so a chunk can be built
+/// from several runs - the **offline** dump (`OfflineDump`, multi-source merge)
+/// instead of the realtime one. 512 MiB is unreachable from a test, and the
+/// cross-engine gate has to drive that path on a few tens of thousands of rows,
+/// so it lowers the budget through the environment.
+pub(crate) fn text_index_budget_bytes() -> usize {
+    static CAP: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CAP.get_or_init(|| {
+        std::env::var("INFINITY_TEXT_INDEX_BUDGET_BYTES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(TEXT_INDEX_BUDGET_BYTES)
+    })
+}
+
 /// Size at which the current segment is sealed to disk. Only this much posting
 /// data stays resident per column; sealed segments are read through `mmap`,
 /// like the reference's on-disk segments.
@@ -4162,11 +4180,41 @@ pub(crate) struct SecondaryIndexes {
 }
 
 impl TableEntry {
-    /// Appends rows to the append buffer, keeping `pending_pos` current.
+    /// Appends rows to the append buffer, keeping it **ordered by row id** and
+    /// `pending_pos` current.
+    ///
+    /// The block writer, the range scans and the checkpoint all walk
+    /// `pending_rows` as the table's row order, so a batch that lands behind
+    /// rows already buffered (two commits whose bottoms finished out of order,
+    /// now possible because the insert path no longer serialises its commits)
+    /// is merged in at its place instead of appended. Rows normally arrive after
+    /// everything buffered, so the fast path is still a push.
     pub(crate) fn buffer_rows(&mut self, rows: impl IntoIterator<Item = (usize, Vec<Value>)>) {
-        for (seq, values) in rows {
-            self.pending_pos.insert(seq, self.pending_rows.len());
-            self.pending_rows.push((seq, values));
+        let mut batch: Vec<(usize, Vec<Value>)> = rows.into_iter().collect();
+        if batch.is_empty() {
+            return;
+        }
+        if self
+            .pending_rows
+            .last()
+            .is_none_or(|(last, _)| *last < batch[0].0)
+        {
+            for (seq, values) in batch {
+                self.pending_pos.insert(seq, self.pending_rows.len());
+                self.pending_rows.push((seq, values));
+            }
+            return;
+        }
+        batch.sort_by_key(|(seq, _)| *seq);
+        for (seq, values) in batch {
+            let at = self
+                .pending_rows
+                .partition_point(|(buffered, _)| *buffered < seq);
+            self.pending_rows.insert(at, (seq, values));
+        }
+        self.pending_pos.clear();
+        for (at, (seq, _)) in self.pending_rows.iter().enumerate() {
+            self.pending_pos.insert(*seq, at);
         }
     }
 
@@ -4246,6 +4294,15 @@ pub(crate) struct TableEntry {
     /// Row ids deleted since the table was created (`dellog:{table}`), loaded
     /// on first use.
     pub(crate) deleted_ids: Option<Vec<u64>>,
+    /// [`Self::deleted_ids`] as a set, so a single row's tombstone is one hash
+    /// lookup instead of a linear scan of the journal.
+    ///
+    /// A bulk `DELETE`/`UPDATE` asks `is_deleted` once per row, and the scan
+    /// made that quadratic in the journal's length (a 5k-row statement against
+    /// a 50k-entry journal walked 250M entries). Built lazily on the first
+    /// lookup, extended by `note_deleted_ids`, dropped whenever the journal is
+    /// rebuilt (`ensure_journals`).
+    pub(crate) deleted_set: Option<Arc<std::collections::HashSet<u64>>>,
     /// Commit timestamp of every delete, one entry per `deleted_ids` entry
     /// (`delete_ts:{table}`).
     pub(crate) delete_ts: Option<Vec<u64>>,
@@ -4827,7 +4884,7 @@ pub(crate) fn run_bottom(
                 .iter()
                 .map(|(seq, cells)| (*seq, cells.as_slice()))
                 .collect();
-            engine.update_text_indexes_batch(table, &batch, &schema);
+            engine.update_text_indexes_batch(table, &batch, &schema, None);
             for (seq, cells) in &texts {
                 engine.update_vector_caches(table, *seq, cells);
             }
@@ -5399,6 +5456,57 @@ pub(crate) fn index_rows_prepared(index: &mut TextIndex, docs: &[PreparedDoc]) {
 /// Marks a document deleted. Its postings and length stay: the reference's
 /// segments keep deleted documents until compaction, so corpus statistics must
 /// still count them; the search paths filter them out by sequence id.
+/// Seals one column's unsealed segment with the write lock **released** for the
+/// file write.
+///
+/// The tail moves into `TextIndex::inflight` while it is written, so the rows
+/// stay searchable and a concurrent query never waits for the FST build, the
+/// posting encoding or the `fsync` (measured at ~0.9 s for a 20k-row tail, which
+/// a lock-held seal put in front of every query on the column). A failed write
+/// leaves the tail in flight for the next attempt instead of merging it back
+/// into a tail other writers may have appended to.
+pub(crate) fn seal_text_index_unlocked(shared: &SharedTextIndex) {
+    let job = {
+        let mut index = shared.write().unwrap();
+        index.claim_seal()
+    };
+    let Some(job) = job else {
+        return;
+    };
+    // No lock held: the segment files are written here.
+    let started = std::time::Instant::now();
+    let written = job.write();
+    let elapsed_us = started.elapsed().as_micros() as u64;
+    let mut index = shared.write().unwrap();
+    index.last_seal_us = elapsed_us;
+    match written {
+        Some(segment) => index.complete_seal(job, segment),
+        None => index.abort_seal(job),
+    }
+}
+
+/// Runs one column's chunk merge with the write lock **released**.
+///
+/// The plan is made under the lock from the chunk headers, the files are
+/// rewritten with no lock at all, and the swap back in checks that the chunk
+/// list is still the one the plan was made from. A chunk list that moved (a seal
+/// appended a chunk, another optimize replaced one) is left alone and the merged
+/// files are dropped, so a long merge never blocks a query or a writer and never
+/// loses a chunk that arrived meanwhile.
+pub(crate) fn optimize_text_index_unlocked(shared: &SharedTextIndex) -> crate::Result<usize> {
+    let (plan, dir) = {
+        let index = shared.read().unwrap();
+        let Some(plan) = index.plan_merge()? else {
+            return Ok(0);
+        };
+        (plan, index.dir.clone())
+    };
+    // No lock held: whole chunks are rewritten here.
+    let merged = TextIndex::merge_runs(&dir, &plan);
+    let mut index = shared.write().unwrap();
+    Ok(index.apply_merge(&plan, merged))
+}
+
 pub(crate) fn index_delete_row(index: &mut TextIndex, seq: u64) {
     index.mem.delete(seq);
     // A row whose text already went to a sealed segment keeps its old postings

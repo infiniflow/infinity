@@ -74,8 +74,9 @@ impl Engine {
         };
         let mut merges = 0;
         for index in indexes {
-            let mut guard = index.write().unwrap();
-            merges += guard.optimize_chunks()?;
+            // The merge rewrites whole chunks: keep its I/O out of the column's
+            // write lock so queries and inserts are not held behind it.
+            merges += crate::engine::state::optimize_text_index_unlocked(&index)?;
         }
         Ok(merges)
     }

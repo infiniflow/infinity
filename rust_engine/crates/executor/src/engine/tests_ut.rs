@@ -749,6 +749,256 @@ mod tests {
             .sum()
     }
 
+    /// A chunk is written under one `base_row_id` and its `.len` spans
+    /// `base_row_id..=last_row`, so the unsealed segment may not mix rows of two
+    /// `ROW_ID` segments - they are 2^32 apart, and the span would neither fit
+    /// `u32` nor be meant to be allocated (the reference keeps one
+    /// `ChunkIndexMetaInfo` per segment). The insert path therefore seals the old
+    /// tail before the first row of the next segment lands.
+    #[test]
+    fn an_unsealed_tail_never_mixes_two_row_id_segments() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // Only the byte budget may seal, so the tail is exactly what the test
+        // inserts.
+        e.set_memindex_capacity(0);
+        e.execute("CREATE TABLE seg2 (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX seg2_idx ON seg2 (body) USING FULLTEXT")
+            .unwrap();
+        let schema = vec!["id".to_string(), "body".to_string()];
+        let row = |text: &str| vec!["0".to_string(), text.to_string()];
+        let first = row("alpha beta");
+        e.update_text_indexes_batch("seg2", &[(0usize, first.as_slice())], &schema, None);
+        // A row of the next segment: `1 << 32` is its first offset.
+        let second = row("gamma alpha");
+        e.update_text_indexes_batch("seg2", &[(1usize << 32, second.as_slice())], &schema, None);
+
+        let tables = e.tables.lock().unwrap();
+        let shared = tables
+            .values()
+            .flat_map(|entry| entry.text.values())
+            .next()
+            .expect("the column's index");
+        let index = shared.read().unwrap();
+        assert_eq!(
+            index.reader.segments.len(),
+            1,
+            "the segment-0 tail was sealed before the segment-1 row arrived"
+        );
+        let sealed = &index.reader.segments[0];
+        assert_eq!(sealed.reader.base_row_id(), 0);
+        assert_eq!(sealed.docs, 1, "one row, no padding across the segment gap");
+        assert_eq!(index.unsealed_segment(), Some(1), "the new tail");
+        assert_eq!(index.mem.row_range, Some(((1 << 32), (1 << 32))));
+    }
+
+    /// A chunk's `.len` covers every row of its span, so a seal must not span a
+    /// row another writer has announced but not published yet: the chunk would
+    /// record length 0 for it, and the chunk that publishes it a moment later
+    /// would start before the end of this one - two chunks over one row, which
+    /// `optimize_chunks` then reports as an overlap for good.
+    #[test]
+    fn a_seal_defers_while_a_lower_row_is_still_being_published() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // Only the explicit seals below may write a chunk.
+        e.set_memindex_capacity(0);
+        e.execute("CREATE TABLE publish (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX publish_idx ON publish (body) USING FULLTEXT")
+            .unwrap();
+        let schema = vec!["id".to_string(), "body".to_string()];
+        let row = |text: &str| vec!["0".to_string(), text.to_string()];
+        let shared = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .flat_map(|entry| entry.text.values())
+                .next()
+                .cloned()
+                .expect("the column's index")
+        };
+
+        // Writer A announced row 0 and is still tokenising it.
+        shared.write().unwrap().announce_publish(0);
+        // Writer B got the next row id, published it and asked for a seal.
+        let later = row("beta alpha");
+        e.update_text_indexes_batch("publish", &[(1usize, later.as_slice())], &schema, None);
+        {
+            let mut index = shared.write().unwrap();
+            assert!(
+                !index.seal(),
+                "the seal covered a row whose text was still pending"
+            );
+            assert!(
+                index.reader.segments.is_empty(),
+                "nothing was written while row 0 was pending"
+            );
+            assert!(index.mem.docs.contains_key(&1), "row 1 stays in the tail");
+        }
+
+        // Row 0 lands, the barrier lifts, and one seal covers both rows.
+        shared.write().unwrap().finish_publish(0);
+        let first = row("alpha gamma");
+        e.update_text_indexes_batch("publish", &[(0usize, first.as_slice())], &schema, None);
+        {
+            let mut index = shared.write().unwrap();
+            assert!(index.seal(), "the seal runs once the barrier is lifted");
+            assert_eq!(index.reader.segments.len(), 1);
+            assert_eq!(
+                index.reader.segments[0].docs, 2,
+                "one dense chunk over rows 0 and 1, with no zero-length padding"
+            );
+            assert_eq!(index.reader.segments[0].reader.base_row_id(), 0);
+        }
+        // Both rows kept their own length, i.e. neither was published as a gap.
+        let index = shared.read().unwrap();
+        assert_eq!(index.doc_len_opt(0), Some(2), "row 0: alpha + gamma");
+        assert_eq!(index.doc_len_opt(1), Some(2), "row 1: beta + alpha");
+    }
+
+    /// The unsealed segment is written **with the column's lock released**
+    /// (`seal_text_index_unlocked`), so the tail has to stay searchable while its
+    /// segment is on disk: it moves to `TextIndex::inflight`, which every read
+    /// path merges after the resident tail.
+    ///
+    /// This takes the tail out exactly as the seal does and then, with the write
+    /// not yet started, asks the index for the rows: they must all still answer,
+    /// with their lengths and document frequencies.
+    #[test]
+    fn a_query_still_sees_the_tail_while_its_segment_is_being_written() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_capacity(0);
+        e.execute("CREATE TABLE slip (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX slip_idx ON slip (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..6 {
+            e.execute(&format!(
+                "INSERT INTO slip VALUES ({i}, 'alpha beta row{i}');"
+            ))
+            .unwrap();
+        }
+        let query = "SELECT id FROM slip SEARCH MATCH TEXT (body, 'alpha', 100);";
+        let before = rows(&e, query);
+        assert_eq!(before.len(), 6);
+        let shared = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .flat_map(|entry| entry.text.values())
+                .next()
+                .cloned()
+                .expect("the column's index")
+        };
+
+        // What `claim_seal` does, minus the write.
+        let job = shared
+            .write()
+            .unwrap()
+            .claim_seal()
+            .expect("the tail is sealable");
+        {
+            let index = shared.read().unwrap();
+            assert!(
+                index.inflight.is_some(),
+                "the tail moved to the in-flight slot"
+            );
+            assert_eq!(index.reader.segments.len(), 0, "nothing is sealed yet");
+            assert_eq!(
+                index.mem.pending_docs(),
+                0,
+                "the resident tail is empty; the rows live in the in-flight one"
+            );
+            // The rows the segment will hold are still fully searchable: the
+            // postings (df), the lengths and the corpus statistics include the
+            // in-flight tail.
+            assert_eq!(index.term_df("alpha"), 6);
+            assert_eq!(index.total_docs(), 6);
+            assert_eq!(index.doc_len_opt(3), Some(3), "alpha beta row3");
+        }
+        assert_eq!(
+            rows(&e, query).len(),
+            6,
+            "a query runs while the segment is not written yet"
+        );
+
+        // The write finishes and the same rows answer from the sealed chunk.
+        let segment = job.write().expect("the segment is written");
+        shared.write().unwrap().complete_seal(job, segment);
+        {
+            let index = shared.read().unwrap();
+            assert!(index.inflight.is_none());
+            assert_eq!(index.reader.segments.len(), 1);
+            assert_eq!(index.mem.pending_docs(), 0);
+        }
+        assert_eq!(rows(&e, query).len(), 6);
+        assert_eq!(
+            rows(&e, query),
+            before,
+            "the sealed chunk answers exactly what the in-flight tail did"
+        );
+    }
+
+    /// A seal whose write fails must not lose the rows and must not merge the
+    /// tail back into a resident tail that other writers may have appended to:
+    /// the tail stays in flight, keeps answering, and the next seal retries it.
+    #[test]
+    fn a_failed_seal_keeps_the_rows_and_the_next_one_retries() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_capacity(0);
+        e.execute("CREATE TABLE fail (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX fail_idx ON fail (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..4 {
+            e.execute(&format!("INSERT INTO fail VALUES ({i}, 'alpha row{i}');"))
+                .unwrap();
+        }
+        let query = "SELECT id FROM fail SEARCH MATCH TEXT (body, 'alpha', 100);";
+        let shared = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .flat_map(|entry| entry.text.values())
+                .next()
+                .cloned()
+                .expect("the column's index")
+        };
+
+        // A seal that is abandoned instead of completed (the I/O-error path).
+        let job = shared.write().unwrap().claim_seal().expect("a tail");
+        shared.write().unwrap().abort_seal(job);
+        {
+            let index = shared.read().unwrap();
+            assert!(index.inflight.is_some(), "the tail waits for a retry");
+            assert_eq!(
+                index.inflight.as_ref().unwrap().mem.pending_docs(),
+                4,
+                "no row was lost"
+            );
+        }
+        assert_eq!(rows(&e, query).len(), 4, "the rows still answer");
+
+        // The next write retries: the in-flight tail becomes the chunk and the
+        // new row stays in the (fresh) resident tail.
+        e.execute("INSERT INTO fail VALUES (4, 'alpha row4');")
+            .unwrap();
+        {
+            let index = shared.read().unwrap();
+            assert!(
+                index.inflight.is_none(),
+                "the retry consumed the in-flight tail"
+            );
+            assert_eq!(index.reader.segments.len(), 1);
+            assert_eq!(index.reader.segments[0].docs, 4);
+        }
+        assert_eq!(rows(&e, query).len(), 5, "the new row is searchable too");
+    }
+
     /// `PhraseDocIterator::GetSloppyPhraseMatchData`
     /// (`phrase_doc_iterator_impl.cpp:238-368`): a solution picks one position
     /// per term, is acceptable while the spread of `pos_i - i` stays within the
@@ -1143,11 +1393,10 @@ mod tests {
         .is_empty());
     }
 
-    /// `OptimizeFtIndex` stops at the first gap: the rest of the chunk list is
-    /// not merged (`new_txn_index_impl.cpp:2219-2227`), and a lone prefix chunk
-    /// is skipped (`chunk_ids.size() <= 1`).
+    /// A run of one chunk is skipped (`chunk_ids.size() <= 1`), so two chunks
+    /// separated by a gap both stay.
     #[test]
-    fn optimize_stops_at_a_gap_like_the_reference() {
+    fn optimize_skips_a_run_of_one_chunk() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
         write_chunk(d, 0, 2, "a");
@@ -1157,6 +1406,254 @@ mod tests {
         assert_eq!(index.reader.segments.len(), 2);
         assert_eq!(index.optimize_chunks().unwrap(), 0);
         assert_eq!(index.reader.segments.len(), 2, "both chunks stay");
+    }
+
+    /// `Engine::fulltext_stats` reports where a query's cost comes from: the
+    /// chunk count (every query probes all of them), the unsealed tail, the spill
+    /// runs the next seal will merge, and the stale copies left by deletes.
+    #[test]
+    fn fulltext_stats_reports_the_chunk_and_tail_shape() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // Two rows per chunk: six rows become three sealed chunks.
+        e.set_memindex_capacity(2);
+        e.execute("CREATE TABLE stat (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX stat_idx ON stat (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..6 {
+            e.execute(&format!("INSERT INTO stat VALUES ({i}, 'alpha row{i}');"))
+                .unwrap();
+        }
+        let stats = e.fulltext_stats("stat");
+        assert_eq!(stats.len(), 1, "one full-text column");
+        let stats = &stats[0];
+        assert_eq!(stats.index, "body");
+        assert_eq!(stats.chunks, 3);
+        assert_eq!(stats.chunk_rows, 6);
+        assert_eq!(stats.tail_rows, 0, "the trigger sealed every chunk");
+        assert_eq!(stats.spill_runs, 0);
+        assert_eq!(stats.inflight_rows, 0);
+        assert!(stats.last_seal_us > 0, "the seal was timed");
+
+        // A delete touches no index file: the row's postings stay in its chunk
+        // and the scan drops them through the tombstone. `overridden` only tracks
+        // a row re-indexed **in place**, which the append-only `UPDATE` path does
+        // not produce (it appends a new row id), so the set stays empty.
+        e.execute("DELETE FROM stat WHERE id = 0;").unwrap();
+        let stats = e.fulltext_stats("stat");
+        assert_eq!(stats[0].chunks, 3, "a delete does not seal anything");
+        assert_eq!(
+            stats[0].overridden_rows, 0,
+            "no override marks for a delete"
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM stat SEARCH MATCH TEXT (body, 'alpha', 100);"
+            )
+            .len(),
+            5,
+            "the deleted row is filtered by the tombstone, not by the index"
+        );
+    }
+
+    /// The rows of one statement are tokenised **before** the table's write gate
+    /// is taken (`prepare_text_terms`), then inserted by position
+    /// (`base + position`). A batch larger than one row is where a position/
+    /// row-id mix-up would show: every row carries its own term, so the terms
+    /// must land on the row that owns them and nowhere else.
+    #[test]
+    fn a_batch_tokenised_before_the_gate_indexes_every_row_once() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE batch (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX batch_idx ON batch (body) USING FULLTEXT")
+            .unwrap();
+        e.execute(
+            "INSERT INTO batch VALUES \
+             (0, 'unique0 common'), (1, 'unique1 common'), (2, 'unique2 common'), \
+             (3, 'unique3 common'), (4, 'unique4 common'), (5, 'unique5 common');",
+        )
+        .unwrap();
+        for id in 0..6 {
+            let hits = rows(
+                &e,
+                &format!("SELECT id FROM batch SEARCH MATCH TEXT (body, 'unique{id}', 100);"),
+            );
+            assert_eq!(
+                hits,
+                vec![vec![id.to_string()]],
+                "unique{id} belongs to row {id} only"
+            );
+        }
+        // A term every row shares still finds all six, once each.
+        let common = rows(
+            &e,
+            "SELECT id FROM batch SEARCH MATCH TEXT (body, 'common', 100);",
+        );
+        assert_eq!(common.len(), 6);
+        assert_eq!(
+            e.fulltext_stats("batch")[0].chunk_rows + e.fulltext_stats("batch")[0].tail_rows,
+            6
+        );
+    }
+
+    /// Timing probe for same-table insert concurrency, run by hand:
+    /// `cargo test --lib probe_same_table_insert_concurrency -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "timing probe"]
+    fn probe_same_table_insert_concurrency() {
+        for threads in [1usize, 2, 4] {
+            let dir = tempdir().unwrap();
+            let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+            e.execute("CREATE TABLE conc (id INTEGER, body VARCHAR)")
+                .unwrap();
+            e.execute("CREATE INDEX conc_idx ON conc (body) USING FULLTEXT")
+                .unwrap();
+            let words: String = (0..40).map(|w| format!("word{w} ")).collect::<String>();
+            let started = std::time::Instant::now();
+            let mut handles = Vec::new();
+            for t in 0..threads {
+                let e = e.clone();
+                let words = words.clone();
+                handles.push(std::thread::spawn(move || {
+                    for i in 0..(2000 / threads) {
+                        e.execute(&format!(
+                            "INSERT INTO conc VALUES ({}, '{words}');",
+                            1000 * t + i
+                        ))
+                        .unwrap();
+                    }
+                }));
+            }
+            for handle in handles {
+                handle.join().unwrap();
+            }
+            eprintln!(
+                "PROBE threads={threads} rows=2000 elapsed={:?}",
+                started.elapsed()
+            );
+        }
+    }
+
+    /// Timing probe for the tombstone check of a bulk delete:
+    /// `Engine::delete_row_ids` asks `is_deleted` once per row, so a linear
+    /// scan of the journal makes each pass slower than the one before while
+    /// the hashed set keeps them flat.
+    /// `cargo test --lib probe_bulk_delete_journal_scan -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "timing probe"]
+    fn probe_bulk_delete_journal_scan() {
+        const BATCH: usize = 4_000;
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE del (id INTEGER)").unwrap();
+        for chunk in 0..3 {
+            let values: String = (0..BATCH)
+                .map(|i| format!("({})", chunk * BATCH + i))
+                .collect::<Vec<_>>()
+                .join(",");
+            e.execute(&format!("INSERT INTO del VALUES {values}"))
+                .unwrap();
+        }
+        for pass in 0..3u32 {
+            let ids: Vec<(u32, u32)> = (0..BATCH as u32)
+                .map(|i| (0, pass * BATCH as u32 + i))
+                .collect();
+            let started = std::time::Instant::now();
+            let mut txn = e.begin_txn();
+            assert_eq!(txn.delete_row_ids("del", &ids).unwrap(), BATCH);
+            txn.commit().unwrap();
+            eprintln!(
+                "PROBE delete pass={pass} journal_before={} rows={BATCH} elapsed={:?}",
+                pass as usize * BATCH,
+                started.elapsed()
+            );
+        }
+    }
+
+    /// The merge itself runs **with the column's lock released**
+    /// (`optimize_text_index_unlocked`): the plan is made from the chunk headers,
+    /// the files are rewritten unlocked, and the swap is refused when the chunk
+    /// list moved in the meantime — otherwise a seal that appended a chunk while
+    /// the merge was running would be overwritten by the stale list.
+    #[test]
+    fn a_merge_is_dropped_when_the_chunk_list_moved_while_it_ran() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index.load_sealed();
+        let plan = index
+            .plan_merge()
+            .unwrap()
+            .expect("two contiguous chunks are one run");
+
+        // A seal lands while the merge is writing its files.
+        write_chunk(d, 4, 2, "a");
+        let reader = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
+            d,
+            "ft_0000000000000004",
+            4,
+            storage::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .unwrap();
+        index.reader.segments.push(SealedSegment {
+            docs: 2,
+            total_len: 0,
+            reader,
+        });
+
+        let merged = TextIndex::merge_runs(d, &plan);
+        assert_eq!(
+            index.apply_merge(&plan, merged),
+            0,
+            "the plan no longer matches the chunk list"
+        );
+        assert_eq!(index.reader.segments.len(), 3, "no chunk was replaced");
+        let leftover = format!("{d}/ft_0000000000000000_4.len");
+        assert!(
+            !std::path::Path::new(&leftover).exists(),
+            "the merged chunk of the stale plan is removed"
+        );
+        // The list is still fully readable.
+        assert_eq!(index.total_docs(), 3 * 2);
+    }
+
+    /// **Deviation from the reference, deliberate**: every contiguous run is
+    /// merged, not just the prefix before the first gap. Stopping at the gap
+    /// (`new_txn_index_impl.cpp:2219-2227`) would leave the chunk list frozen
+    /// after one hole, and every query pays for the extra segments.
+    #[test]
+    fn optimize_merges_every_contiguous_run() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        write_chunk(d, 10, 2, "a");
+        write_chunk(d, 12, 2, "a");
+        write_chunk(d, 20, 2, "a");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.reader.segments.len(), 5);
+        assert_eq!(
+            index.optimize_chunks().unwrap(),
+            2,
+            "the two runs of two merge; the lone chunk does not"
+        );
+        let bases: Vec<u64> = index
+            .reader
+            .segments
+            .iter()
+            .map(|s| s.reader.base_row_id())
+            .collect();
+        assert_eq!(bases, vec![0, 10, 20], "one merged chunk per run");
+        assert_eq!(index.reader.segments[0].docs, 4);
+        assert_eq!(index.reader.segments[1].docs, 4);
+        assert_eq!(index.reader.segments[2].docs, 2);
     }
 
     /// The contiguous prefix is merged; the chunks behind the gap stay as they
@@ -1212,6 +1709,184 @@ mod tests {
             2,
             "the chunks survive the refusal"
         );
+    }
+
+    /// An `UPDATE` is the reference's delete-plus-append, so the rewritten row
+    /// gets a **fresh** `ROW_ID` past every sealed chunk: its chunk starts where
+    /// the previous one ended, and the chunk list stays gap-free and disjoint.
+    ///
+    /// This is what keeps `optimize` (which refuses a chunk starting *before*
+    /// the run it belongs to) safe after updates, and what keeps `load_sealed`
+    /// (which drops a plain chunk whose base falls inside a merged chunk) from
+    /// deleting the copy that carries the new text. If an update ever re-used
+    /// the old row id, both would break - hence the assertions.
+    #[test]
+    fn an_update_lands_in_a_chunk_after_the_sealed_range() {
+        let dir = tempdir().unwrap();
+        let query = "SELECT id FROM upd SEARCH MATCH TEXT (body, 'gamma', 100);";
+        let stale = "SELECT id FROM upd SEARCH MATCH TEXT (body, 'alpha', 100);";
+        let hit = || vec![vec!["1".to_string()]];
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            // Two rows per chunk, so row 1 is sealed by the first one.
+            e.set_memindex_capacity(2);
+            e.execute("CREATE TABLE upd (id INTEGER, body VARCHAR)")
+                .unwrap();
+            e.execute("CREATE INDEX upd_idx ON upd (body) USING FULLTEXT")
+                .unwrap();
+            for i in 0..6 {
+                e.execute(&format!("INSERT INTO upd VALUES ({i}, 'alpha row{i}');"))
+                    .unwrap();
+            }
+            e.flush().unwrap();
+            assert!(fulltext_chunks(&e) > 1, "the table starts fragmented");
+
+            e.execute("UPDATE upd SET body = 'gamma' WHERE id = 1;")
+                .unwrap();
+            // Dumping the tail is what turns the update into its own chunk.
+            e.flush().unwrap();
+            assert_eq!(rows(&e, query), hit(), "the new text is searchable");
+            assert_eq!(rows(&e, stale).len(), 5, "the old text is gone");
+
+            e.optimize_indexes()
+                .expect("one update chunk must not make optimize refuse the list");
+            assert_eq!(rows(&e, query), hit(), "the merge keeps the new text");
+            assert_eq!(rows(&e, stale).len(), 5, "the merge cannot resurrect it");
+        }
+        // The restart path is where the stale copy used to come back.
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            rows(&e, query),
+            hit(),
+            "reopening dropped the update chunk and served the old text"
+        );
+        assert_eq!(rows(&e, stale).len(), 5, "the old text came back");
+    }
+
+    /// Lowers the full-text budget of every open index on `e`, so the next
+    /// inserts spill their tail into sorted runs.
+    ///
+    /// `TEXT_INDEX_BUDGET_BYTES` (512 MiB) is unreachable from a test, and
+    /// `INFINITY_TEXT_INDEX_BUDGET_BYTES` is read once per process, so the field
+    /// is set directly: this is the only way to drive the **offline** dump
+    /// (`for_each_merged_term` over several runs) instead of the realtime one.
+    fn set_text_budget(e: &Engine, bytes: usize) {
+        let indexes: Vec<_> = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .flat_map(|entry| entry.text.values().cloned())
+                .collect()
+        };
+        for shared in indexes {
+            shared.write().unwrap().budget = bytes;
+        }
+    }
+
+    /// Every file under `<dir>/fulltext`, keyed by its path below that root.
+    fn fulltext_files(dir: &std::path::Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+        fn walk(
+            root: &std::path::Path,
+            at: &std::path::Path,
+            out: &mut std::collections::BTreeMap<String, Vec<u8>>,
+        ) {
+            let Ok(entries) = std::fs::read_dir(at) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(root, &path, out);
+                } else {
+                    let rel = path
+                        .strip_prefix(root)
+                        .map(|p| p.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    out.insert(rel, std::fs::read(&path).unwrap_or_default());
+                }
+            }
+        }
+        let root = dir.join("fulltext");
+        let mut out = std::collections::BTreeMap::new();
+        walk(&root, &root, &mut out);
+        out
+    }
+
+    /// The **offline** dump (`MemoryIndexer::spill` + `for_each_merged_term`)
+    /// only runs when the resident tail outgrows its budget, which 512 MiB makes
+    /// impossible in a test. Lowering the budget makes every insert spill, so the
+    /// seal merges several sorted runs; the chunk it writes must be **byte for
+    /// byte** what the resident (realtime) dump writes for the same rows.
+    #[test]
+    fn a_spilled_build_writes_the_same_chunk_as_a_resident_one() {
+        const ROWS: usize = 20;
+        let resident = tempdir().unwrap();
+        let spilled = tempdir().unwrap();
+        let query = "SELECT id FROM offl SEARCH MATCH TEXT (body, 'alpha', 100);";
+
+        let build = |dir: &std::path::Path, budget: Option<usize>| {
+            let e = Engine::open(dir).unwrap();
+            e.execute("CREATE TABLE offl (id INTEGER, body VARCHAR)")
+                .unwrap();
+            e.execute("CREATE INDEX offl_idx ON offl (body) USING FULLTEXT")
+                .unwrap();
+            // One seal at the twentieth row, so both builds write one chunk.
+            e.set_memindex_capacity(ROWS);
+            for i in 0..ROWS {
+                e.execute(&format!(
+                    "INSERT INTO offl VALUES ({i}, 'alpha beta row{i}');"
+                ))
+                .unwrap();
+                if i == 0 {
+                    if let Some(bytes) = budget {
+                        set_text_budget(&e, bytes);
+                    }
+                }
+            }
+            e
+        };
+
+        let expected;
+        {
+            let resident_engine = build(resident.path(), None);
+            let spilled_engine = build(spilled.path(), Some(1));
+            // The spilled column really did go through the offline path: one
+            // sealed chunk, no run left behind and nothing in the tail.
+            {
+                let tables = spilled_engine.tables.lock().unwrap();
+                for shared in tables.values().flat_map(|entry| entry.text.values()) {
+                    let guard = shared.read().unwrap();
+                    assert_eq!(guard.reader.segments.len(), 1, "one sealed chunk");
+                    assert_eq!(guard.mem.runs.len(), 0, "the seal consumed the runs");
+                    assert_eq!(guard.mem.pending_docs(), 0, "the tail is empty");
+                }
+            }
+            let a = fulltext_files(resident.path());
+            let b = fulltext_files(spilled.path());
+            assert_eq!(
+                a.keys().collect::<Vec<_>>(),
+                b.keys().collect::<Vec<_>>(),
+                "the two builds must write the same files"
+            );
+            for (name, bytes) in &a {
+                assert_eq!(
+                    bytes,
+                    b.get(name).unwrap(),
+                    "{name} differs: the offline dump does not reproduce the realtime one"
+                );
+            }
+            expected = rows(&resident_engine, query);
+            assert_eq!(
+                expected,
+                rows(&spilled_engine, query),
+                "the two builds must answer the same rows"
+            );
+            assert_eq!(expected.len(), ROWS);
+        }
+
+        // And the chunk is the one a restart maps.
+        let reopened = Engine::open(spilled.path()).unwrap();
+        assert_eq!(rows(&reopened, query), expected);
     }
 
     /// Rows as display text, for assertions.
@@ -5432,6 +6107,101 @@ mod tests {
             h.join().unwrap();
         }
         assert_eq!(e.row_count("pit").unwrap(), 1200);
+    }
+
+    /// The engine's lock order is `batch_gate -> tables -> index` for a writer
+    /// and `index(read) -> tables` for a query (a query fetches its hit rows
+    /// while it still holds the column's read guard — `text_index_for`'s comment
+    /// spells the cycle out). The two orders are compatible **only** because no
+    /// writer acquires an index lock while it holds `tables`: every site clones
+    /// the `Arc` out of the map and drops the guard first. An edit that takes the
+    /// lock inside the guard turns the pair into a deadlock that hangs the suite
+    /// instead of failing it.
+    ///
+    /// This drives insert, query, seal (through the row-count trigger, so it runs
+    /// on the writer threads) and optimize together, and reports a deadlock as a
+    /// failure after a timeout instead of hanging.
+    #[test]
+    fn concurrent_insert_query_seal_and_optimize_do_not_deadlock() {
+        const WRITERS: usize = 3;
+        const READERS: usize = 3;
+        const PER_WRITER: usize = 12;
+        const READS: usize = 12;
+        const OPTIMIZES: usize = 12;
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        // Seven rows per chunk, so the writers seal while the readers search.
+        e.set_memindex_capacity(7);
+        e.execute("CREATE TABLE mix (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX mix_idx ON mix (body) USING FULLTEXT")
+            .unwrap();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(WRITERS + READERS + 1));
+        // `()` results: every send is one finished unit of work.
+        let (tx, rx) = std::sync::mpsc::channel::<crate::Result<()>>();
+        for w in 0..WRITERS {
+            let (e, barrier, tx) = (e.clone(), barrier.clone(), tx.clone());
+            std::thread::spawn(move || {
+                barrier.wait();
+                for i in 0..PER_WRITER {
+                    let id = w * 1000 + i;
+                    let _ = tx.send(
+                        e.execute(&format!(
+                            "INSERT INTO mix VALUES ({id}, 'alpha beta row{id}');"
+                        ))
+                        .map(|_| ()),
+                    );
+                }
+            });
+        }
+        for _ in 0..READERS {
+            let (e, barrier, tx) = (e.clone(), barrier.clone(), tx.clone());
+            std::thread::spawn(move || {
+                barrier.wait();
+                for _ in 0..READS {
+                    let _ = tx.send(
+                        e.execute("SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);")
+                            .map(|_| ()),
+                    );
+                }
+            });
+        }
+        {
+            let (e, barrier, tx) = (e.clone(), barrier.clone(), tx.clone());
+            std::thread::spawn(move || {
+                barrier.wait();
+                for _ in 0..OPTIMIZES {
+                    // Optimize takes `batch_gate` and then the index's write
+                    // lock (the writer's order) while the readers hold the read
+                    // guard: exactly the pair a reversed acquisition would hang.
+                    let _ = tx.send(e.optimize_fulltext("mix").map(|_| ()));
+                }
+            });
+        }
+        drop(tx);
+        let expected = WRITERS * PER_WRITER + READERS * READS + OPTIMIZES;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        for i in 0..expected {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            let unit = rx
+                .recv_timeout(left)
+                .unwrap_or_else(|_| panic!("deadlock: only {i} of {expected} units finished"));
+            unit.unwrap_or_else(|err| panic!("unit {i} failed: {err}"));
+        }
+        // Every row survived the concurrent seals and merges, and the index can
+        // still answer for all of them.
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM mix;"),
+            vec![vec![(WRITERS * PER_WRITER).to_string()]]
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);"
+            )
+            .len(),
+            WRITERS * PER_WRITER
+        );
     }
 
     /// C++: `TestTxnAppend.DISABLED_SLOW_test_append_append_concurrent` —

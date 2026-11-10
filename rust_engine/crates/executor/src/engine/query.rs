@@ -2518,7 +2518,7 @@ impl Engine {
                                 .iter()
                                 .map(|(seq, cells)| (*seq, cells.as_slice()))
                                 .collect();
-                            self.update_text_indexes_batch(table, &batch, &schema);
+                            self.update_text_indexes_batch(table, &batch, &schema, None);
                             for (seq, texts) in &row_texts {
                                 self.update_vector_caches(table, *seq, texts);
                             }

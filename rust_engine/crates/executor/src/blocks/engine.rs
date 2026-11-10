@@ -2206,20 +2206,14 @@ impl Engine {
             .unwrap_or(false)
     }
 
-    /// Whether the delete journal holds `seq`. Reads the loaded journal in
-    /// place, and only pays for loading it when this is the first look.
+    /// Whether the delete journal holds `seq`.
+    ///
+    /// One hash lookup into the journal's set. The journal itself is a `Vec`
+    /// and used to be scanned here, which a bulk `DELETE`/`UPDATE` pays once
+    /// per row (`row_is_present`) and made the statement quadratic in the
+    /// journal's length.
     pub(crate) fn is_deleted(&self, table: &str, seq: usize) -> bool {
-        let key = self.table_key(table);
-        {
-            let tables = self.tables.lock().unwrap();
-            if let Some(ids) = tables
-                .get(&key)
-                .and_then(|entry| entry.deleted_ids.as_ref())
-            {
-                return ids.contains(&(seq as u64));
-            }
-        }
-        self.deleted_ids(table).contains(&(seq as u64))
+        self.deleted_set(table).contains(&(seq as u64))
     }
 
     /// The blocks a reader may see: the table's block index minus every segment
