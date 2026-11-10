@@ -711,7 +711,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                 for k in 0..self.prefix.len() {
                     let i = self.prefix[k];
                     let cursor = &mut self.cursors[i];
-                    let tf = f64::from(cursor.stream.tf());
+                    let tf = cursor.stream.tf();
                     let dl = f64::from(cursor.stream.len());
                     score += ranker.score_with(
                         tf,
@@ -1245,10 +1245,13 @@ mod tests {
         let idf_a = ranker.idf(n, a.len() as f64);
         let idf_b = ranker.idf(n, b.len() as f64);
         let make = || {
-            let cursor = crate::PhraseCursor::new(vec![
-                TermStream::from_postings(a.clone(), &lens),
-                TermStream::from_postings(b.clone(), &lens),
-            ]);
+            let cursor = crate::PhraseCursor::new(
+                vec![
+                    TermStream::from_postings(a.clone(), &lens),
+                    TermStream::from_postings(b.clone(), &lens),
+                ],
+                0,
+            );
             vec![WandField {
                 n_docs: DOCS as usize,
                 total_len: DOCS * 100,
@@ -1289,10 +1292,13 @@ mod tests {
             }
         }
         let lens: Vec<(u64, u32)> = (0..400u64).map(|d| (d, 10)).collect();
-        let mut cursor = crate::PhraseCursor::new(vec![
-            TermStream::from_postings(a, &lens),
-            TermStream::from_postings(b, &lens),
-        ]);
+        let mut cursor = crate::PhraseCursor::new(
+            vec![
+                TermStream::from_postings(a, &lens),
+                TermStream::from_postings(b, &lens),
+            ],
+            0,
+        );
         assert_eq!(cursor.doc(), Some(0));
         let before = cursor.verified();
         cursor.seek_block(200);

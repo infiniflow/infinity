@@ -435,7 +435,7 @@ impl MemoryIndexer {
             self.next_run_id,
             storage::invertedindex::format::FULLTEXT_SPILL_SUFFIX
         );
-        let flags = storage::invertedindex::format::TermMetaFlags::default();
+        let flags = storage::invertedindex::format::OPTION_FLAG_ALL;
         if storage::invertedindex::disk_segment_reader::write_segment_index(
             dir,
             &base_name,
@@ -668,7 +668,7 @@ impl MemoryIndexer {
             docs[0].0,
             &docs,
             &postings,
-            storage::invertedindex::format::TermMetaFlags::default(),
+            storage::invertedindex::format::OPTION_FLAG_ALL,
         )
         .is_ok()
     }
@@ -678,7 +678,7 @@ impl MemoryIndexer {
     /// reader and are served by [`Self::segment_posting`].
     #[allow(dead_code)] // the product spill path; exercised by `memory_indexer_ut`.
     pub(crate) fn load(&mut self, dir: &str, base_name: &str) -> bool {
-        let flags = storage::invertedindex::format::TermMetaFlags::default();
+        let flags = storage::invertedindex::format::OPTION_FLAG_ALL;
         let Ok(reader) = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
             dir, base_name, 0, flags,
         ) else {
@@ -1000,11 +1000,22 @@ impl TextIndex {
         let mut segments = Vec::with_capacity(bases.len());
         let mut next = 0u64;
         for base in &bases {
+            // The chunk's first row id is part of its name
+            // (`fulltext_base_name`), and it is what turns a posting's dense
+            // ordinal back into a row id: opening with 0 would make every chunk
+            // claim rows `0..doc_count` and the caller would re-index the rest.
+            let Some(base_row_id) = base
+                .strip_prefix("ft_")
+                .and_then(|hex| hex.split('_').next())
+                .and_then(|hex| u64::from_str_radix(hex, 16).ok())
+            else {
+                return 0;
+            };
             let Ok(reader) = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
                 &self.dir,
                 base,
-                0,
-                storage::invertedindex::format::TermMetaFlags::default(),
+                base_row_id,
+                storage::invertedindex::format::OPTION_FLAG_ALL,
             ) else {
                 return 0;
             };
@@ -1052,7 +1063,7 @@ impl TextIndex {
         let base_row_id = docs[0].0;
         let total_len = self.mem.pending_len();
         let base_name = format!("ft_{base_row_id:016x}");
-        let flags = storage::invertedindex::format::TermMetaFlags::default();
+        let flags = storage::invertedindex::format::OPTION_FLAG_ALL;
         if storage::invertedindex::disk_segment_reader::write_segment_index(
             &self.dir,
             &base_name,
@@ -1085,6 +1096,100 @@ impl TextIndex {
         });
         self.mem.reset();
         true
+    }
+
+    /// `NewTxn::OptimizeFtIndex` (`new_txn_index_impl.cpp:2179-2270`): merges
+    /// the sealed chunks of one segment into a single
+    /// `ft_{base:016x}_{rows:x}` chunk and drops the sources.
+    ///
+    /// The reference walks the chunk list against the running offset: a chunk
+    /// that starts **after** the expected row id truncates the list (only the
+    /// contiguous prefix is merged, `:2219-2227`) and one that starts before it
+    /// is unrecoverable (`:2228-2233`). Our chunks are sorted and disjoint, so
+    /// grouping them into contiguous runs is the same selection; a run of one
+    /// chunk is skipped, exactly like the reference's
+    /// `if chunk_ids.size() <= 1 { return }`. Returns the number of merges.
+    pub(crate) fn optimize_chunks(&mut self) -> crate::Result<usize> {
+        if self.reader.segments.len() < 2 {
+            return Ok(0);
+        }
+        let flags = storage::invertedindex::format::OPTION_FLAG_ALL;
+        let mut segments = std::mem::take(&mut self.reader.segments);
+        segments.sort_by_key(|segment| segment.reader.base_row_id());
+
+        // `OptimizeFtIndex` walks the chunk list from its first entry and
+        // **stops at the first gap** (`new_txn_index_impl.cpp:2219-2227`: the
+        // remaining chunk ids are erased from the merge list and left as they
+        // are); a chunk that starts *before* the expected row id is an overlap,
+        // which the reference treats as unrecoverable (`:2228-2233`). Merging
+        // past a gap, or merging the later runs as well, would produce chunks
+        // the reference never produces.
+        let mut expected = segments[0].reader.base_row_id();
+        let mut split = 0usize;
+        for (index, segment) in segments.iter().enumerate() {
+            let base = segment.reader.base_row_id();
+            if base > expected {
+                break;
+            }
+            if base < expected {
+                let name = segment.reader.base_name().to_string();
+                self.reader.segments = segments;
+                return Err(crate::Error::Invalid(format!(
+                    "full-text chunks overlap: chunk '{name}' starts at row {base}, but the run \
+                     expects row {expected}"
+                )));
+            }
+            expected = base + u64::from(segment.docs);
+            split = index + 1;
+        }
+        let rest = segments.split_off(split);
+        if segments.len() <= 1 {
+            // Nothing to merge (`chunk_ids.size() <= 1` after the gap cut): the
+            // chunks stay as they are.
+            self.reader.segments = segments;
+            self.reader.segments.extend(rest);
+            return Ok(0);
+        }
+
+        let base_row_id = segments[0].reader.base_row_id();
+        let rows: u64 = segments.iter().map(|s| u64::from(s.docs)).sum();
+        let total_len: u64 = segments.iter().map(|s| s.total_len).sum();
+        let dst = storage::fulltext_base_name(base_row_id, Some(rows));
+        let sources: Vec<storage::invertedindex::index_merger::ColumnSource> = segments
+            .iter()
+            .map(
+                |segment| storage::invertedindex::index_merger::ColumnSource {
+                    base_name: segment.reader.base_name().to_string(),
+                    base_row_id: segment.reader.base_row_id(),
+                },
+            )
+            .collect();
+        let merged = storage::invertedindex::index_merger::ColumnIndexMerger::new(&self.dir, flags)
+            .merge(&sources, &dst)
+            .and_then(|()| {
+                storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
+                    &self.dir,
+                    &dst,
+                    base_row_id,
+                    flags,
+                )
+            });
+        let Ok(reader) = merged else {
+            // Keep the sources: a failed merge must not lose postings.
+            self.reader.segments = segments;
+            self.reader.segments.extend(rest);
+            return Ok(0);
+        };
+        for source in &sources {
+            remove_run_files(&self.dir, &source.base_name);
+        }
+        self.reader.segments = vec![SealedSegment {
+            docs: rows as u32,
+            total_len,
+            reader,
+        }];
+        self.reader.segments.extend(rest);
+        Ok(1)
     }
 
     /// Seals once the unsealed segment (runs included) reaches its size budget

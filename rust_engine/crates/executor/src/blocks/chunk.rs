@@ -404,10 +404,10 @@ pub fn encode_fulltext_chunk(
     lengths: &[u32],
 ) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     const OPTION_FLAG_ALL: u8 = 1 | 2 | 4 | 8 | 16 | 32;
-    let flags = storage::invertedindex::format::TermMetaFlags {
-        has_term_frequency: true,
-        has_term_payload: true,
-    };
+    // The `.dic` half records `total_tf` and the term payload, and the doc list
+    // below is built with `OPTION_FLAG_ALL`, so the flags have to describe the
+    // same option word (`index_full_text.cppm:73`).
+    let flags = storage::invertedindex::format::OPTION_FLAG_ALL;
     let doc_option =
         storage::invertedindex::format::doc_list::DocListFormatOption::new(OPTION_FLAG_ALL);
     let mut pos = Vec::new();

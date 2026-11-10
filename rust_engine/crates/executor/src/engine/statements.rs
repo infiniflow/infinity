@@ -4974,7 +4974,25 @@ impl Engine {
                 }
             }
         }
-        let params = arg_str(m.args.get(1)).unwrap_or_default();
+        // `SEARCH MATCH TEXT (col, query [, topn] [, options])`: the reference
+        // puts the row count in the third slot and the option string in the
+        // fourth, so the arguments after the query are told apart by type.
+        // Reading `args[1]` unconditionally used to take `topn` as the option
+        // string, which silently disabled every option (`operator`,
+        // `threshold`, `block_max`, `filter`, `similarity`, `rank_features`,
+        // `minimum_should_match`, `bm25_param_*`).
+        let mut topn_positional: Option<usize> = None;
+        let mut options: Option<String> = None;
+        for arg in m.args.iter().skip(1) {
+            if let Some(n) = super::state::arg_usize(arg) {
+                topn_positional = Some(n);
+                continue;
+            }
+            if let ExprAst::Literal(Literal::Str(text)) = arg {
+                options = Some(text.clone());
+            }
+        }
+        let params = options.unwrap_or_default();
         // `threshold=<f>` keeps only documents scoring at least `f`
         let threshold: Option<f64> = params
             .split(';')
@@ -5053,10 +5071,12 @@ impl Engine {
             .unwrap_or_default();
         // One unit per quoted phrase / bare word. The analyzer decides what a
         // `"a b"` group tokenises to, so quotes are stripped first.
-        let units: Vec<(bool, Vec<String>, f64)> = query_units(&query)
+        let units: Vec<(bool, Vec<String>, f64, u32)> = query_units(&query)
             .into_iter()
-            .map(|(phrase, text, boost)| (phrase, tokenize_text(&text, &tokenizer), boost))
-            .filter(|(_, toks, _)| !toks.is_empty())
+            .map(|(phrase, text, boost, slop)| {
+                (phrase, tokenize_text(&text, &tokenizer), boost, slop)
+            })
+            .filter(|(_, toks, _, _)| !toks.is_empty())
             .collect();
         // One entry per matched column: `(schema index, field boost, tokeniser)`.
         // `similarity=boolean` scores each field on its own, so a `keyword`
@@ -5084,7 +5104,7 @@ impl Engine {
             .collect();
         let terms: Vec<String> = units
             .iter()
-            .flat_map(|(_, u, _)| u.iter().cloned())
+            .flat_map(|(_, u, _, _)| u.iter().cloned())
             .filter(|t| t != "or" && t != "and")
             .collect();
         if terms.is_empty() {
@@ -5099,7 +5119,42 @@ impl Engine {
         // With `operator=and`, each OR-separated group is a clause: a run of
         // several words must appear as a phrase (iresearch's `AndQuery`).
         let min_should = if require_all { units.len() } else { min_should };
-        let topn = parse_topn_param(&params).unwrap_or(10);
+        let topn = parse_topn_param(&params).or(topn_positional).unwrap_or(10);
+        // The query-string grammar (`a AND b`, `a OR b`, `a AND NOT b`,
+        // `(a OR b) AND c`, `column:term`, `"a b"~2`): build the reference's
+        // query tree and evaluate it (`QueryBuilder::CreateSearch`). A plain
+        // term list keeps the block-max WAND path below.
+        if super::text_query::has_query_syntax(&query) {
+            if let Some(hits) = self.search_text_query_tree(
+                table,
+                &m.column,
+                &query,
+                topn,
+                delta_term,
+                delta_phrase,
+                threshold,
+            )? {
+                let wanted: Vec<u64> = hits.iter().map(|(seq, _)| *seq).collect();
+                let mut by_id: HashMap<usize, Vec<Value>> = self
+                    .fetch_some_rows_with_ids(table, &wanted)?
+                    .into_iter()
+                    .collect();
+                let mut out = Vec::new();
+                for (seq, score) in hits {
+                    let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                        continue;
+                    };
+                    row.push(Value::Int(seq as i64));
+                    row.push(Value::Float(score));
+                    row.push(Value::Float(0.0));
+                    row.push(Value::Float(score));
+                    out.push(row);
+                }
+                // An empty tree result is the answer: falling through to the
+                // plain-term path would answer a different question.
+                return Ok((out, hidden.to_vec()));
+            }
+        }
         // `block_max=…`: the reference's `EarlyTermAlgo` switch
         // (`bound_select_statement_impl.cpp:168-183`). The port has one block-max
         // iterator, so every accepted value selects it except the no-pruning
@@ -5201,7 +5256,7 @@ impl Engine {
         if rank_features.is_empty()
             && !tokenizer.keyword()
             && !field_specs.is_empty()
-            && units.iter().all(|(_, toks, _)| !toks.is_empty())
+            && units.iter().all(|(_, toks, _, _)| !toks.is_empty())
         {
             // One lazy posting stream per (field, term): nothing is materialised,
             // so the WAND cursors pay only for the documents they visit. The
@@ -5226,7 +5281,7 @@ impl Engine {
                     (1.0 + (n - df + 0.5) / (df + 0.5)).ln()
                 };
                 let mut wand_units: Vec<WandUnit<'_>> = Vec::with_capacity(units.len());
-                for (phrase, toks, uboost) in &units {
+                for (phrase, toks, uboost, slop) in &units {
                     // Boolean similarity ignores per-term boosts (one point per
                     // matched unit, weighted by the field boost).
                     let weight = if boolean { *boost } else { boost * uboost };
@@ -5256,7 +5311,7 @@ impl Engine {
                             .iter()
                             .map(|t| text.term_stream_capture(t, true))
                             .collect();
-                        let cursor = PhraseCursor::new(children);
+                        let cursor = PhraseCursor::new(children, *slop);
                         let idf: f64 = toks.iter().map(|t| idf_of(t)).sum();
                         wand_units.push(WandUnit {
                             stream: WandStream::Phrase(cursor),
@@ -5354,9 +5409,9 @@ impl Engine {
                     row.push(Value::Float(score));
                     out.push(row);
                 }
-                if !out.is_empty() {
-                    return Ok((out, hidden.to_vec()));
-                }
+                // An empty tree result is the answer: falling through to the
+                // plain-term path would answer a different question.
+                return Ok((out, hidden.to_vec()));
             }
         }
         // Everything below runs off the inverted index. The postings give the
@@ -5367,7 +5422,7 @@ impl Engine {
         // query needs a value from it: a filter, or `rank_features`.
         let query_terms: Vec<String> = {
             let mut out: Vec<String> = Vec::new();
-            for (_, unit, _) in &units {
+            for (_, unit, _, _) in &units {
                 for term in unit {
                     if !out.contains(term) {
                         out.push(term.clone());
@@ -5532,7 +5587,7 @@ impl Engine {
                             };
                         if keyword_field {
                             let mut any = false;
-                            for (ui, (_, unit, _)) in units.iter().enumerate() {
+                            for (ui, (_, unit, _, _)) in units.iter().enumerate() {
                                 let hit = unit.iter().any(|t| {
                                     query_terms
                                         .iter()
@@ -5549,7 +5604,7 @@ impl Engine {
                             }
                             continue;
                         }
-                        for (ui, (phrase, unit, uboost)) in units.iter().enumerate() {
+                        for (ui, (phrase, unit, uboost, slop)) in units.iter().enumerate() {
                             let uboost = *uboost;
                             if (*phrase || require_all) && unit.len() > 1 {
                                 // A phrase scores like one term whose `tf` is the phrase
@@ -5572,9 +5627,20 @@ impl Engine {
                                         phrase_positions[k].extend_from_slice(cursor.positions());
                                     }
                                 }
-                                let freq =
-                                    phrase_freq_lists(&phrase_positions[..unit.len()], unit.len());
-                                if freq == 0 {
+                                // `"a b"~N`: a sloppy phrase scores with the
+                                // fractional frequency the reference's
+                                // `GetSloppyPhraseMatchData` produces.
+                                let freq = if *slop == 0 {
+                                    phrase_freq_lists(&phrase_positions[..unit.len()], unit.len())
+                                        as f64
+                                } else {
+                                    phrase_freq_lists_sloppy(
+                                        &phrase_positions[..unit.len()],
+                                        unit.len(),
+                                        *slop,
+                                    )
+                                };
+                                if freq <= 0.0 {
                                     continue;
                                 }
                                 unit_hits[ui] = true;
@@ -5592,7 +5658,7 @@ impl Engine {
                                         }
                                     })
                                     .sum();
-                                let tf = freq as f64;
+                                let tf = freq;
                                 let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
                                 score += idf_sum * (norm + delta_phrase) * boost * uboost;
                                 continue;
@@ -5620,7 +5686,7 @@ impl Engine {
                             .iter()
                             .zip(unit_hits.iter())
                             .filter(|(_, m)| **m)
-                            .map(|((_, u, _), _)| u.len())
+                            .map(|((_, u, _, _), _)| u.len())
                             .sum()
                     };
                     score += rank_bonus;
@@ -5670,6 +5736,83 @@ impl Engine {
     /// standard field once per matching term); otherwise the query is parsed
     /// into a normal query tree and scored with BM25, like a named column.
     #[allow(clippy::type_complexity)]
+    /// Evaluates a query-string query (`a AND b`, `a OR b`, `a AND NOT b`,
+    /// `(a OR b) AND c`, `column:term`, `"a b"~2`) through the reference's
+    /// `QueryNode` tree (`query_builder_impl.cpp`).
+    ///
+    /// `Ok(None)` when the text does not build a tree (a `:` that is not a
+    /// field qualifier, an empty analysis), in which case the caller keeps its
+    /// plain-term fast path.
+    #[allow(clippy::too_many_arguments)]
+    fn search_text_query_tree(
+        &self,
+        table: &str,
+        columns: &str,
+        query: &str,
+        topn: usize,
+        delta_term: f64,
+        delta_phrase: f64,
+        threshold: Option<f64>,
+    ) -> Result<Option<Vec<(u64, f64)>>> {
+        use crate::invertedindex::search::query_builder::SearchDriver;
+        let tkey = self.table_key(table);
+        let (indexes, analyzers) = {
+            let tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get(&tkey) else {
+                return Ok(None);
+            };
+            (entry.text.clone(), entry.analyzers.clone())
+        };
+        if indexes.is_empty() {
+            return Ok(None);
+        }
+        let mut field2analyzer: HashMap<String, HashMap<String, String>> = HashMap::new();
+        let mut lookup: HashMap<String, super::state::SharedTextIndex> = HashMap::new();
+        let mut default_field: Option<String> = None;
+        for spec in columns.split(',') {
+            let name = spec
+                .split('^')
+                .next()
+                .unwrap_or(spec)
+                .split('@')
+                .next()
+                .unwrap_or(spec)
+                .trim();
+            let Some(shared) = indexes.get(name) else {
+                continue;
+            };
+            // `SearchDriver::analyzer_name` reads the first entry of the inner
+            // map when the field carries no `index` suffix, which is how the
+            // reference looks a column up.
+            let mut per_index: HashMap<String, String> = HashMap::new();
+            per_index.insert(
+                String::new(),
+                analyzers.get(name).cloned().unwrap_or_default(),
+            );
+            field2analyzer.insert(name.to_string(), per_index);
+            lookup.insert(name.to_string(), shared.clone());
+            default_field.get_or_insert_with(|| name.to_string());
+        }
+        let Some(default_field) = default_field else {
+            return Ok(None);
+        };
+        let driver = SearchDriver::new(field2analyzer, default_field);
+        let Ok(tree) = driver.parse_single_with_fields(columns, query) else {
+            return Ok(None);
+        };
+        let dead = self.tombstone_set(table)?;
+        let Some(hits) =
+            super::text_query::run_query_tree(tree, lookup, topn, &dead, delta_term, delta_phrase)
+        else {
+            return Ok(None);
+        };
+        Ok(Some(
+            hits.into_iter()
+                .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
+                .collect(),
+        ))
+    }
+
     pub(crate) fn search_field_query(
         &self,
         table: &str,

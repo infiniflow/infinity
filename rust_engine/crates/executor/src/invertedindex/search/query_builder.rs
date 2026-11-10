@@ -654,6 +654,15 @@ impl<'a> Parser<'a> {
             if self.eat(&Token::Or) {
                 let right = self.parse_clause()?;
                 node = QueryNode::Or(vec![node, right]);
+            } else if self.peek() == Some(&Token::Not) {
+                // `a NOT b` is Lucene's `a AND NOT b`: a bare `NOT` introduces a
+                // negative clause, so it joins with `AND` rather than `OR` (the
+                // reference's parser does the same, and its optimizer rejects an
+                // `OR` that mixes a negation with a positive clause —
+                // `QueryError::OrWithNotAndNonNot`).
+                self.position += 1;
+                let right = self.parse_term()?;
+                node = QueryNode::And(vec![node, QueryNode::Not(vec![right])]);
             } else if self.starts_term() {
                 // Juxtaposed clauses are an implicit OR.
                 let right = self.parse_clause()?;

@@ -4443,6 +4443,16 @@ impl Engine {
                     // part of the index; reconcile the in-memory set now instead
                     // of at the next checkpoint.
                     self.reload_vector_indexes();
+                    // The full-text half of `OptimizeIndexInner`
+                    // (`new_txn_index_impl.cpp:349-353` → `OptimizeFtIndex`).
+                    // A full-text chunk is only its three files — the chunk list
+                    // *is* the directory — so this rewrite carries no catalog
+                    // entry and therefore runs after the vector commit: a failed
+                    // merge leaves the source chunks readable instead of rolling
+                    // back the vector work.
+                    if let Err(error) = self.optimize_all_fulltext_indexes() {
+                        eprintln!("optimize: merging the full-text chunks failed: {error}");
+                    }
                     Ok(())
                 }
                 // A concurrent merge (or a drop that took the index away) is a

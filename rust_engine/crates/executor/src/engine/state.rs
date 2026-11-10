@@ -2439,9 +2439,11 @@ impl<'a> WandStream<'a> {
         }
     }
 
-    pub(crate) fn tf(&mut self) -> u32 {
+    /// The unit's frequency: an integer for a term, fractional for a sloppy
+    /// phrase (`PhraseDocIterator::tf_` is a float in the reference).
+    pub(crate) fn tf(&mut self) -> f64 {
         match self {
-            WandStream::Term(s) => s.tf(),
+            WandStream::Term(s) => f64::from(s.tf()),
             WandStream::Phrase(s) => s.tf(),
         }
     }
@@ -2602,8 +2604,12 @@ impl<'a> TermStream<'a> {
     }
 
     /// Loads the next block: up to WAND_BLOCK postings starting at the cursor,
-    /// recording the block's bound as it goes. Blocks stay aligned from the
-    /// start of the list.
+    /// recording the block's bound as it goes.
+    ///
+    /// The block starts wherever the cursor is, which after a seek is the first
+    /// posting at or past the target rather than a 128-aligned position. The
+    /// bound still covers exactly this block's postings, so pruning stays sound;
+    /// only its reach differs from the reference's fixed 128-document runs.
     pub(crate) fn load(&mut self) -> bool {
         if self.at < self.docs.len() {
             return true;
@@ -2690,15 +2696,35 @@ impl<'a> TermStream<'a> {
     }
 
     /// SeekDoc: position on the first document >= target.
+    ///
+    /// Inside the block this is a linear step. When the target lies past the
+    /// block, the **merged cursor** is seeked to it first (`MergeCursor::advance`
+    /// → the sealed segment's `TermDocCursor::advance`, which hops blocks
+    /// through the doc skip list) and the next block is decoded from where it
+    /// landed - the reference's `TermDocIterator::NextShallow` →
+    /// `PostingIterator::SkipTo` path. Without it the block-max WAND would decode
+    /// every block between the two positions one at a time.
     pub(crate) fn advance(&mut self, target: u64) {
         loop {
             if !self.load() {
                 return;
             }
-            match self.docs.get(self.at) {
-                Some(doc) if *doc < target => self.at += 1,
-                _ => return,
+            let Some(doc) = self.docs.get(self.at).copied() else {
+                return;
+            };
+            if doc >= target {
+                return;
             }
+            // The target is past this block: leave `at` at the end so `load`
+            // refills, and let the cursor seek - it is the layer that owns the
+            // skip list. Walking the block first would pay a step per posting
+            // for a jump the skip list covers in one decode.
+            if target > self.last {
+                self.at = self.docs.len();
+                self.merge.advance(target);
+                continue;
+            }
+            self.at += 1;
         }
     }
 
@@ -2744,8 +2770,15 @@ impl<'a> TermStream<'a> {
 pub(crate) struct PhraseCursor<'a> {
     pub(crate) children: Vec<TermStream<'a>>,
     pub(crate) unit_len: usize,
+    /// `"a b"~2`'s slop (`PhraseQueryNode::GetSlop`): 0 requires the terms to be
+    /// strictly adjacent, otherwise Lucene's sloppy-phrase rule applies
+    /// (`phrase_doc_iterator_impl.cpp:238-368`).
+    pub(crate) slop: u32,
     pub(crate) cur: Option<u64>,
-    pub(crate) cur_tf: u32,
+    /// The phrase frequency (`tf`). Fractional for a sloppy phrase, whose
+    /// frequency is the sum of `1/(1+matchLength)` over the acceptable
+    /// solutions (`phrase_doc_iterator_impl.cpp:337-340`).
+    pub(crate) cur_tf: f64,
     pub(crate) cur_len: u32,
     pub(crate) scratch: Vec<Vec<u32>>,
     /// cur is stale: seek_block repositioned the children without verifying any
@@ -2757,13 +2790,14 @@ pub(crate) struct PhraseCursor<'a> {
 }
 
 impl<'a> PhraseCursor<'a> {
-    pub(crate) fn new(children: Vec<TermStream<'a>>) -> Self {
+    pub(crate) fn new(children: Vec<TermStream<'a>>, slop: u32) -> Self {
         let unit_len = children.len();
         let mut cursor = Self {
             children,
             unit_len,
+            slop,
             cur: None,
-            cur_tf: 0,
+            cur_tf: 0.0,
             cur_len: 1,
             scratch: Vec::new(),
             pending: true,
@@ -2842,10 +2876,16 @@ impl<'a> PhraseCursor<'a> {
                 scratch[i].clear();
                 scratch[i].extend_from_slice(child.positions());
             }
-            let freq = phrase_freq_lists(scratch, self.unit_len);
-            if freq > 0 {
+            // `slop == 0` keeps the exact-adjacency path (integer frequency);
+            // a sloppy phrase sums `1/(1+matchLength)` over its solutions.
+            let freq = if self.slop == 0 {
+                phrase_freq_lists(scratch, self.unit_len) as f64
+            } else {
+                phrase_freq_lists_sloppy(scratch, self.unit_len, self.slop)
+            };
+            if freq > 0.0 {
                 self.cur = Some(top);
-                self.cur_tf = freq as u32;
+                self.cur_tf = freq;
                 // Any child on the aligned document has the document's length.
                 self.cur_len = self.children.first_mut().map(|c| c.len()).unwrap_or(1);
                 return;
@@ -2861,7 +2901,7 @@ impl<'a> PhraseCursor<'a> {
         self.cur
     }
 
-    pub(crate) fn tf(&mut self) -> u32 {
+    pub(crate) fn tf(&mut self) -> f64 {
         self.resolve();
         self.cur_tf
     }
@@ -6084,6 +6124,15 @@ pub(crate) fn fmt_num(f: f64) -> String {
     }
 }
 
+/// A positional integer argument (`SEARCH MATCH TEXT (col, query, <topn>, …)`).
+/// Only an integer literal counts: a string like `'10'` there is an option.
+pub(crate) fn arg_usize(e: &ExprAst) -> Option<usize> {
+    match e {
+        ExprAst::Literal(Literal::Int(n)) => usize::try_from(*n).ok(),
+        _ => None,
+    }
+}
+
 pub(crate) fn arg_str(e: Option<&ExprAst>) -> Option<String> {
     match e? {
         ExprAst::Literal(Literal::Str(s)) => Some(s.clone()),
@@ -6753,6 +6802,100 @@ pub(crate) fn phrase_freq_lists(lists: &[Vec<u32>], unit_len: usize) -> usize {
     n
 }
 
+/// A sloppy phrase's frequency: `PhraseDocIterator::GetSloppyPhraseMatchData`
+/// (`phrase_doc_iterator_impl.cpp:238-368`), Lucene's `SloppyPhraseMatcher`.
+///
+/// `lists[i]` is term `i`'s ascending position list in the document. A solution
+/// picks one position per term; with `phrase_pos_i = term_pos_i - i` it is
+/// acceptable when `max(phrase_pos) - min(phrase_pos) <= slop`, and it
+/// contributes `1 / (1 + matchLength)` where `matchLength` is that spread. The
+/// frequency is the sum over the solutions.
+///
+/// The reference walks the solutions as a DFS over the terms, starting each
+/// level at the first position that can still reach the previous level's
+/// `min_phrase_pos` (`lower_bound` in `:321-324`) and backtracking when the
+/// spread exceeds the slop (`:297-300`).
+pub(crate) fn phrase_freq_lists_sloppy(lists: &[Vec<u32>], unit_len: usize, slop: u32) -> f64 {
+    if unit_len == 0 || lists.len() < unit_len || lists[0].is_empty() {
+        return 0.0;
+    }
+    if slop == 0 {
+        return phrase_freq_lists(lists, unit_len) as f64;
+    }
+    struct Step {
+        pos_i: usize,
+        term_pos_idx: usize,
+        min_phrase_pos: i64,
+        max_phrase_pos: i64,
+    }
+    let slop = i64::from(slop);
+    let mut steps: Vec<Step> = Vec::with_capacity(unit_len);
+    steps.push(Step {
+        pos_i: 0,
+        term_pos_idx: 0,
+        min_phrase_pos: 0,
+        max_phrase_pos: 0,
+    });
+    let mut tf = 0.0f64;
+    while !steps.is_empty() {
+        // `CalibrateLastStep`: the spread of the prefix ending at the last step.
+        let ok = {
+            let at = steps.len() - 1;
+            let pos_i = steps[at].pos_i;
+            let term_pos_idx = steps[at].term_pos_idx;
+            match lists[pos_i].get(term_pos_idx) {
+                None => false,
+                Some(&position) => {
+                    let phrase_pos = i64::from(position) - pos_i as i64;
+                    if pos_i == 0 {
+                        steps[at].min_phrase_pos = phrase_pos;
+                        steps[at].max_phrase_pos = phrase_pos;
+                        true
+                    } else {
+                        let (prev_min, prev_max) = {
+                            let prev = &steps[at - 1];
+                            (prev.min_phrase_pos, prev.max_phrase_pos)
+                        };
+                        let min = phrase_pos.min(prev_min);
+                        let max = phrase_pos.max(prev_max);
+                        steps[at].min_phrase_pos = min;
+                        steps[at].max_phrase_pos = max;
+                        max - min <= slop
+                    }
+                }
+            }
+        };
+        if ok {
+            if steps.len() == unit_len {
+                let step = steps.last().expect("non-empty");
+                let match_length = (step.max_phrase_pos - step.min_phrase_pos) as f64;
+                tf += 1.0 / (1.0 + match_length);
+                steps.last_mut().expect("non-empty").term_pos_idx += 1;
+            } else {
+                let pos_i = steps.len();
+                let begin = steps[pos_i - 1].min_phrase_pos - slop + pos_i as i64;
+                let term_pos_idx =
+                    lists[pos_i].partition_point(|&position| i64::from(position) < begin);
+                steps.push(Step {
+                    pos_i,
+                    term_pos_idx,
+                    min_phrase_pos: 0,
+                    max_phrase_pos: 0,
+                });
+            }
+        } else {
+            steps.pop();
+            if steps.is_empty() {
+                break;
+            }
+            if steps.len() != unit_len {
+                steps.last_mut().expect("non-empty").term_pos_idx += 1;
+            }
+        }
+    }
+    tf
+}
+
 /// Splits a field-query group body into terms, keeping a quoted phrase together
 /// and dropping the quote marks (`doc:"a b" doc2:c` -> `["doc:a b", "doc2:c"]`).
 pub(crate) fn split_query_terms(s: &str) -> Vec<String> {
@@ -6780,7 +6923,14 @@ pub(crate) fn split_query_terms(s: &str) -> Vec<String> {
 /// together: `"second default text"` is one phrase unit that only matches where
 /// its tokens sit at consecutive positions, while bare words are single-term
 /// units. `term^2.0` boosts are stripped here — boosts are applied per field.
-pub(crate) fn query_units(query: &str) -> Vec<(bool, String, f64)> {
+/// Splits a query into `(is_phrase, text, boost, slop)` units.
+///
+/// `"a b"~2` is one phrase unit with slop 2 (`PhraseQueryNode::slop_`); the
+/// `~N` is consumed here instead of becoming a term, which the reference's
+/// lexer does the same way (`search_driver`'s Lucene syntax). A `~` after a
+/// bare term is left alone: this port has no fuzzy query, matching the
+/// reference, whose `QueryNodeType` has no fuzzy node.
+pub(crate) fn query_units(query: &str) -> Vec<(bool, String, f64, u32)> {
     let mut out = Vec::new();
     let mut cur = String::new();
     let mut in_quote = false;
@@ -6807,14 +6957,29 @@ pub(crate) fn query_units(query: &str) -> Vec<(bool, String, f64)> {
         }
     }
     flush(&mut cur, &mut was_quoted, &mut out);
-    out.into_iter()
-        .map(|(q, t)| {
+    let mut units: Vec<(bool, String, u32)> = Vec::with_capacity(out.len());
+    for (quoted, text) in out {
+        // `"a b"~2`: the slop belongs to the quoted unit before it. The lexer
+        // leaves the `~2` as its own token, so it is folded back here.
+        if let Some(digits) = text.strip_prefix('~') {
+            if let (Ok(slop), Some(previous)) = (digits.parse::<u32>(), units.last_mut()) {
+                if previous.0 {
+                    previous.2 = slop;
+                    continue;
+                }
+            }
+        }
+        units.push((quoted, text, 0));
+    }
+    units
+        .into_iter()
+        .map(|(quoted, text, slop)| {
             // `term^2.0` boosts that one unit.
-            let (t, boost) = match t.split_once('^') {
-                Some((t, b)) => (t.to_string(), b.parse::<f64>().unwrap_or(1.0)),
-                None => (t, 1.0),
+            let (text, boost) = match text.split_once('^') {
+                Some((text, boost)) => (text.to_string(), boost.parse::<f64>().unwrap_or(1.0)),
+                None => (text, 1.0),
             };
-            (q, t, boost)
+            (quoted, text, boost, slop)
         })
         .collect()
 }

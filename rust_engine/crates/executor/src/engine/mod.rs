@@ -46,6 +46,8 @@ pub(crate) use crate::{
 pub(crate) mod admin;
 pub(crate) mod ddl;
 pub(crate) mod dml;
+#[cfg(test)]
+mod fulltext_big_ut;
 pub(crate) mod statements;
 #[cfg(test)]
 mod tests_ut;
@@ -57,6 +59,7 @@ pub(crate) mod query;
 pub(crate) mod state;
 pub(crate) mod tasks;
 pub(crate) mod text_index;
+pub(crate) mod text_query;
 pub(crate) mod types;
 
 pub use state::*;

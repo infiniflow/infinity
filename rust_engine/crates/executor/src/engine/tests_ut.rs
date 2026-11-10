@@ -345,6 +345,58 @@ mod tests {
         assert_eq!(pending, 0, "no row should be indexed again");
     }
 
+    /// `NewTxn::OptimizeIndexInner` → `OptimizeFtIndex`: an index holding
+    /// several chunks is merged into one `ft_{base:016x}_{rows:x}` chunk, the
+    /// sources are dropped, and the merged chunk serves the same rows after a
+    /// restart.
+    #[test]
+    fn optimizing_a_fulltext_index_merges_its_chunks() {
+        let dir = tempdir().unwrap();
+        let query = "SELECT id FROM opt SEARCH MATCH TEXT (body, 'alpha', 100);";
+        let before;
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            // One chunk per two rows, so the index starts fragmented.
+            e.set_memindex_capacity(2);
+            e.execute("CREATE TABLE opt (id INTEGER, body VARCHAR)")
+                .unwrap();
+            e.execute("CREATE INDEX opt_idx ON opt (body) USING FULLTEXT")
+                .unwrap();
+            for i in 0..10 {
+                e.execute(&format!(
+                    "INSERT INTO opt VALUES ({i}, 'alpha beta row{i}');"
+                ))
+                .unwrap();
+            }
+            e.flush().unwrap();
+            before = rows(&e, query);
+            assert_eq!(before.len(), 10);
+            let chunks = fulltext_chunks(&e);
+            assert!(chunks > 1, "five seals leave five chunks, got {chunks}");
+
+            // The production entry point: `optimize_indexes` is what the
+            // `OPTIMIZE` statement and the periodic task drive
+            // (`OptimizationProcessor::NewNotifyOptimize`).
+            e.optimize_indexes().unwrap();
+            assert_eq!(
+                fulltext_chunks(&e),
+                1,
+                "the chunks tile one row range, so they merge into one"
+            );
+            assert_eq!(rows(&e, query), before, "the merge must not lose rows");
+            assert_eq!(
+                e.optimize_fulltext("opt").unwrap(),
+                0,
+                "an already-merged index is a no-op"
+            );
+        }
+
+        // The merged chunk is what `load_sealed` finds on the next open.
+        let reopened = Engine::open(dir.path()).unwrap();
+        assert_eq!(fulltext_chunks(&reopened), 1);
+        assert_eq!(rows(&reopened, query), before);
+    }
+
     /// A query that spans several sealed segments plus the memory tail must
     /// return exactly what one unsealed segment returns: same rows, same order.
     /// That is the concat path's contract (the segments' row ranges are
@@ -684,6 +736,378 @@ mod tests {
             }
         }
         Vec::new()
+    }
+
+    /// How many sealed chunks the table's full-text indexes hold, i.e. the
+    /// reference's `SegmentIndexMeta` chunk list length.
+    fn fulltext_chunks(e: &Engine) -> usize {
+        let tables = e.tables.lock().unwrap();
+        tables
+            .values()
+            .flat_map(|entry| entry.text.values())
+            .map(|shared| shared.read().unwrap().reader.segments.len())
+            .sum()
+    }
+
+    /// `PhraseDocIterator::GetSloppyPhraseMatchData`
+    /// (`phrase_doc_iterator_impl.cpp:238-368`): a solution picks one position
+    /// per term, is acceptable while the spread of `pos_i - i` stays within the
+    /// slop, and contributes `1/(1+spread)`.
+    #[test]
+    fn sloppy_phrase_frequency_matches_the_reference() {
+        // Strict adjacency: one occurrence.
+        assert_eq!(
+            super::state::phrase_freq_lists_sloppy(&[vec![0], vec![1]], 2, 0),
+            1.0
+        );
+        // `"a b"~1` also accepts a single-token gap; spread 1 -> weight 1/2.
+        assert_eq!(
+            super::state::phrase_freq_lists_sloppy(&[vec![0], vec![2]], 2, 1),
+            0.5
+        );
+        // Two-token gap with slop 1: no solution.
+        assert_eq!(
+            super::state::phrase_freq_lists_sloppy(&[vec![0], vec![3]], 2, 1),
+            0.0
+        );
+        // Two exact solutions sum up.
+        assert_eq!(
+            super::state::phrase_freq_lists_sloppy(&[vec![0, 2], vec![1, 3]], 2, 1),
+            2.0
+        );
+        // Reordering is allowed once the slop covers the offset: `b a` gives
+        // phrase positions 1 and -1, spread 2 -> weight 1/3.
+        assert_eq!(
+            super::state::phrase_freq_lists_sloppy(&[vec![1], vec![0]], 2, 2),
+            1.0 / 3.0
+        );
+        assert_eq!(
+            super::state::phrase_freq_lists_sloppy(&[vec![1], vec![0]], 2, 1),
+            0.0
+        );
+    }
+
+    /// `"a b"~N` end to end: the slop widens the adjacency requirement and the
+    /// `~N` no longer becomes a term of its own.
+    #[test]
+    fn search_honours_the_phrase_slop() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sl (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX sl_idx ON sl (body) USING FULLTEXT")
+            .unwrap();
+        for (id, body) in [
+            (0, "alpha beta"),
+            (1, "alpha x beta"),
+            (2, "alpha x x beta"),
+            (3, "beta alpha"),
+        ] {
+            e.execute(&format!("INSERT INTO sl VALUES ({id}, '{body}');"))
+                .unwrap();
+        }
+        e.flush().unwrap();
+
+        let exact = rows(
+            &e,
+            "SELECT id FROM sl SEARCH MATCH TEXT (body, '\"alpha beta\"', 10);",
+        );
+        assert_eq!(exact, vec![vec!["0".to_string()]]);
+
+        let one = rows(
+            &e,
+            "SELECT id FROM sl SEARCH MATCH TEXT (body, '\"alpha beta\"~1', 10);",
+        );
+        let mut one_ids: Vec<String> = one.iter().map(|r| r[0].clone()).collect();
+        one_ids.sort();
+        assert_eq!(
+            one_ids,
+            vec!["0".to_string(), "1".to_string()],
+            "slop 1 reaches a one-token gap; the swapped order needs 2"
+        );
+
+        let two = rows(
+            &e,
+            "SELECT id FROM sl SEARCH MATCH TEXT (body, '\"alpha beta\"~2', 10);",
+        );
+        let mut two_ids: Vec<String> = two.iter().map(|r| r[0].clone()).collect();
+        two_ids.sort();
+        assert_eq!(
+            two_ids,
+            vec![
+                "0".to_string(),
+                "1".to_string(),
+                "2".to_string(),
+                "3".to_string()
+            ],
+            "slop 2 also reaches the two-token gap"
+        );
+    }
+
+    /// `operator=and` is the reference's `AndQueryNode`: every clause has to
+    /// match the same document, and adjacency is *not* required (only a phrase
+    /// asks for that). `minimum_should_match` is the same predicate expressed
+    /// as a count, so the two must select the same rows.
+    #[test]
+    fn operator_and_requires_every_clause_without_adjacency() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ba (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX ba_idx ON ba (body) USING FULLTEXT")
+            .unwrap();
+        for (id, body) in [
+            (0, "alpha beta"),
+            (1, "alpha"),
+            (2, "beta"),
+            (3, "alpha x beta"),
+        ] {
+            e.execute(&format!("INSERT INTO ba VALUES ({id}, '{body}');"))
+                .unwrap();
+        }
+        e.flush().unwrap();
+
+        let default_or = rows(
+            &e,
+            "SELECT id FROM ba SEARCH MATCH TEXT (body, 'alpha beta', 10);",
+        );
+        assert_eq!(default_or.len(), 4, "the default operator is OR");
+
+        let and = rows(
+            &e,
+            "SELECT id FROM ba SEARCH MATCH TEXT (body, 'alpha beta', 10, 'operator=and');",
+        );
+        let mut and_ids: Vec<String> = and.iter().map(|r| r[0].clone()).collect();
+        and_ids.sort();
+        assert_eq!(
+            and_ids,
+            vec!["0".to_string(), "3".to_string()],
+            "both clauses must match; `alpha x beta` still qualifies"
+        );
+
+        let msm = rows(
+            &e,
+            "SELECT id FROM ba SEARCH MATCH TEXT (body, 'alpha beta', 10, 'minimum_should_match=2');",
+        );
+        let mut msm_ids: Vec<String> = msm.iter().map(|r| r[0].clone()).collect();
+        msm_ids.sort();
+        assert_eq!(msm_ids, and_ids, "minimum_should_match=2 is operator=and");
+    }
+
+    /// The reference's query-string grammar (`SearchDriver::ParseSingle` +
+    /// `QueryBuilder::CreateSearch`): `AND` / `OR` / `NOT`, groups and
+    /// `column:term`. `alpha NOT beta` is the reference's `AndNotQueryNode`,
+    /// and a group is a real subtree, not a flat term list.
+    #[test]
+    fn search_supports_the_query_string_grammar() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE bt (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
+            .unwrap();
+        for (id, body) in [
+            (0, "alpha beta"),
+            (1, "alpha"),
+            (2, "beta"),
+            (3, "alpha x beta"),
+            (4, "gamma"),
+            (5, "alpha gamma"),
+        ] {
+            e.execute(&format!("INSERT INTO bt VALUES ({id}, '{body}');"))
+                .unwrap();
+        }
+        e.flush().unwrap();
+
+        let ids = |query: &str| {
+            let mut out: Vec<String> = rows(
+                &e,
+                &format!("SELECT id FROM bt SEARCH MATCH TEXT (body, '{query}', 10);"),
+            )
+            .iter()
+            .map(|r| r[0].clone())
+            .collect();
+            out.sort();
+            out
+        };
+
+        assert_eq!(
+            ids("alpha AND beta"),
+            vec!["0".to_string(), "3".to_string()],
+            "AND is an intersection"
+        );
+        assert_eq!(
+            ids("alpha OR beta"),
+            vec![
+                "0".to_string(),
+                "1".to_string(),
+                "2".to_string(),
+                "3".to_string(),
+                "5".to_string()
+            ],
+            "OR is a union"
+        );
+        assert_eq!(
+            ids("alpha AND NOT beta"),
+            vec!["1".to_string(), "5".to_string()],
+            "NOT excludes the right-hand documents"
+        );
+        assert_eq!(
+            ids("alpha NOT beta"),
+            vec!["1".to_string(), "5".to_string()],
+            "`a NOT b` is the reference's AndNotQueryNode"
+        );
+        assert_eq!(
+            ids("(alpha OR beta) AND gamma"),
+            vec!["5".to_string()],
+            "a group is evaluated as a subtree"
+        );
+        assert_eq!(
+            ids("body:alpha"),
+            vec![
+                "0".to_string(),
+                "1".to_string(),
+                "3".to_string(),
+                "5".to_string()
+            ],
+            "a field qualifier restricts the term to that column"
+        );
+        assert!(
+            ids("\"alpha beta\" AND gamma").is_empty(),
+            "a phrase inside an AND still needs adjacency"
+        );
+        assert_eq!(
+            ids("\"alpha beta\" AND alpha"),
+            vec!["0".to_string()],
+            "a phrase and a term can be combined"
+        );
+    }
+
+    /// Writes one full-text chunk for `rows` (every document holds `term` once).
+    fn write_chunk(dir: &str, base: u64, rows: u32, term: &str) {
+        use std::collections::BTreeMap;
+        let docs: Vec<(u64, u32)> = (base..base + u64::from(rows)).map(|row| (row, 1)).collect();
+        let mut postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
+        postings.insert(
+            term.to_string(),
+            docs.iter().map(|(row, _)| (*row, 1, vec![0])).collect(),
+        );
+        storage::invertedindex::disk_segment_reader::write_segment_index(
+            dir,
+            &format!("ft_{base:016x}"),
+            base,
+            &docs,
+            &postings,
+            storage::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .unwrap();
+    }
+
+    /// The block-max WAND's cursor (`TermStream::advance`) hands a target that is
+    /// past the loaded block to the merged cursor, which hops the sealed
+    /// segment's blocks through the doc skip list
+    /// (`TermDocIterator::NextShallow` -> `PostingIterator::SkipTo`). A shallow
+    /// reposition over a long posting list therefore costs one block decode, not
+    /// one per 128 documents.
+    #[test]
+    fn a_shallow_seek_on_a_sealed_segment_hops_blocks() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        // 5000 rows: 39 full blocks of 128 postings plus a partial one.
+        write_chunk(d, 0, 5000, "a");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 5000);
+        let _ = crate::take_decode_stats();
+        let mut stream = index.term_stream("a");
+        assert_eq!(stream.doc(), Some(0));
+        assert_eq!(crate::take_decode_stats().0, 1, "the first block");
+        stream.advance(4900);
+        assert_eq!(stream.doc(), Some(4900));
+        // The cursor seeked instead of decoding blocks one by one: the stream
+        // refilled **once** from the position the seek landed on, so its block
+        // starts at the target and not at the next unread posting. That the seek
+        // itself hops the sealed segment's blocks is asserted in `storage`
+        // (`advance_hops_blocks_with_the_skip_list`).
+        assert_eq!(stream.docs.first().copied(), Some(4900));
+        let (blocks, _) = crate::take_decode_stats();
+        assert_eq!(blocks, 1, "the seek refilled the block more than once");
+        // Past the hop the cursor steps one document at a time again.
+        stream.advance(4901);
+        assert_eq!(stream.doc(), Some(4901));
+        stream.advance(4902);
+        assert_eq!(stream.doc(), Some(4902));
+        assert_eq!(crate::take_decode_stats().0, 0, "still the same block");
+    }
+
+    /// `OptimizeFtIndex` stops at the first gap: the rest of the chunk list is
+    /// not merged (`new_txn_index_impl.cpp:2219-2227`), and a lone prefix chunk
+    /// is skipped (`chunk_ids.size() <= 1`).
+    #[test]
+    fn optimize_stops_at_a_gap_like_the_reference() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 10, 2, "b");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.reader.segments.len(), 2);
+        assert_eq!(index.optimize_chunks().unwrap(), 0);
+        assert_eq!(index.reader.segments.len(), 2, "both chunks stay");
+    }
+
+    /// The contiguous prefix is merged; the chunks behind the gap stay as they
+    /// are and keep their row ranges.
+    #[test]
+    fn optimize_merges_the_prefix_and_keeps_the_rest() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        write_chunk(d, 10, 2, "a");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.reader.segments.len(), 3);
+        assert_eq!(index.optimize_chunks().unwrap(), 1);
+        assert_eq!(
+            index.reader.segments.len(),
+            2,
+            "one merged prefix plus the tail"
+        );
+        assert_eq!(index.reader.segments[0].docs, 4);
+        assert_eq!(index.reader.segments[0].reader.base_row_id(), 0);
+        assert_eq!(index.reader.segments[1].reader.base_row_id(), 10);
+        // The merged chunk is named after the row range it covers.
+        assert_eq!(
+            index.reader.segments[0].reader.base_name(),
+            storage::fulltext_base_name(0, Some(4))
+        );
+        // Every row of the prefix is still reachable through the merged copy.
+        for row in 0..4u64 {
+            assert!(
+                index.reader.segments[0].reader.ordinal(row).is_some(),
+                "row {row}"
+            );
+        }
+    }
+
+    /// An overlapping chunk list is unrecoverable in the reference
+    /// (`new_txn_index_impl.cpp:2228-2233`); merging it would produce a doc list
+    /// no reference run could produce, so it is refused.
+    #[test]
+    fn optimize_refuses_overlapping_chunks() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 1, 2, "a");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.reader.segments.len(), 2);
+        assert!(index.optimize_chunks().is_err());
+        assert_eq!(
+            index.reader.segments.len(),
+            2,
+            "the chunks survive the refusal"
+        );
     }
 
     /// Rows as display text, for assertions.

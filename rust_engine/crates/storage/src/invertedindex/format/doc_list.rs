@@ -136,6 +136,15 @@ impl DocListEncoder {
         self.last_doc_id
     }
 
+    /// `DocListEncoder::SetCurrentTF` (`doc_list_encoder.cppm:29-32`): the
+    /// frequency of a document whose occurrences were not replayed through
+    /// [`Self::add_position`]. The value also counts into `total_tf`, exactly
+    /// like the reference.
+    pub fn set_current_tf(&mut self, tf: u32) {
+        self.current_tf = tf;
+        self.total_tf += tf;
+    }
+
     /// `DocListEncoder::AddPosition`.
     pub fn add_position(&mut self) {
         self.current_tf += 1;
@@ -149,7 +158,8 @@ impl DocListEncoder {
         self.current_tf = 0;
     }
 
-    fn add_document(&mut self, doc_id: u32, doc_payload: u16, tf: u32, doc_len: u32) {
+    /// `DocListEncoder::AddDocument` (`doc_list_encoder_impl.cpp:57-75`).
+    pub fn add_document(&mut self, doc_id: u32, doc_payload: u16, tf: u32, doc_len: u32) {
         self.buffer
             .push_back_u32(0, doc_id.wrapping_sub(self.last_doc_id));
         let mut n = 1;
@@ -209,6 +219,18 @@ impl DocListEncoder {
 
     pub fn doc_list_buffer(&mut self) -> &mut PostingByteSlice {
         &mut self.buffer
+    }
+
+    /// The two streams of the reference's non-spill `Dump`, before the `VInt`
+    /// length framing: `(skip_list, doc_list)` (`doc_list_encoder_impl.cpp:96-117`).
+    ///
+    /// [`Self::dump`] frames them itself; a caller that assembles a whole
+    /// `PostingWriter::Dump` slice (doc half + position half) needs the two
+    /// streams separately so it can lay out
+    /// `VInt doc_skip_len, VInt doc_len, doc_skip, doc_list`.
+    pub fn parts(&mut self) -> (Vec<u8>, Vec<u8>) {
+        self.flush();
+        (self.skiplist.bytes().to_vec(), self.buffer.bytes.to_vec())
     }
 
     /// `DocListEncoder::Dump`.

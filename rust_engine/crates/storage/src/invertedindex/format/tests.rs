@@ -20,6 +20,8 @@ mod tests {
         let flags = TermMetaFlags {
             has_term_frequency: true,
             has_term_payload: true,
+            has_doc_payload: false,
+            has_block_max: false,
         };
         let bytes = encode_term_meta(&meta, flags);
         let (decoded, used) = decode_term_meta(&bytes, flags).unwrap();
@@ -63,6 +65,8 @@ mod tests {
         let flags = TermMetaFlags {
             has_term_frequency: true,
             has_term_payload: true,
+            has_doc_payload: false,
+            has_block_max: false,
         };
         let metas = [
             TermMeta {
@@ -681,6 +685,8 @@ mod tests {
         let flags = TermMetaFlags {
             has_term_frequency: true,
             has_term_payload: true,
+            has_doc_payload: false,
+            has_block_max: false,
         };
         let terms = ["apple", "banana", "cat"];
         let docs: [Vec<u32>; 3] = [vec![1, 5, 9], vec![3], vec![2, 4, 6, 7, 130, 200]];
@@ -860,10 +866,14 @@ mod tests {
             TermMetaFlags {
                 has_term_frequency: true,
                 has_term_payload: false,
+                has_doc_payload: false,
+                has_block_max: false,
             },
             TermMetaFlags {
                 has_term_frequency: true,
                 has_term_payload: true,
+                has_doc_payload: false,
+                has_block_max: false,
             },
         ] {
             let bytes = encode_term_meta(&meta, flags);
@@ -897,6 +907,8 @@ mod tests {
             TermMetaFlags {
                 has_term_frequency: false,
                 has_term_payload: true,
+                has_doc_payload: false,
+                has_block_max: false,
             },
         );
         // VInt(1) = 0x01, then the raw payload little-endian.

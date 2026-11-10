@@ -82,6 +82,8 @@ fn fulltext_chunk_files_compose_into_a_readable_index() {
     let flags = inv::TermMetaFlags {
         has_term_frequency: false,
         has_term_payload: false,
+        has_doc_payload: false,
+        has_block_max: false,
     };
     let mut metas = Vec::new();
     for d in docs.iter() {

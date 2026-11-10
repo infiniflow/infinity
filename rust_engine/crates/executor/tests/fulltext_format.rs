@@ -106,6 +106,8 @@ fn repeated_term_counts_one_document_and_every_occurrence() {
     let flags = storage::invertedindex::format::TermMetaFlags {
         has_term_frequency: true,
         has_term_payload: true,
+        has_doc_payload: false,
+        has_block_max: false,
     };
     let (meta, _used) = storage::invertedindex::format::decode_term_meta(&dic, flags)
         .expect("the first record is the only term's meta");
