@@ -109,6 +109,40 @@ impl Bm25Ranker {
     }
 }
 
+/// The rows a query may score, ascending: the `FILTER (…)` / `IN (…)` /
+/// `filter=…` answer, evaluated once over the table.
+///
+/// The iterator consumes it as a **seek target**. Without it a rejected
+/// candidate is scored (its block bound is decoded) and then dropped by
+/// `offer`, one pivot per rejected document; with it the cursors hop to the
+/// next admitted row, so a selective filter costs one seek per surviving row
+/// instead of one pivot per rejected one.
+pub(crate) struct DocFilter {
+    allowed: Vec<u64>,
+}
+
+impl DocFilter {
+    /// `rows` must be sorted and deduplicated (see `Engine::allowed_rows`).
+    pub(crate) fn new(rows: Vec<u64>) -> Self {
+        Self { allowed: rows }
+    }
+
+    pub(crate) fn contains(&self, doc: u64) -> bool {
+        self.allowed.binary_search(&doc).is_ok()
+    }
+
+    /// The first admitted row `>= doc`.
+    pub(crate) fn next_ge(&self, doc: u64) -> Option<u64> {
+        let at = self.allowed.partition_point(|row| *row < doc);
+        self.allowed.get(at).copied()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.allowed.len()
+    }
+}
+
 /// similarity=boolean scores one point per matched term (per field); the default
 /// is BM25. Both are handled inside the same iterator.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -212,6 +246,9 @@ impl<'a> Cursor<'a> {
 pub(crate) struct BlockMaxWandIterator<'a> {
     fields: usize,
     dead: &'a HashSet<u64>,
+    /// Rows a `FILTER(…)` admits; `None` scores every row the postings reach.
+    /// See [`DocFilter`] for why it is a row list and not a predicate closure.
+    filter: Option<&'a DocFilter>,
     k: usize,
     min_should: usize,
     mode: WandMode,
@@ -326,6 +363,7 @@ impl<'a> BlockMaxWandIterator<'a> {
         Self {
             fields: field_count,
             dead,
+            filter: None,
             k,
             min_should,
             mode,
@@ -353,6 +391,14 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// pruned path, without the pruning.
     pub fn with_naive(mut self) -> Self {
         self.naive = true;
+        self
+    }
+
+    /// Restricts scoring to `filter`'s rows - the `FILTER (…)` / `IN (…)` /
+    /// `filter=…` pushdown. Without it every row the postings reach is a
+    /// candidate and the rejected ones are dropped after being scored.
+    pub fn with_filter(mut self, filter: &'a DocFilter) -> Self {
+        self.filter = Some(filter);
         self
     }
 
@@ -475,6 +521,12 @@ impl<'a> BlockMaxWandIterator<'a> {
             if self.doc_id.is_some_and(|current| current >= target) {
                 return true;
             }
+            // Start the reposition at the next row the filter admits: a rejected
+            // row can never be scored, so no cursor needs to stop there.
+            let Some(target) = self.lift(target) else {
+                self.doc_id = None;
+                return false;
+            };
             // Reposition the cursors the last pivot parked on the candidate.
             // Everything else still in the heap already sits above doc_id.
             self.advance_prefix(target);
@@ -511,6 +563,19 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.heap.pop();
                 self.heap_ops += 1;
                 self.prefix.push(i);
+            }
+            // The pivot must land on a row the filter admits. Hopping the cursors
+            // here is what makes the filter a seek instead of a post-score drop:
+            // a rejected candidate would otherwise be decoded, bounded and
+            // offered only to be thrown away, one pivot per rejected row.
+            if let Some(filter) = self.filter {
+                if !filter.contains(doc) {
+                    let Some(next) = filter.next_ge(doc + 1) else {
+                        break;
+                    };
+                    self.skip_to(next);
+                    continue;
+                }
             }
             // (2) Upper bound at the candidate. A cursor parked on the document
             // or inside a block that covers it contributes that block's bound; a
@@ -577,6 +642,36 @@ impl<'a> BlockMaxWandIterator<'a> {
         }
     }
 
+    /// The first row at or after `doc` the filter admits; `doc` itself when the
+    /// query has no filter.
+    fn lift(&self, doc: u64) -> Option<u64> {
+        match self.filter {
+            Some(filter) => filter.next_ge(doc),
+            None => Some(doc),
+        }
+    }
+
+    /// Moves every cursor that still sits before `next` up to it: the pivot
+    /// prefix (already out of the heap) and the heap entries below it. Rows in
+    /// between are ones the filter rejected, so no cursor needs to stop there.
+    fn skip_to(&mut self, next: u64) {
+        self.jumps += 1;
+        self.advance_prefix(next);
+        let mut moved: Vec<usize> = Vec::new();
+        while let Some(&Reverse((doc, i))) = self.heap.peek() {
+            if doc >= next {
+                break;
+            }
+            self.heap.pop();
+            self.heap_ops += 1;
+            moved.push(i);
+        }
+        for i in moved {
+            self.cursors[i].seek(next);
+            self.push_back(i);
+        }
+    }
+
     /// Resolves a cursor the round moved: its document, and the bound of the
     /// block it landed on (which also refreshes block_last_doc).
     fn resolve(&mut self, i: usize) {
@@ -596,6 +691,10 @@ impl<'a> BlockMaxWandIterator<'a> {
             if self.doc_id.is_some_and(|current| current >= target) {
                 return true;
             }
+            let Some(target) = self.lift(target) else {
+                self.doc_id = None;
+                return false;
+            };
             for i in std::mem::take(&mut self.prefix) {
                 let cursor = &mut self.cursors[i];
                 if cursor.cur.is_some_and(|doc| doc < target) {
@@ -604,22 +703,36 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.push_back(i);
             }
         }
-        self.prefix.clear();
-        let Some(&Reverse((doc, _))) = self.heap.peek() else {
-            self.doc_id = None;
-            return false;
-        };
-        while let Some(&Reverse((tied, i))) = self.heap.peek() {
-            if tied != doc {
-                break;
+        loop {
+            self.prefix.clear();
+            let Some(&Reverse((doc, _))) = self.heap.peek() else {
+                self.doc_id = None;
+                return false;
+            };
+            // Same pushdown as the pruned path: a document the filter rejects is
+            // never scored, so the cursors hop to the next admitted row.
+            if let Some(filter) = self.filter {
+                if !filter.contains(doc) {
+                    let Some(next) = filter.next_ge(doc + 1) else {
+                        self.doc_id = None;
+                        return false;
+                    };
+                    self.skip_to(next);
+                    continue;
+                }
             }
-            self.heap.pop();
-            self.heap_ops += 1;
-            self.prefix.push(i);
+            while let Some(&Reverse((tied, i))) = self.heap.peek() {
+                if tied != doc {
+                    break;
+                }
+                self.heap.pop();
+                self.heap_ops += 1;
+                self.prefix.push(i);
+            }
+            self.candidate_score = self.score_prefix();
+            self.doc_id = Some(doc);
+            return true;
         }
-        self.candidate_score = self.score_prefix();
-        self.doc_id = Some(doc);
-        true
     }
 
     /// The reference's block-skip path (SkipUncompetitiveRange,
@@ -899,6 +1012,90 @@ mod tests {
         assert_eq!(all.len(), docs as usize);
         assert_eq!(full_evaluations, docs as usize);
         assert!(evaluations * 10 < full_evaluations);
+    }
+
+    /// The filtered pushdown returns exactly what a post-filtered scan does, and
+    /// only scores admitted rows.
+    #[test]
+    fn filter_pushdown_matches_a_post_filtered_scan() {
+        const DOCS: u64 = 2000;
+        let doc_len: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 20 + (d % 37) as u32)).collect();
+        let postings: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 1 + (d % 5) as u32)).collect();
+        let dead = HashSet::new();
+        // Every fifth row survives the filter.
+        let allowed: Vec<u64> = (0..DOCS).step_by(5).collect();
+        let filter = DocFilter::new(allowed.clone());
+        assert_eq!(filter.len(), allowed.len());
+        assert_eq!(filter.next_ge(3), Some(5));
+        assert!(filter.contains(10));
+        assert!(!filter.contains(11));
+        assert_eq!(filter.next_ge(DOCS), None);
+
+        let make = || {
+            vec![field(
+                &[("alpha", &postings)],
+                &doc_len,
+                DOCS as usize,
+                vec![1.0],
+            )]
+        };
+        let k = allowed.len();
+        let got = BlockMaxWandIterator::new(make(), k, &dead, 0.0, 1, WandMode::Bm25)
+            .with_filter(&filter)
+            .run();
+        assert_eq!(got.len(), k, "every admitted row is a candidate");
+        // The same query answered without the pushdown, filtered afterwards.
+        let want: Vec<(u64, f64)> =
+            BlockMaxWandIterator::new(make(), DOCS as usize, &dead, 0.0, 1, WandMode::Bm25)
+                .run()
+                .into_iter()
+                .filter(|(doc, _)| filter.contains(*doc))
+                .take(k)
+                .collect();
+        assert_eq!(got.len(), want.len());
+        for (a, b) in got.iter().zip(&want) {
+            assert_eq!(a.0, b.0, "different document order");
+            assert!((a.1 - b.1).abs() < 1e-12, "score of doc {}", a.0);
+        }
+    }
+
+    /// A rejected candidate costs a seek, not a scoring pass: the pruned path
+    /// scores at most one document per admitted row, where the unfiltered scan
+    /// scores every document the postings hold.
+    #[test]
+    fn filter_pushdown_scores_only_admitted_rows() {
+        const DOCS: u64 = 2000;
+        let doc_len: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 50)).collect();
+        let postings: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 1)).collect();
+        let dead = HashSet::new();
+        let allowed: Vec<u64> = (0..DOCS).step_by(20).collect();
+        let filter = DocFilter::new(allowed.clone());
+        let make = || {
+            vec![field(
+                &[("alpha", &postings)],
+                &doc_len,
+                DOCS as usize,
+                vec![1.0],
+            )]
+        };
+        let (best, evaluations, _) =
+            BlockMaxWandIterator::new(make(), allowed.len(), &dead, 0.0, 1, WandMode::Bm25)
+                .with_filter(&filter)
+                .drive_with_stats();
+        assert_eq!(best.len(), allowed.len());
+        assert!(
+            evaluations <= allowed.len(),
+            "scored {evaluations} documents for {} admitted rows",
+            allowed.len()
+        );
+        let (_, without, _) =
+            BlockMaxWandIterator::new(make(), DOCS as usize, &dead, 0.0, 1, WandMode::Bm25)
+                .drive_with_stats();
+        assert_eq!(
+            without, DOCS as usize,
+            "the unfiltered scan scores every row"
+        );
+        assert!(without >= evaluations * 10, "the pushdown skipped nothing");
     }
 
     fn lcg(state: &mut u64) -> u64 {

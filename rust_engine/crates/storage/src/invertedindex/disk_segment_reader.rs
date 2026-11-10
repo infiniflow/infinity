@@ -462,7 +462,7 @@ impl SegmentIndexReader {
                 let option = DocListFormatOption::new(self.flags.option_flag());
                 let mut reader = SkipListReader::new(&option.skip_list_format());
                 reader.load_byte_slice(bytes, 0, bytes.len());
-                reader
+                Box::new(reader)
             });
         Ok(Some(TermDocCursor {
             reader: self,
@@ -601,8 +601,9 @@ pub struct TermDocCursor<'a> {
     cur_positions: Vec<u32>,
     /// The term's doc skip list (`DocListEncoder`'s items, one per
     /// `MAX_DOC_PER_RECORD`-document block). `None` for a list the writer never
-    /// flushed a block for, i.e. one shorter than a block.
-    skiplist: Option<SkipListReader>,
+    /// flushed a block for, i.e. one shorter than a block. Boxed: the reader's
+    /// 32-item decode buffers make it larger than the whole cursor.
+    skiplist: Option<Box<SkipListReader>>,
     /// The last doc id the skip list was positioned at. The reader only moves
     /// forward, so a target at or before it is walked block by block instead.
     skiplist_at: Option<u32>,

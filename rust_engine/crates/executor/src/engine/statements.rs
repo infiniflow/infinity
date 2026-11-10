@@ -4942,6 +4942,47 @@ impl Engine {
         Ok(())
     }
 
+    /// The rows a `SEARCH MATCH TEXT` may score, ascending: the `WHERE`, the
+    /// `FILTER (…)` clause and the `filter=…` option evaluated once over the
+    /// table, minus the tombstones. `None` when the query carries no filter.
+    ///
+    /// The result travels to the scorers as row ids rather than as a predicate
+    /// closure because both of them **seek** with it: the block-max WAND moves
+    /// every cursor past a rejected row and the streaming path advances every
+    /// merge cursor, instead of scoring/fetching the row and dropping it.
+    fn allowed_rows(
+        &self,
+        table: &str,
+        pred: Option<&Expr>,
+        in_filter: Option<&Expr>,
+        opt_filter: Option<&Expr>,
+        dead: &std::collections::HashSet<u64>,
+    ) -> Result<Option<wand::DocFilter>> {
+        if pred.is_none() && in_filter.is_none() && opt_filter.is_none() {
+            return Ok(None);
+        }
+        let mut rows: Vec<u64> = Vec::new();
+        for (seq, row) in self.fetch_rows_with_ids(table)? {
+            let row_id = seq as u64;
+            // A tombstone can never be scored, so it is not an admitted row
+            // either: leaving it out makes the seek skip deletes too.
+            if dead.contains(&row_id) {
+                continue;
+            }
+            let ok = pred.map(|p| p.eval_predicate(&row)).unwrap_or(true)
+                && in_filter.map(|p| p.eval_predicate(&row)).unwrap_or(true)
+                && opt_filter.map(|p| p.eval_predicate(&row)).unwrap_or(true);
+            if ok {
+                rows.push(row_id);
+            }
+        }
+        // The row cache the fetch may answer from is not ordered by row id, and
+        // the pushdown needs `partition_point` to work.
+        rows.sort_unstable();
+        rows.dedup();
+        Ok(Some(wand::DocFilter::new(rows)))
+    }
+
     /// Selects rows for `SEARCH MATCH TEXT` by term presence. This reproduces
     /// the *row set* (any query term, `minimum_should_match`, `topn`); the exact
     /// BM25 ordering/threshold needs the iresearch scorer, so a query carrying
@@ -5341,29 +5382,13 @@ impl Engine {
             }
             // Tombstones still feed the corpus statistics (as the reference's
             // segments do until compaction) but never rank.
-            let mut dead = self.tombstone_set(table)?;
-            // A filter removes documents before ranking; evaluating it over the
-            // rows and feeding the failures as tombstones keeps the
-            // postings-only scoring exact.
-            if pred.is_some() || in_filter.is_some() || opt_filter.is_some() {
-                for (seq, row) in self.fetch_rows_with_ids(table)? {
-                    let ok = pred
-                        .as_ref()
-                        .map(|p| p.eval_predicate(&row))
-                        .unwrap_or(true)
-                        && in_filter
-                            .as_ref()
-                            .map(|p| p.eval_predicate(&row))
-                            .unwrap_or(true)
-                        && opt_filter
-                            .as_ref()
-                            .map(|p| p.eval_predicate(&row))
-                            .unwrap_or(true);
-                    if !ok {
-                        dead.insert(seq as u64);
-                    }
-                }
-            }
+            let dead = self.tombstone_set(table)?;
+            // A filter removes documents before ranking. Its answer is a row list
+            // the iterator can seek with (`DocFilter`), which is what turns a
+            // rejected candidate from "decode the block bound, score, drop" into
+            // "hop every cursor past it".
+            let filter =
+                self.allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)?;
             let mode = if boolean {
                 wand::WandMode::Boolean
             } else {
@@ -5377,6 +5402,9 @@ impl Engine {
                 min_should,
                 mode,
             );
+            if let Some(filter) = filter.as_ref() {
+                iterator = iterator.with_filter(filter);
+            }
             if naive_scan {
                 iterator = iterator.with_naive();
             }
@@ -5475,13 +5503,12 @@ impl Engine {
         let keyword_field = tokenizer.keyword();
         // Deleted rows keep contributing to the corpus statistics (as the
         // reference's segments do until compaction) but never rank.
-        let mut dead = self.tombstone_set(table)?;
-        // Filters and rank features need values from the row; only the
-        // documents the cursors reach are read.
-        let needs_values = pred.is_some()
-            || in_filter.is_some()
-            || opt_filter.is_some()
-            || !rank_features.is_empty();
+        let dead = self.tombstone_set(table)?;
+        // The filters are evaluated once, into the row list the cursors seek
+        // with; only `rank_features` still needs a row per candidate.
+        let filter =
+            self.allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)?;
+        let needs_values = !rank_features.is_empty();
         let defaults = if needs_values {
             self.table_defaults(table).unwrap_or_default()
         } else {
@@ -5500,6 +5527,23 @@ impl Engine {
                 }
             }
             let Some(doc) = doc else { break };
+            // A row the filter rejects can never be scored: push every cursor
+            // past it instead of fetching and evaluating it one at a time.
+            if let Some(filter) = filter.as_ref() {
+                if !filter.contains(doc) {
+                    let Some(next) = filter.next_ge(doc + 1) else {
+                        break;
+                    };
+                    for field in field_cursors.iter_mut() {
+                        for cursor in field.iter_mut() {
+                            if cursor.doc().is_some_and(|d| d < next) {
+                                cursor.advance(next);
+                            }
+                        }
+                    }
+                    continue;
+                }
+            }
             let mut value_row: Option<Vec<Value>> = None;
             if needs_values {
                 if let Some((_, mut row)) = self
@@ -5513,21 +5557,6 @@ impl Engine {
                             Some(d) => Value::from_literal(&default_literal(d)),
                             None => Value::Null,
                         });
-                    }
-                    let ok = pred
-                        .as_ref()
-                        .map(|p| p.eval_predicate(&row))
-                        .unwrap_or(true)
-                        && in_filter
-                            .as_ref()
-                            .map(|p| p.eval_predicate(&row))
-                            .unwrap_or(true)
-                        && opt_filter
-                            .as_ref()
-                            .map(|p| p.eval_predicate(&row))
-                            .unwrap_or(true);
-                    if !ok {
-                        dead.insert(doc);
                     }
                     value_row = Some(row);
                 }

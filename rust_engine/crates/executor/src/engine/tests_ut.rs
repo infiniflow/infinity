@@ -1039,6 +1039,52 @@ mod tests {
         assert_eq!(crate::take_decode_stats().0, 0, "still the same block");
     }
 
+    /// A `MATCH TEXT (…, WHERE …)` filter reaches the scorers as a row list they
+    /// seek with, so the rows it rejects are neither fetched nor scored. The
+    /// answer must be exactly the unfiltered one narrowed.
+    #[test]
+    fn a_match_text_filter_narrows_the_candidates() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // Eight rows per seal: several chunks plus a memory tail, so the cursors
+        // of a sealed segment and the ones of the tail both take the pushdown.
+        e.set_memindex_capacity(8);
+        e.execute("CREATE TABLE fts (id INT, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX fts_i ON fts (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..40 {
+            e.execute(&format!("INSERT INTO fts VALUES ({i}, 'alpha row{i}');"))
+                .unwrap();
+        }
+        e.flush().unwrap();
+        let all = rows(
+            &e,
+            "SELECT id FROM fts SEARCH MATCH TEXT (body, 'alpha', 'topn=100');",
+        );
+        assert_eq!(all.len(), 40, "every row holds the term");
+        let filtered = rows(
+            &e,
+            "SELECT id FROM fts SEARCH MATCH TEXT (body, 'alpha', 'topn=100', WHERE id < 10);",
+        );
+        let want: Vec<Vec<String>> = all
+            .iter()
+            .filter(|row| row[0].parse::<i32>().unwrap() < 10)
+            .cloned()
+            .collect();
+        assert_eq!(want.len(), 10, "the fixture admits ten rows");
+        assert_eq!(
+            filtered, want,
+            "the pushed-down filter changed which rows survive, or their order"
+        );
+        // A filter that admits nothing is an empty answer, not an error.
+        assert!(rows(
+            &e,
+            "SELECT id FROM fts SEARCH MATCH TEXT (body, 'alpha', 'topn=100', WHERE id > 99);",
+        )
+        .is_empty());
+    }
+
     /// `OptimizeFtIndex` stops at the first gap: the rest of the chunk list is
     /// not merged (`new_txn_index_impl.cpp:2219-2227`), and a lone prefix chunk
     /// is skipped (`chunk_ids.size() <= 1`).
