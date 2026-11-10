@@ -168,8 +168,11 @@ impl TermLookup for TextTermLookup {
 /// ordered by score descending and row ascending (the reference's
 /// `ScoreResultHeap` order).
 ///
-/// `None` means the tree produced no iterator (an empty or unbuildable query),
-/// which the caller treats as "no syntax match, fall back".
+/// `None` means `QueryBuilder::CreateSearch` rejected the tree, which the caller
+/// treats as "no syntax match, fall back". A tree that builds successfully but
+/// yields no iterator (`Ok(None)`, e.g. a term with no postings) is **not** a
+/// failure: it matches nothing, and falling back would answer a different
+/// question, so it returns an empty hit list.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_query_tree(
     root: QueryNode,
@@ -187,9 +190,15 @@ pub(crate) fn run_query_tree(
     bm25: (f64, f64),
 ) -> Option<Vec<(u64, f64)>> {
     let lookup = TextTermLookup::new(indexes, delta_term, delta_phrase, bm25);
-    let mut iterator = QueryBuilder::new(&lookup)
+    let mut iterator = match QueryBuilder::new(&lookup)
         .create_search(FullTextQueryContext::new(root).with_topn(topn))
-        .ok()??;
+    {
+        Ok(Some(iterator)) => iterator,
+        // A tree that built but produced no iterator matches nothing.
+        Ok(None) => return Some(Vec::new()),
+        // A rejected tree keeps the caller's fallback.
+        Err(_) => return None,
+    };
     let mut hits: Vec<(u64, f64)> = Vec::new();
     let mut target = 0u64;
     while iterator.next(target) {

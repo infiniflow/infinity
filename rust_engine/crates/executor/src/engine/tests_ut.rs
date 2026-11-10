@@ -785,6 +785,15 @@ mod tests {
             super::state::phrase_freq_lists_sloppy(&[vec![1], vec![0]], 2, 1),
             0.0
         );
+        // A position below the prefix's window is too low, but the term's next
+        // occurrence still fits: `a b c`~2 with a=[4], b=[3], c=[2, 4] gives the
+        // prefix positions (2, 4); c=2 has spread 4-0=4 and is rejected, c=4
+        // yields spread 2 -> weight 1/3. Unwinding on the rejected position
+        // instead of advancing the level scored 0.0 and dropped the match.
+        assert_eq!(
+            super::state::phrase_freq_lists_sloppy(&[vec![4], vec![3], vec![2, 4]], 3, 2),
+            1.0 / 3.0
+        );
     }
 
     /// `"a b"~N` end to end: the slop widens the adjacency requirement and the
@@ -892,6 +901,55 @@ mod tests {
         let mut msm_ids: Vec<String> = msm.iter().map(|r| r[0].clone()).collect();
         msm_ids.sort();
         assert_eq!(msm_ids, and_ids, "minimum_should_match=2 is operator=and");
+    }
+
+    /// An explicit `operator=` selects the term-list grammar. The reference's
+    /// `FulltextQueryOperatorOption` is `kAnd`/`kOr` when the option is given and
+    /// `kInfinitySyntax` only when it is absent (`bound_select_statement_impl.cpp:200-210`),
+    /// so `alpha OR beta` with `operator=` is analysed into terms - `or` is a
+    /// word, not an operator - and must never be rejected as "unsupported with
+    /// the query-string grammar".
+    #[test]
+    fn an_explicit_operator_switches_off_the_query_grammar() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE og (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX og_idx ON og (body) USING FULLTEXT")
+            .unwrap();
+        for (id, body) in [(0, "alpha or beta"), (1, "alpha beta"), (2, "gamma")] {
+            e.execute(&format!("INSERT INTO og VALUES ({id}, '{body}');"))
+                .unwrap();
+        }
+        e.flush().unwrap();
+        let sorted = |sql: &str| -> Vec<String> {
+            let mut ids: Vec<String> = rows(&e, sql).iter().map(|r| r[0].clone()).collect();
+            ids.sort();
+            ids
+        };
+        // The term list is `alpha`, `or`, `beta`: the disjunction reaches the doc
+        // that spells `or` out and the one that does not.
+        assert_eq!(
+            sorted(
+                "SELECT id FROM og SEARCH MATCH TEXT (body, 'alpha OR beta', 10, 'operator=or');"
+            ),
+            vec!["0".to_string(), "1".to_string()]
+        );
+        // ... and requiring all three terms keeps only the doc that has them.
+        assert_eq!(
+            sorted(
+                "SELECT id FROM og SEARCH MATCH TEXT (body, 'alpha OR beta', 10, 'operator=and');"
+            ),
+            vec!["0".to_string()]
+        );
+        // `block_max` only picks an early-termination algorithm, so it is accepted
+        // on a parsed query too (`EarlyTermAlgo`): same rows as without it.
+        assert_eq!(
+            sorted(
+                "SELECT id FROM og SEARCH MATCH TEXT (body, 'alpha OR beta', 10, 'block_max=compare');"
+            ),
+            vec!["0".to_string(), "1".to_string()]
+        );
     }
 
     /// The reference's query-string grammar (`SearchDriver::ParseSingle` +
@@ -3562,7 +3620,10 @@ mod tests {
         // are exact integers: 2 for the rows carrying both terms, 1 otherwise.
         let strict = "SELECT id FROM tt SEARCH MATCH TEXT \
                       ('body','alpha beta','topn=10;similarity=boolean;threshold=2');";
-        assert!(rows(&e, strict).is_empty(), "threshold is a strict lower bound");
+        assert!(
+            rows(&e, strict).is_empty(),
+            "threshold is a strict lower bound"
+        );
 
         let above_one = "SELECT id FROM tt SEARCH MATCH TEXT \
                          ('body','alpha beta','topn=10;similarity=boolean;threshold=1');";
@@ -4751,6 +4812,52 @@ mod tests {
             highlight_text(text, &q, &none.delims),
             "<em>Anarchism</em> is a philosophy.  ... <em>Anarchism</em> spread."
         );
+    }
+
+    /// A delimiter family highlights whole tokens, like
+    /// `Highlighter::GetASCIIWordHighlight` with that analyzer: a substring that
+    /// is not a token of its own is not a match. `Some([])` is the keyword
+    /// family (whitespace-split), `Some(chars)` splits on those characters.
+    #[test]
+    fn a_delimiter_field_highlights_tokens_not_substrings() {
+        let q = vec!["cat".to_string()];
+        let delims: Option<Vec<char>> = Some(Vec::new());
+        // A keyword field splits on whitespace only, so `cat.` is one token and
+        // does not equal the query term.
+        assert_eq!(
+            highlight_text("cat concatenate cat.", &q, &delims),
+            "<em>cat</em> concatenate cat."
+        );
+        let comma: Option<Vec<char>> = Some(vec![',']);
+        assert_eq!(
+            highlight_text("cat,dog,cat", &q, &comma),
+            "<em>cat</em>,dog,<em>cat</em>"
+        );
+        // A term that only occurs inside a longer token stays unmarked.
+        assert_eq!(highlight_text("concatenate", &q, &delims), "concatenate");
+    }
+
+    /// `HIGHLIGHT` analyses the document with the **column's** analyzer
+    /// (`Highlighter::GetHighlight` takes the analyzer the project operator
+    /// fetched for the index), so an `ngram` field is highlighted through its
+    /// n-grams: `qui` is a term of the index, while the standard byte scanner
+    /// never produces it out of `quick` and the cell would stay unmarked.
+    #[test]
+    fn highlight_uses_the_columns_analyzer() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE hg (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute("CREATE INDEX hg_idx ON hg (body) USING FULLTEXT WITH (analyzer='ngram-3')")
+            .unwrap();
+        e.execute("INSERT INTO hg VALUES (1, 'quick brown');")
+            .unwrap();
+        e.flush().unwrap();
+        let out = rows(
+            &e,
+            "SELECT body HIGHLIGHT body FROM hg SEARCH MATCH TEXT (body, 'qui', 10);",
+        );
+        assert_eq!(out, vec![vec!["<em>qui</em>ck brown".to_string()]]);
     }
 
     /// A column indexed with `ik` must be tokenised by the IK analyzer on both

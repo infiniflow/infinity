@@ -600,8 +600,8 @@ impl TermDocIterator {
             })
             .unwrap_or((0.0, 1.0));
         let idf = bm25_idf(self.n_docs, self.postings.len());
-        let norm = (self.k1 + 1.0) * tf
-            / (tf + self.k1 * ((1.0 - self.b) + self.b * dl / self.avg_len));
+        let norm =
+            (self.k1 + 1.0) * tf / (tf + self.k1 * ((1.0 - self.b) + self.b * dl / self.avg_len));
         self.score_cache = idf * (norm + self.delta) * self.weight;
         self.term_freq += tf as u64;
         self.scored_doc = self.doc_id;
@@ -761,8 +761,8 @@ impl PhraseDocIterator {
             .iter()
             .map(|list| bm25_idf(self.n_docs, list.len()))
             .sum();
-        let norm = (self.k1 + 1.0) * tf
-            / (tf + self.k1 * ((1.0 - self.b) + self.b * dl / self.avg_len));
+        let norm =
+            (self.k1 + 1.0) * tf / (tf + self.k1 * ((1.0 - self.b) + self.b * dl / self.avg_len));
         self.score_cache = idf_sum * (norm + self.delta) * self.weight;
         self.scored_doc = self.doc_id;
         self.score_cache

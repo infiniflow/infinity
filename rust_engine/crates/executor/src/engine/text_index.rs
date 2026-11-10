@@ -44,7 +44,6 @@ pub(crate) fn remove_run_files(dir: &str, base_name: &str) {
         storage::invertedindex::format::FULLTEXT_DICT_SUFFIX,
         storage::invertedindex::format::FULLTEXT_POSTING_SUFFIX,
         storage::invertedindex::format::FULLTEXT_LENGTH_SUFFIX,
-        storage::invertedindex::disk_segment_reader::FULLTEXT_ROW_SUFFIX,
     ] {
         let _ = std::fs::remove_file(storage::invertedindex::format::fulltext_chunk_file(
             dir, base_name, suffix,
@@ -66,7 +65,7 @@ pub(crate) struct SpilledRun {
     pub(crate) id: u64,
     /// Directory holding the run's files, for cleanup.
     pub(crate) dir: String,
-    /// Base name of the run's `.dic` / `.pos` / `.len` / `.row` files.
+    /// Base name of the run's `.dic` / `.pos` / `.len` files.
     pub(crate) base_name: String,
     /// `(row id, length)` ascending, for document lengths and counts.
     pub(crate) docs: Vec<(u64, u32)>,
@@ -207,6 +206,34 @@ pub(crate) struct MemoryIndexer {
 /// tail, so every spilled run holds a stale one.
 pub(crate) const IN_TAIL: u64 = u64::MAX;
 
+/// One document, tokenised but **not yet interned**: what [`prepare_doc`]
+/// produces outside the column's write lock and [`MemoryIndexer::insert_prepared`]
+/// consumes inside it.
+///
+/// The terms are owned `String`s (rather than the analyzer's borrowed views)
+/// because they have to outlive the call that produced them; a batch therefore
+/// holds one `String` per posting, which is why the caller prepares in bounded
+/// batches instead of a whole import at once.
+pub(crate) struct PreparedDoc {
+    pub(crate) seq: u64,
+    pub(crate) terms: Vec<(String, u32, u16)>,
+    /// Bytes the document will add to the tail: `~64 B` per posting plus the
+    /// term text, the same accounting [`MemoryIndexer::insert`] always used.
+    pub(crate) cost: usize,
+}
+
+/// Tokenises one document for a [`TextIndex`]. Takes no index state, so it runs
+/// without the write lock - the analyzer is the only input.
+pub(crate) fn prepare_doc(seq: u64, text: &str, tokenizer: &TextTokenizer) -> PreparedDoc {
+    let mut terms: Vec<(String, u32, u16)> = Vec::new();
+    let mut cost = 64usize;
+    for_each_index_term(text, tokenizer, |term, pos, payload| {
+        cost += term.len() + 32;
+        terms.push((term.to_string(), pos, payload));
+    });
+    PreparedDoc { seq, terms, cost }
+}
+
 impl MemoryIndexer {
     pub(crate) fn new() -> Self {
         Self::default()
@@ -214,6 +241,11 @@ impl MemoryIndexer {
 
     /// C++: `MemoryIndexer::Insert` for one document. Returns `false` when the
     /// document would push the segment past `budget`, leaving it unchanged.
+    ///
+    /// The write path tokenises outside the lock and calls
+    /// [`Self::insert_prepared`]; this is the one-document convenience the unit
+    /// tests use.
+    #[cfg(test)]
     pub(crate) fn insert(
         &mut self,
         seq: u64,
@@ -221,33 +253,37 @@ impl MemoryIndexer {
         tokenizer: &TextTokenizer,
         budget: usize,
     ) -> bool {
-        // Terms are streamed and interned on the way in: no `String` per term
-        // (a 20k-row column is ~3.7M of them) and no per-document list of
-        // borrowed strings to keep alive. Interning happens before the budget
-        // check, so a rejected document may leave an unused dictionary entry;
-        // its posting list stays empty, which every consumer already skips.
-        let mut toks: Vec<(u32, u32, u16)> = Vec::new();
-        // ~32 B per posting entry plus the positions and the term string.
-        let mut cost = 64usize;
-        for_each_index_term(text, tokenizer, |term, pos, payload| {
-            cost += term.len() + 32;
-            let id = match self.term_ids.get(term) {
+        let doc = prepare_doc(seq, text, tokenizer);
+        self.insert_prepared(&doc, budget)
+    }
+
+    /// [`Self::insert`] with the document already tokenised. The caller can run
+    /// [`prepare_doc`] without holding the column's write lock, which is what
+    /// turns a batch into "tokenise N documents, then take the lock once".
+    ///
+    /// Returns `false` when the document would push the segment past `budget`,
+    /// leaving it unchanged (the caller spills and retries).
+    pub(crate) fn insert_prepared(&mut self, doc: &PreparedDoc, budget: usize) -> bool {
+        if self.bytes + doc.cost > budget {
+            return false;
+        }
+        let seq = doc.seq;
+        let mut toks: Vec<(u32, u32, u16)> = Vec::with_capacity(doc.terms.len());
+        for (term, pos, payload) in &doc.terms {
+            let id = match self.term_ids.get(term.as_str()) {
                 Some(id) => *id,
                 None => {
                     let id = self.term_names.len() as u32;
-                    self.term_names.push(term.to_string());
-                    self.term_ids.insert(term.to_string(), id);
+                    self.term_names.push(term.clone());
+                    self.term_ids.insert(term.clone(), id);
                     self.postings.push(TermPostings::default());
                     self.payloads.push(std::collections::BTreeMap::new());
                     id
                 }
             };
-            toks.push((id, pos, payload));
-        });
-        if self.bytes + cost > budget {
-            return false;
+            toks.push((id, *pos, *payload));
         }
-        self.bytes += cost;
+        self.bytes += doc.cost;
         // A re-indexed row (UPDATE rewrites in place) replaces its length
         // rather than adding a second document to the corpus statistics.
         match self.docs.insert(seq, toks.len() as u32) {
@@ -533,8 +569,8 @@ impl MemoryIndexer {
         let mut lengths: std::collections::BTreeMap<u64, u32> = std::collections::BTreeMap::new();
         if let Some(reader) = &self.spilled {
             for row in reader.rows() {
-                if let Some(len) = reader.doc_len_of_row(*row) {
-                    lengths.insert(*row, len);
+                if let Some(len) = reader.doc_len_of_row(row) {
+                    lengths.insert(row, len);
                 }
             }
         }
@@ -677,15 +713,16 @@ impl MemoryIndexer {
     /// tail. Only a `rankfeatures` column has entries.
     pub(crate) fn doc_payloads(&self, term: &str) -> std::collections::BTreeMap<u64, u16> {
         let mut out = std::collections::BTreeMap::new();
-        let mut absorb = |reader: &storage::invertedindex::disk_segment_reader::SegmentIndexReader| {
-            out.extend(
-                reader
-                    .doc_payloads(term)
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|(_, payload)| *payload != 0),
-            );
-        };
+        let mut absorb =
+            |reader: &storage::invertedindex::disk_segment_reader::SegmentIndexReader| {
+                out.extend(
+                    reader
+                        .doc_payloads(term)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|(_, payload)| *payload != 0),
+                );
+            };
         if let Some(reader) = &self.spilled {
             absorb(reader);
         }
@@ -789,7 +826,7 @@ impl MemoryIndexer {
             return false;
         };
         self.reset();
-        let rows = reader.rows().to_vec();
+        let rows = reader.rows();
         for row in &rows {
             let len = reader.doc_len_of_row(*row).unwrap_or(0);
             self.docs.insert(*row, len);
@@ -1029,6 +1066,79 @@ impl SealedSegment {
     }
 }
 
+/// The unsealed segment, moved out of its [`TextIndex`] so the files can be
+/// written with no lock held ([`TextIndex::detach_seal`] /
+/// [`TextIndex::attach_sealed`]).
+///
+/// `Dump(offline = false)` vs `Dump(offline = true)` → `OfflineDump()`
+/// (`memory_indexer_impl.cpp:592-601`): a table with no spill run writes the
+/// resident tail straight out, one with runs merges them. Both paths exist - the
+/// merge does not replace the realtime dump.
+pub(crate) struct SealJob {
+    pub(crate) mem: MemoryIndexer,
+    pub(crate) docs: Vec<(u64, u32)>,
+    pub(crate) base_row_id: u64,
+    pub(crate) docs_span: u32,
+    pub(crate) total_len: u64,
+    pub(crate) dir: String,
+    pub(crate) flags: storage::invertedindex::format::TermMetaFlags,
+    /// Rows the segment will hold, so the index can clear its override marks.
+    pub(crate) overridden_rows: Vec<u64>,
+}
+
+impl SealJob {
+    /// Writes the segment's `.dic` / `.pos` / `.len` and opens it. `None` on an
+    /// I/O error, leaving everything in the job so the caller can restore it.
+    pub(crate) fn write(&mut self) -> Option<SealedSegment> {
+        let base_name = format!("ft_{:016x}", self.base_row_id);
+        let realtime = self.mem.runs.is_empty() && self.mem.spilled.is_none();
+        let mem = &mut self.mem;
+        let docs = &self.docs;
+        let written = storage::invertedindex::disk_segment_reader::write_segment_index_streaming(
+            &self.dir,
+            &base_name,
+            self.base_row_id,
+            docs,
+            self.flags,
+            &mut |emit| {
+                if realtime {
+                    mem.for_each_tail_term(|term, hits, table| {
+                        let payload = |row: u64| table.get(&row).copied().unwrap_or(0);
+                        emit(term, hits, &payload);
+                    });
+                } else {
+                    mem.for_each_merged_term(|term, hits, table| {
+                        let payload = |row: u64| table.get(&row).copied().unwrap_or(0);
+                        emit(term, hits, &payload);
+                    });
+                }
+            },
+        );
+        if written.is_err() {
+            return None;
+        }
+        let reader = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
+            &self.dir,
+            &base_name,
+            self.base_row_id,
+            self.flags,
+        )
+        .ok()?;
+        // The runs were merged into the segment: their transient files go, and
+        // the tail's memory is released (`MemoryIndexer::Reset`).
+        for run in self.mem.runs.drain(..) {
+            run.remove();
+        }
+        self.mem.spilled = None;
+        self.mem.clear_tail();
+        Some(SealedSegment {
+            docs: self.docs_span,
+            total_len: self.total_len,
+            reader,
+        })
+    }
+}
+
 /// The per-column reader over the sealed segments.
 ///
 /// C++: `ColumnIndexReader` (`src/storage/invertedindex/column_index_reader.cppm`).
@@ -1251,65 +1361,77 @@ impl TextIndex {
     /// Returns `false` (leaving everything in memory) if the files cannot be
     /// written, so a failure never loses results.
     pub(crate) fn seal(&mut self) -> bool {
-        let Some(docs) = self.mem.merged_docs() else {
+        let Some(mut job) = self.detach_seal() else {
             return false;
         };
+        match job.write() {
+            Some(segment) => {
+                self.attach_sealed(job, segment);
+                true
+            }
+            None => {
+                // The files could not be written: put the index back so a
+                // failure never loses results.
+                self.restore_unsealed(job);
+                false
+            }
+        }
+    }
+
+    /// True when the unsealed segment has reached either budget and should be
+    /// sealed (`MemoryIndexer::MemUsed` or `mem_index_capacity` rows).
+    pub(crate) fn should_seal(&self, capacity: usize) -> bool {
+        self.mem.mem_used() >= text_segment_bytes()
+            || (capacity > 0 && self.mem.pending_docs() >= capacity)
+    }
+
+    /// Moves the unsealed segment (tail + spill runs) out of the index so it can
+    /// be written **without holding the column's write lock**:
+    /// [`SealJob::write`] does the mmap-and-write, then [`Self::attach_sealed`]
+    /// publishes the reader.
+    ///
+    /// `None` when there is nothing to seal. The move is O(1) for the in-memory
+    /// tail, so the lock is held only for the swap.
+    pub(crate) fn detach_seal(&mut self) -> Option<SealJob> {
+        let docs = self.mem.merged_docs()?;
         if docs.is_empty() {
-            return false;
+            return None;
         }
         let base_row_id = docs[0].0;
         let total_len = self.mem.pending_len();
-        let base_name = format!("ft_{base_row_id:016x}");
-        let flags = storage::invertedindex::format::OPTION_FLAG_ALL;
-        // `Dump(offline = false)` vs `Dump(offline = true)` → `OfflineDump()`
-        // (`memory_indexer_impl.cpp:592-601`): a table with no spill run writes
-        // the resident tail straight out, one with runs merges them. Both paths
-        // exist - the merge does not replace the realtime dump.
-        let realtime = self.mem.runs.is_empty() && self.mem.spilled.is_none();
-        if storage::invertedindex::disk_segment_reader::write_segment_index_streaming(
-            &self.dir,
-            &base_name,
+        // The segment covers `base_row_id..base_row_id + docs_span`: the
+        // reference's `ChunkIndexMetaInfo::row_cnt`. A row with no text (the
+        // reference's `InsertGap`) is a zero-length document inside that range,
+        // which is why the span, not the document count, is what the chunk
+        // records.
+        let docs_span = (docs[docs.len() - 1].0 - base_row_id + 1) as u32;
+        let overridden_rows: Vec<u64> = docs.iter().map(|(row, _)| *row).collect();
+        let mem = std::mem::take(&mut self.mem);
+        Some(SealJob {
+            mem,
+            docs,
             base_row_id,
-            &docs,
-            flags,
-            &mut |emit| {
-                if realtime {
-                    self.mem.for_each_tail_term(|term, hits, table| {
-                        let payload = |row: u64| table.get(&row).copied().unwrap_or(0);
-                        emit(term, hits, &payload);
-                    });
-                } else {
-                    self.mem.for_each_merged_term(|term, hits, table| {
-                        let payload = |row: u64| table.get(&row).copied().unwrap_or(0);
-                        emit(term, hits, &payload);
-                    });
-                }
-            },
-        )
-        .is_err()
-        {
-            return false;
-        }
-        let Ok(reader) = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
-            &self.dir,
-            &base_name,
-            base_row_id,
-            flags,
-        ) else {
-            return false;
-        };
-        // The new segment now carries the current text of every row it holds,
-        // so those rows are no longer shadowed by an older sealed copy.
-        for (row, _) in &docs {
+            docs_span,
+            total_len,
+            dir: self.dir.clone(),
+            flags: storage::invertedindex::format::OPTION_FLAG_ALL,
+            overridden_rows,
+        })
+    }
+
+    /// Publishes a segment written by [`SealJob::write`]. The new segment now
+    /// carries the current text of every row it holds, so those rows are no
+    /// longer shadowed by an older sealed copy.
+    pub(crate) fn attach_sealed(&mut self, job: SealJob, reader: SealedSegment) {
+        for row in &job.overridden_rows {
             self.overridden.remove(row);
         }
-        self.reader.segments.push(SealedSegment {
-            docs: docs.len() as u32,
-            total_len,
-            reader,
-        });
-        self.mem.reset();
-        true
+        self.reader.segments.push(reader);
+    }
+
+    /// Puts a detached index back after a failed write.
+    pub(crate) fn restore_unsealed(&mut self, job: SealJob) {
+        self.mem = job.mem;
     }
 
     /// `NewTxn::OptimizeFtIndex` (`new_txn_index_impl.cpp:2179-2270`): merges
@@ -1419,9 +1541,7 @@ impl TextIndex {
     /// Seals once the unsealed segment (runs included) reaches its size budget
     /// or the configured `mem_index_capacity` row count.
     pub(crate) fn maybe_seal(&mut self, capacity: usize) {
-        if self.mem.mem_used() >= text_segment_bytes()
-            || (capacity > 0 && self.mem.pending_docs() >= capacity)
-        {
+        if self.should_seal(capacity) {
             self.seal();
         }
     }

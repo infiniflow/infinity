@@ -40,7 +40,6 @@ impl TermMetaFlags {
         }
         flag
     }
-
 }
 
 /// `OPTION_FLAG_ALL` (`index_defines.cppm:32`): the flag word a full-text index

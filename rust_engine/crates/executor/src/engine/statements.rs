@@ -5218,7 +5218,13 @@ impl Engine {
         // query tree and evaluate it (`QueryBuilder::CreateSearch`). A plain
         // term list keeps the block-max WAND path below. The branch sits after the
         // option parsing so the predicate, `filter=` and `similarity` are known.
-        if super::text_query::has_query_syntax(&query) {
+        // An explicit `operator=` selects the **term-list** grammar: the
+        // reference's `FulltextQueryOperatorOption` is `kAnd`/`kOr` there and
+        // `kInfinitySyntax` only when the option is absent
+        // (`bound_select_statement_impl.cpp:200-210`), so the query string is
+        // analysed into terms instead of being parsed. `TO BE OR NOT` with
+        // `operator=and` is four ANDed terms, not a boolean expression.
+        if !has_operator_opt && super::text_query::has_query_syntax(&query) {
             // The tree path scores each leaf on its own: it has no BooleanWeight,
             // batch-OR or rank-feature channel. Options only the WAND path
             // implements are rejected instead of being silently dropped -
@@ -5236,13 +5242,15 @@ impl Engine {
                      (a AND b / a OR b / column:term)"
                 ))
             };
-            if require_all {
-                return Err(unsupported("operator=and"));
-            }
             if boolean {
                 return Err(unsupported("similarity=boolean"));
             }
-            for name in ["minimum_should_match", "rank_features", "block_max"] {
+            // `block_max` is not in this set: it only picks an early-termination
+            // algorithm (`EarlyTermAlgo`, `bound_select_statement_impl.cpp:169-190`)
+            // and every value yields the same result set. The tree path scores
+            // every candidate, which is `batch`/`false`; accepting the option
+            // keeps `compare` and the BMW spellings usable on a parsed query.
+            for name in ["minimum_should_match", "rank_features"] {
                 if given(name) {
                     return Err(unsupported(name));
                 }
@@ -5915,11 +5923,9 @@ impl Engine {
             // answer a different question. The reference resolves field names
             // against every index of the table, so such a leaf finds no postings -
             // match nothing instead of guessing.
-            let outside = query_field_qualifiers(query).into_iter().any(|field| {
-                !columns
-                    .split(',')
-                    .any(|spec| column_of(spec) == field)
-            });
+            let outside = query_field_qualifiers(query)
+                .into_iter()
+                .any(|field| !columns.split(',').any(|spec| column_of(spec) == field));
             if outside {
                 return Ok(Some(Vec::new()));
             }
@@ -8395,9 +8401,7 @@ fn query_field_qualifiers(query: &str) -> Vec<&str> {
             continue;
         };
         if field.is_empty()
-            || !field
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '_')
+            || !field.chars().all(|c| c.is_alphanumeric() || c == '_')
             || field.starts_with(|c: char| c.is_ascii_digit())
         {
             continue;

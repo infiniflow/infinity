@@ -628,7 +628,15 @@ impl Engine {
                 let schema = engine.table_schema(&index_table).unwrap_or_default();
                 for (seq, texts) in &index_rows {
                     engine.update_indexes_on_insert_text(&index_table, *seq, texts, &schema)?;
-                    engine.update_text_indexes(&index_table, *seq, texts, &schema);
+                }
+                // One batch: the full-text terms of the whole append are
+                // tokenised without the column lock and inserted under it once.
+                let batch: Vec<(usize, &[String])> = index_rows
+                    .iter()
+                    .map(|(seq, texts)| (*seq, texts.as_slice()))
+                    .collect();
+                engine.update_text_indexes_batch(&index_table, &batch, &schema);
+                for (seq, texts) in &index_rows {
                     engine.update_vector_caches(&index_table, *seq, texts);
                 }
                 // C++ `AppendMemIndex`: a segment that reached
@@ -925,12 +933,39 @@ impl Engine {
                 continue;
             }
             let tokenizer = self.index_tokenizer(table, name);
+            // `Highlighter::GetHighlight` analyses **both** sides with the
+            // column's analyzer (`highlighter_impl.cpp:41-46`: the analyzer
+            // `physical_project_impl.cpp:123` fetches for the index), so an
+            // `ik`/`ngram`/`rag-chinese` field is highlighted with the tokeniser
+            // that produced its postings - otherwise the document side would be
+            // scanned by the standard tokenizer and a term the analyzer emitted
+            // could never be found.
+            //
+            // The `standard` family and the delimiter families (`keyword`,
+            // `whitespace[-chars]`) keep the byte scanner instead: it is the
+            // measured form of the reference's output (its highlighter splits
+            // `com/anarchism` where the index side unites `/`) and it is what a
+            // column without an explicit analyzer already uses, so the default
+            // and `analyzer='standard'` stay identical.
+            let analyzer = tokenizer
+                .analyzer
+                .as_deref()
+                .filter(|name| {
+                    !name
+                        .split('-')
+                        .next()
+                        .is_some_and(|family| family.eq_ignore_ascii_case("standard"))
+                })
+                .and_then(|name| analyzer::AnalyzerPool::instance().get_analyzer(name).ok());
             let qterms = tokenize_index_text(&query, &tokenizer);
             for row in rows.iter_mut() {
                 let Some(text) = row.get(i).map(|v| v.to_slt_string()) else {
                     continue;
                 };
-                row[i] = Value::Str(highlight_text(&text, &qterms, &tokenizer.delims));
+                row[i] = Value::Str(match &analyzer {
+                    Some(analyzer) => highlight_with_analyzer(&query, &text, analyzer),
+                    None => highlight_text(&text, &qterms, &tokenizer.delims),
+                });
             }
         }
     }
@@ -1270,19 +1305,36 @@ impl Engine {
         }
     }
 
-    /// Keeps existing inverted indexes in step with an inserted/rewritten row.
-    pub(crate) fn update_text_indexes(
+    /// Documents tokenised per chunk while a batch is indexed. Bounded so a
+    /// `COPY` of a million rows never holds every row's terms in the heap, and
+    /// so one lock acquisition only covers a chunk's worth of work.
+    const TEXT_BATCH_ROWS: usize = 4096;
+
+    /// Keeps existing inverted indexes in step with a batch of inserted or
+    /// rewritten rows.
+    ///
+    /// Two phases per column: the documents are **tokenised without the write
+    /// lock** (with a snapshot of the tokenizer), then the chunk is inserted
+    /// under **one** lock acquisition. Before this, a multi-row INSERT or COPY
+    /// took the column's write lock once per row and ran the analyzer inside it,
+    /// which serialised the most expensive part of the write path against every
+    /// reader of that column.
+    pub(crate) fn update_text_indexes_batch(
         &self,
         table: &str,
-        seq: usize,
-        cells: &[String],
+        rows: &[(usize, &[String])],
         schema: &[String],
     ) {
+        if rows.is_empty() {
+            return;
+        }
         // The multi-vector and sparse indexes share this DML hook: it is the one
         // place every write path (SQL INSERT/UPDATE, COPY, Thrift insert) goes
         // through.
-        self.update_multivector_indexes(table, seq, cells);
-        self.update_sparse_indexes(table, seq, cells);
+        for (seq, cells) in rows {
+            self.update_multivector_indexes(table, *seq, cells);
+            self.update_sparse_indexes(table, *seq, cells);
+        }
         self.enforce_memindex_quota();
         let tkey = self.table_key(table);
         let indexes: Vec<(String, SharedTextIndex)> = self
@@ -1293,15 +1345,57 @@ impl Engine {
             .map(|e| e.text.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
             .unwrap_or_default();
         for (column, shared) in indexes {
-            let column = &column;
-            let Some(ci) = schema.iter().position(|c| c == column) else {
+            let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;
             };
-            let Some(text) = cells.get(ci) else { continue };
-            let mut index = shared.write().unwrap();
-            index_delete_row(&mut index, seq as u64);
-            index_row(&mut index, seq as u64, text);
-            index.maybe_seal(self.memindex_capacity());
+            // Phase 1, no lock held: snapshot the tokenizer, then tokenise.
+            let tokenizer = {
+                let index = shared.read().unwrap();
+                index.tokenizer.clone()
+            };
+            // The batch is bounded: a COPY of a million rows tokenises
+            // `TEXT_BATCH_ROWS` documents at a time instead of holding every
+            // document's terms in the heap, and the column lock is released
+            // between chunks. This is the same bounded shape the reference's
+            // inverter ring gives (a full ring is its backpressure), without the
+            // ring's handshake.
+            for chunk in rows.chunks(Self::TEXT_BATCH_ROWS) {
+                let prepared: Vec<PreparedDoc> = chunk
+                    .iter()
+                    .filter_map(|(seq, cells)| {
+                        let text = cells.get(ci)?;
+                        Some(prepare_doc(*seq as u64, text, &tokenizer))
+                    })
+                    .collect();
+                if prepared.is_empty() {
+                    continue;
+                }
+                // Phase 2, one lock acquisition for the chunk.
+                let capacity = self.memindex_capacity();
+                let job = {
+                    let mut index = shared.write().unwrap();
+                    for doc in &prepared {
+                        index_delete_row(&mut index, doc.seq);
+                    }
+                    index_rows_prepared(&mut index, &prepared);
+                    if index.should_seal(capacity) {
+                        index.detach_seal()
+                    } else {
+                        None
+                    }
+                };
+                // Phase 3, no lock held: serialise the segment. Only the swap in
+                // and out of the tail touches the column, so a reader is never
+                // blocked behind a segment write.
+                if let Some(mut job) = job {
+                    let segment = job.write();
+                    let mut index = shared.write().unwrap();
+                    match segment {
+                        Some(segment) => index.attach_sealed(job, segment),
+                        None => index.restore_unsealed(job),
+                    }
+                }
+            }
         }
     }
 

@@ -230,13 +230,17 @@ impl<'a> Cursor<'a> {
         }
         // `BlockMaxPhraseScore` for a phrase unit: the minimum over its terms',
         // since a phrase can occur no more often than any one of them.
-        let (last, max_tf, max_pct) = self.stream.block_stats();
+        let (last, max_tf, pct) = self.stream.block_stats();
         let value = match mode {
             // One point per matched term, independent of tf and length.
             WandMode::Boolean => self.weight,
             WandMode::Bm25 => {
-                let pct_u16 = (max_pct * PERCENTAGE_SCALE).ceil().max(1.0);
-                let norm = 1.0 / (1.0 + self.f1 / max_tf.max(1.0) + self.f3 / pct_u16);
+                // `bm25_common_score_ * (1/(1 + f1/block_max_tf +
+                // f3/block_max_percentage) + f4)` with the stored `u16`
+                // percentage (`term_doc_iterator_impl.cpp:98-100`), so the bound
+                // is bit-for-bit the reference's.
+                let norm =
+                    1.0 / (1.0 + self.f1 / max_tf.max(1.0) + self.f3 / f64::from(pct.max(1)));
                 (self.common * (norm + self.f4)).min(self.upper_bound)
             }
         };

@@ -2501,17 +2501,26 @@ impl Engine {
                         // (`BlockCursor::rows` / `row`), which is the reference's
                         // `CheckSegmentRowsVisible`.
                         if self.table_has_memory_index(table) || self.has_index_declaration(table) {
+                            let mut row_texts: Vec<(usize, Vec<String>)> =
+                                Vec::with_capacity(new_rows.len());
                             for (k, nr) in new_rows.iter().enumerate() {
-                                let row_texts: Vec<String> =
+                                let texts: Vec<String> =
                                     nr.iter().map(|v| v.to_slt_string()).collect();
                                 self.update_indexes_on_insert_text(
                                     table,
                                     base + k,
-                                    &row_texts,
+                                    &texts,
                                     &schema,
                                 )?;
-                                self.update_text_indexes(table, base + k, &row_texts, &schema);
-                                self.update_vector_caches(table, base + k, &row_texts);
+                                row_texts.push((base + k, texts));
+                            }
+                            let batch: Vec<(usize, &[String])> = row_texts
+                                .iter()
+                                .map(|(seq, cells)| (*seq, cells.as_slice()))
+                                .collect();
+                            self.update_text_indexes_batch(table, &batch, &schema);
+                            for (seq, texts) in &row_texts {
+                                self.update_vector_caches(table, *seq, texts);
                             }
                         }
                     }

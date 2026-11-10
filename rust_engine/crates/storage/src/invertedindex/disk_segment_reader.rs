@@ -11,15 +11,12 @@
 //!   * `{index_dir}/{base_name}.pos` — the per-term postings slices.
 //!   * `{index_dir}/{base_name}.len` — `u32[row_count]` document lengths.
 //!
-//! The reference's `docid_t` is a segment offset because its segments hold a
-//! contiguous row-id range. Our rows live in a flat KV store, so a segment can
-//! span two insert batches whose row ids differ by 2^32. Postings therefore use
-//! the document's offset in the segment's ascending row list (`0..doc_count`),
-//! and an auxiliary `.row` file holds the row id of each offset (8 bytes each) so
-//! the reader can map back and keep the gaps out of the document set. The
-//! reference has no such file: for a dense segment the offsets are exactly
-//! `base_row_id + i`, which is the fallback the reader uses when `.row` is
-//! missing (a segment the reference wrote).
+//! `docid_t` is a segment offset, exactly like the reference: a segment covers
+//! the contiguous row-id range `base_row_id..base_row_id + doc_count`, and a
+//! posting's id is `row - base_row_id`. A row that carries no text (the
+//! reference's `InsertGap`) is a document with no posting and a zero length, so
+//! no row-id table is needed on disk - the three files above are the whole
+//! segment, byte for byte what the reference writes.
 //!
 //! The `.pos` slice uses the reference framing
 //! (`VInt doc_skip_len, VInt doc_len, doc_skip, doc_list, VInt pos_skip_len,
@@ -65,18 +62,6 @@ use crate::invertedindex::format::{
     FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX, FULLTEXT_POSTING_SUFFIX, POSTING_MINI_BLOCK,
 };
 use crate::invertedindex::index_merger::{decode_doc_block, PostingWriter};
-
-/// Auxiliary file: `u64[doc_count]` row ids, one per dense document ordinal.
-/// The reference does not need it (a segment is a contiguous row range); ours is
-/// a flat KV store, so the mapping has to be stored.
-/// The port's own sidecar: `u64[doc_count]`, the row id of each segment offset.
-///
-/// The reference has no equivalent - its `docid_t` is a segment offset and its
-/// chunks cover a contiguous row range, which is why [`SegmentIndexReader::open`]
-/// falls back to `base_row_id + offset` when this file is absent. It is written
-/// so a sparse segment (rows with gaps) keeps its gaps out of the document set;
-/// for a dense segment the file is redundant but harmless.
-pub const FULLTEXT_ROW_SUFFIX: &str = ".row";
 
 /// One term's posting entry in a segment: `(row id, term frequency, positions)`.
 ///
@@ -202,32 +187,42 @@ pub fn write_segment_index_streaming(
 ) -> Result<(), FormatError> {
     fs::create_dir_all(index_dir).map_err(|e| FormatError::Io(e.to_string()))?;
 
-    // `docs` is the segment's document set in ascending row order. `.len` is
-    // indexed by the segment offset, so it must follow that same order; `.row`
-    // records the row id each offset belongs to, which is what lets a sparse
-    // segment (rows with gaps) keep its gaps as non-documents instead of padding
-    // `.len` with fake lengths.
+    // A segment covers the **contiguous** row-id range `base_row_id..base_row_id
+    // + doc_count`, exactly like the reference's `ChunkIndexMetaInfo`: a posting's
+    // `docid_t` is `row - base_row_id` and `.len` is indexed by that subtraction,
+    // so a row that carries no text (the reference's `InsertGap`) is simply a
+    // document with no posting and length 0 - it is still addressable. `docs`
+    // only lists the rows that do carry text; the holes between them are padded
+    // into `.len` here instead of being compressed away.
     if docs.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
         return Err(FormatError::Invalid(
             "a segment's documents must be strictly ascending by row id".into(),
         ));
     }
-    let lengths: Vec<u32> = docs.iter().map(|(_, len)| *len).collect();
-    let len_bytes = encode_column_lengths(&lengths);
-    let mut row_bytes: Vec<u8> = Vec::with_capacity(docs.len() * 8);
-    for (row, _) in docs {
-        row_bytes.extend_from_slice(&row.to_le_bytes());
+    let Some((first_row, _)) = docs.first() else {
+        return Err(FormatError::Invalid(
+            "a segment needs at least one document".into(),
+        ));
+    };
+    if *first_row < base_row_id {
+        return Err(FormatError::Invalid(format!(
+            "the segment starts at row {base_row_id} but holds a document at row {first_row}"
+        )));
     }
+    let last_row = docs[docs.len() - 1].0;
+    let doc_count = u32::try_from(last_row - base_row_id + 1).map_err(|_| {
+        FormatError::Invalid(format!(
+            "the segment at {base_row_id} spans more than u32::MAX rows"
+        ))
+    })?;
+    let mut lengths = vec![0u32; doc_count as usize];
     let mut doc_len: std::collections::HashMap<u64, u32> =
         std::collections::HashMap::with_capacity(docs.len());
     for (row, len) in docs {
+        lengths[(row - base_row_id) as usize] = *len;
         doc_len.insert(*row, *len);
     }
-    // `docs` is exactly `base_row_id + offset`: the reference's shape, where an
-    // offset is a subtraction instead of a search.
-    let dense = !docs.is_empty()
-        && docs[0].0 == base_row_id
-        && docs[docs.len() - 1].0 == base_row_id + docs.len() as u64 - 1;
+    let len_bytes = encode_column_lengths(&lengths);
 
     let mut pos: Vec<u8> = Vec::new();
     let mut metas: Vec<TermMeta> = Vec::new();
@@ -242,32 +237,19 @@ pub fn write_segment_index_streaming(
             }
             let mut writer = PostingWriter::new(flags);
             for (row, tf, doc_positions) in list {
-                // `docid_t` is the segment offset: this row's position in the
-                // ascending document list. `ColumnIndexMerger::MergeTerm` rebases
-                // with `base_row_id - merge_base_rowid`, which is the same number
-                // for a dense segment; a sparse one searches, so the posting stays
-                // inside `0..doc_count` and still indexes `.len` (the real row ids
-                // live in the `.row` table).
-                let ordinal = if dense {
-                    row.checked_sub(base_row_id)
-                        .filter(|offset| (*offset as usize) < docs.len())
-                        .map(|offset| offset as usize)
-                } else {
-                    docs.binary_search_by_key(row, |(r, _)| *r).ok()
-                };
-                let Some(ordinal) = ordinal else {
+                // `docid_t` is the segment offset (`row - base_row_id`), the same
+                // subtraction the reference makes; no table and no search.
+                let Some(doc) = row
+                    .checked_sub(base_row_id)
+                    .filter(|offset| *offset < u64::from(doc_count))
+                else {
                     failure = Some(FormatError::Invalid(format!(
-                        "term '{term}' has a posting for row {row}, which is not a document of \
-                         the segment starting at {base_row_id}"
+                        "term '{term}' has a posting for row {row}, which is outside the segment \
+                         starting at {base_row_id}"
                     )));
                     return;
                 };
-                let Some(doc) = u32::try_from(ordinal).ok() else {
-                    failure = Some(FormatError::Invalid(format!(
-                        "segment at {base_row_id} has more than u32::MAX documents"
-                    )));
-                    return;
-                };
+                let doc = doc as u32;
                 let len = doc_len.get(row).copied().unwrap_or(*tf);
                 // `PostingWriter::AddPosition` counts the frequency and writes the
                 // position stream (`posting_writer_impl.cpp:87-92`), so the two can
@@ -311,10 +293,6 @@ pub fn write_segment_index_streaming(
     write(FULLTEXT_DICT_SUFFIX, &dic)?;
     write(FULLTEXT_POSTING_SUFFIX, &pos)?;
     write(FULLTEXT_LENGTH_SUFFIX, &len_bytes)?;
-    // The port's own sidecar; a contiguous segment's ids are `base_row_id + i`,
-    // so the reference's reader (which has no row table) still sees a dense
-    // segment after the file is ignored.
-    write(FULLTEXT_ROW_SUFFIX, &row_bytes)?;
     Ok(())
 }
 
@@ -329,14 +307,6 @@ pub struct SegmentIndexReader {
     /// posting's `docid_t` equal `row - base_row_id`
     /// (`ChunkIndexMetaInfo::base_row_id_`).
     base_row_id: u64,
-    /// The segment's row ids in offset order, materialised once so the query path
-    /// can hand out slices. A dense segment (the reference's shape) is
-    /// `base_row_id..base_row_id + doc_count`; a sparse one comes from the `.row`
-    /// sidecar.
-    rows: Vec<u64>,
-    /// `rows` is exactly `base_row_id + offset`, so an ordinal is a subtraction
-    /// instead of a search.
-    dense: bool,
     flags: TermMetaFlags,
     /// The name the three files were opened under (`ft_{base:016x}` or the
     /// merged `ft_{base:016x}_{rows:x}`), which a merge needs as its source id.
@@ -367,49 +337,35 @@ impl SegmentIndexReader {
             Ok(MappedFile::from_mmap(map))
         };
         let len = map(FULLTEXT_LENGTH_SUFFIX)?;
-        let doc_count = len.len() / 4;
-        // The port writes a `.row` table (the real row ids in segment-offset
-        // order), so a segment whose rows have gaps keeps them out of the
-        // document set. The reference has no such file - its chunks cover a
-        // contiguous range - and that dense case is exactly `base_row_id + offset`,
-        // so the fallback reads the same bytes.
-        let rows: Vec<u64> =
-            match std::fs::read(fulltext_chunk_file(dir, base_name, FULLTEXT_ROW_SUFFIX)) {
-                Ok(bytes) if bytes.len() == doc_count * 8 => bytes
-                    .chunks(8)
-                    .map(|chunk| u64::from_le_bytes(chunk.try_into().expect("an 8-byte chunk")))
-                    .collect(),
-                _ => (0..doc_count as u64).map(|d| base_row_id + d).collect(),
-            };
-        let dense = doc_count > 0
-            && rows.first() == Some(&base_row_id)
-            && rows.last() == Some(&(base_row_id + doc_count as u64 - 1));
         Ok(Self {
             dic: map(FULLTEXT_DICT_SUFFIX)?,
             pos: map(FULLTEXT_POSTING_SUFFIX)?,
             len,
             base_row_id,
-            rows,
-            dense,
             flags,
             base_name: base_name.to_string(),
         })
     }
 
-    /// Row ids in segment order. The reference's segments hold a contiguous row
-    /// range, so the rows are `base_row_id..base_row_id + doc_count`.
-    pub fn rows(&self) -> &[u64] {
-        &self.rows
+    /// Row ids in segment order: the contiguous range
+    /// `base_row_id..base_row_id + doc_count`, which is the only shape the
+    /// reference's segments have (there is no row table on disk).
+    pub fn rows(&self) -> Vec<u64> {
+        let base = self.base_row_id;
+        (0..self.doc_count() as u64).map(|ord| base + ord).collect()
+    }
+
+    /// Row id of segment offset `ord`.
+    pub fn row_at(&self, ord: u32) -> Option<u64> {
+        (ord as usize)
+            .lt(&self.doc_count())
+            .then_some(self.base_row_id + u64::from(ord))
     }
 
     /// Segment offset (`docid_t`) of `row`, if the segment holds it.
     pub fn ordinal(&self, row: u64) -> Option<u32> {
-        if self.dense {
-            let doc = row.checked_sub(self.base_row_id)?;
-            (doc < self.doc_count() as u64).then_some(doc as u32)
-        } else {
-            self.rows.binary_search(&row).ok().map(|ord| ord as u32)
-        }
+        let doc = row.checked_sub(self.base_row_id)?;
+        (doc < self.doc_count() as u64).then_some(doc as u32)
     }
 
     /// The document length of `row` (BM25 `dl`), addressed by its segment
@@ -429,7 +385,11 @@ impl SegmentIndexReader {
     /// any document. Consecutive segments are disjoint, which is what lets a
     /// query concatenate their posting lists instead of merging them.
     pub fn row_range(&self) -> Option<(u64, u64)> {
-        Some((*self.rows.first()?, *self.rows.last()?))
+        let doc_count = self.doc_count();
+        if doc_count == 0 {
+            return None;
+        }
+        Some((self.base_row_id, self.base_row_id + doc_count as u64 - 1))
     }
 
     /// Number of documents in the segment.
@@ -523,9 +483,9 @@ impl SegmentIndexReader {
         let mut last: u32 = 0;
         for (doc, tf) in docs.into_iter().zip(tfs) {
             last = last.wrapping_add(doc);
-            // An ordinal beyond the `.row` table would mean a corrupt index.
-            if let Some(row) = self.rows.get(last as usize) {
-                out.push((*row, tf));
+            // An ordinal beyond `.len` would mean a corrupt index.
+            if let Some(row) = self.row_at(last) {
+                out.push((row, tf));
             }
         }
         Ok(out)
@@ -561,8 +521,8 @@ impl SegmentIndexReader {
             let (deltas, _, payloads) = self.decode_doc_block(&framed.doc_list, &mut off, take)?;
             for (delta, payload) in deltas.into_iter().zip(payloads) {
                 last = last.wrapping_add(delta);
-                if let Some(row) = self.rows.get(last as usize) {
-                    out.push((*row, payload));
+                if let Some(row) = self.row_at(last) {
+                    out.push((row, payload));
                 }
             }
             left -= take;
@@ -643,6 +603,7 @@ impl SegmentIndexReader {
             cur_positions: Vec::new(),
             skiplist,
             skiplist_at: None,
+            block_max: None,
             pos_skip: 0,
             #[cfg(test)]
             blocks_decoded: 0,
@@ -651,7 +612,7 @@ impl SegmentIndexReader {
 
     /// The row id of segment offset `doc` (`base_row_id + docid_t`).
     fn row_of_doc(&self, doc: u32) -> Option<u64> {
-        self.rows.get(doc as usize).copied()
+        self.row_at(doc)
     }
 
     /// Decodes one 128-document mini-block of a doc list: the `doc_id` column,
@@ -766,6 +727,12 @@ pub struct TermDocCursor<'a> {
     /// The last doc id the skip list was positioned at. The reader only moves
     /// forward, so a target at or before it is walked block by block instead.
     skiplist_at: Option<u32>,
+    /// The loaded block's `(block_max_tf, block_max_percentage)` **as stored by
+    /// the writer** in the doc skip list (`DocListEncoder::add_skip_list_item`),
+    /// read back through `SkipListReader::GetBlockMaxInfo`. `None` for a list
+    /// without a skip item (shorter than one block), where the caller has to
+    /// compute the bound from the decoded postings.
+    block_max: Option<(u32, u16)>,
     /// Occurrences still to drop from the position stream: after a block hop
     /// the stream is re-read from its start and the skipped blocks' positions
     /// are discarded lazily, on the first `positions()` call.
@@ -785,9 +752,9 @@ impl<'a> TermDocCursor<'a> {
     fn fill(&mut self) -> bool {
         while self.left > 0 {
             let take = self.left.min(POSTING_MINI_BLOCK);
-            let Ok((docs, tfs, _)) = self
-                .reader
-                .decode_doc_block(self.doc_list, &mut self.off, take)
+            let Ok((docs, tfs, _)) =
+                self.reader
+                    .decode_doc_block(self.doc_list, &mut self.off, take)
             else {
                 self.left = 0;
                 return false;
@@ -818,10 +785,32 @@ impl<'a> TermDocCursor<'a> {
                 }
             }
             if !self.rows.is_empty() {
+                // Keep the doc skip list on the block that was just decoded: an
+                // item is keyed by its block's **last** doc id, so seeking to
+                // this block's last ordinal lands on its own item. Only then is
+                // `GetBlockMaxInfo` the bound of the postings now in `rows`.
+                if let Some(skiplist) = self.skiplist.as_mut() {
+                    if let Some(&block_last) = self.ordinals.last() {
+                        if skiplist.current_doc_id() != block_last {
+                            skiplist.skip_to(block_last);
+                        }
+                        let (max_tf, pct) = skiplist.block_max_info();
+                        // `(0, 0)` means the list has no item here (a block the
+                        // writer's flush never reached): no bound to hand out.
+                        self.block_max = (max_tf > 0 && pct > 0).then_some((max_tf, pct));
+                    }
+                }
                 return true;
             }
         }
         false
+    }
+
+    /// The loaded block's `(block_max_tf, block_max_percentage)` from the doc
+    /// skip list, i.e. the values the writer recorded for this exact block
+    /// (`term_doc_iterator_impl.cpp:99`, `PostingIterator::GetBlockMaxInfo`).
+    pub fn block_max(&self) -> Option<(u32, u16)> {
+        self.block_max
     }
 
     fn ensure(&mut self) -> bool {
@@ -1036,6 +1025,9 @@ impl<'a> TermDocCursor<'a> {
             self.exhaust();
             return false;
         };
+        // The running item count is the block ordinal the cursor landed on: a
+        // sequential walk advances one item per block too, so the total stays
+        // "blocks already passed", which is what the remaining count needs.
         let blocks = skiplist.get_skipped_item_count().max(0) as usize;
         let prev_ttf = skiplist.get_prev_ttf();
         self.skiplist_at = Some(hit.doc_id);
@@ -1265,8 +1257,8 @@ mod tests {
 
     #[allow(clippy::type_complexity)]
     fn sample() -> (Vec<(u64, u32)>, BTreeMap<String, Vec<PostingEntry>>) {
-        // 300 documents whose row ids start at 1<<32: a later insert batch. The
-        // `.row` table keeps them addressable even though the ids are sparse.
+        // 300 documents whose row ids start at 1<<32: a later insert batch, far
+        // from 0 but still a contiguous range (`base_row_id + docid_t`).
         let base = 1u64 << 32;
         let docs: Vec<(u64, u32)> = (0..300).map(|i| (base + i, (i % 7 + 2) as u32)).collect();
         let mut postings: BTreeMap<String, Vec<PostingEntry>> = BTreeMap::new();
@@ -1333,6 +1325,119 @@ mod tests {
         let meta = reader.lookup("gamma").unwrap().unwrap();
         assert_eq!(meta.doc_freq, 300);
         assert_eq!(meta.total_tf, 300);
+    }
+
+    /// A segment is exactly the reference's three files: `.dic`, `.pos`, `.len`.
+    /// The port used to add a `.row` sidecar (a `u64[]` row-id table); the row
+    /// of a document is now `base_row_id + docid_t`, so nothing else may be
+    /// written - an extra file in the chunk directory is a format deviation.
+    #[test]
+    fn a_segment_is_exactly_the_reference_file_family() {
+        let dir = tempfile::tempdir().unwrap();
+        let index_dir = dir.path().to_str().unwrap();
+        let docs = vec![(0u64, 7u32), (1, 9)];
+        let postings: BTreeMap<String, Vec<PostingEntry>> =
+            BTreeMap::from([("t".to_string(), vec![(0u64, 1u32, vec![0u32])])]);
+        write_segment_index(
+            index_dir,
+            "ft_0000000000000000",
+            0,
+            &docs,
+            &postings,
+            TermMetaFlags::default(),
+        )
+        .unwrap();
+        let mut names: Vec<String> = std::fs::read_dir(index_dir)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        assert_eq!(
+            names,
+            vec![
+                "ft_0000000000000000.dic".to_string(),
+                "ft_0000000000000000.len".to_string(),
+                "ft_0000000000000000.pos".to_string(),
+            ]
+        );
+    }
+
+    /// A row with no text (the reference's `InsertGap`) keeps its `docid_t`: the
+    /// segment covers `base_row_id..base_row_id + doc_count`, the hole has no
+    /// posting and length 0, and every later row keeps `row - base_row_id`.
+    #[test]
+    fn a_gap_row_is_a_zero_length_document() {
+        let dir = tempfile::tempdir().unwrap();
+        let index_dir = dir.path().to_str().unwrap();
+        // Rows 0 and 2 carry text, row 1 is a gap.
+        let docs = vec![(0u64, 5u32), (2u64, 7u32)];
+        let postings: BTreeMap<String, Vec<PostingEntry>> =
+            BTreeMap::from([("t".to_string(), vec![(2u64, 1u32, vec![0u32])])]);
+        write_segment_index(
+            index_dir,
+            "ft_0000000000000000",
+            0,
+            &docs,
+            &postings,
+            TermMetaFlags::default(),
+        )
+        .unwrap();
+        let reader = SegmentIndexReader::open(
+            index_dir,
+            "ft_0000000000000000",
+            0,
+            TermMetaFlags::default(),
+        )
+        .unwrap();
+        assert_eq!(reader.doc_count(), 3, "the span, not the document count");
+        assert_eq!(reader.row_range(), Some((0, 2)));
+        assert_eq!(reader.doc_len(0), Some(5));
+        assert_eq!(reader.doc_len(1), Some(0), "the gap has no text");
+        assert_eq!(reader.doc_len(2), Some(7));
+        assert_eq!(reader.ordinal(2), Some(2), "row - base_row_id");
+        assert_eq!(reader.row_at(2), Some(2));
+        assert_eq!(reader.postings("t").unwrap(), vec![(2, 1)]);
+    }
+
+    /// The block bound the WAND reads is the writer's own `block_max_tf` /
+    /// `block_max_percentage` (`DocListEncoder::add_skip_list_item`), carried in
+    /// the doc skip list - not a value recomputed from the decoded postings.
+    #[test]
+    fn block_max_comes_from_the_doc_skip_list() {
+        let dir = tempfile::tempdir().unwrap();
+        let index_dir = dir.path().to_str().unwrap();
+        let docs: Vec<(u64, u32)> = (0..300u64).map(|row| (row, 10)).collect();
+        let postings: BTreeMap<String, Vec<PostingEntry>> = BTreeMap::from([(
+            "t".to_string(),
+            (0..300u64)
+                .map(|row| (row, (row % 5 + 1) as u32, Vec::new()))
+                .collect::<Vec<_>>(),
+        )]);
+        let flags = crate::invertedindex::format::OPTION_FLAG_ALL;
+        write_segment_index(index_dir, "ft_0000000000000000", 0, &docs, &postings, flags).unwrap();
+        let reader = SegmentIndexReader::open(index_dir, "ft_0000000000000000", 0, flags).unwrap();
+        let mut cursor = reader.term_doc_cursor("t").unwrap().unwrap();
+        let mut blocks = 0;
+        loop {
+            if cursor.doc().is_none() {
+                break;
+            }
+            let Some((rows, tfs, _)) = cursor.block() else {
+                break;
+            };
+            let count = rows.len();
+            let max_tf = tfs.iter().copied().max().expect("a block has postings");
+            let (stored_tf, stored_pct) = cursor.block_max().expect("a skip-list item per block");
+            assert_eq!(stored_tf, max_tf, "block {blocks}: the writer's max tf");
+            // Every document is 10 tokens long here, so the ratio bound is
+            // `ceil(max_tf / 10 * u16::MAX)` - the value the writer stored.
+            let expected = (max_tf as f32 / 10.0 * f32::from(u16::MAX)).ceil() as u16;
+            assert_eq!(stored_pct, expected, "block {blocks}: stored percentage");
+            blocks += 1;
+            cursor.skip(count);
+        }
+        assert_eq!(blocks, 3, "300 postings are three 128-document blocks");
     }
 
     #[test]
@@ -1706,6 +1811,71 @@ mod tests {
         let mut cursor = reader.term_doc_cursor("alpha").unwrap().unwrap();
         cursor.advance(0);
         assert_eq!(cursor.doc(), Some(0));
+    }
+
+    /// A seek has to land on the first posting at or after the target even when
+    /// the segment's rows are not all present. The chunk's `docid_t` is the dense
+    /// span (`row - base_row_id`, the holes padded with length 0), so the target's
+    /// ordinal is exactly that subtraction - and hopping over the blocks in
+    /// between must not drop a posting that sits between the cursor and the
+    /// target. The skip list is keyed by those ordinals, so this is also what
+    /// makes a gapped chunk seekable at all.
+    #[test]
+    fn advance_over_a_gapped_segment_keeps_every_posting_between() {
+        let dir = tempfile::tempdir().unwrap();
+        let index_dir = dir.path().to_str().unwrap();
+        // Every third row carries text: 300 documents over the 898-row span
+        // `0..=897`, i.e. seven blocks with holes in them.
+        let rows: Vec<u64> = (0..300u64).map(|i| i * 3).collect();
+        let docs: Vec<(u64, u32)> = rows.iter().map(|row| (*row, 8)).collect();
+        let list: Vec<PostingEntry> = rows.iter().map(|row| (*row, 1u32, vec![0u32])).collect();
+        let postings = BTreeMap::from([("alpha".to_string(), list)]);
+        write_segment_index(
+            index_dir,
+            "ft_gap",
+            0,
+            &docs,
+            &postings,
+            crate::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .unwrap();
+        let reader = SegmentIndexReader::open(
+            index_dir,
+            "ft_gap",
+            0,
+            crate::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .unwrap();
+        assert_eq!(reader.doc_count(), 898, "the span, not the 300 documents");
+
+        // A linear pass over the whole list: what every seek has to reproduce.
+        let mut expected: Vec<u64> = Vec::new();
+        let mut walk = reader.term_doc_cursor("alpha").unwrap().unwrap();
+        while let Some(doc) = walk.doc() {
+            expected.push(doc);
+            walk.advance(doc + 1);
+        }
+        assert_eq!(expected, rows);
+
+        // Every row of the span, gap or not: the cursor lands on the first
+        // posting at or after it, and a target past the last one exhausts.
+        for target in 0..900u64 {
+            let want = rows.iter().copied().find(|row| *row >= target);
+            let mut cursor = reader.term_doc_cursor("alpha").unwrap().unwrap();
+            cursor.advance(target);
+            assert_eq!(cursor.doc(), want, "target {target}");
+        }
+
+        // A cursor that already walked into a block and then seeks further must
+        // land on the target, not past it.
+        let mut cursor = reader.term_doc_cursor("alpha").unwrap().unwrap();
+        assert_eq!(cursor.doc(), Some(0));
+        cursor.advance(301);
+        assert_eq!(cursor.doc(), Some(303));
+        cursor.advance(447);
+        assert_eq!(cursor.doc(), Some(447));
+        cursor.advance(897);
+        assert_eq!(cursor.doc(), Some(897));
     }
 
     /// The position stream is sequential, so a hop has to drop the occurrences of
