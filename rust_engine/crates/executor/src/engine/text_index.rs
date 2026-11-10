@@ -163,6 +163,13 @@ pub(crate) struct MemoryIndexer {
     /// One entry per interned term, indexed by its id: a document's tokens cost
     /// an integer lookup instead of hashing the term string per posting.
     pub(crate) postings: Vec<TermPostings>,
+    /// `term id -> row -> doc payload`, parallel to `postings`. Only a
+    /// `rankfeatures` index fills it: the analyzer's
+    /// `SmallFloat::Float122ToUInt16` weight per `(term, document)`, which
+    /// becomes the posting's doc-payload column
+    /// (`write_segment_index_with_payloads`). Every other analyzer leaves the
+    /// maps empty, so the cost is one empty `BTreeMap` per term.
+    pub(crate) payloads: Vec<std::collections::BTreeMap<u64, u16>>,
     /// `term -> id` and `id -> term`. The dictionary outlives the tail's postings
     /// (a spill keeps using the same ids) and is rebuilt from the rows when a
     /// process opens a directory.
@@ -219,10 +226,10 @@ impl MemoryIndexer {
         // borrowed strings to keep alive. Interning happens before the budget
         // check, so a rejected document may leave an unused dictionary entry;
         // its posting list stays empty, which every consumer already skips.
-        let mut toks: Vec<(u32, u32)> = Vec::new();
+        let mut toks: Vec<(u32, u32, u16)> = Vec::new();
         // ~32 B per posting entry plus the positions and the term string.
         let mut cost = 64usize;
-        for_each_index_term(text, tokenizer, |term, pos| {
+        for_each_index_term(text, tokenizer, |term, pos, payload| {
             cost += term.len() + 32;
             let id = match self.term_ids.get(term) {
                 Some(id) => *id,
@@ -231,10 +238,11 @@ impl MemoryIndexer {
                     self.term_names.push(term.to_string());
                     self.term_ids.insert(term.to_string(), id);
                     self.postings.push(TermPostings::default());
+                    self.payloads.push(std::collections::BTreeMap::new());
                     id
                 }
             };
-            toks.push((id, pos));
+            toks.push((id, pos, payload));
         });
         if self.bytes + cost > budget {
             return false;
@@ -271,6 +279,15 @@ impl MemoryIndexer {
                 at += 1;
             }
             let id = toks[first].0 as usize;
+            // The `rankfeatures` weight of this `(term, document)`; a re-indexed
+            // row replaces its old value (or clears it when the new text carries
+            // no payload).
+            let payload = toks[first].2;
+            if payload != 0 {
+                self.payloads[id].insert(seq, payload);
+            } else {
+                self.payloads[id].remove(&seq);
+            }
             positions.clear();
             positions.extend(toks[first..at].iter().map(|entry| entry.1));
             let list = &mut self.postings[id];
@@ -335,6 +352,8 @@ impl MemoryIndexer {
     pub(crate) fn clear_tail(&mut self) {
         self.postings.clear();
         self.postings.shrink_to_fit();
+        self.payloads.clear();
+        self.payloads.shrink_to_fit();
         self.term_ids.clear();
         self.term_names.clear();
         self.term_names.shrink_to_fit();
@@ -376,46 +395,6 @@ impl MemoryIndexer {
         }
     }
 
-    /// The tail as the segment writer wants it: documents by row id and the
-    /// postings by term, a re-inserted row collapsed to one entry.
-    #[allow(clippy::type_complexity)]
-    pub(crate) fn segment_payload(
-        &self,
-    ) -> Option<(
-        Vec<(u64, u32)>,
-        std::collections::BTreeMap<
-            String,
-            Vec<storage::invertedindex::disk_segment_reader::PostingEntry>,
-        >,
-    )> {
-        if self.docs.is_empty() {
-            return None;
-        }
-        let mut docs: Vec<(u64, u32)> = self.docs.iter().map(|(row, len)| (*row, *len)).collect();
-        docs.sort_unstable_by_key(|(row, _)| *row);
-        let mut postings: std::collections::BTreeMap<
-            String,
-            Vec<storage::invertedindex::disk_segment_reader::PostingEntry>,
-        > = std::collections::BTreeMap::new();
-        for (id, term) in self.term_names.iter().enumerate() {
-            let list = &self.postings[id];
-            if list.list.is_empty() {
-                continue;
-            }
-            let mut hits: Vec<storage::invertedindex::disk_segment_reader::PostingEntry> = list
-                .list
-                .iter()
-                .enumerate()
-                .map(|(i, (row, tf, _, _))| (*row, *tf, list.positions(i).to_vec()))
-                .collect();
-            dedupe_posting_entries(&mut hits);
-            // The map is keyed by the term text, so its iteration order is the
-            // ascending byte order the FST builder requires.
-            postings.insert(term.clone(), hits);
-        }
-        Some((docs, postings))
-    }
-
     /// C++: the spill half of `MemoryIndexer::Dump` (`Dump(false, spill = true)`)
     /// and `CommitOffline` — writes the resident tail as one sorted run under a
     /// transient base name and resets the budget accounting, so indexing
@@ -425,7 +404,7 @@ impl MemoryIndexer {
     /// written (no directory, disk error): the caller then keeps the documents
     /// in memory rather than lose them.
     pub(crate) fn spill(&mut self, dir: &str) -> bool {
-        let Some((docs, postings)) = self.segment_payload() else {
+        let Some(docs) = self.tail_docs() else {
             return false;
         };
         let total_len: u64 = docs.iter().map(|(_, len)| u64::from(*len)).sum();
@@ -436,13 +415,20 @@ impl MemoryIndexer {
             storage::invertedindex::format::FULLTEXT_SPILL_SUFFIX
         );
         let flags = storage::invertedindex::format::OPTION_FLAG_ALL;
-        if storage::invertedindex::disk_segment_reader::write_segment_index(
+        // A spill run is the realtime dump written sideways: the tail's own
+        // postings, streamed, with no merge involved.
+        if storage::invertedindex::disk_segment_reader::write_segment_index_streaming(
             dir,
             &base_name,
             base_row_id,
             &docs,
-            &postings,
             flags,
+            &mut |emit| {
+                self.for_each_tail_term(|term, hits, table| {
+                    let payload = |row: u64| table.get(&row).copied().unwrap_or(0);
+                    emit(term, hits, &payload);
+                });
+            },
         )
         .is_err()
         {
@@ -512,29 +498,38 @@ impl MemoryIndexer {
         )
     }
 
-    /// C++: `SortMerger` (`OfflineDump`, `memory_indexer_impl.cpp:792-812`) —
-    /// merges the spilled runs and the resident tail (plus a `Load`ed spill
-    /// segment) into one sorted posting stream, which is what the seal path
-    /// writes into the segment.
-    ///
-    /// Sources are ranked oldest to newest and a re-inserted row keeps only its
-    /// newest entry, so a row that was spilled and then rewritten ends up with
-    /// exactly one posting list (the `InsertGap` case: an out-of-order or
-    /// re-inserted document must not leave a stale copy in a run).
-    #[allow(clippy::type_complexity)]
-    pub(crate) fn merged_segment(
-        &self,
-    ) -> Option<(
-        Vec<(u64, u32)>,
-        std::collections::BTreeMap<
-            String,
-            Vec<storage::invertedindex::disk_segment_reader::PostingEntry>,
-        >,
-    )> {
+    /// The `of_doc_payload` column of one term, keyed by row id and with the
+    /// zero entries dropped (zero is "no payload"). Empty unless the index was
+    /// built by the `rankfeatures` analyzer.
+    fn reader_payload_map(
+        reader: &storage::invertedindex::disk_segment_reader::SegmentIndexReader,
+        term: &str,
+    ) -> std::collections::BTreeMap<u64, u16> {
+        reader
+            .doc_payloads(term)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(_, payload)| *payload != 0)
+            .collect()
+    }
+
+    /// The resident tail's document lengths, ascending by row: the input of a
+    /// realtime dump and of a spill run (`Dump(offline = false, spill = true)`).
+    pub(crate) fn tail_docs(&self) -> Option<Vec<(u64, u32)>> {
+        if self.docs.is_empty() {
+            return None;
+        }
+        let mut docs: Vec<(u64, u32)> = self.docs.iter().map(|(row, len)| (*row, *len)).collect();
+        docs.sort_unstable_by_key(|(row, _)| *row);
+        Some(docs)
+    }
+
+    /// The merged document lengths, oldest source first so the newest write wins.
+    /// `None` when the unsealed segment holds nothing.
+    pub(crate) fn merged_docs(&self) -> Option<Vec<(u64, u32)>> {
         if self.docs.is_empty() && self.runs.is_empty() && self.spilled.is_none() {
             return None;
         }
-        // Document lengths, oldest source first so the newest write wins.
         let mut lengths: std::collections::BTreeMap<u64, u32> = std::collections::BTreeMap::new();
         if let Some(reader) = &self.spilled {
             for row in reader.rows() {
@@ -547,67 +542,162 @@ impl MemoryIndexer {
             lengths.extend(run.docs.iter().copied());
         }
         lengths.extend(self.docs.iter().map(|(row, len)| (*row, *len)));
-        let docs: Vec<(u64, u32)> = lengths.into_iter().collect();
+        Some(lengths.into_iter().collect())
+    }
 
-        // `spilled` (a `Load`ed dump) is the oldest source, then the runs in
-        // creation order, then the tail. Each source's dictionary is walked
-        // once, so every term is decoded at most once per source.
-        let tail_rank = self.runs.len() as u32 + 1;
-        let mut entries_by_term: std::collections::BTreeMap<String, Vec<SourcedEntry>> =
-            std::collections::BTreeMap::new();
-        if let Some(reader) = &self.spilled {
-            for term in reader.terms().unwrap_or_default() {
-                if let Some(hits) = Self::reader_posting_entries(reader, &term) {
-                    entries_by_term
-                        .entry(term)
-                        .or_default()
-                        .extend(hits.into_iter().map(|(row, tf, pos)| (0, row, tf, pos)));
-                }
-            }
-        }
-        for (i, run) in self.runs.iter().enumerate() {
-            let rank = i as u32 + 1;
-            for term in run.reader.terms().unwrap_or_default() {
-                let Some(hits) = Self::reader_posting_entries(&run.reader, &term) else {
-                    continue;
-                };
-                let current: Vec<SourcedEntry> = hits
-                    .into_iter()
-                    // A re-inserted row's older copy is a stale posting: the
-                    // segment must hold exactly one list per document.
-                    .filter(|(row, _, _)| self.run_entry_is_current(run.id, *row))
-                    .map(|(row, tf, pos)| (rank, row, tf, pos))
-                    .collect();
-                if !current.is_empty() {
-                    entries_by_term.entry(term).or_default().extend(current);
-                }
-            }
-        }
-        for (id, term) in self.term_names.iter().enumerate() {
+    /// The **realtime** dump path (`MemoryIndexer::Dump(offline=false)`): the
+    /// resident tail written straight out, terms in dictionary order.
+    ///
+    /// C++ keeps the online postings in a `std::map` (`GetOrAddPosting` is
+    /// `postings_`), so they are already ordered when `Dump` walks them; the tail
+    /// here is insertion ordered, so the indices are sorted instead (the names
+    /// are compared in place, never copied). No spill file and no merge is
+    /// involved — this is the path a table with no spill run seals through.
+    pub(crate) fn for_each_tail_term(
+        &self,
+        mut f: impl FnMut(
+            &str,
+            &[storage::invertedindex::disk_segment_reader::PostingEntry],
+            &std::collections::BTreeMap<u64, u16>,
+        ),
+    ) {
+        let mut order: Vec<usize> = (0..self.term_names.len()).collect();
+        order.sort_unstable_by(|a, b| self.term_names[*a].cmp(&self.term_names[*b]));
+        for id in order {
             let list = &self.postings[id];
-            let positions: Vec<(u64, u32, &[u32])> = list
+            if list.list.is_empty() {
+                continue;
+            }
+            let mut hits: Vec<storage::invertedindex::disk_segment_reader::PostingEntry> = list
                 .list
                 .iter()
                 .enumerate()
-                .map(|(i, (row, tf, _, _))| (*row, *tf, list.positions(i)))
+                .map(|(i, (row, tf, _, _))| (*row, *tf, list.positions(i).to_vec()))
                 .collect();
-            entries_by_term.entry(term.clone()).or_default().extend(
-                positions
-                    .into_iter()
-                    .map(|(row, tf, pos)| (tail_rank, row, tf, pos.to_vec())),
-            );
+            // A row re-indexed inside the tail appears twice; the segment holds
+            // exactly one list per document.
+            dedupe_posting_entries(&mut hits);
+            let empty = std::collections::BTreeMap::new();
+            let payloads = self.payloads.get(id).unwrap_or(&empty);
+            f(&self.term_names[id], &hits, payloads);
         }
+    }
 
-        let mut postings: std::collections::BTreeMap<
-            String,
-            Vec<storage::invertedindex::disk_segment_reader::PostingEntry>,
-        > = std::collections::BTreeMap::new();
-        for (term, entries) in entries_by_term {
+    /// C++: `SortMerger` (`OfflineDump`, `memory_indexer_impl.cpp:792-812`) —
+    /// merges the spilled runs and the resident tail (plus a `Load`ed spill
+    /// segment) into one posting stream in ascending term order.
+    ///
+    /// The reference merges k sorted term tuples, so only one term's postings
+    /// exist at a time. This walks the same order and holds only the term
+    /// *names* for the whole merge, so sealing a large tail never materialises
+    /// the segment's positions.
+    ///
+    /// Sources are ranked oldest to newest and a re-inserted row keeps only its
+    /// newest entry, so a row that was spilled and then rewritten ends up with
+    /// exactly one posting list (the `InsertGap` case: an out-of-order or
+    /// re-inserted document must not leave a stale copy in a run).
+    pub(crate) fn for_each_merged_term(
+        &self,
+        mut f: impl FnMut(
+            &str,
+            &[storage::invertedindex::disk_segment_reader::PostingEntry],
+            &std::collections::BTreeMap<u64, u16>,
+        ),
+    ) {
+        let tail_rank = self.runs.len() as u32 + 1;
+        // The union of the sources' dictionaries, in ascending byte order -
+        // the order the FST builder requires.
+        let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        if let Some(reader) = &self.spilled {
+            names.extend(reader.terms().unwrap_or_default());
+        }
+        for run in &self.runs {
+            names.extend(run.reader.terms().unwrap_or_default());
+        }
+        names.extend(self.term_names.iter().cloned());
+        for term in names {
+            // `spilled` (a `Load`ed dump) is the oldest source, then the runs in
+            // creation order, then the tail.
+            let mut entries: Vec<SourcedEntry> = Vec::new();
+            if let Some(reader) = &self.spilled {
+                if let Some(hits) = Self::reader_posting_entries(reader, &term) {
+                    let payloads = Self::reader_payload_map(reader, &term);
+                    entries.extend(hits.into_iter().map(|(row, tf, pos)| {
+                        (0, row, tf, pos, *payloads.get(&row).unwrap_or(&0))
+                    }));
+                }
+            }
+            for (i, run) in self.runs.iter().enumerate() {
+                let rank = i as u32 + 1;
+                let Some(hits) = Self::reader_posting_entries(&run.reader, &term) else {
+                    continue;
+                };
+                let payloads = Self::reader_payload_map(&run.reader, &term);
+                entries.extend(
+                    hits.into_iter()
+                        // A re-inserted row's older copy is a stale posting: the
+                        // segment must hold exactly one list per document.
+                        .filter(|(row, _, _)| self.run_entry_is_current(run.id, *row))
+                        .map(|(row, tf, pos)| {
+                            (rank, row, tf, pos, *payloads.get(&row).unwrap_or(&0))
+                        }),
+                );
+            }
+            if let Some(id) = self.term_ids.get(&term) {
+                let id = *id as usize;
+                let list = &self.postings[id];
+                let tail_payloads = self.payloads.get(id);
+                let positions: Vec<(u64, u32, &[u32])> = list
+                    .list
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (row, tf, _, _))| (*row, *tf, list.positions(i)))
+                    .collect();
+                entries.extend(positions.into_iter().map(|(row, tf, pos)| {
+                    (
+                        tail_rank,
+                        row,
+                        tf,
+                        pos.to_vec(),
+                        tail_payloads
+                            .and_then(|map| map.get(&row).copied())
+                            .unwrap_or(0),
+                    )
+                }));
+            }
             if !entries.is_empty() {
-                postings.insert(term, dedupe_sourced_entries(entries));
+                let (hits, table) = dedupe_sourced_entries(entries);
+                f(&term, &hits, &table);
             }
         }
-        Some((docs, postings))
+    }
+
+    /// `row -> payload` for `term`, oldest source first so the newest write
+    /// wins: a `Load`ed spill segment, then the spill runs, then the memory
+    /// tail. Only a `rankfeatures` column has entries.
+    pub(crate) fn doc_payloads(&self, term: &str) -> std::collections::BTreeMap<u64, u16> {
+        let mut out = std::collections::BTreeMap::new();
+        let mut absorb = |reader: &storage::invertedindex::disk_segment_reader::SegmentIndexReader| {
+            out.extend(
+                reader
+                    .doc_payloads(term)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|(_, payload)| *payload != 0),
+            );
+        };
+        if let Some(reader) = &self.spilled {
+            absorb(reader);
+        }
+        for run in &self.runs {
+            absorb(&run.reader);
+        }
+        if let Some(id) = self.term_ids.get(term) {
+            if let Some(map) = self.payloads.get(*id as usize) {
+                out.extend(map.iter().map(|(row, payload)| (*row, *payload)));
+            }
+        }
+        out
     }
 
     /// C++: `GetColumnLength` for the unsealed segment — the tail wins over the
@@ -656,19 +746,33 @@ impl MemoryIndexer {
     /// answer phrase queries. The spilled runs are merged in first.
     #[allow(dead_code)] // the product spill path; exercised by `memory_indexer_ut`.
     pub(crate) fn dump(&self, dir: &str, base_name: &str) -> bool {
-        let Some((docs, postings)) = self.merged_segment() else {
+        let Some(docs) = self.merged_docs() else {
             return false;
         };
         if docs.is_empty() {
             return false;
         }
-        storage::invertedindex::disk_segment_reader::write_segment_index(
+        // Same fork as `seal`: `Dump(offline = false)` vs `OfflineDump()`.
+        let realtime = self.runs.is_empty() && self.spilled.is_none();
+        storage::invertedindex::disk_segment_reader::write_segment_index_streaming(
             dir,
             base_name,
             docs[0].0,
             &docs,
-            &postings,
             storage::invertedindex::format::OPTION_FLAG_ALL,
+            &mut |emit| {
+                if realtime {
+                    self.for_each_tail_term(|term, hits, table| {
+                        let payload = |row: u64| table.get(&row).copied().unwrap_or(0);
+                        emit(term, hits, &payload);
+                    });
+                } else {
+                    self.for_each_merged_term(|term, hits, table| {
+                        let payload = |row: u64| table.get(&row).copied().unwrap_or(0);
+                        emit(term, hits, &payload);
+                    });
+                }
+            },
         )
         .is_ok()
     }
@@ -719,7 +823,7 @@ impl MemoryIndexer {
 
 /// One posting entry tagged with the source that produced it: `(source rank,
 /// row id, term frequency, positions)`. A higher rank is newer.
-pub(crate) type SourcedEntry = (u32, u64, u32, Vec<u32>);
+pub(crate) type SourcedEntry = (u32, u64, u32, Vec<u32>, u16);
 
 /// Merges one term's entries from several sources: for a re-inserted row the
 /// entry with the highest source rank wins (the newest spill run, or the
@@ -728,29 +832,46 @@ pub(crate) type SourcedEntry = (u32, u64, u32, Vec<u32>);
 /// union of the positions), which is what a duplicate inside one tail means.
 pub(crate) fn dedupe_sourced_entries(
     mut entries: Vec<SourcedEntry>,
-) -> Vec<storage::invertedindex::disk_segment_reader::PostingEntry> {
-    entries.sort_by_key(|(rank, row, _, _)| (*row, *rank));
+) -> (
+    Vec<storage::invertedindex::disk_segment_reader::PostingEntry>,
+    std::collections::BTreeMap<u64, u16>,
+) {
+    entries.sort_by_key(|(rank, row, _, _, _)| (*row, *rank));
     let mut out: Vec<SourcedEntry> = Vec::with_capacity(entries.len());
-    for (rank, row, tf, mut positions) in entries {
+    for (rank, row, tf, mut positions, payload) in entries {
         match out.last_mut() {
-            Some((last_rank, last_row, last_tf, last_positions)) if *last_row == row => {
+            Some((last_rank, last_row, last_tf, last_positions, last_payload))
+                if *last_row == row =>
+            {
                 if rank > *last_rank {
                     *last_rank = rank;
                     *last_tf = tf;
                     *last_positions = positions;
+                    *last_payload = payload;
                 } else {
                     *last_tf = tf;
                     last_positions.append(&mut positions);
                     last_positions.sort_unstable();
                     last_positions.dedup();
+                    if payload != 0 {
+                        *last_payload = payload;
+                    }
                 }
             }
-            _ => out.push((rank, row, tf, positions)),
+            _ => out.push((rank, row, tf, positions, payload)),
         }
     }
-    out.into_iter()
-        .map(|(_, row, tf, positions)| (row, tf, positions))
-        .collect()
+    let mut payloads = std::collections::BTreeMap::new();
+    let hits = out
+        .into_iter()
+        .map(|(_, row, tf, positions, payload)| {
+            if payload != 0 {
+                payloads.insert(row, payload);
+            }
+            (row, tf, positions)
+        })
+        .collect();
+    (hits, payloads)
 }
 
 /// How a full-text column's documents and queries are tokenised: the legacy
@@ -867,6 +988,34 @@ pub(crate) struct TextIndex {
     pub(crate) overridden: std::collections::HashSet<u64>,
 }
 
+impl TextIndex {
+    /// `row -> feature weight` for `term`: the `of_doc_payload` column across
+    /// every source, newest write winning. A row re-indexed after its segment
+    /// was sealed keeps the memory payload and must not fall back to the
+    /// segment's stale one.
+    pub(crate) fn doc_payloads(&self, term: &str) -> std::collections::BTreeMap<u64, u16> {
+        let mut out = std::collections::BTreeMap::new();
+        for segment in &self.reader.segments {
+            out.extend(
+                segment
+                    .reader
+                    .doc_payloads(term)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|(_, payload)| *payload != 0),
+            );
+        }
+        let tail = self.mem.doc_payloads(term);
+        for row in &self.overridden {
+            if !tail.contains_key(row) {
+                out.remove(row);
+            }
+        }
+        out.extend(tail);
+        out
+    }
+}
+
 /// One sealed segment's index: the mmap'd reader plus the corpus counts.
 pub(crate) struct SealedSegment {
     pub(crate) docs: u32,
@@ -977,6 +1126,11 @@ impl TextIndex {
     /// they cover, and returns the first row id they do **not** cover — 0 when
     /// nothing could be loaded, so the caller rebuilds from the rows.
     ///
+    /// A merged chunk (`ft_{first_row:016x}_{rows:x}`, written by
+    /// [`Self::optimize_chunks`]) covers a range: plain chunks starting inside it
+    /// are leftovers of a merge that crashed before deleting its sources, and are
+    /// dropped rather than loaded twice.
+    ///
     /// A chunk that cannot be mapped (a torn write at a crash) discards the
     /// whole set: indexing half the table from disk and rebuilding the other
     /// half would count the same documents twice.
@@ -997,6 +1151,49 @@ impl TextIndex {
         // The base name is the chunk's first row id in hex, zero padded, so the
         // name order is the row order.
         bases.sort_unstable();
+        // A merged chunk (`ft_{base:016x}_{rows:x}`, `optimize_chunks`) supersedes
+        // the plain chunks its range covers. A crash between writing the merged
+        // files and deleting the sources leaves both on disk; loading both would
+        // count every row in the range twice, only a rebuild would not notice. The
+        // covered plain chunks are dropped here, and their files removed through
+        // `remove_run_files` so the next open does not see them either.
+        let mut merged_ranges: Vec<(u64, u64)> = Vec::new();
+        for base in &bases {
+            let Some(rest) = base.strip_prefix("ft_") else {
+                continue;
+            };
+            let Some((start_hex, rows_hex)) = rest.split_once('_') else {
+                continue;
+            };
+            let (Ok(start), Ok(rows)) = (
+                u64::from_str_radix(start_hex, 16),
+                u64::from_str_radix(rows_hex, 16),
+            ) else {
+                continue;
+            };
+            merged_ranges.push((start, start + rows));
+        }
+        if !merged_ranges.is_empty() {
+            bases.retain(|base| {
+                let Some(rest) = base.strip_prefix("ft_") else {
+                    return true;
+                };
+                // The merged chunk is not covered by its own range.
+                if rest.contains('_') {
+                    return true;
+                }
+                let Ok(start) = u64::from_str_radix(rest, 16) else {
+                    return true;
+                };
+                let covered = merged_ranges
+                    .iter()
+                    .any(|(from, to)| start >= *from && start < *to);
+                if covered {
+                    remove_run_files(&self.dir, base);
+                }
+                !covered
+            });
+        }
         let mut segments = Vec::with_capacity(bases.len());
         let mut next = 0u64;
         for base in &bases {
@@ -1054,7 +1251,7 @@ impl TextIndex {
     /// Returns `false` (leaving everything in memory) if the files cannot be
     /// written, so a failure never loses results.
     pub(crate) fn seal(&mut self) -> bool {
-        let Some((docs, postings)) = self.mem.merged_segment() else {
+        let Some(docs) = self.mem.merged_docs() else {
             return false;
         };
         if docs.is_empty() {
@@ -1064,13 +1261,30 @@ impl TextIndex {
         let total_len = self.mem.pending_len();
         let base_name = format!("ft_{base_row_id:016x}");
         let flags = storage::invertedindex::format::OPTION_FLAG_ALL;
-        if storage::invertedindex::disk_segment_reader::write_segment_index(
+        // `Dump(offline = false)` vs `Dump(offline = true)` → `OfflineDump()`
+        // (`memory_indexer_impl.cpp:592-601`): a table with no spill run writes
+        // the resident tail straight out, one with runs merges them. Both paths
+        // exist - the merge does not replace the realtime dump.
+        let realtime = self.mem.runs.is_empty() && self.mem.spilled.is_none();
+        if storage::invertedindex::disk_segment_reader::write_segment_index_streaming(
             &self.dir,
             &base_name,
             base_row_id,
             &docs,
-            &postings,
             flags,
+            &mut |emit| {
+                if realtime {
+                    self.mem.for_each_tail_term(|term, hits, table| {
+                        let payload = |row: u64| table.get(&row).copied().unwrap_or(0);
+                        emit(term, hits, &payload);
+                    });
+                } else {
+                    self.mem.for_each_merged_term(|term, hits, table| {
+                        let payload = |row: u64| table.get(&row).copied().unwrap_or(0);
+                        emit(term, hits, &payload);
+                    });
+                }
+            },
         )
         .is_err()
         {
@@ -1175,11 +1389,21 @@ impl TextIndex {
                 )
             });
         let Ok(reader) = merged else {
+            // The merger has already renamed its output into place, so a failure
+            // in the *last* step must remove those files: leaving them beside the
+            // intact sources would make the next `load_sealed` count every row in
+            // the range twice, and the next optimize report an overlap forever.
+            remove_run_files(&self.dir, &dst);
             // Keep the sources: a failed merge must not lose postings.
             self.reader.segments = segments;
             self.reader.segments.extend(rest);
             return Ok(0);
         };
+        // Rename-then-unlink, not one atomic step: a crash between the two leaves
+        // a complete merged chunk next to some of its sources. That is exactly the
+        // state `load_sealed` resolves - it drops plain chunks whose base row id
+        // falls inside a merged chunk's range - so the window costs one cleanup on
+        // the next open instead of a double count.
         for source in &sources {
             remove_run_files(&self.dir, &source.base_name);
         }

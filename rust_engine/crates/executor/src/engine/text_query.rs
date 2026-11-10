@@ -1,9 +1,10 @@
 //! `MATCH TEXT` queries that use the reference's query-string grammar.
 //!
-//! The plain term list (`a b`, `"a b"`, `a^2`) is answered by the block-max WAND
-//! path in `statements.rs`, which is the fast path for the common case. The
-//! boolean grammar — `a AND b`, `a OR b`, `a AND NOT b`, `(a OR b) AND c`,
-//! `column:a`, `"a b"~2` — needs a query tree, exactly like the reference:
+//! The plain term list (`a b`, `"a b"`, `a^2`, and the slop form `"a b"~2`,
+//! which `query_units` + `PhraseCursor` implement on the fast path) is answered
+//! by the block-max WAND path in `statements.rs`. The boolean grammar —
+//! `a AND b`, `a OR b`, `a AND NOT b`, `(a OR b) AND c`, `column:a` — needs a
+//! query tree, exactly like the reference:
 //! `SearchDriver::ParseSingleWithFields` builds a [`QueryNode`] and
 //! `QueryBuilder::CreateSearch` turns it into `AndIterator` / `OrIterator` /
 //! `AndNotIterator` over posting iterators (`query_builder_impl.cpp`).
@@ -60,6 +61,9 @@ pub(crate) struct TextTermLookup {
     indexes: HashMap<String, SharedTextIndex>,
     delta_term: f64,
     delta_phrase: f64,
+    /// `bm25_param_k1` / `bm25_param_b`.
+    k1: f64,
+    b: f64,
 }
 
 impl TextTermLookup {
@@ -67,11 +71,14 @@ impl TextTermLookup {
         indexes: HashMap<String, SharedTextIndex>,
         delta_term: f64,
         delta_phrase: f64,
+        bm25: (f64, f64),
     ) -> Self {
         Self {
             indexes,
             delta_term,
             delta_phrase,
+            k1: bm25.0,
+            b: bm25.1,
         }
     }
 }
@@ -94,15 +101,18 @@ impl TermLookup for TextTermLookup {
             .iter()
             .map(|(row, _)| text.doc_len_opt(*row).unwrap_or(1))
             .collect();
-        Some(Box::new(TermDocIterator::new(
-            term,
-            postings,
-            doc_lens,
-            merged.n_docs,
-            merged.total_len,
-            boost,
-            self.delta_term,
-        )))
+        Some(Box::new(
+            TermDocIterator::new(
+                term,
+                postings,
+                doc_lens,
+                merged.n_docs,
+                merged.total_len,
+                boost,
+                self.delta_term,
+            )
+            .with_bm25(self.k1, self.b),
+        ))
     }
 
     /// `PhraseQueryNode::CreateSearch`: the terms' position lists (`"a b"~N`
@@ -135,16 +145,19 @@ impl TermLookup for TextTermLookup {
             .into_iter()
             .map(|row| (row, text.doc_len_opt(row).unwrap_or(1)))
             .collect();
-        Some(Box::new(PhraseDocIterator::new(
-            terms.to_vec(),
-            postings,
-            slop,
-            doc_lens,
-            text.total_docs(),
-            text.corpus_len(),
-            boost,
-            self.delta_phrase,
-        )))
+        Some(Box::new(
+            PhraseDocIterator::new(
+                terms.to_vec(),
+                postings,
+                slop,
+                doc_lens,
+                text.total_docs(),
+                text.corpus_len(),
+                boost,
+                self.delta_phrase,
+            )
+            .with_bm25(self.k1, self.b),
+        ))
     }
 
     // The block-max WAND path is the fast path and stays in `statements.rs`; a
@@ -157,15 +170,23 @@ impl TermLookup for TextTermLookup {
 ///
 /// `None` means the tree produced no iterator (an empty or unbuildable query),
 /// which the caller treats as "no syntax match, fall back".
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_query_tree(
     root: QueryNode,
     indexes: HashMap<String, SharedTextIndex>,
     topn: usize,
     dead: &HashSet<u64>,
+    // Rows the predicate / `filter=` / `IN (…)` admit. Applied before the sort
+    // and the truncation, so a rejected row never takes a `topn` slot.
+    allowed: Option<&crate::engine::wand::DocFilter>,
+    // `threshold=` is a strict lower bound and is applied before the truncation
+    // for the same reason: a rejected row must not occupy a `topn` slot.
+    threshold: Option<f64>,
     delta_term: f64,
     delta_phrase: f64,
+    bm25: (f64, f64),
 ) -> Option<Vec<(u64, f64)>> {
-    let lookup = TextTermLookup::new(indexes, delta_term, delta_phrase);
+    let lookup = TextTermLookup::new(indexes, delta_term, delta_phrase, bm25);
     let mut iterator = QueryBuilder::new(&lookup)
         .create_search(FullTextQueryContext::new(root).with_topn(topn))
         .ok()??;
@@ -180,7 +201,14 @@ pub(crate) fn run_query_tree(
         if dead.contains(&doc) {
             continue;
         }
-        hits.push((doc, iterator.score()));
+        if allowed.is_some_and(|rows| !rows.contains(doc)) {
+            continue;
+        }
+        let score = iterator.score();
+        if threshold.is_some_and(|t| score <= t) {
+            continue;
+        }
+        hits.push((doc, score));
     }
     hits.sort_by(|a, b| {
         b.1.partial_cmp(&a.1)

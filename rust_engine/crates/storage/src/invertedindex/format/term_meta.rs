@@ -41,12 +41,6 @@ impl TermMetaFlags {
         flag
     }
 
-    /// Whether the option word carries `of_position_list`. Always true here
-    /// (see [`Self::option_flag`]), kept as a predicate so the merge can state
-    /// the dependency on a frequency column explicitly.
-    pub fn has_position_list(self) -> bool {
-        self.option_flag() & super::position_list::OF_POSITION_LIST != 0
-    }
 }
 
 /// `OPTION_FLAG_ALL` (`index_defines.cppm:32`): the flag word a full-text index

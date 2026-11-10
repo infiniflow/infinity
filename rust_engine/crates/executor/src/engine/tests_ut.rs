@@ -3474,6 +3474,174 @@ mod tests {
         assert!((value - expected).abs() < 1e-4, "{value} vs {expected}");
     }
 
+    /// `bm25_param_k1` / `bm25_param_b` override the ranker's constants, exactly
+    /// as `bound_select_statement_impl.cpp:239-252` writes them into
+    /// `BM25Params`, and every scoring path reads them.
+    #[test]
+    fn bm25_params_override_the_constants() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE bm (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute(
+            "INSERT INTO bm VALUES (1,'alpha beta'),(2,'alpha gamma'),\
+             (3,'beta gamma'),(4,'alpha beta gamma');",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX bm_i ON bm(body) USING FULLTEXT;")
+            .unwrap();
+
+        // id=4: tf=1 per term, dl=3; N=4, total_len=9 → avgdl=2.25; df=3.
+        let idf = (1.0f64 + 1.5 / 3.5).ln();
+        let score_of = |k1: f64, b: f64| {
+            let norm = (k1 + 1.0) / (1.0 + k1 * ((1.0 - b) + b * 3.0 / 2.25));
+            2.0 * idf * norm
+        };
+        let pick = |rs: &[Vec<String>]| -> f64 {
+            rs.iter()
+                .find(|r| r[0] == "4")
+                .unwrap_or_else(|| panic!("id 4 missing: {rs:?}"))[1]
+                .parse()
+                .unwrap()
+        };
+
+        // Defaults: k1 = 1.2, b = 0.75.
+        let base = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM bm SEARCH MATCH TEXT \
+             ('body','alpha beta','topn=10');",
+        );
+        assert!((pick(&base) - score_of(1.2, 0.75)).abs() < 1e-5);
+
+        // The two options move the score onto the new formula.
+        let tuned = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM bm SEARCH MATCH TEXT \
+             ('body','alpha beta','topn=10;bm25_param_k1=0.5;bm25_param_b=0.5');",
+        );
+        assert!((pick(&tuned) - score_of(0.5, 0.5)).abs() < 1e-5);
+        assert!((pick(&tuned) - pick(&base)).abs() > 1e-3);
+
+        // The query-tree path (`AND`) reads the same parameters: its two term
+        // leaves score with the same formula against the same statistics.
+        let tree = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM bm SEARCH MATCH TEXT \
+             ('body','alpha AND beta','topn=10;bm25_param_k1=0.5;bm25_param_b=0.5');",
+        );
+        assert!((pick(&tree) - score_of(0.5, 0.5)).abs() < 1e-5);
+
+        // The reference rejects out-of-range values.
+        assert!(e
+            .execute("SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_k1=-1');")
+            .is_err());
+        assert!(e
+            .execute("SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_b=2');")
+            .is_err());
+    }
+
+    /// `threshold=` is a strict lower bound (`term_doc_iterator_impl.cpp:118`)
+    /// and it raises the block-max pruning bar rather than only filtering the
+    /// answer afterwards (`UpdateScoreThreshold`), so the pruned and the
+    /// unpruned scans return the same documents.
+    #[test]
+    fn threshold_is_a_strict_lower_bound_and_prunes_the_scan() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE tt (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute(
+            "INSERT INTO tt VALUES (1,'alpha beta'),(2,'alpha gamma'),\
+             (3,'beta gamma'),(4,'alpha beta gamma');",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX tt_i ON tt(body) USING FULLTEXT;")
+            .unwrap();
+
+        // `similarity=boolean` scores one point per matched term, so the scores
+        // are exact integers: 2 for the rows carrying both terms, 1 otherwise.
+        let strict = "SELECT id FROM tt SEARCH MATCH TEXT \
+                      ('body','alpha beta','topn=10;similarity=boolean;threshold=2');";
+        assert!(rows(&e, strict).is_empty(), "threshold is a strict lower bound");
+
+        let above_one = "SELECT id FROM tt SEARCH MATCH TEXT \
+                         ('body','alpha beta','topn=10;similarity=boolean;threshold=1');";
+        assert_eq!(
+            rows(&e, above_one),
+            vec![vec!["1".to_string()], vec!["4".to_string()]]
+        );
+
+        // Same answer with pruning switched off: the threshold changes what the
+        // iterator decodes, never the result set.
+        let unpruned = "SELECT id FROM tt SEARCH MATCH TEXT \
+                        ('body','alpha beta','topn=10;similarity=boolean;threshold=1;block_max=false');";
+        assert_eq!(rows(&e, above_one), rows(&e, unpruned));
+
+        // A non-positive threshold is the reference's `threshold_ <= 0.0f`
+        // shortcut: it filters nothing.
+        let zero = "SELECT id FROM tt SEARCH MATCH TEXT \
+                    ('body','alpha beta','topn=10;similarity=boolean;threshold=0');";
+        assert_eq!(rows(&e, zero).len(), 4);
+    }
+
+    /// `rank_features` adds the posting's doc-payload column, decoded with
+    /// `SmallFloat::UInt16ToFloat122` - `RankFeatureDocIterator`'s number - and
+    /// not the raw JSON value of the row. The payload survives both the memory
+    /// tail and the sealed segment, so the score is the same before and after a
+    /// flush.
+    #[test]
+    fn rank_features_reads_the_index_doc_payload() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE rf (id INT, body VARCHAR, feat VARCHAR);")
+            .unwrap();
+        e.execute(
+            "INSERT INTO rf VALUES (1,'alpha','[{\"Tag1\":1}]'),\
+             (2,'alpha','[{\"Tag1\":2}]');",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX rf_body ON rf (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute(
+            "CREATE INDEX rf_feat ON rf (feat) USING FULLTEXT WITH (analyzer='rankfeatures');",
+        )
+        .unwrap();
+
+        // Both rows carry the same `body`, so the BM25 half is identical and the
+        // difference between the two scores is exactly the feature weight.
+        let base = rows(
+            &e,
+            "SELECT id, SCORE() FROM rf SEARCH MATCH TEXT ('body','alpha','topn=10');",
+        );
+        let ranked = rows(
+            &e,
+            "SELECT id, SCORE() FROM rf SEARCH MATCH TEXT \
+             ('body','alpha','topn=10;rank_features=feat^Tag1^1');",
+        );
+        let pick = |rs: &[Vec<String>], id: &str| -> f64 {
+            rs.iter()
+                .find(|r| r[0] == id)
+                .unwrap_or_else(|| panic!("id {id} missing: {rs:?}"))[1]
+                .parse()
+                .unwrap()
+        };
+        assert!((pick(&ranked, "1") - pick(&base, "1") - 1.0).abs() < 1e-4);
+        assert!((pick(&ranked, "2") - pick(&base, "2") - 2.0).abs() < 1e-4);
+
+        // Round-trip through the sealed segment: the payload is written into the
+        // doc list's `of_doc_payload` column and read back by
+        // `SegmentIndexReader::doc_payloads`.
+        e.flush().unwrap();
+        let sealed = rows(
+            &e,
+            "SELECT id, SCORE() FROM rf SEARCH MATCH TEXT \
+             ('body','alpha','topn=10;rank_features=feat^Tag1^1');",
+        );
+        assert_eq!(sealed.len(), ranked.len());
+        assert!((pick(&sealed, "1") - pick(&ranked, "1")).abs() < 1e-4);
+        assert!((pick(&sealed, "2") - pick(&ranked, "2")).abs() < 1e-4);
+    }
+
     /// A phrase, a multi-token clause under `operator=and`, and a boolean
     /// similarity query answer from the index's postings and position lists: no
     /// row is re-tokenised (`MATCH_ROWS_TOKENIZED` stays 0), which is what the

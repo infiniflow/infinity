@@ -138,9 +138,11 @@ pub(crate) struct Journals {
     pub(crate) delete_ts: Vec<u64>,
 }
 
-/// `rank_features` contribution: `cell` is a JSON array of
-/// `{"<tag>": <number>}` objects, and each listed tag adds `number * weight`.
-/// A missing tag contributes nothing.
+/// `rank_features` contribution from a row's JSON cell - the pre-index path,
+/// kept only for the unit test that pins the JSON shape. The query path reads
+/// the same weight back from the index's doc-payload column instead
+/// (`RankFeatureDocIterator` equivalent).
+#[cfg(test)]
 pub(crate) fn rank_features_bonus(cell: &str, tags: &[(String, f64)]) -> f64 {
     let mut sum = 0.0;
     for (tag, weight) in tags {
@@ -6508,24 +6510,32 @@ pub(crate) fn tokenize_index_text(s: &str, tokenizer: &TextTokenizer) -> Vec<Str
 pub(crate) fn for_each_index_term(
     text: &str,
     tokenizer: &TextTokenizer,
-    mut f: impl FnMut(&str, u32),
+    mut f: impl FnMut(&str, u32, u16),
 ) {
     let streamed = tokenizer.for_each_term(text, &mut |term: analyzer::TermView| {
-        f(term.text, term.word_offset)
+        f(term.text, term.word_offset, term.payload)
     });
     if !streamed {
-        for (term, pos) in tokenize_index_positions(text, tokenizer) {
-            f(&term, pos);
+        for (term, pos, payload) in tokenize_index_terms(text, tokenizer) {
+            f(&term, pos, payload);
         }
     }
 }
 
-pub(crate) fn tokenize_index_positions(s: &str, tokenizer: &TextTokenizer) -> Vec<(String, u32)> {
+/// `(term, position, payload)`. The payload is `Term::payload_`
+/// (`index_defines.cppm`): the `rankfeatures` analyzer encodes the feature
+/// weight with `SmallFloat::Float122ToUInt16`, every other analyzer leaves it
+/// zero. It ends up in the posting's doc-payload slot, which is what
+/// `RankFeatureDocIterator` decodes.
+pub(crate) fn tokenize_index_terms(
+    s: &str,
+    tokenizer: &TextTokenizer,
+) -> Vec<(String, u32, u16)> {
     if let Some(terms) = tokenizer.analyze(s) {
         return terms
             .into_iter()
             .filter(|term| !term.text.is_empty())
-            .map(|term| (term.text, term.word_offset))
+            .map(|term| (term.text, term.word_offset, term.payload))
             .collect();
     }
     let delims = &tokenizer.delims;
@@ -6533,14 +6543,21 @@ pub(crate) fn tokenize_index_positions(s: &str, tokenizer: &TextTokenizer) -> Ve
         return split_words(s, delims)
             .into_iter()
             .enumerate()
-            .map(|(pos, word)| (word, pos as u32))
+            .map(|(pos, word)| (word, pos as u32, 0))
             .collect();
     }
     tokenizer
         .standard(false)
         .analyze(s)
         .into_iter()
-        .map(|t| (t.text, t.word_offset))
+        .map(|t| (t.text, t.word_offset, t.payload))
+        .collect()
+}
+
+pub(crate) fn tokenize_index_positions(s: &str, tokenizer: &TextTokenizer) -> Vec<(String, u32)> {
+    tokenize_index_terms(s, tokenizer)
+        .into_iter()
+        .map(|(text, pos, _)| (text, pos))
         .collect()
 }
 
@@ -6839,28 +6856,38 @@ pub(crate) fn phrase_freq_lists_sloppy(lists: &[Vec<u32>], unit_len: usize, slop
     let mut tf = 0.0f64;
     while !steps.is_empty() {
         // `CalibrateLastStep`: the spread of the prefix ending at the last step.
-        let ok = {
+        // `too_low` says the position is behind the window the prefix allows, so
+        // the same term's *next* occurrence may still fit and only this level
+        // advances; an exhausted list or an over-high position unwinds a level.
+        let (ok, too_low) = {
             let at = steps.len() - 1;
             let pos_i = steps[at].pos_i;
             let term_pos_idx = steps[at].term_pos_idx;
             match lists[pos_i].get(term_pos_idx) {
-                None => false,
+                None => (false, false),
                 Some(&position) => {
                     let phrase_pos = i64::from(position) - pos_i as i64;
                     if pos_i == 0 {
                         steps[at].min_phrase_pos = phrase_pos;
                         steps[at].max_phrase_pos = phrase_pos;
-                        true
+                        (true, false)
                     } else {
                         let (prev_min, prev_max) = {
                             let prev = &steps[at - 1];
                             (prev.min_phrase_pos, prev.max_phrase_pos)
                         };
-                        let min = phrase_pos.min(prev_min);
-                        let max = phrase_pos.max(prev_max);
-                        steps[at].min_phrase_pos = min;
-                        steps[at].max_phrase_pos = max;
-                        max - min <= slop
+                        // The same bound `push` uses for a new level
+                        // (`prev_min - slop + pos_i`), expressed on the
+                        // phrase-relative scale.
+                        if phrase_pos < prev_min - slop {
+                            (false, true)
+                        } else {
+                            let min = phrase_pos.min(prev_min);
+                            let max = phrase_pos.max(prev_max);
+                            steps[at].min_phrase_pos = min;
+                            steps[at].max_phrase_pos = max;
+                            (max - min <= slop, false)
+                        }
                     }
                 }
             }
@@ -6883,6 +6910,11 @@ pub(crate) fn phrase_freq_lists_sloppy(lists: &[Vec<u32>], unit_len: usize, slop
                     max_phrase_pos: 0,
                 });
             }
+        } else if too_low {
+            // The position is behind the prefix's window: the next occurrence of
+            // the same term is the only way forward, so advance this level and
+            // keep the prefix calibrated.
+            steps.last_mut().expect("non-empty").term_pos_idx += 1;
         } else {
             steps.pop();
             if steps.is_empty() {
@@ -7104,7 +7136,11 @@ pub(crate) fn eval_field_query_node(
     n_docs: usize,
     delta_term: f64,
     delta_phrase: f64,
+    // `(k1, b)` from `bm25_param_k1` / `bm25_param_b`
+    // (`bound_select_statement_impl.cpp:239-252`).
+    bm25: (f64, f64),
 ) -> Option<(f64, usize)> {
+    let (k1, b) = bm25;
     match node {
         QueryNode::Term(term) => {
             let fi = fields.iter().position(|field| field.name == term.column)?;
@@ -7123,7 +7159,8 @@ pub(crate) fn eval_field_query_node(
                 let idf = (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln();
                 let len = tokens[fi].len() as f64;
                 let tf = tf as f64;
-                let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / field.avg_len));
+                let norm =
+                    (k1 + 1.0) * tf / (tf + k1 * (1.0 - b + b * len / field.avg_len));
                 idf * (norm + delta_term) * f64::from(term.boost)
             };
             Some((score, 1))
@@ -7150,7 +7187,8 @@ pub(crate) fn eval_field_query_node(
                     .sum();
                 let len = tokens[fi].len() as f64;
                 let tf = freq as f64;
-                let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / field.avg_len));
+                let norm =
+                    (k1 + 1.0) * tf / (tf + k1 * (1.0 - b + b * len / field.avg_len));
                 idf_sum * (norm + delta_phrase) * f64::from(phrase.boost)
             };
             Some((score, phrase.terms.len()))
@@ -7159,7 +7197,7 @@ pub(crate) fn eval_field_query_node(
             let (mut score, mut units) = (0.0, 0);
             for child in children {
                 let (child_score, child_units) =
-                    eval_field_query_node(child, fields, tokens, n_docs, delta_term, delta_phrase)?;
+                    eval_field_query_node(child, fields, tokens, n_docs, delta_term, delta_phrase, bm25)?;
                 score += child_score;
                 units += child_units;
             }
@@ -7170,7 +7208,7 @@ pub(crate) fn eval_field_query_node(
             let mut matched = false;
             for child in children {
                 if let Some((child_score, child_units)) =
-                    eval_field_query_node(child, fields, tokens, n_docs, delta_term, delta_phrase)
+                    eval_field_query_node(child, fields, tokens, n_docs, delta_term, delta_phrase, bm25)
                 {
                     matched = true;
                     score += child_score;
@@ -7188,9 +7226,10 @@ pub(crate) fn eval_field_query_node(
                 n_docs,
                 delta_term,
                 delta_phrase,
+                bm25,
             )?;
             for child in iter {
-                if eval_field_query_node(child, fields, tokens, n_docs, delta_term, delta_phrase)
+                if eval_field_query_node(child, fields, tokens, n_docs, delta_term, delta_phrase, bm25)
                     .is_some()
                 {
                     return None;

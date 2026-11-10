@@ -14,8 +14,12 @@
 //! The reference's `docid_t` is a segment offset because its segments hold a
 //! contiguous row-id range. Our rows live in a flat KV store, so a segment can
 //! span two insert batches whose row ids differ by 2^32. Postings therefore use
-//! a dense document ordinal (0..doc_count), and an auxiliary `.row` file holds
-//! the row id of each ordinal (8 bytes each) so the reader can map back.
+//! the document's offset in the segment's ascending row list (`0..doc_count`),
+//! and an auxiliary `.row` file holds the row id of each offset (8 bytes each) so
+//! the reader can map back and keep the gaps out of the document set. The
+//! reference has no such file: for a dense segment the offsets are exactly
+//! `base_row_id + i`, which is the fallback the reader uses when `.row` is
+//! missing (a segment the reference wrote).
 //!
 //! The `.pos` slice uses the reference framing
 //! (`VInt doc_skip_len, VInt doc_len, doc_skip, doc_list, VInt pos_skip_len,
@@ -65,6 +69,13 @@ use crate::invertedindex::index_merger::{decode_doc_block, PostingWriter};
 /// Auxiliary file: `u64[doc_count]` row ids, one per dense document ordinal.
 /// The reference does not need it (a segment is a contiguous row range); ours is
 /// a flat KV store, so the mapping has to be stored.
+/// The port's own sidecar: `u64[doc_count]`, the row id of each segment offset.
+///
+/// The reference has no equivalent - its `docid_t` is a segment offset and its
+/// chunks cover a contiguous row range, which is why [`SegmentIndexReader::open`]
+/// falls back to `base_row_id + offset` when this file is absent. It is written
+/// so a sparse segment (rows with gaps) keeps its gaps out of the document set;
+/// for a dense segment the file is redundant but harmless.
 pub const FULLTEXT_ROW_SUFFIX: &str = ".row";
 
 /// One term's posting entry in a segment: `(row id, term frequency, positions)`.
@@ -150,59 +161,141 @@ fn write_segment_index_inner(
     flags: TermMetaFlags,
     payload_of: &dyn Fn(&str, u64) -> u16,
 ) -> Result<(), FormatError> {
+    write_segment_index_streaming(
+        index_dir,
+        base_name,
+        base_row_id,
+        docs,
+        flags,
+        &mut |emit| {
+            for (term, list) in postings {
+                let payload = |row: u64| payload_of(term, row);
+                emit(term, list, &payload);
+            }
+        },
+    )
+}
+
+/// Writes the three files of a segment while the caller produces one term at a
+/// time, in ascending byte order.
+///
+/// This is the reference's `SortMergerTermTuple` shape (`memory_indexer_impl.cpp`
+/// `OfflineDump`): the term metadata and the FST dictionary still accumulate
+/// (they are per term, not per posting), but only one term's postings exist at a
+/// time, so sealing a large tail never needs the whole segment's postings in the
+/// heap. `write_segment_index` drives the same writer from a materialised map, so
+/// both paths emit identical bytes.
+/// One term's postings plus the payload lookup for its rows: what
+/// [`write_segment_index_streaming`] hands to the callback it is given.
+pub type TermSink<'a> = dyn FnMut(&str, &[PostingEntry], &dyn Fn(u64) -> u16) + 'a;
+
+/// One mini-block's decoded columns: `doc_id` deltas, frequencies, doc payloads.
+pub type DecodedDocBlock = (Vec<u32>, Vec<u32>, Vec<u16>);
+
+pub fn write_segment_index_streaming(
+    index_dir: &str,
+    base_name: &str,
+    base_row_id: u64,
+    docs: &[(u64, u32)],
+    flags: TermMetaFlags,
+    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+) -> Result<(), FormatError> {
     fs::create_dir_all(index_dir).map_err(|e| FormatError::Io(e.to_string()))?;
 
+    // `docs` is the segment's document set in ascending row order. `.len` is
+    // indexed by the segment offset, so it must follow that same order; `.row`
+    // records the row id each offset belongs to, which is what lets a sparse
+    // segment (rows with gaps) keep its gaps as non-documents instead of padding
+    // `.len` with fake lengths.
+    if docs.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
+        return Err(FormatError::Invalid(
+            "a segment's documents must be strictly ascending by row id".into(),
+        ));
+    }
     let lengths: Vec<u32> = docs.iter().map(|(_, len)| *len).collect();
     let len_bytes = encode_column_lengths(&lengths);
+    let mut row_bytes: Vec<u8> = Vec::with_capacity(docs.len() * 8);
+    for (row, _) in docs {
+        row_bytes.extend_from_slice(&row.to_le_bytes());
+    }
     let mut doc_len: std::collections::HashMap<u64, u32> =
         std::collections::HashMap::with_capacity(docs.len());
     for (row, len) in docs {
         doc_len.insert(*row, *len);
     }
+    // `docs` is exactly `base_row_id + offset`: the reference's shape, where an
+    // offset is a subtraction instead of a search.
+    let dense = !docs.is_empty()
+        && docs[0].0 == base_row_id
+        && docs[docs.len() - 1].0 == base_row_id + docs.len() as u64 - 1;
 
     let mut pos: Vec<u8> = Vec::new();
-    let mut metas: Vec<TermMeta> = Vec::with_capacity(postings.len());
-    let mut terms: Vec<Vec<u8>> = Vec::with_capacity(postings.len());
-    for (term, list) in postings {
-        if list.is_empty() {
-            continue;
-        }
-        let mut writer = PostingWriter::new(flags);
-        for (row, tf, doc_positions) in list {
-            // The reference's `docid_t` is the segment offset
-            // (`ColumnIndexMerger::MergeTerm` rebases with
-            // `base_row_id - merge_base_rowid`), so a doc id is
-            // `row - base_row_id`.
-            let doc = row
-                .checked_sub(base_row_id)
-                .and_then(|d| u32::try_from(d).ok())
-                .ok_or_else(|| {
-                    FormatError::Invalid(format!(
-                        "row {row} is outside the segment starting at {base_row_id}"
-                    ))
-                })?;
-            let len = doc_len.get(row).copied().unwrap_or(*tf);
-            // `PostingWriter::AddPosition` counts the frequency and writes the
-            // position stream (`posting_writer_impl.cpp:87-92`), so the two can
-            // never disagree.
-            if doc_positions.is_empty() {
-                // Indexed without a position list: the frequency can only come
-                // from the caller (`SetCurrentTF`).
-                writer.set_current_tf(*tf);
-            } else if doc_positions.len() == *tf as usize {
-                for p in doc_positions {
-                    writer.add_position(*p);
-                }
-            } else {
-                return Err(FormatError::Invalid(format!(
-                    "term '{term}' has {} positions for document {row} but its frequency is {tf}",
-                    doc_positions.len()
-                )));
+    let mut metas: Vec<TermMeta> = Vec::new();
+    let mut terms: Vec<Vec<u8>> = Vec::new();
+    // An error inside the callback cannot propagate through the `dyn` signature,
+    // so it is parked here and returned once the term loop is done.
+    let mut failure: Option<FormatError> = None;
+    {
+        let mut emit = |term: &str, list: &[PostingEntry], payload_of: &dyn Fn(u64) -> u16| {
+            if failure.is_some() || list.is_empty() {
+                return;
             }
-            writer.end_document(doc, len, payload_of(term, *row));
-        }
-        metas.push(writer.dump(&mut pos));
-        terms.push(term.as_bytes().to_vec());
+            let mut writer = PostingWriter::new(flags);
+            for (row, tf, doc_positions) in list {
+                // `docid_t` is the segment offset: this row's position in the
+                // ascending document list. `ColumnIndexMerger::MergeTerm` rebases
+                // with `base_row_id - merge_base_rowid`, which is the same number
+                // for a dense segment; a sparse one searches, so the posting stays
+                // inside `0..doc_count` and still indexes `.len` (the real row ids
+                // live in the `.row` table).
+                let ordinal = if dense {
+                    row.checked_sub(base_row_id)
+                        .filter(|offset| (*offset as usize) < docs.len())
+                        .map(|offset| offset as usize)
+                } else {
+                    docs.binary_search_by_key(row, |(r, _)| *r).ok()
+                };
+                let Some(ordinal) = ordinal else {
+                    failure = Some(FormatError::Invalid(format!(
+                        "term '{term}' has a posting for row {row}, which is not a document of \
+                         the segment starting at {base_row_id}"
+                    )));
+                    return;
+                };
+                let Some(doc) = u32::try_from(ordinal).ok() else {
+                    failure = Some(FormatError::Invalid(format!(
+                        "segment at {base_row_id} has more than u32::MAX documents"
+                    )));
+                    return;
+                };
+                let len = doc_len.get(row).copied().unwrap_or(*tf);
+                // `PostingWriter::AddPosition` counts the frequency and writes the
+                // position stream (`posting_writer_impl.cpp:87-92`), so the two can
+                // never disagree.
+                if doc_positions.is_empty() {
+                    // Indexed without a position list: the frequency can only come
+                    // from the caller (`SetCurrentTF`).
+                    writer.set_current_tf(*tf);
+                } else if doc_positions.len() == *tf as usize {
+                    for p in doc_positions {
+                        writer.add_position(*p);
+                    }
+                } else {
+                    failure = Some(FormatError::Invalid(format!(
+                        "term '{term}' has {} positions for document {row} but its frequency is {tf}",
+                        doc_positions.len()
+                    )));
+                    return;
+                }
+                writer.end_document(doc, len, payload_of(*row));
+            }
+            metas.push(writer.dump(&mut pos));
+            terms.push(term.as_bytes().to_vec());
+        };
+        for_each_term(&mut emit);
+    }
+    if let Some(failure) = failure {
+        return Err(failure);
     }
 
     let (meta_region, offsets) = encode_term_meta_region_with_offsets(&metas, flags);
@@ -218,6 +311,10 @@ fn write_segment_index_inner(
     write(FULLTEXT_DICT_SUFFIX, &dic)?;
     write(FULLTEXT_POSTING_SUFFIX, &pos)?;
     write(FULLTEXT_LENGTH_SUFFIX, &len_bytes)?;
+    // The port's own sidecar; a contiguous segment's ids are `base_row_id + i`,
+    // so the reference's reader (which has no row table) still sees a dense
+    // segment after the file is ignored.
+    write(FULLTEXT_ROW_SUFFIX, &row_bytes)?;
     Ok(())
 }
 
@@ -232,10 +329,14 @@ pub struct SegmentIndexReader {
     /// posting's `docid_t` equal `row - base_row_id`
     /// (`ChunkIndexMetaInfo::base_row_id_`).
     base_row_id: u64,
-    /// `base_row_id..base_row_id + doc_count`, materialised once so the query
-    /// path can hand out slices (derived, not stored on disk: the reference has
-    /// no row table).
+    /// The segment's row ids in offset order, materialised once so the query path
+    /// can hand out slices. A dense segment (the reference's shape) is
+    /// `base_row_id..base_row_id + doc_count`; a sparse one comes from the `.row`
+    /// sidecar.
     rows: Vec<u64>,
+    /// `rows` is exactly `base_row_id + offset`, so an ordinal is a subtraction
+    /// instead of a search.
+    dense: bool,
     flags: TermMetaFlags,
     /// The name the three files were opened under (`ft_{base:016x}` or the
     /// merged `ft_{base:016x}_{rows:x}`), which a merge needs as its source id.
@@ -267,13 +368,29 @@ impl SegmentIndexReader {
         };
         let len = map(FULLTEXT_LENGTH_SUFFIX)?;
         let doc_count = len.len() / 4;
-        let rows = (0..doc_count as u64).map(|d| base_row_id + d).collect();
+        // The port writes a `.row` table (the real row ids in segment-offset
+        // order), so a segment whose rows have gaps keeps them out of the
+        // document set. The reference has no such file - its chunks cover a
+        // contiguous range - and that dense case is exactly `base_row_id + offset`,
+        // so the fallback reads the same bytes.
+        let rows: Vec<u64> =
+            match std::fs::read(fulltext_chunk_file(dir, base_name, FULLTEXT_ROW_SUFFIX)) {
+                Ok(bytes) if bytes.len() == doc_count * 8 => bytes
+                    .chunks(8)
+                    .map(|chunk| u64::from_le_bytes(chunk.try_into().expect("an 8-byte chunk")))
+                    .collect(),
+                _ => (0..doc_count as u64).map(|d| base_row_id + d).collect(),
+            };
+        let dense = doc_count > 0
+            && rows.first() == Some(&base_row_id)
+            && rows.last() == Some(&(base_row_id + doc_count as u64 - 1));
         Ok(Self {
             dic: map(FULLTEXT_DICT_SUFFIX)?,
             pos: map(FULLTEXT_POSTING_SUFFIX)?,
             len,
             base_row_id,
             rows,
+            dense,
             flags,
             base_name: base_name.to_string(),
         })
@@ -287,8 +404,12 @@ impl SegmentIndexReader {
 
     /// Segment offset (`docid_t`) of `row`, if the segment holds it.
     pub fn ordinal(&self, row: u64) -> Option<u32> {
-        let doc = row.checked_sub(self.base_row_id)?;
-        (doc < self.doc_count() as u64).then_some(doc as u32)
+        if self.dense {
+            let doc = row.checked_sub(self.base_row_id)?;
+            (doc < self.doc_count() as u64).then_some(doc as u32)
+        } else {
+            self.rows.binary_search(&row).ok().map(|ord| ord as u32)
+        }
     }
 
     /// The document length of `row` (BM25 `dl`), addressed by its segment
@@ -393,7 +514,7 @@ impl SegmentIndexReader {
         let mut left = df;
         while left > 0 {
             let take = left.min(POSTING_MINI_BLOCK);
-            let (d, t) = self.decode_doc_block(&framed.doc_list, &mut off, take)?;
+            let (d, t, _) = self.decode_doc_block(&framed.doc_list, &mut off, take)?;
             docs.extend_from_slice(&d);
             tfs.extend_from_slice(&t);
             left -= take;
@@ -406,6 +527,45 @@ impl SegmentIndexReader {
             if let Some(row) = self.rows.get(last as usize) {
                 out.push((*row, tf));
             }
+        }
+        Ok(out)
+    }
+
+    /// The doc-payload column of `term`'s doc list (`of_doc_payload`, written by
+    /// `DocListEncoder::add_document`): `(row id, payload)` ascending by row id.
+    ///
+    /// The `rankfeatures` analyzer is the only producer (its
+    /// `SmallFloat::Float122ToUInt16` weight) and
+    /// `RankFeatureDocIterator` the only consumer. An index without the payload
+    /// column, or a term that carries no payload, yields an empty list.
+    pub fn doc_payloads(&self, term: &str) -> Result<Vec<(u64, u16)>, FormatError> {
+        if !DocListFormatOption::new(self.flags.option_flag()).has_doc_payload {
+            return Ok(Vec::new());
+        }
+        let Some(meta) = self.lookup(term)? else {
+            return Ok(Vec::new());
+        };
+        let start = meta.doc_start as usize;
+        let end = meta.pos_end as usize;
+        let slice = self.pos.get(start..end).ok_or(FormatError::Truncated {
+            need: end,
+            got: self.pos.len(),
+        })?;
+        let (framed, _) = TermPostings::decode(slice)?;
+        let mut off = 0usize;
+        let mut left = meta.doc_freq as usize;
+        let mut out = Vec::with_capacity(left);
+        let mut last: u32 = 0;
+        while left > 0 {
+            let take = left.min(POSTING_MINI_BLOCK);
+            let (deltas, _, payloads) = self.decode_doc_block(&framed.doc_list, &mut off, take)?;
+            for (delta, payload) in deltas.into_iter().zip(payloads) {
+                last = last.wrapping_add(delta);
+                if let Some(row) = self.rows.get(last as usize) {
+                    out.push((*row, payload));
+                }
+            }
+            left -= take;
         }
         Ok(out)
     }
@@ -491,7 +651,7 @@ impl SegmentIndexReader {
 
     /// The row id of segment offset `doc` (`base_row_id + docid_t`).
     fn row_of_doc(&self, doc: u32) -> Option<u64> {
-        ((doc as usize) < self.rows.len()).then(|| self.base_row_id + u64::from(doc))
+        self.rows.get(doc as usize).copied()
     }
 
     /// Decodes one 128-document mini-block of a doc list: the `doc_id` column,
@@ -501,19 +661,18 @@ impl SegmentIndexReader {
     /// `PostingByteSlice::DoFlush` (`posting_byte_slice_impl.cpp:18-32`) and
     /// `DocListEncoder::AddDocument` (`doc_list_encoder_impl.cpp:57-75`).
     ///
-    /// Returns the `doc_id` deltas and the frequencies, and advances `off` past
-    /// the block.
+    /// Returnsthe `doc_id` deltas, the frequencies and the doc-payload column,
+    /// and advances `off` past the block.
     fn decode_doc_block(
         &self,
         doc_list: &[u8],
         off: &mut usize,
         count: usize,
-    ) -> Result<(Vec<u32>, Vec<u32>), FormatError> {
+    ) -> Result<DecodedDocBlock, FormatError> {
         // One decoder for the cursor and the merger
-        // (`index_merger::decode_doc_block`); the cursor has no use for the
-        // payload column, but it has to be consumed to keep `off` aligned.
+        // (`index_merger::decode_doc_block`).
         let block = decode_doc_block(doc_list, off, count, self.flags)?;
-        Ok((block.doc_ids, block.tfs))
+        Ok((block.doc_ids, block.tfs, block.doc_payloads))
     }
 
     /// The positions of `term`, per document, the read side of
@@ -626,7 +785,7 @@ impl<'a> TermDocCursor<'a> {
     fn fill(&mut self) -> bool {
         while self.left > 0 {
             let take = self.left.min(POSTING_MINI_BLOCK);
-            let Ok((docs, tfs)) = self
+            let Ok((docs, tfs, _)) = self
                 .reader
                 .decode_doc_block(self.doc_list, &mut self.off, take)
             else {
@@ -645,6 +804,11 @@ impl<'a> TermDocCursor<'a> {
             self.tfs.clear();
             self.ordinals.clear();
             self.at = 0;
+            // `consume_to_end` pushed `consumed` to the *previous* block's length;
+            // the new block starts its own position accounting, so a cursor that
+            // crosses a block boundary naturally (no `seek`, no hop) would
+            // otherwise hand back the old block's last document positions.
+            self.consumed = 0;
             for (delta, tf) in docs.into_iter().zip(tfs) {
                 self.last_ordinal = self.last_ordinal.wrapping_add(delta);
                 if let Some(row) = self.reader.row_of_doc(self.last_ordinal) {
@@ -1072,6 +1236,32 @@ impl PostingIterator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A cursor that crosses a mini-block boundary naturally - no seek, no skip
+    /// list hop - must hand out the **new** block's positions. `fill` used to
+    /// reset the block cursor (`at`) but not the position accounting
+    /// (`consumed`), so every document of the new block got the previous block's
+    /// last positions; phrase / `~N` queries read exactly this.
+    #[test]
+    fn positions_survive_a_natural_block_boundary() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_str = dir.path().to_str().unwrap();
+        let docs: Vec<(u64, u32)> = (0..400u64).map(|row| (row, 5)).collect();
+        let postings = BTreeMap::from([(
+            "t".to_string(),
+            (0..400u64)
+                .map(|row| (row, 1, vec![(row % 5) as u32]))
+                .collect::<Vec<_>>(),
+        )]);
+        let flags = crate::invertedindex::format::OPTION_FLAG_ALL;
+        write_segment_index(dir_str, "bnd", 0, &docs, &postings, flags).unwrap();
+        let reader = SegmentIndexReader::open(dir_str, "bnd", 0, flags).unwrap();
+        let mut cursor = reader.term_doc_cursor("t").unwrap().unwrap();
+        while let Some(doc) = cursor.doc() {
+            assert_eq!(cursor.positions(), [(doc % 5) as u32], "doc {doc}");
+            cursor.skip(1);
+        }
+    }
 
     #[allow(clippy::type_complexity)]
     fn sample() -> (Vec<(u64, u32)>, BTreeMap<String, Vec<PostingEntry>>) {

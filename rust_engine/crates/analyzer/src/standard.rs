@@ -104,6 +104,7 @@ impl StandardAnalyzer {
                     word_offset,
                     char_offset: offset,
                     end_offset,
+                    payload: 0,
                 })
             };
             let emit = &mut emit;

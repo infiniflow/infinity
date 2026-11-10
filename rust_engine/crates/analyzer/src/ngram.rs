@@ -54,6 +54,7 @@ impl NGramAnalyzer {
                 word_offset: offset,
                 char_offset: start_byte as u32,
                 end_offset: end_byte as u32,
+                payload: 0,
             });
             offset += 1;
             i += 1;

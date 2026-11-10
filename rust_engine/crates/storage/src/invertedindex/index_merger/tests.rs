@@ -336,8 +336,9 @@ fn a_position_list_without_frequencies_is_refused() {
         has_block_max: false,
     };
     assert!(
-        flags.has_position_list(),
-        "this store always sets of_position_list"
+        !flags.has_term_frequency,
+        "the refusal is about the missing frequency column, not about positions \
+         (this store always sets of_position_list)"
     );
     let result = ColumnIndexMerger::new(d, flags).merge(&[source("chunk1", 0)], "merged");
     assert!(

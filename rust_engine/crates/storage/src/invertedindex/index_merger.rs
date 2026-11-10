@@ -597,8 +597,10 @@ impl ColumnIndexMerger {
         // `HasTfList()` its loop has no per-document stop and runs to the end of
         // the stream). The reference never builds such an index, and merging one
         // would silently collapse every document to a single occurrence, so it
-        // is refused instead.
-        if self.flags.has_position_list() && !self.flags.has_term_frequency {
+        // is refused instead. Every index this store writes carries a position
+        // list ([`TermMetaFlags::option_flag`] always sets `OF_POSITION_LIST`), so
+        // the condition is about the frequency column, not about positions.
+        if !self.flags.has_term_frequency {
             return Err(FormatError::Invalid(
                 "cannot merge an index with position lists but no term frequencies: \
                  the position stream has no per-document boundary"
@@ -617,12 +619,18 @@ impl ColumnIndexMerger {
         // (`column_index_merger_impl.cpp:96-137`).
         let mut column_lengths: Vec<u32> = Vec::new();
         for source in sources {
-            let offset = usize::try_from(source.base_row_id - merge_base_rowid).map_err(|_| {
+            // `docid_t` is a `u32` in the reference, so a source more than
+            // `u32::MAX` rows above the merge base cannot be placed at all. Check
+            // before sizing the array: two sources straddling a segment boundary
+            // are 2^32 apart, and `as usize` would ask for a 16 GiB vector before
+            // `PostingMerger` ever sees the offset.
+            let offset = u32::try_from(source.base_row_id - merge_base_rowid).map_err(|_| {
                 FormatError::Invalid(format!(
-                    "source base row id {} is below the merge base {merge_base_rowid}",
+                    "source base row id {} is more than u32::MAX rows above the merge base \
+                     {merge_base_rowid}",
                     source.base_row_id
                 ))
-            })?;
+            })? as usize;
             let path =
                 fulltext_chunk_file(&self.index_dir, &source.base_name, FULLTEXT_LENGTH_SUFFIX);
             let bytes = fs::read(&path).map_err(|e| FormatError::Io(e.to_string()))?;

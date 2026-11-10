@@ -35,9 +35,11 @@ const BLOCK_SIZE: usize = WAND_BLOCK;
 /// of the block's largest tf/doc-length ratio (doc_list_encoder_impl.cpp:166).
 const PERCENTAGE_SCALE: f64 = u16::MAX as f64;
 
-/// BM25Ranker (bm25_ranker_impl.cpp:25-34): k1 = 1.2, b = 0.75,
+/// BM25Ranker (bm25_ranker_impl.cpp:25-34): k1 = 1.2, b = 0.75 by default,
 /// idf = ln(1 + (N - df + 0.5) / (df + 0.5)), plus the optional delta_term added
-/// to the tf norm.
+/// to the tf norm. `bm25_param_k1` / `bm25_param_b` override the two constants
+/// (`bound_select_statement_impl.cpp:239-252`).
+#[derive(Clone)]
 pub(crate) struct Bm25Ranker {
     pub k1: f64,
     pub b: f64,
@@ -45,12 +47,15 @@ pub(crate) struct Bm25Ranker {
 }
 
 impl Bm25Ranker {
+    /// The reference defaults (`kBM25K1 = 1.2`, `kBM25B = 0.75`).
     pub fn new(delta: f64) -> Self {
-        Self {
-            k1: 1.2,
-            b: 0.75,
-            delta,
-        }
+        Self::with_params(1.2, 0.75, delta)
+    }
+
+    /// `bm25_param_k1=<f>` / `bm25_param_b=<f>`: the values
+    /// `bound_select_statement_impl.cpp:239-252` writes into `BM25Params`.
+    pub fn with_params(k1: f64, b: f64, delta: f64) -> Self {
+        Self { k1, b, delta }
     }
 
     pub fn idf(&self, n_docs: f64, df: f64) -> f64 {
@@ -80,9 +85,10 @@ impl Bm25Ranker {
         idf * (norm + delta) * weight
     }
 
-    /// `f4 = delta / (k1 + 1)` for an arbitrary per-unit delta.
-    pub fn f4_with(delta: f64) -> f64 {
-        delta / 2.2
+    /// `f4 = delta / (k1 + 1)` for an arbitrary per-unit delta
+    /// (`term_doc_iterator_impl.cpp:76`).
+    pub fn f4(&self, delta: f64) -> f64 {
+        delta / (self.k1 + 1.0)
     }
 
     /// tf_norm <= k1+1, so this is a safe upper bound for pruning.
@@ -326,7 +332,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                         ranker.common(idf, w),
                         ranker.f1(),
                         ranker.f3(avg),
-                        Bm25Ranker::f4_with(unit_delta),
+                        ranker.f4(unit_delta),
                     ),
                     WandMode::Boolean => (w, 0.0, 0.0, 0.0, 0.0),
                 };
@@ -391,6 +397,48 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// pruned path, without the pruning.
     pub fn with_naive(mut self) -> Self {
         self.naive = true;
+        self
+    }
+
+    /// `bm25_param_k1=<f>` / `bm25_param_b=<f>`: the reference folds both into
+    /// `BM25Params` before any iterator is built
+    /// (`bound_select_statement_impl.cpp:239-252`), so every coefficient derived
+    /// from k1/b - the whole-term bound, `common`, f1, f3, f4 - is recomputed
+    /// here. `similarity=boolean` never touches BM25 and is left alone.
+    pub fn with_bm25_params(mut self, k1: f64, b: f64) -> Self {
+        if self.mode == WandMode::Boolean {
+            return self;
+        }
+        let ranker = Bm25Ranker::with_params(k1, b, self.ranker.delta);
+        for cursor in &mut self.cursors {
+            cursor.upper_bound = ranker.upper_bound(cursor.idf, cursor.weight);
+            cursor.common = ranker.common(cursor.idf, cursor.weight);
+            cursor.f1 = ranker.f1();
+            cursor.f3 = ranker.f3(cursor.avg);
+            cursor.f4 = ranker.f4(cursor.delta);
+        }
+        // The pruning bound is the sum over the cursors that still have a
+        // document; a retired cursor contributes nothing.
+        self.total_upper = self
+            .cursors
+            .iter()
+            .filter(|c| c.cur.is_some())
+            .map(|c| c.upper_bound)
+            .sum();
+        self.ranker = ranker;
+        self
+    }
+
+    /// `threshold=<f>`: the reference raises the block-max WAND's pruning bar to
+    /// the requested score (`UpdateScoreThreshold`,
+    /// `blockmax_wand_iterator_impl.cpp:233-246`, fed by
+    /// `physical_match_impl.cpp`), so documents whose bound cannot reach it are
+    /// skipped instead of decoded and then dropped. `t <= 0` means "no
+    /// threshold" - the reference's `threshold_ <= 0.0f` shortcut.
+    pub fn with_threshold(mut self, t: f64) -> Self {
+        if t > 0.0 {
+            self.threshold = self.threshold.max(t);
+        }
         self
     }
 
@@ -505,7 +553,10 @@ impl<'a> BlockMaxWandIterator<'a> {
         });
         self.best.truncate(self.k);
         if self.best.len() == self.k {
-            self.threshold = self.best[self.k - 1].1;
+            // `UpdateScoreThreshold` only ever raises the bar
+            // (`blockmax_wand_iterator_impl.cpp:233-246`), so a user
+            // `threshold=` survives a weak k-th score.
+            self.threshold = self.threshold.max(self.best[self.k - 1].1);
         }
     }
 
@@ -813,7 +864,7 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// Sums the exact BM25Score() of the prefix cursors, all parked on the same
     /// document.
     fn score_prefix(&mut self) -> f64 {
-        let ranker = Bm25Ranker::new(self.ranker.delta);
+        let ranker = self.ranker.clone();
         let mut score = 0.0;
         // Sum in cursor creation order (field-major, then term) so the value is
         // independent of the document order the heap handed us, matching the

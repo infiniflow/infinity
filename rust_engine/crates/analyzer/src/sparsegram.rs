@@ -26,6 +26,7 @@ impl SparseGramAnalyzer {
                 word_offset: offset,
                 char_offset: 0,
                 end_offset: offset + 1,
+                payload: 0,
             });
             offset += 1;
         });

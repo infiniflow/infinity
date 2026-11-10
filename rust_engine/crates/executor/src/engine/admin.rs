@@ -61,12 +61,19 @@ impl Engine {
         let gate = self.batch_gate(table);
         let _batch = gate.lock().unwrap();
         let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let Some(entry) = tables.get(&key) else {
-            return Ok(0);
+        // Clone the handles while the `tables` guard is held, then drop it before
+        // taking any index write lock. `text_index_for` takes `tables` first and
+        // the index second, so waiting for an index lock with `tables` held is the
+        // reverse order and can deadlock a concurrent seal or query.
+        let indexes: Vec<_> = {
+            let tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get(&key) else {
+                return Ok(0);
+            };
+            entry.text.values().cloned().collect()
         };
         let mut merges = 0;
-        for index in entry.text.values() {
+        for index in indexes {
             let mut guard = index.write().unwrap();
             merges += guard.optimize_chunks()?;
         }
