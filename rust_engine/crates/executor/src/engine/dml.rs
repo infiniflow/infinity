@@ -1119,6 +1119,12 @@ impl Engine {
     /// string) and took the registry lock for every row, and looked the indexed
     /// column up in the schema once per index per row. A bulk statement paid
     /// that per row; this pays it once for the batch.
+    ///
+    /// Each key is the column's **order-preserving encoding**
+    /// (`Key::ordered_bytes`) - the same domain a sealed chunk uses - so the
+    /// memory tail is ordered like the column (a range scan slices it instead
+    /// of decoding every key) and a dump can write its keys out directly. The
+    /// tails are cloned out under the table lock and appended to outside it.
     pub(crate) fn update_secondary_indexes_batch(
         &self,
         table: &str,
@@ -1129,40 +1135,51 @@ impl Engine {
         if rows.is_empty() {
             return;
         }
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey).or_default();
-        if entry.secondary.indexes.is_empty() {
+        let targets = self.secondary_targets(table, schema);
+        if targets.is_empty() {
             return;
         }
-        // `(position of the indexed column in the row, index)`, resolved once.
-        let mut targets: Vec<(usize, &mut SecondaryIndex)> = Vec::new();
-        for (col, idx) in entry.secondary.indexes.iter_mut() {
-            if let Some(pos) = schema.iter().position(|c| c == col) {
-                targets.push((pos, idx));
-            }
-        }
-        // Only the indexed cells are rendered: the key is the cell's stored
-        // text, and a wide table has no reason to format the rest. A varchar
-        // cell *is* its stored text, so it goes in without a copy; everything
-        // else is formatted into one buffer reused across the batch.
-        let mut key = String::new();
         for (k, values) in rows.iter().enumerate() {
             let seq = (base + k) as u64;
-            for (pos, idx) in targets.iter_mut() {
+            for (pos, declared, index) in &targets {
                 let Some(value) = values.get(*pos) else {
                     continue;
                 };
-                match value {
-                    Value::Str(text) => idx.insert(text.as_bytes(), seq),
-                    other => {
-                        key.clear();
-                        key.push_str(&other.to_slt_string());
-                        idx.insert(key.as_bytes(), seq);
-                    }
+                // A JSON document contributes one key per flattened term; every
+                // other column contributes exactly one.
+                for key in value_to_tail_keys(declared, value) {
+                    index.insert(&key, seq);
                 }
             }
         }
+    }
+
+    /// `(position in the row, declared type, memory tail)` of each indexed
+    /// column, resolved once per statement and held outside the table lock.
+    ///
+    /// The tail is an `Arc` (the registry only borrows it while building this
+    /// list), so the rows go into it without excluding any other table - the
+    /// reference writes into each `SecondaryIndexInMemT` the same way.
+    fn secondary_targets(
+        &self,
+        table: &str,
+        schema: &[String],
+    ) -> Vec<(usize, String, Arc<SecondaryIndex>)> {
+        let tkey = self.table_key(table);
+        let tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get(&tkey) else {
+            return Vec::new();
+        };
+        entry
+            .secondary
+            .indexes
+            .iter()
+            .filter_map(|(col, index)| {
+                let pos = schema.iter().position(|c| c == col)?;
+                let declared = entry.secondary.declared_types.get(col)?;
+                Some((pos, declared.clone(), Arc::clone(index)))
+            })
+            .collect()
     }
 
     pub(crate) fn update_indexes_on_insert_text(
@@ -1172,14 +1189,12 @@ impl Engine {
         values: &[String],
         schema: &[String],
     ) -> Result<()> {
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey).or_default();
-        for (col, idx) in entry.secondary.indexes.iter_mut() {
-            if let Some(ci) = schema.iter().position(|c| c == col) {
-                if let Some(v) = values.get(ci) {
-                    idx.insert(v.as_bytes(), seq as u64);
-                }
+        for (pos, declared, index) in self.secondary_targets(table, schema) {
+            let Some(text) = values.get(pos) else {
+                continue;
+            };
+            for key in text_to_tail_keys(&declared, text) {
+                index.insert(&key, seq as u64);
             }
         }
         Ok(())

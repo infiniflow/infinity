@@ -337,8 +337,12 @@ impl Engine {
         entry.secondary.disk_backed.insert(column.to_string());
         entry
             .secondary
+            .declared_types
+            .insert(column.to_string(), type_upper.clone());
+        entry
+            .secondary
             .indexes
-            .insert(column.to_string(), SecondaryIndex::new());
+            .insert(column.to_string(), Arc::new(SecondaryIndex::new()));
         Ok(())
     }
 
@@ -885,18 +889,19 @@ impl Engine {
                 .map(|t| t.trim().to_ascii_uppercase())
                 .unwrap_or_default();
             let is_bool = ty.starts_with("BOOL");
-            let is_int = ty.starts_with("INT") || ty.starts_with("UINT");
             let tail_kind = secondary_key_kind(&ty);
             let key = index_key(&im.table, &column);
-            let tail = match self
-                .tables
-                .lock()
-                .unwrap()
-                .get_mut(&tkey)
-                .and_then(|e| e.secondary.indexes.get_mut(&column))
-            {
-                Some(idx) => idx.take(),
-                None => continue,
+            // `take` needs only `&self` (the tail has its own RCU), so the table
+            // lock is released before the chunk the dump builds from it.
+            let tail = {
+                let tables = self.tables.lock().unwrap();
+                let Some(index) = tables
+                    .get(&tkey)
+                    .and_then(|e| e.secondary.indexes.get(&column))
+                else {
+                    continue;
+                };
+                index.take()
             };
             if tail.is_empty() {
                 continue;
@@ -908,37 +913,11 @@ impl Engine {
             if !is_bool {
                 let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
                 for (raw_key, ids) in &tail {
-                    let Some(text) = std::str::from_utf8(raw_key).ok() else {
+                    // The tail was written in the column's ordered encoding
+                    // (`Key::ordered_bytes`), which is exactly the domain the
+                    // chunk stores, so a dump decodes instead of parsing text.
+                    let Some(ordered) = Key::from_ordered_bytes(tail_kind, raw_key) else {
                         continue;
-                    };
-                    let ordered = if is_int {
-                        match text.trim().parse::<i64>() {
-                            Ok(v) => integer_secondary_key(&ty, v),
-                            Err(_) => continue,
-                        }
-                    } else if tail_kind == KeyKind::F32 || tail_kind == KeyKind::F64 {
-                        // FLOAT/DOUBLE: the raw value is the key.
-                        let Ok(v) = text.trim().parse::<f64>() else {
-                            continue;
-                        };
-                        if tail_kind == KeyKind::F32 {
-                            Key::F32(v as f32)
-                        } else {
-                            Key::F64(v)
-                        }
-                    } else if key_domain(&ty) == KeyDomain::Temporal {
-                        // DATE/TIME: the ordered day/second count.
-                        let Some(v) = temporal_key(&ty, text) else {
-                            continue;
-                        };
-                        if tail_kind == KeyKind::I32 {
-                            Key::I32(v as i32)
-                        } else {
-                            Key::I64(v)
-                        }
-                    } else {
-                        // VARCHAR/JSON: the reference hashes the key.
-                        Key::U64(storage::secondary_segment::hash_varchar(text))
                     };
                     for id in ids {
                         by_segment
@@ -993,10 +972,14 @@ impl Engine {
             } else {
                 let mut by_segment: HashMap<u64, [Vec<u32>; 2]> = HashMap::new();
                 for (raw_key, ids) in &tail {
-                    let text = String::from_utf8_lossy(raw_key);
-                    let bit = matches!(text.trim(), "true" | "1");
+                    // A BOOL tail key is the ordered encoding of 0/1, one byte.
+                    let Some(Key::Bool(flag)) = Key::from_ordered_bytes(KeyKind::Bool, raw_key)
+                    else {
+                        continue;
+                    };
+                    let bit = usize::from(flag);
                     for id in ids {
-                        by_segment.entry(id >> 32).or_default()[bit as usize]
+                        by_segment.entry(id >> 32).or_default()[bit]
                             .push((*id & 0xffff_ffff) as u32);
                     }
                 }
@@ -1010,18 +993,28 @@ impl Engine {
                     .unwrap_or(0);
                 let mut readers = Vec::new();
                 for (offset, (segment, lists)) in by_segment.into_iter().enumerate() {
-                    let mut entries: Vec<(u64, Vec<u32>)> = Vec::new();
+                    // A BOOL chunk's key array is one byte per unique value
+                    // (`KeepOrderedSelf<BooleanT>`), so it is written typed.
+                    let mut entries: Vec<(storage::secondary_lowcard::LowCardKey, Vec<u32>)> =
+                        Vec::new();
                     for (bit, list) in lists.iter().enumerate() {
                         if !list.is_empty() {
-                            entries.push((bit as u64, list.clone()));
+                            entries.push((
+                                storage::secondary_lowcard::LowCardKey::Fixed(Key::Bool(bit != 0)),
+                                list.clone(),
+                            ));
                         }
                     }
-                    entries.sort_by_key(|(k, _)| *k);
                     let path = dir.join(format!("seg_{segment}_tail{}.idx", start + offset));
-                    if storage::secondary_lowcard::write_lowcard_segment(&path, &entries).is_err() {
+                    if storage::secondary_lowcard::write_lowcard_segment_typed(&path, &entries)
+                        .is_err()
+                    {
                         continue;
                     }
-                    if let Ok(reader) = storage::secondary_lowcard::LowCardReader::open(&path) {
+                    if let Ok(reader) = storage::secondary_lowcard::LowCardReader::open_with_kind(
+                        &path,
+                        KeyKind::Bool,
+                    ) {
                         readers.push((segment << 32, Arc::new(reader)));
                     }
                 }
@@ -1092,7 +1085,7 @@ impl Engine {
                 .unwrap()
                 .values()
                 .flat_map(|e| e.secondary.indexes.values())
-                .map(SecondaryIndex::approx_bytes)
+                .map(|index| index.approx_bytes())
                 .sum::<usize>()
     }
 
@@ -1104,12 +1097,15 @@ impl Engine {
     ) -> Option<Vec<u64>> {
         let tkey = self.table_key(table);
         let want = value.to_slt_string();
-        // Snapshot the readers (cheap Arc clones) and the memory-tail hits so
-        // the table lock is not held across the row lookup.
-        let (disk, low, tail): (
+        // Snapshot the readers (cheap Arc clones) and the memory tail so the
+        // table lock is not held across the row lookup. The tail's declared
+        // type comes from the registry rather than the catalog: it is the one
+        // the writer encoded the keys with.
+        let (disk, low, tail_index, declared): (
             Option<SecondaryDiskChunks>,
             Option<SecondaryLowChunks>,
-            Vec<u64>,
+            Option<Arc<SecondaryIndex>>,
+            Option<String>,
         ) = {
             let tables = self.tables.lock().unwrap();
             let reg = tables.get(&tkey).map(|e| &e.secondary)?;
@@ -1119,16 +1115,21 @@ impl Engine {
             if !known {
                 return None;
             }
-            let tail = reg
-                .indexes
-                .get(column)
-                .map(|idx| idx.lookup(want.as_bytes()).to_vec())
-                .unwrap_or_default();
             (
                 reg.disk.get(column).cloned(),
                 reg.low.get(column).cloned(),
-                tail,
+                reg.indexes.get(column).cloned(),
+                reg.declared_types.get(column).cloned(),
             )
+        };
+        // The tail holds the column's ordered key encoding, so the probe is the
+        // same `text_to_key` the writer used, not the literal's text.
+        let tail: Vec<u64> = match (&tail_index, &declared) {
+            (Some(index), Some(declared)) => match text_to_key(declared, &want) {
+                Some(key) => index.lookup(&key.ordered_bytes()),
+                None => Vec::new(),
+            },
+            _ => Vec::new(),
         };
         let schema = self.table_schema(table).unwrap_or_default();
         let col = schema.iter().position(|c| c == column);
@@ -1167,8 +1168,15 @@ impl Engine {
                         KeyKind::F32 => Key::F32(*f as f32),
                         KeyKind::F64 => Key::F64(*f),
                         // Neither a hashed varchar nor a date/time chunk can
-                        // hold a float key.
-                        KeyKind::U64 | KeyKind::I32 | KeyKind::I64 => continue,
+                        // hold a float key; the narrow integers and the
+                        // low-cardinality kinds cannot either.
+                        KeyKind::U64
+                        | KeyKind::I32
+                        | KeyKind::I64
+                        | KeyKind::I8
+                        | KeyKind::I16
+                        | KeyKind::Bool
+                        | KeyKind::Bytes => continue,
                     };
                     for off in reader.lookup(key) {
                         let id = base | u64::from(off);
@@ -1190,7 +1198,9 @@ impl Engine {
             if let Some(bit) = bit {
                 if let Some(segments) = &low {
                     for (base, reader) in segments {
-                        for off in reader.lookup(bit) {
+                        let probe =
+                            storage::secondary_lowcard::LowCardKey::Fixed(Key::Bool(bit != 0));
+                        for off in reader.lookup(&probe) {
                             let id = base | u64::from(off);
                             if seen.insert(id) {
                                 candidates.push(id);
@@ -1341,9 +1351,9 @@ impl Engine {
         if keys.is_empty() {
             return None;
         }
-        // Snapshot the sealed readers (cheap `Arc` clones) and the matching
-        // part of the memory tail, so the row lookup runs without the lock.
-        let (disk, tail): (Option<SecondaryDiskChunks>, Vec<u64>) = {
+        // Snapshot the sealed readers and the memory tail (cheap `Arc` clones),
+        // so the key lookups run without the table lock.
+        let (disk, tail): (Option<SecondaryDiskChunks>, Option<Arc<SecondaryIndex>>) = {
             let tables = self.tables.lock().unwrap();
             let reg = tables.get(&tkey).map(|e| &e.secondary)?;
             let known = reg.indexes.contains_key(column)
@@ -1352,53 +1362,10 @@ impl Engine {
             if !known {
                 return None;
             }
-            // The tail is keyed by the literal's text, so its byte order is not
-            // numeric order (`"10"` sorts before `"9"`): every visited key is
-            // decoded and compared, never sliced at a bound.
-            let mut tail = Vec::new();
-            if let Some(index) = reg.indexes.get(column) {
-                index.for_each_in_order(|key, ids| {
-                    let Some(text) = std::str::from_utf8(key).ok() else {
-                        return;
-                    };
-                    let key = match kind {
-                        KeyKind::U64 => match text.trim().parse::<i64>() {
-                            Ok(v) => Key::U64(ordered_i64_key(v)),
-                            Err(_) => return,
-                        },
-                        // INTEGER/BIGINT keep the value itself; only a width
-                        // the reference does not spell stays order-mapped.
-                        KeyKind::I32 | KeyKind::I64
-                            if key_domain(&column_type) == KeyDomain::Integer =>
-                        {
-                            match text.trim().parse::<i64>() {
-                                Ok(v) => integer_secondary_key(&column_type, v),
-                                Err(_) => return,
-                            }
-                        }
-                        KeyKind::F32 | KeyKind::F64 => match text.trim().parse::<f64>() {
-                            Ok(v) if kind == KeyKind::F32 => Key::F32(v as f32),
-                            Ok(v) => Key::F64(v),
-                            Err(_) => return,
-                        },
-                        KeyKind::I32 => match temporal_key(&column_type, text) {
-                            Some(v) => Key::I32(v as i32),
-                            None => return,
-                        },
-                        KeyKind::I64 => match temporal_key(&column_type, text) {
-                            Some(v) => Key::I64(v),
-                            None => return,
-                        },
-                    };
-                    if keys.iter().any(|(lo, hi)| {
-                        lo.order(&key) != std::cmp::Ordering::Greater
-                            && key.order(hi) != std::cmp::Ordering::Greater
-                    }) {
-                        tail.extend_from_slice(ids);
-                    }
-                });
-            }
-            (reg.disk.get(column).cloned(), tail)
+            (
+                reg.disk.get(column).cloned(),
+                reg.indexes.get(column).cloned(),
+            )
         };
         let mut candidates: Vec<u64> = Vec::new();
         if let Some(segments) = &disk {
@@ -1410,7 +1377,18 @@ impl Engine {
                 }
             }
         }
-        candidates.extend(tail);
+        // The tail carries the same ordered encoding as the chunks, so a bound
+        // applies to it directly: one ordered slice per range, with no key
+        // decoded and compared.
+        if let Some(index) = &tail {
+            for (start, end) in &keys {
+                let lo = tail_bound(kind, *start);
+                let hi = tail_bound(kind, *end);
+                for (_, ids) in index.range(Some(&lo), Some(&hi)) {
+                    candidates.extend_from_slice(&ids);
+                }
+            }
+        }
         // No per-candidate row decode here, for the same reason as
         // `index_lookup`: both callers re-apply the range to the rows they
         // fetch, and a stale id contributes no row. Dedupe by sorting instead

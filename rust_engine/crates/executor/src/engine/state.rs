@@ -4167,7 +4167,16 @@ pub(crate) type SecondaryLowChunks = Vec<(u64, Arc<storage::secondary_lowcard::L
 #[derive(Default)]
 pub(crate) struct SecondaryIndexes {
     /// Memory tails: rows written since the last chunk dump.
-    pub(crate) indexes: HashMap<String, SecondaryIndex>,
+    ///
+    /// Shared behind an `Arc` so a scan or a bulk insert can hold one column's
+    /// tail across the table lock, and so the tail's own RCU handles reader /
+    /// writer overlap (see `index::SecondaryIndex`).
+    pub(crate) indexes: HashMap<String, Arc<SecondaryIndex>>,
+    /// The declared type of each indexed column, which fixes its ordered key
+    /// domain (`ConvertToOrderedType`): a tail key is the value's
+    /// order-preserving encoding, so a range scan can slice it. Recorded when
+    /// the index is created and read back when the tail is dumped into a chunk.
+    pub(crate) declared_types: HashMap<String, String>,
     /// Low-cardinality (boolean) chunk readers with their base row id.
     pub(crate) low: HashMap<String, SecondaryLowChunks>,
     /// High-cardinality (integer/varchar) PGM chunk readers.
@@ -5708,6 +5717,21 @@ pub(crate) fn secondary_key_kind(declared: &str) -> storage::secondary_segment::
     } else if ty.starts_with("bigint") {
         // `KeepOrderedSelf<BigIntT>`: the raw `i64`.
         KeyKind::I64
+    } else if ty.starts_with("smallint") {
+        // `KeepOrderedSelf<SmallIntT>`: `int16_t`, a 2-byte key.
+        KeyKind::I16
+    } else if ty.starts_with("tinyint") {
+        // `KeepOrderedSelf<TinyIntT>`: `int8_t`, a 1-byte key.
+        KeyKind::I8
+    } else if ty.starts_with("bool") {
+        // `KeepOrderedSelf<BooleanT>`: a 1-byte key. Only ever written as a
+        // low-cardinality chunk, the reference's own BOOL dispatch.
+        KeyKind::Bool
+    } else if ty.starts_with("json") {
+        // `KeepOrderedString<JsonTermT>`: the column is expanded into one term
+        // per path/scalar (`storage::json_index::flatten_json`), and only ever
+        // stored as a low-cardinality chunk.
+        KeyKind::Bytes
     } else if ty.starts_with("int") {
         // `KeepOrderedSelf<IntegerT>`: the raw `i32`. Storing the value
         // itself (not an order-mapped `u64`) is what makes the chunk
@@ -5763,8 +5787,84 @@ pub(crate) fn integer_secondary_key(declared: &str, value: i64) -> Key {
     match secondary_key_kind(declared) {
         KeyKind::I32 => Key::I32(value as i32),
         KeyKind::I64 => Key::I64(value),
-        _ => Key::U64(ordered_i64_key(value)),
+        KeyKind::I16 => Key::I16(value as i16),
+        KeyKind::I8 => Key::I8(value as i8),
+        KeyKind::Bool => Key::Bool(value != 0),
+        KeyKind::U64 => Key::U64(ordered_i64_key(value)),
+        // A float/double column has no integral key; the caller picked the
+        // wrong conversion.
+        KeyKind::F32 | KeyKind::F64 => Key::F64(value as f64),
+        // A JSON column's key is a term, not an integer.
+        KeyKind::Bytes => Key::U64(0),
     }
+}
+
+/// A cell's stored text as its column's ordered key — the reference's
+/// `ConvertToOrderedKeyValue` for a value that reached the index as text.
+///
+/// This is what the memory tail stores (`Key::ordered_bytes`), so the tail is
+/// ordered like the column: a numeric range is a `BTreeMap::range`, not a walk
+/// that parses every key back into a number.
+pub(crate) fn text_to_key(declared: &str, text: &str) -> Option<Key> {
+    // `BooleanT` is its own ordered key: the low-cardinality writer stores the
+    // value as a 0/1 key (`SecondaryIndexDataLowCardinalityImpl<bool>`).
+    if declared.trim().to_ascii_lowercase().starts_with("bool") {
+        return Some(Key::Bool(matches!(text.trim(), "true" | "1")));
+    }
+    let key_kind = secondary_key_kind(declared);
+    if key_kind == KeyKind::Bytes {
+        // A JSON cell has no single ordered key: it becomes several terms, see
+        // [`text_to_tail_keys`].
+        return None;
+    }
+    match key_domain(declared) {
+        KeyDomain::Integer => Some(integer_secondary_key(
+            declared,
+            text.trim().parse::<i64>().ok()?,
+        )),
+        KeyDomain::Float => {
+            let value = text.trim().parse::<f64>().ok()?;
+            Some(match key_kind {
+                KeyKind::F32 => Key::F32(value as f32),
+                _ => Key::F64(value),
+            })
+        }
+        KeyDomain::Temporal => Some(match key_kind {
+            KeyKind::I32 => Key::I32(temporal_key(declared, text)? as i32),
+            _ => Key::I64(temporal_key(declared, text)?),
+        }),
+        // `ConvertToHashU64`: a varchar (and, until the JSON term encoding is
+        // ported, a json document) is keyed by `std::hash` of its text.
+        KeyDomain::Hashed => Some(Key::U64(storage::secondary_segment::hash_varchar(text))),
+    }
+}
+
+/// A stored cell as the **memory tail's keys**.
+///
+/// Every column contributes one key - the order-preserving encoding of its
+/// value - except a JSON document, which the reference expands into one term
+/// per path/scalar and writes into a low-cardinality chunk. Those terms are the
+/// tail keys here, so a dump can hand them straight to the term array.
+pub(crate) fn value_to_tail_keys(declared: &str, value: &Value) -> Vec<Vec<u8>> {
+    let text = match value {
+        Value::Str(text) => text.clone(),
+        other => other.to_slt_string(),
+    };
+    text_to_tail_keys(declared, &text)
+}
+
+/// [`value_to_tail_keys`] for a cell that already reached the index as text.
+pub(crate) fn text_to_tail_keys(declared: &str, text: &str) -> Vec<Vec<u8>> {
+    if secondary_key_kind(declared) == KeyKind::Bytes {
+        return storage::json_index::flatten_json_terms(text)
+            .into_iter()
+            .map(String::into_bytes)
+            .collect();
+    }
+    text_to_key(declared, text)
+        .map(|key| key.ordered_bytes())
+        .into_iter()
+        .collect()
 }
 
 /// The reference's ordered key for a date/time text (`ConvertToOrderedKeyValue`):
@@ -5837,6 +5937,49 @@ pub(crate) fn bound_key(
         KeyKind::I32 => temporal_bound(declared, value)
             .map(|v| Key::I32(v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32)),
         KeyKind::I64 => temporal_bound(declared, value).map(Key::I64),
+        KeyKind::I8 => match value {
+            Value::Int(i) => Some(Key::I8(
+                (*i).clamp(i64::from(i8::MIN), i64::from(i8::MAX)) as i8
+            )),
+            _ => None,
+        },
+        KeyKind::I16 => match value {
+            Value::Int(i) => Some(Key::I16(
+                (*i).clamp(i64::from(i16::MIN), i64::from(i16::MAX)) as i16,
+            )),
+            _ => None,
+        },
+        // A BOOL column is a low-cardinality chunk; its predicate reaches the
+        // index as an equality, but an interval still has to convert.
+        KeyKind::Bool => match value {
+            Value::Int(i) => Some(Key::Bool(*i != 0)),
+            Value::Str(text) => Some(Key::Bool(matches!(
+                text.trim().to_ascii_lowercase().as_str(),
+                "true" | "1"
+            ))),
+            _ => None,
+        },
+        // A JSON path range is answered by the low-cardinality term array, not
+        // by an ordered-key chunk.
+        KeyKind::Bytes => None,
+    }
+}
+
+/// A query bound as the memory tail's ordered bytes.
+///
+/// [`bound_key`] widens a float bound to `f64` so that a chunk's `f32`
+/// comparison cannot clip a boundary row; the tail stores the column's own
+/// width, so the bound is narrowed back here. Narrowing rounds monotonically, so
+/// a row that satisfies the bound still falls inside the narrowed interval —
+/// any extra candidates the rounding adds are removed by the residual filter.
+pub(crate) fn tail_bound(
+    kind: storage::secondary_segment::KeyKind,
+    key: storage::secondary_segment::Key,
+) -> Vec<u8> {
+    use storage::secondary_segment::{Key, KeyKind};
+    match (kind, key) {
+        (KeyKind::F32, Key::F64(v)) => Key::F32(v as f32).ordered_bytes(),
+        _ => key.ordered_bytes(),
     }
 }
 

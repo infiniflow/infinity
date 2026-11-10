@@ -21,7 +21,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::format::FormatError;
-use crate::secondary_lowcard::{write_lowcard_segment, LowCardReader};
+use crate::secondary_lowcard::{write_lowcard_segment, LowCardKey, LowCardReader};
 use crate::secondary_segment::{write_secondary_segment, Key, SecondarySegmentReader};
 
 /// Order-preserving map of a signed integer into `u64`: `i64::MIN` -> 0.
@@ -174,7 +174,7 @@ impl LowCardinalityReader {
     }
 
     pub fn offsets_for_key(&self, key: u64) -> Vec<u32> {
-        self.reader.lookup(key)
+        self.reader.lookup(&LowCardKey::Fixed(Key::U64(key)))
     }
 }
 

@@ -88,6 +88,7 @@ pub mod definition;
 pub mod fast_rough_filter;
 pub mod invertedindex;
 pub mod io;
+pub mod json_index;
 pub mod knn_index;
 pub mod new_txn;
 pub mod persistence;

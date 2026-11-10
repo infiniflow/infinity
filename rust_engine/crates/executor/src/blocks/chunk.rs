@@ -15,8 +15,13 @@ pub(crate) fn decode_secondary_key(
         KeyKind::U64 => Key::U64(u64::from_le_bytes(bytes.try_into().ok()?)),
         KeyKind::I64 => Key::I64(i64::from_le_bytes(bytes.try_into().ok()?)),
         KeyKind::I32 => Key::I32(i32::from_le_bytes(bytes.try_into().ok()?)),
+        KeyKind::I16 => Key::I16(i16::from_le_bytes(bytes.try_into().ok()?)),
+        KeyKind::I8 => Key::I8(*bytes.first()? as i8),
+        KeyKind::Bool => Key::Bool(*bytes.first()? != 0),
         KeyKind::F32 => Key::F32(f32::from_le_bytes(bytes.try_into().ok()?)),
         KeyKind::F64 => Key::F64(f64::from_le_bytes(bytes.try_into().ok()?)),
+        // A JSON chunk is low-cardinality and has no ordered key array.
+        KeyKind::Bytes => return None,
     })
 }
 
