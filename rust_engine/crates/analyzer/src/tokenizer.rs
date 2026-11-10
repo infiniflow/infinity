@@ -140,6 +140,9 @@ pub struct TermView<'a> {
     pub word_offset: u32,
     pub char_offset: u32,
     pub end_offset: u32,
+    /// C++ `Term::payload_`; zero for every streaming analyzer (only
+    /// `rankfeatures` produces a value, and it goes through `analyze`).
+    pub payload: u16,
 }
 
 /// C++: `Term`.

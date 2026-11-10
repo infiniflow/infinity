@@ -70,6 +70,41 @@ pub struct MemoryIndexRow {
     pub mem_used: usize,
 }
 
+/// Health of one full-text index: where a slow query's cost comes from.
+///
+/// A query walks **every** sealed chunk for its terms, then the memory tail, so
+/// the numbers that matter are how many chunks there are and how much of the
+/// column is still unsealed - the two things `optimize` and the seal trigger
+/// move. `overridden_rows` is the price of the append-only delete story: those
+/// rows are held in a set and filtered out of every scan.
+///
+/// Reported by [`crate::Engine::fulltext_stats`]. It is deliberately **not** part
+/// of the `SHOW MEMINDEX` wire shape (that one is the reference's
+/// `MemIndexTracerInfo`); exposing these fields to clients is a schema decision
+/// left to the caller.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FulltextStats {
+    pub table: String,
+    pub index: String,
+    /// Sealed chunks. Every query probes all of them.
+    pub chunks: usize,
+    /// Rows held by the sealed chunks.
+    pub chunk_rows: usize,
+    /// Rows still in the memory tail (not sealed yet).
+    pub tail_rows: usize,
+    /// Sorted runs the tail spilled into; `> 0` means the next seal merges them
+    /// instead of writing the tail straight out.
+    pub spill_runs: usize,
+    /// Rows a seal is writing right now (they keep answering from memory).
+    pub inflight_rows: usize,
+    /// Rows whose sealed copy is stale: deleted, or re-indexed in place.
+    pub overridden_rows: usize,
+    /// Bytes the unsealed tail estimates it occupies.
+    pub tail_bytes: usize,
+    /// Duration of the last seal's file write, in microseconds.
+    pub last_seal_us: u64,
+}
+
 /// A query that is executing right now.
 #[derive(Clone, Debug)]
 pub struct RunningQuery {

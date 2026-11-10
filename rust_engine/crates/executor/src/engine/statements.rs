@@ -952,6 +952,9 @@ impl Engine {
         entry.append_ts = Some(append_ts);
         entry.append_copy = Some(append_copy);
         entry.deleted_ids = Some(deletes);
+        // The journal was just rebuilt: a set built from the old one no longer
+        // describes it.
+        entry.deleted_set = None;
         entry.delete_ts = Some(delete_ts);
         entry.imports = Some(imports);
         Journals {
@@ -1148,6 +1151,43 @@ impl Engine {
         self.load_deletes(table).0
     }
 
+    /// [`Self::deleted_ids`] as a set, built once per journal load.
+    ///
+    /// A bulk `DELETE`/`UPDATE` asks whether each of its rows is already gone
+    /// (`row_is_present` -> `is_deleted`), and scanning the journal for every
+    /// one of them made the statement quadratic in the journal's length. The
+    /// set is built on the first lookup, shared (`Arc`) by every later reader,
+    /// and dropped when `ensure_journals` rebuilds the journal from the blocks.
+    pub(crate) fn deleted_set(&self, table: &str) -> Arc<std::collections::HashSet<u64>> {
+        let key = self.table_key(table);
+        {
+            let tables = self.tables.lock().unwrap();
+            if let Some(set) = tables
+                .get(&key)
+                .and_then(|entry| entry.deleted_set.as_ref())
+            {
+                return Arc::clone(set);
+            }
+        }
+        // Loading the journal takes the table lock itself, so it runs outside
+        // it (`ensure_journals` re-reads the block `version` files).
+        let set = Arc::new(
+            self.deleted_ids(table)
+                .into_iter()
+                .collect::<std::collections::HashSet<u64>>(),
+        );
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(key).or_default();
+        match entry.deleted_set {
+            // Another thread built it while this one loaded: keep the first.
+            Some(ref existing) => Arc::clone(existing),
+            None => {
+                entry.deleted_set = Some(Arc::clone(&set));
+                set
+            }
+        }
+    }
+
     /// The deleted row ids and their delete timestamps, both loaded together.
     ///
     /// The block `version` files say which rows are gone and when
@@ -1165,11 +1205,13 @@ impl Engine {
         if count == 0 || first == usize::MAX {
             return;
         }
-        let n = self.deleted_ids(table).len();
+        // One journal load for both halves: a second call would clone the
+        // whole cached journal again.
+        let (ids, mut log) = self.load_deletes(table);
+        let n = ids.len();
         if first >= n {
             return;
         }
-        let mut log = self.delete_ts(table);
         log.resize(n, 0);
         for value in &mut log[first..(first + count).min(n)] {
             *value = ts;
@@ -1182,11 +1224,11 @@ impl Engine {
     /// Stamps the last `count` deletes with the commit timestamp their
     /// transaction got (`BlockVersion::Delete(row_id, commit_ts)`).
     pub(crate) fn settle_delete_ts(&self, table: &str, count: usize, ts: u64) {
-        let n = self.deleted_ids(table).len();
+        let (ids, mut log) = self.load_deletes(table);
+        let n = ids.len();
         if count == 0 || n == 0 {
             return;
         }
-        let mut log = self.delete_ts(table);
         log.resize(n - count.min(n), 0);
         log.resize(n, ts);
         let tkey = self.table_key(table);
@@ -3633,12 +3675,11 @@ impl Engine {
 
     /// Tombstoned sequence ids of a table; index hits are validated against it.
     pub(crate) fn tombstone_set(&self, table: &str) -> Result<std::collections::HashSet<u64>> {
-        let mut dead: std::collections::HashSet<u64> = Default::default();
         // A delete the checkpoint has not written yet is in the table's delete
         // log (`note_deleted_ids`, `DeleteInBlock`); the block's `version`
-        // carries it after the flush.
-        dead.extend(self.deleted_ids(table));
-        Ok(dead)
+        // carries it after the flush. The set is the one the journal keeps for
+        // single-row lookups, so building it is not repeated per query.
+        Ok((*self.deleted_set(table)).clone())
     }
 
     /// [`Self::tombstone_set`] as of `read_ts`: a delete that committed after
@@ -3651,8 +3692,9 @@ impl Engine {
         if read_ts == u64::MAX {
             return self.tombstone_set(table);
         }
-        let ids = self.deleted_ids(table);
-        let ts = self.delete_ts(table);
+        // Both journal halves in one load: each `deleted_ids`/`delete_ts` call
+        // clones the whole journal, and this is the read path of every query.
+        let (ids, ts) = self.load_deletes(table);
         let mut dead: std::collections::HashSet<u64> = Default::default();
         for (at, id) in ids.iter().enumerate() {
             let deleted = ts.get(at).copied().unwrap_or(0);
@@ -4942,6 +4984,47 @@ impl Engine {
         Ok(())
     }
 
+    /// The rows a `SEARCH MATCH TEXT` may score, ascending: the `WHERE`, the
+    /// `FILTER (…)` clause and the `filter=…` option evaluated once over the
+    /// table, minus the tombstones. `None` when the query carries no filter.
+    ///
+    /// The result travels to the scorers as row ids rather than as a predicate
+    /// closure because both of them **seek** with it: the block-max WAND moves
+    /// every cursor past a rejected row and the streaming path advances every
+    /// merge cursor, instead of scoring/fetching the row and dropping it.
+    fn allowed_rows(
+        &self,
+        table: &str,
+        pred: Option<&Expr>,
+        in_filter: Option<&Expr>,
+        opt_filter: Option<&Expr>,
+        dead: &std::collections::HashSet<u64>,
+    ) -> Result<Option<wand::DocFilter>> {
+        if pred.is_none() && in_filter.is_none() && opt_filter.is_none() {
+            return Ok(None);
+        }
+        let mut rows: Vec<u64> = Vec::new();
+        for (seq, row) in self.fetch_rows_with_ids(table)? {
+            let row_id = seq as u64;
+            // A tombstone can never be scored, so it is not an admitted row
+            // either: leaving it out makes the seek skip deletes too.
+            if dead.contains(&row_id) {
+                continue;
+            }
+            let ok = pred.map(|p| p.eval_predicate(&row)).unwrap_or(true)
+                && in_filter.map(|p| p.eval_predicate(&row)).unwrap_or(true)
+                && opt_filter.map(|p| p.eval_predicate(&row)).unwrap_or(true);
+            if ok {
+                rows.push(row_id);
+            }
+        }
+        // The row cache the fetch may answer from is not ordered by row id, and
+        // the pushdown needs `partition_point` to work.
+        rows.sort_unstable();
+        rows.dedup();
+        Ok(Some(wand::DocFilter::new(rows)))
+    }
+
     /// Selects rows for `SEARCH MATCH TEXT` by term presence. This reproduces
     /// the *row set* (any query term, `minimum_should_match`, `topn`); the exact
     /// BM25 ordering/threshold needs the iresearch scorer, so a query carrying
@@ -4974,25 +5057,48 @@ impl Engine {
                 }
             }
         }
-        let params = arg_str(m.args.get(1)).unwrap_or_default();
+        // `SEARCH MATCH TEXT (col, query [, topn] [, options])`: the reference
+        // puts the row count in the third slot and the option string in the
+        // fourth, so the arguments after the query are told apart by type.
+        // Reading `args[1]` unconditionally used to take `topn` as the option
+        // string, which silently disabled every option (`operator`,
+        // `threshold`, `block_max`, `filter`, `similarity`, `rank_features`,
+        // `minimum_should_match`, `bm25_param_*`).
+        let mut topn_positional: Option<usize> = None;
+        let mut options: Option<String> = None;
+        for arg in m.args.iter().skip(1) {
+            if let Some(n) = super::state::arg_usize(arg) {
+                topn_positional = Some(n);
+                continue;
+            }
+            if let ExprAst::Literal(Literal::Str(text)) = arg {
+                options = Some(text.clone());
+            }
+        }
+        let params = options.unwrap_or_default();
         // `threshold=<f>` keeps only documents scoring at least `f`
         let threshold: Option<f64> = params
             .split(';')
             .filter_map(|p| p.split_once('='))
             .find(|(k, _)| k.trim().eq_ignore_ascii_case("threshold"))
-            .and_then(|(_, v)| v.trim().parse().ok());
+            .and_then(|(_, v)| v.trim().parse().ok())
+            // The reference's `threshold_ <= 0.0f` shortcut
+            // (`term_doc_iterator_impl.cpp:118`): a non-positive threshold
+            // filters nothing.
+            .filter(|t| *t > 0.0);
         // `bm25_param_delta_term` / `bm25_param_delta_phrase` add
         // `idf * delta` to each matching unit: `TermDocIterator::InitBM25Info`
         // folds them into `f4 = delta / (k1 + 1)` which is added to the
         // frequency term and then scaled by `idf * (k1 + 1) * weight`.
-        let bm25_param = |name: &str| -> f64 {
+        let bm25_param_opt = |name: &str| -> Option<f64> {
             params
                 .split(';')
                 .filter_map(|p| p.split_once('='))
                 .find(|(k, _)| k.trim().eq_ignore_ascii_case(name))
                 .and_then(|(_, v)| v.trim().parse().ok())
-                .unwrap_or(0.0)
         };
+        let bm25_param = |name: &str| -> f64 { bm25_param_opt(name).unwrap_or(0.0) };
+        let (bm25_k1, bm25_b) = parse_bm25_k1_b(&params)?;
         // `bm25_param_delta` is a shorthand that sets both
         // (`bound_select_statement_impl.cpp:256-257`).
         let delta_both = bm25_param("bm25_param_delta");
@@ -5053,10 +5159,12 @@ impl Engine {
             .unwrap_or_default();
         // One unit per quoted phrase / bare word. The analyzer decides what a
         // `"a b"` group tokenises to, so quotes are stripped first.
-        let units: Vec<(bool, Vec<String>, f64)> = query_units(&query)
+        let units: Vec<(bool, Vec<String>, f64, u32)> = query_units(&query)
             .into_iter()
-            .map(|(phrase, text, boost)| (phrase, tokenize_text(&text, &tokenizer), boost))
-            .filter(|(_, toks, _)| !toks.is_empty())
+            .map(|(phrase, text, boost, slop)| {
+                (phrase, tokenize_text(&text, &tokenizer), boost, slop)
+            })
+            .filter(|(_, toks, _, _)| !toks.is_empty())
             .collect();
         // One entry per matched column: `(schema index, field boost, tokeniser)`.
         // `similarity=boolean` scores each field on its own, so a `keyword`
@@ -5084,7 +5192,7 @@ impl Engine {
             .collect();
         let terms: Vec<String> = units
             .iter()
-            .flat_map(|(_, u, _)| u.iter().cloned())
+            .flat_map(|(_, u, _, _)| u.iter().cloned())
             .filter(|t| t != "or" && t != "and")
             .collect();
         if terms.is_empty() {
@@ -5099,7 +5207,7 @@ impl Engine {
         // With `operator=and`, each OR-separated group is a clause: a run of
         // several words must appear as a phrase (iresearch's `AndQuery`).
         let min_should = if require_all { units.len() } else { min_should };
-        let topn = parse_topn_param(&params).unwrap_or(10);
+        let topn = parse_topn_param(&params).or(topn_positional).unwrap_or(10);
         // `block_max=…`: the reference's `EarlyTermAlgo` switch
         // (`bound_select_statement_impl.cpp:168-183`). The port has one block-max
         // iterator, so every accepted value selects it except the no-pruning
@@ -5147,6 +5255,85 @@ impl Engine {
                 })
                 .unwrap_or(false)
         });
+        // The query-string grammar (`a AND b`, `a OR b`, `a AND NOT b`,
+        // `(a OR b) AND c`, `column:term`, `"a b"~2`): build the reference's
+        // query tree and evaluate it (`QueryBuilder::CreateSearch`). A plain
+        // term list keeps the block-max WAND path below. The branch sits after the
+        // option parsing so the predicate, `filter=` and `similarity` are known.
+        // An explicit `operator=` selects the **term-list** grammar: the
+        // reference's `FulltextQueryOperatorOption` is `kAnd`/`kOr` there and
+        // `kInfinitySyntax` only when the option is absent
+        // (`bound_select_statement_impl.cpp:200-210`), so the query string is
+        // analysed into terms instead of being parsed. `TO BE OR NOT` with
+        // `operator=and` is four ANDed terms, not a boolean expression.
+        if !has_operator_opt && super::text_query::has_query_syntax(&query) {
+            // The tree path scores each leaf on its own: it has no BooleanWeight,
+            // batch-OR or rank-feature channel. Options only the WAND path
+            // implements are rejected instead of being silently dropped -
+            // answering a different question than the one asked is worse than an
+            // error.
+            let given = |name: &str| -> bool {
+                params
+                    .split(';')
+                    .filter_map(|p| p.split_once('='))
+                    .any(|(k, _)| k.trim().eq_ignore_ascii_case(name))
+            };
+            let unsupported = |name: &str| -> Error {
+                Error::Invalid(format!(
+                    "{name} is not supported with the query-string grammar \
+                     (a AND b / a OR b / column:term)"
+                ))
+            };
+            if boolean {
+                return Err(unsupported("similarity=boolean"));
+            }
+            // `block_max` is not in this set: it only picks an early-termination
+            // algorithm (`EarlyTermAlgo`, `bound_select_statement_impl.cpp:169-190`)
+            // and every value yields the same result set. The tree path scores
+            // every candidate, which is `batch`/`false`; accepting the option
+            // keeps `compare` and the BMW spellings usable on a parsed query.
+            for name in ["minimum_should_match", "rank_features"] {
+                if given(name) {
+                    return Err(unsupported(name));
+                }
+            }
+            // The predicate / `filter=` / `IN (…)` narrow the candidates before
+            // the tree ranks and truncates, exactly like the WAND path.
+            let dead = self.tombstone_set(table)?;
+            let allowed =
+                self.allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)?;
+            if let Some(hits) = self.search_text_query_tree(
+                table,
+                &m.column,
+                &query,
+                topn,
+                delta_term,
+                delta_phrase,
+                threshold,
+                (bm25_k1, bm25_b),
+                allowed.as_ref(),
+            )? {
+                let wanted: Vec<u64> = hits.iter().map(|(seq, _)| *seq).collect();
+                let mut by_id: HashMap<usize, Vec<Value>> = self
+                    .fetch_some_rows_with_ids(table, &wanted)?
+                    .into_iter()
+                    .collect();
+                let mut out = Vec::new();
+                for (seq, score) in hits {
+                    let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                        continue;
+                    };
+                    row.push(Value::Int(seq as i64));
+                    row.push(Value::Float(score));
+                    row.push(Value::Float(0.0));
+                    row.push(Value::Float(score));
+                    out.push(row);
+                }
+                // An empty tree result is the answer: falling through to the
+                // plain-term path would answer a different question.
+                return Ok((out, hidden.to_vec()));
+            }
+        }
         // `rank_features=<col>^<tag>^<weight>,…`: each document's `<col>` value is
         // a JSON array of `{"<tag>": <number>}` objects (its index uses the
         // `rankfeatures` analyzer), and the score gains `number * weight` for
@@ -5201,7 +5388,7 @@ impl Engine {
         if rank_features.is_empty()
             && !tokenizer.keyword()
             && !field_specs.is_empty()
-            && units.iter().all(|(_, toks, _)| !toks.is_empty())
+            && units.iter().all(|(_, toks, _, _)| !toks.is_empty())
         {
             // One lazy posting stream per (field, term): nothing is materialised,
             // so the WAND cursors pay only for the documents they visit. The
@@ -5226,7 +5413,7 @@ impl Engine {
                     (1.0 + (n - df + 0.5) / (df + 0.5)).ln()
                 };
                 let mut wand_units: Vec<WandUnit<'_>> = Vec::with_capacity(units.len());
-                for (phrase, toks, uboost) in &units {
+                for (phrase, toks, uboost, slop) in &units {
                     // Boolean similarity ignores per-term boosts (one point per
                     // matched unit, weighted by the field boost).
                     let weight = if boolean { *boost } else { boost * uboost };
@@ -5256,7 +5443,7 @@ impl Engine {
                             .iter()
                             .map(|t| text.term_stream_capture(t, true))
                             .collect();
-                        let cursor = PhraseCursor::new(children);
+                        let cursor = PhraseCursor::new(children, *slop);
                         let idf: f64 = toks.iter().map(|t| idf_of(t)).sum();
                         wand_units.push(WandUnit {
                             stream: WandStream::Phrase(cursor),
@@ -5286,29 +5473,13 @@ impl Engine {
             }
             // Tombstones still feed the corpus statistics (as the reference's
             // segments do until compaction) but never rank.
-            let mut dead = self.tombstone_set(table)?;
-            // A filter removes documents before ranking; evaluating it over the
-            // rows and feeding the failures as tombstones keeps the
-            // postings-only scoring exact.
-            if pred.is_some() || in_filter.is_some() || opt_filter.is_some() {
-                for (seq, row) in self.fetch_rows_with_ids(table)? {
-                    let ok = pred
-                        .as_ref()
-                        .map(|p| p.eval_predicate(&row))
-                        .unwrap_or(true)
-                        && in_filter
-                            .as_ref()
-                            .map(|p| p.eval_predicate(&row))
-                            .unwrap_or(true)
-                        && opt_filter
-                            .as_ref()
-                            .map(|p| p.eval_predicate(&row))
-                            .unwrap_or(true);
-                    if !ok {
-                        dead.insert(seq as u64);
-                    }
-                }
-            }
+            let dead = self.tombstone_set(table)?;
+            // A filter removes documents before ranking. Its answer is a row list
+            // the iterator can seek with (`DocFilter`), which is what turns a
+            // rejected candidate from "decode the block bound, score, drop" into
+            // "hop every cursor past it".
+            let filter =
+                self.allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)?;
             let mode = if boolean {
                 wand::WandMode::Boolean
             } else {
@@ -5322,6 +5493,17 @@ impl Engine {
                 min_should,
                 mode,
             );
+            if let Some(filter) = filter.as_ref() {
+                iterator = iterator.with_filter(filter);
+            }
+            if bm25_k1 != 1.2 || bm25_b != 0.75 {
+                iterator = iterator.with_bm25_params(bm25_k1, bm25_b);
+            }
+            // `threshold=` raises the pruning bar, like the reference's
+            // `UpdateScoreThreshold` (`blockmax_wand_iterator_impl.cpp:233`).
+            if let Some(t) = threshold {
+                iterator = iterator.with_threshold(t);
+            }
             if naive_scan {
                 iterator = iterator.with_naive();
             }
@@ -5329,7 +5511,7 @@ impl Engine {
             let scored: Vec<(usize, f64)> = hits
                 .into_iter()
                 .map(|(seq, score)| (seq as usize, score))
-                .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
+                .filter(|(_, score)| threshold.map(|t| *score > t).unwrap_or(true))
                 .collect();
             // For plain OR terms this path is the whole answer: an empty result
             // is empty, and falling through would redo the same work on the
@@ -5354,9 +5536,9 @@ impl Engine {
                     row.push(Value::Float(score));
                     out.push(row);
                 }
-                if !out.is_empty() {
-                    return Ok((out, hidden.to_vec()));
-                }
+                // An empty tree result is the answer: falling through to the
+                // plain-term path would answer a different question.
+                return Ok((out, hidden.to_vec()));
             }
         }
         // Everything below runs off the inverted index. The postings give the
@@ -5367,7 +5549,7 @@ impl Engine {
         // query needs a value from it: a filter, or `rank_features`.
         let query_terms: Vec<String> = {
             let mut out: Vec<String> = Vec::new();
-            for (_, unit, _) in &units {
+            for (_, unit, _, _) in &units {
                 for term in unit {
                     if !out.contains(term) {
                         out.push(term.clone());
@@ -5420,18 +5602,36 @@ impl Engine {
         let keyword_field = tokenizer.keyword();
         // Deleted rows keep contributing to the corpus statistics (as the
         // reference's segments do until compaction) but never rank.
-        let mut dead = self.tombstone_set(table)?;
-        // Filters and rank features need values from the row; only the
-        // documents the cursors reach are read.
-        let needs_values = pred.is_some()
-            || in_filter.is_some()
-            || opt_filter.is_some()
-            || !rank_features.is_empty();
-        let defaults = if needs_values {
-            self.table_defaults(table).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
+        let dead = self.tombstone_set(table)?;
+        // The filters are evaluated once, into the row list the cursors seek
+        // with; only `rank_features` still needs a row per candidate.
+        let filter =
+            self.allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)?;
+        // `rank_features`: each listed tag's weight is the posting's doc-payload
+        // column, written by the `rankfeatures` analyzer as
+        // `SmallFloat::Float122ToUInt16`. Reading it from the index is what
+        // `RankFeatureDocIterator` does; it keeps the reference's number (and
+        // saves a row fetch plus a JSON parse per candidate).
+        #[allow(clippy::type_complexity)]
+        let mut rank_payloads: Vec<(
+            usize,
+            Vec<(String, f64, std::collections::BTreeMap<u64, u16>)>,
+        )> = Vec::with_capacity(rank_features.len());
+        if !rank_features.is_empty() {
+            if let Some((_, _, decoded)) = field_specs.first() {
+                for (ci, tags) in &rank_features {
+                    let name = schema[*ci].clone();
+                    let index = self.text_index_for(table, &name, decoded.clone())?;
+                    let guard = index.read().unwrap();
+                    let per_tag = tags
+                        .iter()
+                        .map(|(tag, weight)| (tag.clone(), *weight, guard.doc_payloads(tag)))
+                        .collect();
+                    rank_payloads.push((*ci, per_tag));
+                }
+            }
+        }
+
         let mut scored: Vec<(usize, f64)> = Vec::new();
         // Reused per document: each phrase unit's terms' positions.
         let mut phrase_positions: Vec<Vec<u32>> = Vec::new();
@@ -5445,50 +5645,42 @@ impl Engine {
                 }
             }
             let Some(doc) = doc else { break };
-            let mut value_row: Option<Vec<Value>> = None;
-            if needs_values {
-                if let Some((_, mut row)) = self
-                    .fetch_some_rows_with_ids(table, &[doc])?
-                    .into_iter()
-                    .next()
-                {
-                    while row.len() < defaults.len() {
-                        let i = row.len();
-                        row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
-                            Some(d) => Value::from_literal(&default_literal(d)),
-                            None => Value::Null,
-                        });
+            // A row the filter rejects can never be scored: push every cursor
+            // past it instead of fetching and evaluating it one at a time.
+            if let Some(filter) = filter.as_ref() {
+                if !filter.contains(doc) {
+                    let Some(next) = filter.next_ge(doc + 1) else {
+                        break;
+                    };
+                    for field in field_cursors.iter_mut() {
+                        for cursor in field.iter_mut() {
+                            if cursor.doc().is_some_and(|d| d < next) {
+                                cursor.advance(next);
+                            }
+                        }
                     }
-                    let ok = pred
-                        .as_ref()
-                        .map(|p| p.eval_predicate(&row))
-                        .unwrap_or(true)
-                        && in_filter
-                            .as_ref()
-                            .map(|p| p.eval_predicate(&row))
-                            .unwrap_or(true)
-                        && opt_filter
-                            .as_ref()
-                            .map(|p| p.eval_predicate(&row))
-                            .unwrap_or(true);
-                    if !ok {
-                        dead.insert(doc);
-                    }
-                    value_row = Some(row);
+                    continue;
                 }
             }
             if !dead.contains(&doc) {
-                // `rank_features=<col>^<tag>^<weight>` adds `value * weight`.
-                let rank_bonus: f64 = match (value_row.as_ref(), rank_features.is_empty()) {
-                    (Some(row), false) => rank_features
-                        .iter()
-                        .map(|(ci, tags)| {
-                            let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
-                            rank_features_bonus(&cell, tags)
-                        })
-                        .sum(),
-                    _ => 0.0,
-                };
+                // `rank_features=<col>^<tag>^<weight>` adds `weight_of_tag * weight`,
+                // where `weight_of_tag` is the posting's doc payload decoded with
+                // `SmallFloat::UInt16ToFloat122`.
+                let rank_bonus: f64 = rank_payloads
+                    .iter()
+                    .map(|(_, per_tag)| {
+                        per_tag
+                            .iter()
+                            .map(|(_, weight, rows)| {
+                                rows.get(&doc)
+                                    .map(|payload| {
+                                        f64::from(analyzer::uint16_to_float122(*payload)) * weight
+                                    })
+                                    .unwrap_or(0.0)
+                            })
+                            .sum::<f64>()
+                    })
+                    .sum();
                 // `similarity=boolean` scores each field on its own: a
                 // `keyword`/`whitespace` field contributes its boost once, a
                 // standard field one boost per matching term.
@@ -5509,7 +5701,7 @@ impl Engine {
                     let bscore = bscore + rank_bonus;
                     if bhits >= min_should
                         && bhits > 0
-                        && threshold.map(|t| bscore >= t).unwrap_or(true)
+                        && threshold.map(|t| bscore > t).unwrap_or(true)
                     {
                         scored.push((doc as usize, bscore));
                     }
@@ -5532,7 +5724,7 @@ impl Engine {
                             };
                         if keyword_field {
                             let mut any = false;
-                            for (ui, (_, unit, _)) in units.iter().enumerate() {
+                            for (ui, (_, unit, _, _)) in units.iter().enumerate() {
                                 let hit = unit.iter().any(|t| {
                                     query_terms
                                         .iter()
@@ -5549,7 +5741,7 @@ impl Engine {
                             }
                             continue;
                         }
-                        for (ui, (phrase, unit, uboost)) in units.iter().enumerate() {
+                        for (ui, (phrase, unit, uboost, slop)) in units.iter().enumerate() {
                             let uboost = *uboost;
                             if (*phrase || require_all) && unit.len() > 1 {
                                 // A phrase scores like one term whose `tf` is the phrase
@@ -5572,9 +5764,20 @@ impl Engine {
                                         phrase_positions[k].extend_from_slice(cursor.positions());
                                     }
                                 }
-                                let freq =
-                                    phrase_freq_lists(&phrase_positions[..unit.len()], unit.len());
-                                if freq == 0 {
+                                // `"a b"~N`: a sloppy phrase scores with the
+                                // fractional frequency the reference's
+                                // `GetSloppyPhraseMatchData` produces.
+                                let freq = if *slop == 0 {
+                                    phrase_freq_lists(&phrase_positions[..unit.len()], unit.len())
+                                        as f64
+                                } else {
+                                    phrase_freq_lists_sloppy(
+                                        &phrase_positions[..unit.len()],
+                                        unit.len(),
+                                        *slop,
+                                    )
+                                };
+                                if freq <= 0.0 {
                                     continue;
                                 }
                                 unit_hits[ui] = true;
@@ -5592,8 +5795,9 @@ impl Engine {
                                         }
                                     })
                                     .sum();
-                                let tf = freq as f64;
-                                let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
+                                let tf = freq;
+                                let norm = (bm25_k1 + 1.0) * tf
+                                    / (tf + bm25_k1 * (1.0 - bm25_b + bm25_b * len / avg_len));
                                 score += idf_sum * (norm + delta_phrase) * boost * uboost;
                                 continue;
                             }
@@ -5607,7 +5811,8 @@ impl Engine {
                                 unit_hits[ui] = true;
                                 let idf = idf_of(ti);
                                 let tf = tf as f64;
-                                let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
+                                let norm = (bm25_k1 + 1.0) * tf
+                                    / (tf + bm25_k1 * (1.0 - bm25_b + bm25_b * len / avg_len));
                                 score += idf * (norm + delta_term) * boost * uboost;
                             }
                         }
@@ -5620,13 +5825,13 @@ impl Engine {
                             .iter()
                             .zip(unit_hits.iter())
                             .filter(|(_, m)| **m)
-                            .map(|((_, u, _), _)| u.len())
+                            .map(|((_, u, _, _), _)| u.len())
                             .sum()
                     };
                     score += rank_bonus;
                     if hits >= min_should
                         && hits > 0
-                        && threshold.map(|t| score >= t).unwrap_or(true)
+                        && threshold.map(|t| score > t).unwrap_or(true)
                     {
                         scored.push((doc as usize, score));
                     }
@@ -5670,6 +5875,123 @@ impl Engine {
     /// standard field once per matching term); otherwise the query is parsed
     /// into a normal query tree and scored with BM25, like a named column.
     #[allow(clippy::type_complexity)]
+    /// Evaluates a query-string query (`a AND b`, `a OR b`, `a AND NOT b`,
+    /// `(a OR b) AND c`, `column:term`, `"a b"~2`) through the reference's
+    /// `QueryNode` tree (`query_builder_impl.cpp`).
+    ///
+    /// `Ok(None)` when the text does not build a tree (a `:` that is not a
+    /// field qualifier, an empty analysis), in which case the caller keeps its
+    /// plain-term fast path.
+    #[allow(clippy::too_many_arguments)]
+    fn search_text_query_tree(
+        &self,
+        table: &str,
+        columns: &str,
+        query: &str,
+        topn: usize,
+        delta_term: f64,
+        delta_phrase: f64,
+        threshold: Option<f64>,
+        bm25: (f64, f64),
+        // Rows the predicate / `filter=` / `IN (…)` admit, applied before the
+        // tree ranks and truncates - the WAND path's rule.
+        allowed: Option<&crate::engine::wand::DocFilter>,
+    ) -> Result<Option<Vec<(u64, f64)>>> {
+        use crate::invertedindex::search::query_builder::SearchDriver;
+        let tkey = self.table_key(table);
+        // Load or refresh every field's index *before* taking the `tables` guard:
+        // opening one may seal the tail or rebuild it from rows, and
+        // `text_index_for` takes the table guard itself. This also makes sure the
+        // index covers the published row count before the tree is built.
+        for spec in columns.split(',') {
+            let name = spec
+                .split('^')
+                .next()
+                .unwrap_or(spec)
+                .split('@')
+                .next()
+                .unwrap_or(spec)
+                .trim();
+            if name.is_empty() {
+                continue;
+            }
+            let tokenizer = self.index_tokenizer(table, name);
+            let _ = self.text_index_for(table, name, tokenizer)?;
+        }
+        let (indexes, analyzers) = {
+            let tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get(&tkey) else {
+                return Ok(None);
+            };
+            (entry.text.clone(), entry.analyzers.clone())
+        };
+        if indexes.is_empty() {
+            return Ok(None);
+        }
+        let mut field2analyzer: HashMap<String, HashMap<String, String>> = HashMap::new();
+        let mut lookup: HashMap<String, super::state::SharedTextIndex> = HashMap::new();
+        let mut default_field: Option<String> = None;
+        for spec in columns.split(',') {
+            let name = spec
+                .split('^')
+                .next()
+                .unwrap_or(spec)
+                .split('@')
+                .next()
+                .unwrap_or(spec)
+                .trim();
+            let Some(shared) = indexes.get(name) else {
+                continue;
+            };
+            // `SearchDriver::analyzer_name` reads the first entry of the inner
+            // map when the field carries no `index` suffix, which is how the
+            // reference looks a column up.
+            let mut per_index: HashMap<String, String> = HashMap::new();
+            per_index.insert(
+                String::new(),
+                analyzers.get(name).cloned().unwrap_or_default(),
+            );
+            field2analyzer.insert(name.to_string(), per_index);
+            lookup.insert(name.to_string(), shared.clone());
+            default_field.get_or_insert_with(|| name.to_string());
+        }
+        let Some(default_field) = default_field else {
+            return Ok(None);
+        };
+        let driver = SearchDriver::new(field2analyzer, default_field);
+        let Ok(tree) = driver.parse_single_with_fields(columns, query) else {
+            // A `column:term` naming a column outside `columns` is not "no
+            // syntax": falling back would search `title:foo` as ordinary text and
+            // answer a different question. The reference resolves field names
+            // against every index of the table, so such a leaf finds no postings -
+            // match nothing instead of guessing.
+            let outside = query_field_qualifiers(query)
+                .into_iter()
+                .any(|field| !columns.split(',').any(|spec| column_of(spec) == field));
+            if outside {
+                return Ok(Some(Vec::new()));
+            }
+            return Ok(None);
+        };
+        let dead = self.tombstone_set(table)?;
+        let Some(hits) = super::text_query::run_query_tree(
+            tree,
+            lookup,
+            topn,
+            &dead,
+            allowed,
+            threshold,
+            delta_term,
+            delta_phrase,
+            bm25,
+        ) else {
+            return Ok(None);
+        };
+        // `run_query_tree` already dropped the rows below `threshold`, before its
+        // sort and `topn` cut; filtering again here would only re-check them.
+        Ok(Some(hits))
+    }
+
     pub(crate) fn search_field_query(
         &self,
         table: &str,
@@ -5992,6 +6314,7 @@ impl Engine {
                 .and_then(|(_, v)| v.trim().parse().ok())
                 .unwrap_or(0.0)
         };
+        let (bm25_k1, bm25_b) = parse_bm25_k1_b(params)?;
         // `bm25_param_delta` is shorthand for both, as in
         // `bound_select_statement_impl.cpp:256-257`.
         let delta_both = bm25_param("bm25_param_delta");
@@ -6001,7 +6324,11 @@ impl Engine {
             .split(';')
             .filter_map(|p| p.split_once('='))
             .find(|(k, _)| k.trim().eq_ignore_ascii_case("threshold"))
-            .and_then(|(_, v)| v.trim().parse().ok());
+            .and_then(|(_, v)| v.trim().parse().ok())
+            // The reference's `threshold_ <= 0.0f` shortcut
+            // (`term_doc_iterator_impl.cpp:118`): a non-positive threshold
+            // filters nothing.
+            .filter(|t| *t > 0.0);
         let total_terms = query_term_count(&tree);
         let min_should = params
             .split(';')
@@ -6015,12 +6342,18 @@ impl Engine {
             if !live || !passes {
                 continue;
             }
-            let Some((score, units)) =
-                eval_field_query_node(&tree, &fields, tokens, n_docs, delta_term, delta_phrase)
-            else {
+            let Some((score, units)) = eval_field_query_node(
+                &tree,
+                &fields,
+                tokens,
+                n_docs,
+                delta_term,
+                delta_phrase,
+                (bm25_k1, bm25_b),
+            ) else {
                 continue;
             };
-            if units >= min_should && units > 0 && threshold.map(|t| score >= t).unwrap_or(true) {
+            if units >= min_should && units > 0 && threshold.map(|t| score > t).unwrap_or(true) {
                 scored.push((*seq, score));
             }
         }
@@ -7944,9 +8277,15 @@ impl Engine {
                 }
                 Some(Handle::Text(t)) => {
                     let t = t.read().unwrap();
-                    // `mem_used` is the segment's byte estimate; the token
-                    // count is the corpus length BM25 scores against.
-                    (t.mem.doc_count(), t.mem.mem_used())
+                    // The rows still unsealed: the resident tail plus the one a
+                    // seal is writing right now (it keeps answering from memory,
+                    // so it must not disappear from the report mid-seal).
+                    let inflight = t
+                        .inflight
+                        .as_ref()
+                        .map(|inflight| inflight.mem.doc_count())
+                        .unwrap_or(0);
+                    (t.mem.doc_count() + inflight, t.mem.mem_used())
                 }
                 Some(Handle::Sparse(s)) => {
                     let s = s.read().unwrap();
@@ -7973,6 +8312,59 @@ impl Engine {
             });
         }
         out.sort_by(|a, b| (&a.table, &a.index).cmp(&(&b.table, &b.index)));
+        out
+    }
+
+    /// Health of the full-text indexes of `table`: chunk count, unsealed tail,
+    /// spill runs, rows a seal is writing right now, stale copies, and the last
+    /// seal's duration ([`diagnostics::FulltextStats`]).
+    ///
+    /// This is the data a slow full-text query is diagnosed with. It reads the
+    /// column under its **read** guard, which a seal never holds while writing,
+    /// so asking for stats cannot be blocked behind an fsync.
+    pub fn fulltext_stats(&self, table: &str) -> Vec<diagnostics::FulltextStats> {
+        let key = self.table_key(table);
+        // Clone the handles out of `tables`, then drop the guard: the index lock
+        // is taken after it everywhere (see `dml::batch_gate`).
+        let handles: Vec<(String, SharedTextIndex)> = {
+            let tables = self.tables.lock().unwrap();
+            match tables.get(&key) {
+                Some(entry) => entry
+                    .text
+                    .iter()
+                    .map(|(column, shared)| (column.clone(), shared.clone()))
+                    .collect(),
+                None => Vec::new(),
+            }
+        };
+        let mut out: Vec<diagnostics::FulltextStats> = handles
+            .into_iter()
+            .map(|(column, shared)| {
+                let index = shared.read().unwrap();
+                diagnostics::FulltextStats {
+                    table: table.to_string(),
+                    index: column,
+                    chunks: index.reader.segments.len(),
+                    chunk_rows: index
+                        .reader
+                        .segments
+                        .iter()
+                        .map(|segment| segment.docs as usize)
+                        .sum(),
+                    tail_rows: index.mem.pending_docs(),
+                    spill_runs: index.mem.runs.len(),
+                    inflight_rows: index
+                        .inflight
+                        .as_ref()
+                        .map(|inflight| inflight.mem.pending_docs())
+                        .unwrap_or(0),
+                    overridden_rows: index.overridden.len(),
+                    tail_bytes: index.mem.mem_used(),
+                    last_seal_us: index.last_seal_us,
+                }
+            })
+            .collect();
+        out.sort_by(|a, b| a.index.cmp(&b.index));
         out
     }
 
@@ -8051,4 +8443,71 @@ impl Engine {
         self.txn.append_cleanup()?;
         cleaned
     }
+}
+
+/// `bm25_param_k1` / `bm25_param_b`, validated the way
+/// `bound_select_statement_impl.cpp:239-252` validates them before writing the
+/// values into `BM25Params`. Defaults: k1 = 1.2, b = 0.75.
+fn parse_bm25_k1_b(params: &str) -> Result<(f64, f64)> {
+    let get = |name: &str| -> Option<f64> {
+        params
+            .split(';')
+            .filter_map(|p| p.split_once('='))
+            .find(|(k, _)| k.trim().eq_ignore_ascii_case(name))
+            .and_then(|(_, v)| v.trim().parse().ok())
+    };
+    let k1 = match get("bm25_param_k1") {
+        Some(v) if v < 0.0 => {
+            return Err(Error::Syntax(
+                "bm25_param_k1 must be a non-negative float. default value: 1.2".into(),
+            ))
+        }
+        Some(v) => v,
+        None => 1.2,
+    };
+    let b = match get("bm25_param_b") {
+        Some(v) if !(0.0..=1.0).contains(&v) => {
+            return Err(Error::Syntax(
+                "bm25_param_b must be in the range [0.0f, 1.0f]. default value: 0.75".into(),
+            ))
+        }
+        Some(v) => v,
+        None => 0.75,
+    };
+    Ok((k1, b))
+}
+
+/// The column a `MATCH TEXT` column spec names: `col`, `col^2`, `col@index`.
+fn column_of(spec: &str) -> &str {
+    spec.split('^')
+        .next()
+        .unwrap_or(spec)
+        .split('@')
+        .next()
+        .unwrap_or(spec)
+        .trim()
+}
+
+/// The field qualifiers (`col:term`) a query string names, in order.
+///
+/// Used to tell "the grammar did not parse" apart from "the grammar parsed but
+/// named a column outside the searched ones": the first is a reason to fall back
+/// to the plain-term path, the second must not be, because the fallback would
+/// search `title:foo` as ordinary text.
+fn query_field_qualifiers(query: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    for token in query.split(|c: char| c.is_whitespace() || c == '(' || c == ')') {
+        let token = token.trim_matches('"');
+        let Some((field, _)) = token.split_once(':') else {
+            continue;
+        };
+        if field.is_empty()
+            || !field.chars().all(|c| c.is_alphanumeric() || c == '_')
+            || field.starts_with(|c: char| c.is_ascii_digit())
+        {
+            continue;
+        }
+        out.push(field);
+    }
+    out
 }

@@ -35,9 +35,11 @@ const BLOCK_SIZE: usize = WAND_BLOCK;
 /// of the block's largest tf/doc-length ratio (doc_list_encoder_impl.cpp:166).
 const PERCENTAGE_SCALE: f64 = u16::MAX as f64;
 
-/// BM25Ranker (bm25_ranker_impl.cpp:25-34): k1 = 1.2, b = 0.75,
+/// BM25Ranker (bm25_ranker_impl.cpp:25-34): k1 = 1.2, b = 0.75 by default,
 /// idf = ln(1 + (N - df + 0.5) / (df + 0.5)), plus the optional delta_term added
-/// to the tf norm.
+/// to the tf norm. `bm25_param_k1` / `bm25_param_b` override the two constants
+/// (`bound_select_statement_impl.cpp:239-252`).
+#[derive(Clone)]
 pub(crate) struct Bm25Ranker {
     pub k1: f64,
     pub b: f64,
@@ -45,12 +47,15 @@ pub(crate) struct Bm25Ranker {
 }
 
 impl Bm25Ranker {
+    /// The reference defaults (`kBM25K1 = 1.2`, `kBM25B = 0.75`).
     pub fn new(delta: f64) -> Self {
-        Self {
-            k1: 1.2,
-            b: 0.75,
-            delta,
-        }
+        Self::with_params(1.2, 0.75, delta)
+    }
+
+    /// `bm25_param_k1=<f>` / `bm25_param_b=<f>`: the values
+    /// `bound_select_statement_impl.cpp:239-252` writes into `BM25Params`.
+    pub fn with_params(k1: f64, b: f64, delta: f64) -> Self {
+        Self { k1, b, delta }
     }
 
     pub fn idf(&self, n_docs: f64, df: f64) -> f64 {
@@ -80,9 +85,10 @@ impl Bm25Ranker {
         idf * (norm + delta) * weight
     }
 
-    /// `f4 = delta / (k1 + 1)` for an arbitrary per-unit delta.
-    pub fn f4_with(delta: f64) -> f64 {
-        delta / 2.2
+    /// `f4 = delta / (k1 + 1)` for an arbitrary per-unit delta
+    /// (`term_doc_iterator_impl.cpp:76`).
+    pub fn f4(&self, delta: f64) -> f64 {
+        delta / (self.k1 + 1.0)
     }
 
     /// tf_norm <= k1+1, so this is a safe upper bound for pruning.
@@ -106,6 +112,40 @@ impl Bm25Ranker {
     /// tf/doc-length ratio term of BlockMaxBM25Score.
     pub fn f3(&self, avgdl: f64) -> f64 {
         self.k1 * self.b / avgdl.max(1e-9) * PERCENTAGE_SCALE
+    }
+}
+
+/// The rows a query may score, ascending: the `FILTER (…)` / `IN (…)` /
+/// `filter=…` answer, evaluated once over the table.
+///
+/// The iterator consumes it as a **seek target**. Without it a rejected
+/// candidate is scored (its block bound is decoded) and then dropped by
+/// `offer`, one pivot per rejected document; with it the cursors hop to the
+/// next admitted row, so a selective filter costs one seek per surviving row
+/// instead of one pivot per rejected one.
+pub(crate) struct DocFilter {
+    allowed: Vec<u64>,
+}
+
+impl DocFilter {
+    /// `rows` must be sorted and deduplicated (see `Engine::allowed_rows`).
+    pub(crate) fn new(rows: Vec<u64>) -> Self {
+        Self { allowed: rows }
+    }
+
+    pub(crate) fn contains(&self, doc: u64) -> bool {
+        self.allowed.binary_search(&doc).is_ok()
+    }
+
+    /// The first admitted row `>= doc`.
+    pub(crate) fn next_ge(&self, doc: u64) -> Option<u64> {
+        let at = self.allowed.partition_point(|row| *row < doc);
+        self.allowed.get(at).copied()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.allowed.len()
     }
 }
 
@@ -190,13 +230,17 @@ impl<'a> Cursor<'a> {
         }
         // `BlockMaxPhraseScore` for a phrase unit: the minimum over its terms',
         // since a phrase can occur no more often than any one of them.
-        let (last, max_tf, max_pct) = self.stream.block_stats();
+        let (last, max_tf, pct) = self.stream.block_stats();
         let value = match mode {
             // One point per matched term, independent of tf and length.
             WandMode::Boolean => self.weight,
             WandMode::Bm25 => {
-                let pct_u16 = (max_pct * PERCENTAGE_SCALE).ceil().max(1.0);
-                let norm = 1.0 / (1.0 + self.f1 / max_tf.max(1.0) + self.f3 / pct_u16);
+                // `bm25_common_score_ * (1/(1 + f1/block_max_tf +
+                // f3/block_max_percentage) + f4)` with the stored `u16`
+                // percentage (`term_doc_iterator_impl.cpp:98-100`), so the bound
+                // is bit-for-bit the reference's.
+                let norm =
+                    1.0 / (1.0 + self.f1 / max_tf.max(1.0) + self.f3 / f64::from(pct.max(1)));
                 (self.common * (norm + self.f4)).min(self.upper_bound)
             }
         };
@@ -212,6 +256,9 @@ impl<'a> Cursor<'a> {
 pub(crate) struct BlockMaxWandIterator<'a> {
     fields: usize,
     dead: &'a HashSet<u64>,
+    /// Rows a `FILTER(…)` admits; `None` scores every row the postings reach.
+    /// See [`DocFilter`] for why it is a row list and not a predicate closure.
+    filter: Option<&'a DocFilter>,
     k: usize,
     min_should: usize,
     mode: WandMode,
@@ -289,7 +336,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                         ranker.common(idf, w),
                         ranker.f1(),
                         ranker.f3(avg),
-                        Bm25Ranker::f4_with(unit_delta),
+                        ranker.f4(unit_delta),
                     ),
                     WandMode::Boolean => (w, 0.0, 0.0, 0.0, 0.0),
                 };
@@ -326,6 +373,7 @@ impl<'a> BlockMaxWandIterator<'a> {
         Self {
             fields: field_count,
             dead,
+            filter: None,
             k,
             min_should,
             mode,
@@ -353,6 +401,56 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// pruned path, without the pruning.
     pub fn with_naive(mut self) -> Self {
         self.naive = true;
+        self
+    }
+
+    /// `bm25_param_k1=<f>` / `bm25_param_b=<f>`: the reference folds both into
+    /// `BM25Params` before any iterator is built
+    /// (`bound_select_statement_impl.cpp:239-252`), so every coefficient derived
+    /// from k1/b - the whole-term bound, `common`, f1, f3, f4 - is recomputed
+    /// here. `similarity=boolean` never touches BM25 and is left alone.
+    pub fn with_bm25_params(mut self, k1: f64, b: f64) -> Self {
+        if self.mode == WandMode::Boolean {
+            return self;
+        }
+        let ranker = Bm25Ranker::with_params(k1, b, self.ranker.delta);
+        for cursor in &mut self.cursors {
+            cursor.upper_bound = ranker.upper_bound(cursor.idf, cursor.weight);
+            cursor.common = ranker.common(cursor.idf, cursor.weight);
+            cursor.f1 = ranker.f1();
+            cursor.f3 = ranker.f3(cursor.avg);
+            cursor.f4 = ranker.f4(cursor.delta);
+        }
+        // The pruning bound is the sum over the cursors that still have a
+        // document; a retired cursor contributes nothing.
+        self.total_upper = self
+            .cursors
+            .iter()
+            .filter(|c| c.cur.is_some())
+            .map(|c| c.upper_bound)
+            .sum();
+        self.ranker = ranker;
+        self
+    }
+
+    /// `threshold=<f>`: the reference raises the block-max WAND's pruning bar to
+    /// the requested score (`UpdateScoreThreshold`,
+    /// `blockmax_wand_iterator_impl.cpp:233-246`, fed by
+    /// `physical_match_impl.cpp`), so documents whose bound cannot reach it are
+    /// skipped instead of decoded and then dropped. `t <= 0` means "no
+    /// threshold" - the reference's `threshold_ <= 0.0f` shortcut.
+    pub fn with_threshold(mut self, t: f64) -> Self {
+        if t > 0.0 {
+            self.threshold = self.threshold.max(t);
+        }
+        self
+    }
+
+    /// Restricts scoring to `filter`'s rows - the `FILTER (…)` / `IN (…)` /
+    /// `filter=…` pushdown. Without it every row the postings reach is a
+    /// candidate and the rejected ones are dropped after being scored.
+    pub fn with_filter(mut self, filter: &'a DocFilter) -> Self {
+        self.filter = Some(filter);
         self
     }
 
@@ -459,7 +557,10 @@ impl<'a> BlockMaxWandIterator<'a> {
         });
         self.best.truncate(self.k);
         if self.best.len() == self.k {
-            self.threshold = self.best[self.k - 1].1;
+            // `UpdateScoreThreshold` only ever raises the bar
+            // (`blockmax_wand_iterator_impl.cpp:233-246`), so a user
+            // `threshold=` survives a weak k-th score.
+            self.threshold = self.threshold.max(self.best[self.k - 1].1);
         }
     }
 
@@ -475,6 +576,12 @@ impl<'a> BlockMaxWandIterator<'a> {
             if self.doc_id.is_some_and(|current| current >= target) {
                 return true;
             }
+            // Start the reposition at the next row the filter admits: a rejected
+            // row can never be scored, so no cursor needs to stop there.
+            let Some(target) = self.lift(target) else {
+                self.doc_id = None;
+                return false;
+            };
             // Reposition the cursors the last pivot parked on the candidate.
             // Everything else still in the heap already sits above doc_id.
             self.advance_prefix(target);
@@ -511,6 +618,19 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.heap.pop();
                 self.heap_ops += 1;
                 self.prefix.push(i);
+            }
+            // The pivot must land on a row the filter admits. Hopping the cursors
+            // here is what makes the filter a seek instead of a post-score drop:
+            // a rejected candidate would otherwise be decoded, bounded and
+            // offered only to be thrown away, one pivot per rejected row.
+            if let Some(filter) = self.filter {
+                if !filter.contains(doc) {
+                    let Some(next) = filter.next_ge(doc + 1) else {
+                        break;
+                    };
+                    self.skip_to(next);
+                    continue;
+                }
             }
             // (2) Upper bound at the candidate. A cursor parked on the document
             // or inside a block that covers it contributes that block's bound; a
@@ -577,6 +697,36 @@ impl<'a> BlockMaxWandIterator<'a> {
         }
     }
 
+    /// The first row at or after `doc` the filter admits; `doc` itself when the
+    /// query has no filter.
+    fn lift(&self, doc: u64) -> Option<u64> {
+        match self.filter {
+            Some(filter) => filter.next_ge(doc),
+            None => Some(doc),
+        }
+    }
+
+    /// Moves every cursor that still sits before `next` up to it: the pivot
+    /// prefix (already out of the heap) and the heap entries below it. Rows in
+    /// between are ones the filter rejected, so no cursor needs to stop there.
+    fn skip_to(&mut self, next: u64) {
+        self.jumps += 1;
+        self.advance_prefix(next);
+        let mut moved: Vec<usize> = Vec::new();
+        while let Some(&Reverse((doc, i))) = self.heap.peek() {
+            if doc >= next {
+                break;
+            }
+            self.heap.pop();
+            self.heap_ops += 1;
+            moved.push(i);
+        }
+        for i in moved {
+            self.cursors[i].seek(next);
+            self.push_back(i);
+        }
+    }
+
     /// Resolves a cursor the round moved: its document, and the bound of the
     /// block it landed on (which also refreshes block_last_doc).
     fn resolve(&mut self, i: usize) {
@@ -596,6 +746,10 @@ impl<'a> BlockMaxWandIterator<'a> {
             if self.doc_id.is_some_and(|current| current >= target) {
                 return true;
             }
+            let Some(target) = self.lift(target) else {
+                self.doc_id = None;
+                return false;
+            };
             for i in std::mem::take(&mut self.prefix) {
                 let cursor = &mut self.cursors[i];
                 if cursor.cur.is_some_and(|doc| doc < target) {
@@ -604,22 +758,36 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.push_back(i);
             }
         }
-        self.prefix.clear();
-        let Some(&Reverse((doc, _))) = self.heap.peek() else {
-            self.doc_id = None;
-            return false;
-        };
-        while let Some(&Reverse((tied, i))) = self.heap.peek() {
-            if tied != doc {
-                break;
+        loop {
+            self.prefix.clear();
+            let Some(&Reverse((doc, _))) = self.heap.peek() else {
+                self.doc_id = None;
+                return false;
+            };
+            // Same pushdown as the pruned path: a document the filter rejects is
+            // never scored, so the cursors hop to the next admitted row.
+            if let Some(filter) = self.filter {
+                if !filter.contains(doc) {
+                    let Some(next) = filter.next_ge(doc + 1) else {
+                        self.doc_id = None;
+                        return false;
+                    };
+                    self.skip_to(next);
+                    continue;
+                }
             }
-            self.heap.pop();
-            self.heap_ops += 1;
-            self.prefix.push(i);
+            while let Some(&Reverse((tied, i))) = self.heap.peek() {
+                if tied != doc {
+                    break;
+                }
+                self.heap.pop();
+                self.heap_ops += 1;
+                self.prefix.push(i);
+            }
+            self.candidate_score = self.score_prefix();
+            self.doc_id = Some(doc);
+            return true;
         }
-        self.candidate_score = self.score_prefix();
-        self.doc_id = Some(doc);
-        true
     }
 
     /// The reference's block-skip path (SkipUncompetitiveRange,
@@ -700,7 +868,7 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// Sums the exact BM25Score() of the prefix cursors, all parked on the same
     /// document.
     fn score_prefix(&mut self) -> f64 {
-        let ranker = Bm25Ranker::new(self.ranker.delta);
+        let ranker = self.ranker.clone();
         let mut score = 0.0;
         // Sum in cursor creation order (field-major, then term) so the value is
         // independent of the document order the heap handed us, matching the
@@ -711,7 +879,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                 for k in 0..self.prefix.len() {
                     let i = self.prefix[k];
                     let cursor = &mut self.cursors[i];
-                    let tf = f64::from(cursor.stream.tf());
+                    let tf = cursor.stream.tf();
                     let dl = f64::from(cursor.stream.len());
                     score += ranker.score_with(
                         tf,
@@ -899,6 +1067,90 @@ mod tests {
         assert_eq!(all.len(), docs as usize);
         assert_eq!(full_evaluations, docs as usize);
         assert!(evaluations * 10 < full_evaluations);
+    }
+
+    /// The filtered pushdown returns exactly what a post-filtered scan does, and
+    /// only scores admitted rows.
+    #[test]
+    fn filter_pushdown_matches_a_post_filtered_scan() {
+        const DOCS: u64 = 2000;
+        let doc_len: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 20 + (d % 37) as u32)).collect();
+        let postings: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 1 + (d % 5) as u32)).collect();
+        let dead = HashSet::new();
+        // Every fifth row survives the filter.
+        let allowed: Vec<u64> = (0..DOCS).step_by(5).collect();
+        let filter = DocFilter::new(allowed.clone());
+        assert_eq!(filter.len(), allowed.len());
+        assert_eq!(filter.next_ge(3), Some(5));
+        assert!(filter.contains(10));
+        assert!(!filter.contains(11));
+        assert_eq!(filter.next_ge(DOCS), None);
+
+        let make = || {
+            vec![field(
+                &[("alpha", &postings)],
+                &doc_len,
+                DOCS as usize,
+                vec![1.0],
+            )]
+        };
+        let k = allowed.len();
+        let got = BlockMaxWandIterator::new(make(), k, &dead, 0.0, 1, WandMode::Bm25)
+            .with_filter(&filter)
+            .run();
+        assert_eq!(got.len(), k, "every admitted row is a candidate");
+        // The same query answered without the pushdown, filtered afterwards.
+        let want: Vec<(u64, f64)> =
+            BlockMaxWandIterator::new(make(), DOCS as usize, &dead, 0.0, 1, WandMode::Bm25)
+                .run()
+                .into_iter()
+                .filter(|(doc, _)| filter.contains(*doc))
+                .take(k)
+                .collect();
+        assert_eq!(got.len(), want.len());
+        for (a, b) in got.iter().zip(&want) {
+            assert_eq!(a.0, b.0, "different document order");
+            assert!((a.1 - b.1).abs() < 1e-12, "score of doc {}", a.0);
+        }
+    }
+
+    /// A rejected candidate costs a seek, not a scoring pass: the pruned path
+    /// scores at most one document per admitted row, where the unfiltered scan
+    /// scores every document the postings hold.
+    #[test]
+    fn filter_pushdown_scores_only_admitted_rows() {
+        const DOCS: u64 = 2000;
+        let doc_len: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 50)).collect();
+        let postings: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 1)).collect();
+        let dead = HashSet::new();
+        let allowed: Vec<u64> = (0..DOCS).step_by(20).collect();
+        let filter = DocFilter::new(allowed.clone());
+        let make = || {
+            vec![field(
+                &[("alpha", &postings)],
+                &doc_len,
+                DOCS as usize,
+                vec![1.0],
+            )]
+        };
+        let (best, evaluations, _) =
+            BlockMaxWandIterator::new(make(), allowed.len(), &dead, 0.0, 1, WandMode::Bm25)
+                .with_filter(&filter)
+                .drive_with_stats();
+        assert_eq!(best.len(), allowed.len());
+        assert!(
+            evaluations <= allowed.len(),
+            "scored {evaluations} documents for {} admitted rows",
+            allowed.len()
+        );
+        let (_, without, _) =
+            BlockMaxWandIterator::new(make(), DOCS as usize, &dead, 0.0, 1, WandMode::Bm25)
+                .drive_with_stats();
+        assert_eq!(
+            without, DOCS as usize,
+            "the unfiltered scan scores every row"
+        );
+        assert!(without >= evaluations * 10, "the pushdown skipped nothing");
     }
 
     fn lcg(state: &mut u64) -> u64 {
@@ -1245,10 +1497,13 @@ mod tests {
         let idf_a = ranker.idf(n, a.len() as f64);
         let idf_b = ranker.idf(n, b.len() as f64);
         let make = || {
-            let cursor = crate::PhraseCursor::new(vec![
-                TermStream::from_postings(a.clone(), &lens),
-                TermStream::from_postings(b.clone(), &lens),
-            ]);
+            let cursor = crate::PhraseCursor::new(
+                vec![
+                    TermStream::from_postings(a.clone(), &lens),
+                    TermStream::from_postings(b.clone(), &lens),
+                ],
+                0,
+            );
             vec![WandField {
                 n_docs: DOCS as usize,
                 total_len: DOCS * 100,
@@ -1289,10 +1544,13 @@ mod tests {
             }
         }
         let lens: Vec<(u64, u32)> = (0..400u64).map(|d| (d, 10)).collect();
-        let mut cursor = crate::PhraseCursor::new(vec![
-            TermStream::from_postings(a, &lens),
-            TermStream::from_postings(b, &lens),
-        ]);
+        let mut cursor = crate::PhraseCursor::new(
+            vec![
+                TermStream::from_postings(a, &lens),
+                TermStream::from_postings(b, &lens),
+            ],
+            0,
+        );
         assert_eq!(cursor.doc(), Some(0));
         let before = cursor.verified();
         cursor.seek_block(200);

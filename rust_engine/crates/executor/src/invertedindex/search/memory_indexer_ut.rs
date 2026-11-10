@@ -14,7 +14,7 @@ use crate::{index_row, Engine, MemoryIndexer, QueryResult, TextIndex, TextTokeni
 use std::collections::BTreeMap;
 use std::path::Path;
 use storage::invertedindex::disk_segment_reader::{PostingIterator, SegmentIndexReader};
-use storage::invertedindex::format::{TermMetaFlags, FULLTEXT_SPILL_SUFFIX};
+use storage::invertedindex::format::{FULLTEXT_SPILL_SUFFIX, OPTION_FLAG_ALL};
 use tempfile::tempdir;
 
 /// `MemoryIndexerTest::SpillLoadTest`.
@@ -165,7 +165,7 @@ fn spilled_runs_merge_in_doc_id_order() {
         spill_dir.path().to_str().unwrap(),
         "ft_0000000000000000",
         0,
-        TermMetaFlags::default(),
+        OPTION_FLAG_ALL,
     )
     .unwrap();
     let expected: Vec<(u64, u32)> = (0..40u64)
@@ -207,8 +207,7 @@ fn a_reinserted_doc_does_not_corrupt_a_spilled_run() {
     assert!(index.seal());
 
     let reader =
-        SegmentIndexReader::open(&dir_str, "ft_0000000000000005", 5, TermMetaFlags::default())
-            .unwrap();
+        SegmentIndexReader::open(&dir_str, "ft_0000000000000005", 5, OPTION_FLAG_ALL).unwrap();
     // Exactly one posting list for doc 5, and it is the second text's.
     assert!(reader.postings("alpha").unwrap().is_empty());
     assert!(reader.postings("beta").unwrap().is_empty());
@@ -292,8 +291,7 @@ fn terms_from_spilled_runs_survive_a_restart() {
         .expect("a sealed dictionary")
         .trim_end_matches(".dic")
         .to_string();
-    let reader =
-        SegmentIndexReader::open(&index_dir, &base_name, 0, TermMetaFlags::default()).unwrap();
+    let reader = SegmentIndexReader::open(&index_dir, &base_name, 0, OPTION_FLAG_ALL).unwrap();
     assert!(reader.lookup("zebrafish").unwrap().is_some());
 
     // A fresh process finds the terms of the spilled runs again.

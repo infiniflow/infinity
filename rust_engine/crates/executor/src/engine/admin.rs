@@ -45,6 +45,66 @@ impl Engine {
         self.compact_segments(table, &all)
     }
 
+    /// `NewTxn::OptimizeIndex` for the full-text indexes of `table`
+    /// (`new_txn_index_impl.cpp:332-370` → `OptimizeFtIndex`, `:2179-2270`):
+    /// merges each index's chunk list into a single
+    /// `ft_{base:016x}_{rows:x}` chunk.
+    ///
+    /// No row moves — this only rewrites the inverted index's files, which is
+    /// why the reference calls it from `OptimizeIndex` and not from `Compact`
+    /// (`Compact` re-writes indexes from rows instead). Returns how many chunk
+    /// merges happened; an index with one chunk costs nothing.
+    pub fn optimize_fulltext(&self, table: &str) -> Result<usize> {
+        self.ensure_writable()?;
+        // A merge replaces chunk files, so it must not interleave with a seal
+        // or a compaction of the same table.
+        let gate = self.batch_gate(table);
+        let _batch = gate.lock().unwrap();
+        let key = self.table_key(table);
+        // Clone the handles while the `tables` guard is held, then drop it before
+        // taking any index write lock. `text_index_for` takes `tables` first and
+        // the index second, so waiting for an index lock with `tables` held is the
+        // reverse order and can deadlock a concurrent seal or query.
+        let indexes: Vec<_> = {
+            let tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get(&key) else {
+                return Ok(0);
+            };
+            entry.text.values().cloned().collect()
+        };
+        let mut merges = 0;
+        for index in indexes {
+            // The merge rewrites whole chunks: keep its I/O out of the column's
+            // write lock so queries and inserts are not held behind it.
+            merges += crate::engine::state::optimize_text_index_unlocked(&index)?;
+        }
+        Ok(merges)
+    }
+
+    /// [`Self::optimize_fulltext`] for every open table — the full-text half of
+    /// an optimize tick (`OptimizationProcessor` → `OptimizeAllIndexes`).
+    ///
+    /// The reference walks the catalog's index metas and merges each
+    /// `kFullText` index's chunk list (`new_txn_index_impl.cpp:349-353`); this
+    /// port walks the tables whose indexes are open, which is a subset: a table
+    /// nobody touched since the process started has no `TextIndex` in memory
+    /// yet, and its chunks are merged by a later tick (opening the table runs
+    /// `load_sealed`, which sees every chunk). Loading it here instead would
+    /// mean calling `text_index_for`, whose row-count check can start a rebuild
+    /// — an optimize tick must not rewrite an index it was only asked to
+    /// compact. Returns the number of chunk merges.
+    pub fn optimize_all_fulltext_indexes(&self) -> Result<usize> {
+        let keys: Vec<String> = {
+            let tables = self.tables.lock().unwrap();
+            tables.keys().cloned().collect()
+        };
+        let mut merges = 0;
+        for key in keys {
+            merges += self.optimize_fulltext(&key)?;
+        }
+        Ok(merges)
+    }
+
     /// `NewTxn::Compact(db, table, segment_ids)`: merge exactly `sources` into
     /// one new segment and leave every other segment alone.
     ///

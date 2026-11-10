@@ -813,6 +813,12 @@ impl Engine {
 
     /// Seals the full-text memory tail of one column into its segment files
     /// (`ft_{first_row:016x}.{dic,pos,len,row}`).
+    ///
+    /// The write runs with the column's lock released
+    /// ([`crate::engine::state::seal_text_index_unlocked`]): a dump must not make
+    /// every query on the column wait for the segment's fsync. The caller holds
+    /// `flush_lock`, which serialises dumps and checkpoints but is never taken
+    /// on the query path.
     pub(crate) fn seal_text_index(&self, table: &str, column: &str) {
         let key = self.table_key(table);
         let shared = self
@@ -822,9 +828,7 @@ impl Engine {
             .get(&key)
             .and_then(|entry| entry.text.get(column).cloned());
         if let Some(shared) = shared {
-            if let Ok(mut index) = shared.write() {
-                index.seal();
-            }
+            crate::engine::state::seal_text_index_unlocked(&shared);
         }
     }
 

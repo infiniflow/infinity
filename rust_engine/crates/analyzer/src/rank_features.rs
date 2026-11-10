@@ -1,6 +1,14 @@
 use super::*;
 
 /// C++: `SmallFloat::Float122ToUInt16` (`smallfloat.cppm`).
+/// C++ `SmallFloat::UInt16ToFloat122`: the inverse of [`float122_to_uint16`],
+/// used by `RankFeatureDocIterator` to turn a posting's doc-payload back into
+/// the feature weight.
+pub fn uint16_to_float122(i: u16) -> f32 {
+    let bits = ((i as i32 + ((127 - 2) << 12)) << (23 - 12)) as u32;
+    f32::from_bits(bits)
+}
+
 pub(crate) fn float122_to_uint16(f: f32) -> u16 {
     let bits = f.to_bits() as i32;
     let smallfloat = bits >> (23 - 12);

@@ -39,6 +39,10 @@ pub enum FormatError {
     Checksum { expected: u32, got: u32 },
     /// An index file could not be read or written.
     Io(String),
+    /// The input violates a format invariant (e.g. a row outside the segment's
+    /// `base_row_id..base_row_id + doc_count` range, which the reference's
+    /// `docid_t` cannot express).
+    Invalid(String),
 }
 
 impl std::fmt::Display for FormatError {
@@ -55,6 +59,7 @@ impl std::fmt::Display for FormatError {
                 )
             }
             FormatError::Io(msg) => write!(f, "index file i/o: {msg}"),
+            FormatError::Invalid(msg) => write!(f, "invalid index structure: {msg}"),
         }
     }
 }

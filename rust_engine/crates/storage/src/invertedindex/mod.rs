@@ -9,3 +9,4 @@ pub mod common;
 pub mod disk_segment_reader;
 pub mod format;
 pub mod fst;
+pub mod index_merger;

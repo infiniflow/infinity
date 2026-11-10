@@ -991,6 +991,23 @@ impl SkipListReader {
         self.format.has_tf_list
     }
 
+    /// `SkipListReader::current_doc_id_`: the last doc id of the block the
+    /// reader points at (an item is keyed by its block's last document).
+    pub fn current_doc_id(&self) -> u32 {
+        self.current_doc_id
+    }
+
+    /// `SkipListReader::GetBlockMaxInfo`: the block's largest tf and its
+    /// `ceil(tf / doc_len) * u16::MAX` ratio, exactly the values the writer
+    /// stored (`DocListEncoder::add_skip_list_item`). `(0, 0)` when the list has
+    /// no item at the cursor.
+    pub fn block_max_info(&self) -> (u32, u16) {
+        (
+            self.current_block_max_tf,
+            self.current_block_max_tf_percentage,
+        )
+    }
+
     fn load_buffer(&mut self) -> bool {
         let has_tf = self.format.has_tf_list;
         let has_block_max = self.format.has_block_max;

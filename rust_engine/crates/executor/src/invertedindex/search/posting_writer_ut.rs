@@ -3,15 +3,16 @@
 //! The reference writes a term's posting list with `PostingWriter::Dump`,
 //! reads it back with `PostingWriter::Load` and drives a `PostingIterator` over
 //! one or two segments. The port uses the product segment writer/reader for the
-//! dump/load pair and the `PostingWriter`/`PostingIterator` types for the
-//! in-memory halves.
+//! dump/load pair and `DecodedPostingList`/`PostingIterator` for the in-memory
+//! halves (`DecodedPostingList` is the decoded form the reference does not
+//! have: a posting list only exists encoded).
 
 use std::collections::BTreeMap;
 
 use storage::invertedindex::disk_segment_reader::{
-    write_segment_index, PostingIterator, PostingWriter, SegmentIndexReader, INVALID_ROW_ID,
+    write_segment_index, DecodedPostingList, PostingIterator, SegmentIndexReader, INVALID_ROW_ID,
 };
-use storage::invertedindex::format::TermMetaFlags;
+use storage::invertedindex::format::OPTION_FLAG_ALL;
 use tempfile::tempdir;
 
 /// `PostingWriterTest::test1`.
@@ -20,7 +21,11 @@ fn test1() {
     let expected = [1u64, 3, 5, 7, 9];
     let dir = tempdir().unwrap();
     let dir_str = dir.path().to_str().unwrap();
-    let docs: Vec<(u64, u32)> = expected.iter().map(|doc| (*doc, 10)).collect();
+    // The segment's documents cover its whole row range: the reader maps an
+    // ordinal back to `base_row_id + ordinal`, so it cannot represent a
+    // segment whose rows are sparse (`0..=10` here, base 0). The term only
+    // occurs in `expected`, so the doc-id deltas still skip the gaps.
+    let docs: Vec<(u64, u32)> = (0..=10).map(|row| (row, 10)).collect();
     let postings = BTreeMap::from([(
         "term".to_string(),
         expected
@@ -28,11 +33,11 @@ fn test1() {
             .map(|doc| (*doc, 3, vec![0, 1, 2]))
             .collect::<Vec<_>>(),
     )]);
-    let flags = TermMetaFlags::default();
+    let flags = OPTION_FLAG_ALL;
     write_segment_index(dir_str, "posting_writer", 0, &docs, &postings, flags).unwrap();
 
     let reader = SegmentIndexReader::open(dir_str, "posting_writer", 0, flags).unwrap();
-    let mut posting = PostingWriter::with_postings(reader.postings("term").unwrap());
+    let mut posting = DecodedPostingList::with_postings(reader.postings("term").unwrap());
     assert_eq!(posting.doc_freq(), 5);
     assert_eq!(posting.total_tf(), 15);
 
@@ -58,7 +63,7 @@ fn test1() {
 /// `PostingWriterTest::tf_after_skip_to_across_segments`.
 #[test]
 fn tf_after_skip_to_across_segments() {
-    let flags = TermMetaFlags::default();
+    let flags = OPTION_FLAG_ALL;
     let dir = tempdir().unwrap();
     let dir_str = dir.path().to_str().unwrap();
     let base = 1u64 << 32;

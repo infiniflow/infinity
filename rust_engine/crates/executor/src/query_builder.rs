@@ -486,6 +486,9 @@ impl DocIterator for BmwIterator {
 }
 
 /// The BM25 constants of `BM25Ranker`.
+/// `kBM25K1` / `kBM25B` (`bm25_ranker_impl.cpp:25-34`). Each iterator carries
+/// its own copy so `bm25_param_k1` / `bm25_param_b` can override them
+/// (`bound_select_statement_impl.cpp:239-252`).
 const K1: f64 = 1.2;
 const B: f64 = 0.75;
 
@@ -511,6 +514,9 @@ pub struct TermDocIterator {
     avg_len: f64,
     weight: f64,
     delta: f64,
+    /// BM25 constants, defaulting to [`K1`] / [`B`].
+    k1: f64,
+    b: f64,
     scored_doc: u64,
     score_cache: f64,
 }
@@ -545,9 +551,18 @@ impl TermDocIterator {
             },
             weight,
             delta,
+            k1: K1,
+            b: B,
             scored_doc: INVALID_DOC_ID,
             score_cache: 0.0,
         }
+    }
+
+    /// `bm25_param_k1=<f>` / `bm25_param_b=<f>`: the per-query BM25 constants.
+    pub fn with_bm25(mut self, k1: f64, b: f64) -> Self {
+        self.k1 = k1;
+        self.b = b;
+        self
     }
 
     pub fn term(&self) -> &str {
@@ -585,7 +600,8 @@ impl TermDocIterator {
             })
             .unwrap_or((0.0, 1.0));
         let idf = bm25_idf(self.n_docs, self.postings.len());
-        let norm = (K1 + 1.0) * tf / (tf + K1 * ((1.0 - B) + B * dl / self.avg_len));
+        let norm =
+            (self.k1 + 1.0) * tf / (tf + self.k1 * ((1.0 - self.b) + self.b * dl / self.avg_len));
         self.score_cache = idf * (norm + self.delta) * self.weight;
         self.term_freq += tf as u64;
         self.scored_doc = self.doc_id;
@@ -594,7 +610,9 @@ impl TermDocIterator {
 
     /// `BM25ScoreUpperBound`: `tf/(tf+p) <= 1`.
     pub fn upper_bound(&self) -> f64 {
-        bm25_idf(self.n_docs, self.postings.len()) * (K1 + 1.0 + self.delta.max(0.0)) * self.weight
+        bm25_idf(self.n_docs, self.postings.len())
+            * (self.k1 + 1.0 + self.delta.max(0.0))
+            * self.weight
     }
 }
 
@@ -660,6 +678,9 @@ pub struct PhraseDocIterator {
     avg_len: f64,
     weight: f64,
     delta: f64,
+    /// BM25 constants, defaulting to [`K1`] / [`B`].
+    k1: f64,
+    b: f64,
     scored_doc: u64,
     score_cache: f64,
 }
@@ -695,9 +716,18 @@ impl PhraseDocIterator {
             },
             weight,
             delta,
+            k1: K1,
+            b: B,
             scored_doc: INVALID_DOC_ID,
             score_cache: 0.0,
         }
+    }
+
+    /// `bm25_param_k1=<f>` / `bm25_param_b=<f>`: the per-query BM25 constants.
+    pub fn with_bm25(mut self, k1: f64, b: f64) -> Self {
+        self.k1 = k1;
+        self.b = b;
+        self
     }
 
     pub fn terms(&self) -> &[String] {
@@ -731,7 +761,8 @@ impl PhraseDocIterator {
             .iter()
             .map(|list| bm25_idf(self.n_docs, list.len()))
             .sum();
-        let norm = (K1 + 1.0) * tf / (tf + K1 * ((1.0 - B) + B * dl / self.avg_len));
+        let norm =
+            (self.k1 + 1.0) * tf / (tf + self.k1 * ((1.0 - self.b) + self.b * dl / self.avg_len));
         self.score_cache = idf_sum * (norm + self.delta) * self.weight;
         self.scored_doc = self.doc_id;
         self.score_cache

@@ -5,11 +5,52 @@ use super::*;
 /// (`index_defines.cppm:13-38`; `index_full_text.cppm:42,73`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct TermMetaFlags {
-    /// `of_term_frequency` — a `total_tf` field follows `doc_freq`.
+    /// `of_term_frequency` — a `total_tf` field follows `doc_freq`, and the doc
+    /// list carries a term-frequency column.
     pub has_term_frequency: bool,
     /// `of_term_payload` — a raw `u32` payload follows the frequency fields.
     pub has_term_payload: bool,
+    /// `of_doc_payload` — the doc list carries a `u16` per-document payload
+    /// column (`DocListEncoder::AddDocument`, `doc_list_encoder_impl.cpp:63`).
+    pub has_doc_payload: bool,
+    /// `of_block_max` — the doc skip list carries `block_max_tf` and
+    /// `block_max_percentage`, which needs the frequency column
+    /// (`doc_list_encoder_impl.cpp:164-168`).
+    pub has_block_max: bool,
 }
+
+impl TermMetaFlags {
+    /// The `optionflag_t` word these bits stand for (`index_defines.cppm:32`).
+    ///
+    /// A position list is always written: this store never indexes a term
+    /// without positions, so `of_position_list` is always set.
+    pub fn option_flag(self) -> u8 {
+        let mut flag = super::position_list::OF_POSITION_LIST;
+        if self.has_term_frequency {
+            flag |= super::position_list::OF_TERM_FREQUENCY;
+        }
+        if self.has_term_payload {
+            flag |= super::doc_list::OF_TERM_PAYLOAD;
+        }
+        if self.has_doc_payload {
+            flag |= super::doc_list::OF_DOC_PAYLOAD;
+        }
+        if self.has_block_max {
+            flag |= super::doc_list::OF_BLOCK_MAX;
+        }
+        flag
+    }
+}
+
+/// `OPTION_FLAG_ALL` (`index_defines.cppm:32`): the flag word a full-text index
+/// is created with (`index_full_text.cppm:73`), and therefore the one both the
+/// writer and the reader of its files must use.
+pub const OPTION_FLAG_ALL: TermMetaFlags = TermMetaFlags {
+    has_term_frequency: true,
+    has_term_payload: true,
+    has_doc_payload: true,
+    has_block_max: true,
+};
 
 /// One term's dictionary entry (`term_meta.cppm:44-49`), encoded by
 /// `TermMetaDumper::Dump` (`term_meta_impl.cpp:92-104`).

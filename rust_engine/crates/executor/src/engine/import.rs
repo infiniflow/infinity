@@ -205,11 +205,21 @@ impl Engine {
                     if !segments.contains(&segment) {
                         segments.push(segment);
                     }
+                    let mut texts_by_row: Vec<(usize, Vec<String>)> = Vec::with_capacity(take);
                     for (k, row) in batch[start..start + take].iter().enumerate() {
                         self.update_indexes_on_insert(table, base + k, row, &schema)?;
-                        let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-                        self.update_text_indexes(table, base + k, &texts, &schema);
-                        self.update_vector_caches(table, base + k, &texts);
+                        texts_by_row
+                            .push((base + k, row.iter().map(|v| v.to_slt_string()).collect()));
+                    }
+                    // One batch for the full-text columns: tokenise without the
+                    // column lock, insert under it once.
+                    let text_batch: Vec<(usize, &[String])> = texts_by_row
+                        .iter()
+                        .map(|(seq, cells)| (*seq, cells.as_slice()))
+                        .collect();
+                    self.update_text_indexes_batch(table, &text_batch, &schema, None);
+                    for (seq, texts) in &texts_by_row {
+                        self.update_vector_caches(table, *seq, texts);
                     }
                     total += take;
                     staged += take;
@@ -362,11 +372,18 @@ impl Engine {
         self.note_import_ts(table, (base >> 32) as u32, _ts);
         self.publish_rows(table, base, &rows)?;
         let schema = self.table_schema(table).unwrap_or_default();
+        let mut texts_by_row: Vec<(usize, Vec<String>)> = Vec::with_capacity(rows.len());
         for (k, row) in rows.iter().enumerate() {
             self.update_indexes_on_insert(table, base + k, row, &schema)?;
-            let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-            self.update_text_indexes(table, base + k, &texts, &schema);
-            self.update_vector_caches(table, base + k, &texts);
+            texts_by_row.push((base + k, row.iter().map(|v| v.to_slt_string()).collect()));
+        }
+        let text_batch: Vec<(usize, &[String])> = texts_by_row
+            .iter()
+            .map(|(seq, cells)| (*seq, cells.as_slice()))
+            .collect();
+        self.update_text_indexes_batch(table, &text_batch, &schema, None);
+        for (seq, texts) in &texts_by_row {
+            self.update_vector_caches(table, *seq, texts);
         }
         self.dump_hnsw_over_capacity(table);
         self.dump_secondary_over_capacity(table);

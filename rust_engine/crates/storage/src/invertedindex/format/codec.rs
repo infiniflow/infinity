@@ -1206,6 +1206,27 @@ pub(crate) fn decode_u32_block_all(payload: &[u8]) -> Result<Vec<u32>, FormatErr
     Ok(out)
 }
 
+/// Decodes one `IntEncoder<u32, SIMDBitPacking>`-framed field block: the
+/// reference writes a one-byte word count and then `words * 4` bytes of
+/// `CompositeCodec<SIMDBinaryPacking, VariableByte>` output
+/// (`int_encoder.cppm:88-95`; `Decode` reads the `u8` back at `:96-110`).
+///
+/// Returns the values and the bytes consumed **including** the count byte, so a
+/// caller can walk a doc-list body field by field.
+pub fn decode_u32_field(buf: &[u8]) -> Result<(Vec<u32>, usize), FormatError> {
+    let Some(&words) = buf.first() else {
+        return Err(FormatError::Truncated { need: 1, got: 0 });
+    };
+    let end = 1 + usize::from(words) * 4;
+    if buf.len() < end {
+        return Err(FormatError::Truncated {
+            need: end,
+            got: buf.len(),
+        });
+    }
+    Ok((decode_u32_block_all(&buf[1..end])?, end))
+}
+
 /// `NewPForDeltaCompressor::BLOCK_SIZE` (`new_pfordelta_compressor.h:51`).
 pub const NPF_BLOCK_SIZE: usize = 128;
 
