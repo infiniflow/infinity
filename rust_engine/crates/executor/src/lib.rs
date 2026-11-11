@@ -13,6 +13,11 @@
 //! the part of the model that is not ported (see `docs/CLASS_MAP.md`).
 
 #![forbid(unsafe_code)]
+// Portable SIMD (stable in neither channel yet, so the workspace pins a nightly
+// toolchain - see `rust-toolchain.toml`) keeps the `MaxSim` kernels safe code:
+// a tensor `MATCH` spends its time in `sum_q max_d dot(q, d)`, and `std::arch`
+// intrinsics would need `unsafe`, which this crate forbids.
+#![feature(portable_simd)]
 
 // Names the rest of the crate reaches through `crate::`.
 use ::common::{Error, Result};

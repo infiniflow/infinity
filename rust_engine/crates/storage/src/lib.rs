@@ -94,6 +94,7 @@ pub mod new_txn;
 pub mod persistence;
 pub mod result_cache_manager;
 pub mod secondary_index;
+pub mod simd;
 pub mod wal;
 
 // The module tree above mirrors the reference's src/storage/. The re-exports

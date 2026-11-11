@@ -4871,6 +4871,78 @@ mod tests {
         assert_eq!(found.len(), BEFORE + DURING, "duplicate index entries");
     }
 
+    /// Timing harness for the `MATCH TENSOR` scoring loop: the current
+    /// implementation against the per-`(query, doc)` `Vec` allocation plus
+    /// scalar dot it replaced.
+    ///
+    /// ```text
+    /// cargo test --release -p executor --lib tensor_maxsim_throughput -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "timing"]
+    fn tensor_maxsim_throughput() {
+        let (nq, nd, dim) = (32usize, 32usize, 128usize);
+        let q: Vec<Vec<f64>> = (0..nq)
+            .map(|i| {
+                (0..dim)
+                    .map(|j| ((i * 3 + j) % 17) as f64 * 0.5 - 4.0)
+                    .collect()
+            })
+            .collect();
+        let d: Vec<Vec<f64>> = (0..nd)
+            .map(|i| (0..dim).map(|j| ((i * 7 + j) % 13) as f64 - 6.0).collect())
+            .collect();
+
+        let rounds = 500;
+        let t0 = std::time::Instant::now();
+        let mut acc = 0f64;
+        for _ in 0..rounds {
+            acc += tensor_maxsim(&q, &d, ElemType::Float32, ElemType::Float32);
+        }
+        let now = t0.elapsed() / rounds;
+
+        // The loop this replaced: a `Vec<&[f64]>` per pair and a sequential dot.
+        let t0 = std::time::Instant::now();
+        let mut old_acc = 0f64;
+        for _ in 0..rounds {
+            let mut sum = 0f32;
+            for qv in &q {
+                let mut best = f32::NEG_INFINITY;
+                for dv in &d {
+                    let pieces: Vec<&[f64]> = if qv.is_empty() {
+                        continue;
+                    } else if dv.len() == qv.len() {
+                        vec![dv.as_slice()]
+                    } else if dv.len() % qv.len() == 0 {
+                        dv.chunks(qv.len()).collect()
+                    } else {
+                        continue;
+                    };
+                    for piece in pieces {
+                        let mut s = 0f32;
+                        for (a, b) in qv.iter().zip(piece) {
+                            s += quantize_elem(*a, ElemType::Float32)
+                                * quantize_elem(*b, ElemType::Float32);
+                        }
+                        if s > best {
+                            best = s;
+                        }
+                    }
+                }
+                if best.is_finite() {
+                    sum += best;
+                }
+            }
+            old_acc += sum as f64;
+        }
+        let old = t0.elapsed() / rounds;
+        eprintln!(
+            "tensor_maxsim nq={nq} nd={nd} dim={dim}: per_pair_vec+scalar={old:?} \
+             chunks+simd={now:?} ({:.2}x) acc={acc} {old_acc}",
+            old.as_secs_f64() / now.as_secs_f64()
+        );
+    }
+
     /// The PLAID budget is "do not build", not "build and spill": this port has
     /// no buffer-manager/mmap search path, so a table past
     /// `INFINITY_PLAID_MAX_BYTES` answers from the sealed brute-force scan. That

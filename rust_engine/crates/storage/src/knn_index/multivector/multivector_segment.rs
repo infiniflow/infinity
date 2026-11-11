@@ -111,34 +111,36 @@ impl MultiVectorSegmentReader {
     }
 
     /// Reads token `t` of document `doc` into `out` (dims floats).
-    fn token_into(&self, doc: usize, t: usize, out: &mut Vec<f32>) {
-        out.clear();
-        let at = self.doc_at(doc) + 4 + t * self.dims * 4;
-        for i in 0..self.dims {
-            out.push(f32::from_le_bytes(
-                self.map[at + i * 4..at + i * 4 + 4].try_into().unwrap(),
-            ));
-        }
-    }
-
     /// `MaxSim` of one document, computed straight from the mapping.
+    ///
+    /// The document is decoded once into a flat buffer. Decoding inside the
+    /// `(query, token)` loop re-read the same bytes `nq` times, and the decode
+    /// (four bounds-checked byte reads per element) cost more than the dot
+    /// product it fed.
     pub fn maxsim(&self, query: &[Vec<f32>], doc: usize) -> f32 {
         let n = self.token_count(doc);
-        if n == 0 {
+        if n == 0 || self.dims == 0 {
             return 0.0;
         }
-        let mut token = Vec::with_capacity(self.dims);
+        let mut tokens = vec![0f32; n * self.dims];
+        let at = self.doc_at(doc) + 4;
+        let bytes = &self.map[at..at + n * self.dims * 4];
+        let (words, _) = bytes.as_chunks::<4>();
+        for (slot, word) in tokens.iter_mut().zip(words) {
+            *slot = f32::from_le_bytes(*word);
+        }
         let mut total = 0.0f32;
         for q in query {
             let mut best = f32::NEG_INFINITY;
-            for t in 0..n {
-                self.token_into(doc, t, &mut token);
-                let score: f32 = q.iter().zip(token.iter()).map(|(a, b)| a * b).sum();
+            for token in tokens.chunks_exact(self.dims) {
+                let score = crate::simd::dot_f32(q, token);
                 if score > best {
                     best = score;
                 }
             }
-            total += best;
+            if best != f32::NEG_INFINITY {
+                total += best;
+            }
         }
         total
     }
@@ -161,6 +163,70 @@ impl MultiVectorSegmentReader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Timing harness for the mmap `MaxSim`: the current reader against the
+    /// per-`(query, token)` decode it replaced, measured in one run.
+    ///
+    /// ```text
+    /// cargo test --release -p storage --lib maxsim_throughput -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "timing"]
+    fn maxsim_throughput() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("seg_bench.mvec");
+        let (dim, tokens, nq) = (128usize, 32usize, 32usize);
+        let doc: Vec<Vec<f32>> = (0..tokens)
+            .map(|t| (0..dim).map(|i| ((t * 7 + i) % 11) as f32 - 5.0).collect())
+            .collect();
+        let docs = vec![doc];
+        write_multivector_segment(&path, dim, &docs).unwrap();
+        let reader = MultiVectorSegmentReader::open(&path).unwrap();
+        let query: Vec<Vec<f32>> = (0..nq)
+            .map(|q| (0..dim).map(|i| ((q + i) % 13) as f32 * 0.25).collect())
+            .collect();
+
+        let rounds = 2000;
+        let t0 = std::time::Instant::now();
+        let mut acc = 0f32;
+        for _ in 0..rounds {
+            acc += reader.maxsim(&query, 0);
+        }
+        let flat = t0.elapsed() / rounds;
+
+        // The loop this replaced: decode inside the (query, token) pair.
+        let t0 = std::time::Instant::now();
+        let mut old_acc = 0f32;
+        for _ in 0..rounds {
+            let n = reader.token_count(0);
+            let mut token = Vec::with_capacity(dim);
+            let mut total = 0f32;
+            for q in &query {
+                let mut best = f32::NEG_INFINITY;
+                for t in 0..n {
+                    token.clear();
+                    let at = reader.doc_at(0) + 4 + t * dim * 4;
+                    for i in 0..dim {
+                        token.push(f32::from_le_bytes(
+                            reader.map[at + i * 4..at + i * 4 + 4].try_into().unwrap(),
+                        ));
+                    }
+                    let score: f32 = q.iter().zip(token.iter()).map(|(a, b)| a * b).sum();
+                    if score > best {
+                        best = score;
+                    }
+                }
+                total += best;
+            }
+            old_acc += total;
+        }
+        let per_pair = t0.elapsed() / rounds;
+        eprintln!(
+            "mmap maxsim nq={nq} tokens={tokens} dim={dim}: per_pair_decode={per_pair:?} \
+             flat_decode+simd={flat:?} ({:.2}x) acc={acc} {old_acc}",
+            per_pair.as_secs_f64() / flat.as_secs_f64()
+        );
+    }
 
     #[test]
     fn roundtrips_and_scores() {

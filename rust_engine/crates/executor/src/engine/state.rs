@@ -3378,24 +3378,13 @@ pub(crate) fn multivector_doc_bytes(doc: &[Vec<f32>]) -> usize {
 
 /// `MaxSim` over one in-memory document: sum over query rows of the best dot
 /// product against a stored row (the same formula as the mmap reader).
+///
+/// Delegated to [`storage::simd::maxsim_f32`], which keeps this crate's
+/// `#![forbid(unsafe_code)]` intact: the width-8 kernel is `std::simd`, and the
+/// dot products are what a multi-vector re-rank spends its time on
+/// (`nq * nd * dim` multiply-adds per candidate).
 pub(crate) fn maxsim_tokens(query: &[Vec<f32>], doc: &[Vec<f32>]) -> f32 {
-    let mut total = 0.0f32;
-    for q in query {
-        let mut best = f32::NEG_INFINITY;
-        for t in doc {
-            if t.len() != q.len() {
-                continue;
-            }
-            let score: f32 = q.iter().zip(t).map(|(a, b)| a * b).sum();
-            if score > best {
-                best = score;
-            }
-        }
-        if best != f32::NEG_INFINITY {
-            total += best;
-        }
-    }
-    total
+    storage::simd::maxsim_f32(query, doc)
 }
 
 impl MultiVectorIndex {
@@ -7123,33 +7112,34 @@ pub(crate) fn split_top_level(s: &str) -> Vec<String> {
 pub(crate) fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], col: ElemType, qry: ElemType) -> f64 {
     let mut sum = 0f32;
     for qv in q {
+        let width = qv.len();
+        if width == 0 {
+            continue;
+        }
         let mut best = f32::NEG_INFINITY;
         for dv in d {
             // A stored tensor row may concatenate several `dim`-sized vectors
-            // (the C++ writer emits one flat list); compare each slice.
-            let pieces: Vec<&[f64]> = if qv.is_empty() {
+            // (the C++ writer emits one flat list); compare each slice. This is
+            // `dv.len() == width` or a whole multiple of it.
+            if dv.len() < width || dv.len() % width != 0 {
                 continue;
-            } else if dv.len() == qv.len() {
-                vec![dv.as_slice()]
-            } else if dv.len() % qv.len() == 0 {
-                dv.chunks(qv.len()).collect()
-            } else {
-                continue;
-            };
-            for piece in pieces {
-                let dv = piece;
+            }
+            // `chunks` rather than a collected `Vec`: this loop runs once per
+            // (query vector, doc vector) pair, and the allocation was a visible
+            // part of a tensor match.
+            for piece in dv.chunks(width) {
                 let score = if col == ElemType::Bit {
                     if qry == ElemType::Bit {
                         // Hamming distance: higher score means more different.
                         let diff = qv
                             .iter()
-                            .zip(dv)
+                            .zip(piece)
                             .filter(|(a, b)| (**a != 0.0) != (**b != 0.0))
                             .count();
                         -(diff as f32)
                     } else {
                         let mut acc = 0f32;
-                        for (a, b) in qv.iter().zip(dv) {
+                        for (a, b) in qv.iter().zip(piece) {
                             if *b != 0.0 {
                                 acc += quantize_elem(*a, qry);
                             }
@@ -7157,11 +7147,9 @@ pub(crate) fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], col: ElemType, qry: 
                         acc
                     }
                 } else {
-                    let mut acc = 0f32;
-                    for (a, b) in qv.iter().zip(dv) {
-                        acc += quantize_elem(*a, qry) * quantize_elem(*b, col);
-                    }
-                    acc
+                    // Width-4 `f64 -> f32` conversion + multiply-add; see
+                    // `dot_quantized` for why `Float16`/`BFloat16` stay scalar.
+                    dot_quantized(qv, piece, qry, col)
                 };
                 if score > best {
                     best = score;
