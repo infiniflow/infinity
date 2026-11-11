@@ -3230,6 +3230,20 @@ pub(crate) struct MultiVectorIndex {
     /// add that could not be covered), so the next search rebuilds it instead of
     /// serving from sealed brute force forever.
     pub(crate) plaid_dropped: bool,
+    /// Set when PLAID cannot exist for this column at all: the estimate is over
+    /// [`plaid_memory_budget`], or the index refused to build.
+    ///
+    /// This port has no buffer-manager/mmap search path, so the budget is
+    /// "do not build" rather than "build and spill". A table past it is served
+    /// by the sealed brute-force scan, which is correct and merely slower - but
+    /// a rebuild is pointless: the next attempt would take the same decision on
+    /// the same data. Without this flag the flag `plaid_dropped` set by a
+    /// mutation would keep the index permanently incomplete, and every query
+    /// would rescan the table, retrain the centroids and rewrite the chunk set.
+    ///
+    /// It is not persisted: raising the budget and restarting gets a fresh
+    /// build, because the index is reconstructed from the rows on open.
+    pub(crate) plaid_unavailable: bool,
     /// SMVE options when the column carries a `USING SMVE` index.
     pub(crate) smve_config: Option<SmveConfig>,
     /// The index's `pq_subspace_num` / `pq_subspace_bits`, which decide how the
@@ -3413,6 +3427,7 @@ impl MultiVectorIndex {
             plaid_seqs: Vec::new(),
             scanned_rows: 0,
             plaid_dropped: false,
+            plaid_unavailable: false,
             smve_config,
             emvb_config,
             smve: None,
@@ -3563,14 +3578,23 @@ impl MultiVectorIndex {
         let assignment_bytes = total * 4;
         let estimate = residual_bytes + centroid_bytes + assignment_bytes;
         if estimate > plaid_memory_budget() {
+            // "Do not build", not "build and spill": this port has no
+            // buffer-manager or mmap search path, so the column keeps answering
+            // from the sealed brute-force scan. Recording the decision is what
+            // stops every later query from rescanning the table, retraining the
+            // centroids and rewriting the chunk set only to decline again.
+            self.degrade_plaid("over the memory budget");
             return;
         }
         let Ok(mut index) =
             index::plaid::PlaidIndex::new(0, self.dims as u32, cfg.nbits, k, cfg.colbertsar)
         else {
+            self.degrade_plaid("PlaidIndex::new rejected the configuration");
             return;
         };
         if index.train(k, &flat, total, 4).is_err() {
+            // Not recorded as final: a failed training can be transient (heap
+            // pressure), and the next build may succeed.
             return;
         }
         if index.add_multiple_docs_embeddings(&flat, &lens).is_err() {
@@ -3579,12 +3603,27 @@ impl MultiVectorIndex {
         self.plaid = Some(index);
         self.plaid_seqs = seqs;
         self.plaid_dropped = false;
+        self.plaid_unavailable = false;
+    }
+
+    /// Marks PLAID as impossible for this column and falls back to the sealed
+    /// scan for good (until the process restarts and the index is rebuilt).
+    fn degrade_plaid(&mut self, why: &str) {
+        self.plaid = None;
+        self.plaid_seqs.clear();
+        self.plaid_dropped = true;
+        self.plaid_unavailable = true;
+        if std::env::var_os("INFINITY_DEBUG_PLAN").is_some() {
+            eprintln!("DEBUG plaid degraded for the process: {why}");
+        }
     }
 
     /// Whether this index can answer every live row: it has scanned them all and
-    /// no mutation has dropped the PLAID index since.
+    /// no mutation has dropped the PLAID index since - unless PLAID cannot exist
+    /// here at all, in which case the sealed scan is the final answer rather
+    /// than a state to repair.
     pub(crate) fn is_complete(&self, live_rows: usize) -> bool {
-        self.scanned_rows >= live_rows && !self.plaid_dropped
+        self.scanned_rows >= live_rows && (!self.plaid_dropped || self.plaid_unavailable)
     }
 
     /// Whether this index was built knowing about `kind` (`PLAID` / `SMVE`).
@@ -3955,6 +3994,15 @@ pub(crate) struct SparseIndex {
     /// when it lags (the reference's `BMPAlg` held by the mem index).
     pub(crate) tail_generation: u64,
     pub(crate) tail_index: std::sync::Mutex<Option<SparseTailBmp>>,
+    /// Rows this index has *seen*, whether or not they contributed postings.
+    ///
+    /// A NULL (or unparseable) sparse cell writes no term, so `doc_count` is
+    /// always short of the table's row count on such a table - and a coverage
+    /// check based on it never agrees, which rebuilt the whole index on every
+    /// query. This counter is the one the check reads: the rebuild sets it to
+    /// the rows it scanned (NULL included) and the write hook bumps it per row
+    /// it is handed, so it can only run ahead of the truth, never behind it.
+    pub(crate) scanned_rows: usize,
 }
 
 /// The in-memory `BMPAlg` over the sparse tail, plus the `ROW_ID` of each
@@ -4034,7 +4082,23 @@ impl SparseIndex {
             tail_bytes: 0,
             tail_generation: 0,
             tail_index: std::sync::Mutex::new(None),
+            scanned_rows: 0,
         }
+    }
+
+    /// Whether this index covers every row of a table with `live_rows` rows.
+    ///
+    /// `doc_count` cannot answer that: a NULL sparse cell has no postings, so a
+    /// table holding one would look incomplete forever and be rebuilt on every
+    /// query. The counter the rebuild and the write hook maintain can.
+    pub(crate) fn is_complete(&self, live_rows: usize) -> bool {
+        self.scanned_rows >= live_rows
+    }
+
+    /// Records that the write hook handed this index one row, whether or not
+    /// the row had postings to add.
+    pub(crate) fn note_row(&mut self) {
+        self.scanned_rows += 1;
     }
 
     pub(crate) fn insert(&mut self, seq: u64, doc: Vec<(i32, f32)>) {

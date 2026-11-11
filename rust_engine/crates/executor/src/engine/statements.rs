@@ -3694,7 +3694,19 @@ impl Engine {
     ) -> Result<Arc<std::sync::RwLock<SparseIndex>>> {
         let key = index_key(table, column);
         let tkey = self.table_key(table);
-        let reserved = self.row_count(table).unwrap_or(0);
+        // The counter the write paths maintain, like `multivector_index_for`:
+        // `row_count` walks every block version file and slot, which is a
+        // visible slice of a small query's latency.
+        let reserved = {
+            let tables = self.tables.lock().unwrap();
+            match tables.get(&tkey).and_then(|e| e.live_rows) {
+                Some(n) => n,
+                None => {
+                    drop(tables);
+                    self.row_count(table).unwrap_or(0)
+                }
+            }
+        };
         let schema = self.table_schema(table)?;
         let ci = schema
             .iter()
@@ -3716,10 +3728,13 @@ impl Engine {
         };
         if let Some(idx) = cached {
             // A changed catalog hint invalidates the cached index even though
-            // the BMP bytes are identical.
+            // the BMP bytes are identical. Coverage is measured by the rows the
+            // index has *seen*, not by `doc_count`: a NULL sparse cell writes
+            // no postings, so a table holding one never looked complete and was
+            // rebuilt on every query.
             let reusable = idx
                 .read()
-                .map(|g| g.doc_count() >= reserved && g.store == store)
+                .map(|g| g.is_complete(reserved) && g.store == store)
                 .unwrap_or(false);
             if reusable {
                 return Ok(idx);
@@ -3751,7 +3766,9 @@ impl Engine {
             .and_then(|t| t.get(ci).cloned())
             .and_then(|text| sparse_declared_bound(&text))
             .unwrap_or(0);
+        let mut scanned = 0usize;
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
+            scanned += 1;
             // A NULL sparse cell has no postings; only stored values are indexed.
             let Some(Value::Str(text)) = cells.get(ci) else {
                 continue;
@@ -3762,6 +3779,9 @@ impl Engine {
                 .collect();
             index.insert(seq as u64, entries);
         }
+        // A row with no postings still counts as covered: the check above asks
+        // whether this index saw the table, not how many documents it holds.
+        index.scanned_rows = scanned;
         index.seal();
         let shared = Arc::new(std::sync::RwLock::new(index));
         self.tables

@@ -276,6 +276,11 @@ impl Engine {
         let int_column = key_domain(&type_upper) == KeyDomain::Integer;
         let key_kind = secondary_key_kind(&type_upper);
         let low_card = self.secondary_low_cardinality(table, column, &type_upper);
+        // The highest row id this build read. Anything above it was appended
+        // while the build was running and is in neither the chunks written
+        // below nor the tail that replaces them; `secondary_catch_up` appends
+        // those rows to the tail once it is registered.
+        let mut hwm = 0usize;
         if low_card {
             // `SecondaryIndexDataLowCardinalityT`: unique keys, each with one
             // bitmap of segment offsets (`secondary_index_data_impl.cpp:284`).
@@ -284,6 +289,7 @@ impl Engine {
             let mut grouped: HashMap<u64, std::collections::BTreeMap<Vec<u8>, Vec<u32>>> =
                 HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
+                hwm = hwm.max(seq);
                 let Some(value) = evaluate(&row) else {
                     continue;
                 };
@@ -319,6 +325,7 @@ impl Engine {
         } else if int_column {
             let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
+                hwm = hwm.max(seq);
                 let Some(Value::Int(v)) = evaluate(&row) else {
                     continue;
                 };
@@ -337,6 +344,7 @@ impl Engine {
             // ordered day (or day+second) count, also raw.
             let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
+                hwm = hwm.max(seq);
                 let key = match key_kind {
                     KeyKind::F32 | KeyKind::F64 => {
                         let value = match evaluate(&row) {
@@ -377,6 +385,7 @@ impl Engine {
             // reference's `std::hash<std::string_view>` (`ConvertToOrderedKeyValue`).
             let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
+                hwm = hwm.max(seq);
                 let Some(value) = evaluate(&row) else {
                     continue;
                 };
@@ -388,19 +397,95 @@ impl Engine {
             }
             self.write_secondary_pgm_chunks(table, column, KeyKind::U64, by_segment);
         }
-        // The memory map is only the tail written since the last dump.
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey).or_default();
-        entry.secondary.disk_backed.insert(column.to_string());
-        entry
-            .secondary
-            .declared_types
-            .insert(column.to_string(), type_upper.clone());
-        entry
-            .secondary
-            .indexes
-            .insert(column.to_string(), Arc::new(SecondaryIndex::new()));
+        // The memory map is only the tail written since the last dump. The tail
+        // this replaces holds rows the chunks above already cover (they were in
+        // the table when the scan ran), so dropping it loses nothing; rows
+        // appended during the scan are picked up below, after the new tail is
+        // registered and the write hook can maintain it again.
+        {
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(tkey).or_default();
+            entry.secondary.disk_backed.insert(column.to_string());
+            entry
+                .secondary
+                .declared_types
+                .insert(column.to_string(), type_upper.clone());
+            entry
+                .secondary
+                .indexes
+                .insert(column.to_string(), Arc::new(SecondaryIndex::new()));
+        }
+        self.secondary_catch_up(table, column, hwm + 1, &schema);
         Ok(())
+    }
+
+    /// Rows appended while [`Self::build_index`] was scanning.
+    ///
+    /// The build reads the table without excluding writers: the reference
+    /// relies on its transaction conflict detection, which this port does not
+    /// have yet. A row committed after the scan read the table is covered by
+    /// neither the chunks the build wrote nor the tail it just registered - the
+    /// write hook could not put it there, because the index was not registered
+    /// while it was being built. Those rows are appended to the tail here, which
+    /// is the channel the write path maintains from now on, so a truncated
+    /// chunk set no longer means silently missing rows.
+    ///
+    /// `insert` is not idempotent, and a row that arrives *after* the tail is
+    /// registered is already in it, so a row whose first key already lists its
+    /// id is skipped. A tombstoned row contributes nothing.
+    fn secondary_catch_up(&self, table: &str, column: &str, from: usize, schema: &[String]) {
+        let Ok(rows) = self.fetch_rows_including_deleted_from(table, from) else {
+            return;
+        };
+        if rows.is_empty() {
+            return;
+        }
+        let tkey = self.table_key(table);
+        let (index, declared, func, pos) = {
+            let tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get(&tkey) else {
+                return;
+            };
+            let Some(index) = entry.secondary.indexes.get(column).cloned() else {
+                return;
+            };
+            let Some(declared) = entry.secondary.declared_types.get(column).cloned() else {
+                return;
+            };
+            let (pos, func) = match entry.secondary.functional.get(column) {
+                Some(functional) => match schema.iter().position(|c| c == &functional.base) {
+                    Some(pos) => (pos, Some(functional.func.clone())),
+                    None => return,
+                },
+                None => match schema.iter().position(|c| c == column) {
+                    Some(pos) => (pos, None),
+                    None => return,
+                },
+            };
+            (index, declared, func, pos)
+        };
+        let dead = self.tombstone_set(table).unwrap_or_default();
+        for (seq, values) in rows {
+            if dead.contains(&(seq as u64)) {
+                continue;
+            }
+            let Some(value) = values.get(pos) else {
+                continue;
+            };
+            let keys = match &func {
+                None => value_to_tail_keys(&declared, value),
+                Some(func) => match functional_value(func, pos, &values) {
+                    Some(value) => value_to_key(&declared, &value),
+                    None => Vec::new(),
+                },
+            };
+            if keys.is_empty() || index.contains(&keys[0], seq as u64) {
+                continue;
+            }
+            for key in keys {
+                index.insert(&key, seq as u64);
+            }
+        }
     }
 
     /// Reloads the HNSW/IVF chunk readers after new chunks were written, so a
@@ -2124,7 +2209,7 @@ impl Engine {
         ranges: &[(Value, Value)],
     ) -> Option<Vec<u64>> {
         use storage::secondary_lowcard::LowCardKey;
-        let terms: Vec<(Vec<u8>, Vec<u8>)> = ranges
+        let mut terms: Vec<(Vec<u8>, Vec<u8>)> = ranges
             .iter()
             .filter_map(|(lo, hi)| match (lo, hi) {
                 (Value::Str(lo), Value::Str(hi)) if lo.as_bytes() <= hi.as_bytes() => {
@@ -2134,8 +2219,23 @@ impl Engine {
             })
             .collect();
         if terms.is_empty() {
+            // The predicate produced no usable term range: the row scan fallback
+            // has to answer, and it reads the document itself, so a sentinel
+            // key would add nothing.
             return None;
         }
+        // A document nested past the flattener's depth bound is *valid* JSON
+        // whose terms were never expanded, so this index cannot prove it misses
+        // the predicate. Such a row carries `OVERFLOW_TERM` instead of no term,
+        // and every candidate set for the column unions that key in, which is
+        // what keeps the row alive to the residual filter above the index
+        // scan - the only stage that can answer it exactly.
+        //
+        // Only the candidate path is widened this way. The sentinel is an
+        // ordinary chunk key, so a rebuild and a cold restart both preserve it
+        // with no side table to recover.
+        let overflow = storage::json_index::OVERFLOW_TERM.as_bytes().to_vec();
+        terms.push((overflow.clone(), overflow));
         let (low, tail, sealing): (
             Option<SecondaryLowChunks>,
             Option<Arc<SecondaryIndex>>,

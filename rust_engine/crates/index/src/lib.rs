@@ -294,6 +294,25 @@ impl SecondaryIndex {
         SealedTail(self.take())
     }
 
+    /// Whether `row_id` is already recorded under `key`.
+    ///
+    /// The DDL catch-up (`Engine::secondary_catch_up`) appends the rows a
+    /// concurrent writer committed after the index build had read the table. A
+    /// row that arrived *after* the tail was registered is already here, and
+    /// [`Self::insert`] is not idempotent, so the row's first key decides.
+    ///
+    /// `pending` before the snapshot, like every other reader: with it held,
+    /// `fold` cannot move the entry between the two views.
+    pub fn contains(&self, key: &[u8], row_id: RowID) -> bool {
+        let pending = self.pending.lock().unwrap();
+        if pending.get(key).is_some_and(|ids| ids.contains(&row_id)) {
+            return true;
+        }
+        self.snapshot()
+            .get(key)
+            .is_some_and(|ids| ids.contains(&row_id))
+    }
+
     /// Number of row entries across all keys (C++ `GetRowCount`) - an atomic
     /// load, not a walk: the quota check reads it once per row.
     pub fn row_count(&self) -> usize {

@@ -4600,6 +4600,78 @@ mod tests {
         );
     }
 
+    /// A `json` document nesting past the flattener's depth bound cannot be
+    /// expanded into terms, but it is valid JSON that may still match a
+    /// predicate. The index therefore keeps it as a candidate instead of
+    /// reporting "no terms" and dropping the row before the residual filter
+    /// above the index scan runs.
+    ///
+    /// The marker is an ordinary term-chunk key, so the row survives the dump
+    /// into a chunk and a cold restart alike.
+    #[test]
+    fn over_depth_json_rows_stay_candidates() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE jd (id INT, meta JSON);").unwrap();
+        // Row 2 nests past `MAX_JSON_DEPTH` (512) and is still valid JSON whose
+        // `$.a` is 1 - exactly the row a term-range read would lose.
+        let deep = format!("{{\"a\":1,\"d\":{}1{}}}", "[".repeat(513), "]".repeat(513));
+        e.execute(&format!(
+            "INSERT INTO jd VALUES (1, '{{\"a\":1}}'), (2, '{deep}');"
+        ))
+        .unwrap();
+        e.execute("CREATE INDEX idx_jd ON jd (meta);").unwrap();
+        let q = "SELECT id FROM jd WHERE json_extract_int(meta, '$.a') = 1;";
+        let both = vec![vec!["1".to_string()], vec!["2".to_string()]];
+        assert_eq!(rows(&e, q), both);
+
+        // The dump rewrites the tail's terms into a low-cardinality chunk. The
+        // marker is a key like any other, so the row is still found.
+        e.dump_index_transaction("jd", "idx_jd").unwrap();
+        assert_eq!(rows(&e, q), both);
+
+        // Widening the candidate set must not become a false positive: the
+        // residual filter above the index scan still answers the predicate.
+        assert!(rows(
+            &e,
+            "SELECT id FROM jd WHERE json_extract_int(meta, '$.a') = 999;"
+        )
+        .is_empty());
+        assert!(rows(
+            &e,
+            "SELECT id FROM jd WHERE json_exists_path(meta, '$.zzz');"
+        )
+        .is_empty());
+
+        // The chunk also carries the marker on disk, which is what a cold
+        // restart - or a rebuild from the rows - reads back.
+        {
+            let tables = e.tables.lock().unwrap();
+            let low = tables
+                .values()
+                .find_map(|t| t.secondary.low.get("meta"))
+                .expect("a json column uses term chunks");
+            assert!(
+                low.iter().any(|(_, reader)| reader
+                    .range(
+                        storage::secondary_lowcard::LowCardKey::Bytes(
+                            storage::json_index::OVERFLOW_TERM.as_bytes().to_vec()
+                        ),
+                        storage::secondary_lowcard::LowCardKey::Bytes(
+                            storage::json_index::OVERFLOW_TERM.as_bytes().to_vec()
+                        ),
+                    )
+                    .len()
+                    == 1),
+                "the over-depth row's candidate term must be written to the chunk"
+            );
+        }
+
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(rows(&e, q), both);
+    }
+
     /// `WITH (cardinality = low)` moves any column onto the bitmap layout, not
     /// just BOOL and JSON (`NewSecondaryIndexInMem` honours the option for every
     /// type).
@@ -4748,6 +4820,279 @@ mod tests {
                 "index returned the ghost row {id} for v = {value}"
             );
         }
+    }
+
+    /// `CREATE INDEX` reads the table without excluding writers (the reference
+    /// leans on its transaction conflict detection, which this port does not
+    /// have yet). A row committed after the scan had read the table is in
+    /// neither the chunks the build wrote nor the tail it installs - the write
+    /// hook could not put it there while the index was still being built - so
+    /// the build appends it to the tail afterwards (`secondary_catch_up`).
+    /// Without that step the index silently loses every row in the window.
+    #[test]
+    fn create_index_covers_rows_committed_while_it_builds() {
+        use std::sync::Arc;
+
+        const BEFORE: usize = 200;
+        const DURING: usize = 200;
+
+        let dir = tempdir().unwrap();
+        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute("CREATE TABLE cd (id INT, v INT);").unwrap();
+        for i in 0..BEFORE {
+            e.execute(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+                .unwrap();
+        }
+        // One writer keeps appending while the build scans; the values are
+        // unique so every expected row is individually checkable.
+        let writer = {
+            let e = Arc::clone(&e);
+            std::thread::spawn(move || {
+                for i in BEFORE..(BEFORE + DURING) {
+                    e.execute(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+                        .unwrap();
+                }
+            })
+        };
+        e.execute("CREATE INDEX cdv ON cd (v);").unwrap();
+        writer.join().unwrap();
+
+        // A range predicate is answered by the index (chunk keys plus the
+        // tail), so a row the build dropped would be missing from the result.
+        let found = rows(&e, "SELECT v FROM cd WHERE v >= 0;");
+        let values: std::collections::HashSet<String> =
+            found.iter().map(|row| row[0].clone()).collect();
+        for i in 0..(BEFORE + DURING) {
+            assert!(
+                values.contains(&i.to_string()),
+                "v = {i} is missing from the index after a concurrent insert"
+            );
+        }
+        assert_eq!(found.len(), BEFORE + DURING, "duplicate index entries");
+    }
+
+    /// The PLAID budget is "do not build", not "build and spill": this port has
+    /// no buffer-manager/mmap search path, so a table past
+    /// `INFINITY_PLAID_MAX_BYTES` answers from the sealed brute-force scan. That
+    /// decision has to be final for the process - otherwise every later query
+    /// rescans the table, retrains the centroids and rewrites the chunk set only
+    /// to decline again.
+    ///
+    /// The budget is a process-wide `OnceLock`, so the case runs in a child
+    /// started with a 1-byte budget.
+    #[test]
+    fn a_plaid_index_over_budget_keeps_answering_from_the_sealed_scan() {
+        const CHILD: &str = "INFINITY_PLAID_BUDGET_CHILD";
+        const DIR: &str = "INFINITY_PLAID_BUDGET_DIR";
+        if let Ok(dir) = std::env::var(DIR) {
+            let e = Engine::open(std::path::Path::new(&dir)).unwrap();
+            e.execute("CREATE TABLE pb (id INT, t TENSOR(FLOAT,4));")
+                .unwrap();
+            let values: Vec<String> = (0..300)
+                .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
+                .collect();
+            e.execute(&format!("INSERT INTO pb VALUES {};", values.join(",")))
+                .unwrap();
+            e.execute("CREATE INDEX pbi ON pb (t) USING PLAID;")
+                .unwrap();
+            let first = e.multivector_index_for("default_db.pb", "t", 4).unwrap();
+            {
+                let guard = first.read().unwrap();
+                assert!(guard.plaid.is_none(), "PLAID must not be built over budget");
+                assert!(guard.plaid_unavailable, "the refusal must be recorded");
+                assert!(guard.plaid_dropped, "the index must report the fallback");
+            }
+            // The refusal is final, so the cached index is reused: a rebuild
+            // would scan the table and retrain the centroids again.
+            let again = e.multivector_index_for("default_db.pb", "t", 4).unwrap();
+            assert!(
+                std::sync::Arc::ptr_eq(&first, &again),
+                "the index was rebuilt although the budget refused to build PLAID"
+            );
+            return;
+        }
+        let dir = tempdir().unwrap();
+        let out = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "engine::tests_ut::tests::a_plaid_index_over_budget_keeps_answering_from_the_sealed_scan",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .env(DIR, dir.path())
+            .env("INFINITY_PLAID_MAX_BYTES", "1")
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(
+            out.status.success(),
+            "child failed:\n{stdout}\n{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            stdout.contains("1 passed"),
+            "the child ran no test:\n{stdout}"
+        );
+    }
+
+    /// A NULL sparse cell writes no postings, so `doc_count` can never reach the
+    /// table's row count on such a table: the coverage check based on it never
+    /// agreed and every `MATCH SPARSE` rebuilt the whole index, chunks
+    /// included. Coverage is measured by the rows the index has *seen*.
+    #[test]
+    fn sparse_index_with_null_rows_is_not_rebuilt_per_query() {
+        use storage::bmp::IdxWidth;
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE spn (id INT, v SPARSE(FLOAT,30000));")
+            .unwrap();
+        e.execute("INSERT INTO spn VALUES (1, [0:1.0,10:1.0]), (2, NULL), (3, [20:2.0]);")
+            .unwrap();
+        e.execute("CREATE INDEX spnv ON spn (v);").unwrap();
+        let first = e
+            .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
+            .unwrap();
+        let again = e
+            .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
+            .unwrap();
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &again),
+            "the index was rebuilt although it had seen every row"
+        );
+        // A NULL insert keeps the same instance: the write hook counts the row
+        // even though it contributes no postings.
+        e.execute("INSERT INTO spn VALUES (4, NULL);").unwrap();
+        let after = e
+            .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
+            .unwrap();
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &after),
+            "the index was rebuilt after a NULL row landed in the tail"
+        );
+    }
+
+    /// `kill -9` in the middle of a dump leaves a spilled chunk file half
+    /// written while the rows themselves are already durable. The restart
+    /// rebuilds every secondary index from the rows (`rebuild_indexes`), and the
+    /// rebuild rewrites the spill set, so the truncated file must never reach
+    /// the reloaded index - a query answered from a half-parsed chunk would
+    /// silently lose rows.
+    #[test]
+    fn a_truncated_chunk_is_rebuilt_from_the_rows_on_startup() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE tc (id INT, v INT);").unwrap();
+        let values: Vec<String> = (0..500).map(|i| format!("({i}, {i})")).collect();
+        e.execute(&format!("INSERT INTO tc VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute("CREATE INDEX tcv ON tc (v);").unwrap();
+        e.dump_index_transaction("tc", "tcv").unwrap();
+        e.flush().unwrap();
+        drop(e);
+
+        assert!(
+            truncate_spilled_chunks(dir.path()) > 0,
+            "the dump must have written a chunk file to truncate"
+        );
+
+        let e = Engine::open(dir.path()).unwrap();
+        let found = rows(&e, "SELECT v FROM tc WHERE v >= 0;");
+        assert_eq!(found.len(), 500, "a truncated chunk lost rows");
+    }
+
+    /// Cuts every spilled secondary chunk down to half its length: what a
+    /// process killed in the middle of a dump leaves behind.
+    fn truncate_spilled_chunks(root: &std::path::Path) -> usize {
+        let mut cut = 0;
+        for sub in ["secondary", "secondary_low"] {
+            let Ok(entries) = std::fs::read_dir(root.join(sub)) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    if let Ok(files) = std::fs::read_dir(&path) {
+                        for file in files.flatten() {
+                            cut += truncate_chunk_file(&file.path());
+                        }
+                    }
+                } else {
+                    cut += truncate_chunk_file(&path);
+                }
+            }
+        }
+        cut
+    }
+
+    fn truncate_chunk_file(path: &std::path::Path) -> usize {
+        let Ok(meta) = std::fs::metadata(path) else {
+            return 0;
+        };
+        if !path.extension().is_some_and(|e| e == "idx") || meta.len() < 16 {
+            return 0;
+        }
+        let Ok(file) = std::fs::OpenOptions::new().write(true).open(path) else {
+            return 0;
+        };
+        usize::from(file.set_len(meta.len() / 2).is_ok())
+    }
+
+    /// The sustained-load shape: a wide table written in bursts with index
+    /// dumps between them, then a reopen. It is the million-row counterpart of
+    /// `secondary_index_is_correct_under_concurrent_writes_and_dumps`, and it is
+    /// ignored by default because it writes `INFINITY_STRESS_ROWS` rows
+    /// (1,000,000 unless the variable says otherwise):
+    ///
+    /// ```text
+    /// INFINITY_STRESS_ROWS=2000000 cargo test -p executor --lib \
+    ///     secondary_stress_sustained_dumps -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "writes up to a million rows; run explicitly"]
+    fn secondary_stress_sustained_dumps() {
+        let total: usize = std::env::var("INFINITY_STRESS_ROWS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1_000_000);
+        const BATCH: usize = 5_000;
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE st (id INT, v INT);").unwrap();
+        e.execute("CREATE INDEX stv ON st (v);").unwrap();
+
+        let mut written = 0usize;
+        let mut batches = 0usize;
+        while written < total {
+            let end = (written + BATCH).min(total);
+            let values: Vec<String> = (written..end).map(|i| format!("({i}, {i})")).collect();
+            e.execute(&format!("INSERT INTO st VALUES {};", values.join(",")))
+                .unwrap();
+            written = end;
+            batches += 1;
+            // Every tenth burst dumps what the tail accumulated, so the chunk
+            // set grows while later bursts keep appending to the fresh tail.
+            if batches % 10 == 0 {
+                e.dump_index_transaction("st", "stv").unwrap();
+            }
+            // A read in the middle of the load: it must see at least the rows
+            // the dumps have already sealed, and never a row that is not there.
+            if batches % 25 == 0 {
+                let _ = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+            }
+        }
+        // The tail is dumped so the final read comes from the chunks, not from
+        // the buffer that would hide a broken chunk set.
+        e.dump_index_transaction("st", "stv").unwrap();
+
+        let found = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+        assert_eq!(found.len(), total, "the index lost rows under load");
+        drop(e);
+
+        let e = Engine::open(dir.path()).unwrap();
+        let found = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+        assert_eq!(found.len(), total, "the rebuild lost rows under load");
     }
 
     /// `CREATE INDEX i ON t (lower(name))` is the reference's

@@ -7,4 +7,4 @@
 
 pub mod flattener;
 
-pub use flattener::{flatten_json, flatten_json_terms, FlattenedTerm};
+pub use flattener::{flatten_json, flatten_json_terms, FlattenedTerm, OVERFLOW_TERM};

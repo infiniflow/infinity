@@ -1497,6 +1497,11 @@ impl Engine {
             };
             let mut index = shared.write().unwrap();
             index.remove(seq as u64);
+            // The index has seen this row whether or not it carries postings:
+            // the coverage check counts rows, not documents (a NULL sparse cell
+            // writes no term). A rewritten row counts twice, which only makes
+            // the index look more complete than it is - it was just updated.
+            index.note_row();
             let Some(text) = cells.get(ci) else { continue };
             // A NULL cell stores the literal `null`; it has no postings.
             if text.trim().eq_ignore_ascii_case("null") {

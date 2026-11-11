@@ -43,6 +43,26 @@ pub struct FlattenedTerm {
 /// would exhaust the stack.
 const MAX_JSON_DEPTH: usize = 512;
 
+/// The single term a document nested deeper than [`MAX_JSON_DEPTH`] carries.
+///
+/// Such a document is *valid* JSON that the flattener refuses to walk (the
+/// depth bound is what protects the recursive walk's stack). It therefore has
+/// no `path:tag:value` terms, and writing none at all would be a lie the index
+/// acts on: a term-range probe would find no row for the document and drop it
+/// before the residual filter above the index scan ever saw it - a false
+/// negative for a row that may well match.
+///
+/// The row instead carries this sentinel, and every JSON candidate set unions
+/// it in, so an over-depth document always survives to the residual filter
+/// that answers the predicate exactly. It is an ordinary chunk key, so a
+/// rebuild and a cold restart both keep it; nothing about the representation
+/// has to be recovered separately.
+///
+/// `\u{0}` cannot start a real term - every path the flattener emits begins
+/// with `$`, `[`, `.` or `:` (a root scalar) - so the sentinel sorts before
+/// every real term and no predicate's range reaches it by accident.
+pub const OVERFLOW_TERM: &str = "\u{0}overflow";
+
 /// Whether `text` nests `{`/`[` more than `limit` deep.
 ///
 /// The check walks the raw text, so it has to ignore brackets that are part of
@@ -82,7 +102,13 @@ fn exceeds_max_depth(text: &str, limit: usize) -> bool {
 /// Flattens the JSON text stored in a `json` cell.
 ///
 /// Invalid JSON yields no terms rather than an error, matching the reference's
-/// `if (json_obj)` guard around the recursive walk.
+/// `if (json_obj)` guard around the recursive walk: such a cell cannot satisfy
+/// a JSON predicate, so having no term is accurate.
+///
+/// A document nested past [`MAX_JSON_DEPTH`] is different - it is valid JSON
+/// that may match, only its terms were never expanded - and yields
+/// [`OVERFLOW_TERM`] so the index keeps it as a candidate instead of claiming
+/// it matches nothing.
 pub fn flatten_json(text: &str) -> Vec<FlattenedTerm> {
     // `serde_json` stops at 128 levels of nesting by default, while the
     // reference parses with `nlohmann::json`, which has no limit: a document
@@ -93,9 +119,13 @@ pub fn flatten_json(text: &str) -> Vec<FlattenedTerm> {
     // well above the reference's ~130 levels, well below what exhausts the
     // stack of the recursive walk below.
     if exceeds_max_depth(text, MAX_JSON_DEPTH) {
-        // Rejected exactly like malformed JSON: the column simply gets no
-        // terms, which leaves the row filter to answer for that row.
-        return Vec::new();
+        // Valid JSON this walk will not enter. Emitting no term would let the
+        // index claim the row matches nothing and drop it before the residual
+        // filter ran, so the row carries the sentinel instead and stays a
+        // candidate for every JSON predicate on the column.
+        return vec![FlattenedTerm {
+            term: OVERFLOW_TERM.to_string(),
+        }];
     }
     let mut deserializer = serde_json::Deserializer::from_str(text);
     deserializer.disable_recursion_limit();
@@ -355,12 +385,36 @@ mod tests {
             .any(|term| term.ends_with(":i:8000000000000001")));
     }
 
+    /// A document past the bound is not "matches nothing": it is a row the
+    /// index cannot decide, and it keeps exactly one term so a candidate set
+    /// can find it.
     #[test]
-    fn documents_beyond_the_bound_yield_no_terms() {
+    fn documents_beyond_the_bound_keep_their_candidate_term() {
         let mut text = "[".repeat(MAX_JSON_DEPTH + 1);
         text.push_str(&"]".repeat(MAX_JSON_DEPTH + 1));
         assert!(exceeds_max_depth(&text, MAX_JSON_DEPTH));
-        assert!(terms(&text).is_empty());
+        assert_eq!(terms(&text), vec![OVERFLOW_TERM.to_string()]);
+    }
+
+    /// The sentinel has to sort before every real term, or a predicate's term
+    /// range could start matching it and treat an undecided row as a hit.
+    #[test]
+    fn the_candidate_term_sorts_before_every_real_term() {
+        let real = terms(r#"{"a":1,"b":[true,"x"],"c":null}"#);
+        assert!(!real.is_empty());
+        for term in &real {
+            assert!(
+                OVERFLOW_TERM.as_bytes() < term.as_bytes(),
+                "{OVERFLOW_TERM:?} must sort before {term:?}"
+            );
+        }
+    }
+
+    /// Invalid JSON still yields nothing: unlike an over-depth document it is
+    /// not a row the predicate could be true for.
+    #[test]
+    fn invalid_json_keeps_yielding_no_terms() {
+        assert!(terms("{deep but broken").is_empty());
     }
 
     /// Brackets inside a string are text, and an escaped quote must not end the
