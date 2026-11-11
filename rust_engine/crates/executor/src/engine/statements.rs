@@ -3163,15 +3163,28 @@ impl Engine {
         let read = t_read.elapsed();
         let segments = self.hnsw_mem_segments(table, column)?;
         let t_build = std::time::Instant::now();
+        let workers = self.hnsw_build_workers();
         for mem in segments {
             if let Ok(mut mem) = mem.lock() {
-                let batch: Vec<(u64, Vec<f32>)> = rows
-                    .iter()
-                    .filter(|(_, v)| v.len() == mem.dims)
-                    .map(|(seq, v)| (*seq, v.clone()))
-                    .collect();
-                if !batch.is_empty() {
-                    mem.insert_batch(&batch, self.hnsw_build_workers());
+                if mem.is_multivector() {
+                    // One vertex per token, all labelled with the row id: the
+                    // single-vector filter below would drop every cell holding
+                    // more than one token and index a whole multi-vector cell
+                    // as a single vertex.
+                    let tokens: Vec<(u64, Vec<Vec<f32>>)> = rows
+                        .iter()
+                        .map(|(seq, v)| (*seq, crate::hnsw_mem::split_tokens(v, mem.dims)))
+                        .collect();
+                    mem.insert_token_batch(&tokens, workers);
+                } else {
+                    let batch: Vec<(u64, Vec<f32>)> = rows
+                        .iter()
+                        .filter(|(_, v)| v.len() == mem.dims)
+                        .map(|(seq, v)| (*seq, v.clone()))
+                        .collect();
+                    if !batch.is_empty() {
+                        mem.insert_batch(&batch, workers);
+                    }
                 }
             }
         }
@@ -3229,10 +3242,23 @@ impl Engine {
                     index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
                 let encoding =
                     index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
+                // A MULTIVECTOR column keeps one vertex per token, all labelled
+                // with the row id (the reference's `MemIndexInserterIter1<
+                // MultiVectorRef>`). The segment has to know that from the
+                // moment it is created: whichever of the query path (here) and
+                // the write path (`dml::insert_vector_indexes`) wins the
+                // `or_insert_with` race decides, and a plain segment silently
+                // drops every multi-token cell and reports token counts where
+                // the coverage check expects row counts.
+                let multivector = self.multivector_column(table, &im.column);
                 entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
-                    Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
-                        dims, m, efc, metric, encoding,
-                    )))
+                    Arc::new(Mutex::new(if multivector {
+                        crate::hnsw_mem::HnswIndexInMem::new_multivector(
+                            dims, m, efc, metric, encoding,
+                        )
+                    } else {
+                        crate::hnsw_mem::HnswIndexInMem::new_with(dims, m, efc, metric, encoding)
+                    }))
                 });
             }
         }
@@ -7688,6 +7714,14 @@ impl Engine {
         // the table. `rows` therefore starts empty and is filled once the
         // candidate set is known.
         let has_filter = pred.is_some() || in_filter.is_some() || search_filter.is_some();
+        // Every predicate the scan applies (C++ `PhysicalKnnScan`'s block
+        // filter): one closure, so pushing it into the graph and applying it
+        // during scoring cannot drift apart.
+        let keep = |row: &[Value]| {
+            pred.is_none_or(|p| p.eval_predicate(row))
+                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+        };
         let mut rows: Vec<(usize, Vec<Value>)> = Vec::new();
         // The cache path scores from `score_cache` and never touches `rows`.
         // A `bit` sparse column scores and renders as an integer.
@@ -7697,14 +7731,60 @@ impl Engine {
         // below, so the ranking equals the exhaustive scan whenever the graph
         // yields the whole top-`k` — `k` is generous and capped by the row
         // count, which fully covers a small table.
+        // Filter pushdown: a filtered query can still use the index when the
+        // rows the predicate admits are known. The reference compiles each
+        // block's predicate into a `BitmaskFilter` and hands it to the graph
+        // (`CalculateFilterBitmask` -> `SearchIndex(..., bitmask)`), so the
+        // graph returns `topn` accepted rows instead of the exact scan walking
+        // the table. Reading the rows once here is that bitmask's cost.
+        let allow_rows: Option<std::collections::HashSet<usize>> = if has_filter && cache.is_none()
+        {
+            let indexed_column = match_columns(&m.column)
+                .first()
+                .cloned()
+                .unwrap_or_default();
+            if self.has_vector_index(table, &indexed_column) {
+                // Only the columns the predicate names are decoded: the bitmask
+                // is a property of the filter columns, and the vector payload is
+                // the largest column in the table. Every other cell comes back
+                // `NULL`, which is why the rows are *not* reused for scoring.
+                let mut cols: Vec<usize> = [pred, in_filter.as_ref(), search_filter.as_ref()]
+                    .into_iter()
+                    .flatten()
+                    .flat_map(expression::Expr::referenced_columns)
+                    .collect();
+                cols.sort_unstable();
+                cols.dedup();
+                Some(
+                    self.read_blocks_values(table, Some(&cols), &[], Some(&keep), None)?
+                        .1
+                        .into_iter()
+                        .map(|(seq, _)| seq)
+                        .collect(),
+                )
+            } else {
+                // Nothing to push the bitmask into: the exact scan decodes the
+                // table once and applies `keep` itself.
+                None
+            }
+        } else {
+            None
+        };
         let vector_candidates: Option<std::collections::HashSet<usize>> = (|| {
-            if is_sparse || is_tensor {
+            if is_sparse {
                 return None;
             }
             let col_name = match_columns(&m.column).first()?.clone();
             let col_type = types.get(col_idx)?.to_ascii_uppercase();
-            if col_type.starts_with("MULTIVECTOR") || is_bit_type(&col_type) {
-                return None; // a single-vector index
+            if is_bit_type(&col_type) {
+                return None;
+            }
+            // A `MULTIVECTOR` column indexes one vertex per token, so the query
+            // row's tokens are the query set; any other tensor column has no
+            // single-vector graph.
+            let multivector = col_type.starts_with("MULTIVECTOR");
+            if is_tensor && !multivector {
+                return None;
             }
             let qv: Vec<f32> = query_items
                 .iter()
@@ -7714,16 +7794,21 @@ impl Engine {
             if qv.is_empty() {
                 return None;
             }
-            // A predicate can exclude rows the graph returned, so the graph alone
-            // cannot decide the top-k: the reference re-scores every row the
-            // filter admits. Keep the exact scan for filtered queries.
-            if has_filter {
-                return None;
-            }
+            let queries: Vec<Vec<f32>> = if multivector {
+                let dims = type_dim(&col_type).filter(|d| *d > 0)?;
+                if !qv.len().is_multiple_of(dims) {
+                    return None;
+                }
+                qv.chunks_exact(dims).map(<[f32]>::to_vec).collect()
+            } else {
+                vec![qv]
+            };
             self.knn_candidates(&knn_scan::KnnCandidateScan {
                 table,
                 column: &col_name,
-                query: &qv,
+                queries: &queries,
+                multivector,
+                allow: allow_rows.as_ref(),
                 rows: &rows,
                 live_rows: None,
                 cache: cache.as_ref(),
@@ -7736,13 +7821,9 @@ impl Engine {
         // table when no index answered.
         if cache.is_none() {
             rows = match &vector_candidates {
-                // A predicate reads other columns, so a filtered query needs the
-                // whole row; an unfiltered one is scored from the vector column
-                // alone and gets its output rows from the block pass below.
                 Some(cands) if !cands.is_empty() => {
-                    let wanted: &[usize] = if has_filter { &[] } else { &[col_idx] };
-                    let (_, got) = self.read_blocks_candidates_values(table, wanted, cands)?;
-                    got
+                    self.read_blocks_candidates_values(table, &[col_idx], cands)?
+                        .1
                 }
                 Some(_) => Vec::new(),
                 None => self.fetch_rows_with_ids(table)?,
@@ -7879,16 +7960,12 @@ impl Engine {
         // C++ `PhysicalKnnScan`: exact scoring/ranking of the scanned rows
         // (filters live in the filter-scan base; the index probe above is
         // `KnnCandidateScan`).
-        let keep = |row: &[Value]| {
-            pred.is_none_or(|p| p.eval_predicate(row))
-                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
-                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
-        };
         let column_decl = types
             .get(col_idx)
             .map(|t| t.to_ascii_uppercase())
             .unwrap_or_default();
         let query_elem_arg = arg_str(m.args.get(1));
+        let indexed = vector_candidates.is_some();
         let scan = knn_scan::PhysicalKnnScan {
             column_index: col_idx,
             column_type: &column_decl,
@@ -7907,7 +7984,15 @@ impl Engine {
         // Scoring only ever reads the vector column, so the rows it decoded are
         // projections of it. The result rows are read separately (all columns),
         // which is why this scan cannot reuse them.
-        let state = scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores)?);
+        //
+        // An indexed query's rows carry that projection alone: every other cell
+        // is `NULL`, so re-evaluating the predicate here would reject every row.
+        // The predicate is already in the candidate set instead - `allow_rows`
+        // holds every row it admits, and `KnnCandidateScan` intersects the rows
+        // the graph did not label with it.
+        let admitted = |_: &[Value]| true;
+        let row_filter: &dyn Fn(&[Value]) -> bool = if indexed { &admitted } else { &keep };
+        let state = scan.finish(scan.execute(row_filter, &bmp_scores, &mv_scores)?);
         let use_sim = state.use_sim;
         let scored = state.scored;
 

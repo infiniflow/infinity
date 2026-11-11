@@ -7020,8 +7020,13 @@ pub(crate) fn arg_int(e: &ExprAst) -> Option<i64> {
 }
 
 pub(crate) fn parse_vec_str(s: &str) -> Vec<f64> {
-    let t = s.trim().trim_start_matches('[').trim_end_matches(']');
-    t.split([',', ' '])
+    // The brackets of a nested literal are *separators*, not payload: a
+    // `MULTIVECTOR` cell is stored as `[[a,b],[c,d]]`, and keeping the inner
+    // brackets makes `b]` and `[c` fail the parse, so the flat value silently
+    // loses every coordinate but the first and the last. Every caller wants the
+    // flattened coordinates (one vertex per `dim`-sized token), so both kinds of
+    // bracket are split on.
+    s.split([',', ' ', '[', ']'])
         .filter(|x| !x.is_empty())
         .filter_map(|x| x.parse::<f64>().ok())
         .collect()
@@ -8399,5 +8404,26 @@ mod float_format_ut {
     #[allow(clippy::excessive_precision)]
     fn a_decimal_tie_rounds_like_ryu() {
         assert_eq!(fmt_f32_cpp(0.470703125), "0.47070312");
+    }
+}
+
+#[cfg(test)]
+mod literal_tests {
+    use super::parse_vec_str;
+
+    /// A nested literal flattens to every one of its coordinates. The
+    /// multi-vector write paths split the flat value into `dim`-sized tokens,
+    /// so treating the inner brackets as payload silently reduced a two-token
+    /// cell to a single malformed token (`[a, d]` out of `[[a,b],[c,d]]`).
+    #[test]
+    fn a_nested_literal_flattens_to_all_of_its_coordinates() {
+        assert_eq!(
+            parse_vec_str("[[0.3,0.7],[0.9,0.9]]"),
+            vec![0.3, 0.7, 0.9, 0.9]
+        );
+        assert_eq!(parse_vec_str("[[1,2]]"), vec![1.0, 2.0]);
+        assert_eq!(parse_vec_str("[1,2]"), vec![1.0, 2.0]);
+        assert_eq!(parse_vec_str("  [ 1 , 2 ] "), vec![1.0, 2.0]);
+        assert_eq!(parse_vec_str("[]"), Vec::<f64>::new());
     }
 }

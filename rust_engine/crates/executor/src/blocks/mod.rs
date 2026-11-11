@@ -51,9 +51,32 @@ pub(crate) struct HnswChunkParts {
     pub(crate) enterpoint: Option<usize>,
     pub(crate) store_meta: Vec<u8>,
     pub(crate) records: Vec<u8>,
-    pub(crate) vertices: Vec<knn_format::HnswGraphVertex>,
+    /// Set when the chunk is **mapped**: the file, the vector region's offset and
+    /// one vector's stride. `records` is empty then — the plain store borrows the
+    /// mapping instead of copying the payload into the heap
+    /// (`HnswIndex::from_chunk_region_mapped`).
+    pub(crate) mapped: Option<(index::vector::ByteSource, usize, usize)>,
+    /// The raw `GraphStoreInner` region, decoded straight into the compact
+    /// graph (`HnswIndex::from_chunk_region`).
+    pub(crate) graph_region: Vec<u8>,
     pub(crate) labels: Vec<u32>,
     pub(crate) options: HnswOptions,
+}
+
+/// Distinct rows a chunk's labels name.
+///
+/// A single-vector chunk labels node `i` with segment offset `i`, so the labels
+/// are strictly increasing and the count is `labels.len()`; a `MULTIVECTOR`
+/// chunk repeats a row once per token. The ordering test keeps the common case
+/// allocation-free.
+pub(crate) fn labelled_rows(labels: &[u32]) -> usize {
+    if labels.windows(2).all(|pair| pair[0] < pair[1]) {
+        return labels.len();
+    }
+    labels
+        .iter()
+        .collect::<std::collections::HashSet<_>>()
+        .len()
 }
 
 pub(crate) mod chunk;

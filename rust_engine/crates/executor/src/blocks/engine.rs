@@ -4098,13 +4098,22 @@ impl Engine {
         options: &HnswOptions,
         segment: Option<u32>,
     ) -> Result<(usize, Vec<u8>)> {
-        let vectors = self.column_vectors(table, column, segment)?;
-        if vectors.is_empty() {
+        let tokens = self.column_tokens(table, column, segment)?;
+        let total: usize = tokens.iter().map(|(_, t)| t.len()).sum();
+        let Some(dim) = tokens
+            .iter()
+            .find_map(|(_, t)| t.first().map(Vec::len))
+            .filter(|d| *d > 0)
+        else {
+            return Err(Error::Invalid(format!(
+                "no vectors to index in '{table}.{column}'"
+            )));
+        };
+        if total == 0 {
             return Err(Error::Invalid(format!(
                 "no vectors to index in '{table}.{column}'"
             )));
         }
-        let dim = vectors[0].1.len();
         let mut index = HnswIndex::with_encoding(
             dim,
             options.m,
@@ -4113,15 +4122,81 @@ impl Engine {
             options.metric,
             options.encoding,
         );
-        // Train LVQ/LS mean/RaBitQ centroid and the LSG averages on the whole
-        // column, then build the graph with the trained store.
-        let rows: Vec<Vec<f32>> = vectors.iter().map(|(_, v)| v.clone()).collect();
-        index.train_store(&rows, options.lsg);
-        let labels: Vec<u32> = vectors.iter().map(|(label, _)| *label).collect();
+        // One vertex per row for an `EMBEDDING` column, one per token for a
+        // `MULTIVECTOR` — the reference's `MemIndexInserterIter1<MultiVectorRef>`
+        // (a token-level graph whose labels are row ids).
+        let mut vectors: Vec<Vec<f32>> = Vec::with_capacity(total);
+        let mut labels: Vec<u32> = Vec::with_capacity(total);
+        for (label, row_tokens) in &tokens {
+            for token in row_tokens {
+                vectors.push(token.clone());
+                labels.push(*label);
+            }
+        }
+        // Train LVQ/LS mean/RaBitQ centroid and the LSG averages on every
+        // vertex, then build the graph with the trained store.
+        index.train_store(&vectors, options.lsg);
         // Bucket-parallel construction, as the reference does on its dense-index
         // pool; a store that is not plain keeps the serial path.
-        index.add_batch(&rows, self.hnsw_build_workers());
+        index.add_batch(&vectors, self.hnsw_build_workers());
         Ok(encode_hnsw_chunk_from(&index, &labels))
+    }
+
+    /// The vectors of `column` split into one entry per graph vertex: a single
+    /// vector per row for an `EMBEDDING` column, the row's `dim`-sized tokens
+    /// for a `MULTIVECTOR`.
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn column_tokens(
+        &self,
+        table: &str,
+        column: &str,
+        segment: Option<u32>,
+    ) -> Result<Vec<(u32, Vec<Vec<f32>>)>> {
+        let schema = self.table_schema(table)?;
+        let col_idx = schema
+            .iter()
+            .position(|c| c == column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}' on '{table}'")))?;
+        let dim = self
+            .storage
+            .catalog
+            .get_table_by_name(&self.qualified_table(table))
+            .ok()
+            .flatten()
+            .and_then(|meta| {
+                meta.types
+                    .get(col_idx)
+                    .and_then(|decl| crate::type_dim(decl))
+            })
+            .filter(|d| *d > 0);
+        let mut out = Vec::new();
+        for (seq, row) in self.fetch_rows_with_ids(table)? {
+            if let Some(only) = segment {
+                if (seq >> 32) as u32 != only {
+                    continue;
+                }
+            }
+            let Some(Value::Str(s)) = row.get(col_idx) else {
+                continue;
+            };
+            let flat: Vec<f32> = crate::parse_vec_str(s).iter().map(|x| *x as f32).collect();
+            if flat.is_empty() {
+                continue;
+            }
+            let tokens: Vec<Vec<f32>> = match dim {
+                Some(dim) if flat.len() % dim == 0 && !flat.is_empty() => {
+                    flat.chunks_exact(dim).map(<[f32]>::to_vec).collect()
+                }
+                // A cell whose length is not a multiple of the declared
+                // dimension is not a multi-vector payload: index it as one
+                // vertex, which is what a single-vector column looks like.
+                _ => vec![flat],
+            };
+            if !tokens.is_empty() {
+                out.push((seq as u32, tokens));
+            }
+        }
+        Ok(out)
     }
 
     /// The HNSW options of `index_name` (`metric`, `encode`, `build_type`,
@@ -4227,20 +4302,6 @@ impl Engine {
             })
             .map(|im| im.column)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
-        // A MULTIVECTOR holds several sub-vectors per row; the C++ mirror is a
-        // single-vector graph, so there is nothing to write for it.
-        if let Some(i) = meta.columns.iter().position(|c| c == &column) {
-            if meta
-                .types
-                .get(i)
-                .map(|t| t.trim().to_ascii_uppercase().starts_with("MULTIVECTOR"))
-                .unwrap_or(false)
-            {
-                return Err(Error::Invalid(format!(
-                    "no single-vector HNSW mirror for multivector column '{column}'"
-                )));
-            }
-        }
         // A checkpoint dumps the **memory segment** (rows since the previous
         // dump), not a graph rebuilt from every row: rebuilding cost O(table)
         // memory and time on every checkpoint and was the Gate C OOM driver.
@@ -4258,6 +4319,20 @@ impl Engine {
         } else {
             segments
         };
+        // A local-to-scaling-graph index is never dumped from the buffer. LSG
+        // needs a two-pass build - sample the rows, derive each row's mean
+        // distance to its `ls_k` nearest samples, then link vertices - and the
+        // memory segment links them as they arrive, so its graph uses
+        // *unadjusted* distances. Publishing it would mix two distance
+        // functions across a segment's chunks; and rebuilding here on every
+        // checkpoint is the O(table) transient this function exists to avoid.
+        // The LSG chunk therefore comes from the full mirror write/optimize
+        // merge, while rows added since then are answered by the memory segment
+        // the query side already merges.
+        let options = self.hnsw_options(&table, index_name);
+        if new_chunk && options.lsg.is_some() {
+            return Ok((0, Vec::new()));
+        }
         let from_memory = if new_chunk && segments.len() == 1 {
             let Some(mem) = self
                 .tables
@@ -4282,7 +4357,6 @@ impl Engine {
             None
         };
         let db_id = self.database_id_of(&table);
-        let options = self.hnsw_options(&table, index_name);
         let mut written = 0usize;
         let mut rewrites: Vec<ChunkRewrite> = Vec::new();
         for (segment, rows) in &segments {
@@ -4505,12 +4579,6 @@ impl Engine {
                 continue;
             }
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
-                continue;
-            }
-            // A MULTIVECTOR column has no single-vector graph in this build, so
-            // its mirror has nothing to merge (`write_hnsw_chunk` refuses
-            // it); skipping it keeps one such index from failing the pass.
-            if self.multivector_column(&im.table, &im.column) {
                 continue;
             }
             // The rows an optimize would merge are the *live* ones: a table
@@ -5143,13 +5211,6 @@ impl Engine {
             knn_format::VERTEX_LX_SIZE,
         )
         .ok()?;
-        let vertices = knn_format::decode_graph_region(
-            &chunk.graph,
-            chunk.cur_vec_num as usize,
-            chunk.mmax0,
-            chunk.mmax,
-        )
-        .ok()?;
         Some(HnswChunkParts {
             m,
             ef,
@@ -5159,8 +5220,63 @@ impl Engine {
             enterpoint: (chunk.enterpoint >= 0).then_some(chunk.enterpoint as usize),
             store_meta: chunk.store_meta,
             records: chunk.vectors,
-            vertices,
+            mapped: None,
+            graph_region: chunk.graph,
             labels: chunk.labels,
+            options,
+        })
+    }
+
+    /// Decodes a chunk that is **mapped** rather than read: the vector region
+    /// stays where it is and only the (much smaller) graph and labels are
+    /// copied out.
+    ///
+    /// This is the reference's shape — `PlainVecStoreInner` holds a pointer into
+    /// the buffer manager's chunk — and it is what keeps a loaded index's
+    /// footprint to its graph instead of a full second copy of every vector.
+    pub(crate) fn read_hnsw_chunk_parts_mapped(
+        &self,
+        table: &str,
+        index_name: &str,
+        src: &index::vector::ByteSource,
+    ) -> Option<HnswChunkParts> {
+        let options = self.hnsw_options(table, index_name);
+        let bytes = src.as_ref().as_ref();
+        if bytes.len() < 32 {
+            return None;
+        }
+        let u64_at = |at: usize| -> Option<u64> {
+            bytes
+                .get(at..at + 8)
+                .and_then(|b| b.try_into().ok())
+                .map(u64::from_le_bytes)
+        };
+        let m = u64_at(0)?;
+        let ef = u64_at(8)?;
+        let n = u64_at(16)? as usize;
+        let dims = u64_at(24)? as usize;
+        let meta_len = hnsw_store_meta_len(dims, options.metric, options.encoding);
+        let record_size = hnsw_record_size(dims, options.encoding);
+        let regions = knn_format::hnsw_chunk_regions(
+            bytes,
+            meta_len,
+            record_size,
+            knn_format::VERTEX_L0_SIZE,
+            knn_format::VERTEX_LX_SIZE,
+        )
+        .ok()?;
+        Some(HnswChunkParts {
+            m,
+            ef,
+            n,
+            dims,
+            max_layer: regions.max_layer.max(0) as usize,
+            enterpoint: (regions.enterpoint >= 0).then_some(regions.enterpoint as usize),
+            store_meta: bytes[regions.store_meta].to_vec(),
+            records: Vec::new(),
+            mapped: Some((src.clone(), regions.vectors.start, record_size)),
+            graph_region: bytes[regions.graph].to_vec(),
+            labels: knn_format::decode_labels(&bytes[regions.labels]).ok()?,
             options,
         })
     }
@@ -5173,52 +5289,55 @@ impl Engine {
         if parts.n == 0 {
             return None;
         }
-        let levels: Vec<usize> = parts
-            .vertices
-            .iter()
-            .map(|v| v.layer_count.max(0) as usize)
-            .collect();
-        let mut links: Vec<Vec<Vec<usize>>> = vec![Vec::new()];
-        for (node, v) in parts.vertices.iter().enumerate() {
-            while links[0].len() <= node {
-                links[0].push(Vec::new());
-            }
-            links[0][node] = v.neighbors_l0.iter().map(|&x| x as usize).collect();
-            for (l, nbrs) in v.upper.iter().enumerate() {
-                let layer = l + 1;
-                while links.len() <= layer {
-                    links.push(Vec::new());
-                }
-                while links[layer].len() <= node {
-                    links[layer].push(Vec::new());
-                }
-                links[layer][node] = nbrs.iter().map(|&x| x as usize).collect();
-            }
-        }
         let entry = parts.enterpoint.map(|e| e.min(parts.n.saturating_sub(1)));
-        let graph_bytes: usize = links
-            .iter()
-            .flat_map(|layer| layer.iter())
-            .map(|neighbors| neighbors.len() * 4 + 24)
-            .sum();
-        let bytes = parts.records.len() + parts.labels.len() * 4 + levels.len() * 8 + graph_bytes;
-        let index = HnswIndex::from_chunk_parts(
-            parts.dims,
-            parts.m.max(1) as usize,
-            (parts.ef as usize).max(64),
-            parts.options.metric,
-            parts.options.encoding,
-            &parts.store_meta,
-            &parts.records,
-            parts.n,
-            levels,
-            links,
-            entry,
-            parts.max_layer,
-        )?;
+        // Only what enters the heap counts against the segment budget: a mapped
+        // chunk's vectors live in the page cache, so its footprint is the graph
+        // (plus the label bookkeeping), not the payload.
+        let bytes = parts.labels.len() * 4
+            + parts.n * 4
+            + parts.graph_region.len()
+            + if parts.mapped.is_some() {
+                0
+            } else {
+                parts.records.len()
+            };
+        // The neighbour lists go from the chunk bytes straight into the
+        // compact slabs: no per-vertex `Vec` in between.
+        let index = match &parts.mapped {
+            Some((src, vector_off, record_size)) => HnswIndex::from_chunk_region_mapped(
+                parts.dims,
+                parts.m.max(1) as usize,
+                (parts.ef as usize).max(64),
+                parts.options.metric,
+                parts.options.encoding,
+                &parts.store_meta,
+                src.clone(),
+                *vector_off,
+                *record_size,
+                parts.n,
+                &parts.graph_region,
+                entry,
+                parts.max_layer,
+            )?,
+            None => HnswIndex::from_chunk_region(
+                parts.dims,
+                parts.m.max(1) as usize,
+                (parts.ef as usize).max(64),
+                parts.options.metric,
+                parts.options.encoding,
+                &parts.store_meta,
+                &parts.records,
+                parts.n,
+                &parts.graph_region,
+                entry,
+                parts.max_layer,
+            )?,
+        };
+        let labelled_rows = labelled_rows(&parts.labels);
         Some(LoadedVectorIndex {
             index: HnswHandler::from_index(index),
             labels: parts.labels,
+            labelled_rows,
             chunk_id,
             bytes,
             stamp,
@@ -5230,10 +5349,10 @@ impl Engine {
     pub fn load_vector_index(&self, table: &str, index_name: &str) -> Result<LoadedVectorIndex> {
         let table = self.qualified_table(table);
         let path = self.hnsw_chunk_path(&table, index_name)?;
-        let bytes = std::fs::read(&path)
-            .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
+        let src = map_hnsw_chunk(&path)
+            .ok_or_else(|| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
         let parts = self
-            .read_hnsw_chunk_parts(&table, index_name, &bytes)
+            .read_hnsw_chunk_parts_mapped(&table, index_name, &src)
             .ok_or_else(|| Error::Invalid("bad HNSW chunk".to_string()))?;
         Self::assemble_loaded_index(parts, 0, file_stamp(&path))
             .ok_or_else(|| Error::Invalid("HNSW mirror has no vectors".to_string()))
@@ -5264,10 +5383,12 @@ impl Engine {
             if after.is_some_and(|a| chunk_id <= a) {
                 continue;
             }
-            let Ok(bytes) = std::fs::read(&path) else {
+            // Mapped, not read: a chunk's vectors are the largest thing this
+            // process holds, and they are immutable once written.
+            let Some(src) = map_hnsw_chunk(&path) else {
                 continue;
             };
-            let Some(parts) = self.read_hnsw_chunk_parts(&table, index_name, &bytes) else {
+            let Some(parts) = self.read_hnsw_chunk_parts_mapped(&table, index_name, &src) else {
                 continue;
             };
             if let Some(loaded) = Self::assemble_loaded_index(parts, chunk_id, file_stamp(&path)) {
@@ -5306,8 +5427,8 @@ impl Engine {
             .into_iter()
             .find(|(id, _)| *id == chunk_id)
             .map(|(_, path)| path)?;
-        let bytes = std::fs::read(&path).ok()?;
-        let parts = self.read_hnsw_chunk_parts(&table, index_name, &bytes)?;
+        let src = map_hnsw_chunk(&path)?;
+        let parts = self.read_hnsw_chunk_parts_mapped(&table, index_name, &src)?;
         Self::assemble_loaded_index(parts, chunk_id, file_stamp(&path))
     }
 

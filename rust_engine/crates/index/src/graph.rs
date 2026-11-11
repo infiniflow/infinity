@@ -1,0 +1,508 @@
+//! HNSW neighbour lists in the reference's compact layout.
+//!
+//! The reference keeps the graph in `GraphStoreInner` as one flat buffer:
+//! layer 0 is a fixed-stride slab of `2 * Mmax` `i32` slots per vertex
+//! (`VertexL0` = `layer_n_`, `layers_p_`, `neighbor_n_`, then the neighbour
+//! array), and the upper layers are one contiguous block per vertex that only
+//! exists when the vertex actually reaches that layer (`layers_p_` points at
+//! it). `graph_store.cppm:31-46,172-219`.
+//!
+//! This module reproduces that shape in Rust: `u32` slot ids, `2M` slots for
+//! layer 0, `M` slots per upper layer, allocated per vertex only for the layers
+//! the vertex appears in. The straightforward `Vec<Vec<Vec<usize>>>` it
+//! replaces paid a `Vec` header plus one heap allocation per vertex *per
+//! layer*, used `usize` ids, and — worse — had to size every layer to `n`
+//! during `add_batch`, which allocated empty upper-layer lists for vertices
+//! that never reach those layers.
+//!
+//! Slots are `AtomicU32` because graph construction is multi-threaded: threads
+//! link disjoint vertices concurrently (the reference takes a per-vertex
+//! `shared_mutex`, `hnsw_alg.cppm` `WithLock`), so a read of a vertex another
+//! thread is rewriting must not be a data race. The length is published after
+//! the slots (Release/Acquire), so a reader that sees `len = k` also sees
+//! `slots[0..k]`.
+
+use std::sync::atomic::{AtomicU32, Ordering};
+
+/// `layer_n_`, the layer pointer and `neighbor_n_` of a level-0 record, plus
+/// the 4 trailing bytes of alignment padding (`VERTEX_L0_SIZE`).
+const VERTEX_L0_SIZE: usize = 24;
+/// `neighbor_n_` of an upper-layer record (`VERTEX_LX_SIZE`).
+const VERTEX_LX_SIZE: usize = 4;
+
+/// A vertex has no upper-layer block.
+const NO_BLOCK: u32 = u32::MAX;
+
+/// Neighbour list of one vertex on one layer.
+///
+/// Yields `u32` vertex ids; the underlying storage is shared with the builder,
+/// so it is read on demand rather than copied.
+#[derive(Clone, Copy)]
+pub struct Neighbors<'a> {
+    slots: &'a [AtomicU32],
+}
+
+impl<'a> Neighbors<'a> {
+    /// An empty list, for vertices the caller knows are absent.
+    #[inline]
+    pub fn empty() -> Self {
+        Self { slots: &[] }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.slots.len()
+    }
+
+    #[inline]
+    pub fn get(&self, index: usize) -> Option<u32> {
+        self.slots.get(index).map(|s| s.load(Ordering::Relaxed))
+    }
+
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = u32> + 'a {
+        self.slots.iter().map(|s| s.load(Ordering::Relaxed))
+    }
+
+    pub fn to_vec(&self) -> Vec<u32> {
+        self.iter().collect()
+    }
+}
+
+impl std::fmt::Debug for Neighbors<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+/// Compact, append-only neighbour store for a whole HNSW graph.
+pub(crate) struct GraphStore {
+    /// `M`: neighbour limit for layers ≥ 1.
+    m: usize,
+    /// `Mmax0 = 2 * M`: neighbour limit for layer 0.
+    m0: usize,
+    /// `layer_n_` per vertex: how many layers above 0 the vertex appears in.
+    levels: Vec<u32>,
+    /// Layer 0: `m0` slots per vertex, `n * m0` entries.
+    l0: Vec<AtomicU32>,
+    /// Layer 0 neighbour counts.
+    l0_len: Vec<AtomicU32>,
+    /// Layers ≥ 1: `m` slots per (vertex, layer) block, blocks back to back.
+    up: Vec<AtomicU32>,
+    /// Neighbour count per upper-layer block.
+    up_len: Vec<AtomicU32>,
+    /// First block ordinal of each vertex (`NO_BLOCK` when level == 0).
+    up_start: Vec<u32>,
+    /// Number of upper-layer blocks handed out so far.
+    up_blocks: usize,
+}
+
+impl GraphStore {
+    pub(crate) fn new(m: usize) -> Self {
+        Self {
+            m,
+            m0: m * 2,
+            levels: Vec::new(),
+            l0: Vec::new(),
+            l0_len: Vec::new(),
+            up: Vec::new(),
+            up_len: Vec::new(),
+            up_start: Vec::new(),
+            up_blocks: 0,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.levels.len()
+    }
+
+    pub(crate) fn max_degree(&self, layer: usize) -> usize {
+        if layer == 0 {
+            self.m0
+        } else {
+            self.m
+        }
+    }
+
+    pub(crate) fn level_of(&self, node: usize) -> usize {
+        self.levels.get(node).copied().unwrap_or(0) as usize
+    }
+
+    /// Appends `count` vertices, taking their levels from `new_levels`.
+    ///
+    /// All the storage a batch needs is reserved here, before any thread starts
+    /// writing: the builder only ever fills slots.
+    pub(crate) fn push_levels(&mut self, new_levels: &[u32]) {
+        if new_levels.is_empty() {
+            return;
+        }
+        let n = self.levels.len() + new_levels.len();
+        self.levels.extend_from_slice(new_levels);
+        self.l0
+            .resize_with(n * self.m0, || AtomicU32::new(u32::MAX));
+        self.l0_len.resize_with(n, || AtomicU32::new(0));
+        self.up_start.reserve(new_levels.len());
+        for &level in new_levels {
+            if level == 0 {
+                self.up_start.push(NO_BLOCK);
+            } else {
+                self.up_start.push(self.up_blocks as u32);
+                self.up_blocks += level as usize;
+            }
+        }
+        self.up
+            .resize_with(self.up_blocks * self.m, || AtomicU32::new(u32::MAX));
+        self.up_len
+            .resize_with(self.up_blocks, || AtomicU32::new(0));
+    }
+
+    /// Appends one vertex with `level`.
+    pub(crate) fn push_level(&mut self, level: usize) -> usize {
+        let node = self.levels.len();
+        let level = level as u32;
+        self.levels.push(level);
+        self.l0
+            .resize_with(self.levels.len() * self.m0, || AtomicU32::new(u32::MAX));
+        self.l0_len.push(AtomicU32::new(0));
+        if level == 0 {
+            self.up_start.push(NO_BLOCK);
+        } else {
+            self.up_start.push(self.up_blocks as u32);
+            self.up_blocks += level as usize;
+            self.up
+                .resize_with(self.up_blocks * self.m, || AtomicU32::new(u32::MAX));
+            self.up_len
+                .resize_with(self.up_blocks, || AtomicU32::new(0));
+        }
+        node
+    }
+
+    #[inline]
+    fn block(&self, node: usize, layer: usize) -> Option<usize> {
+        debug_assert!(layer >= 1);
+        if layer > *self.levels.get(node)? as usize {
+            return None;
+        }
+        let start = *self.up_start.get(node)?;
+        if start == NO_BLOCK {
+            return None;
+        }
+        let block = start as usize + (layer - 1);
+        (block < self.up_blocks).then_some(block)
+    }
+
+    /// Neighbours of `node` on `layer`; empty when the vertex does not reach
+    /// that layer or does not exist.
+    #[inline]
+    pub(crate) fn neighbors(&self, layer: usize, node: usize) -> Neighbors<'_> {
+        if layer == 0 {
+            let Some(count) = self.l0_len.get(node) else {
+                return Neighbors { slots: &[] };
+            };
+            let count = count.load(Ordering::Acquire) as usize;
+            let start = node * self.m0;
+            let end = (start + count).min(self.l0.len());
+            return Neighbors {
+                slots: &self.l0[start.min(end)..end],
+            };
+        }
+        let Some(block) = self.block(node, layer) else {
+            return Neighbors { slots: &[] };
+        };
+        let count = self.up_len[block].load(Ordering::Acquire) as usize;
+        let start = block * self.m;
+        let end = (start + count).min(self.up.len());
+        Neighbors {
+            slots: &self.up[start.min(end)..end],
+        }
+    }
+
+    /// Replaces the neighbour list of `node` on `layer`.
+    pub(crate) fn set_neighbors(&self, layer: usize, node: usize, list: &[u32]) {
+        let (slots, count) = if layer == 0 {
+            let start = node * self.m0;
+            (
+                &self.l0[start..(start + self.m0).min(self.l0.len())],
+                &self.l0_len[node],
+            )
+        } else {
+            let Some(block) = self.block(node, layer) else {
+                return;
+            };
+            let start = block * self.m;
+            (&self.up[start..start + self.m], &self.up_len[block])
+        };
+        let n = list.len().min(slots.len());
+        for (slot, &value) in slots.iter().zip(list.iter()).take(n) {
+            slot.store(value, Ordering::Relaxed);
+        }
+        count.store(n as u32, Ordering::Release);
+    }
+
+    /// `GraphStoreInner::AddNeighbor`: appends when there is room.
+    /// Returns `false` when the list is already full.
+    pub(crate) fn push_neighbor(&self, layer: usize, node: usize, neighbor: u32) -> bool {
+        let (slots, count) = if layer == 0 {
+            let start = node * self.m0;
+            (
+                &self.l0[start..(start + self.m0).min(self.l0.len())],
+                &self.l0_len[node],
+            )
+        } else {
+            let Some(block) = self.block(node, layer) else {
+                return false;
+            };
+            let start = block * self.m;
+            (&self.up[start..start + self.m], &self.up_len[block])
+        };
+        let len = count.load(Ordering::Acquire) as usize;
+        if len >= slots.len() {
+            return false;
+        }
+        slots[len].store(neighbor, Ordering::Relaxed);
+        count.store((len + 1) as u32, Ordering::Release);
+        true
+    }
+
+    /// Byte size the graph occupies in a chunk: the `layer_sum` header, one
+    /// level-0 record per vertex and one upper-layer record per (vertex, layer).
+    pub(crate) fn serialized_size(&self) -> usize {
+        let layer_sum: usize = self.levels.iter().map(|&l| l as usize).sum();
+        8 + self.len() * self.level0_stride() + layer_sum * self.levelx_stride()
+    }
+
+    /// Bytes held by the graph, for the memindex budget.
+    pub(crate) fn mem_bytes(&self) -> usize {
+        self.levels.capacity() * 4
+            + self.l0.capacity() * 4
+            + self.l0_len.capacity() * 4
+            + self.up.capacity() * 4
+            + self.up_len.capacity() * 4
+            + self.up_start.capacity() * 4
+    }
+
+    /// Builds the store from layer-major neighbour lists (`lists[layer][node]`).
+    pub(crate) fn from_layers(m: usize, levels: &[u32], lists: &[Vec<Vec<u32>>]) -> Self {
+        let mut graph = Self::new(m);
+        graph.push_levels(levels);
+        for (layer, nodes) in lists.iter().enumerate() {
+            for (node, list) in nodes.iter().enumerate() {
+                if node >= graph.len() || layer > graph.level_of(node) {
+                    continue;
+                }
+                graph.set_neighbors(layer, node, list);
+            }
+        }
+        graph
+    }
+
+    /// Byte size of one level-0 record (`VERTEX_L0_SIZE + 4 * Mmax0`).
+    pub(crate) fn level0_stride(&self) -> usize {
+        VERTEX_L0_SIZE + 4 * self.m0
+    }
+
+    /// Byte size of one upper-layer record (`VERTEX_LX_SIZE + 4 * Mmax`).
+    pub(crate) fn levelx_stride(&self) -> usize {
+        VERTEX_LX_SIZE + 4 * self.m
+    }
+
+    /// Encodes the reference's `GraphStoreInner` region: `u64 layer_sum`, the
+    /// level-0 records, then the upper-layer records.
+    ///
+    /// `layers_p_` is written as a `u64` byte offset into the upper region —
+    /// the in-memory pointer has no meaning in a file, which is what
+    /// `graph_store.cppm` does when it saves a chunk.
+    pub fn to_cpp_region(&self) -> Vec<u8> {
+        let n = self.len();
+        let l0 = self.level0_stride();
+        let lx = self.levelx_stride();
+        let layer_sum: u64 = self.levels.iter().map(|&l| l as u64).sum();
+        let mut out = Vec::with_capacity(8 + n * l0 + layer_sum as usize * lx);
+        out.extend_from_slice(&layer_sum.to_le_bytes());
+
+        let mut layers_p = Vec::with_capacity(n);
+        for node in 0..n {
+            layers_p.push((self.up_start[node] as usize * lx) as u64);
+        }
+        for node in 0..n {
+            let start = out.len();
+            out.extend_from_slice(&(self.levels[node] as i32).to_le_bytes());
+            out.resize(start + 16, 0);
+            out[start + 8..start + 16].copy_from_slice(&layers_p[node].to_le_bytes());
+            let nbrs = self.neighbors(0, node);
+            out.extend_from_slice(&(nbrs.len() as i32).to_le_bytes());
+            for k in 0..self.m0 {
+                out.extend_from_slice(&nbrs.get(k).unwrap_or(0).to_le_bytes());
+            }
+            out.resize(start + l0, 0);
+        }
+        for node in 0..n {
+            for layer in 1..=self.levels[node] as usize {
+                let start = out.len();
+                let nbrs = self.neighbors(layer, node);
+                out.extend_from_slice(&(nbrs.len() as i32).to_le_bytes());
+                for k in 0..self.m {
+                    out.extend_from_slice(&nbrs.get(k).unwrap_or(0).to_le_bytes());
+                }
+                out.resize(start + lx, 0);
+            }
+        }
+        out
+    }
+
+    /// Decodes a `GraphStoreInner` region written by [`Self::to_cpp_region`]
+    /// (or by the reference).
+    pub fn from_cpp_region(region: &[u8], n: usize, m0: usize, m: usize) -> Result<Self, String> {
+        let l0 = VERTEX_L0_SIZE + 4 * m0;
+        let lx = VERTEX_LX_SIZE + 4 * m;
+        let need = 8usize
+            .checked_add(n.checked_mul(l0).ok_or("graph size overflow")?)
+            .ok_or("graph size overflow")?;
+        if region.len() < need {
+            return Err(format!("graph region truncated: {} < {need}", region.len()));
+        }
+        let layer_sum = u64::from_le_bytes(region[0..8].try_into().unwrap()) as usize;
+        let mut graph = Self::new(m);
+        let mut levels = Vec::with_capacity(n);
+        for node in 0..n {
+            let base = 8 + node * l0;
+            let layer_count = i32::from_le_bytes(region[base..base + 4].try_into().unwrap());
+            if layer_count < 0 {
+                return Err(format!("vertex {node} has negative layer count"));
+            }
+            levels.push(layer_count as u32);
+        }
+        if levels.iter().map(|&l| l as usize).sum::<usize>() != layer_sum {
+            return Err("layer_sum does not match the vertex records".to_string());
+        }
+        graph.push_levels(&levels);
+        for node in 0..n {
+            let base = 8 + node * l0;
+            let count = i32::from_le_bytes(region[base + 16..base + 20].try_into().unwrap());
+            if count < 0 || count as usize > m0 {
+                return Err(format!("vertex {node} has invalid degree {count}"));
+            }
+            let start = base + 20;
+            let list: Vec<u32> = (0..count as usize)
+                .map(|k| {
+                    u32::from_le_bytes(region[start + 4 * k..start + 4 * k + 4].try_into().unwrap())
+                })
+                .collect();
+            graph.set_neighbors(0, node, &list);
+        }
+        let mut cursor = 8 + n * l0;
+        for node in 0..n {
+            for layer in 1..=graph.levels[node] as usize {
+                if cursor + lx > region.len() {
+                    return Err("upper-layer region truncated".to_string());
+                }
+                let count = i32::from_le_bytes(region[cursor..cursor + 4].try_into().unwrap());
+                if count < 0 || count as usize > m {
+                    return Err(format!("vertex {node} has invalid degree {count}"));
+                }
+                let start = cursor + 4;
+                let list: Vec<u32> = (0..count as usize)
+                    .map(|k| {
+                        u32::from_le_bytes(
+                            region[start + 4 * k..start + 4 * k + 4].try_into().unwrap(),
+                        )
+                    })
+                    .collect();
+                graph.set_neighbors(layer, node, &list);
+                cursor += lx;
+            }
+        }
+        Ok(graph)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn small_graph() -> GraphStore {
+        let mut graph = GraphStore::new(2);
+        // node 0: level 1, node 1: level 0, node 2: level 2
+        graph.push_levels(&[1, 0, 2]);
+        graph.set_neighbors(0, 0, &[1, 2]);
+        graph.set_neighbors(1, 0, &[2]);
+        graph.set_neighbors(0, 1, &[0]);
+        graph.set_neighbors(0, 2, &[0, 1]);
+        graph.set_neighbors(1, 2, &[0]);
+        graph.set_neighbors(2, 2, &[1]);
+        graph
+    }
+
+    #[test]
+    fn neighbors_follow_the_level_of_the_vertex() {
+        let graph = small_graph();
+        assert_eq!(graph.neighbors(0, 2).to_vec(), vec![0, 1]);
+        assert_eq!(graph.neighbors(1, 2).to_vec(), vec![0]);
+        assert_eq!(graph.neighbors(2, 2).to_vec(), vec![1]);
+        // Node 1 never reaches layer 1 and node 0 never reaches layer 2.
+        assert_eq!(graph.neighbors(1, 1).len(), 0);
+        assert_eq!(graph.neighbors(2, 0).len(), 0);
+        assert_eq!(graph.neighbors(0, 9).len(), 0);
+    }
+
+    #[test]
+    fn upper_layers_are_allocated_per_vertex_not_globally() {
+        let mut graph = GraphStore::new(16);
+        // 1000 vertices, only the first has an upper layer.
+        let mut levels = vec![0u32; 1000];
+        levels[0] = 3;
+        graph.push_levels(&levels);
+        // 1000 * 2M slots for layer 0, 3 * M slots for the single upper vertex.
+        assert_eq!(graph.up.len(), 3 * 16);
+        assert_eq!(graph.l0.len(), 1000 * 32);
+        // Per-vertex overhead: 2M*4 (layer 0) + 4 (count) + 4 (start) + 4 (level).
+        let per_vertex = 32 * 4 + 4 + 4 + 4;
+        assert!(graph.mem_bytes() >= 1000 * per_vertex);
+        assert!(graph.mem_bytes() < 1000 * per_vertex * 2);
+    }
+
+    #[test]
+    fn region_round_trips_through_the_reference_layout() {
+        let graph = small_graph();
+        let region = graph.to_cpp_region();
+        assert_eq!(&region[0..8], &3u64.to_le_bytes());
+        let decoded = GraphStore::from_cpp_region(&region, 3, 4, 2).unwrap();
+        assert_eq!(
+            (0..3)
+                .map(|node| decoded.level_of(node))
+                .collect::<Vec<_>>(),
+            (0..3).map(|node| graph.level_of(node)).collect::<Vec<_>>()
+        );
+        for node in 0..3 {
+            for layer in 0..=graph.level_of(node) {
+                assert_eq!(
+                    decoded.neighbors(layer, node).to_vec(),
+                    graph.neighbors(layer, node).to_vec(),
+                    "node {node} layer {layer}"
+                );
+            }
+        }
+        assert_eq!(decoded.to_cpp_region(), region);
+    }
+
+    #[test]
+    fn region_rejects_inconsistent_layer_sum() {
+        let mut region = small_graph().to_cpp_region();
+        region[0] = 9;
+        assert!(GraphStore::from_cpp_region(&region, 3, 4, 2).is_err());
+        assert!(GraphStore::from_cpp_region(&region[..10], 3, 4, 2).is_err());
+    }
+
+    #[test]
+    fn push_neighbor_stops_at_the_degree_limit() {
+        let mut graph = GraphStore::new(1);
+        graph.push_level(1);
+        assert!(graph.push_neighbor(0, 0, 7));
+        assert!(graph.push_neighbor(0, 0, 8));
+        assert!(!graph.push_neighbor(0, 0, 9));
+        assert_eq!(graph.neighbors(0, 0).to_vec(), vec![7, 8]);
+        assert!(graph.push_neighbor(1, 0, 5));
+        assert!(!graph.push_neighbor(1, 0, 6));
+        assert_eq!(graph.neighbors(1, 0).len(), 1);
+    }
+}

@@ -3473,6 +3473,109 @@ mod tests {
         }
     }
 
+    /// A sealed HNSW chunk is **mapped**, not read: its vector payload stays in
+    /// the page cache and a loaded segment's heap is its graph, which is the
+    /// reference's shape (`PlainVecStoreInner` points into the buffer).
+    #[test]
+    fn a_sealed_hnsw_chunk_maps_its_vectors() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE mp (id INT, v EMBEDDING(FLOAT,8));")
+                .unwrap();
+            let mut sql = String::from("INSERT INTO mp VALUES ");
+            for i in 0..300 {
+                let parts: Vec<String> = (0..8).map(|j| format!("{}", i + j)).collect();
+                sql.push_str(&format!("({i}, [{}])", parts.join(",")));
+                if i < 299 {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute(&sql).unwrap();
+            e.execute("CREATE INDEX mp_i ON mp (v) USING HNSW WITH (metric='l2');")
+                .unwrap();
+            e.flush().unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        let loaded = e.load_vector_index("mp", "mp_i").unwrap();
+        let index = loaded.index.index();
+        assert!(
+            index.vectors_are_mapped(),
+            "the payload must be borrowed from the mapping"
+        );
+        assert_eq!(
+            index.store_mem_bytes(),
+            0,
+            "a mapped store keeps no vectors"
+        );
+        assert_eq!(index.len(), 300);
+        // The mapped payload is what answers: this engine has no memory segment.
+        // Row 42's own vector: [42, 43, …, 49].
+        let query: Vec<String> = (0..8).map(|j| format!("{}", 42 + j)).collect();
+        assert_eq!(
+            rows(
+                &e,
+                &format!(
+                    "SELECT id FROM mp SEARCH MATCH VECTOR (v, [{}], 'float', 'l2', 1);",
+                    query.join(",")
+                )
+            ),
+            vec![vec!["42".to_string()]]
+        );
+    }
+
+    /// A filtered query on an indexed column evaluates its predicate on the
+    /// columns it names and pushes the result into the graph as a bitmask
+    /// (`CalculateFilterBitmask`): the answer is the nearest *admitted* row, not
+    /// the nearest row that then gets discarded.
+    #[test]
+    fn a_filtered_hnsw_query_answers_only_admitted_rows() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE fv (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO fv VALUES ");
+        for i in 0..200 {
+            sql.push_str(&format!("({i}, {}, [{i}.0,0.0,0.0,0.0])", i % 2));
+            if i < 199 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute(&sql).unwrap();
+        e.execute("CREATE INDEX fv_i ON fv (v) USING HNSW WITH (metric='l2');")
+            .unwrap();
+        e.flush().unwrap();
+
+        // 49 is the nearest row and is odd; only the even rows are admitted, so
+        // the answer is the nearest of those.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM fv SEARCH MATCH VECTOR (v, [49.0,0.0,0.0,0.0], 'float', 'l2', 1) \
+                 WHERE tag = 0;"
+            ),
+            vec![vec!["48".to_string()]]
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM fv SEARCH MATCH VECTOR (v, [49.0,0.0,0.0,0.0], 'float', 'l2', 1);"
+            ),
+            vec![vec!["49".to_string()]]
+        );
+        // More results than the graph would return unfiltered: every one of them
+        // still satisfies the predicate.
+        let got = rows(
+            &e,
+            "SELECT id, tag FROM fv SEARCH MATCH VECTOR (v, [49.0,0.0,0.0,0.0], 'float', 'l2', 5) \
+             WHERE tag = 0;",
+        );
+        assert_eq!(got.len(), 5);
+        assert!(got.iter().all(|r| r[1] == "0"), "{got:?}");
+    }
+
     /// C++ `test_lsg_build_ut.cpp::test1`: an LSG-built HNSW keeps >= 95%
     /// recall@1 for self-queries.
     #[test]
@@ -4457,6 +4560,50 @@ mod tests {
         assert_eq!(
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+    }
+
+    /// A `MULTIVECTOR` column's HNSW graph is one vertex per token, and it stays
+    /// that way across the restart boundary. The query path materialises the
+    /// memory segment from the catalog before any write touches it
+    /// (`hnsw_mem_segments`), so whichever path creates the segment decides
+    /// whether multi-token cells are indexed at all
+    /// (`MemIndexInserterIter1<MultiVectorRef>`).
+    ///
+    /// The answers alone cannot prove the graph holds the tokens — the coverage
+    /// check folds unlabelled rows back in (`include_uncovered`) — so the token
+    /// accounting is pinned by `hnsw_mem::tests` instead.
+    #[test]
+    fn multivector_hnsw_indexes_every_token_after_a_restart() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE mvt (id INT, v MULTIVECTOR(FLOAT,2));")
+                .unwrap();
+            e.execute("INSERT INTO mvt VALUES (1, [[0.0,1.0],[1.0,0.0]]), (2, [[0.0,0.5]]);")
+                .unwrap();
+            e.execute("CREATE INDEX mvt_i ON mvt (v) USING HNSW WITH (metric='l2');")
+                .unwrap();
+            e.flush().unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        // The first query is what creates the reopened engine's memory segment.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM mvt SEARCH MATCH VECTOR (v, [0.0,1.0], 'float', 'l2', 1);"
+            ),
+            vec![vec!["1".to_string()]]
+        );
+        // A cell with two tokens: the single-vector path would drop it whole.
+        e.execute("INSERT INTO mvt VALUES (3, [[0.3,0.7],[0.9,0.9]]);")
+            .unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM mvt SEARCH MATCH VECTOR (v, [0.3,0.7], 'float', 'l2', 1);"
+            ),
+            vec![vec!["3".to_string()]]
         );
     }
 

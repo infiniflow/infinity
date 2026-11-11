@@ -52,6 +52,10 @@ pub(crate) struct HnswOptions {
 pub struct LoadedVectorIndex {
     pub index: HnswHandler,
     pub labels: Vec<u32>,
+    /// Distinct rows the graph labels. Equal to `labels.len()` for a
+    /// single-vector column; a `MULTIVECTOR` chunk labels one row several
+    /// times, one per token, so the count is what the coverage check needs.
+    pub labelled_rows: usize,
     /// The `chunk_{id}.idx` this graph came from, so a later reload can load
     /// only the chunks written since the last one.
     pub chunk_id: u64,
@@ -131,6 +135,21 @@ pub(crate) struct PlaidOptions {
     pub(crate) colbertsar: bool,
 }
 
+/// Maps one sealed HNSW chunk read-only.
+///
+/// A chunk is immutable once published (every publisher renames a temp file over
+/// it), so a reader points at the page cache instead of reading the payload into
+/// the heap — the reference's buffer-manager chunk, without the LRU. Publisher
+/// and reader agree because a rewrite swaps the directory entry and leaves the
+/// inode this mapping names untouched.
+pub(crate) fn map_hnsw_chunk(path: &std::path::Path) -> Option<index::vector::ByteSource> {
+    let mapped = storage::buffer::mapped::MappedFile::open(path).ok()?;
+    if mapped.is_empty() {
+        return None;
+    }
+    Some(std::sync::Arc::new(mapped))
+}
+
 pub(crate) fn file_stamp(path: &std::path::Path) -> (u64, u64) {
     std::fs::metadata(path)
         .ok()
@@ -157,34 +176,10 @@ pub(crate) fn encode_hnsw_chunk_from(index: &HnswIndex, labels: &[u32]) -> (usiz
     let enterpoint = index.entry_point().map(|e| e as i32).unwrap_or(0);
     let store_meta = index.store_meta_bytes();
     let vector_region = index.store_records_bytes();
-    // Neighbour counts must not exceed the level's limit.
-    let vertices: Vec<knn_format::HnswGraphVertex> = (0..index.len())
-        .map(|n| {
-            let level = index.level_of(n);
-            let neighbors_l0 = index
-                .neighbors(0, n)
-                .iter()
-                .take(mmax0 as usize)
-                .map(|&x| x as u32)
-                .collect();
-            let upper = (1..=level)
-                .map(|l| {
-                    index
-                        .neighbors(l, n)
-                        .iter()
-                        .take(mmax as usize)
-                        .map(|&x| x as u32)
-                        .collect()
-                })
-                .collect();
-            knn_format::HnswGraphVertex {
-                layer_count: level as i32,
-                neighbors_l0,
-                upper,
-            }
-        })
-        .collect();
-    let graph = knn_format::encode_graph_region(&vertices, mmax0, mmax);
+    // The graph region is written straight from the compact slabs: routing it
+    // through one `HnswGraphVertex` per node cost a full second copy of the
+    // graph, which is what the compact store exists to avoid.
+    let graph = index.encode_graph_region();
     let chunk = knn_format::encode_hnsw_chunk_ext(
         m,
         ef_construction,

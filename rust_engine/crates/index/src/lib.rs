@@ -5,7 +5,10 @@
 //! (the engine encodes typed values to bytes), matching Infinity's byte-key
 //! design. Indexes are pluggable behind the [`Index`] trait.
 
-#![forbid(unsafe_code)]
+// One audited reinterpreting read, in `vector::floats_at`: a sealed chunk's
+// vector region is `f32` payload read out of a file mapping, which is exactly
+// what the reference's `DataType*` does. Everything else stays safe.
+#![deny(unsafe_code)]
 // The distance kernels use portable SIMD (`std::simd`, still nightly-only) to
 // mirror the reference's `F32L2*` / `F32IP*` / `F32Cos*` intrinsics; see
 // `simd.rs` for why that is `std::simd` and not `std::arch`.
@@ -14,6 +17,7 @@
 pub mod bp;
 pub mod emvb;
 pub mod fulltext;
+pub mod graph;
 pub mod hnsw_handler;
 pub mod ivf;
 pub mod ivf_def;
@@ -22,8 +26,7 @@ pub mod linscan;
 pub mod lsg;
 pub mod lvq;
 pub mod merge_knn;
-pub mod multivector;
-pub mod parallel_build;
+mod parallel_build;
 pub mod plaid;
 pub mod rabitq;
 pub mod simd;

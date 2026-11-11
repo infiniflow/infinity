@@ -244,6 +244,53 @@ impl Expr {
     pub fn eval_predicate(&self, row: &[Value]) -> bool {
         matches!(self.eval(row), Value::Bool(true))
     }
+
+    /// The row positions this expression reads, ascending.
+    ///
+    /// A predicate only needs the columns it names, so a scan that evaluates one
+    /// can decode just those and leave the rest `NULL` — the reference's
+    /// `CalculateFilterBitmask` reads the block's filter columns, never the
+    /// vector payload the filter does not mention. Positional indices must stay
+    /// in sync with the row they are evaluated against, which is why this walks
+    /// exactly the same shapes as [`Expr::eval`].
+    pub fn referenced_columns(&self) -> Vec<usize> {
+        fn walk(expr: &Expr, out: &mut Vec<usize>) {
+            match expr {
+                Expr::Column(i) => out.push(*i),
+                Expr::Literal(_) => {}
+                Expr::Cmp(a, _, b) | Expr::And(a, b) | Expr::Or(a, b) | Expr::Binary(a, _, b) => {
+                    walk(a, out);
+                    walk(b, out);
+                }
+                Expr::Not(a) | Expr::IsNull(a, _) => walk(a, out),
+                Expr::Like(a, b, _, _) => {
+                    walk(a, out);
+                    walk(b, out);
+                }
+                Expr::In(a, list, _) => {
+                    walk(a, out);
+                    for e in list {
+                        walk(e, out);
+                    }
+                }
+                Expr::Func { args, .. } => {
+                    for e in args {
+                        walk(e, out);
+                    }
+                }
+                Expr::FullText(i, _, _) => out.push(*i),
+                Expr::Regex(i, pattern) => {
+                    out.push(*i);
+                    walk(pattern, out);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(self, &mut out);
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
 }
 
 /// Evaluates `a <op> b` with numeric promotion; NULL propagates.

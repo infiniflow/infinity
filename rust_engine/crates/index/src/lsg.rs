@@ -1,9 +1,33 @@
 //! Local scaling graph (LSG) support for HNSW.
 //!
 //! Port of `src/storage/knn_index/knn_hnsw/hnsw_lsg_builder.cppm` and
-//! `dist_func_lsg_wrapper.cppm`. Every row gets an average distance to its
-//! `ls_k` nearest sampled vectors; HNSW distances are divided by
+//! `dist_func_lsg_wrapper.cppm`. Every row gets the mean distance to its `ls_k`
+//! nearest sampled vectors; HNSW distances are then divided by
 //! `sqrt(avg_i * avg_j)^alpha`, which adapts the graph to non-uniform density.
+//!
+//! The builder keeps the reference's three-step shape, so the incremental path
+//! (`InsertSampleVec` → `InsertLSAvg` → `SetLSGParam`) and the one-shot path
+//! share it:
+//!
+//! * [`LsgBuilder::insert_sample_vecs`] samples each row with probability
+//!   `sample_ratio` (`HnswLSGBuilder::InsertSampleVec`, `SampleIter`):
+//!   `rand() % 1000 / 1000.0 <= ratio`. A deterministic generator is used here
+//!   so a build is reproducible.
+//! * [`LsgBuilder::insert_ls_avg`] appends one factor per row by keeping the
+//!   `ls_k` best sample distances in a bounded heap (`MergeKnn(1, ls_k)` with
+//!   `CompareMax` for L2 / `CompareMin` for IP and cosine) and averaging them
+//!   (`GetDistMean`). Rows are split across threads like the reference's
+//!   `LsgBuildThreadPool` path.
+//! * [`LsgBuilder::finish`] is `SetLSGParam(alpha, avg)`: the factors and the
+//!   alpha the distance wrapper applies.
+//!
+//! Unlike the reference, nothing in the engine calls the incremental API, so
+//! `avg` is dropped when an index is reloaded or compressed — the same as the
+//! reference, whose `avg_` is a borrowed pointer passed to the wrapper and is
+//! not part of the chunk format.
+
+use std::cmp::{Ordering, Reverse};
+use std::collections::BinaryHeap;
 
 /// C++ `LSGConfig`.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -61,6 +85,16 @@ pub enum Metric {
     Cos,
 }
 
+impl Metric {
+    /// L2 is a distance (smaller is closer); inner product and cosine are
+    /// similarities (larger is closer). The reference picks `CompareMax` for
+    /// the former and `CompareMin` for the latter when building the top-`ls_k`
+    /// heap.
+    fn keeps_smallest(self) -> bool {
+        matches!(self, Metric::L2)
+    }
+}
+
 /// The same values as C++ `KnnDistance1`: squared L2 (smaller is closer),
 /// inner product and cosine similarity (larger is closer).
 fn distance(a: &[f32], b: &[f32], metric: Metric) -> f32 {
@@ -68,6 +102,22 @@ fn distance(a: &[f32], b: &[f32], metric: Metric) -> f32 {
         Metric::L2 => crate::simd::l2_sq(a, b),
         Metric::Ip => crate::simd::ip(a, b),
         Metric::Cos => crate::simd::cosine(a, b),
+    }
+}
+
+/// A distance with a total order, for the bounded top-`ls_k` heaps.
+#[derive(Clone, Copy, PartialEq)]
+struct Dist(f32);
+
+impl Eq for Dist {}
+impl PartialOrd for Dist {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for Dist {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.total_cmp(&other.0)
     }
 }
 
@@ -79,54 +129,175 @@ pub struct LsgIndex {
     metric: Metric,
 }
 
-impl LsgIndex {
-    /// Builds the sample set and the average distances.
-    ///
-    /// C++ `InsertSampleVec` samples each row independently with probability
-    /// `sample_ratio`; the deterministic LCG here keeps a build reproducible.
-    pub fn build(vectors: &[Vec<f32>], metric: Metric, config: LsgConfig) -> Self {
-        let mut state = 0x9E37_79B9_7F4A_7C15u64;
-        let mut samples: Vec<&Vec<f32>> = Vec::new();
-        if config.sample_ratio >= 1.0 {
-            samples.extend(vectors.iter());
-        } else if config.sample_ratio > 0.0 {
-            for v in vectors {
-                state = state
-                    .wrapping_mul(6364136223846793005)
-                    .wrapping_add(1442695040888963407);
-                let r = ((state >> 33) as u32) as f32 / u32::MAX as f32;
-                if r <= config.sample_ratio {
-                    samples.push(v);
-                }
-            }
-        }
-        if samples.is_empty() {
-            // A too-small ratio must not leave the graph unscaled.
-            samples.extend(vectors.iter());
-        }
-        let ls_k = config.ls_k.min(samples.len()).max(1);
-        let mut avg = Vec::with_capacity(vectors.len());
-        for v in vectors {
-            let mut distances: Vec<f32> = samples
-                .iter()
-                .map(|sample| distance(v, sample, metric))
-                .collect();
-            match metric {
-                Metric::L2 => {
-                    distances.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                }
-                Metric::Ip | Metric::Cos => {
-                    distances.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal))
-                }
-            }
-            let mean = distances.iter().take(ls_k).sum::<f32>() / ls_k as f32;
-            avg.push(mean);
-        }
+/// `HnswLSGBuilder`: collects samples, then appends one factor per row.
+pub struct LsgBuilder {
+    metric: Metric,
+    config: LsgConfig,
+    samples: Vec<Vec<f32>>,
+    avg: Vec<f32>,
+    /// Deterministic generator behind the sampler's `rand() % 1000` draw.
+    seed: u64,
+}
+
+impl LsgBuilder {
+    pub fn new(metric: Metric, config: LsgConfig) -> Self {
         Self {
-            avg,
-            alpha: config.alpha,
             metric,
+            config,
+            samples: Vec::new(),
+            avg: Vec::new(),
+            seed: 0x9E37_79B9_7F4A_7C15,
         }
+    }
+
+    /// `InsertSampleVec`: keeps each row with probability `sample_ratio`.
+    ///
+    /// Returns how many rows were sampled. A ratio of `0` samples nothing, and
+    /// a ratio of `1` (or more) keeps every row, as in the reference.
+    pub fn insert_sample_vecs<'a>(
+        &mut self,
+        vectors: impl IntoIterator<Item = &'a Vec<f32>>,
+    ) -> usize {
+        let mut count = 0;
+        for vector in vectors {
+            let keep = if self.config.sample_ratio >= 1.0 {
+                true
+            } else if self.config.sample_ratio > 0.0 {
+                // `rand() % 1000 / 1000.0 <= ratio`: a thousandth-resolution
+                // draw, which is what makes `sample_ratio = 0.001` still
+                // sample roughly one row in a thousand.
+                let draw = (next_rand(&mut self.seed) % 1000) as f32 / 1000.0;
+                draw <= self.config.sample_ratio
+            } else {
+                false
+            };
+            if keep {
+                self.samples.push(vector.clone());
+                count += 1;
+            }
+        }
+        count
+    }
+
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
+    /// `InsertLSAvg`: appends the mean distance to the `ls_k` nearest samples
+    /// for every row in `rows`.
+    pub fn insert_ls_avg(&mut self, rows: &[Vec<f32>]) -> usize {
+        let base = self.avg.len();
+        self.avg.resize(base + rows.len(), 0.0);
+        let ls_k = self.config.ls_k.min(self.samples.len()).max(1);
+        let metric = self.metric;
+        let samples = &self.samples;
+        let avg = &mut self.avg[base..];
+        // The reference splits the row iterator across its LSG build pool; the
+        // distance loop is the only work, so plain scoped threads are enough.
+        let threads = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1)
+            .min(4)
+            .min(rows.len().max(1));
+        let chunk = rows.len().div_ceil(threads).max(1);
+        let mut out = avg;
+        let mut rows_rest = rows;
+        let mut pairs: Vec<(&[Vec<f32>], &mut [f32])> = Vec::new();
+        while !rows_rest.is_empty() {
+            let take = chunk.min(rows_rest.len());
+            let (head, tail) = rows_rest.split_at(take);
+            let (out_head, out_tail) = out.split_at_mut(take);
+            pairs.push((head, out_head));
+            rows_rest = tail;
+            out = out_tail;
+        }
+        std::thread::scope(|scope| {
+            for (chunk_rows, chunk_avg) in pairs {
+                scope.spawn(move || {
+                    let mut heap: BinaryHeap<Dist> = BinaryHeap::with_capacity(ls_k + 1);
+                    let mut heap_min: BinaryHeap<Reverse<Dist>> =
+                        BinaryHeap::with_capacity(ls_k + 1);
+                    for (row, slot) in chunk_rows.iter().zip(chunk_avg.iter_mut()) {
+                        if metric.keeps_smallest() {
+                            heap.clear();
+                            for sample in samples {
+                                let d = distance(row, sample, metric);
+                                push_smallest(&mut heap, ls_k, d);
+                            }
+                            *slot = heap.iter().map(|d| d.0).sum::<f32>() / ls_k as f32;
+                        } else {
+                            heap_min.clear();
+                            for sample in samples {
+                                let d = distance(row, sample, metric);
+                                push_largest(&mut heap_min, ls_k, d);
+                            }
+                            *slot = heap_min.iter().map(|d| d.0 .0).sum::<f32>() / ls_k as f32;
+                        }
+                    }
+                });
+            }
+        });
+        rows.len()
+    }
+
+    /// `SetLSGParam(alpha, avg)`: freezes the factors into the wrapper state.
+    pub fn finish(self) -> LsgIndex {
+        LsgIndex {
+            avg: self.avg,
+            alpha: self.config.alpha,
+            metric: self.metric,
+        }
+    }
+}
+
+/// Keeps the `cap` smallest values seen (`CompareMax` + `MergeKnn(topk)`).
+fn push_smallest(heap: &mut BinaryHeap<Dist>, cap: usize, value: f32) {
+    if heap.len() < cap {
+        heap.push(Dist(value));
+    } else if let Some(top) = heap.peek() {
+        if value < top.0 {
+            heap.pop();
+            heap.push(Dist(value));
+        }
+    }
+}
+
+/// Keeps the `cap` largest values seen (`CompareMin` + `MergeKnn(topk)`).
+fn push_largest(heap: &mut BinaryHeap<Reverse<Dist>>, cap: usize, value: f32) {
+    if heap.len() < cap {
+        heap.push(Reverse(Dist(value)));
+    } else if let Some(Reverse(top)) = heap.peek() {
+        if value > top.0 {
+            heap.pop();
+            heap.push(Reverse(Dist(value)));
+        }
+    }
+}
+
+/// One step of the splitmix-style generator behind the sampler's
+/// `rand() % 1000` draw: reproducible, and fine-grained enough that
+/// `sample_ratio = 0.001` still keeps roughly one row in a thousand.
+fn next_rand(state: &mut u64) -> u64 {
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    *state >> 33
+}
+
+impl LsgIndex {
+    /// Builds the sample set and the average distances in one pass.
+    pub fn build(vectors: &[Vec<f32>], metric: Metric, config: LsgConfig) -> Self {
+        let mut builder = LsgBuilder::new(metric, config);
+        let mut sampled = builder.insert_sample_vecs(vectors.iter());
+        if sampled == 0 && !vectors.is_empty() {
+            // A ratio below the sampler's resolution must not leave the graph
+            // unscaled: fall back to the full set, as the port always did.
+            builder.samples.extend(vectors.iter().cloned());
+            sampled = builder.samples.len();
+        }
+        let _ = sampled;
+        builder.insert_ls_avg(vectors);
+        builder.finish()
     }
 
     pub fn avg(&self) -> &[f32] {
@@ -196,6 +367,102 @@ mod tests {
                 lsg.avg()[i]
             );
         }
+    }
+
+    /// The bounded heap keeps the same `ls_k` values as a full sort: L2 keeps
+    /// the smallest, inner product the largest (`MergeKnn` + `CompareMax` /
+    /// `CompareMin`).
+    #[test]
+    fn top_k_heap_matches_a_full_sort_for_both_comparators() {
+        let mut rng = Rng(7);
+        let dim = 32;
+        let n = 64;
+        let vectors: Vec<Vec<f32>> = (0..n).map(|_| rng.vector(dim)).collect();
+        let config = LsgConfig {
+            sample_ratio: 1.0,
+            ls_k: 7,
+            alpha: 1.0,
+        };
+        for metric in [Metric::L2, Metric::Ip, Metric::Cos] {
+            let lsg = LsgIndex::build(&vectors, metric, config);
+            for (i, row) in vectors.iter().enumerate() {
+                let mut all: Vec<f32> = vectors.iter().map(|v| distance(row, v, metric)).collect();
+                if metric.keeps_smallest() {
+                    all.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                } else {
+                    all.sort_by(|a, b| b.partial_cmp(a).unwrap());
+                }
+                let expected: f32 = all.iter().take(config.ls_k).sum::<f32>() / config.ls_k as f32;
+                assert!(
+                    (lsg.avg()[i] - expected).abs() < 1e-3,
+                    "{metric:?} row {i}: {} != {expected}",
+                    lsg.avg()[i]
+                );
+            }
+        }
+    }
+
+    /// `sample_ratio = 0` samples nothing, which the one-shot build then
+    /// papers over by using every row; the incremental builder keeps it empty
+    /// so a caller can see the difference (the reference's `SampleIter` does
+    /// the same).
+    #[test]
+    fn sample_ratio_controls_the_sample_set() {
+        let mut rng = Rng(3);
+        let vectors: Vec<Vec<f32>> = (0..256).map(|_| rng.vector(8)).collect();
+        let mut builder = LsgBuilder::new(
+            Metric::L2,
+            LsgConfig {
+                sample_ratio: 0.0,
+                ls_k: 4,
+                alpha: 1.0,
+            },
+        );
+        assert_eq!(builder.insert_sample_vecs(vectors.iter()), 0);
+        assert_eq!(builder.sample_count(), 0);
+
+        let mut builder = LsgBuilder::new(
+            Metric::L2,
+            LsgConfig {
+                sample_ratio: 1.0,
+                ls_k: 4,
+                alpha: 1.0,
+            },
+        );
+        assert_eq!(builder.insert_sample_vecs(vectors.iter()), 256);
+        assert_eq!(builder.sample_count(), 256);
+
+        let mut builder = LsgBuilder::new(
+            Metric::L2,
+            LsgConfig {
+                sample_ratio: 0.25,
+                ls_k: 4,
+                alpha: 1.0,
+            },
+        );
+        let kept = builder.insert_sample_vecs(vectors.iter());
+        assert!(kept > 20 && kept < 100, "kept {kept} of 256 at ratio 0.25");
+    }
+
+    /// The incremental path (`InsertSampleVec` → `InsertLSAvg` → `SetLSGParam`)
+    /// has to produce the same factors as the one-shot build.
+    #[test]
+    fn incremental_build_matches_the_one_shot_build() {
+        let mut rng = Rng(11);
+        let vectors: Vec<Vec<f32>> = (0..64).map(|_| rng.vector(16)).collect();
+        let config = LsgConfig {
+            sample_ratio: 1.0,
+            ls_k: 5,
+            alpha: 0.5,
+        };
+        let one_shot = LsgIndex::build(&vectors, Metric::L2, config);
+        let mut builder = LsgBuilder::new(Metric::L2, config);
+        builder.insert_sample_vecs(vectors.iter());
+        builder.insert_ls_avg(&vectors[..32]);
+        builder.insert_ls_avg(&vectors[32..]);
+        let incremental = builder.finish();
+        assert_eq!(one_shot.avg(), incremental.avg());
+        assert_eq!(one_shot.alpha(), incremental.alpha());
     }
 
     #[test]

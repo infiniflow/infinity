@@ -55,7 +55,14 @@ impl IvfIndex {
     }
 
     /// Top-k candidate row offsets: scan the `nprobe` best centroids' parts.
-    pub fn candidates(&self, query: &[f32], k: usize, nprobe: usize, metric: &str) -> Vec<u32> {
+    pub fn candidates(
+        &self,
+        query: &[f32],
+        k: usize,
+        nprobe: usize,
+        metric: &str,
+        allow: Option<&dyn Fn(u32) -> bool>,
+    ) -> Vec<u32> {
         if k == 0
             || self.dims == 0
             || query.len() != self.dims
@@ -82,6 +89,12 @@ impl IvfIndex {
         for (c, _) in centroids.into_iter().take(nprobe) {
             if let Some(part) = self.parts.get(c) {
                 for (offset, vector) in part {
+                    // Refused rows are skipped *before* the distance, as the
+                    // reference's `IVF_Filter` does
+                    // (`ivf_index_search.cppm:134-136`).
+                    if allow.is_some_and(|f| !f(*offset)) {
+                        continue;
+                    }
                     if vector.len() == self.dims {
                         hits.push((*offset, self.score(query, vector, metric)));
                     }
@@ -233,7 +246,14 @@ impl IvfSqIndex {
     }
 
     /// Top-k candidate row offsets (`SearchIndexT` for `kScalarQuantization`).
-    pub fn candidates(&self, query: &[f32], k: usize, nprobe: usize, metric: &str) -> Vec<u32> {
+    pub fn candidates(
+        &self,
+        query: &[f32],
+        k: usize,
+        nprobe: usize,
+        metric: &str,
+        allow: Option<&dyn Fn(u32) -> bool>,
+    ) -> Vec<u32> {
         if k == 0
             || self.dims == 0
             || query.len() != self.dims
@@ -282,6 +302,10 @@ impl IvfSqIndex {
             for i in 0..part.offsets.len() {
                 let base = i * bytes;
                 let offset = part.offsets[i];
+                // Refused rows are skipped before the code is decoded.
+                if allow.is_some_and(|f| !f(offset)) {
+                    continue;
+                }
                 let score = match metric {
                     // dot(x, v) = dot(x, c + b) + dot(v, e) + dot(x * a, code)
                     "ip" => {
@@ -339,12 +363,21 @@ pub enum IvfSegment {
 }
 
 impl IvfSegment {
-    /// Top-k candidate row offsets for `query`.
-    pub fn candidates(&self, query: &[f32], k: usize, nprobe: usize, metric: &str) -> Vec<u32> {
+    /// Top-k candidate row offsets for `query`, skipping the rows `allow`
+    /// refuses so the probe does not decode them
+    /// (`ivf_index_search.cppm:80-95,134-136`).
+    pub fn candidates(
+        &self,
+        query: &[f32],
+        k: usize,
+        nprobe: usize,
+        metric: &str,
+        allow: Option<&dyn Fn(u32) -> bool>,
+    ) -> Vec<u32> {
         match self {
-            IvfSegment::Plain(index) => index.candidates(query, k, nprobe, metric),
-            IvfSegment::Scalar(index) => index.candidates(query, k, nprobe, metric),
-            IvfSegment::Product(index) => index.candidates(query, k, nprobe, metric),
+            IvfSegment::Plain(index) => index.candidates(query, k, nprobe, metric, allow),
+            IvfSegment::Scalar(index) => index.candidates(query, k, nprobe, metric, allow),
+            IvfSegment::Product(index) => index.candidates(query, k, nprobe, metric, allow),
         }
     }
 
@@ -611,7 +644,14 @@ impl IvfPqIndex {
     }
 
     /// Top-k candidate row offsets (`SearchIndexT` for `kProductQuantization`).
-    pub fn candidates(&self, query: &[f32], k: usize, nprobe: usize, metric: &str) -> Vec<u32> {
+    pub fn candidates(
+        &self,
+        query: &[f32],
+        k: usize,
+        nprobe: usize,
+        metric: &str,
+        allow: Option<&dyn Fn(u32) -> bool>,
+    ) -> Vec<u32> {
         if k == 0
             || self.dims == 0
             || query.len() != self.dims
@@ -647,6 +687,10 @@ impl IvfPqIndex {
             let residual_table = self.ip_table(&residual);
             let query_centroid_ip = dot(query, c);
             for (i, offset) in part.offsets.iter().enumerate() {
+                // Refused rows are skipped before the codes are read.
+                if allow.is_some_and(|f| !f(*offset)) {
+                    continue;
+                }
                 let score = match metric {
                     "ip" => {
                         let mut d = query_centroid_ip;
@@ -720,17 +764,40 @@ mod tests {
     #[test]
     fn picks_the_nearest_part() {
         let index = sample();
-        let hits = index.candidates(&[0.0, 1.0], 1, 1, "l2");
+        let hits = index.candidates(&[0.0, 1.0], 1, 1, "l2", None);
         assert_eq!(hits[0], 20);
-        let hits = index.candidates(&[1.0, 0.0], 2, 1, "ip");
+        let hits = index.candidates(&[1.0, 0.0], 2, 1, "ip", None);
         assert_eq!(hits, vec![10, 11]);
     }
 
     #[test]
     fn nprobe_covers_every_part() {
         let index = sample();
-        let hits = index.candidates(&[1.0, 0.0], 4, 2, "l2");
+        let hits = index.candidates(&[1.0, 0.0], 4, 2, "l2", None);
         assert_eq!(hits.len(), 4);
+    }
+
+    /// The segment's bitmask is pushed into the probe: a refused row is skipped
+    /// before its distance (or its code) is decoded, so the `k` slots are filled
+    /// by accepted rows instead of being spent on refused ones
+    /// (`ivf_index_search.cppm:80-95,134-136`).
+    #[test]
+    fn the_filter_is_applied_inside_the_probe() {
+        let index = sample();
+        let allow = |offset: u32| offset != 20;
+        // `20` is the nearest row of the second part; the runner-up takes the
+        // slot rather than the result coming back short.
+        assert_eq!(
+            index.candidates(&[0.0, 1.0], 1, 1, "l2", Some(&allow)),
+            vec![21]
+        );
+        assert_eq!(index.candidates(&[0.0, 1.0], 1, 1, "l2", None)[0], 20);
+        // A predicate that refuses nothing must not change the ranking.
+        let keep_all = |_: u32| true;
+        assert_eq!(
+            index.candidates(&[1.0, 0.0], 4, 2, "l2", Some(&keep_all)),
+            index.candidates(&[1.0, 0.0], 4, 2, "l2", None)
+        );
     }
 
     /// Training on residuals then encoding recovers each dimension to within
@@ -836,8 +903,8 @@ mod tests {
             sq_bits: 8,
             parts,
         };
-        assert_eq!(index.candidates(&[0.0, 1.0], 1, 1, "l2")[0], 20);
-        assert_eq!(index.candidates(&[1.0, 0.0], 1, 1, "ip")[0], 10);
+        assert_eq!(index.candidates(&[0.0, 1.0], 1, 1, "l2", None)[0], 20);
+        assert_eq!(index.candidates(&[1.0, 0.0], 1, 1, "ip", None)[0], 10);
         assert_eq!(index.offsets().count(), 4);
     }
 }

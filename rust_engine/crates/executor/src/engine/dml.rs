@@ -1329,10 +1329,20 @@ impl Engine {
                         index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
                     let encoding =
                         index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
+                    // A MULTIVECTOR column keeps one vertex per token, all
+                    // labelled with the row id (the reference's
+                    // `MemIndexInserterIter1<MultiVectorRef>`).
+                    let multivector = self.multivector_column(table, &im.column);
                     entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
-                        Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
-                            dims, m, efc, metric, encoding,
-                        )))
+                        Arc::new(Mutex::new(if multivector {
+                            crate::hnsw_mem::HnswIndexInMem::new_multivector(
+                                dims, m, efc, metric, encoding,
+                            )
+                        } else {
+                            crate::hnsw_mem::HnswIndexInMem::new_with(
+                                dims, m, efc, metric, encoding,
+                            )
+                        }))
                     });
                 }
             }
@@ -1348,10 +1358,15 @@ impl Engine {
             };
             let Some(text) = cells.get(ci) else { continue };
             let v: Vec<f32> = parse_vec_str(text).iter().map(|x| *x as f32).collect();
-            if let Ok(mut mem) = mem.lock() {
-                if v.len() == mem.dims {
-                    mem.insert(seq, &v);
-                }
+            let Ok(mut mem) = mem.lock() else { continue };
+            let dims = mem.dims;
+            if mem.is_multivector() {
+                // One vertex per token; a cell whose length is not a multiple
+                // of the declared dimension indexes as a single vertex.
+                let tokens = crate::hnsw_mem::split_tokens(&v, dims);
+                mem.insert_tokens(seq, &tokens, 1);
+            } else if v.len() == dims {
+                mem.insert(seq, &v);
             }
         }
     }
