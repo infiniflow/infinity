@@ -86,6 +86,15 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     Status rollback_status = Status::Ignore();
     i64 dump_count = 0;
     do {
+        // Exponential backoff between attempts: 0.5s doubling up to 30s. Without it the
+        // retry loop burns through the 5 attempts in ~5 seconds of lock contention during
+        // sustained concurrent inserts, and the task is dropped permanently — since dump
+        // is only triggered from the insert path, nothing re-submits it after writes stop,
+        // so the mem index never persists and a restart has to rebuild it from the WAL.
+        if (dump_count > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(
+                std::min<i64>(30000, 500 * (1LL << std::min<i64>(dump_count - 1, 6)))));
+        }
         dump_count++;
         auto bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kDumpMemIndex);
         std::shared_ptr<NewTxn> new_txn_shared =

@@ -311,6 +311,14 @@ Status KVStore::Init(const std::string &db_path) {
     write_options_.disableWAL = true;
 
     txn_options_.set_snapshot = true;
+    // The default transaction lock timeout is too short for background optimize
+    // transactions: merging two large chunks takes longer than the 1s default
+    // (TransactionDBOptions::transaction_lock_timeout — the default for lock waits
+    // inside transactions, per TransactionOptions::lock_timeout), so under concurrent
+    // inserts every merge attempt times out and block merging livelocks. Foreground
+    // transactions (insert/dump) hold catalog keys for only milliseconds, so a larger
+    // timeout does not affect them.
+    txn_db_options_.transaction_lock_timeout = 30000; // 30s
 
     auto *config = infinity::InfinityContext::instance().config();
     if (config != nullptr && config->StorageType() == StorageType::kMinio) {
