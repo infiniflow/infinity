@@ -2300,7 +2300,12 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
                 return status;
             }
             u32 offset = 0;
-            memory_hnsw_index->InsertVecs(base_rowid.segment_offset_, col, offset, row_cnt);
+            // Row-id labels must use the block's absolute offset within the segment (the pattern
+            // used by the SMVE branch below). base_rowid.segment_offset_ is always 0 when the
+            // merge range starts from the segment base, which would relabel every block after
+            // the first one as 0..8191 and silently drop those rows from search results.
+            SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+            memory_hnsw_index->InsertVecs(block_offset, col, offset, row_cnt);
         }
 
         memory_hnsw_index->Dump(buffer_obj);
@@ -2323,7 +2328,9 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
                 return status;
             }
             u32 offset = 0;
-            memory_bmp_index->AddDocs(base_rowid.segment_offset_, col, offset, row_cnt);
+            // Same as the HNSW branch above: label rows with the block's absolute offset.
+            SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+            memory_bmp_index->AddDocs(block_offset, col, offset, row_cnt);
         }
         memory_bmp_index->Dump(buffer_obj);
     } else if (index_base->index_type_ == IndexType::kSMVE) {
