@@ -1896,7 +1896,35 @@ impl Engine {
                 opts,
                 if_not_exists,
             } => {
-                self.validate_index(table, column, index_type, opts)?;
+                // A functional target (`lower(name)`) is the reference's
+                // `kSecondaryFunctional` (`parser.y:586`): the expression is the
+                // index's column in the catalog and its argument is the column
+                // the rows come from (`logical_planner_impl.cpp:939-985`). The
+                // key domain is the function's return type.
+                let functional = functional_parts(column);
+                let (validate_column, effective_type, returns) = match &functional {
+                    Some((func, base)) => {
+                        let base_type = self
+                            .table_schema(table)?
+                            .iter()
+                            .position(|c| c == base)
+                            .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
+                            .ok_or_else(|| Error::Invalid(format!("unknown column '{base}'")))?;
+                        let returns =
+                            functional_return_type(func, &base_type).ok_or_else(|| {
+                                Error::Invalid(format!(
+                                "unsupported function '{func}' for a secondary functional index"
+                            ))
+                            })?;
+                        (
+                            base.clone(),
+                            "SECONDARYFUNCTIONAL",
+                            Some(returns.to_string()),
+                        )
+                    }
+                    None => (column.clone(), index_type.as_str(), None),
+                };
+                self.validate_index(table, &validate_column, effective_type, opts)?;
                 let duplicate = self
                     .storage
                     .catalog
@@ -1910,6 +1938,18 @@ impl Engine {
                 // qualified (`default_db.wdldl`).
                 let table_name = table.rsplit('.').next().unwrap_or(table).to_string();
                 let table_key = self.table_catalog_key(table)?;
+                let mut index_opts = opts.clone();
+                if let Some((func, base)) = &functional {
+                    // `IndexSecondaryFunctional`'s record carries the function
+                    // info and the return type next to the cardinality
+                    // (`index_secondary_functional_impl.cpp:67-77`).
+                    index_opts.push(("FUNC".to_string(), func.clone()));
+                    index_opts.push(("FUNC_COLUMN".to_string(), base.clone()));
+                    index_opts.push((
+                        "FUNC_RETURN".to_string(),
+                        returns.clone().unwrap_or_default(),
+                    ));
+                }
                 self.ddl_commit_typed(
                     TxnOp::CreateIndex {
                         table: table.clone(),
@@ -1917,9 +1957,13 @@ impl Engine {
                         columns: vec![column.clone()],
                     },
                     || {
-                        self.storage
-                            .catalog
-                            .create_index_typed(name, table, column, index_type, opts)
+                        self.storage.catalog.create_index_typed(
+                            name,
+                            table,
+                            column,
+                            effective_type,
+                            &index_opts,
+                        )
                     },
                     |batch| {
                         let (db, _) = split_table_name(table);
@@ -1955,10 +1999,22 @@ impl Engine {
                         .insert(name.clone(), a.clone());
                     entry.analyzers_by_index.insert(name.clone(), a);
                 }
-                // a functional-index target is not a plain column, so there is
-                // no materialised index to build
-                let has_rows = self.table_schema(table)?.iter().any(|c| c == column);
-                if is_secondary_kind(index_type) && has_rows {
+                // A functional index is materialised from its base column; the
+                // expression itself is not a column of the table.
+                let has_rows = match &functional {
+                    Some((_, base)) => self.table_schema(table)?.iter().any(|c| c == base),
+                    None => self.table_schema(table)?.iter().any(|c| c == column),
+                };
+                if let (Some((func, base)), true) = (&functional, has_rows) {
+                    self.register_functional_index(
+                        table,
+                        column,
+                        base,
+                        func,
+                        returns.as_deref().unwrap_or_default(),
+                    );
+                }
+                if is_secondary_kind(effective_type) && has_rows {
                     self.build_index(table, column)?;
                 }
                 // C++ `IndexBuilder`: a full-text or HNSW index is materialised
@@ -2504,14 +2560,9 @@ impl Engine {
                             let mut row_texts: Vec<(usize, Vec<String>)> =
                                 Vec::with_capacity(new_rows.len());
                             for (k, nr) in new_rows.iter().enumerate() {
+                                self.update_indexes_on_insert_text(table, base + k, nr, &schema)?;
                                 let texts: Vec<String> =
                                     nr.iter().map(|v| v.to_slt_string()).collect();
-                                self.update_indexes_on_insert_text(
-                                    table,
-                                    base + k,
-                                    &texts,
-                                    &schema,
-                                )?;
                                 row_texts.push((base + k, texts));
                             }
                             let batch: Vec<(usize, &[String])> = row_texts
@@ -2638,6 +2689,9 @@ impl Engine {
                 let prune = scan_predicate_of(&plan)
                     .map(|pred| prune_conditions(&pred, &columns))
                     .unwrap_or_default();
+                // The index filter names `columns[i]` for the evaluator's
+                // `column_id`, exactly the layout `index_positions` maps.
+                let index_columns = Some(columns.clone());
                 crate::operator::scan::SourceSpec::Table(Box::new(
                     crate::operator::scan::TableScan {
                         table,
@@ -2646,6 +2700,7 @@ impl Engine {
                         override_rows,
                         candidate,
                         index_positions,
+                        index_columns,
                         fulltext_index_column,
                         fulltext_substring,
                         prune,

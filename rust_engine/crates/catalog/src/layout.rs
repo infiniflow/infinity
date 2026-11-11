@@ -589,14 +589,22 @@ pub(crate) fn index_def_for(im: &IndexMeta, table: &TableLayout) -> Option<Index
             &im.column,
             &opt_word("ANALYZER", "standard"),
         )),
+        // A functional index names an expression, not a column: the record
+        // carries the expression, its base column and the return type
+        // (`IndexSecondaryFunctional::Serialize`).
+        "SECONDARYFUNCTIONAL" => functional_index_def(im, table),
         // An index with no `USING` kind is the C++ default, a secondary index.
         "SECONDARY" | "" => match col {
             Some(col) => {
                 let is_json = value_format::data_type_code(&col.column_type)
                     == Some(value_format::logical::JSON);
-                let low = opt("CARDINALITY")
-                    .map(|v| v.eq_ignore_ascii_case("low"))
-                    .unwrap_or(false);
+                // `IndexSecondary` forces `kLowCardinality` for a JSON column
+                // (`index_secondary.cppm:56`), so the record says `low` whether
+                // or not the statement asked for it.
+                let low = is_json
+                    || opt("CARDINALITY")
+                        .map(|v| v.eq_ignore_ascii_case("low"))
+                        .unwrap_or(false);
                 Some(IndexDefValue::secondary(
                     &im.name,
                     &table.table_name,
@@ -693,7 +701,10 @@ pub(crate) fn index_def_for(im: &IndexMeta, table: &TableLayout) -> Option<Index
             &table.table_name,
             &im.column,
             opt_num("NBITS", 4),
-            opt_num("N_CENTROIDS", 0),
+            // `centroids` is the option the statement spells
+            // (`CREATE INDEX … WITH (centroids = 4096)`); the record's field is
+            // `n_centroids`, which a record read back from disk carries instead.
+            opt_num("CENTROIDS", 0).max(opt_num("N_CENTROIDS", 0)),
             opt("COLBERTSAR_MODE")
                 .map(|v| v.eq_ignore_ascii_case("true"))
                 .unwrap_or(false),
@@ -751,12 +762,22 @@ fn functional_index_def(im: &IndexMeta, table: &TableLayout) -> Option<IndexDefV
         .find(|(k, _)| k.eq_ignore_ascii_case("CARDINALITY"))
         .map(|(_, v)| v.eq_ignore_ascii_case("low"))
         .unwrap_or(false);
+    // `func_return_type` is the function's own type, not the argument's: the
+    // engine records it when the index is created (`FUNC_RETURN`).
+    let returns = im
+        .options
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("FUNC_RETURN"))
+        .map(|(_, v)| v.clone())
+        .filter(|v| !v.trim().is_empty())
+        .and_then(|v| data_type_of_text(&v))
+        .unwrap_or_else(|| col.column_type.clone());
     Some(IndexDefValue::secondary_functional(
         &im.name,
         &table.table_name,
         base,
         expr,
-        col.column_type.clone(),
+        returns,
         expression::json::Json::Obj(vec![(
             "name".to_string(),
             expression::json::Json::Str(func.to_string()),

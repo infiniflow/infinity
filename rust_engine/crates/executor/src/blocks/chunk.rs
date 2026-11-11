@@ -50,6 +50,10 @@ pub(crate) fn publish_secondary_chunks(
     let width = kind.key_width();
     let stride = width + 4;
     let mut by_block: std::collections::BTreeMap<u64, Vec<_>> = Default::default();
+    // A merged spill file holds the whole segment (`merge_secondary_chunks`),
+    // which is the reference's layout after `OptimizeIndex`: one chunk per
+    // segment rather than one per block.
+    let mut merged = false;
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -75,6 +79,9 @@ pub(crate) fn publish_secondary_chunks(
         if run_segment.parse::<u32>() != Ok(segment) {
             continue;
         };
+        if rest.contains("_merged") {
+            merged = true;
+        }
         let (Ok(bytes), Ok(reader)) = (
             std::fs::read(&path),
             SecondarySegmentReader::open_with_kind(&path, kind),
@@ -101,7 +108,7 @@ pub(crate) fn publish_secondary_chunks(
     // one in-memory index and dumps **once**, so an imported segment has a
     // single chunk covering all of its blocks (`InsertBlockData` is called per
     // block, `Dump` once after the loop).
-    if single_chunk {
+    if single_chunk || merged {
         let mut entries: Vec<_> = by_block.into_values().flatten().collect();
         if entries.is_empty() || std::fs::create_dir_all(seg_dir).is_err() {
             return Vec::new();

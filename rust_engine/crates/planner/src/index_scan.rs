@@ -25,6 +25,8 @@ use common::{Error, Result};
 use expression::{Expr, Value};
 use parser::CmpOp;
 
+use roaring::RoaringBitmap;
+
 use crate::regex_rewrite::{RegexIndexCatalog, RegexIndexRewrite};
 use crate::LogicalPlan;
 
@@ -963,7 +965,7 @@ fn classify_compare(left: IndexScanInfo, right: IndexScanInfo, is_eq: bool) -> I
 pub struct Bitmask {
     count: u32,
     all_true: bool,
-    values: BTreeSet<u32>,
+    values: RoaringBitmap,
 }
 
 impl Bitmask {
@@ -972,7 +974,7 @@ impl Bitmask {
         Self {
             count,
             all_true: true,
-            values: BTreeSet::new(),
+            values: RoaringBitmap::new(),
         }
     }
 
@@ -980,7 +982,7 @@ impl Bitmask {
         Self {
             count,
             all_true: false,
-            values: BTreeSet::new(),
+            values: RoaringBitmap::new(),
         }
     }
 
@@ -1000,7 +1002,7 @@ impl Bitmask {
     }
 
     pub fn is_true(&self, row: u32) -> bool {
-        row < self.count && (self.all_true || self.values.contains(&row))
+        row < self.count && (self.all_true || self.values.contains(row))
     }
 
     pub fn count_true(&self) -> u32 {
@@ -1027,7 +1029,7 @@ impl Bitmask {
         if other.all_true {
             return;
         }
-        self.values = self.values.intersection(&other.values).copied().collect();
+        self.values &= &other.values;
     }
 
     pub fn merge_or(&mut self, other: &Bitmask) {
@@ -1039,7 +1041,7 @@ impl Bitmask {
         if self.all_true {
             return;
         }
-        self.values.extend(other.values.iter().copied());
+        self.values |= &other.values;
         if self.values.len() as u32 == self.count {
             self.all_true = true;
             self.values.clear();

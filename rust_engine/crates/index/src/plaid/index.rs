@@ -100,6 +100,14 @@ pub struct PlaidIndex {
     doc_offsets: Vec<u32>,
     centroid_ids: Vec<u32>,
     packed_residuals: Vec<u8>,
+    /// When the index came from an mmap'd chunk, the packed codes stay in the map
+    /// (file-backed, like the reference's buffer-manager chunk) and
+    /// `packed_residuals` is empty; a mutation materializes the codes into it
+    /// first.
+    packed_map: Option<(
+        std::sync::Arc<dyn AsRef<[u8]> + Send + Sync>,
+        std::ops::Range<usize>,
+    )>,
     ivf_lists: Vec<Vec<u32>>,
     ivf_data: Vec<u32>,
     ivf_offsets: Vec<u32>,
@@ -140,6 +148,7 @@ impl PlaidIndex {
             doc_offsets: Vec::new(),
             centroid_ids: Vec::new(),
             packed_residuals: Vec::new(),
+            packed_map: None,
             ivf_lists: Vec::new(),
             ivf_data: Vec::new(),
             ivf_offsets: Vec::new(),
@@ -227,7 +236,39 @@ impl PlaidIndex {
         &self.centroid_ids
     }
     pub fn packed_residuals(&self) -> &[u8] {
-        &self.packed_residuals
+        self.packed()
+    }
+
+    /// The packed residual codes: the heap buffer, or the mmap'd chunk's slice.
+    fn packed(&self) -> &[u8] {
+        match &self.packed_map {
+            Some((backing, range)) => &backing.as_ref().as_ref()[range.clone()],
+            None => &self.packed_residuals,
+        }
+    }
+
+    /// The heap buffer, copying the mmap'd codes into it the first time a
+    /// mutation needs owned bytes.
+    fn packed_mut(&mut self) -> &mut Vec<u8> {
+        if let Some((backing, range)) = self.packed_map.take() {
+            self.packed_residuals = backing.as_ref().as_ref()[range].to_vec();
+        }
+        &mut self.packed_residuals
+    }
+
+    fn set_packed(&mut self, packed: Vec<u8>) {
+        self.packed_map = None;
+        self.packed_residuals = packed;
+    }
+
+    fn clear_packed(&mut self) {
+        self.packed_map = None;
+        self.packed_residuals.clear();
+    }
+
+    /// Whether the codes are still file-backed (no heap copy).
+    pub fn is_packed_mapped(&self) -> bool {
+        self.packed_map.is_some()
     }
     pub fn packed_dim(&self) -> u32 {
         (self.embedding_dimension * self.nbits).div_ceil(8)
@@ -757,7 +798,7 @@ impl PlaidIndex {
                 .expect("PLAID mode has a quantizer")
                 .quantize(&residuals, total)?;
             debug_assert_eq!(packed.len(), total * packed_dim);
-            self.packed_residuals.extend_from_slice(&packed);
+            self.packed_mut().extend_from_slice(&packed);
         }
 
         self.centroid_ids.extend_from_slice(&assignments);
@@ -825,7 +866,7 @@ impl PlaidIndex {
                         .into(),
                 ));
             }
-            self.packed_residuals.extend_from_slice(&packed[..need]);
+            self.packed_mut().extend_from_slice(&packed[..need]);
         }
 
         let mut offset = 0usize;
@@ -945,7 +986,7 @@ impl PlaidIndex {
             let mut max_score = f32::MIN;
             for d in 0..doc_len {
                 let emb = self.doc_offsets[doc_id as usize] as usize + d;
-                let r = quantizer.single_ip_distance_from_lut(emb, lut, &self.packed_residuals);
+                let r = quantizer.single_ip_distance_from_lut(emb, lut, self.packed());
                 let centroid_part =
                     c_scores[q * total_tokens_in_c_scores + doc_start_in_c_scores + d];
                 max_score = max_score.max(centroid_part + r);
@@ -1053,7 +1094,7 @@ impl PlaidIndex {
                         let r = quantizer.single_ip_distance_from_lut(
                             doc_offset + d,
                             lut,
-                            &self.packed_residuals,
+                            self.packed(),
                         );
                         max_score = max_score.max(c_scores[q * total_tokens + start + d] + r);
                     }
@@ -1374,7 +1415,7 @@ impl PlaidIndex {
         self.doc_offsets = doc_offsets;
         self.centroid_ids = centroid_ids;
         if !self.colbertsar_mode {
-            self.packed_residuals = packed;
+            self.set_packed(packed);
         }
         self.ivf_lists = ivf;
         self.n_docs = total_docs as u32;
@@ -1387,7 +1428,7 @@ impl PlaidIndex {
         self.doc_lens.clear();
         self.doc_offsets.clear();
         self.centroid_ids.clear();
-        self.packed_residuals.clear();
+        self.clear_packed();
         self.n_centroids = n_centroids;
         self.ivf_lists = vec![Vec::new(); n_centroids as usize];
         self.ivf_data.clear();
@@ -1410,7 +1451,7 @@ impl PlaidIndex {
         }
         self.centroid_ids.extend_from_slice(chunk.centroid_ids());
         if !self.colbertsar_mode {
-            self.packed_residuals
+            self.packed_mut()
                 .extend_from_slice(chunk.packed_residuals());
         }
         for i in 0..chunk_docs {
@@ -1482,7 +1523,7 @@ impl PlaidIndex {
                 self.centroid_norms_neg_half = global.centroid_norms_neg_half().to_vec();
                 self.global_centroids = None;
             }
-            self.packed_residuals = packed_residuals;
+            self.set_packed(packed_residuals);
         }
         self.doc_lens = doc_lens;
         self.doc_offsets = doc_offsets;
@@ -1615,8 +1656,8 @@ impl PlaidIndex {
             }
         }
         if !self.colbertsar_mode {
-            out.extend_from_slice(&(self.packed_residuals.len() as u32).to_le_bytes());
-            out.extend_from_slice(&self.packed_residuals);
+            out.extend_from_slice(&(self.packed().len() as u32).to_le_bytes());
+            out.extend_from_slice(self.packed());
             out.extend_from_slice(
                 &self
                     .quantizer
@@ -1634,6 +1675,41 @@ impl PlaidIndex {
         embedding_dimension: u32,
         nbits: u32,
         bytes: &[u8],
+    ) -> Result<(Self, usize)> {
+        Self::parse(
+            start_segment_offset,
+            embedding_dimension,
+            nbits,
+            bytes,
+            None,
+        )
+    }
+
+    /// `from_bytes` over a shared, file-backed backing (an mmap'd chunk): the
+    /// packed residual codes stay in it instead of being copied onto the heap,
+    /// which is what lets a large index be searched without a matching anonymous
+    /// allocation.
+    pub fn from_shared(
+        backing: std::sync::Arc<dyn AsRef<[u8]> + Send + Sync>,
+        embedding_dimension: u32,
+        nbits: u32,
+    ) -> Result<Self> {
+        let (index, _) = Self::parse(
+            0,
+            embedding_dimension,
+            nbits,
+            backing.as_ref().as_ref(),
+            Some(&backing),
+        )?;
+        Ok(index)
+    }
+
+    fn parse(
+        start_segment_offset: u32,
+        embedding_dimension: u32,
+        nbits: u32,
+        bytes: &[u8],
+        mapped: Option<&std::sync::Arc<dyn AsRef<[u8]> + Send + Sync>>,
     ) -> Result<(Self, usize)> {
         let mut at = 0usize;
         let read_u32 = |at: &mut usize| -> Result<u32> {
@@ -1702,10 +1778,16 @@ impl PlaidIndex {
         if format_version == 1 {
             let packed_len = read_u32(&mut at)? as usize;
             let end = at + packed_len;
-            index.packed_residuals = bytes
-                .get(at..end)
-                .ok_or_else(|| Error::Invalid("PlaidIndex::Load: truncated".into()))?
-                .to_vec();
+            if end > bytes.len() {
+                return Err(Error::Invalid("PlaidIndex::Load: truncated".into()));
+            }
+            match mapped {
+                // Keep the codes file-backed; the map outlives the borrow.
+                Some(backing) => {
+                    index.packed_map = Some((std::sync::Arc::clone(backing), at..end));
+                }
+                None => index.packed_residuals = bytes[at..end].to_vec(),
+            }
             at = end;
             let (quantizer, used) =
                 PlaidQuantizer::from_bytes(nbits, embedding_dimension, &bytes[at..])?;
@@ -2109,6 +2191,55 @@ mod tests {
         assert_eq!(merged.doc_num(), 10);
         assert_eq!(merged.total_embedding_num(), 10 * COLBERTSAR_PER_DOC);
         assert!(merged.packed_residuals().is_empty());
+    }
+
+    /// A chunk loaded from a mapped file keeps its packed residual codes
+    /// file-backed (`from_shared`) instead of copying them onto the heap, and
+    /// decodes to the same bytes.
+    #[test]
+    fn mapped_chunk_keeps_packed_codes_file_backed() {
+        const DIM: u32 = 8;
+        const K: u32 = 8;
+        const DOCS: usize = 32;
+        const PER_DOC: usize = 4;
+        let mut flat = Vec::new();
+        let mut lens = Vec::new();
+        for doc in 0..DOCS {
+            lens.push(PER_DOC as u32);
+            for token in 0..PER_DOC {
+                for j in 0..DIM as usize {
+                    flat.push(((doc + token + j) % 7) as f32 * 0.25);
+                }
+            }
+        }
+        let total = DOCS * PER_DOC;
+        let mut index = PlaidIndex::new(0, DIM, 4, K, false).unwrap();
+        index.train(K, &flat, total, 4).unwrap();
+        index.add_multiple_docs_embeddings(&flat, &lens).unwrap();
+        let bytes = index.to_bytes();
+        let packed_len = index.packed_residuals().len();
+        assert!(packed_len > 0, "the residual table is empty");
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_0.idx");
+        std::fs::write(&path, &bytes).unwrap();
+        let mapped = std::sync::Arc::new(storage::buffer::mapped::MappedFile::open(&path).unwrap());
+        let loaded = PlaidIndex::from_shared(mapped, DIM, 4).unwrap();
+        assert!(
+            loaded.is_packed_mapped(),
+            "the packed codes were copied onto the heap"
+        );
+        assert_eq!(loaded.packed_residuals().len(), packed_len);
+        assert_eq!(loaded.packed_residuals(), index.packed_residuals());
+        assert_eq!(loaded.doc_num(), index.doc_num());
+
+        // A mutation materializes them (the file is read-only) and keeps working.
+        let mut loaded = loaded;
+        loaded
+            .add_multiple_docs_embeddings(&flat[..PER_DOC * DIM as usize], &[PER_DOC as u32])
+            .unwrap();
+        assert!(!loaded.is_packed_mapped());
+        assert_eq!(loaded.doc_num(), index.doc_num() + 1);
     }
 
     /// C++: `PlaidIndexColBERTSaRTest.test_colbertsar_size_smaller_than_plaid`

@@ -3221,6 +3221,15 @@ pub(crate) struct MultiVectorIndex {
     pub(crate) plaid: Option<index::plaid::PlaidIndex>,
     /// Row id of each PLAID document id.
     pub(crate) plaid_seqs: Vec<u64>,
+    /// Rows this index has seen (parsed or not). `doc_count` only counts parsed
+    /// documents, so a column holding a NULL/empty tensor could never look
+    /// complete against the table's live rows and every search rebuilt the whole
+    /// index.
+    pub(crate) scanned_rows: usize,
+    /// Set when a mutation dropped `plaid` (a rewritten row, or an incremental
+    /// add that could not be covered), so the next search rebuilds it instead of
+    /// serving from sealed brute force forever.
+    pub(crate) plaid_dropped: bool,
     /// SMVE options when the column carries a `USING SMVE` index.
     pub(crate) smve_config: Option<SmveConfig>,
     /// The index's `pq_subspace_num` / `pq_subspace_bits`, which decide how the
@@ -3230,6 +3239,68 @@ pub(crate) struct MultiVectorIndex {
     pub(crate) smve: Option<index::smve::SmveIndex>,
     /// Row id of each SMVE document id.
     pub(crate) smve_seqs: Vec<u64>,
+}
+
+/// `IndexOptions`' PLAID search knobs, overridable per query
+/// (`SEARCH MATCH TENSOR (…, 'plaid_n_ivf_probe=32')`). The defaults are the
+/// reference's (`default_values.cppm:154-157`).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PlaidSearchOptions {
+    pub(crate) n_ivf_probe: usize,
+    pub(crate) centroid_score_threshold: f32,
+    pub(crate) n_doc_to_score: usize,
+    pub(crate) n_full_scores: usize,
+}
+
+impl PlaidSearchOptions {
+    /// `PLAID_N_DOC_TO_SCORE_FACTOR` / `PLAID_N_FULL_SCORES_FACTOR` scale with
+    /// `topn`, so the defaults are derived once `topn` is known.
+    pub(crate) fn for_topn(topn: usize) -> Self {
+        Self {
+            n_ivf_probe: 8,
+            centroid_score_threshold: -0.1,
+            n_doc_to_score: topn.max(1) * 100,
+            n_full_scores: topn.max(1) * 10,
+        }
+    }
+}
+
+/// The PLAID knobs of one query: the defaults above, overridden by the search
+/// options the statement carries (`SEARCH MATCH TENSOR (…, 'plaid_n_ivf_probe=32')`,
+/// `logical_match_tensor_scan_impl.cpp:116-152`).
+pub(crate) fn plaid_search_options(
+    lookup: impl Fn(&str) -> Option<String>,
+    topn: usize,
+) -> PlaidSearchOptions {
+    let topn = topn.max(1);
+    let mut options = PlaidSearchOptions::for_topn(topn);
+    if let Some(v) = lookup("plaid_n_ivf_probe")
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+    {
+        options.n_ivf_probe = v;
+    }
+    if let Some(v) =
+        lookup("plaid_centroid_score_threshold").and_then(|v| v.trim().parse::<f32>().ok())
+    {
+        options.centroid_score_threshold = v;
+    }
+    // The reference rejects `n_doc_to_score < topn` and
+    // `n_full_scores > n_doc_to_score`; a value it would reject keeps the
+    // default instead of failing the query.
+    if let Some(v) = lookup("plaid_n_doc_to_score")
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v >= topn)
+    {
+        options.n_doc_to_score = v;
+    }
+    if let Some(v) = lookup("plaid_n_full_scores")
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v >= topn && *v <= options.n_doc_to_score)
+    {
+        options.n_full_scores = v;
+    }
+    options
 }
 
 /// `CREATE INDEX … USING PLAID WITH (nbits=…, n_centroids=…)`.
@@ -3273,6 +3344,17 @@ pub(crate) fn emvb_build_threshold() -> usize {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(EMVB_BUILD_THRESHOLD)
+    })
+}
+
+/// Heap a PLAID index may take before this port declines to build it.
+pub(crate) fn plaid_memory_budget() -> usize {
+    static BUDGET: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *BUDGET.get_or_init(|| {
+        std::env::var("INFINITY_PLAID_MAX_BYTES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(512 * 1024 * 1024)
     })
 }
 
@@ -3329,6 +3411,8 @@ impl MultiVectorIndex {
             plaid_config,
             plaid: None,
             plaid_seqs: Vec::new(),
+            scanned_rows: 0,
+            plaid_dropped: false,
             smve_config,
             emvb_config,
             smve: None,
@@ -3347,16 +3431,22 @@ impl MultiVectorIndex {
 
     pub(crate) fn insert(&mut self, seq: u64, doc: Vec<Vec<f32>>) {
         let replacing = self.tail.contains_key(&seq);
+        // The PLAID document list is `plaid_seqs`, which a cold start restores
+        // without the sealed readers, so coverage is measured against it rather
+        // than against `doc_count()`.
         let covered = self
             .plaid
             .as_ref()
-            .is_some_and(|p| p.doc_num() as usize == self.doc_count());
+            .is_some_and(|p| p.doc_num() as usize == self.plaid_seqs.len());
         if let Some(old) = self.tail.remove(&seq) {
             self.tail_bytes = self.tail_bytes.saturating_sub(multivector_doc_bytes(&old));
         }
         self.tail_bytes += multivector_doc_bytes(&doc);
         self.tail.insert(seq, doc.clone());
         self.tail_generation += 1;
+        if !replacing {
+            self.scanned_rows += 1;
+        }
         // The reference's `PlaidIndexInMem::Insert`: once a trained index
         // covers every document, new rows are added incrementally. A rewritten
         // row cannot be removed from PLAID, so the index is dropped and the
@@ -3373,6 +3463,7 @@ impl MultiVectorIndex {
             } else {
                 self.plaid = None;
                 self.plaid_seqs.clear();
+                self.plaid_dropped = true;
             }
         }
         // `SMVEIndexInMem::BuildFromColumn` runs per inserted block; the BMP
@@ -3396,6 +3487,7 @@ impl MultiVectorIndex {
             // hides dead rows, and a rewritten row needs a fresh build.
             self.plaid = None;
             self.plaid_seqs.clear();
+            self.plaid_dropped = true;
             self.smve = None;
             self.smve_seqs.clear();
         }
@@ -3456,6 +3548,23 @@ impl MultiVectorIndex {
                 flat.extend_from_slice(token);
             }
         }
+        // The reference keeps its PLAID index in the buffer manager and maps
+        // chunks on demand; this port holds it in the process, so a table whose
+        // residual table alone would exceed the budget keeps answering from the
+        // sealed chunks instead of taking the process down. `INFINITY_PLAID_MAX_BYTES`
+        // overrides it.
+        let packed_dim = (self.dims * cfg.nbits as usize).div_ceil(8);
+        let residual_bytes = if cfg.colbertsar {
+            0
+        } else {
+            total * packed_dim
+        };
+        let centroid_bytes = k as usize * self.dims * 4;
+        let assignment_bytes = total * 4;
+        let estimate = residual_bytes + centroid_bytes + assignment_bytes;
+        if estimate > plaid_memory_budget() {
+            return;
+        }
         let Ok(mut index) =
             index::plaid::PlaidIndex::new(0, self.dims as u32, cfg.nbits, k, cfg.colbertsar)
         else {
@@ -3469,6 +3578,13 @@ impl MultiVectorIndex {
         }
         self.plaid = Some(index);
         self.plaid_seqs = seqs;
+        self.plaid_dropped = false;
+    }
+
+    /// Whether this index can answer every live row: it has scanned them all and
+    /// no mutation has dropped the PLAID index since.
+    pub(crate) fn is_complete(&self, live_rows: usize) -> bool {
+        self.scanned_rows >= live_rows && !self.plaid_dropped
     }
 
     /// Whether this index was built knowing about `kind` (`PLAID` / `SMVE`).
@@ -3643,6 +3759,8 @@ impl MultiVectorIndex {
         k: usize,
         dead: &std::collections::HashSet<u64>,
         exact: Option<&dyn Fn(u64) -> Option<f32>>,
+        plaid: &PlaidSearchOptions,
+        allowed: Option<&std::collections::HashSet<u64>>,
     ) -> Vec<(u64, f32)> {
         // A built PLAID index answers the query directly: IVF probing, an
         // approximate pass over the candidates and an exact residual rerank
@@ -3652,7 +3770,9 @@ impl MultiVectorIndex {
             if index.doc_num() as usize == self.plaid_seqs.len() {
                 let mut mask = index::plaid::Bitmask::new(index.doc_num() as usize);
                 for (doc, seq) in self.plaid_seqs.iter().enumerate() {
-                    if !dead.contains(seq) {
+                    // `CalculateFilterBitmask` + the tombstone mask: only rows the
+                    // statement admits take part in the search.
+                    if !dead.contains(seq) && allowed.is_none_or(|set| set.contains(seq)) {
                         mask.set(doc as u32);
                     }
                 }
@@ -3663,10 +3783,12 @@ impl MultiVectorIndex {
                     query.len(),
                     topn,
                     &mask,
-                    8,
-                    -0.1,
-                    topn.saturating_mul(100),
-                    topn.saturating_mul(10),
+                    plaid.n_ivf_probe,
+                    plaid.centroid_score_threshold,
+                    plaid.n_doc_to_score.max(topn),
+                    plaid
+                        .n_full_scores
+                        .clamp(topn, plaid.n_doc_to_score.max(topn)),
                 );
                 let mut hits: Vec<(u64, f32)> = result
                     .ids
@@ -3692,12 +3814,12 @@ impl MultiVectorIndex {
         // `exact` callback supplies that score here.
         if let Some(index) = &self.smve {
             if index.row_count() == self.smve_seqs.len() {
-                let allowed: Vec<bool> = self
+                let permitted: Vec<bool> = self
                     .smve_seqs
                     .iter()
-                    .map(|seq| !dead.contains(seq))
+                    .map(|seq| !dead.contains(seq) && allowed.is_none_or(|set| set.contains(seq)))
                     .collect();
-                let (scores, docs) = index.search(query, k.max(1), 5, Some(&allowed));
+                let (scores, docs) = index.search(query, k.max(1), 5, Some(&permitted));
                 let mut hits: Vec<(u64, f32)> = docs
                     .iter()
                     .zip(&scores)
@@ -3732,7 +3854,7 @@ impl MultiVectorIndex {
             };
             for doc in docs {
                 let Some(seq) = ids.get(doc) else { continue };
-                if dead.contains(seq) {
+                if dead.contains(seq) || allowed.is_some_and(|set| !set.contains(seq)) {
                     continue;
                 }
                 hits.push((*seq, reader.maxsim(query, doc)));
@@ -3771,7 +3893,7 @@ impl MultiVectorIndex {
                     let Some(seq) = tail.seqs.get(doc as usize) else {
                         continue;
                     };
-                    if dead.contains(seq) {
+                    if dead.contains(seq) || allowed.is_some_and(|set| !set.contains(seq)) {
                         continue;
                     }
                     if let Some(tokens) = self.tail.get(seq) {
@@ -3782,7 +3904,10 @@ impl MultiVectorIndex {
             drop(guard);
         } else {
             for (seq, doc) in &self.tail {
-                if dead.contains(seq) || doc.is_empty() {
+                if dead.contains(seq)
+                    || doc.is_empty()
+                    || allowed.is_some_and(|set| !set.contains(seq))
+                {
                     continue;
                 }
                 hits.push((*seq, maxsim_tokens(query, doc)));
@@ -4186,6 +4311,16 @@ pub(crate) struct SecondaryIndexes {
     pub(crate) chunk_meta: HashMap<String, Vec<(u64, usize)>>,
     /// Columns whose memory map is a tail backed by on-disk chunks.
     pub(crate) disk_backed: std::collections::HashSet<String>,
+    /// Functional indexes of this table, keyed by the expression the catalog
+    /// stores as the index's column (`lower(name)`).
+    pub(crate) functional: HashMap<String, FunctionalIndex>,
+    /// Tails a dump has frozen but whose chunks are not registered yet.
+    ///
+    /// `SecondaryIndex::seal` empties the tail, and the chunk that holds its
+    /// entries only becomes visible a few writes later. A reader landing in that
+    /// window would see neither copy, so the dump keeps the frozen entries here
+    /// and readers merge them until the chunk is registered.
+    pub(crate) sealing: HashMap<String, Vec<std::sync::Arc<index::SealedTail>>>,
 }
 
 impl TableEntry {
@@ -5846,6 +5981,12 @@ pub(crate) fn text_to_key(declared: &str, text: &str) -> Option<Key> {
 /// per path/scalar and writes into a low-cardinality chunk. Those terms are the
 /// tail keys here, so a dump can hand them straight to the term array.
 pub(crate) fn value_to_tail_keys(declared: &str, value: &Value) -> Vec<Vec<u8>> {
+    // `SecondaryIndexInMemT::InsertInner` skips a row whose null bit is set
+    // (`secondary_index_in_mem_impl.cpp:181-184`): a NULL is not a key, so a
+    // predicate that admits it can only come from the row set, never the index.
+    if matches!(value, Value::Null) {
+        return Vec::new();
+    }
     let text = match value {
         Value::Str(text) => text.clone(),
         other => other.to_slt_string(),
@@ -5865,6 +6006,114 @@ pub(crate) fn text_to_tail_keys(declared: &str, text: &str) -> Vec<Vec<u8>> {
         .map(|key| key.ordered_bytes())
         .into_iter()
         .collect()
+}
+
+/// One indexed column of a table resolved for a batch of rows: where the value
+/// sits in the row, which type fixes its key domain, and — for a functional
+/// index — the scalar function to apply before encoding.
+pub(crate) struct SecondaryTarget {
+    pub(crate) pos: usize,
+    pub(crate) declared: String,
+    pub(crate) index: std::sync::Arc<SecondaryIndex>,
+    pub(crate) func: Option<String>,
+}
+
+/// A functional secondary index (`SECONDARYFUNCTIONAL`): the catalog keeps the
+/// expression as the index's column, and this record says how to evaluate it.
+///
+/// The reference stores the bound expression (`function_expression`) and the
+/// base column (`column_names`) and evaluates it per column vector
+/// (`NewTxn::ExecuteFunctionExpression`, `new_txn_index_impl.cpp:2032`); the
+/// port re-evaluates the same scalar function row by row.
+#[derive(Debug, Clone)]
+pub(crate) struct FunctionalIndex {
+    /// The column the function reads.
+    pub(crate) base: String,
+    /// The scalar function, lower-cased (`lower`, `length`, `abs`, …).
+    pub(crate) func: String,
+    /// The function's declared return type, which fixes the key domain
+    /// (`func_return_type` in the reference's index record).
+    pub(crate) returns: String,
+}
+
+/// The `(function, base column)` a functional index expression names:
+/// `lower(name)` -> `("lower", "name")`.
+///
+/// `logical_planner_impl.cpp:941-960` accepts exactly one column argument, no
+/// nested call and no other argument shape; anything else is rejected when the
+/// index is created.
+pub(crate) fn functional_parts(expr: &str) -> Option<(String, String)> {
+    let expr = expr.trim();
+    let open = expr.find('(')?;
+    if !expr.ends_with(')') {
+        return None;
+    }
+    let name = expr[..open].trim().to_ascii_lowercase();
+    let inner = expr[open + 1..expr.len() - 1].trim();
+    if name.is_empty() || inner.is_empty() || inner.contains('(') || inner.contains(',') {
+        return None;
+    }
+    if !inner.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return None;
+    }
+    Some((name, inner.to_ascii_lowercase()))
+}
+
+/// `func_return_type` of a functional index: the type the scalar function yields
+/// for one column value, spelled as a declared type the key encoder understands.
+///
+/// The reference binds the expression and takes `FunctionExpression::Type()`
+/// (`logical_planner_impl.cpp:976`); the port maps the functions whose result
+/// type is fixed by the name (and, for `abs`, by the argument's type).
+pub(crate) fn functional_return_type(func: &str, base_type: &str) -> Option<&'static str> {
+    match func {
+        "lower" | "upper" | "trim" | "ltrim" | "rtrim" | "replace" | "concat" => Some("VARCHAR"),
+        "length" | "char_length" | "strpos" | "char_position" | "instr" => Some("BIGINT"),
+        "abs" => {
+            let base = base_type.trim().to_ascii_uppercase();
+            Some(if base.starts_with("FLOAT") || base.starts_with("DOUBLE") {
+                "DOUBLE"
+            } else {
+                "BIGINT"
+            })
+        }
+        "round" | "floor" | "ceil" | "sqrt" | "exp" | "ln" | "log10" | "pow" | "power" => {
+            Some("DOUBLE")
+        }
+        _ => None,
+    }
+}
+
+/// One row's functional-index value: `func(base)` evaluated on the row.
+pub(crate) fn functional_value(func: &str, pos: usize, row: &[Value]) -> Option<Value> {
+    let expr = expression::Expr::Func {
+        name: func.to_string(),
+        args: vec![expression::Expr::Column(pos)],
+    };
+    let value = expr.eval(row);
+    // `InsertInner` skips a NULL cell; a function that yields one has no key.
+    (!matches!(value, Value::Null)).then_some(value)
+}
+
+/// A computed value as its column's ordered key: the same encoding
+/// [`value_to_tail_keys`] applies, without the text round-trip (a computed
+/// `DOUBLE` would lose precision on the way through the slt rendering).
+pub(crate) fn value_to_key(declared: &str, value: &Value) -> Vec<Vec<u8>> {
+    use storage::secondary_segment::{Key, KeyKind};
+    if matches!(value, Value::Null) {
+        return Vec::new();
+    }
+    let key = match value {
+        Value::Str(text) => return text_to_tail_keys(declared, text),
+        Value::Int(i) => integer_secondary_key(declared, *i),
+        Value::Float(f) => match secondary_key_kind(declared) {
+            KeyKind::F32 => Key::F32(*f as f32),
+            _ => Key::F64(*f),
+        },
+        Value::Bool(flag) => Key::Bool(*flag),
+        other => return text_to_tail_keys(declared, &other.to_slt_string()),
+    };
+    vec![key.ordered_bytes()]
 }
 
 /// The reference's ordered key for a date/time text (`ConvertToOrderedKeyValue`):
@@ -6086,10 +6335,40 @@ pub(crate) struct RowSecondaryProvider<'a> {
     pub(crate) rows: &'a [Vec<Value>],
     /// pruned scan position -> position in the materialised row
     pub(crate) positions: &'a [usize],
+    /// The candidate's columns, in the evaluator's own order: `column_id` indexes
+    /// this list, and the name is what the engine's index registry knows.
+    pub(crate) columns: Option<&'a [String]>,
+    pub(crate) engine: Option<&'a Engine>,
+    pub(crate) table: &'a str,
+    /// storage sequence id -> position in `rows`. The secondary index is keyed
+    /// by the id, so a hit can only select a row the scan holds.
+    pub(crate) row_positions: Option<&'a std::collections::HashMap<usize, u32>>,
 }
 
 impl planner::index_scan::SecondaryIndexProvider for RowSecondaryProvider<'_> {
     fn range_rows(&self, column_id: usize, start: &Value, end: &Value) -> Vec<u32> {
+        // The column's own index answers first: the reference's
+        // `IndexFilterEvaluatorSecondary` reads the chunk bitmaps
+        // (`index_filter_evaluators_impl.cpp:912`) instead of re-reading rows.
+        // A column whose key has no order (a hashed VARCHAR) or that carries no
+        // index reports `None`, and the row walk below is the fallback.
+        if let (Some(engine), Some(columns), Some(positions)) =
+            (self.engine, self.columns, self.row_positions)
+        {
+            if let Some(column) = columns.get(column_id) {
+                if let Some(seqs) =
+                    engine.index_range_lookup(self.table, column, &[(start.clone(), end.clone())])
+                {
+                    let mut out = Vec::new();
+                    for seq in seqs {
+                        if let Some(position) = positions.get(&(seq as usize)) {
+                            out.push(*position);
+                        }
+                    }
+                    return out;
+                }
+            }
+        }
         let mut out = Vec::new();
         let position = self.positions.get(column_id).copied().unwrap_or(column_id);
         for (i, row) in self.rows.iter().enumerate() {
@@ -6208,6 +6487,7 @@ pub(crate) fn fulltext_column(expr: &Expr) -> Option<usize> {
 
 /// Applies the index-scan candidate to the fetched rows (C++ `LogicalIndexScan`
 /// yields exactly the rows its evaluator selects).
+#[allow(clippy::too_many_arguments)] // one argument per planner hint the filter reads
 pub(crate) fn apply_index_filter(
     rows: Vec<Vec<Value>>,
     row_ids: Option<&[usize]>,
@@ -6215,14 +6495,27 @@ pub(crate) fn apply_index_filter(
     candidate: &planner::index_scan::IndexScanCandidate,
     positions: &[usize],
     fulltext_substring: bool,
+    engine: Option<&Engine>,
+    table: &str,
+    index_columns: Option<&[String]>,
 ) -> Result<Vec<Vec<Value>>> {
     if rows.is_empty() {
         return Ok(rows);
     }
     let row_count = rows.len() as u32;
+    let row_positions: Option<std::collections::HashMap<usize, u32>> = row_ids.map(|ids| {
+        ids.iter()
+            .enumerate()
+            .map(|(i, id)| (*id, i as u32))
+            .collect()
+    });
     let secondary = RowSecondaryProvider {
         rows: &rows,
         positions,
+        columns: index_columns,
+        engine,
+        table,
+        row_positions: row_positions.as_ref(),
     };
     let mut ctx = planner::index_scan::IndexEvalContext::new(row_count).with_secondary(&secondary);
     let fulltext = RowFulltextProvider {

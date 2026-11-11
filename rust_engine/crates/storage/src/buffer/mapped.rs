@@ -65,6 +65,12 @@ impl MappedFile {
     }
 }
 
+impl AsRef<[u8]> for MappedFile {
+    fn as_ref(&self) -> &[u8] {
+        &self.map
+    }
+}
+
 impl Deref for MappedFile {
     type Target = [u8];
 

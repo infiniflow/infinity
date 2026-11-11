@@ -13,14 +13,27 @@ impl Engine {
             e.ivf_mem.clear();
         }
         for im in self.storage.catalog.list_indexes()? {
-            // skip functional-index targets (not plain columns)
-            if is_secondary_kind(&im.index_type)
-                && self
+            if is_secondary_kind(&im.index_type) {
+                // A functional index's column is its expression: restore how to
+                // evaluate it from the record (`FUNC`/`FUNC_COLUMN`/`FUNC_RETURN`,
+                // the reference's `func_col_params` and `func_return_type`), then
+                // rebuild it from its base column.
+                if let Some(function) = self.functional_from_meta(&im) {
+                    self.register_functional_index(
+                        &im.table,
+                        &im.column,
+                        &function.base,
+                        &function.func,
+                        &function.returns,
+                    );
+                    self.build_index(&im.table, &im.column)?;
+                } else if self
                     .table_schema(&im.table)?
                     .iter()
                     .any(|c| c == &im.column)
-            {
-                self.build_index(&im.table, &im.column)?;
+                {
+                    self.build_index(&im.table, &im.column)?;
+                }
             }
             // A vector index's persisted HNSW graph, loaded so the search path
             // can walk it (best-effort: a table without a mirror just brute
@@ -187,15 +200,50 @@ impl Engine {
 
     pub(crate) fn build_index(&self, table: &str, column: &str) -> Result<()> {
         let schema = self.table_schema(table)?;
-        let col_idx = schema
-            .iter()
-            .position(|c| c == column)
-            .ok_or_else(|| Error::Invalid(format!("unknown column '{column}'")))?;
         // Every secondary column has a chunk form, so the build only reads the
         // indexed column (not the wide vectors in the same row): `index_lookup`
         // merges the chunks with the in-memory tail.
-        let key = index_key(table, column);
         let tkey = self.table_key(table);
+        // A functional index's `column` is its expression: the rows are read
+        // from the base column, and the key domain is the function's return type
+        // (`IndexSecondaryFunctional::GetFuncReturnType`).
+        let functional = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .and_then(|e| e.secondary.functional.get(column).cloned())
+        };
+        let (col_idx, type_upper) = match &functional {
+            Some(f) => {
+                let pos = schema
+                    .iter()
+                    .position(|c| c == &f.base)
+                    .ok_or_else(|| Error::Invalid(format!("unknown column '{}'", f.base)))?;
+                (pos, f.returns.clone())
+            }
+            None => {
+                let pos = schema
+                    .iter()
+                    .position(|c| c == column)
+                    .ok_or_else(|| Error::Invalid(format!("unknown column '{column}'")))?;
+                let ty = self
+                    .column_types(table)
+                    .ok()
+                    .and_then(|t| t.get(pos).cloned())
+                    .map(|t| t.trim().to_ascii_uppercase())
+                    .unwrap_or_default();
+                (pos, ty)
+            }
+        };
+        // One row's indexed value: the cell itself, or `func(cell)` for a
+        // functional index. A NULL has no key (`InsertInner` skips it).
+        let evaluate = |row: &[Value]| -> Option<Value> {
+            let value = match &functional {
+                Some(f) => functional_value(&f.func, col_idx, row)?,
+                None => row.get(col_idx)?.clone(),
+            };
+            (!matches!(value, Value::Null)).then_some(value)
+        };
         self.tables
             .lock()
             .unwrap()
@@ -204,22 +252,56 @@ impl Engine {
             .secondary
             .disk
             .remove(column);
-        let type_upper = self
-            .column_types(table)
-            .ok()
-            .and_then(|t| t.get(col_idx).cloned())
-            .map(|t| t.trim().to_ascii_uppercase())
-            .unwrap_or_default();
         let int_column = type_upper.starts_with("INT") || type_upper.starts_with("UINT");
-        let is_bool = type_upper.starts_with("BOOL");
         let key_kind = secondary_key_kind(&type_upper);
-        if int_column {
-            let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
+        let low_card = self.secondary_low_cardinality(table, column, &type_upper);
+        if low_card {
+            // `SecondaryIndexDataLowCardinalityT`: unique keys, each with one
+            // bitmap of segment offsets (`secondary_index_data_impl.cpp:284`).
+            // BOOL and JSON are always low (`NewSecondaryIndexInMem`), and
+            // `WITH (cardinality='low')` asks for it on any other type.
+            let mut grouped: HashMap<u64, std::collections::BTreeMap<Vec<u8>, Vec<u32>>> =
+                HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
-                let Some(Value::Int(v)) = row.get(col_idx) else {
+                let Some(value) = evaluate(&row) else {
                     continue;
                 };
-                let ordered = integer_secondary_key(&type_upper, *v);
+                let text = match &value {
+                    Value::Str(s) => s.clone(),
+                    other => other.to_slt_string(),
+                };
+                // A JSON document contributes one key per flattened term; every
+                // other column contributes exactly one.
+                let raw_keys: Vec<Vec<u8>> = if key_kind == KeyKind::Bytes {
+                    storage::json_index::flatten_json_terms(&text)
+                        .into_iter()
+                        .map(String::into_bytes)
+                        .collect()
+                } else {
+                    value_to_key(&type_upper, &value)
+                };
+                for raw in raw_keys {
+                    grouped
+                        .entry((seq as u64) >> 32)
+                        .or_default()
+                        .entry(raw)
+                        .or_default()
+                        .push((seq as u64 & 0xffff_ffff) as u32);
+                }
+            }
+            let (readers, meta) =
+                self.write_secondary_low_chunks(table, column, key_kind, grouped, "");
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(tkey.clone()).or_default();
+            entry.secondary.low.insert(column.to_string(), readers);
+            entry.secondary.chunk_meta.insert(column.to_string(), meta);
+        } else if int_column {
+            let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
+            for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
+                let Some(Value::Int(v)) = evaluate(&row) else {
+                    continue;
+                };
+                let ordered = integer_secondary_key(&type_upper, v);
                 by_segment
                     .entry((seq as u64) >> 32)
                     .or_default()
@@ -236,9 +318,9 @@ impl Engine {
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
                 let key = match key_kind {
                     KeyKind::F32 | KeyKind::F64 => {
-                        let value = match row.get(col_idx) {
-                            Some(Value::Float(f)) => *f,
-                            Some(Value::Int(i)) => *i as f64,
+                        let value = match evaluate(&row) {
+                            Some(Value::Float(f)) => f,
+                            Some(Value::Int(i)) => i as f64,
                             _ => continue,
                         };
                         if key_kind == KeyKind::F32 {
@@ -248,8 +330,8 @@ impl Engine {
                         }
                     }
                     _ => {
-                        let text = match row.get(col_idx) {
-                            Some(Value::Str(s)) => s.clone(),
+                        let text = match evaluate(&row) {
+                            Some(Value::Str(s)) => s,
                             Some(other) => other.to_slt_string(),
                             None => continue,
                         };
@@ -269,67 +351,21 @@ impl Engine {
                     .push((key, (seq as u64 & 0xffff_ffff) as u32));
             }
             self.write_secondary_pgm_chunks(table, column, key_kind, by_segment);
-        } else if !is_bool {
+        } else {
             // VARCHAR (and JSON) keys are hashed to u64, exactly like the
             // reference's `std::hash<std::string_view>` (`ConvertToOrderedKeyValue`).
             let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
-                let Some(v) = row.get(col_idx) else {
+                let Some(value) = evaluate(&row) else {
                     continue;
                 };
-                let ordered = storage::secondary_segment::hash_varchar(&v.to_slt_string());
+                let ordered = storage::secondary_segment::hash_varchar(&value.to_slt_string());
                 by_segment
                     .entry((seq as u64) >> 32)
                     .or_default()
                     .push((Key::U64(ordered), (seq as u64 & 0xffff_ffff) as u32));
             }
             self.write_secondary_pgm_chunks(table, column, KeyKind::U64, by_segment);
-        }
-        // Boolean columns use the low-cardinality variant.
-        self.tables
-            .lock()
-            .unwrap()
-            .entry(tkey.clone())
-            .or_default()
-            .secondary
-            .low
-            .remove(column);
-        {
-            if is_bool {
-                let mut by_segment: HashMap<u64, [Vec<u32>; 2]> = HashMap::new();
-                for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
-                    let Some(v) = row.get(col_idx) else { continue };
-                    let key = matches!(v, Value::Int(1)) || v.to_slt_string() == "true";
-                    by_segment.entry((seq as u64) >> 32).or_default()[key as usize]
-                        .push((seq as u64 & 0xffff_ffff) as u32);
-                }
-                let dir = self.dir.join("secondary_low").join(key.replace('/', "_"));
-                let mut readers = Vec::new();
-                for (segment, lists) in by_segment {
-                    let mut entries: Vec<(u64, Vec<u32>)> = Vec::new();
-                    for (bit, list) in lists.iter().enumerate() {
-                        if !list.is_empty() {
-                            entries.push((bit as u64, list.clone()));
-                        }
-                    }
-                    entries.sort_by_key(|(k, _)| *k);
-                    let path = dir.join(format!("seg_{segment}_{}.idx", entries.len()));
-                    if storage::secondary_lowcard::write_lowcard_segment(&path, &entries).is_err() {
-                        continue;
-                    }
-                    if let Ok(reader) = storage::secondary_lowcard::LowCardReader::open(&path) {
-                        readers.push((segment << 32, Arc::new(reader)));
-                    }
-                }
-                self.tables
-                    .lock()
-                    .unwrap()
-                    .entry(tkey.clone())
-                    .or_default()
-                    .secondary
-                    .low
-                    .insert(column.to_string(), readers);
-            }
         }
         // The memory map is only the tail written since the last dump.
         let mut tables = self.tables.lock().unwrap();
@@ -888,29 +924,54 @@ impl Engine {
                 .get(ci)
                 .map(|t| t.trim().to_ascii_uppercase())
                 .unwrap_or_default();
-            let is_bool = ty.starts_with("BOOL");
+            let low_card = self.secondary_low_cardinality(&im.table, &column, &ty);
             let tail_kind = secondary_key_kind(&ty);
             let key = index_key(&im.table, &column);
-            // `take` needs only `&self` (the tail has its own RCU), so the table
-            // lock is released before the chunk the dump builds from it.
-            let tail = {
-                let tables = self.tables.lock().unwrap();
-                let Some(index) = tables
-                    .get(&tkey)
-                    .and_then(|e| e.secondary.indexes.get(&column))
-                else {
+            // `seal` empties the tail, and the chunk below only becomes visible
+            // after it is written; the frozen entries stay in `sealing`, where
+            // readers merge them, so the window in between loses no row.
+            let sealed = {
+                let mut tables = self.tables.lock().unwrap();
+                let Some(entry) = tables.get_mut(&tkey) else {
                     continue;
                 };
-                index.take()
+                let Some(index) = entry.secondary.indexes.get(&column) else {
+                    continue;
+                };
+                let sealed = Arc::new(index.seal());
+                if sealed.is_empty() {
+                    continue;
+                }
+                entry
+                    .secondary
+                    .sealing
+                    .entry(column.clone())
+                    .or_default()
+                    .push(Arc::clone(&sealed));
+                sealed
             };
-            if tail.is_empty() {
-                continue;
-            }
+            let tail = sealed.entries();
             // `ChunkIndexMetaInfo`: the first row id in the dump and its row
             // count. Recorded per dump (one chunk per seal call).
-            let base = tail.values().flatten().min().copied().unwrap_or(0);
-            let row_count: usize = tail.values().map(Vec::len).sum();
-            if !is_bool {
+            let base = tail
+                .iter()
+                .flat_map(|(_, ids)| ids.iter())
+                .min()
+                .copied()
+                .unwrap_or(0);
+            // `ChunkIndexMetaInfo::row_count_` counts **data rows**, not entries
+            // (`SecondaryIndexInMemT::GetRowCount`): a JSON row contributes one
+            // entry per flattened term but one row.
+            let row_count = {
+                let mut ids: Vec<u64> = tail
+                    .iter()
+                    .flat_map(|(_, ids)| ids.iter().copied())
+                    .collect();
+                ids.sort_unstable();
+                ids.dedup();
+                ids.len()
+            };
+            if !low_card {
                 let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
                 for (raw_key, ids) in &tail {
                     // The tail was written in the column's ordered encoding
@@ -968,72 +1029,55 @@ impl Engine {
                         .entry(column.clone())
                         .or_default()
                         .push((base, row_count));
+                    // The chunk now covers the frozen entries, atomically with
+                    // the readers above: a reader either sees the chunk or the
+                    // frozen tail.
+                    if let Some(pending) = entry.secondary.sealing.get_mut(&column) {
+                        pending.retain(|tail| !Arc::ptr_eq(tail, &sealed));
+                    }
                 }
             } else {
-                let mut by_segment: HashMap<u64, [Vec<u32>; 2]> = HashMap::new();
+                // `SecondaryIndexDataLowCardinalityT::InsertData`: one bitmap of
+                // segment offsets per unique key. A dump feeds it the tail's
+                // grouped keys, one chunk file per segment.
+                let mut grouped: HashMap<u64, std::collections::BTreeMap<Vec<u8>, Vec<u32>>> =
+                    HashMap::new();
                 for (raw_key, ids) in &tail {
-                    // A BOOL tail key is the ordered encoding of 0/1, one byte.
-                    let Some(Key::Bool(flag)) = Key::from_ordered_bytes(KeyKind::Bool, raw_key)
-                    else {
-                        continue;
-                    };
-                    let bit = usize::from(flag);
                     for id in ids {
-                        by_segment.entry(id >> 32).or_default()[bit]
+                        grouped
+                            .entry(id >> 32)
+                            .or_default()
+                            .entry(raw_key.clone())
+                            .or_default()
                             .push((*id & 0xffff_ffff) as u32);
                     }
                 }
-                let dir = self.dir.join("secondary_low").join(key.replace('/', "_"));
-                let start = std::fs::read_dir(&dir)
-                    .map(|d| {
-                        d.filter_map(|e| e.ok())
-                            .filter(|e| e.path().extension().is_some_and(|x| x == "idx"))
-                            .count()
-                    })
-                    .unwrap_or(0);
-                let mut readers = Vec::new();
-                for (offset, (segment, lists)) in by_segment.into_iter().enumerate() {
-                    // A BOOL chunk's key array is one byte per unique value
-                    // (`KeepOrderedSelf<BooleanT>`), so it is written typed.
-                    let mut entries: Vec<(storage::secondary_lowcard::LowCardKey, Vec<u32>)> =
-                        Vec::new();
-                    for (bit, list) in lists.iter().enumerate() {
-                        if !list.is_empty() {
-                            entries.push((
-                                storage::secondary_lowcard::LowCardKey::Fixed(Key::Bool(bit != 0)),
-                                list.clone(),
-                            ));
-                        }
-                    }
-                    let path = dir.join(format!("seg_{segment}_tail{}.idx", start + offset));
-                    if storage::secondary_lowcard::write_lowcard_segment_typed(&path, &entries)
-                        .is_err()
-                    {
-                        continue;
-                    }
-                    if let Ok(reader) = storage::secondary_lowcard::LowCardReader::open_with_kind(
-                        &path,
-                        KeyKind::Bool,
-                    ) {
-                        readers.push((segment << 32, Arc::new(reader)));
-                    }
-                }
-                {
-                    let mut tables = self.tables.lock().unwrap();
-                    let entry = tables.entry(tkey).or_default();
-                    let meta_key = column.clone();
-                    entry
-                        .secondary
-                        .low
-                        .entry(column)
-                        .or_default()
-                        .extend(readers);
-                    entry
-                        .secondary
-                        .chunk_meta
-                        .entry(meta_key)
-                        .or_default()
-                        .push((base, row_count));
+                let (readers, meta) =
+                    self.write_secondary_low_chunks(&im.table, &column, tail_kind, grouped, "tail");
+                let mut tables = self.tables.lock().unwrap();
+                let entry = tables.entry(tkey.clone()).or_default();
+                entry
+                    .secondary
+                    .low
+                    .entry(column.clone())
+                    .or_default()
+                    .extend(readers);
+                entry
+                    .secondary
+                    .chunk_meta
+                    .entry(column.clone())
+                    .or_default()
+                    .extend(meta);
+                entry
+                    .secondary
+                    .chunk_meta
+                    .entry(column.clone())
+                    .or_default()
+                    .push((base, row_count));
+                // Atomic with the readers above: a reader sees either the chunk
+                // or the frozen tail.
+                if let Some(pending) = entry.secondary.sealing.get_mut(&column) {
+                    pending.retain(|frozen| !Arc::ptr_eq(frozen, &sealed));
                 }
             }
         }
@@ -1089,29 +1133,471 @@ impl Engine {
                 .sum::<usize>()
     }
 
+    /// `SecondaryIndexCardinality` of one indexed column.
+    ///
+    /// `BOOL` is inherently low cardinality and a JSON index exists only in the
+    /// low form (`NewSecondaryIndexInMem`, `secondary_index_in_mem_impl.cpp:
+    /// 250-334`); `WITH (cardinality='low')` asks for the low layout on any
+    /// other column.
+    pub(crate) fn secondary_low_cardinality(
+        &self,
+        table: &str,
+        column: &str,
+        declared: &str,
+    ) -> bool {
+        let declared = declared.trim().to_ascii_uppercase();
+        if declared.starts_with("BOOL") || declared.starts_with("JSON") {
+            return true;
+        }
+        let tkey = self.table_key(table);
+        self.storage
+            .catalog
+            .list_indexes()
+            .ok()
+            .and_then(|list| {
+                list.into_iter()
+                    .find(|im| self.table_key(&im.table) == tkey && im.column == column)
+            })
+            .is_some_and(|im| {
+                im.options.iter().any(|(key, value)| {
+                    key.eq_ignore_ascii_case("CARDINALITY") && value.eq_ignore_ascii_case("low")
+                })
+            })
+    }
+
+    /// Writes one low-cardinality chunk per segment and returns the readers with
+    /// their base row id (`segment << 32`).
+    ///
+    /// `grouped` maps a segment to its `raw key -> offsets`; a raw key is the
+    /// column's ordered encoding — whose lexicographic order *is* the key order —
+    /// or, for a JSON column, the term itself. `suffix` keeps a dump's chunks
+    /// distinct from a rebuild's (`tail` versus empty).
+    /// Returns the readers and the `(base row id, data row count)` of every chunk
+    /// it wrote, the `ChunkIndexMetaInfo` the reference records per chunk.
+    fn write_secondary_low_chunks(
+        &self,
+        table: &str,
+        column: &str,
+        kind: KeyKind,
+        grouped: HashMap<u64, std::collections::BTreeMap<Vec<u8>, Vec<u32>>>,
+        suffix: &str,
+    ) -> (SecondaryLowChunks, Vec<(u64, usize)>) {
+        use storage::secondary_lowcard::{write_lowcard_segment_typed, LowCardKey, LowCardReader};
+        let key = index_key(table, column);
+        let dir = self.dir.join("secondary_low").join(key.replace('/', "_"));
+        let start = std::fs::read_dir(&dir)
+            .map(|d| {
+                d.filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().is_some_and(|x| x == "idx"))
+                    .count()
+            })
+            .unwrap_or(0);
+        let mut readers: SecondaryLowChunks = Vec::new();
+        let mut meta: Vec<(u64, usize)> = Vec::new();
+        for (offset, (segment, keys)) in grouped.into_iter().enumerate() {
+            let entries: Vec<(LowCardKey, Vec<u32>)> = keys
+                .into_iter()
+                .filter_map(|(raw, mut offsets)| {
+                    let key = if kind == KeyKind::Bytes {
+                        LowCardKey::Bytes(raw)
+                    } else {
+                        LowCardKey::Fixed(Key::from_ordered_bytes(kind, &raw)?)
+                    };
+                    offsets.sort_unstable();
+                    offsets.dedup();
+                    Some((key, offsets))
+                })
+                .collect();
+            if entries.is_empty() {
+                continue;
+            }
+            let path = dir.join(format!("seg_{segment}_{suffix}{}.idx", start + offset));
+            if write_lowcard_segment_typed(&path, &entries).is_err() {
+                continue;
+            }
+            if let Ok(reader) = LowCardReader::open_with_kind(&path, kind) {
+                // The chunk covers one data row per distinct offset, not one per
+                // unique key (a JSON row contributes several terms).
+                let mut offsets: Vec<u32> = entries
+                    .iter()
+                    .flat_map(|(_, list)| list.iter().copied())
+                    .collect();
+                offsets.sort_unstable();
+                offsets.dedup();
+                meta.push((segment << 32, offsets.len()));
+                readers.push((segment << 32, Arc::new(reader)));
+            }
+        }
+        (readers, meta)
+    }
+
+    /// The functional index an `IndexMeta` describes, from the parameters its
+    /// record carries: `FUNC`, `FUNC_COLUMN` and `FUNC_RETURN`, falling back to
+    /// parsing the expression for a record written by another engine.
+    fn functional_from_meta(&self, im: &IndexMeta) -> Option<FunctionalIndex> {
+        if !im.index_type.eq_ignore_ascii_case("SECONDARYFUNCTIONAL") {
+            return None;
+        }
+        let opt = |name: &str| {
+            im.options
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                .map(|(_, v)| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+        };
+        let (func, base) = match (opt("FUNC"), opt("FUNC_COLUMN")) {
+            (Some(func), Some(base)) => (func.to_ascii_lowercase(), base.to_ascii_lowercase()),
+            _ => functional_parts(&im.column)?,
+        };
+        let returns = opt("FUNC_RETURN").or_else(|| {
+            let base_type = self
+                .table_schema(&im.table)
+                .ok()?
+                .iter()
+                .position(|c| c == &base)
+                .and_then(|i| self.column_types(&im.table).ok()?.get(i).cloned())?;
+            functional_return_type(&func, &base_type).map(str::to_string)
+        })?;
+        Some(FunctionalIndex {
+            base,
+            func,
+            returns,
+        })
+    }
+
+    /// Records how to evaluate a functional index: its base column, its scalar
+    /// function and the function's return type (`func_return_type` in the
+    /// reference's index record).
+    pub(crate) fn register_functional_index(
+        &self,
+        table: &str,
+        expression: &str,
+        base: &str,
+        func: &str,
+        returns: &str,
+    ) {
+        let key = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(key)
+            .or_default()
+            .secondary
+            .functional
+            .insert(
+                expression.to_string(),
+                FunctionalIndex {
+                    base: base.to_string(),
+                    func: func.to_string(),
+                    returns: returns.to_string(),
+                },
+            );
+    }
+
+    /// The declared type of one indexed column (`INT`, `VARCHAR(64)`, `JSON`, …).
+    fn secondary_declared_type(&self, table: &str, column: &str) -> String {
+        self.table_schema(table)
+            .ok()
+            .and_then(|schema| {
+                let ci = schema.iter().position(|c| c == column)?;
+                self.column_types(table).ok()?.get(ci).cloned()
+            })
+            .unwrap_or_default()
+    }
+
+    /// The segment a spill file belongs to: `seg_{segment}_…idx`.
+    fn secondary_spill_segment(path: &std::path::Path) -> Option<u64> {
+        path.file_name()?
+            .to_string_lossy()
+            .strip_prefix("seg_")?
+            .split('_')
+            .next()?
+            .parse()
+            .ok()
+    }
+
+    /// `OptimizeIndexInner`'s secondary case for every secondary index
+    /// (`new_txn_index_impl.cpp:336-340` -> `OptimizeSecondaryIndex`).
+    pub(crate) fn optimize_all_secondary_indexes(&self) -> Result<()> {
+        for im in self.storage.catalog.list_indexes()? {
+            if !is_secondary_kind(&im.index_type) {
+                continue;
+            }
+            if let Err(error) = self.merge_secondary_chunks(&im.table, &im.column) {
+                eprintln!(
+                    "optimize: merging the secondary chunks of {} failed: {error}",
+                    im.column
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Folds one secondary column's chunks into one per segment.
+    ///
+    /// The reference merges a segment's chunks by feeding every old chunk's
+    /// `(key, offset)` pairs to `InsertMergeData` and dumping the result as a
+    /// single new chunk. The offsets are already segment-relative, so the merge
+    /// is a sort over the concatenation and nothing is rebased. In this port a
+    /// column's chunk set *is* its spill-file set (`publish_secondary_chunks`
+    /// derives the chunk records from those files), so folding the files is the
+    /// merge; a segment left with one file publishes one chunk, which is the
+    /// layout the reference has after an optimize.
+    pub(crate) fn merge_secondary_chunks(&self, table: &str, column: &str) -> Result<bool> {
+        let declared = self.secondary_declared_type(table, column);
+        if self.secondary_low_cardinality(table, column, &declared) {
+            return self.merge_low_card_chunks(table, column, &declared);
+        }
+        use storage::secondary_segment::{write_secondary_segment_typed, SecondarySegmentReader};
+        let kind = secondary_key_kind(&declared);
+        let dir = self
+            .dir
+            .join("secondary")
+            .join(index_key(table, column).replace('/', "_"));
+        let Ok(files) = std::fs::read_dir(&dir) else {
+            return Ok(false);
+        };
+        let mut by_segment: std::collections::BTreeMap<u64, Vec<std::path::PathBuf>> =
+            Default::default();
+        for entry in files.flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|e| e != "idx") {
+                continue;
+            }
+            if let Some(segment) = Self::secondary_spill_segment(&path) {
+                by_segment.entry(segment).or_default().push(path);
+            }
+        }
+        let mut merged = false;
+        for (segment, paths) in by_segment {
+            if paths.len() < 2 {
+                continue;
+            }
+            let mut pairs: Vec<(Key, u32)> = Vec::new();
+            for path in &paths {
+                if let Ok(reader) = SecondarySegmentReader::open_with_kind(path, kind) {
+                    pairs.extend(reader.pairs());
+                }
+            }
+            if pairs.is_empty() {
+                continue;
+            }
+            pairs.sort_by(|a, b| a.0.order(&b.0).then(a.1.cmp(&b.1)));
+            let path = dir.join(format!("seg_{segment}_merged{}.idx", pairs.len()));
+            if write_secondary_segment_typed(&path, kind, &pairs).is_err() {
+                continue;
+            }
+            for old in &paths {
+                let _ = std::fs::remove_file(old);
+            }
+            merged = true;
+        }
+        if merged {
+            self.reload_secondary_chunks(table, column, kind);
+        }
+        Ok(merged)
+    }
+
+    /// Re-reads a high-cardinality column's spill files into the registry.
+    fn reload_secondary_chunks(&self, table: &str, column: &str, kind: KeyKind) {
+        use storage::secondary_segment::SecondarySegmentReader;
+        let dir = self
+            .dir
+            .join("secondary")
+            .join(index_key(table, column).replace('/', "_"));
+        let mut readers: SecondaryDiskChunks = Vec::new();
+        let mut meta: std::collections::BTreeMap<u64, usize> = Default::default();
+        if let Ok(files) = std::fs::read_dir(&dir) {
+            for entry in files.flatten() {
+                let path = entry.path();
+                if path.extension().is_none_or(|e| e != "idx") {
+                    continue;
+                }
+                let Some(segment) = Self::secondary_spill_segment(&path) else {
+                    continue;
+                };
+                if let Ok(reader) = SecondarySegmentReader::open_with_kind(&path, kind) {
+                    *meta.entry(segment).or_default() += reader.row_count();
+                    readers.push((segment << 32, Arc::new(reader)));
+                }
+            }
+        }
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey).or_default();
+        entry.secondary.disk.insert(column.to_string(), readers);
+        entry.secondary.chunk_meta.insert(
+            column.to_string(),
+            meta.into_iter()
+                .map(|(segment, rows)| (segment << 32, rows))
+                .collect(),
+        );
+    }
+
+    /// The low-cardinality half of [`Self::merge_secondary_chunks`]: the union of
+    /// the chunks' offset bitmaps per key, written as one chunk.
+    fn merge_low_card_chunks(&self, table: &str, column: &str, declared: &str) -> Result<bool> {
+        use storage::secondary_lowcard::{write_lowcard_segment_typed, LowCardKey, LowCardReader};
+        let kind = secondary_key_kind(declared);
+        let dir = self
+            .dir
+            .join("secondary_low")
+            .join(index_key(table, column).replace('/', "_"));
+        let Ok(files) = std::fs::read_dir(&dir) else {
+            return Ok(false);
+        };
+        let mut by_segment: std::collections::BTreeMap<u64, Vec<std::path::PathBuf>> =
+            Default::default();
+        for entry in files.flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|e| e != "idx") {
+                continue;
+            }
+            if let Some(segment) = Self::secondary_spill_segment(&path) {
+                by_segment.entry(segment).or_default().push(path);
+            }
+        }
+        let mut merged = false;
+        for (segment, paths) in by_segment {
+            if paths.len() < 2 {
+                continue;
+            }
+            let mut grouped: std::collections::BTreeMap<Vec<u8>, Vec<u32>> = Default::default();
+            for path in &paths {
+                let Ok(reader) = LowCardReader::open_with_kind(path, kind) else {
+                    continue;
+                };
+                for i in 0..reader.len() {
+                    let Some(key) = reader.key_at(i) else {
+                        continue;
+                    };
+                    let raw = match &key {
+                        LowCardKey::Fixed(key) => key.ordered_bytes(),
+                        LowCardKey::Bytes(bytes) => bytes.clone(),
+                    };
+                    grouped.entry(raw).or_default().extend(reader.lookup(key));
+                }
+            }
+            if grouped.is_empty() {
+                continue;
+            }
+            let entries: Vec<(LowCardKey, Vec<u32>)> = grouped
+                .into_iter()
+                .filter_map(|(raw, mut offsets)| {
+                    let key = if kind == KeyKind::Bytes {
+                        LowCardKey::Bytes(raw)
+                    } else {
+                        LowCardKey::Fixed(Key::from_ordered_bytes(kind, &raw)?)
+                    };
+                    offsets.sort_unstable();
+                    offsets.dedup();
+                    Some((key, offsets))
+                })
+                .collect();
+            let path = dir.join(format!("seg_{segment}_merged{}.idx", entries.len()));
+            if write_lowcard_segment_typed(&path, &entries).is_err() {
+                continue;
+            }
+            for old in &paths {
+                let _ = std::fs::remove_file(old);
+            }
+            merged = true;
+        }
+        if merged {
+            self.reload_secondary_low_chunks(table, column, kind);
+        }
+        Ok(merged)
+    }
+
+    /// Re-reads a low-cardinality column's spill files into the registry.
+    fn reload_secondary_low_chunks(&self, table: &str, column: &str, kind: KeyKind) {
+        use storage::secondary_lowcard::LowCardReader;
+        let dir = self
+            .dir
+            .join("secondary_low")
+            .join(index_key(table, column).replace('/', "_"));
+        let mut readers: SecondaryLowChunks = Vec::new();
+        let mut meta: std::collections::BTreeMap<u64, usize> = Default::default();
+        if let Ok(files) = std::fs::read_dir(&dir) {
+            for entry in files.flatten() {
+                let path = entry.path();
+                if path.extension().is_none_or(|e| e != "idx") {
+                    continue;
+                }
+                let Some(segment) = Self::secondary_spill_segment(&path) else {
+                    continue;
+                };
+                if let Ok(reader) = LowCardReader::open_with_kind(&path, kind) {
+                    *meta.entry(segment).or_default() += reader.len();
+                    readers.push((segment << 32, Arc::new(reader)));
+                }
+            }
+        }
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey).or_default();
+        entry.secondary.low.insert(column.to_string(), readers);
+        entry.secondary.chunk_meta.insert(
+            column.to_string(),
+            meta.into_iter()
+                .map(|(segment, rows)| (segment << 32, rows))
+                .collect(),
+        );
+    }
+
     pub(crate) fn index_lookup(
         &self,
         table: &str,
         column: &str,
         value: &Literal,
     ) -> Option<Vec<u64>> {
+        if let Some(ids) = self.index_lookup_one(table, column, value) {
+            return Some(ids);
+        }
+        // Same fallback as the range read: a functional index's catalog column
+        // is its expression, so an equality on the base column has to be probed
+        // against every function over it (the residual predicate proves
+        // membership).
+        let expressions = self.functional_over(table, column);
+        if expressions.is_empty() {
+            return None;
+        }
+        let mut out: Vec<u64> = Vec::new();
+        let mut answered = false;
+        for expression in expressions {
+            if let Some(mut ids) = self.index_lookup_one(table, &expression, value) {
+                answered = true;
+                out.append(&mut ids);
+            }
+        }
+        answered.then(|| {
+            out.sort_unstable();
+            out.dedup();
+            out
+        })
+    }
+
+    /// One column's (or one functional expression's) rows whose key is `value`.
+    fn index_lookup_one(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
         let tkey = self.table_key(table);
         let want = value.to_slt_string();
         // Snapshot the readers (cheap Arc clones) and the memory tail so the
         // table lock is not held across the row lookup. The tail's declared
         // type comes from the registry rather than the catalog: it is the one
         // the writer encoded the keys with.
-        let (disk, low, tail_index, declared): (
+        let (disk, low, tail_index, declared, sealing): (
             Option<SecondaryDiskChunks>,
             Option<SecondaryLowChunks>,
             Option<Arc<SecondaryIndex>>,
             Option<String>,
+            Vec<Arc<index::SealedTail>>,
         ) = {
             let tables = self.tables.lock().unwrap();
             let reg = tables.get(&tkey).map(|e| &e.secondary)?;
             let known = reg.indexes.contains_key(column)
                 || reg.disk.contains_key(column)
-                || reg.low.contains_key(column);
+                || reg.low.contains_key(column)
+                || reg.sealing.contains_key(column);
             if !known {
                 return None;
             }
@@ -1120,16 +1606,30 @@ impl Engine {
                 reg.low.get(column).cloned(),
                 reg.indexes.get(column).cloned(),
                 reg.declared_types.get(column).cloned(),
+                reg.sealing
+                    .get(column)
+                    .map(|tails| tails.iter().map(Arc::clone).collect())
+                    .unwrap_or_default(),
             )
         };
         // The tail holds the column's ordered key encoding, so the probe is the
-        // same `text_to_key` the writer used, not the literal's text.
-        let tail: Vec<u64> = match (&tail_index, &declared) {
-            (Some(index), Some(declared)) => match text_to_key(declared, &want) {
-                Some(key) => index.lookup(&key.ordered_bytes()),
-                None => Vec::new(),
-            },
-            _ => Vec::new(),
+        // same `text_to_key` the writer used, not the literal's text. A tail a
+        // dump has just frozen is still authoritative for the rows its chunk
+        // does not cover yet.
+        let tail: Vec<u64> = {
+            let mut out = Vec::new();
+            if let Some(declared) = &declared {
+                if let Some(key) = text_to_key(declared, &want) {
+                    let bytes = key.ordered_bytes();
+                    if let Some(index) = &tail_index {
+                        out.extend(index.lookup(&bytes));
+                    }
+                    for frozen in &sealing {
+                        out.extend(frozen.lookup(&bytes));
+                    }
+                }
+            }
+            out
         };
         let schema = self.table_schema(table).unwrap_or_default();
         let col = schema.iter().position(|c| c == column);
@@ -1142,12 +1642,48 @@ impl Engine {
         let mut seen: std::collections::HashSet<u64> = Default::default();
         // Sealed chunks are authoritative for the rows they cover; the memory
         // map only holds the tail written since the last dump.
+        //
+        // A low-cardinality column - BOOL, JSON's term index, or any column
+        // created `WITH (cardinality='low')` - lives in bitmap chunks keyed by
+        // the column's own ordered encoding, so the probe is the same
+        // `text_to_key` the writer used. (A JSON term is not a document value, so
+        // only its ranges are meaningful and those go through
+        // `low_card_term_range`.)
+        if let Some(segments) = &low {
+            // As below: the registry's declared type is authoritative.
+            let column_type = declared.clone().unwrap_or_else(|| {
+                col.and_then(|ci| {
+                    self.column_types(table)
+                        .ok()
+                        .and_then(|t| t.get(ci).cloned())
+                })
+                .unwrap_or_default()
+            });
+            if !column_type.trim().to_ascii_uppercase().starts_with("JSON") {
+                if let Some(probe) = text_to_key(&column_type, &want)
+                    .map(storage::secondary_lowcard::LowCardKey::Fixed)
+                {
+                    for (base, reader) in segments {
+                        for off in reader.lookup(&probe) {
+                            let id = base | u64::from(off);
+                            if seen.insert(id) {
+                                candidates.push(id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
         if let Literal::Int(v) = value {
-            let ty = self
-                .column_types(table)
-                .ok()
-                .and_then(|types| col.and_then(|c| types.get(c).cloned()))
-                .unwrap_or_default();
+            // The registry's declared type is authoritative: the catalog lookup
+            // is keyed by a qualified table name, so an unqualified `table`
+            // would classify the key as a `u64` and miss every `i32` chunk.
+            let ty = declared.clone().unwrap_or_else(|| {
+                self.column_types(table)
+                    .ok()
+                    .and_then(|types| col.and_then(|c| types.get(c).cloned()))
+                    .unwrap_or_default()
+            });
             let ordered = integer_secondary_key(&ty, *v);
             if let Some(segments) = &disk {
                 for (base, reader) in segments {
@@ -1186,39 +1722,22 @@ impl Engine {
                     }
                 }
             }
-        } else if let Literal::Str(text) = value {
-            let lower = text.trim().to_ascii_lowercase();
-            let bit = if lower == "true" {
-                Some(1u64)
-            } else if lower == "false" {
-                Some(0u64)
-            } else {
-                None
-            };
-            if let Some(bit) = bit {
-                if let Some(segments) = &low {
-                    for (base, reader) in segments {
-                        let probe =
-                            storage::secondary_lowcard::LowCardKey::Fixed(Key::Bool(bit != 0));
-                        for off in reader.lookup(&probe) {
-                            let id = base | u64::from(off);
-                            if seen.insert(id) {
-                                candidates.push(id);
-                            }
-                        }
-                    }
-                }
-            } else {
+        } else if let Literal::Str(_) = value {
+            {
                 // VARCHAR/JSON chunks store the reference's u64 key hash; a
                 // DATE/TIME chunk stores the ordered day/second count, so the
                 // literal text is converted the same way the writer did.
-                let column_type = col
-                    .and_then(|ci| {
+                // The declared type the registry holds is the one the writer
+                // encoded with; the catalog lookup is only a fallback (it is
+                // keyed by a qualified table name, so it misses a bare one).
+                let column_type = declared.clone().unwrap_or_else(|| {
+                    col.and_then(|ci| {
                         self.column_types(table)
                             .ok()
                             .and_then(|t| t.get(ci).cloned())
                     })
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                });
                 let hashed = Key::U64(storage::secondary_segment::hash_varchar(&want));
                 let temporal = temporal_key(&column_type, &want);
                 if let Some(segments) = &disk {
@@ -1307,14 +1826,66 @@ impl Engine {
     /// Rows whose indexed key falls in one of `ranges` (inclusive bounds,
     /// already merged by `FilterExpressionPushDown`).
     ///
-    /// `INT`/`UINT` keys are order-mapped, `FLOAT`/`DOUBLE` keys are the raw
-    /// value and `DATE`/`TIME`/`DATETIME`/`TIMESTAMP` the reference's ordered
-    /// day (or day+second) count (`KeyKind`, matching
-    /// `ConvertToOrderedType`), so all of them can be range-scanned.
-    /// `VARCHAR`/`JSON` keys are hashes and cannot, so they return `None` here
-    /// and the caller keeps the full-scan path — `EXPLAIN`'s `INDEX SCAN` is
-    /// truthful for the ordered kinds and still overstates a varchar/json one.
+    /// `INT`/`UINT` keys are the value itself, `FLOAT`/`DOUBLE` the raw value
+    /// and `DATE`/`TIME`/`DATETIME`/`TIMESTAMP` the reference's ordered day (or
+    /// day+second) count (`KeyKind`, matching `ConvertToOrderedType`), so all of
+    /// them can be range-scanned. A `VARCHAR` key is a hash, so only an
+    /// equality range is answerable; a JSON key is a term, answered by
+    /// [`Self::low_card_term_range`]. Anything else returns `None`, and the
+    /// caller keeps the full scan.
     pub(crate) fn index_range_lookup(
+        &self,
+        table: &str,
+        column: &str,
+        ranges: &[(Value, Value)],
+    ) -> Option<Vec<u64>> {
+        if let Some(ids) = self.index_range_lookup_one(table, column, ranges) {
+            return Some(ids);
+        }
+        // A functional index's catalog column is its expression, so the
+        // planner's `column_id` (the base column) does not name it. Its ranges
+        // are already the function's results, so every functional index over the
+        // column is a candidate; the residual predicate proves membership, which
+        // keeps the union safe even when two functions share one column.
+        let expressions = self.functional_over(table, column);
+        if expressions.is_empty() {
+            return None;
+        }
+        let mut out: Vec<u64> = Vec::new();
+        let mut answered = false;
+        for expression in expressions {
+            if let Some(mut ids) = self.index_range_lookup_one(table, &expression, ranges) {
+                answered = true;
+                out.append(&mut ids);
+            }
+        }
+        answered.then(|| {
+            out.sort_unstable();
+            out.dedup();
+            out
+        })
+    }
+
+    /// The functional indexes whose base column is `column`.
+    fn functional_over(&self, table: &str, column: &str) -> Vec<String> {
+        let tkey = self.table_key(table);
+        let tables = self.tables.lock().unwrap();
+        tables
+            .get(&tkey)
+            .map(|entry| {
+                entry
+                    .secondary
+                    .functional
+                    .iter()
+                    .filter(|(_, function)| function.base == column)
+                    .map(|(expression, _)| expression.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// One column's (or one functional expression's) rows in `ranges`.
+    fn index_range_lookup_one(
         &self,
         table: &str,
         column: &str,
@@ -1322,49 +1893,95 @@ impl Engine {
     ) -> Option<Vec<u64>> {
         let tkey = self.table_key(table);
         let schema = self.table_schema(table).unwrap_or_default();
-        let col = schema.iter().position(|c| c == column)?;
-        // Same classification as the chunk writer.
-        let column_type = self
-            .column_types(table)
-            .ok()
-            .and_then(|types| types.get(col).cloned())
+        let col = schema.iter().position(|c| c == column);
+        // Same classification as the chunk writer. The registry's declared type
+        // is authoritative — it is what the writer encoded the keys with — and
+        // the catalog lookup is keyed by a qualified table name, so it can miss
+        // an unqualified one.
+        let declared = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .and_then(|e| e.secondary.declared_types.get(column).cloned())
+        };
+        let column_type = declared
+            .or_else(|| {
+                col.and_then(|ci| {
+                    self.column_types(table)
+                        .ok()
+                        .and_then(|types| types.get(ci).cloned())
+                })
+            })
             .map(|ty| ty.trim().to_ascii_uppercase())
             .unwrap_or_default();
-        let kind = secondary_key_kind(&column_type);
-        if kind == KeyKind::U64
-            && !(column_type.starts_with("INT") || column_type.starts_with("UINT"))
-        {
-            // A hashed key has no order to scan.
+        if column_type.is_empty() {
             return None;
         }
+        let kind = secondary_key_kind(&column_type);
+        if kind == KeyKind::Bytes {
+            // A JSON index is low-cardinality and keyed by term, so each bound is
+            // the term text itself (the planner's `$.a:i:…` range).
+            return self.low_card_term_range(&tkey, column, ranges);
+        }
+        // `ConvertToHashU64`: a hashed key has no order to scan, so only an
+        // *equality* range has an exact key. The reference still resolves it
+        // through the chunk's lower/upper_bound pair
+        // (`index_filter_evaluators_impl.cpp:770-772`), and a `<>` range is left
+        // to the residual filter.
+        let hashed = kind == KeyKind::U64
+            && !(column_type.starts_with("INT") || column_type.starts_with("UINT"));
         // Bounds: `Value::Int(i64::MIN/MAX)` for the planner's open ends,
         // `Value::Float` for a float column and the literal's text for a
         // date/time one. `bound_key` puts each in the chunk's own domain.
-        let keys: Vec<(Key, Key)> = ranges
-            .iter()
-            .filter_map(|(lo, hi)| {
-                let lo = bound_key(kind, &column_type, lo)?;
-                let hi = bound_key(kind, &column_type, hi)?;
-                (lo.order(&hi) != std::cmp::Ordering::Greater).then_some((lo, hi))
-            })
-            .collect();
+        let keys: Vec<(Key, Key)> = if hashed {
+            let mut out = Vec::new();
+            for (lo, hi) in ranges {
+                let (lo_text, hi_text) = (lo.to_slt_string(), hi.to_slt_string());
+                if lo_text != hi_text {
+                    return None;
+                }
+                let key = Key::U64(storage::secondary_segment::hash_varchar(&lo_text));
+                out.push((key, key));
+            }
+            out
+        } else {
+            ranges
+                .iter()
+                .filter_map(|(lo, hi)| {
+                    let lo = bound_key(kind, &column_type, lo)?;
+                    let hi = bound_key(kind, &column_type, hi)?;
+                    (lo.order(&hi) != std::cmp::Ordering::Greater).then_some((lo, hi))
+                })
+                .collect()
+        };
         if keys.is_empty() {
             return None;
         }
         // Snapshot the sealed readers and the memory tail (cheap `Arc` clones),
         // so the key lookups run without the table lock.
-        let (disk, tail): (Option<SecondaryDiskChunks>, Option<Arc<SecondaryIndex>>) = {
+        let (disk, low, tail, sealing): (
+            Option<SecondaryDiskChunks>,
+            Option<SecondaryLowChunks>,
+            Option<Arc<SecondaryIndex>>,
+            Vec<Arc<index::SealedTail>>,
+        ) = {
             let tables = self.tables.lock().unwrap();
             let reg = tables.get(&tkey).map(|e| &e.secondary)?;
             let known = reg.indexes.contains_key(column)
                 || reg.disk.contains_key(column)
-                || reg.low.contains_key(column);
+                || reg.low.contains_key(column)
+                || reg.sealing.contains_key(column);
             if !known {
                 return None;
             }
             (
                 reg.disk.get(column).cloned(),
+                reg.low.get(column).cloned(),
                 reg.indexes.get(column).cloned(),
+                reg.sealing
+                    .get(column)
+                    .map(|tails| tails.iter().map(Arc::clone).collect())
+                    .unwrap_or_default(),
             )
         };
         let mut candidates: Vec<u64> = Vec::new();
@@ -1377,14 +1994,35 @@ impl Engine {
                 }
             }
         }
+        // A `cardinality='low'` column lives in bitmap chunks; its keys are the
+        // same ordered encoding, so the same bounds apply.
+        if let Some(segments) = &low {
+            for (base, reader) in segments {
+                for (start, end) in &keys {
+                    for off in reader.range(
+                        storage::secondary_lowcard::LowCardKey::Fixed(*start),
+                        storage::secondary_lowcard::LowCardKey::Fixed(*end),
+                    ) {
+                        candidates.push(base | u64::from(off));
+                    }
+                }
+            }
+        }
         // The tail carries the same ordered encoding as the chunks, so a bound
         // applies to it directly: one ordered slice per range, with no key
         // decoded and compared.
-        if let Some(index) = &tail {
-            for (start, end) in &keys {
-                let lo = tail_bound(kind, *start);
-                let hi = tail_bound(kind, *end);
+        for (start, end) in &keys {
+            let lo = tail_bound(kind, *start);
+            let hi = tail_bound(kind, *end);
+            if let Some(index) = &tail {
                 for (_, ids) in index.range(Some(&lo), Some(&hi)) {
+                    candidates.extend_from_slice(&ids);
+                }
+            }
+            // A frozen tail is still authoritative until its chunk is
+            // registered.
+            for frozen in &sealing {
+                for (_, ids) in frozen.range(Some(&lo), Some(&hi)) {
                     candidates.extend_from_slice(&ids);
                 }
             }
@@ -1394,6 +2032,75 @@ impl Engine {
         // fetch, and a stale id contributes no row. Dedupe by sorting instead
         // of hashing every id: a 1000-row range spent 11% of the query in
         // SipHash.
+        candidates.sort_unstable();
+        candidates.dedup();
+        Some(candidates)
+    }
+
+    /// Term ranges over a JSON column's low-cardinality chunks.
+    ///
+    /// `flatten_json_terms` keeps the reference's `path:type:value` shape
+    /// (`json_flattener_impl.cpp`), so a term range is a byte range over the
+    /// chunk's sorted keys and the same range applies to the memory tail.
+    fn low_card_term_range(
+        &self,
+        tkey: &str,
+        column: &str,
+        ranges: &[(Value, Value)],
+    ) -> Option<Vec<u64>> {
+        use storage::secondary_lowcard::LowCardKey;
+        let terms: Vec<(Vec<u8>, Vec<u8>)> = ranges
+            .iter()
+            .filter_map(|(lo, hi)| match (lo, hi) {
+                (Value::Str(lo), Value::Str(hi)) if lo.as_bytes() <= hi.as_bytes() => {
+                    Some((lo.clone().into_bytes(), hi.clone().into_bytes()))
+                }
+                _ => None,
+            })
+            .collect();
+        if terms.is_empty() {
+            return None;
+        }
+        let (low, tail, sealing): (
+            Option<SecondaryLowChunks>,
+            Option<Arc<SecondaryIndex>>,
+            Vec<Arc<index::SealedTail>>,
+        ) = {
+            let tables = self.tables.lock().unwrap();
+            let reg = tables.get(tkey).map(|e| &e.secondary)?;
+            (
+                reg.low.get(column).cloned(),
+                reg.indexes.get(column).cloned(),
+                reg.sealing
+                    .get(column)
+                    .map(|tails| tails.iter().map(Arc::clone).collect())
+                    .unwrap_or_default(),
+            )
+        };
+        let mut candidates: Vec<u64> = Vec::new();
+        if let Some(segments) = &low {
+            for (base, reader) in segments {
+                for (lo, hi) in &terms {
+                    for off in
+                        reader.range(LowCardKey::Bytes(lo.clone()), LowCardKey::Bytes(hi.clone()))
+                    {
+                        candidates.push(base | u64::from(off));
+                    }
+                }
+            }
+        }
+        for (lo, hi) in &terms {
+            if let Some(index) = &tail {
+                for (_, ids) in index.range(Some(lo), Some(hi)) {
+                    candidates.extend_from_slice(&ids);
+                }
+            }
+            for frozen in &sealing {
+                for (_, ids) in frozen.range(Some(lo), Some(hi)) {
+                    candidates.extend_from_slice(&ids);
+                }
+            }
+        }
         candidates.sort_unstable();
         candidates.dedup();
         Some(candidates)
@@ -1438,11 +2145,36 @@ impl Engine {
                         column.clone(),
                         SecondaryIndexInfo {
                             column_id: i,
+                            // A JSON index only exists as a term chunk; the
+                            // planner needs the flag to treat `json_*`
+                            // functions as its predicates
+                            // (`index_scan.rs:831`).
+                            json: kinds[i] == ColumnKind::Json,
                             kind: kinds[i],
-                            json: false,
                         },
                     );
                 }
+            }
+            // A functional index answers `func(col)` predicates: the planner
+            // keys it by `ExtractFunctionInfo`'s spelling, `func(c<column id>)`
+            // (`index_scan.rs:143`), and reads the base column from the record.
+            for (expression, function) in &entry.secondary.functional {
+                let Some(pos) = columns.iter().position(|c| c == &function.base) else {
+                    continue;
+                };
+                catalog.functional.insert(
+                    format!("{}(c{})", function.func, pos),
+                    function.base.clone(),
+                );
+                catalog.secondary.insert(
+                    function.base.clone(),
+                    SecondaryIndexInfo {
+                        column_id: pos,
+                        json: false,
+                        kind: column_kind_of(&function.returns),
+                    },
+                );
+                let _ = expression;
             }
         }
         catalog

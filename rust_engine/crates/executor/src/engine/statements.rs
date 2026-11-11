@@ -3330,6 +3330,11 @@ impl Engine {
         column: &str,
         dims: usize,
     ) -> Result<Arc<std::sync::RwLock<MultiVectorIndex>>> {
+        // The catalog and the index directory are keyed by the qualified name, so
+        // a bare name (a test, or an SDK call without a database) would register
+        // the index under a different key and rebuild it on every call.
+        let qualified = self.qualified_table(table);
+        let table = qualified.as_str();
         let key = index_key(table, column);
         let tkey = self.table_key(table);
         // Prefer the counter the write paths maintain (live_rows): row_count
@@ -3351,8 +3356,15 @@ impl Engine {
             tables.get(&tkey).and_then(|e| e.mv.get(column)).cloned()
         };
         if let Some(idx) = cached {
-            let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
-            if complete >= reserved {
+            // `doc_count` counts parsed documents only: a column with a NULL or
+            // unparseable tensor row would then never look complete and every
+            // search would rebuild the index (PLAID training included). The
+            // index tracks the rows it has *seen* instead.
+            let complete = idx
+                .read()
+                .map(|index| index.is_complete(reserved))
+                .unwrap_or(false);
+            if complete {
                 return Ok(idx);
             }
         }
@@ -3362,6 +3374,36 @@ impl Engine {
             .position(|c| c == column)
             .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
         let dir = self.dir.join("multivector").join(key.replace('/', "_"));
+        // A previous `flush` wrote the index out as C++ PLAID chunks; loading
+        // them costs O(chunks), while the rebuild below retrains the centroids
+        // and re-adds every embedding. The chunk's document order is the row
+        // order, so a light column scan recovers the row ids.
+        if let Some(index_name) = self.plaid_index_name(table, column) {
+            if let Ok(loaded) = self.read_plaid_index(table, &index_name) {
+                let seqs = self.multivector_row_ids(table, ci, dims)?;
+                if !seqs.is_empty() && loaded.doc_num() as usize == seqs.len() {
+                    let mut index = MultiVectorIndex::new(
+                        dir.clone(),
+                        dims,
+                        self.mv_plaid_config(table, column),
+                        self.mv_smve_config(table, column),
+                        self.mv_emvb_config(table, column),
+                    );
+                    index.plaid_seqs = seqs;
+                    index.scanned_rows = reserved;
+                    index.plaid = Some(loaded);
+                    let shared = Arc::new(std::sync::RwLock::new(index));
+                    self.tables
+                        .lock()
+                        .unwrap()
+                        .entry(tkey)
+                        .or_default()
+                        .mv
+                        .insert(column.to_string(), shared.clone());
+                    return Ok(shared);
+                }
+            }
+        }
         // A rebuild rewrites the chunk set; drop stale files so the readers
         // never mix two builds.
         if let Ok(entries) = std::fs::read_dir(&dir) {
@@ -3386,7 +3428,9 @@ impl Engine {
             self.mv_smve_config(table, column),
             self.mv_emvb_config(table, column),
         );
+        let mut scanned = 0usize;
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
+            scanned += 1;
             let text = match cells.get(ci) {
                 Some(Value::Str(s)) => s.clone(),
                 Some(other) => other.to_slt_string(),
@@ -3396,6 +3440,10 @@ impl Engine {
                 index.insert(seq as u64, doc);
             }
         }
+        // A row whose tensor does not parse still counts as seen: the reference
+        // indexes the rows it is given, and the search falls back to the sealed
+        // chunks for the rest.
+        index.scanned_rows = scanned;
         // The reference trains `PlaidGlobalCentroids` and builds
         // `PlaidIndexInMem` while the embeddings are buffered, before the dump.
         index.build_plaid();
@@ -3410,6 +3458,59 @@ impl Engine {
             .mv
             .insert(column.to_string(), shared.clone());
         Ok(shared)
+    }
+
+    /// The rows a `SEARCH MATCH …` filter admits. The reference computes a
+    /// per-block bitmask (`CalculateFilterBitmask`) and passes it to the index;
+    /// this evaluates the same predicates once over the rows.
+    fn match_filter_rows(
+        &self,
+        table: &str,
+        filters: &[&Expr],
+    ) -> Result<std::collections::HashSet<u64>> {
+        let mut out = std::collections::HashSet::new();
+        if filters.is_empty() {
+            return Ok(out);
+        }
+        for (seq, row) in self.fetch_rows_with_ids(table)? {
+            if filters.iter().all(|filter| filter.eval_predicate(&row)) {
+                out.insert(seq as u64);
+            }
+        }
+        Ok(out)
+    }
+
+    /// Name of the `USING PLAID` index on `table.column`, if any.
+    fn plaid_index_name(&self, table: &str, column: &str) -> Option<String> {
+        let short = table.rsplit('.').next().unwrap_or(table);
+        self.storage
+            .catalog
+            .list_indexes()
+            .ok()?
+            .into_iter()
+            .find(|im| {
+                im.index_type.eq_ignore_ascii_case("PLAID")
+                    && im.column == column
+                    && (im.table == table || im.table == short)
+            })
+            .map(|im| im.name)
+    }
+
+    /// The row ids whose tensor parses, ascending: the document order a PLAID
+    /// chunk was written in (`plaid_chunk` -> `column_docs`).
+    fn multivector_row_ids(&self, table: &str, ci: usize, dims: usize) -> Result<Vec<u64>> {
+        let mut out = Vec::new();
+        for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
+            let text = match cells.get(ci) {
+                Some(Value::Str(s)) => s.clone(),
+                Some(other) => other.to_slt_string(),
+                None => continue,
+            };
+            if parse_multivector_doc(&text, dims).is_some() {
+                out.push(seq as u64);
+            }
+        }
+        Ok(out)
     }
 
     /// `CREATE INDEX … USING PLAID WITH (nbits=…, n_centroids=…)` on
@@ -4852,11 +4953,38 @@ impl Engine {
                         "{index_type} index requires a vector column, got '{ty}'"
                     )));
                 }
+                // `IndexPLAID::Make` (`index_plaid_impl.cpp:68-105`): the mode
+                // flag takes `true`/`1`/`false`/`0` and nothing else, and a
+                // ColBERTSaR index stores no residual, so its `nbits` is not
+                // validated (it is unused).
+                let mut colbertsar = false;
                 for (k, v) in opts {
-                    if k == "NBITS" {
-                        let n: i64 = v.parse().unwrap_or(0);
-                        if n != 2 && n != 4 {
-                            return Err(Error::Invalid(format!("nbits {n} must be 2 or 4")));
+                    // `IndexPLAID::Make` rejects any parameter it does not know.
+                    if !matches!(
+                        k.to_ascii_uppercase().as_str(),
+                        "NBITS" | "N_CENTROIDS" | "CENTROIDS" | "COLBERTSAR_MODE"
+                    ) {
+                        return Err(Error::Invalid(format!("Invalid index parameter type: {k}")));
+                    }
+                    if k.eq_ignore_ascii_case("COLBERTSAR_MODE") {
+                        match v.trim().to_ascii_lowercase().as_str() {
+                            "true" | "1" => colbertsar = true,
+                            "false" | "0" => colbertsar = false,
+                            _ => {
+                                return Err(Error::Invalid(
+                                    "colbertsar_mode must be 'true' or 'false'".into(),
+                                ))
+                            }
+                        }
+                    }
+                }
+                if !colbertsar {
+                    for (k, v) in opts {
+                        if k.eq_ignore_ascii_case("NBITS") {
+                            let n: i64 = v.parse().unwrap_or(0);
+                            if n != 2 && n != 4 {
+                                return Err(Error::Invalid(format!("nbits {n} must be 2 or 4")));
+                            }
                         }
                     }
                 }
@@ -4944,18 +5072,47 @@ impl Engine {
                     .map_err(|e| Error::Invalid(e.to_string()))?;
                 }
             }
-            "SECONDARY" => {
-                // A secondary index covers scalars (and JSON paths).
-                if is_sparse_type(&ty) || is_embedding_type(&ty) || is_tensor_type(&ty) {
+            "SECONDARY" | "SECONDARYFUNCTIONAL" => {
+                // `DataType::CanBuildSecondaryIndex` (`data_type.h:99`) narrowed
+                // to what the factories actually instantiate
+                // (`secondary_index_data_impl.cpp:808-902`): every other type
+                // - ARRAY, BLOB, UUID, FLOAT16, DECIMAL - has no ordered key and
+                // the reference fails the index definition.
+                const SECONDARY_TYPES: [&str; 13] = [
+                    "BOOL",
+                    "TINYINT",
+                    "SMALLINT",
+                    "INT",
+                    "BIGINT",
+                    "FLOAT",
+                    "DOUBLE",
+                    "DATE",
+                    "TIME",
+                    "DATETIME",
+                    "TIMESTAMP",
+                    "VARCHAR",
+                    "JSON",
+                ];
+                if !SECONDARY_TYPES.iter().any(|t| ty.starts_with(t)) {
                     return Err(Error::Invalid(format!(
-                        "SECONDARY index requires a scalar column, got '{ty}'"
+                        "Cannot build secondary index on data type: {ty}"
                     )));
                 }
-                // the cardinality hint does not apply to a JSON index
-                if is_json_type(&ty) && opts.iter().any(|(k, _)| k == "CARDINALITY") {
-                    return Err(Error::Invalid(
-                        "cardinality is not supported for a JSON secondary index".into(),
-                    ));
+                // `IndexSecondary::ValidateColumnDataType`: a JSON index is
+                // always low cardinality, so `cardinality = high` is an invalid
+                // definition while `low` is accepted (and redundant).
+                if is_json_type(&ty) {
+                    if let Some((_, value)) = opts
+                        .iter()
+                        .find(|(key, _)| key.eq_ignore_ascii_case("CARDINALITY"))
+                    {
+                        let value = value.trim().trim_matches(|c| c == '\'' || c == '"');
+                        if !value.eq_ignore_ascii_case("low") {
+                            return Err(Error::Invalid(
+                                "cardinality is always low for JSON column".into(),
+                            ));
+                        }
+                    }
                 }
             }
             "FULLTEXT" => {
@@ -7252,7 +7409,12 @@ impl Engine {
         // Multi-vector: answer from the write-time index (sealed chunks + the
         // memory tail) when no predicate needs the other columns. The index
         // covers every live row, so this path does not scan the table.
-        if is_tensor && pred.is_none() && in_filter.is_none() && search_filter.is_none() {
+        // A `filter=` option or an in-parenthesis `WHERE` narrows the candidates
+        // before ranking; the reference bakes it into the search bitmask
+        // (`CalculateFilterBitmask`) instead of scanning, so the index answers it
+        // here too. The outer `WHERE` still takes the scan path: it may hold
+        // constructs this evaluator does not model.
+        if is_tensor && pred.is_none() {
             let decl_up = types
                 .get(col_idx)
                 .map(|t| t.to_ascii_uppercase())
@@ -7277,11 +7439,28 @@ impl Engine {
                         let dead = self.tombstone_set(table)?;
                         let rank =
                             |seq: u64| self.exact_tensor_score(table, &column, dims, &query, seq);
-                        let hits =
-                            index
-                                .read()
-                                .unwrap()
-                                .search(&query, topn.max(1), &dead, Some(&rank));
+                        let plaid_options = crate::engine::state::plaid_search_options(
+                            |key| option_value(key),
+                            topn,
+                        );
+                        let filters: Vec<&Expr> = [in_filter.as_ref(), search_filter.as_ref()]
+                            .into_iter()
+                            .flatten()
+                            .collect();
+                        let allowed: Option<std::collections::HashSet<u64>> = if filters.is_empty()
+                        {
+                            None
+                        } else {
+                            Some(self.match_filter_rows(table, &filters)?)
+                        };
+                        let hits = index.read().unwrap().search(
+                            &query,
+                            topn.max(1),
+                            &dead,
+                            Some(&rank),
+                            &plaid_options,
+                            allowed.as_ref(),
+                        );
                         let scored: Vec<(u64, f64)> = hits
                             .into_iter()
                             .map(|(seq, score)| (seq, f64::from(score)))
@@ -7368,8 +7547,6 @@ impl Engine {
                 .map(|t| t.to_ascii_uppercase().starts_with("MULTIVECTOR"))
                 .unwrap_or(false)
             && pred.is_none()
-            && in_filter.is_none()
-            && search_filter.is_none()
         {
             let dims = types.get(col_idx).and_then(|t| type_dim(t));
             if let Some(dims) = dims.filter(|d| *d > 0) {
@@ -7396,10 +7573,31 @@ impl Engine {
                         let dead = self.tombstone_set(table)?;
                         let rank =
                             |seq: u64| self.exact_tensor_score(table, &column, dims, &query, seq);
+                        let plaid_options = crate::engine::state::plaid_search_options(
+                            |key| option_value(key),
+                            topn,
+                        );
+                        let filters: Vec<&Expr> = [in_filter.as_ref(), search_filter.as_ref()]
+                            .into_iter()
+                            .flatten()
+                            .collect();
+                        let allowed: Option<std::collections::HashSet<u64>> = if filters.is_empty()
+                        {
+                            None
+                        } else {
+                            Some(self.match_filter_rows(table, &filters)?)
+                        };
                         let hits: Vec<(u64, f32)> = index
                             .read()
                             .unwrap()
-                            .search(&query, topn.max(1), &dead, Some(&rank))
+                            .search(
+                                &query,
+                                topn.max(1),
+                                &dead,
+                                Some(&rank),
+                                &plaid_options,
+                                allowed.as_ref(),
+                            )
                             .into_iter()
                             .filter(|(_, score)| {
                                 threshold.map(|t| f64::from(*score) >= t).unwrap_or(true)

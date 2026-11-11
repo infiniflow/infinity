@@ -151,8 +151,10 @@ impl Default for SecondaryIndex {
 
 impl Clone for SecondaryIndex {
     fn clone(&self) -> Self {
-        let published = self.snapshot();
+        // `pending` first, like every reader: `fold` takes it before it
+        // republishes, so the two views cannot disagree.
         let pending = self.pending.lock().unwrap().clone();
+        let published = self.snapshot();
         Self {
             published: RwLock::new(published),
             rows: AtomicUsize::new(self.rows.load(AtomicOrdering::Relaxed)),
@@ -160,6 +162,45 @@ impl Clone for SecondaryIndex {
             published_keys: AtomicUsize::new(self.published_keys.load(AtomicOrdering::Relaxed)),
             pending: Mutex::new(pending),
         }
+    }
+}
+
+/// A frozen memory tail: the entries a dump has taken and is writing into a
+/// chunk.
+///
+/// `take` leaves the index empty, so between the dump reading the tail and the
+/// chunk it writes becoming visible a reader would see neither copy. The dump
+/// keeps the taken entries here, and readers merge them, until the chunk is
+/// registered (`Engine::seal_secondary_index`).
+pub struct SealedTail(Map);
+
+impl SealedTail {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The row ids `key` maps to, exactly like an unfrozen tail.
+    pub fn lookup(&self, key: &[u8]) -> Vec<RowID> {
+        self.0.get(key).cloned().unwrap_or_default()
+    }
+
+    /// Every entry whose key lies in the inclusive range `[lo, hi]`.
+    pub fn range(&self, lo: Option<&[u8]>, hi: Option<&[u8]>) -> Vec<(Vec<u8>, Vec<RowID>)> {
+        use std::ops::Bound;
+        let start = lo.map_or(Bound::Unbounded, |k| Bound::Included(k.to_vec()));
+        let end = hi.map_or(Bound::Unbounded, |k| Bound::Included(k.to_vec()));
+        self.0
+            .range((start, end))
+            .map(|(key, ids)| (key.clone(), ids.clone()))
+            .collect()
+    }
+
+    /// Every entry in ascending key order: what the chunk writer consumes.
+    pub fn entries(&self) -> Vec<(Vec<u8>, Vec<RowID>)> {
+        self.0
+            .iter()
+            .map(|(key, ids)| (key.clone(), ids.clone()))
+            .collect()
     }
 }
 
@@ -209,8 +250,11 @@ impl SecondaryIndex {
     /// Every entry, both maps merged, in ascending key order. Used by the
     /// flush/take/statistics paths, which have to materialise anyway.
     fn merged(&self) -> Map {
+        // `pending` first: with it held, `fold` cannot republish between the two
+        // reads (see `Index::lookup`).
+        let pending = self.pending.lock().unwrap();
         let mut out = (*self.snapshot()).clone();
-        for (key, ids) in self.pending.lock().unwrap().iter() {
+        for (key, ids) in pending.iter() {
             match out.get_mut(key) {
                 Some(existing) => existing.extend_from_slice(ids),
                 None => {
@@ -243,6 +287,13 @@ impl SecondaryIndex {
         merged
     }
 
+    /// Freezes the tail for a dump: removes the entries and hands them back in a
+    /// form readers can still query until the chunk that holds them is
+    /// registered.
+    pub fn seal(&self) -> SealedTail {
+        SealedTail(self.take())
+    }
+
     /// Number of row entries across all keys (C++ `GetRowCount`) - an atomic
     /// load, not a walk: the quota check reads it once per row.
     pub fn row_count(&self) -> usize {
@@ -252,8 +303,8 @@ impl SecondaryIndex {
     /// Lowest row id recorded, in `segment << 32 | offset` form (C++
     /// `GetBeginRowID`).
     pub fn begin_row_id(&self) -> Option<RowID> {
-        let snapshot = self.snapshot();
         let pending = self.pending.lock().unwrap();
+        let snapshot = self.snapshot();
         snapshot
             .values()
             .chain(pending.values())
@@ -269,8 +320,8 @@ impl SecondaryIndex {
     /// bounds instead of decoding every key. The two maps are merged on the fly,
     /// so a key that exists in both is reported once with both posting lists.
     pub fn for_each_in_order(&self, mut f: impl FnMut(&[u8], &[RowID])) {
-        let snapshot = self.snapshot();
         let pending = self.pending.lock().unwrap();
+        let snapshot = self.snapshot();
         let mut pending_iter = pending.iter().peekable();
         for (key, ids) in snapshot.iter() {
             while let Some((pending_key, _)) = pending_iter.peek() {
@@ -426,9 +477,16 @@ impl Index for SecondaryIndex {
     fn lookup(&self, key: &[u8]) -> Vec<RowID> {
         // Both sides, always: the published map is stale by however much is
         // pending, and a key can exist in both (see the type docs).
+        //
+        // `pending` is taken **before** the snapshot: `fold` holds it while it
+        // republishes, so with this lock held the two views describe the same
+        // instant. Reading the snapshot first lets a fold move the keys it
+        // folded out of `pending` after the reader already read the old
+        // snapshot - the row then exists in neither view.
+        let pending = self.pending.lock().unwrap();
         let snapshot = self.snapshot();
         let mut out = snapshot.get(key).cloned().unwrap_or_default();
-        if let Some(ids) = self.pending.lock().unwrap().get(key) {
+        if let Some(ids) = pending.get(key) {
             out.extend_from_slice(ids);
         }
         out
@@ -446,14 +504,15 @@ impl Index for SecondaryIndex {
             Some(k) => Bound::Included(k.to_vec()),
             None => Bound::Unbounded,
         };
-        // The published slice is read without any write lock held; the pending
-        // one is copied under its own short lock and merged in key order.
+        // Same lock order as `lookup`: `pending` first, so a fold cannot move
+        // entries between the two views.
+        let pending = self.pending.lock().unwrap();
         let snapshot = self.snapshot();
         let mut out: Map = snapshot
             .range((start.clone(), end.clone()))
             .map(|(key, ids)| (key.clone(), ids.clone()))
             .collect();
-        for (key, ids) in self.pending.lock().unwrap().range((start, end)) {
+        for (key, ids) in pending.range((start, end)) {
             match out.get_mut(key) {
                 Some(existing) => existing.extend_from_slice(ids),
                 None => {
@@ -465,8 +524,8 @@ impl Index for SecondaryIndex {
     }
 
     fn key_count(&self) -> usize {
-        let snapshot = self.snapshot();
         let pending = self.pending.lock().unwrap();
+        let snapshot = self.snapshot();
         let fresh = pending
             .keys()
             .filter(|key| !snapshot.contains_key(*key))

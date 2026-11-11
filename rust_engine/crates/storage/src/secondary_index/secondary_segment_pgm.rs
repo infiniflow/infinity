@@ -2175,6 +2175,15 @@ impl SecondarySegmentReader {
         lo
     }
 
+    /// Every `(key, offset)` pair, in stored order: key order, then the order
+    /// duplicates were written. A merge reads a whole chunk this way
+    /// (`InsertMergeData` over the reference's chunk buffers).
+    pub fn pairs(&self) -> Vec<(Key, u32)> {
+        (0..self.row_count)
+            .map(|i| (self.key(i), self.offset(i)))
+            .collect()
+    }
+
     /// First key of the chunk (useful for range scans).
     pub fn first_key(&self) -> Key {
         if self.row_count == 0 {
@@ -2904,12 +2913,16 @@ mod tests {
         assert_eq!(reader.range(Key::I64(-86_400), Key::I64(0)), vec![0, 1]);
     }
 
-    /// An empty typed chunk round-trips (`n = 0`, one sentinel segment).
+    /// An empty typed chunk round-trips. `PGMIndex::build` returns before it
+    /// pushes a segment or a level (`pgm_index.hpp:97-99`), so the tail is
+    /// `n = 0`, `first_key = 0`, no segments and no levels: 16 bytes for an
+    /// `f32` key, the reference's own empty model.
     #[test]
     fn empty_typed_chunk_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("empty_f32.idx");
         write_secondary_segment_typed(&path, KeyKind::F32, &[]).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap().len(), 4 + 4 + 4 + 4);
         let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F32).unwrap();
         assert_eq!(reader.len(), 0);
         assert!(reader.lookup(Key::F32(1.0)).is_empty());

@@ -172,8 +172,9 @@ fn test_index0() {
     assert_eq!(e.secondary_chunks("db1.tb1", "col1"), vec![(0, 8192)]);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
 
-    // Second dump + third block, then OptimizeIndex (a no-op for secondary in
-    // the Rust engine; the reference merges the chunks into chunk 2).
+    // Second dump + third block, then OptimizeIndex: the two chunks of the
+    // segment fold into one (`InsertMergeData` over their `(key, offset)` pairs,
+    // `OptimizeIndexInner`'s secondary case).
     dump(&e, "index1");
     e.insert_literals(
         "db1.tb1",
@@ -186,12 +187,10 @@ fn test_index0() {
     .unwrap();
     e.optimize_indexes().unwrap();
     assert_eq!(e.secondary_tail("db1.tb1", "col1"), Some((16384, 8192)));
-    // Each chunk records base row id 0 (the reference's
-    // `ChunkIndexMetaInfo::base_row_id_ == RowID(0,0)`) and the rows it covers.
-    assert_eq!(
-        e.secondary_chunks("db1.tb1", "col1"),
-        vec![(0, 8192), (0, 8192)]
-    );
+    // The merged chunk records base row id 0 (the reference's
+    // `ChunkIndexMetaInfo::base_row_id_ == RowID(0,0)`) and covers both blocks
+    // the two old chunks held.
+    assert_eq!(e.secondary_chunks("db1.tb1", "col1"), vec![(0, 16384)]);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 24576);
 }
 
@@ -358,9 +357,9 @@ fn disabled_slow_test_populate_index() {
 ///
 /// The reference also asks for `cardinality = low` and inspects
 /// `IndexSecondary::IsJsonIndex/GetSecondaryIndexCardinality/
-/// BuildOtherParamsString`. The engine explicitly rejects the cardinality hint
-/// on a JSON secondary index and has no equivalent inspector, so the reachable
-/// assertion is the successful create/list/drop of the JSON index.
+/// BuildOtherParamsString`. A JSON index is always low cardinality, so `low` is
+/// accepted and `high` is an invalid definition
+/// (`index_secondary_impl.cpp:83-89`).
 #[test]
 fn test_json_index() {
     let dir = tempdir().unwrap();
@@ -369,16 +368,19 @@ fn test_json_index() {
     e.execute("CREATE TABLE db1.tb1 (id INT, meta JSON);")
         .unwrap();
 
-    // The reference's `cardinality = low` option is rejected by this engine.
+    // `cardinality = high` contradicts a JSON index; `low` is what the index is
+    // anyway, so it is accepted.
     assert!(e
         .execute(
             "CREATE INDEX idx_json ON db1.tb1 (meta) USING SECONDARY \
-             WITH (cardinality = 'low');"
+             WITH (cardinality = 'high');"
         )
         .is_err());
-    // Without the hint the JSON secondary index is created.
-    e.execute("CREATE INDEX idx_json ON db1.tb1 (meta) USING SECONDARY;")
-        .unwrap();
+    e.execute(
+        "CREATE INDEX idx_json ON db1.tb1 (meta) USING SECONDARY \
+         WITH (cardinality = 'low');",
+    )
+    .unwrap();
     assert!(e.execute("SHOW TABLE db1.tb1 INDEX idx_json;").is_ok());
 
     e.execute("DROP INDEX idx_json ON db1.tb1;").unwrap();
