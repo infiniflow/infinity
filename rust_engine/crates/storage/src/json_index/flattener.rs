@@ -38,6 +38,47 @@ pub struct FlattenedTerm {
     pub term: String,
 }
 
+/// The deepest nesting [`flatten_json`] parses: four times the reference
+/// suite's ~130-level case, and far below the depth at which the recursive walk
+/// would exhaust the stack.
+const MAX_JSON_DEPTH: usize = 512;
+
+/// Whether `text` nests `{`/`[` more than `limit` deep.
+///
+/// The check walks the raw text, so it has to ignore brackets that are part of
+/// a string - `"a{b"`, `"[1]"`, `"escaped \" quote {"` - or it would measure
+/// characters instead of structure. A closing bracket without an opener only
+/// lowers the count, and the parser rejects such input on its own.
+fn exceeds_max_depth(text: &str, limit: usize) -> bool {
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for byte in text.bytes() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'{' | b'[' => {
+                depth += 1;
+                if depth > limit {
+                    return true;
+                }
+            }
+            b'}' | b']' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    false
+}
+
 /// Flattens the JSON text stored in a `json` cell.
 ///
 /// Invalid JSON yields no terms rather than an error, matching the reference's
@@ -47,7 +88,15 @@ pub fn flatten_json(text: &str) -> Vec<FlattenedTerm> {
     // reference parses with `nlohmann::json`, which has no limit: a document
     // nested deeper (`test/sql/ddl/index/test_json_index.slt`'s long-term case
     // nests ~130 levels) is valid JSON and must index, not silently yield no
-    // terms at all.
+    // terms at all. Lifting the limit removes the guard against a stack
+    // overflow on a hostile document, so the nesting is bounded here instead -
+    // well above the reference's ~130 levels, well below what exhausts the
+    // stack of the recursive walk below.
+    if exceeds_max_depth(text, MAX_JSON_DEPTH) {
+        // Rejected exactly like malformed JSON: the column simply gets no
+        // terms, which leaves the row filter to answer for that row.
+        return Vec::new();
+    }
     let mut deserializer = serde_json::Deserializer::from_str(text);
     deserializer.disable_recursion_limit();
     let Ok(value) = Value::deserialize(&mut deserializer) else {
@@ -156,7 +205,10 @@ fn add_numeric_alias(value: &Value, path: &str, terms: &mut Vec<FlattenedTerm>) 
     let Value::Number(number) = value else {
         return;
     };
-    if let Some(integer) = number.as_i64().or_else(|| number.as_u64().map(|u| u as i64)) {
+    if let Some(integer) = number
+        .as_i64()
+        .or_else(|| number.as_u64().map(|u| u as i64))
+    {
         terms.push(FlattenedTerm {
             term: format!("{path}:d:{}", encode_double(integer as f64)),
         });
@@ -226,8 +278,11 @@ mod tests {
                 "$.a[0]:p:",
                 "$.a[1]:s:x",
                 "$.a[1]:p:",
-                // `json_contains(doc, value)` matches these.
+                // `json_contains(doc, value)` matches these; a numeric element
+                // is also written under the other numeric tag, so `50` and
+                // `50.0` both find it.
                 "$.a:i:8000000000000001",
+                "$.a:d:BFF0000000000000",
                 "$.a:s:x",
                 "$.a:p:",
                 "$:p:",
@@ -280,6 +335,44 @@ mod tests {
     fn invalid_json_flattens_to_nothing() {
         assert!(terms("{not json").is_empty());
         assert!(terms("").is_empty());
+    }
+
+    /// The reference's long-term case nests ~130 levels, so the bound has to
+    /// keep accepting it while `unbounded_depth` no longer protects the stack.
+    #[test]
+    fn documents_nested_past_the_reference_case_still_flatten() {
+        let mut text = String::new();
+        for _ in 0..130 {
+            text.push_str(r#"{"k":"#);
+        }
+        text.push('1');
+        for _ in 0..130 {
+            text.push('}');
+        }
+        assert!(!exceeds_max_depth(&text, MAX_JSON_DEPTH));
+        assert!(terms(&text)
+            .iter()
+            .any(|term| term.ends_with(":i:8000000000000001")));
+    }
+
+    #[test]
+    fn documents_beyond_the_bound_yield_no_terms() {
+        let mut text = "[".repeat(MAX_JSON_DEPTH + 1);
+        text.push_str(&"]".repeat(MAX_JSON_DEPTH + 1));
+        assert!(exceeds_max_depth(&text, MAX_JSON_DEPTH));
+        assert!(terms(&text).is_empty());
+    }
+
+    /// Brackets inside a string are text, and an escaped quote must not end the
+    /// string: the check measures structure, not characters.
+    #[test]
+    fn brackets_inside_strings_do_not_count_as_depth() {
+        let deep_text = format!("[\"{}\"]", "[".repeat(MAX_JSON_DEPTH + 10));
+        assert!(!exceeds_max_depth(&deep_text, MAX_JSON_DEPTH));
+        assert!(terms(&deep_text).iter().any(|term| term.contains(":s:[")));
+
+        let escaped = format!("[\"quote \\\" then {}\"]", "{".repeat(MAX_JSON_DEPTH + 10));
+        assert!(!exceeds_max_depth(&escaped, MAX_JSON_DEPTH));
     }
 
     #[test]

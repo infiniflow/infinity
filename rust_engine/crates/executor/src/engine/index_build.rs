@@ -1362,11 +1362,26 @@ impl Engine {
             );
     }
 
-    /// The declared type of one indexed column (`INT`, `VARCHAR(64)`, `JSON`, …).
+    /// The declared type of one indexed column or functional expression
+    /// (`INT`, `VARCHAR(64)`, `JSON`, …).
+    ///
+    /// The registry's `declared_types` is the type the writer encoded the keys
+    /// with, so it is consulted first, exactly as the seal path does: a
+    /// functional index records its *return* type there while the schema only
+    /// knows the base column's. The schema lookup is the fallback for an index
+    /// whose chunks predate that map; with neither the empty string keeps
+    /// `secondary_key_kind` on its hashed default.
     fn secondary_declared_type(&self, table: &str, column: &str) -> String {
-        self.table_schema(table)
-            .ok()
-            .and_then(|schema| {
+        let tkey = self.table_key(table);
+        let registered = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .and_then(|entry| entry.secondary.declared_types.get(column).cloned())
+        };
+        registered
+            .or_else(|| {
+                let schema = self.table_schema(table).ok()?;
                 let ci = schema.iter().position(|c| c == column)?;
                 self.column_types(table).ok()?.get(ci).cloned()
             })
@@ -1574,7 +1589,10 @@ impl Engine {
             let mut path = dir.join(format!("seg_{segment}_merged{}.idx", entries.len()));
             let mut serial = 0u32;
             while path.exists() || paths.iter().any(|old| old == &path) {
-                path = dir.join(format!("seg_{segment}_merged{}_{serial}.idx", entries.len()));
+                path = dir.join(format!(
+                    "seg_{segment}_merged{}_{serial}.idx",
+                    entries.len()
+                ));
                 serial += 1;
             }
             if write_lowcard_segment_typed(&path, &entries).is_err() {
@@ -1934,7 +1952,7 @@ impl Engine {
     /// (`sqrt(c0)`, the column by id) while the registry keeps the catalog's
     /// text (`sqrt(c1)`), so the two are matched on the function name and on the
     /// base column the expression reads.
-    fn functional_expression_for(
+    pub(crate) fn functional_expression_for(
         &self,
         table: &str,
         expr: &Expr,
@@ -2221,7 +2239,7 @@ impl Engine {
             // registered as a secondary index - `c1 = 2` says nothing about
             // `sqrt(c1)`, and registering it made such a predicate look
             // index-answerable.
-            for (_, function) in &entry.secondary.functional {
+            for function in entry.secondary.functional.values() {
                 let Some(pos) = columns.iter().position(|c| c == &function.base) else {
                     continue;
                 };

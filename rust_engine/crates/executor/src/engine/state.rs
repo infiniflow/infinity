@@ -6347,6 +6347,10 @@ pub(crate) struct RowSecondaryProvider<'a> {
     /// The candidate's columns, in the evaluator's own order: `column_id` indexes
     /// this list, and the name is what the engine's index registry knows.
     pub(crate) columns: Option<&'a [String]>,
+    /// The functional index the predicate was pushed down for, if any: the
+    /// registry keys it by its expression (`sqrt(c1)`), while `column_id` only
+    /// names the base column, whose values are not what the index stores.
+    pub(crate) functional: Option<String>,
     pub(crate) engine: Option<&'a Engine>,
     pub(crate) table: &'a str,
     /// storage sequence id -> position in `rows`. The secondary index is keyed
@@ -6364,9 +6368,15 @@ impl planner::index_scan::SecondaryIndexProvider for RowSecondaryProvider<'_> {
         if let (Some(engine), Some(columns), Some(positions)) =
             (self.engine, self.columns, self.row_positions)
         {
-            if let Some(column) = columns.get(column_id) {
+            // A functional index is keyed by its expression, which is not the
+            // base column `column_id` names.
+            let column = self
+                .functional
+                .clone()
+                .or_else(|| columns.get(column_id).cloned());
+            if let Some(column) = column {
                 if let Some(seqs) =
-                    engine.index_range_lookup(self.table, column, &[(start.clone(), end.clone())])
+                    engine.index_range_lookup(self.table, &column, &[(start.clone(), end.clone())])
                 {
                     let mut out = Vec::new();
                     for seq in seqs {
@@ -6376,6 +6386,13 @@ impl planner::index_scan::SecondaryIndexProvider for RowSecondaryProvider<'_> {
                     }
                     return out;
                 }
+            }
+            // A functional predicate the index could not answer must not fall
+            // through to the row walk: it compares the base column's own text
+            // against bounds written for the function's output, which silently
+            // drops every row whose text differs from its image (`lower`).
+            if self.functional.is_some() {
+                return (0..self.rows.len() as u32).collect();
             }
         }
         let mut out = Vec::new();
@@ -6518,10 +6535,21 @@ pub(crate) fn apply_index_filter(
             .map(|(i, id)| (*id, i as u32))
             .collect()
     });
+    // The evaluator's own expression decides which registered index answers a
+    // functional predicate; `column_id` only names its base column.
+    let functional = match (&candidate.evaluator, engine, index_columns) {
+        (
+            planner::index_scan::IndexFilterEvaluator::Secondary(secondary),
+            Some(engine),
+            Some(columns),
+        ) => engine.functional_expression_for(table, &secondary.src_expr, columns),
+        _ => None,
+    };
     let secondary = RowSecondaryProvider {
         rows: &rows,
         positions,
         columns: index_columns,
+        functional,
         engine,
         table,
         row_positions: row_positions.as_ref(),
