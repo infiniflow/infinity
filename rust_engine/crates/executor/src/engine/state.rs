@@ -3448,9 +3448,6 @@ impl MultiVectorIndex {
         self.tail_bytes += multivector_doc_bytes(&doc);
         self.tail.insert(seq, doc.clone());
         self.tail_generation += 1;
-        if !replacing {
-            self.scanned_rows += 1;
-        }
         // The reference's `PlaidIndexInMem::Insert`: once a trained index
         // covers every document, new rows are added incrementally. A rewritten
         // row cannot be removed from PLAID, so the index is dropped and the
@@ -3481,6 +3478,17 @@ impl MultiVectorIndex {
                 self.smve_seqs.push(seq);
             }
         }
+    }
+
+    /// Records that the write hook handed this index one row.
+    ///
+    /// [`Self::insert`] cannot do it: a NULL (or unparseable) tensor cell adds
+    /// no document, and the row would then never count towards
+    /// [`Self::is_complete`] - every search would rebuild the whole index,
+    /// PLAID training included. The rebuild sets the counter to the rows it
+    /// scanned instead, so this is only for the per-row write path.
+    pub(crate) fn note_row(&mut self) {
+        self.scanned_rows += 1;
     }
 
     pub(crate) fn remove(&mut self, seq: u64) {
@@ -3777,6 +3785,54 @@ impl MultiVectorIndex {
             {
                 self.sealed.push((Arc::new(reader), Arc::new(ids), pq));
             }
+        }
+    }
+
+    /// Points the sealed scan at the chunks a previous process wrote, without
+    /// writing anything. [`Self::seal`] writes the chunks and then keeps their
+    /// readers; a reload (a PLAID chunk opened on `Engine::open`) needs only the
+    /// second half, and it matters for correctness: [`Self::search`] falls
+    /// through to the sealed scan when the PLAID candidates are all excluded by
+    /// a filter, which is exactly what an empty sealed set would turn into an
+    /// empty answer.
+    ///
+    /// `ids` is the live, parseable row list in document order - the same list
+    /// the chunk writer used (`column_docs`), split per segment.
+    pub(crate) fn load_sealed(&mut self, ids: &[u64]) {
+        let Ok(entries) = std::fs::read_dir(&self.dir) else {
+            return;
+        };
+        let mut chunks: Vec<(u64, std::path::PathBuf)> = entries
+            .flatten()
+            .filter_map(|entry| {
+                let path = entry.path();
+                if path.extension().is_none_or(|x| x != "mvec") {
+                    return None;
+                }
+                // `seg_<segment>_<chunk>_<rows>.mvec`, the name `seal` writes.
+                let stem = path.file_stem()?.to_str()?;
+                let segment = stem.strip_prefix("seg_")?.split('_').next()?.parse().ok()?;
+                Some((segment, path))
+            })
+            .collect();
+        chunks.sort();
+        for (segment, path) in chunks {
+            let Ok(reader) = storage::multivector_segment::MultiVectorSegmentReader::open(&path)
+            else {
+                continue;
+            };
+            let segment_ids: Vec<u64> = ids
+                .iter()
+                .copied()
+                .filter(|seq| *seq >> 32 == segment)
+                .collect();
+            // A chunk whose document count no longer matches the live rows was
+            // written before a delete; the PLAID rebuild will rewrite it.
+            if reader.doc_count() != segment_ids.len() {
+                continue;
+            }
+            self.sealed
+                .push((Arc::new(reader), Arc::new(segment_ids), None));
         }
     }
 

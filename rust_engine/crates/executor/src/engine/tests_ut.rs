@@ -4012,6 +4012,21 @@ mod tests {
         }
         let e = Engine::open(dir.path()).unwrap();
         assert_eq!(rows(&e, q).len(), 3);
+        // A filter can exclude every PLAID candidate; the sealed readers loaded
+        // beside PLAID are what keeps such a search answered.
+        let filtered = "SELECT id FROM pr SEARCH MATCH TENSOR \
+                        (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3;filter=id < 5');";
+        let filtered_hits = rows(&e, filtered);
+        assert!(
+            !filtered_hits.is_empty(),
+            "a filtered search lost its fallback"
+        );
+        assert!(
+            filtered_hits
+                .iter()
+                .all(|row| row[0].parse::<i64>().unwrap_or(99) < 5),
+            "the filter was not applied: {filtered_hits:?}"
+        );
         let index = e.multivector_index_for("pr", "t", 4).unwrap();
         let guard = index.read().unwrap();
         assert!(
@@ -4023,11 +4038,134 @@ mod tests {
             guard.plaid.as_ref().is_some_and(|p| p.is_packed_mapped()),
             "the loaded PLAID chunk was copied onto the heap instead of mapped"
         );
+        // The sealed readers are loaded beside PLAID on purpose: they are the
+        // fallback a filtered search needs when PLAID returns no admissible
+        // candidate. Their presence also proves the chunk path ran - a rebuild
+        // would have written new ones from the rows.
+        assert_eq!(
+            guard.sealed.len(),
+            1,
+            "the flushed chunk was not mapped for the sealed fallback"
+        );
         assert!(
-            guard.sealed.is_empty(),
-            "the index was rebuilt from the rows instead of loaded from its chunks"
+            guard
+                .sealed
+                .iter()
+                .all(|(reader, ids, _)| reader.doc_count() == ids.len()),
+            "the restored row ids do not line up with the chunk's documents"
         );
         assert!(!guard.plaid_dropped, "PLAID was left dropped");
+    }
+
+    /// A NULL tensor adds no PLAID document, but the row still has to count as
+    /// *seen*: `is_complete(reserved)` compares the counter with the table's
+    /// live rows, so a row it never advances on would make every search rebuild
+    /// the whole index, PLAID training included.
+    #[test]
+    fn a_null_tensor_row_keeps_the_multivector_index_complete() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE mn (id INT, m MULTIVECTOR(FLOAT,4));")
+            .unwrap();
+        let values: Vec<String> = (0..300)
+            .map(|i| format!("({i}, [[1.0,0.5,0.25,0.125]])"))
+            .collect();
+        e.execute(&format!("INSERT INTO mn VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute("CREATE INDEX mni ON mn (m) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+        let first = e.multivector_index_for("mn", "m", 4).unwrap();
+        e.execute("INSERT INTO mn VALUES (300, NULL);").unwrap();
+        let after = e.multivector_index_for("mn", "m", 4).unwrap();
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &after),
+            "the index was rebuilt although the NULL row was counted as seen"
+        );
+    }
+
+    /// The four `plaid_*` keys reach `plaid_search_options`; the statement's
+    /// option validator runs first and used to reject them as unknown.
+    #[test]
+    fn plaid_search_options_are_accepted_by_the_validator() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE pv (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let values: Vec<String> = (0..300)
+            .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
+            .collect();
+        e.execute(&format!("INSERT INTO pv VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute("CREATE INDEX pvi ON pv (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+        let query = "SELECT id FROM pv SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', \
+                      'topn=3;plaid_n_ivf_probe=32;plaid_centroid_score_threshold=-0.5;\
+                      plaid_n_doc_to_score=300;plaid_n_full_scores=30');";
+        assert_eq!(rows(&e, query).len(), 3);
+    }
+
+    /// A chunk written after a delete covers only the live rows. The restored
+    /// row list has to be that same live population, or the document count
+    /// never matches `doc_num()` and every reopen retrains the index.
+    #[test]
+    fn a_chunk_written_after_a_delete_reopens_without_retraining() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE md (id INT, t TENSOR(FLOAT,4));")
+                .unwrap();
+            let values: Vec<String> = (0..300)
+                .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
+                .collect();
+            e.execute(&format!("INSERT INTO md VALUES {};", values.join(",")))
+                .unwrap();
+            e.execute("CREATE INDEX mdi ON md (t) USING PLAID WITH (n_centroids = 8);")
+                .unwrap();
+            e.flush().unwrap();
+            e.execute("DELETE FROM md WHERE id = 0;").unwrap();
+            // A delete drops the in-memory PLAID index, and the next search
+            // rebuilds it; the following flush then rewrites the chunk from the
+            // live rows (`plaid_chunk` -> `column_docs`), which is the chunk
+            // this test reopens.
+            e.execute(
+                "SELECT id FROM md SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');",
+            )
+            .unwrap();
+            e.flush().unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        let hits = rows(
+            &e,
+            "SELECT id FROM md SEARCH MATCH TENSOR \
+             (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');",
+        );
+        assert!(
+            !hits.iter().any(|row| row[0] == "0"),
+            "the deleted row was scored after the reopen"
+        );
+        let index = e.multivector_index_for("md", "t", 4).unwrap();
+        let guard = index.read().unwrap();
+        assert!(guard.plaid.is_some(), "PLAID was not restored");
+        // The restored id lists have to line up with the chunks that carry
+        // them; a tombstoned row in the list would shift every later id.
+        assert!(
+            guard
+                .sealed
+                .iter()
+                .all(|(reader, ids, _)| reader.doc_count() == ids.len()),
+            "the sealed fallback was loaded with a stale row list"
+        );
+        assert_eq!(
+            guard.plaid_seqs.len(),
+            guard
+                .plaid
+                .as_ref()
+                .map(|p| p.doc_num() as usize)
+                .unwrap_or(0),
+            "the restored document ids do not cover the loaded index"
+        );
     }
 
     /// `IndexOptions`' PLAID knobs: the reference's defaults

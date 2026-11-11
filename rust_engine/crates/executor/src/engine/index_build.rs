@@ -248,6 +248,35 @@ impl Engine {
                 (pos, ty)
             }
         };
+        // The tail is registered *before* the scan, not after: a row committed
+        // while the scan runs must land somewhere, and the write hook can only
+        // put it in a tail that already exists. `base` is the first row id the
+        // hook owns from here on; everything below it is what this scan is
+        // about to write into the chunks, so the scan skips the rest rather
+        // than racing it. (The reference relies on transaction conflict
+        // detection for this; this port has none yet.)
+        //
+        // Registering first also makes the build's coverage exact: no row can
+        // be in neither the chunks nor the tail, because a row is either
+        // allocated before `base` (and therefore on disk when the scan reads)
+        // or after it (and therefore seen by the hook).
+        // `next_row_seq` reads the table's own layout rather than
+        // `row_counter`: only the `INSERT` path maintains that counter, so an
+        // import leaves it behind and it would cut the scan short.
+        let base = self.next_row_seq(table)? as u64;
+        {
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(tkey.clone()).or_default();
+            entry.secondary.disk_backed.insert(column.to_string());
+            entry
+                .secondary
+                .declared_types
+                .insert(column.to_string(), type_upper.clone());
+            entry
+                .secondary
+                .indexes
+                .insert(column.to_string(), Arc::new(SecondaryIndex::new()));
+        }
         // One row's indexed value: the cell itself, or `func(cell)` for a
         // functional index. A NULL has no key (`InsertInner` skips it).
         let evaluate = |row: &[Value]| -> Option<Value> {
@@ -276,11 +305,6 @@ impl Engine {
         let int_column = key_domain(&type_upper) == KeyDomain::Integer;
         let key_kind = secondary_key_kind(&type_upper);
         let low_card = self.secondary_low_cardinality(table, column, &type_upper);
-        // The highest row id this build read. Anything above it was appended
-        // while the build was running and is in neither the chunks written
-        // below nor the tail that replaces them; `secondary_catch_up` appends
-        // those rows to the tail once it is registered.
-        let mut hwm = 0usize;
         if low_card {
             // `SecondaryIndexDataLowCardinalityT`: unique keys, each with one
             // bitmap of segment offsets (`secondary_index_data_impl.cpp:284`).
@@ -289,7 +313,11 @@ impl Engine {
             let mut grouped: HashMap<u64, std::collections::BTreeMap<Vec<u8>, Vec<u32>>> =
                 HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
-                hwm = hwm.max(seq);
+                // Rows from `base` on belong to the tail the write hook is
+                // feeding; the chunks below cover the ones before it.
+                if seq as u64 >= base {
+                    continue;
+                }
                 let Some(value) = evaluate(&row) else {
                     continue;
                 };
@@ -325,7 +353,11 @@ impl Engine {
         } else if int_column {
             let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
-                hwm = hwm.max(seq);
+                // Rows from `base` on belong to the tail the write hook is
+                // feeding; the chunks below cover the ones before it.
+                if seq as u64 >= base {
+                    continue;
+                }
                 let Some(Value::Int(v)) = evaluate(&row) else {
                     continue;
                 };
@@ -344,7 +376,11 @@ impl Engine {
             // ordered day (or day+second) count, also raw.
             let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
-                hwm = hwm.max(seq);
+                // Rows from `base` on belong to the tail the write hook is
+                // feeding; the chunks below cover the ones before it.
+                if seq as u64 >= base {
+                    continue;
+                }
                 let key = match key_kind {
                     KeyKind::F32 | KeyKind::F64 => {
                         let value = match evaluate(&row) {
@@ -385,7 +421,11 @@ impl Engine {
             // reference's `std::hash<std::string_view>` (`ConvertToOrderedKeyValue`).
             let mut by_segment: HashMap<u64, Vec<(Key, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
-                hwm = hwm.max(seq);
+                // Rows from `base` on belong to the tail the write hook is
+                // feeding; the chunks below cover the ones before it.
+                if seq as u64 >= base {
+                    continue;
+                }
                 let Some(value) = evaluate(&row) else {
                     continue;
                 };
@@ -397,95 +437,10 @@ impl Engine {
             }
             self.write_secondary_pgm_chunks(table, column, KeyKind::U64, by_segment);
         }
-        // The memory map is only the tail written since the last dump. The tail
-        // this replaces holds rows the chunks above already cover (they were in
-        // the table when the scan ran), so dropping it loses nothing; rows
-        // appended during the scan are picked up below, after the new tail is
-        // registered and the write hook can maintain it again.
-        {
-            let mut tables = self.tables.lock().unwrap();
-            let entry = tables.entry(tkey).or_default();
-            entry.secondary.disk_backed.insert(column.to_string());
-            entry
-                .secondary
-                .declared_types
-                .insert(column.to_string(), type_upper.clone());
-            entry
-                .secondary
-                .indexes
-                .insert(column.to_string(), Arc::new(SecondaryIndex::new()));
-        }
-        self.secondary_catch_up(table, column, hwm + 1, &schema);
+        // The tail registered before the scan is deliberately left alone: it
+        // holds every row the write hook saw while the chunks above were being
+        // written, and replacing it here would drop exactly those rows.
         Ok(())
-    }
-
-    /// Rows appended while [`Self::build_index`] was scanning.
-    ///
-    /// The build reads the table without excluding writers: the reference
-    /// relies on its transaction conflict detection, which this port does not
-    /// have yet. A row committed after the scan read the table is covered by
-    /// neither the chunks the build wrote nor the tail it just registered - the
-    /// write hook could not put it there, because the index was not registered
-    /// while it was being built. Those rows are appended to the tail here, which
-    /// is the channel the write path maintains from now on, so a truncated
-    /// chunk set no longer means silently missing rows.
-    ///
-    /// `insert` is not idempotent, and a row that arrives *after* the tail is
-    /// registered is already in it, so a row whose first key already lists its
-    /// id is skipped. A tombstoned row contributes nothing.
-    fn secondary_catch_up(&self, table: &str, column: &str, from: usize, schema: &[String]) {
-        let Ok(rows) = self.fetch_rows_including_deleted_from(table, from) else {
-            return;
-        };
-        if rows.is_empty() {
-            return;
-        }
-        let tkey = self.table_key(table);
-        let (index, declared, func, pos) = {
-            let tables = self.tables.lock().unwrap();
-            let Some(entry) = tables.get(&tkey) else {
-                return;
-            };
-            let Some(index) = entry.secondary.indexes.get(column).cloned() else {
-                return;
-            };
-            let Some(declared) = entry.secondary.declared_types.get(column).cloned() else {
-                return;
-            };
-            let (pos, func) = match entry.secondary.functional.get(column) {
-                Some(functional) => match schema.iter().position(|c| c == &functional.base) {
-                    Some(pos) => (pos, Some(functional.func.clone())),
-                    None => return,
-                },
-                None => match schema.iter().position(|c| c == column) {
-                    Some(pos) => (pos, None),
-                    None => return,
-                },
-            };
-            (index, declared, func, pos)
-        };
-        let dead = self.tombstone_set(table).unwrap_or_default();
-        for (seq, values) in rows {
-            if dead.contains(&(seq as u64)) {
-                continue;
-            }
-            let Some(value) = values.get(pos) else {
-                continue;
-            };
-            let keys = match &func {
-                None => value_to_tail_keys(&declared, value),
-                Some(func) => match functional_value(func, pos, &values) {
-                    Some(value) => value_to_key(&declared, &value),
-                    None => Vec::new(),
-                },
-            };
-            if keys.is_empty() || index.contains(&keys[0], seq as u64) {
-                continue;
-            }
-            for key in keys {
-                index.insert(&key, seq as u64);
-            }
-        }
     }
 
     /// Reloads the HNSW/IVF chunk readers after new chunks were written, so a

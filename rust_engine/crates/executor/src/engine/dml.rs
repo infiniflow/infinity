@@ -1462,6 +1462,12 @@ impl Engine {
             }
             let mut index = shared.write().unwrap();
             index.remove(seq as u64);
+            // The row is seen whether or not it carries a tensor. A NULL cell
+            // adds no PLAID document, but the coverage counter has to advance
+            // anyway: `is_complete(reserved)` compares it with the table's live
+            // rows, and a row it never counts keeps every later search
+            // rebuilding the index from scratch.
+            index.note_row();
             let Some(text) = cells.get(ci) else { continue };
             if let Some(doc) = parse_multivector_doc(text, dims) {
                 index.insert(seq as u64, doc);

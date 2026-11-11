@@ -3389,8 +3389,12 @@ impl Engine {
                         self.mv_smve_config(table, column),
                         self.mv_emvb_config(table, column),
                     );
-                    index.plaid_seqs = seqs;
                     index.scanned_rows = reserved;
+                    // The sealed scan is the fallback when a filter excludes
+                    // every PLAID candidate; without the readers a filtered
+                    // search would answer nothing at all.
+                    index.load_sealed(&seqs);
+                    index.plaid_seqs = seqs;
                     index.plaid = Some(loaded);
                     let shared = Arc::new(std::sync::RwLock::new(index));
                     self.tables
@@ -3498,10 +3502,15 @@ impl Engine {
 
     /// The row ids whose tensor parses, ascending: the document order a PLAID
     /// chunk was written in (`plaid_chunk` -> `column_docs`).
+    ///
+    /// `fetch_rows_with_ids` is the *live* population, which is what the chunk
+    /// writer reads: a tombstoned row is not in a chunk, so listing it here
+    /// would make the count disagree with `doc_num()` and every reopen would
+    /// retrain the index instead of mapping it.
     fn multivector_row_ids(&self, table: &str, ci: usize, dims: usize) -> Result<Vec<u64>> {
         let mut out = Vec::new();
-        for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
-            let text = match cells.get(ci) {
+        for (seq, row) in self.fetch_rows_with_ids(table)? {
+            let text = match row.get(ci) {
                 Some(Value::Str(s)) => s.clone(),
                 Some(other) => other.to_slt_string(),
                 None => continue,
@@ -7366,6 +7375,13 @@ impl Engine {
                         // not prune on them yet.
                         | "emvb_threshold_first"
                         | "emvb_threshold_final"
+                        // `plaid_search_options` reads these four; an override
+                        // the reference would reject keeps the default, so they
+                        // have to reach it instead of failing here.
+                        | "plaid_n_ivf_probe"
+                        | "plaid_centroid_score_threshold"
+                        | "plaid_n_doc_to_score"
+                        | "plaid_n_full_scores"
                 );
                 if !known {
                     return Err(Error::Invalid(format!(
